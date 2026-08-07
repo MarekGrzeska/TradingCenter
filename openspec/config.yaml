@@ -1,4 +1,4 @@
-schema: spec-driven
+schema: spec-driven-reviewed
 
 context: |
   Language: OpenSpec artifacts in this project are written in POLISH prose.
