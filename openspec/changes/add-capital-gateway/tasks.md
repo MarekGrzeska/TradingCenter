@@ -30,7 +30,7 @@
 
 ## 5. Głęboka historia
 
-- [ ] 5.1 Napisać `history.py`: stronicowanie wstecz, szerokość okna `(liczba − 1) × rozdzielczość`, `from`/`to` jako `YYYY-MM-DDTHH:MM:SS` UTC
+- [x] 5.1 Napisać `history.py`: stronicowanie wstecz, szerokość okna `(liczba − 1) × rozdzielczość`, `from`/`to` jako `YYYY-MM-DDTHH:MM:SS` UTC
 - [ ] 5.2 Kotwiczyć każde kolejne okno na najstarszej pobranej świecy, a nie na zegarze
 - [ ] 5.3 Zatrzymywać się na `error.prices.not-found`, na oknie niedającym nic starszego albo na żądanej liczbie; sortować, usuwać duplikaty po znaczniku czasu, przycinać do żądania
 - [ ] 5.4 Przestać wysyłać żądania do providera, gdy wywołujący się rozłączy
