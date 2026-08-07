@@ -38,23 +38,23 @@
 
 ## 3. Warstwa danych — implementacje
 
-- [ ] 3.1 Zaimplementować adapter gatewaya: `searchInstruments`, `listInstruments` (z flagą
+- [x] 3.1 Zaimplementować adapter gatewaya: `searchInstruments`, `listInstruments` (z flagą
       `truncated`), `history` przez `GET /instruments/{symbol}/history`
-- [ ] 3.2 Odwzorować błędy gatewaya na błędy nazywające przyczynę — nieznany symbol,
+- [x] 3.2 Odwzorować błędy gatewaya na błędy nazywające przyczynę — nieznany symbol,
       nieobsługiwana rozdzielczość, źródło nieosiągalne; żaden komunikat nie niesie poświadczeń
-- [ ] 3.3 Zaimplementować hub gniazd z liczeniem referencji po kluczu `symbol|resolution`:
+- [x] 3.3 Zaimplementować hub gniazd z liczeniem referencji po kluczu `symbol|resolution`:
       pierwszy odbiorca otwiera, kolejni dzielą, ostatni zamyka; testy na współdzieleniu i
       zamknięciu
-- [ ] 3.4 Dodać wznawianie z rosnącym odstępem i rozrzutem, sufit 30 s, oraz publikowanie stanu
+- [x] 3.4 Dodać wznawianie z rosnącym odstępem i rozrzutem, sufit 30 s, oraz publikowanie stanu
       połączenia; test harmonogramu na sterowanym zegarze
-- [ ] 3.5 Dociągać lukę po wznowieniu: po powrocie połączenia odczytać ostatnie świece i scalić je
+- [x] 3.5 Dociągać lukę po wznowieniu: po powrocie połączenia odczytać ostatnie świece i scalić je
       z serią
-- [ ] 3.6 Zaimplementować źródło mock: deterministyczne ziarno z symbolu, błądzenie losowe, świece
+- [x] 3.6 Zaimplementować źródło mock: deterministyczne ziarno z symbolu, błądzenie losowe, świece
       historyczne i tykanie na żywo z flagą `forming`; test na powtarzalności serii
-- [ ] 3.7 Budować adresy z `VITE_GATEWAY_HTTP` i `VITE_GATEWAY_WS` niezależnie, przyjmując ścieżkę
+- [x] 3.7 Budować adresy z `VITE_GATEWAY_HTTP` i `VITE_GATEWAY_WS` niezależnie, przyjmując ścieżkę
       względną i pełny URL; ścieżka względna dla strumienia rozwija się na `ws`/`wss` zgodnie ze
       schematem strony. Test na obu kształtach — inaczej rozjazd wyjdzie dopiero przy wdrożeniu
-- [ ] 3.8 Wystawić wybór źródła (`gateway` / `mock`) jako stan aplikacji na `useSyncExternalStore`,
+- [x] 3.8 Wystawić wybór źródła (`gateway` / `mock`) jako stan aplikacji na `useSyncExternalStore`,
       z wartością początkową ze zmiennej środowiskowej
 
 ## 4. Powłoka terminala
