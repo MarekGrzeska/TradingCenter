@@ -18,18 +18,11 @@ export const RESOLUTIONS = [
 
 export type Resolution = (typeof RESOLUTIONS)[number];
 
-/** Seconds in one period, for resolutions where that is even well-defined.
- *  DAY and WEEK are deliberately absent: a daily candle starts at the venue's
- *  session open, not UTC midnight, so only a source may decide that boundary —
- *  see design.md, Risks: "`DAY` i `WEEK` nie mają stałej długości okresu." */
-export const FIXED_RESOLUTION_SECONDS: Readonly<Partial<Record<Resolution, number>>> = {
-  MINUTE: 60,
-  MINUTE_5: 300,
-  MINUTE_15: 900,
-  MINUTE_30: 1800,
-  HOUR: 3600,
-  HOUR_4: 14400,
-};
+// Deliberately absent: a per-resolution period length. Nothing here needs to
+// know how long a candle lasts — timestamps come from the source, and a daily
+// candle starts at the venue's session open rather than UTC midnight, so
+// computing one locally would be wrong exactly where it mattered. See
+// design.md, Risks: "`DAY` i `WEEK` nie mają stałej długości okresu."
 
 export type AssetClass =
   | "SHARES"

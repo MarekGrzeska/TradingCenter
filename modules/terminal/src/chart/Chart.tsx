@@ -65,7 +65,13 @@ export function Chart({
   const barsRef = useRef<Bar[]>([]);
 
   const [readout, setReadout] = useState<Readout | null>(null);
-  const [lastIsForming, setLastIsForming] = useState(false);
+  // The newest bar, mirrored into state on purpose. Reading `barsRef` during
+  // render looks cheaper but silently freezes the header: while a candle is
+  // forming nothing else about this component's state changes, so React has no
+  // reason to re-render and the numbers stop following the market. Coalesced to
+  // one write per frame, the same way the crosshair readout is.
+  const [latestBar, setLatestBar] = useState<Bar | null>(null);
+  const latestFrameRef = useRef(0);
 
   // --- the chart instance itself: created once, never on data change ---
   useLayoutEffect(() => {
@@ -118,6 +124,21 @@ export function Chart({
     };
   }, []);
 
+  const publishLatestBar = useCallback(() => {
+    if (latestFrameRef.current) return;
+    latestFrameRef.current = requestAnimationFrame(() => {
+      latestFrameRef.current = 0;
+      setLatestBar(barsRef.current.at(-1) ?? null);
+    });
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (latestFrameRef.current) cancelAnimationFrame(latestFrameRef.current);
+    },
+    [],
+  );
+
   // --- crosshair readout, coalesced to one state write per frame ---
   useEffect(() => {
     const chart = chartRef.current;
@@ -163,7 +184,7 @@ export function Chart({
     barsRef.current = merged;
     seriesRef.current?.setData(merged.map(toCandlestick));
     chartRef.current?.timeScale().fitContent();
-    setLastIsForming(merged.at(-1)?.forming ?? false);
+    setLatestBar(merged.at(-1) ?? null);
     setReadout(null);
   }, []);
 
@@ -181,8 +202,8 @@ export function Chart({
       // construction: only after a dropped stream.
       seriesRef.current?.setData(barsRef.current.map(toCandlestick));
     }
-    setLastIsForming(barsRef.current.at(-1)?.forming ?? false);
-  }, []);
+    publishLatestBar();
+  }, [publishLatestBar]);
 
   const sink: BarSink = useMemo(
     () => ({ onHistory: applyHistory, onBar: applyBar }),
@@ -198,16 +219,14 @@ export function Chart({
     barsRef.current = [];
     seriesRef.current?.setData([]);
     setReadout(null);
-    setLastIsForming(false);
+    setLatestBar(null);
   }, [source, symbol, resolution]);
 
   const feed = useBarFeed(source, symbol, resolution, sink);
 
   const shown: Readout | null =
-    readout ??
-    (barsRef.current.length > 0
-      ? { bar: barsRef.current[barsRef.current.length - 1], hovered: false }
-      : null);
+    readout ?? (latestBar ? { bar: latestBar, hovered: false } : null);
+  const lastIsForming = latestBar?.forming ?? false;
 
   const staleStream = feed.streamState === "reconnecting" || feed.streamState === "closed";
 

@@ -30,7 +30,6 @@ interface HubEntry {
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   lastBarTime: number | null;
   everConnected: boolean;
-  refused: boolean;
   torndown: boolean;
 }
 
@@ -83,7 +82,6 @@ export class SocketHub {
         reconnectTimer: null,
         lastBarTime: null,
         everConnected: false,
-        refused: false,
         torndown: false,
       };
       this.entries.set(key, entry);
@@ -138,7 +136,6 @@ export class SocketHub {
     socket.onclose = (event) => {
       if (entry.torndown) return;
       if (event.code === REFUSAL_CLOSE_CODE) {
-        entry.refused = true;
         entry.state = "closed";
         this.broadcast(entry, {
           kind: "error",

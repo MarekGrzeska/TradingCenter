@@ -172,7 +172,9 @@ describe("Chart — live bars", () => {
     await act(async () => {
       source.emit({ kind: "bar", bar: bar(100, 1.2, false) });
     });
-    expect(screen.queryByText(/forming/i)).not.toBeInTheDocument();
+    // Live bars reach the header on the next animation frame, so the badge
+    // clears a frame after the canvas does.
+    await waitFor(() => expect(screen.queryByText(/forming/i)).not.toBeInTheDocument());
   });
 
   it("shows a missing volume as unavailable, never as zero", async () => {
@@ -291,5 +293,25 @@ describe("Chart — subscription lifecycle", () => {
 
     const series = stub.latest().series[0];
     expect(series.data().map((c) => c.time)).toEqual([3600]);
+  });
+});
+
+describe("Chart — header readout freshness", () => {
+  it("follows the forming candle as it moves within one period", async () => {
+    renderChart(source);
+    await act(async () => {
+      source.resolveHistory(0, [bar(100, 50, true)]);
+    });
+    // `bar(t, c)` puts high at c+1, which is unique in the readout.
+    await waitFor(() => expect(screen.getByText("51")).toBeInTheDocument());
+
+    // Same period, price moved. `forming` does not change, so nothing else
+    // about the component's state does either — which is exactly how the
+    // header used to freeze while the canvas kept moving.
+    await act(async () => {
+      source.emit({ kind: "bar", bar: bar(100, 60, true) });
+    });
+
+    await waitFor(() => expect(screen.getByText("61")).toBeInTheDocument());
   });
 });
