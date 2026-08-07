@@ -12,9 +12,15 @@ documentation:
 
 from __future__ import annotations
 
+from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 
-from .dtos import Resolution
+from .dtos import Candle, CandleHistory, Resolution
+
+# What the provider answers once a window falls past an instrument's oldest candle. It
+# is the end of the data, not a failure, and the difference matters: treating it as an
+# error throws away everything already collected.
+HISTORY_EXHAUSTED = "error.prices.not-found"
 
 MAX_BARS_PER_REQUEST = 1000
 
@@ -66,3 +72,70 @@ def page_size(bars: int) -> int:
 def window_before(anchor: datetime, resolution: Resolution, bars: int) -> tuple[str, str]:
     """The `from`/`to` pair for the page immediately older than ``anchor``."""
     return iso_utc(anchor - timedelta(seconds=window_seconds(resolution, bars))), iso_utc(anchor)
+
+
+# Returns the page, or None once the instrument has no data older than the window —
+# which the provider reports as an error and this module treats as an ending.
+FetchPage = Callable[[str | None, str | None, int], Awaitable[list[Candle] | None]]
+
+
+async def collect(
+    symbol: str,
+    resolution: Resolution,
+    bars: int,
+    fetch_page: FetchPage,
+) -> CandleHistory:
+    """Page backwards until ``bars`` candles are held, or the instrument runs out.
+
+    ``fetch_page(date_from, date_to, limit)`` is injected rather than taken from a
+    client, so the paging rules can be tested without a transport underneath them.
+
+    The cursor is the oldest candle actually collected, never the clock. A window
+    derived from the calendar drifts: ask for 1000 five-minute candles ending Monday and
+    the weekend hands back a couple of hundred, so a clock-stepped cursor would skip the
+    days it assumed were there. Anchoring on data costs one more request instead.
+    """
+    per_request = page_size(bars)
+    collected: list[Candle] = []
+    requests = 0
+    cursor: datetime | None = None
+    history_ended = False
+
+    while len(collected) < bars:
+        date_from, date_to = (
+            window_before(cursor, resolution, per_request) if cursor else (None, None)
+        )
+        requests += 1
+        page = await fetch_page(date_from, date_to, per_request)
+
+        # None is the provider's error.prices.not-found; an empty page is a window that
+        # simply held no candles. Both mean there is nothing further back to ask for.
+        if not page:
+            history_ended = True
+            break
+
+        oldest = parse_candle_ts(page[0].ts)
+        collected.extend(page)
+        # No progress: the window returned nothing older than what we already hold, so
+        # another identical request would return the same thing forever.
+        if cursor is not None and oldest >= cursor:
+            history_ended = True
+            break
+        cursor = oldest
+
+    # Pages overlap at their edges, and a consumer charting this needs time strictly
+    # increasing and unique.
+    collected.sort(key=lambda c: c.ts)
+    unique = [c for i, c in enumerate(collected) if i == 0 or c.ts != collected[i - 1].ts]
+    trimmed = unique[-bars:]
+
+    return CandleHistory(
+        candles=trimmed,
+        count=len(trimmed),
+        requested=bars,
+        requests=requests,
+        resolution=resolution,
+        first_ts=trimmed[0].ts if trimmed else None,
+        last_ts=trimmed[-1].ts if trimmed else None,
+        history_ended=history_ended and len(trimmed) < bars,
+    )

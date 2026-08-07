@@ -11,11 +11,12 @@ import asyncio
 
 import httpx
 
-from . import mapping
+from . import history, mapping
 from .client import CapitalClient
 from .dtos import (
     Account,
     Candle,
+    CandleHistory,
     Capabilities,
     Instrument,
     InstrumentPage,
@@ -133,6 +134,39 @@ class CapitalAdapter:
             raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
         data = self._json_ok(resp)
         return [mapping.candle_from_price(p, resolution) for p in data.get("prices", [])]
+
+    async def get_history(
+        self, symbol: str, resolution: Resolution, bars: int
+    ) -> CandleHistory:
+        """Candles further back than one request reaches.
+
+        The paging rules live in ``history``; this supplies the one page fetch and the
+        judgement of what the provider's refusals mean.
+        """
+
+        async def fetch_page(
+            date_from: str | None, date_to: str | None, limit: int
+        ) -> list[Candle] | None:
+            resp = await self._c.prices(
+                symbol, resolution.value, limit, date_from=date_from, date_to=date_to
+            )
+            if resp.status_code == 404:
+                raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
+            if not resp.is_success:
+                try:
+                    payload = resp.json()
+                except ValueError:
+                    payload = {}
+                # The bottom of this instrument's history — an ending, not a failure.
+                # Raising here would discard every page already collected.
+                if payload.get("errorCode") == history.HISTORY_EXHAUSTED:
+                    return None
+                raise GatewayError(f"capital.com {resp.status_code}: {resp.text[:200]}")
+            return [
+                mapping.candle_from_price(p, resolution) for p in resp.json().get("prices", [])
+            ]
+
+        return await history.collect(symbol, resolution, bars, fetch_page)
 
     # --- trading ---
 
