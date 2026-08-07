@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Query, Request
+from fastapi import Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -84,8 +84,8 @@ def adapter(request: Request) -> CapitalAdapter:
     return request.app.state.adapter
 
 
-def hub(request: Request) -> Hub:
-    return request.app.state.hub
+def hub(websocket: WebSocket) -> Hub:
+    return websocket.app.state.hub
 
 
 @app.get("/", tags=["meta"])
@@ -210,3 +210,48 @@ async def working_orders(a: CapitalAdapter = Depends(adapter)):
 @app.delete("/working-orders/{order_id}", tags=["trading"], response_model=Order)
 async def cancel_working_order(order_id: str, a: CapitalAdapter = Depends(adapter)):
     return await a.cancel_working_order(order_id)
+
+
+# --- streaming ---
+#
+# Not described by the OpenAPI schema — OpenAPI has no vocabulary for WebSocket
+# payloads. The message shapes are pydantic models in stream/messages.py and are
+# documented in the module README.
+
+
+@app.websocket("/ws/stream")
+async def stream(websocket: WebSocket, the_hub: Hub = Depends(hub)) -> None:
+    """Live candles and quotes for one symbol at one resolution.
+
+    Sends `candle` (forming and settled), `quote`, `status` and `error`. Reads nothing:
+    the subscription is the query string, so there is no client protocol to get wrong.
+    """
+    symbol = (websocket.query_params.get("symbol") or "").strip().upper()
+    raw_resolution = websocket.query_params.get("resolution") or Resolution.MINUTE_5.value
+
+    if not symbol:
+        # Refused before accepting. Accepting and then closing would look to a client
+        # like a feed that died rather than a request that was wrong.
+        await websocket.close(code=1008, reason="symbol is required")
+        return
+    try:
+        resolution = Resolution(raw_resolution)
+    except ValueError:
+        await websocket.close(code=1008, reason=f"unknown resolution {raw_resolution!r}")
+        return
+
+    await websocket.accept()
+
+    async def send(message) -> None:
+        await websocket.send_json(message.model_dump(mode="json"))
+
+    await the_hub.subscribe(symbol, resolution, send)
+    try:
+        # Nothing to read, but the receive keeps the connection open and is how a
+        # disconnect is noticed — without it the handler returns and the socket closes.
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    finally:
+        await the_hub.unsubscribe(symbol, resolution, send)
