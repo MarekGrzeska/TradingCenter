@@ -1,0 +1,9 @@
+# Redundant with the repo root .gitignore, kept here so this directory is
+# self-contained if copied out on its own - see docs/architecture.md.
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example

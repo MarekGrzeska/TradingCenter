@@ -1,25 +1,25 @@
 ## 1. Szkielet modułu
 
-- [ ] 1.1 Założyć `modules/terminal/` z `package.json`, `tsconfig.json`, `vite.config.ts`,
+- [x] 1.1 Założyć `modules/terminal/` z `package.json`, `tsconfig.json`, `vite.config.ts`,
       `index.html` i `.gitignore`; React + TypeScript, pnpm, wersja biblioteki wykresu przypięta
       dokładnie
-- [ ] 1.2 Wpiąć Tailwind v4 przez plugin Vite i zdefiniować w `@theme` tokeny: tła, powierzchnie,
+- [x] 1.2 Wpiąć Tailwind v4 przez plugin Vite i zdefiniować w `@theme` tokeny: tła, powierzchnie,
       obramowania, tekst, akcent, kolor wzrostu i spadku; ciemny motyw jako domyślny
-- [ ] 1.3 Skonfigurować w `vite.config.ts` proxy `/api` i `/ws` na `http://localhost:8010`,
+- [x] 1.3 Skonfigurować w `vite.config.ts` proxy `/api` i `/ws` na `http://localhost:8010`,
       z podnoszeniem WebSocketa; `.env.example` z `VITE_GATEWAY_HTTP=/api` i `VITE_GATEWAY_WS=/ws`
       oraz komentarzem, że oba przyjmują też pełny URL
-- [ ] 1.4 Ustawić `vitest` z `@testing-library/react` i `msw`; skrypty `dev`, `build`, `test`,
+- [x] 1.4 Ustawić `vitest` z `@testing-library/react` i `msw`; skrypty `dev`, `build`, `test`,
       `lint`, `typecheck` w `package.json`
-- [ ] 1.5 Potwierdzić, że `pnpm install && pnpm dev` podnosi pustą stronę w świeżo skopiowanym
+- [x] 1.5 Potwierdzić, że `pnpm install && pnpm dev` podnosi pustą stronę w świeżo skopiowanym
       katalogu, bez niczego z reszty repozytorium
-- [ ] 1.6 Napisać `scripts/dev.ps1` w korzeniu repozytorium: podnosi `capital-gateway` na porcie
+- [x] 1.6 Napisać `scripts/dev.ps1` w korzeniu repozytorium: podnosi `capital-gateway` na porcie
       8010 i terminal jednym poleceniem, oznacza logi obu źródeł prefiksem i ubija oba przy
       przerwaniu, nie zostawiając osieroconego procesu na porcie
-- [ ] 1.7 Skrypt sprawdza warunki przed startem — `uv` i `pnpm` na ścieżce, istnienie
+- [x] 1.7 Skrypt sprawdza warunki przed startem — `uv` i `pnpm` na ścieżce, istnienie
       `modules/capital-gateway/.env` — i mówi wprost, czego brakuje, zamiast paść w połowie
-- [ ] 1.8 Skrypt czeka, aż gateway odpowie na `/capabilities`, zanim uzna start za udany, i wypisze
+- [x] 1.8 Skrypt czeka, aż gateway odpowie na `/capabilities`, zanim uzna start za udany, i wypisze
       oba adresy: terminal i Swagger gatewaya
-- [ ] 1.9 Zostawić skrypt wyłącznie wygodą: oba moduły dają się uruchomić osobno własnymi
+- [x] 1.9 Zostawić skrypt wyłącznie wygodą: oba moduły dają się uruchomić osobno własnymi
       poleceniami i żaden nie zależy od jego istnienia; zapisać to w `README.md` repozytorium
 
 ## 2. Warstwa danych — kontrakt i normalizacja

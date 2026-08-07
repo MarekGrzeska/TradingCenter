@@ -30,6 +30,17 @@ docs/       architecture and reference
 - **Python 3.12** (`uv`, `ruff`, `pytest`) — services, data, agents, scripts.
 - **React + TypeScript** (`Vite`, `pnpm`) — the terminal, when it exists.
 
+## Local development
+
+Every module starts on its own with its own documented command. `scripts/dev.ps1` is a
+convenience wrapper for testing `capital-gateway` and `terminal` together: it starts both,
+waits for the gateway to answer, prints both addresses, and stops both on Ctrl+C. Neither
+module depends on it.
+
+```powershell
+./scripts/dev.ps1
+```
+
 ## Workflow
 
 | Situation | Command |
