@@ -153,6 +153,10 @@ export function createGatewaySource(httpBase: string, wsBase: string): MarketDat
 
     history,
 
+    async ping(signal) {
+      await fetchJson(`${httpBase}/capabilities`, signal);
+    },
+
     subscribe(symbol, resolution, sink) {
       return hub.subscribe(symbol, resolution, sink);
     },

@@ -44,12 +44,19 @@ export interface GatewayEndpoints {
   wsBase: string;
 }
 
+// Same defaults as .env.example — a missing .env (a fresh checkout that
+// hasn't copied it yet, or a test/CI environment with no env file at all)
+// must fall back to "talk to the dev proxy", not crash the moment a gateway
+// source is built.
+const DEFAULT_HTTP_BASE = "/api";
+const DEFAULT_WS_BASE = "/ws";
+
 export function resolveGatewayEndpoints(
-  env: { VITE_GATEWAY_HTTP: string; VITE_GATEWAY_WS: string } = import.meta.env,
+  env: { VITE_GATEWAY_HTTP?: string; VITE_GATEWAY_WS?: string } = import.meta.env,
   loc: Pick<Location, "protocol" | "host"> = window.location,
 ): GatewayEndpoints {
   return {
-    httpBase: resolveHttpBase(env.VITE_GATEWAY_HTTP),
-    wsBase: resolveWsBase(env.VITE_GATEWAY_WS, loc),
+    httpBase: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_HTTP_BASE),
+    wsBase: resolveWsBase(env.VITE_GATEWAY_WS || DEFAULT_WS_BASE, loc),
   };
 }

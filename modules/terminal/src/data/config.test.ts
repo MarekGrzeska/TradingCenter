@@ -65,4 +65,9 @@ describe("resolveGatewayEndpoints", () => {
       wsBase: "wss://gateway.example.com/ws",
     });
   });
+
+  it("falls back to /api and /ws when the env vars are unset, instead of throwing", () => {
+    const endpoints = resolveGatewayEndpoints({}, { protocol: "http:", host: "localhost:5173" });
+    expect(endpoints).toEqual({ httpBase: "/api", wsBase: "ws://localhost:5173/ws" });
+  });
 });

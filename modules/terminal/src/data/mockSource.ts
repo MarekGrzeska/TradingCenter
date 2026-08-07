@@ -241,6 +241,10 @@ export function createMockSource(now: () => number = Date.now): MarketDataSource
       return generateHistory(request.symbol, request.resolution, request.count, Math.floor(now() / 1000));
     },
 
+    async ping() {
+      // No network — a mock source is reachable by definition.
+    },
+
     subscribe(symbol, resolution, sink) {
       const key = `${symbol}|${resolution}`;
       let entry = entries.get(key);

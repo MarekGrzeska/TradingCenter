@@ -59,18 +59,21 @@
 
 ## 4. Powłoka terminala
 
-- [ ] 4.1 Wprowadzić rejestr zakładek — nazwa, ścieżka, widok — i wyprowadzić z niego routing
+- [x] 4.1 Wprowadzić rejestr zakładek — nazwa, ścieżka, widok — i wyprowadzić z niego routing
       oraz pasek nawigacji; wpisy `Positions`, `Orders`, `Account` oznaczone jako przygotowane
       na przyszłość
-- [ ] 4.2 Zbudować layout: pasek górny z nazwą, przełącznikiem źródła i wskaźnikiem połączenia,
+- [x] 4.2 Zbudować layout: pasek górny z nazwą, przełącznikiem źródła i wskaźnikiem połączenia,
       pasek zakładek, obszar treści na pełną wysokość
-- [ ] 4.3 Dodać stronę nieznanego adresu z drogą powrotną oraz widok „ta zakładka jeszcze nie
+- [x] 4.3 Dodać stronę nieznanego adresu z drogą powrotną oraz widok „ta zakładka jeszcze nie
       działa" dla wpisów przygotowanych na przyszłość
-- [ ] 4.4 Dodać granicę błędu obejmującą pojedynczy widok, z komunikatem i ponowieniem, tak żeby
+- [x] 4.4 Dodać granicę błędu obejmującą pojedynczy widok, z komunikatem i ponowieniem, tak żeby
       awaria jednego nie gasiła reszty terminala
-- [ ] 4.5 Podpiąć wskaźnik stanu źródła do huba i do odczytów HTTP — cisza na strumieniu ma
-      wyglądać inaczej niż stojący rynek
-- [ ] 4.6 Testy powłoki: przejście między zakładkami zmienia adres, wejście z adresu wprost
+- [x] 4.5 Podpiąć wskaźnik stanu źródła do huba i do odczytów HTTP — cisza na strumieniu ma
+      wyglądać inaczej niż stojący rynek. Zaimplementowane jako niezależny od aktywnych
+      subskrypcji `ping()` na źródle (MarketDataSource), odpytywany cyklicznie — działa nawet
+      gdy żaden wykres nie jest zamontowany. Odróżnienie „cisza na strumieniu" od „rynek stoi"
+      jest per-wykres i należy do zadania 5.7, nie do globalnego wskaźnika.
+- [x] 4.6 Testy powłoki: przejście między zakładkami zmienia adres, wejście z adresu wprost
       pokazuje zakładkę, nieznany adres daje stronę zastępczą
 
 ## 5. Wykres

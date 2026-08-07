@@ -8,6 +8,7 @@ function fakeSource(id: MarketDataSource["id"]): MarketDataSource {
     searchInstruments: async () => [],
     listInstruments: async () => ({ instruments: [], count: 0, truncated: false }),
     history: async () => [],
+    ping: async () => {},
     subscribe: () => () => {},
   };
 }

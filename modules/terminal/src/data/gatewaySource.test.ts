@@ -160,3 +160,17 @@ describe("gatewaySource.history", () => {
     ).rejects.toMatchObject({ kind: "unreachable" });
   });
 });
+
+describe("gatewaySource.ping", () => {
+  it("resolves when /capabilities answers", async () => {
+    server.use(http.get(`${HTTP_BASE}/capabilities`, () => HttpResponse.json({ provider: "capital.com" })));
+    await expect(source().ping(new AbortController().signal)).resolves.toBeUndefined();
+  });
+
+  it("rejects with unreachable when the gateway can't be reached", async () => {
+    server.use(http.get(`${HTTP_BASE}/capabilities`, () => HttpResponse.error()));
+    await expect(source().ping(new AbortController().signal)).rejects.toMatchObject({
+      kind: "unreachable",
+    });
+  });
+});
