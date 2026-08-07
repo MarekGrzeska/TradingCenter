@@ -39,12 +39,12 @@
 
 ## 6. Śledzone pary
 
-- [ ] 6.1 Dodanie pary z walidacją symbolu przez gateway i sprawdzeniem limitu
-- [ ] 6.2 Usunięcie pary zatrzymujące zbieranie i zachowujące dane
-- [ ] 6.3 Odczyt listy wraz ze stanem połączenia i czasem najnowszej świecy
-- [ ] 6.4 Wykrywanie „zbieranie ustało" — najnowsza świeca starsza niż dwa okresy przy otwartym rynku
-- [ ] 6.5 Test: konfiguracja przeżywa restart modułu
-- [ ] 6.6 Test: dodanie ponad limit kończy się odmową z podaniem powodu
+- [x] 6.1 Dodanie pary z walidacją symbolu przez gateway i sprawdzeniem limitu
+- [x] 6.2 Usunięcie pary zatrzymujące zbieranie i zachowujące dane
+- [x] 6.3 Odczyt listy wraz ze stanem połączenia i czasem najnowszej świecy
+- [x] 6.4 Wykrywanie „zbieranie ustało" — najnowsza świeca starsza niż dwa okresy przy otwartym rynku
+- [x] 6.5 Test: konfiguracja przeżywa restart modułu
+- [x] 6.6 Test: dodanie ponad limit kończy się odmową z podaniem powodu
 
 ## 7. Ingest
 

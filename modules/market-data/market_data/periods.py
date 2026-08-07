@@ -14,7 +14,29 @@ module reads a gateway timestamp; both forms arrive here and leave as one instan
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
+
+from .models import Resolution
+
+# How long one period lasts. `DAY` and `WEEK` are here even though their real boundary
+# follows the venue's session rather than the clock, because the two things this map is
+# used for — sizing a window and measuring how stale a series is — both err safely when a
+# period is overstated. Deriving a candle is not one of those things, and `rollups.py`
+# takes only the resolutions it may floor.
+PERIOD_SECONDS: dict[Resolution, int] = {
+    Resolution.MINUTE: 60,
+    Resolution.MINUTE_5: 300,
+    Resolution.MINUTE_15: 900,
+    Resolution.MINUTE_30: 1_800,
+    Resolution.HOUR: 3_600,
+    Resolution.HOUR_4: 14_400,
+    Resolution.DAY: 86_400,
+    Resolution.WEEK: 604_800,
+}
+
+
+def period_length(resolution: Resolution) -> timedelta:
+    return timedelta(seconds=PERIOD_SECONDS[resolution])
 
 
 def from_iso(ts: str) -> datetime:

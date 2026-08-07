@@ -6,6 +6,7 @@ for what is happening now. They spell a period start differently, so both go thr
 """
 
 from .history import DEFAULT_TIMEOUT, GatewayHistory, HistoryPage, http_client
+from .instruments import GatewayInstruments
 from .stream import (
     CandleUpdate,
     FeedFailure,
@@ -25,6 +26,7 @@ __all__ = [
     "FeedState",
     "FeedStatus",
     "GatewayHistory",
+    "GatewayInstruments",
     "HistoryPage",
     "Quote",
     "StreamMessage",
