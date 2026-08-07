@@ -1,0 +1,402 @@
+<title>Azure vs Google vs AWS — co ile kosztuje</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --azure: #2f6b8f; --gcp: #8a5a12; --aws: #94362f;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+      --azure: #7db3d4; --gcp: #d9ac63; --aws: #e0837a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+    --azure: #7db3d4; --gcp: #d9ac63; --aws: #e0837a;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 62rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.5rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.2rem, 2.6vw, 1.5rem); letter-spacing: -0.01em; margin: 3.5rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.02rem; margin: 2rem 0 0.5rem; font-weight: 620; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.06rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 34rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.win td { background: var(--good-soft); }
+  .dim { color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+
+  .who { font-weight: 620; }
+  .who.az { color: var(--azure); }
+  .who.gc { color: var(--gcp); }
+  .who.aw { color: var(--aws); }
+
+  .glossary { display: grid; gap: 0.75rem; margin: 1.5rem 0; }
+  .term { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.85rem 1.1rem; }
+  .term b { display: block; font-size: 0.94rem; margin-bottom: 0.1rem; }
+  .term span { color: var(--text-dim); font-size: 0.92rem; }
+
+  .cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); margin: 1.5rem 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.1rem 1.2rem; }
+  .card h4 { margin: 0 0 0.15rem; font-size: 0.95rem; font-weight: 620; }
+  .card .price { font-family: var(--mono); font-size: 1.45rem; font-weight: 600; letter-spacing: -0.02em; margin: 0.35rem 0 0.1rem; }
+  .card .sub { color: var(--text-dim); font-size: 0.83rem; margin: 0; }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+  footer ol { padding-left: 1.4rem; }
+  footer li { margin: 0.3rem 0; }
+</style>
+
+<main>
+
+<h1>Azure vs Google vs AWS — co ile kosztuje</h1>
+<p class="lede">Porównanie trzech największych chmur dla dwóch rzeczy, których potrzebuje TradingCenter: bazy danych PostgreSQL i klastra Kubernetes. Plus odpowiedź na pytanie, czy zamiast PostgreSQL nie lepiej wziąć czegoś innego.</p>
+<p class="meta">
+  Stan na 2026-08-07 · wszystkie kwoty w USD za miesiąc (730 godzin), bez VAT i bez rabatów umownych<br>
+  Azure: ceny z Retail Prices API dla regionu Poland Central · Google i AWS: ceny katalogowe dla regionów w USA<br>
+  <strong>Uwaga:</strong> regiony europejskie Google i AWS są droższe o kilkanaście do dwudziestu paru procent — porównanie zaniża ich koszt
+</p>
+
+<div class="callout good">
+  <span class="tag">Skrót dla niecierpliwych</span>
+  <ul>
+    <li><strong>Baza danych</strong> → <span class="who az">Azure</span>. Najtaniej na małej skali i rok za darmo na start.</li>
+    <li><strong>Kubernetes</strong> → <span class="who gc">Google</span>. Jeden mały klaster wychodzi u nich najtaniej, bo dają darmowy kredyt na zarządzanie.</li>
+    <li><strong>Ale najpierw</strong> → prawdopodobnie <strong>nie potrzebujecie Kubernetesa</strong>. Wyjaśnienie w sekcji 3.</li>
+    <li><strong>Inna baza niż PostgreSQL</strong> → nie. Uzasadnienie w sekcji 4.</li>
+  </ul>
+</div>
+
+<h2>1. Zanim zaczniemy — kilka pojęć po ludzku</h2>
+
+<div class="glossary">
+  <div class="term"><b>vCPU / vCore</b><span>Wirtualny rdzeń procesora. Im więcej, tym więcej rzeczy serwer robi naraz. Nasz moduł zapisuje ~2 świece na sekundę — to obciążenie, przy którym 2 rdzenie to już komfort.</span></div>
+  <div class="term"><b>Burstable („z doskoku")</b><span>Tańsza odmiana serwera, która zwykle pracuje na pół gwizdka i pozwala sobie na chwilowe zrywy. Działa na kredytach: jak przez godzinę nic nie robisz, odkładasz zapas na później. Świetne, gdy obciążenie jest nierówne — ryzykowne, gdy stałe.</span></div>
+  <div class="term"><b>Storage</b><span>Miejsce na dysku. Rozliczane za gigabajt na miesiąc. U wszystkich trzech jest minimum, poniżej którego i tak płacisz.</span></div>
+  <div class="term"><b>Kubernetes (K8s)</b><span>System, który uruchamia aplikacje w kontenerach i pilnuje, żeby działały: restartuje to, co padło, rozkłada ruch, dokłada kopie pod obciążeniem. Potężny, ale ma swoją cenę — także w czasie, którego wymaga.</span></div>
+  <div class="term"><b>Control plane („mózg klastra")</b><span>Część Kubernetesa, która podejmuje decyzje. W chmurze nie zarządzasz nią sam — dostajesz ją jako usługę, czasem za darmo, czasem za ~73 USD miesięcznie.</span></div>
+  <div class="term"><b>Węzeł (node)</b><span>Zwykła maszyna wirtualna, na której faktycznie działają twoje aplikacje. To tu idzie większość rachunku za Kubernetes — nie na „mózg".</span></div>
+  <div class="term"><b>SLA</b><span>Umowna gwarancja dostępności. „99,95%" oznacza, że dostawca dopuszcza ~22 minuty niedziałania miesięcznie i płaci karę umowną, jeśli przekroczy. Bez SLA masz obietnicę, ale nie zobowiązanie.</span></div>
+</div>
+
+<h2>2. Baza danych PostgreSQL</h2>
+
+<p>Porównanie na tej samej konfiguracji: 2 rdzenie i 64 GB miejsca na dane — z zapasem na kilka lat zbierania świec.</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>Usługa</th><th>Konfiguracja</th><th class="num">Serwer</th><th class="num">Dysk</th><th class="num">Backup</th><th class="num">Razem / mc</th></tr>
+  </thead>
+  <tbody>
+    <tr class="win">
+      <td><span class="who az">Azure</span> Flexible Server <code>B2s</code></td>
+      <td>2 rdzenie / 4 GB</td>
+      <td class="num">58,11</td><td class="num">8,77</td><td class="num">w cenie</td><td class="num"><strong>66,88</strong></td>
+    </tr>
+    <tr>
+      <td><span class="who gc">Google</span> Cloud SQL Enterprise</td>
+      <td>2 rdzenie / 4 GB</td>
+      <td class="num">80,74</td><td class="num">10,88</td><td class="num">5,12</td><td class="num"><strong>96,74</strong></td>
+    </tr>
+    <tr>
+      <td><span class="who aw">AWS</span> RDS <code>db.m5.large</code></td>
+      <td>2 rdzenie / 8 GB</td>
+      <td class="num">99,28</td><td class="num">~7,36</td><td class="num">w cenie</td><td class="num"><strong>~106,64</strong></td>
+    </tr>
+    <tr>
+      <td><span class="who gc">Google</span> Cloud SQL Enterprise</td>
+      <td>2 rdzenie / 8 GB</td>
+      <td class="num">101,18</td><td class="num">10,88</td><td class="num">5,12</td><td class="num"><strong>117,18</strong></td>
+    </tr>
+    <tr>
+      <td><span class="who az">Azure</span> Flexible Server <code>B2ms</code></td>
+      <td>2 rdzenie / 8 GB</td>
+      <td class="num">116,22</td><td class="num">8,77</td><td class="num">w cenie</td><td class="num"><strong>124,99</strong></td>
+    </tr>
+    <tr>
+      <td><span class="who aw">AWS</span> Aurora PostgreSQL</td>
+      <td>2 rdzenie / 16 GB</td>
+      <td class="num">211,70</td><td class="num">+</td><td class="num">+</td><td class="num"><strong>~230</strong></td>
+    </tr>
+    <tr>
+      <td><span class="who gc">Google</span> AlloyDB <span class="dim">(minimum)</span></td>
+      <td>2 rdzenie / 16 GB + HA</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td><td class="num"><strong>~546</strong></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Co z tego wynika po ludzku</h3>
+
+<p><strong>Na najmniejszej konfiguracji Azure jest wyraźnie tańszy — o jakieś 31%.</strong> Powód jest konkretny: tylko Azure ma tanią warstwę „burstable" w bazie danych. Google każe płacić za pełne, dedykowane rdzenie od samego początku. Wasz moduł zapisuje dwie świece na sekundę, czyli dokładnie ten przypadek, do którego burstable wymyślono.</p>
+
+<p><strong>Powyżej, przy większych serwerach, różnica się odwraca</strong> i Google wychodzi minimalnie taniej (117,18 vs 124,99). Ale pamiętajcie o zastrzeżeniu z nagłówka: ceny Google są z regionu amerykańskiego. W Warszawie będą wyższe, więc realnie Azure wygrywa i tutaj.</p>
+
+<p><strong>AWS jest po prostu drogi</strong> na tej półce, a Aurora — ich flagowa baza — kosztuje ponad trzy razy tyle, co najtańsza sensowna opcja Azure. Aurora robi rzeczy, których nie potrzebujecie: rozdziela zapis i odczyt na wiele maszyn, przeżywa awarię strefy. Archiwum świec, które w razie czego można odtworzyć od brokera, tego nie wymaga.</p>
+
+<p><strong>AlloyDB to inna liga cenowa.</strong> Ma jedną rzecz, która was technicznie interesuje — silnik kolumnowy, przyspieszający analizę wielu lat danych naraz, czyli backtesty. Ale minimum to ~546 USD miesięcznie, ośmiokrotność waszego docelowego kosztu, za funkcję, której przy kilku gigabajtach nie odczujecie.</p>
+
+<div class="callout good">
+  <span class="tag">Rzecz, która przeważa nad cenami</span>
+  <p><strong>Azure daje 12 miesięcy za darmo</strong> — serwer <code>B1ms</code> plus 32 GB miejsca, działające bez przerwy przez rok. Google daje 300 USD kredytu na 90 dni, co przy Cloud SQL starcza na jakieś trzy miesiące. AWS daje rok na najmniejszej maszynce.</p>
+  <p>Dla modułu, którego głównym zadaniem w pierwszym roku jest <strong>zmierzyć, ile danych naprawdę przyrasta</strong>, rok darmowego działania jest wart więcej niż wszystkie różnice w tabeli powyżej.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Pułapka, w którą łatwo wpaść</span>
+  <p>Neon, Supabase, Aurora Serverless — wyglądają bardzo tanio, bo są wycenione pod aplikacje działające <em>zrywami</em>, które między szczytami zasypiają i nic nie kosztują.</p>
+  <p><strong>Wasz moduł nigdy nie zaśnie.</strong> Świece zamykają się co minutę, całą dobę, także w nocy i w weekend, kiedy handluje krypto. Mechanizm „usypiania" nigdy się nie włączy, więc zapłacicie pełną stawkę bez rabatu, który jest całym sensem tych ofert.</p>
+</div>
+
+<h2>3. Kubernetes</h2>
+
+<div class="callout bad">
+  <span class="tag">Zanim spojrzycie na ceny</span>
+  <p><strong>Prawie na pewno nie potrzebujecie Kubernetesa.</strong> Macie dwie aplikacje: jedno API w Pythonie i jeden frontend, który jest zbiorem plików statycznych. Kubernetes rozwiązuje problemy, które pojawiają się przy kilkunastu–kilkudziesięciu usługach i zespole, który je utrzymuje.</p>
+  <p>Tańsze i prostsze narzędzia do tego samego: <strong>Azure Container Apps</strong>, <strong>Google Cloud Run</strong>, <strong>AWS App Runner</strong>. Wrzucacie kontener, dostajecie adres, nie zarządzacie niczym. Koszt dla dwóch małych, stale działających usług to rząd <strong>20–40 USD miesięcznie</strong> zamiast 100–200.</p>
+  <p>Poniższe porównanie jest więc odpowiedzią na pytanie „ile <em>by</em> kosztowało", a nie rekomendacją, żeby to zrobić.</p>
+</div>
+
+<h3>Sam „mózg klastra"</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Dostawca</th><th>Wariant</th><th class="num">Koszt / mc</th><th>Co za to jest</th></tr></thead>
+  <tbody>
+    <tr class="win"><td><span class="who az">Azure</span> AKS</td><td>Free</td><td class="num">0</td><td>bez SLA, obietnica 99,5% — do testów i małej produkcji</td></tr>
+    <tr><td><span class="who az">Azure</span> AKS</td><td>Standard</td><td class="num">73</td><td>SLA 99,95%</td></tr>
+    <tr><td><span class="who az">Azure</span> AKS</td><td>Premium</td><td class="num">438</td><td>SLA + wsparcie starych wersji przez 2 lata</td></tr>
+    <tr class="win"><td><span class="who gc">Google</span> GKE</td><td>Standard / Autopilot</td><td class="num">73 <span class="dim">→ 0</span></td><td>opłata 73 USD, ale <strong>74,40 USD kredytu miesięcznie</strong> pokrywa jeden mały klaster w całości</td></tr>
+    <tr><td><span class="who aw">AWS</span> EKS</td><td>—</td><td class="num">73</td><td>bez wyjątków i bez kredytu; stara wersja Kubernetesa to dopłata 438 USD</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Uwaga do kredytu Google: obejmuje <strong>jeden</strong> klaster typu zonal albo Autopilot na konto rozliczeniowe. Klaster regionalny (rozłożony na kilka stref, odporniejszy na awarie) już się nie łapie.</p>
+
+<h3>Węzły, czyli gdzie naprawdę idą pieniądze</h3>
+
+<p>„Mózg" to mała część rachunku. Prawdziwy koszt to maszyny, na których działają aplikacje. Poniżej maszyna o 2 rdzeniach i 8 GB pamięci u każdego:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Dostawca</th><th>Typ maszyny</th><th>Zasoby</th><th class="num">Koszt / mc</th></tr></thead>
+  <tbody>
+    <tr class="win"><td><span class="who gc">Google</span></td><td><code>e2-standard-2</code></td><td>2 rdzenie / 8 GB</td><td class="num">48,92</td></tr>
+    <tr><td><span class="who az">Azure</span></td><td><code>B2ms</code> <span class="dim">(burstable)</span></td><td>2 rdzenie / 8 GB</td><td class="num">70,08</td></tr>
+    <tr><td><span class="who aw">AWS</span></td><td><code>m5.large</code></td><td>2 rdzenie / 8 GB</td><td class="num">70,08</td></tr>
+    <tr><td><span class="who az">Azure</span></td><td><code>D2s_v5</code></td><td>2 rdzenie / 8 GB</td><td class="num">83,95</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Cały klaster — dwa węzły, minimum produkcyjne</h3>
+
+<div class="cards">
+  <div class="card">
+    <h4><span class="who gc">Google GKE</span> <span class="pill good">najtaniej</span></h4>
+    <p class="price">97,84 USD</p>
+    <p class="sub">0 za mózg (kredyt) + 2 × <code>e2-standard-2</code></p>
+  </div>
+  <div class="card">
+    <h4><span class="who az">Azure AKS</span></h4>
+    <p class="price">140,16 USD</p>
+    <p class="sub">0 za mózg (Free) + 2 × <code>B2ms</code></p>
+  </div>
+  <div class="card">
+    <h4><span class="who aw">AWS EKS</span></h4>
+    <p class="price">213,16 USD</p>
+    <p class="sub">73 za mózg + 2 × <code>m5.large</code></p>
+  </div>
+</div>
+
+<p>Do każdej z tych kwot dochodzą jeszcze: dyski dla węzłów, load balancer (~15–25 USD), transfer danych na zewnątrz i monitoring. Realnie doliczcie 30–50 USD miesięcznie ponad tabelę.</p>
+
+<p><strong>Wniosek:</strong> przy jednym małym klastrze Google jest najtańszy, bo ich darmowy kredyt zeruje opłatę za zarządzanie, a ich maszyny są tańsze. Azure jest drugi. <strong>AWS jest najdroższy</strong> i jako jedyny nie ma żadnej darmowej furtki na starcie.</p>
+
+<h2>4. Czy inna baza niż PostgreSQL wchodzi w grę?</h2>
+
+<p>Krótko: <strong>nie, i to z dobrego powodu</strong> — ale warto wiedzieć, co się odrzuca i kiedy warto wrócić.</p>
+
+<p>Wasze dane to świece giełdowe: dla każdego instrumentu i każdej rozdzielczości jeden wiersz na okres, z ceną otwarcia, maksimum, minimum i zamknięcia. To klasyczne dane szeregów czasowych i istnieje pod nie cała rodzina wyspecjalizowanych baz. Problem w tym, że wasz przypadek ma jedną cechę, która je wszystkie osłabia: <strong>świecę trzeba nadpisywać</strong>. Świeca „w budowie" zmienia się przy każdym tiku, a gdy broker przyśle wersję ostateczną, ta musi zastąpić poprzednią. Bazy analityczne są budowane pod „zapisz raz, czytaj miliony razy" i nadpisywanie jest w nich najsłabszym miejscem.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Baza</th><th>W czym dobra</th><th>Dlaczego nie teraz</th><th>Werdykt</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>ClickHouse</strong></td>
+      <td>Bezkonkurencyjna przy skanowaniu setek milionów wierszy — czyli przy backtestach</td>
+      <td>Nadpisywanie pojedynczej świecy jest obejściem, nie funkcją. Cięższa w utrzymaniu. Przy waszych ~6 GB rocznie nie kupujecie nic, za co płacicie</td>
+      <td><span class="pill warn">wrócić przy backtestach</span></td>
+    </tr>
+    <tr>
+      <td><strong>QuestDB</strong></td>
+      <td>Zbudowana wprost pod dane giełdowe — bardzo szybki zapis, deduplikacja po czasie, zwykły SQL</td>
+      <td>Naprawdę dobrze pasuje. Ale mały ekosystem i osobna wiedza operacyjna za korzyść, której przy tej skali nie odczujecie</td>
+      <td><span class="pill">dobra, ale niepotrzebna</span></td>
+    </tr>
+    <tr>
+      <td><strong>DuckDB + Parquet</strong></td>
+      <td>Zero utrzymania, pliki na dysku, znakomita do analizy historii</td>
+      <td>Jeden proces może pisać naraz. Ciągły zapis ze strumienia równolegle z odczytami z terminala to nie ten model</td>
+      <td><span class="pill good">jako eksport obok</span></td>
+    </tr>
+    <tr>
+      <td><strong>InfluxDB</strong></td>
+      <td>Popularna w monitoringu</td>
+      <td>Zamieszanie wokół kolejnych wersji i słabsze SQL. W systemie, który ma żyć lata, to ryzyko bez nagrody</td>
+      <td><span class="pill bad">nie</span></td>
+    </tr>
+    <tr>
+      <td><strong>MongoDB</strong> <span class="dim">(kolekcje czasowe)</span></td>
+      <td>Elastyczny schemat</td>
+      <td>Oddajecie SQL, którego backtesty i tak będą chciały, i nie dostajecie nic w zamian</td>
+      <td><span class="pill bad">nie</span></td>
+    </tr>
+    <tr>
+      <td><strong>SQLite</strong></td>
+      <td>Zero konfiguracji, jeden plik</td>
+      <td>Uciągnęłaby to bez problemu. Ale nie ma dostępu po sieci, a migracja później kosztuje więcej niż postawienie Postgresa teraz</td>
+      <td><span class="pill bad">nie</span></td>
+    </tr>
+    <tr>
+      <td><strong>Redis / Valkey</strong></td>
+      <td>Błyskawiczna pamięć podręczna</td>
+      <td>To nie jest archiwum — dane żyją w pamięci. Świeca w budowie i tak siedzi w pamięci procesu i nie potrzebuje osobnej bazy</td>
+      <td><span class="pill bad">nie</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Dlaczego PostgreSQL wygrywa</h3>
+
+<ul>
+  <li><strong>Nadpisywanie ma wbudowane.</strong> Reguła „ostateczna świeca od brokera zastępuje tę w budowie" to w PostgreSQL jedna linijka (<code>ON CONFLICT ... DO UPDATE</code>). W bazach analitycznych to obejście.</li>
+  <li><strong>Wasze dane są małe.</strong> Około 6 GB rocznie przy stu instrumentach. Wyspecjalizowane bazy zaczynają się opłacać, gdy zaczyna brakować miejsca albo czasu — a wy jesteście trzy rzędy wielkości poniżej tego progu.</li>
+  <li><strong>Backtesty i agenci dostają zwykły SQL.</strong> Bez klienta, bez API, bez uczenia się nowego języka zapytań.</li>
+  <li><strong>Wiedza jest powszechna.</strong> Kopie zapasowe, monitoring, aktualizacje — wszystko standardowe, w każdej chmurze i w każdym poradniku.</li>
+  <li><strong>Przenośność.</strong> Zwykły schemat PostgreSQL uruchomicie u każdego z trzech dostawców, na własnym serwerze i u wyspecjalizowanych firm. Baza egzotyczna przywiązuje was na lata.</li>
+</ul>
+
+<p><strong>Kiedy wrócić do tego pytania:</strong> gdy przekroczycie ~200 milionów wierszy albo gdy zapytania backtestów zaczną trwać minuty zamiast sekund. Wtedy pierwszym krokiem nie jest zmiana bazy, tylko dołożenie ClickHouse albo plików Parquet <em>obok</em> PostgreSQL — do analizy, przy zachowaniu Postgresa jako miejsca zapisu na żywo.</p>
+
+<h2>5. Podsumowanie</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Potrzeba</th><th>Wybór</th><th class="num">Koszt / mc</th><th>Dlaczego</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Baza danych — start</td>
+      <td><span class="who az">Azure</span> Flexible Server <code>B1ms</code></td>
+      <td class="num">0</td>
+      <td>rok za darmo; przez ten czas zmierzycie realny przyrost danych</td>
+    </tr>
+    <tr>
+      <td>Baza danych — produkcja</td>
+      <td><span class="who az">Azure</span> Flexible Server <code>B2s</code></td>
+      <td class="num">66,88</td>
+      <td>najtańszy na tej półce dzięki warstwie burstable</td>
+    </tr>
+    <tr>
+      <td>Uruchamianie aplikacji</td>
+      <td><span class="who az">Azure</span> Container Apps</td>
+      <td class="num">~20–40</td>
+      <td>dwie usługi to za mało na Kubernetesa</td>
+    </tr>
+    <tr>
+      <td>Gdyby jednak Kubernetes</td>
+      <td><span class="who gc">Google</span> GKE</td>
+      <td class="num">~98</td>
+      <td>darmowy kredyt na zarządzanie + najtańsze maszyny</td>
+    </tr>
+    <tr>
+      <td>Silnik bazy</td>
+      <td>PostgreSQL</td>
+      <td class="num">—</td>
+      <td>nadpisywanie świec, zwykły SQL, przenośność</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Wychodzi z tego lekka niespójność: baza najtaniej u Azure, Kubernetes najtaniej u Google. <strong>Nie rozdzielajcie tego.</strong> Baza i aplikacja w dwóch różnych chmurach oznaczają opłaty za transfer danych między nimi, wyższą latencję i dwie konsole do pilnowania — a mówimy o różnicy rzędu 40 USD miesięcznie. Skoro Kubernetes i tak jest tu nadmiarowy, <strong>całość na Azure</strong> jest wyborem spójnym i najtańszym w praktyce.</p>
+
+<div class="callout warn">
+  <span class="tag">Co trzeba sprawdzić, zanim to stanie się decyzją</span>
+  <ul>
+    <li>Ceny Google i AWS pochodzą z regionów amerykańskich. <strong>Regiony europejskie są droższe</strong> — dokładnej różnicy nie weryfikowałem, orientacyjnie kilkanaście do dwudziestu paru procent.</li>
+    <li>Region w Polsce mają tylko <strong>Azure</strong> (Poland Central) i <strong>Google</strong> (Warszawa). AWS najbliżej ma Frankfurt albo Sztokholm.</li>
+    <li>Koszty Kubernetesa nie obejmują dysków, load balancera, transferu i monitoringu — doliczcie 30–50 USD miesięcznie.</li>
+    <li>Wszystkie kwoty są <strong>bez VAT</strong> i bez rabatów umownych.</li>
+    <li>Szczegółowa analiza samego Azure, wraz z warstwami i modelami wdrożenia, jest w osobnym dokumencie: <code>docs/azure-postgres-cost-research.html</code>.</li>
+  </ul>
+</div>
+
+<footer>
+  <p><strong>Źródła</strong></p>
+  <ol>
+    <li><a href="https://prices.azure.com/api/retail/prices">Azure Retail Prices API</a> — ceny Azure dla <code>polandcentral</code>, odpytane 2026-08-07</li>
+    <li><a href="https://cloud.google.com/sql/pricing">Cloud SQL pricing</a> oraz <a href="https://www.bytebase.com/blog/understanding-google-cloud-sql-pricing/">zestawienie stawek za vCPU i GB</a></li>
+    <li><a href="https://cloud.google.com/alloydb/pricing">AlloyDB pricing</a> i <a href="https://www.bytebase.com/blog/understanding-google-alloydb-pricing/">analiza kosztów AlloyDB</a></li>
+    <li><a href="https://www.bytebase.com/blog/postgres-hosting-options-pricing-comparison/">Porównanie hostingu PostgreSQL 2026</a> — ceny AWS RDS i Aurora</li>
+    <li><a href="https://cloud.google.com/kubernetes-engine/pricing">GKE pricing</a> — opłata za klaster i kredyt 74,40 USD</li>
+    <li><a href="https://spendark.com/blog/eks-vs-aks-vs-gke-pricing/">EKS vs AKS vs GKE: Kubernetes Pricing Compared (2026)</a></li>
+    <li><a href="https://sedai.io/blog/understanding-azure-kubernetes-service-aks-pricing-costs">Azure AKS 2026: Pricing &amp; Cost-Optimization</a> — warstwy Free / Standard / Premium</li>
+    <li><a href="https://www.economize.cloud/resources/gcp/pricing/compute-engine/e2-standard-2/">e2-standard-2</a>, <a href="https://www.economize.cloud/resources/aws/pricing/ec2/m5.large/">m5.large</a> — ceny maszyn</li>
+  </ol>
+</footer>
+
+</main>

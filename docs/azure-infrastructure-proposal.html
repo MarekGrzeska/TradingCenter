@@ -1,0 +1,473 @@
+<title>TradingCenter w 100% na Azure — propozycja infrastruktury</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 62rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.4rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.2rem, 2.6vw, 1.5rem); letter-spacing: -0.01em; margin: 3.5rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.02rem; margin: 2rem 0 0.5rem; font-weight: 620; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.06rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.total td { font-weight: 650; background: var(--surface-2); }
+  .dim { color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps > li { counter-increment: step; position: relative; padding: 0 0 0 3rem; margin: 0 0 1.3rem; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: 0.05rem;
+    width: 2rem; height: 2rem; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.85rem; font-weight: 600;
+  }
+  .steps > li > b { display: block; margin-bottom: 0.15rem; }
+  .steps > li p { margin: 0.3rem 0; }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>TradingCenter w 100% na Azure</h1>
+<p class="lede">Propozycja infrastruktury dla <code>capital-gateway</code>, <code>terminal</code> i planowanego <code>market-data</code>. Wszystko opisane Terraformem, nic klikane ani tworzone przez CLI.</p>
+<p class="meta">
+  Stan na 2026-08-07 · ceny z Azure Retail Prices API, region Poland Central, USD, 730 h/mc, bez VAT<br>
+  Zakłada nowe konto <code>mgrzeskait@outlook.com</code> z ofertą <code>FreeTrial_2014-09-01</code> — potwierdzoną przez API
+</p>
+
+<div class="callout good">
+  <span class="tag">Skrót</span>
+  <ul>
+    <li><strong>Rok pierwszy: ~$14 miesięcznie.</strong> Baza jest darmowa, płacisz tylko za plan aplikacji.</li>
+    <li><strong>Od roku drugiego: ~$33 miesięcznie</strong>, gdy skończy się darmowy rok bazy.</li>
+    <li><strong>Zero sekretów w repozytorium i zero w GitHubie</strong> — Key Vault plus logowanie OIDC.</li>
+    <li><strong>Kopie zapasowe z odtwarzaniem do punktu w czasie</strong> — to jest ta rzecz, za którą tu naprawdę płacisz.</li>
+  </ul>
+</div>
+
+<h2>1. Architektura</h2>
+
+<pre><code>                            capital.com
+                                 ▲
+                                 │ REST + WebSocket
+                                 │ jedna sesja, jeden RateGate
+┌────────────────────────────────┼─────────────────────────────────────┐
+│  App Service Plan  B1 (Linux)  │   ← jeden plan, dwie aplikacje      │
+│                                │                                     │
+│   ┌────────────────────────────┴──────────┐                          │
+│   │  capital-gateway                      │  Always On               │
+│   │  ⚠ dokładnie 1 instancja, bez skalowania │                       │
+│   │  Access Restrictions: tylko market-data │                        │
+│   └────────────────┬──────────────────────┘                          │
+│                    │ HTTP + WS                                       │
+│   ┌────────────────┴──────────────────────┐                          │
+│   │  market-data                          │  Always On               │
+│   │  ingest (WS → baza) + API             │  Easy Auth (Entra ID)    │
+│   └────────────────┬──────────────────────┘                          │
+└────────────────────┼─────────────────────────────────────────────────┘
+                     │ TLS, reguła firewalla
+        ┌────────────┴──────────────────┐
+        │ PostgreSQL Flexible Server    │  B1ms · 32 GB
+        │ backup 7 dni + PITR           │  darmowe przez 12 miesięcy
+        └───────────────────────────────┘
+
+        ┌───────────────────────────────┐
+        │ Static Web Apps  (plan Free)  │  terminal
+        │ + wbudowane logowanie         │  CDN, TLS, własna domena
+        └───────────────────────────────┘
+
+   Key Vault  ·  Application Insights  ·  budżet z alertem  ·  tfstate w Blob Storage</code></pre>
+
+<h2>2. Dobór usług — z uzasadnieniem</h2>
+
+<h3>Aplikacje: App Service, nie Container Apps</h3>
+
+<p>Container Apps wydają się naturalniejsze, bo są kontenerowe. Ale wasze usługi działają <strong>bez przerwy</strong>, a Container Apps rozliczają się za sekundy procesora — model stworzony pod obciążenia zrywowe. Policzmy dwa kontenery po 0,25 vCPU i 0,5 GiB, chodzące non stop:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Opcja</th><th>Co dostajesz</th><th class="num">Koszt / mc</th></tr></thead>
+  <tbody>
+    <tr class="total"><td><strong>App Service Plan B1</strong></td><td>1 vCPU, 1,75 GB — <strong>dzielone przez obie aplikacje</strong></td><td class="num">13,15</td></tr>
+    <tr><td>App Service Plan B2</td><td>2 vCPU, 3,5 GB, gdyby B1 nie wystarczył</td><td class="num">26,31</td></tr>
+    <tr><td>Container Apps</td><td>2 × 0,25 vCPU / 0,5 GiB, po odjęciu darmowego przydziału</td><td class="num">~33,48</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>App Service jest 2,5× tańszy</strong> i przy okazji odpowiada na pytanie, które zadałeś wcześniej: „czy mogę zapłacić raz za wszystko". Jeden plan to jedna opłata, a aplikacji na nim postawisz ile chcesz. Baza nie może go współdzielić, bo jest usługą zarządzaną bez dostępu do maszyny — ale <code>capital-gateway</code> i <code>market-data</code> już tak.</p>
+
+<div class="callout bad">
+  <span class="tag">Ustawienie, którego nie wolno pomylić</span>
+  <p><strong><code>capital-gateway</code> musi mieć dokładnie jedną instancję.</strong> Nigdy więcej.</p>
+  <p>capital.com liczy limity per konto, a nie per proces. Druga instancja to drugi <code>RateGate</code> i podwójny ruch do brokera — czyli przekroczony limit 10 żądań na sekundę, objawiający się dla wywołującego jak problem z danymi, a nie jak problem z ruchem. Dokładnie to opisuje docstring w <code>rategate.py</code>.</p>
+  <p>W Terraformie: <code>worker_count = 1</code> i <strong>żadnego autoskalowania</strong>. Warto to opatrzyć komentarzem w kodzie, bo jest to reguła, którą ktoś kiedyś „poprawi" w dobrej wierze.</p>
+</div>
+
+<h3>WebSockety</h3>
+
+<p>Cała aplikacja stoi na strumieniach, więc to nie jest szczegół. <strong>Plan Basic daje 350 równoczesnych połączeń WebSocket na instancję</strong> — przy jednym operatorze i siatce sześciu wykresów masz zapas dwóch rzędów wielkości. Trzeba tylko pamiętać, żeby jawnie włączyć obsługę: <code>websockets_enabled = true</code>.</p>
+
+<h3>Baza: PostgreSQL Flexible Server B1ms</h3>
+
+<p>Sprawdziłem przez API, że <code>Standard_B1ms</code> i <code>Standard_B2s</code> są dostępne w <code>polandcentral</code>, a wersje Postgresa sięgają od 11 do 18. <strong>B1ms z 32 GB mieści się w darmowym rocznym limicie</strong> (750 godzin miesięcznie, czyli praca ciągła).</p>
+
+<p>Proponuję <strong>PostgreSQL 17</strong>, nie 18 — TimescaleDB i narzędzia zwykle nadganiają nową wersję główną z opóźnieniem, a wy nie zyskujecie nic na byciu pierwszymi.</p>
+
+<h3>Terminal: Static Web Apps</h3>
+
+<p>Plan Free kosztuje zero i daje CDN, certyfikat, własną domenę oraz — co ważne — <strong>wbudowane logowanie</strong>. To jest odpowiedź na twoje pytanie o autoryzację: użytkownik loguje się przez Entra ID, GitHuba albo Google, zanim zobaczy cokolwiek. Bez pisania kodu.</p>
+
+<h2>3. Terraform</h2>
+
+<h3>Układ katalogów</h3>
+
+<pre><code>infra/
+  main.tf              provider azurerm, backend na Blob Storage
+  variables.tf         region, nazwy, wersja Postgresa
+  resource-group.tf
+  database.tf          Flexible Server + baza + reguła firewalla
+  app-service.tf       plan + dwie aplikacje + tożsamości zarządzane
+  static-web-app.tf    terminal
+  key-vault.tf         sejf + sekrety + uprawnienia dla tożsamości
+  github-oidc.tf       aplikacja Entra + federacja + przypisanie ról
+  monitoring.tf        Application Insights + alerty + budżet
+  outputs.tf</code></pre>
+
+<h3>Rdzeń — jak to wygląda w kodzie</h3>
+
+<pre><code>resource "azurerm_service_plan" "main" {
+  name                = "asp-tradingcenter"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  os_type             = "Linux"
+  sku_name            = "B1"
+  worker_count        = 1
+}
+
+resource "azurerm_linux_web_app" "gateway" {
+  name                = "app-capital-gateway"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_service_plan.main.location
+  service_plan_id     = azurerm_service_plan.main.id
+
+  site_config {
+    always_on          = true   # bez tego aplikacja jest usypiana
+    websockets_enabled = true
+    application_stack { docker_image_name = "ghcr.io/marekgrzeska/capital-gateway:latest" }
+
+    # gateway nie ma być osiągalny z internetu — patrz sekcja 5
+    ip_restriction_default_action = "Deny"
+  }
+
+  identity { type = "SystemAssigned" }
+
+  app_settings = {
+    # wartość nigdy nie przechodzi przez Terraform ani przez repozytorium
+    CAPITAL_API_KEY = "@Microsoft.KeyVault(SecretUri=${azurerm_key_vault_secret.capital_api_key.id})"
+  }
+}
+
+resource "azurerm_postgresql_flexible_server" "db" {
+  name                  = "psql-tradingcenter"
+  resource_group_name   = azurerm_resource_group.main.name
+  location              = azurerm_resource_group.main.location
+  version               = "17"
+  sku_name              = "B_Standard_B1ms"   # objęte darmowym rokiem
+  storage_mb            = 32768               # 32 GB, granica darmowego limitu
+  backup_retention_days = 7
+  zone                  = "1"
+}</code></pre>
+
+<div class="callout warn">
+  <span class="tag">Problem kury i jajka</span>
+  <p>Stan Terraforma powinien leżeć w Azure Blob Storage, a nie w gicie — bo zawiera wartości, których nie chcesz publikować, i bo bez wspólnego stanu nie da się pracować z dwóch miejsc.</p>
+  <p>Ale konto magazynu na ten stan trzeba czymś stworzyć. <strong>Rozwiązanie: mały osobny katalog <code>infra/bootstrap/</code> z lokalnym stanem</strong>, tworzący wyłącznie grupę zasobów, konto magazynu i kontener. Uruchamiasz go raz, jego stan (nic wrażliwego) commitujesz albo porzucasz, a cała reszta infrastruktury używa już backendu zdalnego.</p>
+</div>
+
+<h2>4. Sekrety — zero w repozytorium, zero w GitHubie</h2>
+
+<p>To była jedna z rzeczy, dla których chciałeś Azure, i tutaj rzeczywiście wychodzi ładnie:</p>
+
+<ol>
+  <li><strong>Key Vault</strong> trzyma poświadczenia capital.com i hasło do bazy.</li>
+  <li><strong>Aplikacje mają tożsamość zarządzaną</strong> (<code>SystemAssigned</code>) i uprawnienie odczytu sekretów.</li>
+  <li><strong>W ustawieniach aplikacji jest tylko odwołanie</strong> w postaci <code>@Microsoft.KeyVault(SecretUri=…)</code>. Platforma podstawia wartość przy starcie. Sekret nie pojawia się ani w kodzie Terraforma, ani w portalu, ani w logach wdrożenia.</li>
+  <li><strong>GitHub Actions loguje się przez OIDC</strong> — federacja tożsamości zamiast hasła. W repozytorium nie ma <em>żadnego</em> sekretu do Azure, nawet klucza wdrożeniowego.</li>
+</ol>
+
+<p>Porównaj z wariantem na VPS-ie, gdzie w GitHub Secrets musiałby leżeć klucz SSH do serwera. Tutaj nie ma czego wykraść, bo nie ma czego przechowywać.</p>
+
+<div class="callout">
+  <span class="tag">Rozwinięcie na później</span>
+  <p>Flexible Server obsługuje uwierzytelnianie przez Entra ID. Wtedy <code>market-data</code> łączy się z bazą <strong>swoją tożsamością zarządzaną, bez hasła w ogóle</strong> — znika ostatni sekret, który trzeba rotować. Na start zostawiłbym hasło w Key Vault, bo to jeden ruchomy element mniej przy pierwszym uruchomieniu.</p>
+</div>
+
+<h2>5. Sieć i dostęp</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Element</th><th>Jak wystawiony</th><th>Czym chroniony</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>terminal</strong></td>
+      <td>publicznie, własna domena</td>
+      <td>wbudowane logowanie Static Web Apps</td>
+    </tr>
+    <tr>
+      <td><strong>market-data</strong></td>
+      <td>publicznie <span class="dim">(terminal woła je z przeglądarki)</span></td>
+      <td>Easy Auth z Entra ID — bez kodu</td>
+    </tr>
+    <tr>
+      <td><strong>capital-gateway</strong></td>
+      <td><span class="pill bad">niepublicznie</span></td>
+      <td>Access Restrictions: <code>Deny</code> domyślnie, wyjątek dla adresów wyjściowych planu + <strong>własne uwierzytelnianie w kodzie</strong></td>
+    </tr>
+    <tr>
+      <td><strong>baza</strong></td>
+      <td>tylko dla App Service</td>
+      <td>reguła firewalla na adresy wyjściowe planu, wymuszony TLS</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout bad">
+  <span class="tag">To trzeba zrobić niezależnie od chmury</span>
+  <p><strong><code>capital-gateway</code> nie ma dziś żadnego uwierzytelniania na endpointach</strong> — sprawdziłem <code>app.py</code>. A wystawia <code>POST /orders</code> i <code>DELETE /positions/{id}</code>.</p>
+  <p>Access Restrictions to konfiguracja, a konfigurację można popsuć jednym błędnym wpisem. Uwierzytelnianie w kodzie to warunek, którego nie da się przypadkiem wyłączyć. <strong>Zrób je pierwsze.</strong></p>
+  <p>Przy okazji wyłącz Swaggera w produkcji (<code>docs_url=None</code>, <code>openapi_url=None</code>) — inaczej podajesz gotową mapę API razem z endpointami handlowymi.</p>
+</div>
+
+<h3>Pułapka z adresami wyjściowymi</h3>
+
+<p>Reguła firewalla bazy i Access Restrictions gatewaya opierają się na <strong>adresach wyjściowych App Service Plan</strong>. Te adresy <strong>zmieniają się przy zmianie warstwy planu</strong> — przejście z B1 na B2 potrafi je przestawić i wtedy aplikacja nagle nie widzi bazy.</p>
+
+<p>Dlatego w Terraformie czytaj je z zasobu (<code>possible_outbound_ip_address_list</code>), zamiast wpisywać ręcznie. Docelowe rozwiązanie to integracja z siecią wirtualną i prywatny endpoint bazy — ale to podnosi koszt i złożoność, więc na start wystarczy reguła wyliczana z kodu.</p>
+
+<h2>6. Wdrożenia</h2>
+
+<pre><code>name: deploy
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write      # OIDC — bez tego federacja nie zadziała
+  contents: read
+  packages: write
+
+jobs:
+  gateway:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/build-push-action@v6
+        with:
+          context: modules/capital-gateway
+          push: true
+          tags: ghcr.io/marekgrzeska/capital-gateway:${{ github.sha }}
+
+      - uses: azure/login@v2          # logowanie bez hasła
+        with:
+          client-id:       ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id:       ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: app-capital-gateway
+          images: ghcr.io/marekgrzeska/capital-gateway:${{ github.sha }}</code></pre>
+
+<p>Zwróć uwagę na <code>vars</code>, nie <code>secrets</code> — identyfikatory dzierżawy i subskrypcji nie są tajne, a hasła nie ma w ogóle. Terraform wdraża się osobnym przepływem, z <code>plan</code> na pull requestach i <code>apply</code> po scaleniu.</p>
+
+<h2>7. Kopie zapasowe i monitoring</h2>
+
+<div class="callout good">
+  <span class="tag">Za to tu naprawdę płacisz</span>
+  <p><strong>Flexible Server robi kopie automatycznie</strong> — 7 dni w cenie, do 35 dni konfigurowalnie, z <strong>odtwarzaniem do dowolnego punktu w czasie</strong>. Nie piszesz skryptu, nie ustawiasz crona, nie testujesz odtwarzania ręcznie.</p>
+  <p>Waga tego jest konkretna: odtworzenie trzech lat historii dla stu instrumentów z brokera zajmuje — licząc z pomiaru z README modułu — <strong>około 27 godzin</strong>. PITR sprowadza to do kilkunastu minut.</p>
+</div>
+
+<p><strong>Application Insights</strong> mieści się w darmowym limicie 5 GB miesięcznie i daje logi, wyjątki oraz metryki bez stawiania niczego. <strong>Alerty metryczne</strong> kosztują ~$0,10 za regułę miesięcznie.</p>
+
+<div class="callout warn">
+  <span class="tag">Czego Azure za ciebie nie zrobi</span>
+  <p>Alert „ingest przestał zapisywać świece" musisz zbudować sam — Azure nie wie, co twoja aplikacja ma robić. Wystaw z <code>market-data</code> metrykę wieku najnowszej świecy, a alert na niej postaw już w Azure Monitor.</p>
+  <p>To jest ten sam nakład pracy co na VPS-ie. Nie liczy się jako przewaga chmury — chmura daje tylko instalację hydrauliczną, nie sam czujnik.</p>
+</div>
+
+<h2>8. Koszty</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pozycja</th><th class="num">Rok 1</th><th class="num">Rok 2+</th></tr></thead>
+  <tbody>
+    <tr><td>App Service Plan B1 (Linux)</td><td class="num">13,15</td><td class="num">13,15</td></tr>
+    <tr><td>PostgreSQL Flexible Server B1ms + 32 GB</td><td class="num"><strong>0,00</strong> <span class="dim">darmowy rok</span></td><td class="num">18,91</td></tr>
+    <tr><td>Static Web Apps (plan Free)</td><td class="num">0,00</td><td class="num">0,00</td></tr>
+    <tr><td>Key Vault <span class="dim">($0,03 / 10 tys. operacji)</span></td><td class="num">~0,01</td><td class="num">~0,01</td></tr>
+    <tr><td>Application Insights <span class="dim">(5 GB w cenie)</span></td><td class="num">0,00</td><td class="num">0,00</td></tr>
+    <tr><td>Blob Storage na stan Terraforma</td><td class="num">~0,10</td><td class="num">~0,10</td></tr>
+    <tr><td>Alerty metryczne <span class="dim">(3 reguły)</span></td><td class="num">~0,30</td><td class="num">~0,30</td></tr>
+    <tr class="total"><td><strong>Razem miesięcznie</strong></td><td class="num"><strong>~13,56</strong></td><td class="num"><strong>~32,47</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Gdyby baza urosła do <code>B2s</code> z 64 GB — czyli konfiguracji docelowej z wcześniejszych analiz — dochodzi $66,88 zamiast $18,91, więc całość wychodzi <strong>~$80 miesięcznie</strong>. Ale przy dwudziestu instrumentach i przyroście rzędu 1,2 GB rocznie B1ms wystarcza na lata.</p>
+
+<div class="callout">
+  <span class="tag">Uczciwe porównanie</span>
+  <p><strong>Rok pierwszy na Azure kosztuje mniej więcej tyle co VPS</strong> (~$14 wobec ~$14 z kopiami zapasowymi). Od roku drugiego Azure jest około <strong>dwa i pół raza droższy</strong>.</p>
+  <p>Ta różnica kupuje: kopie zapasowe z PITR, brak własności systemu operacyjnego, wdrożenia bez przechowywanych sekretów i logowanie bez pisania kodu. Czy warta — zależy od tego, ile wart jest twój czas i jak bardzo nie chcesz być tym, kto o trzeciej w nocy odtwarza bazę.</p>
+</div>
+
+<h2>9. Pułapki</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pułapka</th><th>Co robić</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Limit wydatków wyłączy wszystko po 30 dniach</strong></td>
+      <td><span class="pill bad">termin</span> Przejdź na Pay-As-You-Go przed trzydziestym dniem, inaczej subskrypcja zostaje wyłączona i darmowy rok przepada. Zaraz potem ustaw budżet z alertem, bo zdejmując limit zdejmujesz też zabezpieczenie.</td>
+    </tr>
+    <tr>
+      <td><strong>Darmowy limit to 750 godzin <em>jednego</em> B1ms</strong></td>
+      <td>Dwa serwery naraz przekraczają go natychmiast. Jedno środowisko, nie dev i prod osobno.</td>
+    </tr>
+    <tr>
+      <td><strong>App Service restartuje aplikacje</strong></td>
+      <td>Konserwacja platformy przerywa strumień. <code>Upstream</code> w gatewayu ma pętlę ponawiania, a <code>market-data</code> musi domykać lukę po restarcie — to już jest w wymaganiach modułu, ale tu staje się obowiązkowe, nie opcjonalne.</td>
+    </tr>
+    <tr>
+      <td><strong>Adresy wyjściowe zmieniają się przy zmianie warstwy planu</strong></td>
+      <td>Czytaj je z zasobu w Terraformie, nigdy nie wpisuj ręcznie.</td>
+    </tr>
+    <tr>
+      <td><strong>Key Vault ma miękkie usuwanie</strong></td>
+      <td><code>terraform destroy</code> zostawia sejf w stanie usuniętym, a ponowne utworzenie z tą samą nazwą się wywraca. Przy środowiskach jednorazowych używaj losowego przyrostka w nazwie.</td>
+    </tr>
+    <tr>
+      <td><strong>Stan Terraforma nie może trafić do gita</strong></td>
+      <td>Backend na Blob Storage, bootstrap osobnym katalogiem.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>10. Kolejność prac</h2>
+
+<ol class="steps">
+  <li>
+    <b>Uwierzytelnianie w gatewayu + wyłączenie Swaggera</b>
+    <p>Zanim cokolwiek stanie w chmurze. To zmiana zachowania, więc idzie przez OpenSpec jako modyfikacja <code>capital-session</code>.</p>
+  </li>
+  <li>
+    <b><code>infra/bootstrap/</code></b>
+    <p>Grupa zasobów, konto magazynu i kontener na stan. Raz, z lokalnym stanem.</p>
+  </li>
+  <li>
+    <b>Zdejmij limit wydatków i ustaw budżet</b>
+    <p><span class="pill bad">przed 30. dniem</span> Inaczej reszta planu nie ma na czym stanąć.</p>
+  </li>
+  <li>
+    <b>Terraform: baza, plan, Key Vault, Application Insights</b>
+    <p>Baza pierwsza, bo od niej zależy reszta konfiguracji.</p>
+  </li>
+  <li>
+    <b>Federacja OIDC dla GitHub Actions</b>
+    <p>Aplikacja Entra, poświadczenie federowane, przypisanie roli. Od tego momentu wdrożenia działają bez żadnego hasła.</p>
+  </li>
+  <li>
+    <b>Dockerfile gatewaya i pierwsze wdrożenie</b>
+    <p>Sprawdzasz cały łańcuch na module, który już działa, zanim dołożysz nowy.</p>
+  </li>
+  <li>
+    <b>Terminal na Static Web Apps</b>
+    <p>Z wbudowanym logowaniem. Ścieżki API na względne, żeby działały za bramką.</p>
+  </li>
+  <li>
+    <b>Dopiero teraz <code>market-data</code></b>
+    <p>Na gotowej infrastrukturze, z bazą, sekretami i wdrożeniami, które już działają.</p>
+  </li>
+</ol>
+
+<footer>
+  <p><strong>Powiązane dokumenty</strong></p>
+  <ul>
+    <li><code>docs/vps-plan.html</code> — ten sam system na VPS: deploye, sekrety, autoryzacja</li>
+    <li><code>docs/vps-deployment-proposal.html</code> — architektura na VPS, dobór maszyny, kopie zapasowe</li>
+    <li><code>docs/azure-postgres-cost-research.html</code> — koszty bazy na Azure, edycje TimescaleDB</li>
+    <li><code>docs/cloud-cost-comparison.html</code> — Azure, Google i AWS</li>
+    <li><code>docs/architecture.md</code> — granice modułów</li>
+  </ul>
+</footer>
+
+</main>
