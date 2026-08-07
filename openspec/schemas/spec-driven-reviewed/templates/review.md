@@ -23,8 +23,8 @@
      proves it. A scenario with no test is a gap and is listed as one — a
      passing suite and a satisfied spec are different claims. -->
 
-| Requirement / Scenario | Proven by | |
-|---|---|---|
+| Requirement / Scenario | Proven by |
+|---|---|
 
 ## Gaps
 

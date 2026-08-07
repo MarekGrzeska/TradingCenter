@@ -7,7 +7,7 @@
           {
             "type": "command",
             "shell": "powershell",
-            "command": "powershell -ExecutionPolicy Bypass -File \".claude/hooks/require-review.ps1\"",
+            "command": "$root = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (Get-Location).Path }; & (Join-Path $root '.claude\\hooks\\require-review.ps1')",
             "timeout": 15,
             "statusMessage": "Checking the change has been reviewed"
           }
