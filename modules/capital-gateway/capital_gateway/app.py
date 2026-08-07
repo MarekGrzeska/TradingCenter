@@ -4,13 +4,22 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, Query, Request
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from .adapter import CapitalAdapter
 from .client import CapitalClient
 from .config import Settings
-from .dtos import Capabilities
+from .dtos import (
+    Account,
+    Candle,
+    CandleHistory,
+    Capabilities,
+    Instrument,
+    InstrumentPage,
+    Resolution,
+)
 from .errors import GatewayError
 from .stream.hub import Hub
 from .stream.upstream import Upstream
@@ -83,3 +92,73 @@ async def root() -> dict:
 async def capabilities(a: CapitalAdapter = Depends(adapter)):
     """What this module serves, and which environment it is bound to."""
     return a.capabilities()
+
+
+# --- accounts ---
+
+
+@app.get("/accounts", tags=["accounts"], response_model=list[Account])
+async def accounts(a: CapitalAdapter = Depends(adapter)):
+    return await a.list_accounts()
+
+
+class SetActiveAccount(BaseModel):
+    account_id: str = Field(description="an id from GET /accounts")
+
+
+@app.put("/accounts/active", tags=["accounts"], response_model=Account)
+async def set_active_account(body: SetActiveAccount, a: CapitalAdapter = Depends(adapter)):
+    """Switch the active account. Positions and orders act on it afterwards."""
+    return await a.set_active_account(body.account_id)
+
+
+# --- market data ---
+
+
+@app.get("/instruments", tags=["market-data"], response_model=InstrumentPage)
+async def instruments(
+    max_nodes: int = Query(300, ge=1, le=3000, description="how much of the tree to walk"),
+    a: CapitalAdapter = Depends(adapter),
+):
+    """Every instrument, deduped. `truncated` is true when the bound cut the walk short."""
+    return await a.list_instruments(max_nodes)
+
+
+@app.get("/instruments/search", tags=["market-data"], response_model=list[Instrument])
+async def search_instruments(
+    q: str = Query(..., description="e.g. 'gold', 'apple', 'btc'"),
+    a: CapitalAdapter = Depends(adapter),
+):
+    return await a.search_instruments(q)
+
+
+@app.get("/instruments/{symbol}/candles", tags=["market-data"], response_model=list[Candle])
+async def candles(
+    symbol: str,
+    resolution: Resolution = Query(Resolution.MINUTE, description="candle time frame"),
+    limit: int = Query(100, ge=1, le=1000, description="the provider's ceiling is 1000"),
+    a: CapitalAdapter = Depends(adapter),
+):
+    """One request's worth of candles. For more than 1000, use `/history`."""
+    return await a.get_candles(symbol, resolution, limit)
+
+
+@app.get("/instruments/{symbol}/history", tags=["market-data"], response_model=CandleHistory)
+async def history(
+    request: Request,
+    symbol: str,
+    resolution: Resolution = Query(Resolution.MINUTE_5),
+    bars: int = Query(1000, ge=1, le=50_000, description="how many candles to reach back for"),
+    a: CapitalAdapter = Depends(adapter),
+):
+    """Candles paged past the provider's per-request ceiling.
+
+    This is a long request by design — 20 000 five-minute candles measured at 30 provider
+    calls and 26 seconds. The response says how many requests it took, and paging stops
+    early if the client disconnects.
+    """
+
+    async def still_wanted() -> bool:
+        return not await request.is_disconnected()
+
+    return await a.get_history(symbol, resolution, bars, still_wanted)
