@@ -15,7 +15,7 @@
 ## 3. Klient REST i sesja
 
 - [x] 3.1 Napisać `client.py`: asynchroniczny klient httpx, logowanie przechwytujące `CST` i `X-SECURITY-TOKEN`, helper żądania uwierzytelnionego, jedno ponowne logowanie i ponowienie na 401
-- [ ] 3.2 Dzielić jedno trwające logowanie między współbieżnych wywołujących, żeby seria żądań powodowała pojedyncze logowanie
+- [x] 3.2 Dzielić jedno trwające logowanie między współbieżnych wywołujących, żeby seria żądań powodowała pojedyncze logowanie
 - [ ] 3.3 Przepuścić każde wywołanie do providera przez jedną ograniczoną bramkę trzymającą moduł poniżej 10 żądań/s
 - [ ] 3.4 Test na `respx`: wygasła sesja uwierzytelnia się ponownie i ponawia raz; współbieżni wywołujący wywołują dokładnie jedno logowanie; bramka ogranicza współbieżność żądań
 

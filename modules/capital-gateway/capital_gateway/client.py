@@ -12,6 +12,8 @@ idle minutes. Callers never see them.
 
 from __future__ import annotations
 
+import asyncio
+
 import httpx
 
 from .config import Settings
@@ -28,6 +30,7 @@ class CapitalClient:
         )
         self._cst: str | None = None
         self._security_token: str | None = None
+        self._login_inflight: asyncio.Task[httpx.Response] | None = None
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -47,6 +50,24 @@ class CapitalClient:
         return self._cst or "", self._security_token or ""
 
     async def login(self) -> httpx.Response:
+        """Log in, or join the login already running.
+
+        Without this, a burst of calls arriving with no session each starts its own
+        login: capital.com invalidates the previous session on every new one, so the
+        winners of that race hold tokens the last login already killed. One shared
+        attempt turns a stampede into one request everybody waits on.
+
+        Deliberately a Task rather than a lock: awaiting the same Task hands every
+        waiter the same result, whereas a lock would let each waiter proceed to log in
+        again in turn.
+        """
+        if self._login_inflight is None or self._login_inflight.done():
+            self._login_inflight = asyncio.create_task(self._login())
+        # Shielded so one caller's cancellation does not cancel the login the others
+        # are waiting on.
+        return await asyncio.shield(self._login_inflight)
+
+    async def _login(self) -> httpx.Response:
         resp = await self._http.post(
             f"{API_PREFIX}/session",
             headers={"X-CAP-API-KEY": self._s.capital_api_key},
