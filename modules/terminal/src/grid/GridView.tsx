@@ -1,12 +1,11 @@
 import { useSyncExternalStore } from "react";
 import { Chart } from "../chart/Chart";
-import { sourceStore } from "../data/sourceStore";
+import { marketData } from "../data/marketData";
 import { gridStore } from "./gridStore";
 import { SymbolField } from "./SymbolField";
 import { LAYOUTS, LAYOUT_IDS, visibleSlotIds, type SlotId } from "./model";
 
 export function GridView() {
-  const source = useSyncExternalStore(sourceStore.subscribe, sourceStore.getSnapshot);
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
 
   const visible = visibleSlotIds(config.layout);
@@ -43,22 +42,14 @@ export function GridView() {
         }}
       >
         {visible.map((slotId) => (
-          <Slot key={slotId} slotId={slotId} active={config.activeSlot === slotId} source={source} />
+          <Slot key={slotId} slotId={slotId} active={config.activeSlot === slotId} />
         ))}
       </div>
     </div>
   );
 }
 
-function Slot({
-  slotId,
-  active,
-  source,
-}: {
-  slotId: SlotId;
-  active: boolean;
-  source: ReturnType<typeof sourceStore.getSnapshot>;
-}) {
+function Slot({ slotId, active }: { slotId: SlotId; active: boolean }) {
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
   const slot = config.slots[slotId];
 
@@ -79,7 +70,7 @@ function Slot({
         <EmptySlot slotId={slotId} />
       ) : (
         <Chart
-          source={source}
+          source={marketData}
           symbol={slot.symbol}
           resolution={slot.resolution}
           onResolutionChange={(resolution) => gridStore.setSlotResolution(slotId, resolution)}

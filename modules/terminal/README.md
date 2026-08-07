@@ -1,19 +1,19 @@
 # terminal
 
-The operator-facing frontend: charts, in a grid, fed either by `capital-gateway` or by a
-mock that needs no network. React + TypeScript, talking to the gateway over HTTP and
-WebSocket and depending on nothing else in this repository.
+The operator-facing frontend: charts, in a grid, fed by `capital-gateway`. React +
+TypeScript, talking to the gateway over HTTP and WebSocket and depending on nothing else in
+this repository.
 
 ## What
 
 - `data/` — the contract and its implementations. `types.ts` (`Bar`, `Instrument`,
   `Resolution`), `source.ts` (the `MarketDataSource` interface every view reads through),
-  `gatewaySource.ts` (capital-gateway), `mockSource.ts` (deterministic, offline),
-  `socketHub.ts` (one WebSocket per `symbol|resolution`, ref-counted), `merge.ts`
+  `gatewaySource.ts` (the one implementation), `marketData.ts` (the single instance every
+  view reads), `socketHub.ts` (one WebSocket per `symbol|resolution`, ref-counted), `merge.ts`
   (candles deduped by timestamp), `time.ts` (the ISO → epoch-seconds seam),
   `config.ts` (the two independent base addresses).
-- `app/` — the shell: tab registry, routing, theme, source switch, connection indicator,
-  per-view error boundary.
+- `app/` — the shell: tab registry, routing, theme, connection indicator, per-view error
+  boundary.
 - `chart/` — the reusable candlestick chart, identical standalone and in a grid slot.
 - `grid/` — six slots with fixed identities, layout presets, and persistence.
 - `instruments/` — search and catalogue, feeding instruments into the active slot.
@@ -26,11 +26,9 @@ cp .env.example .env      # optional; the defaults already target the dev proxy
 pnpm dev                  # http://localhost:5173
 ```
 
-The **mock** source is the default and needs nothing else running. For the **gateway**
-source, start `capital-gateway` on port 8010 first, then switch source in the top bar.
-
-From the repo root, `./scripts/dev.ps1` starts the terminal alone and
-`./scripts/dev.ps1 -WithGateway` starts the gateway alongside it.
+`capital-gateway` must be running on port 8010 — there is no offline mode, and without it the
+terminal says the source is unreachable and draws nothing. From the repo root,
+`./scripts/dev.ps1` starts the gateway, waits for it, then starts the terminal against it.
 
 ## Test
 
@@ -91,10 +89,12 @@ immediately while a 500-bar read takes seconds, so history is *merged* under wha
 stream already delivered rather than replacing it — otherwise the forming candle would
 vanish until the next tick, which at `DAY` resolution could be hours.
 
-**Switching source has to clear the chart, not just re-read it.** Caught in the browser:
-mock prices stayed on screen under a "gateway" label for the seconds the deep read took.
-Not a stale chart — a wrong one. Now the series is cleared on a source change exactly as it
-is on a symbol change.
+**Changing what a chart points at has to clear it, not just re-read it.** Caught in the
+browser back when a second source existed: the previous source's prices stayed on screen
+under the new source's label for the seconds a deep read takes. Not a stale chart — a wrong
+one. The series is cleared whenever the symbol, the resolution *or* the source instance
+changes, which is what keeps that true when the candle store becomes the second
+implementation.
 
 **Up candles are drawn hollow.** Teal-vs-red passes every gate in the palette validator
 except protan CVD separation (ΔE 6.5, inside the 6–8 floor band), which is only legal

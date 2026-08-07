@@ -8,7 +8,7 @@ import type { MarketDataSource } from "../data/source";
 // Drives search results by hand so debounce and out-of-order answers are
 // testable rather than incidental.
 class SearchableSource implements MarketDataSource {
-  readonly id = "mock" as const;
+  readonly id = "gateway" as const;
   searchCalls: string[] = [];
   listCalls = 0;
 
@@ -54,12 +54,11 @@ class SearchableSource implements MarketDataSource {
 
 let source: SearchableSource;
 
-vi.mock("../data/sourceStore", () => ({
-  sourceStore: {
-    subscribe: () => () => {},
-    getSnapshot: () => source,
-    getSourceId: () => "mock" as const,
-    setSource: () => {},
+vi.mock("../data/marketData", () => ({
+  // A getter, so each test's freshly constructed source is the one the view
+  // reads — the module is imported once, but `source` is reassigned per test.
+  get marketData() {
+    return source;
   },
 }));
 

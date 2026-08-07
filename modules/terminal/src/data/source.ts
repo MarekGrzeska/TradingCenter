@@ -8,12 +8,12 @@ export interface HistoryRequest {
   count: number;
 }
 
-/** One interface, swappable implementations: `gatewaySource` reads capital-gateway,
- *  `mockSource` generates deterministic data with no network. A candle-store
- *  implementation slots in later the same way — see design.md. No view ever
- *  imports a concrete source; everything goes through this. */
+/** One interface, swappable implementations. `gatewaySource` is the only one
+ *  today; a candle-store implementation slots in later the same way, without
+ *  the chart, the grid or the search knowing — see design.md. Views read the
+ *  single instance exported by `marketData.ts`, never a constructor. */
 export interface MarketDataSource {
-  readonly id: "gateway" | "mock";
+  readonly id: "gateway";
 
   searchInstruments(query: string, signal: AbortSignal): Promise<Instrument[]>;
 

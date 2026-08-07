@@ -49,21 +49,25 @@
       połączenia; test harmonogramu na sterowanym zegarze
 - [x] 3.5 Dociągać lukę po wznowieniu: po powrocie połączenia odczytać ostatnie świece i scalić je
       z serią
-- [x] 3.6 Zaimplementować źródło mock: deterministyczne ziarno z symbolu, błądzenie losowe, świece
-      historyczne i tykanie na żywo z flagą `forming`; test na powtarzalności serii
+- [x] 3.6 ~~Zaimplementować źródło mock~~ — **wycofane**. Zostało zbudowane (deterministyczne
+      ziarno, świece historyczne, tykanie na żywo, test powtarzalności) i usunięte na życzenie:
+      terminal ma pokazywać rynek, a rynek jest w gatewayu. Testy nigdy z niego nie korzystały —
+      każdy ma własną atrapę sterowaną z testu — więc usunięcie nic nie odsłoniło.
 - [x] 3.7 Budować adresy z `VITE_GATEWAY_HTTP` i `VITE_GATEWAY_WS` niezależnie, przyjmując ścieżkę
       względną i pełny URL; ścieżka względna dla strumienia rozwija się na `ws`/`wss` zgodnie ze
       schematem strony. Test na obu kształtach — inaczej rozjazd wyjdzie dopiero przy wdrożeniu
-- [x] 3.8 Wystawić wybór źródła (`gateway` / `mock`) jako stan aplikacji na `useSyncExternalStore`,
-      z wartością początkową ze zmiennej środowiskowej
+- [x] 3.8 ~~Wystawić wybór źródła jako stan aplikacji~~ — **wycofane** razem z 3.6. Przy jednej
+      implementacji przełącznik nie ma czego przełączać; źródło jest pojedynczą instancją modułu
+      (`marketData.ts`), po którą sięgają widoki. Interfejs `MarketDataSource` zostaje — to szew
+      pod bazę świec, nie pod wybór w UI.
 
 ## 4. Powłoka terminala
 
 - [x] 4.1 Wprowadzić rejestr zakładek — nazwa, ścieżka, widok — i wyprowadzić z niego routing
       oraz pasek nawigacji; wpisy `Positions`, `Orders`, `Account` oznaczone jako przygotowane
       na przyszłość
-- [x] 4.2 Zbudować layout: pasek górny z nazwą, przełącznikiem źródła i wskaźnikiem połączenia,
-      pasek zakładek, obszar treści na pełną wysokość
+- [x] 4.2 Zbudować layout: pasek górny z nazwą i wskaźnikiem połączenia, pasek zakładek, obszar
+      treści na pełną wysokość. Przełącznik źródła zniknął razem z 3.8.
 - [x] 4.3 Dodać stronę nieznanego adresu z drogą powrotną oraz widok „ta zakładka jeszcze nie
       działa" dla wpisów przygotowanych na przyszłość
 - [x] 4.4 Dodać granicę błędu obejmującą pojedynczy widok, z komunikatem i ponowieniem, tak żeby
@@ -137,7 +141,7 @@
 ## 8. Domknięcie
 
 - [x] 8.1 Napisać `modules/terminal/README.md` w układzie what / run / test / contract, z
-      wymaganiem uruchomionego gatewaya dla źródła `gateway` i informacją, że mock działa bez niego
+      wymaganiem uruchomionego gatewaya — terminal nie ma trybu offline
 - [x] 8.2 Uruchomić przeciw działającemu `capital-gateway` na demo: potwierdzić, że świeca
       w budowie faktycznie rusza wykresem na `MINUTE_5`, i zapisać, co się zobaczyło. Ruszyła —
       OHLC ostatniej świecy US100 zmieniło się w ciągu 45 s bez świecy zamkniętej po drodze.

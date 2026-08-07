@@ -1,30 +1,34 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-// These tests are about the shell — routing, the tab registry, the source
+// These tests are about the shell — routing, the tab registry, the connection
 // indicator. The Graph tab's real grid would mount charts (and with them a
-// canvas jsdom cannot provide, plus a live mock feed) for every assertion
-// about a link. GridView has its own tests.
+// canvas jsdom cannot provide) for every assertion about a link. GridView has
+// its own tests.
 vi.mock("./grid/GridView", () => ({
   GridView: () => <div>grid stub</div>,
 }));
 vi.mock("./instruments/InstrumentsView", () => ({
   InstrumentsView: () => <div>instruments stub</div>,
 }));
+// No gateway is running under the test suite; the top bar's reachability
+// check is stubbed so these tests assert routing, not connectivity.
+vi.mock("./data/marketData", () => ({
+  marketData: {
+    id: "gateway" as const,
+    searchInstruments: async () => [],
+    listInstruments: async () => ({ instruments: [], count: 0, truncated: false }),
+    history: async () => [],
+    ping: async () => {},
+    subscribe: () => () => {},
+  },
+}));
 
 const { App } = await import("./App");
-const { sourceStore } = await import("./data/sourceStore");
 
 beforeEach(() => {
   window.history.pushState({}, "", "/");
-});
-
-// sourceStore is a module-level singleton (one active source for the whole
-// app, by design) — reset it so a source switch in one test can't leak into
-// the next.
-afterEach(() => {
-  sourceStore.setSource("mock");
 });
 
 // The top bar's health check (useSourceHealth) resolves asynchronously right
@@ -33,7 +37,7 @@ afterEach(() => {
 // whichever test happens to be running when the microtask lands.
 async function renderApp() {
   const view = render(<App />);
-  await screen.findByText(/checking|connected|unreachable/i);
+  await screen.findByText(/capital-gateway (checking|connected|unreachable)/i);
   return view;
 }
 
@@ -86,21 +90,8 @@ describe("App routing (terminal-shell spec)", () => {
 });
 
 describe("App top bar (terminal-shell spec, source status)", () => {
-  it("names the active source and reports it reachable once the mock source answers", async () => {
+  it("names the source and reports it reachable once it answers", async () => {
     await renderApp();
-    expect(await screen.findByText(/mock connected/i)).toBeInTheDocument();
-  });
-
-  it("switching source updates the label and re-checks reachability", async () => {
-    const user = userEvent.setup();
-    await renderApp();
-    await screen.findByText(/mock connected/i);
-
-    await user.selectOptions(screen.getByLabelText("Source"), "gateway");
-
-    // No real gateway is running in this test — the point is that the
-    // indicator follows the newly selected source rather than staying on
-    // the old one's last known state.
-    expect(await screen.findByText(/gateway (unreachable|checking)/i)).toBeInTheDocument();
+    expect(await screen.findByText(/capital-gateway connected/i)).toBeInTheDocument();
   });
 });

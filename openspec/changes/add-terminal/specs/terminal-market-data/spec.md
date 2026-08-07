@@ -9,25 +9,20 @@ połączenie zamiast otwierać po jednym każdy.
 ### Requirement: Źródło danych jest wymienne za jednym interfejsem
 
 Terminal MUST czytać świece i strumień wyłącznie przez jeden interfejs, opisujący odczyt historii
-i subskrypcję na żywo. MUST istnieć co najmniej dwie implementacje tego interfejsu: czytająca z
-`capital-gateway` oraz mock generujący dane bez sieci. Żaden widok MUST NOT wiedzieć, która
-implementacja go obsługuje.
+i subskrypcję na żywo. Implementacją jest dziś wyłącznie ta czytająca z `capital-gateway`. Żaden
+widok MUST NOT wiedzieć, która implementacja go obsługuje, ani MUST NOT budować jej sam — widoki
+sięgają po jedną instancję udostępnioną przez moduł.
 
-#### Scenario: Przełączenie źródła
-
-- **WHEN** operator przełącza źródło danych w interfejsie
-- **THEN** wykresy i wyszukiwarka zaczynają czytać z nowego źródła
-- **AND** nie wymaga to zmiany w żadnym widoku
-
-#### Scenario: Dołożenie trzeciego źródła
+#### Scenario: Dołożenie kolejnego źródła
 
 - **WHEN** pojawia się kolejna implementacja interfejsu, na przykład czytająca z bazy świec
 - **THEN** wpięcie jej MUST NOT wymagać zmian w wykresie, w siatce ani w wyszukiwarce
 
-#### Scenario: Praca bez gatewaya
+#### Scenario: Jedna instancja na całą aplikację
 
-- **WHEN** `capital-gateway` jest nieosiągalny, a wybrane źródło to mock
-- **THEN** terminal działa w całości: rysuje świece, zmienia interwały i pokazuje ruch na żywo
+- **WHEN** wiele widoków czyta dane w tym samym czasie
+- **THEN** korzystają z tej samej instancji źródła, żeby współdzieliły jeden zestaw połączeń
+- **AND** żaden widok nie tworzy własnej
 
 ### Requirement: Znaczniki czasu są sprowadzone do jednej postaci
 

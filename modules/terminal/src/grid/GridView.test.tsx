@@ -18,12 +18,11 @@ vi.mock("lightweight-charts", () => ({
   }),
 }));
 
-// A quiet source: the real mock source ticks on an interval, which would push
-// state updates into these tests at arbitrary moments. The grid's job is
-// layout and slot wiring, not data.
-vi.mock("../data/sourceStore", () => {
-  const source = {
-    id: "mock" as const,
+// A quiet source. The grid's job is layout and slot wiring, not data, and a
+// live source would push state updates into these tests at arbitrary moments.
+vi.mock("../data/marketData", () => ({
+  marketData: {
+    id: "gateway" as const,
     searchInstruments: async () => [],
     listInstruments: async () => ({ instruments: [], count: 0, truncated: false }),
     // Never resolves: the charts stay in their loading state, so no async
@@ -31,16 +30,8 @@ vi.mock("../data/sourceStore", () => {
     history: () => new Promise<never>(() => {}),
     ping: async () => {},
     subscribe: () => () => {},
-  };
-  return {
-    sourceStore: {
-      subscribe: () => () => {},
-      getSnapshot: () => source,
-      getSourceId: () => "mock" as const,
-      setSource: () => {},
-    },
-  };
-});
+  },
+}));
 
 const { GridView } = await import("./GridView");
 const { gridStore, STORAGE_KEY } = await import("./gridStore");

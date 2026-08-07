@@ -68,7 +68,7 @@ export function makeFakeSeries(): FakeSeries {
 
 /** A source whose history resolution and stream events the test drives. */
 export class ControllableSource implements MarketDataSource {
-  readonly id = "mock" as const;
+  readonly id = "gateway" as const;
 
   historyCalls: Array<{ symbol: string; resolution: Resolution }> = [];
   subscribeCalls: Array<{ symbol: string; resolution: Resolution }> = [];

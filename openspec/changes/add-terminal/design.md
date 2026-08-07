@@ -40,6 +40,9 @@ tego, co dalej. Baza świec to osobny moduł, którego jeszcze nie ma.
 - Własne cache'owanie historii między sesjami. Trwałe jest ustawienie slotu, nie jego dane.
 - Wdrożenie do Azure. Kierunek jest znany — Static Web Apps dla terminala — ale ta zmiana buduje
   i uruchamia lokalnie. Pliki wdrożeniowe powstają wtedy, gdy będzie co wdrażać.
+- Tryb offline. `capital-gateway` jest jedynym źródłem danych; bez niego terminal mówi, że źródło
+  nie odpowiada, i nie rysuje niczego. Generator danych „na niby" był rozważany i odrzucony —
+  patrz niżej.
 
 ## Decisions
 
@@ -89,7 +92,7 @@ trzyma poświadczenia providera i wystawia `POST /orders`. Wariant z gatewayem o
 z przeglądarki wymaga postawienia przed nim czegoś, co pyta o tożsamość. To nie jest problem tej
 zmiany, ale jest problem.
 
-### `MarketDataSource` — jeden interfejs, trzy przyszłe implementacje
+### `MarketDataSource` — jeden interfejs, jedna implementacja dziś
 
 ```ts
 type Bar = {
@@ -100,7 +103,7 @@ type Bar = {
 }
 
 interface MarketDataSource {
-  readonly id: 'gateway' | 'mock'
+  readonly id: 'gateway'
   searchInstruments(query: string, signal: AbortSignal): Promise<Instrument[]>
   listInstruments(signal: AbortSignal): Promise<InstrumentPage>
   history(req: { symbol: string; resolution: Resolution; count: number },
@@ -112,7 +115,12 @@ interface MarketDataSource {
 
 `Bar` jest normalizowany na wejściu do terminala, nie na wyjściu do wykresu — konwersja ISO na
 sekundy dzieje się raz, w adapterze, i tylko adapter wie, że gateway ma dwie konwencje. Baza
-świec wejdzie jako trzecia implementacja tego samego interfejsu.
+świec wejdzie jako druga implementacja tego samego interfejsu.
+
+Implementacja jest jedna, a interfejs i tak jest — nie po to, żeby dziś było z czego wybierać,
+tylko żeby dołożenie bazy nie oznaczało przepisywania wykresu. Widoki sięgają po jedną instancję
+udostępnioną przez moduł (`marketData.ts`); nie budują źródła same, bo wtedy każdy widok miałby
+własny hub gniazd i sześć wykresów na tę samą parę otwierałoby sześć połączeń zamiast jednego.
 
 Odrzucone: oddawanie DTO gatewaya wprost do komponentów. Wtedy każdy komponent zna szew czasu,
 a dołożenie bazy oznacza przejście po wszystkich.
@@ -175,12 +183,19 @@ Zapis w `localStorage` pod kluczem z wersją (`terminal.grid.v1`). Odczyt przech
 strażnik typu; cokolwiek nie przejdzie, ląduje w koszu i terminal startuje z domyślnym układem.
 Odrzucone: `zod` — jedna funkcja walidująca jeden kształt nie jest wart zależności.
 
-### Źródło mock jest deterministyczne
+### Bez źródła „na niby"
 
-Generator z ziarnem wyprowadzonym z symbolu (`mulberry32`), błądzenie losowe po cenie, świece
-składane tą samą arytmetyką okresu co adapter gatewaya. Ten sam symbol daje ten sam wykres przy
-każdym uruchomieniu, więc test może się do niego odwołać, a zrzut ekranu z wczoraj wygląda tak
-samo dzisiaj.
+Deterministyczny generator świec był zbudowany i usunięty. Powód usunięcia jest prosty: nikt go
+nie potrzebował. Terminal ma pokazywać rynek, a rynek jest w gatewayu — dane wyglądające jak
+rynek, ale nim niebędące, to dodatkowa droga kodu do utrzymania i drugi zestaw zachowań do
+tłumaczenia, żeby odpowiedzieć na pytanie, którego nikt nie zadał.
+
+Co przez to nie ucierpiało: testy nigdy z niego nie korzystały. Każdy test warstwy danych i każdy
+test komponentu ma własną atrapę, sterowaną z testu (`ControllableSource`, `SearchableSource`) —
+to one pozwalają rozstrzygnąć wyścig albo spóźnioną odpowiedź, czego generator tykający własnym
+zegarem i tak by nie umiał.
+
+Cena: bez uruchomionego gatewaya nie da się popatrzeć na terminal. Przyjęta świadomie.
 
 ### Tailwind v4 z tokenami w `@theme`
 

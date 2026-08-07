@@ -18,9 +18,9 @@ that runs on its own and publishes a contract. Nothing imports across that bound
 ```
 
 `terminal` is a consumer, not a peer: it publishes no contract of its own and nothing
-depends on it. It reads market data through one interface with two implementations today —
-the gateway, and a mock that needs no network — so a candle store, when there is one, is a
-third implementation rather than a rewrite of the charts.
+depends on it. It reads market data through one interface with a single implementation —
+the gateway — so a candle store, when there is one, arrives as a second implementation
+rather than a rewrite of the charts.
 
 ## Why no shared library
 

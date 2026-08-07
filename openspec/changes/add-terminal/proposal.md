@@ -20,10 +20,10 @@ stanie unieść, czytając prosto z gatewaya.
   własny instrument i własny interwał; układ i zawartość slotów przeżywają odświeżenie strony.
 - **Zakładka Instruments**: wyszukiwarka po `GET /instruments/search`, z której instrument trafia
   do wskazanego slotu siatki.
-- **Warstwa danych za jednym interfejsem** `MarketDataSource`, z dwiema implementacjami: gateway
-  (`GET /instruments/{symbol}/history` + `/ws/stream`) oraz mock (deterministyczny generator).
-  Przełącznik między nimi jest widoczny w UI. Baza świec, gdy powstanie, wchodzi jako trzecia
-  implementacja tego samego interfejsu — nie jako przebudowa wykresu.
+- **Warstwa danych za jednym interfejsem** `MarketDataSource`, z jedną implementacją: gateway
+  (`GET /instruments/{symbol}/history` + `/ws/stream`). Interfejs istnieje nie dla dzisiejszego
+  wyboru, tylko dlatego, że baza świec — gdy powstanie — ma wejść jako druga implementacja, a nie
+  jako przebudowa wykresu.
 - Zakładki handlowe (`Positions`, `Orders`, `Account`) pojawiają się wyłącznie jako puste miejsca w
   rejestrze; ich zachowanie to osobne zmiany.
 
@@ -33,9 +33,9 @@ stanie unieść, czytając prosto z gatewaya.
 
 - `terminal-shell`: powłoka aplikacji — routing, rejestr zakładek, motyw, obsługa nieznanej ścieżki
   i stan „gateway nie odpowiada" widoczny globalnie.
-- `terminal-market-data`: jeden interfejs na świece i strumień, dwie wymienne implementacje
-  (gateway, mock), zszycie znaczników czasu REST (ISO) ze strumieniem (epoch w sekundach),
-  współdzielenie jednego połączenia przez wielu odbiorców tej samej pary symbol + rozdzielczość.
+- `terminal-market-data`: jeden interfejs na świece i strumień, wymienna implementacja za nim,
+  zszycie znaczników czasu REST (ISO) ze strumieniem (epoch w sekundach), współdzielenie jednego
+  połączenia przez wielu odbiorców tej samej pary symbol + rozdzielczość.
 - `terminal-chart`: reużywalny wykres świecowy — zaciąg historii, doklejanie świec na żywo, świeca
   w budowie, zmiana rozdzielczości, stan pusty, ładowania i błędu.
 - `terminal-grid`: siatka slotów z presetami układu, przypisaniem instrumentu i interwału do slotu
@@ -58,5 +58,5 @@ kontraktu takiego, jaki jest opublikowany.
   spec.
 - `README.md` repozytorium i `docs/architecture.md` dostają terminal w tabeli modułów i na rysunku,
   gdzie dziś stoi „terminal (later)".
-- Wymaga uruchomionego `capital-gateway` na `http://localhost:8010`, żeby zobaczyć realne dane;
-  źródło mock działa bez niego.
+- Wymaga uruchomionego `capital-gateway` na `http://localhost:8010`. Terminal nie ma trybu
+  offline: bez gatewaya pokazuje, że źródło nie odpowiada, i nic nie rysuje.

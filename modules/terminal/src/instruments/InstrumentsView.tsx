@@ -1,17 +1,16 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { useNavigate } from "react-router";
-import { sourceStore } from "../data/sourceStore";
+import { marketData } from "../data/marketData";
 import { gridStore } from "../grid/gridStore";
 import type { Instrument, InstrumentPage } from "../data/types";
 import { useInstrumentSearch } from "./useInstrumentSearch";
 
 export function InstrumentsView() {
-  const source = useSyncExternalStore(sourceStore.subscribe, sourceStore.getSnapshot);
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
   const navigate = useNavigate();
 
   const [query, setQuery] = useState("");
-  const search = useInstrumentSearch(source, query);
+  const search = useInstrumentSearch(marketData, query);
 
   const assign = useCallback(
     (instrument: Instrument) => {
@@ -80,7 +79,6 @@ function SearchResults({
 }
 
 function Catalogue({ onPick }: { onPick(instrument: Instrument): void }) {
-  const source = useSyncExternalStore(sourceStore.subscribe, sourceStore.getSnapshot);
   const [page, setPage] = useState<InstrumentPage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -91,7 +89,7 @@ function Catalogue({ onPick }: { onPick(instrument: Instrument): void }) {
     setPage(null);
     setError(null);
 
-    source
+    marketData
       .listInstruments(controller.signal)
       .then((result) => {
         if (!cancelled) setPage(result);
@@ -105,7 +103,7 @@ function Catalogue({ onPick }: { onPick(instrument: Instrument): void }) {
       cancelled = true;
       controller.abort();
     };
-  }, [source, attempt]);
+  }, [attempt]);
 
   if (error) {
     return (
