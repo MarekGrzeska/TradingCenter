@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+/*
+ * One dark theme, one place tokens are declared. Tailwind utilities (`bg-panel`,
+ * `text-ink`, ...) and the chart (lightweight-charts options, read via
+ * `getComputedStyle`) both consume these — see terminal-shell spec, "Motyw jest
+ * ciemny i wyprowadzony z tokenów".
+ *
+ * Up/down are teal/red, not green/red: validated with the dataviz skill's
+ * palette validator against this surface — plain green/red fails deutan CVD
+ * separation (ΔE 4.1, below the 6-8 floor). Teal/red clears every check except a
+ * protan WARN (ΔE 6.5, the floor band), which the skill requires backing with a
+ * secondary encoding — the chart renders up candles hollow and down candles
+ * filled, so the distinction survives on shape even where hue does not.
+ */
+@theme {
+  --color-canvas: #0d0d0d;
+  --color-panel: #1a1a19;
+  --color-panel-strong: #232322;
+  --color-border: rgba(255, 255, 255, 0.1);
+
+  --color-ink: #ffffff;
+  --color-ink-secondary: #c3c2b7;
+  --color-ink-muted: #898781;
+
+  --color-grid: #2c2c2a;
+  --color-axis: #383835;
+
+  --color-accent: #3987e5;
+
+  --color-up: #199e70;
+  --color-down: #e66767;
+
+  --color-good: #0ca30c;
+  --color-warning: #fab219;
+  --color-critical: #d03b3b;
+
+  --font-sans:
+    system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-ink);
+  font-variant-numeric: tabular-nums;
+}
