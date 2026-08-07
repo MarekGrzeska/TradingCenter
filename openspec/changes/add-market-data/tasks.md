@@ -22,12 +22,12 @@
 
 ## 4. Archiwum
 
-- [ ] 4.1 Zapis świecy zamkniętej z nadpisaniem wpisu o tej samej trójce
-- [ ] 4.2 Reguła autorytatywności: wartość z odczytu historii wygrywa z wartością ze strumienia
-- [ ] 4.3 Odczyt zakresu świec uporządkowany od najstarszej, bez powtórzeń
-- [ ] 4.4 Zapis i odczyt zakresów pokrycia, w tym granica wynikająca z `history_ended`
-- [ ] 4.5 Rozstrzyganie „rynek zamknięty" kontra „brak danych" na podstawie pokrycia
-- [ ] 4.6 Test: brak świecy wewnątrz pokrycia jest raportowany inaczej niż brak poza pokryciem
+- [x] 4.1 Zapis świecy zamkniętej z nadpisaniem wpisu o tej samej trójce
+- [x] 4.2 Reguła autorytatywności: wartość z odczytu historii wygrywa z wartością ze strumienia
+- [x] 4.3 Odczyt zakresu świec uporządkowany od najstarszej, bez powtórzeń
+- [x] 4.4 Zapis i odczyt zakresów pokrycia, w tym granica wynikająca z `history_ended`
+- [x] 4.5 Rozstrzyganie „rynek zamknięty" kontra „brak danych" na podstawie pokrycia
+- [x] 4.6 Test: brak świecy wewnątrz pokrycia jest raportowany inaczej niż brak poza pokryciem
 
 ## 5. Rozdzielczości pochodne
 
