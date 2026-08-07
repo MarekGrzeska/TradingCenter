@@ -1,9 +1,9 @@
 ## 1. Szkielet modułu
 
-- [ ] 1.1 Utwórz `modules/market-data/` z `pyproject.toml`, `README.md` i `.env.example` wzorowanymi na `capital-gateway`
-- [ ] 1.2 Dodaj zależności: `fastapi`, `uvicorn`, `httpx`, `websockets`, `pydantic-settings`, `asyncpg`, `alembic`
-- [ ] 1.3 Napisz `config.py` — adres gatewaya, połączenie do bazy, limit śledzonych par, równoległość uzupełnień, domyślna głębokość historii
-- [ ] 1.4 Dodaj `pytest` z `docker`-owym Postgresem dla testów integracyjnych i sprawdź, że pusta suita przechodzi
+- [x] 1.1 Utwórz `modules/market-data/` z `pyproject.toml`, `README.md` i `.env.example` wzorowanymi na `capital-gateway`
+- [x] 1.2 Dodaj zależności: `fastapi`, `uvicorn`, `httpx`, `websockets`, `pydantic-settings`, `asyncpg`, `alembic`
+- [x] 1.3 Napisz `config.py` — adres gatewaya, połączenie do bazy, limit śledzonych par, równoległość uzupełnień, domyślna głębokość historii
+- [x] 1.4 Dodaj `pytest` z `docker`-owym Postgresem dla testów integracyjnych i sprawdź, że pusta suita przechodzi
 
 ## 2. Schemat bazy
 
