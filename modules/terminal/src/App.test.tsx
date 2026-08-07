@@ -1,8 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { App } from "./App";
-import { sourceStore } from "./data/sourceStore";
+
+// These tests are about the shell — routing, the tab registry, the source
+// indicator. The Graph tab's real grid would mount charts (and with them a
+// canvas jsdom cannot provide, plus a live mock feed) for every assertion
+// about a link. GridView has its own tests.
+vi.mock("./grid/GridView", () => ({
+  GridView: () => <div>grid stub</div>,
+}));
+
+const { App } = await import("./App");
+const { sourceStore } = await import("./data/sourceStore");
 
 beforeEach(() => {
   window.history.pushState({}, "", "/");
@@ -53,12 +62,14 @@ describe("App routing (terminal-shell spec)", () => {
     const user = userEvent.setup();
     await renderApp();
 
-    expect(screen.getByText(/isn't built yet/i)).toBeInTheDocument();
-
+    // Graph is implemented; Account is one of the registry entries reserved
+    // for a later change.
     await user.click(screen.getByRole("link", { name: "Account" }));
     expect(screen.getByText(/isn't built yet/i)).toBeInTheDocument();
+
     await user.click(screen.getByRole("link", { name: "Graph" }));
     expect(window.location.pathname).toBe("/graph");
+    expect(screen.queryByText(/isn't built yet/i)).not.toBeInTheDocument();
   });
 
   it("shows a way back to the default tab for an unknown address", async () => {

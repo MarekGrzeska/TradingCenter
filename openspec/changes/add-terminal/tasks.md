@@ -100,19 +100,23 @@
 
 ## 6. Siatka wykresów
 
-- [ ] 6.1 Opisać model konfiguracji: sześć slotów o stałych identyfikatorach, każdy z symbolem i
+- [x] 6.1 Opisać model konfiguracji: sześć slotów o stałych identyfikatorach, każdy z symbolem i
       rozdzielczością, oraz wybrany układ
-- [ ] 6.2 Zbudować siatkę na CSS Grid z presetami `1x1`, `2x1`, `2x2`, `3x2`; układ decyduje
+- [x] 6.2 Zbudować siatkę na CSS Grid z presetami `1x1`, `2x1`, `2x2`, `3x2`; układ decyduje
       wyłącznie o liczbie widocznych slotów, konfiguracja ukrytych zostaje zapamiętana
-- [ ] 6.3 Dodać nagłówek slotu z symbolem, rozdzielczością i zmianą jednego i drugiego bez
-      opuszczania siatki; slot bez instrumentu zaprasza do wyboru
-- [ ] 6.4 Oznaczać slot aktywny, żeby akcje kierowane do slotu miały jawny cel
-- [ ] 6.5 Zapisywać konfigurację w `localStorage` pod kluczem z wersją, ze strażnikiem typu przy
+- [x] 6.3 Dodać nagłówek slotu z symbolem, rozdzielczością i zmianą jednego i drugiego bez
+      opuszczania siatki; slot bez instrumentu zaprasza do wyboru. Doszedł przycisk czyszczenia
+      slotu — bez niego stan pusty był osiągalny wyłącznie przy pierwszym uruchomieniu.
+- [x] 6.4 Oznaczać slot aktywny, żeby akcje kierowane do slotu miały jawny cel. Aktywacja także
+      przy wejściu fokusem, nie tylko kliknięciem, żeby sterowanie klawiaturą dawało ten sam sygnał.
+- [x] 6.5 Zapisywać konfigurację w `localStorage` pod kluczem z wersją, ze strażnikiem typu przy
       odczycie i powrotem do domyślnego układu przy danych nieczytelnych; testy na uszkodzonym
       zapisie
-- [ ] 6.6 Obsłużyć slot wskazujący symbol nieznany bieżącemu źródłu: komunikat w tym slocie,
-      reszta siatki działa dalej
-- [ ] 6.7 Test sprawdzający, że dwa sloty na tę samą parę dzielą jedno połączenie, a zejście na
+- [x] 6.6 Obsłużyć slot wskazujący symbol nieznany bieżącemu źródłu: komunikat w tym slocie,
+      reszta siatki działa dalej. Realizowane przez nakładkę błędu wykresu (`not-found` z adaptera
+      nazywa symbol), która jest per-slot z konstrukcji; wybór innego instrumentu jest zawsze pod
+      ręką w nagłówku slotu.
+- [x] 6.7 Test sprawdzający, że dwa sloty na tę samą parę dzielą jedno połączenie, a zejście na
       mniejszy układ kończy subskrypcje slotów, które zniknęły
 
 ## 7. Zakładka Instruments
