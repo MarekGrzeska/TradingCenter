@@ -1,0 +1,9 @@
+{
+  "clientId": "37735639",
+  "accountId": "325778595166630174",
+  "timezoneOffset": 2,
+  "locale": "pl-PL",
+  "currency": "USD",
+  "symbol": "$",
+  "streamEndpoint": "wss://api-streaming-capital.backend-capital.com/"
+}

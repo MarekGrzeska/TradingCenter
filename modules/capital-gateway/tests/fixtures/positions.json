@@ -1,0 +1,47 @@
+{
+  "positions": [
+    {
+      "position": {
+        "contractSize": 1,
+        "createdDate": "2026-07-23T16:22:18.473",
+        "createdDateUTC": "2026-07-23T14:22:18.473",
+        "dealId": "00000000-5897-786d-0485-65e80055311e",
+        "dealReference": "p_00000000-5897-786d-0485-65e80055311e",
+        "workingOrderId": "00000000-5897-786a-0485-65e80055311e",
+        "size": 0.01,
+        "leverage": 20,
+        "upl": -0.0024,
+        "direction": "BUY",
+        "level": 4048.38,
+        "currency": "USD",
+        "guaranteedStop": false
+      },
+      "market": {
+        "instrumentName": "Gold",
+        "instrumentId": 27045129890124996,
+        "expiry": "-",
+        "epic": "GOLD",
+        "symbol": "Gold",
+        "instrumentType": "COMMODITIES",
+        "marketStatus": "TRADEABLE",
+        "lotSize": 1,
+        "high": 4140.84,
+        "low": 4040.4,
+        "percentageChange": -1.98,
+        "netChange": -23.61,
+        "bid": 4048.14,
+        "offer": 4048.44,
+        "updateTime": "2026-07-23T16:22:19.582",
+        "updateTimeUTC": "2026-07-23T14:22:19.582",
+        "delayTime": 0,
+        "streamingPricesAvailable": true,
+        "scalingFactor": 1,
+        "marketModes": [
+          "REGULAR"
+        ],
+        "pipPosition": 0,
+        "tickSize": 0.01
+      }
+    }
+  ]
+}

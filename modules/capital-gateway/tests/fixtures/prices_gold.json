@@ -1,0 +1,70 @@
+{
+  "prices": [
+    {
+      "snapshotTime": "2026-07-23T16:19:00",
+      "snapshotTimeUTC": "2026-07-23T14:19:00",
+      "openPrice": {
+        "bid": 4042.35,
+        "ask": 4042.65
+      },
+      "closePrice": {
+        "bid": 4043.73,
+        "ask": 4044.03
+      },
+      "highPrice": {
+        "bid": 4044.29,
+        "ask": 4044.4
+      },
+      "lowPrice": {
+        "bid": 4042.23,
+        "ask": 4042.53
+      },
+      "lastTradedVolume": 310
+    },
+    {
+      "snapshotTime": "2026-07-23T16:20:00",
+      "snapshotTimeUTC": "2026-07-23T14:20:00",
+      "openPrice": {
+        "bid": 4044.77,
+        "ask": 4045.07
+      },
+      "closePrice": {
+        "bid": 4044.09,
+        "ask": 4044.39
+      },
+      "highPrice": {
+        "bid": 4044.8,
+        "ask": 4045.1
+      },
+      "lowPrice": {
+        "bid": 4043.77,
+        "ask": 4044.07
+      },
+      "lastTradedVolume": 90
+    },
+    {
+      "snapshotTime": "2026-07-23T16:21:00",
+      "snapshotTimeUTC": "2026-07-23T14:21:00",
+      "openPrice": {
+        "bid": 4044.11,
+        "ask": 4044.41
+      },
+      "closePrice": {
+        "bid": 4044.11,
+        "ask": 4044.41
+      },
+      "highPrice": {
+        "bid": 4044.11,
+        "ask": 4044.41
+      },
+      "lowPrice": {
+        "bid": 4044.11,
+        "ask": 4044.41
+      },
+      "lastTradedVolume": 1
+    }
+  ],
+  "instrumentType": "COMMODITIES",
+  "tickSize": 0.01,
+  "pipPosition": 0
+}

@@ -1,0 +1,19 @@
+{
+  "date": "2026-07-23T14:41:23.710",
+  "status": "OPEN",
+  "dealStatus": "ACCEPTED",
+  "epic": "GOLD",
+  "dealReference": "o_d736cbac-e4f4-4e43-8d41-bcc2070ccc85",
+  "dealId": "00000000-5897-8fd1-0485-65e80055311e",
+  "affectedDeals": [
+    {
+      "dealId": "00000000-5897-8fd1-0485-65e80055311e",
+      "status": "OPENED"
+    }
+  ],
+  "level": 3651.84,
+  "size": 0.01,
+  "direction": "BUY",
+  "guaranteedStop": false,
+  "trailingStop": false
+}

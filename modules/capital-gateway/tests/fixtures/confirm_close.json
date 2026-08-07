@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-23T14:22:19.799",
+  "status": "CLOSED",
+  "dealStatus": "ACCEPTED",
+  "epic": "GOLD",
+  "dealReference": "p_00000000-5897-786d-0485-65e80055311e",
+  "dealId": "00000000-5897-786d-0485-65e80055311e",
+  "affectedDeals": [
+    {
+      "dealId": "00000000-5897-786d-0485-65e80055311e",
+      "status": "FULLY_CLOSED"
+    }
+  ],
+  "level": 4048.09,
+  "size": 0.01,
+  "direction": "SELL",
+  "guaranteedStop": false,
+  "trailingStop": false,
+  "profit": -0.0029,
+  "profitCurrency": "USD"
+}

@@ -1,0 +1,64 @@
+{
+  "accounts": [
+    {
+      "accountId": "325778023931794590",
+      "accountName": "EUR",
+      "status": "ENABLED",
+      "accountType": "CFD",
+      "preferred": false,
+      "balance": {
+        "balance": 51000.0,
+        "deposit": 51000.0,
+        "profitLoss": 0.0,
+        "available": 51000.0
+      },
+      "currency": "EUR",
+      "symbol": "\u20ac"
+    },
+    {
+      "accountId": "325778595166630174",
+      "accountName": "demo2",
+      "status": "ENABLED",
+      "accountType": "CFD",
+      "preferred": true,
+      "balance": {
+        "balance": 91638.91,
+        "deposit": 91638.91,
+        "profitLoss": 0.0,
+        "available": 91638.91
+      },
+      "currency": "USD",
+      "symbol": "$"
+    },
+    {
+      "accountId": "325785235186069790",
+      "accountName": "random",
+      "status": "ENABLED",
+      "accountType": "CFD",
+      "preferred": false,
+      "balance": {
+        "balance": 11385.18,
+        "deposit": 11334.32,
+        "profitLoss": 50.86,
+        "available": 10002.41
+      },
+      "currency": "USD",
+      "symbol": "$"
+    },
+    {
+      "accountId": "325785256660906270",
+      "accountName": "devtest",
+      "status": "ENABLED",
+      "accountType": "CFD",
+      "preferred": false,
+      "balance": {
+        "balance": 1000.0,
+        "deposit": 1000.0,
+        "profitLoss": 0.0,
+        "available": 1000.0
+      },
+      "currency": "USD",
+      "symbol": "$"
+    }
+  ]
+}

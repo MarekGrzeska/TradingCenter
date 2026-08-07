@@ -1,0 +1,45 @@
+{
+  "workingOrders": [
+    {
+      "workingOrderData": {
+        "dealId": "00000000-5897-8fd1-0485-65e80055311e",
+        "direction": "BUY",
+        "epic": "GOLD",
+        "orderSize": 0.01,
+        "leverage": 20,
+        "orderLevel": 3651.84,
+        "timeInForce": "GOOD_TILL_CANCELLED",
+        "createdDate": "2026-07-23T16:41:23.710",
+        "createdDateUTC": "2026-07-23T14:41:23.710",
+        "guaranteedStop": false,
+        "orderType": "LIMIT",
+        "trailingStop": false,
+        "currencyCode": "USD"
+      },
+      "marketData": {
+        "instrumentName": "Gold",
+        "instrumentId": 27045129890124996,
+        "expiry": "-",
+        "epic": "GOLD",
+        "symbol": "Gold",
+        "instrumentType": "COMMODITIES",
+        "marketStatus": "TRADEABLE",
+        "lotSize": 1,
+        "high": 4140.84,
+        "low": 4040.1,
+        "percentageChange": -1.75,
+        "netChange": -28.67,
+        "bid": 4057.51,
+        "offer": 4057.81,
+        "updateTime": "2026-07-23T16:41:24.870",
+        "updateTimeUTC": "2026-07-23T14:41:24.870",
+        "delayTime": 0,
+        "streamingPricesAvailable": true,
+        "scalingFactor": 1,
+        "marketModes": [
+          "REGULAR"
+        ]
+      }
+    }
+  ]
+}
