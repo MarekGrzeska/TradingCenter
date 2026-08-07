@@ -48,7 +48,7 @@
 
 ## 7. Powierzchnia HTTP i WebSocket
 
-- [ ] 7.1 Napisać `app.py`: lifespan będący właścicielem klienta i huba, handler mapujący typ błędu modułu na status, `/capabilities` podające providera, środowisko `demo`, streaming i typy zleceń
+- [x] 7.1 Napisać `app.py`: lifespan będący właścicielem klienta i huba, handler mapujący typ błędu modułu na status, `/capabilities` podające providera, środowisko `demo`, streaming i typy zleceń
 - [ ] 7.2 Trasy: `/accounts`, `/accounts/active`, `/instruments`, `/instruments/search`, `/instruments/{symbol}/candles`, `/instruments/{symbol}/history`
 - [ ] 7.3 Trasy: `/positions`, `/orders`, `/positions/{id}` (zamknięcie, zmiana), `/working-orders`, `/working-orders/{id}`
 - [ ] 7.4 WebSocket `/ws/stream?symbol=&resolution=` — odmówić połączenia niewskazującego symbolu
