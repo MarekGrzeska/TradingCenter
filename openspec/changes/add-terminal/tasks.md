@@ -136,12 +136,23 @@
 
 ## 8. Domknięcie
 
-- [ ] 8.1 Napisać `modules/terminal/README.md` w układzie what / run / test / contract, z
+- [x] 8.1 Napisać `modules/terminal/README.md` w układzie what / run / test / contract, z
       wymaganiem uruchomionego gatewaya dla źródła `gateway` i informacją, że mock działa bez niego
-- [ ] 8.2 Uruchomić `scripts/dev.ps1` przeciw działającemu `capital-gateway` na demo: potwierdzić, że
-      świeca w budowie faktycznie rusza wykresem na `MINUTE_5`, i zapisać, co się zobaczyło
-- [ ] 8.3 Zmierzyć siatkę `3x2` na sześciu różnych parach: liczba gniazd, zachowanie przy zmianie
-      układu, koszt przerysowań; zapisać wynik zamiast go zakładać
-- [ ] 8.4 Dopisać terminal do tabeli modułów w `README.md` i podmienić „terminal (later)" na
+- [x] 8.2 Uruchomić przeciw działającemu `capital-gateway` na demo: potwierdzić, że świeca
+      w budowie faktycznie rusza wykresem na `MINUTE_5`, i zapisać, co się zobaczyło. Ruszyła —
+      OHLC ostatniej świecy US100 zmieniło się w ciągu 45 s bez świecy zamkniętej po drodze.
+      Potwierdzone też `ts` z `Z` na żywej odpowiedzi (zadanie 2.5). Przy okazji wyszedł błąd:
+      przełączenie źródła zostawiało świece poprzedniego na ekranie pod nową etykietą — naprawione
+      i przykryte testem.
+- [x] 8.3 Zmierzyć siatkę `3x2` na sześciu różnych parach: liczba gniazd, zachowanie przy zmianie
+      układu, koszt przerysowań; zapisać wynik zamiast go zakładać. Zmierzone w przeglądarce:
+      **sześć gniazd jednocześnie, szczyt sześć**, po jednym na parę. Dwa dodatkowe otwarcia w logu
+      zamykają się w tej samej dziesiątej sekundy — `StrictMode` w developmencie podwaja efekty,
+      więc świeżo zamontowany wykres subskrybuje, odsubskrybowuje i subskrybuje ponownie; nigdy
+      nie są równoczesne, a build produkcyjny nie podwaja. Zejście na `2x2` zamyka gniazda
+      zniknionych slotów. Kosztu przerysowań nie mierzono osobno — seria nie przechodzi przez stan
+      Reacta z konstrukcji, więc nie ma czego liczyć na tick.
+- [x] 8.4 Dopisać terminal do tabeli modułów w `README.md` i podmienić „terminal (later)" na
       rysunku w `docs/architecture.md`
-- [ ] 8.5 Przepuścić całość przez `pnpm typecheck`, `pnpm lint` i `pnpm test`
+- [x] 8.5 Przepuścić całość przez `pnpm typecheck`, `pnpm lint` i `pnpm test` — plus `pnpm build`,
+      bo dopiero on przechodzi przez `tsc -b` na produkcyjnej ścieżce. 118 testów, wszystko czyste.

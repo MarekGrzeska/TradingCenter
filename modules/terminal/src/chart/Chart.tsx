@@ -189,14 +189,17 @@ export function Chart({
     [applyHistory, applyBar],
   );
 
-  // A symbol or resolution change must not leave the previous instrument's
-  // candles on screen while the new history loads.
+  // Changing symbol, resolution *or source* must not leave the previous
+  // series on screen while the new history loads. Source matters as much as
+  // the other two: switching mock → gateway was observed showing mock prices
+  // under a "gateway" label for the seconds a deep read takes, which is not a
+  // stale chart but a wrong one.
   useEffect(() => {
     barsRef.current = [];
     seriesRef.current?.setData([]);
     setReadout(null);
     setLastIsForming(false);
-  }, [symbol, resolution]);
+  }, [source, symbol, resolution]);
 
   const feed = useBarFeed(source, symbol, resolution, sink);
 

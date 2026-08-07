@@ -16,6 +16,7 @@ modules move here one at a time.
 | Module | What | Contract |
 |---|---|---|
 | [capital-gateway](modules/capital-gateway/) | capital.com — trading, deep history, a live stream. Demo only. | HTTP + WebSocket |
+| [terminal](modules/terminal/) | The operator's screen — charts in a grid, fed by the gateway or by a mock. | consumes the gateway |
 
 ## Layout
 
@@ -28,7 +29,7 @@ docs/       architecture and reference
 ## Stack
 
 - **Python 3.12** (`uv`, `ruff`, `pytest`) — services, data, agents, scripts.
-- **React + TypeScript** (`Vite`, `pnpm`) — the terminal, when it exists.
+- **React + TypeScript** (`Vite`, `pnpm`, `Tailwind`) — the terminal.
 
 ## Local development
 

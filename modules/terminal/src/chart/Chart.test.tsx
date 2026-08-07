@@ -248,6 +248,31 @@ describe("Chart — subscription lifecycle", () => {
     expect(source.unsubscribeCount).toBe(1);
   });
 
+  it("clears the previous source's candles when the source changes", async () => {
+    // Caught live: switching mock → gateway kept the mock series on screen for
+    // the seconds the gateway's deep read took, under a "gateway" label.
+    const { rerender, onResolutionChange } = renderChart(source);
+    await act(async () => {
+      source.resolveHistory(0, [bar(100, 1), bar(200, 2)]);
+    });
+    expect(stub.latest().series[0].data()).toHaveLength(2);
+
+    const other = new ControllableSource();
+    rerender(
+      <Chart
+        source={other}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(stub.latest().series[0].data()).toHaveLength(0);
+    });
+    expect(other.historyCalls).toHaveLength(1);
+  });
+
   it("a late response from a superseded resolution never reaches the chart", async () => {
     const { rerender, onResolutionChange } = renderChart(source);
 
