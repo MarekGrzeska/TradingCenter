@@ -7,7 +7,13 @@ from typing import ClassVar
 
 from capital_gateway.dtos import Resolution
 from capital_gateway.stream.hub import Hub
-from capital_gateway.stream.messages import CandleMessage, Message, QuoteMessage, StatusMessage
+from capital_gateway.stream.messages import (
+    CandleMessage,
+    ErrorMessage,
+    Message,
+    QuoteMessage,
+    StatusMessage,
+)
 
 BASE_MS = 1_784_988_000_000
 BASE_S = BASE_MS // 1000
@@ -188,6 +194,21 @@ async def test_a_subscriber_that_fails_is_dropped_not_allowed_to_silence_the_roo
     await upstream.emit({"kind": "quote", "t": BASE_MS + 1000, "bid": 101.0, "ask": 101.2})
 
     assert len([m for m in got_healthy if isinstance(m, QuoteMessage)]) == 2
+
+
+async def test_an_upstream_failure_reaches_the_subscribers() -> None:
+    hub = make_hub()
+    subscriber, received = collector()
+    await hub.subscribe("US100", Resolution.MINUTE_5, subscriber)
+    upstream = FakeUpstream.instances[0]
+
+    await upstream.emit({"kind": "error", "message": "ERROR: error.invalid.epic"})
+
+    # A refused subscription is silence otherwise, which a consumer reads as a quiet
+    # market rather than a broken one.
+    errors = [m for m in received if isinstance(m, ErrorMessage)]
+    assert len(errors) == 1
+    assert "error.invalid.epic" in errors[0].message
 
 
 async def test_unsubscribing_from_an_unknown_room_is_not_an_error() -> None:

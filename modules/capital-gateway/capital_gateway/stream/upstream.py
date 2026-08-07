@@ -180,6 +180,10 @@ class Upstream:
             )
         elif msg.get("status") and msg.get("status") != "OK":
             # A subscription refused is silence otherwise, which reads as a quiet market.
-            await self._emit(
-                {"kind": "error", "message": f"{msg['status']}: {json.dumps(payload)[:200]}"}
-            )
+            #
+            # Only named fields are quoted, never the payload. capital.com echoes the
+            # failing request back — including the `cst` and `securityToken` it carried —
+            # so dumping the payload publishes the session to every subscriber.
+            detail = payload.get("errorCode") or payload.get("error") or ""
+            message = f"{msg['status']}: {detail}" if detail else str(msg["status"])
+            await self._emit({"kind": "error", "message": message[:200]})

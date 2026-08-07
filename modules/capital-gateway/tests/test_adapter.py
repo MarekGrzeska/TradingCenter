@@ -65,6 +65,37 @@ def mock_navigation() -> None:
 
 
 @respx.mock
+async def test_searching_returns_matching_instruments(adapter: CapitalAdapter) -> None:
+    mock_session()
+    respx.get(f"{API}/markets").mock(
+        return_value=httpx.Response(200, json=load_fixture("search_gold.json"))
+    )
+
+    found = await adapter.search_instruments("gold")
+
+    assert found
+    assert any(i.symbol == "GOLD" for i in found)
+    assert all(i.provider == "capital.com" for i in found)
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_switching_to_a_known_account_makes_it_active(adapter: CapitalAdapter) -> None:
+    raw = load_fixture("accounts.json")
+    target = raw["accounts"][1]["accountId"]
+    mock_session(account_id=raw["accounts"][0]["accountId"])
+    switch = respx.put(f"{API}/session").mock(return_value=httpx.Response(200, json={}))
+    respx.get(f"{API}/accounts").mock(return_value=httpx.Response(200, json=raw))
+
+    account = await adapter.set_active_account(target)
+
+    assert account.id == target
+    assert account.active is True
+    assert json.loads(switch.calls.last.request.content) == {"accountId": target}
+    await adapter.aclose()
+
+
+@respx.mock
 async def test_accounts_mark_the_active_one(adapter: CapitalAdapter) -> None:
     raw = load_fixture("accounts.json")
     mock_session(account_id=raw["accounts"][0]["accountId"])
@@ -168,6 +199,45 @@ async def test_a_rate_limited_read_raises_instead_of_reaching_a_mapper(
 
 
 # --- trading ---
+
+
+@respx.mock
+async def test_open_positions_are_readable(adapter: CapitalAdapter) -> None:
+    mock_session()
+    raw = load_fixture("positions.json")
+    respx.get(f"{API}/positions").mock(return_value=httpx.Response(200, json=raw))
+
+    positions = await adapter.list_positions()
+
+    assert len(positions) == len(raw["positions"])
+    assert all(p.id and p.symbol for p in positions)
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_no_positions_is_an_empty_list_not_an_error(adapter: CapitalAdapter) -> None:
+    mock_session()
+    respx.get(f"{API}/positions").mock(return_value=httpx.Response(200, json={"positions": []}))
+
+    # A flat account is a normal state, and a caller polling it should not have to catch
+    # an exception to learn that.
+    assert await adapter.list_positions() == []
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_working_orders_are_listed(adapter: CapitalAdapter) -> None:
+    mock_session()
+    raw = load_fixture("working_orders.json")
+    respx.get(f"{API}/workingorders").mock(return_value=httpx.Response(200, json=raw))
+
+    orders = await adapter.list_working_orders()
+
+    assert len(orders) == len(raw["workingOrders"])
+    first = orders[0]
+    assert first.id and first.symbol
+    assert first.order_type in (OrderType.LIMIT, OrderType.STOP)
+    await adapter.aclose()
 
 
 @respx.mock

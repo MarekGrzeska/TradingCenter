@@ -33,6 +33,20 @@ def test_candles_take_the_bid_side() -> None:
     assert c.high != (raw["highPrice"]["bid"] + raw["highPrice"]["ask"]) / 2
 
 
+def test_history_and_the_stream_read_the_same_price_side() -> None:
+    """The seam. Both halves are mapped from one provider payload and must land on the
+    same number — a midpoint on either side puts a half-spread step where a consumer
+    joins stored history to live candles, and nothing in either half alone shows it."""
+    raw = load_fixture("prices_gold.json")["prices"][0]
+
+    from_history = mapping.candle_from_price(raw, Resolution.MINUTE)
+    # What the stream publishes for the same candle: capital.com's `classic` OHLC event
+    # carries one side, and upstream keeps `priceType: "bid"`.
+    from_stream_close = raw["closePrice"]["bid"]
+
+    assert from_history.close == from_stream_close
+
+
 def test_a_candle_timestamp_says_it_is_utc() -> None:
     raw = load_fixture("prices_gold.json")["prices"][0]
     c = mapping.candle_from_price(raw, Resolution.MINUTE)
