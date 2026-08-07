@@ -48,14 +48,14 @@
 
 ## 7. Ingest
 
-- [ ] 7.1 Nasłuch na żywo z subskrypcją na śledzoną parę i zapisem świec zamkniętych
-- [ ] 7.2 Wznawianie subskrypcji z rosnącym odstępem, dopóki para jest śledzona
-- [ ] 7.3 Uzupełnianie wstecz przez `/history`, bez własnego stronicowania
-- [ ] 7.4 Domknięcie luki przy starcie modułu dla każdej śledzonej pary
-- [ ] 7.5 Domknięcie luki po wznowieniu zerwanej subskrypcji
-- [ ] 7.6 Ograniczenie równoległości uzupełnień, żeby nie zagłodzić ruchu interaktywnego
-- [ ] 7.7 Raportowanie postępu i przyczyn niepowodzeń, czytelne dla operatora
-- [ ] 7.8 Test: start po przerwie dociąga brakujący przedział; start bez przerwy nie wysyła żądań
+- [x] 7.1 Nasłuch na żywo z subskrypcją na śledzoną parę i zapisem świec zamkniętych
+- [x] 7.2 Wznawianie subskrypcji z rosnącym odstępem, dopóki para jest śledzona
+- [x] 7.3 Uzupełnianie wstecz przez `/history`, bez własnego stronicowania
+- [x] 7.4 Domknięcie luki przy starcie modułu dla każdej śledzonej pary
+- [x] 7.5 Domknięcie luki po wznowieniu zerwanej subskrypcji
+- [x] 7.6 Ograniczenie równoległości uzupełnień, żeby nie zagłodzić ruchu interaktywnego
+- [x] 7.7 Raportowanie postępu i przyczyn niepowodzeń, czytelne dla operatora
+- [x] 7.8 Test: start po przerwie dociąga brakujący przedział; start bez przerwy nie wysyła żądań
 
 ## 8. Kontrakt modułu
 

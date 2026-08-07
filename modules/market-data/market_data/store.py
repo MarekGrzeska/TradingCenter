@@ -65,6 +65,10 @@ _UPSERT = """
     RETURNING 1
 """
 
+_SELECT_LATEST = """
+    SELECT max(period_start) FROM candles WHERE symbol = $1 AND resolution = $2
+"""
+
 _SELECT_RANGE = """
     SELECT symbol, resolution, period_start, price_side,
            open, high, low, close, volume, source
@@ -149,3 +153,14 @@ async def read_candles(
         )
         for row in rows
     ]
+
+
+async def read_latest_period(
+    conn: asyncpg.Connection, symbol: str, resolution: Resolution
+) -> datetime | None:
+    """The newest period this pair holds, or `None` if it holds nothing.
+
+    What ingest asks before deciding whether to reach for anything: it is the right edge
+    of the gap, and its absence means there is no edge because there is no data.
+    """
+    return await conn.fetchval(_SELECT_LATEST, symbol, resolution.value)
