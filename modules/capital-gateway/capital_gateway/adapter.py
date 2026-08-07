@@ -31,6 +31,8 @@ from .dtos import (
 from .errors import GatewayError
 
 _TREE_CONCURRENCY = 5  # parallel marketnavigation requests, under the rate gate
+_CONFIRM_ATTEMPTS = 5
+_CONFIRM_DELAY = 0.4  # seconds between confirm polls; after the attempts run out -> PENDING
 
 
 class CapitalAdapter:
@@ -186,6 +188,34 @@ class CapitalAdapter:
     async def cancel_working_order(self, order_id: str) -> Order:
         cancelled = (await self._c.delete_working_order(order_id)).json()
         return await self._settle(cancelled, accepted=OrderStatus.CANCELLED)
+
+    async def _settle(self, created: dict, accepted: OrderStatus = OrderStatus.FILLED) -> Order:
+        """Turn the provider's acknowledgement into an outcome.
+
+        capital.com answers a create, close, amend or cancel with a ``dealReference``
+        and settles it separately — the acknowledgement says the request was received,
+        not that anything happened. So the reference is polled until the deal reports a
+        status.
+
+        ``accepted`` is what an ACCEPTED deal means for the action that produced it.
+
+        When the attempts run out the result is PENDING, carrying the reference. That is
+        the important case: reporting an unresolved reference as FILLED would tell a
+        caller it holds a position that may not exist, and the reference is what lets it
+        find out later.
+        """
+        ref = created.get("dealReference")
+        if not ref:
+            # No reference at all means the provider refused before the deal existed —
+            # the payload carries an error code instead.
+            reason = created.get("errorCode") or str(created)
+            return Order(status=OrderStatus.REJECTED, reason=reason)
+        for _ in range(_CONFIRM_ATTEMPTS):
+            r = await self._c.confirm(ref)
+            if r.is_success and r.json().get("dealStatus"):
+                return mapping.order_from_confirm(r.json(), accepted_status=accepted)
+            await asyncio.sleep(_CONFIRM_DELAY)
+        return Order(status=OrderStatus.PENDING, reference=ref)
 
     # --- meta ---
 
