@@ -1,6 +1,6 @@
 ## 1. Szkielet
 
-- [ ] 1.1 Utworzyć `modules/capital-gateway/` z `pyproject.toml` (Python ≥3.12, `uv`, `package = false`, ruff line-length 100, pytest `asyncio_mode = "auto"` i marker `live`)
+- [x] 1.1 Utworzyć `modules/capital-gateway/` z `pyproject.toml` (Python ≥3.12, `uv`, `package = false`, ruff line-length 100, pytest `asyncio_mode = "auto"` i marker `live`)
 - [ ] 1.2 Dodać `.env.example` z `CAPITAL_API_KEY`, `CAPITAL_IDENTIFIER`, `CAPITAL_PASSWORD`, `CAPITAL_BASE_URL`, `CAPITAL_STREAM_URL`
 - [ ] 1.3 Napisać `config.py`: ustawienia pydantic plus bezpiecznik demo-only — adres bazowy albo adres strumienia spoza demo podnosi wyjątek, zanim powstanie aplikacja
 - [ ] 1.4 Napisać `errors.py` — typ błędu modułu niosący status HTTP
