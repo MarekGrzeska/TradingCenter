@@ -53,11 +53,6 @@ class FormingCandle:
     def current(self) -> Bar | None:
         return self._bar
 
-    def seed(self, bar: Bar | None) -> None:
-        """Start from the newest historical candle, so the first quote extends the
-        series a consumer already has instead of opening a bar beside it."""
-        self._bar = bar
-
     def on_sealed(self, bar: Bar) -> Bar:
         """A closed candle from the provider. Authoritative: it watched the whole
         period, while this module only saw it from the moment it connected."""
