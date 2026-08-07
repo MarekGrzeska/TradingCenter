@@ -8,6 +8,7 @@ above this layer knows what an epic is.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Awaitable, Callable
 
 import httpx
 
@@ -136,7 +137,11 @@ class CapitalAdapter:
         return [mapping.candle_from_price(p, resolution) for p in data.get("prices", [])]
 
     async def get_history(
-        self, symbol: str, resolution: Resolution, bars: int
+        self,
+        symbol: str,
+        resolution: Resolution,
+        bars: int,
+        still_wanted: Callable[[], Awaitable[bool]] | None = None,
     ) -> CandleHistory:
         """Candles further back than one request reaches.
 
@@ -166,7 +171,7 @@ class CapitalAdapter:
                 mapping.candle_from_price(p, resolution) for p in resp.json().get("prices", [])
             ]
 
-        return await history.collect(symbol, resolution, bars, fetch_page)
+        return await history.collect(symbol, resolution, bars, fetch_page, still_wanted)
 
     # --- trading ---
 

@@ -84,6 +84,7 @@ async def collect(
     resolution: Resolution,
     bars: int,
     fetch_page: FetchPage,
+    still_wanted: Callable[[], Awaitable[bool]] | None = None,
 ) -> CandleHistory:
     """Page backwards until ``bars`` candles are held, or the instrument runs out.
 
@@ -94,6 +95,10 @@ async def collect(
     derived from the calendar drifts: ask for 1000 five-minute candles ending Monday and
     the weekend hands back a couple of hundred, so a clock-stepped cursor would skip the
     days it assumed were there. Anchoring on data costs one more request instead.
+
+    ``still_wanted`` is checked before each request. A deep read is up to thirty calls
+    over half a minute; without it, a client that gave up ten seconds in keeps spending
+    the rate budget on an answer nobody will read.
     """
     per_request = page_size(bars)
     collected: list[Candle] = []
@@ -102,6 +107,8 @@ async def collect(
     history_ended = False
 
     while len(collected) < bars:
+        if still_wanted is not None and not await still_wanted():
+            break
         date_from, date_to = (
             window_before(cursor, resolution, per_request) if cursor else (None, None)
         )
