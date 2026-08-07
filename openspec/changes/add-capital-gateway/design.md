@@ -44,7 +44,7 @@ skądinąd.
 - Zero składowania. Ten moduł jest oknem na capital.com, nie jego archiwum. Magazyn to w tym
   ekosystemie robota `market-data`, a powielanie go tutaj dałoby jednej świecy dwa źródła.
 - Brak warstwy abstrakcji nad providerem. Jeden provider, jeden adapter.
-- Brak UI. Konsola w Reakcie to późniejszy moduł, konsumujący ten po HTTP i WebSockecie.
+- Brak UI. Terminal w Reakcie to późniejszy moduł, konsumujący ten po HTTP i WebSockecie.
 - Brak konta live, przy jakiejkolwiek konfiguracji.
 
 ## Decisions
@@ -102,7 +102,7 @@ się co do semantyki providera, to dwa, które da się przetestować bez socketu
 ### Świeca w budowie mieszka po stronie serwera
 
 Dziś ta logika jest hookiem Reacta, więc jest osiągalna wyłącznie z przeglądarki. Przeniesienie
-jej do `stream/forming.py` sprawia, że agent, backtest i przyszła konsola dzielą jedną definicję
+jej do `stream/forming.py` sprawia, że agent, backtest i przyszły terminal dzielą jedną definicję
 bieżącej świecy, zamiast pisać trzy.
 
 Reguła: znacznik czasu kwotowania jest zaokrąglany w dół do rozdzielczości, żeby znaleźć jego

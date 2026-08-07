@@ -24,6 +24,9 @@ context: |
 
   Validate with: openspec validate <change> --strict
 
+  Naming: the operator-facing frontend is the **terminal** (modules/terminal),
+  never a "console" or "dashboard".
+
   Tech stack: Python 3.12 (uv, ruff, pytest) for services; React + TypeScript
   (Vite, pnpm) for frontends. Monorepo: modules/ + openspec/ + docs/. Every module
   runs standalone and communicates only through a published contract (HTTP/OpenAPI,

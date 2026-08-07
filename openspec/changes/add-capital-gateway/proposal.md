@@ -8,7 +8,7 @@ i w pluginie Vite — dostępna wyłącznie z karty przeglądarki i tylko dopók
 
 TradingCenter jest następcą ekosystemu TradingHub. Jego pierwszy moduł składa oba spike'y w jedną
 usługę, żeby handel, głęboka historia i strumień na żywo pochodziły z jednego kontraktu, który
-zje agent, backtest i przyszła konsola w Reakcie.
+zje agent, backtest i przyszły terminal w Reakcie.
 
 ## What Changes
 
