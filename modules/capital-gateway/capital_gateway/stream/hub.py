@@ -33,13 +33,24 @@ class Room:
         # than waiting in silence for the next provider event.
         self.state: str = "connecting"
 
+    async def deliver(self, subscriber: Subscriber, message: Message) -> bool:
+        """Send to one subscriber, dropping it if the send fails.
+
+        Every send goes through here, including the welcome messages: a socket can die
+        between the connection being accepted and the subscription completing, and an
+        exception escaping there fails the subscribe call rather than that subscriber.
+        """
+        try:
+            await subscriber(message)
+        except Exception:  # noqa: BLE001 - a dead subscriber must not stop the rest
+            self.subscribers.discard(subscriber)
+            return False
+        return True
+
     async def broadcast(self, message: Message) -> None:
         # A copy, because a failing send removes its subscriber mid-iteration.
         for subscriber in list(self.subscribers):
-            try:
-                await subscriber(message)
-            except Exception:  # noqa: BLE001 - a dead subscriber must not stop the rest
-                self.subscribers.discard(subscriber)
+            await self.deliver(subscriber, message)
 
     async def on_upstream(self, event: dict) -> None:
         kind = event.get("kind")
@@ -104,11 +115,12 @@ class Hub:
             room.upstream = self._make_upstream(epic, resolution, room.on_upstream)
             room.upstream.start()
         room.subscribers.add(subscriber)
-        await subscriber(StatusMessage(state=room.state))
+        if not await room.deliver(subscriber, StatusMessage(state=room.state)):
+            return
         if room.forming.current is not None:
             # Whatever the room has built so far, so a late joiner sees a bar rather than
             # an empty chart until the next quote.
-            await subscriber(room.candle_message(room.forming.current, forming=True))
+            await room.deliver(subscriber, room.candle_message(room.forming.current, True))
 
     async def unsubscribe(self, epic: str, resolution: Resolution, subscriber: Subscriber) -> None:
         key = (epic, resolution)

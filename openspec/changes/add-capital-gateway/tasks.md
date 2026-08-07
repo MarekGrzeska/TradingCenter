@@ -44,7 +44,7 @@
 - [x] 6.4 Przepuszczać wyłącznie `priceType: "bid"` ze zdarzenia zamkniętej świecy, żeby publikowana była jedna świeca na okres
 - [x] 6.5 Napisać `stream/hub.py`: pokoje kluczowane `(epic, resolution)`, rozgłaszanie, połączenie otwierane przy pierwszym subskrybencie i zamykane po odejściu ostatniego
 - [x] 6.6 Testować `forming.py` w izolacji: pierwsze kwotowanie otwiera, kolejne rozciągają maksimum/minimum i przesuwają zamknięcie, nowy okres otwiera nową świecę, `DAY`/`WEEK` rozciągają zamiast otwierać, zamknięta świeca zastępuje złożoną
-- [ ] 6.7 Testować hub na sztucznym upstreamie: drugi subskrybent nie otwiera drugiego połączenia, ostatni odchodzący je zamyka, zerwanie publikuje `reconnecting` i wraca do publikowania
+- [x] 6.7 Testować hub na sztucznym upstreamie: drugi subskrybent nie otwiera drugiego połączenia, ostatni odchodzący je zamyka, zerwanie publikuje `reconnecting` i wraca do publikowania
 
 ## 7. Powierzchnia HTTP i WebSocket
 
