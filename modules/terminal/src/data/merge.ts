@@ -48,6 +48,14 @@ export function mergeSeries(base: readonly Bar[], incoming: readonly Bar[]): Bar
   return result;
 }
 
+/** The bar at exactly `time`, or undefined. Binary search — the chart calls
+ *  this on every crosshair move, over a series of several hundred bars. */
+export function findBar(series: readonly Bar[], time: number): Bar | undefined {
+  const index = lowerBound(series, time);
+  const found = series[index];
+  return found?.time === time ? found : undefined;
+}
+
 /** Index of the first bar whose `time` is >= `time`, or `series.length` if none. */
 function lowerBound(series: readonly Bar[], time: number): number {
   let lo = 0;

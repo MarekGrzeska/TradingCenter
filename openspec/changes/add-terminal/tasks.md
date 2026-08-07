@@ -78,21 +78,24 @@
 
 ## 5. Wykres
 
-- [ ] 5.1 Zbudować komponent wykresu sterowany wyłącznie symbolem i rozdzielczością; tworzenie w
+- [x] 5.1 Zbudować komponent wykresu sterowany wyłącznie symbolem i rozdzielczością; tworzenie w
       `useLayoutEffect`, kolory czytane z tokenów motywu
-- [ ] 5.2 Zaciągnąć historię i podać ją jednym `setData`, a świece na żywo puszczać przez
-      `update`, bez trzymania serii w stanie Reacta
-- [ ] 5.3 Sprzątać po sobie: zakończenie subskrypcji i usunięcie wykresu przy odmontowaniu,
+- [x] 5.2 Zaciągnąć historię i podać ją jednym `setData`, a świece na żywo puszczać przez
+      `update`, bez trzymania serii w stanie Reacta. Historia jest scalana z tym, co już przyszło
+      ze strumienia, a nie podmienia to — subskrypcja startuje przed odczytem, więc świeca w
+      budowie normalnie przychodzi pierwsza i inaczej znikałaby do następnego ticku.
+- [x] 5.3 Sprzątać po sobie: zakończenie subskrypcji i usunięcie wykresu przy odmontowaniu,
       odporne na podwójne wywołanie efektu w `StrictMode`
-- [ ] 5.4 Dopasowywać rozmiar przez `ResizeObserver` na kontenerze, bez wymiarów w propsach
-- [ ] 5.5 Dodać wybór rozdzielczości w nagłówku wykresu, z licznikiem generacji odrzucającym
-      spóźnione odpowiedzi; test na szybkim przełączaniu
-- [ ] 5.6 Oznaczyć świecę w budowie na ekranie i zdejmować oznaczenie, gdy zastąpi ją świeca
+- [x] 5.4 Dopasowywać rozmiar przez `ResizeObserver` na kontenerze, bez wymiarów w propsach
+- [x] 5.5 Dodać wybór rozdzielczości w nagłówku wykresu, z odrzucaniem spóźnionych odpowiedzi;
+      test na szybkim przełączaniu. Zamiast licznika generacji wystarczyła flaga zamknięta w
+      pojedynczym przebiegu efektu — daje tę samą gwarancję, a nie czyta `ref.current` w cleanupie.
+- [x] 5.6 Oznaczyć świecę w budowie na ekranie i zdejmować oznaczenie, gdy zastąpi ją świeca
       zamknięta
-- [ ] 5.7 Rozróżnić stany: ładowanie, pusta seria, błąd odczytu z ponowieniem, strumień zerwany
-- [ ] 5.8 Pokazywać wartości spod kursora — otwarcie, maksimum, minimum, zamknięcie, czas —
+- [x] 5.7 Rozróżnić stany: ładowanie, pusta seria, błąd odczytu z ponowieniem, strumień zerwany
+- [x] 5.8 Pokazywać wartości spod kursora — otwarcie, maksimum, minimum, zamknięcie, czas —
       dławione do jednej klatki; brak wolumenu pokazywany jako brak danej, nie jako zero
-- [ ] 5.9 Testy komponentu z zaślepioną biblioteką wykresu: stany, przepięcie subskrypcji przy
+- [x] 5.9 Testy komponentu z zaślepioną biblioteką wykresu: stany, przepięcie subskrypcji przy
       zmianie symbolu, sprzątanie przy odmontowaniu
 
 ## 6. Siatka wykresów
