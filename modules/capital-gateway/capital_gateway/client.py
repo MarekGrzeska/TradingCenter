@@ -17,9 +17,11 @@ import asyncio
 import httpx
 
 from .config import Settings
+from .rategate import RateGate
 
 API_PREFIX = "/api/v1"
 _TIMEOUT_SECONDS = 20.0
+_REQUESTS_PER_SECOND = 10
 
 
 class CapitalClient:
@@ -31,6 +33,7 @@ class CapitalClient:
         self._cst: str | None = None
         self._security_token: str | None = None
         self._login_inflight: asyncio.Task[httpx.Response] | None = None
+        self._gate = RateGate(_REQUESTS_PER_SECOND)
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -67,8 +70,15 @@ class CapitalClient:
         # are waiting on.
         return await asyncio.shield(self._login_inflight)
 
+    async def _send(self, method: str, path: str, **kwargs) -> httpx.Response:
+        """Every request to capital.com goes through here, and so through the gate.
+        A login counts against the budget like any other call."""
+        await self._gate.acquire()
+        return await self._http.request(method, path, **kwargs)
+
     async def _login(self) -> httpx.Response:
-        resp = await self._http.post(
+        resp = await self._send(
+            "POST",
             f"{API_PREFIX}/session",
             headers={"X-CAP-API-KEY": self._s.capital_api_key},
             json={
@@ -94,10 +104,10 @@ class CapitalClient:
         once more and retries — that is what an expired session looks like from here."""
         if not self.authenticated:
             await self.login()
-        resp = await self._http.request(method, path, headers=self._headers(), **kwargs)
+        resp = await self._send(method, path, headers=self._headers(), **kwargs)
         if resp.status_code == 401:
             await self.login()
-            resp = await self._http.request(method, path, headers=self._headers(), **kwargs)
+            resp = await self._send(method, path, headers=self._headers(), **kwargs)
         return resp
 
     # --- convenience wrappers, all returning the raw response ---
