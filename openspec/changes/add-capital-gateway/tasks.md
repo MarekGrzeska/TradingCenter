@@ -8,7 +8,7 @@
 
 ## 2. Typy kontraktu
 
-- [ ] 2.1 Napisać `dtos.py`: `AssetClass`, `Direction`, `Resolution`, `OrderStatus`, `OrderType`, `Instrument`, `InstrumentPage`, `Candle`, `Account`, `Position`, `Order`, `WorkingOrder`, `PlaceOrderRequest`, `UpdatePositionRequest`, `Capabilities` — przeniesione z `broker-gateway`, z `Capabilities` rozszerzonym o środowisko i streaming
+- [x] 2.1 Napisać `dtos.py`: `AssetClass`, `Direction`, `Resolution`, `OrderStatus`, `OrderType`, `Instrument`, `InstrumentPage`, `Candle`, `Account`, `Position`, `Order`, `WorkingOrder`, `PlaceOrderRequest`, `UpdatePositionRequest`, `Capabilities` — przeniesione z `broker-gateway`, z `Capabilities` rozszerzonym o środowisko i streaming
 - [ ] 2.2 Dodać typ odpowiedzi głębokiej historii: świece plus liczba zebranych, liczba wysłanych żądań, pokryty okres i informacja, czy historia skończyła się przed zaspokojeniem żądania
 - [ ] 2.3 Walidacja: LIMIT/STOP bez poziomu jest odrzucane; zmiana niewskazująca żadnego stopu jest odrzucana
 
