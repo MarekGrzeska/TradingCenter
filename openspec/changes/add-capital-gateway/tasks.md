@@ -56,7 +56,7 @@
 
 ## 8. Weryfikacja i dokumentacja
 
-- [ ] 8.1 Test dymny na żywo za flagą `--run-live`: sesja się otwiera, głęboki odczyt stronicuje, strumień dostarcza kwotowania i zamkniętą świecę
+- [x] 8.1 Test dymny na żywo za flagą `--run-live`: sesja się otwiera, głęboki odczyt stronicuje, strumień dostarcza kwotowania i zamkniętą świecę
 - [ ] 8.2 Przepuścić `ruff` i pełny zestaw testów na czysto
 - [ ] 8.3 Napisać README modułu — co / uruchomienie / testy / kontrakt — na jeden ekran, razem z kształtami wiadomości WebSocketa
 - [ ] 8.4 Napisać README repozytorium i `docs/architecture.md` ustanawiające układ `modules/`
