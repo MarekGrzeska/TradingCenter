@@ -35,6 +35,7 @@ pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
     "db: needs a real PostgreSQL (a throwaway container, started on demand — see conftest)",
+    "live: reads through a running capital-gateway against the demo API (needs --run-live)",
 ]
 
 [dependency-groups]
