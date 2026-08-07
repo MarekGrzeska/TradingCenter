@@ -155,17 +155,18 @@ class CapitalAdapter:
             resp = await self._c.prices(
                 symbol, resolution.value, limit, date_from=date_from, date_to=date_to
             )
-            if resp.status_code == 404:
-                raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
             if not resp.is_success:
                 try:
                     payload = resp.json()
                 except ValueError:
                     payload = {}
-                # The bottom of this instrument's history — an ending, not a failure.
-                # Raising here would discard every page already collected.
+                # Checked before the status, because the bottom of history arrives as a
+                # 404 too. Reading it as an unknown symbol would raise on the last page
+                # of a deep read and throw away every page before it.
                 if payload.get("errorCode") == history.HISTORY_EXHAUSTED:
                     return None
+                if resp.status_code == 404:
+                    raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
                 raise GatewayError(f"capital.com {resp.status_code}: {resp.text[:200]}")
             return [
                 mapping.candle_from_price(p, resolution) for p in resp.json().get("prices", [])

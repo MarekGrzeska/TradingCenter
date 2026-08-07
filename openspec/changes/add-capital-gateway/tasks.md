@@ -34,7 +34,7 @@
 - [x] 5.2 Kotwiczyć każde kolejne okno na najstarszej pobranej świecy, a nie na zegarze
 - [x] 5.3 Zatrzymywać się na `error.prices.not-found`, na oknie niedającym nic starszego albo na żądanej liczbie; sortować, usuwać duplikaty po znaczniku czasu, przycinać do żądania
 - [x] 5.4 Przestać wysyłać żądania do providera, gdy wywołujący się rozłączy
-- [ ] 5.5 Test: odczyt wielostronicowy zwraca jedną uporządkowaną serię bez duplikatów; przebieg poza dno historii zwraca to, co zebrał, i mówi, że historia się skończyła; okno bez postępu kończy pętlę
+- [x] 5.5 Test: odczyt wielostronicowy zwraca jedną uporządkowaną serię bez duplikatów; przebieg poza dno historii zwraca to, co zebrał, i mówi, że historia się skończyła; okno bez postępu kończy pętlę
 
 ## 6. Streaming
 
