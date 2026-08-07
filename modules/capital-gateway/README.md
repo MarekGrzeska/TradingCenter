@@ -33,10 +33,16 @@ Swagger: <http://localhost:8010/docs>
 ## Test
 
 ```bash
-uv run pytest             # fixtures + respx-mocked; no network
-uv run pytest --run-live  # + smoke tests against the real demo API (needs credentials)
+uv run pytest                     # fixtures + respx-mocked; no network
+uv run pytest --run-live          # + read-only smoke tests against the real demo API
+uv run pytest --run-live-trading  # + tests that open, amend and close demo positions
 uv run ruff check . && uv run ruff format --check .
 ```
+
+`--run-live-trading` has its own flag because it **writes**: it opens a position, amends
+it, closes it, rests an order and cancels it. Everything is cleaned up in a `finally`, but
+the account will show the round trip. It is the only thing that can catch capital.com
+changing a dealing rule or a payload — mocks are structurally blind to that.
 
 ## Contract
 
@@ -60,6 +66,11 @@ HTTP, described by OpenAPI at `/docs`.
 
 **An answer is settled, not acknowledged.** A deal the provider has not resolved comes back
 `PENDING` with its reference — never `FILLED`.
+
+**A refusal names itself.** `REJECTED` carries the provider's `reason` — `RC_NOT_ENOUGH_MARGIN`
+and the like. Note that capital.com may accept a request, hand back a reference, and only
+refuse at settlement, so a `dealReference` is not an acceptance. It also assigns a `dealId`
+to a deal it refuses: on a `REJECTED` order the `id` identifies the attempt, not a position.
 
 **Amending stops is tri-state.** A number sets, `null` removes, an omitted field is left
 alone, so changing one stop cannot clear the other.
@@ -116,8 +127,16 @@ while a period is a fixed number of seconds, and a daily candle starts at the ve
 open, not UTC midnight. At those resolutions quotes extend the last known candle and only a
 sealed candle moves the boundary.
 
+**Streamed candles carry no volume.** `volume` is always `null` on the WebSocket feed —
+neither the provider's candle event nor its quotes report it. The field is there so the
+shape matches the REST candle, which does carry `lastTradedVolume`. A volume-based
+indicator cannot be computed on this feed; read it from `/candles` or `/history` instead.
+
 **One connection per `(symbol, resolution)`**, shared by every subscriber and closed when the
 last one leaves.
+
+**Ten requests per second, per process.** The gate lives on the client, and the app owns one
+client — so two clients in one process would be two gates and twice the rate.
 
 **Nothing is stored.** This is a window onto capital.com, not an archive of it — `MINUTE_5`
 reaches back about two years and nothing recovers what is past that.
