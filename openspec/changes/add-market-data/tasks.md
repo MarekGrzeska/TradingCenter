@@ -59,16 +59,16 @@
 
 ## 8. Kontrakt modułu
 
-- [ ] 8.1 `GET` świec po zakresie czasu z rozdzielczością i stroną ceny w odpowiedzi
-- [ ] 8.2 Oznaczanie części żądanego przedziału, która nie jest pokryta
-- [ ] 8.3 Subskrypcja WebSocket ze snapshotem jako pierwszą wiadomością, czytanym w jednej transakcji z dopięciem odbiorcy
-- [ ] 8.4 Rozgłaszanie zmian po snapshocie, z jawnym oznaczeniem świecy zamkniętej i w budowie
-- [ ] 8.5 `GET` pokrycia pary
-- [ ] 8.6 Zarządzanie śledzonymi parami przez kontrakt
-- [ ] 8.7 Błędy nazywające przyczynę, bez surowych błędów bazy i bez poświadczeń
-- [ ] 8.8 OpenAPI dla tras HTTP i opis wiadomości WebSocket w `README.md`, z testem pilnującym, że ścieżka WS jest nieobecna w schemacie
-- [ ] 8.9 Test: subskrypcja nieśledzonej pary jest odrzucana
-- [ ] 8.10 Test: snapshot i kolejne zmiany nie tworzą duplikatu świecy tego samego okresu
+- [x] 8.1 `GET` świec po zakresie czasu z rozdzielczością i stroną ceny w odpowiedzi
+- [x] 8.2 Oznaczanie części żądanego przedziału, która nie jest pokryta
+- [x] 8.3 Subskrypcja WebSocket ze snapshotem jako pierwszą wiadomością, czytanym w jednej transakcji z dopięciem odbiorcy
+- [x] 8.4 Rozgłaszanie zmian po snapshocie, z jawnym oznaczeniem świecy zamkniętej i w budowie
+- [x] 8.5 `GET` pokrycia pary
+- [x] 8.6 Zarządzanie śledzonymi parami przez kontrakt
+- [x] 8.7 Błędy nazywające przyczynę, bez surowych błędów bazy i bez poświadczeń
+- [x] 8.8 OpenAPI dla tras HTTP i opis wiadomości WebSocket w `README.md`, z testem pilnującym, że ścieżka WS jest nieobecna w schemacie
+- [x] 8.9 Test: subskrypcja nieśledzonej pary jest odrzucana
+- [x] 8.10 Test: snapshot i kolejne zmiany nie tworzą duplikatu świecy tego samego okresu
 
 ## 9. Terminal — źródło składane
 
