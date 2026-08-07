@@ -18,7 +18,12 @@ from .dtos import (
     Capabilities,
     Instrument,
     InstrumentPage,
+    Order,
+    PlaceOrderRequest,
+    Position,
     Resolution,
+    UpdatePositionRequest,
+    WorkingOrder,
 )
 from .errors import GatewayError
 from .stream.hub import Hub
@@ -162,3 +167,46 @@ async def history(
         return not await request.is_disconnected()
 
     return await a.get_history(symbol, resolution, bars, still_wanted)
+
+
+# --- trading ---
+
+
+@app.get("/positions", tags=["trading"], response_model=list[Position])
+async def positions(a: CapitalAdapter = Depends(adapter)):
+    return await a.list_positions()
+
+
+@app.post("/orders", tags=["trading"], response_model=Order)
+async def place_order(req: PlaceOrderRequest, a: CapitalAdapter = Depends(adapter)):
+    """Place an order. MARKET fills now (FILLED); LIMIT and STOP rest (WORKING).
+
+    The answer is settled, not acknowledged. A deal the provider has not resolved comes
+    back PENDING with its reference — never FILLED.
+    """
+    return await a.place_order(req)
+
+
+@app.delete("/positions/{position_id}", tags=["trading"], response_model=Order)
+async def close_position(position_id: str, a: CapitalAdapter = Depends(adapter)):
+    return await a.close_position(position_id)
+
+
+@app.put("/positions/{position_id}", tags=["trading"], response_model=Order)
+async def update_position(
+    position_id: str, req: UpdatePositionRequest, a: CapitalAdapter = Depends(adapter)
+):
+    """Set or remove stops. A number sets, `null` removes, an omitted field is left
+    alone — so amending one stop cannot clear the other."""
+    return await a.update_position(position_id, req)
+
+
+@app.get("/working-orders", tags=["trading"], response_model=list[WorkingOrder])
+async def working_orders(a: CapitalAdapter = Depends(adapter)):
+    """Resting LIMIT and STOP orders on the active account."""
+    return await a.list_working_orders()
+
+
+@app.delete("/working-orders/{order_id}", tags=["trading"], response_model=Order)
+async def cancel_working_order(order_id: str, a: CapitalAdapter = Depends(adapter)):
+    return await a.cancel_working_order(order_id)
