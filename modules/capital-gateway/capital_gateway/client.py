@@ -27,9 +27,7 @@ _REQUESTS_PER_SECOND = 10
 class CapitalClient:
     def __init__(self, settings: Settings) -> None:
         self._s = settings
-        self._http = httpx.AsyncClient(
-            base_url=settings.capital_base_url, timeout=_TIMEOUT_SECONDS
-        )
+        self._http = httpx.AsyncClient(base_url=settings.capital_base_url, timeout=_TIMEOUT_SECONDS)
         self._cst: str | None = None
         self._security_token: str | None = None
         self._login_inflight: asyncio.Task[httpx.Response] | None = None

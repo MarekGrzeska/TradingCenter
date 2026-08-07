@@ -168,9 +168,7 @@ class CapitalAdapter:
                 if resp.status_code == 404:
                     raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
                 raise GatewayError(f"capital.com {resp.status_code}: {resp.text[:200]}")
-            return [
-                mapping.candle_from_price(p, resolution) for p in resp.json().get("prices", [])
-            ]
+            return [mapping.candle_from_price(p, resolution) for p in resp.json().get("prices", [])]
 
         return await history.collect(symbol, resolution, bars, fetch_page, still_wanted)
 

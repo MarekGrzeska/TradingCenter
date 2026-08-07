@@ -40,7 +40,9 @@ def mock_session(account_id: str = "acc-1") -> None:
     respx.post(f"{API}/session").mock(
         return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
     )
-    respx.get(f"{API}/session").mock(return_value=httpx.Response(200, json={"accountId": account_id}))
+    respx.get(f"{API}/session").mock(
+        return_value=httpx.Response(200, json={"accountId": account_id})
+    )
 
 
 def mock_navigation() -> None:
