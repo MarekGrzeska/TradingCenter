@@ -12,8 +12,10 @@ dependencies = [
     "asyncpg>=0.30",
     "alembic>=1.14",
     # Alembic drives migrations through SQLAlchemy Core; the module's own queries go
-    # straight through asyncpg, so no ORM is pulled into the runtime path.
-    "sqlalchemy>=2.0",
+    # straight through asyncpg, so no ORM is pulled into the runtime path. The `asyncio`
+    # extra is not optional here: it pulls greenlet, without which an async engine raises
+    # at its first connect — and the only driver this module installs is an async one.
+    "sqlalchemy[asyncio]>=2.0",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
