@@ -8,6 +8,10 @@ deep reads are enough to do it: a deep read is dozens of requests back to back.
 A sliding window rather than a semaphore, because the limit is a *rate*: ten requests
 that each take a second are fine, ten that take a millisecond are not, and a semaphore
 cannot tell those apart.
+
+One gate per ``CapitalClient``, and the provider counts per account — so a second client
+in the same process is a second gate and twice the rate. The app owns exactly one, which
+is what makes this a process-wide budget rather than a per-caller one.
 """
 
 from __future__ import annotations
