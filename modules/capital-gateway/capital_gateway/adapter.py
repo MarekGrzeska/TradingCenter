@@ -19,7 +19,14 @@ from .dtos import (
     Capabilities,
     Instrument,
     InstrumentPage,
+    Order,
+    OrderStatus,
+    OrderType,
+    PlaceOrderRequest,
+    Position,
     Resolution,
+    UpdatePositionRequest,
+    WorkingOrder,
 )
 from .errors import GatewayError
 
@@ -124,6 +131,61 @@ class CapitalAdapter:
             raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
         data = self._json_ok(resp)
         return [mapping.candle_from_price(p, resolution) for p in data.get("prices", [])]
+
+    # --- trading ---
+
+    async def list_positions(self) -> list[Position]:
+        data = self._json_ok(await self._c.positions())
+        return [mapping.position_from_raw(row) for row in data.get("positions", [])]
+
+    async def place_order(self, req: PlaceOrderRequest) -> Order:
+        """MARKET opens a position now; LIMIT and STOP rest as working orders.
+
+        Two different provider endpoints, one request shape for the caller — which is
+        the whole reason this module has an order type rather than two routes.
+        """
+        body: dict = {"epic": req.symbol, "direction": req.direction.value, "size": req.size}
+        if req.stop_loss is not None:
+            body["stopLevel"] = req.stop_loss
+        if req.take_profit is not None:
+            body["profitLevel"] = req.take_profit
+
+        if req.order_type == OrderType.MARKET:
+            body.update(req.provider_params or {})
+            created = (await self._c.create_position(body)).json()
+            return await self._settle(created, accepted=OrderStatus.FILLED)
+
+        body["type"] = req.order_type.value
+        body["level"] = req.level
+        if req.good_till is not None:
+            body["goodTillDate"] = req.good_till
+        body.update(req.provider_params or {})
+        created = (await self._c.create_working_order(body)).json()
+        return await self._settle(created, accepted=OrderStatus.WORKING)
+
+    async def close_position(self, position_id: str) -> Order:
+        closed = (await self._c.close_position(position_id)).json()
+        return await self._settle(closed, accepted=OrderStatus.CLOSED)
+
+    async def update_position(self, position_id: str, req: UpdatePositionRequest) -> Order:
+        """Set or remove stops. Only the fields the caller named are sent: a value sets,
+        None removes, an omitted field is left alone. Sending the whole model would
+        clear a live stop the caller never mentioned."""
+        body: dict = {}
+        if "stop_loss" in req.model_fields_set:
+            body["stopLevel"] = req.stop_loss
+        if "take_profit" in req.model_fields_set:
+            body["profitLevel"] = req.take_profit
+        updated = (await self._c.update_position(position_id, body)).json()
+        return await self._settle(updated, accepted=OrderStatus.UPDATED)
+
+    async def list_working_orders(self) -> list[WorkingOrder]:
+        data = self._json_ok(await self._c.working_orders())
+        return [mapping.working_order_from_raw(row) for row in data.get("workingOrders", [])]
+
+    async def cancel_working_order(self, order_id: str) -> Order:
+        cancelled = (await self._c.delete_working_order(order_id)).json()
+        return await self._settle(cancelled, accepted=OrderStatus.CANCELLED)
 
     # --- meta ---
 
