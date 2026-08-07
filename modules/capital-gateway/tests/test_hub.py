@@ -130,6 +130,25 @@ async def test_a_sealed_event_publishes_a_settled_candle() -> None:
     assert candle.time == BASE_S
 
 
+async def test_a_streamed_candle_carries_no_volume() -> None:
+    hub = make_hub()
+    subscriber, received = collector()
+    await hub.subscribe("US100", Resolution.MINUTE_5, subscriber)
+    upstream = FakeUpstream.instances[0]
+
+    await upstream.emit({"kind": "quote", "t": BASE_MS, "bid": 100.0, "ask": 100.2})
+    await upstream.emit(
+        {"kind": "sealed", "t": BASE_MS, "o": 95.0, "h": 110.0, "l": 94.0, "c": 99.0}
+    )
+
+    # Neither provider event carries volume, so the field is null on this feed — forming
+    # and sealed alike. It exists so the shape matches the REST candle; pinning it here
+    # means a consumer reading a zero one day is a change somebody made, not a surprise.
+    candles = [m for m in received if isinstance(m, CandleMessage)]
+    assert len(candles) == 2
+    assert all(c.volume is None for c in candles)
+
+
 async def test_a_late_joiner_is_handed_the_bar_already_forming() -> None:
     hub = make_hub()
     early, _ = collector()
