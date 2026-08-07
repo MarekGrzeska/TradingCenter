@@ -28,6 +28,7 @@ pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
     "live: hits the real capital.com demo API (opt-in via --run-live, needs credentials)",
+    "live_trading: opens and closes real demo positions (opt-in via --run-live-trading)",
 ]
 
 [dependency-groups]

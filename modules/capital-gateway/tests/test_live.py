@@ -5,14 +5,15 @@ only tests that can catch a provider changing its mind — the rest of the suite
 this module is consistent with what capital.com did in July 2026, which is not the same
 claim.
 
-Read-only. Nothing here places, amends or cancels an order: a demo account is still an
-account, and a smoke test that trades is a smoke test nobody runs.
+Read-only. Nothing here places, amends or cancels an order — that lives in
+``test_live_trading.py`` behind its own flag, so this file stays safe to run against any
+demo account at any time.
 """
 
 from __future__ import annotations
 
 import asyncio
-import os
+import time
 
 import pytest
 
@@ -27,16 +28,6 @@ from capital_gateway.stream.upstream import Upstream
 pytestmark = pytest.mark.live
 
 EPIC = "US100"  # liquid enough that quotes arrive within seconds while the market is open
-
-
-@pytest.fixture
-def settings(monkeypatch: pytest.MonkeyPatch) -> Settings:
-    # conftest strips these for the rest of the suite; here they are the point.
-    for name in ("CAPITAL_API_KEY", "CAPITAL_IDENTIFIER", "CAPITAL_PASSWORD"):
-        value = os.environ.get(name)
-        if value:
-            monkeypatch.setenv(name, value)
-    return Settings()  # type: ignore[call-arg]
 
 
 async def test_a_session_opens_and_accounts_are_readable(settings: Settings) -> None:
@@ -63,6 +54,40 @@ async def test_a_deep_read_pages_and_reports_its_cost(settings: Settings) -> Non
         assert result.count == 2500 or result.history_ended
     finally:
         await adapter.aclose()
+
+
+async def test_the_gate_keeps_a_burst_under_the_providers_limit(settings: Settings) -> None:
+    """The unit test measures this module's own delay; this measures whether capital.com
+    agrees that the resulting stream of requests is acceptable.
+
+    The failure it exists to catch is a rate limit reached in production, where a 429 is
+    not an exception a caller sees but an empty candle series that looks like a data
+    problem.
+
+    The gate is per ``CapitalClient`` and the provider counts per account, so this waits
+    out the previous test's traffic first. It has to: a new client's window starts empty
+    and knows nothing of what the last one sent, and without the wait this test measured
+    the deep read's tail rather than its own burst. The app runs one client per process,
+    which is what makes the per-client gate a process-wide one — two clients in one
+    process would be two gates and twice the rate.
+    """
+    burst = 25  # more than two windows at 10/s, so the gate has to hold the line twice
+    client = CapitalClient(settings)
+    try:
+        await client.login()  # not part of the burst, and not part of the timing
+        await asyncio.sleep(1.1)  # let the provider's window drain
+
+        started = time.monotonic()
+        responses = await asyncio.gather(*(client.session_details() for _ in range(burst)))
+        elapsed = time.monotonic() - started
+
+        assert [r.status_code for r in responses if r.status_code != 200] == []
+        # 25 requests cannot clear a 10-per-second gate in under two seconds. Passing this
+        # faster would mean the gate let the burst through, and the assertion above would
+        # then be luck rather than evidence.
+        assert elapsed >= 2.0
+    finally:
+        await client.aclose()
 
 
 async def _watch(
