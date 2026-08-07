@@ -52,7 +52,7 @@
 - [x] 7.2 Trasy: `/accounts`, `/accounts/active`, `/instruments`, `/instruments/search`, `/instruments/{symbol}/candles`, `/instruments/{symbol}/history`
 - [x] 7.3 Trasy: `/positions`, `/orders`, `/positions/{id}` (zamknięcie, zmiana), `/working-orders`, `/working-orders/{id}`
 - [x] 7.4 WebSocket `/ws/stream?symbol=&resolution=` — odmówić połączenia niewskazującego symbolu
-- [ ] 7.5 Test: publikowane OpenAPI pokrywa każdą trasę; strumień bez symbolu jest odrzucany; żadna odpowiedź ani wiadomość nie niesie poświadczenia ani tokenu providera
+- [x] 7.5 Test: publikowane OpenAPI pokrywa każdą trasę; strumień bez symbolu jest odrzucany; żadna odpowiedź ani wiadomość nie niesie poświadczenia ani tokenu providera
 
 ## 8. Weryfikacja i dokumentacja
 
