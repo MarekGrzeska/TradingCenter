@@ -3,7 +3,9 @@
 Terminal działa przeciw żywemu `capital-gateway`: powłoka z rejestrem zakładek, reużywalny wykres
 świecowy, siatka slotów z presetami i trwałością, wyszukiwarka instrumentów. Wszystko, co spec
 obiecuje, jest zaimplementowane; pięć błędów wyszło dopiero z uruchomienia w przeglądarce i
-zostało naprawionych przed tym przeglądem.
+zostało naprawionych przed tym przeglądem. Dwa ustalenia zostawione wtedy z uzasadnieniem zostały
+domknięte po przeglądzie (`f842245`) — w `Findings` nie ma nic otwartego. Dziewięć scenariuszy bez
+testu jest **zaakceptowanych**, z podziałem i uzasadnieniem w `Gaps`.
 
 Świadomie niekompletne: **przeglądarkowe zachowania, których jsdom nie oddaje** — dopasowanie
 rozmiaru przez `ResizeObserver` i odczyt spod kursora nie mają testów jednostkowych i były
@@ -16,14 +18,17 @@ nadmiarowa abstrakcja, tylko miejsce wejścia dla bazy świec — i jedyna rzecz
 
 ## Verified
 
-Uruchomione w `modules/terminal`, na commicie `8a069b4`:
+Uruchomione w `modules/terminal`, na commicie `f842245`:
 
 | Komenda | Wynik |
 |---|---|
 | `pnpm typecheck` (`tsc -b --noEmit`) | czysto, bez wyjścia |
 | `pnpm lint` (`eslint .`) | czysto, zero ostrzeżeń |
-| `pnpm test` (`vitest run`) | **100 passed**, 10 plików, 6,3 s |
-| `pnpm build` (`tsc -b && vite build`) | `dist/` 408,75 kB (gzip 130,80 kB), 1,56 s |
+| `pnpm test` (`vitest run`) | **103 passed**, 10 plików, 6,5 s |
+| `pnpm build` (`tsc -b && vite build`) | `dist/` 409,06 kB (gzip 130,90 kB), 1,60 s |
+
+Ruch w przeglądarce niżej pochodzi z przebiegu na `8a069b4`; `f842245` rusza wyłącznie dociąganie
+luki po wznowieniu połączenia i jest pokryte testami jednostkowymi.
 
 Poza tym, przeciw **realnemu gatewayowi na koncie demo**, przez `scripts/dev.ps1` i sterowaną
 przeglądarkę (Chromium, playwright-core):
@@ -54,14 +59,14 @@ naprawione w trakcie; żadne nie zostaje otwarte.
 | Low | `src/data/types.ts`, `src/data/socketHub.ts` | Martwy kod po usunięciu mocka: `FIXED_RESOLUTION_SECONDS` bez konsumenta i `HubEntry.refused` zapisywane, nigdy nieczytane. | **FIXED** `8a069b4` |
 | Low | `modules/terminal/index.html` | Brak favikony — 404 w konsoli przy każdym załadowaniu. | **FIXED** `f98bf5b` |
 
-Świadomie zostawione, z uzasadnieniem:
+Dwa ustalenia były najpierw zostawione świadomie, a potem jednak domknięte — obydwa w `f842245`:
 
-- `socketHub.ts:202` — dociąganie luki bierze sztywne 50 świec zamiast liczyć długość przerwy.
-  Świece scalają się po znaczniku czasu, więc nadmiar jest nieszkodliwy, a niedomiar zasypie
-  następna świeca zamknięta. Liczenie okresu wymagałoby tablicy długości okresów, której ten moduł
-  celowo nie ma (`DAY` nie ma stałej długości).
-- `gatewaySource.ts:123` — `fetchRecent` tworzy `AbortController`, którego nigdy nie przerywa.
-  Wywoływane wyłącznie z huba po wznowieniu; żądanie i tak jest krótkie.
+| Severity | Where | Finding | Status |
+|---|---|---|---|
+| Low | `src/data/socketHub.ts:202` (przed naprawą) | Dociąganie luki brało sztywne 50 świec zamiast mierzyć przerwę. Nadmiar nieszkodliwy (scalanie po znaczniku czasu), ale niedomiar zostawiał dziurę do następnej świecy zamkniętej — przy `DAY` godziny. Liczenie długości okresu dalej odpada (`DAY` i `WEEK` nie mają stałej), więc hub nie liczy, tylko **pyta i sprawdza**: bierze partię, patrzy, czy jej najstarsza świeca sięga za ostatnią widzianą przed zerwaniem, i podwaja zapytanie, gdy nie sięga — 50 → 400, po czym przestaje. Nadawana jest wyłącznie partia, która przykrywa lukę. | **FIXED** `f842245` |
+| Low | `src/data/gatewaySource.ts:123` (przed naprawą) | `fetchRecent` tworzyło `AbortController`, którego nigdy nie przerywało, więc dociąganie przeżywało subskrypcję, która je wywołała. Sygnał należy teraz do wpisu w hubie, a `teardown` przerywa go razem z ostatnim odbiorcą. | **FIXED** `f842245` |
+
+Po tej naprawie w `Findings` nie zostaje nic otwartego.
 
 ## Spec coverage
 
@@ -93,7 +98,7 @@ Pass 2 — każdy wymóg i scenariusz z `specs/**/*.md` tej zmiany.
 | … / Ostatni odbiorca odchodzi | `src/data/socketHub.test.ts::closes the socket only once the last subscriber leaves` |
 | … / Sześć różnych par naraz | `src/grid/GridView.test.tsx::opens at most one connection per pair for a full 3x2 of distinct pairs` |
 | Zerwane połączenie wraca samo / Połączenie pada | `src/data/socketHub.test.ts::reconnects on an unexpected drop with growing backoff, and reopens the socket` |
-| … / Połączenie wraca | `src/data/socketHub.test.ts::backfills the gap from fetchRecent once a reconnect succeeds` |
+| … / Połączenie wraca | `src/data/socketHub.test.ts::backfills the gap from fetchRecent once a reconnect succeeds`, `::asks for more bars when the first batch doesn't reach back to the drop`, `::stops escalating the backfill at a ceiling instead of asking forever`, `::aborts a backfill still in flight when the last subscriber leaves` |
 | Świeca w budowie oznaczona jako niepewna / Świeca się zamyka | `src/data/merge.test.ts::closes a forming candle by replacing it with the settled one` |
 | Zapytanie nazywa swoją porażkę / Nieznany symbol | `src/data/gatewaySource.test.ts::maps a 404 to a not-found MarketDataError naming the symbol` |
 | … / Źródło nieosiągalne | `src/data/gatewaySource.test.ts::maps a network failure to unreachable, not a raw fetch error` |
@@ -148,7 +153,12 @@ Pass 2 — każdy wymóg i scenariusz z `specs/**/*.md` tej zmiany.
 
 ## Gaps
 
-Dziewięć scenariuszy bez testu. Trzy grupy, różne powody i różna waga:
+**Zaakceptowane** — dziewięć scenariuszy bez testu wchodzi do archiwum tak, jak stoi. Żadna z tych
+luk nie jest znanym błędem: każda to brakująca asercja przy zachowaniu sprawdzonym inaczej
+(przeglądarka) albo wymuszonym przez typ. Zamykanie ich nie blokuje tej zmiany; poniższy podział
+mówi, co konkretnie trzeba by dopisać, gdyby wróciły jako praca.
+
+Trzy grupy, różne powody i różna waga:
 
 **Nietestowalne w jsdom — sprawdzone w przeglądarce, nie w suicie.**
 
@@ -177,3 +187,7 @@ zmierzony w przeglądarce (sześć gniazd na sześć par).
 - `terminal-grid` / Zapisany symbol jest nieznany źródłu — izolacja błędu do jednego slotu.
 - `terminal-chart` / Wybór innego interwału — przepięcie subskrypcji na nową **rozdzielczość**
   (dla symbolu jest asertowane, dla rozdzielczości nie).
+
+Te cztery są przyjęte jako dług, nie jako przeoczenie: wszystkie leżą w kodzie już działającym pod
+ręką i przez sąsiednie testy, a żadna nie dotyka ścieżki, na której cena trafia na ekran. Jeśli
+wrócą, wracają jako osobna zmiana — najpierw `ViewErrorBoundary`.
