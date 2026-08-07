@@ -31,11 +31,11 @@
 
 ## 5. Rozdzielczości pochodne
 
-- [ ] 5.1 **Zweryfikuj empirycznie**, czy provider kotwiczy `HOUR_4` na północy UTC — wylicz próbkę z serii minutowej i porównaj ze świecami pobranymi z gatewaya
-- [ ] 5.2 Widoki materializowane dla `MINUTE_5`, `MINUTE_15`, `MINUTE_30`, `HOUR`, `HOUR_4`
-- [ ] 5.3 Przyrostowe odświeżanie po zamknięciu okresu
-- [ ] 5.4 Oznaczanie świecy powstałej z niepełnego okresu
-- [ ] 5.5 Test: wyliczona świeca ma otwarcie pierwszej, maksimum i minimum wszystkich, zamknięcie ostatniej
+- [x] 5.1 **Zweryfikuj empirycznie**, czy provider kotwiczy `HOUR_4` na północy UTC — wylicz próbkę z serii minutowej i porównaj ze świecami pobranymi z gatewaya
+- [x] 5.2 Rollupy dla `MINUTE_5`, `MINUTE_15`, `MINUTE_30`, `HOUR`, `HOUR_4` (tabela, nie widok materializowany — patrz `design.md`)
+- [x] 5.3 Przyrostowe odświeżanie po zamknięciu okresu
+- [x] 5.4 Oznaczanie świecy powstałej z niepełnego okresu
+- [x] 5.5 Test: wyliczona świeca ma otwarcie pierwszej, maksimum i minimum wszystkich, zamknięcie ostatniej
 
 ## 6. Śledzone pary
 

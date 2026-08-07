@@ -67,18 +67,30 @@ TimescaleDB odpada dodatkowo z powodu, którego nie widać z zewnątrz: **Azure 
 edycję Apache-2**, czyli bez kompresji i bez continuous aggregates. Te dwie funkcje były jedynym
 argumentem za nim.
 
-### Rozdzielczości pochodne z widoków materializowanych
+### Rozdzielczości pochodne z tabeli rollupów, nie z widoku materializowanego
 
-Skoro nie ma continuous aggregates, rollupy `MINUTE_5` … `HOUR_4` powstają jako widoki
-materializowane odświeżane przyrostowo po zamknięciu okresu. Kilkadziesiąt linii SQL zamiast
-polityki.
+Skoro nie ma continuous aggregates, rollupy `MINUTE_5` … `HOUR_4` powstają z serii minutowej
+i są odświeżane przyrostowo po zamknięciu okresu. Kilkadziesiąt linii SQL zamiast polityki.
+
+Nie jest to jednak widok materializowany PostgreSQL, jak zakładała pierwsza wersja tej decyzji.
+`REFRESH MATERIALIZED VIEW` przelicza całość — również z `CONCURRENTLY` — więc przy roku świec
+minutowych domknięcie jednego okresu kosztowałoby przebudowę całego archiwum. Rollupy są zatem
+zwykłą tabelą, w której odświeżenie nadpisuje wyłącznie okresy dotknięte zapisem. Jest to dokładnie
+to, co dałby continuous aggregate, i tym samym powód, dla którego jego brak został tu odnotowany.
 
 `DAY` i `WEEK` pochodzą z providera. Wyliczanie ich z serii minutowej dałoby świecę, która wygląda
 poprawnie i jest błędna — to samo rozstrzygnięcie, które podjął już `forming.py`.
 
-**Do zweryfikowania, nie do założenia:** czy provider kotwiczy `HOUR_4` na północy UTC. Przed
-zaufaniem derywacji trzeba wyliczyć próbkę i porównać ją ze świecami od providera. Jest to zadanie
-w `tasks.md`, nie przypis.
+**Zweryfikowane, nie założone:** provider kotwiczy `HOUR_4` na północy UTC. Świece pobrane
+z gatewaya zaczynają się o 00, 04, 08, 12, 16 i 20 UTC, a `HOUR_4` wyliczone z serii minutowej
+zgadza się z nimi co do wartości. Sprawdzone na `BTCUSD` (rynek ciągły) i `US100` (rynek sesyjny),
+sierpień 2026 — `modules/market-data/tests/test_live.py`, za flagą `--run-live`.
+
+Przy okazji wyszło coś, czego nikt nie zakładał: provider przerywa notowania na kilka minut około
+21:00 UTC, codziennie i dla obu instrumentów. Okres `HOUR_4` zaczynający się o 20:00 nigdy nie ma
+kompletu 240 świec minutowych — bywa 233–235 — podczas gdy każdy inny okres wewnętrzny ma komplet.
+Oznaczenie „niepełny okres" jest więc normalnym stanem jednego okresu na sześć i MUST NOT być
+czytane jako brak danych. Od tego są zakresy pokrycia.
 
 ### Śledzone pary są jawną decyzją operatora, podejmowaną w terminalu
 

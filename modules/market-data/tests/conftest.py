@@ -36,7 +36,7 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 # Emptied between tests so that one test's rows are never another's premise. TRUNCATE
 # rather than dropping and re-migrating: the schema is the same for every test, and
 # re-running three migrations per test buys nothing.
-TABLES = ("candles", "tracked_pairs", "coverage_ranges")
+TABLES = ("candles", "derived_candles", "tracked_pairs", "coverage_ranges")
 
 
 # Generous, because Docker Desktop wakes its VM lazily and a first call after an idle
@@ -55,7 +55,22 @@ DOCKER_SOCKETS = (
 )
 
 
+def pytest_addoption(parser: pytest.Parser) -> None:
+    parser.addoption(
+        "--run-live",
+        action="store_true",
+        default=False,
+        help="run tests that read through a running capital-gateway on the demo API",
+    )
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    if not config.getoption("--run-live"):
+        skip_live = pytest.mark.skip(reason="needs --run-live and a running capital-gateway")
+        for item in items:
+            if "live" in item.keywords:
+                item.add_marker(skip_live)
+
     reason = _reason_to_skip_db_tests()
     if reason is None:
         return

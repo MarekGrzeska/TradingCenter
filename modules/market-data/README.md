@@ -17,6 +17,8 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
 - `store.py` — the only door to the candle table: closed candles in, one row per period.
 - `coverage.py` — what the archive has verified, and so which absences are answers.
 - `periods.py` — the gateway's two spellings of a period start, reduced to one instant.
+- `rollups.py` — the derived resolutions, computed from the minute series and refreshed
+  only where a write touched them.
 - `gateway/` — the only place that talks to `capital-gateway`: deep history over HTTP,
   live candles and quotes over its WebSocket.
 - `errors.py` — the gateway being down, refusing, or answering something unreadable, told apart.
@@ -103,6 +105,41 @@ catch, so it runs under a transaction-scoped advisory lock on the pair.
 `earliest_reachable` is what stops backfill walking further back every night into data that
 was never there. It survives a merge, because nothing can be older than it. `None` from that
 call means *not known yet*, never *no limit*.
+
+## Derived resolutions
+
+The provider serves at most a thousand candles per request at ten requests a second, so
+fetching eight resolutions separately costs eight times the traffic for data the finest one
+already implies. `MINUTE_5`, `MINUTE_15`, `MINUTE_30`, `HOUR` and `HOUR_4` are therefore
+computed from the minute series. `DAY` and `WEEK` are not, and never will be: their boundary
+follows the venue's session rather than the clock, so a daily candle floored to UTC midnight
+would look right and be wrong — the same conclusion the gateway's `forming.py` reached.
+
+**Not a PostgreSQL materialized view**, though the design first called for one. A materialized
+view cannot be refreshed incrementally — `REFRESH` recomputes the whole thing, `CONCURRENTLY`
+included — so at a year of minute candles, settling one bar would rebuild the entire archive.
+`derived_candles` is an ordinary table whose refresh rewrites only the periods a write actually
+touched, which is what a Timescale continuous aggregate would have done for us and the reason
+its absence was worth noting in the first place.
+
+**The four-hour boundary was measured, not assumed.** It is the one place a guess is plausible
+and wrong in a way nothing would catch: a provider anchoring on a venue's open rather than the
+clock would return candles of the right length and shape, offset by hours, and every one of
+them would look correct on a chart. `tests/test_live.py` reads through a running gateway and
+compares a derivation against the provider's own candles for the same periods. Measured August
+2026 on `BTCUSD` (continuous) and `US100` (session-bound): periods start at 00, 04, 08, 12, 16
+and 20 UTC, and the derived values match to within a float's hair.
+
+**`complete` is not a data-quality signal.** The same run turned up something nobody assumed:
+the provider pauses for a few minutes around 21:00 UTC every day, for both instruments. Every
+interior four-hour period holds all 240 of its minutes except the one starting at 20:00, which
+holds 233–235. So one period in six is legitimately short, forever. `complete` says only that
+a period was built from every minute the archive held — coverage is what answers whether data
+is missing.
+
+```bash
+uv run pytest -m live --run-live   # needs capital-gateway on :8010 and Docker
+```
 
 ## Reading the gateway
 
