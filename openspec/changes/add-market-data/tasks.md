@@ -7,11 +7,11 @@
 
 ## 2. Schemat bazy
 
-- [ ] 2.1 Migracja: tabela świec z kluczem (symbol, rozdzielczość, początek okresu) i jawną kolumną strony ceny
-- [ ] 2.2 Migracja: tabela śledzonych par z trwałym stanem i znacznikiem dodania
-- [ ] 2.3 Migracja: tabela zakresów pokrycia wraz z flagą „historia providera się skończyła"
-- [ ] 2.4 Test: powtórny zapis tej samej trójki nadpisuje wpis i nie tworzy duplikatu
-- [ ] 2.5 Test: zapis świecy w budowie jest odrzucany na poziomie warstwy dostępu do danych
+- [x] 2.1 Migracja: tabela świec z kluczem (symbol, rozdzielczość, początek okresu) i jawną kolumną strony ceny
+- [x] 2.2 Migracja: tabela śledzonych par z trwałym stanem i znacznikiem dodania
+- [x] 2.3 Migracja: tabela zakresów pokrycia wraz z flagą „historia providera się skończyła"
+- [x] 2.4 Test: powtórny zapis tej samej trójki nadpisuje wpis i nie tworzy duplikatu
+- [x] 2.5 Test: zapis świecy w budowie jest odrzucany na poziomie warstwy dostępu do danych
 
 ## 3. Odczyt z gatewaya
 

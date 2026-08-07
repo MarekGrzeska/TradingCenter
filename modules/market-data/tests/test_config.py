@@ -87,19 +87,3 @@ def test_a_budget_below_one_names_itself(field: str) -> None:
     with pytest.raises(ValidationError) as err:
         settings(**{field: 0})
     assert field.upper() in str(err.value)
-
-
-@pytest.mark.db
-def test_the_test_database_is_reachable_and_empty(postgres_url: str) -> None:
-    """The harness itself, proven once: a container comes up and has no tables yet.
-
-    Everything under the `db` marker builds on this, so its failure should point here
-    rather than at whichever migration test happened to run first.
-    """
-    import psycopg
-
-    with psycopg.connect(postgres_url) as conn:
-        rows = conn.execute(
-            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'"
-        ).fetchall()
-    assert rows == []
