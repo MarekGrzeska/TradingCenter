@@ -15,10 +15,10 @@
 
 ## 3. Odczyt z gatewaya
 
-- [ ] 3.1 Klient HTTP do `/instruments/{symbol}/history` z mapowaniem `CandleHistory` na model wewnętrzny
-- [ ] 3.2 Klient WebSocket do `/ws/stream` z rozpoznaniem wiadomości świecy, kwotowania, statusu i błędu
-- [ ] 3.3 Sprowadzenie znaczników czasu do jednej postaci — ISO z historii i epoka ze strumienia na wspólny początek okresu
-- [ ] 3.4 Test: świeca z historii i świeca ze strumienia dla tego samego okresu mają identyczny znacznik czasu
+- [x] 3.1 Klient HTTP do `/instruments/{symbol}/history` z mapowaniem `CandleHistory` na model wewnętrzny
+- [x] 3.2 Klient WebSocket do `/ws/stream` z rozpoznaniem wiadomości świecy, kwotowania, statusu i błędu
+- [x] 3.3 Sprowadzenie znaczników czasu do jednej postaci — ISO z historii i epoka ze strumienia na wspólny początek okresu
+- [x] 3.4 Test: świeca z historii i świeca ze strumienia dla tego samego okresu mają identyczny znacznik czasu
 
 ## 4. Archiwum
 
