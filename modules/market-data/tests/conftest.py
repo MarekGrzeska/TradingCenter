@@ -11,6 +11,7 @@ start, instead of failing with a connection error that reads like a bug in the c
 
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
@@ -20,6 +21,17 @@ import pytest
 from market_data.db import asyncpg_dsn, sqlalchemy_url
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent
+
+# Testcontainers' reaper is a sidecar that bind-mounts the Docker socket so it can remove
+# containers a hard-killed test run left behind. On Docker Desktop for macOS the socket
+# lives under the user's home directory, which the VM refuses to mount, and every `db`
+# test then fails on a container that will not start.
+#
+# Turning it off is safe here because the container fixture is a context manager: normal
+# runs, failing runs and Ctrl-C all stop it on the way out. Only a SIGKILL of pytest
+# leaks one, and `docker rm` on a stray `postgres:17-alpine` is the whole cleanup.
+# Set the variable yourself to keep the reaper on a machine where it works.
+os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 # Emptied between tests so that one test's rows are never another's premise. TRUNCATE
 # rather than dropping and re-migrating: the schema is the same for every test, and
@@ -55,7 +67,7 @@ def _docker_is_usable() -> bool:
 @pytest.fixture(scope="session")
 def postgres_url() -> Iterator[str]:
     """A URL to an empty PostgreSQL, alive for the session and gone afterwards."""
-    from testcontainers.postgres import PostgresContainer
+    from testcontainers.community.postgres import PostgresContainer
 
     with PostgresContainer("postgres:17-alpine", driver=None) as pg:
         yield pg.get_connection_url()
