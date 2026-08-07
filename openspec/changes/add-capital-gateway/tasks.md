@@ -4,7 +4,7 @@
 - [x] 1.2 Dodać `.env.example` z `CAPITAL_API_KEY`, `CAPITAL_IDENTIFIER`, `CAPITAL_PASSWORD`, `CAPITAL_BASE_URL`, `CAPITAL_STREAM_URL`
 - [x] 1.3 Napisać `config.py`: ustawienia pydantic plus bezpiecznik demo-only — adres bazowy albo adres strumienia spoza demo podnosi wyjątek, zanim powstanie aplikacja
 - [x] 1.4 Napisać `errors.py` — typ błędu modułu niosący status HTTP
-- [ ] 1.5 Test: host produkcyjny w którymkolwiek adresie wywala start; brak poświadczeń wywala start, nazywając brakującą wartość
+- [x] 1.5 Test: host produkcyjny w którymkolwiek adresie wywala start; brak poświadczeń wywala start, nazywając brakującą wartość
 
 ## 2. Typy kontraktu
 
