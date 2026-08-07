@@ -17,6 +17,8 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
 - `store.py` — the only door to the candle table: closed candles in, one row per period.
 - `coverage.py` — what the archive has verified, and so which absences are answers.
 - `tracking.py` — which pairs are collected, and whether collection is actually happening.
+- `ingest/` — getting candles in and keeping them coming: the live feed, backfill, and the
+  budget they share.
 - `periods.py` — the gateway's two spellings of a period start, reduced to one instant.
 - `rollups.py` — the derived resolutions, computed from the minute series and refreshed
   only where a write touched them.
@@ -106,6 +108,48 @@ catch, so it runs under a transaction-scoped advisory lock on the pair.
 `earliest_reachable` is what stops backfill walking further back every night into data that
 was never there. It survives a merge, because nothing can be older than it. `None` from that
 call means *not known yet*, never *no limit*.
+
+## Ingest
+
+Two modes, because the provider offers two. The stream is the only way to catch a candle as
+it closes; `/history` is the only way to recover from not having been listening. Neither
+alone is an archive — the stream cannot fill in the hour the process spent restarting, and
+history alone would mean polling.
+
+One task per tracked pair, and the loop is: **close the gap, subscribe, store closed candles
+until the socket ends, wait, do it again.** The gap-closing sits inside the loop rather than
+before it, because a dropped subscription is not only a socket to reopen — it is a stretch of
+time nobody was listening for, and reconnecting without fetching it leaves a hole that looks
+exactly like a market that was shut.
+
+**Knowing when *not* to ask is half the job.** At any moment the newest closed candle is up to
+one period old: the current period has not finished, so the provider does not have it either.
+Treating that as a gap would send a request every period forever, for a candle nobody has yet.
+An archive that refetches the same closed weekend every night is worse than one that is merely
+behind, because it spends the budget that would have closed a real gap.
+
+**Fills run under one shared budget.** `BACKFILL_CONCURRENCY` is an `asyncio.Semaphore` held by
+the supervisor, not one per pair — a per-pair budget is no budget at all, since twenty pairs
+would each politely run one fill and together spend twenty times the allowance. The limiter is
+taken around the provider call only, so a pair that needs nothing never queues behind another
+pair's deep fill just to discover that.
+
+**Reconnection backs off**, growing from a second to a minute, and resets only once a
+subscription actually produces something — resetting on connection alone would let a gateway
+that accepts a socket and drops it retry in a hot loop.
+
+**Failures are reported, not raised.** One pair's fill failing is not a reason to stop
+collecting the others, so it comes back as a `FillOutcome` carrying the reason. Every outcome
+renders as one line for a log an operator reads at three in the morning:
+
+```
+US100 MINUTE: asked for 31 candles, wrote 29 in 1 provider request(s)
+US100 MINUTE: already current, nothing requested
+NOPE MINUTE: fill failed — the gateway refused with 404: unknown symbol 'NOPE'
+```
+
+Adding or removing a pair takes effect without a restart: `Ingest.sync()` reconciles the
+running tasks against what the operator has decided.
 
 ## Tracked pairs
 

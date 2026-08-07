@@ -52,3 +52,19 @@ async def connect(database_url: str) -> AsyncIterator[asyncpg.Connection]:
         yield conn
     finally:
         await conn.close()
+
+
+@asynccontextmanager
+async def pool(database_url: str, min_size: int = 1, max_size: int = 10) -> AsyncIterator:
+    """A pool, for the parts of the module that run as many things at once.
+
+    Ingest needs one: a subscription per tracked pair, each writing as candles close, plus
+    whatever backfills are running beside them. A single shared connection would serialise
+    all of that behind whichever query got there first, and a connection per pair would
+    open twenty of them to write one row a minute each.
+    """
+    created = await asyncpg.create_pool(asyncpg_dsn(database_url), min_size=min_size, max_size=max_size)
+    try:
+        yield created
+    finally:
+        await created.close()
