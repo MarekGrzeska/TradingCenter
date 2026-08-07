@@ -8,7 +8,17 @@ import type { MarketDataSource } from "../data/source";
 // Drives search results by hand so debounce and out-of-order answers are
 // testable rather than incidental.
 class SearchableSource implements MarketDataSource {
-  readonly id = "gateway" as const;
+  // The search never touches the archive, so the only part that matters here
+  // is the gateway's.
+  readonly parts = [
+    {
+      id: "gateway",
+      label: "capital-gateway",
+      whenUnreachable: "instrument search is unavailable",
+      ping: async () => {},
+    },
+  ];
+
   searchCalls: string[] = [];
   listCalls = 0;
 
@@ -36,8 +46,6 @@ class SearchableSource implements MarketDataSource {
   async history() {
     return [];
   }
-
-  async ping() {}
 
   subscribe() {
     return () => {};

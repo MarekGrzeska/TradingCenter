@@ -13,7 +13,7 @@ afterEach(() => server.resetHandlers());
 afterAll(() => server.close());
 
 function source() {
-  return createGatewaySource(HTTP_BASE, "ws://gateway.test/ws");
+  return createGatewaySource(HTTP_BASE);
 }
 
 describe("gatewaySource.searchInstruments", () => {
@@ -46,6 +46,38 @@ describe("gatewaySource.searchInstruments", () => {
       },
     ]);
   });
+
+  it("maps a FastAPI validation error to a readable message, not a raw shape", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/instruments/search`, () =>
+        HttpResponse.json(
+          { detail: [{ loc: ["query", "q"], msg: "query is too short", type: "value_error" }] },
+          { status: 422 },
+        ),
+      ),
+    );
+
+    const call = source().searchInstruments("g", new AbortController().signal);
+    await expect(call).rejects.toBeInstanceOf(MarketDataError);
+    await expect(call).rejects.toMatchObject({ message: "query is too short" });
+  });
+
+  // The whole point of leaving the catalogue with the gateway: an archive that
+  // is down takes the candles with it and nothing else (terminal-market-data
+  // spec, "Jedno ze źródeł nie odpowiada"). This is that claim at the adapter
+  // level — the search asks the gateway and nobody else.
+  it("asks the gateway and only the gateway", async () => {
+    const seen: string[] = [];
+    server.use(
+      http.get(`${HTTP_BASE}/instruments/search`, ({ request }) => {
+        seen.push(new URL(request.url).host);
+        return HttpResponse.json([]);
+      }),
+    );
+
+    await source().searchInstruments("gold", new AbortController().signal);
+    expect(seen).toEqual(["gateway.test"]);
+  });
 });
 
 describe("gatewaySource.listInstruments", () => {
@@ -64,106 +96,21 @@ describe("gatewaySource.listInstruments", () => {
     const page = await source().listInstruments(new AbortController().signal);
     expect(page).toEqual({ instruments: [], count: 300, truncated: true });
   });
-});
-
-describe("gatewaySource.history", () => {
-  it("converts ISO timestamps to epoch seconds and marks bars settled", async () => {
-    server.use(
-      http.get(`${HTTP_BASE}/instruments/US100/history`, ({ request }) => {
-        const url = new URL(request.url);
-        expect(url.searchParams.get("resolution")).toBe("MINUTE_5");
-        expect(url.searchParams.get("bars")).toBe("2");
-        return HttpResponse.json({
-          candles: [
-            { ts: "2026-08-07T14:35:00Z", open: 1, high: 2, low: 0.5, close: 1.5, volume: 10 },
-            { ts: "2026-08-07T14:40:00Z", open: 1.5, high: 2, low: 1, close: 1.8, volume: null },
-          ],
-        });
-      }),
-    );
-
-    const bars = await source().history(
-      { symbol: "US100", resolution: "MINUTE_5", count: 2 },
-      new AbortController().signal,
-    );
-    expect(bars).toEqual([
-      { time: 1786113300, open: 1, high: 2, low: 0.5, close: 1.5, volume: 10, forming: false },
-      { time: 1786113600, open: 1.5, high: 2, low: 1, close: 1.8, volume: null, forming: false },
-    ]);
-  });
-
-  it("drops a candle missing an OHLC field instead of faking a zero", async () => {
-    server.use(
-      http.get(`${HTTP_BASE}/instruments/US100/history`, () =>
-        HttpResponse.json({
-          candles: [
-            { ts: "2026-08-07T14:35:00Z", open: null, high: null, low: null, close: null, volume: null },
-            { ts: "2026-08-07T14:40:00Z", open: 1, high: 1, low: 1, close: 1, volume: null },
-          ],
-        }),
-      ),
-    );
-
-    const bars = await source().history(
-      { symbol: "US100", resolution: "MINUTE_5", count: 2 },
-      new AbortController().signal,
-    );
-    expect(bars).toHaveLength(1);
-    expect(bars[0].time).toBe(1786113600);
-  });
-
-  it("maps a 404 to a not-found MarketDataError naming the symbol", async () => {
-    server.use(
-      http.get(`${HTTP_BASE}/instruments/NOPE/history`, () =>
-        HttpResponse.json({ detail: "unknown instrument 'NOPE'" }, { status: 404 }),
-      ),
-    );
-
-    const call = source().history(
-      { symbol: "NOPE", resolution: "MINUTE_5", count: 10 },
-      new AbortController().signal,
-    );
-    await expect(call).rejects.toBeInstanceOf(MarketDataError);
-    await expect(call).rejects.toMatchObject({
-      kind: "not-found",
-      message: "unknown instrument 'NOPE'",
-    });
-  });
-
-  it("maps a FastAPI 422 validation error to unsupported-resolution", async () => {
-    server.use(
-      http.get(`${HTTP_BASE}/instruments/US100/history`, () =>
-        HttpResponse.json(
-          { detail: [{ loc: ["query", "resolution"], msg: "invalid enum value", type: "enum" }] },
-          { status: 422 },
-        ),
-      ),
-    );
-
-    await expect(
-      source().history(
-        // @ts-expect-error deliberately invalid — exercising the gateway's own rejection
-        { symbol: "US100", resolution: "NOT_A_RESOLUTION", count: 10 },
-        new AbortController().signal,
-      ),
-    ).rejects.toMatchObject({ kind: "unsupported-resolution" });
-  });
 
   it("maps a network failure to unreachable, not a raw fetch error", async () => {
-    server.use(http.get(`${HTTP_BASE}/instruments/US100/history`, () => HttpResponse.error()));
+    server.use(http.get(`${HTTP_BASE}/instruments`, () => HttpResponse.error()));
 
     await expect(
-      source().history(
-        { symbol: "US100", resolution: "MINUTE_5", count: 10 },
-        new AbortController().signal,
-      ),
-    ).rejects.toMatchObject({ kind: "unreachable" });
+      source().listInstruments(new AbortController().signal),
+    ).rejects.toMatchObject({ kind: "unreachable", message: "capital-gateway is not reachable" });
   });
 });
 
 describe("gatewaySource.ping", () => {
   it("resolves when /capabilities answers", async () => {
-    server.use(http.get(`${HTTP_BASE}/capabilities`, () => HttpResponse.json({ provider: "capital.com" })));
+    server.use(
+      http.get(`${HTTP_BASE}/capabilities`, () => HttpResponse.json({ provider: "capital.com" })),
+    );
     await expect(source().ping(new AbortController().signal)).resolves.toBeUndefined();
   });
 

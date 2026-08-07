@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { resolveGatewayEndpoints, resolveHttpBase, resolveWsBase } from "./config";
+import { resolveEndpoints, resolveHttpBase, resolveWsBase } from "./config";
 
 describe("resolveHttpBase", () => {
   it("passes a relative path through, trimmed", () => {
@@ -43,31 +43,46 @@ describe("resolveWsBase", () => {
   });
 });
 
-describe("resolveGatewayEndpoints", () => {
-  it("resolves both addresses independently from env", () => {
-    const endpoints = resolveGatewayEndpoints(
-      { VITE_GATEWAY_HTTP: "/api", VITE_GATEWAY_WS: "/ws" },
-      { protocol: "http:", host: "localhost:5173" },
+describe("resolveEndpoints", () => {
+  const devLoc = { protocol: "http:", host: "localhost:5173" };
+
+  it("resolves all three addresses independently from env", () => {
+    const endpoints = resolveEndpoints(
+      {
+        VITE_GATEWAY_HTTP: "/api",
+        VITE_ARCHIVE_HTTP: "/archive",
+        VITE_ARCHIVE_WS: "/archive/ws",
+      },
+      devLoc,
     );
-    expect(endpoints).toEqual({ httpBase: "/api", wsBase: "ws://localhost:5173/ws" });
+    expect(endpoints).toEqual({
+      gatewayHttp: "/api",
+      archiveHttp: "/archive",
+      archiveWs: "ws://localhost:5173/archive/ws",
+    });
   });
 
-  it("resolves a fully split-topology configuration (SWA + direct gateway host)", () => {
-    const endpoints = resolveGatewayEndpoints(
+  it("resolves a fully split topology — static site, archive and gateway on three hosts", () => {
+    const endpoints = resolveEndpoints(
       {
         VITE_GATEWAY_HTTP: "https://gateway.example.com",
-        VITE_GATEWAY_WS: "wss://gateway.example.com/ws",
+        VITE_ARCHIVE_HTTP: "https://archive.example.com",
+        VITE_ARCHIVE_WS: "wss://archive.example.com/ws",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
     expect(endpoints).toEqual({
-      httpBase: "https://gateway.example.com",
-      wsBase: "wss://gateway.example.com/ws",
+      gatewayHttp: "https://gateway.example.com",
+      archiveHttp: "https://archive.example.com",
+      archiveWs: "wss://archive.example.com/ws",
     });
   });
 
-  it("falls back to /api and /ws when the env vars are unset, instead of throwing", () => {
-    const endpoints = resolveGatewayEndpoints({}, { protocol: "http:", host: "localhost:5173" });
-    expect(endpoints).toEqual({ httpBase: "/api", wsBase: "ws://localhost:5173/ws" });
+  it("falls back to the dev-proxy prefixes when the env vars are unset, instead of throwing", () => {
+    expect(resolveEndpoints({}, devLoc)).toEqual({
+      gatewayHttp: "/api",
+      archiveHttp: "/archive",
+      archiveWs: "ws://localhost:5173/archive/ws",
+    });
   });
 });

@@ -1,8 +1,8 @@
 /**
- * The terminal's own vocabulary — not capital-gateway's wire shapes. An adapter
- * (gatewaySource.ts) is the only place that ever sees a gateway payload; every
- * other module speaks these types. See design.md, "MarketDataSource — jeden
- * interfejs, trzy przyszłe implementacje".
+ * The terminal's own vocabulary — not the wire shapes of whoever answers. The
+ * adapters (`archive.ts` for candles, `gatewaySource.ts` for instruments) are
+ * the only places that ever see a payload; every other module speaks these
+ * types. See design.md, "Terminal składa jedno źródło z dwóch".
  */
 
 export const RESOLUTIONS = [
@@ -72,14 +72,27 @@ export interface Bar {
 export type ConnectionState = "connecting" | "connected" | "reconnecting" | "closed";
 
 export type StreamEvent =
+  /** The series as it stands, always the first thing a subscription delivers
+   *  and delivered again after every reconnect. It is what replaced the
+   *  terminal's own history-plus-stream stitching: the archive reads it while
+   *  holding the room still and attaches the subscriber before letting go, so
+   *  no bar can fall between the snapshot and the changes, and none can arrive
+   *  twice (market-data README, "The subscription"). */
+  | { kind: "snapshot"; bars: Bar[]; forming: Bar | null }
   | { kind: "bar"; bar: Bar }
-  | { kind: "quote"; time: number; bid: number; ask: number }
   | { kind: "status"; state: ConnectionState }
   | { kind: "error"; message: string };
 
 export type MarketDataErrorKind =
   | "not-found"
   | "unsupported-resolution"
+  /** The archive understood the request and declined it — a ceiling reached, a
+   *  symbol it will not take on. Distinct from a failure: retrying unchanged
+   *  gets the same answer, and the message says what to change. */
+  | "refused"
+  /** The archive answered, but on behalf of something behind it that did not.
+   *  Retrying is worth doing; nothing about the request is wrong. */
+  | "upstream"
   | "unreachable"
   | "unknown";
 
@@ -94,4 +107,51 @@ export class MarketDataError extends Error {
     this.name = "MarketDataError";
     this.kind = kind;
   }
+}
+
+// --- what the archive is collecting, and how far it reaches ---
+//
+// Only the archive panel speaks these; the chart never sees one. They are here
+// rather than next to the panel because they are vocabulary the data layer
+// hands out, not shapes a view invented.
+
+/** Whether data is actually arriving for a pair, as far as the archive can
+ *  tell. Being on the list proves nothing — a subscription can die without a
+ *  sound, and the only symptom is a series that stops growing. `unknown` is a
+ *  third answer on purpose: behind, with nobody able to say whether the market
+ *  is open. */
+export type CollectionState =
+  | "never_collected"
+  | "collecting"
+  | "stalled"
+  | "market_closed"
+  | "unknown";
+
+export interface TrackedPair {
+  symbol: string;
+  resolution: Resolution;
+  /** Epoch seconds, like every other instant here. */
+  addedAt: number;
+  /** The newest period collected, or null when nothing has been yet. */
+  latestCandle: number | null;
+  collection: CollectionState;
+}
+
+/** A stretch of time the archive has actually verified for a pair — which is
+ *  what makes an empty period an answer rather than an absence. */
+export interface CoverageRange {
+  from: number;
+  to: number;
+  /** True when the provider has nothing older than `from`, so this is as far
+   *  back as the pair can ever reach. */
+  historyEnded: boolean;
+}
+
+export interface PairCoverage {
+  symbol: string;
+  resolution: Resolution;
+  ranges: CoverageRange[];
+  /** The oldest moment worth asking the provider about. null means the end of
+   *  its history has not been reached yet — never "there is no limit". */
+  earliestReachable: number | null;
 }

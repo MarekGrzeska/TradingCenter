@@ -66,58 +66,81 @@ export function makeFakeSeries(): FakeSeries {
   };
 }
 
-/** A source whose history resolution and stream events the test drives. */
+/**
+ * A source whose subscription the test drives message by message.
+ *
+ * Everything a chart draws now arrives through `subscribe` — the opening
+ * snapshot included — so this double has no history to resolve. `historyCalls`
+ * stays, counting the range reads nobody is expected to make: a feed that went
+ * back to fetching one would be the seam growing back (design.md, "Archiwum
+ * jest dla terminala jedynym źródłem świec i strumienia").
+ */
 export class ControllableSource implements MarketDataSource {
-  readonly id = "gateway" as const;
+  readonly parts = [
+    {
+      id: "archive",
+      label: "market-data",
+      whenUnreachable: "the candles on screen are stale",
+      ping: vi.fn(async () => {}),
+    },
+  ];
 
   historyCalls: Array<{ symbol: string; resolution: Resolution }> = [];
   subscribeCalls: Array<{ symbol: string; resolution: Resolution }> = [];
   unsubscribeCount = 0;
 
-  private pending: Array<{
-    symbol: string;
-    resolution: Resolution;
-    resolve(bars: Bar[]): void;
-    reject(error: Error): void;
+  /** Every subscription ever opened, in order, live or long since dropped —
+   *  which is what lets a test aim a late message at a superseded one. */
+  private subscriptions: Array<{
+    sink: (event: StreamEvent) => void;
+    live: boolean;
   }> = [];
-
-  private sinks: Array<(event: StreamEvent) => void> = [];
 
   searchInstruments = vi.fn(async () => []);
   listInstruments = vi.fn(async () => ({ instruments: [], count: 0, truncated: false }));
-  ping = vi.fn(async () => {});
 
-  history(request: { symbol: string; resolution: Resolution }): Promise<Bar[]> {
+  async history(request: { symbol: string; resolution: Resolution }): Promise<Bar[]> {
     this.historyCalls.push({ symbol: request.symbol, resolution: request.resolution });
-    return new Promise<Bar[]>((resolve, reject) => {
-      this.pending.push({ symbol: request.symbol, resolution: request.resolution, resolve, reject });
-    });
+    return [];
   }
 
   subscribe(symbol: string, resolution: Resolution, sink: (event: StreamEvent) => void): () => void {
     this.subscribeCalls.push({ symbol, resolution });
-    this.sinks.push(sink);
+    const subscription = { sink, live: true };
+    this.subscriptions.push(subscription);
     return () => {
       this.unsubscribeCount++;
-      this.sinks = this.sinks.filter((s) => s !== sink);
+      subscription.live = false;
     };
   }
 
-  /** Resolve the Nth outstanding history call (0 = the oldest). */
-  resolveHistory(index: number, bars: Bar[]): void {
-    this.pending[index]?.resolve(bars);
-  }
-
-  rejectHistory(index: number, message: string): void {
-    this.pending[index]?.reject(new Error(message));
-  }
-
-  pendingCount(): number {
-    return this.pending.length;
-  }
-
+  /** To every live subscription — what the real hub does. */
   emit(event: StreamEvent): void {
-    for (const sink of [...this.sinks]) sink(event);
+    for (const subscription of [...this.subscriptions]) {
+      if (subscription.live) subscription.sink(event);
+    }
+  }
+
+  /** To one subscription by age (0 = the oldest), live or not. */
+  emitTo(index: number, event: StreamEvent): void {
+    this.subscriptions[index]?.sink(event);
+  }
+
+  /** The opening message of a subscription: the series, plus whichever period
+   *  is still being built. */
+  snapshot(bars: Bar[], forming: Bar | null = null): void {
+    this.emit({ kind: "snapshot", bars, forming });
+  }
+
+  snapshotTo(index: number, bars: Bar[], forming: Bar | null = null): void {
+    this.emitTo(index, { kind: "snapshot", bars, forming });
+  }
+
+  /** A subscription that failed instead of opening — a pair nobody chose to
+   *  collect, or an archive that is not there. */
+  refuse(message: string): void {
+    this.emit({ kind: "error", message });
+    this.emit({ kind: "status", state: "closed" });
   }
 }
 

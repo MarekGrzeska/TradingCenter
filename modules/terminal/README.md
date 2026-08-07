@@ -1,17 +1,24 @@
 # terminal
 
-The operator-facing frontend: charts, in a grid, fed by `capital-gateway`. React +
-TypeScript, talking to the gateway over HTTP and WebSocket and depending on nothing else in
+The operator-facing frontend: charts, in a grid, fed by `market-data` and `capital-gateway`.
+React + TypeScript, talking to both over HTTP and WebSocket and depending on nothing else in
 this repository.
+
+**Two back ends, one interface.** Candles and the live stream come from `market-data`, the
+archive, which has yesterday's as well as today's. The instrument catalogue stays with
+`capital-gateway`, which owns it. Views see one `MarketDataSource` and never learn which
+call went where — the composition is `marketData.ts` and nothing else.
 
 ## What
 
 - `data/` — the contract and its implementations. `types.ts` (`Bar`, `Instrument`,
   `Resolution`), `source.ts` (the `MarketDataSource` interface every view reads through),
-  `gatewaySource.ts` (the one implementation), `marketData.ts` (the single instance every
-  view reads), `socketHub.ts` (one WebSocket per `symbol|resolution`, ref-counted), `merge.ts`
-  (candles deduped by timestamp), `time.ts` (the ISO → epoch-seconds seam),
-  `config.ts` (the two independent base addresses).
+  `archive.ts` (candles and the subscription), `gatewaySource.ts` (the catalogue),
+  `marketData.ts` (the single instance every view reads, composed from the two),
+  `socketHub.ts` (one WebSocket per `symbol|resolution`, ref-counted), `merge.ts`
+  (candles deduped by timestamp), `time.ts` (the ISO → epoch-seconds seam), `http.ts`
+  (a failed request turned into something an operator can read), `config.ts` (the base
+  addresses).
 - `app/` — the shell: tab registry, routing, theme, connection indicator, per-view error
   boundary.
 - `chart/` — the reusable candlestick chart, identical standalone and in a grid slot.
@@ -26,9 +33,11 @@ cp .env.example .env      # optional; the defaults already target the dev proxy
 pnpm dev                  # http://localhost:5173
 ```
 
-`capital-gateway` must be running on port 8010 — there is no offline mode, and without it the
-terminal says the source is unreachable and draws nothing. From the repo root,
-`./scripts/dev.ps1` starts the gateway, waits for it, then starts the terminal against it.
+`market-data` must be running on port 8020 and `capital-gateway` on 8010 — there is no
+offline mode. Either being down is survivable and says so: without the archive the charts
+report that candles are stale, without the gateway the instrument search stops. From the
+repo root, `./scripts/dev.ps1` starts the gateway, waits for it, then starts the terminal
+against it; the archive is started separately (see `modules/market-data/README.md`).
 
 ## Test
 
@@ -40,26 +49,37 @@ pnpm lint
 
 The chart's canvas is not assertable, so chart and grid tests stub the charting library
 and assert what the component *asks it to draw*. What that cannot cover was checked by
-driving a real browser against a real gateway — see Findings.
+driving a real browser against the real back ends — see Findings.
 
 ## Contract
 
-This module consumes; it publishes nothing. It depends on `capital-gateway`:
+This module consumes; it publishes nothing.
+
+From `market-data` — everything about candles:
+
+| Direction | What |
+|---|---|
+| `WS /ws/candles?symbol=&resolution=` | the series as a snapshot, then every change |
+| `GET /candles/{symbol}?resolution=&from=&to=` | a range read, with what was never collected marked |
+| `GET /coverage/{symbol}?resolution=` | how far the archive reaches for a pair |
+| `GET /pairs`, `POST /pairs`, `DELETE /pairs/{symbol}` | what is collected, as the operator decides it |
+| `GET /health` | the reachability check behind the connection indicator |
+
+From `capital-gateway` — the catalogue, which is its:
 
 | Direction | What |
 |---|---|
 | `GET /instruments/search?q=` | search results |
 | `GET /instruments` | the catalogue, with its `truncated` flag |
-| `GET /instruments/{symbol}/history` | candles |
-| `GET /capabilities` | the reachability check behind the connection indicator |
-| `WS /ws/stream?symbol=&resolution=` | live candles and quotes |
+| `GET /capabilities` | its own reachability check |
 
-**The HTTP and WebSocket base addresses are configured separately** — `VITE_GATEWAY_HTTP`
-and `VITE_GATEWAY_WS` — and each accepts a relative path or a full URL. This is not
-redundancy: Azure Static Web Apps, the deployment target, proxies HTTP only and caps a
-request at 45 s, so a topology where the stream goes straight to the gateway host while
-static files come from elsewhere has to be configurable without touching code. Locally
-both are relative and Vite's dev proxy carries them.
+**The archive's HTTP and WebSocket base addresses are configured separately** —
+`VITE_ARCHIVE_HTTP` and `VITE_ARCHIVE_WS` — and each accepts a relative path or a full URL.
+This is not redundancy: Azure Static Web Apps, the deployment target, proxies HTTP only and
+caps a request at 45 s, so a topology where the stream goes straight to the archive host
+while static files come from elsewhere has to be configurable without touching code.
+Locally both are relative and Vite's dev proxy carries them. The gateway needs no WebSocket
+address any more: the terminal reads its catalogue and nothing else.
 
 ## Findings
 
@@ -84,22 +104,24 @@ development, so a freshly mounted chart subscribes, unsubscribes and resubscribe
 never concurrent, and a production build does not double-invoke at all. Dropping from 3x2
 to 2x2 closes the vanished slots' sockets.
 
-**Live bars normally arrive before the history read finishes.** The subscription opens
-immediately while a 500-bar read takes seconds, so history is *merged* under whatever the
-stream already delivered rather than replacing it — otherwise the forming candle would
-vanish until the next tick, which at `DAY` resolution could be hours.
+**There is no history read left to race.** Live bars used to arrive before a 500-bar read
+finished, which is why history is *merged* under whatever the stream already delivered
+rather than replacing it. The archive's subscription opens with the series itself, taken
+while its room is held still, so the race is gone — and the merge stays, because it costs
+nothing and is what makes a reconnect's fresh snapshot fold into what is drawn instead of
+blanking it.
 
 **Changing what a chart points at has to clear it, not just re-read it.** Caught in the
 browser back when a second source existed: the previous source's prices stayed on screen
 under the new source's label for the seconds a deep read takes. Not a stale chart — a wrong
 one. The series is cleared whenever the symbol, the resolution *or* the source instance
-changes, which is what keeps that true when the candle store becomes the second
-implementation.
+changes, which is what kept it true when the archive became the source of candles.
 
 **Up candles are drawn hollow.** Teal-vs-red passes every gate in the palette validator
 except protan CVD separation (ΔE 6.5, inside the 6–8 floor band), which is only legal
 alongside a non-colour encoding. Body fill is that encoding, and it survives greyscale too.
 
-**Streamed candles carry no volume**, so the readout shows `n/a` rather than `0` — the
-gateway's `volume: null` means "not reported", and zero would be a claim about the market.
-Volume appears on candles read from history.
+**A candle can arrive without a volume**, so the readout shows `n/a` rather than `0` — a
+`volume: null` means "not reported", and zero would be a claim about the market. It is the
+period still being built that usually lacks one: the gateway assembles it from quotes,
+which carry no size.

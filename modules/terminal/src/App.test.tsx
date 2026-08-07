@@ -12,15 +12,27 @@ vi.mock("./grid/GridView", () => ({
 vi.mock("./instruments/InstrumentsView", () => ({
   InstrumentsView: () => <div>instruments stub</div>,
 }));
-// No gateway is running under the test suite; the top bar's reachability
-// check is stubbed so these tests assert routing, not connectivity.
+// Neither back end is running under the test suite; both reachability checks
+// are stubbed so these tests assert routing, not connectivity.
 vi.mock("./data/marketData", () => ({
   marketData: {
-    id: "gateway" as const,
+    parts: [
+      {
+        id: "archive",
+        label: "market-data",
+        whenUnreachable: "the candles on screen are stale",
+        ping: async () => {},
+      },
+      {
+        id: "gateway",
+        label: "capital-gateway",
+        whenUnreachable: "instrument search is unavailable",
+        ping: async () => {},
+      },
+    ],
     searchInstruments: async () => [],
     listInstruments: async () => ({ instruments: [], count: 0, truncated: false }),
     history: async () => [],
-    ping: async () => {},
     subscribe: () => () => {},
   },
 }));
@@ -37,7 +49,7 @@ beforeEach(() => {
 // whichever test happens to be running when the microtask lands.
 async function renderApp() {
   const view = render(<App />);
-  await screen.findByText(/capital-gateway (checking|connected|unreachable)/i);
+  await screen.findByText(/market-data (checking|connected|unreachable)/i);
   return view;
 }
 
@@ -90,8 +102,12 @@ describe("App routing (terminal-shell spec)", () => {
 });
 
 describe("App top bar (terminal-shell spec, source status)", () => {
-  it("names the source and reports it reachable once it answers", async () => {
+  // Two back ends, two indicators: the archive keeps the candles and the
+  // gateway keeps the catalogue, and they go down separately. One combined
+  // light would send an operator looking in the wrong place.
+  it("names each back end and reports it reachable once it answers", async () => {
     await renderApp();
+    expect(await screen.findByText(/market-data connected/i)).toBeInTheDocument();
     expect(await screen.findByText(/capital-gateway connected/i)).toBeInTheDocument();
   });
 });

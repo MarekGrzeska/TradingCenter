@@ -4,17 +4,17 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 
 /**
- * "capital-gateway is not running" is a normal state here — the terminal's
- * default source is the offline mock, and the gateway is opt-in. Vite's stock
- * proxy error handler prints a multi-line stack for every failed request, so a
- * grid of six charts retrying on a backoff buries the console in identical
- * AggregateErrors that say nothing the first one didn't.
+ * A back end not running is a normal state here — the terminal has no offline
+ * mode and both services are started separately. Vite's stock proxy error
+ * handler prints a multi-line stack for every failed request, so a grid of six
+ * charts retrying on a backoff buries the console in identical AggregateErrors
+ * that say nothing the first one didn't.
  *
  * This replaces that handler with one throttled line, and answers the request
  * with a 502 carrying a readable `detail` so the app renders its own
  * "source unreachable" state rather than a transport failure.
  */
-function quietGatewayProxyErrors(label: string, target: string): ProxyOptions["configure"] {
+function quietProxyErrors(label: string, target: string): ProxyOptions["configure"] {
   let lastLoggedAt = 0;
   const LOG_EVERY_MS = 10_000;
 
@@ -29,12 +29,11 @@ function quietGatewayProxyErrors(label: string, target: string): ProxyOptions["c
         lastLoggedAt = now;
         const reason =
           err.code === "ECONNREFUSED"
-            ? `no capital-gateway on ${target}`
+            ? `nothing listening on ${target}`
             : `${err.code ?? "error"}: ${err.message}`;
         console.warn(
-          `[proxy:${label}] ${reason}. Start it with ./scripts/dev.ps1 -WithGateway, ` +
-            `or switch Source to "mock" in the terminal. Further errors are silenced ` +
-            `for ${LOG_EVERY_MS / 1000}s.`,
+          `[proxy:${label}] ${reason}. Start it — see modules/${label}/README.md. ` +
+            `Further errors are silenced for ${LOG_EVERY_MS / 1000}s.`,
         );
       }
 
@@ -51,30 +50,35 @@ function quietGatewayProxyErrors(label: string, target: string): ProxyOptions["c
   };
 }
 
-// The dev-time stand-in for whatever sits in front of capital-gateway in production
-// (Front Door, Application Gateway, ...). `GATEWAY_PROXY_TARGET` is a server-side
-// variable read here, distinct from `VITE_GATEWAY_HTTP`/`VITE_GATEWAY_WS`, which are
-// client-side and point at `/api`/`/ws` in dev — see design.md.
+// The dev-time stand-in for whatever sits in front of the two back ends in production
+// (Front Door, Application Gateway, ...). The `*_PROXY_TARGET` variables are
+// server-side and read only here, distinct from `VITE_GATEWAY_HTTP` /
+// `VITE_ARCHIVE_HTTP` / `VITE_ARCHIVE_WS`, which are client-side and point at the
+// prefixes below in dev — see design.md.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const target = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
-  const wsTarget = target.replace(/^http/, "ws");
+  const gateway = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
+  const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
 
   return {
     plugins: [react(), tailwindcss()],
     server: {
       proxy: {
         "/api": {
-          target,
+          target: gateway,
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/api/, ""),
-          configure: quietGatewayProxyErrors("api", target),
+          configure: quietProxyErrors("capital-gateway", gateway),
         },
-        "/ws": {
-          target: wsTarget,
+        // One entry for both roads to the archive: `/archive/...` is its HTTP
+        // contract and `/archive/ws/candles` its subscription, and `ws: true`
+        // upgrades only the request that asks to be upgraded.
+        "/archive": {
+          target: archive,
           ws: true,
           changeOrigin: true,
-          configure: quietGatewayProxyErrors("ws", target),
+          rewrite: (path) => path.replace(/^\/archive/, ""),
+          configure: quietProxyErrors("market-data", archive),
         },
       },
     },

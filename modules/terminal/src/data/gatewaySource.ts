@@ -1,12 +1,24 @@
-import { parseIsoToEpochSeconds } from "./time";
-import { SocketHub } from "./socketHub";
+import { jsonClient } from "./http";
 import { MarketDataError } from "./types";
-import type { Bar, Instrument, InstrumentPage, Resolution } from "./types";
-import type { HistoryRequest, MarketDataSource } from "./source";
+import type { Instrument, InstrumentPage } from "./types";
+import type { InstrumentSource } from "./source";
 
-// capital-gateway's wire shapes (snake_case, per its OpenAPI schema) — kept
-// private to this file. Nothing outside `gatewaySource.ts` ever sees them; see
-// design.md, "`MarketDataSource` — jeden interfejs, trzy przyszłe implementacje".
+/**
+ * The instrument catalogue, which is `capital-gateway`'s and stays there.
+ *
+ * This used to serve candles too. It no longer does: the archive keeps them,
+ * and it keeps yesterday's as well as today's, which a window onto the provider
+ * by definition cannot. What the gateway owns and the archive does not is the
+ * catalogue — and trading after it — so that is what remains here (design.md,
+ * "Archiwum nie udaje właściciela rzeczy, których nie posiada").
+ *
+ * The practical consequence is worth stating: the search keeps working while
+ * the archive is down, because it never went there.
+ *
+ * capital-gateway's wire shapes (snake_case, per its OpenAPI schema) are kept
+ * private to this file.
+ */
+
 interface RawInstrument {
   symbol: string;
   name: string;
@@ -20,19 +32,6 @@ interface RawInstrumentPage {
   instruments: RawInstrument[];
   count: number;
   truncated: boolean;
-}
-
-interface RawCandle {
-  ts: string;
-  open: number | null;
-  high: number | null;
-  low: number | null;
-  close: number | null;
-  volume: number | null;
-}
-
-interface RawCandleHistory {
-  candles: RawCandle[];
 }
 
 function mapInstrument(raw: RawInstrument): Instrument {
@@ -54,117 +53,33 @@ function mapInstrumentPage(raw: RawInstrumentPage): InstrumentPage {
   };
 }
 
-/** A candle missing any OHLC field (the provider reports this for a period with
- *  no trade) can't become a `Bar` — `Bar`'s fields are non-nullable by design, so
- *  such a candle is dropped rather than faked with a zero. */
-function mapCandle(raw: RawCandle): Bar | null {
-  if (raw.open === null || raw.high === null || raw.low === null || raw.close === null) {
-    return null;
-  }
-  return {
-    time: parseIsoToEpochSeconds(raw.ts),
-    open: raw.open,
-    high: raw.high,
-    low: raw.low,
-    close: raw.close,
-    volume: raw.volume,
-    forming: false,
-  };
-}
-
-async function parseErrorDetail(response: Response): Promise<string> {
-  try {
-    const body = (await response.json()) as { detail?: unknown };
-    if (typeof body.detail === "string") {
-      return body.detail;
-    }
-    // FastAPI's own validation-error shape (a 422 from a bad query param) is a
-    // list of {loc, msg, type} objects, not GatewayError's plain string.
-    if (Array.isArray(body.detail)) {
-      return body.detail
-        .map((entry) => (entry && typeof entry === "object" && "msg" in entry ? entry.msg : entry))
-        .join("; ");
-    }
-  } catch {
-    // Not JSON, or no body — fall through to the status line below.
-  }
-  return response.statusText || `HTTP ${response.status}`;
-}
-
-async function toMarketDataError(response: Response): Promise<MarketDataError> {
-  const detail = await parseErrorDetail(response);
-  if (response.status === 404) {
-    return new MarketDataError("not-found", detail);
-  }
-  if (response.status === 422) {
-    return new MarketDataError("unsupported-resolution", detail);
-  }
+function mapStatus(status: number, detail: string): MarketDataError {
+  if (status === 404) return new MarketDataError("not-found", detail);
+  if (status === 422) return new MarketDataError("unsupported-resolution", detail);
   return new MarketDataError("unknown", detail);
 }
 
-async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
-  let response: Response;
-  try {
-    response = await fetch(url, { signal });
-  } catch (cause) {
-    if (signal.aborted) {
-      throw cause;
-    }
-    throw new MarketDataError("unreachable", "capital-gateway is not reachable");
-  }
-  if (!response.ok) {
-    throw await toMarketDataError(response);
-  }
-  return (await response.json()) as T;
-}
-
-export function createGatewaySource(httpBase: string, wsBase: string): MarketDataSource {
-  // The hub owns the signal: it aborts a backfill still in flight when the last
-  // subscriber to the pair leaves.
-  const fetchRecent = async (
-    symbol: string,
-    resolution: Resolution,
-    count: number,
-    signal: AbortSignal,
-  ) => history({ symbol, resolution, count }, signal);
-
-  const hub = new SocketHub(wsBase, fetchRecent);
-
-  async function history(request: HistoryRequest, signal: AbortSignal): Promise<Bar[]> {
-    const url =
-      `${httpBase}/instruments/${encodeURIComponent(request.symbol)}/history` +
-      `?resolution=${request.resolution}&bars=${request.count}`;
-    const raw = await fetchJson<RawCandleHistory>(url, signal);
-    const bars: Bar[] = [];
-    for (const candle of raw.candles) {
-      const bar = mapCandle(candle);
-      if (bar) bars.push(bar);
-    }
-    return bars;
-  }
+export function createGatewaySource(httpBase: string): InstrumentSource {
+  const http = jsonClient("capital-gateway", mapStatus);
 
   return {
     id: "gateway",
+    label: "capital-gateway",
+    whenUnreachable: "instrument search is unavailable",
 
     async searchInstruments(query, signal) {
       const url = `${httpBase}/instruments/search?q=${encodeURIComponent(query)}`;
-      const raw = await fetchJson<RawInstrument[]>(url, signal);
+      const raw = await http.json<RawInstrument[]>(url, { signal });
       return raw.map(mapInstrument);
     },
 
     async listInstruments(signal) {
-      const raw = await fetchJson<RawInstrumentPage>(`${httpBase}/instruments`, signal);
+      const raw = await http.json<RawInstrumentPage>(`${httpBase}/instruments`, { signal });
       return mapInstrumentPage(raw);
     },
 
-    history,
-
     async ping(signal) {
-      await fetchJson(`${httpBase}/capabilities`, signal);
-    },
-
-    subscribe(symbol, resolution, sink) {
-      return hub.subscribe(symbol, resolution, sink);
+      await http.json(`${httpBase}/capabilities`, { signal });
     },
   };
 }

@@ -5,7 +5,7 @@ import type { Bar, ConnectionState, Resolution } from "../data/types";
 export type FeedStatus = "loading" | "ready" | "empty" | "error";
 
 export interface BarSink {
-  /** The whole history, replacing whatever was drawn. */
+  /** The whole series as the source has it, to be merged into what is drawn. */
   onHistory(bars: Bar[]): void;
   /** One live bar, to be merged by timestamp into what is already drawn. */
   onBar(bar: Bar): void;
@@ -18,15 +18,23 @@ export interface BarFeed {
   retry(): void;
 }
 
-export const HISTORY_BARS = 500;
-
 /**
- * Owns one (symbol, resolution) feed: pull the history, then keep it current
- * from the stream. Bars are handed to `sink` imperatively and never held in
- * React state — six slots at roughly five quotes a second each would otherwise
- * re-render the tree ~30 times a second (design.md, "Wykres pisze do canvasu,
- * nie do stanu Reacta"). Only what changes rarely — status, error, connection
- * state — lives in state here.
+ * Owns one (symbol, resolution) feed: subscribe, and draw what arrives.
+ *
+ * It used to read a history and splice the stream onto it, and the splice was
+ * the hard part — between the read finishing and the first message there was a
+ * window in which a candle could close unseen, which is where the old "on
+ * resume, close the gap" rule came from. The archive's subscription opens with
+ * a snapshot of the series, taken while its room is held still, so there is no
+ * window to cover: the first message *is* the history, and a reconnect brings a
+ * fresh one rather than a gap to chase (design.md, "Archiwum jest dla terminala
+ * jedynym źródłem świec i strumienia").
+ *
+ * Bars are handed to `sink` imperatively and never held in React state — six
+ * slots at roughly five quotes a second each would otherwise re-render the tree
+ * ~30 times a second (design.md, "Wykres pisze do canvasu, nie do stanu
+ * Reacta"). Only what changes rarely — status, error, connection state — lives
+ * in state here.
  */
 export function useBarFeed(
   source: MarketDataSource,
@@ -49,35 +57,32 @@ export function useBarFeed(
   useEffect(() => {
     // Each effect run owns this flag and its cleanup sets it. A resolution
     // switched three times in quick succession therefore draws the last one,
-    // not whichever response happens to land last — AbortController alone
-    // does not cover that, since a response already queued as a microtask when
-    // abort() fires still resolves. It also makes StrictMode's
-    // mount/unmount/mount safe: the first run's late response is dead the
+    // not whichever snapshot happens to land last. It also makes StrictMode's
+    // mount/unmount/mount safe: the first run's late message is dead the
     // moment its cleanup ran.
     let cancelled = false;
-    const controller = new AbortController();
-    const isCurrent = () => !cancelled;
 
     setStatus("loading");
     setError(null);
     setStreamState("connecting");
 
-    source
-      .history({ symbol, resolution, count: HISTORY_BARS }, controller.signal)
-      .then((bars) => {
-        if (!isCurrent()) return;
-        sinkRef.current.onHistory(bars);
-        setStatus(bars.length === 0 ? "empty" : "ready");
-      })
-      .catch((cause: unknown) => {
-        if (!isCurrent() || controller.signal.aborted) return;
-        setStatus("error");
-        setError(cause instanceof Error ? cause.message : "could not read history");
-      });
-
     const unsubscribe = source.subscribe(symbol, resolution, (event) => {
-      if (!isCurrent()) return;
+      if (cancelled) return;
       switch (event.kind) {
+        case "snapshot":
+          sinkRef.current.onHistory(event.bars);
+          if (event.forming) {
+            // Separate from the settled series because it means something
+            // different: the period still moving, which the next message will
+            // move again. The sink merges it by timestamp like any other bar.
+            sinkRef.current.onBar(event.forming);
+          }
+          setStatus(event.bars.length === 0 && !event.forming ? "empty" : "ready");
+          // A snapshot that arrives after a refusal-then-retry supersedes the
+          // refusal; leaving the old message up would contradict the candles
+          // now on screen.
+          setError(null);
+          break;
         case "bar":
           sinkRef.current.onBar(event.bar);
           break;
@@ -85,16 +90,18 @@ export function useBarFeed(
           setStreamState(event.state);
           break;
         case "error":
+          // Named by the source — an unknown symbol, a pair nobody chose to
+          // collect, the archive being unreachable. A subscription that fails
+          // before its snapshot has nothing to draw, so this is the whole
+          // answer rather than a footnote under a chart.
           setError(event.message);
-          break;
-        case "quote":
+          setStatus((current) => (current === "loading" ? "error" : current));
           break;
       }
     });
 
     return () => {
       cancelled = true;
-      controller.abort();
       unsubscribe();
     };
   }, [source, symbol, resolution, attempt]);

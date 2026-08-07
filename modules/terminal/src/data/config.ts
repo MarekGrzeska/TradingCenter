@@ -1,9 +1,15 @@
 /**
- * Two independent base addresses, each accepting a relative path or a full URL —
- * see design.md, "Azure Static Web Apps poda statyki, ale nie przeprowadzi
- * strumienia". Static Web Apps can't proxy the WebSocket, so whatever topology
- * the app ends up deployed behind, HTTP and WS may need to point at different
- * hosts. This is the only place that decision gets made.
+ * Where the two back ends live, each address accepting a relative path or a
+ * full URL.
+ *
+ * HTTP and WebSocket are configured separately — see design.md, "Azure Static
+ * Web Apps poda statyki, ale nie przeprowadzi strumienia". Static Web Apps
+ * can't proxy the WebSocket, so whatever topology the app ends up deployed
+ * behind, the two may need to point at different hosts.
+ *
+ * The gateway has no WebSocket address any more: the terminal reads its
+ * catalogue and nothing else, and the stream it used to open there now comes
+ * from the archive. This is the only place either decision gets made.
  */
 
 const ABSOLUTE_URL = /^https?:\/\//i;
@@ -39,24 +45,35 @@ export function resolveWsBase(
   return `${scheme}://${loc.host}${path}`;
 }
 
-export interface GatewayEndpoints {
-  httpBase: string;
-  wsBase: string;
+export interface Endpoints {
+  /** `capital-gateway`, for the instrument catalogue. HTTP only. */
+  gatewayHttp: string;
+  /** `market-data`, for candles: a range read and the subscription. */
+  archiveHttp: string;
+  archiveWs: string;
 }
 
 // Same defaults as .env.example — a missing .env (a fresh checkout that
 // hasn't copied it yet, or a test/CI environment with no env file at all)
-// must fall back to "talk to the dev proxy", not crash the moment a gateway
-// source is built.
-const DEFAULT_HTTP_BASE = "/api";
-const DEFAULT_WS_BASE = "/ws";
+// must fall back to "talk to the dev proxy", not crash the moment a source is
+// built.
+const DEFAULT_GATEWAY_HTTP = "/api";
+const DEFAULT_ARCHIVE_HTTP = "/archive";
+const DEFAULT_ARCHIVE_WS = "/archive/ws";
 
-export function resolveGatewayEndpoints(
-  env: { VITE_GATEWAY_HTTP?: string; VITE_GATEWAY_WS?: string } = import.meta.env,
+export interface EnvVars {
+  VITE_GATEWAY_HTTP?: string;
+  VITE_ARCHIVE_HTTP?: string;
+  VITE_ARCHIVE_WS?: string;
+}
+
+export function resolveEndpoints(
+  env: EnvVars = import.meta.env,
   loc: Pick<Location, "protocol" | "host"> = window.location,
-): GatewayEndpoints {
+): Endpoints {
   return {
-    httpBase: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_HTTP_BASE),
-    wsBase: resolveWsBase(env.VITE_GATEWAY_WS || DEFAULT_WS_BASE, loc),
+    gatewayHttp: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_GATEWAY_HTTP),
+    archiveHttp: resolveHttpBase(env.VITE_ARCHIVE_HTTP || DEFAULT_ARCHIVE_HTTP),
+    archiveWs: resolveWsBase(env.VITE_ARCHIVE_WS || DEFAULT_ARCHIVE_WS, loc),
   };
 }

@@ -72,15 +72,15 @@ afterEach(() => {
 });
 
 describe("Chart — feed states (terminal-chart spec)", () => {
-  it("says it is loading before the history lands", () => {
+  it("says it is loading before the snapshot lands", () => {
     renderChart(source);
     expect(screen.getByText(/loading us100 history/i)).toBeInTheDocument();
   });
 
-  it("draws the history in one setData once it arrives", async () => {
+  it("draws the snapshot in one setData once it arrives", async () => {
     renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1), bar(200, 2)]);
+      source.snapshot([bar(100, 1), bar(200, 2)]);
     });
 
     const series = stub.latest().series[0];
@@ -94,29 +94,62 @@ describe("Chart — feed states (terminal-chart spec)", () => {
   it("states an empty series rather than showing a blank pane", async () => {
     renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, []);
+      source.snapshot([]);
     });
     expect(screen.getByText(/no candles for us100 at minute_5/i)).toBeInTheDocument();
   });
 
-  it("names a failed read and retries it on demand", async () => {
+  it("names a refused subscription and retries it on demand", async () => {
     const user = userEvent.setup();
     renderChart(source);
     await act(async () => {
-      source.rejectHistory(0, "unknown instrument 'US100'");
+      // What the archive closes a subscription with when nobody chose to
+      // collect the pair — a reason an operator can act on, not a socket code.
+      source.refuse("US100 MINUTE_5 is not being collected");
     });
 
     expect(screen.getByText(/could not load us100/i)).toBeInTheDocument();
-    expect(screen.getByText(/unknown instrument 'US100'/)).toBeInTheDocument();
+    expect(screen.getByText(/is not being collected/i)).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /retry/i }));
-    expect(source.historyCalls).toHaveLength(2);
+    expect(source.subscribeCalls).toHaveLength(2);
+  });
+
+  it("never asks for a history of its own — the subscription brings it", async () => {
+    // The seam this change removed. A separate history read is exactly what
+    // used to leave a window in which a closing candle could go missing.
+    renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+      source.emit({ kind: "status", state: "reconnecting" });
+      source.emit({ kind: "status", state: "connected" });
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+    expect(source.historyCalls).toHaveLength(0);
+  });
+
+  it("fills the outage from the reconnect's snapshot rather than a gap request", async () => {
+    renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await act(async () => {
+      source.emit({ kind: "status", state: "reconnecting" });
+      // Back up: the fresh snapshot carries what closed while nobody was
+      // listening, so the series closes its own gap.
+      source.emit({ kind: "status", state: "connected" });
+      source.snapshot([bar(100, 1), bar(200, 2), bar(300, 3)]);
+    });
+
+    expect(stub.latest().series[0].data().map((c) => c.time)).toEqual([100, 200, 300]);
+    expect(source.historyCalls).toHaveLength(0);
+    expect(screen.queryByText(/reconnecting/i)).not.toBeInTheDocument();
   });
 
   it("marks the data stale when the stream drops, instead of showing a frozen candle silently", async () => {
     renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1)]);
+      source.snapshot([bar(100, 1)]);
       source.emit({ kind: "status", state: "reconnecting" });
     });
     expect(screen.getByText(/reconnecting/i)).toBeInTheDocument();
@@ -127,7 +160,7 @@ describe("Chart — live bars", () => {
   it("updates the last candle in place rather than appending a second one", async () => {
     renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1), bar(200, 2, true)]);
+      source.snapshot([bar(100, 1)], bar(200, 2, true));
       source.emit({ kind: "bar", bar: bar(200, 2.5, true) });
     });
 
@@ -139,16 +172,16 @@ describe("Chart — live bars", () => {
   it("appends when a new period opens", async () => {
     renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1)]);
+      source.snapshot([bar(100, 1)]);
       source.emit({ kind: "bar", bar: bar(200, 2, true) });
     });
     expect(stub.latest().series[0].data()).toHaveLength(2);
   });
 
-  it("redraws wholesale when a gap-fill bar arrives older than what is drawn", async () => {
+  it("redraws wholesale when a bar arrives older than what is drawn", async () => {
     renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1), bar(300, 3)]);
+      source.snapshot([bar(100, 1), bar(300, 3)]);
     });
     const series = stub.latest().series[0];
     const setDataBefore = series.setDataCalls.length;
@@ -165,9 +198,11 @@ describe("Chart — live bars", () => {
   it("flags a forming candle and drops the flag once it settles", async () => {
     renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1, true)]);
+      source.snapshot([], bar(100, 1, true));
     });
-    expect(screen.getByText(/forming/i)).toBeInTheDocument();
+    // The snapshot's forming bar reaches the header on the next animation
+    // frame, like any other live bar.
+    await waitFor(() => expect(screen.getByText(/forming/i)).toBeInTheDocument());
 
     await act(async () => {
       source.emit({ kind: "bar", bar: bar(100, 1.2, false) });
@@ -182,22 +217,23 @@ describe("Chart — live bars", () => {
     await act(async () => {
       // Prices well away from 0 so a stray "0" in the readout could only be
       // the volume field.
-      source.resolveHistory(0, [bar(100, 50, false, null)]);
+      source.snapshot([bar(100, 50, false, null)]);
     });
     expect(screen.getByText("n/a")).toBeInTheDocument();
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
-  it("keeps a live bar that arrived before the history read finished", async () => {
+  it("keeps a bar that arrived before the snapshot did", async () => {
     renderChart(source);
 
-    // The subscription is live immediately; the history read is still in
-    // flight. This ordering is the normal case, not an edge case.
+    // Not the normal order — the snapshot is the first message by construction
+    // — but the merge must not depend on that, or a chart would blank itself
+    // the one time the archive reordered anything.
     await act(async () => {
       source.emit({ kind: "bar", bar: bar(300, 3, true) });
     });
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1), bar(200, 2)]);
+      source.snapshot([bar(100, 1), bar(200, 2)]);
     });
 
     const series = stub.latest().series[0];
@@ -208,7 +244,7 @@ describe("Chart — live bars", () => {
   it("shows a real volume when the source carries one", async () => {
     renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1, false, 1234)]);
+      source.snapshot([bar(100, 1, false, 1234)]);
     });
     expect(screen.getByText("1234")).toBeInTheDocument();
   });
@@ -218,7 +254,7 @@ describe("Chart — subscription lifecycle", () => {
   it("re-subscribes to the new symbol and drops the old subscription", async () => {
     const { rerender, onResolutionChange } = renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1)]);
+      source.snapshot([bar(100, 1)]);
     });
     expect(source.subscribeCalls).toEqual([{ symbol: "US100", resolution: "MINUTE_5" }]);
 
@@ -241,7 +277,7 @@ describe("Chart — subscription lifecycle", () => {
   it("tears down the chart and the subscription on unmount", async () => {
     const { unmount } = renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1)]);
+      source.snapshot([bar(100, 1)]);
     });
 
     unmount();
@@ -255,7 +291,7 @@ describe("Chart — subscription lifecycle", () => {
     // the seconds the gateway's deep read took, under a "gateway" label.
     const { rerender, onResolutionChange } = renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 1), bar(200, 2)]);
+      source.snapshot([bar(100, 1), bar(200, 2)]);
     });
     expect(stub.latest().series[0].data()).toHaveLength(2);
 
@@ -272,23 +308,24 @@ describe("Chart — subscription lifecycle", () => {
     await waitFor(() => {
       expect(stub.latest().series[0].data()).toHaveLength(0);
     });
-    expect(other.historyCalls).toHaveLength(1);
+    expect(other.subscribeCalls).toHaveLength(1);
   });
 
-  it("a late response from a superseded resolution never reaches the chart", async () => {
+  it("a late message from a superseded resolution never reaches the chart", async () => {
     const { rerender, onResolutionChange } = renderChart(source);
 
     rerender(
       <Chart source={source} symbol="US100" resolution="HOUR" onResolutionChange={onResolutionChange} />,
     );
     await waitFor(() => {
-      expect(source.historyCalls).toHaveLength(2);
+      expect(source.subscribeCalls).toHaveLength(2);
     });
 
-    // The HOUR read lands first, then the stale MINUTE_5 one.
+    // The HOUR snapshot lands first, then one from the dropped MINUTE_5
+    // subscription — the cleanup has run, so it is dead on arrival.
     await act(async () => {
-      source.resolveHistory(1, [bar(3600, 10)]);
-      source.resolveHistory(0, [bar(100, 1), bar(200, 2)]);
+      source.snapshotTo(1, [bar(3600, 10)]);
+      source.snapshotTo(0, [bar(100, 1), bar(200, 2)]);
     });
 
     const series = stub.latest().series[0];
@@ -300,7 +337,7 @@ describe("Chart — header readout freshness", () => {
   it("follows the forming candle as it moves within one period", async () => {
     renderChart(source);
     await act(async () => {
-      source.resolveHistory(0, [bar(100, 50, true)]);
+      source.snapshot([], bar(100, 50, true));
     });
     // `bar(t, c)` puts high at c+1, which is unique in the readout.
     await waitFor(() => expect(screen.getByText("51")).toBeInTheDocument());

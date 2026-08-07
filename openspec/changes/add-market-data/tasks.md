@@ -72,13 +72,13 @@
 
 ## 9. Terminal — źródło składane
 
-- [ ] 9.1 Implementacja `MarketDataSource` czytająca świece i strumień z archiwum
-- [ ] 9.2 Złożenie w `marketData.ts`: świece z archiwum, instrumenty z gatewaya, jedna instancja na aplikację
-- [ ] 9.3 Obsługa snapshotu w `useBarFeed` — zastąpienie dotychczasowego zszywania historii ze strumieniem
-- [ ] 9.4 Usunięcie dociągania luki po stronie terminala, skoro przynosi ją snapshot
-- [ ] 9.5 Rozróżnienie stanów: archiwum nieosiągalne kontra gateway nieosiągalny
-- [ ] 9.6 Test: wykres, siatka i wyszukiwarka działają bez zmian w swoim kodzie
-- [ ] 9.7 Test: gdy archiwum nie odpowiada, wyszukiwarka instrumentów działa dalej
+- [x] 9.1 Implementacja `MarketDataSource` czytająca świece i strumień z archiwum
+- [x] 9.2 Złożenie w `marketData.ts`: świece z archiwum, instrumenty z gatewaya, jedna instancja na aplikację
+- [x] 9.3 Obsługa snapshotu w `useBarFeed` — zastąpienie dotychczasowego zszywania historii ze strumieniem
+- [x] 9.4 Usunięcie dociągania luki po stronie terminala, skoro przynosi ją snapshot
+- [x] 9.5 Rozróżnienie stanów: archiwum nieosiągalne kontra gateway nieosiągalny
+- [x] 9.6 Test: wykres, siatka i wyszukiwarka działają bez zmian w swoim kodzie
+- [x] 9.7 Test: gdy archiwum nie odpowiada, wyszukiwarka instrumentów działa dalej
 
 ## 10. Terminal — panel konfiguracji
 
