@@ -95,6 +95,90 @@ async def test_the_same_period_from_the_other_source_is_still_one_candle(
     assert stored[0].source is CandleSource.HISTORY
 
 
+# --- 4.2: which of the two roads is believed ----------------------------------------
+
+
+@pytest.mark.db
+async def test_a_backfill_replaces_what_the_stream_left(db: asyncpg.Connection) -> None:
+    # The stream may have been disconnected for part of the period, which understates the
+    # range and loses the volume it never saw. A history read watched the whole period.
+    await write_candles(db, [candle(source=CandleSource.STREAM, high=101.0, volume=None)])
+    await write_candles(db, [candle(source=CandleSource.HISTORY, high=105.0, volume=2_000.0)])
+
+    [stored] = await read_candles(db, "US100", Resolution.MINUTE)
+    assert stored.source is CandleSource.HISTORY
+    assert stored.high == 105.0
+    assert stored.volume == 2_000.0
+
+
+@pytest.mark.db
+async def test_the_stream_does_not_displace_a_backfilled_value(db: asyncpg.Connection) -> None:
+    # The same period arriving the other way round. The stored value stays put, because
+    # the one now being offered is the weaker witness regardless of which came second.
+    await write_candles(db, [candle(source=CandleSource.HISTORY, high=105.0, volume=2_000.0)])
+    await write_candles(db, [candle(source=CandleSource.STREAM, high=101.0, volume=None)])
+
+    [stored] = await read_candles(db, "US100", Resolution.MINUTE)
+    assert stored.source is CandleSource.HISTORY
+    assert stored.high == 105.0
+    assert stored.volume == 2_000.0
+
+
+@pytest.mark.db
+async def test_a_refetch_corrects_an_earlier_refetch(db: asyncpg.Connection) -> None:
+    # History over history is an overwrite: the provider is correcting itself, and the
+    # later answer is the one it stands behind.
+    await write_candles(db, [candle(source=CandleSource.HISTORY, close=100.5)])
+    await write_candles(db, [candle(source=CandleSource.HISTORY, close=123.0)])
+
+    assert (await read_candles(db, "US100", Resolution.MINUTE))[0].close == 123.0
+
+
+@pytest.mark.db
+async def test_a_later_streamed_candle_replaces_an_earlier_one(db: asyncpg.Connection) -> None:
+    # Stream over stream still overwrites. Only a stored *history* value is protected.
+    await write_candles(db, [candle(source=CandleSource.STREAM, close=100.5)])
+    await write_candles(db, [candle(source=CandleSource.STREAM, close=123.0)])
+
+    assert (await read_candles(db, "US100", Resolution.MINUTE))[0].close == 123.0
+
+
+@pytest.mark.db
+async def test_a_declined_write_is_not_counted_as_written(db: asyncpg.Connection) -> None:
+    # A caller reporting progress needs "written" to mean written.
+    await write_candles(db, [candle(source=CandleSource.HISTORY)])
+
+    assert await write_candles(db, [candle(source=CandleSource.STREAM)]) == 0
+
+
+@pytest.mark.db
+async def test_a_batch_reports_only_the_rows_the_archive_took(db: asyncpg.Connection) -> None:
+    await write_candles(db, [candle(source=CandleSource.HISTORY)])
+
+    written = await write_candles(
+        db,
+        [
+            candle(source=CandleSource.STREAM),  # declined: history already holds it
+            candle(period_start=MOMENT + timedelta(minutes=1), source=CandleSource.STREAM),
+        ],
+    )
+
+    assert written == 1
+    assert len(await read_candles(db, "US100", Resolution.MINUTE)) == 2
+
+
+@pytest.mark.db
+async def test_the_same_period_twice_in_one_batch_is_one_row(db: asyncpg.Connection) -> None:
+    # Postgres refuses an ON CONFLICT that would touch a row twice in one statement, so
+    # the batch is keyed before it is sent; the last offer for a period is the one meant.
+    written = await write_candles(
+        db, [candle(close=100.5), candle(close=123.0)]
+    )
+
+    assert written == 1
+    assert (await read_candles(db, "US100", Resolution.MINUTE))[0].close == 123.0
+
+
 @pytest.mark.db
 async def test_the_same_period_at_another_resolution_is_another_candle(
     db: asyncpg.Connection,

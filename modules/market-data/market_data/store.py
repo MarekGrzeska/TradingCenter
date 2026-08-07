@@ -1,9 +1,11 @@
 """Reading and writing candles — the only door to the candle table.
 
-Two rules live here rather than in whatever calls it. A candle still being built never
-reaches storage, and writing a period that is already stored overwrites it instead of
-adding a second row. Both are properties of the archive, not of any one caller, so both
-are enforced where every caller passes.
+Three rules live here rather than in whatever calls it. A candle still being built never
+reaches storage. Writing a period that is already stored overwrites it instead of adding
+a second row. And when the two roads disagree about a period, the value read from the
+provider's history wins over the one that came off the stream. All three are properties
+of the archive rather than of any one caller, so all three are enforced where every
+caller passes.
 
 Queries go through asyncpg directly. SQLAlchemy is present for alembic and stops at the
 migrations; the runtime path has no ORM in it.
@@ -28,15 +30,28 @@ class FormingCandleRejected(ValueError):
     """
 
 
-# ON CONFLICT rather than a read-then-write: the same period can arrive from the stream
-# and from a backfill at the same time, and two statements would race into a duplicate-key
-# error or a lost value depending on which won.
+# One statement for a whole batch, and ON CONFLICT rather than a read-then-write: the
+# same period can arrive from the stream and from a backfill at the same moment, and two
+# statements would race into either a duplicate-key error or a lost value, depending on
+# which got there first.
+#
+# The WHERE on the update is the authority rule. A history read watched the period whole;
+# a stream that was disconnected for part of it reports a range that is too narrow and a
+# volume it never saw. So a streamed value may not overwrite a stored history one — every
+# other combination may, including history over history, because a refetch is the
+# provider correcting itself.
+#
+# RETURNING makes the count honest: a row the rule declined to update returns nothing,
+# and a caller reporting progress needs "written" to mean written.
 _UPSERT = """
     INSERT INTO candles (
         symbol, resolution, period_start, price_side,
-        open, high, low, close, volume, source, recorded_at
+        open, high, low, close, volume, source
     )
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now())
+    SELECT * FROM unnest(
+        $1::text[], $2::text[], $3::timestamptz[], $4::text[],
+        $5::float8[], $6::float8[], $7::float8[], $8::float8[], $9::float8[], $10::text[]
+    )
     ON CONFLICT (symbol, resolution, period_start) DO UPDATE SET
         price_side  = EXCLUDED.price_side,
         open        = EXCLUDED.open,
@@ -45,7 +60,9 @@ _UPSERT = """
         close       = EXCLUDED.close,
         volume      = EXCLUDED.volume,
         source      = EXCLUDED.source,
-        recorded_at = EXCLUDED.recorded_at
+        recorded_at = now()
+    WHERE NOT (candles.source = 'history' AND EXCLUDED.source = 'stream')
+    RETURNING 1
 """
 
 _SELECT_RANGE = """
@@ -61,13 +78,20 @@ _SELECT_RANGE = """
 
 
 async def write_candles(conn: asyncpg.Connection, candles: Iterable[Candle]) -> int:
-    """Store closed candles, overwriting any already held for the same period.
+    """Store closed candles, overwriting what is already held for the same period.
 
-    Returns how many were written. Raises `FormingCandleRejected` if any candle in the
-    batch is still forming — and writes none of them, because a partially applied batch
-    leaves the caller with no way to know which half landed.
+    Returns how many rows the archive actually took — which is not always how many were
+    offered, because a streamed value never displaces a stored history one.
+
+    Raises `FormingCandleRejected` if any candle in the batch is still forming, and
+    writes none of them: a partially applied batch leaves the caller with no way to know
+    which half landed.
     """
-    rows = []
+    # Keyed by the triple, keeping the last offer for each. Postgres refuses an
+    # ON CONFLICT that would touch the same row twice in one statement, and a batch is
+    # normally one source at a time anyway, so last-one-wins matches what a caller means
+    # by sending the same period twice.
+    kept: dict[tuple[str, str, datetime], Candle] = {}
     for candle in candles:
         if candle.forming:
             raise FormingCandleRejected(
@@ -75,26 +99,26 @@ async def write_candles(conn: asyncpg.Connection, candles: Iterable[Candle]) -> 
                 f"{candle.period_start.isoformat()} is still forming; only closed candles "
                 "are stored"
             )
-        rows.append(
-            (
-                candle.symbol,
-                candle.resolution.value,
-                candle.period_start,
-                candle.price_side.value,
-                candle.open,
-                candle.high,
-                candle.low,
-                candle.close,
-                candle.volume,
-                candle.source.value,
-            )
-        )
+        kept[(candle.symbol, candle.resolution.value, candle.period_start)] = candle
 
-    if not rows:
+    if not kept:
         return 0
 
-    await conn.executemany(_UPSERT, rows)
-    return len(rows)
+    rows = list(kept.values())
+    written = await conn.fetch(
+        _UPSERT,
+        [c.symbol for c in rows],
+        [c.resolution.value for c in rows],
+        [c.period_start for c in rows],
+        [c.price_side.value for c in rows],
+        [c.open for c in rows],
+        [c.high for c in rows],
+        [c.low for c in rows],
+        [c.close for c in rows],
+        [c.volume for c in rows],
+        [c.source.value for c in rows],
+    )
+    return len(written)
 
 
 async def read_candles(

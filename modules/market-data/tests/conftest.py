@@ -39,29 +39,59 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 TABLES = ("candles", "tracked_pairs", "coverage_ranges")
 
 
+# Generous, because Docker Desktop wakes its VM lazily and a first call after an idle
+# spell can take several seconds. The earlier two-second budget was tight enough that a
+# cold daemon read as an absent one, and thirty tests skipped on a machine where they
+# would have passed — which is how they went unrun long enough to hide two real bugs.
+DOCKER_PING_TIMEOUT = 15
+
+# Where a daemon's socket lives, if there is one. Used only to tell "Docker was never
+# installed here" from "Docker is installed and unwell".
+DOCKER_SOCKETS = (
+    Path("/var/run/docker.sock"),
+    Path.home() / ".docker/run/docker.sock",
+    Path.home() / ".colima/default/docker.sock",
+    Path.home() / ".rd/docker.sock",
+)
+
+
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
-    if _docker_is_usable():
+    reason = _reason_to_skip_db_tests()
+    if reason is None:
         return
-    skip = pytest.mark.skip(reason="needs a running Docker daemon for the PostgreSQL container")
+    skip = pytest.mark.skip(reason=reason)
     for item in items:
         if "db" in item.keywords:
             item.add_marker(skip)
 
 
-def _docker_is_usable() -> bool:
+def _reason_to_skip_db_tests() -> str | None:
+    """Why the `db` tests cannot run here, or `None` to let them run.
+
+    Only a machine with no Docker at all earns a skip. A daemon that is installed and
+    failing does not: the tests are then left to run and fail with whatever the daemon
+    actually said, because a silent skip on a machine that was supposed to have Docker
+    is indistinguishable from a suite that passed.
+    """
     try:
         import docker
     except ImportError:
-        return False
+        return "the docker package is not installed"
+
     try:
-        # A short timeout on purpose. The default waits about a minute for a daemon that
-        # is not running, which turns every test run on a machine without Docker into a
-        # minute of silence before the same skip. A daemon that cannot answer a ping in
-        # two seconds is not one the container fixture would have succeeded against.
-        docker.from_env(timeout=2).ping()
-    except Exception:  # noqa: BLE001 - any failure here means "no usable daemon"
-        return False
-    return True
+        docker.from_env(timeout=DOCKER_PING_TIMEOUT).ping()
+    except Exception as err:  # noqa: BLE001 - any failure here means "not answering"
+        if _docker_is_installed():
+            print(f"\ndocker is installed but not answering ({err}); running `db` tests anyway")
+            return None
+        return "no Docker daemon for the PostgreSQL container"
+    return None
+
+
+def _docker_is_installed() -> bool:
+    return bool(os.environ.get("DOCKER_HOST")) or any(
+        socket.exists() for socket in DOCKER_SOCKETS
+    )
 
 
 @pytest.fixture(scope="session")
