@@ -1,0 +1,437 @@
+<title>Baza świec na Azure — koszty i plany</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --surface: #ffffff;
+    --surface-2: #f3f1ed;
+    --text: #1c1a17;
+    --text-dim: #5f5952;
+    --border: #e2ded7;
+    --accent: #9a5b2c;
+    --accent-soft: #f5e9df;
+    --good: #2f6b4f;
+    --good-soft: #e4f0e9;
+    --warn: #8a5a12;
+    --warn-soft: #f8eedb;
+    --bad: #94362f;
+    --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614;
+      --surface: #1f1e1b;
+      --surface-2: #262421;
+      --text: #ece8e2;
+      --text-dim: #a29b92;
+      --border: #35322e;
+      --accent: #d99a63;
+      --accent-soft: #2e241b;
+      --good: #7cc39d;
+      --good-soft: #1d2a23;
+      --warn: #d9ac63;
+      --warn-soft: #2c2519;
+      --bad: #e0837a;
+      --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614;
+    --surface: #1f1e1b;
+    --surface-2: #262421;
+    --text: #ece8e2;
+    --text-dim: #a29b92;
+    --border: #35322e;
+    --accent: #d99a63;
+    --accent-soft: #2e241b;
+    --good: #7cc39d;
+    --good-soft: #1d2a23;
+    --warn: #d9ac63;
+    --warn-soft: #2c2519;
+    --bad: #e0837a;
+    --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.65;
+    margin: 0;
+    padding: 3rem 1.25rem 6rem;
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 61rem; margin: 0 auto; }
+
+  h1 {
+    font-size: clamp(1.7rem, 4.5vw, 2.5rem);
+    line-height: 1.15;
+    letter-spacing: -0.02em;
+    margin: 0 0 0.5rem;
+    font-weight: 650;
+  }
+  h2 {
+    font-size: clamp(1.2rem, 2.6vw, 1.5rem);
+    letter-spacing: -0.01em;
+    margin: 3.5rem 0 0.25rem;
+    font-weight: 620;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.02rem;
+    margin: 2rem 0 0.5rem;
+    font-weight: 620;
+    color: var(--text);
+  }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.05rem; margin-bottom: 0.35rem; }
+  .meta {
+    color: var(--text-dim);
+    font-size: 0.83rem;
+    font-family: var(--mono);
+    border-top: 1px solid var(--border);
+    padding-top: 0.9rem;
+    margin-top: 1.5rem;
+  }
+
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 1.1rem 1.3rem;
+    margin: 1.75rem 0;
+  }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag {
+    display: block;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 0.4rem;
+  }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th {
+    background: var(--surface-2);
+    font-weight: 600;
+    font-size: 0.76rem;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tr.total td { font-weight: 650; background: var(--surface-2); }
+  .dim { color: var(--text-dim); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.87em;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.08em 0.35em;
+  }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.4rem 0; }
+
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    padding: 0.12em 0.5em;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--text-dim);
+    white-space: nowrap;
+  }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+
+  .cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); margin: 1.5rem 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.1rem 1.2rem; }
+  .card h4 { margin: 0 0 0.15rem; font-size: 0.95rem; font-weight: 620; }
+  .card .price { font-family: var(--mono); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; margin: 0.35rem 0 0.1rem; }
+  .card .sub { color: var(--text-dim); font-size: 0.83rem; margin: 0; }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+  footer ol { padding-left: 1.4rem; }
+  footer li { margin: 0.3rem 0; }
+</style>
+
+<main>
+
+<h1>Baza świec na Azure — koszty i plany</h1>
+<p class="lede">Research pod moduł <code>market-data</code>: ile realnie kosztuje trzymanie historii świecowej na Azure, i czy TimescaleDB ma tam sens.</p>
+<p class="meta">
+  Stan na 2026-08-07 · ceny z Azure Retail Prices API, waluta EUR, region Poland Central, bez VAT<br>
+  Miesiąc liczony jako 730 h · ceny Tiger Cloud w USD, wg publicznego cennika
+</p>
+
+<div class="callout bad">
+  <span class="tag">Ustalenie, które zmienia rekomendację</span>
+  <p><strong>Azure Database for PostgreSQL Flexible Server udostępnia wyłącznie edycję TimescaleDB Apache-2.</strong> To wersja <em>bez kompresji</em> i <em>bez continuous aggregates</em> — obie są funkcjami modułu TSL, czyli edycji Community. Czyli dokładnie te dwie rzeczy, na których opierałem wcześniejszą rekomendację „bierzcie Timescale", <strong>na Azure PaaS nie są dostępne</strong>.</p>
+</div>
+
+<div class="callout good">
+  <span class="tag">Wniosek</span>
+  <p><strong>Weźcie zwykły Azure Database for PostgreSQL Flexible Server.</strong> Przy waszej skali danych kompresja nie ma czego oszczędzić, a continuous aggregates zastępuje zwykły <code>MATERIALIZED VIEW</code> odświeżany przyrostowo. TimescaleDB dokładajcie dopiero wtedy, gdy wolumen albo złożoność zapytań to uzasadnią — a wtedy self-host albo Tiger Cloud, nie Azure PaaS.</p>
+  <p>Punkt wejścia: <strong>0 EUR</strong> przez 12 miesięcy na koncie free, potem <strong>~59 EUR/mc</strong> dla realnego v1.</p>
+</div>
+
+<h2>1. Ile danych to faktycznie jest</h2>
+
+<p>Zanim cokolwiek o cenach — bez tej liczby cała reszta jest zgadywanką. Założenia: świece <code>MINUTE</code>, instrumenty CFD (rynek ~24/5, czyli ~370 tys. świec na instrument rocznie), wiersz w Postgresie ~120 B razem z indeksem <code>(symbol, resolution, ts)</code>, plus ~32% narzutu na zmaterializowane rozdzielczości pochodne (<code>MINUTE_5</code> … <code>HOUR_4</code>).</p>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr>
+      <th>Śledzone instrumenty</th>
+      <th class="num">Wierszy / rok</th>
+      <th class="num">Dane / rok</th>
+      <th class="num">Po 3 latach</th>
+      <th class="num">Koszt miejsca / mc</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>20 <span class="dim">— zakres v1</span></td><td class="num">7,4 mln</td><td class="num">~1,2 GB</td><td class="num">~3,6 GB</td><td class="num">0,14 EUR</td></tr>
+    <tr><td>100</td><td class="num">37 mln</td><td class="num">~5,9 GB</td><td class="num">~18 GB</td><td class="num">0,71 EUR</td></tr>
+    <tr><td>500</td><td class="num">185 mln</td><td class="num">~29 GB</td><td class="num">~88 GB</td><td class="num">3,49 EUR</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">To jest sedno całej analizy</span>
+  <p>Flexible Server ma <strong>minimum 32 GiB provisioned storage</strong>, płatne niezależnie od tego, ile realnie zajmujecie — to <strong>3,85 EUR/mc</strong>. Przy 20 instrumentach dorośniecie do tego minimum dopiero po <strong>~26 latach</strong>.</p>
+  <p>Kompresja TimescaleDB oszczędzająca 90% miejsca oszczędziłaby wam zatem <strong>0,00 EUR</strong>, bo i tak płacicie za podłogę. Argument o kompresji, który podnosiłem wcześniej, jest przy tej skali ekonomicznie martwy.</p>
+</div>
+
+<h2>2. Azure Database for PostgreSQL Flexible Server — cennik</h2>
+
+<p>Trzy składniki: compute (za vCore-godzinę), storage (za GiB-miesiąc), backup (darmowy do 100% provisioned storage, powyżej płatny). Ceny w Poland Central, West Europe i Germany West Central są <strong>identyczne co do grosza</strong> — wybór regionu to decyzja o latencji i zgodności, nie o koszcie.</p>
+
+<h3>Burstable (seria B) — do obciążeń nierównomiernych</h3>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>SKU</th><th class="num">vCore</th><th class="num">RAM</th><th class="num">EUR / h</th><th class="num">EUR / mc</th><th>Do czego</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>B1ms</code></td><td class="num">1</td><td class="num">2 GiB</td><td class="num">0,0175</td><td class="num">12,78</td><td>dev, PoC <span class="pill good">free tier</span></td></tr>
+    <tr><td><code>B2s</code></td><td class="num">2</td><td class="num">4 GiB</td><td class="num">0,0699</td><td class="num">51,03</td><td>v1 produkcyjny</td></tr>
+    <tr><td><code>B2ms</code></td><td class="num">2</td><td class="num">8 GiB</td><td class="num">0,1397</td><td class="num">101,98</td><td>produkcja z zapasem</td></tr>
+    <tr><td><code>B4ms</code></td><td class="num">4</td><td class="num">16 GiB</td><td class="num">0,2794</td><td class="num">203,96</td><td>backtesty obok ingestu</td></tr>
+    <tr><td><code>B8ms</code></td><td class="num">8</td><td class="num">32 GiB</td><td class="num">0,5588</td><td class="num">407,92</td><td>—</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>Uwaga o Burstable:</strong> seria B pracuje na kredytach CPU. Ciągły ingest ze strumienia to obciążenie <em>stałe</em>, choć niskie — kredyty mogą się wyczerpać przy równoległym głębokim backfillu. Przy v1 (~1,7 zapisu/s) to nieistotne, ale gdy dojdą backtesty skanujące lata danych, seria B przestanie wystarczać.</p>
+
+<h3>General Purpose (seria D) — wydajność przewidywalna</h3>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>SKU</th><th class="num">vCore</th><th class="num">RAM</th><th class="num">EUR / mc</th><th class="num">Rezerwacja 1 rok</th><th class="num">Rezerwacja 3 lata</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>D2ds_v5</code></td><td class="num">2</td><td class="num">8 GiB</td><td class="num">135,78</td><td class="num">68,45 <span class="dim">−50%</span></td><td class="num">45,63 <span class="dim">−66%</span></td></tr>
+    <tr><td><code>D4ds_v5</code></td><td class="num">4</td><td class="num">16 GiB</td><td class="num">271,63</td><td class="num">136,90</td><td class="num">91,27</td></tr>
+    <tr><td><code>D8ds_v5</code></td><td class="num">8</td><td class="num">32 GiB</td><td class="num">543,27</td><td class="num">273,81</td><td class="num">182,54</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Rezerwacje liczone z cen katalogowych: 410,71 EUR za vCore na rok i 821,41 EUR za vCore na trzy lata. <strong>Rezerwacja obejmuje wyłącznie compute</strong> — storage i backup płacicie dalej wg zużycia. Memory Optimized (seria E) startuje od 96,73 EUR/mc za vCore i przy świecach nie ma uzasadnienia: to nie jest workload pamięciożerny.</p>
+
+<h3>Storage i backup</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pozycja</th><th class="num">Cena</th><th>Uwagi</th></tr></thead>
+  <tbody>
+    <tr><td>Storage (General Purpose / Premium SSD v2)</td><td class="num">0,1202 EUR / GiB / mc</td><td>minimum 32 GiB</td></tr>
+    <tr><td>Premium SSD v2 — provisioned IOPS</td><td class="num">0,0228 EUR / IOPS / mc</td><td>ponad darmowy przydział</td></tr>
+    <tr><td>Premium SSD v2 — throughput</td><td class="num">0,0913 EUR / MB/s / mc</td><td>ponad darmowy przydział</td></tr>
+    <tr><td>Backup LRS</td><td class="num">0,0904 EUR / GB / mc</td><td><strong>darmowy do 100% provisioned storage</strong></td></tr>
+    <tr><td>Backup GRS <span class="dim">(geo-redundantny)</span></td><td class="num">0,2089 EUR / GB / mc</td><td>tylko West Europe / Germany West Central</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>3. Warianty kosztowe dla waszego przypadku</h2>
+
+<div class="cards">
+  <div class="card">
+    <h4>Dev / PoC <span class="pill good">rekomendacja na start</span></h4>
+    <p class="price">0 EUR</p>
+    <p class="sub"><code>B1ms</code> + 32 GB przez 12 mies. na koncie free.<br>Potem 16,63 EUR/mc.</p>
+  </div>
+  <div class="card">
+    <h4>v1 produkcyjny <span class="pill good">rekomendacja docelowa</span></h4>
+    <p class="price">58,72 EUR<span class="dim" style="font-size:0.9rem">/mc</span></p>
+    <p class="sub"><code>B2s</code> 51,03 + 64 GiB storage 7,69.<br>Backup w ramach darmowego przydziału.</p>
+  </div>
+  <div class="card">
+    <h4>Produkcja z zapasem</h4>
+    <p class="price">117,37 EUR<span class="dim" style="font-size:0.9rem">/mc</span></p>
+    <p class="sub"><code>B2ms</code> 101,98 + 128 GiB storage 15,39.</p>
+  </div>
+  <div class="card">
+    <h4>General Purpose, 3-letnia rezerwacja</h4>
+    <p class="price">61,02 EUR<span class="dim" style="font-size:0.9rem">/mc</span></p>
+    <p class="sub"><code>D2ds_v5</code> 45,63 + 128 GiB storage 15,39.<br>Taniej niż <code>B2ms</code> on-demand i bez kredytów CPU.</p>
+  </div>
+</div>
+
+<p><strong>Wysoka dostępność (zone-redundant HA) podwaja compute i storage.</strong> Dla v1 produkcyjnego to skok z 58,72 na ~117 EUR/mc. Przy archiwum świec, które da się odtworzyć z providera przez backfill, HA jest wydatkiem trudnym do obrony — RPO liczone w minutach kupujecie tu kodem, nie infrastrukturą.</p>
+
+<div class="callout">
+  <span class="tag">Rzecz nieoczywista</span>
+  <p><code>D2ds_v5</code> z rezerwacją 3-letnią (45,63 EUR/mc) jest <strong>tańszy od <code>B2ms</code> on-demand</strong> (101,98 EUR/mc) przy tej samej liczbie vCore i tej samej pamięci — i bez ryzyka wyczerpania kredytów CPU. Jeżeli moduł ma żyć lata, rezerwacja General Purpose bije Burstable na obu frontach naraz.</p>
+</div>
+
+<h2>4. TimescaleDB — trzy drogi i czego która kosztuje</h2>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>Droga</th><th>Edycja</th><th class="num">Koszt / mc</th><th>Kompresja</th><th>Cont. aggregates</th><th>Ops</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Azure Flexible Server</strong><br><span class="dim">PaaS</span></td>
+      <td>Apache-2</td>
+      <td class="num">od 16,63</td>
+      <td><span class="pill bad">nie</span></td>
+      <td><span class="pill bad">nie</span></td>
+      <td><span class="pill good">zerowe</span></td>
+    </tr>
+    <tr>
+      <td><strong>Self-host na VM</strong><br><span class="dim">B2ms + dysk P10</span></td>
+      <td>Community (TSL)</td>
+      <td class="num">~80,50</td>
+      <td><span class="pill good">tak</span></td>
+      <td><span class="pill good">tak</span></td>
+      <td><span class="pill bad">wszystko wasze</span></td>
+    </tr>
+    <tr>
+      <td><strong>Tiger Cloud</strong><br><span class="dim">Azure: Amsterdam / Frankfurt</span></td>
+      <td>pełna</td>
+      <td class="num">od ~32 USD</td>
+      <td><span class="pill good">tak</span></td>
+      <td><span class="pill good">tak</span></td>
+      <td><span class="pill good">zerowe</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Self-host na Azure VM</h3>
+<p>Licencja TSL jest <strong>darmowa dla self-managed</strong> — płacicie tylko za infrastrukturę. <code>B2ms</code> VM 61,47 EUR/mc + dysk Premium SSD P10 (128 GiB) 19,03 EUR/mc = <strong>80,50 EUR/mc</strong>. Ceny dysków: P4 (32 GiB) 5,10 · P6 (64) 9,85 · P10 (128) 19,03 · P20 (512) 70,68 · P30 (1 TiB) 130,48 EUR/mc.</p>
+<p>Ale ta kwota jest myląca. Dochodzą: backupy, monitoring, patchowanie, failover, upgrade'y majora — wszystko ręcznie. Przy module, który ma być archiwum działającym latami, to nie jest 80 EUR/mc, tylko 80 EUR/mc <em>plus wasz czas na zawsze</em>.</p>
+
+<h3>Tiger Cloud (Timescale zarządzany)</h3>
+<p>Od 2026 działa <strong>na Azure</strong> w regionach <code>westeurope</code> (Amsterdam) i <code>germanywestcentral</code> (Frankfurt) — z Polski oba są w zasięgu kilkudziesięciu milisekund.</p>
+<ul>
+  <li><strong>Performance</strong> — od 30 USD/mc, do 8 CPU / 32 GB RAM, storage <strong>0,177 USD/GB-mc</strong> (przy zakładanej kompresji 5×), PITR 3 dni</li>
+  <li><strong>Scale</strong> — od 36 USD/mc, do 32 CPU / 128 GB RAM, storage 0,212 USD/GB-mc + tiered storage 0,021 USD/GB-mc, PITR 14 dni</li>
+  <li>Backupy i transfer sieciowy <strong>bez opłat</strong>; repliki HA liczone jak instancja podstawowa</li>
+  <li>30 dni trialu bez karty</li>
+</ul>
+<p class="dim">Zastrzeżenie: publiczny cennik podaje progi wejścia, nie stawkę za CPU-godzinę. Realnego kosztu dla konkretnego rozmiaru nie da się z niego wyliczyć — trzeba przejść trial albo zapytać o wycenę. Liczba „od ~32 USD" w tabeli to compute minimalny plus storage dla ~10 GB i nie jest ofertą.</p>
+
+<h2>5. Czego naprawdę tracicie bez edycji Community</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Funkcja TSL</th><th>Wartość dla was</th><th>Zamiennik na czystym Postgresie</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Kompresja kolumnowa</strong></td>
+      <td><span class="pill">żadna</span> płacicie za podłogę 32 GiB przez lata</td>
+      <td>niepotrzebny</td>
+    </tr>
+    <tr>
+      <td><strong>Continuous aggregates</strong></td>
+      <td><span class="pill warn">realna</span> rollupy <code>MINUTE</code> → <code>MINUTE_5</code>…<code>HOUR_4</code></td>
+      <td><code>MATERIALIZED VIEW</code> + <code>pg_cron</code>, odświeżane przyrostowo po zamknięciu okresu. Kilkadziesiąt linii SQL zamiast polityki.</td>
+    </tr>
+    <tr>
+      <td><strong>Hypertables</strong> <span class="dim">(są w Apache-2)</span></td>
+      <td><span class="pill">niska</span> przy &lt;50 mln wierszy</td>
+      <td>natywne partycjonowanie deklaratywne po <code>ts</code></td>
+    </tr>
+    <tr>
+      <td><strong>Polityki retencji</strong></td>
+      <td><span class="pill">żadna</span> archiwum nie kasuje danych</td>
+      <td>niepotrzebny</td>
+    </tr>
+    <tr>
+      <td><strong>Hyperfunctions / Toolkit</strong></td>
+      <td><span class="pill warn">do sprawdzenia</span> przydatne przy analizie w backtestach</td>
+      <td>okna SQL, <code>percentile_cont</code>; część rzeczy trzeba napisać samemu</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Bilans: jedna funkcja o realnej wartości (<em>continuous aggregates</em>) i ma dobry, tani zamiennik. Reszta przy tej skali nic nie wnosi. To za mało, żeby dla samego Timescale wychodzić z Azure PaaS albo brać na siebie utrzymanie VM-ki.</p>
+
+<h2>6. Rekomendacja</h2>
+
+<ol>
+  <li><strong>Teraz</strong> — <code>B1ms</code> + 32 GB na koncie free. <strong>0 EUR przez 12 miesięcy.</strong> Wystarczy na cały v1 z kilkunastoma instrumentami i pozwala zmierzyć rzeczywisty wzrost danych, zamiast go szacować tak, jak w sekcji 1.</li>
+  <li><strong>Wejście na produkcję</strong> — <code>B2s</code> + 64 GiB, <strong>58,72 EUR/mc</strong>, region <code>polandcentral</code> (najbliżej, ta sama cena co reszta EU).</li>
+  <li><strong>Bez TimescaleDB.</strong> Partycjonowanie natywne po <code>ts</code> i zmaterializowane widoki na rollupy. Zyskujecie przenośność: taki schemat działa na każdym Postgresie, także na Tiger Cloud, gdyby kiedyś zaszła potrzeba.</li>
+  <li><strong>Gdy dojdą backtesty skanujące lata</strong> — przejście na <code>D2ds_v5</code> z rezerwacją 3-letnią, <strong>61,02 EUR/mc</strong>. Taniej niż <code>B2ms</code> on-demand i bez kredytów CPU.</li>
+  <li><strong>TimescaleDB rozważcie ponownie</strong>, dopiero gdy przekroczycie ~200 mln wierszy albo gdy rollupy na widokach materializowanych zaczną męczyć. Wtedy Tiger Cloud we Frankfurcie, nie self-host — utrzymanie własnej VM-ki kosztuje więcej niż różnica w cenniku.</li>
+</ol>
+
+<div class="callout warn">
+  <span class="tag">Do zweryfikowania, zanim to stanie się decyzją</span>
+  <ul>
+    <li>Szacunki wolumenu z sekcji 1 opierają się na ~120 B/wiersz i rynku 24/5. Zmierzcie na prawdziwych danych po miesiącu — <code>pg_total_relation_size</code> odpowie lepiej niż ten dokument.</li>
+    <li>Instrumenty krypto handlują się 24/7, czyli dają ~42% wierszy więcej niż przyjęto w tabeli.</li>
+    <li>Ceny Tiger Cloud są w USD i zależą od kursu; Azure rozlicza w EUR wg cennika regionalnego.</li>
+    <li>Egress z Azure jest płatny, gdy baza i konsument są w różnych regionach albo poza VNet. Trzymajcie <code>market-data</code>, <code>capital-gateway</code> i bazę w jednym regionie.</li>
+    <li>Wszystkie kwoty są <strong>bez VAT</strong> i bez rabatów umownych (EA / CSP).</li>
+  </ul>
+</div>
+
+<footer>
+  <p><strong>Źródła</strong></p>
+  <ol>
+    <li><a href="https://prices.azure.com/api/retail/prices">Azure Retail Prices API</a> — ceny compute, storage, backup, VM i dysków; odpytane 2026-08-07 dla <code>polandcentral</code>, <code>westeurope</code>, <code>germanywestcentral</code>, EUR</li>
+    <li><a href="https://learn.microsoft.com/en-us/azure/postgresql/extensions/concepts-extensions-considerations">Considerations when Using Extensions and Modules in Azure Database for PostgreSQL Flexible Server</a> — potwierdzenie edycji Apache-2</li>
+    <li><a href="https://learn.microsoft.com/en-us/answers/questions/1380687/will-azure-have-the-functionality-to-support-commu">Will Azure support the community edition of TimescaleDB?</a> — Microsoft Q&amp;A</li>
+    <li><a href="https://www.tigerdata.com/legal/licenses">Software Licensing: Timescale License (TSL)</a> — podział funkcji Apache-2 / TSL</li>
+    <li><a href="https://www.tigerdata.com/pricing">Tiger Cloud Pricing</a> oraz <a href="https://www.tigerdata.com/docs/deploy/tiger-cloud/tiger-cloud-aws/pricing-and-account-management">Billing and account management</a></li>
+    <li><a href="https://www.tigerdata.com/docs/get-started/supported-regions">Tiger Cloud — supported regions</a> — regiony Azure</li>
+    <li><a href="https://github.com/MicrosoftDocs/azure-databases-docs/blob/main/articles/postgresql/flexible-server/how-to-deploy-on-azure-free-account.md">Deploy Azure Database for PostgreSQL on an Azure free account</a> — 750 h <code>B1ms</code> + 32 GB przez 12 miesięcy</li>
+    <li><a href="https://azure.microsoft.com/en-us/pricing/details/postgresql/flexible-server/">Azure Database for PostgreSQL Flexible Server — pricing</a></li>
+  </ol>
+</footer>
+
+</main>

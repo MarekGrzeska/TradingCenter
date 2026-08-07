@@ -1,0 +1,316 @@
+<title>Plan wdrożenia na VPS — deploye, sekrety, dostęp</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.7; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 60rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.4rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.2rem, 2.6vw, 1.5rem); letter-spacing: -0.01em; margin: 3.5rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.02rem; margin: 2rem 0 0.5rem; font-weight: 620; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.06rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dim { color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.82rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+
+  .worry { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.2rem 1.35rem; margin: 1.3rem 0; }
+  .worry .q { font-weight: 620; font-size: 1.02rem; margin: 0 0 0.1rem; }
+  .worry .verdict { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.6rem; }
+  .worry.solved .verdict { color: var(--good); }
+  .worry.real .verdict { color: var(--bad); }
+  .worry > :last-child { margin-bottom: 0; }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps > li { counter-increment: step; position: relative; padding: 0 0 0 3rem; margin: 0 0 1.3rem; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: 0.05rem;
+    width: 2rem; height: 2rem; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.85rem; font-weight: 600;
+  }
+  .steps > li > b { display: block; margin-bottom: 0.15rem; }
+  .steps > li p { margin: 0.3rem 0; }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>Plan wdrożenia na VPS</h1>
+<p class="lede">Deploye, sekrety, autoryzacja i to, co faktycznie jest trudniejsze niż w chmurze. Prostym językiem.</p>
+<p class="meta">Stan na 2026-08-07 · zakłada VPS z Dockerem i repozytorium <code>MarekGrzeska/TradingCenter</code></p>
+
+<div class="callout good">
+  <span class="tag">Wniosek na wstępie</span>
+  <p>Z czterech rzeczy, dla których chciałeś Azure — <strong>łatwe deploye, integracja z GitHubem, sekrety w vaulcie, autoryzacja</strong> — trzy pierwsze załatwiasz narzędziami, które już masz, w większości za darmo. Autoryzacja wychodzi nawet <em>lepiej</em> niż w Azure.</p>
+  <p>Realnie trudniejsza jest <strong>jedna rzecz: to, że jesteś właścicielem systemu operacyjnego i kopii zapasowych.</strong> I to jest cała różnica, za którą płaciłbyś w chmurze.</p>
+</div>
+
+<h2>1. Cztery obawy, po kolei</h2>
+
+<div class="worry solved">
+  <p class="verdict">✓ rozwiązane</p>
+  <p class="q">„Chciałem łatwych deployów"</p>
+  <p><strong>GitHub Actions wdraża na VPS równie łatwo jak do Azure.</strong> Robisz <code>git push</code>, Actions buduje obrazy, wysyła je do rejestru GitHuba, a potem łączy się z VPS-em po SSH i mówi „pobierz nową wersję i zrestartuj". Całość to około 40 linii pliku YAML, pokazanego w sekcji 3.</p>
+  <p>Wdrożenie do Azure App Service to <em>też</em> GitHub Actions i <em>też</em> plik YAML podobnej długości. Przewaga chmury jest tu praktycznie żadna — po prostu w jednym przypadku ostatnim krokiem jest „wyślij do Azure", a w drugim „wejdź po SSH i pociągnij obraz".</p>
+</div>
+
+<div class="worry solved">
+  <p class="verdict">✓ rozwiązane</p>
+  <p class="q">„Chciałem wygodnego połączenia z GitHubem"</p>
+  <p><strong>Rejestr obrazów GitHuba (<code>ghcr.io</code>) jest wbudowany w twoje repozytorium.</strong> Nie zakładasz konta, nie konfigurujesz dostępu — Actions ma automatyczny token do wypychania obrazów. VPS pobiera je tym samym mechanizmem.</p>
+  <p>W praktyce jest to <em>bliżej</em> GitHuba niż Azure, bo wszystko dzieje się w obrębie jednego dostawcy.</p>
+  <p class="dim">Uwaga na limit: prywatne obrazy liczą się do darmowego pakietu GitHub Packages, który na planie darmowym jest niewielki. Rozwiązanie: trzymaj tylko tag <code>latest</code> i sprzątaj stare wersje, albo ustaw obrazy jako publiczne — pod warunkiem, że nie wbudowujesz w nie żadnych sekretów, czego i tak nie wolno robić.</p>
+</div>
+
+<div class="worry solved">
+  <p class="verdict">✓ rozwiązane</p>
+  <p class="q">„Chciałem trzymać sekrety w vaulcie"</p>
+  <p><strong>GitHub Secrets to jest vault</strong> — szyfrowany, z kontrolą dostępu, wbudowany w repozytorium i darmowy. Wpisujesz tam klucz API do capital.com i hasło do bazy, a podczas wdrożenia Actions zapisuje je na VPS-ie do pliku <code>.env</code> z uprawnieniami tylko dla właściciela.</p>
+  <p>Azure Key Vault daje ponadto dziennik dostępu i mechanizmy rotacji. Przy jednym operatorze i jednym zestawie poświadczeń nie kupujesz tym nic realnego, a płacisz i dokładasz zależność.</p>
+  <p>Gdybyś chciał czegoś ładniejszego: <strong>SOPS + age</strong> pozwala trzymać zaszyfrowane sekrety <em>w repozytorium</em>, a VPS odszyfrowuje je swoim kluczem. Zyskujesz historię zmian sekretów w gicie. To rozwinięcie na później, nie warunek startu.</p>
+</div>
+
+<div class="worry solved">
+  <p class="verdict">✓ rozwiązane — i lepiej niż w Azure</p>
+  <p class="q">„No i jeszcze autoryzacja?"</p>
+  <p><strong>Cloudflare Access</strong> stawia przed twoją aplikacją stronę logowania — Google, GitHub albo kod jednorazowy na e-mail — i przepuszcza wyłącznie osoby z listy. <strong>Nie piszesz do tego ani linijki kodu.</strong> Darmowe do 50 użytkowników, na stałe.</p>
+  <p>Do tego dokładasz <strong>Cloudflare Tunnel</strong>: VPS nie ma żadnego otwartego portu przychodzącego, bo to tunel dzwoni na zewnątrz. Wchodzisz z dowolnej przeglądarki na świecie, bez klienta VPN.</p>
+  <p>Odpowiednik w Azure to Entra ID z App Service Easy Auth — działa dobrze, ale jest zaprojektowany dla organizacji z wieloma użytkownikami i wymaga, żeby aplikacja stała w Azure.</p>
+</div>
+
+<h2>2. Rekomendowany zestaw</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Do czego</th><th>Czym</th><th class="num">Koszt</th></tr></thead>
+  <tbody>
+    <tr><td>Uruchamianie usług</td><td>Docker Compose</td><td class="num">—</td></tr>
+    <tr><td>Wejście, TLS, routing</td><td>Caddy</td><td class="num">—</td></tr>
+    <tr><td>Dostęp z internetu</td><td>Cloudflare Tunnel</td><td class="num">$0</td></tr>
+    <tr><td>Logowanie do terminala</td><td>Cloudflare Access</td><td class="num">$0</td></tr>
+    <tr><td>Budowanie i wdrażanie</td><td>GitHub Actions</td><td class="num">$0</td></tr>
+    <tr><td>Rejestr obrazów</td><td><code>ghcr.io</code></td><td class="num">$0*</td></tr>
+    <tr><td>Sekrety</td><td>GitHub Secrets → <code>.env</code> na VPS</td><td class="num">$0</td></tr>
+    <tr><td>Baza</td><td>PostgreSQL + TimescaleDB Community</td><td class="num">—</td></tr>
+    <tr><td>Kopie zapasowe</td><td><code>pg_dump</code> → magazyn poza VPS-em</td><td class="num">~€3</td></tr>
+    <tr><td>Alerty</td><td>cron + Telegram albo e-mail</td><td class="num">$0</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p class="dim">* w granicach darmowego pakietu GitHub Packages</p>
+
+<h2>3. Jak wygląda wdrożenie</h2>
+
+<p>Robisz <code>git push</code> na gałąź <code>main</code>. Dalej dzieje się to samo:</p>
+
+<pre><code>name: deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: docker/build-push-action@v6
+        with:
+          context: modules/capital-gateway
+          push: true
+          tags: ghcr.io/marekgrzeska/capital-gateway:latest
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: deploy
+          key: ${{ secrets.VPS_SSH_KEY }}
+          script: |
+            cd /srv/tradingcenter
+            docker compose pull
+            docker compose up -d
+            docker image prune -f</code></pre>
+
+<p>To wszystko. <code>VPS_HOST</code> i <code>VPS_SSH_KEY</code> siedzą w GitHub Secrets, więc nigdzie w repozytorium nie ma adresu ani klucza.</p>
+
+<div class="callout warn">
+  <span class="tag">Dlaczego budować w Actions, a nie na VPS-ie</span>
+  <p>Kuszące jest zrobić po prostu <code>git pull &amp;&amp; docker compose up -d --build</code> na serwerze. Nie rób tego: <strong>budowanie frontendu potrafi zjeść 1–2 GB pamięci</strong>, a robi to na tej samej maszynie, na której akurat pracuje Postgres i leci ingest. Na małym VPS-ie kończy się to ubiciem procesu przez system i dziurą w danych.</p>
+  <p>Budowanie w Actions jest darmowe i dzieje się na cudzej maszynie. VPS tylko pobiera gotowy obraz.</p>
+</div>
+
+<h2>4. Co naprawdę jest trudniejsze</h2>
+
+<p>Teraz uczciwie — nie wszystko wychodzi na zero.</p>
+
+<div class="worry real">
+  <p class="verdict">✗ realny koszt</p>
+  <p class="q">Kopie zapasowe są twoje</p>
+  <p>To jest <strong>ta jedna rzecz</strong>, za którą naprawdę płaci się w chmurze. Zarządzana baza robi kopie sama i sama pilnuje, żeby dało się z nich odtworzyć.</p>
+  <p>Dlaczego to tu boli szczególnie: gdyby archiwum świec przepadło, odtworzenie trzech lat historii dla stu instrumentów z brokera zajmuje — licząc z pomiaru z waszego README — <strong>około 27 godzin</strong>. I to zakładając, że capital.com ma tyle historii, czego nie ma.</p>
+  <p><strong>Minimum: nocny <code>pg_dump</code> wysyłany poza maszynę i jedno odtworzenie przetestowane od razu, nie „kiedyś".</strong> Kopia leżąca na tym samym dysku nie chroni przed awarią tego dysku.</p>
+</div>
+
+<div class="worry real">
+  <p class="verdict">✗ realny koszt</p>
+  <p class="q">System operacyjny jest twój</p>
+  <p>Aktualizacje bezpieczeństwa, restarty po aktualizacji jądra, miejsce na dysku. Większość załatwia <code>unattended-upgrades</code>, ale to ty jesteś tym, kto zauważy, że coś nie wstało.</p>
+  <p>Raz na kilka lat dochodzi aktualizacja Postgresa do nowej wersji głównej — <code>pg_dump</code>, <code>restore</code>, wieczór pracy.</p>
+</div>
+
+<div class="worry real">
+  <p class="verdict">✗ realny koszt</p>
+  <p class="q">Nic się samo nie naprawia</p>
+  <p>Nie ma SLA i nie ma automatycznego przełączenia na zapas. Docker zrestartuje kontener, który padł, ale awarii maszyny nie przeżyjesz bez ręcznej reakcji.</p>
+  <p>Dla archiwum świec to znośne — przerwa oznacza lukę, którą dociągniesz z brokera. Byłoby nieznośne, gdyby na tym stał automatyczny handel.</p>
+</div>
+
+<div class="callout">
+  <span class="tag">Rzecz, którą warto zauważyć</span>
+  <p>Alertów o tym, że <strong>ingest przestał zapisywać świece</strong>, nie dostałbyś także w Azure. App Service nie wie, co twoja aplikacja ma robić. Ten monitoring musisz napisać niezależnie od tego, gdzie to stoi — więc nie liczy się jako przewaga chmury.</p>
+</div>
+
+<h2>5. Kolejność prac</h2>
+
+<ol class="steps">
+  <li>
+    <b>Uwierzytelnianie w gatewayu</b>
+    <p>Kilkanaście linii w FastAPI: nagłówek z sekretem, sprawdzany globalnie. <strong>Pierwsze, bo bez tego reszta nie ma znaczenia</strong> — gateway wystawia składanie zleceń i dziś nie pyta o nic.</p>
+    <p class="dim">To zmiana zachowania, więc idzie przez OpenSpec jako modyfikacja <code>capital-session</code>.</p>
+  </li>
+  <li>
+    <b>Wyłącz Swaggera w produkcji</b>
+    <p><code>docs_url=None</code> i <code>openapi_url=None</code>, włączane zmienną środowiskową tylko lokalnie. Inaczej podajesz obcemu gotową mapę API razem z endpointami handlowymi.</p>
+  </li>
+  <li>
+    <b>Dockerfile dla gatewaya i build terminala</b>
+    <p>Produkcyjnie, bez <code>--reload</code>. Terminal buduje się do plików statycznych, które serwuje Caddy.</p>
+  </li>
+  <li>
+    <b><code>compose.yml</code></b>
+    <p>Cztery usługi. <strong>Tylko Caddy ma porty na hoście</strong> — reszta żyje w sieci wewnętrznej i jest z zewnątrz nieosiągalna z braku mapowania, a nie dzięki firewallowi.</p>
+    <p class="dim">Pamiętaj: <code>-p 8010:8010</code> omija <code>ufw</code>. Jeśli musisz coś opublikować lokalnie, pisz <code>-p 127.0.0.1:8010:8010</code>.</p>
+  </li>
+  <li>
+    <b>Cloudflare Tunnel + Access</b>
+    <p>Kontener <code>cloudflared</code> i polityka „wpuszczaj tylko mój e-mail". Potem zamykasz na VPS-ie wszystkie porty przychodzące, łącznie z 443.</p>
+  </li>
+  <li>
+    <b>GitHub Actions</b>
+    <p>Plik z sekcji 3. Sekrety <code>VPS_HOST</code> i <code>VPS_SSH_KEY</code> w GitHub Secrets.</p>
+  </li>
+  <li>
+    <b>Kopie zapasowe</b>
+    <p>Skrypt, cel poza maszyną, cron, alert przy niepowodzeniu — i <strong>pierwsze odtworzenie testowe tego samego dnia.</strong></p>
+  </li>
+  <li>
+    <b>Watchdog świeżości danych</b>
+    <p>Cron co 15 minut sprawdza <code>max(ts)</code> i alarmuje, gdy świece przestały przychodzić. Cicha śmierć ingestu to dziura, której inaczej nie zauważysz tygodniami.</p>
+  </li>
+  <li>
+    <b>Dopiero teraz moduł <code>market-data</code></b>
+    <p>Na gotowym fundamencie — zamiast dokładać wdrożenie do działającego już ingestu.</p>
+  </li>
+</ol>
+
+<h2>6. Kiedy wrócić do chmury</h2>
+
+<p>Nie „nigdy". Konkretne sygnały, przy których warto przeliczyć to od nowa:</p>
+
+<ul>
+  <li><strong>Gdy na tym stanie automatyczny handel.</strong> Wtedy przerwa kosztuje pieniądze, a nie tylko lukę w danych — i SLA zaczyna mieć wartość.</li>
+  <li><strong>Gdy pojawi się drugi człowiek.</strong> Współdzielone poświadczenia i ręczne wdrożenia przestają się skalować na dwie osoby.</li>
+  <li><strong>Gdy dwa razy z rzędu nie zauważysz awarii przez kilka dni.</strong> To znak, że utrzymanie przerosło dostępny czas.</li>
+  <li><strong>Gdy backtesty przestaną się mieścić</strong> — ale wtedy potrzebujesz większej maszyny, niekoniecznie chmury.</li>
+</ul>
+
+<p>Migracja na tym etapie jest tania: przy kilku gigabajtach to <code>pg_dump</code>, <code>pg_restore</code> i zmiana adresu w konfiguracji. Godzina pracy. <strong>Nie budujesz sobie pułapki — budujesz wersję, którą stać cię utrzymać dzisiaj.</strong></p>
+
+<footer>
+  <p><strong>Powiązane dokumenty</strong></p>
+  <ul>
+    <li><code>docs/vps-deployment-proposal.html</code> — architektura, dobór rozmiaru maszyny, szczegóły backupów</li>
+    <li><code>docs/cloud-cost-comparison.html</code> — Azure, Google i AWS: baza i Kubernetes</li>
+    <li><code>docs/azure-postgres-cost-research.html</code> — koszty bazy na Azure, edycje TimescaleDB</li>
+    <li><code>docs/architecture.md</code> — granice modułów</li>
+  </ul>
+</footer>
+
+</main>

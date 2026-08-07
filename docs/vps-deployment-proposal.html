@@ -1,0 +1,323 @@
+<title>TradingCenter na VPS — propozycja infrastruktury</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 62rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.5rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.2rem, 2.6vw, 1.5rem); letter-spacing: -0.01em; margin: 3.5rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.02rem; margin: 2rem 0 0.5rem; font-weight: 620; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.06rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dim { color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.83rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>TradingCenter na VPS</h1>
+<p class="lede">Propozycja infrastruktury: co postawić, jak to poskładać, co zabezpieczyć i czego pilnować, żeby archiwum świec przeżyło lata.</p>
+<p class="meta">
+  Stan na 2026-08-07 · oparte na kodzie w repozytorium: <code>modules/capital-gateway</code>, <code>modules/terminal</code>, <code>docs/architecture.md</code><br>
+  Zakłada moduł <code>market-data</code> w kształcie ustalonym w rozmowie: ingest ze strumienia + API ze snapshotem
+</p>
+
+<div class="callout bad">
+  <span class="tag">Zrób to, zanim cokolwiek wystawisz na publiczny adres</span>
+  <p><strong><code>capital-gateway</code> nie ma żadnego uwierzytelniania na endpointach.</strong> Sprawdziłem <code>app.py</code> — jedyne wystąpienie słowa „authenticated" dotyczy sesji z capital.com, nie ruchu przychodzącego. Nie ma też CORS.</p>
+  <p>A gateway wystawia między innymi <code>POST /orders</code>, <code>DELETE /positions/{id}</code>, <code>PUT /positions/{id}</code> i <code>DELETE /working-orders/{id}</code>.</p>
+  <p>Na <code>localhost:8010</code> było to bez znaczenia. Na VPS-ie z publicznym IP oznacza, że <strong>każdy, kto trafi na ten port, może otwierać i zamykać pozycje na twoim koncie</strong>. Dziś to konto demo, więc szkoda jest ograniczona — ale skanery portów znajdują takie usługi w godziny, a nie miesiące.</p>
+  <p><strong>Wniosek dla tego wdrożenia: gateway nie może mieć publicznie osiągalnego portu.</strong> Poniższa architektura jest tak zbudowana, żeby to wymusić — nie polegając na tym, że ktoś pamiętał o firewallu.</p>
+</div>
+
+<h2>1. Co masz, czego brakuje</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Element</th><th>Stan</th><th>Co trzeba</th></tr></thead>
+  <tbody>
+    <tr><td><code>capital-gateway</code></td><td>działa, uruchamiany przez <code>uv run uvicorn … --reload --port 8010</code></td><td>Dockerfile, tryb produkcyjny bez <code>--reload</code></td></tr>
+    <tr><td><code>terminal</code></td><td>Vite + React, w dev proxy do gatewaya</td><td>build produkcyjny, serwowany jako pliki statyczne</td></tr>
+    <tr><td><code>market-data</code></td><td>jeszcze nie istnieje</td><td>cały moduł + baza</td></tr>
+    <tr><td>Konteneryzacja</td><td><strong>brak</strong> — w repo nie ma żadnego Dockerfile ani compose</td><td>do napisania</td></tr>
+    <tr><td>Skrypt uruchomieniowy</td><td><code>scripts/dev.ps1</code> — PowerShell</td><td>na Linuksie potrzebna inna ścieżka</td></tr>
+    <tr><td>Uwierzytelnianie</td><td><strong>brak</strong></td><td>patrz ramka wyżej</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>2. Proponowana architektura</h2>
+
+<pre><code>                          capital.com
+                               ▲
+                               │ REST + WebSocket
+                               │ jedna sesja, jeden RateGate
+┌──────────────────────────────┼─────────────────────────────────┐
+│  VPS                         │                                 │
+│                              │                                 │
+│   ┌──────────────────────────┴──────────────┐                  │
+│   │  capital-gateway            :8010       │  bez portu       │
+│   │  handel · historia · strumień           │  na hoście       │
+│   └───────────────┬─────────────────────────┘                  │
+│                   │ HTTP + WS (sieć wewnętrzna compose)         │
+│   ┌───────────────┴─────────────────────────┐                  │
+│   │  market-data                :8020       │  bez portu       │
+│   │  ingest (WS → baza)                     │  na hoście       │
+│   │  API (świece + snapshot + delta)        │                  │
+│   └───────────────┬─────────────────────────┘                  │
+│                   │                                            │
+│   ┌───────────────┴─────────────────────────┐                  │
+│   │  postgres + timescaledb     :5432       │  wolumen         │
+│   └─────────────────────────────────────────┘                  │
+│                                                                │
+│   ┌─────────────────────────────────────────┐                  │
+│   │  caddy                    :80 :443      │  ◀── jedyny      │
+│   │  TLS · reverse proxy · pliki terminala  │      wystawiony  │
+│   └─────────────────────────────────────────┘                  │
+└────────────────────────────────┬───────────────────────────────┘
+                                 │
+                     backup poza maszyną (nocny)</code></pre>
+
+<h3>Zasada, na której to stoi</h3>
+
+<p><strong>Tylko Caddy publikuje porty na hoście.</strong> Gateway, market-data i Postgres istnieją wyłącznie w wewnętrznej sieci Dockera — nie mają mapowania portów, więc z internetu są nieosiągalne niezależnie od tego, jak skonfigurowany jest firewall. To nie jest ustawienie, które można zapomnieć włączyć; to brak linijki w <code>compose.yml</code>.</p>
+
+<p>Ten układ ma dwa skutki uboczne, oba dobre:</p>
+
+<ul>
+  <li><strong>Znika problem CORS.</strong> Proposal <code>add-terminal</code> odnotowywał, że „<em>capital-gateway musi wpuścić przeglądarkę: dziś nie ma CORS</em>", i obchodził to własnym proxy Vite w developmencie. Za wspólnym reverse proxy wszystko jest na jednym originie i problem nie istnieje w produkcji.</li>
+  <li><strong>Trading nie wychodzi na świat.</strong> Do gatewaya sięga tylko <code>market-data</code> i — dla wyszukiwarki instrumentów — terminal, przez wąską, jawnie wypisaną trasę w Caddym. Endpointy handlowe nie mają publicznej ścieżki w ogóle.</li>
+</ul>
+
+<h2>3. Dlaczego Docker Compose, a nie coś większego</h2>
+
+<p>Trzy usługi i baza. Compose odwzorowuje granice modułów jeden do jednego: <strong>jeden moduł = jedna usługa = jeden obraz = własny plik <code>.env</code></strong>. To jest dokładnie to, czego wymaga wasz <code>docs/architecture.md</code>: moduły stoją samodzielnie i rozmawiają wyłącznie przez publikowany kontrakt, a usunięcie modułu to usunięcie katalogu. W Compose usunięcie modułu to usunięcie jednej sekcji.</p>
+
+<p>Kubernetes rozwiązuje problemy, których tu nie ma — rozkładanie ruchu na wiele kopii, rolling deploy bez przerwy, samoleczenie klastra. Co więcej, <strong>gateway nie może działać w wielu kopiach</strong>: capital.com liczy limity per konto, więc druga instancja to drugi <code>RateGate</code> i podwójny ruch do brokera. Skalowanie poziome jest tu nie tyle zbędne, co szkodliwe.</p>
+
+<h2>4. Dostęp z zewnątrz — dwie opcje</h2>
+
+<div class="callout good">
+  <span class="tag">Rekomendacja</span>
+  <p><strong>Sieć prywatna (Tailscale albo WireGuard) — nic nie wystawiaj na publiczny internet.</strong></p>
+  <p>Terminal to narzędzie dla jednego operatora. Nie ma powodu, żeby był osiągalny dla kogokolwiek poza tobą. Tailscale zakłada prywatną sieć między twoimi urządzeniami a VPS-em w kilka minut, jest darmowy do użytku osobistego i sprowadza powierzchnię ataku do zera — bez portu 443 wystawionego światu, bez certyfikatów, bez basicauth do złamania.</p>
+  <p>Wchodzisz na terminal z laptopa i telefonu tak samo jak dziś, tyle że przez adres w sieci prywatnej.</p>
+</div>
+
+<p><strong>Wariant publiczny</strong> — jeśli chcesz dostęp z dowolnego urządzenia bez instalowania klienta VPN. Wtedy Caddy z automatycznym Let's Encrypt plus:</p>
+
+<ul>
+  <li><strong>uwierzytelnianie na całej witrynie</strong> — minimum basicauth, lepiej token albo Cloudflare Access;</li>
+  <li><strong>jawna lista tras do gatewaya</strong> — przepuszczasz wyłącznie <code>/instruments*</code>, wszystko inne zwraca 403. Endpointy handlowe nie mają trasy;</li>
+  <li><strong>fail2ban albo rate limiting</strong> na próby logowania.</li>
+</ul>
+
+<p>To działa, ale każdy z tych elementów to coś, co można źle skonfigurować. Sieć prywatna nie ma czego zepsuć.</p>
+
+<h2>5. Dobranie rozmiaru</h2>
+
+<p>Nie znam parametrów twojego VPS-a, więc poniżej progi. Punkt odniesienia: ingest to około <strong>2 zapisy na sekundę</strong>, a dane rosną o ~6 GB rocznie przy stu instrumentach na rozdzielczości minutowej.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Maszyna</th><th>Na co wystarczy</th><th><code>shared_buffers</code></th><th>Zapas dysku</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>2 vCPU / 4 GB / 40 GB</strong></td>
+      <td>v1: ~20 instrumentów, <code>MINUTE</code>, terminal. Z zapasem</td>
+      <td class="num">1 GB</td>
+      <td>lata</td>
+    </tr>
+    <tr>
+      <td><strong>4 vCPU / 8 GB / 80 GB</strong></td>
+      <td><span class="pill good">docelowo</span> ~100 instrumentów, backtesty obok ingestu</td>
+      <td class="num">2 GB</td>
+      <td>~10 lat</td>
+    </tr>
+    <tr>
+      <td><strong>8 vCPU / 16 GB / 160 GB</strong></td>
+      <td>backtesty skanujące lata równolegle z ingestem, kilka procesów agentów</td>
+      <td class="num">4 GB</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Nawet najmniejsza z tych maszyn jest dla samego ingestu przesadą. Wąskim gardłem będą <strong>backtesty</strong>, nie zbieranie danych — i to one, gdy się pojawią, wyznaczą moment rozbudowy.</p>
+
+<div class="callout good">
+  <span class="tag">Rzecz, którą zyskujesz przechodząc na własną maszynę</span>
+  <p><strong>Pełny TimescaleDB Community</strong> — z kompresją i continuous aggregates. Licencja TSL jest darmowa dla self-managed, a Azure PaaS dawał wyłącznie edycję Apache-2, bez obu tych funkcji.</p>
+  <p>Przy waszej skali nadal nie są konieczne. Różnica polega na tym, że teraz nic nie kosztują — więc rollupy <code>MINUTE</code> → <code>MINUTE_5</code>…<code>HOUR_4</code> możesz zrobić polityką zamiast zestawem widoków materializowanych i crona.</p>
+</div>
+
+<h2>6. Backup — tu jest cała gra</h2>
+
+<div class="callout warn">
+  <span class="tag">Policzmy, ile kosztuje utrata bazy</span>
+  <p>Archiwum świec teoretycznie da się odtworzyć od brokera. Zobaczmy, ile to trwa, korzystając z pomiaru z waszego własnego README: <strong>20 000 świec pięciominutowych = 30 wywołań do providera i 26 sekund</strong>, czyli około 0,87 s na wywołanie po limicie 10 req/s.</p>
+  <p>Rok świec minutowych dla jednego instrumentu to ~370 000 świec, czyli ~370 wywołań — około <strong>5,4 minuty</strong>. Dla stu instrumentów i trzech lat historii:</p>
+  <p style="font-family: var(--mono); font-size: 1.05rem; text-align: center; margin: 1rem 0;">100 × 3 × 5,4 min ≈ <strong>27 godzin</strong></p>
+  <p>I to przy założeniu, że nic się nie wywróci i że capital.com ma tyle historii dla każdego instrumentu — czego nie ma. <strong>Backup nie jest opcją.</strong></p>
+</div>
+
+<h3>Co konkretnie</h3>
+
+<ul>
+  <li><strong>Nocny <code>pg_dump</code></strong> w formacie <code>custom</code>, skompresowany, <strong>wysyłany poza maszynę</strong>. Kopia na tym samym dysku nie chroni przed awarią tego dysku.</li>
+  <li><strong>Cel:</strong> Hetzner Storage Box <code>BX11</code> — 1 TB za <strong>€3,20/mc</strong>, transfer bez limitu. Albo Backblaze B2, albo dowolny inny magazyn poza VPS-em.</li>
+  <li><strong>Retencja:</strong> 7 kopii dziennych + 4 tygodniowe. Przy kilku gigabajtach to nadal grosze.</li>
+  <li><strong>Comiesięczny test odtworzenia</strong>, najlepiej skryptem: odtwórz do tymczasowej bazy, policz wiersze, porównaj z produkcją. <strong>Backup nietestowany to nie backup, tylko plik.</strong></li>
+</ul>
+
+<p>Rozważ też <code>pgBackRest</code> z archiwizacją WAL, gdybyś chciał odtwarzanie do punktu w czasie. Przy waszym profilu ryzyka to przesada — brakujące świece dociągniesz z brokera — więc <code>pg_dump</code> w zupełności wystarczy i jest o rząd wielkości prostszy.</p>
+
+<h2>7. Monitoring — minimalny, ale konkretny</h2>
+
+<p>Nie Prometheus z Grafaną. Przy jednej maszynie i trzech usługach to więcej pracy niż pożytku. Wystarczą cztery rzeczy:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Co</th><th>Jak</th><th>Dlaczego akurat to</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Restart po awarii</strong></td><td><code>restart: unless-stopped</code> + <code>healthcheck</code> w compose</td><td>proces, który padł, wraca sam</td></tr>
+    <tr>
+      <td><strong>Świeżość danych</strong></td>
+      <td>cron co 15 min: sprawdź <code>max(ts)</code> dla śledzonych par, alert gdy starsze niż dwa okresy świecy</td>
+      <td><span class="pill bad">najważniejsze</span> cicha śmierć ingestu to dziura, której nikt nie zauważy tygodniami</td>
+    </tr>
+    <tr><td><strong>Miejsce na dysku</strong></td><td>cron, alert przy 80%</td><td>pełny dysk zatrzymuje Postgresa</td></tr>
+    <tr><td><strong>Powodzenie backupu</strong></td><td>alert, gdy nocna kopia <em>nie</em> powstała</td><td>backup, który cicho przestał działać, jest gorszy niż jego brak — bo usypia czujność</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Kanał alertów: cokolwiek, co realnie czytasz. Telegram albo e-mail. Alert, do którego się nie zagląda, nie istnieje.</p>
+
+<h2>8. Czego nie dostajesz</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Na VPS-ie</th><th>Kto to robi</th></tr></thead>
+  <tbody>
+    <tr><td>Kopie zapasowe</td><td><strong>ty</strong> — sekcja 6</td></tr>
+    <tr><td>Aktualizacje systemu i łatki bezpieczeństwa</td><td><strong>ty</strong> — <code>unattended-upgrades</code> załatwia większość</td></tr>
+    <tr><td>Aktualizacja Postgresa do nowego majora</td><td><strong>ty</strong> — raz na kilka lat, <code>pg_dump</code> + <code>restore</code></td></tr>
+    <tr><td>Odtworzenie po awarii dysku</td><td><strong>ty</strong> — i tylko wtedy, gdy backup działa</td></tr>
+    <tr><td>SLA</td><td><strong>nikt</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>To jest uczciwa cena tej oszczędności. Warto ją nazwać: <strong>usługa zarządzana nie kupuje ci wydajności — kupuje kopie zapasowe, o których nie musisz myśleć.</strong> Jeśli zrobisz backupy porządnie i przetestujesz odtworzenie, różnica w praktyce znika. Jeśli ich nie zrobisz, VPS jest tańszy dokładnie do dnia awarii dysku.</p>
+
+<h2>9. Koszty</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pozycja</th><th class="num">Koszt / mc</th></tr></thead>
+  <tbody>
+    <tr><td>VPS</td><td class="num">masz</td></tr>
+    <tr><td>Storage Box <code>BX11</code> na backupy (1 TB)</td><td class="num">€3,20</td></tr>
+    <tr><td>Domena</td><td class="num">~€1</td></tr>
+    <tr><td>Tailscale <span class="dim">(użytek osobisty)</span></td><td class="num">€0</td></tr>
+    <tr><td><strong>Dodatkowo ponad VPS</strong></td><td class="num"><strong>~€4</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Dla porównania: docelowa konfiguracja na Azure to <strong>$67 miesięcznie za samą bazę</strong>, bez maszyn pod aplikacje.</p>
+
+<h2>10. Kolejność prac</h2>
+
+<ol>
+  <li><strong>Dockerfile dla <code>capital-gateway</code></strong> — produkcyjny, bez <code>--reload</code>, bez publikowanego portu.</li>
+  <li><strong>Build produkcyjny terminala</strong> i wskazanie ścieżek API na względne, żeby działały za reverse proxy.</li>
+  <li><strong><code>compose.yml</code></strong> — Caddy jako jedyna usługa z portami, reszta w sieci wewnętrznej.</li>
+  <li><strong>Tailscale na VPS-ie</strong> i na twoich urządzeniach.</li>
+  <li><strong>Backupy</strong> — skrypt, cel poza maszyną, cron, alert i <em>pierwsze odtworzenie testowe od razu</em>, nie „kiedyś".</li>
+  <li><strong>Watchdog świeżości danych.</strong></li>
+  <li><strong>Dopiero teraz</strong> moduł <code>market-data</code> — na gotowym fundamencie, zamiast dokładania wdrożenia do działającego już ingestu.</li>
+</ol>
+
+<div class="callout">
+  <span class="tag">Uwaga o procesie</span>
+  <p>Punkty 1–6 to zmiana infrastrukturalna, nie zmiana zachowania — a wasz OpenSpec odrzuca zmianę bez delty specyfikacji, chyba że <code>.openspec.yaml</code> ustawia <code>skip_specs: true</code>. To jest dokładnie ten przypadek: konteneryzacja i backupy niczego nie zmieniają w kontrakcie modułów.</p>
+  <p>Wyjątkiem jest <strong>uwierzytelnianie gatewaya</strong>. To zmiana obserwowalnego zachowania i należy do <code>capital-session</code> jako zmodyfikowana zdolność — wraz ze scenariuszem mówiącym, że wywołanie bez poświadczeń jest odrzucane.</p>
+</div>
+
+<footer>
+  <p><strong>Powiązane dokumenty</strong></p>
+  <ul>
+    <li><code>docs/architecture.md</code> — granice modułów i zasada „moduł jest właścicielem swojego magazynu"</li>
+    <li><code>docs/azure-postgres-cost-research.html</code> — koszty bazy na Azure, analiza edycji TimescaleDB</li>
+    <li><code>docs/cloud-cost-comparison.html</code> — Azure, Google i AWS dla bazy i Kubernetesa</li>
+    <li><code>docs/microsoft-for-startups-founders-hub.html</code> — program kredytowy Microsoftu</li>
+  </ul>
+</footer>
+
+</main>

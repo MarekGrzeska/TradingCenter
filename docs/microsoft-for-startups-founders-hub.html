@@ -1,0 +1,347 @@
+<title>Microsoft for Startups — jak zdobyć kredyty Azure</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 60rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.5rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.2rem, 2.6vw, 1.5rem); letter-spacing: -0.01em; margin: 3.5rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.02rem; margin: 2rem 0 0.5rem; font-weight: 620; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.06rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dim { color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; margin: 1.5rem 0; }
+  .steps > li {
+    counter-increment: step; position: relative; padding: 0 0 0 3rem; margin: 0 0 1.4rem;
+  }
+  .steps > li::before {
+    content: counter(step);
+    position: absolute; left: 0; top: 0.05rem;
+    width: 2rem; height: 2rem; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent);
+    border: 1px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.85rem; font-weight: 600;
+  }
+  .steps > li > b { display: block; margin-bottom: 0.15rem; }
+  .steps > li p { margin: 0.35rem 0; }
+
+  .check { list-style: none; padding: 0; }
+  .check li { position: relative; padding-left: 1.6rem; }
+  .check li::before { content: "☐"; position: absolute; left: 0; color: var(--accent); font-size: 1.05rem; }
+
+  .timeline { display: grid; gap: 0.6rem; margin: 1.5rem 0; }
+  .tl { display: grid; grid-template-columns: minmax(6.5rem, auto) 1fr; gap: 1rem; align-items: start; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.8rem 1rem; }
+  .tl .when { font-family: var(--mono); font-size: 0.83rem; color: var(--accent); font-weight: 600; }
+  .tl .what { font-size: 0.94rem; }
+  .tl .what b { display: block; }
+  .tl .what span { color: var(--text-dim); font-size: 0.9rem; }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+  footer ol { padding-left: 1.4rem; }
+  footer li { margin: 0.3rem 0; }
+</style>
+
+<main>
+
+<h1>Microsoft for Startups — jak zdobyć kredyty Azure</h1>
+<p class="lede">Wszystko o programie: ile realnie można dostać, jakie są wymagania, jak wygląda wniosek krok po kroku i po jakim czasie pieniądze są na koncie. Plus konkretne przeszkody, które stoją przed TradingCenter.</p>
+<p class="meta">
+  Stan na 2026-08-07 · oparte na oficjalnej dokumentacji Microsoft Learn, aktualizowanej 2026-08-05<br>
+  Kwoty w USD · gdzie blogi przeczą dokumentacji, dokumentacja wygrywa i jest to zaznaczone
+</p>
+
+<div class="callout good">
+  <span class="tag">Skrót</span>
+  <ul>
+    <li><strong>Bez inwestora dostajesz $1 000 na 90 dni</strong>, a po weryfikacji firmy <strong>kolejne $4 000 na 180 dni</strong>. Razem $5 000 rozłożone na ~9 miesięcy.</li>
+    <li><strong>$200 masz od ręki</strong>, jeszcze przed rozpatrzeniem wniosku.</li>
+    <li><strong>Decyzja w ~3 dni robocze.</strong></li>
+    <li><strong>Gmail jest OK</strong> — wbrew temu, co piszą blogi. Microsoft wprost <em>wymaga</em> konta prywatnego.</li>
+    <li>⚠️ <strong>Masz już konto Azure i to jest główne ryzyko.</strong> Szczegóły w sekcji 6.</li>
+  </ul>
+</div>
+
+<h2>1. Dwie ścieżki do programu</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Ścieżka</th><th>Warunek wejścia</th><th class="num">Kredyty</th><th>Dla kogo</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Bez kodu inwestora</strong><br><span class="dim">Azure startup credit offer</span></td>
+      <td>brak — wystarczy wniosek</td>
+      <td class="num">$1 000<br>+ $4 000</td>
+      <td><span class="pill good">to twoja ścieżka</span> bootstrapowani, solo founderzy</td>
+    </tr>
+    <tr>
+      <td><strong>Z kodem inwestora</strong><br><span class="dim">Investor offer</span></td>
+      <td>10-znakowy kod od funduszu, akceleratora, inkubatora, sieci aniołów lub uczelni</td>
+      <td class="num">od $100 000<br>do $150 000</td>
+      <td>startupy z inwestorem lub po akceleratorze</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Microsoft <strong>nie publikuje listy</strong> uczestniczących inwestorów i akceleratorów — kodu trzeba szukać u swojego funduszu czy akceleratora bezpośrednio. Warto wiedzieć, że kwalifikują się też <strong>uczelnie</strong>, więc jeśli masz jakiekolwiek powiązanie z programem akademickim lub inkubatorem przyuczelnianym, zapytaj tam, zanim pójdziesz ścieżką bez kodu.</p>
+
+<p>Ścieżka z kodem to zupełnie inna liga: oprócz kredytów daje Azure Standard Support, dostęp do inżynierów Microsoftu, wsparcie sprzedażowe oraz GitHub Enterprise, LinkedIn Premium Business, Microsoft 365 Business Premium, Visual Studio Enterprise, Dynamics 365 i Power Platform.</p>
+
+<h2>2. Ile kredytów i — co ważniejsze — na jak długo</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Etap</th><th class="num">Kwota</th><th class="num">Ważność</th><th>Co odblokowuje</th></tr></thead>
+  <tbody>
+    <tr><td>Kredyt startowy przy zakładaniu konta</td><td class="num">$200</td><td class="num">—</td><td>dostępny od razu, przed decyzją</td></tr>
+    <tr><td>Po zatwierdzeniu wniosku</td><td class="num">$1 000</td><td class="num">90 dni</td><td>samo zatwierdzenie</td></tr>
+    <tr><td>Po weryfikacji firmy</td><td class="num">$4 000</td><td class="num">180 dni</td><td>weryfikacja danych rejestrowych</td></tr>
+    <tr><td><strong>Razem</strong></td><td class="num"><strong>$5 000</strong></td><td class="num"><strong>~270 dni</strong></td><td>—</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Rzecz, której nie widać na pierwszy rzut oka</span>
+  <p><strong>Kredyty są ograniczone czasem, nie zużyciem.</strong> $1 000 wygasa po 90 dniach niezależnie od tego, ile z niego wykorzystasz — reszta przepada.</p>
+  <p>Policzmy to dla waszej docelowej konfiguracji bazy (<code>B2s</code> + 64 GB, ~$66,88/mc):</p>
+  <ul>
+    <li>przez 90 dni zużyjecie ~$200 z $1 000 — <strong>zostanie 80%</strong></li>
+    <li>przez 180 dni zużyjecie ~$400 z $4 000 — <strong>zostanie 90%</strong></li>
+  </ul>
+  <p>Czyli z $5 000 realnie wykorzystacie około <strong>$600</strong>. To wciąż <strong>~9 miesięcy działania za darmo</strong> i wyraźnie więcej niż utracona oferta 12 miesięcy (wartość ~$230). Ale nie planujcie budżetu tak, jakby to było $5 000 do wydania.</p>
+  <p>Wniosek praktyczny: <strong>składajcie wniosek dopiero wtedy, gdy będziecie gotowi realnie postawić infrastrukturę</strong>. Zegar tyka od aktywacji, nie od pierwszego wdrożenia.</p>
+</div>
+
+<h2>3. Wymagania — wersja oficjalna</h2>
+
+<p>Microsoft podaje pięć kryteriów. Wszystkie muszą być spełnione:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Kryterium</th><th>Wymaganie</th><th>TradingCenter</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Etap</strong></td><td>od pre-seed do Series C — czyli praktycznie wszystko poza dużymi, dojrzałymi firmami</td><td><span class="pill good">spełnione</span></td></tr>
+    <tr><td><strong>Model biznesowy</strong></td><td><strong>B2B</strong> — budujecie oprogramowanie, AI albo rozwiązania technologiczne</td><td><span class="pill warn">do przemyślenia</span></td></tr>
+    <tr><td><strong>Dojrzałość produktu</strong></td><td>w drodze do MVP albo już po MVP, z celem dojścia do product-market fit</td><td><span class="pill good">spełnione</span></td></tr>
+    <tr><td><strong>Własność</strong></td><td>firma prywatna, niezależna — nie spółka zależna większej organizacji; produkt jest waszą własnością, nie licencją od kogoś</td><td><span class="pill good">spełnione</span></td></tr>
+    <tr><td><strong>Lokalizacja</strong></td><td>siedziba w regionie, w którym program działa — Polska tak</td><td><span class="pill good">spełnione</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Poza oficjalną piątką w materiałach branżowych powtarzają się jeszcze: firma młodsza niż 7 lat, przychód poniżej $10 mln rocznie i limit $350 000 darmowych kredytów Azure w całej historii. Microsoft nie potwierdza tych progów na stronach dokumentacji, ale żaden z nich i tak was nie dotyczy.</p>
+
+<h2>4. Co przygotować przed kliknięciem „Apply"</h2>
+
+<ul class="check">
+  <li><strong>Prywatne konto Microsoft (MSA)</strong> — najlepiej takie, które <em>nie miało wcześniej konta Azure</em></li>
+  <li><strong>Numer telefonu</strong> — będzie weryfikowany SMS-em</li>
+  <li><strong>Strefa czasowa</strong> — służy do przypisania regionalnego wsparcia</li>
+  <li><strong>Zarejestrowana nazwa firmy</strong> — musi zgadzać się z dokumentami rejestrowymi</li>
+  <li><strong>Branża</strong>, w której działa startup</li>
+  <li><strong>Strona internetowa</strong> — formalnie opcjonalna, praktycznie mocno pomaga</li>
+  <li><strong>Adres rejestrowy firmy</strong></li>
+  <li><strong>Karta płatnicza</strong> — obowiązkowa, także przy samych kredytach</li>
+  <li><em>Opcjonalnie:</em> 10-znakowy kod inwestora</li>
+</ul>
+
+<div class="callout bad">
+  <span class="tag">Sprostowanie mitu, który krąży po blogach</span>
+  <p>Wiele poradników twierdzi, że trzeba mieć <strong>firmowy adres e-mail</strong>, a Gmail powoduje odrzucenie. <strong>To nieprawda i jest dokładnie odwrotnie.</strong></p>
+  <p>Oficjalna dokumentacja Microsoftu mówi wprost: <em>„Use a personal consumer email address for the sign-up steps. Work, school, and company-domain email accounts aren't accepted."</em></p>
+  <p>Konta służbowe i szkolne (Entra ID) potrafią wręcz wywołać błędy przy aktywacji korzyści. <strong>Twój adres Gmail jest właściwym wyborem</strong>, nie przeszkodą.</p>
+</div>
+
+<h2>5. Wniosek krok po kroku</h2>
+
+<ol class="steps">
+  <li>
+    <b>Wejdź na stronę programu</b>
+    <p>Otwórz <a href="https://www.microsoft.com/en-us/startups">microsoft.com/startups</a> i kliknij <strong>„Get started now"</strong>.</p>
+  </li>
+  <li>
+    <b>Zaloguj się kontem Microsoft</b>
+    <p>Użyj <strong>prywatnego</strong> adresu e-mail. Jeśli nie masz konta Microsoft na tym adresie, wybierz „Create an account".</p>
+  </li>
+  <li>
+    <b>Kod inwestora — masz albo nie masz</b>
+    <p>Jeśli masz 10-znakowy kod, wpisz go i kliknij „Next". Jeśli nie — wybierz <strong>„Continue without a code"</strong>.</p>
+    <p class="dim">Bez kodu pomijasz dłuższy formularz i idziesz prosto do zakładania konta Azure.</p>
+  </li>
+  <li>
+    <b>Zweryfikuj e-mail i telefon</b>
+    <p>Kod z e-maila wygasa po <strong>10 minutach</strong>. Potem to samo SMS-em na numer telefonu.</p>
+  </li>
+  <li>
+    <b>Uzupełnij dane firmy</b>
+    <p>Zarejestrowana nazwa (zgodna z dokumentami), branża, strona www, adres rejestrowy. Kliknij „Submit".</p>
+  </li>
+  <li>
+    <b>Załóż konto Azure — 3 ekrany</b>
+    <p><strong>Profil:</strong> kraj (⚠️ <strong>nie da się go później zmienić</strong>), imię i nazwisko, e-mail, telefon, captcha.</p>
+    <p><strong>Adres:</strong> adres rozliczeniowy i zgody — w tym akceptacja Microsoft Customer Agreement.</p>
+    <p><strong>Płatność:</strong> dane karty. Karta służy do weryfikacji tożsamości i do rozliczania usług nieobjętych kredytami.</p>
+  </li>
+  <li>
+    <b>Masz $200 i możesz zaczynać</b>
+    <p>Kredyt startowy jest dostępny od razu — saldo może się aktualizować do <strong>24 godzin</strong>. Nie czekaj z budowaniem na decyzję.</p>
+  </li>
+  <li>
+    <b>Czekaj na decyzję</b>
+    <p>Microsoft rozpatruje wniosek w <strong>ciągu ~3 dni roboczych</strong> — dłużej, jeśli potrzebuje coś zweryfikować. Odpowiedź przychodzi na adres użyty przy rejestracji.</p>
+  </li>
+</ol>
+
+<h3>Oś czasu</h3>
+
+<div class="timeline">
+  <div class="tl"><span class="when">dzień 0</span><span class="what"><b>Wniosek złożony, konto Azure gotowe</b><span>$200 dostępne od ręki (saldo do 24 h)</span></span></div>
+  <div class="tl"><span class="when">~3 dni robocze</span><span class="what"><b>Decyzja</b><span>e-mail z rozstrzygnięciem; po zatwierdzeniu odblokowuje się $1 000 na 90 dni</span></span></div>
+  <div class="tl"><span class="when">po weryfikacji firmy</span><span class="what"><b>Dodatkowe $4 000 na 180 dni</b><span>wymaga potwierdzenia danych rejestrowych</span></span></div>
+  <div class="tl"><span class="when">do 90 dni</span><span class="what"><b>Termin na aktywację kredytów</b><span>liczony od akceptacji umowy programu — po tym oferta przepada i trzeba aplikować od nowa</span></span></div>
+  <div class="tl"><span class="when">do 2 lat</span><span class="what"><b>Maksymalna ważność aktywowanych kredytów</b><span>przedłużenia nie ma</span></span></div>
+</div>
+
+<h2>6. Twoja sytuacja — trzy realne przeszkody</h2>
+
+<div class="callout bad">
+  <span class="tag">Przeszkoda 1 — największa</span>
+  <p><strong>Masz już konto Azure na tym samym adresie e-mail.</strong></p>
+  <p>Dokumentacja wymienia wśród rzeczy do przygotowania: <em>„Valid personal Microsoft account <strong>with no prior Azure account</strong>"</em>, a ofertę kredytów opisuje słowami <em>„If you're <strong>new to Azure</strong>…"</em>.</p>
+  <p>Na koncie <code>maarekgrzeska@gmail.com</code> są dwie subskrypcje, w tym Pay-As-You-Go. Przy aktywacji grozi błąd <strong>„Already redeemed"</strong>, który — wprost wg FAQ — oznacza, że dane konto Microsoft już wykorzystało kredyty Azure z innego programu.</p>
+  <p><strong>Co z tym zrobić:</strong> najpierw napisz do Program Support i zapytaj wprost o swój przypadek, zanim cokolwiek założysz. Zakładanie świeżego konta Microsoft „na wszelki wypadek" ma poważny haczyk — patrz następna ramka.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Zanim założysz nowe konto Microsoft</span>
+  <p><strong>Kredytów nie da się przenieść.</strong> FAQ jest jednoznaczne: są <em>na stałe</em> przypisane do subskrypcji utworzonej przy aktywacji i nie przechodzą na inne konto Microsoft ani inną subskrypcję.</p>
+  <p>To znaczy, że konto i subskrypcja wybrane przy odbiorze kredytów <strong>stają się docelowym domem TradingCenter</strong>. Jeśli aktywujesz je na koncie „tymczasowym", będziesz musiał albo zostać na nim na stałe, albo później migrować całą infrastrukturę.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Przeszkoda 2</span>
+  <p><strong>Wniosek wymaga zarejestrowanej firmy.</strong> Formularz prosi o nazwę zgodną z dokumentami rejestrowymi i adres rejestrowy, a drugi etap kredytów ($4 000) jest wprost uzależniony od <em>weryfikacji firmy</em>.</p>
+  <p>Bez działalności gospodarczej albo spółki możesz mieć problem już przy $1 000, a przy $4 000 na pewno. JDG powinna wystarczyć — nie ma wymogu spółki kapitałowej.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Przeszkoda 3</span>
+  <p><strong>Kryterium „B2B".</strong> Oficjalne wymaganie mówi o startupach <em>B2B</em> budujących oprogramowanie, AI lub rozwiązania technologiczne. TradingCenter jest dziś narzędziem własnym, nie produktem sprzedawanym komuś.</p>
+  <p>Opisując projekt, trzymaj się tego, czym on faktycznie jest — <strong>infrastrukturą do danych rynkowych i analityki</strong>: moduły z publikowanym kontraktem, archiwum szeregów czasowych, terminal do obserwacji rynku, zaplecze pod backtesty i agentów. To jest prawdziwy opis i jednocześnie taki, który mieści się w kryterium. Nie wymyślaj klientów, których nie ma — to widać przy weryfikacji.</p>
+  <p class="dim">Osobno: część poradników wymienia kryptowaluty i hazard wśród branż odrzucanych. <strong>Nie znalazłem tego w oficjalnej dokumentacji</strong> i traktuję jako niepotwierdzone. Warto jednak wiedzieć, że taki sygnał krąży, i w polu „branża" wybrać to, czym projekt jest naprawdę — oprogramowanie i dane — a nie handel.</p>
+</div>
+
+<h2>7. Zasady, na których łatwo się potknąć</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Zasada</th><th>Szczegół</th></tr></thead>
+  <tbody>
+    <tr><td><strong>90 dni na aktywację</strong></td><td>Liczone od akceptacji umowy programu. Po tym oferta wygasa i trzeba aplikować od nowa.</td></tr>
+    <tr><td><strong>2 lata maksymalnej ważności</strong></td><td>Po aktywacji kredyty żyją do dwóch lat. <strong>Przedłużeń nie ma.</strong></td></tr>
+    <tr><td><strong>Brak transferu</strong></td><td>Kredyty są przypisane do subskrypcji utworzonej przy odbiorze. Nie przeniesiesz ich gdzie indziej.</td></tr>
+    <tr><td><strong>Karta obowiązkowa</strong></td><td>Do weryfikacji tożsamości i rozliczania usług spoza kredytów.</td></tr>
+    <tr><td><strong>Kraj nie do zmiany</strong></td><td>Regionu rozliczeniowego nie da się później zmienić — trzeba założyć nowe konto rozliczeniowe.</td></tr>
+    <tr><td><strong>Automatyczne przejście na PAYG</strong></td><td>Po wyczerpaniu lub wygaśnięciu kredytów subskrypcja sama przechodzi na płatność wg zużycia. <strong>Ustaw alerty budżetowe</strong>, żeby się nie zdziwić.</td></tr>
+    <tr><td><strong>Nie da się edytować wniosku</strong></td><td>Jeśli jest jeszcze rozpatrywany — z e-maila potwierdzającego można go usunąć i złożyć ponownie.</td></tr>
+    <tr><td><strong>Odmowa? 14 dni karencji</strong></td><td>Po odrzuceniu można aplikować ponownie po 14 dniach, adresując uwagi z uzasadnienia.</td></tr>
+    <tr><td><strong>Konto MSA, nie służbowe</strong></td><td>Korzyści aktywuj tym samym kontem Microsoft, którym rejestrowałeś się w programie. Konta Entra ID powodują błędy.</td></tr>
+    <tr><td><strong>Jedna korzyść na konto</strong></td><td>Konto, które już odebrało daną ofertę startupową, nie odbierze jej drugi raz.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>8. Co bym zrobił na twoim miejscu</h2>
+
+<ol>
+  <li><strong>Najpierw zapytaj Program Support</strong>, czy istniejące konto Azure na <code>@gmail.com</code> blokuje ofertę i jak to obejść bez zakładania nowej tożsamości. To jedno pytanie oszczędza ryzyko utknięcia z kredytami na złym koncie. Kontakt: <a href="https://aka.ms/startuphelp-mfs-portal">aka.ms/startuphelp-mfs-portal</a>.</li>
+  <li><strong>Poszukaj kodu inwestora</strong>, zanim pójdziesz ścieżką bez kodu. Kwalifikują się też uczelnie i inkubatory przyuczelniane — a różnica to $5 000 kontra $100 000.</li>
+  <li><strong>Sprawdź, czy firma jest gotowa</strong> — nazwa rejestrowa i adres muszą się zgadzać z dokumentami. Bez tego drugi etap ($4 000) odpadnie.</li>
+  <li><strong>Postaw prostą stronę projektu.</strong> Formalnie opcjonalna, realnie jeden z mocniejszych sygnałów przy ocenie.</li>
+  <li><strong>Aplikuj dopiero, gdy będziesz gotowy wdrażać.</strong> Zegar 90 dni startuje od aktywacji, a nie od pierwszego wdrożenia — złożenie wniosku „na zapas" po prostu spala kredyt.</li>
+  <li><strong>Jeśli to nie wypali — nic strasznego.</strong> Docelowa konfiguracja to $66,88 miesięcznie, a start na <code>B1ms</code> ~$19. To ~$230 rocznie. Program jest miłym przyspieszeniem, nie warunkiem powodzenia projektu.</li>
+</ol>
+
+<div class="callout">
+  <span class="tag">Powiązane dokumenty</span>
+  <ul>
+    <li><code>docs/azure-postgres-cost-research.html</code> — koszty bazy na Azure i analiza TimescaleDB</li>
+    <li><code>docs/cloud-cost-comparison.html</code> — porównanie Azure, Google i AWS dla bazy i Kubernetesa</li>
+  </ul>
+</div>
+
+<footer>
+  <p><strong>Źródła</strong></p>
+  <ol>
+    <li><a href="https://learn.microsoft.com/en-us/startups/microsoft-for-startups/application">Overview of the Microsoft for Startups application process</a> — Microsoft Learn, aktualizacja 2026-08-05. Kryteria, lista rzeczy do przygotowania, wymóg konta prywatnego, kroki wniosku, termin 3 dni roboczych, $200 kredytu startowego</li>
+    <li><a href="https://learn.microsoft.com/en-us/startups/microsoft-for-startups/mfs-faqs">Microsoft for Startups – Frequently Asked Questions</a> — Microsoft Learn, aktualizacja 2026-08-05. Oferta $1 000 / 90 dni i $4 000 / 180 dni, 90 dni na aktywację, 2 lata ważności, brak transferu, karencja 14 dni, błąd „Already redeemed"</li>
+    <li><a href="https://learn.microsoft.com/en-us/startups/microsoft-for-startups/overview">What is Microsoft for Startups?</a> — Microsoft Learn</li>
+    <li><a href="https://www.microsoft.com/en-us/startups">Microsoft for Startups</a> — strona programu, punkt wejścia do wniosku</li>
+    <li><a href="https://blogs.microsoft.com/blog/2022/03/08/microsoft-for-startups-founders-hub-now-open-to-all-no-funding-needed/">Founders Hub now open to all — no funding needed</a> — oficjalny blog Microsoftu, potwierdzenie braku wymogu inwestora</li>
+    <li><a href="https://aka.ms/startuphelp-mfs-portal">Program Support</a> — wsparcie programu</li>
+  </ol>
+</footer>
+
+</main>
