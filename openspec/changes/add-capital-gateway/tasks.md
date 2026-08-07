@@ -23,7 +23,7 @@
 
 - [x] 4.1 Nagrać fixture'y payloadów providera do `tests/fixtures/` (sesja, konta, wyszukiwanie rynków, nawigacja po katalogu, ceny, pozycje, zlecenia oczekujące, confirms)
 - [x] 4.2 Napisać `mapping.py` — czyste funkcje payload→DTO, świece czytane ze strony **bid**
-- [ ] 4.3 Napisać `adapter.py`: konta, przełączanie aktywnego konta, wyszukiwanie instrumentów, obchód katalogu z własnym ograniczeniem i flagą `truncated`, odczyt świec
+- [x] 4.3 Napisać `adapter.py`: konta, przełączanie aktywnego konta, wyszukiwanie instrumentów, obchód katalogu z własnym ograniczeniem i flagą `truncated`, odczyt świec
 - [ ] 4.4 Adapter: pozycje, składanie zleceń (MARKET → pozycja, LIMIT/STOP → zlecenie oczekujące), zamknięcie, zmiana z trójstanem na polu, lista i anulowanie zleceń oczekujących
 - [ ] 4.5 Adapter: rozliczenie `dealReference → confirms`, ograniczona liczba prób, nierozwiązana referencja zwraca `PENDING`, nigdy `FILLED`
 - [ ] 4.6 Testować mapping wyłącznie na fixture'ach; adapter na `respx`, łącznie z odrzuconą transakcją i rozliczeniem, które nigdy nie przychodzi

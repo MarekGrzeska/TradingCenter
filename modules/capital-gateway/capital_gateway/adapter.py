@@ -1,0 +1,138 @@
+"""CapitalAdapter — raw capital.com payloads in, neutral DTOs out.
+
+Owns a ``CapitalClient`` and hides every provider quirk: the session, the market
+navigation tree, and the asynchronous ``dealReference -> confirms`` settlement. Nothing
+above this layer knows what an epic is.
+"""
+
+from __future__ import annotations
+
+import asyncio
+
+import httpx
+
+from . import mapping
+from .client import CapitalClient
+from .dtos import (
+    Account,
+    Candle,
+    Capabilities,
+    Instrument,
+    InstrumentPage,
+    Resolution,
+)
+from .errors import GatewayError
+
+_TREE_CONCURRENCY = 5  # parallel marketnavigation requests, under the rate gate
+
+
+class CapitalAdapter:
+    def __init__(self, client: CapitalClient) -> None:
+        self._c = client
+
+    async def aclose(self) -> None:
+        await self._c.aclose()
+
+    @staticmethod
+    def _json_ok(resp: httpx.Response) -> dict:
+        """Parse a read, or raise on a non-2xx — so a rate-limit or error payload never
+        reaches a mapper and surfaces as a KeyError about a field nobody asked for."""
+        if not resp.is_success:
+            raise GatewayError(f"capital.com {resp.status_code}: {resp.text[:200]}")
+        return resp.json()
+
+    # --- accounts ---
+
+    async def list_accounts(self) -> list[Account]:
+        active = await self._active_account_id()
+        data = self._json_ok(await self._c.accounts())
+        return [
+            mapping.account_from_raw(a, active=a.get("accountId") == active)
+            for a in data.get("accounts", [])
+        ]
+
+    async def _active_account_id(self) -> str | None:
+        r = await self._c.session_details()
+        return r.json().get("accountId") if r.is_success else None
+
+    async def set_active_account(self, account_id: str) -> Account:
+        r = await self._c.switch_account(account_id)
+        if not r.is_success:
+            raise GatewayError(f"cannot switch to account {account_id}", status_code=400)
+        # The switch succeeded, so the target is active now; read the accounts once and
+        # mark it, rather than asking the session again for what we just set.
+        data = self._json_ok(await self._c.accounts())
+        for a in data.get("accounts", []):
+            if a.get("accountId") == account_id:
+                return mapping.account_from_raw(a, active=True)
+        raise GatewayError(f"account {account_id} not found after switch", status_code=404)
+
+    # --- market data ---
+
+    async def search_instruments(self, query: str) -> list[Instrument]:
+        data = self._json_ok(await self._c.search_markets(query))
+        return [mapping.instrument_from_market(m) for m in data.get("markets", [])]
+
+    async def list_instruments(self, max_nodes: int = 300) -> InstrumentPage:
+        """Walk the marketnavigation tree, flatten every market, dedupe by symbol.
+
+        ``max_nodes`` is a bound on how much of the tree is visited. asyncio is
+        cooperative, so the check and the increment below both run before any await —
+        the counter cannot overshoot. The returned ``truncated`` flag is what stops a
+        partial catalogue from reading as a complete one.
+        """
+        sem = asyncio.Semaphore(_TREE_CONCURRENCY)
+        markets: list[dict] = []
+        visited = 0
+        truncated = False
+
+        async def visit(node_id: str | None) -> None:
+            nonlocal visited, truncated
+            if visited >= max_nodes:
+                truncated = True
+                return
+            visited += 1
+            async with sem:
+                r = await self._c.market_navigation(node_id)
+            # A bad node is skipped rather than failing the traversal: one unreadable
+            # branch should cost that branch, not the whole catalogue.
+            if not r.is_success:
+                return
+            d = r.json()
+            markets.extend(d.get("markets") or [])
+            await asyncio.gather(*(visit(s["id"]) for s in d.get("nodes") or []))
+
+        await visit(None)
+
+        seen: set[str] = set()
+        out: list[Instrument] = []
+        for m in markets:
+            epic = m.get("epic")
+            # The same instrument hangs under several branches, so without this the
+            # catalogue reports duplicates as separate instruments.
+            if epic in seen:
+                continue
+            seen.add(epic)
+            out.append(mapping.instrument_from_market(m))
+        return InstrumentPage(
+            instruments=out, count=len(out), truncated=truncated, nodes_visited=visited
+        )
+
+    async def get_candles(self, symbol: str, resolution: Resolution, limit: int) -> list[Candle]:
+        resp = await self._c.prices(symbol, resolution.value, limit)
+        if resp.status_code == 404:
+            raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
+        data = self._json_ok(resp)
+        return [mapping.candle_from_price(p, resolution) for p in data.get("prices", [])]
+
+    # --- meta ---
+
+    def capabilities(self) -> Capabilities:
+        return Capabilities(
+            provider="capital.com",
+            environment="demo",
+            has_positions=True,
+            has_streaming=True,
+            has_working_orders=True,
+            order_types=["MARKET", "LIMIT", "STOP"],
+        )
