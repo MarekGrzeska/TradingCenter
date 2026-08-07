@@ -28,7 +28,9 @@ pnpm dev                  # http://localhost:5173
 
 The **mock** source is the default and needs nothing else running. For the **gateway**
 source, start `capital-gateway` on port 8010 first, then switch source in the top bar.
-`../../scripts/dev.ps1` starts both together.
+
+From the repo root, `./scripts/dev.ps1` starts the terminal alone and
+`./scripts/dev.ps1 -WithGateway` starts the gateway alongside it.
 
 ## Test
 

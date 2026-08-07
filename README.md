@@ -34,13 +34,16 @@ docs/       architecture and reference
 ## Local development
 
 Every module starts on its own with its own documented command. `scripts/dev.ps1` is a
-convenience wrapper for testing `capital-gateway` and `terminal` together: it starts both,
-waits for the gateway to answer, prints both addresses, and stops both on Ctrl+C. Neither
-module depends on it.
+convenience wrapper; neither module depends on it.
 
 ```powershell
-./scripts/dev.ps1
+./scripts/dev.ps1                # terminal only, on its offline mock source
+./scripts/dev.ps1 -WithGateway   # plus capital-gateway, for live demo data
 ```
+
+The terminal defaults to a mock data source, so the plain form needs no credentials and no
+network. `-WithGateway` additionally starts the gateway, waits for it to answer, and prints
+both addresses; either form stops everything it started on Ctrl+C.
 
 ## Workflow
 
