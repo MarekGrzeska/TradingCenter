@@ -69,6 +69,15 @@ _SELECT_LATEST = """
     SELECT max(period_start) FROM candles WHERE symbol = $1 AND resolution = $2
 """
 
+_SELECT_RECENT = """
+    SELECT symbol, resolution, period_start, price_side,
+           open, high, low, close, volume, source
+      FROM candles
+     WHERE symbol = $1 AND resolution = $2
+     ORDER BY period_start DESC
+     LIMIT $3
+"""
+
 _SELECT_RANGE = """
     SELECT symbol, resolution, period_start, price_side,
            open, high, low, close, volume, source
@@ -164,3 +173,30 @@ async def read_latest_period(
     of the gap, and its absence means there is no edge because there is no data.
     """
     return await conn.fetchval(_SELECT_LATEST, symbol, resolution.value)
+
+
+async def read_recent(
+    conn: asyncpg.Connection, symbol: str, resolution: Resolution, limit: int
+) -> Sequence[Candle]:
+    """The newest `limit` candles, still oldest first.
+
+    What a snapshot is made of. Ordered descending to pick the tail, then turned back
+    round, because a consumer charting this wants time increasing however few it asked
+    for.
+    """
+    rows = await conn.fetch(_SELECT_RECENT, symbol, resolution.value, limit)
+    return [
+        Candle(
+            symbol=row["symbol"],
+            resolution=Resolution(row["resolution"]),
+            period_start=row["period_start"],
+            price_side=PriceSide(row["price_side"]),
+            open=row["open"],
+            high=row["high"],
+            low=row["low"],
+            close=row["close"],
+            volume=row["volume"],
+            source=CandleSource(row["source"]),
+        )
+        for row in reversed(rows)
+    ]

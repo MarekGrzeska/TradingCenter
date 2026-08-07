@@ -19,6 +19,8 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
 - `tracking.py` — which pairs are collected, and whether collection is actually happening.
 - `ingest/` — getting candles in and keeping them coming: the live feed, backfill, and the
   budget they share.
+- `hub.py` — fan-out to subscribers, and the hold that makes a snapshot airtight.
+- `app.py` / `contract.py` — the published surface and the shapes it answers with.
 - `periods.py` — the gateway's two spellings of a period start, reduced to one instant.
 - `rollups.py` — the derived resolutions, computed from the minute series and refreshed
   only where a write touched them.
@@ -27,7 +29,7 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
 - `errors.py` — the gateway being down, refusing, or answering something unreadable, told apart.
 - `migrations/` — the schema, as the statements a deployment actually runs.
 
-Everything else is still to be built; see `openspec/changes/add-market-data/tasks.md`.
+The terminal side is what remains; see `openspec/changes/add-market-data/tasks.md`.
 
 ## Run
 
@@ -300,6 +302,65 @@ good habit into a requirement.
 
 ## Contract
 
-Not published yet. It will carry candle reads by time range, a subscription whose first
-message is a snapshot, a coverage report and management of the tracked pairs — see
-`openspec/changes/add-market-data/specs/market-data-api/spec.md`.
+HTTP, described by OpenAPI at `/docs`.
+
+| Method | Path | Returns |
+|--------|------|---------|
+| GET | `/health` | whether the database answers, and what is being collected |
+| GET | `/candles/{symbol}?resolution=&from=&to=` | the series, **plus what was never collected** |
+| GET | `/coverage/{symbol}?resolution=` | verified ranges and the end of provider history |
+| GET | `/pairs` | what is collected, with how collection is going |
+| POST | `/pairs` | start collecting a pair |
+| DELETE | `/pairs/{symbol}?resolution=` | stop collecting it; the candles stay |
+
+**A range read says what it is not saying.** `uncovered` carries the stretches of the
+requested window the archive never verified. That is not the same as periods with no candle:
+a shut market has no candle either, and only one of the two is missing data. A plain list of
+candles cannot express the difference, which is why it is a separate field rather than a gap
+a consumer is left to infer.
+
+**Every answer names the price side.** The archive holds bid, matching the gateway. A series
+quietly compared against an ask-side one is off by a spread that reads as a real move.
+
+**Refusals name themselves and carry nothing raw.** A ceiling reached is 409 with the count
+and the setting to raise; a symbol the gateway will not serve is 422; a gateway that is down
+is 504 rather than 500, because the archive is fine and retrying it as though it were at
+fault is the wrong response. Nothing surfaces a database error — those name tables and
+columns, which is more than a caller can use.
+
+### WebSocket — `/ws/candles?symbol=US100&resolution=MINUTE`
+
+Not in the OpenAPI schema: OpenAPI has no vocabulary for WebSocket payloads, so a path there
+would describe a contract it cannot state, and this section would become the second
+description rather than the only one. A test keeps the path out of the schema.
+
+The subscription is the query string and the module reads nothing back, so there is no client
+protocol to get wrong. **The first message is always a snapshot; every message after it is a
+change.**
+
+```jsonc
+// first, exactly once
+{"kind":"snapshot","symbol":"US100","resolution":"MINUTE",
+ "candles":[{"symbol":"US100","period_start":"2026-08-07T12:00:00Z","open":1.0,"high":1.2,
+             "low":0.9,"close":1.1,"volume":10.0,"price_side":"bid","source":"history",
+             "forming":false}],
+ "forming":{"...":"the period currently being built, or null"}}
+
+// then, as they happen
+{"kind":"candle","symbol":"US100","resolution":"MINUTE","candle":{"...":"...","forming":true}}
+```
+
+`forming` marks a period still moving. One message kind covers both states rather than two,
+because a consumer upserts by `period_start` and two kinds would only make it reconcile them
+itself.
+
+**There is no gap to close after connecting, and no duplicate to filter.** The snapshot is
+read while the room is held still, and the subscriber attaches before it is released — and
+the ingest write happens inside that same hold. Without the last part there is a moment where
+a candle is committed but not yet broadcast, and a subscriber attaching then gets it twice:
+once in its snapshot and once in the change that follows. That is why the terminal no longer
+needs its "on resume, close the gap" rule.
+
+Subscribing to a pair nobody chose to collect is refused **before** the handshake, so it fails
+to connect rather than handing back a socket that dies a moment later. It does not start
+collecting it either — that is the decision the ceiling exists to keep deliberate.

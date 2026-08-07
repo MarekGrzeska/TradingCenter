@@ -22,7 +22,7 @@ from ..coverage import record_coverage
 from ..errors import GatewayError
 from ..gateway import CandleUpdate, FeedFailure, FeedState, FeedStatus, subscribe
 from ..gateway import GatewayHistory as _GatewayHistory
-from ..models import Resolution
+from ..models import Candle, Resolution
 from ..periods import period_length
 from ..rollups import refresh_all
 from ..store import write_candles
@@ -71,6 +71,10 @@ class PairIngest:
     still_tracked: Callable[[], Awaitable[bool]]
     limiter: object | None = None
     on_fill: Callable[[FillOutcome], None] | None = None
+    # Where candles go instead of straight to storage. The contract layer supplies one
+    # that publishes to subscribers and stores inside the same hold, so a candle can never
+    # be both in a subscriber's snapshot and in the change that follows it.
+    sink: Callable[[Candle], Awaitable[None]] | None = None
     # Injected so the tests can supply a feed and a clock. In the process, these are the
     # real ones.
     subscribe_to: Callable = subscribe
@@ -119,8 +123,7 @@ class PairIngest:
             async for message in messages:
                 if isinstance(message, CandleUpdate):
                     self.backoff.reset()
-                    if not message.candle.forming:
-                        await self._store(message.candle)
+                    await self._deliver(message.candle)
                 elif isinstance(message, FeedStatus):
                     if message.state is FeedState.CONNECTED:
                         self.backoff.reset()
@@ -137,20 +140,42 @@ class PairIngest:
                 if not await self.still_tracked():
                     return
 
-    async def _store(self, candle) -> None:
-        """One closed candle: stored, counted as verified, and folded into the rollups."""
-        period = period_length(self.resolution)
-        async with self.pool.acquire() as conn:
-            await write_candles(conn, [candle])
-            # The period is now verified, and so is the moment it closed. Recording only
-            # the period itself would leave a hairline gap between consecutive candles
-            # that a coverage lookup would report as never collected.
-            await record_coverage(
-                conn,
-                self.symbol,
-                self.resolution,
-                candle.period_start,
-                max(candle.period_start + period, datetime.now(UTC)),
-            )
-            if self.resolution is Resolution.MINUTE:
-                await refresh_all(conn, self.symbol, candle.period_start, candle.period_start)
+    async def _deliver(self, candle) -> None:
+        """Hand a candle on, forming or not.
+
+        A forming candle goes no further than whoever is watching; only a closed one is
+        stored. When a sink is supplied it takes both, because the thing that fans out to
+        subscribers needs to see the forming ones too — and needs the store to happen
+        inside its own hold, which is why it does the storing rather than this.
+        """
+        if self.sink is not None:
+            await self.sink(candle)
+        elif not candle.forming:
+            await self.store(candle)
+
+    async def store(self, candle: Candle) -> None:
+        await store_closed_candle(self.pool, candle)
+
+
+async def store_closed_candle(pool, candle: Candle) -> None:
+    """One closed candle: stored, counted as verified, and folded into the rollups.
+
+    A module-level function rather than a method because the contract layer runs it too —
+    it has to happen inside the hold that keeps a subscriber's snapshot and the change
+    that follows it from overlapping, and that hold belongs to the hub.
+    """
+    period = period_length(candle.resolution)
+    async with pool.acquire() as conn:
+        await write_candles(conn, [candle])
+        # The period is now verified, and so is the moment it closed. Recording only the
+        # period itself would leave a hairline gap between consecutive candles that a
+        # coverage lookup would report as never collected.
+        await record_coverage(
+            conn,
+            candle.symbol,
+            candle.resolution,
+            candle.period_start,
+            max(candle.period_start + period, datetime.now(UTC)),
+        )
+        if candle.resolution is Resolution.MINUTE:
+            await refresh_all(conn, candle.symbol, candle.period_start, candle.period_start)

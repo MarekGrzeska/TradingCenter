@@ -207,3 +207,43 @@ async def earliest_reachable(
     not yet reached the end of the provider's history — not that there is no limit.
     """
     return await conn.fetchval(_SELECT_HISTORY_END, symbol, resolution.value)
+
+
+async def uncovered_within(
+    conn: asyncpg.Connection,
+    symbol: str,
+    resolution: Resolution,
+    start: datetime,
+    end: datetime,
+) -> list[tuple[datetime, datetime]]:
+    """The stretches of `[start, end]` the archive has never looked at, oldest first.
+
+    The complement of coverage, clipped to what was asked for. A consumer reading a range
+    needs this beside the candles: a series with nothing in it on Saturday and a series
+    with nothing in it because ingest was down are the same list of candles, and only one
+    of them is complete.
+
+    Empty means the whole requested range was verified — which is not the same as the
+    range being full of candles.
+    """
+    if end < start:
+        raise ValueError(
+            f"a range cannot end before it starts: {start.isoformat()} to {end.isoformat()}"
+        )
+
+    gaps: list[tuple[datetime, datetime]] = []
+    edge = start
+    for covered in await read_coverage(conn, symbol, resolution):
+        if covered.range_end < start:
+            continue
+        if covered.range_start > end:
+            break
+        if covered.range_start > edge:
+            gaps.append((edge, min(covered.range_start, end)))
+        edge = max(edge, covered.range_end)
+        if edge >= end:
+            return gaps
+
+    if edge < end:
+        gaps.append((edge, end))
+    return gaps
