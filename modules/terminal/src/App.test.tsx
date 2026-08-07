@@ -9,6 +9,9 @@ import userEvent from "@testing-library/user-event";
 vi.mock("./grid/GridView", () => ({
   GridView: () => <div>grid stub</div>,
 }));
+vi.mock("./instruments/InstrumentsView", () => ({
+  InstrumentsView: () => <div>instruments stub</div>,
+}));
 
 const { App } = await import("./App");
 const { sourceStore } = await import("./data/sourceStore");
@@ -47,9 +50,7 @@ describe("App routing (terminal-shell spec)", () => {
     await user.click(screen.getByRole("link", { name: "Instruments" }));
 
     expect(window.location.pathname).toBe("/instruments");
-    // Matches the ComingSoon placeholder's own heading, not the nav link of
-    // the same name.
-    expect(screen.getByText("Instruments", { selector: "p" })).toBeInTheDocument();
+    expect(screen.getByText("instruments stub")).toBeInTheDocument();
   });
 
   it("loading an address directly shows that tab, not the default", async () => {

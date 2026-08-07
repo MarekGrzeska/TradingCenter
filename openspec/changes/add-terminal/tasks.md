@@ -121,14 +121,17 @@
 
 ## 7. Zakładka Instruments
 
-- [ ] 7.1 Zbudować wyszukiwarkę z dławieniem 250 ms, przerywaniem poprzedniego żądania i
-      licznikiem generacji; lista pokazuje symbol, nazwę, klasę aktywów, flagę handlowalności
+- [x] 7.1 Zbudować wyszukiwarkę z dławieniem 250 ms, przerywaniem poprzedniego żądania i
+      odrzucaniem spóźnionych odpowiedzi (ta sama flaga na przebieg efektu co w wykresie, nie
+      licznik generacji); lista pokazuje symbol, nazwę, klasę aktywów, flagę handlowalności
       oraz bid i ask tam, gdzie są
-- [ ] 7.2 Rozróżnić brak wyników od błędu wyszukiwania; błąd niesie ponowienie
-- [ ] 7.3 Dodać wyliczenie katalogu z widocznym ostrzeżeniem, gdy źródło zgłasza ucięcie
-- [ ] 7.4 Wstawiać wybrany instrument do aktywnego slotu i przechodzić na zakładkę wykresów z
+- [x] 7.2 Rozróżnić brak wyników od błędu wyszukiwania; błąd niesie ponowienie. Wyszukiwanie
+      ponawia się samo po poprawieniu frazy, więc jawny przycisk został przy odczycie katalogu,
+      gdzie nie ma czego zmienić.
+- [x] 7.3 Dodać wyliczenie katalogu z widocznym ostrzeżeniem, gdy źródło zgłasza ucięcie
+- [x] 7.4 Wstawiać wybrany instrument do aktywnego slotu i przechodzić na zakładkę wykresów z
       narysowaną serią; instrument niehandlowalny pokazuje się z widoczną adnotacją
-- [ ] 7.5 Testy: dławienie nie wysyła zapytania po każdym znaku, spóźniona odpowiedź nie nadpisuje
+- [x] 7.5 Testy: dławienie nie wysyła zapytania po każdym znaku, spóźniona odpowiedź nie nadpisuje
       wyniku ostatniej frazy, wybór instrumentu trafia do właściwego slotu
 
 ## 8. Domknięcie

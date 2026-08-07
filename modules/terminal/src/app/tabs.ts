@@ -1,5 +1,6 @@
 import type { ComponentType } from "react";
 import { GridView } from "../grid/GridView";
+import { InstrumentsView } from "../instruments/InstrumentsView";
 
 /**
  * The one place tabs are declared — routing and the nav bar are both derived
@@ -31,7 +32,13 @@ export type TabDefinition = ReadyTab | ComingSoonTab;
 
 export const TABS: TabDefinition[] = [
   { id: "graph", label: "Graph", path: "graph", status: "ready", Component: GridView },
-  { id: "instruments", label: "Instruments", path: "instruments", status: "coming-soon" },
+  {
+    id: "instruments",
+    label: "Instruments",
+    path: "instruments",
+    status: "ready",
+    Component: InstrumentsView,
+  },
   { id: "positions", label: "Positions", path: "positions", status: "coming-soon" },
   { id: "orders", label: "Orders", path: "orders", status: "coming-soon" },
   { id: "account", label: "Account", path: "account", status: "coming-soon" },
