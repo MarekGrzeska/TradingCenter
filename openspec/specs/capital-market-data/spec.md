@@ -1,0 +1,97 @@
+## Purpose
+
+Podaje, czym jest instrument i co robił: znajdowanie instrumentów, którymi da się handlować, oraz
+odczyt ich historii świecowej — łącznie z historią głębszą niż zwraca jedno żądanie do providera.
+
+## Requirements
+
+### Requirement: Instrumenty są wyszukiwalne i wyliczalne
+
+Moduł MUST pozwalać znaleźć instrumenty po frazie oraz wyliczyć cały katalog. Każdy instrument
+MUST nieść symbol, nazwę, klasę aktywów i informację, czy da się nim handlować.
+
+#### Scenario: Wyszukiwanie po frazie
+
+- **WHEN** konsument wyszukuje frazę
+- **THEN** moduł zwraca pasujące instrumenty z symbolem, nazwą, klasą aktywów, flagą
+  handlowalności oraz bieżącym bid i ask tam, gdzie provider je podaje
+
+#### Scenario: Wyliczenie katalogu
+
+- **WHEN** konsument wylicza instrumenty
+- **THEN** wynik nie zawiera zduplikowanych symboli
+- **AND** stwierdza, czy obchód został ucięty własnym ograniczeniem, żeby katalog częściowy nigdy
+  nie został wzięty za kompletny
+
+#### Scenario: Gałąź katalogu jest nieczytelna
+
+- **WHEN** części katalogu nie da się odczytać
+- **THEN** ta część jest pomijana, a reszta zwracana, zamiast wywrócić cały odczyt
+
+### Requirement: Świece czyta się w zadanej rozdzielczości
+
+Moduł MUST podawać świece instrumentu w zadanej rozdzielczości, od najstarszej, bez powtórzonych
+znaczników czasu. Wspierane rozdzielczości MUST obejmować `MINUTE`, `MINUTE_5`, `MINUTE_15`,
+`MINUTE_30`, `HOUR`, `HOUR_4`, `DAY` i `WEEK`.
+
+#### Scenario: Odczyt bieżących świec
+
+- **WHEN** konsument prosi o świece instrumentu w danej rozdzielczości
+- **THEN** odpowiedź jest uporządkowana od najstarszej, nie zawiera powtórzonego znacznika czasu
+  i podaje rozdzielczość na każdej świecy
+
+#### Scenario: Nieznany symbol
+
+- **WHEN** konsument prosi o świece symbolu, którego provider nie zna
+- **THEN** moduł odpowiada błędem „nie znaleziono" nazywającym symbol
+
+### Requirement: Wszędzie ta sama strona ceny
+
+Świece MUST być budowane ze strony bid kwotowań providera, zarówno w historii, jak i w danych na
+żywo, żeby seria złożona z obu była ciągła.
+
+#### Scenario: Historia styka się z danymi na żywo
+
+- **WHEN** konsument dokleja świece odebrane na żywo do świec historycznych tego samego symbolu
+- **THEN** obie strony mają tę samą konwencję cenową i szew nie wprowadza skoku
+
+### Requirement: Historia jest stronicowana poza limit providera
+
+Provider zwraca najwyżej 1000 świec na żądanie i odrzuca okno czasowe szersze niż żądana liczba.
+Moduł MUST stronicować wstecz, żeby zaspokoić większe żądanie, a każde kolejne okno MUST być
+kotwiczone na najstarszej już pobranej świecy, a nie na zegarze — rynek, który był zamknięty,
+zwraca mniej świec, niż wynika z kalendarza.
+
+#### Scenario: Prośba o więcej świec, niż mieści jedno żądanie
+
+- **WHEN** konsument prosi o więcej świec, niż provider podaje w jednym żądaniu
+- **THEN** moduł wysyła tyle żądań, ile trzeba, i zwraca jedną serię, uporządkowaną od najstarszej
+  i wolną od powtórzonych znaczników czasu
+
+#### Scenario: Historia instrumentu się kończy
+
+- **WHEN** stronicowanie dochodzi do miejsca, w którym provider nie ma starszych danych
+- **THEN** moduł zatrzymuje się i zwraca to, co zebrał, co nie jest błędem
+- **AND** odpowiedź stwierdza, że seria jest krótsza od żądanej, bo historia się skończyła
+
+#### Scenario: Okno nie przynosi nic nowego
+
+- **WHEN** kolejne okno nie daje świecy starszej niż najstarsza już posiadana
+- **THEN** stronicowanie kończy się, zamiast powtarzać to samo okno
+
+### Requirement: Głęboki odczyt raportuje swój postęp i koszt
+
+Głęboki odczyt historii może trwać dziesiątki sekund i kosztować dziesiątki żądań do providera.
+Moduł MUST podać wraz z wynikiem, ile świec zebrał, ile żądań to kosztowało i jaki okres seria
+pokrywa.
+
+#### Scenario: Zakończenie głębokiego odczytu
+
+- **WHEN** głęboki odczyt historii się kończy
+- **THEN** odpowiedź podaje liczbę świec, liczbę wysłanych żądań do providera oraz pierwszy
+  i ostatni pokryty znacznik czasu
+
+#### Scenario: Wywołujący porzuca głęboki odczyt
+
+- **WHEN** konsument rozłącza się w trakcie głębokiego odczytu
+- **THEN** moduł przestaje wysyłać kolejne żądania do providera
