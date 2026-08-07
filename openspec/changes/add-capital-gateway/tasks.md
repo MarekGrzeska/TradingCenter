@@ -40,7 +40,7 @@
 
 - [x] 6.1 Napisać `stream/messages.py` — publikowane kształty `candle`, `quote`, `status`, `error`
 - [x] 6.2 Napisać `stream/forming.py`: kwotowania → świeca w budowie; zaokrąglanie znacznika czasu w dół do rozdzielczości wewnątrz dnia, rozciąganie ostatniej znanej świecy przy `DAY`/`WEEK`, nadpisanie złożonej świecy przez zamkniętą. Zero I/O
-- [ ] 6.3 Napisać `stream/upstream.py`: jedno wychodzące połączenie na `(epic, resolution)`, obie subskrypcje (`OHLCMarketData` + `marketData`), tokeny wstrzykiwane do każdej wiadomości, ping z zapasem wobec tolerancji providera, reconnect po zerwaniu, dopóki są subskrybenci
+- [x] 6.3 Napisać `stream/upstream.py`: jedno wychodzące połączenie na `(epic, resolution)`, obie subskrypcje (`OHLCMarketData` + `marketData`), tokeny wstrzykiwane do każdej wiadomości, ping z zapasem wobec tolerancji providera, reconnect po zerwaniu, dopóki są subskrybenci
 - [ ] 6.4 Przepuszczać wyłącznie `priceType: "bid"` ze zdarzenia zamkniętej świecy, żeby publikowana była jedna świeca na okres
 - [ ] 6.5 Napisać `stream/hub.py`: pokoje kluczowane `(epic, resolution)`, rozgłaszanie, połączenie otwierane przy pierwszym subskrybencie i zamykane po odejściu ostatniego
 - [ ] 6.6 Testować `forming.py` w izolacji: pierwsze kwotowanie otwiera, kolejne rozciągają maksimum/minimum i przesuwają zamknięcie, nowy okres otwiera nową świecę, `DAY`/`WEEK` rozciągają zamiast otwierać, zamknięta świeca zastępuje złożoną
