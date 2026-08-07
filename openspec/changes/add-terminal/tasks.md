@@ -24,16 +24,16 @@
 
 ## 2. Warstwa danych — kontrakt i normalizacja
 
-- [ ] 2.1 Opisać typy terminala: `Bar`, `Instrument`, `InstrumentPage`, `Resolution`,
+- [x] 2.1 Opisać typy terminala: `Bar`, `Instrument`, `InstrumentPage`, `Resolution`,
       `StreamEvent`; `Resolution` obejmuje `MINUTE`, `MINUTE_5`, `MINUTE_15`, `MINUTE_30`,
       `HOUR`, `HOUR_4`, `DAY`, `WEEK`
-- [ ] 2.2 Zadeklarować interfejs `MarketDataSource` w kształcie z `design.md`
-- [ ] 2.3 Napisać normalizację czasu: ISO z REST-u na sekundy od epoki, jawnie, bez polegania na
+- [x] 2.2 Zadeklarować interfejs `MarketDataSource` w kształcie z `design.md`
+- [x] 2.3 Napisać normalizację czasu: ISO z REST-u na sekundy od epoki, jawnie, bez polegania na
       strefie lokalnej; test na utrwalonej odpowiedzi z działającego gatewaya sprawdzający
       konkretną godzinę
-- [ ] 2.4 Napisać scalanie świec po znaczniku czasu — świeca z okresu znanego podmienia, z nowego
+- [x] 2.4 Napisać scalanie świec po znaczniku czasu — świeca z okresu znanego podmienia, z nowego
       dopisuje, seria nigdy nie ma dwóch świec o tym samym znaczniku; testy jednostkowe
-- [ ] 2.5 Rozstrzygnąć, czy `ts` z gatewaya niesie strefę, i zapisać wynik w `README.md` modułu —
+- [x] 2.5 Rozstrzygnąć, czy `ts` z gatewaya niesie strefę, i zapisać wynik w `README.md` modułu —
       to pierwsza rzecz do potwierdzenia przy realnym gatewayu
 
 ## 3. Warstwa danych — implementacje
