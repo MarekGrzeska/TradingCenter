@@ -1,0 +1,30 @@
+{
+  "markets": [
+    {
+      "instrumentName": "Gold",
+      "expiry": "-",
+      "epic": "GOLD",
+      "symbol": "Gold",
+      "instrumentType": "COMMODITIES",
+      "marketStatus": "TRADEABLE",
+      "lotSize": 1,
+      "bid": 4049.28,
+      "offer": 4049.58,
+      "streamingPricesAvailable": true,
+      "scalingFactor": 1
+    },
+    {
+      "instrumentName": "Silver",
+      "expiry": "-",
+      "epic": "SILVER",
+      "symbol": "Silver",
+      "instrumentType": "COMMODITIES",
+      "marketStatus": "TRADEABLE",
+      "lotSize": 1,
+      "bid": 51.12,
+      "offer": 51.18,
+      "streamingPricesAvailable": true,
+      "scalingFactor": 1
+    }
+  ]
+}

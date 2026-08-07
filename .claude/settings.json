@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "$root = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { (Get-Location).Path }; & (Join-Path $root '.claude\\hooks\\require-review.ps1')",
+            "timeout": 15,
+            "statusMessage": "Checking the change has been reviewed"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "nodes": [
+    {
+      "id": "hierarchy_v1.commodities",
+      "name": "Commodities"
+    },
+    {
+      "id": "hierarchy_v1.indices",
+      "name": "Indices"
+    }
+  ]
+}
