@@ -92,6 +92,26 @@ class Candle(BaseModel):
     resolution: Resolution
 
 
+class CandleHistory(BaseModel):
+    """A deep read, with what it cost.
+
+    The provider serves at most 1000 candles per request, so a deep read is many
+    requests and can take tens of seconds. ``requests`` makes that visible instead of
+    leaving a caller to guess why a read was slow, and ``history_ended`` distinguishes
+    "the instrument has no more data" from "we stopped early" — both of which otherwise
+    look identical: a series shorter than the one asked for.
+    """
+
+    candles: list[Candle]
+    count: int
+    requested: int
+    requests: int
+    resolution: Resolution
+    first_ts: str | None = None
+    last_ts: str | None = None
+    history_ended: bool = False
+
+
 class Account(BaseModel):
     id: str
     name: str
