@@ -119,8 +119,14 @@ async function fetchJson<T>(url: string, signal: AbortSignal): Promise<T> {
 }
 
 export function createGatewaySource(httpBase: string, wsBase: string): MarketDataSource {
-  const fetchRecent = async (symbol: string, resolution: Resolution, count: number) =>
-    history({ symbol, resolution, count }, new AbortController().signal);
+  // The hub owns the signal: it aborts a backfill still in flight when the last
+  // subscriber to the pair leaves.
+  const fetchRecent = async (
+    symbol: string,
+    resolution: Resolution,
+    count: number,
+    signal: AbortSignal,
+  ) => history({ symbol, resolution, count }, signal);
 
   const hub = new SocketHub(wsBase, fetchRecent);
 

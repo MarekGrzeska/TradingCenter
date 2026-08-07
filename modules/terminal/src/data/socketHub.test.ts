@@ -149,12 +149,83 @@ describe("SocketHub", () => {
 
     sockets[1].open();
     await vi.waitFor(() => {
-      expect(fetchRecent).toHaveBeenCalledWith("US100", "MINUTE_5", 50);
+      expect(fetchRecent).toHaveBeenCalledWith("US100", "MINUTE_5", 50, expect.any(AbortSignal));
     });
     await vi.waitFor(() => {
       const bars = events.filter((e) => e.kind === "bar").map((e) => e.bar);
       expect(bars).toEqual([bar(200, 2), bar(300, 3)]);
     });
+  });
+
+  it("asks for more bars when the first batch doesn't reach back to the drop", async () => {
+    // The last bar seen before the drop is at t=100. A full batch whose oldest
+    // bar is newer than that leaves part of the gap unfilled, so the hub asks
+    // again for twice as many — without ever computing a period length.
+    const batch = (from: number, size: number) =>
+      Array.from({ length: size }, (_, i) => bar(from + i, 1));
+    fetchRecent
+      .mockResolvedValueOnce(batch(1000, 50))
+      .mockResolvedValueOnce(batch(50, 100));
+
+    const events: StreamEvent[] = [];
+    hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    sockets[0].open();
+    sockets[0].message({ kind: "candle", time: 100, open: 1, high: 1, low: 1, close: 1 });
+    sockets[0].drop();
+    vi.advanceTimersByTime(1000);
+    sockets[1].open();
+
+    await vi.waitFor(() => {
+      expect(fetchRecent.mock.calls.map((call) => call[2])).toEqual([50, 100]);
+    });
+    await vi.waitFor(() => {
+      // Only the batch that covers the gap is broadcast — the short one that
+      // prompted the escalation never reaches the sinks.
+      const bars = events.filter((e) => e.kind === "bar").map((e) => e.bar);
+      expect(bars).toEqual([bar(100, 1, false), ...batch(50, 100)]);
+    });
+  });
+
+  it("stops escalating the backfill at a ceiling instead of asking forever", async () => {
+    // Every batch stays newer than the last bar seen, so nothing ever reaches
+    // back: the ask must still stop rather than double without end.
+    fetchRecent.mockImplementation((_s: string, _r: string, count: number) =>
+      Promise.resolve(Array.from({ length: count }, (_, i) => bar(10_000 + i, 1))),
+    );
+
+    hub.subscribe("US100", "MINUTE_5", () => {});
+    sockets[0].open();
+    sockets[0].message({ kind: "candle", time: 100, open: 1, high: 1, low: 1, close: 1 });
+    sockets[0].drop();
+    vi.advanceTimersByTime(1000);
+    sockets[1].open();
+
+    await vi.waitFor(() => {
+      expect(fetchRecent.mock.calls.map((call) => call[2])).toEqual([50, 100, 200, 400]);
+    });
+  });
+
+  it("aborts a backfill still in flight when the last subscriber leaves", async () => {
+    let capturedSignal: AbortSignal | undefined;
+    fetchRecent.mockImplementation(
+      (_s: string, _r: string, _c: number, signal: AbortSignal) =>
+        new Promise<Bar[]>(() => {
+          capturedSignal = signal; // never resolves — the request is still open
+        }),
+    );
+
+    const unsub = hub.subscribe("US100", "MINUTE_5", () => {});
+    sockets[0].open();
+    sockets[0].drop();
+    vi.advanceTimersByTime(1000);
+    sockets[1].open();
+
+    await vi.waitFor(() => {
+      expect(capturedSignal).toBeDefined();
+    });
+    expect(capturedSignal?.aborted).toBe(false);
+    unsub();
+    expect(capturedSignal?.aborted).toBe(true);
   });
 
   it("does not backfill or reconnect after the very first connect", () => {

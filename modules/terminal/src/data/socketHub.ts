@@ -16,6 +16,7 @@ export type FetchRecent = (
   symbol: string,
   resolution: Resolution,
   count: number,
+  signal: AbortSignal,
 ) => Promise<Bar[]>;
 
 type Sink = (event: StreamEvent) => void;
@@ -31,6 +32,7 @@ interface HubEntry {
   lastBarTime: number | null;
   everConnected: boolean;
   torndown: boolean;
+  backfill: AbortController | null;
 }
 
 // min(30s, 2^attempt * 500ms), with ±20% jitter so many slots reconnecting at
@@ -41,6 +43,14 @@ function backoffMs(attempt: number, random: () => number): number {
 }
 
 const REFUSAL_CLOSE_CODE = 1008; // gateway's "refused before accepting" — see its README
+
+// Backfill after a reconnect can't turn the outage's length into a bar count:
+// that would need a per-resolution period length, which `DAY` and `WEEK` don't
+// have (see types.ts). So the hub asks for a batch, checks whether it reaches
+// back past the last bar seen before the drop, and doubles the ask when it
+// doesn't — the source itself answers how many bars the gap took.
+const BACKFILL_FIRST_BATCH = 50;
+const BACKFILL_MAX_BATCH = 400;
 
 /**
  * Ref-counted per (symbol, resolution) WebSocket: the first subscriber opens
@@ -83,6 +93,7 @@ export class SocketHub {
         lastBarTime: null,
         everConnected: false,
         torndown: false,
+        backfill: null,
       };
       this.entries.set(key, entry);
       this.connect(key, entry);
@@ -121,7 +132,7 @@ export class SocketHub {
       entry.state = "connected";
       this.broadcast(entry, { kind: "status", state: "connected" });
       if (wasReconnect) {
-        this.backfillGap(entry);
+        void this.backfillGap(entry);
       }
     };
 
@@ -195,20 +206,42 @@ export class SocketHub {
     }
   }
 
-  private backfillGap(entry: HubEntry): void {
-    // A handful of periods is enough to cover any plausible outage; each bar
-    // replaces or appends via the consumer's own mergeBar, so re-sending
-    // already-known bars is harmless.
-    this.fetchRecent(entry.symbol, entry.resolution, 50)
-      .then((bars) => {
-        for (const bar of bars) {
-          this.broadcast(entry, { kind: "bar", bar });
-        }
-      })
-      .catch(() => {
-        // The live socket is already back; a failed backfill just leaves the
-        // gap for the next settled candle to close naturally.
-      });
+  private async backfillGap(entry: HubEntry): Promise<void> {
+    // The bar the stream last carried before the drop: everything after it is
+    // the gap. Snapshotted now because the live socket keeps moving it while
+    // the backfill is in flight.
+    const lastBeforeDrop = entry.lastBarTime;
+    const controller = new AbortController();
+    entry.backfill?.abort();
+    entry.backfill = controller;
+
+    try {
+      let count = BACKFILL_FIRST_BATCH;
+      let bars: Bar[] = [];
+      for (;;) {
+        bars = await this.fetchRecent(entry.symbol, entry.resolution, count, controller.signal);
+        if (entry.torndown || entry.backfill !== controller) return;
+        // Covered once the oldest bar of the batch sits at or before the last
+        // one seen. A batch shorter than asked for means the source has no
+        // more history, so asking again would return the same bars.
+        const reachesBack =
+          lastBeforeDrop === null || bars.length === 0 || bars[0].time <= lastBeforeDrop;
+        if (reachesBack || bars.length < count || count >= BACKFILL_MAX_BATCH) break;
+        count = Math.min(count * 2, BACKFILL_MAX_BATCH);
+      }
+      // Each bar replaces or appends via the consumer's own mergeBar, so
+      // re-sending already-known bars is harmless.
+      for (const bar of bars) {
+        this.broadcast(entry, { kind: "bar", bar });
+      }
+    } catch {
+      // The live socket is already back; a failed or aborted backfill just
+      // leaves the gap for the next settled candle to close naturally.
+    } finally {
+      if (entry.backfill === controller) {
+        entry.backfill = null;
+      }
+    }
   }
 
   private scheduleReconnect(key: string, entry: HubEntry): void {
@@ -226,6 +259,10 @@ export class SocketHub {
     if (entry.reconnectTimer !== null) {
       clearTimeout(entry.reconnectTimer);
     }
+    // A backfill outlives the socket it was triggered by unless it is cut off
+    // here: the last subscriber is gone, so nobody is left to receive its bars.
+    entry.backfill?.abort();
+    entry.backfill = null;
     entry.socket?.close();
     this.entries.delete(key);
   }
