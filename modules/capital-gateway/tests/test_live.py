@@ -5,14 +5,14 @@ only tests that can catch a provider changing its mind — the rest of the suite
 this module is consistent with what capital.com did in July 2026, which is not the same
 claim.
 
-Read-only. Nothing here places, amends or cancels an order: a demo account is still an
-account, and a smoke test that trades is a smoke test nobody runs.
+Read-only. Nothing here places, amends or cancels an order — that lives in
+``test_live_trading.py`` behind its own flag, so this file stays safe to run against any
+demo account at any time.
 """
 
 from __future__ import annotations
 
 import asyncio
-import os
 
 import pytest
 
@@ -27,16 +27,6 @@ from capital_gateway.stream.upstream import Upstream
 pytestmark = pytest.mark.live
 
 EPIC = "US100"  # liquid enough that quotes arrive within seconds while the market is open
-
-
-@pytest.fixture
-def settings(monkeypatch: pytest.MonkeyPatch) -> Settings:
-    # conftest strips these for the rest of the suite; here they are the point.
-    for name in ("CAPITAL_API_KEY", "CAPITAL_IDENTIFIER", "CAPITAL_PASSWORD"):
-        value = os.environ.get(name)
-        if value:
-            monkeypatch.setenv(name, value)
-    return Settings()  # type: ignore[call-arg]
 
 
 async def test_a_session_opens_and_accounts_are_readable(settings: Settings) -> None:
