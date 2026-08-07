@@ -82,15 +82,15 @@
 
 ## 10. Terminal — panel konfiguracji
 
-- [ ] 10.1 Nowa zakładka w rejestrze, z własną ścieżką
-- [ ] 10.2 Lista archiwizowanych par ze stanem zbierania i czasem najnowszej świecy
-- [ ] 10.3 Dodawanie pary: wybór instrumentu z wyszukiwarki plus rozdzielczość
-- [ ] 10.4 Pokazanie powodu, gdy archiwum odmawia dodania
-- [ ] 10.5 Wyróżnienie pary, dla której zbieranie ustało
-- [ ] 10.6 Podgląd pokrycia wybranej pary
-- [ ] 10.7 Zdejmowanie pary z potwierdzeniem i informacją, że dane zostają
-- [ ] 10.8 Odróżnienie pustej listy od nieosiągalnego archiwum
-- [ ] 10.9 Test: dodanie i zdjęcie pary odzwierciedla się na liście
+- [x] 10.1 Nowa zakładka w rejestrze, z własną ścieżką
+- [x] 10.2 Lista archiwizowanych par ze stanem zbierania i czasem najnowszej świecy
+- [x] 10.3 Dodawanie pary: wybór instrumentu z wyszukiwarki plus rozdzielczość
+- [x] 10.4 Pokazanie powodu, gdy archiwum odmawia dodania
+- [x] 10.5 Wyróżnienie pary, dla której zbieranie ustało
+- [x] 10.6 Podgląd pokrycia wybranej pary
+- [x] 10.7 Zdejmowanie pary z potwierdzeniem i informacją, że dane zostają
+- [x] 10.8 Odróżnienie pustej listy od nieosiągalnego archiwum
+- [x] 10.9 Test: dodanie i zdjęcie pary odzwierciedla się na liście
 
 ## 11. Domknięcie
 

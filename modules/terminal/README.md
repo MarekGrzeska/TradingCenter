@@ -9,6 +9,11 @@ archive, which has yesterday's as well as today's. The instrument catalogue stay
 `capital-gateway`, which owns it. Views see one `MarketDataSource` and never learn which
 call went where — the composition is `marketData.ts` and nothing else.
 
+**Nothing is archived because somebody looked at a chart.** Collecting a pair holds a
+provider connection open around the clock and the provider limits how many a session may
+hold, so what gets collected is a standing decision — made, and taken back, on the Archive
+tab.
+
 ## What
 
 - `data/` — the contract and its implementations. `types.ts` (`Bar`, `Instrument`,
@@ -24,6 +29,8 @@ call went where — the composition is `marketData.ts` and nothing else.
 - `chart/` — the reusable candlestick chart, identical standalone and in a grid slot.
 - `grid/` — six slots with fixed identities, layout presets, and persistence.
 - `instruments/` — search and catalogue, feeding instruments into the active slot.
+- `archive/` — the panel where the operator decides what `market-data` collects, and sees
+  whether collection is actually happening.
 
 ## Run
 
@@ -42,7 +49,7 @@ against it; the archive is started separately (see `modules/market-data/README.m
 ## Test
 
 ```bash
-pnpm test        # vitest — data layer, shell, chart, grid, instruments
+pnpm test        # vitest — data layer, shell, chart, grid, instruments, archive panel
 pnpm typecheck
 pnpm lint
 ```

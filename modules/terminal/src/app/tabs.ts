@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import { ArchiveView } from "../archive/ArchiveView";
 import { GridView } from "../grid/GridView";
 import { InstrumentsView } from "../instruments/InstrumentsView";
 
@@ -39,6 +40,10 @@ export const TABS: TabDefinition[] = [
     status: "ready",
     Component: InstrumentsView,
   },
+  // Adding a tab is an entry here and nothing else — which is what the registry
+  // was for. Nothing in the bar, the routing or the other tabs changed to make
+  // room for this one.
+  { id: "archive", label: "Archive", path: "archive", status: "ready", Component: ArchiveView },
   { id: "positions", label: "Positions", path: "positions", status: "coming-soon" },
   { id: "orders", label: "Orders", path: "orders", status: "coming-soon" },
   { id: "account", label: "Account", path: "account", status: "coming-soon" },
