@@ -58,9 +58,19 @@ def test_a_period_holds_the_minutes_it_should(resolution: Resolution, minutes: i
 def test_every_derivable_resolution_divides_a_day() -> None:
     # Which is what makes UTC midnight the anchor for all of them, and what makes the
     # epoch a usable origin at all.
-    from market_data.rollups import PERIOD_SECONDS
+    from market_data.periods import PERIOD_SECONDS
 
-    assert all(86_400 % seconds == 0 for seconds in PERIOD_SECONDS.values())
+    assert all(86_400 % PERIOD_SECONDS[resolution] == 0 for resolution in DERIVABLE)
+
+
+@pytest.mark.parametrize("resolution", [Resolution.MINUTE, Resolution.DAY, Resolution.WEEK])
+def test_flooring_a_resolution_with_no_clock_boundary_is_refused(
+    resolution: Resolution,
+) -> None:
+    # A length exists for DAY and WEEK because staleness and window sizing both err safely
+    # when a period is overstated. Flooring does not err safely, so it refuses.
+    with pytest.raises(ValueError, match="provider"):
+        bucket_start(MIDNIGHT, resolution)
 
 
 def test_day_and_week_are_not_derivable() -> None:

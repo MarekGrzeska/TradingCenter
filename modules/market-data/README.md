@@ -16,6 +16,7 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
 - `db.py` — the connection string, in the two shapes asyncpg and SQLAlchemy each insist on.
 - `store.py` — the only door to the candle table: closed candles in, one row per period.
 - `coverage.py` — what the archive has verified, and so which absences are answers.
+- `tracking.py` — which pairs are collected, and whether collection is actually happening.
 - `periods.py` — the gateway's two spellings of a period start, reduced to one instant.
 - `rollups.py` — the derived resolutions, computed from the minute series and refreshed
   only where a write touched them.
@@ -105,6 +106,39 @@ catch, so it runs under a transaction-scoped advisory lock on the pair.
 `earliest_reachable` is what stops backfill walking further back every night into data that
 was never there. It survives a merge, because nothing can be older than it. `None` from that
 call means *not known yet*, never *no limit*.
+
+## Tracked pairs
+
+Nothing is archived because somebody looked at a chart. Collecting a pair means holding a
+provider connection open around the clock, and the provider limits how many a session may
+hold — so spending one is a decision, not a side effect of browsing. That is also why the
+list lives in the database rather than a configuration file: a file needs access to the
+machine and a restart, and neither belongs in the loop of "archive this too". A restart
+reads the rows, and there is nothing else for them to disagree with.
+
+**Adding a pair is validated against the gateway**, which owns the instrument catalogue.
+The question asked is "can one candle be had for this symbol at this resolution" rather than
+"does this symbol appear in a search": a search matches on names and would accept an
+instrument with no series at that resolution, which is a pair that sits on the list forever
+holding a connection and archiving nothing.
+
+**The ceiling refuses loudly**, naming the count, the limit and the setting to raise. The
+alternative is accepting a pair and quietly not collecting some of them. Counting and
+inserting happen under one advisory lock, because otherwise several additions read the same
+count, all decide there is room, and the archive ends up over a limit the provider enforces.
+
+**Untracking stops collection and keeps every candle.** The row is flipped rather than
+deleted, which leaves `untracked_at` behind — the left edge of the gap that tracking the pair
+again will have to close.
+
+**Being on the list proves nothing about collection.** A subscription can die without a
+sound, and the only symptom is a series that stops growing. `collection_state` reads the age
+of the newest candle: within two periods is healthy (a candle is only written once its period
+closes, so one period of lateness is normal and a tighter threshold would call every pair
+broken every period). Beyond that it depends on whether the market is open — which the gateway
+answers, not this module. Without that answer the state is `UNKNOWN` rather than a guess:
+there is no session calendar here, and inventing one would produce a confident wrong answer
+twice a day.
 
 ## Derived resolutions
 

@@ -27,18 +27,20 @@ import asyncpg
 from pydantic import BaseModel
 
 from .models import PriceSide, Resolution
+from .periods import PERIOD_SECONDS
 
-# One period, in seconds. Only resolutions that can be floored by arithmetic appear here;
-# adding DAY would mean adding a boundary the clock does not know.
-PERIOD_SECONDS: dict[Resolution, int] = {
-    Resolution.MINUTE_5: 300,
-    Resolution.MINUTE_15: 900,
-    Resolution.MINUTE_30: 1800,
-    Resolution.HOUR: 3600,
-    Resolution.HOUR_4: 14_400,
-}
-
-DERIVABLE = tuple(PERIOD_SECONDS)
+# The resolutions whose period may be floored by arithmetic on the epoch. MINUTE is absent
+# because it is the source rather than a result; DAY and WEEK because their boundary
+# follows the venue's session, and a candle floored to UTC midnight would look right and
+# be wrong. Lengths come from `periods.PERIOD_SECONDS`, which knows all eight — this is
+# the list of the ones it is safe to divide by.
+DERIVABLE = (
+    Resolution.MINUTE_5,
+    Resolution.MINUTE_15,
+    Resolution.MINUTE_30,
+    Resolution.HOUR,
+    Resolution.HOUR_4,
+)
 
 # The epoch, and therefore UTC midnight, because every period above divides a day evenly.
 # Spelled into the SQL rather than left to `date_bin`'s default so that the anchor this
@@ -77,6 +79,14 @@ def bucket_start(moment: datetime, resolution: Resolution) -> datetime:
     candles: the values themselves are aggregated in the database, where the minute rows
     already are.
     """
+    if resolution not in DERIVABLE:
+        # `PERIOD_SECONDS` carries a length for DAY and WEEK because sizing a window and
+        # measuring staleness both err safely when a period is overstated. Flooring does
+        # not: it would put a daily candle on UTC midnight, which is not where the venue
+        # puts it.
+        raise ValueError(
+            f"{resolution.value} has no arithmetic period boundary; it comes from the provider"
+        )
     step = PERIOD_SECONDS[resolution]
     seconds = int(moment.astimezone(UTC).timestamp())
     return datetime.fromtimestamp(seconds - seconds % step, tz=UTC)
