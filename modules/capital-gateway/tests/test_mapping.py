@@ -111,9 +111,20 @@ def test_a_close_confirm_reports_the_deal_it_affected() -> None:
         assert o.id == confirm["affectedDeals"][0]["dealId"]
 
 
-def test_a_non_accepted_confirm_is_rejected() -> None:
-    o = mapping.order_from_confirm(
-        {"dealStatus": "REJECTED", "dealReference": "r1", "reason": "MARKET_CLOSED"}
-    )
+def test_a_non_accepted_confirm_is_rejected_and_says_why() -> None:
+    o = mapping.order_from_confirm(load_fixture("confirm_rejected.json"))
+
     assert o.status is OrderStatus.REJECTED
-    assert o.reason == "MARKET_CLOSED"
+    # `rejectReason`, which is what the provider actually sends. This assertion was
+    # written against an invented `reason` field and passed for it, so every real
+    # rejection reached the caller with a null cause.
+    assert o.reason == "RC_NOT_ENOUGH_MARGIN"
+
+
+def test_a_rejection_keeps_its_reference() -> None:
+    o = mapping.order_from_confirm(load_fixture("confirm_rejected.json"))
+
+    # `affectedDeals` is empty on a refusal, so the id must not be taken from it — the
+    # reference is all a caller has to correlate the attempt with the provider's record.
+    assert o.reference == "o_041f7e8f-6318-4b3b-8e65-f1a81f4a3879"
+    assert o.symbol == "US100"

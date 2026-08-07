@@ -123,6 +123,11 @@ def order_from_confirm(c: dict, accepted_status: OrderStatus = OrderStatus.FILLE
     CANCELLED for a working-order cancel, UPDATED for an amendment. Anything other than
     ACCEPTED is REJECTED — the provider states one status and the caller needs to know
     which of those five it settled into.
+
+    The cause of a refusal is ``rejectReason`` (``RC_NOT_ENOUGH_MARGIN`` and friends).
+    ``reason`` is read as a fallback only; no recorded payload carries it. Reading that
+    one alone gave every real rejection a null cause — the caller learned that the deal
+    was refused and never why.
     """
     status = accepted_status if c.get("dealStatus") == "ACCEPTED" else OrderStatus.REJECTED
     deal_id = c.get("dealId")
@@ -140,7 +145,7 @@ def order_from_confirm(c: dict, accepted_status: OrderStatus = OrderStatus.FILLE
         direction=Direction(direction) if direction else None,
         size=c.get("size"),
         level=c.get("level"),
-        reason=c.get("reason"),
+        reason=c.get("rejectReason") or c.get("reason"),
     )
 
 

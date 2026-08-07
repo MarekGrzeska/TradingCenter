@@ -1,0 +1,15 @@
+{
+  "date": "2026-08-07T14:54:02.815",
+  "status": "DELETED",
+  "rejectReason": "RC_NOT_ENOUGH_MARGIN",
+  "dealStatus": "REJECTED",
+  "epic": "US100",
+  "dealReference": "o_041f7e8f-6318-4b3b-8e65-f1a81f4a3879",
+  "dealId": "00000000-5a0e-b3df-0485-65e80055311e",
+  "affectedDeals": [],
+  "level": 0,
+  "size": 1000.0,
+  "direction": "BUY",
+  "guaranteedStop": false,
+  "trailingStop": false
+}
