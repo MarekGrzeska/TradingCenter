@@ -1,62 +1,62 @@
-## 1. Scaffold
+## 1. Szkielet
 
-- [ ] 1.1 Create `modules/capital-gateway/` with `pyproject.toml` (Python ≥3.12, `uv`, `package = false`, ruff line-length 100, pytest `asyncio_mode = "auto"` and a `live` marker)
-- [ ] 1.2 Add `.env.example` with `CAPITAL_API_KEY`, `CAPITAL_IDENTIFIER`, `CAPITAL_PASSWORD`, `CAPITAL_BASE_URL`, `CAPITAL_STREAM_URL`
-- [ ] 1.3 Write `config.py`: pydantic settings plus the demo-only guard — a non-demo base or stream URL raises before the app is built
-- [ ] 1.4 Write `errors.py` — the module's error type carrying an HTTP status
-- [ ] 1.5 Test: a live host in either URL fails startup; missing credentials fail startup naming the absent value
+- [ ] 1.1 Utworzyć `modules/capital-gateway/` z `pyproject.toml` (Python ≥3.12, `uv`, `package = false`, ruff line-length 100, pytest `asyncio_mode = "auto"` i marker `live`)
+- [ ] 1.2 Dodać `.env.example` z `CAPITAL_API_KEY`, `CAPITAL_IDENTIFIER`, `CAPITAL_PASSWORD`, `CAPITAL_BASE_URL`, `CAPITAL_STREAM_URL`
+- [ ] 1.3 Napisać `config.py`: ustawienia pydantic plus bezpiecznik demo-only — adres bazowy albo adres strumienia spoza demo podnosi wyjątek, zanim powstanie aplikacja
+- [ ] 1.4 Napisać `errors.py` — typ błędu modułu niosący status HTTP
+- [ ] 1.5 Test: host produkcyjny w którymkolwiek adresie wywala start; brak poświadczeń wywala start, nazywając brakującą wartość
 
-## 2. Contract types
+## 2. Typy kontraktu
 
-- [ ] 2.1 Write `dtos.py`: `AssetClass`, `Direction`, `Resolution`, `OrderStatus`, `OrderType`, `Instrument`, `InstrumentPage`, `Candle`, `Account`, `Position`, `Order`, `WorkingOrder`, `PlaceOrderRequest`, `UpdatePositionRequest`, `Capabilities` — carried over from `broker-gateway`, with `Capabilities` extended to state the environment and streaming
-- [ ] 2.2 Add the deep-history response type: candles plus collected count, requests issued, covered period, and whether history ended before the request was satisfied
-- [ ] 2.3 Validation: LIMIT/STOP without a level is rejected; an amendment naming neither stop is rejected
+- [ ] 2.1 Napisać `dtos.py`: `AssetClass`, `Direction`, `Resolution`, `OrderStatus`, `OrderType`, `Instrument`, `InstrumentPage`, `Candle`, `Account`, `Position`, `Order`, `WorkingOrder`, `PlaceOrderRequest`, `UpdatePositionRequest`, `Capabilities` — przeniesione z `broker-gateway`, z `Capabilities` rozszerzonym o środowisko i streaming
+- [ ] 2.2 Dodać typ odpowiedzi głębokiej historii: świece plus liczba zebranych, liczba wysłanych żądań, pokryty okres i informacja, czy historia skończyła się przed zaspokojeniem żądania
+- [ ] 2.3 Walidacja: LIMIT/STOP bez poziomu jest odrzucane; zmiana niewskazująca żadnego stopu jest odrzucana
 
-## 3. REST client and session
+## 3. Klient REST i sesja
 
-- [ ] 3.1 Write `client.py`: async httpx client, login capturing `CST` and `X-SECURITY-TOKEN`, authed request helper, one re-login and retry on 401
-- [ ] 3.2 Share one in-flight login across concurrent callers so a burst causes a single login
-- [ ] 3.3 Put every provider call behind one bounded gate that keeps the module under 10 req/s
-- [ ] 3.4 Test with `respx`: expired session re-authenticates and retries once; concurrent callers trigger exactly one login; the gate bounds request concurrency
+- [ ] 3.1 Napisać `client.py`: asynchroniczny klient httpx, logowanie przechwytujące `CST` i `X-SECURITY-TOKEN`, helper żądania uwierzytelnionego, jedno ponowne logowanie i ponowienie na 401
+- [ ] 3.2 Dzielić jedno trwające logowanie między współbieżnych wywołujących, żeby seria żądań powodowała pojedyncze logowanie
+- [ ] 3.3 Przepuścić każde wywołanie do providera przez jedną ograniczoną bramkę trzymającą moduł poniżej 10 żądań/s
+- [ ] 3.4 Test na `respx`: wygasła sesja uwierzytelnia się ponownie i ponawia raz; współbieżni wywołujący wywołują dokładnie jedno logowanie; bramka ogranicza współbieżność żądań
 
-## 4. Mapping and adapter
+## 4. Mapping i adapter
 
-- [ ] 4.1 Record provider payload fixtures under `tests/fixtures/` (session, accounts, markets search, market navigation, prices, positions, working orders, confirms)
-- [ ] 4.2 Write `mapping.py` — pure payload→DTO functions, candles read from the **bid** side
-- [ ] 4.3 Write `adapter.py`: accounts, active-account switch, instrument search, catalogue traversal with its own bound and a `truncated` flag, candle reads
-- [ ] 4.4 Adapter: positions, order placement (MARKET → position, LIMIT/STOP → working order), close, amend with per-field tri-state, working-order list and cancel
-- [ ] 4.5 Adapter: `dealReference → confirms` settlement, bounded attempts, unresolved reference returns `PENDING` and never `FILLED`
-- [ ] 4.6 Test mapping against fixtures alone; test the adapter against `respx`, including a rejected deal and a settlement that never arrives
+- [ ] 4.1 Nagrać fixture'y payloadów providera do `tests/fixtures/` (sesja, konta, wyszukiwanie rynków, nawigacja po katalogu, ceny, pozycje, zlecenia oczekujące, confirms)
+- [ ] 4.2 Napisać `mapping.py` — czyste funkcje payload→DTO, świece czytane ze strony **bid**
+- [ ] 4.3 Napisać `adapter.py`: konta, przełączanie aktywnego konta, wyszukiwanie instrumentów, obchód katalogu z własnym ograniczeniem i flagą `truncated`, odczyt świec
+- [ ] 4.4 Adapter: pozycje, składanie zleceń (MARKET → pozycja, LIMIT/STOP → zlecenie oczekujące), zamknięcie, zmiana z trójstanem na polu, lista i anulowanie zleceń oczekujących
+- [ ] 4.5 Adapter: rozliczenie `dealReference → confirms`, ograniczona liczba prób, nierozwiązana referencja zwraca `PENDING`, nigdy `FILLED`
+- [ ] 4.6 Testować mapping wyłącznie na fixture'ach; adapter na `respx`, łącznie z odrzuconą transakcją i rozliczeniem, które nigdy nie przychodzi
 
-## 5. Deep history
+## 5. Głęboka historia
 
-- [ ] 5.1 Write `history.py`: backwards paging, window width `(count − 1) × resolution`, `from`/`to` as `YYYY-MM-DDTHH:MM:SS` UTC
-- [ ] 5.2 Anchor each further window on the oldest candle collected, not on the clock
-- [ ] 5.3 Stop on `error.prices.not-found`, on a window yielding nothing older, or on the requested count; sort, dedupe by timestamp, trim to the request
-- [ ] 5.4 Stop issuing provider requests when the caller disconnects
-- [ ] 5.5 Test: a multi-page read returns one ordered series with no duplicates; a run past the bottom of history returns what it collected and says history ended; a stalled window terminates the loop
+- [ ] 5.1 Napisać `history.py`: stronicowanie wstecz, szerokość okna `(liczba − 1) × rozdzielczość`, `from`/`to` jako `YYYY-MM-DDTHH:MM:SS` UTC
+- [ ] 5.2 Kotwiczyć każde kolejne okno na najstarszej pobranej świecy, a nie na zegarze
+- [ ] 5.3 Zatrzymywać się na `error.prices.not-found`, na oknie niedającym nic starszego albo na żądanej liczbie; sortować, usuwać duplikaty po znaczniku czasu, przycinać do żądania
+- [ ] 5.4 Przestać wysyłać żądania do providera, gdy wywołujący się rozłączy
+- [ ] 5.5 Test: odczyt wielostronicowy zwraca jedną uporządkowaną serię bez duplikatów; przebieg poza dno historii zwraca to, co zebrał, i mówi, że historia się skończyła; okno bez postępu kończy pętlę
 
 ## 6. Streaming
 
-- [ ] 6.1 Write `stream/messages.py` — the published shapes for `candle`, `quote`, `status`, `error`
-- [ ] 6.2 Write `stream/forming.py`: quotes → forming candle; floor the timestamp to the resolution intraday, extend the last known candle for `DAY`/`WEEK`, and let a settled candle overwrite the assembled one. No I/O
-- [ ] 6.3 Write `stream/upstream.py`: one outbound connection per `(epic, resolution)`, both subscriptions (`OHLCMarketData` + `marketData`), tokens injected per message, ping inside the provider's tolerance, reconnect on drop while subscribers remain
-- [ ] 6.4 Keep only `priceType: "bid"` from the closed-candle event so one candle is published per period
-- [ ] 6.5 Write `stream/hub.py`: rooms keyed by `(epic, resolution)`, fan-out, connection opened on first subscriber and closed after the last one leaves
-- [ ] 6.6 Test `forming.py` in isolation: first quote opens, later quotes extend high/low and move close, a new period opens a new candle, `DAY`/`WEEK` extend instead, a settled candle replaces the assembled one
-- [ ] 6.7 Test the hub against a fake upstream: a second subscriber opens no second connection, the last leaver closes it, a drop publishes `reconnecting` and recovers
+- [ ] 6.1 Napisać `stream/messages.py` — publikowane kształty `candle`, `quote`, `status`, `error`
+- [ ] 6.2 Napisać `stream/forming.py`: kwotowania → świeca w budowie; zaokrąglanie znacznika czasu w dół do rozdzielczości wewnątrz dnia, rozciąganie ostatniej znanej świecy przy `DAY`/`WEEK`, nadpisanie złożonej świecy przez zamkniętą. Zero I/O
+- [ ] 6.3 Napisać `stream/upstream.py`: jedno wychodzące połączenie na `(epic, resolution)`, obie subskrypcje (`OHLCMarketData` + `marketData`), tokeny wstrzykiwane do każdej wiadomości, ping z zapasem wobec tolerancji providera, reconnect po zerwaniu, dopóki są subskrybenci
+- [ ] 6.4 Przepuszczać wyłącznie `priceType: "bid"` ze zdarzenia zamkniętej świecy, żeby publikowana była jedna świeca na okres
+- [ ] 6.5 Napisać `stream/hub.py`: pokoje kluczowane `(epic, resolution)`, rozgłaszanie, połączenie otwierane przy pierwszym subskrybencie i zamykane po odejściu ostatniego
+- [ ] 6.6 Testować `forming.py` w izolacji: pierwsze kwotowanie otwiera, kolejne rozciągają maksimum/minimum i przesuwają zamknięcie, nowy okres otwiera nową świecę, `DAY`/`WEEK` rozciągają zamiast otwierać, zamknięta świeca zastępuje złożoną
+- [ ] 6.7 Testować hub na sztucznym upstreamie: drugi subskrybent nie otwiera drugiego połączenia, ostatni odchodzący je zamyka, zerwanie publikuje `reconnecting` i wraca do publikowania
 
-## 7. HTTP and WebSocket surface
+## 7. Powierzchnia HTTP i WebSocket
 
-- [ ] 7.1 Write `app.py`: lifespan owning the client and hub, error handler mapping the module's error type to a status, `/capabilities` stating provider, environment `demo`, streaming and order types
-- [ ] 7.2 Routes: `/accounts`, `/accounts/active`, `/instruments`, `/instruments/search`, `/instruments/{symbol}/candles`, `/instruments/{symbol}/history`
-- [ ] 7.3 Routes: `/positions`, `/orders`, `/positions/{id}` (close, amend), `/working-orders`, `/working-orders/{id}`
-- [ ] 7.4 WebSocket `/ws/stream?symbol=&resolution=` — refuse a connection naming no symbol
-- [ ] 7.5 Test: the published OpenAPI covers every route; a stream without a symbol is refused; no response or message carries a credential or provider token
+- [ ] 7.1 Napisać `app.py`: lifespan będący właścicielem klienta i huba, handler mapujący typ błędu modułu na status, `/capabilities` podające providera, środowisko `demo`, streaming i typy zleceń
+- [ ] 7.2 Trasy: `/accounts`, `/accounts/active`, `/instruments`, `/instruments/search`, `/instruments/{symbol}/candles`, `/instruments/{symbol}/history`
+- [ ] 7.3 Trasy: `/positions`, `/orders`, `/positions/{id}` (zamknięcie, zmiana), `/working-orders`, `/working-orders/{id}`
+- [ ] 7.4 WebSocket `/ws/stream?symbol=&resolution=` — odmówić połączenia niewskazującego symbolu
+- [ ] 7.5 Test: publikowane OpenAPI pokrywa każdą trasę; strumień bez symbolu jest odrzucany; żadna odpowiedź ani wiadomość nie niesie poświadczenia ani tokenu providera
 
-## 8. Verification and documentation
+## 8. Weryfikacja i dokumentacja
 
-- [ ] 8.1 Live smoke test behind `--run-live`: a session opens, a deep read pages, the stream delivers quotes and a settled candle
-- [ ] 8.2 Run `ruff` and the full suite clean
-- [ ] 8.3 Write the module README — what, run, test, contract — on one screen, including the WebSocket message shapes
-- [ ] 8.4 Write the repository README and `docs/architecture.md` establishing the `modules/` layout
+- [ ] 8.1 Test dymny na żywo za flagą `--run-live`: sesja się otwiera, głęboki odczyt stronicuje, strumień dostarcza kwotowania i zamkniętą świecę
+- [ ] 8.2 Przepuścić `ruff` i pełny zestaw testów na czysto
+- [ ] 8.3 Napisać README modułu — co / uruchomienie / testy / kontrakt — na jeden ekran, razem z kształtami wiadomości WebSocketa
+- [ ] 8.4 Napisać README repozytorium i `docs/architecture.md` ustanawiające układ `modules/`

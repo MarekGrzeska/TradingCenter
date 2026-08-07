@@ -1,97 +1,97 @@
 ## Purpose
 
-Serves what an instrument is and what it did: finding tradeable symbols, and reading their
-candle history — including history deeper than one provider request can return.
+Podaje, czym jest instrument i co robił: znajdowanie instrumentów, którymi da się handlować, oraz
+odczyt ich historii świecowej — łącznie z historią głębszą niż zwraca jedno żądanie do providera.
 
 ## ADDED Requirements
 
-### Requirement: Instruments are searchable and enumerable
+### Requirement: Instrumenty są wyszukiwalne i wyliczalne
 
-The module SHALL let a consumer find instruments by phrase and enumerate the whole catalogue.
-Every instrument SHALL carry a symbol, a name, an asset class and whether it is tradeable.
+Moduł MUST pozwalać znaleźć instrumenty po frazie oraz wyliczyć cały katalog. Każdy instrument
+MUST nieść symbol, nazwę, klasę aktywów i informację, czy da się nim handlować.
 
-#### Scenario: Searching by phrase
+#### Scenario: Wyszukiwanie po frazie
 
-- **WHEN** a consumer searches for a phrase
-- **THEN** the module returns matching instruments with symbol, name, asset class, tradeable
-  flag, and current bid and ask where the provider supplies them
+- **WHEN** konsument wyszukuje frazę
+- **THEN** moduł zwraca pasujące instrumenty z symbolem, nazwą, klasą aktywów, flagą
+  handlowalności oraz bieżącym bid i ask tam, gdzie provider je podaje
 
-#### Scenario: Enumerating the catalogue
+#### Scenario: Wyliczenie katalogu
 
-- **WHEN** a consumer enumerates instruments
-- **THEN** the result contains no duplicate symbols
-- **AND** it states whether the traversal was cut short by its own bound, so a partial
-  catalogue is never mistaken for a complete one
+- **WHEN** konsument wylicza instrumenty
+- **THEN** wynik nie zawiera zduplikowanych symboli
+- **AND** stwierdza, czy obchód został ucięty własnym ograniczeniem, żeby katalog częściowy nigdy
+  nie został wzięty za kompletny
 
-#### Scenario: A branch of the catalogue is unreadable
+#### Scenario: Gałąź katalogu jest nieczytelna
 
-- **WHEN** part of the catalogue cannot be read
-- **THEN** that part is skipped and the rest is returned, rather than failing the whole read
+- **WHEN** części katalogu nie da się odczytać
+- **THEN** ta część jest pomijana, a reszta zwracana, zamiast wywrócić cały odczyt
 
-### Requirement: Candles are read at a stated resolution
+### Requirement: Świece czyta się w zadanej rozdzielczości
 
-The module SHALL serve candles for a symbol at a stated resolution, oldest first, with no
-duplicate timestamps. Supported resolutions SHALL be `MINUTE`, `MINUTE_5`, `MINUTE_15`,
-`MINUTE_30`, `HOUR`, `HOUR_4`, `DAY` and `WEEK`.
+Moduł MUST podawać świece instrumentu w zadanej rozdzielczości, od najstarszej, bez powtórzonych
+znaczników czasu. Wspierane rozdzielczości MUST obejmować `MINUTE`, `MINUTE_5`, `MINUTE_15`,
+`MINUTE_30`, `HOUR`, `HOUR_4`, `DAY` i `WEEK`.
 
-#### Scenario: Reading recent candles
+#### Scenario: Odczyt bieżących świec
 
-- **WHEN** a consumer asks for candles of a symbol at a resolution
-- **THEN** the response is ordered oldest first, contains no repeated timestamp, and states the
-  resolution on every candle
+- **WHEN** konsument prosi o świece instrumentu w danej rozdzielczości
+- **THEN** odpowiedź jest uporządkowana od najstarszej, nie zawiera powtórzonego znacznika czasu
+  i podaje rozdzielczość na każdej świecy
 
-#### Scenario: An unknown symbol
+#### Scenario: Nieznany symbol
 
-- **WHEN** a consumer asks for candles of a symbol the provider does not know
-- **THEN** the module answers with a not-found error naming the symbol
+- **WHEN** konsument prosi o świece symbolu, którego provider nie zna
+- **THEN** moduł odpowiada błędem „nie znaleziono" nazywającym symbol
 
-### Requirement: One price side is used everywhere
+### Requirement: Wszędzie ta sama strona ceny
 
-Candles SHALL be built from the bid side of the provider's quotes, for both history and live
-data, so that a series assembled from both is continuous.
+Świece MUST być budowane ze strony bid kwotowań providera, zarówno w historii, jak i w danych na
+żywo, żeby seria złożona z obu była ciągła.
 
-#### Scenario: History meets live data
+#### Scenario: Historia styka się z danymi na żywo
 
-- **WHEN** a consumer joins historical candles to candles received live for the same symbol
-- **THEN** the two carry the same price convention and the join introduces no step
+- **WHEN** konsument dokleja świece odebrane na żywo do świec historycznych tego samego symbolu
+- **THEN** obie strony mają tę samą konwencję cenową i szew nie wprowadza skoku
 
-### Requirement: History is paged beyond the provider's ceiling
+### Requirement: Historia jest stronicowana poza limit providera
 
-The provider returns at most 1000 candles per request and refuses a date window wider than the
-requested count. The module SHALL page backwards to satisfy a larger request, and each further
-window SHALL be anchored on the oldest candle already collected rather than on the clock — a
-market that was shut returns fewer candles than the calendar implies.
+Provider zwraca najwyżej 1000 świec na żądanie i odrzuca okno czasowe szersze niż żądana liczba.
+Moduł MUST stronicować wstecz, żeby zaspokoić większe żądanie, a każde kolejne okno MUST być
+kotwiczone na najstarszej już pobranej świecy, a nie na zegarze — rynek, który był zamknięty,
+zwraca mniej świec, niż wynika z kalendarza.
 
-#### Scenario: Asking for more candles than one request allows
+#### Scenario: Prośba o więcej świec, niż mieści jedno żądanie
 
-- **WHEN** a consumer asks for more candles than the provider serves in one request
-- **THEN** the module issues as many requests as needed and returns a single series, ordered
-  oldest first and free of duplicate timestamps
+- **WHEN** konsument prosi o więcej świec, niż provider podaje w jednym żądaniu
+- **THEN** moduł wysyła tyle żądań, ile trzeba, i zwraca jedną serię, uporządkowaną od najstarszej
+  i wolną od powtórzonych znaczników czasu
 
-#### Scenario: The instrument's history runs out
+#### Scenario: Historia instrumentu się kończy
 
-- **WHEN** paging reaches the point where the provider has no older data
-- **THEN** the module stops and returns what it collected, which is not an error
-- **AND** the response states that the series is shorter than requested because history ended
+- **WHEN** stronicowanie dochodzi do miejsca, w którym provider nie ma starszych danych
+- **THEN** moduł zatrzymuje się i zwraca to, co zebrał, co nie jest błędem
+- **AND** odpowiedź stwierdza, że seria jest krótsza od żądanej, bo historia się skończyła
 
-#### Scenario: A window returns nothing new
+#### Scenario: Okno nie przynosi nic nowego
 
-- **WHEN** a further window yields no candle older than the oldest already held
-- **THEN** paging stops rather than repeating the same window
+- **WHEN** kolejne okno nie daje świecy starszej niż najstarsza już posiadana
+- **THEN** stronicowanie kończy się, zamiast powtarzać to samo okno
 
-### Requirement: A deep read reports its progress and its cost
+### Requirement: Głęboki odczyt raportuje swój postęp i koszt
 
-A deep history read may take tens of seconds and dozens of provider requests. The module SHALL
-report, with the result, how many candles were collected, how many requests it took, and the
-period the series covers.
+Głęboki odczyt historii może trwać dziesiątki sekund i kosztować dziesiątki żądań do providera.
+Moduł MUST podać wraz z wynikiem, ile świec zebrał, ile żądań to kosztowało i jaki okres seria
+pokrywa.
 
-#### Scenario: Completing a deep read
+#### Scenario: Zakończenie głębokiego odczytu
 
-- **WHEN** a deep history read completes
-- **THEN** the response states the candle count, the number of provider requests issued, and the
-  first and last timestamps covered
+- **WHEN** głęboki odczyt historii się kończy
+- **THEN** odpowiedź podaje liczbę świec, liczbę wysłanych żądań do providera oraz pierwszy
+  i ostatni pokryty znacznik czasu
 
-#### Scenario: The caller abandons a deep read
+#### Scenario: Wywołujący porzuca głęboki odczyt
 
-- **WHEN** the consumer disconnects while a deep read is in flight
-- **THEN** the module stops issuing further provider requests
+- **WHEN** konsument rozłącza się w trakcie głębokiego odczytu
+- **THEN** moduł przestaje wysyłać kolejne żądania do providera

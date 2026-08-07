@@ -1,91 +1,89 @@
 ## Purpose
 
-Holds the module's connection to capital.com: how it authenticates, how long that
-authentication lasts, which environment it is allowed to reach, and which trading account
-subsequent calls act on.
+Trzyma połączenie modułu z capital.com: jak się uwierzytelnia, jak długo to uwierzytelnienie
+żyje, do którego środowiska wolno mu sięgać i na którym koncie handlowym działają kolejne
+wywołania.
 
 ## ADDED Requirements
 
-### Requirement: Credentials never leave the module
+### Requirement: Poświadczenia nie opuszczają modułu
 
-The module SHALL authenticate to capital.com on behalf of every caller. Provider credentials
-and session tokens SHALL NOT appear in any response, in any WebSocket message, or in any log
-line.
+Moduł MUST uwierzytelniać się w capital.com w imieniu każdego wywołującego. Poświadczenia
+providera i tokeny sesji MUST NOT pojawić się w żadnej odpowiedzi, w żadnej wiadomości
+WebSocketa ani w żadnej linii logu.
 
-#### Scenario: A caller reads data without holding a credential
+#### Scenario: Konsument czyta dane, nie mając poświadczenia
 
-- **WHEN** a consumer calls any endpoint of this module
-- **THEN** it supplies no capital.com credential
-- **AND** the response carries no API key, identifier, password, `CST` or `X-SECURITY-TOKEN`
+- **WHEN** konsument wywołuje dowolny endpoint modułu
+- **THEN** nie podaje żadnego poświadczenia capital.com
+- **AND** odpowiedź nie niesie klucza API, identyfikatora, hasła, `CST` ani `X-SECURITY-TOKEN`
 
-#### Scenario: Credentials are missing at startup
+#### Scenario: Brak poświadczeń przy starcie
 
-- **WHEN** the module starts without an API key, identifier or password configured
-- **THEN** it refuses to start and names which value is missing
+- **WHEN** moduł startuje bez skonfigurowanego klucza API, identyfikatora albo hasła
+- **THEN** odmawia startu i nazywa brakującą wartość
 
-### Requirement: Demo environment only
+### Requirement: Wyłącznie środowisko demo
 
-The module SHALL refuse to operate against any capital.com host other than the demo host. The
-check SHALL happen at startup, before any request is issued.
+Moduł MUST odmówić pracy z hostem capital.com innym niż host demo. Sprawdzenie MUST nastąpić przy
+starcie, przed wysłaniem jakiegokolwiek żądania.
 
-#### Scenario: Configured for the live host
+#### Scenario: Skonfigurowany host produkcyjny
 
-- **WHEN** the configured base URL or streaming URL is not the demo host
-- **THEN** the module refuses to start and states that only the demo environment is permitted
+- **WHEN** skonfigurowany adres bazowy albo adres strumienia nie jest hostem demo
+- **THEN** moduł odmawia startu i stwierdza, że dozwolone jest wyłącznie środowisko demo
 
-#### Scenario: Published capability states the environment
+#### Scenario: Publikowane możliwości nazywają środowisko
 
-- **WHEN** a consumer reads the module's capabilities
-- **THEN** the response names the environment as `demo`
+- **WHEN** konsument odczytuje możliwości modułu
+- **THEN** odpowiedź nazywa środowisko jako `demo`
 
-### Requirement: Sessions are renewed without the caller noticing
+### Requirement: Sesja odnawia się niezauważalnie dla wywołującego
 
-A capital.com session expires after roughly ten idle minutes. The module SHALL renew it
-transparently, and a concurrent burst of calls SHALL cause at most one login.
+Sesja capital.com wygasa po około dziesięciu minutach bezczynności. Moduł MUST odnawiać ją
+przezroczyście, a równoległa seria wywołań MUST spowodować najwyżej jedno logowanie.
 
-#### Scenario: An expired session is met mid-call
+#### Scenario: Sesja wygasła w trakcie wywołania
 
-- **WHEN** the provider rejects a request because the session expired
-- **THEN** the module logs in again and retries the request once
-- **AND** the caller receives the result of the retry, not the rejection
+- **WHEN** provider odrzuca żądanie z powodu wygasłej sesji
+- **THEN** moduł loguje się ponownie i jeden raz ponawia żądanie
+- **AND** wywołujący dostaje wynik ponowienia, a nie odmowę
 
-#### Scenario: Several calls arrive with no valid session
+#### Scenario: Kilka wywołań trafia na brak ważnej sesji
 
-- **WHEN** multiple requests need a session at the same moment
-- **THEN** exactly one login is issued and all of them proceed on it
+- **WHEN** wiele żądań potrzebuje sesji w tym samym momencie
+- **THEN** wysyłane jest dokładnie jedno logowanie i wszystkie idą dalej na nim
 
-### Requirement: Accounts are listed and one is active
+### Requirement: Konta są wyliczane, jedno jest aktywne
 
-The module SHALL publish the accounts reachable with the configured credentials, mark which one
-is active, and allow switching the active account. Trading and position reads SHALL act on the
-active account.
+Moduł MUST publikować konta osiągalne skonfigurowanymi poświadczeniami, oznaczać które jest
+aktywne i pozwalać je przełączyć. Handel oraz odczyt pozycji MUST działać na koncie aktywnym.
 
-#### Scenario: Listing accounts
+#### Scenario: Wylistowanie kont
 
-- **WHEN** a consumer lists accounts
-- **THEN** each account carries its identifier, name, currency, balance, available funds and
-  profit or loss
-- **AND** exactly one is marked active
+- **WHEN** konsument wylistowuje konta
+- **THEN** każde konto niesie identyfikator, nazwę, walutę, saldo, środki dostępne oraz wynik
+- **AND** dokładnie jedno jest oznaczone jako aktywne
 
-#### Scenario: Switching the active account
+#### Scenario: Przełączenie aktywnego konta
 
-- **WHEN** a consumer switches to a known account identifier
-- **THEN** the module returns that account marked active
-- **AND** subsequent position and order operations act on it
+- **WHEN** konsument przełącza się na znany identyfikator konta
+- **THEN** moduł zwraca to konto oznaczone jako aktywne
+- **AND** kolejne operacje na pozycjach i zleceniach działają na nim
 
-#### Scenario: Switching to an unknown account
+#### Scenario: Przełączenie na nieznane konto
 
-- **WHEN** a consumer switches to an identifier the provider does not accept
-- **THEN** the module answers with a client error naming the rejected identifier
-- **AND** the previously active account remains active
+- **WHEN** konsument przełącza się na identyfikator, którego provider nie przyjmuje
+- **THEN** moduł odpowiada błędem klienta nazywającym odrzucony identyfikator
+- **AND** dotychczas aktywne konto pozostaje aktywne
 
-### Requirement: The module publishes what it can do
+### Requirement: Moduł publikuje, co potrafi
 
-The module SHALL publish a machine-readable statement of its capabilities: the provider, the
-environment, which order types it accepts, and whether it streams.
+Moduł MUST publikować maszynowo czytelną deklarację swoich możliwości: providera, środowisko,
+przyjmowane typy zleceń oraz to, czy streamuje.
 
-#### Scenario: Reading capabilities
+#### Scenario: Odczyt możliwości
 
-- **WHEN** a consumer reads the capabilities
-- **THEN** the response states provider `capital.com`, environment `demo`, streaming available,
-  and the accepted order types
+- **WHEN** konsument odczytuje możliwości modułu
+- **THEN** odpowiedź podaje providera `capital.com`, środowisko `demo`, dostępność streamingu
+  oraz przyjmowane typy zleceń

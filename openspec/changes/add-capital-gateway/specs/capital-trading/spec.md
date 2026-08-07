@@ -1,121 +1,120 @@
 ## Purpose
 
-Everything that changes money: opening and closing positions, resting orders, attached stops,
-and turning the provider's asynchronous acknowledgement into a result a caller can act on.
+Wszystko, co rusza pieniądze: otwieranie i zamykanie pozycji, zlecenia oczekujące, dołączone
+stopy oraz zamiana asynchronicznego potwierdzenia providera w wynik, na którym wywołujący może
+polegać.
 
 ## ADDED Requirements
 
-### Requirement: Open positions are readable
+### Requirement: Otwarte pozycje są czytelne
 
-The module SHALL publish the open positions of the active account, each carrying its
-identifier, symbol, direction, size, opening level and profit or loss.
+Moduł MUST publikować otwarte pozycje aktywnego konta, każdą z identyfikatorem, symbolem,
+kierunkiem, wielkością, poziomem otwarcia i wynikiem.
 
-#### Scenario: Reading positions
+#### Scenario: Odczyt pozycji
 
-- **WHEN** a consumer reads positions
-- **THEN** each entry carries identifier, symbol, direction, size, open level and profit or loss
+- **WHEN** konsument odczytuje pozycje
+- **THEN** każdy wpis niesie identyfikator, symbol, kierunek, wielkość, poziom otwarcia i wynik
 
-#### Scenario: No positions are open
+#### Scenario: Brak otwartych pozycji
 
-- **WHEN** the active account holds no position
-- **THEN** the module returns an empty list, not an error
+- **WHEN** aktywne konto nie trzyma żadnej pozycji
+- **THEN** moduł zwraca pustą listę, a nie błąd
 
-### Requirement: Orders are placed by type
+### Requirement: Zlecenia są składane według typu
 
-The module SHALL accept `MARKET`, `LIMIT` and `STOP` orders. `LIMIT` and `STOP` SHALL require a
-target level; a request without one SHALL be rejected before it reaches the provider. An order
-MAY carry an attached stop-loss and take-profit.
+Moduł MUST przyjmować zlecenia `MARKET`, `LIMIT` i `STOP`. `LIMIT` i `STOP` MUST wymagać poziomu
+docelowego; żądanie bez niego MUST zostać odrzucone, zanim dotrze do providera. Zlecenie MAY nieść
+dołączony stop-loss i take-profit.
 
-#### Scenario: A market order
+#### Scenario: Zlecenie rynkowe
 
-- **WHEN** a consumer places a MARKET order for a tradeable symbol
-- **THEN** the module returns a settled result reporting the order as filled, with its
-  identifier and the level it filled at
+- **WHEN** konsument składa zlecenie MARKET na handlowalnym symbolu
+- **THEN** moduł zwraca rozliczony wynik raportujący zlecenie jako wykonane, z jego
+  identyfikatorem i poziomem wykonania
 
-#### Scenario: A resting order
+#### Scenario: Zlecenie oczekujące
 
-- **WHEN** a consumer places a LIMIT or STOP order with a target level
-- **THEN** the module returns a settled result reporting the order as working
-- **AND** the order appears among the working orders
+- **WHEN** konsument składa zlecenie LIMIT albo STOP z poziomem docelowym
+- **THEN** moduł zwraca rozliczony wynik raportujący zlecenie jako oczekujące
+- **AND** zlecenie pojawia się wśród zleceń oczekujących
 
-#### Scenario: A resting order without a level
+#### Scenario: Zlecenie oczekujące bez poziomu
 
-- **WHEN** a consumer places a LIMIT or STOP order with no target level
-- **THEN** the module rejects the request without contacting the provider and names the missing
-  field
+- **WHEN** konsument składa zlecenie LIMIT albo STOP bez poziomu docelowego
+- **THEN** moduł odrzuca żądanie bez kontaktu z providerem i nazywa brakujące pole
 
-#### Scenario: The provider refuses the order
+#### Scenario: Provider odmawia przyjęcia zlecenia
 
-- **WHEN** the provider rejects the order
-- **THEN** the module returns a result marked rejected, carrying the provider's stated reason
+- **WHEN** provider odrzuca zlecenie
+- **THEN** moduł zwraca wynik oznaczony jako odrzucony, niosący podany przez providera powód
 
-### Requirement: An asynchronous deal is settled before it is reported
+### Requirement: Asynchroniczna transakcja jest rozliczana przed zaraportowaniem
 
-The provider acknowledges an order with a reference and settles it separately. The module SHALL
-resolve that reference into an outcome before answering, and SHALL NOT report an unresolved
-reference as success.
+Provider potwierdza zlecenie referencją, a rozlicza je osobno. Moduł MUST rozwiązać tę referencję
+w wynik, zanim odpowie, i MUST NOT raportować nierozwiązanej referencji jako sukcesu.
 
-#### Scenario: Settlement arrives
+#### Scenario: Rozliczenie przychodzi
 
-- **WHEN** the provider settles a deal shortly after acknowledging it
-- **THEN** the module returns the settled outcome — filled, working, closed, cancelled or
-  updated as the action requires
+- **WHEN** provider rozlicza transakcję krótko po jej potwierdzeniu
+- **THEN** moduł zwraca rozliczony wynik — wykonane, oczekujące, zamknięte, anulowane albo
+  zmienione, zależnie od operacji
 
-#### Scenario: Settlement does not arrive in time
+#### Scenario: Rozliczenie nie przychodzi na czas
 
-- **WHEN** the deal is still unsettled after the module has waited its bounded number of attempts
-- **THEN** the module returns a result marked pending, carrying the reference so the caller can
-  resolve it later
-- **AND** the result is not reported as filled
+- **WHEN** transakcja pozostaje nierozliczona po wyczerpaniu ograniczonej liczby prób
+- **THEN** moduł zwraca wynik oznaczony jako oczekujący na rozliczenie, niosący referencję, żeby
+  wywołujący mógł rozwiązać ją później
+- **AND** wynik nie jest raportowany jako wykonany
 
-### Requirement: Positions are closed and amended
+### Requirement: Pozycje są zamykane i zmieniane
 
-The module SHALL close an open position by identifier, and SHALL set or remove its stop-loss and
-take-profit. Each stop SHALL be independently settable, removable, or left untouched — an
-omitted field SHALL NOT clear an existing level.
+Moduł MUST zamykać otwartą pozycję po identyfikatorze oraz ustawiać i usuwać jej stop-loss
+i take-profit. Każdy stop MUST być niezależnie ustawialny, usuwalny albo pozostawiany bez zmian —
+pominięte pole MUST NOT skasować istniejącego poziomu.
 
-#### Scenario: Closing a position
+#### Scenario: Zamknięcie pozycji
 
-- **WHEN** a consumer closes a position by identifier
-- **THEN** the module returns a settled result reporting the position as closed
+- **WHEN** konsument zamyka pozycję po identyfikatorze
+- **THEN** moduł zwraca rozliczony wynik raportujący pozycję jako zamkniętą
 
-#### Scenario: Setting one stop and leaving the other
+#### Scenario: Ustawienie jednego stopu i pozostawienie drugiego
 
-- **WHEN** a consumer sets a stop-loss and omits the take-profit
-- **THEN** the stop-loss is set and the existing take-profit is unchanged
+- **WHEN** konsument ustawia stop-loss i pomija take-profit
+- **THEN** stop-loss zostaje ustawiony, a istniejący take-profit pozostaje bez zmian
 
-#### Scenario: Removing a stop
+#### Scenario: Usunięcie stopu
 
-- **WHEN** a consumer explicitly clears the take-profit
-- **THEN** the take-profit is removed from the position
+- **WHEN** konsument jawnie kasuje take-profit
+- **THEN** take-profit zostaje usunięty z pozycji
 
-#### Scenario: An amendment naming no stop
+#### Scenario: Zmiana niewskazująca żadnego stopu
 
-- **WHEN** a consumer submits an amendment that names neither stop
-- **THEN** the module rejects it rather than issuing an empty change
+- **WHEN** konsument wysyła zmianę niewskazującą żadnego ze stopów
+- **THEN** moduł odrzuca ją, zamiast wysyłać pustą zmianę
 
-### Requirement: Working orders are listed and cancelled
+### Requirement: Zlecenia oczekujące są wyliczane i anulowane
 
-The module SHALL publish the resting orders of the active account and cancel one by identifier.
+Moduł MUST publikować zlecenia oczekujące aktywnego konta i anulować wskazane po identyfikatorze.
 
-#### Scenario: Listing working orders
+#### Scenario: Wylistowanie zleceń oczekujących
 
-- **WHEN** a consumer lists working orders
-- **THEN** each carries identifier, symbol, direction, size, order type, target level and any
-  expiry
+- **WHEN** konsument wylistowuje zlecenia oczekujące
+- **THEN** każde niesie identyfikator, symbol, kierunek, wielkość, typ zlecenia, poziom docelowy
+  i ewentualny termin ważności
 
-#### Scenario: Cancelling a working order
+#### Scenario: Anulowanie zlecenia oczekującego
 
-- **WHEN** a consumer cancels a working order by identifier
-- **THEN** the module returns a settled result reporting it as cancelled
-- **AND** it no longer appears among the working orders
+- **WHEN** konsument anuluje zlecenie oczekujące po identyfikatorze
+- **THEN** moduł zwraca rozliczony wynik raportujący je jako anulowane
+- **AND** nie pojawia się ono już wśród zleceń oczekujących
 
-### Requirement: Trading acts on the demo account only
+### Requirement: Handel dotyka wyłącznie konta demo
 
-Order placement, position closure, amendment and cancellation SHALL be reachable only while the
-module is bound to the demo environment.
+Składanie zleceń, zamykanie pozycji, zmiana i anulowanie MUST być osiągalne tylko wtedy, gdy moduł
+jest związany ze środowiskiem demo.
 
-#### Scenario: Trading is attempted outside demo
+#### Scenario: Próba handlu poza demo
 
-- **WHEN** the module is configured against any environment other than demo
-- **THEN** it does not start, so no trading operation is reachable
+- **WHEN** moduł jest skonfigurowany na środowisko inne niż demo
+- **THEN** nie startuje, więc żadna operacja handlowa nie jest osiągalna

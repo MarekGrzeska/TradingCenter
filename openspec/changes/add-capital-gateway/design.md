@@ -1,205 +1,208 @@
 ## Context
 
-See proposal.md — Why. Two spikes exist and each solved half the problem; this design folds
-them into one service.
+Patrz proposal.md — Why. Istnieją dwa spike'y i każdy rozwiązał połowę problemu; ten projekt
+składa je w jedną usługę.
 
-What the spikes established, all of it measured against a working key rather than read from
-documentation. These numbers shape the design, so they are recorded here:
+Co ustaliły spike'y — wszystko zmierzone na działającym kluczu, nie wyczytane z dokumentacji. Te
+liczby kształtują projekt, więc są tu zapisane:
 
-| Constraint | Value |
+| Ograniczenie | Wartość |
 |---|---|
-| Candles per request | 1000 (`1001` → `error.invalid.max`) |
-| Date window width | at most `(count − 1) × resolution` (a window counts both edges) |
-| `from`/`to` format | `YYYY-MM-DDTHH:MM:SS`, UTC, no zone |
-| Result direction | forward from `from`, not backwards from `to` |
-| Past the bottom of history | `error.prices.not-found` |
-| Session lifetime | ~10 idle minutes; tokens are response *headers* |
-| Streaming auth | tokens go **inside every message**, not in connection headers |
-| Stream ping | at least every 10 minutes |
-| Rate limit | 10 requests/second |
-| `ohlc.event` frequency | 0 in 60 s on US100 at `MINUTE_5` — only on close |
-| `quote` frequency | 296 in 60 s on the same instrument |
-| `ohlc.event` duplication | twice per candle: `priceType` `bid` and `ask` (~1.8 pt apart on US100) |
-| Deep read cost | `OIL_CRUDE` `MINUTE_5` × 20 000 → 30 requests, 26.2 s |
-| History depth | `DAY` reaches 1991 on US100; `MINUTE_5` about two years |
+| Świec na żądanie | 1000 (`1001` → `error.invalid.max`) |
+| Szerokość okna dat | najwyżej `(liczba − 1) × rozdzielczość` (okno liczy obie krawędzie) |
+| Format `from`/`to` | `YYYY-MM-DDTHH:MM:SS`, UTC, bez strefy |
+| Kierunek wyników | od `from` w przód, nie od `to` wstecz |
+| Poza dnem historii | `error.prices.not-found` |
+| Czas życia sesji | ~10 minut bezczynności; tokeny są *nagłówkami* odpowiedzi |
+| Uwierzytelnienie strumienia | tokeny idą **w każdej wiadomości**, nie w nagłówkach połączenia |
+| Ping strumienia | co najmniej raz na 10 minut |
+| Limit zapytań | 10 żądań/sekundę |
+| Częstość `ohlc.event` | 0 na 60 s na US100 przy `MINUTE_5` — tylko przy zamknięciu |
+| Częstość `quote` | 296 na 60 s na tym samym instrumencie |
+| Duplikacja `ohlc.event` | dwa razy na świecę: `priceType` `bid` i `ask` (~1,8 pkt różnicy na US100) |
+| Koszt głębokiego odczytu | `OIL_CRUDE` `MINUTE_5` × 20 000 → 30 żądań, 26,2 s |
+| Głębokość historii | `DAY` sięga 1991 na US100; `MINUTE_5` około dwóch lat |
 
-Two facts drive most of what follows. First, the streaming credential model rules out a plain
-reverse proxy — something must own the outbound connection and inject tokens per message.
-Second, `ohlc.event` firing zero times in a minute means a stream carrying only closed candles
-looks broken; the candle in progress has to come from somewhere else.
+Dwa fakty napędzają większość tego, co dalej. Po pierwsze, model poświadczeń streamingu wyklucza
+zwykłe reverse proxy — coś musi być właścicielem wychodzącego połączenia i wstrzykiwać tokeny do
+każdej wiadomości. Po drugie, `ohlc.event` odpalający się zero razy w ciągu minuty znaczy, że
+strumień niosący wyłącznie zamknięte świece wygląda na zepsuty; świeca w budowie musi wziąć się
+skądinąd.
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- One process, one contract, three concerns: trade, read history, stream.
-- Provider quirks confined to the adapter — a consumer never learns what `dealReference` or
-  `epic` mean.
-- The forming candle defined once, in the module, so every consumer sees the same candle.
-- Startup fails loudly on misconfiguration rather than at the first order.
+- Jeden proces, jeden kontrakt, trzy sprawy: handel, odczyt historii, strumień.
+- Dziwactwa providera zamknięte w adapterze — konsument nigdy nie dowiaduje się, czym jest
+  `dealReference` albo `epic`.
+- Świeca w budowie zdefiniowana raz, w module, żeby każdy konsument widział tę samą świecę.
+- Zła konfiguracja wywala start głośno, a nie przy pierwszym zleceniu.
 
 **Non-Goals:**
 
-- No persistence. This module is a window onto capital.com, not an archive of it. A store is
-  `market-data`'s job in the ecosystem, and duplicating it here would give one bar two origins.
-- No provider abstraction layer. One provider, one adapter.
-- No UI. A React console is a later module and consumes this one over HTTP and WebSocket.
-- No live account, at any configuration.
+- Zero składowania. Ten moduł jest oknem na capital.com, nie jego archiwum. Magazyn to w tym
+  ekosystemie robota `market-data`, a powielanie go tutaj dałoby jednej świecy dwa źródła.
+- Brak warstwy abstrakcji nad providerem. Jeden provider, jeden adapter.
+- Brak UI. Konsola w Reakcie to późniejszy moduł, konsumujący ten po HTTP i WebSockecie.
+- Brak konta live, przy jakiejkolwiek konfiguracji.
 
 ## Decisions
 
 ### Python 3.12 + FastAPI
 
-Chosen over Node/TypeScript and C#/.NET.
+Wybrane ponad Node/TypeScript i C#/.NET.
 
-The work is almost entirely I/O concurrency: dozens of sequential HTTP pages, a persistent
-outbound WebSocket, and a fan-out to subscribers. `asyncio` covers all three in one model, and
-the trading half already exists in Python — the adapter, DTOs, mapping and the `respx`-mocked
-tests move across close to unchanged. FastAPI publishes OpenAPI from the same pydantic models
-that validate input, so the contract cannot drift from the code that serves it.
+Praca to prawie wyłącznie współbieżne I/O: kilkadziesiąt sekwencyjnych stron HTTP, trwałe
+wychodzące połączenie WebSocket i rozgłaszanie do subskrybentów. `asyncio` obsługuje wszystkie
+trzy jednym modelem, a połowa handlowa już istnieje w Pythonie — adapter, DTO, mapping i testy
+mockowane przez `respx` przenoszą się prawie bez zmian. FastAPI publikuje OpenAPI z tych samych
+modeli pydantic, które walidują wejście, więc kontrakt nie może rozjechać się z kodem, który go
+obsługuje.
 
-Node was the alternative with the stronger claim on the streaming half: `server/capitalPlugin.js`
-is a working relay today. But adopting it means rewriting the trading half from nothing and
-splitting the ecosystem across two languages for one module. C# types best and is the language
-Marek knows best, but nothing in either spike would survive the port, and its real advantage —
-genuine parallelism — buys nothing for a workload that is waiting on sockets.
+Node był alternatywą z mocniejszym prawem do połowy streamingowej: `server/capitalPlugin.js` jest
+dziś działającym relayem. Ale wzięcie go oznacza przepisanie połowy handlowej od zera i rozbicie
+ekosystemu na dwa języki dla jednego modułu. C# typuje najlepiej i jest językiem, który Marek zna
+najlepiej, ale nic z obu spike'ów nie przeżyłoby portu, a jego prawdziwa przewaga — rzeczywista
+równoległość — nic nie daje przy pracy, która czeka na sockety.
 
-The GIL is not a constraint here for the same reason: no step is CPU-bound.
+GIL nie jest tu ograniczeniem z tego samego powodu: żaden krok nie jest CPU-bound.
 
-Dependencies, all of them earning a line: `fastapi`, `uvicorn[standard]`, `httpx` (async REST),
-`websockets` (outbound stream), `pydantic-settings` (config). Dev: `pytest`, `pytest-asyncio`,
-`respx` (HTTP mocking), `ruff`. Tooling is `uv`.
+Zależności, każda zasługująca na swoją linię: `fastapi`, `uvicorn[standard]`, `httpx`
+(asynchroniczny REST), `websockets` (wychodzący strumień), `pydantic-settings` (konfiguracja).
+Deweloperskie: `pytest`, `pytest-asyncio`, `respx` (mockowanie HTTP), `ruff`. Narzędzie to `uv`.
 
-### Layout
+### Układ
 
 ```
 modules/capital-gateway/
   capital_gateway/
-    app.py            FastAPI assembly, lifespan, error handling
-    config.py         settings + the demo-only guard
-    dtos.py           the contract: Instrument, Candle, Account, Position, Order, …
-    errors.py         the module's error type → HTTP status
-    client.py         thin async REST client: auth, tokens, one retry on 401
-    adapter.py        raw capital.com payloads ⇄ DTOs; the async settlement
-    mapping.py        pure functions, no I/O — testable against fixtures alone
-    history.py        backwards paging past the 1000-row ceiling
+    app.py            złożenie FastAPI, lifespan, obsługa błędów
+    config.py         ustawienia + bezpiecznik demo-only
+    dtos.py           kontrakt: Instrument, Candle, Account, Position, Order, …
+    errors.py         typ błędu modułu → status HTTP
+    client.py         cienki asynchroniczny klient REST: auth, tokeny, jeden retry na 401
+    adapter.py        surowe payloady capital.com ⇄ DTO; asynchroniczne rozliczenie
+    mapping.py        funkcje czyste, zero I/O — testowalne samymi fixture'ami
+    history.py        stronicowanie wstecz poza limit 1000 wierszy
     stream/
-      upstream.py     one outbound connection per (epic, resolution): subscribe, ping, reconnect
-      forming.py      quotes → the candle in progress. Pure, no I/O
-      hub.py          rooms, fan-out, lifecycle
-      messages.py     the published WebSocket message shapes
+      upstream.py     jedno wychodzące połączenie na (epic, resolution): subskrypcje, ping, reconnect
+      forming.py      kwotowania → świeca w budowie. Czyste, zero I/O
+      hub.py          pokoje, rozgłaszanie, cykl życia
+      messages.py     publikowane kształty wiadomości WebSocketa
   tests/
-    fixtures/         recorded provider payloads
+    fixtures/         nagrane payloady providera
   pyproject.toml
   README.md
 ```
 
-`mapping.py` and `stream/forming.py` hold no I/O deliberately: the two places where the
-provider's semantics are easiest to get wrong are the two that can be tested without a socket.
+`mapping.py` i `stream/forming.py` celowo nie mają I/O: dwa miejsca, w których najłatwiej pomylić
+się co do semantyki providera, to dwa, które da się przetestować bez socketu.
 
-### The forming candle lives server-side
+### Świeca w budowie mieszka po stronie serwera
 
-Today this logic is a React hook, so it is reachable only from a browser. Moving it into
-`stream/forming.py` means an agent, a backtest and a future console share one definition of
-"the current candle" instead of writing three.
+Dziś ta logika jest hookiem Reacta, więc jest osiągalna wyłącznie z przeglądarki. Przeniesienie
+jej do `stream/forming.py` sprawia, że agent, backtest i przyszła konsola dzielą jedną definicję
+bieżącej świecy, zamiast pisać trzy.
 
-The rule: a quote's timestamp is floored to the resolution to find its period. A quote in the
-current period extends high/low and moves close; a quote in a later period opens a new candle.
-When `ohlc.event` finally arrives, it overwrites — it saw the whole period, the module only saw
-it from the moment it connected.
+Reguła: znacznik czasu kwotowania jest zaokrąglany w dół do rozdzielczości, żeby znaleźć jego
+okres. Kwotowanie w bieżącym okresie rozciąga maksimum i minimum oraz przesuwa zamknięcie;
+kwotowanie w okresie późniejszym otwiera nową świecę. Gdy w końcu przyjdzie `ohlc.event`,
+nadpisuje — widział cały okres, a moduł widział go dopiero od chwili podłączenia.
 
-Arithmetic bucketing is correct only intraday. `DAY` and `WEEK` boundaries follow the venue's
-session, not UTC midnight, so for those resolutions quotes extend the last known candle and only
-the provider's closed candle moves the boundary. Guessing there would produce a candle that
-looks right and is wrong.
+Kubełkowanie arytmetyczne jest poprawne tylko wewnątrz dnia. Granice `DAY` i `WEEK` idą za sesją
+rynku, nie za północą UTC, więc przy tych rozdzielczościach kwotowania rozciągają ostatnią znaną
+świecę, a granicę przesuwa dopiero zamknięta świeca od providera. Zgadywanie dałoby tam świecę,
+która wygląda poprawnie i jest błędna.
 
-### The stream carries `candle` and `quote`, not the provider's shapes
+### Strumień niesie `candle` i `quote`, nie kształty providera
 
-`{kind: "candle", forming: true|false, …}` is what a chart consumes — one message kind, upsert by
-timestamp. `{kind: "quote", bid, ask, …}` stays alongside it because a spread is needed at
-execution time and cannot wait for a candle to close. `{kind: "status"}` and `{kind: "error"}`
-carry liveness.
+`{kind: "candle", forming: true|false, …}` to jest to, co konsumuje wykres — jeden rodzaj
+wiadomości, upsert po znaczniku czasu. `{kind: "quote", bid, ask, …}` zostaje obok, bo spread jest
+potrzebny przy egzekucji i nie może czekać na zamknięcie świecy. `{kind: "status"}` i
+`{kind: "error"}` niosą informację o żywotności.
 
-The provider's raw `ohlc.event` is not republished: it arrives twice per candle, once per price
-side, and passing both through is what makes a chart jump across the spread.
+Surowy `ohlc.event` providera nie jest przepuszczany dalej: przychodzi dwa razy na świecę, po
+razie na stronę ceny, a przepuszczenie obu jest dokładnie tym, co sprawia, że wykres skacze przez
+spread.
 
-### The bid side, everywhere
+### Strona bid, wszędzie
 
-REST history exposes both sides per candle edge; the stream's `classic` OHLC exposes one. Taking
-bid in both places is what makes history and live data join without a step. It is a convention,
-not a truth — recorded here because the seam is invisible until it is wrong.
+Historia REST wystawia obie strony na każdej krawędzi świecy; strumień w trybie `classic` wystawia
+jedną. Wzięcie bid w obu miejscach jest tym, co sprawia, że historia i dane na żywo łączą się bez
+skoku. To konwencja, nie prawda — zapisana tutaj, bo szew jest niewidoczny, dopóki nie jest zły.
 
-### Deep paging anchors on data, not on the clock
+### Głębokie stronicowanie kotwiczy na danych, nie na zegarze
 
-Each further window is anchored on the oldest candle actually collected. A calendar-derived
-cursor drifts across a weekend or a holiday, because the provider returns far fewer candles than
-the window implies; anchoring on data costs one extra request instead of a gap. The loop stops on
-`error.prices.not-found`, on a window that yields nothing older, or on the requested count.
+Każde kolejne okno jest kotwiczone na najstarszej faktycznie pobranej świecy. Kursor liczony
+kalendarzowo dryfuje przez weekend albo święto, bo provider zwraca wtedy grubo mniej świec, niż
+sugeruje okno; kotwiczenie na danych kosztuje jedno żądanie więcej zamiast dziury. Pętla kończy
+się na `error.prices.not-found`, na oknie niedającym nic starszego albo na żądanej liczbie.
 
-A deep read is a long HTTP request — 26 s in the worst measured case. It stays a plain request
-rather than a job with a polling endpoint: a job needs state, and this module has none. The
-response reports the request count so the cost is visible.
+Głęboki odczyt to długie żądanie HTTP — 26 s w najgorszym zmierzonym przypadku. Zostaje zwykłym
+żądaniem, a nie zadaniem z endpointem do odpytywania: zadanie potrzebuje stanu, a ten moduł stanu
+nie ma. Odpowiedź podaje liczbę żądań, więc koszt jest widoczny.
 
-### `BrokerPort` is deleted
+### `BrokerPort` znika
 
-`typing.Protocol` is structural: nothing declares that it implements the port, and only an
-annotation typed as `BrokerPort` makes a checker compare them. `broker-gateway` has no such
-annotation — `app.py` types its dependency as the concrete adapter — so the port is checked by
-nothing today. It is a comment in the shape of a type. The DTOs stay, because they *are* the
-HTTP contract. A second broker, if one ever arrives, gets its interface extracted from a working
-adapter, which is mechanical.
+`typing.Protocol` jest strukturalny: nic nie deklaruje, że implementuje port, i dopiero adnotacja
+typu `BrokerPort` każe checkerowi je porównać. `broker-gateway` takiej adnotacji nie ma — `app.py`
+typuje swoją zależność jako konkretny adapter — więc port jest dziś sprawdzany przez nic. Jest
+komentarzem w kształcie typu. DTO zostają, bo one *są* kontraktem HTTP. Drugi broker, jeśli
+kiedykolwiek się pojawi, dostanie interfejs wyciągnięty z działającego adaptera, co jest robotą
+mechaniczną.
 
-*(In C# terms: an `interface` is nominal and the compiler enforces it; a `Protocol` is
-structural and enforces nothing unless a type checker is pointed at a matching annotation.)*
+*(W kategoriach C#: `interface` jest nominalny i kompilator go wymusza; `Protocol` jest
+strukturalny i nie wymusza niczego, dopóki nie skieruje się na pasującą adnotację type checkera.)*
 
-### Demo-only is a startup check
+### Demo-only jest sprawdzane przy starcie
 
-`config.py` rejects any base or streaming URL that is not the demo host, before the app object
-exists. A runtime guard on trading endpoints would leave a live session authenticated and
-readable; refusing to start leaves nothing running to misuse.
+`config.py` odrzuca każdy adres bazowy i adres strumienia, który nie jest hostem demo, zanim
+powstanie obiekt aplikacji. Bezpiecznik działający dopiero na endpointach handlowych zostawiłby
+uwierzytelnioną i czytelną sesję live; odmowa startu nie zostawia niczego, czego dałoby się użyć.
 
 ## Risks / Trade-offs
 
-**A deep read can outlive a client's timeout (26 s measured, worse instruments possible)** →
-the response states its request count and coverage; a consumer that needs more depth asks for a
-narrower range. If this becomes routine, the answer is a job with a polling endpoint, and that is
-a later change.
+**Głęboki odczyt może przeżyć timeout klienta (zmierzone 26 s, możliwe gorsze instrumenty)** →
+odpowiedź podaje liczbę żądań i pokrycie; konsument potrzebujący większej głębokości pyta
+o węższy zakres. Jeśli stanie się to normą, odpowiedzią jest zadanie z endpointem do odpytywania,
+a to osobna zmiana.
 
-**Concurrent deep reads can exhaust the 10 req/s budget** → provider calls pass through one
-bounded gate, so a second deep read queues instead of triggering a rate-limit refusal that would
-look like a data error.
+**Równoległe głębokie odczyty mogą wyczerpać budżet 10 żądań/s** → wywołania do providera idą
+przez jedną ograniczoną bramkę, więc drugi głęboki odczyt czeka w kolejce, zamiast wywołać odmowę
+z limitu, która wyglądałaby jak błąd danych.
 
-**A forming candle after a restart understates its range** → it is marked `forming: true` and the
-spec says so plainly. An indicator computed on it repaints; it is for looking at, not for
-backtesting.
+**Świeca w budowie po restarcie zaniża swój zakres** → jest oznaczona `forming: true` i spec mówi
+to wprost. Wskaźnik policzony na niej przemalowuje się; jest do patrzenia, nie do backtestu.
 
-**No persistence means no history beyond what the provider keeps** → `MINUTE_5` is about two
-years and nothing recovers what is past it. Accepted: archiving is a different module's job.
+**Brak składowania znaczy brak historii poza tym, co trzyma provider** → `MINUTE_5` to około dwóch
+lat i nic nie odzyska tego, co jest dalej. Przyjęte: archiwizacja to robota innego modułu.
 
-**Session renewal under concurrency could stampede** → one in-flight login is shared by every
-waiting caller, and a 401 triggers exactly one re-login and one retry.
+**Odnawianie sesji przy współbieżności mogłoby wywołać stampede** → jedno trwające logowanie jest
+dzielone przez wszystkich czekających, a 401 wywołuje dokładnie jedno ponowne logowanie i jedno
+ponowienie.
 
-**The upstream connection can drop silently** → the module pings well inside the provider's
-tolerance, publishes `status: reconnecting` on a drop, and reconnects while subscribers remain.
+**Połączenie z providerem może paść po cichu** → moduł pinguje z dużym zapasem wobec tolerancji
+providera, publikuje `status: reconnecting` przy zerwaniu i wznawia, dopóki są subskrybenci.
 
-**Trading against a demo account proves less than it appears to** → fills are simulated, and
-demo liquidity is not real liquidity. The module's correctness claim is about the contract, not
-about execution quality.
+**Handel na koncie demo dowodzi mniej, niż się wydaje** → wykonania są symulowane, a płynność demo
+nie jest prawdziwą płynnością. Moduł twierdzi coś o poprawności kontraktu, nie o jakości
+egzekucji.
 
 ## Migration Plan
 
-Nothing to migrate: TradingCenter is empty and this change establishes its layout. TradingHub
-keeps running untouched; `broker-gateway` there is superseded but retiring it is a separate
-decision.
+Nie ma czego migrować: TradingCenter jest pusty, a ta zmiana ustanawia jego układ. TradingHub
+działa nietknięty; tamtejszy `broker-gateway` jest zastąpiony, ale jego wygaszenie to osobna
+decyzja.
 
-Rollback is deleting the module directory — the standing property that the ecosystem's module
-rules exist to preserve.
+Wycofanie to skasowanie katalogu modułu — trwała własność, dla której zachowania istnieją reguły
+modułów w tym ekosystemie.
 
 ## Open Questions
 
-- Whether the WebSocket message shapes are published as a JSON Schema file in the repository or
-  only documented in the README. Affects a consumer's ability to generate types, not the
-  behaviour, so it can be decided when the first consumer exists.
-- What the repository's own constitution says — the file that would state conventions,
-  principles and the module contract for TradingCenter is not written yet, and was deliberately
-  deferred rather than copied from TradingHub.
+- Czy kształty wiadomości WebSocketa są publikowane jako plik JSON Schema w repozytorium, czy
+  tylko udokumentowane w README. Dotyczy możliwości wygenerowania typów po stronie konsumenta,
+  nie zachowania, więc może poczekać do pojawienia się pierwszego konsumenta.
+- Co mówi konstytucja samego repozytorium — plik, który określałby konwencje, zasady i kontrakt
+  modułów dla TradingCenter, nie jest jeszcze napisany i został świadomie odłożony, a nie
+  skopiowany z TradingHub.

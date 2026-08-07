@@ -1,13 +1,33 @@
 schema: spec-driven
 
-# Project context (optional)
-# This is shown to AI when creating artifacts.
-# Add your tech stack, conventions, style guides, domain knowledge, etc.
-# Example:
-#   context: |
-#     Tech stack: TypeScript, React, Node.js
-#     We use conventional commits
-#     Domain: e-commerce platform
+context: |
+  Language: OpenSpec artifacts in this project are written in POLISH prose.
+  Everything else — code, comments, identifiers, commit messages, module READMEs —
+  stays English.
+
+  Structure stays English, because the CLI parses it. Never translate:
+    - section headers from the artifact template: ## Why, ## What Changes,
+      ## Capabilities, ### New Capabilities, ### Modified Capabilities, ## Impact,
+      ## Purpose, ## Context, ## Goals / Non-Goals, ## Decisions,
+      ## Risks / Trade-offs, ## Migration Plan, ## Open Questions
+    - delta operations: ## ADDED / MODIFIED / REMOVED / RENAMED Requirements
+    - ### Requirement: and #### Scenario: prefixes (the name after the colon is Polish)
+    - the scenario keywords **WHEN** / **THEN** / **AND**
+    - task checkboxes: - [ ] X.Y
+    - **Reason** / **Migration** labels in REMOVED requirements
+
+  RFC 2119 keywords stay English inside Polish sentences — MUST, MUST NOT, SHALL,
+  SHOULD, MAY — the way "working order" or "forming candle" stays English. They are
+  terms of art, and `openspec validate --strict` fails a requirement whose text
+  carries no literal SHALL or MUST. Polish "MUSI" does not satisfy it.
+  Example: "Moduł MUST odmówić pracy z hostem innym niż demo."
+
+  Validate with: openspec validate <change> --strict
+
+  Tech stack: Python 3.12 (uv, ruff, pytest) for services; React + TypeScript
+  (Vite, pnpm) for frontends. Monorepo: modules/ + openspec/ + docs/. Every module
+  runs standalone and communicates only through a published contract (HTTP/OpenAPI,
+  CLI, or typed events) — no cross-module imports.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.

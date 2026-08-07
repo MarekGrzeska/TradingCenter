@@ -1,65 +1,64 @@
 ## Why
 
-Two throwaway spikes proved the two halves of capital.com separately and neither can be
-used by anything else. `TradingHub/modules/broker-gateway` (Python/FastAPI) trades but
-declares `has_streaming: false` and fetches at most 1000 candles. `TwelveDataTest`
-(Vite dev-server plugin) streams live candles and pages history 20 000 bars deep, but its
-knowledge lives in a React hook and a Vite plugin — reachable only from a browser tab, and
-only while the dev server runs.
+Dwa spike'y udowodniły po jednej połowie capital.com i żadnej z nich nie da się użyć z zewnątrz.
+`TradingHub/modules/broker-gateway` (Python/FastAPI) handluje, ale deklaruje
+`has_streaming: false` i pobiera najwyżej 1000 świec. `TwelveDataTest` (plugin dev-serwera Vite)
+streamuje świece na żywo i schodzi 20 000 świec wstecz, ale jego wiedza siedzi w hooku Reacta
+i w pluginie Vite — dostępna wyłącznie z karty przeglądarki i tylko dopóki działa dev-serwer.
 
-TradingCenter is the successor ecosystem to TradingHub. Its first module folds both spikes
-into one standalone service so that trading, deep history and a live feed come from a single
-contract that an agent, a backtest or a future React console can all consume.
+TradingCenter jest następcą ekosystemu TradingHub. Jego pierwszy moduł składa oba spike'y w jedną
+usługę, żeby handel, głęboka historia i strumień na żywo pochodziły z jednego kontraktu, który
+zje agent, backtest i przyszła konsola w Reakcie.
 
 ## What Changes
 
-- New module `modules/capital-gateway` — FastAPI service, the only place that knows
-  capital.com exists.
-- **Trading**, carried over from `broker-gateway`: accounts, active-account switch,
-  positions, MARKET/LIMIT/STOP orders, attached SL/TP, position amendment, working orders,
-  and the async `dealReference → confirms` settlement.
-- **Deep history**, carried over from the `TwelveDataTest` spike: candles paged backwards
-  past the provider's 1000-row ceiling, anchored on the oldest bar already collected rather
-  than on the clock.
-- **Live streaming**, new as a published contract: an outbound WebSocket for consumers
-  carrying `candle` (forming and settled) and `quote`. One upstream connection per
-  `(epic, resolution)` is shared by every subscriber.
-- **The forming candle is assembled server-side**, not by the consumer. Bucketing quotes into
-  the candle in progress moves out of the React hook it lives in today, so every consumer sees
-  one definition of "the current candle".
-- **Demo only.** A base URL that is not the demo host is refused at startup. This module
-  cannot place an order with real money.
-- **`BrokerPort` is deleted, neutral DTOs are kept.** The DTOs are the HTTP contract. The
-  Protocol is referenced by nothing executable in `broker-gateway` today — `app.py` types its
-  dependency as the concrete adapter — so it enforces nothing it appears to enforce.
-- **No storage.** History is paged from the provider per request; nothing is persisted.
+- Nowy moduł `modules/capital-gateway` — usługa FastAPI, jedyne miejsce wiedzące o istnieniu
+  capital.com.
+- **Handel**, przeniesiony z `broker-gateway`: konta, przełączanie aktywnego konta, pozycje,
+  zlecenia MARKET/LIMIT/STOP, dołączone SL/TP, zmiana pozycji, zlecenia oczekujące oraz
+  asynchroniczne rozliczenie `dealReference → confirms`.
+- **Głęboka historia**, przeniesiona ze spike'u `TwelveDataTest`: świece stronicowane wstecz poza
+  limit 1000 wierszy, kotwiczone na najstarszej już pobranej świecy, a nie na zegarze.
+- **Strumień na żywo**, nowy jako publikowany kontrakt: wychodzący WebSocket dla konsumentów
+  niosący `candle` (w budowie i zamkniętą) oraz `quote`. Jedno połączenie z providerem na parę
+  `(epic, resolution)` dzielone przez wszystkich subskrybentów.
+- **Świeca w budowie składana po stronie serwera**, nie u konsumenta. Kubełkowanie kwotowań
+  wychodzi z hooka Reacta, w którym siedzi dziś, więc każdy konsument widzi jedną definicję
+  bieżącej świecy.
+- **Wyłącznie demo.** Adres bazowy inny niż host demo jest odrzucany przy starcie. Ten moduł nie
+  jest w stanie złożyć zlecenia za prawdziwe pieniądze.
+- **`BrokerPort` znika, neutralne DTO zostają.** DTO są kontraktem HTTP. Protokół nie jest dziś
+  w `broker-gateway` referencjonowany przez nic wykonywalnego — `app.py` typuje swoją zależność
+  jako konkretny adapter — więc nie wymusza niczego, co pozornie wymusza.
+- **Zero składowania.** Historia jest stronicowana od providera na żądanie; nic nie jest
+  zapisywane.
 
 ## Capabilities
 
 ### New Capabilities
-- `capital-session`: authentication against capital.com, session lifetime and renewal, the
-  demo-only guard, accounts and active-account selection, published capabilities.
-- `capital-market-data`: instrument search and enumeration, candle reads, and history paged
-  deeper than one provider request.
-- `capital-trading`: positions, order placement across MARKET/LIMIT/STOP, attached and amended
-  stops, working orders, and how an asynchronous deal becomes a settled result.
-- `capital-streaming`: the outbound WebSocket contract — message kinds, the forming candle,
-  subscription sharing, liveness and reconnection.
+- `capital-session`: uwierzytelnienie w capital.com, czas życia i odnawianie sesji, bezpiecznik
+  demo-only, konta i wybór aktywnego konta, publikowane możliwości modułu.
+- `capital-market-data`: wyszukiwanie i wyliczanie instrumentów, odczyt świec oraz historia
+  stronicowana głębiej niż jedno żądanie do providera.
+- `capital-trading`: pozycje, składanie zleceń MARKET/LIMIT/STOP, dołączane i zmieniane stopy,
+  zlecenia oczekujące oraz to, jak asynchroniczna transakcja staje się rozliczonym wynikiem.
+- `capital-streaming`: kontrakt wychodzącego WebSocketa — rodzaje wiadomości, świeca w budowie,
+  współdzielenie subskrypcji, utrzymanie połączenia i wznawianie po zerwaniu.
 
 ### Modified Capabilities
 
-None — TradingCenter has no specs yet.
+Brak — TradingCenter nie ma jeszcze żadnych specyfikacji.
 
 ## Impact
 
-- **New**: `modules/capital-gateway/` (Python 3.12, FastAPI, httpx, websockets, pydantic;
-  `uv` + `ruff` + `pytest`). Repository layout `modules/`, `openspec/`, `docs/` is established
-  by this change.
-- **Contract**: HTTP described by OpenAPI at `/docs`, plus a WebSocket at `/ws/stream` whose
-  message shapes are published as JSON Schema — OpenAPI does not describe WebSocket payloads.
-- **Credentials**: `CAPITAL_API_KEY`, `CAPITAL_IDENTIFIER`, `CAPITAL_PASSWORD` in `.env`,
-  never leaving the process.
-- **Not affected**: TradingHub keeps running untouched. `broker-gateway` there is superseded
-  by this module, but retiring it is a separate decision, not part of this change.
-- **Deliberately absent**: no database, no scheduler, no UI, no live-account access, no
-  provider abstraction layer.
+- **Nowe**: `modules/capital-gateway/` (Python 3.12, FastAPI, httpx, websockets, pydantic;
+  `uv` + `ruff` + `pytest`). Ta zmiana ustanawia też układ repozytorium: `modules/`, `openspec/`,
+  `docs/`.
+- **Kontrakt**: HTTP opisane przez OpenAPI pod `/docs`, plus WebSocket `/ws/stream`, którego
+  kształty wiadomości są publikowane jako JSON Schema — OpenAPI nie opisuje ładunków WebSocketa.
+- **Poświadczenia**: `CAPITAL_API_KEY`, `CAPITAL_IDENTIFIER`, `CAPITAL_PASSWORD` w `.env`, nigdy
+  nieopuszczające procesu.
+- **Bez wpływu**: TradingHub działa nietknięty. Tamtejszy `broker-gateway` jest przez ten moduł
+  zastąpiony, ale jego wygaszenie to osobna decyzja, poza tą zmianą.
+- **Świadomie nieobecne**: brak bazy danych, brak schedulera, brak UI, brak dostępu do konta live,
+  brak warstwy abstrakcji nad providerem.

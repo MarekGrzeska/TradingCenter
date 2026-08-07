@@ -1,126 +1,125 @@
 ## Purpose
 
-The live feed: what a consumer receives over a WebSocket while a market moves, including the
-candle that has not closed yet, and what happens to that feed when the provider's connection
-drops.
+Strumień na żywo: co konsument dostaje po WebSockecie, gdy rynek się rusza, łącznie ze świecą,
+która jeszcze się nie zamknęła, oraz co dzieje się z tym strumieniem, gdy połączenie z providerem
+padnie.
 
 ## ADDED Requirements
 
-### Requirement: A consumer subscribes by symbol and resolution
+### Requirement: Konsument subskrybuje po symbolu i rozdzielczości
 
-The module SHALL accept WebSocket subscriptions naming a symbol and a candle resolution, and
-SHALL deliver only messages for that pair.
+Moduł MUST przyjmować subskrypcje WebSocketa wskazujące symbol i rozdzielczość świecy oraz MUST
+dostarczać wyłącznie wiadomości dotyczące tej pary.
 
-#### Scenario: Subscribing
+#### Scenario: Subskrypcja
 
-- **WHEN** a consumer opens a stream for a symbol and resolution
-- **THEN** it receives a status message once the upstream feed is live
-- **AND** every subsequent message concerns that symbol and resolution
+- **WHEN** konsument otwiera strumień na symbol i rozdzielczość
+- **THEN** dostaje wiadomość statusu, gdy strumień od providera jest żywy
+- **AND** każda kolejna wiadomość dotyczy tego symbolu i tej rozdzielczości
 
-#### Scenario: Subscribing without a symbol
+#### Scenario: Subskrypcja bez symbolu
 
-- **WHEN** a consumer opens a stream naming no symbol
-- **THEN** the module refuses the connection
+- **WHEN** konsument otwiera strumień, nie wskazując symbolu
+- **THEN** moduł odmawia połączenia
 
-### Requirement: The stream carries candles and quotes
+### Requirement: Strumień niesie świece i kwotowania
 
-The module SHALL publish two message kinds carrying data: a candle, marked as either forming or
-settled, and a quote carrying bid and ask. It SHALL also publish status and error messages. No
-message SHALL expose the provider's own message shape or its tokens.
+Moduł MUST publikować dwa rodzaje wiadomości z danymi: świecę oznaczoną jako w budowie albo
+zamkniętą oraz kwotowanie niosące bid i ask. MUST publikować także wiadomości statusu i błędu.
+Żadna wiadomość MUST NOT ujawniać własnego kształtu wiadomości providera ani jego tokenów.
 
-#### Scenario: A candle closes
+#### Scenario: Świeca się zamyka
 
-- **WHEN** the provider reports a closed candle
-- **THEN** the module publishes a candle message marked settled, carrying open, high, low, close
-  and the candle's start time
+- **WHEN** provider raportuje zamkniętą świecę
+- **THEN** moduł publikuje wiadomość świecy oznaczoną jako zamknięta, niosącą otwarcie,
+  maksimum, minimum, zamknięcie i czas początku świecy
 
-#### Scenario: The market moves inside a candle
+#### Scenario: Rynek rusza się wewnątrz świecy
 
-- **WHEN** a quote arrives between candle closes
-- **THEN** the module publishes a quote message carrying bid, ask and timestamp
+- **WHEN** między zamknięciami świec przychodzi kwotowanie
+- **THEN** moduł publikuje wiadomość kwotowania niosącą bid, ask i znacznik czasu
 
-#### Scenario: The provider reports a fault
+#### Scenario: Provider zgłasza awarię
 
-- **WHEN** the upstream connection or subscription fails
-- **THEN** the module publishes an error message stating what failed, without provider
-  credentials in it
+- **WHEN** połączenie z providerem albo subskrypcja zawodzi
+- **THEN** moduł publikuje wiadomość błędu mówiącą, co zawiodło, bez poświadczeń providera w niej
 
-### Requirement: The forming candle is assembled by the module
+### Requirement: Świeca w budowie jest składana przez moduł
 
-The provider reports a candle only when it closes, so between closes a consumer would see no
-candle at all. The module SHALL assemble the candle in progress from quotes: the first quote in
-a period opens it, later quotes extend its high and low and move its close. A closed candle from
-the provider is authoritative and SHALL replace the assembled one.
+Provider raportuje świecę dopiero przy jej zamknięciu, więc między zamknięciami konsument nie
+widziałby żadnej świecy. Moduł MUST składać świecę w budowie z kwotowań: pierwsze kwotowanie
+w okresie ją otwiera, kolejne rozciągają maksimum i minimum oraz przesuwają zamknięcie. Zamknięta
+świeca od providera jest autorytatywna i MUST zastąpić tę złożoną.
 
-#### Scenario: The first quote of a new period
+#### Scenario: Pierwsze kwotowanie nowego okresu
 
-- **WHEN** a quote arrives whose timestamp falls in a period later than the current candle
-- **THEN** the module publishes a forming candle opening at that price
+- **WHEN** przychodzi kwotowanie, którego znacznik czasu wypada w okresie późniejszym niż bieżąca
+  świeca
+- **THEN** moduł publikuje świecę w budowie otwartą na tej cenie
 
-#### Scenario: Quotes inside the period
+#### Scenario: Kwotowania wewnątrz okresu
 
-- **WHEN** further quotes arrive in the same period
-- **THEN** the module publishes the forming candle with its high and low extended and its close
-  moved to the latest price
+- **WHEN** w tym samym okresie przychodzą kolejne kwotowania
+- **THEN** moduł publikuje świecę w budowie z rozciągniętym maksimum i minimum oraz zamknięciem
+  przesuniętym na ostatnią cenę
 
-#### Scenario: The provider's candle arrives
+#### Scenario: Przychodzi świeca od providera
 
-- **WHEN** the provider reports the closed candle for a period the module was assembling
-- **THEN** the provider's values replace the assembled ones and the candle is published as
-  settled
+- **WHEN** provider raportuje zamkniętą świecę okresu, który moduł składał
+- **THEN** wartości providera zastępują złożone, a świeca jest publikowana jako zamknięta
 
-#### Scenario: A resolution with no fixed period boundary
+#### Scenario: Rozdzielczość bez stałej granicy okresu
 
-- **WHEN** the resolution is daily or weekly, whose boundary depends on the venue's session
-  rather than on the clock
-- **THEN** quotes extend the last known candle instead of opening a new one, and the boundary is
-  set only by the provider's closed candle
+- **WHEN** rozdzielczość jest dzienna albo tygodniowa, a jej granica zależy od sesji rynku, nie od
+  zegara
+- **THEN** kwotowania rozciągają ostatnią znaną świecę, zamiast otwierać nową, a granicę wyznacza
+  wyłącznie zamknięta świeca od providera
 
-#### Scenario: A subscriber joins mid-period
+#### Scenario: Subskrybent dołącza w środku okresu
 
-- **WHEN** a consumer subscribes partway through a period
-- **THEN** the forming candle it receives reflects only quotes seen since the module connected,
-  and the module states that the candle is forming rather than final
+- **WHEN** konsument subskrybuje w trakcie trwania okresu
+- **THEN** świeca w budowie, którą dostaje, odzwierciedla wyłącznie kwotowania widziane od
+  podłączenia modułu, a moduł stwierdza, że świeca jest w budowie, a nie ostateczna
 
-### Requirement: One upstream connection serves every subscriber of a pair
+### Requirement: Jedno połączenie z providerem obsługuje wszystkich subskrybentów pary
 
-The module SHALL hold at most one provider connection per symbol and resolution, shared by all
-consumers of that pair, and SHALL close it once the last consumer leaves.
+Moduł MUST trzymać najwyżej jedno połączenie z providerem na symbol i rozdzielczość, dzielone
+przez wszystkich konsumentów tej pary, i MUST je zamknąć, gdy odejdzie ostatni konsument.
 
-#### Scenario: A second consumer joins
+#### Scenario: Dołącza drugi konsument
 
-- **WHEN** a second consumer subscribes to a symbol and resolution already streaming
-- **THEN** no additional provider connection is opened
-- **AND** both consumers receive the same messages
+- **WHEN** drugi konsument subskrybuje symbol i rozdzielczość już streamowane
+- **THEN** nie jest otwierane dodatkowe połączenie z providerem
+- **AND** obaj konsumenci dostają te same wiadomości
 
-#### Scenario: The last consumer leaves
+#### Scenario: Odchodzi ostatni konsument
 
-- **WHEN** the final consumer of a symbol and resolution disconnects
-- **THEN** the module closes the provider connection for that pair
+- **WHEN** rozłącza się ostatni konsument danego symbolu i rozdzielczości
+- **THEN** moduł zamyka połączenie z providerem dla tej pary
 
-### Requirement: The feed survives an interruption
+### Requirement: Strumień przeżywa zerwanie
 
-The module SHALL keep the provider connection alive while subscribers remain, and SHALL restore
-it after a drop without the consumer reconnecting.
+Moduł MUST utrzymywać połączenie z providerem przy życiu, dopóki są subskrybenci, i MUST je
+odtworzyć po zerwaniu, bez ponownego łączenia się konsumenta.
 
-#### Scenario: The provider connection drops
+#### Scenario: Połączenie z providerem pada
 
-- **WHEN** the upstream connection closes while consumers are still subscribed
-- **THEN** the module publishes a status message stating it is reconnecting, reconnects, and
-  resumes publishing without the consumer having to reconnect
+- **WHEN** połączenie z providerem zamyka się, gdy konsumenci wciąż subskrybują
+- **THEN** moduł publikuje wiadomość statusu mówiącą, że wznawia połączenie, łączy się ponownie
+  i wraca do publikowania, a konsument nie musi się przełączać
 
-#### Scenario: An idle feed
+#### Scenario: Bezczynny strumień
 
-- **WHEN** no message has been exchanged with the provider for longer than the provider tolerates
-- **THEN** the module keeps the connection alive on its own
+- **WHEN** z providerem nie wymieniono żadnej wiadomości dłużej, niż provider toleruje
+- **THEN** moduł sam utrzymuje połączenie przy życiu
 
-### Requirement: A price side matching history
+### Requirement: Strona ceny zgodna z historią
 
-Candles published on the stream SHALL use the same price side as candles served from history.
-Where the provider reports both sides of a closed candle, only one SHALL be published.
+Świece publikowane na strumieniu MUST używać tej samej strony ceny co świece podawane z historii.
+Gdy provider raportuje obie strony zamkniętej świecy, publikowana MUST być tylko jedna.
 
-#### Scenario: Both price sides are reported
+#### Scenario: Provider raportuje obie strony ceny
 
-- **WHEN** the provider reports the same closed candle twice, once per price side
-- **THEN** the module publishes exactly one candle for that period, on the same side its history
-  uses
+- **WHEN** provider raportuje tę samą zamkniętą świecę dwa razy, po razie na stronę ceny
+- **THEN** moduł publikuje dokładnie jedną świecę tego okresu, po tej samej stronie, której używa
+  jego historia
