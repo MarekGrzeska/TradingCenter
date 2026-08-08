@@ -1,10 +1,10 @@
 ## 1. capital-gateway: katalog zawężalny do klasy aktywów
 
-- [ ] 1.1 Dołożyć `asset_class` do `CapitalAdapter.list_instruments` — odsiew w trakcie obchodu drzewa, osobny pułap `max_nodes` dla zapytania z filtrem, `truncated` liczone jak dotąd
-- [ ] 1.2 Rozszerzyć `GET /instruments` o parametr `asset_class`, z odmową nazywającą znane klasy, gdy podana jest spoza nich
-- [ ] 1.3 Dodać `GET /asset-classes` zwracające zbiór klas, jakimi moduł opisuje instrumenty
-- [ ] 1.4 Testy: wyliczenie jednej klasy zwraca wyłącznie tę klasę, klasa nieznana jest odmawiana z listą znanych, nieczytelna gałąź nadal jest pomijana zamiast wywracać odczyt
-- [ ] 1.5 Uzupełnić README modułu o filtr klasy i o to, dlaczego zapytanie z filtrem ma własny pułap obchodu
+- [x] 1.1 Dołożyć `asset_class` do `CapitalAdapter.list_instruments` — odsiew w trakcie obchodu drzewa, osobny pułap `max_nodes` dla zapytania z filtrem, `truncated` liczone jak dotąd
+- [x] 1.2 Rozszerzyć `GET /instruments` o parametr `asset_class`, z odmową nazywającą znane klasy, gdy podana jest spoza nich
+- [x] 1.3 Dodać `GET /asset-classes` zwracające zbiór klas, jakimi moduł opisuje instrumenty
+- [x] 1.4 Testy: wyliczenie jednej klasy zwraca wyłącznie tę klasę, klasa nieznana jest odmawiana z listą znanych, nieczytelna gałąź nadal jest pomijana zamiast wywracać odczyt
+- [x] 1.5 Uzupełnić README modułu o filtr klasy i o to, dlaczego zapytanie z filtrem ma własny pułap obchodu
 
 ## 2. market-data: trwały stan zleceń
 

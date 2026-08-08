@@ -5,8 +5,8 @@ proves the tidying, not the mapping.
 
 | Origin | Files |
 |---|---|
-| Recorded from the capital.com demo API | everything except the three below |
-| Hand-written from the documented shape | `navigation_root.json`, `navigation_commodities.json`, `navigation_metals.json` |
+| Recorded from the capital.com demo API | everything except the four below |
+| Hand-written from the documented shape | `navigation_root.json`, `navigation_commodities.json`, `navigation_metals.json`, `navigation_shares.json` |
 
 The navigation fixtures are the exception because neither spike recorded the market
 tree: `broker-gateway` mocked it inline in its tests, and the streaming spike never
@@ -14,6 +14,10 @@ walked it. The market entries inside them are copied from a recorded search resp
 so only the tree structure — nodes pointing at nodes — is invented. That structure is
 what the traversal is tested against: a nested node, a market appearing under two
 branches, and a leaf.
+
+`navigation_shares.json` exists so the tree holds more than one asset class. Filtering
+by class cannot be tested against a catalogue where every market is a commodity — such a
+test passes for a sieve that lets everything through.
 
 Re-record with `--run-live` credentials rather than editing one by hand: a field
 adjusted to make a test pass is a field the provider never sent.

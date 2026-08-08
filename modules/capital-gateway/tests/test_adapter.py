@@ -10,6 +10,7 @@ from capital_gateway.adapter import CapitalAdapter
 from capital_gateway.client import CapitalClient
 from capital_gateway.config import DEMO_BASE_URL, Settings
 from capital_gateway.dtos import (
+    AssetClass,
     Direction,
     OrderStatus,
     OrderType,
@@ -149,6 +150,94 @@ async def test_a_cut_short_traversal_says_so(adapter: CapitalAdapter) -> None:
     # small.
     assert page.truncated is True
     assert page.nodes_visited == 1
+    await adapter.aclose()
+
+
+def mock_mixed_navigation() -> None:
+    """A tree with two asset classes in it.
+
+    Kept apart from `mock_navigation` rather than folded into it: the traversal tests
+    below assert on exact catalogue contents, and a sieve tested against a tree of one
+    class would pass while letting everything through.
+    """
+    respx.get(f"{API}/marketnavigation").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "nodes": [
+                    {"id": "hierarchy_v1.commodities", "name": "Commodities"},
+                    {"id": "hierarchy_v1.shares", "name": "Shares"},
+                ]
+            },
+        )
+    )
+    respx.get(f"{API}/marketnavigation/hierarchy_v1.commodities").mock(
+        return_value=httpx.Response(200, json=load_fixture("navigation_commodities.json"))
+    )
+    respx.get(f"{API}/marketnavigation/hierarchy_v1.commodities.metals").mock(
+        return_value=httpx.Response(200, json=load_fixture("navigation_metals.json"))
+    )
+    respx.get(f"{API}/marketnavigation/hierarchy_v1.shares").mock(
+        return_value=httpx.Response(200, json=load_fixture("navigation_shares.json"))
+    )
+
+
+@respx.mock
+async def test_one_asset_class_comes_back_without_the_others(adapter: CapitalAdapter) -> None:
+    mock_session()
+    mock_mixed_navigation()
+
+    page = await adapter.list_instruments(max_nodes=100, asset_class=AssetClass.SHARES)
+
+    assert sorted(i.symbol for i in page.instruments) == ["AAPL", "MSFT"]
+    # `count` is what came back, not what the tree held — a consumer sizing a list off
+    # it would otherwise be told about instruments it cannot see.
+    assert page.count == 2
+    assert page.truncated is False
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_filtering_by_class_still_walks_the_whole_tree(adapter: CapitalAdapter) -> None:
+    """The sieve is on markets, not on branches.
+
+    A walk that guessed a branch's class from its name would be cheaper and would drop
+    instruments filed somewhere the name did not suggest.
+    """
+    mock_session()
+    mock_mixed_navigation()
+
+    unfiltered = await adapter.list_instruments(max_nodes=100)
+    filtered = await adapter.list_instruments(max_nodes=100, asset_class=AssetClass.SHARES)
+
+    assert filtered.nodes_visited == unfiltered.nodes_visited
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_a_class_nothing_matches_is_an_empty_catalogue_not_an_error(
+    adapter: CapitalAdapter,
+) -> None:
+    mock_session()
+    mock_mixed_navigation()
+
+    page = await adapter.list_instruments(max_nodes=100, asset_class=AssetClass.CRYPTO)
+
+    assert page.instruments == []
+    assert page.count == 0
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_a_filtered_walk_cut_short_still_says_so(adapter: CapitalAdapter) -> None:
+    mock_session()
+    mock_mixed_navigation()
+
+    page = await adapter.list_instruments(max_nodes=1, asset_class=AssetClass.SHARES)
+
+    # The filter narrows what comes back; it does not turn a partial walk into a
+    # complete one, which is the mistake that would matter here.
+    assert page.truncated is True
     await adapter.aclose()
 
 

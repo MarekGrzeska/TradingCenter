@@ -57,6 +57,7 @@ def test_every_route_appears_in_the_published_schema(client: TestClient) -> None
         "/capabilities",
         "/accounts",
         "/accounts/active",
+        "/asset-classes",
         "/instruments",
         "/instruments/search",
         "/instruments/{symbol}/candles",
@@ -80,6 +81,28 @@ def test_capabilities_name_the_environment(client: TestClient) -> None:
 
     assert body["environment"] == "demo"
     assert body["has_streaming"] is True
+
+
+@respx.mock
+def test_an_unknown_asset_class_is_refused_by_naming_the_known_ones(client: TestClient) -> None:
+    mock_login()
+
+    with client:
+        response = client.get("/instruments", params={"asset_class": "STONKS"})
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    # The caller's next move is to pick a different class, so the refusal hands them the
+    # ones there are rather than only rejecting the one they tried.
+    assert "STONKS" in detail
+    assert "CRYPTO" in detail and "SHARES" in detail
+
+
+def test_the_asset_classes_are_published(client: TestClient) -> None:
+    with client:
+        body = client.get("/asset-classes").json()
+
+    assert set(body) == {"SHARES", "INDICES", "CRYPTO", "CURRENCIES", "COMMODITIES", "OTHER"}
 
 
 # --- nothing leaks ---

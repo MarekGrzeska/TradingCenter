@@ -13,6 +13,7 @@ from .client import CapitalClient
 from .config import Settings
 from .dtos import (
     Account,
+    AssetClass,
     Candle,
     CandleHistory,
     Capabilities,
@@ -120,13 +121,60 @@ async def set_active_account(body: SetActiveAccount, a: CapitalAdapter = Depends
 # --- market data ---
 
 
+@app.get("/asset-classes", tags=["market-data"], response_model=list[AssetClass])
+async def asset_classes() -> list[AssetClass]:
+    """The classes this module describes instruments with.
+
+    Published so a consumer offering a choice of class does not carry its own copy of
+    the list — a copy is a thing that drifts, and it drifts silently.
+    """
+    return list(AssetClass)
+
+
+# How much of the tree an unfiltered walk visits, and how much a filtered one may. One
+# class is a fraction of the catalogue, so the same budget spent looking for it reaches
+# correspondingly further in — and a consumer picking an instrument to archive decides
+# on what it can see, which makes a list cut short worse for it than for a browser.
+_CATALOGUE_NODES = 300
+_CLASS_NODES = 1500
+
+
 @app.get("/instruments", tags=["market-data"], response_model=InstrumentPage)
 async def instruments(
-    max_nodes: int = Query(300, ge=1, le=3000, description="how much of the tree to walk"),
+    max_nodes: int | None = Query(
+        None,
+        ge=1,
+        le=5000,
+        description="how much of the tree to walk; defaults higher when asset_class is set",
+    ),
+    asset_class: str | None = Query(
+        None, description="narrow to one class, e.g. 'CRYPTO'; see GET /asset-classes"
+    ),
     a: CapitalAdapter = Depends(adapter),
 ):
     """Every instrument, deduped. `truncated` is true when the bound cut the walk short."""
-    return await a.list_instruments(max_nodes)
+    wanted = _asset_class_or_refuse(asset_class)
+    bound = max_nodes if max_nodes is not None else (_CLASS_NODES if wanted else _CATALOGUE_NODES)
+    return await a.list_instruments(bound, wanted)
+
+
+def _asset_class_or_refuse(value: str | None) -> AssetClass | None:
+    """Read the query parameter, or refuse in a sentence naming the alternatives.
+
+    Typed as `str` on the route rather than as the enum so this refusal is ours: the
+    framework's own would be a validation envelope about an unexpected literal, and the
+    caller's next move is to pick a different class, which is exactly what the list
+    below gives them.
+    """
+    if value is None:
+        return None
+    try:
+        return AssetClass(value.strip().upper())
+    except ValueError:
+        known = ", ".join(c.value for c in AssetClass)
+        raise GatewayError(
+            f"unknown asset class {value!r}; this module knows {known}", status_code=422
+        ) from None
 
 
 @app.get("/instruments/search", tags=["market-data"], response_model=list[Instrument])

@@ -53,7 +53,9 @@ HTTP, described by OpenAPI at `/docs`.
 | GET | `/capabilities` | `Capabilities` — provider, environment, order types |
 | GET | `/accounts` | `Account[]` |
 | PUT | `/accounts/active` | `Account` — switch the active account |
+| GET | `/asset-classes` | `AssetClass[]` — the classes instruments are described with |
 | GET | `/instruments` | `InstrumentPage` — deduped, with a `truncated` flag |
+| GET | `/instruments?asset_class=` | the same, narrowed to one class |
 | GET | `/instruments/search?q=` | `Instrument[]` |
 | GET | `/instruments/{symbol}/candles` | `Candle[]` — one request, at most 1000 |
 | GET | `/instruments/{symbol}/history` | `CandleHistory` — paged, with its cost |
@@ -63,6 +65,22 @@ HTTP, described by OpenAPI at `/docs`.
 | PUT | `/positions/{id}` | `Order` — set/remove SL/TP |
 | GET | `/working-orders` | `WorkingOrder[]` |
 | DELETE | `/working-orders/{id}` | `Order` — cancel |
+
+**A filtered catalogue gets a bigger budget.** The walk bounds itself by nodes visited, and
+`truncated` says when that bound stopped it. Filtering by class does not make the walk cheaper —
+a node's name suggests its class but does not promise it, so the sieve is on the markets and every
+branch is still visited. What changes is the default bound: 300 nodes unfiltered, 1500 with a
+class, because one class is a fraction of the catalogue and the same budget reaches that much
+further inside it. Whoever picks an instrument to archive out of such a list is committing to tens
+of minutes of backfill, and a list cut short costs them more than it costs somebody browsing.
+
+**A filtered catalogue gets a bigger budget.** The walk bounds itself by nodes visited, and
+`truncated` says when that bound stopped it. Filtering by class does not make the walk cheaper —
+a node's name suggests its class but does not promise it, so the sieve is on the markets and every
+branch is still visited. What changes is the default bound: 300 nodes unfiltered, 1500 with a
+class, because one class is a fraction of the catalogue and the same budget reaches that much
+further inside it. Whoever picks an instrument to archive out of such a list is committing to tens
+of minutes of backfill, and a list cut short costs them more than it costs somebody browsing.
 
 **An answer is settled, not acknowledged.** A deal the provider has not resolved comes back
 `PENDING` with its reference — never `FILLED`.
