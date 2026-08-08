@@ -12,6 +12,9 @@ vi.mock("./grid/GridView", () => ({
 vi.mock("./instruments/InstrumentsView", () => ({
   InstrumentsView: () => <div>instruments stub</div>,
 }));
+vi.mock("./history/CollectionHistoryView", () => ({
+  CollectionHistoryView: () => <div>data history stub</div>,
+}));
 // Neither back end is running under the test suite; both reachability checks
 // are stubbed so these tests assert routing, not connectivity.
 vi.mock("./data/marketData", () => ({
@@ -67,6 +70,11 @@ describe("App routing (terminal-shell spec)", () => {
 
     expect(window.location.pathname).toBe("/instruments");
     expect(screen.getByText("instruments stub")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "Data History" }));
+
+    expect(window.location.pathname).toBe("/data-history");
+    expect(screen.getByText("data history stub")).toBeInTheDocument();
   });
 
   it("loading an address directly shows that tab, not the default", async () => {

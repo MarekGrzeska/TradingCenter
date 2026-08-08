@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import { CollectionHistoryView } from "../history/CollectionHistoryView";
 import { GridView } from "../grid/GridView";
 import { InstrumentsView } from "../instruments/InstrumentsView";
 
@@ -40,6 +41,13 @@ export const TABS: TabDefinition[] = [
     path: "instruments",
     status: "ready",
     Component: InstrumentsView,
+  },
+  {
+    id: "data-history",
+    label: "Data History",
+    path: "data-history",
+    status: "ready",
+    Component: CollectionHistoryView,
   },
   { id: "positions", label: "Positions", path: "positions", status: "coming-soon" },
   { id: "orders", label: "Orders", path: "orders", status: "coming-soon" },

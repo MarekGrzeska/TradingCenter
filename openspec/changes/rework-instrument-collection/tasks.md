@@ -81,14 +81,14 @@
 
 ## 10. terminal: zakładka Data History
 
-- [ ] 10.1 Wpis `data-history` w `src/app/tabs.ts` i katalog `src/history/`
-- [ ] 10.2 Widok per instrument i per interwał: kiedy, jaki zakres, ile świec, jaki stan; wiele dociągnięć tej samej pary od najnowszego
-- [ ] 10.3 Praca w toku: udział ukończonych kawałków, świece zapisane do tej pory, para właśnie obsługiwana
-- [ ] 10.4 Odpytywanie co 30 s, ustające przy opuszczeniu zakładki; nieudane odświeżenie zostawia wiersze i mówi o sobie
-- [ ] 10.5 Zakończenie powodzeniem na zielono z liczbą świec i zakresem; pokrycie częściowe jako osobny stan z udziałem pokrycia i wyliczeniem przyczyn
-- [ ] 10.6 Ponowienie z poziomu wiersza — z powiedzeniem, co zostanie ponowione, przed zrobieniem tego, i z obsługą sytuacji, w której samo zlecenie ponowienia zawodzi
-- [ ] 10.7 Odróżnienie „nic jeszcze nie dociągano" od „archiwum nieosiągalne"
-- [ ] 10.8 Testy widoku, w tym odpytywania i ponowienia
+- [x] 10.1 Wpis `data-history` w `src/app/tabs.ts` i katalog `src/history/`
+- [x] 10.2 Widok per instrument i per interwał: kiedy, jaki zakres, ile świec, jaki stan; wiele dociągnięć tej samej pary od najnowszego
+- [x] 10.3 Praca w toku: udział ukończonych kawałków, świece zapisane do tej pory, para właśnie obsługiwana
+- [x] 10.4 Odpytywanie co 30 s, ustające przy opuszczeniu zakładki; nieudane odświeżenie zostawia wiersze i mówi o sobie
+- [x] 10.5 Zakończenie powodzeniem na zielono z liczbą świec i zakresem; pokrycie częściowe jako osobny stan z udziałem pokrycia i wyliczeniem przyczyn
+- [x] 10.6 Ponowienie z poziomu wiersza — z powiedzeniem, co zostanie ponowione, przed zrobieniem tego, i z obsługą sytuacji, w której samo zlecenie ponowienia zawodzi
+- [x] 10.7 Odróżnienie „nic jeszcze nie dociągano" od „archiwum nieosiągalne"
+- [x] 10.8 Testy widoku, w tym odpytywania i ponowienia
 
 ## 11. terminal: wykres tylko na instrumentach archiwizowanych
 
