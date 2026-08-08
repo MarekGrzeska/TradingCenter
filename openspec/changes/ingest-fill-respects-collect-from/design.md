@@ -28,6 +28,39 @@ tracked without an explicit date. The bug is narrower: a pair tracked *with* an 
 shallower `collect_from` still gets the deep fixed-depth fill anyway, because nothing downstream
 of `track()` looks at the value it just stored.
 
+### What clamping the fill did not fix
+
+The live retest after that fix still showed data reaching months before the requested date, on the
+job path this time. Row counts in `candles` matched `collection_job_chunks.candles_written` exactly,
+which rules the quiet fill out: the job wrote them.
+
+`bars` and `periods_between` are not the same quantity. `execute_chunk` sizes its request as
+`periods_between(resolution, chunk_start, chunk_end)` — **calendar periods** in the window — and
+the gateway pages until it holds that many **candles**. US100 trades roughly 70% of calendar time,
+so a chunk asking for a January-to-August window's worth of periods keeps paging past January until
+it has counted out the missing 30%, and lands in the previous autumn. No count fixes this, because
+the ratio is a property of the instrument's session calendar, which neither module knows. The older
+edge has to be said as a moment.
+
+### What saying it as a moment then exposed
+
+Once the gateway had a floor, its last window became narrow and clamped to it. Capital answers such
+a window with `error.prices.not-found`, or with the same candle it already returned — and `collect`
+read both as "the provider has nothing older". That claim is not local: `execute_chunk` records it
+as the pair's permanent boundary and calls `skip_chunks_beyond_history`, settling every older chunk
+still queued with zero requests and no retry, since nothing failed.
+
+Measured twice, through the two different ways `collect`'s loop can run out — the empty-window
+branch, then the no-progress branch, which the first fix did not touch. Second time in the
+database:
+
+```
+MINUTE_5  done     2026-02-16 07:01 → 2026-08-08 21:41   35329 candles, 52 requests
+MINUTE_5  skipped  2026-01-01 00:00 → 2026-02-16 07:01       0 candles,  0 requests
+```
+
+The job reported `done`. Six weeks the operator asked for were never fetched.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -36,6 +69,9 @@ of `track()` looks at the value it just stored.
   `collect_from`.
 - A pair tracked without an explicit `collect_from` keeps behaving exactly as it does today —
   this is a correctness fix for one case, not a behavior change for the common one.
+- A chunk MUST NOT store a candle older than its own window, whatever the gateway returns.
+- Reaching a caller-supplied floor MUST NOT be reported as the provider's history ending, by any
+  route out of the paging loop.
 
 **Non-Goals:**
 
@@ -98,6 +134,43 @@ the same shape of race `delete-archived-pair-data`'s `execute_chunk` guard close
 and it gets the same answer: a pair nobody is tracking anymore gets nothing written for it, never
 a deep fetch nobody asked for.
 
+### The gateway takes an `after` floor, and both callers pass it
+
+`GET /history` gains `after`, alongside the existing `before` anchor, and `collect` uses it three
+ways: windows are clamped to it (`window_before(..., floor=after)`), so no request is spent on
+candles that would be discarded; paging stops once a page reaches it; and anything older that still
+arrives inside a page is dropped before the answer is built. The last one is not redundant with the
+first — a page is only ever clamped at its *edges*, and Capital returns whole candles, so the
+oldest one in a clamped window can still start before the floor.
+
+The alternative considered was to leave the gateway alone and filter in `market-data` only. Rejected
+because a request whose window reaches years past what the caller wants still *costs* those
+requests, and because the same overshoot would be re-derived by every future consumer of `/history`.
+
+Both `market-data` callers pass it — `after=chunk.chunk_start` from `execute_chunk`,
+`after=collect_from` from `fill_gap` — **and** filter what came back before writing. Belt and
+braces on purpose: what the archive stores is this module's promise, and a promise kept by asking
+someone else nicely is not kept. The filter is also what makes the minute-rollup refresh safe, since
+refreshing over candles that were dropped would derive a bucket from a source that was never stored.
+
+### Reaching the floor is not `history_ended`, decided in one place
+
+`collect` keeps two separate flags. `history_ended` means the provider has nothing older;
+`reached_floor` means the caller's own bound was hit. Only the first ever reaches the response.
+
+The structural point is where that gets decided. The loop can run out two ways — a window that
+comes back empty or not-found, and a window that comes back holding nothing older than the cursor —
+and the first attempt at this fix guarded only one of them, which is exactly how the bug survived
+into a second live test. So both routes now fall through to a single terminal block, `on_the_floor`
+is computed once per iteration next to the window it describes, and `history_ended = True` has one
+assignment site in the function. A third route added later cannot silently miss the check.
+
+`on_the_floor` is "this window's older edge is the floor rather than the calendar" —
+`edge - window_seconds(resolution, per_request) <= after`. When it holds, running out means the
+caller's bound; when it does not, the window spanned a full page of calendar and running out is the
+provider's own bottom. A genuine ending above the floor is therefore still reported, which matters:
+it is what lets a job skip chunks below a boundary that really exists.
+
 ## Risks / Trade-offs
 
 - **`periods_between` rounds up (`math.ceil`)** — so a clamped fill can overshoot `collect_from` by
@@ -113,6 +186,19 @@ a deep fetch nobody asked for.
 - **Moving `periods_between`** touches two existing call sites and a test file's imports —
   mechanical, but a real diff outside `ingest/`. Named here so it does not read as scope creep
   when it shows up in the tasks.
+- **One extra gateway request per floored read.** Paging stops on the window *below* the oldest
+  candle it found, so a read that ends a few minutes above its floor spends one narrow request to
+  learn that. Cheap, and the alternative — guessing that a sliver narrower than one period cannot
+  hold a candle — trades a request for an assumption about the provider's bucketing that nothing
+  here verifies.
+- **A floored read almost never returns `bars` candles**, so the `len(trimmed) < bars` half of the
+  `history_ended` condition stops being any protection at all under a floor. It is kept because it
+  only ever makes the claim *less* likely, but `not reached_floor` is now the load-bearing half and
+  is the one the tests pin.
+- **`error.prices.not-found` for a window in a shut market** is still read as an ending when the
+  window was not clamped. Left as is: an unclamped window spans a full page of periods, which for
+  every resolution this module fetches is wider than any stretch the market is shut for. The bug
+  was the *clamped* windows, which are narrow by construction.
 
 ## Migration Plan
 
