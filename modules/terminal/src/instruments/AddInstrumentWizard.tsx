@@ -41,8 +41,7 @@ function todayDateInput(): string {
   return asDateInput(new Date());
 }
 
-/** One year back — the field always carries a value without the operator
- *  typing one, and this is the value it is safe to carry.
+/** The start of the current year — year to date.
  *
  *  Deliberately not "everything available". An arbitrarily early date is a
  *  legitimate request — it clips rather than fails (design.md, "Data OD jest
@@ -50,11 +49,14 @@ function todayDateInput(): string {
  *  `MINUTE` a decade is around a hundred chunks per pair, so every operator
  *  who never touched this field would be committing hundreds of gateway
  *  requests without deciding to. Deep history stays one edit away; it just
- *  stops being what happens by accident. */
+ *  stops being what happens by accident.
+ *
+ *  A round boundary rather than a rolling window, so the same instrument added
+ *  twice in a month asks for the same range both times. The trade is that the
+ *  default is shallow in January — which is the safe direction for a default
+ *  that costs provider requests. */
 function defaultCollectFromInput(): string {
-  const oneYearBack = new Date();
-  oneYearBack.setUTCFullYear(oneYearBack.getUTCFullYear() - 1);
-  return asDateInput(oneYearBack);
+  return `${new Date().getUTCFullYear()}-01-01`;
 }
 
 function dateInputToEpochSeconds(value: string): number {

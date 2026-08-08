@@ -204,7 +204,7 @@ bazy w liczbie rzędu dziesiątek — realne, ale nie na tyle, by przerabiać to
 | · Przejście przez kreator | `AddInstrumentWizard.test.tsx::prices every pair, shows the range and a total, and asks for one estimate covering both resolutions` |
 | · Instrumenty zależą od klasy | `autocompleteSources.test.ts::enumerates the class on an empty query…`, `::searches within the class once a query is typed…` |
 | · Zmiana klasy po wybraniu instrumentu | `AddInstrumentWizard.test.tsx::clears the chosen instrument when the asset class changes` |
-| · Podana data jest wcześniejsza niż historia providera | `tests/test_jobs_plan.py::test_a_moment_before_provider_history_is_clipped_not_refused` (przycięcie po stronie archiwum; kreator nie waliduje daty w ogóle, a domyślnie proponuje rok wstecz — `AddInstrumentWizard.test.tsx::starts one year back, not at everything the provider has`) — **luka po stronie terminala, patrz Gaps** |
+| · Podana data jest wcześniejsza niż historia providera | `tests/test_jobs_plan.py::test_a_moment_before_provider_history_is_clipped_not_refused` (przycięcie po stronie archiwum; kreator nie waliduje daty w ogóle, a domyślnie proponuje początek bieżącego roku — `AddInstrumentWizard.test.tsx::starts at the beginning of the current year, not at everything the provider has`) — **luka po stronie terminala, patrz Gaps** |
 | · Kreator bez kompletu wyborów | `AddInstrumentWizard.test.tsx::blocks review until an instrument and at least one resolution are chosen` |
 | Zatwierdzenie kreatora otwiera dialog akceptacji | — |
 | · Dialog przed dodaniem | `AddInstrumentWizard.test.tsx::prices every pair, shows the range and a total, and asks for one estimate covering both resolutions` |

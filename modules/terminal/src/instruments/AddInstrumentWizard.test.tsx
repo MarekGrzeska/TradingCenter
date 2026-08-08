@@ -116,19 +116,17 @@ async function pickInstrument(user: ReturnType<typeof userEvent.setup>, symbol: 
 }
 
 describe("AddInstrumentWizard — steps (terminal-data-manager spec)", () => {
-  // Reaching back a year by default, not to the beginning of time. An arbitrarily early
-  // date is a legitimate request and clips rather than fails, but as the default it would
-  // commit every operator who never touched the field to hundreds of gateway requests.
-  it("starts one year back, not at everything the provider has", () => {
+  // Year to date by default, not the beginning of time. An arbitrarily early date is a
+  // legitimate request and clips rather than fails, but as the default it would commit
+  // every operator who never touched the field to hundreds of gateway requests.
+  it("starts at the beginning of the current year, not at everything the provider has", () => {
     renderWizard();
 
     const field = screen.getByLabelText("History from") as HTMLInputElement;
-    const expected = new Date();
-    expected.setUTCFullYear(expected.getUTCFullYear() - 1);
 
-    expect(field.value).toBe(expected.toISOString().slice(0, 10));
+    expect(field.value).toBe(`${new Date().getUTCFullYear()}-01-01`);
     // And never a date the archive would refuse outright.
-    expect(field.value < new Date().toISOString().slice(0, 10)).toBe(true);
+    expect(field.value <= new Date().toISOString().slice(0, 10)).toBe(true);
   });
 
   it("blocks review until an instrument and at least one resolution are chosen", async () => {
