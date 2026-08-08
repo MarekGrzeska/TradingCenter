@@ -56,10 +56,12 @@ def test_a_wide_gap_splits_at_the_bars_ceiling() -> None:
     start = MOMENT - timedelta(days=40)
     windows = split_into_windows(Resolution.MINUTE, start, MOMENT)
     assert len(windows) == 2
-    assert windows[0][0] == start
-    assert windows[-1][1] == MOMENT
-    # Contiguous: the second window starts exactly where the first ends.
-    assert windows[0][1] == windows[1][0]
+    # Newest window first — the one ending at `MOMENT` runs before the one reaching
+    # further back, so a chunk that discovers the provider's boundary runs early.
+    assert windows[0][1] == MOMENT
+    assert windows[-1][0] == start
+    # Contiguous: the older window ends exactly where the newer one starts.
+    assert windows[1][1] == windows[0][0]
 
 
 def test_windows_never_exceed_the_bars_ceiling() -> None:
@@ -70,6 +72,14 @@ def test_windows_never_exceed_the_bars_ceiling() -> None:
 
 def test_an_empty_gap_produces_no_windows() -> None:
     assert split_into_windows(Resolution.MINUTE, MOMENT, MOMENT) == []
+
+
+def test_windows_run_newest_to_oldest() -> None:
+    start = MOMENT - timedelta(days=200)
+    windows = split_into_windows(Resolution.MINUTE, start, MOMENT)
+    assert len(windows) > 2
+    ends = [window_end for _, window_end in windows]
+    assert ends == sorted(ends, reverse=True)
 
 
 # --- planning against the archive -------------------------------------------------------

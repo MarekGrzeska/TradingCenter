@@ -25,11 +25,12 @@
 
 ## 4. market-data: wykonywanie zlecenia
 
-- [ ] 4.1 Przepisać `fill_gap` na wykonanie kawałka o zadanym oknie `(od, do)` zamiast głębokości liczonej z konfiguracji, zachowując jedno żądanie do gatewaya na kawałek
-- [ ] 4.2 Runner kawałków pod istniejącym `backfill_concurrency` i tym samym rate gate; wynik każdego kawałka zapisywany natychmiast po jego zakończeniu
-- [ ] 4.3 Kawałek nieudany odnotowuje nazwaną przyczynę i nie zatrzymuje pozostałych; kawałek sięgający poza koniec historii providera jest pomijany, a nie oznaczany jako nieudany
+- [x] 4.0 *(odkryte podczas implementacji grupy 3)* `split_into_windows` i `plan_chunks` układają kawałki od najnowszego wstecz, nie od najstarszego — inaczej prośba o głębię sprzed znanej granicy historii providera wysyłałaby jedno żądanie na każdy skazany na porażkę kawałek zamiast odkryć granicę raz
+- [ ] 4.1 Nowa funkcja wykonania kawałka o zadanym oknie `(od, do)` przez `before=chunk_end` na gatewayu, osobna od `fill_gap` (ten zostaje dla pojedynczych par bez zlecenia — restart i wznowienie strumienia)
+- [ ] 4.2 Runner kawałków pod istniejącym `backfill_concurrency` i tym samym rate gate co `Ingest` (współdzielony semafor); wynik każdego kawałka zapisywany natychmiast po jego zakończeniu
+- [ ] 4.3 Kawałek nieudany odnotowuje nazwaną przyczynę i nie zatrzymuje pozostałych; kawałek, który odkryje `history_ended`, kończy się jako wykonany (nawet z zerem świec), a wszystkie pozostałe jeszcze niepodjęte kawałki tej pary w tym zleceniu są masowo oznaczane jako pominięte (`skip_chunks_beyond_history`) zamiast każdy z osobna odkrywać tę samą granicę
 - [ ] 4.4 Ponowienie: wykonanie wyłącznie kawałków `failed` i `interrupted` jako kolejna próba tego samego zlecenia, z podbiciem numeru próby
-- [ ] 4.5 Podłączyć `record_coverage` tak, by luka po nieudanym kawałku dawała rozdzielone przedziały pokrycia
+- [ ] 4.5 `record_coverage` wywoływane dla pełnego okna kawałka (nie tylko zakresu zwróconych świec), żeby granica `history_ended` i luka po nieudanym kawałku dawały poprawne, rozdzielone przedziały pokrycia
 - [ ] 4.6 Testy: porażka kawałka w środku zostawia świece z kawałków udanych i lukę w pokryciu, ponowienie nie pyta o zakresy już pokryte, ponowienie zlecenia bez porażek jest odmawiane, odczyt świec w trakcie zlecenia nie czeka na jego koniec
 
 ## 5. market-data: kontrakt

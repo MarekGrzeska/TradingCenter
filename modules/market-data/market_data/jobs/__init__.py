@@ -23,6 +23,7 @@ from .store import (
     list_jobs,
     read_job,
     retry_job,
+    skip_chunks_beyond_history,
 )
 
 __all__ = [
@@ -48,4 +49,5 @@ __all__ = [
     "plan_chunks",
     "read_job",
     "retry_job",
+    "skip_chunks_beyond_history",
 ]

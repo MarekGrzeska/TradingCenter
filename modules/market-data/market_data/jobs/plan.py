@@ -45,19 +45,29 @@ def split_into_windows(
 ) -> list[tuple[datetime, datetime]]:
     """One gap, cut into windows no wider than `MAX_BARS_PER_FILL` candles each.
 
-    Oldest window first. Each window becomes one chunk and one gateway request —
+    **Newest window first.** Each window becomes one chunk and one gateway request —
     `before=window_end`, reaching back for the candles the window holds — so a window
     wider than the gateway's own ceiling would be a chunk that request can never satisfy.
+
+    The order is load-bearing, not cosmetic. `earliest_reachable` may still be unknown
+    when a deep request is planned — an operator asking for "everything" clips only to
+    what coverage already knows, and a pair's true depth is not among that yet. Planned
+    oldest-first, the runner would spend one gateway request per chunk marching back
+    from a boundary nobody has found, discovering the same "nothing here" answer
+    hundreds of times before reaching data. Newest-first, the chunk that actually finds
+    the boundary runs early, and every chunk still queued behind it — by definition
+    older, by definition past that boundary — is skipped in bulk rather than individually
+    rediscovering it (`jobs/store.py`, `skip_chunks_beyond_history`).
     """
     if end <= start:
         return []
     width = period_length(resolution) * MAX_BARS_PER_FILL
     windows: list[tuple[datetime, datetime]] = []
-    cursor = start
-    while cursor < end:
-        window_end = min(cursor + width, end)
-        windows.append((cursor, window_end))
-        cursor = window_end
+    cursor = end
+    while cursor > start:
+        window_start = max(cursor - width, start)
+        windows.append((window_start, cursor))
+        cursor = window_start
     return windows
 
 
@@ -89,9 +99,12 @@ async def plan_chunks(
 
     gaps = await uncovered_within(conn, symbol, resolution, effective_from, now)
 
+    # `uncovered_within` returns gaps oldest first; reversed here so the whole pair's
+    # chunks run newest-first end to end, not just within one gap — see
+    # `split_into_windows` for why the order matters.
     plans = [
         ChunkPlan(symbol=symbol, resolution=resolution, chunk_start=window_start, chunk_end=window_end)
-        for gap_start, gap_end in gaps
+        for gap_start, gap_end in reversed(gaps)
         for window_start, window_end in split_into_windows(resolution, gap_start, gap_end)
     ]
     return plans, effective_from

@@ -25,6 +25,7 @@ from market_data.jobs.store import (
     list_jobs,
     read_job,
     retry_job,
+    skip_chunks_beyond_history,
 )
 from market_data.models import Resolution
 from market_data.tracking import track
@@ -311,6 +312,50 @@ async def test_retrying_a_job_with_nothing_failed_is_refused(db: asyncpg.Connect
 async def test_retrying_an_unknown_job_is_refused(db: asyncpg.Connection) -> None:
     with pytest.raises(UnknownJob):
         await retry_job(db, 999_999)
+
+
+# --- bulk-skipping chunks past a discovered boundary -----------------------------------
+
+
+@pytest.mark.db
+async def test_skipping_only_touches_pending_chunks_at_or_before_the_boundary(
+    db: asyncpg.Connection,
+) -> None:
+    await _tracked(db)
+    newest = plan(chunk_start=MOMENT - timedelta(days=1), chunk_end=MOMENT)
+    boundary_chunk = plan(
+        chunk_start=MOMENT - timedelta(days=2), chunk_end=MOMENT - timedelta(days=1)
+    )
+    older = plan(chunk_start=MOMENT - timedelta(days=3), chunk_end=MOMENT - timedelta(days=2))
+    job = await create_job(db, MOMENT, [newest, boundary_chunk, older])
+
+    # The boundary sits at the start of `boundary_chunk` — everything at or before it
+    # (here, only `older`) is skipped; `newest` and `boundary_chunk` itself are not.
+    skipped = await skip_chunks_beyond_history(
+        db, job.id, "US100", Resolution.MINUTE, boundary_chunk.chunk_start
+    )
+
+    assert skipped == 1
+    reread = await read_job(db, job.id)
+    by_window = {(c.chunk_start, c.chunk_end): c.state for c in reread.chunks}
+    assert by_window[(older.chunk_start, older.chunk_end)] is ChunkState.SKIPPED
+    assert by_window[(boundary_chunk.chunk_start, boundary_chunk.chunk_end)] is ChunkState.PENDING
+    assert by_window[(newest.chunk_start, newest.chunk_end)] is ChunkState.PENDING
+
+
+@pytest.mark.db
+async def test_skipping_does_not_touch_a_chunk_already_running(db: asyncpg.Connection) -> None:
+    await _tracked(db)
+    running = plan(chunk_start=MOMENT - timedelta(days=2), chunk_end=MOMENT - timedelta(days=1))
+    job = await create_job(db, MOMENT, [running])
+    claimed = await claim_pending_chunk(db)
+
+    skipped = await skip_chunks_beyond_history(db, job.id, "US100", Resolution.MINUTE, MOMENT)
+
+    assert skipped == 0
+    reread = await read_job(db, job.id)
+    assert reread.chunks[0].id == claimed.id
+    assert reread.chunks[0].state is ChunkState.RUNNING
 
 
 # --- listing, narrowed to a pair -------------------------------------------------------

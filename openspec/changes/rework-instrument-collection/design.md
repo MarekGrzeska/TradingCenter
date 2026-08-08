@@ -61,6 +61,21 @@ się na najstarszej pobranej świecy. Kawałek zamawia się jako `before=chunk_e
 `(chunk_end - chunk_start)` — patrz nowe wymaganie w `capital-market-data`, „Głęboki odczyt zaczyna
 się w dowolnym momencie, nie tylko teraz".
 
+**Drugie odkrycie, tej samej natury:** przycięcie daty OD dzieje się względem
+`earliest_reachable`, a ta bywa `None` — provider jeszcze nikomu nie powiedział, gdzie kończy się
+jego historia. Prośba „wszystko od 1850" dla pary, której głębokość nikt jeszcze nie zbadał,
+rozłożona od najstarszego kawałka wstecz, wysyłałaby setki żądań do gatewaya, z których każde
+dostawałoby to samo „nic tu nie ma", zanim dotarłaby do kawałka z prawdziwymi danymi — dokładnie
+koszt, przed którym miało chronić przycinanie.
+
+Rozwiązanie: kawałki idą **od najnowszego wstecz** (`split_into_windows`, odwrócone również między
+lukami w `plan_chunks`), a gdy któryś odkryje granicę historii providera (`history_ended=True`),
+wszystkie pozostałe, jeszcze niepodjęte kawałki tego zlecenia dla tej pary — z konstrukcji starsze,
+z konstrukcji leżące za tą granicą — zostają od razu masowo oznaczone jako pominięte
+(`skip_chunks_beyond_history`), bez wysyłania do nich ani jednego żądania. Kawałek, który
+odkrył granicę, kończy się jako `done` z zerem zapisanych świec, gdy okno faktycznie jest puste —
+to sama w sobie użyteczna odpowiedź, nie porażka.
+
 Postęp zlecenia to `kawałki ukończone / kawałki wszystkie`. Dla `MINUTE` i 50 000 świec na kawałek
 jedno okno to ~35 dni, więc dziesięć lat historii minutowej to ~104 kawałki — pasek rusza się co
 kilkadziesiąt sekund. Dla `DAY` całe dziesięć lat mieści się w jednym kawałku i pasek skacze z 0 na

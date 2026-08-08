@@ -7,6 +7,8 @@ states `models.py` defines, and reads them back.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import asyncpg
 
 from ..models import Resolution
@@ -100,6 +102,17 @@ _MARK_FAILED = """
      WHERE id = $1
 """
 
+# Every chunk of this job, for this pair, that is still pending and lies entirely at or
+# before the boundary just discovered. `chunk_end <= boundary` is deliberately not
+# `<`: a chunk touching the boundary exactly has nothing on its far side either.
+_SKIP_BEYOND_HISTORY = """
+    UPDATE collection_job_chunks
+       SET state = 'skipped', finished_at = now()
+     WHERE job_id = $1 AND symbol = $2 AND resolution = $3
+       AND state = 'pending' AND chunk_end <= $4
+    RETURNING id
+"""
+
 _INTERRUPT_OPEN_CHUNKS = """
     UPDATE collection_job_chunks
        SET state = 'interrupted', finished_at = now()
@@ -138,7 +151,9 @@ def _chunk(row: asyncpg.Record) -> Chunk:
     )
 
 
-async def create_job(conn: asyncpg.Connection, requested_from, plans: list[ChunkPlan]) -> Job:
+async def create_job(
+    conn: asyncpg.Connection, requested_from: datetime, plans: list[ChunkPlan]
+) -> Job:
     """Record a job and the chunks it was planned into, as one write.
 
     `plans` may be empty — every pair in the decision was already fully covered — and
@@ -251,6 +266,22 @@ async def finish_chunk_failed(
     conn: asyncpg.Connection, chunk_id: int, *, failure: str, requests: int
 ) -> None:
     await conn.execute(_MARK_FAILED, chunk_id, failure, requests)
+
+
+async def skip_chunks_beyond_history(
+    conn: asyncpg.Connection,
+    job_id: int,
+    symbol: str,
+    resolution: Resolution,
+    boundary: datetime,
+) -> int:
+    """Once one chunk discovers the provider's own boundary, every chunk still queued
+    behind it — by construction older, by construction past that boundary, since chunks
+    run newest-first (`plan.py`, `split_into_windows`) — is skipped without ever being
+    claimed. Returns how many were skipped.
+    """
+    rows = await conn.fetch(_SKIP_BEYOND_HISTORY, job_id, symbol, resolution.value, boundary)
+    return len(rows)
 
 
 async def retry_job(conn: asyncpg.Connection, job_id: int) -> Job:
