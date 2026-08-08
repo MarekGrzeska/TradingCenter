@@ -136,15 +136,11 @@ export function AddInstrumentWizard({
             source={instrumentSource}
             getOptionId={(i) => i.symbol}
             getOptionLabel={(i) => i.symbol}
-            renderOption={(i) => (
-              <span className="flex items-center gap-2">
-                <span className="font-semibold text-ink">{i.symbol}</span>
-                <span className="text-ink-secondary">{i.name}</span>
-              </span>
-            )}
+            renderOption={(i) => <InstrumentOption instrument={i} />}
             ariaLabel="Instrument"
             placeholder={assetClass ? "Instrument…" : "Choose an asset class first"}
             disabled={assetClass === null}
+            countLabel={(n) => `${n} instrument${n === 1 ? "" : "s"} in ${assetClass}`}
           />
         </Field>
 
@@ -206,6 +202,31 @@ export function AddInstrumentWizard({
         />
       )}
     </div>
+  );
+}
+
+/** One suggested instrument, with everything the operator judges it on:
+ *  symbol, name, class, whether it can be traded, and the current spread where
+ *  the gateway reports one (terminal-instruments spec, "Instrumenty wyszukuje
+ *  się po frazie"). Not tradeable is worth saying and is not disqualifying —
+ *  the archive collects it and the chart draws it either way. */
+function InstrumentOption({ instrument }: { instrument: Instrument }) {
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <span className="font-semibold text-ink">{instrument.symbol}</span>
+      <span className="text-ink-secondary">{instrument.name}</span>
+      <span className="text-ink-muted">{instrument.assetClass}</span>
+      {instrument.bid !== null && instrument.ask !== null && (
+        <span className="text-ink-muted">
+          {instrument.bid} / {instrument.ask}
+        </span>
+      )}
+      {!instrument.tradeable && (
+        <span className="text-warning" title="Not tradeable; it can still be collected and charted.">
+          not tradeable
+        </span>
+      )}
+    </span>
   );
 }
 

@@ -23,12 +23,13 @@ import type {
 class FakeGateway {
   classes: AssetClass[] = [];
   instrumentsByClass: Instrument[] = [];
+  truncated = false;
 
   listAssetClasses = async () => this.classes;
   listInstruments = async () => ({
     instruments: this.instrumentsByClass,
     count: this.instrumentsByClass.length,
-    truncated: false,
+    truncated: this.truncated,
   });
   searchInstruments = async () => [];
 }
@@ -130,6 +131,54 @@ describe("AddInstrumentWizard — steps (terminal-data-manager spec)", () => {
 
     await user.click(screen.getByRole("button", { name: "1m" }));
     expect(submit).toBeEnabled();
+  });
+
+  // The operator commits real collection work off this list, so a row carries what
+  // that decision rests on (terminal-instruments spec, "Instrumenty wyszukuje się po
+  // frazie").
+  it("shows symbol, name, class, the spread and tradeability for each suggestion", async () => {
+    const user = userEvent.setup();
+    fakeGateway.instrumentsByClass = [
+      { symbol: "BTCUSD", name: "Bitcoin", assetClass: "CRYPTO", tradeable: false, bid: 60000, ask: 60010 },
+    ];
+    renderWizard();
+
+    await pickAssetClass(user, "CRYPTO");
+    await user.click(screen.getByRole("combobox", { name: "Instrument" }));
+
+    const option = await screen.findByRole("option", { name: /BTCUSD/ });
+    expect(option).toHaveTextContent("Bitcoin");
+    expect(option).toHaveTextContent("CRYPTO");
+    expect(option).toHaveTextContent("60000");
+    expect(option).toHaveTextContent("60010");
+    // Not disqualifying — the archive collects it and the chart draws it either way.
+    expect(option).toHaveTextContent(/not tradeable/i);
+  });
+
+  it("states the instrument count when the class was enumerated whole", async () => {
+    const user = userEvent.setup();
+    fakeGateway.instrumentsByClass = [instrument("BTCUSD"), instrument("ETHUSD")];
+    renderWizard();
+
+    await pickAssetClass(user, "CRYPTO");
+    await user.click(screen.getByRole("combobox", { name: "Instrument" }));
+
+    expect(await screen.findByText("2 instruments in CRYPTO")).toBeInTheDocument();
+    expect(screen.queryByText(/cut short/i)).not.toBeInTheDocument();
+  });
+
+  it("warns instead of counting when the class was cut short", async () => {
+    const user = userEvent.setup();
+    fakeGateway.truncated = true;
+    fakeGateway.instrumentsByClass = [instrument("BTCUSD")];
+    renderWizard();
+
+    await pickAssetClass(user, "CRYPTO");
+    await user.click(screen.getByRole("combobox", { name: "Instrument" }));
+
+    expect(await screen.findByText(/cut short/i)).toBeInTheDocument();
+    // A count under a truncated list would read as the total when it is not one.
+    expect(screen.queryByText(/instruments in CRYPTO/)).not.toBeInTheDocument();
   });
 
   it("clears the chosen instrument when the asset class changes", async () => {

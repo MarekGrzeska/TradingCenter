@@ -22,6 +22,12 @@ export interface AutocompleteProps<T> {
    *  reason for an empty list (e.g. nothing archived yet) says its own
    *  sentence instead of the generic one. */
   noResultsMessage?: string;
+  /** How many came back, said out loud under a list that was *not* cut short
+   *  — for a list an operator picks from to commit real collection work, the
+   *  count is what tells them they are looking at all of it
+   *  (terminal-instruments spec, "Katalog kompletny"). Omitted where a count
+   *  would be noise, as with a handful of asset classes. */
+  countLabel?(count: number): string;
 }
 
 /**
@@ -49,6 +55,7 @@ export function Autocomplete<T>({
   disabled = false,
   truncatedMessage = "List cut short — keep typing to narrow it down.",
   noResultsMessage = "No matches.",
+  countLabel,
 }: AutocompleteProps<T>) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
@@ -192,11 +199,20 @@ export function Autocomplete<T>({
                 {renderOption ? renderOption(option) : getOptionLabel(option)}
               </li>
             ))}
-          {state.status === "results" && state.truncated && (
-            <li className="border-t border-border px-2 py-1.5 text-xs text-warning">
-              {truncatedMessage}
-            </li>
-          )}
+          {state.status === "results" &&
+            (state.truncated ? (
+              <li className="border-t border-border px-2 py-1.5 text-xs text-warning">
+                {truncatedMessage}
+              </li>
+            ) : (
+              // Only when nothing was cut short: a count under a truncated list
+              // would read as the total when it is not one.
+              countLabel && (
+                <li className="border-t border-border px-2 py-1.5 text-xs text-ink-muted">
+                  {countLabel(state.options.length)}
+                </li>
+              )
+            ))}
         </ul>
       )}
     </div>
