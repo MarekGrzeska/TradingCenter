@@ -35,11 +35,18 @@ The terminal side is what remains; see `openspec/changes/add-market-data/tasks.m
 
 ```bash
 cp .env.example .env       # gateway URLs and a PostgreSQL connection
+docker compose -f ../../compose.yaml up -d db
 uv run alembic upgrade head
 uv run uvicorn market_data.app:app --reload --port 8020
 ```
 
-Needs `capital-gateway` running on `http://localhost:8010` and a PostgreSQL to write to.
+Needs `capital-gateway` running on `http://localhost:8010` and a PostgreSQL to write to. The
+repository's `compose.yaml` provides one on **port 55432** — not 5432, because a developer
+machine very often already runs PostgreSQL of its own, and migrating somebody else's database
+by accident is worse than failing to connect. `.env.example` already points there.
+
+`../../scripts/dev.sh` (or `dev.ps1`) does all of the above plus the gateway and the terminal,
+in the order they need each other.
 
 ## Schema
 

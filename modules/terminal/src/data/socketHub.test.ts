@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SocketHub, type SocketLike } from "./socketHub";
-import type { Bar, StreamEvent } from "./types";
+import type { StreamEvent } from "./types";
 
 class FakeSocket implements SocketLike {
   onopen: (() => void) | null = null;
@@ -22,8 +22,8 @@ class FakeSocket implements SocketLike {
     this.onopen?.();
   }
 
-  message(payload: unknown): void {
-    this.onmessage?.({ data: JSON.stringify(payload) });
+  message(payload: string): void {
+    this.onmessage?.({ data: payload });
   }
 
   drop(code = 1006, reason = ""): void {
@@ -31,22 +31,22 @@ class FakeSocket implements SocketLike {
   }
 }
 
-function bar(time: number, close: number, forming = false): Bar {
-  return { time, open: close, high: close, low: close, close, volume: null, forming };
-}
+// The hub knows nothing about any protocol — a frame is whatever `translate`
+// says it is. These tests use the plainest possible one, so what fails here is
+// the ref-counting and the reconnecting rather than someone's wire format.
+const translate = (raw: string): StreamEvent[] =>
+  raw === "" ? [] : [{ kind: "error", message: raw }];
 
 describe("SocketHub", () => {
   let sockets: FakeSocket[];
-  let fetchRecent: ReturnType<typeof vi.fn>;
   let hub: SocketHub;
 
   beforeEach(() => {
     vi.useFakeTimers();
     sockets = [];
-    fetchRecent = vi.fn().mockResolvedValue([]);
     hub = new SocketHub(
-      "ws://localhost/ws",
-      fetchRecent,
+      (symbol, resolution) => `ws://localhost/ws/candles?symbol=${symbol}&resolution=${resolution}`,
+      translate,
       (url) => {
         const socket = new FakeSocket(url);
         sockets.push(socket);
@@ -63,7 +63,9 @@ describe("SocketHub", () => {
   it("opens one socket for the first subscriber, addressed at the pair", () => {
     hub.subscribe("US100", "MINUTE_5", () => {});
     expect(sockets).toHaveLength(1);
-    expect(sockets[0].url).toBe("ws://localhost/ws/stream?symbol=US100&resolution=MINUTE_5");
+    expect(sockets[0].url).toBe(
+      "ws://localhost/ws/candles?symbol=US100&resolution=MINUTE_5",
+    );
   });
 
   it("shares one socket between subscribers to the same pair", () => {
@@ -81,28 +83,25 @@ describe("SocketHub", () => {
     expect(hub.activeConnectionCount()).toBe(3);
   });
 
-  it("fans a message out to every sink sharing the pair", () => {
+  it("fans every translated event out to every sink sharing the pair", () => {
     const events: StreamEvent[][] = [[], []];
     hub.subscribe("US100", "MINUTE_5", (e) => events[0].push(e));
     hub.subscribe("US100", "MINUTE_5", (e) => events[1].push(e));
     sockets[0].open();
-    sockets[0].message({
-      kind: "candle",
-      symbol: "US100",
-      resolution: "MINUTE_5",
-      time: 100,
-      open: 1,
-      high: 1,
-      low: 1,
-      close: 1,
-      volume: null,
-      forming: true,
-    });
+    sockets[0].message("a frame");
 
     for (const stream of events) {
-      const barEvents = stream.filter((e) => e.kind === "bar");
-      expect(barEvents).toEqual([{ kind: "bar", bar: bar(100, 1, true) }]);
+      expect(stream).toContainEqual({ kind: "error", message: "a frame" });
     }
+  });
+
+  it("drops a frame the translation makes nothing of, instead of passing it on", () => {
+    const events: StreamEvent[] = [];
+    hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    sockets[0].open();
+    const before = events.length;
+    sockets[0].message("");
+    expect(events).toHaveLength(before);
   });
 
   it("closes the socket only once the last subscriber leaves", () => {
@@ -138,108 +137,36 @@ describe("SocketHub", () => {
     expect(sockets).toHaveLength(2);
   });
 
-  it("backfills the gap from fetchRecent once a reconnect succeeds", async () => {
+  // What used to happen here was a backfill: work out how far back the outage
+  // reached and fetch it. The archive's subscription opens with a snapshot, so
+  // reconnecting delivers the missed bars by itself — the hub reopens the
+  // socket and does nothing else (terminal-market-data spec, "Połączenie
+  // wraca": the terminal MUST NOT ask for the gap separately).
+  it("asks for nothing after a reconnect beyond reopening the socket", () => {
     const events: StreamEvent[] = [];
-    fetchRecent.mockResolvedValue([bar(200, 2), bar(300, 3)]);
     hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
     sockets[0].open();
     sockets[0].drop();
     vi.advanceTimersByTime(1000);
+    sockets[1].open();
+
     expect(sockets).toHaveLength(2);
-
-    sockets[1].open();
-    await vi.waitFor(() => {
-      expect(fetchRecent).toHaveBeenCalledWith("US100", "MINUTE_5", 50, expect.any(AbortSignal));
-    });
-    await vi.waitFor(() => {
-      const bars = events.filter((e) => e.kind === "bar").map((e) => e.bar);
-      expect(bars).toEqual([bar(200, 2), bar(300, 3)]);
-    });
-  });
-
-  it("asks for more bars when the first batch doesn't reach back to the drop", async () => {
-    // The last bar seen before the drop is at t=100. A full batch whose oldest
-    // bar is newer than that leaves part of the gap unfilled, so the hub asks
-    // again for twice as many — without ever computing a period length.
-    const batch = (from: number, size: number) =>
-      Array.from({ length: size }, (_, i) => bar(from + i, 1));
-    fetchRecent
-      .mockResolvedValueOnce(batch(1000, 50))
-      .mockResolvedValueOnce(batch(50, 100));
-
-    const events: StreamEvent[] = [];
-    hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
-    sockets[0].open();
-    sockets[0].message({ kind: "candle", time: 100, open: 1, high: 1, low: 1, close: 1 });
-    sockets[0].drop();
-    vi.advanceTimersByTime(1000);
-    sockets[1].open();
-
-    await vi.waitFor(() => {
-      expect(fetchRecent.mock.calls.map((call) => call[2])).toEqual([50, 100]);
-    });
-    await vi.waitFor(() => {
-      // Only the batch that covers the gap is broadcast — the short one that
-      // prompted the escalation never reaches the sinks.
-      const bars = events.filter((e) => e.kind === "bar").map((e) => e.bar);
-      expect(bars).toEqual([bar(100, 1, false), ...batch(50, 100)]);
-    });
-  });
-
-  it("stops escalating the backfill at a ceiling instead of asking forever", async () => {
-    // Every batch stays newer than the last bar seen, so nothing ever reaches
-    // back: the ask must still stop rather than double without end.
-    fetchRecent.mockImplementation((_s: string, _r: string, count: number) =>
-      Promise.resolve(Array.from({ length: count }, (_, i) => bar(10_000 + i, 1))),
-    );
-
-    hub.subscribe("US100", "MINUTE_5", () => {});
-    sockets[0].open();
-    sockets[0].message({ kind: "candle", time: 100, open: 1, high: 1, low: 1, close: 1 });
-    sockets[0].drop();
-    vi.advanceTimersByTime(1000);
-    sockets[1].open();
-
-    await vi.waitFor(() => {
-      expect(fetchRecent.mock.calls.map((call) => call[2])).toEqual([50, 100, 200, 400]);
-    });
-  });
-
-  it("aborts a backfill still in flight when the last subscriber leaves", async () => {
-    let capturedSignal: AbortSignal | undefined;
-    fetchRecent.mockImplementation(
-      (_s: string, _r: string, _c: number, signal: AbortSignal) =>
-        new Promise<Bar[]>(() => {
-          capturedSignal = signal; // never resolves — the request is still open
-        }),
-    );
-
-    const unsub = hub.subscribe("US100", "MINUTE_5", () => {});
-    sockets[0].open();
-    sockets[0].drop();
-    vi.advanceTimersByTime(1000);
-    sockets[1].open();
-
-    await vi.waitFor(() => {
-      expect(capturedSignal).toBeDefined();
-    });
-    expect(capturedSignal?.aborted).toBe(false);
-    unsub();
-    expect(capturedSignal?.aborted).toBe(true);
-  });
-
-  it("does not backfill or reconnect after the very first connect", () => {
-    hub.subscribe("US100", "MINUTE_5", () => {});
-    sockets[0].open();
-    expect(fetchRecent).not.toHaveBeenCalled();
+    expect(events.at(-1)).toEqual({ kind: "status", state: "connected" });
+    // Whatever the reconnected socket sends is simply passed on — a snapshot
+    // like any other frame.
+    sockets[1].message("the snapshot");
+    expect(events.at(-1)).toEqual({ kind: "error", message: "the snapshot" });
   });
 
   it("treats a refusal close (1008) as terminal, not transient", () => {
     const events: StreamEvent[] = [];
     hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
-    sockets[0].drop(1008, "symbol is required");
+    sockets[0].drop(1008, "US100 MINUTE_5 is not being collected");
 
-    expect(events).toContainEqual({ kind: "error", message: "symbol is required" });
+    expect(events).toContainEqual({
+      kind: "error",
+      message: "US100 MINUTE_5 is not being collected",
+    });
     expect(events.at(-1)).toEqual({ kind: "status", state: "closed" });
 
     vi.advanceTimersByTime(60_000);

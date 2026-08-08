@@ -12,15 +12,30 @@ vi.mock("./grid/GridView", () => ({
 vi.mock("./instruments/InstrumentsView", () => ({
   InstrumentsView: () => <div>instruments stub</div>,
 }));
-// No gateway is running under the test suite; the top bar's reachability
-// check is stubbed so these tests assert routing, not connectivity.
+vi.mock("./archive/ArchiveView", () => ({
+  ArchiveView: () => <div>archive stub</div>,
+}));
+// Neither back end is running under the test suite; both reachability checks
+// are stubbed so these tests assert routing, not connectivity.
 vi.mock("./data/marketData", () => ({
   marketData: {
-    id: "gateway" as const,
+    parts: [
+      {
+        id: "archive",
+        label: "market-data",
+        whenUnreachable: "the candles on screen are stale",
+        ping: async () => {},
+      },
+      {
+        id: "gateway",
+        label: "capital-gateway",
+        whenUnreachable: "instrument search is unavailable",
+        ping: async () => {},
+      },
+    ],
     searchInstruments: async () => [],
     listInstruments: async () => ({ instruments: [], count: 0, truncated: false }),
     history: async () => [],
-    ping: async () => {},
     subscribe: () => () => {},
   },
 }));
@@ -37,7 +52,7 @@ beforeEach(() => {
 // whichever test happens to be running when the microtask lands.
 async function renderApp() {
   const view = render(<App />);
-  await screen.findByText(/capital-gateway (checking|connected|unreachable)/i);
+  await screen.findByText(/market-data (checking|connected|unreachable)/i);
   return view;
 }
 
@@ -61,6 +76,23 @@ describe("App routing (terminal-shell spec)", () => {
     window.history.pushState({}, "", "/instruments");
     await renderApp();
     expect(window.location.pathname).toBe("/instruments");
+  });
+
+  // The archive panel is a tab like any other — an entry in the registry, its
+  // own address, and a reload that comes back to it rather than to the default
+  // (terminal-data-manager spec, "Panel jest zakładką terminala").
+  it("gives the archive panel its own address, and returns to it on a reload", async () => {
+    const user = userEvent.setup();
+    const { unmount } = await renderApp();
+
+    await user.click(screen.getByRole("link", { name: "Archive" }));
+    expect(window.location.pathname).toBe("/archive");
+    expect(screen.getByText("archive stub")).toBeInTheDocument();
+
+    // What a refresh does: the tree goes, the address stays.
+    unmount();
+    await renderApp();
+    expect(screen.getByText("archive stub")).toBeInTheDocument();
   });
 
   it("shows an explicit placeholder for a not-yet-implemented tab, other tabs unaffected", async () => {
@@ -90,8 +122,12 @@ describe("App routing (terminal-shell spec)", () => {
 });
 
 describe("App top bar (terminal-shell spec, source status)", () => {
-  it("names the source and reports it reachable once it answers", async () => {
+  // Two back ends, two indicators: the archive keeps the candles and the
+  // gateway keeps the catalogue, and they go down separately. One combined
+  // light would send an operator looking in the wrong place.
+  it("names each back end and reports it reachable once it answers", async () => {
     await renderApp();
+    expect(await screen.findByText(/market-data connected/i)).toBeInTheDocument();
     expect(await screen.findByText(/capital-gateway connected/i)).toBeInTheDocument();
   });
 });

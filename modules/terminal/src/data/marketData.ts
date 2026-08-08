@@ -1,17 +1,44 @@
-import { resolveGatewayEndpoints } from "./config";
+import { createArchiveSource } from "./archive";
+import { resolveEndpoints } from "./config";
 import { createGatewaySource } from "./gatewaySource";
-import type { MarketDataSource } from "./source";
+import type { ArchiveAdmin, MarketDataSource } from "./source";
 
 /**
- * The one market-data source the app runs on. `capital-gateway` is the only
- * implementation today; the `MarketDataSource` interface stays because a candle
- * store is expected to become a second one, and it must arrive without the
- * chart, the grid or the search knowing (design.md).
+ * The one market-data source the app runs on — and, behind it, the two back
+ * ends it is made of.
+ *
+ * Candles and the live stream come from `market-data`, the archive; the
+ * instrument catalogue comes from `capital-gateway`, which owns it. No view
+ * knows that: they take `marketData` and call it, and the split is this file's
+ * business alone (terminal-market-data spec, "Świece i instrumenty idą
+ * z różnych miejsc"). That is also what makes it a rollback rather than a
+ * rewrite if the archive ever has to come back out — the seam is here.
  *
  * A single module-level instance, so every view shares one socket hub — that
  * sharing is what makes six charts on the same pair one connection rather than
  * six.
  */
-const { httpBase, wsBase } = resolveGatewayEndpoints();
+const { gatewayHttp, archiveHttp, archiveWs } = resolveEndpoints();
 
-export const marketData: MarketDataSource = createGatewaySource(httpBase, wsBase);
+const archiveSource = createArchiveSource(archiveHttp, archiveWs);
+const gateway = createGatewaySource(gatewayHttp);
+
+export const marketData: MarketDataSource = {
+  // Ordered the way the shell reads them out, candles first: the archive is the
+  // one whose absence empties a chart.
+  parts: [archiveSource, gateway],
+
+  history: (request, signal) => archiveSource.history(request, signal),
+  subscribe: (symbol, resolution, sink) => archiveSource.subscribe(symbol, resolution, sink),
+
+  searchInstruments: (query, signal) => gateway.searchInstruments(query, signal),
+  listInstruments: (signal) => gateway.listInstruments(signal),
+};
+
+/**
+ * The same archive, seen as the thing the operator administers rather than the
+ * thing a chart reads. Narrowed to `ArchiveAdmin` on purpose: the panel manages
+ * what is collected, and reading candles through it would go around the one
+ * interface every view is supposed to use.
+ */
+export const archive: ArchiveAdmin = archiveSource;

@@ -72,25 +72,26 @@
 
 ## 9. Terminal — źródło składane
 
-- [ ] 9.1 Implementacja `MarketDataSource` czytająca świece i strumień z archiwum
-- [ ] 9.2 Złożenie w `marketData.ts`: świece z archiwum, instrumenty z gatewaya, jedna instancja na aplikację
-- [ ] 9.3 Obsługa snapshotu w `useBarFeed` — zastąpienie dotychczasowego zszywania historii ze strumieniem
-- [ ] 9.4 Usunięcie dociągania luki po stronie terminala, skoro przynosi ją snapshot
-- [ ] 9.5 Rozróżnienie stanów: archiwum nieosiągalne kontra gateway nieosiągalny
-- [ ] 9.6 Test: wykres, siatka i wyszukiwarka działają bez zmian w swoim kodzie
-- [ ] 9.7 Test: gdy archiwum nie odpowiada, wyszukiwarka instrumentów działa dalej
+- [x] 9.1 Implementacja `MarketDataSource` czytająca świece i strumień z archiwum
+- [x] 9.2 Złożenie w `marketData.ts`: świece z archiwum, instrumenty z gatewaya, jedna instancja na aplikację
+- [x] 9.3 Obsługa snapshotu w `useBarFeed` — zastąpienie dotychczasowego zszywania historii ze strumieniem
+- [x] 9.4 Usunięcie dociągania luki po stronie terminala, skoro przynosi ją snapshot
+- [x] 9.5 Rozróżnienie stanów: archiwum nieosiągalne kontra gateway nieosiągalny
+- [x] 9.6 Test: wykres, siatka i wyszukiwarka działają bez zmian w swoim kodzie
+- [x] 9.7 Test: gdy archiwum nie odpowiada, wyszukiwarka instrumentów działa dalej
 
 ## 10. Terminal — panel konfiguracji
 
-- [ ] 10.1 Nowa zakładka w rejestrze, z własną ścieżką
-- [ ] 10.2 Lista archiwizowanych par ze stanem zbierania i czasem najnowszej świecy
-- [ ] 10.3 Dodawanie pary: wybór instrumentu z wyszukiwarki plus rozdzielczość
-- [ ] 10.4 Pokazanie powodu, gdy archiwum odmawia dodania
-- [ ] 10.5 Wyróżnienie pary, dla której zbieranie ustało
-- [ ] 10.6 Podgląd pokrycia wybranej pary
-- [ ] 10.7 Zdejmowanie pary z potwierdzeniem i informacją, że dane zostają
-- [ ] 10.8 Odróżnienie pustej listy od nieosiągalnego archiwum
-- [ ] 10.9 Test: dodanie i zdjęcie pary odzwierciedla się na liście
+- [x] 10.1 Nowa zakładka w rejestrze, z własną ścieżką
+- [x] 10.2 Lista archiwizowanych par ze stanem zbierania i czasem najnowszej świecy
+- [x] 10.3 Dodawanie pary: wybór instrumentu z wyszukiwarki plus rozdzielczość
+- [x] 10.4 Pokazanie powodu, gdy archiwum odmawia dodania
+- [x] 10.5 Wyróżnienie pary, dla której zbieranie ustało
+- [x] 10.6 Podgląd pokrycia wybranej pary
+- [x] 10.7 Zdejmowanie pary z potwierdzeniem i informacją, że dane zostają
+- [x] 10.8 Odróżnienie pustej listy od nieosiągalnego archiwum
+- [x] 10.9 Test: dodanie i zdjęcie pary odzwierciedla się na liście
+- [x] 10.10 Środowisko lokalne: `compose.yaml` z bazą w kontenerze, usługi na hoście, `scripts/dev.sh` dla macOS i Linuksa obok istniejącego `dev.ps1`
 
 ## 11. Domknięcie
 

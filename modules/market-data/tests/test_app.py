@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -594,6 +595,22 @@ async def test_subscribing_to_a_collected_pair_is_accepted(api, pool) -> None:
     assert len(socket.sent[0]["candles"]) == 1
 
 
+async def test_a_subscription_is_accepted_through_the_router_too(api, pool) -> None:
+    """The tests around this one call the handler themselves, which is how the handshake
+    stayed broken while they all passed: the `hub` dependency asked for a `Request`, and a
+    WebSocket connection is not one, so FastAPI had nothing to pass and every subscription
+    failed with a 500 before the handler ran. Only the router can get that wrong, so only
+    a connection made through it can notice."""
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(0)])
+
+    sent = await _handshake("symbol=US100&resolution=MINUTE")
+
+    assert sent[0]["type"] == "websocket.accept"
+    assert json.loads(sent[1]["text"])["kind"] == "snapshot"
+
+
 async def test_a_subscription_without_a_symbol_is_refused_before_the_handshake(api) -> None:
     from market_data.app import candle_feed
 
@@ -623,6 +640,39 @@ def _at(stamp: str) -> datetime:
     suffix rather than whether the archive answered with the right moment.
     """
     return datetime.fromisoformat(stamp)
+
+
+async def _handshake(query: str) -> list[dict]:
+    """Connect to /ws/candles through the app itself, and answer with what it sent back.
+
+    httpx's ASGI transport speaks HTTP only, so the connection is made at the ASGI level:
+    a connect, then a disconnect, which is enough to see how the handshake ended.
+    """
+    scope = {
+        "type": "websocket",
+        "asgi": {"version": "3.0", "spec_version": "2.3"},
+        "http_version": "1.1",
+        "scheme": "ws",
+        "path": "/ws/candles",
+        "raw_path": b"/ws/candles",
+        "query_string": query.encode(),
+        "root_path": "",
+        "headers": [(b"host", b"archive.test")],
+        "client": ("127.0.0.1", 51234),
+        "server": ("archive.test", 80),
+        "subprotocols": [],
+    }
+    incoming = [{"type": "websocket.connect"}]
+    sent: list[dict] = []
+
+    async def receive() -> dict:
+        return incoming.pop(0) if incoming else {"type": "websocket.disconnect", "code": 1000}
+
+    async def send(message: dict) -> None:
+        sent.append(message)
+
+    await app(scope, receive, send)
+    return sent
 
 
 def _collector():

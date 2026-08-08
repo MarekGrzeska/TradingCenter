@@ -1,62 +1,99 @@
 <#
 .SYNOPSIS
-    Convenience wrapper for local work: starts capital-gateway, waits for it,
-    then starts the terminal against it.
+    Everything the terminal needs, in the order it needs it.
 
 .DESCRIPTION
-    The gateway comes up first and the terminal only once it answers, so the
-    terminal never spends its first seconds hammering a proxy with nothing
-    behind it. The terminal has no offline mode — the gateway is its only
-    source of market data.
+    database (container) -> migrations -> capital-gateway -> market-data -> terminal
 
-    Neither module depends on this script — each still starts on its own with
-    its own documented command (see each module's README).
+    The order is not tidiness. market-data opens a subscription per tracked pair
+    as it starts, so a gateway that is not listening yet costs it a round of
+    backoff; and the terminal's charts read the archive, so starting it first
+    fills the console with proxy errors that mean nothing. Each step waits for
+    the one before it to answer, not merely to have been launched.
 
-.PARAMETER GatewayTimeoutSeconds
-    How long to wait for the gateway to answer /capabilities. `uv run` may
-    resolve dependencies on a cold start, which is the slow part.
+    Only PostgreSQL runs in a container — see compose.yaml at the repository
+    root. The services run here, where they reload on save and can be attached
+    to.
+
+    Neither module depends on this script: each still starts on its own with the
+    command in its README. `scripts/dev.sh` is the macOS and Linux counterpart.
+
+.PARAMETER NoTerminal
+    Back end only — the database, the gateway and the archive. What the live
+    tests need.
+
+.PARAMETER Fresh
+    Drop the database volume first and start with an empty archive.
+
+.PARAMETER DbPort
+    Host port for the container's PostgreSQL. Must match the port in
+    modules\market-data\.env, which the script checks.
+
+.PARAMETER WaitSeconds
+    How long to wait for each service to answer. `uv run` may resolve
+    dependencies on a cold start, which is the slow part.
 
 .EXAMPLE
     ./scripts/dev.ps1
+    ./scripts/dev.ps1 -NoTerminal
+    ./scripts/dev.ps1 -Fresh
 #>
 
 param(
-    [int]$GatewayTimeoutSeconds = 120
+    [switch]$NoTerminal,
+    [switch]$Fresh,
+    [int]$DbPort = 55432,
+    [int]$WaitSeconds = 120
 )
 
 $ErrorActionPreference = "Stop"
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $gatewayDir = Join-Path $repoRoot "modules\capital-gateway"
+$archiveDir = Join-Path $repoRoot "modules\market-data"
 $terminalDir = Join-Path $repoRoot "modules\terminal"
+$composeFile = Join-Path $repoRoot "compose.yaml"
 
 $gatewayPort = 8010
+$archivePort = 8020
 $terminalPort = 5173
 # 127.0.0.1, not "localhost": uvicorn binds IPv4 loopback, while "localhost" can
 # resolve to ::1 first on Windows.
 $gatewayUrl = "http://127.0.0.1:$gatewayPort"
+$archiveUrl = "http://127.0.0.1:$archivePort"
 $terminalUrl = "http://localhost:$terminalPort"
 
 Write-Host "Checking prerequisites..." -ForegroundColor Cyan
 
-$missing = @()
-if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-    $missing += "pnpm is not on PATH (needed to run the terminal) - https://pnpm.io/installation"
-}
-if (-not (Test-Path (Join-Path $terminalDir "node_modules"))) {
-    $missing += "$terminalDir\node_modules is missing - run 'pnpm install' in modules\terminal"
-}
+$problems = @()
+
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    $missing += "uv is not on PATH (needed to run capital-gateway) - https://docs.astral.sh/uv/"
+    $problems += "uv is not on PATH (runs both Python services) - https://docs.astral.sh/uv/"
 }
-$gatewayEnv = Join-Path $gatewayDir ".env"
-if (-not (Test-Path $gatewayEnv)) {
-    $missing += "$gatewayEnv is missing - copy .env.example and fill in demo credentials"
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    $problems += "docker is not on PATH (runs PostgreSQL) - https://docs.docker.com/get-docker/"
 }
 
-# A port already taken is the most common reason a previous run "hangs": the new
-# process cannot bind, and the wait below would sit there watching someone
-# else's service. Name it up front instead.
+$gatewayEnv = Join-Path $gatewayDir ".env"
+if (-not (Test-Path $gatewayEnv)) {
+    $problems += "$gatewayEnv is missing - copy .env.example and fill in demo credentials"
+}
+$archiveEnv = Join-Path $archiveDir ".env"
+if (-not (Test-Path $archiveEnv)) {
+    $problems += "$archiveEnv is missing - copy .env.example (its defaults match compose.yaml)"
+}
+
+if (-not $NoTerminal) {
+    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
+        $problems += "pnpm is not on PATH (runs the terminal) - https://pnpm.io/installation"
+    }
+    if (-not (Test-Path (Join-Path $terminalDir "node_modules"))) {
+        $problems += "$terminalDir\node_modules is missing - run 'pnpm install' in modules\terminal"
+    }
+}
+
+# A port already taken is the commonest reason a run appears to hang: the new
+# process cannot bind, and the wait then watches somebody else's service.
 function Get-PortOwner {
     param([int]$Port)
     $conn = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue |
@@ -67,21 +104,65 @@ function Get-PortOwner {
     return "$($proc.ProcessName) (pid $($proc.Id))"
 }
 
-foreach ($port in @($gatewayPort, $terminalPort)) {
+# Whether the container this repository starts is itself what holds a port.
+#
+# Ctrl+C leaves the database running on purpose, so on the second run of the day
+# its port is legitimately taken - by us. Reporting that as a collision made the
+# normal case fail, and there was nothing to "stop first": `docker compose up -d`
+# on a container that is already up is a no-op.
+#
+# Asked of the container by name rather than of the port, because the port says
+# too little: Docker publishes every container's ports through one proxy process,
+# so the owning process means some container does - not which one, and another
+# project's PostgreSQL on this port is still the collision worth refusing.
+function Test-OurDatabaseContainer {
+    param([int]$Port)
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { return $false }
+    $format = '{{if .State.Running}}{{range $port, $bindings := .NetworkSettings.Ports}}{{range $bindings}}{{.HostPort}} {{end}}{{end}}{{end}}'
+    $published = docker inspect -f $format tradingcenter-db 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($published)) { return $false }
+    return ($published -split '\s+') -contains "$Port"
+}
+
+$dbAlreadyRunning = $false
+
+$ports = @($gatewayPort, $archivePort, $DbPort)
+if (-not $NoTerminal) { $ports += $terminalPort }
+foreach ($port in $ports) {
     $owner = Get-PortOwner -Port $port
-    if ($null -ne $owner) {
-        $missing += "port $port is already in use by $owner - stop it first, or it is a leftover run"
+    if ($null -eq $owner) { continue }
+    if ($port -eq $DbPort -and (Test-OurDatabaseContainer -Port $DbPort)) {
+        # Ours, and already up. Reused rather than reported.
+        $dbAlreadyRunning = $true
+        continue
+    }
+    $problems += "port $port is already in use by $owner - stop it first, or it is a leftover run"
+}
+
+# The quiet disaster this guards against: the container comes up on one port, the
+# archive's .env points at another, and everything then runs happily against
+# whatever PostgreSQL was already there - migrations included. Nothing fails, and
+# the data goes somewhere nobody meant.
+if (Test-Path $archiveEnv) {
+    $urlLine = Select-String -Path $archiveEnv -Pattern '^DATABASE_URL=' | Select-Object -First 1
+    if ($null -ne $urlLine -and $urlLine.Line -match ':(\d+)/') {
+        $envPort = [int]$Matches[1]
+        if ($envPort -ne $DbPort) {
+            $problems += "modules\market-data\.env points DATABASE_URL at port $envPort, but this script starts the database on $DbPort - it would migrate and fill a different database than the one it started"
+        }
     }
 }
 
-if ($missing.Count -gt 0) {
+if ($problems.Count -gt 0) {
     Write-Host "Cannot start:" -ForegroundColor Red
-    foreach ($m in $missing) { Write-Host "  - $m" -ForegroundColor Red }
+    foreach ($p in $problems) { Write-Host "  - $p" -ForegroundColor Red }
     exit 1
 }
 
 $gatewayJob = $null
+$archiveJob = $null
 $terminalJob = $null
+$dbStarted = $false
 
 function Write-Prefixed {
     param([string]$Prefix, [string]$Color, [object[]]$Lines)
@@ -93,86 +174,172 @@ function Write-Prefixed {
     }
 }
 
-try {
-    Write-Host "Starting capital-gateway on port $gatewayPort..." -ForegroundColor Cyan
-    $gatewayJob = Start-Job -Name "gateway" -ScriptBlock {
-        param($dir, $port)
-        Set-Location $dir
-        uv run uvicorn capital_gateway.app:app --port $port 2>&1
-    } -ArgumentList $gatewayDir, $gatewayPort
-
-    Write-Host "Waiting for it to answer $gatewayUrl/capabilities" -NoNewline -ForegroundColor Cyan
-    Write-Host " (uv may resolve dependencies first)..." -ForegroundColor DarkGray
-
-    $healthy = $false
-    $deadline = (Get-Date).AddSeconds($GatewayTimeoutSeconds)
+function Wait-ForHttp {
+    param([string]$Url, [string]$Label, $Job, [string]$Prefix, [string]$Color)
+    $deadline = (Get-Date).AddSeconds($WaitSeconds)
     while ((Get-Date) -lt $deadline) {
-        # Show the gateway's own output while waiting - a silent script for
-        # 30+ seconds is indistinguishable from a hung one.
-        Write-Prefixed -Prefix "gateway " -Color Blue -Lines (Receive-Job $gatewayJob)
-
-        if ($gatewayJob.State -in @("Failed", "Completed", "Stopped")) {
-            Write-Host "capital-gateway exited before answering." -ForegroundColor Red
-            Write-Prefixed -Prefix "gateway " -Color Yellow -Lines (Receive-Job $gatewayJob)
-            exit 1
+        # Show the service's own output while waiting - a silent script for 30+
+        # seconds is indistinguishable from a hung one.
+        Write-Prefixed -Prefix $Prefix -Color $Color -Lines (Receive-Job $Job)
+        if ($Job.State -in @("Failed", "Completed", "Stopped")) {
+            Write-Host "$Label exited before answering." -ForegroundColor Red
+            return $false
         }
-
         try {
-            $response = Invoke-WebRequest -Uri "$gatewayUrl/capabilities" -UseBasicParsing -TimeoutSec 2
-            if ($response.StatusCode -eq 200) { $healthy = $true; break }
+            $response = Invoke-WebRequest -Uri $Url -UseBasicParsing -TimeoutSec 2
+            if ($response.StatusCode -eq 200) { return $true }
         } catch {
             # Not up yet. Keep waiting until the deadline.
         }
         Start-Sleep -Milliseconds 500
     }
+    Write-Host "$Label did not answer $Url within $WaitSeconds s." -ForegroundColor Red
+    Write-Host "A cold 'uv run' resolving dependencies is the usual slow part." -ForegroundColor DarkGray
+    return $false
+}
 
-    if (-not $healthy) {
-        Write-Host "capital-gateway did not answer within $GatewayTimeoutSeconds s." -ForegroundColor Red
-        Write-Prefixed -Prefix "gateway " -Color Yellow -Lines (Receive-Job $gatewayJob)
-        Write-Host "Raise the limit with -GatewayTimeoutSeconds if it was still starting." -ForegroundColor DarkGray
-        exit 1
+try {
+    # --- the database ---
+
+    if ($Fresh) {
+        Write-Host "Removing the existing database volume..." -ForegroundColor Cyan
+        $env:DB_PORT = "$DbPort"
+        docker compose -f $composeFile down -v 2>&1 | Out-Null
+        $dbAlreadyRunning = $false
     }
 
-    Write-Host "capital-gateway is answering." -ForegroundColor Green
+    # Run either way: `up -d` on a running container is a no-op, and on one whose
+    # definition has changed since it started it is the thing that reconciles it.
+    if ($dbAlreadyRunning) {
+        Write-Host "Reusing the database container already running on 127.0.0.1:$DbPort..." -ForegroundColor Cyan
+    } else {
+        Write-Host "Starting PostgreSQL in a container..." -ForegroundColor Cyan
+    }
+    $env:DB_PORT = "$DbPort"
+    docker compose -f $composeFile up -d db
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "docker compose could not start the database." -ForegroundColor Red
+        Write-Host "The reason is above. The two usual ones: the Docker daemon is not running" -ForegroundColor DarkGray
+        Write-Host "('docker info' will say), or something already holds port $DbPort." -ForegroundColor DarkGray
+        exit 1
+    }
+    $dbStarted = $true
 
-    # Started only now: bringing the terminal up first would have it retrying
-    # against a gateway that is not listening yet, filling the log with proxy
-    # errors that mean nothing.
-    Write-Host "Starting terminal on port $terminalPort..." -ForegroundColor Cyan
-    $terminalJob = Start-Job -Name "terminal" -ScriptBlock {
+    Write-Host "Waiting for it to accept connections..." -ForegroundColor Cyan
+    $deadline = (Get-Date).AddSeconds(60)
+    while ($true) {
+        $health = (docker inspect -f '{{.State.Health.Status}}' tradingcenter-db 2>$null)
+        if ($health -eq "healthy") { break }
+        if ((Get-Date) -ge $deadline) {
+            Write-Host "the database did not become healthy within 60s." -ForegroundColor Red
+            docker compose -f $composeFile logs --tail 30 db
+            exit 1
+        }
+        Start-Sleep -Seconds 1
+    }
+    Write-Host "PostgreSQL is accepting connections on 127.0.0.1:$DbPort." -ForegroundColor Green
+
+    # Applied every run, not only on a fresh one: a checkout that has just pulled
+    # a new migration is exactly the case where forgetting this produces an error
+    # that reads like a bug in the archive.
+    Write-Host "Applying migrations..." -ForegroundColor Cyan
+    Push-Location $archiveDir
+    try {
+        uv run alembic upgrade head
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "migrations failed - the archive would fail on its first query, so stopping here." -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+    Write-Host "Schema is up to date." -ForegroundColor Green
+
+    # --- capital-gateway ---
+
+    Write-Host "Starting capital-gateway on port $gatewayPort..." -ForegroundColor Cyan
+    $gatewayJob = Start-Job -Name "gateway" -ScriptBlock {
         param($dir, $port)
         Set-Location $dir
-        pnpm exec vite --port $port --strictPort 2>&1
-    } -ArgumentList $terminalDir, $terminalPort
+        uv run uvicorn capital_gateway.app:app --reload --port $port 2>&1
+    } -ArgumentList $gatewayDir, $gatewayPort
+
+    if (-not (Wait-ForHttp -Url "$gatewayUrl/capabilities" -Label "capital-gateway" `
+                -Job $gatewayJob -Prefix "gateway " -Color Blue)) {
+        Write-Prefixed -Prefix "gateway " -Color Yellow -Lines (Receive-Job $gatewayJob)
+        exit 1
+    }
+    Write-Host "capital-gateway is answering." -ForegroundColor Green
+
+    # --- market-data ---
+    #
+    # After the gateway, because it subscribes to it as it starts. Before the
+    # terminal, because the terminal's charts read it.
+
+    Write-Host "Starting market-data on port $archivePort..." -ForegroundColor Cyan
+    $archiveJob = Start-Job -Name "archive" -ScriptBlock {
+        param($dir, $port)
+        Set-Location $dir
+        uv run uvicorn market_data.app:app --reload --port $port 2>&1
+    } -ArgumentList $archiveDir, $archivePort
+
+    if (-not (Wait-ForHttp -Url "$archiveUrl/health" -Label "market-data" `
+                -Job $archiveJob -Prefix "archive " -Color Magenta)) {
+        Write-Prefixed -Prefix "archive " -Color Yellow -Lines (Receive-Job $archiveJob)
+        exit 1
+    }
+    Write-Host "market-data is answering." -ForegroundColor Green
+
+    # --- the terminal ---
+
+    if (-not $NoTerminal) {
+        Write-Host "Starting the terminal on port $terminalPort..." -ForegroundColor Cyan
+        $terminalJob = Start-Job -Name "terminal" -ScriptBlock {
+            param($dir, $port)
+            Set-Location $dir
+            pnpm exec vite --port $port --strictPort 2>&1
+        } -ArgumentList $terminalDir, $terminalPort
+    }
 
     Write-Host ""
     Write-Host "Ready:" -ForegroundColor Green
-    Write-Host "  Terminal          $terminalUrl"
-    Write-Host "  Gateway Swagger   $gatewayUrl/docs"
+    if (-not $NoTerminal) {
+        Write-Host "  Terminal            $terminalUrl"
+        Write-Host "  Archive panel       $terminalUrl/archive"
+    }
+    Write-Host "  market-data docs    $archiveUrl/docs"
+    Write-Host "  Gateway docs        $gatewayUrl/docs"
+    Write-Host "  Database            postgresql://market_data:change-me@127.0.0.1:$DbPort/market_data"
     Write-Host ""
-    Write-Host "Ctrl+C to stop." -ForegroundColor DarkGray
+    Write-Host "Nothing is archived until a pair is added in the Archive panel - that is deliberate." -ForegroundColor DarkGray
+    Write-Host "Ctrl+C to stop the services. The database keeps running." -ForegroundColor DarkGray
     Write-Host ""
+
+    $watched = @(
+        @{ Job = $gatewayJob; Label = "capital-gateway"; Prefix = "gateway "; Color = "Blue" },
+        @{ Job = $archiveJob; Label = "market-data"; Prefix = "archive "; Color = "Magenta" }
+    )
+    if (-not $NoTerminal) {
+        $watched += @{ Job = $terminalJob; Label = "terminal"; Prefix = "terminal"; Color = "Cyan" }
+    }
 
     while ($true) {
-        Write-Prefixed -Prefix "gateway " -Color Blue -Lines (Receive-Job $gatewayJob)
-        if ($gatewayJob.State -in @("Failed", "Completed", "Stopped")) {
-            Write-Host "capital-gateway exited unexpectedly." -ForegroundColor Red
-            break
+        $died = $false
+        foreach ($w in $watched) {
+            Write-Prefixed -Prefix $w.Prefix -Color $w.Color -Lines (Receive-Job $w.Job)
+            if ($w.Job.State -in @("Failed", "Completed", "Stopped")) {
+                Write-Host "$($w.Label) exited unexpectedly." -ForegroundColor Red
+                $died = $true
+            }
         }
-
-        Write-Prefixed -Prefix "terminal" -Color Magenta -Lines (Receive-Job $terminalJob)
-        if ($terminalJob.State -in @("Failed", "Completed", "Stopped")) {
-            Write-Host "terminal exited unexpectedly." -ForegroundColor Red
-            break
-        }
-
+        if ($died) { break }
         Start-Sleep -Milliseconds 300
     }
 }
 finally {
     Write-Host ""
     Write-Host "Stopping..." -ForegroundColor Cyan
-    foreach ($job in @($gatewayJob, $terminalJob)) {
+    foreach ($job in @($gatewayJob, $archiveJob, $terminalJob)) {
         if ($null -ne $job) {
             Stop-Job $job -ErrorAction SilentlyContinue | Out-Null
             Remove-Job $job -Force -ErrorAction SilentlyContinue | Out-Null
@@ -181,10 +348,15 @@ finally {
     # Start-Job's child process tree (uv -> uvicorn, pnpm -> vite) can outlive the
     # job object itself, which is what actually leaves a process squatting on the
     # port - so processes bound to the ports we used are swept explicitly too.
-    foreach ($port in @($gatewayPort, $terminalPort)) {
+    $sweep = @($gatewayPort, $archivePort)
+    if (-not $NoTerminal) { $sweep += $terminalPort }
+    foreach ($port in $sweep) {
         Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
             ForEach-Object {
                 Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue
             }
+    }
+    if ($dbStarted) {
+        Write-Host "The database is still running - 'docker compose down' when you are done with it." -ForegroundColor DarkGray
     }
 }

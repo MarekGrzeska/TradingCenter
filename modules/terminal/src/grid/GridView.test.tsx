@@ -22,13 +22,12 @@ vi.mock("lightweight-charts", () => ({
 // live source would push state updates into these tests at arbitrary moments.
 vi.mock("../data/marketData", () => ({
   marketData: {
-    id: "gateway" as const,
+    parts: [],
     searchInstruments: async () => [],
     listInstruments: async () => ({ instruments: [], count: 0, truncated: false }),
-    // Never resolves: the charts stay in their loading state, so no async
-    // state update lands outside these tests' control.
-    history: () => new Promise<never>(() => {}),
-    ping: async () => {},
+    history: async () => [],
+    // Never sends anything: the charts stay in their loading state, so no
+    // async state update lands outside these tests' control.
     subscribe: () => () => {},
   },
 }));
@@ -157,11 +156,15 @@ describe("Grid connection sharing (terminal-market-data spec)", () => {
 
   it("shares one connection between two slots on the same pair, and frees it with the last", () => {
     const sockets: FakeSocket[] = [];
-    const hub = new SocketHub("ws://test/ws", async () => [], () => {
-      const socket = new FakeSocket();
-      sockets.push(socket);
-      return socket;
-    });
+    const hub = new SocketHub(
+      (symbol, resolution) => `ws://test/ws/candles?symbol=${symbol}&resolution=${resolution}`,
+      () => [],
+      () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+    );
 
     // Two slots showing US100 MINUTE_5, one showing GOLD MINUTE_5.
     const unsubA = hub.subscribe("US100", "MINUTE_5", () => {});
@@ -185,11 +188,15 @@ describe("Grid connection sharing (terminal-market-data spec)", () => {
 
   it("opens at most one connection per pair for a full 3x2 of distinct pairs", () => {
     const sockets: FakeSocket[] = [];
-    const hub = new SocketHub("ws://test/ws", async () => [], () => {
-      const socket = new FakeSocket();
-      sockets.push(socket);
-      return socket;
-    });
+    const hub = new SocketHub(
+      (symbol, resolution) => `ws://test/ws/candles?symbol=${symbol}&resolution=${resolution}`,
+      () => [],
+      () => {
+        const socket = new FakeSocket();
+        sockets.push(socket);
+        return socket;
+      },
+    );
 
     const pairs = [
       ["US100", "MINUTE_5"],
