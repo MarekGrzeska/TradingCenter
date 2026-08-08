@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { SocketHub, type SocketLike } from "../data/socketHub";
+import type { Resolution, TrackedPair } from "../data/types";
 
 // Same stub rationale as Chart.test.tsx: the canvas is not assertable.
 vi.mock("lightweight-charts", () => ({
@@ -18,8 +20,23 @@ vi.mock("lightweight-charts", () => ({
   }),
 }));
 
-// A quiet source. The grid's job is layout and slot wiring, not data, and a
-// live source would push state updates into these tests at arbitrary moments.
+/** What the slot's picker and its resolution restriction both read from — the
+ *  list changes per test the way the real archive's would. */
+class FakeArchive {
+  pairs: TrackedPair[] = [];
+  listFailure: Error | null = null;
+
+  listPairs = async () => {
+    if (this.listFailure) throw this.listFailure;
+    return [...this.pairs];
+  };
+}
+
+let fakeArchive: FakeArchive;
+
+// A quiet candle source. The grid's job is layout and slot wiring, not data,
+// and a live source would push state updates into these tests at arbitrary
+// moments.
 vi.mock("../data/marketData", () => ({
   marketData: {
     parts: [],
@@ -30,11 +47,26 @@ vi.mock("../data/marketData", () => ({
     // async state update lands outside these tests' control.
     subscribe: () => () => {},
   },
+  get archive() {
+    return fakeArchive;
+  },
 }));
 
 const { GridView } = await import("./GridView");
 const { gridStore, STORAGE_KEY } = await import("./gridStore");
 const { defaultGridConfig, SLOT_IDS } = await import("./model");
+
+function pair(symbol: string, resolution: Resolution): TrackedPair {
+  return { symbol, resolution, addedAt: 0, collectFrom: 0, latestCandle: null, collection: "collecting" };
+}
+
+function renderGrid() {
+  return render(
+    <MemoryRouter>
+      <GridView />
+    </MemoryRouter>,
+  );
+}
 
 beforeEach(() => {
   window.localStorage.clear();
@@ -50,11 +82,25 @@ beforeEach(() => {
     else gridStore.setSlotSymbol(id, slot.symbol);
     gridStore.setSlotResolution(id, slot.resolution);
   }
+
+  fakeArchive = new FakeArchive();
+  // Matches `defaultGridConfig`'s own slots, plus a couple of extra
+  // instruments the tests pick from the picker. `US100` carries a second
+  // resolution so the resolution-switch test still has one to switch to.
+  fakeArchive.pairs = [
+    pair("US100", "MINUTE_5"),
+    pair("US100", "HOUR_4"),
+    pair("GOLD", "MINUTE_5"),
+    pair("BTCUSD", "HOUR"),
+    pair("EURUSD", "MINUTE_15"),
+    pair("SILVER", "MINUTE_5"),
+    pair("TSLA", "MINUTE_5"),
+  ];
 });
 
 describe("GridView layout (terminal-grid spec)", () => {
   it("renders exactly as many slots as the layout calls for", async () => {
-    render(<GridView />);
+    renderGrid();
     expect(screen.getAllByTestId(/^slot-/)).toHaveLength(4);
 
     await userEvent.click(screen.getByRole("button", { name: "3x2" }));
@@ -66,26 +112,24 @@ describe("GridView layout (terminal-grid spec)", () => {
 
   it("keeps a hidden slot's instrument when shrinking and re-expanding", async () => {
     const user = userEvent.setup();
-    render(<GridView />);
+    renderGrid();
 
     await user.click(screen.getByRole("button", { name: "3x2" }));
     const slot6 = within(screen.getByTestId("slot-s6"));
-    const field = slot6.getByLabelText("Symbol for slot s6");
-    await user.type(field, "SILVER{Enter}");
+    await user.click(slot6.getByRole("combobox", { name: "Symbol for slot s6" }));
+    await user.click(await screen.findByRole("option", { name: /^SILVER/ }));
     await waitFor(() => expect(gridStore.getSnapshot().slots.s6.symbol).toBe("SILVER"));
 
     await user.click(screen.getByRole("button", { name: "2x2" }));
     expect(screen.queryByTestId("slot-s6")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "3x2" }));
-    expect(
-      within(screen.getByTestId("slot-s6")).getByLabelText("Symbol for slot s6"),
-    ).toHaveValue("SILVER");
+    expect(within(screen.getByTestId("slot-s6")).getByText("SILVER")).toBeInTheDocument();
   });
 
   it("invites a choice in an empty slot instead of drawing an empty chart", async () => {
     const user = userEvent.setup();
-    render(<GridView />);
+    renderGrid();
     await user.click(screen.getByRole("button", { name: "3x2" }));
 
     const slot6 = within(screen.getByTestId("slot-s6"));
@@ -94,7 +138,7 @@ describe("GridView layout (terminal-grid spec)", () => {
 
   it("marks the slot the operator is acting on", async () => {
     const user = userEvent.setup();
-    render(<GridView />);
+    renderGrid();
 
     expect(screen.getByTestId("slot-s1")).toHaveAttribute("data-active", "true");
     await user.click(screen.getByTestId("slot-s3"));
@@ -104,12 +148,13 @@ describe("GridView layout (terminal-grid spec)", () => {
 
   it("changes one slot's instrument without disturbing the others", async () => {
     const user = userEvent.setup();
-    render(<GridView />);
+    renderGrid();
     const before = gridStore.getSnapshot().slots.s2.symbol;
 
-    const field = within(screen.getByTestId("slot-s1")).getByLabelText("Symbol for slot s1");
-    await user.clear(field);
-    await user.type(field, "TSLA{Enter}");
+    const slot1 = within(screen.getByTestId("slot-s1"));
+    await user.click(slot1.getByRole("button", { name: "Clear Symbol for slot s1" }));
+    await user.click(slot1.getByRole("combobox", { name: "Symbol for slot s1" }));
+    await user.click(await screen.findByRole("option", { name: /^TSLA/ }));
 
     await waitFor(() => expect(gridStore.getSnapshot().slots.s1.symbol).toBe("TSLA"));
     expect(gridStore.getSnapshot().slots.s2.symbol).toBe(before);
@@ -117,7 +162,7 @@ describe("GridView layout (terminal-grid spec)", () => {
 
   it("changes one slot's resolution without disturbing the others", async () => {
     const user = userEvent.setup();
-    render(<GridView />);
+    renderGrid();
     const before = gridStore.getSnapshot().slots.s2.resolution;
 
     const select = within(screen.getByTestId("slot-s1")).getByLabelText("Resolution");
@@ -129,14 +174,78 @@ describe("GridView layout (terminal-grid spec)", () => {
 
   it("persists layout and slots across a remount", async () => {
     const user = userEvent.setup();
-    const { unmount } = render(<GridView />);
+    const { unmount } = renderGrid();
     await user.click(screen.getByRole("button", { name: "3x2" }));
     unmount();
 
     expect(window.localStorage.getItem(STORAGE_KEY)).toContain("3x2");
 
-    render(<GridView />);
+    renderGrid();
     expect(screen.getAllByTestId(/^slot-/)).toHaveLength(6);
+
+    // Let the fresh mount's own read of the archive settle before the test
+    // ends, so its resolution does not land outside any `act()`.
+    await waitFor(() => {
+      const select = within(screen.getByTestId("slot-s1")).getByLabelText(
+        "Resolution",
+      ) as HTMLSelectElement;
+      expect(select.options).toHaveLength(2);
+    });
+  });
+});
+
+describe("GridView slot — archived-only symbols (terminal-grid spec)", () => {
+  it("limits the resolution selector to what the instrument is archived in", async () => {
+    renderGrid();
+
+    // GOLD (slot s2) is archived only at MINUTE_5 in this test's fixture.
+    const select = within(screen.getByTestId("slot-s2")).getByLabelText(
+      "Resolution",
+    ) as HTMLSelectElement;
+    await waitFor(() => {
+      expect([...select.options].map((o) => o.value)).toEqual(["MINUTE_5"]);
+    });
+  });
+
+  it("says nothing archived matches, and points to Instruments, when the picker is empty", async () => {
+    fakeArchive.pairs = [];
+    const user = userEvent.setup();
+    renderGrid();
+    await user.click(screen.getByRole("button", { name: "3x2" }));
+
+    await user.click(
+      within(screen.getByTestId("slot-s6")).getByRole("combobox", {
+        name: "Symbol for slot s6",
+      }),
+    );
+
+    expect(await screen.findByText(/add instruments in the instruments tab/i)).toBeInTheDocument();
+  });
+
+  it("keeps a slot's instrument when the archived list can't be read, and lets the picker say so", async () => {
+    fakeArchive.listFailure = new Error("archive unreachable");
+    const user = userEvent.setup();
+    renderGrid();
+
+    const slot1 = within(screen.getByTestId("slot-s1"));
+    expect(slot1.queryByText(/no longer archived/i)).not.toBeInTheDocument();
+    expect(slot1.getByText("US100")).toBeInTheDocument();
+
+    await user.click(slot1.getByRole("button", { name: "Clear Symbol for slot s1" }));
+    await user.click(screen.getByRole("combobox", { name: "Symbol for slot s1" }));
+
+    expect(await screen.findByText(/archive unreachable/i)).toBeInTheDocument();
+  });
+
+  it("recognizes a remembered instrument that stopped being archived, leaving other slots alone", async () => {
+    fakeArchive.pairs = fakeArchive.pairs.filter((p) => p.symbol !== "US100");
+    renderGrid();
+
+    const slot1 = within(screen.getByTestId("slot-s1"));
+    expect(await slot1.findByText(/no longer archived/i)).toBeInTheDocument();
+    expect(slot1.getByText("US100")).toBeInTheDocument();
+
+    expect(within(screen.getByTestId("slot-s2")).getByText("GOLD")).toBeInTheDocument();
   });
 });
 

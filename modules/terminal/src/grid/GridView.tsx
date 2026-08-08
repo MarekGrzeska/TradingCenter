@@ -1,12 +1,32 @@
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
+import { Link } from "react-router";
 import { Chart } from "../chart/Chart";
-import { marketData } from "../data/marketData";
+import { archive, marketData } from "../data/marketData";
+import type { Resolution, TrackedPair } from "../data/types";
+import { useTrackedPairs } from "../instruments/useTrackedPairs";
 import { gridStore } from "./gridStore";
 import { SymbolField } from "./SymbolField";
 import { LAYOUTS, LAYOUT_IDS, visibleSlotIds, type SlotId } from "./model";
 
+function groupResolutionsBySymbol(pairs: TrackedPair[]): Map<string, Resolution[]> {
+  const map = new Map<string, Resolution[]>();
+  for (const pair of pairs) {
+    const resolutions = map.get(pair.symbol) ?? [];
+    resolutions.push(pair.resolution);
+    map.set(pair.symbol, resolutions);
+  }
+  return map;
+}
+
 export function GridView() {
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
+  // Read once and shared by every slot, rather than one poll per slot — six
+  // slots asking independently would be six requests for the same list.
+  const archived = useTrackedPairs(archive);
+  const resolutionsBySymbol = useMemo(
+    () => groupResolutionsBySymbol(archived.pairs),
+    [archived.pairs],
+  );
 
   const visible = visibleSlotIds(config.layout);
   const { cols, rows } = LAYOUTS[config.layout];
@@ -42,16 +62,39 @@ export function GridView() {
         }}
       >
         {visible.map((slotId) => (
-          <Slot key={slotId} slotId={slotId} active={config.activeSlot === slotId} />
+          <Slot
+            key={slotId}
+            slotId={slotId}
+            active={config.activeSlot === slotId}
+            archivedStatus={archived.status}
+            resolutionsBySymbol={resolutionsBySymbol}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function Slot({ slotId, active }: { slotId: SlotId; active: boolean }) {
+function Slot({
+  slotId,
+  active,
+  archivedStatus,
+  resolutionsBySymbol,
+}: {
+  slotId: SlotId;
+  active: boolean;
+  archivedStatus: ReturnType<typeof useTrackedPairs>["status"];
+  resolutionsBySymbol: Map<string, Resolution[]>;
+}) {
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
   const slot = config.slots[slotId];
+  const allowedResolutions = slot.symbol ? resolutionsBySymbol.get(slot.symbol) : undefined;
+
+  // Only a definite "no" — a fetch that actually finished and came back
+  // without this symbol — counts as stale. `unreachable` must never read as
+  // "no longer archived": the slot keeps showing what it already had
+  // (terminal-grid spec, "Listy archiwizowanych nie da się odczytać").
+  const stale = slot.symbol !== null && archivedStatus === "ready" && allowedResolutions === undefined;
 
   return (
     // Marking the slot the moment focus lands anywhere inside it, not just on
@@ -68,29 +111,24 @@ function Slot({ slotId, active }: { slotId: SlotId; active: boolean }) {
     >
       {slot.symbol === null ? (
         <EmptySlot slotId={slotId} />
+      ) : stale ? (
+        <StaleSlot slotId={slotId} symbol={slot.symbol} />
       ) : (
         <Chart
           source={marketData}
           symbol={slot.symbol}
           resolution={slot.resolution}
+          resolutions={allowedResolutions}
           onResolutionChange={(resolution) => gridStore.setSlotResolution(slotId, resolution)}
           headerLeft={
-            <span className="flex items-center gap-1">
-              <SymbolField
-                label={`Symbol for slot ${slotId}`}
-                value={slot.symbol}
-                onCommit={(symbol) => gridStore.setSlotSymbol(slotId, symbol)}
-              />
-              <button
-                type="button"
-                aria-label={`Clear slot ${slotId}`}
-                title="Empty this slot"
-                onClick={() => gridStore.clearSlotSymbol(slotId)}
-                className="px-1 text-xs text-ink-muted hover:text-ink"
-              >
-                ×
-              </button>
-            </span>
+            <SymbolField
+              label={`Symbol for slot ${slotId}`}
+              value={{ symbol: slot.symbol, resolutions: allowedResolutions ?? [] }}
+              onChange={(instrument) => {
+                if (instrument) gridStore.setSlotSymbol(slotId, instrument.symbol);
+                else gridStore.clearSlotSymbol(slotId);
+              }}
+            />
           }
         />
       )}
@@ -105,9 +143,38 @@ function EmptySlot({ slotId }: { slotId: SlotId }) {
       <SymbolField
         label={`Symbol for slot ${slotId}`}
         value={null}
-        onCommit={(symbol) => gridStore.setSlotSymbol(slotId, symbol)}
+        onChange={(instrument) => {
+          if (instrument) gridStore.setSlotSymbol(slotId, instrument.symbol);
+        }}
       />
-      <p className="text-xs text-ink-muted">or find one on the Instruments tab</p>
+    </div>
+  );
+}
+
+/** A slot whose remembered symbol stopped being archived between sessions —
+ *  recognized rather than left to loop on a subscription the archive will
+ *  keep refusing (terminal-grid spec, "Slot zapamiętany traci ważność, gdy
+ *  instrument przestaje być archiwizowany"). */
+function StaleSlot({ slotId, symbol }: { slotId: SlotId; symbol: string }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2 bg-panel px-4 text-center">
+      <p className="text-sm text-ink-muted">
+        <span className="font-semibold text-ink">{symbol}</span> is no longer archived.
+      </p>
+      <p className="text-xs text-ink-muted">
+        Add it again in the{" "}
+        <Link to="/instruments" className="text-ink underline">
+          Instruments
+        </Link>{" "}
+        tab, or pick a different instrument below.
+      </p>
+      <SymbolField
+        label={`Symbol for slot ${slotId}`}
+        value={null}
+        onChange={(instrument) => {
+          if (instrument) gridStore.setSlotSymbol(slotId, instrument.symbol);
+        }}
+      />
     </div>
   );
 }

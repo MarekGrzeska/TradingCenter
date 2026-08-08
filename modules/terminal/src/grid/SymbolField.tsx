@@ -1,51 +1,42 @@
-import { useEffect, useState } from "react";
+import { archive } from "../data/marketData";
+import { Autocomplete } from "../ui/Autocomplete";
+import { archivedInstrumentSource } from "../ui/autocompleteSources";
+import type { ArchivedInstrument } from "../ui/autocompleteSources";
 
-/** Type a symbol straight into a slot without leaving the grid
- *  (terminal-grid spec, "Zmiana instrumentu w slocie"). The Instruments tab is
- *  the other way in, for when the symbol isn't already known. */
+/**
+ * The only way a symbol reaches a slot: picked from what the archive is
+ * actually collecting, never typed from memory — a chart for a pair nobody
+ * archives has nothing to show, and the old text field only said so after
+ * the fact (terminal-grid spec, "Slot przyjmuje wyłącznie instrument
+ * archiwizowany"). Suggestions that come up empty, or a list that could not
+ * be read, point at the Instruments tab — that is where an instrument gets
+ * added to the archive in the first place.
+ */
 export function SymbolField({
-  value,
-  onCommit,
   label,
+  value,
+  onChange,
 }: {
-  value: string | null;
-  onCommit(symbol: string): void;
   label: string;
+  value: ArchivedInstrument | null;
+  onChange(instrument: ArchivedInstrument | null): void;
 }) {
-  const [draft, setDraft] = useState(value ?? "");
-
-  // Follow the slot when it changes from elsewhere (the Instruments tab
-  // assigning into it, or a layout swap bringing a different slot forward).
-  useEffect(() => {
-    setDraft(value ?? "");
-  }, [value]);
-
-  function commit() {
-    const symbol = draft.trim().toUpperCase();
-    if (symbol && symbol !== value) {
-      onCommit(symbol);
-    } else if (!symbol) {
-      setDraft(value ?? "");
-    }
-  }
-
   return (
-    <form
-      onSubmit={(e) => {
-        e.preventDefault();
-        commit();
-      }}
-    >
-      <input
-        aria-label={label}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onBlur={commit}
-        placeholder="symbol"
-        spellCheck={false}
-        autoComplete="off"
-        className="w-24 rounded border border-border bg-panel-strong px-1.5 py-0.5 text-xs font-semibold text-ink uppercase placeholder:font-normal placeholder:normal-case placeholder:text-ink-muted"
-      />
-    </form>
+    <Autocomplete<ArchivedInstrument>
+      value={value}
+      onChange={onChange}
+      source={archivedInstrumentSource(archive)}
+      getOptionId={(instrument) => instrument.symbol}
+      getOptionLabel={(instrument) => instrument.symbol}
+      renderOption={(instrument) => (
+        <span className="flex items-center gap-2">
+          <span className="font-semibold text-ink">{instrument.symbol}</span>
+          <span className="text-ink-muted">{instrument.resolutions.join(" · ")}</span>
+        </span>
+      )}
+      ariaLabel={label}
+      placeholder="Symbol…"
+      noResultsMessage="Nothing archived matches — add instruments in the Instruments tab."
+    />
   );
 }

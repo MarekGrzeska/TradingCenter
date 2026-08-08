@@ -92,12 +92,12 @@
 
 ## 11. terminal: wykres tylko na instrumentach archiwizowanych
 
-- [ ] 11.1 Zamienić `src/grid/SymbolField.tsx` na `Autocomplete` ze źródłem „instrumenty archiwizowane"
-- [ ] 11.2 Ograniczyć rozdzielczości w slocie do tych, w których wybrany instrument jest archiwizowany
-- [ ] 11.3 Puste archiwum i nieosiągalna lista mówią o sobie wprost i kierują do zakładki `Instruments`, zachowując instrument już ustawiony w slocie
-- [ ] 11.4 Slot wracający z sesji z instrumentem zdjętym z archiwizowanych rozpoznaje to i mówi, zamiast wpadać w pętlę wznawiania
-- [ ] 11.5 Usunąć drogę z wyniku wyszukiwania wprost do slotu wraz z jej testami
-- [ ] 11.6 Testy slotu
+- [x] 11.1 Zamienić `src/grid/SymbolField.tsx` na `Autocomplete` ze źródłem „instrumenty archiwizowane"
+- [x] 11.2 Ograniczyć rozdzielczości w slocie do tych, w których wybrany instrument jest archiwizowany
+- [x] 11.3 Puste archiwum i nieosiągalna lista mówią o sobie wprost i kierują do zakładki `Instruments`, zachowując instrument już ustawiony w slocie
+- [x] 11.4 Slot wracający z sesji z instrumentem zdjętym z archiwizowanych rozpoznaje to i mówi, zamiast wpadać w pętlę wznawiania
+- [x] 11.5 Usunąć drogę z wyniku wyszukiwania wprost do slotu wraz z jej testami
+- [x] 11.6 Testy slotu
 
 ## 12. Domknięcie
 
