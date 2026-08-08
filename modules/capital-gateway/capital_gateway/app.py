@@ -210,6 +210,15 @@ async def history(
             "past can be requested directly"
         ),
     ),
+    after: datetime | None = Query(
+        None,
+        description=(
+            "stop here: no candle older than this is fetched or returned. `bars` counts "
+            "candles, so for an instrument that is not open around the clock it spans "
+            "more calendar time than it looks — this is the only way to name a lower "
+            "bound in time rather than in candles"
+        ),
+    ),
     a: CapitalAdapter = Depends(adapter),
 ):
     """Candles paged past the provider's per-request ceiling.
@@ -222,7 +231,7 @@ async def history(
     async def still_wanted() -> bool:
         return not await request.is_disconnected()
 
-    return await a.get_history(symbol, resolution, bars, still_wanted, anchor=before)
+    return await a.get_history(symbol, resolution, bars, still_wanted, anchor=before, floor=after)
 
 
 # --- trading ---

@@ -60,6 +60,7 @@ HTTP, described by OpenAPI at `/docs`.
 | GET | `/instruments/{symbol}/candles` | `Candle[]` — one request, at most 1000 |
 | GET | `/instruments/{symbol}/history` | `CandleHistory` — paged, with its cost |
 | GET | `/instruments/{symbol}/history?before=` | the same, reaching back from a past instant instead of now |
+| GET | `/instruments/{symbol}/history?after=` | the same, stopping at an instant — a lower bound in time, which `bars` cannot express |
 | GET | `/positions` | `Position[]` |
 | POST | `/orders` | `Order` — MARKET fills, LIMIT/STOP rest |
 | DELETE | `/positions/{id}` | `Order` — close |
@@ -89,6 +90,16 @@ the first window has nothing to anchor on and asks the provider for "the newest 
 is why, unqualified, a deep read always ends at the present. `before` gives that first window an
 anchor of its own, so a caller can ask for a window that ended months or years ago directly,
 rather than only ever reaching the part of history nearest to now.
+
+**`after` is the other end, and it is not the same thing as `bars`.** `bars` counts *candles*.
+An instrument that trades five days a week hands back `bars` candles spanning half again as much
+calendar time as `bars` periods — so a caller wanting "nothing older than this moment" cannot say
+it as a count, and one that tries silently collects months it never asked for. `after` says it as
+a moment: windows are clamped to it so no request is spent on candles that would be thrown away,
+paging stops once a page reaches it, and anything older that still arrives inside a page is
+dropped. Reaching `after` is deliberately **not** `history_ended` — that flag means the provider
+has nothing older, and a consumer stores it as a permanent boundary; saying it because the caller
+asked for less would stop the next, deeper read ever being made.
 
 **An answer is settled, not acknowledged.** A deal the provider has not resolved comes back
 `PENDING` with its reference — never `FILLED`.

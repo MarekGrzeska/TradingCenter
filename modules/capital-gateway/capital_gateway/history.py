@@ -69,9 +69,20 @@ def page_size(bars: int) -> int:
     return min(MAX_BARS_PER_REQUEST, bars)
 
 
-def window_before(anchor: datetime, resolution: Resolution, bars: int) -> tuple[str, str]:
-    """The `from`/`to` pair for the page immediately older than ``anchor``."""
-    return iso_utc(anchor - timedelta(seconds=window_seconds(resolution, bars))), iso_utc(anchor)
+def window_before(
+    anchor: datetime, resolution: Resolution, bars: int, floor: datetime | None = None
+) -> tuple[str, str]:
+    """The `from`/`to` pair for the page immediately older than ``anchor``.
+
+    ``floor`` raises the older edge when the calendar-derived one would reach past it,
+    so a caller that named a lower bound never spends a request on candles it is going
+    to discard. It only ever narrows the window; a floor already older than the window
+    changes nothing.
+    """
+    start = anchor - timedelta(seconds=window_seconds(resolution, bars))
+    if floor is not None and floor > start:
+        start = floor
+    return iso_utc(start), iso_utc(anchor)
 
 
 # Returns the page, or None once the instrument has no data older than the window —
@@ -86,6 +97,7 @@ async def collect(
     fetch_page: FetchPage,
     still_wanted: Callable[[], Awaitable[bool]] | None = None,
     anchor: datetime | None = None,
+    after: datetime | None = None,
 ) -> CandleHistory:
     """Page backwards until ``bars`` candles are held, or the instrument runs out.
 
@@ -106,44 +118,94 @@ async def collect(
     ``still_wanted`` is checked before each request. A deep read is up to thirty calls
     over half a minute; without it, a client that gave up ten seconds in keeps spending
     the rate budget on an answer nobody will read.
+
+    ``after`` is a floor on how far back to reach, and it is a different thing from
+    ``bars``. ``bars`` counts *candles*; an instrument that is shut half the week hands
+    back ``bars`` candles spanning far more calendar time than ``bars`` periods, so a
+    caller wanting "nothing older than this moment" cannot express it as a count. Paging
+    stops once a page reaches the floor, windows are clamped to it so no request is spent
+    on candles that would be discarded, and anything older that arrives inside a page is
+    dropped before the answer is built. Reaching the floor is **not** ``history_ended``:
+    that flag means the *provider* has nothing older, and a consumer records it as a
+    permanent boundary — saying it because the caller asked for less would stop the next,
+    deeper read from ever being made.
     """
     per_request = page_size(bars)
     collected: list[Candle] = []
     requests = 0
     cursor: datetime | None = None
     history_ended = False
+    reached_floor = False
 
     while len(collected) < bars:
         if still_wanted is not None and not await still_wanted():
             break
-        if cursor:
-            date_from, date_to = window_before(cursor, resolution, per_request)
-        elif anchor:
-            date_from, date_to = window_before(anchor, resolution, per_request)
-        else:
+        edge = cursor or anchor
+        if edge is None:
             date_from, date_to = (None, None)
+        else:
+            if after is not None and after >= edge:
+                # The floor is already at or past this window's newer edge: everything
+                # left to ask for is older than the caller wants.
+                reached_floor = True
+                break
+            date_from, date_to = window_before(edge, resolution, per_request, floor=after)
+        # Whether this window's older edge *is* the floor rather than the calendar. It
+        # is the single thing that decides what running out of answers means, so it is
+        # computed once here and consulted once below — the two ways of running out must
+        # never be allowed to disagree about it.
+        on_the_floor = (
+            after is not None
+            and edge is not None
+            and edge - timedelta(seconds=window_seconds(resolution, per_request)) <= after
+        )
         requests += 1
         page = await fetch_page(date_from, date_to, per_request)
 
-        # None is the provider's error.prices.not-found; an empty page is a window that
-        # simply held no candles. Both mean there is nothing further back to ask for.
-        if not page:
-            history_ended = True
-            break
+        if page:
+            collected.extend(page)
+            oldest = parse_candle_ts(page[0].ts)
+            if after is not None and oldest <= after:
+                reached_floor = True
+                break
+            if cursor is None or oldest < cursor:
+                cursor = oldest
+                continue
 
-        oldest = parse_candle_ts(page[0].ts)
-        collected.extend(page)
-        # No progress: the window returned nothing older than what we already hold, so
-        # another identical request would return the same thing forever.
-        if cursor is not None and oldest >= cursor:
+        # Nothing left to ask for, reached by either of two routes that mean the same
+        # thing. The window came back with no candles at all — `None` is the provider's
+        # error.prices.not-found, `[]` a window it considers empty — or it came back
+        # holding nothing older than what is already collected, so asking again would
+        # return that same page forever.
+        #
+        # What running out *means* is not the same in both places it can happen, and the
+        # difference is the whole reason `on_the_floor` exists. Away from the floor the
+        # window spans a full `per_request` periods of calendar, so nothing older in it
+        # is the provider's own bottom. At the floor the window is only `[floor, cursor]`
+        # — often minutes wide — and running out of it says the caller's bound was
+        # reached and nothing whatsoever about what the provider still holds below it.
+        #
+        # Measured twice, both times costing six weeks of candles. First as a not-found:
+        # a 5-minute read floored at 2026-01-01 hit `not-found` on its last, narrow
+        # window. Then as no progress: the same read, floored at 2026-02-16 07:01, paged
+        # down to a candle at 07:05 and asked once more about the 3½ minutes below it —
+        # the provider answered with that same 07:05 candle, which is no progress. Read
+        # as an ending either way it set `history_ended`, which the archive stores as a
+        # permanent boundary and uses to bulk-skip every older chunk still queued.
+        if on_the_floor:
+            reached_floor = True
+        else:
             history_ended = True
-            break
-        cursor = oldest
+        break
 
     # Pages overlap at their edges, and a consumer charting this needs time strictly
     # increasing and unique.
     collected.sort(key=lambda c: c.ts)
     unique = [c for i, c in enumerate(collected) if i == 0 or c.ts != collected[i - 1].ts]
+    if after is not None:
+        # A page is only ever clamped at its edges, so one can still carry candles from
+        # before the floor. The floor is the caller's promise, not an approximation.
+        unique = [c for c in unique if parse_candle_ts(c.ts) >= after]
     trimmed = unique[-bars:]
 
     return CandleHistory(
@@ -154,5 +216,7 @@ async def collect(
         resolution=resolution,
         first_ts=trimmed[0].ts if trimmed else None,
         last_ts=trimmed[-1].ts if trimmed else None,
-        history_ended=history_ended and len(trimmed) < bars,
+        # Never because the caller's own floor was reached: a consumer stores this as the
+        # provider's permanent boundary and would stop ever reaching deeper.
+        history_ended=history_ended and not reached_floor and len(trimmed) < bars,
     )

@@ -122,6 +122,44 @@ def test_a_before_parameter_anchors_the_deep_read_in_the_past(client: TestClient
     assert "2024-01-14" in str(request_made.url) or "2024-01-15" in str(request_made.url)
 
 
+@respx.mock
+def test_an_after_parameter_bounds_the_deep_read_in_the_past(client: TestClient) -> None:
+    mock_login()
+    prices = respx.get(f"{API}/prices/GOLD")
+    prices.mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "prices": [
+                    {"snapshotTimeUTC": "2024-01-01T00:00:00"},  # older than the floor
+                    {"snapshotTimeUTC": "2024-01-15T00:00:00"},
+                ]
+            },
+        )
+    )
+
+    with client:
+        response = client.get(
+            "/instruments/GOLD/history",
+            params={
+                "resolution": "MINUTE_5",
+                "bars": 1000,
+                "before": "2024-01-15T00:00:00Z",
+                # Inside the window 1000 five-minute candles would otherwise span
+                # (~3.5 days), so it is the floor that decides where the request starts.
+                "after": "2024-01-14T00:00:00Z",
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    # The candle from before the floor came back inside the provider's page and was
+    # dropped; only the one at or after it survives.
+    assert [c["ts"] for c in body["candles"]] == ["2024-01-15T00:00:00Z"]
+    # And the window asked for never reached past the floor in the first place.
+    assert "from=2024-01-14T00%3A00%3A00" in str(prices.calls.last.request.url)
+
+
 def test_the_asset_classes_are_published(client: TestClient) -> None:
     with client:
         body = client.get("/asset-classes").json()

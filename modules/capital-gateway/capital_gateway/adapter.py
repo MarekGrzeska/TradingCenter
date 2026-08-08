@@ -157,13 +157,16 @@ class CapitalAdapter:
         bars: int,
         still_wanted: Callable[[], Awaitable[bool]] | None = None,
         anchor: datetime | None = None,
+        floor: datetime | None = None,
     ) -> CandleHistory:
         """Candles further back than one request reaches.
 
         The paging rules live in ``history``; this supplies the one page fetch and the
         judgement of what the provider's refusals mean. ``anchor`` shapes only the first
         page — see ``history.collect`` — so a caller can reach for a window that ended
-        months ago instead of always reaching back from now.
+        months ago instead of always reaching back from now. ``floor`` bounds the other
+        end: nothing older than it is fetched or returned, which ``bars`` alone cannot
+        express for an instrument that is not open around the clock.
         """
 
         async def fetch_page(
@@ -187,7 +190,9 @@ class CapitalAdapter:
                 raise GatewayError(f"capital.com {resp.status_code}: {resp.text[:200]}")
             return [mapping.candle_from_price(p, resolution) for p in resp.json().get("prices", [])]
 
-        return await history.collect(symbol, resolution, bars, fetch_page, still_wanted, anchor)
+        return await history.collect(
+            symbol, resolution, bars, fetch_page, still_wanted, anchor, floor
+        )
 
     # --- trading ---
 
