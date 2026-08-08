@@ -36,7 +36,7 @@ from .gateway import GatewayHistory, GatewayInstruments, http_client
 from .hub import Hub
 from .ingest import Ingest
 from .ingest.live import store_closed_candle
-from .jobs import interrupt_orphaned_chunks
+from .jobs import JobRunner, interrupt_orphaned_chunks
 from .models import Candle, PriceSide, Resolution
 from .rollups import DERIVABLE, read_derived
 from .store import read_candles, read_recent
@@ -100,13 +100,22 @@ async def lifespan(app: FastAPI):
     async with make_pool(settings.database_url) as pool, http_client() as client:
         history = GatewayHistory(settings.gateway_base_url, client)
         hub = Hub()
+        # Shared with the job runner below, not one semaphore each — two gates that
+        # happen to share a number would still let a deep job starve an interactive
+        # read the way a single gate cannot (design.md, "Zlecenia dzielą budżet ruchu
+        # z resztą modułu").
+        fill_limiter = asyncio.Semaphore(settings.backfill_concurrency)
         ingest = Ingest(
             pool,
             history,
             settings.gateway_stream_url,
             default_bars=settings.default_backfill_bars,
             backfill_concurrency=settings.backfill_concurrency,
+            limiter=fill_limiter,
             sink=candle_sink(pool, hub),
+        )
+        job_runner = JobRunner(
+            pool, history, limiter=fill_limiter, concurrency=settings.backfill_concurrency
         )
 
         app.state.settings = settings
@@ -115,6 +124,7 @@ async def lifespan(app: FastAPI):
         app.state.history = history
         app.state.instruments = GatewayInstruments(settings.gateway_base_url, client)
         app.state.ingest = ingest
+        app.state.job_runner = job_runner
 
         # Before anything else touches the job tables: no runner survives a restart, so
         # any chunk left `pending` or `running` from before this start was orphaned, not
@@ -125,9 +135,11 @@ async def lifespan(app: FastAPI):
             log.info("collection jobs: %d orphaned chunk(s) marked interrupted at startup", interrupted)
 
         await ingest.start()
+        await job_runner.start()
         try:
             yield
         finally:
+            await job_runner.stop()
             await ingest.stop()
 
 

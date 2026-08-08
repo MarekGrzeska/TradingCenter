@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from .models import Chunk, ChunkPlan, ChunkState, Job, JobPairView, JobStatus
 from .plan import FutureRequest, JobEstimate, PairEstimate, estimate_job, plan_chunks
+from .runner import JobRunner, execute_chunk
 from .store import (
     NothingToRetry,
     UnknownJob,
@@ -34,6 +35,7 @@ __all__ = [
     "Job",
     "JobEstimate",
     "JobPairView",
+    "JobRunner",
     "JobStatus",
     "NothingToRetry",
     "PairEstimate",
@@ -41,6 +43,7 @@ __all__ = [
     "claim_pending_chunk",
     "create_job",
     "estimate_job",
+    "execute_chunk",
     "finish_chunk_done",
     "finish_chunk_failed",
     "finish_chunk_skipped",

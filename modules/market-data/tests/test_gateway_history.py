@@ -169,6 +169,30 @@ async def test_a_missing_edge_survives_the_crossing(reader: GatewayHistory) -> N
     assert (await reader.history("US100", Resolution.MINUTE, 1000)).candles[0].close is None
 
 
+@respx.mock
+async def test_a_before_moment_is_sent_as_an_anchor(reader: GatewayHistory) -> None:
+    route = respx.get(HISTORY_URL).mock(
+        return_value=httpx.Response(200, json=gateway_history([]))
+    )
+    anchor = datetime(2024, 1, 15, tzinfo=UTC)
+
+    await reader.history("US100", Resolution.MINUTE, 1000, before=anchor)
+
+    sent = route.calls.last.request.url.params
+    assert sent["before"] == anchor.isoformat()
+
+
+@respx.mock
+async def test_no_before_moment_omits_the_anchor(reader: GatewayHistory) -> None:
+    route = respx.get(HISTORY_URL).mock(
+        return_value=httpx.Response(200, json=gateway_history([]))
+    )
+
+    await reader.history("US100", Resolution.MINUTE, 1000)
+
+    assert "before" not in route.calls.last.request.url.params
+
+
 # --- when it goes wrong -------------------------------------------------------------
 
 

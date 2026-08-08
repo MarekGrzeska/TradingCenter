@@ -595,6 +595,32 @@ async def test_the_loop_ends_when_the_pair_stops_being_tracked(pool) -> None:
     assert feed.opened == []
 
 
+def test_a_supplied_limiter_is_used_instead_of_a_private_one() -> None:
+    # So a collection job runner can share the same fill budget rather than getting a
+    # second gate that happens to allow the same count (design.md, "Zlecenia dzielą
+    # budżet ruchu z resztą modułu").
+    shared = asyncio.Semaphore(3)
+    ingest = Ingest(
+        pool=None,
+        history=FakeHistory([]),
+        stream_url="ws://gateway.test/ws/stream",
+        default_bars=100,
+        limiter=shared,
+    )
+    assert ingest._limiter is shared
+
+
+def test_without_a_supplied_limiter_ingest_builds_its_own() -> None:
+    ingest = Ingest(
+        pool=None,
+        history=FakeHistory([]),
+        stream_url="ws://gateway.test/ws/stream",
+        default_bars=100,
+        backfill_concurrency=2,
+    )
+    assert isinstance(ingest._limiter, asyncio.Semaphore)
+
+
 # --- 7.4 and the supervisor ----------------------------------------------------------
 
 

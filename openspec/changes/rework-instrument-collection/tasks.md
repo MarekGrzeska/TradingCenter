@@ -26,12 +26,12 @@
 ## 4. market-data: wykonywanie zlecenia
 
 - [x] 4.0 *(odkryte podczas implementacji grupy 3)* `split_into_windows` i `plan_chunks` układają kawałki od najnowszego wstecz, nie od najstarszego — inaczej prośba o głębię sprzed znanej granicy historii providera wysyłałaby jedno żądanie na każdy skazany na porażkę kawałek zamiast odkryć granicę raz
-- [ ] 4.1 Nowa funkcja wykonania kawałka o zadanym oknie `(od, do)` przez `before=chunk_end` na gatewayu, osobna od `fill_gap` (ten zostaje dla pojedynczych par bez zlecenia — restart i wznowienie strumienia)
-- [ ] 4.2 Runner kawałków pod istniejącym `backfill_concurrency` i tym samym rate gate co `Ingest` (współdzielony semafor); wynik każdego kawałka zapisywany natychmiast po jego zakończeniu
-- [ ] 4.3 Kawałek nieudany odnotowuje nazwaną przyczynę i nie zatrzymuje pozostałych; kawałek, który odkryje `history_ended`, kończy się jako wykonany (nawet z zerem świec), a wszystkie pozostałe jeszcze niepodjęte kawałki tej pary w tym zleceniu są masowo oznaczane jako pominięte (`skip_chunks_beyond_history`) zamiast każdy z osobna odkrywać tę samą granicę
-- [ ] 4.4 Ponowienie: wykonanie wyłącznie kawałków `failed` i `interrupted` jako kolejna próba tego samego zlecenia, z podbiciem numeru próby
-- [ ] 4.5 `record_coverage` wywoływane dla pełnego okna kawałka (nie tylko zakresu zwróconych świec), żeby granica `history_ended` i luka po nieudanym kawałku dawały poprawne, rozdzielone przedziały pokrycia
-- [ ] 4.6 Testy: porażka kawałka w środku zostawia świece z kawałków udanych i lukę w pokryciu, ponowienie nie pyta o zakresy już pokryte, ponowienie zlecenia bez porażek jest odmawiane, odczyt świec w trakcie zlecenia nie czeka na jego koniec
+- [x] 4.1 Nowa funkcja `execute_chunk` wykonania kawałka o zadanym oknie `(od, do)` przez `before=chunk_end` na gatewayu, osobna od `fill_gap` (ten zostaje dla pojedynczych par bez zlecenia — restart i wznowienie strumienia); `GatewayHistory.history()` w market-data przyjmuje `before`
+- [x] 4.2 `JobRunner` z pulą workerów pod `backfill_concurrency`, dzielącym `asyncio.Semaphore` z `Ingest` (zbudowany raz w `app.py`, przekazany do obu); wynik każdego kawałka zapisywany natychmiast po jego zakończeniu; `notify()` budzi bezczynne workery
+- [x] 4.3 Kawałek nieudany odnotowuje nazwaną przyczynę i nie zatrzymuje pozostałych; kawałek, który odkryje `history_ended`, kończy się jako wykonany (nawet z zerem świec), a wszystkie pozostałe jeszcze niepodjęte kawałki tej pary w tym zleceniu są masowo oznaczane jako pominięte (`skip_chunks_beyond_history`) zamiast każdy z osobna odkrywać tę samą granicę
+- [x] 4.4 Ponowienie: `store.retry_job` (grupa 2) resetuje kawałki `failed`/`interrupted` na `pending` z podbitym numerem próby; `JobRunner`, odpytując kolejkę, podejmuje je bez rozróżniania od pierwszego przebiegu — jawne obudzenie przez `notify()` po ponowieniu zostaje spięte w grupie 5 (endpoint HTTP)
+- [x] 4.5 `record_coverage` wywoływane dla pełnego żądanego okna kawałka (nie tylko zakresu zwróconych świec), żeby granica `history_ended` i luka po nieudanym kawałku dawały poprawne, rozdzielone przedziały pokrycia bez szwu między sąsiadującymi kawałkami
+- [x] 4.6 Testy: sukces zapisuje świece i osiada jako `done`, puste okno to `done` z zerem świec (nie `failed`), pełne okno pokryte nawet gdy świec mało, odmowa/nieosiągalność gatewaya osiada jako `failed` z powodem i nie propaguje wyjątku, odkrycie `history_ended` masowo pomija starsze kawałki tej samej pary i nie rusza innej pary/zlecenia, runner podejmuje i kończy oczekujący kawałek, `notify()` budzi bezczynny worker bez czekania na odpytanie, `stop()` kończy workery; `Ingest` przyjmuje i używa dostarczonego semafora zamiast budować własny
 
 ## 5. market-data: kontrakt
 

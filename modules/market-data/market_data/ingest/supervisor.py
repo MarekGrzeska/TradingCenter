@@ -40,6 +40,7 @@ class Ingest:
         default_bars: int,
         backfill_concurrency: int = 1,
         backoff: Backoff | None = None,
+        limiter: asyncio.Semaphore | None = None,
         **pair_options,
     ) -> None:
         self._pool = pool
@@ -49,7 +50,13 @@ class Ingest:
         # One semaphore for the whole process, not one per pair. A per-pair budget is no
         # budget at all: twenty pairs would each politely run one fill and together spend
         # twenty times the allowance.
-        self._limiter = asyncio.Semaphore(backfill_concurrency)
+        #
+        # `limiter` lets a caller hand in a semaphore built elsewhere, so this budget can
+        # be the *same* object a collection job runner draws from — one gate for every
+        # gateway request this process makes on its own initiative, not two gates that
+        # happen to share a number (design.md, "Zlecenia dzielą budżet ruchu z resztą
+        # modułu").
+        self._limiter = limiter if limiter is not None else asyncio.Semaphore(backfill_concurrency)
         self._backoff = backoff
         self._pair_options = pair_options
         self._tasks: dict[Pair, asyncio.Task] = {}
