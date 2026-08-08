@@ -33,13 +33,28 @@ import { RESOLUTION_ABBR } from "./resolutionAbbr";
  * historia providera").
  */
 
-// A default of "get everything" — narrower than any real market's inception,
-// so the field always carries a value without the operator having to type
-// one (design.md, "Data OD jest przycinana, nigdy odrzucana").
-const DEFAULT_COLLECT_FROM_INPUT = "1900-01-01";
+function asDateInput(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
 
 function todayDateInput(): string {
-  return new Date().toISOString().slice(0, 10);
+  return asDateInput(new Date());
+}
+
+/** One year back — the field always carries a value without the operator
+ *  typing one, and this is the value it is safe to carry.
+ *
+ *  Deliberately not "everything available". An arbitrarily early date is a
+ *  legitimate request — it clips rather than fails (design.md, "Data OD jest
+ *  przycinana, nigdy odrzucana") — but as a *default* it is the wrong one: at
+ *  `MINUTE` a decade is around a hundred chunks per pair, so every operator
+ *  who never touched this field would be committing hundreds of gateway
+ *  requests without deciding to. Deep history stays one edit away; it just
+ *  stops being what happens by accident. */
+function defaultCollectFromInput(): string {
+  const oneYearBack = new Date();
+  oneYearBack.setUTCFullYear(oneYearBack.getUTCFullYear() - 1);
+  return asDateInput(oneYearBack);
 }
 
 function dateInputToEpochSeconds(value: string): number {
@@ -61,7 +76,8 @@ export function AddInstrumentWizard({
   const [assetClass, setAssetClass] = useState<AssetClass | null>(null);
   const [instrument, setInstrument] = useState<Instrument | null>(null);
   const [resolutions, setResolutions] = useState<ReadonlySet<Resolution>>(new Set());
-  const [collectFromInput, setCollectFromInput] = useState(DEFAULT_COLLECT_FROM_INPUT);
+  // Lazy: computed once at mount, not on every render.
+  const [collectFromInput, setCollectFromInput] = useState(defaultCollectFromInput);
   const [pending, setPending] = useState<PairRequest[] | null>(null);
 
   // Disabled rather than omitted while no class is chosen — the instrument
@@ -110,7 +126,7 @@ export function AddInstrumentWizard({
     setAssetClass(null);
     setInstrument(null);
     setResolutions(new Set());
-    setCollectFromInput(DEFAULT_COLLECT_FROM_INPUT);
+    setCollectFromInput(defaultCollectFromInput());
     onCollected();
   }
 
