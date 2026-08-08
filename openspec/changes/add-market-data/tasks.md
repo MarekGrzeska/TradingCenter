@@ -204,4 +204,12 @@
       i nie dało się tego zobaczyć inaczej niż patrząc na cztery czarne panele, których tekst
       był tam przez cały czas. `z-10` na `Veil`; test pilnuje samej własności, która o tym
       decyduje, z komentarzem, dlaczego nie może pilnować niczego więcej.
-- [ ] 11.5 Napisz `review.md` — dwa przejścia wymagane przez schemat, przed archiwizacją zmiany
+- [x] 11.5 Napisz `review.md` — dwa przejścia wymagane przez schemat, przed archiwizacją zmiany.
+      Przejście po diffie (17 commitów od `5ed0345`) dało sześć ustaleń: cztery naprawione, dwa
+      otwarte. Najpoważniejsze naprawione w tym przeglądzie — odczyt zakresu czytał tabelę rollupów
+      dla **każdej** rozdzielczości pochodnej, więc para śledzona na `HOUR` trzymała 5000 świec
+      i dostawała w odpowiedzi zero, przy pustym `uncovered`, czyli „rynek był zamknięty przez cały
+      dzień". Dwa otwarte (`market_open` bez producenta, postęp ingestu tylko w logu) zmieniają
+      kształt kontraktu i są opisane z rekomendacją zamiast dopisane. Przejście po pokryciu
+      przeszło wszystkie 62 scenariusze z sześciu delt; sześć luk, wszystkie zaakceptowane
+      i wyliczone.

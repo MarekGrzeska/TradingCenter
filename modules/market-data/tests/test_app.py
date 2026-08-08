@@ -149,6 +149,51 @@ async def test_a_collected_resolution_says_it_was_not_derived(api, pool) -> None
     assert body["derived"] is False
 
 
+async def test_a_pair_collected_at_a_derivable_resolution_is_served_its_own_candles(
+    api, pool
+) -> None:
+    """The bug this catches was found by reading a live archive: US100 was tracked at
+    HOUR, held five thousand hourly candles, and the contract answered with none.
+
+    A resolution being derivable is not the same as this pair having been derived.
+    Tracking a pair at HOUR makes ingest fetch and store the provider's own hourly
+    candles, and nothing builds a rollup for it, because rollups are refreshed off a
+    minute series that pair does not have. Reading the rollup table unconditionally
+    therefore answered an empty series while coverage said the range was verified —
+    which a consumer reads as "the market was shut", not as "ask somebody".
+    """
+    hourly = [
+        Candle(
+            symbol="GOLD",
+            resolution=Resolution.HOUR,
+            period_start=NOW.replace(minute=0, second=0, microsecond=0) - timedelta(hours=h),
+            open=1.0,
+            high=2.0,
+            low=0.5,
+            close=1.5,
+            volume=10.0,
+            source=CandleSource.HISTORY,
+        )
+        for h in range(3)
+    ]
+    async with pool.acquire() as conn:
+        await write_candles(conn, hourly)
+
+    body = (
+        await api.get(
+            "/candles/GOLD",
+            params={
+                "resolution": "HOUR",
+                "from": (NOW - timedelta(hours=6)).isoformat(),
+                "to": (NOW + timedelta(hours=1)).isoformat(),
+            },
+        )
+    ).json()
+
+    assert len(body["candles"]) == 3
+    assert body["derived"] is False  # they were collected, not computed
+
+
 async def test_a_range_that_ends_before_it_starts_is_refused_by_name(api) -> None:
     response = await api.get(
         "/candles/US100",

@@ -212,13 +212,21 @@ async def candles(
     db=Depends(pool),
 ) -> CandlesOut:
     start, end = _window(from_, to, resolution)
-    derived = resolution in DERIVABLE
 
     async with db.acquire() as conn:
-        if derived:
-            series: list[Candle] = list(await read_derived(conn, symbol, resolution, start, end))
-        else:
-            series = list(await read_candles(conn, symbol, resolution, start, end))
+        # Collected beats computed, and the order matters more than it looks. A
+        # resolution being *derivable* does not mean this pair was derived: an operator
+        # may track a pair at HOUR, in which case ingest fetches and stores the
+        # provider's own hourly candles and nothing ever builds a rollup for it, because
+        # rollups are refreshed off the minute series that pair does not have. Reading
+        # the rollup table unconditionally answered such a pair with an empty series
+        # while coverage said the range was verified — which reads as "the market was
+        # shut all day", the one confident wrong answer this module exists to prevent.
+        series: list[Candle] = list(await read_candles(conn, symbol, resolution, start, end))
+        derived = False
+        if not series and resolution in DERIVABLE:
+            series = list(await read_derived(conn, symbol, resolution, start, end))
+            derived = True
         gaps = await uncovered_within(conn, symbol, resolution, start, end)
 
     return CandlesOut(
