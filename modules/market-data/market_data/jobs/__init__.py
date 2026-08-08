@@ -10,6 +10,7 @@ module fetches with.
 from __future__ import annotations
 
 from .models import Chunk, ChunkPlan, ChunkState, Job, JobPairView, JobStatus
+from .plan import FutureRequest, JobEstimate, PairEstimate, estimate_job, plan_chunks
 from .store import (
     NothingToRetry,
     UnknownJob,
@@ -28,18 +29,23 @@ __all__ = [
     "Chunk",
     "ChunkPlan",
     "ChunkState",
+    "FutureRequest",
     "Job",
+    "JobEstimate",
     "JobPairView",
     "JobStatus",
     "NothingToRetry",
+    "PairEstimate",
     "UnknownJob",
     "claim_pending_chunk",
     "create_job",
+    "estimate_job",
     "finish_chunk_done",
     "finish_chunk_failed",
     "finish_chunk_skipped",
     "interrupt_orphaned_chunks",
     "list_jobs",
+    "plan_chunks",
     "read_job",
     "retry_job",
 ]

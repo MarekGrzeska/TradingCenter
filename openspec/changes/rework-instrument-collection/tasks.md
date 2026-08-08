@@ -18,10 +18,10 @@
 
 ## 3. market-data: planowanie i wycena zlecenia
 
-- [ ] 3.1 `market_data/jobs/plan.py` — przycięcie daty OD do `earliest_reachable`, odjęcie tego, co pokrywa `coverage_ranges`, podział reszty na okna po `MAX_BARS_PER_FILL` świec danej rozdzielczości
-- [ ] 3.2 Wycena zlecenia wyprowadzana z tego samego planu: liczba kawałków, szacowana liczba świec z `PERIOD_SECONDS`, szacowany rozmiar jako liczba świec razy stała bajtów na wiersz
-- [ ] 3.3 Odmowa dla daty w przyszłości; data dowolnie wczesna MUST być przycinana, nigdy odrzucana
-- [ ] 3.4 Testy: rok 1850 przycięty do osiągalnego, para w pełni pokryta nie rodzi kawałków, dziesięć lat `MINUTE` daje spodziewaną liczbę okien, dziesięć lat `DAY` mieści się w jednym
+- [x] 3.1 `market_data/jobs/plan.py` — przycięcie daty OD do `earliest_reachable`, odjęcie tego, co pokrywa `coverage_ranges`, podział reszty na okna po `MAX_BARS_PER_FILL` świec danej rozdzielczości
+- [x] 3.2 Wycena zlecenia wyprowadzana z tego samego planu: liczba kawałków, szacowana liczba świec z `PERIOD_SECONDS`, szacowany rozmiar jako liczba świec razy stała bajtów na wiersz
+- [x] 3.3 Odmowa dla daty w przyszłości; data dowolnie wczesna MUST być przycinana, nigdy odrzucana
+- [x] 3.4 Testy: rok 1850 przycięty do osiągalnego, para w pełni pokryta nie rodzi kawałków, dziesięć lat `MINUTE` daje spodziewaną liczbę okien, dziesięć lat `DAY` mieści się w jednym
 
 ## 4. market-data: wykonywanie zlecenia
 
