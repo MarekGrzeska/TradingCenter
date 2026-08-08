@@ -53,11 +53,11 @@
 
 ## 7. terminal: reużywalny autocomplete
 
-- [ ] 7.1 `src/ui/Autocomplete.tsx` — sterowany propem źródła, obsługa strzałek i Entera, Escape, jawny brak dopasowań, jawna porażka źródła z ponowieniem, widoczny i odwoływalny wybór
-- [ ] 7.2 Przenieść debounce i ochronę przed wyprzedzającą się odpowiedzią z `useInstrumentSearch` do wspólnego haka używanego przez komponent
-- [ ] 7.3 Trzy źródła: klasy aktywów, instrumenty w klasie, instrumenty archiwizowane
-- [ ] 7.4 Sygnalizacja ucięcia listy przy podpowiedziach, ze wskazaniem, że wpisanie frazy sięga dalej
-- [ ] 7.5 Testy komponentu, w tym identyczność zachowania klawiatury dla wszystkich trzech źródeł
+- [x] 7.1 `src/ui/Autocomplete.tsx` — sterowany propem źródła, obsługa strzałek i Entera, Escape, jawny brak dopasowań, jawna porażka źródła z ponowieniem, widoczny i odwoływalny wybór
+- [x] 7.2 Przenieść debounce i ochronę przed wyprzedzającą się odpowiedzią z `useInstrumentSearch` do wspólnego haka używanego przez komponent
+- [x] 7.3 Trzy źródła: klasy aktywów, instrumenty w klasie, instrumenty archiwizowane
+- [x] 7.4 Sygnalizacja ucięcia listy przy podpowiedziach, ze wskazaniem, że wpisanie frazy sięga dalej
+- [x] 7.5 Testy komponentu, w tym identyczność zachowania klawiatury dla wszystkich trzech źródeł
 
 ## 8. terminal: połączona zakładka Instruments
 
