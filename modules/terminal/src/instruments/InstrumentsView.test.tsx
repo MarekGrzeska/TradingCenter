@@ -278,7 +278,9 @@ describe("Instruments list — deleting a single interval", () => {
     await user.click(screen.getByRole("button", { name: /delete us100 minute/i }));
 
     expect(fakeArchive.deleteCalls).toHaveLength(0);
-    expect(screen.getByText(/this cannot be undone/i)).toBeInTheDocument();
+    // A modal, the same weight of decision as the wizard's own acceptance dialog.
+    const dialog = screen.getByRole("dialog", { name: /delete us100/i });
+    expect(within(dialog).getByText(/it cannot be undone/i)).toBeInTheDocument();
     // The old assurance no longer holds — deleting removes the data.
     expect(screen.queryByText(/candles already collected stay/i)).not.toBeInTheDocument();
 
@@ -349,10 +351,10 @@ describe("Instruments list — deleting a whole instrument", () => {
     await screen.findByText("US100");
     await user.click(screen.getByRole("button", { name: "Delete US100" }));
 
-    const confirmation = screen.getByText(/delete us100 in/i);
-    expect(confirmation).toHaveTextContent("MINUTE");
-    expect(confirmation).toHaveTextContent("HOUR");
-    expect(confirmation).toHaveTextContent(/cannot be undone/i);
+    const dialog = screen.getByRole("dialog", { name: /delete us100/i });
+    expect(dialog).toHaveTextContent("MINUTE");
+    expect(dialog).toHaveTextContent("HOUR");
+    expect(dialog).toHaveTextContent(/cannot be undone/i);
     expect(fakeArchive.deleteCalls).toHaveLength(0);
 
     await user.click(screen.getByRole("button", { name: /^delete data$/i }));
@@ -397,6 +399,28 @@ describe("Instruments list — deleting a whole instrument", () => {
       expect(within(row).getByText("1h")).toBeInTheDocument();
     });
     expect(screen.getByText(/could not delete HOUR/i)).toBeInTheDocument();
+  });
+
+  it("asks in a dialog, the same way starting collection does", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair()];
+    renderView();
+
+    await screen.findByText("US100");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Delete US100" }));
+
+    const dialog = screen.getByRole("dialog", { name: /delete us100/i });
+    // Says what goes, how far back it reached, and that collection stops with it.
+    expect(dialog).toHaveTextContent(/permanently removes/i);
+    expect(dialog).toHaveTextContent(/2026-08-01/);
+    expect(dialog).toHaveTextContent(/collecting stops/i);
+
+    await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(fakeArchive.deleteCalls).toHaveLength(0);
   });
 
   it("dismisses the deletion banner on request", async () => {

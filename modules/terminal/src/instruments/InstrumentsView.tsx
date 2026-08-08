@@ -130,6 +130,89 @@ function DeletionBanner({ notice, onDismiss }: { notice: DeletionNotice; onDismi
   );
 }
 
+/**
+ * The one confirmation both Delete buttons raise — a modal, the same shape as the
+ * wizard's acceptance dialog, because deleting is the same weight of decision as
+ * starting to collect and the two should not read differently.
+ *
+ * It owns nothing but the asking: `onConfirm` does the deleting and reports back
+ * what failed, so the two call sites keep their own handling of a partial success.
+ */
+function DeleteDialog({
+  symbol,
+  resolutions,
+  dataSince,
+  failure,
+  onConfirm,
+  onCancel,
+}: {
+  symbol: string;
+  resolutions: Resolution[];
+  dataSince: number | null;
+  failure: string | null;
+  onConfirm(): void | Promise<void>;
+  onCancel(): void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+
+  const confirm = useCallback(async () => {
+    setDeleting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setDeleting(false);
+    }
+  }, [onConfirm]);
+
+  return (
+    <div
+      role="dialog"
+      aria-label={`Delete ${symbol}`}
+      className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
+    >
+      <div className="max-h-[85vh] w-full max-w-lg overflow-auto rounded border border-border bg-panel-strong p-4 text-sm">
+        <h2 className="text-base font-semibold text-ink">Delete {symbol}?</h2>
+
+        <p className="mt-3 text-ink">
+          This permanently removes every candle collected for{" "}
+          <span className="text-ink">{resolutions.join(", ")}</span>, and the record of what
+          was covered. It cannot be undone.
+        </p>
+
+        {dataSince !== null && (
+          <p className="mt-2 text-ink-secondary">
+            Data reaches back to <span className="text-ink">{formatInstant(dataSince)}</span>.
+          </p>
+        )}
+
+        <p className="mt-2 text-ink-muted">
+          Collecting stops too — add the instrument again to start over from a new date.
+        </p>
+
+        {failure && <p className="mt-3 text-critical">{failure}</p>}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded border border-border px-3 py-1 text-ink-muted hover:text-ink"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={confirm}
+            className="rounded border border-down px-3 py-1 text-down hover:bg-panel disabled:opacity-40"
+          >
+            {deleting ? "Deleting…" : "Delete data"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function InstrumentsView() {
   const list = useTrackedPairs(archive);
   const groups = useMemo(() => groupBySymbol(list.pairs), [list.pairs]);
@@ -318,34 +401,19 @@ function InstrumentRow({
       </tr>
 
       {confirming && (
-        <tr className="border-t border-border bg-panel">
-          <td colSpan={4} className="px-4 py-2">
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              {/* Deletion is irreversible, and the confirmation says so plainly
-                  — this replaces the old "the candles stay" assurance, which
-                  would now be a lie. */}
-              <span className="text-ink">
-                Delete {group.symbol} in {group.pairs.map((p) => p.resolution).join(", ")}? This
-                permanently removes every candle already collected
-                {earliestData !== null && <> (data since {formatInstant(earliestData)})</>} — this
-                cannot be undone.
-              </span>
-              <button
-                type="button"
-                onClick={deleteAll}
-                className="rounded border border-down px-2 py-0.5 text-xs text-down hover:bg-panel-strong"
-              >
-                Delete data
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirming(false)}
-                className="rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
-              >
-                Cancel
-              </button>
-              {failure && <span className="text-critical">{failure}</span>}
-            </div>
+        <tr>
+          <td colSpan={4} className="p-0">
+            <DeleteDialog
+              symbol={group.symbol}
+              resolutions={group.pairs.map((pair) => pair.resolution)}
+              dataSince={earliestData}
+              failure={failure}
+              onConfirm={deleteAll}
+              onCancel={() => {
+                setFailure(null);
+                setConfirming(false);
+              }}
+            />
           </td>
         </tr>
       )}
@@ -510,29 +578,17 @@ function IntervalCoverage({
         ))}
 
       {confirming && (
-        <div className="flex flex-wrap items-center gap-3 rounded border border-border bg-panel px-2 py-1.5">
-          <span className="text-ink">
-            Delete {pair.symbol} {pair.resolution}? This permanently removes every candle already
-            collected
-            {pair.earliestCandle !== null && <> (data since {formatInstant(pair.earliestCandle)})</>}{" "}
-            — this cannot be undone.
-          </span>
-          <button
-            type="button"
-            onClick={deleteInterval}
-            className="rounded border border-down px-2 py-0.5 text-down hover:bg-panel-strong"
-          >
-            Delete data
-          </button>
-          <button
-            type="button"
-            onClick={() => setConfirming(false)}
-            className="rounded border border-border px-2 py-0.5 text-ink-muted hover:text-ink"
-          >
-            Cancel
-          </button>
-          {failure && <span className="text-critical">{failure}</span>}
-        </div>
+        <DeleteDialog
+          symbol={pair.symbol}
+          resolutions={[pair.resolution]}
+          dataSince={pair.earliestCandle}
+          failure={failure}
+          onConfirm={deleteInterval}
+          onCancel={() => {
+            setFailure(null);
+            setConfirming(false);
+          }}
+        />
       )}
     </div>
   );
