@@ -12,24 +12,32 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
 ## What
 
 - `config.py` — settings, the provider-host guard, and the budgets this module may spend.
-- `models.py` — a candle, a coverage range, and the vocabulary they are spelled in.
+- `models.py`, `periods.py` — a candle, a coverage range, and the gateway's two spellings of
+  a period start reduced to one instant.
 - `db.py` — the connection string, in the two shapes asyncpg and SQLAlchemy each insist on.
 - `store.py` — the only door to the candle table: closed candles in, one row per period.
 - `coverage.py` — what the archive has verified, and so which absences are answers.
 - `tracking.py` — which pairs are collected, and whether collection is actually happening.
-- `ingest/` — getting candles in and keeping them coming: the live feed, backfill, and the
-  budget they share.
+- `rollups.py` — the derived resolutions, computed from the minute series and refreshed only
+  where a write touched them.
+- `ingest/` — the live feed, backfill, and the budget they share.
+- `gateway/` — the only place that talks to `capital-gateway`: deep history over HTTP, live
+  candles and quotes over its WebSocket. Paging is the gateway's job, so a fill is one request
+  however deep — and genuinely long (20 000 five-minute candles: 30 provider calls, 26 s), which
+  is why the read timeout is minutes while the connect timeout stays at five seconds.
 - `hub.py` — fan-out to subscribers, and the hold that makes a snapshot airtight.
-- `app.py` / `contract.py` — the published surface and the shapes it answers with.
-- `periods.py` — the gateway's two spellings of a period start, reduced to one instant.
-- `rollups.py` — the derived resolutions, computed from the minute series and refreshed
-  only where a write touched them.
-- `gateway/` — the only place that talks to `capital-gateway`: deep history over HTTP,
-  live candles and quotes over its WebSocket.
-- `errors.py` — the gateway being down, refusing, or answering something unreadable, told apart.
-- `migrations/` — the schema, as the statements a deployment actually runs.
+- `app.py`, `contract.py`, `errors.py` — the published surface, the shapes it answers with,
+  and refusals that name themselves instead of leaking a database error.
+- `migrations/` — the schema, as the statements a deployment actually runs. Handwritten SQL:
+  there is no ORM model layer to diff against, so `--autogenerate` yields nothing useful.
 
-The terminal side is what remains; see `openspec/changes/add-market-data/tasks.md`.
+Three tables, each answering a question the others cannot. **`candles`** is keyed on
+`(symbol, resolution, period_start)`, so a period written twice is overwritten rather than
+doubled, and stores `price_side` and `source` beside the data instead of assuming them.
+**`tracked_pairs`** is the durable answer to what is collected — untracking flips a state and
+stamps `untracked_at` rather than deleting, because an archive that drops data when its
+configuration changes is not an archive. **`coverage_ranges`** is the stretch of time the
+archive has actually verified.
 
 ## Run
 
@@ -44,242 +52,8 @@ Needs `capital-gateway` running on `http://localhost:8010` and a PostgreSQL to w
 repository's `compose.yaml` provides one on **port 55432** — not 5432, because a developer
 machine very often already runs PostgreSQL of its own, and migrating somebody else's database
 by accident is worse than failing to connect. `.env.example` already points there.
-
 `../../scripts/dev.sh` (or `dev.ps1`) does all of the above plus the gateway and the terminal,
-in the order they need each other.
-
-## Schema
-
-Three tables, each answering a question the others cannot.
-
-**`candles`** — a candle is the triple `(symbol, resolution, period_start)`, and that triple is
-the primary key, so a period written twice is overwritten rather than doubled. `price_side` is
-stored next to the data instead of being assumed: everything is the bid side today, the side
-the gateway builds both history and stream from, and writing it down means that adding the ask
-side one day is a migration someone performs rather than two series quietly averaged into one.
-`source` records whether a candle came from a history read or from the stream, because the two
-are not equally trustworthy — a disconnected stream understates a candle's range, a history
-read sees the period whole.
-
-**`tracked_pairs`** — the durable answer to what is being collected. There is no list in a
-configuration file to drift from it; a restart reads the rows marked `tracked`. Untracking
-flips the state and stamps `untracked_at` rather than deleting the row, so tracking the pair
-again knows which gap it left. The candles are never touched: an archive that deletes data
-when its configuration changes is not an archive.
-
-**`coverage_ranges`** — the stretches of time the archive has actually verified. Without them,
-"no candle at 3am on Saturday" and "no candle because ingest was down" are the same absence,
-and the module re-asks the provider about the same closed weekend forever. `history_ended`
-marks the range whose start is as far back as the provider goes — at most one per pair, which
-a partial unique index enforces, because two of them would be two different answers to how
-far back there is anything left to fetch.
-
-Migrations are handwritten SQL rather than autogenerated: there is no ORM model layer to diff
-against, and a migration reads as the statement it will run. `--autogenerate` will produce
-nothing useful here, by design.
-
-## The three rules the archive keeps
-
-**A forming candle is never stored.** It changes with every quote and understates its own
-range until the period closes. Offering one to `store.write_candles` raises rather than being
-dropped quietly, and one forming candle rejects its whole batch — a half-applied batch leaves
-the caller unable to learn which half landed.
-
-**A period written twice is overwritten.** Identity is `(symbol, resolution, period_start)`
-and that triple is the primary key, so a duplicate is impossible even for something that
-bypasses the store.
-
-**A history value outranks a streamed one.** The same period can arrive both ways, and they
-are not equally trustworthy: a stream that was disconnected for part of the period reports a
-range that is too narrow and a volume it never saw, while a history read watched the period
-whole. So a streamed value may not displace a stored history one. Every other combination may
-— including history over history, because a refetch is the provider correcting itself. The
-rule is one `WHERE` on the upsert, and `write_candles` returns how many rows the archive
-actually took, which is not always how many were offered.
-
-## Coverage: which absences are answers
-
-There is no candle for 3am on Saturday because the market was shut, and none for last Tuesday
-because ingest was down. In the candle table those are the same nothing. Without a second
-record the module cannot tell a complete series from a holed one, and re-asks the provider
-about the same closed weekend forever.
-
-`coverage.py` keeps the stretches of time the archive has actually looked at. Inside one, an
-empty period is an answer — `Absence.MARKET_CLOSED`. Outside every one it is
-`Absence.NOT_COLLECTED`, and only that one is worth sending anyone back to the provider for.
-
-Ranges are stored merged, including ranges that merely touch: a pair collected nightly would
-otherwise grow a row a night until "is this moment covered" is a walk through all of them.
-Merging is read-then-write, and the second writer's rows do not exist yet for a row lock to
-catch, so it runs under a transaction-scoped advisory lock on the pair.
-
-`history_ended` marks the range whose start is as far back as the provider goes, and
-`earliest_reachable` is what stops backfill walking further back every night into data that
-was never there. It survives a merge, because nothing can be older than it. `None` from that
-call means *not known yet*, never *no limit*.
-
-## Ingest
-
-Two modes, because the provider offers two. The stream is the only way to catch a candle as
-it closes; `/history` is the only way to recover from not having been listening. Neither
-alone is an archive — the stream cannot fill in the hour the process spent restarting, and
-history alone would mean polling.
-
-One task per tracked pair, and the loop is: **close the gap, subscribe, store closed candles
-until the socket ends, wait, do it again.** The gap-closing sits inside the loop rather than
-before it, because a dropped subscription is not only a socket to reopen — it is a stretch of
-time nobody was listening for, and reconnecting without fetching it leaves a hole that looks
-exactly like a market that was shut.
-
-**Knowing when *not* to ask is half the job.** At any moment the newest closed candle is up to
-one period old: the current period has not finished, so the provider does not have it either.
-Treating that as a gap would send a request every period forever, for a candle nobody has yet.
-An archive that refetches the same closed weekend every night is worse than one that is merely
-behind, because it spends the budget that would have closed a real gap.
-
-**Fills run under one shared budget.** `BACKFILL_CONCURRENCY` is an `asyncio.Semaphore` held by
-the supervisor, not one per pair — a per-pair budget is no budget at all, since twenty pairs
-would each politely run one fill and together spend twenty times the allowance. The limiter is
-taken around the provider call only, so a pair that needs nothing never queues behind another
-pair's deep fill just to discover that.
-
-**Reconnection backs off**, growing from a second to a minute, and resets only once a
-subscription actually produces something — resetting on connection alone would let a gateway
-that accepts a socket and drops it retry in a hot loop.
-
-**Failures are reported, not raised.** One pair's fill failing is not a reason to stop
-collecting the others, so it comes back as a `FillOutcome` carrying the reason. Every outcome
-renders as one line for a log an operator reads at three in the morning:
-
-```
-US100 MINUTE: asked for 31 candles, wrote 29 in 1 provider request(s)
-US100 MINUTE: already current, nothing requested
-NOPE MINUTE: fill failed — the gateway refused with 404: unknown symbol 'NOPE'
-```
-
-Adding or removing a pair takes effect without a restart: `Ingest.sync()` reconciles the
-running tasks against what the operator has decided.
-
-## Tracked pairs
-
-Nothing is archived because somebody looked at a chart. Collecting a pair means holding a
-provider connection open around the clock, and the provider limits how many a session may
-hold — so spending one is a decision, not a side effect of browsing. That is also why the
-list lives in the database rather than a configuration file: a file needs access to the
-machine and a restart, and neither belongs in the loop of "archive this too". A restart
-reads the rows, and there is nothing else for them to disagree with.
-
-**Adding a pair is validated against the gateway**, which owns the instrument catalogue.
-The question asked is "can one candle be had for this symbol at this resolution" rather than
-"does this symbol appear in a search": a search matches on names and would accept an
-instrument with no series at that resolution, which is a pair that sits on the list forever
-holding a connection and archiving nothing.
-
-**The ceiling refuses loudly**, naming the count, the limit and the setting to raise. The
-alternative is accepting a pair and quietly not collecting some of them. Counting and
-inserting happen under one advisory lock, because otherwise several additions read the same
-count, all decide there is room, and the archive ends up over a limit the provider enforces.
-
-**Untracking stops collection and keeps every candle.** The row is flipped rather than
-deleted, which leaves `untracked_at` behind — the left edge of the gap that tracking the pair
-again will have to close.
-
-**Being on the list proves nothing about collection.** A subscription can die without a
-sound, and the only symptom is a series that stops growing. `collection_state` reads the age
-of the newest candle: within two periods is healthy (a candle is only written once its period
-closes, so one period of lateness is normal and a tighter threshold would call every pair
-broken every period). Beyond that it depends on whether the market is open — which the gateway
-answers, not this module. Without that answer the state is `UNKNOWN` rather than a guess:
-there is no session calendar here, and inventing one would produce a confident wrong answer
-twice a day.
-
-## Derived resolutions
-
-The provider serves at most a thousand candles per request at ten requests a second, so
-fetching eight resolutions separately costs eight times the traffic for data the finest one
-already implies. `MINUTE_5`, `MINUTE_15`, `MINUTE_30`, `HOUR` and `HOUR_4` are therefore
-computed from the minute series. `DAY` and `WEEK` are not, and never will be: their boundary
-follows the venue's session rather than the clock, so a daily candle floored to UTC midnight
-would look right and be wrong — the same conclusion the gateway's `forming.py` reached.
-
-**Not a PostgreSQL materialized view**, though the design first called for one. A materialized
-view cannot be refreshed incrementally — `REFRESH` recomputes the whole thing, `CONCURRENTLY`
-included — so at a year of minute candles, settling one bar would rebuild the entire archive.
-`derived_candles` is an ordinary table whose refresh rewrites only the periods a write actually
-touched, which is what a Timescale continuous aggregate would have done for us and the reason
-its absence was worth noting in the first place.
-
-**The four-hour boundary was measured, not assumed.** It is the one place a guess is plausible
-and wrong in a way nothing would catch: a provider anchoring on a venue's open rather than the
-clock would return candles of the right length and shape, offset by hours, and every one of
-them would look correct on a chart. `tests/test_live.py` reads through a running gateway and
-compares a derivation against the provider's own candles for the same periods. Measured August
-2026 on `BTCUSD` (continuous) and `US100` (session-bound): periods start at 00, 04, 08, 12, 16
-and 20 UTC, and the derived values match to within a float's hair.
-
-**`complete` is not a data-quality signal.** The same run turned up something nobody assumed:
-the provider pauses for a few minutes around 21:00 UTC every day, for both instruments. Every
-interior four-hour period holds all 240 of its minutes except the one starting at 20:00, which
-holds 233–235. So one period in six is legitimately short, forever. `complete` says only that
-a period was built from every minute the archive held — coverage is what answers whether data
-is missing.
-
-```bash
-uv run pytest -m live --run-live   # needs capital-gateway on :8010 and Docker
-```
-
-## Reading the gateway
-
-Two roads carry candles in, and `gateway/` is the only part of the module that walks either.
-
-**Depth** comes from `GET /instruments/{symbol}/history`, one request per fill however deep.
-The gateway already pages past the provider's thousand-candle ceiling, anchors its cursor on
-the oldest candle it actually received rather than on the clock, and reports what the read
-cost — so paging here would be a second implementation of rules the gateway owns along with
-the rate gate. A deep read is genuinely long (twenty thousand five-minute candles measured at
-thirty provider calls and twenty-six seconds), which is why the read timeout is minutes while
-the connect timeout stays at five seconds.
-
-**Now** comes from `/ws/stream?symbol=&resolution=`. The subscription is the query string and
-the gateway reads nothing back, so there is no client protocol to get wrong. Four message
-kinds are recognised — candle, quote, status, error. A fifth kind the gateway may add one day
-is ignored rather than fatal; a *known* kind that no longer matches its published shape raises,
-because that is the two modules' contract having drifted and retrying would only hide it.
-
-**The timestamps do not match on arrival.** REST spells a period start as an ISO string, the
-stream as epoch seconds, and the gateway's README calls the split deliberate — for a chart it
-costs nothing. For an archive keyed on `(symbol, resolution, period_start)` a one-second or
-one-timezone disagreement writes a second row where there should have been an overwrite. Both
-forms go through `periods.py` and nowhere else, and `tests/test_seam.py` checks the two roads
-converge through the clients rather than through the parser they share.
-
-Reconnection is deliberately absent: a dropped feed is not only a socket to reopen but a gap
-to close, and that needs the coverage the ingest side keeps.
-
-```bash
-uv run alembic upgrade head        # apply
-uv run alembic downgrade -1        # step back one
-uv run alembic history             # what exists
-```
-
-## Test
-
-```bash
-uv run pytest              # unit tests only; anything needing a database is skipped
-uv run pytest -m db        # integration tests, needs a running Docker daemon
-uv run ruff check .
-```
-
-Tests marked `db` run against a throwaway PostgreSQL container, started for the session and
-gone afterwards. A container rather than a shared development database, because the schema
-is part of what is under test: a table left over from an earlier run is indistinguishable
-from a migration that works.
-
-Without Docker those tests skip with a reason rather than failing with a connection error.
-The check for a usable daemon carries a two-second timeout, so a machine without Docker
-does not pay a minute of silence to reach the same skip.
-
-## Configuration
+in the order they need each other. Migrations step with `uv run alembic downgrade -1`.
 
 | Variable | Default | What it is |
 | --- | --- | --- |
@@ -290,22 +64,28 @@ does not pay a minute of silence to reach the same skip.
 | `DEFAULT_BACKFILL_BARS` | `5000` | how far back a newly tracked pair reaches |
 | `MAX_TRACKED_PAIRS` | `20` | ceiling on archived (symbol, resolution) pairs |
 
-Three of those are budgets rather than preferences, and the defaults are the cautious end
-of each:
+The last three are budgets rather than preferences, and each default is the cautious end. One
+deep fill is dozens of back-to-back requests through the gateway's shared rate gate, so two at
+once are enough to starve the chart an operator is looking at right now. The ceiling is real —
+the gateway holds one provider connection per `(symbol, resolution)` and the provider limits
+how many a session may hold — and the number is a budget to raise on evidence, not one to
+discover by having the feed die.
 
-**`BACKFILL_CONCURRENCY`** is 1 because a deep fill is dozens of back-to-back requests
-through the gateway's shared rate gate. Two of them together are enough to starve the chart
-an operator is looking at right now.
+## Test
 
-**`MAX_TRACKED_PAIRS`** exists because the gateway holds one provider connection per
-`(symbol, resolution)` and the provider limits how many a session may hold. The ceiling is
-real; the number is a budget to raise on evidence, not a guess to discover by having the
-feed die.
+```bash
+uv run pytest                      # unit tests only; anything needing a database is skipped
+uv run pytest -m db                # integration tests, needs a running Docker daemon
+uv run pytest -m live --run-live   # reads through a real gateway on :8010
+uv run ruff check .
+```
 
-**`DATABASE_URL`** points at the first state this repository owns. That makes this the first
-module that can lose something: rebuilding three years of minute candles for a hundred
-instruments costs roughly 27 hours of provider calls, which is what turns backups from a
-good habit into a requirement.
+Tests marked `db` run against a throwaway PostgreSQL container, started for the session and
+gone afterwards — a container rather than a shared development database, because the schema
+is part of what is under test: a table left over from an earlier run is indistinguishable from
+a migration that works. Without Docker they skip with a reason rather than failing with a
+connection error, and the daemon check carries a two-second timeout, so a machine without
+Docker does not pay a minute of silence to reach the same skip.
 
 ## Contract
 
@@ -322,28 +102,20 @@ HTTP, described by OpenAPI at `/docs`.
 
 **A range read says what it is not saying.** `uncovered` carries the stretches of the
 requested window the archive never verified. That is not the same as periods with no candle:
-a shut market has no candle either, and only one of the two is missing data. A plain list of
-candles cannot express the difference, which is why it is a separate field rather than a gap
-a consumer is left to infer.
+a shut market has no candle either, and only one of the two is missing data.
 
 **Every answer names the price side.** The archive holds bid, matching the gateway. A series
 quietly compared against an ask-side one is off by a spread that reads as a real move.
 
 **Refusals name themselves and carry nothing raw.** A ceiling reached is 409 with the count
 and the setting to raise; a symbol the gateway will not serve is 422; a gateway that is down
-is 504 rather than 500, because the archive is fine and retrying it as though it were at
-fault is the wrong response. Nothing surfaces a database error — those name tables and
-columns, which is more than a caller can use.
+is 504 rather than 500, because the archive is fine and retrying it as though it were at fault
+is the wrong response.
 
 ### WebSocket — `/ws/candles?symbol=US100&resolution=MINUTE`
 
 Not in the OpenAPI schema: OpenAPI has no vocabulary for WebSocket payloads, so a path there
-would describe a contract it cannot state, and this section would become the second
-description rather than the only one. A test keeps the path out of the schema.
-
-The subscription is the query string and the module reads nothing back, so there is no client
-protocol to get wrong. **The first message is always a snapshot; every message after it is a
-change.**
+would describe a contract it cannot state. A test keeps the path out of the schema.
 
 ```jsonc
 // first, exactly once
@@ -357,17 +129,67 @@ change.**
 {"kind":"candle","symbol":"US100","resolution":"MINUTE","candle":{"...":"...","forming":true}}
 ```
 
-`forming` marks a period still moving. One message kind covers both states rather than two,
-because a consumer upserts by `period_start` and two kinds would only make it reconcile them
+The subscription is the query string and the module reads nothing back, so there is no client
+protocol to get wrong. **The first message is always a snapshot; every message after it is a
+change.** One message kind covers both settled and forming, because a consumer upserts by
+`period_start` and two kinds would only make it reconcile them itself.
+
+**There is no gap to close after connecting, and no duplicate to filter.** The snapshot is read
+while the room is held still, the subscriber attaches before it is released, and the ingest
+write happens inside that same hold. Without the last part there is a moment where a candle is
+committed but not yet broadcast, and a subscriber attaching then gets it twice. That is why the
+terminal no longer needs its "on resume, close the gap" rule.
+
+Subscribing to a pair nobody chose to collect is refused **before** the handshake, and does not
+start collecting it either — that is the decision the ceiling exists to keep deliberate.
+
+## The rules, and what was measured
+
+**A forming candle is never stored.** It changes with every quote and understates its own range
+until the period closes. Offering one to `store.write_candles` raises rather than being dropped
+quietly, and one forming candle rejects its whole batch — a half-applied batch leaves the caller
+unable to learn which half landed.
+
+**A history value outranks a streamed one.** The same period can arrive both ways and they are
+not equally trustworthy: a stream disconnected for part of the period reports a range too narrow
+and a volume it never saw, while a history read watched the period whole. Every other
+combination may overwrite, including history over history — a refetch is the provider correcting
 itself.
 
-**There is no gap to close after connecting, and no duplicate to filter.** The snapshot is
-read while the room is held still, and the subscriber attaches before it is released — and
-the ingest write happens inside that same hold. Without the last part there is a moment where
-a candle is committed but not yet broadcast, and a subscriber attaching then gets it twice:
-once in its snapshot and once in the change that follows. That is why the terminal no longer
-needs its "on resume, close the gap" rule.
+**Coverage is what makes an absence an answer.** Inside a verified range an empty period is
+`Absence.MARKET_CLOSED`; outside every one it is `Absence.NOT_COLLECTED`, and only that is worth
+going back to the provider for. Ranges are stored merged, including ranges that merely touch,
+under a transaction-scoped advisory lock — the second writer's rows do not exist yet for a row
+lock to catch. `history_ended` marks the range reaching as far back as the provider goes, and is
+what stops backfill walking further back every night into data that was never there.
 
-Subscribing to a pair nobody chose to collect is refused **before** the handshake, so it fails
-to connect rather than handing back a socket that dies a moment later. It does not start
-collecting it either — that is the decision the ceiling exists to keep deliberate.
+**Knowing when *not* to ask is half of ingest.** One task per tracked pair: close the gap,
+subscribe, store closed candles until the socket ends, wait, repeat — the gap-closing inside the
+loop, because a dropped subscription is also a stretch nobody was listening for. At any moment the
+newest closed candle is up to one period old, and treating that as a gap would send a request every
+period forever for a candle nobody has yet. Reconnection backs off from a second to a minute and
+resets only once a subscription produces something. Fills share one `asyncio.Semaphore` held by the
+supervisor — a per-pair budget is no budget. A failed fill comes back as a `FillOutcome` carrying
+its reason, one operator-readable line per outcome, rather than stopping the other pairs.
+
+**Being on the list proves nothing about collection.** A subscription can die without a sound, and
+the only symptom is a series that stops growing. `collection_state` reads the age of the newest
+candle — within two periods is healthy, beyond that it depends on whether the market is open, which
+the gateway answers and this module does not. Without that answer the state is `UNKNOWN` rather
+than a guess: there is no session calendar here.
+
+**Derived resolutions come from the minute series.** `MINUTE_5` … `HOUR_4` are computed, not
+fetched: eight separate resolutions cost eight times the traffic for data the finest one already
+implies. `DAY` and `WEEK` are not, and never will be — their boundary follows the venue's session
+rather than the clock, the same conclusion the gateway's `forming.py` reached. Not a materialized
+view, though the design first called for one: `REFRESH` recomputes the whole thing, `CONCURRENTLY`
+included, so at a year of minute candles settling one bar would rebuild the archive.
+
+**The four-hour boundary was measured, not assumed** — a provider anchoring on a venue's open would
+return candles of the right length and shape, offset by hours, and every one would look correct on
+a chart. Measured August 2026 on `BTCUSD` and `US100`: periods start at 00, 04, 08, 12, 16 and 20
+UTC, and derived values match the provider's own to within a float's hair. The same run turned up
+something nobody assumed: **the provider pauses for a few minutes around 21:00 UTC every day**, for
+both instruments. Every interior four-hour period holds all 240 of its minutes except the one
+starting at 20:00, which holds 233–235. So `complete` is legitimately false for one period in six,
+forever, and is not a data-quality signal — coverage is what answers whether data is missing.
