@@ -13,7 +13,7 @@ są zaimplementowane i przetestowane, ale nieosiągalne przez kontrakt, bo nikt 
 Postęp ingestu istnieje w pamięci i nie wychodzi poza log, choć spec każe go udostępniać
 (Finding 6). Obie rzeczy zmieniają kształt kontraktu, więc zostały opisane, nie dopisane.
 
-Czego czytelnik za rok nie powinien wziąć za przeoczenie: **cztery z sześciu ustaleń tego przeglądu
+Czego czytelnik za rok nie powinien wziąć za przeoczenie: **cztery z ośmiu ustaleń tego przeglądu
 wyszły z uruchomienia całości w przeglądarce, nie z czytania kodu ani z suity.** Każde z nich
 przechodziło swój test. To nie jest przypadek i nie jest argumentem przeciwko tym testom — jest
 argumentem za tym, żeby zadanie „przejdź ręcznie ścieżkę" zostało w każdej następnej zmianie.
@@ -54,10 +54,16 @@ Poza suitą — **przeciw pełnemu stosowi na koncie demo**, przez `scripts/dev.
   `BTCUSD MINUTE` → 60 świec `derived=false`, `BTCUSD MINUTE_5` → 12 świec `derived=true`.
   Dwanaście pięciominutówek z sześćdziesięciu minut, czyli derywacja liczy to, co powinna.
 
-Czego **nie** udało się sprawdzić: provider stał. Świece `BTCUSD` `MINUTE` kończą się u samego
-gatewaya na `04:59Z`, kwotowanie nie drgnęło przez 90 s obserwacji, `US100` stoi od piątku 20:00Z.
-Sprawdzona więc została gałąź „poproszono o 65 świec, zapisano 0", a nie „zapisano 65": **domknięcie
-luki realnymi danymi pozostaje niezweryfikowane** i wymaga powtórzenia przy otwartym rynku.
+Czego **nie** udało się sprawdzić: **był weekend, a capital.com chodzi 23/5**. Nie tylko indeksy —
+`BTCUSD` też, bo to CFD na bitcoina, a nie bitcoin, więc stoi razem z resztą. Świece `BTCUSD`
+`MINUTE` kończą się u samego gatewaya na `04:59Z`, kwotowanie nie drgnęło przez 90 s obserwacji,
+`US100` stoi od piątku 20:00Z. Nic z tego nie jest awarią i nie należy tego tak czytać w przyszłości.
+
+Sprawdzona więc została gałąź „poproszono o 65 świec, zapisano 0", a nie „zapisano 65":
+**domknięcie luki realnymi danymi pozostaje niezweryfikowane** i wymaga powtórzenia **w dzień
+handlowy**. To samo dotyczy testów `--run-live`: ich sprawdzenie gęstości mierzy świece względem
+zegara, więc weekend w oknie pomiaru wywróciłby je, mówiąc prawdę o serii, z którą wszystko jest
+w porządku.
 
 ## Findings
 
@@ -69,6 +75,8 @@ luki realnymi danymi pozostaje niezweryfikowane** i wymaga powtórzenia przy otw
 | Średnia | `src/data/socketHub.ts:146` | Para, której nikt nie zbiera, wyglądała jak zerwane połączenie i była ponawiana bez końca (20 prób w 12 s). Odmowa przed handshake'em jest niewidoczna dla przeglądarki. | FIXED `9f26566` |
 | Średnia | `market_data/app.py:266` | `read_status(conn)` nigdy nie dostaje `market_open`, więc `STALLED` i `MARKET_CLOSED` są przez kontrakt **nieosiągalne** — każda opóźniona para to `UNKNOWN`. Panel nigdy nie wyróżni pary, dla której zbieranie ustało. | OTWARTE |
 | Niska | `market_data/ingest/supervisor.py:70` | `Ingest.report()` i `Ingest.fills()` nie mają **żadnego wywołania** — ani w aplikacji, ani w testach. Postęp i przyczyny porażek zostają w logu, czego spec zabrania wprost. | OTWARTE |
+| Niska | `tests/test_app.py:21` | Dwa testy pisały świece wokół stałej `NOW` i czytały je **bez podania okna**, a `/candles` domyśla się ostatniej doby z zegara. Zdały każdy przebieg aż do 2026-08-08 12:00 UTC — doby po `NOW` — i wtedy zaczęły padać bez związku z kodem. | FIXED (ten przegląd) |
+| Niska | `tests/test_live.py:45`, `design.md`, `README.md` | Zapisane jako fakt, że `BTCUSD` to rynek ciągły — stała nazywała się `CONTINUOUS`, a docstring mówił „a 24/7 instrument". To CFD na bitcoina u brokera 23/5: stoi w weekend i bierze tę samą dobową przerwę. | FIXED (ten przegląd) |
 
 **Finding 5 — dlaczego nie zostało naprawione od ręki.** Oczywisty kandydat na źródło to `tradeable`
 z katalogu gatewaya, ale pomiar go podważa: `BTCUSD` w sobotę raportuje `tradeable: false`, mając

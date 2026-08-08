@@ -152,14 +152,17 @@
         na jednym połączeniu, zgodnie z `BACKFILL_CONCURRENCY=1`. Pokrycie przesunęło się
         z `05:52:53` na `06:03:13` **scalone w ten sam wiersz**, nie dopisane obok.
 
-      Czego nie dało się przejść i dlaczego: **provider stoi.** Świece `BTCUSD` `MINUTE` kończą
-      się u samego gatewaya na `04:59Z`, a kwotowanie nie drgnęło przez 90 s obserwacji
-      (`bid=64942.25` bez zmiany, równe zamknięciu z 04:59). `US100` stoi od piątku 20:00Z.
-      Zostało więc sprawdzone „poproszono o 65 świec, zapisano 0" zamiast „zapisano 65" —
-      gałąź domknięcia luki **z realnymi danymi jest niesprawdzona** i wymaga powtórzenia przy
-      otwartym rynku. Do powtórzenia zostaje: poczekać na świece na żywo i zobaczyć, że wykres
-      rusza sam, oraz zatrzymać moduł na kilka minut przy ruchu i potwierdzić, że restart
-      dociąga to, co przeleciało.
+      Czego nie dało się przejść i dlaczego: **była sobota, a capital.com chodzi 23/5.** Dotyczy
+      to również `BTCUSD` — to CFD na bitcoina, nie bitcoin, więc stoi razem z resztą, choć sama
+      krypto handluje się dalej gdzie indziej. Świece `BTCUSD` `MINUTE` kończą się u samego
+      gatewaya na `04:59Z`, kwotowanie nie drgnęło przez 90 s obserwacji (`bid=64942.25` bez
+      zmiany, równe zamknięciu z 04:59), `US100` stoi od piątku 20:00Z. Żadne z tego nie jest
+      awarią.
+
+      Zostało więc sprawdzone „poproszono o 65 świec, zapisano 0" zamiast „zapisano 65" — gałąź
+      domknięcia luki **z realnymi danymi jest niesprawdzona**. Do powtórzenia **w dzień
+      handlowy**: poczekać na świece na żywo i zobaczyć, że wykres rusza sam, oraz zatrzymać
+      moduł na kilka minut przy ruchu i potwierdzić, że restart dociąga to, co przeleciało.
 
       Przy okazji wyszły trzy błędy, których suita nie mogła złapać — opisane niżej. Wszystkie
       trzy mają ten sam kształt: każdy z nich jest niewidoczny dla testu jednostkowego z tego
@@ -205,7 +208,7 @@
       był tam przez cały czas. `z-10` na `Veil`; test pilnuje samej własności, która o tym
       decyduje, z komentarzem, dlaczego nie może pilnować niczego więcej.
 - [x] 11.5 Napisz `review.md` — dwa przejścia wymagane przez schemat, przed archiwizacją zmiany.
-      Przejście po diffie (17 commitów od `5ed0345`) dało sześć ustaleń: cztery naprawione, dwa
+      Przejście po diffie (17 commitów od `5ed0345`) dało osiem ustaleń: sześć naprawionych, dwa
       otwarte. Najpoważniejsze naprawione w tym przeglądzie — odczyt zakresu czytał tabelę rollupów
       dla **każdej** rozdzielczości pochodnej, więc para śledzona na `HOUR` trzymała 5000 świec
       i dostawała w odpowiedzi zero, przy pustym `uncovered`, czyli „rynek był zamknięty przez cały

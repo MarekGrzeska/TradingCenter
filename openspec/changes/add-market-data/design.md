@@ -83,8 +83,13 @@ poprawnie i jest błędna — to samo rozstrzygnięcie, które podjął już `fo
 
 **Zweryfikowane, nie założone:** provider kotwiczy `HOUR_4` na północy UTC. Świece pobrane
 z gatewaya zaczynają się o 00, 04, 08, 12, 16 i 20 UTC, a `HOUR_4` wyliczone z serii minutowej
-zgadza się z nimi co do wartości. Sprawdzone na `BTCUSD` (rynek ciągły) i `US100` (rynek sesyjny),
-sierpień 2026 — `modules/market-data/tests/test_live.py`, za flagą `--run-live`.
+zgadza się z nimi co do wartości. Sprawdzone na `BTCUSD` i `US100` — dwóch instrumentach o możliwie
+różnych sesjach, bo gdyby kotwicą było otwarcie giełdy, a nie zegar, te dwa musiałyby się rozjechać.
+**Żaden z nich nie jest rynkiem ciągłym**, wbrew temu, co ten akapit twierdził wcześniej: `BTCUSD`
+u capital.com to CFD na bitcoina, a nie bitcoin, i chodzi w tym samym trybie 23/5 co reszta. Stąd
+też przerwa około 21:00 UTC niżej — to dobowa przerwa tego trybu, nie osobliwość providera.
+Sierpień 2026 — `modules/market-data/tests/test_live.py`, za flagą `--run-live`, **w dzień
+handlowy**: w weekend provider oddaje serię z piątku i nic nowszego.
 
 Przy okazji wyszło coś, czego nikt nie zakładał: provider przerywa notowania na kilka minut około
 21:00 UTC, codziennie i dla obu instrumentów. Okres `HOUR_4` zaczynający się o 20:00 nigdy nie ma

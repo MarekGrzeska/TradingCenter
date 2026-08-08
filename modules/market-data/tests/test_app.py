@@ -21,6 +21,18 @@ pytestmark = pytest.mark.db
 NOW = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
 LIMIT = 20
 
+# Every read of a range says which range, and this is why.
+#
+# `/candles` defaults to the last day *of the real clock*, so a test that writes candles
+# around a fixed `NOW` and then omits the window is only asserting anything while the wall
+# clock happens to be within a day of that constant. Two tests did, and they began failing
+# at noon on 2026-08-08 — a day after `NOW`, having passed every run before it, for no
+# reason connected to the code.
+WINDOW = {
+    "from": (NOW - timedelta(hours=1)).isoformat(),
+    "to": (NOW + timedelta(minutes=1)).isoformat(),
+}
+
 
 def candle(offset: int = 0, **overrides) -> Candle:
     return Candle(
@@ -100,7 +112,7 @@ async def test_a_range_read_answers_with_candles(api, pool) -> None:
     async with pool.acquire() as conn:
         await write_candles(conn, [candle(m) for m in range(3)])
 
-    body = (await api.get("/candles/US100", params={"resolution": "MINUTE"})).json()
+    body = (await api.get("/candles/US100", params={"resolution": "MINUTE", **WINDOW})).json()
 
     assert [_at(c["time"]) for c in body["candles"]] == [
         NOW - timedelta(minutes=m) for m in (2, 1, 0)
@@ -138,7 +150,7 @@ async def test_a_derived_resolution_is_served_from_the_derivation(api, pool) -> 
         await write_candles(conn, [candle(m) for m in range(10)])
         await refresh_all(conn, "US100", NOW - timedelta(minutes=10), NOW)
 
-    body = (await api.get("/candles/US100", params={"resolution": "MINUTE_5"})).json()
+    body = (await api.get("/candles/US100", params={"resolution": "MINUTE_5", **WINDOW})).json()
 
     assert body["derived"] is True
     assert body["candles"]

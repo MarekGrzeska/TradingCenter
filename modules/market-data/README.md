@@ -187,9 +187,16 @@ included, so at a year of minute candles settling one bar would rebuild the arch
 
 **The four-hour boundary was measured, not assumed** — a provider anchoring on a venue's open would
 return candles of the right length and shape, offset by hours, and every one would look correct on
-a chart. Measured August 2026 on `BTCUSD` and `US100`: periods start at 00, 04, 08, 12, 16 and 20
-UTC, and derived values match the provider's own to within a float's hair. The same run turned up
-something nobody assumed: **the provider pauses for a few minutes around 21:00 UTC every day**, for
-both instruments. Every interior four-hour period holds all 240 of its minutes except the one
-starting at 20:00, which holds 233–235. So `complete` is legitimately false for one period in six,
-forever, and is not a data-quality signal — coverage is what answers whether data is missing.
+a chart. Measured August 2026 on `BTCUSD` and `US100` — the two most unlike sessions on offer, so
+that an anchor following a venue's open would have made them disagree: periods start at 00, 04, 08,
+12, 16 and 20 UTC, and derived values match the provider's own to within a float's hair. The same
+run showed **the provider pausing for a few minutes around 21:00 UTC every day**, for both
+instruments: every interior four-hour period holds all 240 of its minutes except the one starting
+at 20:00, which holds 233–235. So `complete` is legitimately false for one period in six, forever,
+and is not a data-quality signal — coverage is what answers whether data is missing.
+
+**Nothing here is a continuous market, `BTCUSD` included.** It is a CFD on bitcoin rather than
+bitcoin: capital.com runs it 23/5 like everything else, so it is shut at the weekend and takes the
+same daily break, and that break is what the 20:00 period is short by. Bitcoin trading somewhere
+else at 3am on Sunday changes nothing about what this provider will hand back — which is why the
+live tests want a trading day, and why a pair that has stopped moving is not evidence of anything.
