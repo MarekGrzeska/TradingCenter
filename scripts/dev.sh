@@ -299,8 +299,10 @@ fi
 
 echo
 ok "Ready:"
-(( START_TERMINAL )) && echo "  Terminal            http://localhost:$TERMINAL_PORT"
-echo "  Archive panel       http://localhost:$TERMINAL_PORT/archive"
+if (( START_TERMINAL )); then
+  echo "  Terminal            http://localhost:$TERMINAL_PORT"
+  echo "  Archive panel       http://localhost:$TERMINAL_PORT/archive"
+fi
 echo "  market-data docs    $ARCHIVE_URL/docs"
 echo "  Gateway docs        $GATEWAY_URL/docs"
 echo "  Database            postgresql://market_data:change-me@127.0.0.1:$DB_PORT/market_data"

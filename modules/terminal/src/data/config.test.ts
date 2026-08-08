@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { TABS } from "../app/tabs";
 import { resolveEndpoints, resolveHttpBase, resolveWsBase } from "./config";
 
 describe("resolveHttpBase", () => {
@@ -50,15 +51,15 @@ describe("resolveEndpoints", () => {
     const endpoints = resolveEndpoints(
       {
         VITE_GATEWAY_HTTP: "/api",
-        VITE_ARCHIVE_HTTP: "/archive",
-        VITE_ARCHIVE_WS: "/archive/ws",
+        VITE_ARCHIVE_HTTP: "/archive-api",
+        VITE_ARCHIVE_WS: "/archive-api/ws",
       },
       devLoc,
     );
     expect(endpoints).toEqual({
       gatewayHttp: "/api",
-      archiveHttp: "/archive",
-      archiveWs: "ws://localhost:5173/archive/ws",
+      archiveHttp: "/archive-api",
+      archiveWs: "ws://localhost:5173/archive-api/ws",
     });
   });
 
@@ -81,8 +82,29 @@ describe("resolveEndpoints", () => {
   it("falls back to the dev-proxy prefixes when the env vars are unset, instead of throwing", () => {
     expect(resolveEndpoints({}, devLoc)).toEqual({
       gatewayHttp: "/api",
-      archiveHttp: "/archive",
-      archiveWs: "ws://localhost:5173/archive/ws",
+      archiveHttp: "/archive-api",
+      archiveWs: "ws://localhost:5173/archive-api/ws",
     });
+  });
+
+  // Caught in a browser, not here: the archive answered on `/archive`, which is
+  // also the Archive tab's route, so reloading the tab returned the service's
+  // JSON instead of the app. Clicking through worked — the router never asks a
+  // server — which is why nothing in this suite noticed.
+  //
+  // A relative back-end prefix is only safe if no tab claims it, so the two
+  // lists are compared rather than each being eyeballed.
+  it("gives no back end a relative prefix that a tab route already claims", () => {
+    const { gatewayHttp, archiveHttp, archiveWs } = resolveEndpoints({}, devLoc);
+    const routes = new Set(TABS.map((tab) => tab.path));
+
+    const prefixes = [gatewayHttp, archiveHttp, new URL(archiveWs).pathname]
+      .filter((base) => base.startsWith("/"))
+      .map((base) => base.split("/")[1]);
+
+    expect(prefixes.length).toBeGreaterThan(0);
+    for (const prefix of prefixes) {
+      expect(routes.has(prefix)).toBe(false);
+    }
   });
 });

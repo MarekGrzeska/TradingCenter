@@ -57,9 +57,12 @@ export interface Endpoints {
 // hasn't copied it yet, or a test/CI environment with no env file at all)
 // must fall back to "talk to the dev proxy", not crash the moment a source is
 // built.
+// `/archive-api`, not `/archive`: the latter is the Archive tab's own route, and
+// a back end answering that prefix shadows the tab for every request that
+// actually reaches a server. See the note in vite.config.ts.
 const DEFAULT_GATEWAY_HTTP = "/api";
-const DEFAULT_ARCHIVE_HTTP = "/archive";
-const DEFAULT_ARCHIVE_WS = "/archive/ws";
+const DEFAULT_ARCHIVE_HTTP = "/archive-api";
+const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 
 export interface EnvVars {
   VITE_GATEWAY_HTTP?: string;

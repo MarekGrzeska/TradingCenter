@@ -28,7 +28,7 @@ describe("the composed source", () => {
   it("sends candles to the archive and instruments to the gateway", async () => {
     const asked: string[] = [];
     server.use(
-      http.get(`${ORIGIN}/archive/candles/US100`, ({ request }) => {
+      http.get(`${ORIGIN}/archive-api/candles/US100`, ({ request }) => {
         asked.push(new URL(request.url).pathname);
         return HttpResponse.json({
           symbol: "US100",
@@ -48,7 +48,7 @@ describe("the composed source", () => {
     await marketData.history({ symbol: "US100", resolution: "MINUTE", from: 0, to: 1 }, signal());
     await marketData.searchInstruments("us", signal());
 
-    expect(asked).toEqual(["/archive/candles/US100", "/api/instruments/search"]);
+    expect(asked).toEqual(["/archive-api/candles/US100", "/api/instruments/search"]);
   });
 
   it("keeps the instrument search working while the archive is unreachable", async () => {
@@ -57,8 +57,8 @@ describe("the composed source", () => {
     // there, so the terminal loses its candles and not itself (design.md,
     // Risks: "Archiwum staje się na ścieżce krytycznej wykresu").
     server.use(
-      http.get(`${ORIGIN}/archive/candles/US100`, () => HttpResponse.error()),
-      http.get(`${ORIGIN}/archive/health`, () => HttpResponse.error()),
+      http.get(`${ORIGIN}/archive-api/candles/US100`, () => HttpResponse.error()),
+      http.get(`${ORIGIN}/archive-api/health`, () => HttpResponse.error()),
       http.get(`${ORIGIN}/api/instruments/search`, () =>
         HttpResponse.json([
           {

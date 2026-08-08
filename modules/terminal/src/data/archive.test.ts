@@ -1,7 +1,8 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { http, HttpResponse, setupServer } from "../test/httpDouble";
-import { createArchiveSource, translateMessage } from "./archive";
+import { createArchiveSource, readRefusalFromPairs, translateMessage } from "./archive";
 import { MarketDataError } from "./types";
+import type { Resolution, TrackedPair } from "./types";
 
 const HTTP_BASE = "http://archive.test";
 
@@ -380,5 +381,38 @@ describe("archive pair management", () => {
 
     const coverage = await source().coverage("US100", "MINUTE", signal());
     expect(coverage.earliestReachable).toBeNull();
+  });
+});
+
+describe("archive: reading a subscription's refusal off the tracked list", () => {
+  const pair = (symbol: string, resolution: Resolution): TrackedPair => ({
+    symbol,
+    resolution,
+    addedAt: 1785578400,
+    latestCandle: null,
+    collection: "never_collected",
+  });
+
+  // The archive refuses before the handshake, so the browser never learns why:
+  // the tracked list is the second place to ask. A pair missing from it is the
+  // one answer that means retrying cannot help.
+  it("names the pair and where to fix it, when nobody is collecting it", () => {
+    const reason = readRefusalFromPairs([pair("GOLD", "HOUR")], "US100", "MINUTE_5");
+    expect(reason).toContain("US100 MINUTE_5");
+    expect(reason).toContain("Archive tab");
+  });
+
+  it("finds no reason to stop when the pair is on the list", () => {
+    expect(
+      readRefusalFromPairs([pair("US100", "MINUTE_5")], "US100", "MINUTE_5"),
+    ).toBeNull();
+  });
+
+  // Same symbol, different resolution, is a different pair — collecting
+  // US100 MINUTE_5 says nothing about US100 HOUR.
+  it("matches on the resolution too, not the symbol alone", () => {
+    expect(readRefusalFromPairs([pair("US100", "MINUTE_5")], "US100", "HOUR")).toContain(
+      "US100 HOUR",
+    );
   });
 });

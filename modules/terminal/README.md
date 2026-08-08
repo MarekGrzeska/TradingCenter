@@ -88,6 +88,11 @@ while static files come from elsewhere has to be configurable without touching c
 Locally both are relative and Vite's dev proxy carries them. The gateway needs no WebSocket
 address any more: the terminal reads its catalogue and nothing else.
 
+**A relative prefix must not be a tab's route.** The archive answers on `/archive-api`, not
+`/archive`, because `/archive` is the Archive tab — and a back end holding that prefix
+shadows the tab for every request that reaches a server, which is a reload or a bookmark but
+never a click. A test compares the two lists so the next prefix cannot repeat it.
+
 ## Findings
 
 Everything here was **measured**, not assumed.

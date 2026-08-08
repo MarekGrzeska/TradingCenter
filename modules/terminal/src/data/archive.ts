@@ -163,13 +163,76 @@ export function translateMessage(raw: string): StreamEvent[] {
 
 export type ArchiveSource = CandleSource & ArchiveAdmin;
 
+/** How long the "why did that socket not open" question may take before the
+ *  answer stops being worth waiting for. Short, because a chart is sitting on
+ *  it and the fallback — keep retrying — is the safe one. */
+const DIAGNOSIS_TIMEOUT_MS = 5_000;
+
+/**
+ * What the tracked-pair list says about a subscription that would not open, or
+ * `null` if it says nothing that should stop the retrying.
+ *
+ * Split out from the request that fetches the list because this is the part
+ * with a judgement in it: a pair absent from the list is a settled answer, and
+ * everything else — including a list that could not be read — is not.
+ */
+export function readRefusalFromPairs(
+  pairs: TrackedPair[],
+  symbol: string,
+  resolution: Resolution,
+): string | null {
+  const tracked = pairs.some(
+    (pair) => pair.symbol === symbol && pair.resolution === resolution,
+  );
+  if (tracked) return null;
+  return `${symbol} ${resolution} is not being archived — add it in the Archive tab to start collecting it.`;
+}
+
 export function createArchiveSource(httpBase: string, wsBase: string): ArchiveSource {
   const http = jsonClient("the candle archive", mapStatus);
+
+  async function readPairs(signal: AbortSignal): Promise<TrackedPair[]> {
+    const raw = await http.json<RawTrackedPair[]>(`${httpBase}/pairs`, { signal });
+    return raw.map(mapTrackedPair);
+  }
+
+  /**
+   * Why a subscription that would not open is going to stay shut.
+   *
+   * The archive refuses a pair nobody chose to collect *before* the handshake,
+   * which is the right call — it never hands back a socket that dies a moment
+   * later — but it means the refusal is an HTTP status the browser will not
+   * show us. What reaches the page is a connection that failed, the same shape
+   * as an archive that is down, and the two deserve opposite responses: one is
+   * worth retrying, the other is worth telling the operator about.
+   *
+   * So the question gets asked a second way. `/pairs` is the same list the
+   * Archive tab reads, and a pair missing from it is a settled answer: nothing
+   * is collecting this, and nothing will until somebody decides otherwise. Any
+   * other outcome — the pair is listed, or `/pairs` cannot be reached either —
+   * returns `null`, and the hub goes on retrying.
+   */
+  async function whyRefused(symbol: string, resolution: Resolution): Promise<string | null> {
+    // The question gets a deadline. An archive that accepts the request and
+    // never answers is an archive worth retrying, and without this the retry
+    // loop would wait on it forever instead — the diagnosis would have become
+    // the outage.
+    const abort = new AbortController();
+    const deadline = setTimeout(() => abort.abort(), DIAGNOSIS_TIMEOUT_MS);
+    try {
+      return readRefusalFromPairs(await readPairs(abort.signal), symbol, resolution);
+    } finally {
+      clearTimeout(deadline);
+    }
+  }
 
   const hub = new SocketHub(
     (symbol, resolution) =>
       `${wsBase}/candles?symbol=${encodeURIComponent(symbol)}&resolution=${resolution}`,
     translateMessage,
+    undefined,
+    undefined,
+    whyRefused,
   );
 
   return {
@@ -203,8 +266,7 @@ export function createArchiveSource(httpBase: string, wsBase: string): ArchiveSo
     },
 
     async listPairs(signal) {
-      const raw = await http.json<RawTrackedPair[]>(`${httpBase}/pairs`, { signal });
-      return raw.map(mapTrackedPair);
+      return readPairs(signal);
     },
 
     async trackPair(symbol, resolution, signal) {

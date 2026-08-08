@@ -69,7 +69,7 @@ export function setupServer(...initial: Handler[]): MockServer {
     // not reachable", which is precisely the misleading state this file exists
     // to remove. The two fields a resolver actually reads are built by hand.
     // Resolved against the page, because the app's default addresses are
-    // relative (`/api`, `/archive`) — that is what the dev proxy expects — and a
+    // relative (`/api`, `/archive-api`) — what the dev proxy expects — and a
     // handler is written with the origin spelled out.
     const raw = typeof input === "string" ? input : (input as { url: string }).url;
     const url = new URL(raw, globalThis.location?.href ?? "http://localhost").href;
