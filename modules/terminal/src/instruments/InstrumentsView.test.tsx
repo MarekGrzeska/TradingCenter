@@ -30,6 +30,14 @@ class FakeArchive {
     this.coverageAnswer ?? { symbol, resolution, ranges: [], earliestReachable: null };
 }
 
+/** The wizard's own picker source — a fixed, empty catalogue is enough here:
+ *  these tests are about the list, not about adding an instrument. */
+const fakeGateway = {
+  listAssetClasses: async () => [],
+  listInstruments: async () => ({ instruments: [], count: 0, truncated: false }),
+  searchInstruments: async () => [],
+};
+
 let fakeArchive: FakeArchive;
 
 vi.mock("../data/marketData", () => ({
@@ -37,6 +45,7 @@ vi.mock("../data/marketData", () => ({
   get archive() {
     return fakeArchive;
   },
+  instruments: fakeGateway,
 }));
 
 const { InstrumentsView } = await import("./InstrumentsView");

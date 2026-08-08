@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { archive } from "../data/marketData";
 import { RESOLUTIONS } from "../data/types";
-import type { CollectionState, PairCoverage, Resolution, TrackedPair } from "../data/types";
+import type { CollectionState, PairCoverage, TrackedPair } from "../data/types";
+import { AddInstrumentWizard } from "./AddInstrumentWizard";
+import { formatInstant } from "./format";
+import { RESOLUTION_ABBR } from "./resolutionAbbr";
 import { useTrackedPairs } from "./useTrackedPairs";
 
 /**
@@ -15,10 +18,6 @@ import { useTrackedPairs } from "./useTrackedPairs";
  * and expanding it shows coverage and lets a resolution — or the whole
  * instrument — stop being collected.
  */
-
-function formatInstant(epochSeconds: number): string {
-  return `${new Date(epochSeconds * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
-}
 
 const COLLECTION_LABEL: Record<CollectionState, string> = {
   never_collected: "nothing yet",
@@ -34,17 +33,6 @@ const COLLECTION_HINT: Record<CollectionState, string> = {
   stalled: "The newest candle is older than two periods and the market is open — nothing is arriving.",
   market_closed: "Behind, but the market is shut, so there is nothing to collect.",
   unknown: "Behind, and nobody could say whether the market is open.",
-};
-
-const RESOLUTION_ABBR: Record<Resolution, string> = {
-  MINUTE: "1m",
-  MINUTE_5: "5m",
-  MINUTE_15: "15m",
-  MINUTE_30: "30m",
-  HOUR: "1h",
-  HOUR_4: "4h",
-  DAY: "1D",
-  WEEK: "1W",
 };
 
 interface InstrumentGroup {
@@ -83,6 +71,8 @@ export function InstrumentsView() {
 
   return (
     <div className="flex h-full min-h-0 flex-col">
+      <AddInstrumentWizard existingPairs={list.pairs} onCollected={list.reload} />
+
       <div className="min-h-0 flex-1 overflow-auto">
         <InstrumentList list={list} groups={groups} />
       </div>
@@ -130,7 +120,9 @@ function InstrumentList({
       )}
 
       {groups.length === 0 ? (
-        <p className="px-4 py-6 text-sm text-ink-muted">Nothing is being archived yet.</p>
+        <p className="px-4 py-6 text-sm text-ink-muted">
+          Nothing is being archived yet. Add an instrument above to start collecting one.
+        </p>
       ) : (
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-canvas text-left text-xs text-ink-muted">

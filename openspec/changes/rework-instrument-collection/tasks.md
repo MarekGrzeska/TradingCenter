@@ -71,13 +71,13 @@
 
 ## 9. terminal: kreator dodawania i dialog akceptacji
 
-- [ ] 9.1 Kreator: klasa aktywów, instrument w klasie, multiselect interwałów, data OD — z blokadą zatwierdzenia i nazwaniem tego, czego brakuje
-- [ ] 9.2 Zmiana klasy czyści wybrany instrument
-- [ ] 9.3 Data OD wcześniejsza niż historia providera jest prośbą o wszystko, nie błędem walidacji
-- [ ] 9.4 Dialog akceptacji: wiersz na parę instrument–interwał z zakresem, szacowaną liczbą rekordów i rozmiarem, sumą dla całości, oznaczeniem zakresu przyciętego i pary już zbieranej
-- [ ] 9.5 Nieudana wycena zamyka drogę do akceptacji na ślepo; odrzucenie dialogu nie dodaje niczego i zachowuje wybory kreatora
-- [ ] 9.6 Akceptacja dodaje pary, uruchamia zlecenie i wskazuje zakładkę `Data History` jako miejsce śledzenia postępu; odmowa dla części par nie przekreśla reszty
-- [ ] 9.7 Testy kreatora i dialogu
+- [x] 9.1 Kreator: klasa aktywów, instrument w klasie, multiselect interwałów, data OD — z blokadą zatwierdzenia i nazwaniem tego, czego brakuje
+- [x] 9.2 Zmiana klasy czyści wybrany instrument
+- [x] 9.3 Data OD wcześniejsza niż historia providera jest prośbą o wszystko, nie błędem walidacji
+- [x] 9.4 Dialog akceptacji: wiersz na parę instrument–interwał z zakresem, szacowaną liczbą rekordów i rozmiarem, sumą dla całości, oznaczeniem zakresu przyciętego i pary już zbieranej
+- [x] 9.5 Nieudana wycena zamyka drogę do akceptacji na ślepo; odrzucenie dialogu nie dodaje niczego i zachowuje wybory kreatora
+- [x] 9.6 Akceptacja dodaje pary, uruchamia zlecenie i wskazuje zakładkę `Data History` jako miejsce śledzenia postępu; odmowa dla części par nie przekreśla reszty
+- [x] 9.7 Testy kreatora i dialogu
 
 ## 10. terminal: zakładka Data History
 
