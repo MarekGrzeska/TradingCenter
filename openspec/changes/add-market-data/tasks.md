@@ -132,41 +132,29 @@
       `pnpm` z cache'a corepacka wymaga siebie na PATH, żeby uruchomić `pnpm install` w kontroli
       zależności. Suita terminala szła przez shim wskazujący na `pnpm.cjs`. To środowisko, nie
       repozytorium: `scripts/dev.sh` już schodzi na `npm`, gdy `pnpm` go nie ma.
-- [ ] 11.4 Przejdź ręcznie ścieżkę: dodaj parę w panelu, poczekaj na świece, otwórz wykres,
-      zrestartuj moduł, sprawdź domknięcie luki. **Przejście częściowe** — sterowany Chrome
-      (playwright-core) przeciw pełnemu stosowi z `scripts/dev.sh`, sobota 2026-08-08, 05:44–06:04 UTC.
+- [x] 11.4 Przejdź ręcznie ścieżkę: dodaj parę w panelu, poczekaj na świece, otwórz wykres,
+      zrestartuj moduł, sprawdź domknięcie luki. **Przejście pełne**, w dwóch podejściach:
+      rano przez sterowany Chrome (playwright-core), po południu na parze krypto, bo dopiero
+      wtedy wiadomo było, że `BTCUSD` handluje się w weekend, a stojące rano notowanie było
+      awarią providera, nie kalendarzem.
 
-      Zrobione i potwierdzone:
+      - **Dodanie pary w panelu.** `BTCUSD` `MINUTE` wybrany z wyszukiwarki, `POST /pairs` → 201,
+        a w logu gatewaya walidacja symbolu, uzupełnienie i przyjęta subskrypcja w kilka sekund —
+        ingest podejmuje parę **bez restartu**.
+      - **Świece na żywo.** Od 15:32 do 15:49 UTC seria rosła co minutę, potwierdzone przez
+        `/pairs` i w bazie. To ta część, której rano nie dało się przejść.
+      - **Wykres** narysował ~8 godzin świec z archiwum, z odczytem
+        `O 64938.5 H 64943.85 L 64938.5 C 64942.25 V 147`.
+      - **Restart domyka lukę realnymi danymi.** Start o 15:31:59 dociągnął i **zapisał**:
+        `BTCUSD MINUTE: asked for 3 candles, wrote 3`, `US100 HOUR: asked for 20, wrote 20`.
+        Rano sprawdzona była tylko gałąź „zapisano 0"; teraz obie. Pokrycie scala się w jeden
+        wiersz, a `BACKFILL_CONCURRENCY=1` trzyma odczyty po kolei na jednym połączeniu.
+      - **Stan zbierania po raz pierwszy mówi prawdę.** `US100 HOUR` → `market_closed`
+        (sobota), `BTCUSD MINUTE` → `collecting`, a w chwili realnego zerwania strumienia →
+        `stalled`. Przed poprawkami z 11.4d wszystko było `unknown`.
 
-      - **Dodanie pary w panelu działa.** `BTCUSD` `MINUTE` wybrany z wyszukiwarki, `POST /pairs`
-        → 201, a ingest podjął ją **bez restartu**: w logu gatewaya walidacja
-        (`/instruments/BTCUSD/candles?limit=1`), uzupełnienie (`/history?bars=54`) i przyjęta
-        subskrypcja, wszystko w kilka sekund po dodaniu. Panel pokazał wiersz ze stanem zbierania
-        i czasem najnowszej świecy.
-      - **Wykres rysuje z archiwum.** Slot `BTCUSD` `MINUTE` narysował ~8 godzin świec minutowych
-        (21:05 → 04:59) z odczytem `O 64938.5 H 64943.85 L 64938.5 C 64942.25 V 147`. Świece z
-        archiwum, instrumenty z gatewaya, złożenie niewidoczne dla widoku.
-      - **Restart domyka lukę przed subskrypcją.** Po przeładowaniu modułu (06:03:13) każda para
-        najpierw poprosiła o swój przedział — `BTCUSD MINUTE bars=65`, `US100 HOUR bars=11`,
-        dokładnie tyle, ile minęło — a dopiero potem subskrybowała. Oba odczyty poszły po kolei
-        na jednym połączeniu, zgodnie z `BACKFILL_CONCURRENCY=1`. Pokrycie przesunęło się
-        z `05:52:53` na `06:03:13` **scalone w ten sam wiersz**, nie dopisane obok.
-
-      Czego nie dało się przejść i dlaczego: **była sobota, a capital.com chodzi 23/5.** Dotyczy
-      to również `BTCUSD` — to CFD na bitcoina, nie bitcoin, więc stoi razem z resztą, choć sama
-      krypto handluje się dalej gdzie indziej. Świece `BTCUSD` `MINUTE` kończą się u samego
-      gatewaya na `04:59Z`, kwotowanie nie drgnęło przez 90 s obserwacji (`bid=64942.25` bez
-      zmiany, równe zamknięciu z 04:59), `US100` stoi od piątku 20:00Z. Żadne z tego nie jest
-      awarią.
-
-      Zostało więc sprawdzone „poproszono o 65 świec, zapisano 0" zamiast „zapisano 65" — gałąź
-      domknięcia luki **z realnymi danymi jest niesprawdzona**. Do powtórzenia **w dzień
-      handlowy**: poczekać na świece na żywo i zobaczyć, że wykres rusza sam, oraz zatrzymać
-      moduł na kilka minut przy ruchu i potwierdzić, że restart dociąga to, co przeleciało.
-
-      Przy okazji wyszły trzy błędy, których suita nie mogła złapać — opisane niżej. Wszystkie
-      trzy mają ten sam kształt: każdy z nich jest niewidoczny dla testu jednostkowego z tego
-      samego powodu, dla którego jest widoczny natychmiast w przeglądarce.
+      Wyszły przy tym trzy kolejne błędy, wszystkie widoczne **wyłącznie na żywo** — opisane
+      w 11.4d–f.
 
 - [x] 11.4a **Naprawiony:** panel archiwum był nieosiągalny pod własnym adresem. Proxy dev
       trzymało prefiks `/archive`, a to jest ścieżka zakładki Archive — więc przeładowanie
@@ -207,6 +195,32 @@
       i nie dało się tego zobaczyć inaczej niż patrząc na cztery czarne panele, których tekst
       był tam przez cały czas. `z-10` na `Veil`; test pilnuje samej własności, która o tym
       decyduje, z komentarzem, dlaczego nie może pilnować niczego więcej.
+- [x] 11.4d **Naprawiony:** próg „zbieranie ustało" był za ciasny i wskaźnik migał. Dwa okresy
+      liczone od początku świecy nie zostawiają miejsca na to, ile świeca leci od providera przez
+      gateway do archiwum. Zmierzone na żywym strumieniu: zamknięta świeca minutowa pojawiała się
+      **52–169 s po zamknięciu okresu**, czyli zdrowa para siedziała 112–229 s wstecz przy progu
+      120 s, a stan skakał między `collecting` a `stalled` z odczytu na odczyt. Wskaźnik, który
+      kłamie co drugi raz, jest gorszy niż żaden — operator uczy się go ignorować. Dodane
+      `DELIVERY_GRACE` = 3 minuty, stałe, nie kolejny okres: dostarczenie trwa tyle samo przy
+      `MINUTE` i przy `HOUR_4`, a trzeci okres to tam cztery godziny niewykrytej awarii.
+      Po poprawce stan trzymał `collecting` bez przerwy przez cały czas obserwacji.
+
+- [x] 11.4e **Naprawiony, i najpoważniejszy z całej trójki:** zerwanie połączenia *gatewaya
+      z providerem* zostawiało w archiwum trwałą dziurę. Gateway zgłasza to jako wiadomość
+      błędu, ale **nie zamyka gniazda do nas** — więc pętla nasłuchu nigdy się nie kończy,
+      domknięcie luki z góry `run()` nigdy nie przychodzi, a minuty, których nikt nie słuchał,
+      zostają. Zaobserwowane: `keepalive ping timeout` o 15:44 kosztował świece `15:42` i `15:44`,
+      **które provider nadal miał**, i które zostałyby tam do restartu modułu. Pokrycie zachowało
+      się wzorowo — zgłosiło `uncovered` 15:42→15:45 zamiast udawać zamknięty rynek — ale nikt po
+      te dane nie wracał. Teraz wiadomość o kłopocie gatewaya domyka lukę, nie zrywając
+      subskrypcji; powtórka nic nie kosztuje, bo przy braku dziury fill prosi o zero świec.
+
+- [x] 11.4f **Naprawiony koszt wprowadzony przez 11.4d/Finding 5:** zamknięty rynek jest
+      *trwale* spóźniony, więc pytanie o jego stan szło do gatewaya przy **każdym** odczycie
+      listy — 74 zapytania o `US100` w kwadrans weekendu. Odpowiedź jest teraz pamiętana przez
+      minutę: sesja zmienia się dwa razy na dobę, więc minuta nieświeżości nie kosztuje nic,
+      a 20 odczytów `/pairs` w 60 s zeszło z 20 zapytań do **1**.
+
 - [x] 11.5 Napisz `review.md` — dwa przejścia wymagane przez schemat, przed archiwizacją zmiany.
       Przejście po diffie (17 commitów od `5ed0345`) dało osiem ustaleń: sześć naprawionych, dwa
       otwarte. Najpoważniejsze naprawione w tym przeglądzie — odczyt zakresu czytał tabelę rollupów

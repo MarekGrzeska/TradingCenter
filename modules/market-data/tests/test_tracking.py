@@ -78,8 +78,33 @@ def test_exactly_two_periods_behind_is_still_collecting() -> None:
 def test_more_than_two_periods_behind_with_the_market_open_has_stalled() -> None:
     # The scenario this exists for: a subscription that died without a sound. The only
     # visible symptom is a series that stopped growing while the market is open.
-    latest = MOMENT - timedelta(minutes=3)
+    latest = MOMENT - timedelta(minutes=10)
     assert collection_state(Resolution.MINUTE, latest, MOMENT, True) is CollectionState.STALLED
+
+
+def test_a_candle_still_on_its_way_is_not_a_stall() -> None:
+    """Measured on the live feed, and the reason `DELIVERY_GRACE` exists.
+
+    A closed minute candle took 52 to 169 seconds to arrive, so a perfectly healthy pair
+    sits well past two periods behind for part of every minute. Without the grace the
+    state flipped between COLLECTING and STALLED from one read to the next, which teaches
+    an operator to ignore the one indicator that is supposed to matter.
+    """
+    for lag in (timedelta(seconds=112), timedelta(seconds=229)):
+        assert (
+            collection_state(Resolution.MINUTE, MOMENT - lag, MOMENT, True)
+            is CollectionState.COLLECTING
+        ), f"{lag} behind is what arriving normally looks like"
+
+
+def test_the_grace_does_not_scale_with_the_period() -> None:
+    """A fixed span, not a third period. At HOUR a third period would be another hour of
+    a dead feed going unreported; the delivery itself takes the same few seconds at every
+    resolution."""
+    assert (
+        collection_state(Resolution.HOUR, MOMENT - timedelta(hours=2, minutes=10), MOMENT, True)
+        is CollectionState.STALLED
+    )
 
 
 def test_the_same_lateness_with_the_market_shut_is_not_a_fault() -> None:
@@ -97,8 +122,8 @@ def test_lateness_with_nobody_saying_whether_the_market_is_open_is_unknown() -> 
 
 
 def test_lateness_is_measured_in_the_pair_s_own_periods() -> None:
-    # Three minutes is stale for a minute series and perfectly fresh for an hourly one.
-    latest = MOMENT - timedelta(minutes=3)
+    # Ten minutes is stale for a minute series and perfectly fresh for an hourly one.
+    latest = MOMENT - timedelta(minutes=10)
     assert collection_state(Resolution.MINUTE, latest, MOMENT, True) is CollectionState.STALLED
     assert collection_state(Resolution.HOUR, latest, MOMENT, True) is CollectionState.COLLECTING
 

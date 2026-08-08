@@ -10,7 +10,9 @@ import pytest
 from market_data.app import app, candle_sink
 from market_data.config import Settings
 from market_data.coverage import record_coverage
+from market_data.errors import GatewayUnreachable
 from market_data.hub import CandleChange, Hub, Snapshot
+from market_data.ingest.backfill import FillOutcome
 from market_data.models import Candle, CandleSource, Resolution
 from market_data.rollups import refresh_all
 from market_data.store import read_candles, write_candles
@@ -52,26 +54,45 @@ def candle(offset: int = 0, **overrides) -> Candle:
 
 
 class FakeInstruments:
-    def __init__(self, collectable: bool = True, error: Exception | None = None):
+    def __init__(
+        self,
+        collectable: bool = True,
+        error: Exception | None = None,
+        market_open: bool | None = None,
+    ):
         self.collectable = collectable
         self.error = error
+        # What the gateway would say about the instrument's session. `None` is the
+        # default because it is the honest one for a fake: no answer, so `UNKNOWN`.
+        self.market_open = market_open
+        self.asked: list[str] = []
 
     async def is_collectable(self, symbol: str, resolution: Resolution) -> bool:
         if self.error is not None:
             raise self.error
         return self.collectable
 
+    async def is_market_open(self, symbol: str) -> bool | None:
+        self.asked.append(symbol)
+        if self.error is not None:
+            raise self.error
+        return self.market_open
+
 
 class FakeIngest:
-    """Stands in for the supervisor. The routes only ever ask it to reconcile."""
+    """Stands in for the supervisor: reconciles, and remembers what a fill did."""
 
-    def __init__(self) -> None:
+    def __init__(self, last_fill=None) -> None:
         self.syncs = 0
         self.running: set = set()
         self.started_at = NOW
+        self._last_fill = last_fill
 
     async def sync(self) -> None:
         self.syncs += 1
+
+    def last_fill(self, symbol: str, resolution: Resolution):
+        return self._last_fill
 
 
 @pytest.fixture
@@ -82,6 +103,17 @@ async def pool(migrated_url: str):
         async with created.acquire() as conn:
             await conn.execute("TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges")
         yield created
+
+
+@pytest.fixture(autouse=True)
+def _forget_market_status():
+    """The market-status cache is module-level, so one test's answer would otherwise be
+    the next test's premise."""
+    from market_data.app import _market_status_cache
+
+    _market_status_cache.clear()
+    yield
+    _market_status_cache.clear()
 
 
 @pytest.fixture
@@ -326,6 +358,150 @@ async def test_the_list_carries_how_collection_is_going(api, pool) -> None:
     assert listed["collection"] in {"collecting", "stalled", "unknown"}
 
 
+async def test_a_late_pair_with_the_market_open_is_reported_stalled(api, pool) -> None:
+    """The state the panel exists to show, reaching the panel at last.
+
+    `collection_state` could always tell `STALLED` from `MARKET_CLOSED`, and was tested
+    doing so — but nothing supplied the one thing it needs, so every late pair came out
+    `UNKNOWN` and the distinction never left the unit test.
+    """
+    app.state.instruments = FakeInstruments(market_open=True)
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        # Hours behind, and the market open: nobody is collecting this.
+        await write_candles(conn, [candle(300)])
+
+    [listed] = (await api.get("/pairs")).json()
+
+    assert listed["collection"] == "stalled"
+
+
+async def test_the_same_lateness_with_the_market_shut_is_not_a_fault(api, pool) -> None:
+    app.state.instruments = FakeInstruments(market_open=False)
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(300)])
+
+    [listed] = (await api.get("/pairs")).json()
+
+    assert listed["collection"] == "market_closed"
+
+
+async def test_a_gateway_that_cannot_say_leaves_the_pair_unknown(api, pool) -> None:
+    """Not a failure of the read. The list is the archive's own, and not knowing why one
+    pair is late is not a reason to refuse all of them."""
+    app.state.instruments = FakeInstruments(error=GatewayUnreachable("the gateway is down"))
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(300)])
+
+    response = await api.get("/pairs")
+
+    assert response.status_code == 200
+    assert response.json()[0]["collection"] == "unknown"
+
+
+async def test_a_fresh_pair_costs_the_gateway_nothing(api, pool) -> None:
+    """The budget rule. A pair whose newest candle is fresh is `COLLECTING` whatever the
+    market is doing, so asking about it would spend the shared allowance to learn nothing
+    that changes an answer."""
+    instruments = FakeInstruments(market_open=True)
+    app.state.instruments = instruments
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(0, period_start=datetime.now(UTC))])
+
+    [listed] = (await api.get("/pairs")).json()
+
+    assert listed["collection"] == "collecting"
+    assert instruments.asked == []
+
+
+async def test_one_symbol_at_two_resolutions_is_one_question(api, pool) -> None:
+    """A market is a property of the instrument, not of the resolution it is sampled at."""
+    instruments = FakeInstruments(market_open=False)
+    app.state.instruments = instruments
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await track(conn, "US100", Resolution.HOUR, LIMIT)
+        await write_candles(conn, [candle(300), candle(300, resolution=Resolution.HOUR)])
+
+    listed = (await api.get("/pairs")).json()
+
+    assert {row["collection"] for row in listed} == {"market_closed"}
+    assert instruments.asked == ["US100"]
+
+
+async def test_a_market_that_was_just_asked_about_is_not_asked_again(api, pool) -> None:
+    """A shut market is permanently late, so without remembering the answer every read of
+    the list spends a request per closed pair. Measured on a live weekend before this
+    existed: 74 requests about one instrument that had been shut since Friday."""
+    instruments = FakeInstruments(market_open=False)
+    app.state.instruments = instruments
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(300)])
+
+    for _ in range(5):
+        assert (await api.get("/pairs")).json()[0]["collection"] == "market_closed"
+
+    assert instruments.asked == ["US100"]
+
+
+async def test_the_list_says_what_the_last_fill_did(api, pool) -> None:
+    """Progress leaves the log. The spec asks for what is in flight, what succeeded and
+    what failed and why, `zamiast pozostawiać to w logach` — and `Ingest` recorded all of
+    it into a report with no caller."""
+    outcome = FillOutcome(
+        symbol="US100",
+        resolution=Resolution.MINUTE,
+        requested=31,
+        written=29,
+        requests=1,
+        finished_at=NOW,
+    )
+    app.state.ingest = FakeIngest(last_fill=outcome)
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+
+    [listed] = (await api.get("/pairs")).json()
+
+    assert listed["last_fill"]["written"] == 29
+    assert listed["last_fill"]["requests"] == 1
+    assert listed["last_fill"]["failure"] is None
+    assert "wrote 29" in listed["last_fill"]["summary"]
+
+
+async def test_a_failed_fill_reaches_the_list_with_its_reason(api, pool) -> None:
+    app.state.ingest = FakeIngest(
+        last_fill=FillOutcome(
+            symbol="NOPE",
+            resolution=Resolution.MINUTE,
+            requested=100,
+            failure="the gateway refused with 404: unknown symbol 'NOPE'",
+            finished_at=NOW,
+        )
+    )
+    async with pool.acquire() as conn:
+        await track(conn, "NOPE", Resolution.MINUTE, LIMIT)
+
+    [listed] = (await api.get("/pairs")).json()
+
+    assert "unknown symbol" in listed["last_fill"]["failure"]
+    assert "fill failed" in listed["last_fill"]["summary"]
+
+
+async def test_a_pair_whose_fill_has_not_run_says_so_rather_than_inventing_one(
+    api, pool
+) -> None:
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+
+    [listed] = (await api.get("/pairs")).json()
+
+    assert listed["last_fill"] is None
+
+
 async def test_a_pair_can_be_let_go_over_the_contract(api, pool) -> None:
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
@@ -372,8 +548,6 @@ async def test_a_symbol_the_gateway_will_not_serve_is_refused_with_the_reason(ap
 
 
 async def test_a_gateway_that_is_down_is_reported_as_upstream(api) -> None:
-    from market_data.errors import GatewayUnreachable
-
     app.state.instruments = FakeInstruments(error=GatewayUnreachable("connection refused"))
 
     response = await api.post("/pairs", json={"symbol": "US100", "resolution": "MINUTE"})

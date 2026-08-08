@@ -7,15 +7,14 @@ jednym budżetem, i kontrakt, którego subskrypcja zaczyna się snapshotem — p
 historią a danymi na żywo zniknął z przeglądarki. Terminal czyta świece z archiwum, instrumenty
 z gatewaya, a operator decyduje z panelu, co jest zbierane.
 
-Świadomie niekompletne, i **nie jest to przeoczenie**: `CollectionState.STALLED` i `MARKET_CLOSED`
-są zaimplementowane i przetestowane, ale nieosiągalne przez kontrakt, bo nikt nie podaje
-`market_open` (Finding 5). Źródło sygnału istnieje i gateway już je publikuje; otwarta jest
-wyłącznie decyzja, ile żądań wolno na to wydać. Postęp ingestu istnieje w pamięci i nie wychodzi
-poza log, choć spec każe go udostępniać (Finding 6). Obie rzeczy zmieniają kształt kontraktu, więc
-zostały opisane z rekomendacją, nie dopisane.
+**Wszystkie jedenaście ustaleń tego przeglądu jest zamkniętych.** Dwa, które zostawiono początkowo
+otwarte, bo zmieniały kształt kontraktu, zostały domknięte po decyzji: stan zbierania sięga teraz
+po `marketStatus` z gatewaya, a postęp uzupełniania wychodzi z logu na listę par. Oba były
+zaimplementowane od dawna i nie miały wyłącznie tego jednego miejsca, w którym się pokazują.
 
-Czego czytelnik za rok nie powinien wziąć za przeoczenie: **cztery z ośmiu ustaleń tego przeglądu
-wyszły z uruchomienia całości w przeglądarce, nie z czytania kodu ani z suity.** Każde z nich
+Czego czytelnik za rok nie powinien wziąć za przeoczenie: **siedem z jedenastu ustaleń tego
+przeglądu wyszło z uruchomienia całości — w przeglądarce albo przeciw żywemu providerowi — a nie
+z czytania kodu ani z suity.** Każde z nich
 przechodziło swój test. To nie jest przypadek i nie jest argumentem przeciwko tym testom — jest
 argumentem za tym, żeby zadanie „przejdź ręcznie ścieżkę" zostało w każdej następnej zmianie.
 
@@ -76,11 +75,13 @@ cisza na `BTCUSD` była **ponadgodzinną awarią providera na instrumencie, któ
 `TRADEABLE`** — nie kalendarzem. Zatrzymana seria nie dowodzi zamkniętego rynku, i to jest dokładnie
 rozróżnienie, którego `collection_state` odmawia dziś zgadywać (Finding 5).
 
-Sprawdzona więc została gałąź „poproszono o 65 świec, zapisano 0", a nie „zapisano 65":
-**domknięcie luki realnymi danymi pozostaje niezweryfikowane**. Da się je powtórzyć **na parze
-krypto o dowolnej porze** — dnia handlowego wymaga tylko część indeksowa, w tym sprawdzenie gęstości
-w testach `--run-live`, które mierzy świece względem zegara i wywróciłoby się na weekendzie, mówiąc
-prawdę o serii, z którą wszystko jest w porządku.
+**Domknięte po południu, na parze krypto.** Start modułu o 15:31:59 dociągnął i **zapisał**:
+`BTCUSD MINUTE: asked for 3 candles, wrote 3` oraz `US100 HOUR: asked for 20, wrote 20`. Świece
+płynęły na żywo od 15:32 do 15:49, stan zbierania po raz pierwszy pokazał `market_closed` dla
+zamkniętego indeksu i `collecting` dla krypto — a w chwili realnego zerwania strumienia `stalled`,
+prawdziwie. Dnia handlowego wymaga już tylko część indeksowa testów `--run-live`, której sprawdzenie
+gęstości mierzy świece względem zegara i na weekendzie wywróciłoby się, mówiąc prawdę o serii,
+z którą wszystko jest w porządku.
 
 ## Findings
 
@@ -90,9 +91,12 @@ prawdę o serii, z którą wszystko jest w porządku.
 | Wysoka | `modules/terminal/vite.config.ts:76`, `src/data/config.ts:61` | Prefiks archiwum `/archive` jest zarazem ścieżką zakładki Archive. Każde żądanie docierające do serwera — przeładowanie, zakładka w przeglądarce, link z `dev.sh` — dostawało JSON usługi zamiast aplikacji. | FIXED `9f26566` |
 | Wysoka | `src/chart/Chart.tsx:356` | `Veil` na domyślnym poziomie stosu, canvasy lightweight-charts na `z-index` 1 i 2 w kontenerze bez własnego kontekstu. Każdy komunikat wykresu renderował się, przechodził test i był zamalowywany pustym płótnem. | FIXED `9f26566` |
 | Średnia | `src/data/socketHub.ts:146` | Para, której nikt nie zbiera, wyglądała jak zerwane połączenie i była ponawiana bez końca (20 prób w 12 s). Odmowa przed handshake'em jest niewidoczna dla przeglądarki. | FIXED `9f26566` |
-| Średnia | `market_data/app.py:266` | `read_status(conn)` nigdy nie dostaje `market_open`, więc `STALLED` i `MARKET_CLOSED` są przez kontrakt **nieosiągalne** — każda opóźniona para to `UNKNOWN`. Panel nigdy nie wyróżni pary, dla której zbieranie ustało. | OTWARTE |
-| Niska | `market_data/ingest/supervisor.py:70` | `Ingest.report()` i `Ingest.fills()` nie mają **żadnego wywołania** — ani w aplikacji, ani w testach. Postęp i przyczyny porażek zostają w logu, czego spec zabrania wprost. | OTWARTE |
+| Średnia | `market_data/app.py:266` | `read_status(conn)` nigdy nie dostawał `market_open`, więc `STALLED` i `MARKET_CLOSED` były przez kontrakt **nieosiągalne** — każda opóźniona para to `UNKNOWN`. Panel nigdy nie wyróżniłby pary, dla której zbieranie ustało. | FIXED (ten przegląd) |
+| Niska | `market_data/ingest/supervisor.py:70` | `Ingest.last_fill()` nie miał **żadnego wywołania** poza jednym testem. Postęp i przyczyny porażek zostawały w logu, czego spec zabrania wprost. | FIXED (ten przegląd) |
 | Niska | `tests/test_app.py:21` | Dwa testy pisały świece wokół stałej `NOW` i czytały je **bez podania okna**, a `/candles` domyśla się ostatniej doby z zegara. Zdały każdy przebieg aż do 2026-08-08 12:00 UTC — doby po `NOW` — i wtedy zaczęły padać bez związku z kodem. | FIXED (ten przegląd) |
+| Wysoka | `market_data/ingest/live.py:130` | Zerwanie połączenia **gatewaya z providerem** nie zamyka gniazda do nas, więc pętla nasłuchu nie kończy się i domknięcie luki nigdy nie przychodzi. `keepalive ping timeout` kosztował dwie świece, które provider nadal miał, i zostałyby do restartu. | FIXED (ten przegląd) |
+| Średnia | `market_data/tracking.py:33` | Próg „zbieranie ustało" liczył dwa okresy i nie zostawiał miejsca na dostarczenie świecy, które trwa 52–169 s. Zdrowa para migała między `collecting` a `stalled` z odczytu na odczyt. | FIXED (ten przegląd) |
+| Niska | `market_data/app.py` | Pytanie o stan rynku szło do gatewaya przy każdym odczycie `/pairs`, a zamknięty rynek jest trwale spóźniony: 74 zapytania o jeden instrument w kwadrans. | FIXED (ten przegląd) |
 | Niska | `tests/test_live.py:45`, `design.md`, `README.md` | Kalendarze instrumentów były zapisane jako fakt i nigdy nie zmierzone — najpierw „`BTCUSD` to rynek ciągły", potem, po pierwszej korekcie, „wszystko chodzi 23/5". Obie wersje błędne: indeksy stoją w weekend, krypto nie. Zmierzone i zapisane z datą pomiaru. | FIXED (ten przegląd) |
 
 **Finding 5 — źródło sygnału istnieje, brakuje decyzji o koszcie.** Pierwsza wersja tego akapitu
@@ -102,7 +106,8 @@ w ponadgodzinną awarię providera. Powtórzony o 15:11 UTC daje odpowiedź czys
 `TRADEABLE` dla krypto i `CLOSED` dla zamkniętego indeksu, a gateway już to publikuje jako
 `Instrument.tradeable`. **Kontraktu gatewaya nie trzeba ruszać.**
 
-Zostaje jedna decyzja, i nie jest to decyzja o poprawności, tylko o koszcie. `GET /pairs` musiałby
+**Zrobione wariantem 2.** Poniżej rozważane opcje, bo powód wyboru jest wart zapisania: to nie była
+decyzja o poprawności, tylko o koszcie. `GET /pairs` musiałby
 poznać stan rynku dla każdej pary na liście, a katalog gatewaya odpowiada na instrument, nie na
 listę — czyli do dwudziestu żądań przez tę samą bramkę dziesięciu na sekundę, przy każdym odświeżeniu
 panelu. Trzy wyjścia, w kolejności, w jakiej bym je rozważał:
@@ -115,12 +120,15 @@ panelu. Trzy wyjścia, w kolejności, w jakiej bym je rozważał:
    rozstrzygnąć `STALLED` od `MARKET_CLOSED`. Zwykle to zero żądań.
 3. **Poprosić gateway o odczyt zbiorczy.** Najczystsze i najdroższe: zmiana w drugim module.
 
-Rekomendacja: **2, z 1 jako uzupełnieniem**, jeśli okaże się, że spóźnionych par bywa wiele naraz.
+Wybrane **2**: pytanie idzie tylko o pary z `UNKNOWN`, raz na symbol, a niedostępny gateway zostawia
+`UNKNOWN` zamiast wywracać odczyt listy. Na zdrowym archiwum kosztuje to zero żądań. Wariant 1 —
+cache o minutowej ważności — zostaje w zanadrzu, gdyby spóźnionych par bywało wiele naraz.
 
-**Finding 6 — rekomendacja.** Kod już istnieje i jest nieużywany; brakuje wyłącznie miejsca, w
-którym wychodzi. Najmniejsze sensowne: pole `last_fill` w każdym wierszu `GET /pairs`, bo to jest
-dokładnie ta tabela, w którą operator już patrzy, i nie wymaga nowego zasobu. Zostawione do
-decyzji, bo to zmiana kształtu kontraktu.
+**Finding 6 — zrobione polem `last_fill` w wierszu `GET /pairs`.** To ta sama tabela, w którą
+operator już patrzy, więc nie doszedł żaden nowy zasób. Wiersz niesie, o ile poproszono, ile
+archiwum wzięło, ile to kosztowało u providera i nazwaną przyczynę porażki — plus `summary`, czyli
+dokładnie to jedno zdanie, które moduł i tak zapisuje do logu. `null` znaczy, że dla tej pary żadne
+uzupełnienie nie biegło od startu modułu: rekord żyje w pamięci i restart go czyści.
 
 **Rozstrzygnięcia, które wyglądają jak usterki i nimi nie są** — żeby nikt ich „nie naprawił":
 
@@ -169,7 +177,7 @@ decyzji, bo to zmiana kształtu kontraktu.
 | Usunięcie zatrzymuje zbieranie → Operator usuwa parę | `test_tracking.py::test_untracking_stops_collection`, `::test_untracking_keeps_every_candle`, `test_ingest.py::test_an_untracked_pair_stops_being_collected` |
 | → Ponowne dodanie wcześniej usuniętej pary | `test_tracking.py::test_tracking_a_stopped_pair_again_resumes_the_same_decision`, `::test_a_stopped_pair_is_still_on_the_record` |
 | Śledzone pary są wyliczalne wraz ze stanem → Odczyt listy | `test_tracking.py::test_the_status_carries_the_newest_candle`, `test_app.py::test_the_list_carries_how_collection_is_going` |
-| → **Zbieranie ustało po cichu** | `test_tracking.py::test_more_than_two_periods_behind_with_the_market_open_has_stalled`, `::test_the_status_reports_collection_stalled_when_the_market_is_open` — **tylko na poziomie jednostki; przez kontrakt nieosiągalne, patrz Finding 5** |
+| → Zbieranie ustało po cichu | `test_tracking.py::test_more_than_two_periods_behind_with_the_market_open_has_stalled`, `test_app.py::test_a_late_pair_with_the_market_open_is_reported_stalled`, `::test_the_same_lateness_with_the_market_shut_is_not_a_fault`, `::test_a_gateway_that_cannot_say_leaves_the_pair_unknown` |
 | Liczba par ma sufit → Próba przekroczenia limitu | `test_tracking.py::test_going_over_the_ceiling_is_refused_with_the_reason`, `::test_additions_racing_each_other_cannot_overrun_the_ceiling`, `test_app.py::test_going_over_the_ceiling_is_refused_with_the_reason` |
 
 ### `market-data-ingest`
@@ -184,8 +192,8 @@ decyzji, bo to zmiana kształtu kontraktu.
 | → Start bez przerwy | `test_ingest.py::test_a_start_without_a_break_sends_no_request`, `::test_a_pair_one_period_behind_asks_for_nothing` |
 | Ruch ma budżet → Kilka par wymaga uzupełnienia naraz | `test_ingest.py::test_fills_do_not_run_more_at_once_than_the_budget_allows`, `::test_a_larger_budget_lets_more_run` |
 | → Uzupełnianie w toku, a operator prosi o dane | `test_ingest.py::test_deciding_not_to_fetch_never_waits_for_the_budget` — **połowicznie**: odczyt operatora idzie do bazy i nigdy nie bierze limitera, więc jest to prawda z konstrukcji, nie z testu |
-| Ingest raportuje postęp → Uzupełnianie się kończy | `test_ingest.py::test_a_fill_records_what_it_verified`, `::test_the_supervisor_reports_what_each_fill_did` — **wyłącznie w pamięci; patrz Finding 6** |
-| → Uzupełnianie zawodzi | `test_ingest.py::test_a_failed_fill_names_its_reason_and_does_not_raise`, `::test_an_unreachable_gateway_is_reported_not_raised`, `::test_an_outcome_reads_as_a_sentence` |
+| Ingest raportuje postęp → Uzupełnianie się kończy | `test_ingest.py::test_a_fill_records_what_it_verified`, `::test_the_supervisor_reports_what_each_fill_did`, `test_app.py::test_the_list_says_what_the_last_fill_did` |
+| → Uzupełnianie zawodzi | `test_ingest.py::test_a_failed_fill_names_its_reason_and_does_not_raise`, `::test_an_unreachable_gateway_is_reported_not_raised`, `test_app.py::test_a_failed_fill_reaches_the_list_with_its_reason` |
 
 ### `market-data-api`
 
@@ -228,31 +236,26 @@ decyzji, bo to zmiana kształtu kontraktu.
 | → Para już archiwizowana | `ArchiveView.test.tsx::"says a pair is already archived instead of sending the request again"` |
 | → Archiwum odmawia dodania | `ArchiveView.test.tsx::"shows the archive's reason when it refuses, not a generic failure"` |
 | Panel pokazuje, czy zbieranie działa → Przegląd listy | `ArchiveView.test.tsx::"shows each pair with how collection is going and how fresh it is"` |
-| → **Zbieranie ustało** | `ArchiveView.test.tsx::"marks a pair that stopped collecting out from the rest"` — dowodzi, że panel wyróżni parę, **gdy archiwum tak powie**; archiwum dziś tak nie powie (Finding 5) |
+| → Zbieranie ustało | `ArchiveView.test.tsx::"marks a pair that stopped collecting out from the rest"` po stronie panelu, `test_app.py::test_a_late_pair_with_the_market_open_is_reported_stalled` po stronie archiwum — od poprawki z Finding 5 te dwa się spotykają |
 | Panel pokazuje zasięg → Podgląd pokrycia pary | `ArchiveView.test.tsx::"shows how far the archive reaches, and whether that is as far as it can"`, `::"says nothing is verified rather than showing an empty range"` |
 | Zdjęcie pary jest jawną decyzją → Operator zdejmuje parę | `ArchiveView.test.tsx::"asks first, promises the candles stay, and drops the row once confirmed"`, `::"leaves the pair collecting when the confirmation is dismissed"` |
 | Panel mówi, gdy archiwum nie odpowiada → Archiwum nieosiągalne | `ArchiveView.test.tsx::"tells an unreachable archive apart from an empty one"`, `::"says nothing is archived rather than showing an empty table"` |
 
 ## Gaps
 
-Wszystkie **zaakceptowane**, żadna nie blokuje archiwizacji zmiany; trzy pierwsze są tą samą rzeczą
-widzianą z dwóch stron.
+Wszystkie **zaakceptowane**, żadna nie blokuje archiwizacji zmiany. Dwie największe — `market_open`
+bez producenta i postęp ingestu uwięziony w logu — **przestały być lukami**: zostały domknięte
+w tym przeglądzie, a scenariusze, które wisiały przez nie w powietrzu, mają teraz test po obu
+stronach.
 
-1. **`market_open` nie ma producenta** → scenariusze `market-data-tracking / Zbieranie ustało po
-   cichu` i `terminal-data-manager / Zbieranie ustało` są dowiedzione osobno po obu stronach i
-   nigdzie nie spotykają się w działającym systemie. Finding 5 mówi, dlaczego nie zostało to
-   naprawione od ręki: brakującym elementem jest stan sesji instrumentu, którego gateway nie
-   publikuje, więc to osobna propozycja dotykająca dwóch modułów.
-2. **Postęp ingestu nie wychodzi poza log** (Finding 6). Kod gotowy i nieużywany; brakuje miejsca,
-   w którym się pokazuje.
-3. **Odczyt operatora w trakcie uzupełniania** nie ma testu. Jest prawdą z konstrukcji — odczyt idzie
+1. **Odczyt operatora w trakcie uzupełniania** nie ma testu. Jest prawdą z konstrukcji — odczyt idzie
    do bazy, limiter obejmuje wyłącznie wywołanie do gatewaya — ale konstrukcja może się zmienić
    ciszej niż test.
-4. **Nieobsługiwana rozdzielczość na trasie HTTP** opiera się na enumie FastAPI i nie ma własnego
+2. **Nieobsługiwana rozdzielczość na trasie HTTP** opiera się na enumie FastAPI i nie ma własnego
    testu, w odróżnieniu od tej samej odmowy na WebSockecie.
-5. **Domknięcie luki realnymi danymi** niesprawdzone na żywo — provider stał przez całe okno
+3. **Domknięcie luki realnymi danymi** niesprawdzone na żywo — provider stał przez całe okno
    weryfikacji. Do powtórzenia przy otwartym rynku: zatrzymać moduł na kilka minut przy ruchu i
    potwierdzić, że restart dociąga to, co przeleciało.
-6. **`--run-live`** (4 testy w `market-data`, 8 w gatewayu) nie idzie w domyślnym uruchomieniu.
+4. **`--run-live`** (4 testy w `market-data`, 8 w gatewayu) nie idzie w domyślnym uruchomieniu.
    To zamierzone — wymaga klucza i sieci — ale znaczy, że granica `HOUR_4` jest zmierzona wtedy,
    gdy ktoś świadomie o to poprosi, a nie na każdym przebiegu.

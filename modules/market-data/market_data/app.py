@@ -9,6 +9,7 @@ released, so no candle can fall between them and none can arrive twice.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -21,6 +22,7 @@ from .contract import (
     CandleOut,
     CandlesOut,
     CoverageOut,
+    FillOut,
     PairCoverageOut,
     Problem,
     TrackedPairOut,
@@ -38,9 +40,11 @@ from .models import Candle, PriceSide, Resolution
 from .rollups import DERIVABLE, read_derived
 from .store import read_candles, read_recent
 from .tracking import (
+    CollectionState,
     LimitReached,
     TrackingRefused,
     add_pair,
+    collection_state,
     is_tracked,
     read_status,
     untrack,
@@ -272,19 +276,113 @@ async def coverage(
     response_model=list[TrackedPairOut],
     summary="Which pairs are collected, and whether collection is happening",
 )
-async def pairs(db=Depends(pool)) -> list[TrackedPairOut]:
+async def pairs(request: Request, db=Depends(pool)) -> list[TrackedPairOut]:
+    moment = datetime.now(UTC)
     async with db.acquire() as conn:
-        statuses = await read_status(conn)
+        statuses = await read_status(conn, now=moment)
+
+    decided = await _decide_late_pairs(request.app.state.instruments, statuses, moment)
+    ingest: Ingest = request.app.state.ingest
+
     return [
         TrackedPairOut(
             symbol=status.symbol,
             resolution=status.resolution,
             added_at=status.added_at,
             latest_candle=status.latest_candle,
-            collection=status.collection,
+            collection=collection,
+            last_fill=_fill_out(ingest.last_fill(status.symbol, status.resolution)),
         )
-        for status in statuses
+        for status, collection in decided
     ]
+
+
+# A market's status, remembered briefly. A session changes twice a day, so a minute of
+# staleness costs nothing an operator can perceive — and without it a shut market is
+# permanently "late", so every read of the list spends a gateway request per closed pair,
+# forever. Measured over a quarter of an hour of a weekend: 74 requests about one
+# instrument that had been shut since Friday.
+_MARKET_STATUS_TTL = timedelta(minutes=1)
+_market_status_cache: dict[str, tuple[datetime, bool | None]] = {}
+
+
+async def _market_status(instruments: GatewayInstruments, symbol: str) -> tuple[str, bool | None]:
+    """Whether this instrument's market is open, from cache when it is fresh enough.
+
+    A gateway that will not answer is cached as `None` like any other answer: it would
+    otherwise be re-asked on every read while it is down, which is when it can least
+    afford the traffic.
+    """
+    now = datetime.now(UTC)
+    remembered = _market_status_cache.get(symbol)
+    if remembered is not None and now - remembered[0] < _MARKET_STATUS_TTL:
+        return symbol, remembered[1]
+
+    try:
+        answer = await instruments.is_market_open(symbol)
+    except GatewayError:
+        answer = None
+
+    _market_status_cache[symbol] = (now, answer)
+    return symbol, answer
+
+
+def _fill_out(outcome) -> FillOut | None:
+    """The last fill for one pair, in the contract's shape.
+
+    Kept out of the log and put here because the spec asks for exactly that: a fill can
+    run for tens of minutes and fail on one pair while the rest carry on, and "what is
+    being collected" is not answered without saying how that went. `None` means no fill
+    has run since the module started — the record is in memory, so a restart empties it.
+    """
+    if outcome is None:
+        return None
+    return FillOut(
+        finished_at=outcome.finished_at,
+        requested=outcome.requested,
+        written=outcome.written,
+        requests=outcome.requests,
+        failure=outcome.failure,
+        summary=outcome.describe(),
+    )
+
+
+async def _decide_late_pairs(
+    instruments: GatewayInstruments,
+    statuses: list,
+    moment: datetime,
+) -> list[tuple]:
+    """Turn `UNKNOWN` into `STALLED` or `MARKET_CLOSED` where the gateway can say which.
+
+    **Only the late ones are asked about.** A pair whose newest candle is fresh reads
+    `COLLECTING` whatever the market is doing, so a request about it would spend the
+    gateway's shared allowance to learn nothing that changes an answer. On a healthy
+    archive that leaves nothing to ask, and this costs one round trip per late *symbol* —
+    not per pair, because the same instrument at two resolutions has one market.
+
+    A gateway that will not answer leaves the state `UNKNOWN`, which is what it already
+    was. The list is the archive's own and worth returning; not knowing why one pair is
+    late is not a reason to fail the whole read.
+    """
+    late = sorted(
+        {status.symbol for status in statuses if status.collection is CollectionState.UNKNOWN}
+    )
+    if not late:
+        return [(status, status.collection) for status in statuses]
+
+    open_now = dict(await asyncio.gather(*(_market_status(instruments, s) for s in late)))
+
+    decided = []
+    for status in statuses:
+        collection = status.collection
+        if collection is CollectionState.UNKNOWN:
+            is_open = open_now.get(status.symbol)
+            if is_open is not None:
+                collection = collection_state(
+                    status.resolution, status.latest_candle, moment, is_open
+                )
+        decided.append((status, collection))
+    return decided
 
 
 @app.post(

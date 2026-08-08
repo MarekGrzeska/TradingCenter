@@ -96,7 +96,7 @@ HTTP, described by OpenAPI at `/docs`.
 | GET | `/health` | whether the database answers, and what is being collected |
 | GET | `/candles/{symbol}?resolution=&from=&to=` | the series, **plus what was never collected** |
 | GET | `/coverage/{symbol}?resolution=` | verified ranges and the end of provider history |
-| GET | `/pairs` | what is collected, with how collection is going |
+| GET | `/pairs` | what is collected, how collection is going, and what the last fill did |
 | POST | `/pairs` | start collecting a pair |
 | DELETE | `/pairs/{symbol}?resolution=` | stop collecting it; the candles stay |
 
@@ -174,9 +174,32 @@ its reason, one operator-readable line per outcome, rather than stopping the oth
 
 **Being on the list proves nothing about collection.** A subscription can die without a sound, and
 the only symptom is a series that stops growing. `collection_state` reads the age of the newest
-candle — within two periods is healthy, beyond that it depends on whether the market is open, which
-the gateway answers and this module does not. Without that answer the state is `UNKNOWN` rather
-than a guess: there is no session calendar here.
+candle — within two periods **plus three minutes** is healthy, beyond that it depends on whether
+the market is open, which the gateway answers and this module does not. Without that answer the
+state is `UNKNOWN` rather than a guess: there is no session calendar here, and inventing one is
+wrong twice a day.
+
+Those three minutes are measured, not padding. A closed minute candle took 52 to 169 seconds to
+reach the archive on 2026-08-08, so a perfectly healthy pair sits 112–229 seconds behind against a
+bare two-period threshold of 120 — and the state flipped between `COLLECTING` and `STALLED` between
+one read and the next while nothing was wrong. An indicator that cries wolf is worse than none. The
+grace is a fixed span rather than a third period, because delivery takes the same few seconds at
+every resolution while a third period would be four more hours at `HOUR_4`.
+
+**Only the late pairs cost a question, and only once a minute.** `/pairs` asks the gateway about a
+market's status just for the pairs whose state turns on it — a fresh pair is `COLLECTING` whatever
+the market is doing — and once per *symbol*, since the same instrument at two resolutions has one
+session. On a healthy archive that is no requests at all. The answer is then remembered for a
+minute, because a shut market is *permanently* late and without that every read of the list spends
+a request per closed pair: 74 of them about one instrument over a quarter of an hour of a weekend,
+measured before the cache existed, against 1 per minute after. A session changes twice a day, so a
+minute of staleness costs nothing. A gateway that will not answer leaves the pair `UNKNOWN`, which
+is what it already was.
+
+**Each row carries its last fill.** A fill can run for tens of minutes and fail on one pair while
+the rest carry on, so `last_fill` travels beside the pair rather than only into the log: what was
+asked, what the archive took, what it cost upstream, and the failure named if there was one. It
+lives in memory, so it is `null` for a pair whose fill has not run since the module started.
 
 **Derived resolutions come from the minute series.** `MINUTE_5` … `HOUR_4` are computed, not
 fetched: eight separate resolutions cost eight times the traffic for data the finest one already

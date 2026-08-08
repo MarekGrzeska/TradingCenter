@@ -54,6 +54,47 @@ class GatewayInstruments:
 
         return isinstance(candles, list) and len(candles) > 0
 
+    async def is_market_open(self, symbol: str) -> bool | None:
+        """Whether the provider currently calls this instrument tradeable.
+
+        The archive has no session calendar and will not grow one — inventing a market's
+        opening hours produces a confident wrong answer twice a day. This asks the module
+        that already knows, and `None` — no exact match in the catalogue — stays distinct
+        from `False`, because "could not find out" and "the market is shut" send an
+        operator to two different places.
+
+        Read off the search route because the gateway publishes none for a single
+        instrument, and matched on the symbol **exactly**: search matches names as well as
+        symbols, so its first hit for `GOLD` is not guaranteed to be `GOLD`.
+        """
+        url = f"{self._base_url}/instruments/search"
+
+        try:
+            response = await self._client.get(url, params={"q": symbol})
+        except httpx.RequestError as err:
+            raise GatewayUnreachable(
+                f"the gateway did not answer when asked whether {symbol} is open: {err}"
+            ) from err
+
+        if response.is_error:
+            raise GatewayRefused(response.status_code, _detail(response))
+
+        try:
+            hits = response.json()
+        except ValueError as err:
+            raise UnreadablePayload(
+                f"the gateway's search for {symbol} was not JSON: {err}"
+            ) from err
+
+        if not isinstance(hits, list):
+            raise UnreadablePayload(f"the gateway's search for {symbol} was not a list")
+
+        for hit in hits:
+            if isinstance(hit, dict) and hit.get("symbol") == symbol:
+                tradeable = hit.get("tradeable")
+                return tradeable if isinstance(tradeable, bool) else None
+        return None
+
 
 def _detail(response: httpx.Response) -> str:
     try:

@@ -128,14 +128,30 @@ class PairIngest:
                     if message.state is FeedState.CONNECTED:
                         self.backoff.reset()
                 elif isinstance(message, FeedFailure):
-                    # The gateway reporting its own trouble. The socket is still open and
-                    # the next message may well be a candle, so this is noted, not fatal.
+                    # The gateway reporting its own trouble — most often its connection to
+                    # the provider dropping and being remade. The socket to *us* stays
+                    # open, and the next message may well be a candle, so this is not
+                    # fatal and the subscription is not torn down over it.
+                    #
+                    # But the stretch the gateway spent disconnected is precisely a stretch
+                    # nobody was listening for, and the loop above will not end, so the
+                    # gap-closing at the top of `run` never comes round. Measured on
+                    # 2026-08-08: a keepalive timeout upstream cost two minute candles the
+                    # provider still had, coverage correctly reported them missing, and
+                    # they stayed missing — because nothing was going to ask again until
+                    # the module restarted.
+                    #
+                    # So the gap is closed here, without dropping the feed. A repeat costs
+                    # nothing: with nothing missing the fill asks for zero candles.
                     log.warning(
-                        "%s %s: gateway reported %s",
+                        "%s %s: gateway reported %s — closing the gap it left",
                         self.symbol,
                         self.resolution.value,
                         message.message,
                     )
+                    outcome = await self._close_gap()
+                    if self.on_fill is not None:
+                        self.on_fill(outcome)
 
                 if not await self.still_tracked():
                     return
