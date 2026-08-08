@@ -22,27 +22,46 @@ from .contract import (
     CandleOut,
     CandlesOut,
     CoverageOut,
+    EstimateRequest,
     FillOut,
+    JobEstimateOut,
+    JobOut,
+    JobPairViewOut,
     PairCoverageOut,
+    PairEstimateOut,
     Problem,
     TrackedPairOut,
+    TrackedPairResult,
     TrackPairRequest,
+    TrackPairsResult,
     Uncovered,
 )
 from .coverage import earliest_reachable, read_coverage, uncovered_within
 from .db import pool as make_pool
-from .errors import GatewayError, GatewayUnreachable
+from .errors import GatewayError, GatewayRefused, GatewayUnreachable
 from .gateway import GatewayHistory, GatewayInstruments, http_client
 from .hub import Hub
 from .ingest import Ingest
 from .ingest.live import store_closed_candle
-from .jobs import JobRunner, interrupt_orphaned_chunks
+from .jobs import (
+    JobRunner,
+    NothingToRetry,
+    UnknownJob,
+    create_job,
+    estimate_job,
+    interrupt_orphaned_chunks,
+    list_jobs,
+    plan_chunks,
+    read_job,
+    retry_job,
+)
 from .models import Candle, PriceSide, Resolution
 from .rollups import DERIVABLE, read_derived
 from .store import read_candles, read_recent
 from .tracking import (
     CollectionState,
     LimitReached,
+    TrackedPair,
     TrackingRefused,
     add_pair,
     collection_state,
@@ -310,6 +329,7 @@ async def pairs(request: Request, db=Depends(pool)) -> list[TrackedPairOut]:
             symbol=status.symbol,
             resolution=status.resolution,
             added_at=status.added_at,
+            collect_from=status.collect_from,
             latest_candle=status.latest_candle,
             collection=collection,
             last_fill=_fill_out(ingest.last_fill(status.symbol, status.resolution)),
@@ -406,41 +426,90 @@ async def _decide_late_pairs(
     return decided
 
 
-@app.post(
-    "/pairs",
-    tags=["tracking"],
-    response_model=TrackedPairOut,
-    status_code=201,
-    responses={409: {"model": Problem}, 422: {"model": Problem}, 504: {"model": Problem}},
-    summary="Start collecting a pair",
-    description=(
-        "Validated against the gateway first, so a symbol the provider cannot serve is "
-        "refused rather than left on the list collecting nothing. Refused with 409 when "
-        "the configured ceiling is full — the ceiling is real, because the gateway holds "
-        "one provider connection per pair."
-    ),
-)
-async def track_pair(body: TrackPairRequest, request: Request) -> TrackedPairOut:
-    state = request.app.state
-    async with state.pool.acquire() as conn:
-        pair = await add_pair(
-            conn,
-            state.instruments,
-            body.symbol,
-            body.resolution,
-            state.settings.max_tracked_pairs,
-            default_bars=state.settings.default_backfill_bars,
-        )
-    # Collection starts now rather than at the next restart.
-    await state.ingest.sync()
-
+def _tracked_pair_out(pair: TrackedPair) -> TrackedPairOut:
     return TrackedPairOut(
         symbol=pair.symbol,
         resolution=pair.resolution,
         added_at=pair.added_at,
+        collect_from=pair.collect_from,
         latest_candle=None,
         collection="never_collected",
     )
+
+
+@app.post(
+    "/pairs",
+    tags=["tracking"],
+    response_model=TrackPairsResult,
+    status_code=201,
+    responses={422: {"model": Problem}},
+    summary="Start collecting one or more pairs",
+    description=(
+        "Each pair is validated against the gateway independently, so one refusal — an "
+        "unknown symbol, the tracked-pairs ceiling — never withholds the pairs that were "
+        "fine. Accepting at least one pair that needed history behind it starts a "
+        "collection job and returns its id; a request whose pairs were all already fully "
+        "covered accepts them with no job. The original single-pair shape (`symbol`, "
+        "`resolution`) still works and still means the configured default depth."
+    ),
+)
+async def track_pairs(body: TrackPairRequest, request: Request) -> TrackPairsResult:
+    state = request.app.state
+    now = datetime.now(UTC)
+
+    results: list[TrackedPairResult] = []
+    accepted: list[TrackedPair] = []
+    first_refusal: tuple[int, str] | None = None
+    for wanted in body.resolved_pairs():
+        async with state.pool.acquire() as conn:
+            try:
+                pair = await add_pair(
+                    conn,
+                    state.instruments,
+                    wanted.symbol,
+                    wanted.resolution,
+                    state.settings.max_tracked_pairs,
+                    collect_from=body.collect_from,
+                    default_bars=state.settings.default_backfill_bars,
+                )
+            except TrackingRefused as err:
+                results.append(
+                    TrackedPairResult(
+                        symbol=wanted.symbol, resolution=wanted.resolution, refused=str(err)
+                    )
+                )
+                if first_refusal is None:
+                    status = 409 if isinstance(err, LimitReached) else 422
+                    first_refusal = (status, str(err))
+                continue
+        accepted.append(pair)
+        results.append(
+            TrackedPairResult(
+                symbol=pair.symbol, resolution=pair.resolution, pair=_tracked_pair_out(pair)
+            )
+        )
+
+    if not accepted:
+        # Every pair was refused. A single-pair request — the shape every caller before
+        # this change used — surfaces exactly the error it always did, rather than a 201
+        # with the refusal buried in a list of one.
+        status, detail = first_refusal or (422, "no pairs given")
+        raise HTTPException(status_code=status, detail=detail)
+
+    # Collection starts now rather than at the next restart.
+    await state.ingest.sync()
+
+    async with state.pool.acquire() as conn:
+        plans = []
+        for pair in accepted:
+            pair_plans, _ = await plan_chunks(
+                conn, pair.symbol, pair.resolution, pair.collect_from, now
+            )
+            plans.extend(pair_plans)
+        job = await create_job(conn, body.collect_from or now, plans)
+    state.job_runner.notify()
+
+    return TrackPairsResult(results=results, job_id=job.id)
 
 
 @app.delete(
@@ -464,6 +533,109 @@ async def untrack_pair(
         )
     await request.app.state.ingest.sync()
     return JSONResponse(status_code=204, content=None)
+
+
+# --- collection jobs ---
+
+
+@app.post(
+    "/jobs/estimate",
+    tags=["jobs"],
+    response_model=JobEstimateOut,
+    summary="Price a collection job without creating it",
+    description=(
+        "Runs the exact planning a job creation would, without writing anything: no pair "
+        "is tracked, no job exists afterwards. A symbol the gateway does not know comes "
+        "back marked `unknown` rather than failing the whole estimate."
+    ),
+)
+async def estimate_pairs(body: EstimateRequest, request: Request) -> JobEstimateOut:
+    state = request.app.state
+    now = datetime.now(UTC)
+
+    known: list[tuple[str, Resolution]] = []
+    unknown: dict[tuple[str, Resolution], PairEstimateOut] = {}
+    for wanted in body.pairs:
+        try:
+            collectable = await state.instruments.is_collectable(wanted.symbol, wanted.resolution)
+        except GatewayRefused:
+            collectable = False
+        if collectable:
+            known.append((wanted.symbol, wanted.resolution))
+        else:
+            unknown[(wanted.symbol, wanted.resolution)] = PairEstimateOut.unknown_pair(
+                wanted.symbol, wanted.resolution
+            )
+
+    async with state.pool.acquire() as conn:
+        priced = await estimate_job(conn, known, body.collect_from, now)
+    by_pair = {(p.symbol, p.resolution): PairEstimateOut.of(p) for p in priced.pairs}
+
+    pairs_out = [
+        by_pair.get((wanted.symbol, wanted.resolution))
+        or unknown[(wanted.symbol, wanted.resolution)]
+        for wanted in body.pairs
+    ]
+    return JobEstimateOut(
+        pairs=pairs_out,
+        total_estimated_candles=sum(p.estimated_candles for p in pairs_out),
+        total_estimated_bytes=sum(p.estimated_bytes for p in pairs_out),
+    )
+
+
+@app.get(
+    "/jobs",
+    tags=["jobs"],
+    response_model=list[JobPairViewOut],
+    summary="Collection jobs, one row per pair they touched",
+)
+async def jobs(
+    symbol: str | None = Query(None),
+    resolution: Resolution | None = Query(None),
+    db=Depends(pool),
+) -> list[JobPairViewOut]:
+    async with db.acquire() as conn:
+        views = await list_jobs(conn, symbol, resolution)
+    return [JobPairViewOut.of(view) for view in views]
+
+
+@app.get(
+    "/jobs/{job_id}",
+    tags=["jobs"],
+    response_model=JobOut,
+    responses={404: {"model": Problem}},
+    summary="One job, whole — every pair and every chunk it covers",
+)
+async def job(job_id: int, db=Depends(pool)) -> JobOut:
+    async with db.acquire() as conn:
+        found = await read_job(conn, job_id)
+    if found is None:
+        raise HTTPException(status_code=404, detail=f"no collection job with id {job_id}")
+    return JobOut.of(found)
+
+
+@app.post(
+    "/jobs/{job_id}/retry",
+    tags=["jobs"],
+    response_model=JobOut,
+    responses={404: {"model": Problem}, 409: {"model": Problem}},
+    summary="Retry a job's failed or interrupted chunks",
+    description=(
+        "Resets only chunks left `failed` or `interrupted`, as a new attempt of the same "
+        "job — never a new job, and never a chunk already `done`. Refused with 409 when "
+        "there is nothing to retry."
+    ),
+)
+async def retry(job_id: int, request: Request) -> JobOut:
+    async with request.app.state.pool.acquire() as conn:
+        try:
+            retried = await retry_job(conn, job_id)
+        except UnknownJob as err:
+            raise HTTPException(status_code=404, detail=str(err)) from err
+        except NothingToRetry as err:
+            raise HTTPException(status_code=409, detail=str(err)) from err
+    request.app.state.job_runner.notify()
+    return JobOut.of(retried)
 
 
 # --- the subscription ---

@@ -96,9 +96,13 @@ HTTP, described by OpenAPI at `/docs`.
 | GET | `/health` | whether the database answers, and what is being collected |
 | GET | `/candles/{symbol}?resolution=&from=&to=` | the series, **plus what was never collected** |
 | GET | `/coverage/{symbol}?resolution=` | verified ranges and the end of provider history |
-| GET | `/pairs` | what is collected, how collection is going, and what the last fill did |
-| POST | `/pairs` | start collecting a pair |
+| GET | `/pairs` | what is collected, how collection is going, and where each pair's history starts |
+| POST | `/pairs` | start collecting one or more pairs, from a given moment |
 | DELETE | `/pairs/{symbol}?resolution=` | stop collecting it; the candles stay |
+| POST | `/jobs/estimate` | price a collection job without creating it |
+| GET | `/jobs?symbol=&resolution=` | jobs, one row per pair they touched |
+| GET | `/jobs/{id}` | one job, whole — every pair and chunk it covers |
+| POST | `/jobs/{id}/retry` | retry a job's failed or interrupted chunks |
 
 **A range read says what it is not saying.** `uncovered` carries the stretches of the
 requested window the archive never verified. That is not the same as periods with no candle:
@@ -111,6 +115,31 @@ quietly compared against an ask-side one is off by a spread that reads as a real
 and the setting to raise; a symbol the gateway will not serve is 422; a gateway that is down
 is 504 rather than 500, because the archive is fine and retrying it as though it were at fault
 is the wrong response.
+
+### Collection jobs
+
+`POST /pairs` still takes the original single-pair body (`symbol`, `resolution`) and it still
+means the configured default depth — nothing that spoke to this endpoint before needs to
+change. It also takes a `pairs` list plus a `collect_from` moment, adding several pairs as one
+decision. Accepting at least one pair that needed history behind it creates a **job**: a
+durable record, split into **chunks** — one pair, one time window, one gateway request each,
+newest first. A chunk that fails is named and does not stop the others; a chunk that discovers
+the end of the provider's own history settles as done and every chunk still queued behind it
+for that pair is skipped in bulk, rather than each spending a request to rediscover the same
+edge. `collect_from` earlier than the provider's own history is clipped, never refused — asking
+for 1850 means "everything there is."
+
+A job's status (`running`, `succeeded`, `partial`, `failed`, `interrupted`) is never stored; it
+is derived from its chunks' states every time it is read, so a process that dies mid-job cannot
+leave two disagreeing records of the same fact. Restarting flips every chunk left `pending` or
+`running` to `interrupted` — no runner survives a restart, so a chunk still queued is exactly as
+orphaned as one mid-request. `POST /jobs/{id}/retry` resets only `failed` and `interrupted`
+chunks, as a new attempt of the same job; it is refused with 409 when there is nothing to retry.
+
+`POST /jobs/estimate` runs the same planning a job creation would — without writing anything —
+so a caller can price a decision before making it. The estimate is honest about being one: it
+counts calendar periods, not a session calendar, so it overstates a market that is shut part of
+the time.
 
 ### WebSocket — `/ws/candles?symbol=US100&resolution=MINUTE`
 

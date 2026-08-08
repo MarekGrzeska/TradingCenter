@@ -35,13 +35,13 @@
 
 ## 5. market-data: kontrakt
 
-- [ ] 5.1 Modele w `contract.py` dla zlecenia, kawałka, wyceny i wyniku dodania wielu par
-- [ ] 5.2 `POST /pairs` przyjmuje wiele par i opcjonalną datę OD, odpowiada wynikiem osobno dla każdej pary i identyfikatorem zlecenia; żądanie w starej postaci zachowuje dotychczasowe znaczenie
-- [ ] 5.3 `POST /jobs/estimate` — wycena bez skutków ubocznych, z nazwaniem par nieznanych providerowi i wyceną pozostałych
-- [ ] 5.4 `GET /jobs` z zawężeniem do pary oraz `GET /jobs/{id}` — stan, postęp z kawałków, świece zapisane, pokryty zakres, przyczyny porażek
-- [ ] 5.5 `POST /jobs/{id}/retry` — odpowiada tym, co zostanie ponowione; odmawia dla zlecenia bez porażek i dla zlecenia nieznanego
-- [ ] 5.6 `GET /pairs` niesie `collect_from` dla każdej pary
-- [ ] 5.7 Testy kontraktowe, w tym utrzymanie starej postaci `POST /pairs`, oraz aktualizacja README modułu o pojęcie zlecenia i kawałka
+- [x] 5.1 Modele w `contract.py` dla zlecenia, kawałka, wyceny i wyniku dodania wielu par
+- [x] 5.2 `POST /pairs` przyjmuje wiele par i opcjonalną datę OD, odpowiada wynikiem osobno dla każdej pary i identyfikatorem zlecenia; żądanie w starej postaci zachowuje dotychczasowe znaczenie i dotychczasowy status błędu, gdy jedyna para zostaje odrzucona
+- [x] 5.3 `POST /jobs/estimate` — wycena bez skutków ubocznych, z nazwaniem par nieznanych providerowi i wyceną pozostałych
+- [x] 5.4 `GET /jobs` z zawężeniem do pary (jeden wiersz na parę) oraz `GET /jobs/{id}` — stan, postęp z kawałków, świece zapisane, para w toku, przyczyny porażek
+- [x] 5.5 `POST /jobs/{id}/retry` — odpowiada tym, co zostanie ponowione, budzi `JobRunner`; odmawia (409) dla zlecenia bez porażek i (404) dla zlecenia nieznanego
+- [x] 5.6 `GET /pairs` niesie `collect_from` dla każdej pary
+- [x] 5.7 Testy kontraktowe (wiele par jedną decyzją, częściowa odmowa, stara postać, wycena, odczyt/listowanie/ponowienie zleceń), zaktualizowany `test_the_http_routes_are_all_described`, oraz aktualizacja README modułu o pojęcie zlecenia i kawałka
 
 ## 6. terminal: warstwa danych
 
