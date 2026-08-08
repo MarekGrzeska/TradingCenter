@@ -812,6 +812,110 @@ async def test_retrying_an_unknown_job_is_404(api) -> None:
     assert response.status_code == 404
 
 
+async def _deep_job(api) -> int:
+    """One pair, reaching back far enough to plan several chunks.
+
+    Depth is the point: a `MINUTE` window holds `MAX_BARS_PER_FILL` candles — about five
+    weeks — so a request for the last couple of days is a single chunk, and a job of one
+    chunk cannot be partly anything.
+    """
+    created = await api.post(
+        "/pairs",
+        json={
+            "symbol": "US100",
+            "resolution": "MINUTE",
+            "collect_from": (NOW - timedelta(days=200)).isoformat(),
+        },
+    )
+    return created.json()["job_id"]
+
+
+async def _set_chunk_states(pool, job_id: int, *states: str) -> None:
+    """Put a job's chunks into given states, oldest chunk first.
+
+    A contract test about how a running or half-failed job *reads* needs one to exist,
+    and driving the runner to produce one would be testing the runner instead. States
+    shorter than the chunk list leave the rest as they were.
+    """
+    async with pool.acquire() as conn:
+        ids = [
+            row["id"]
+            for row in await conn.fetch(
+                "SELECT id FROM collection_job_chunks WHERE job_id = $1 ORDER BY id", job_id
+            )
+        ]
+        for chunk_id, state in zip(ids, states, strict=False):
+            await conn.execute(
+                "UPDATE collection_job_chunks SET state = $2, "
+                "candles_written = CASE WHEN $2 = 'done' THEN 500 ELSE 0 END, "
+                "failure = CASE WHEN $2 = 'failed' THEN 'the gateway refused with 429' END "
+                "WHERE id = $1",
+                chunk_id,
+                state,
+            )
+
+
+async def test_reading_a_running_job_carries_its_progress_and_the_pair_in_flight(
+    api, pool
+) -> None:
+    job_id = await _deep_job(api)
+    await _set_chunk_states(pool, job_id, "done", "running")
+
+    body = (await api.get(f"/jobs/{job_id}")).json()
+
+    assert body["status"] == "running"
+    assert body["chunks_done"] == 1
+    assert body["chunks_total"] >= 2
+    assert body["candles_written"] == 500
+    assert body["running_pair"] == {"symbol": "US100", "resolution": "MINUTE"}
+
+
+async def test_reading_a_partly_failed_job_says_partial_and_names_each_failure(api, pool) -> None:
+    job_id = await _deep_job(api)
+    # Every chunk settled, one of them badly — which is what `partial` means.
+    async with pool.acquire() as conn:
+        total = await conn.fetchval(
+            "SELECT count(*) FROM collection_job_chunks WHERE job_id = $1", job_id
+        )
+    await _set_chunk_states(pool, job_id, "failed", *(["done"] * (total - 1)))
+
+    body = (await api.get(f"/jobs/{job_id}")).json()
+
+    assert body["status"] == "partial"
+    failed = [chunk for chunk in body["chunks"] if chunk["state"] == "failed"]
+    assert failed, "a partial job has to say which chunks failed"
+    assert all(chunk["failure"] for chunk in failed), "and name why each one did"
+
+
+async def test_retrying_a_failed_job_resets_only_it_and_wakes_the_runner(api, pool) -> None:
+    """The success path through the contract: what comes back is the job as it will now be
+    worked, and the runner is told rather than left to find it on its next poll."""
+    job_id = await _deep_job(api)
+    async with pool.acquire() as conn:
+        total = await conn.fetchval(
+            "SELECT count(*) FROM collection_job_chunks WHERE job_id = $1", job_id
+        )
+    await _set_chunk_states(pool, job_id, "failed", *(["done"] * (total - 1)))
+    app.state.job_runner.notifications = 0
+
+    response = await api.post(f"/jobs/{job_id}/retry")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["attempt"] == 2
+    assert app.state.job_runner.notifications == 1
+
+    # Only the failed chunk went back to pending; a chunk already done is not redone.
+    states = [chunk["state"] for chunk in body["chunks"]]
+    assert states.count("pending") == 1
+    assert states.count("done") == total - 1
+    # And the response names the pair and window being retried, so a caller can say what
+    # it just asked for.
+    [retried] = [chunk for chunk in body["chunks"] if chunk["state"] == "pending"]
+    assert retried["symbol"] == "US100"
+    assert retried["chunk_start"] and retried["chunk_end"]
+
+
 # --- 8.8: the schema describes the HTTP contract and nothing else ---------------------
 
 
