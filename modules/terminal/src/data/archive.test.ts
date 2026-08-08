@@ -241,6 +241,7 @@ describe("archive pair management", () => {
             symbol: "US100",
             resolution: "MINUTE",
             added_at: "2026-08-01T10:00:00Z",
+            collect_from: "2026-07-25T10:00:00Z",
             latest_candle: "2026-08-07T14:40:00Z",
             collection: "collecting",
           },
@@ -248,6 +249,7 @@ describe("archive pair management", () => {
             symbol: "GOLD",
             resolution: "HOUR",
             added_at: "2026-08-02T10:00:00Z",
+            collect_from: "2026-06-02T10:00:00Z",
             latest_candle: null,
             collection: "never_collected",
           },
@@ -261,6 +263,7 @@ describe("archive pair management", () => {
         symbol: "US100",
         resolution: "MINUTE",
         addedAt: 1785578400,
+        collectFrom: 1784973600,
         latestCandle: 1786113600,
         collection: "collecting",
       },
@@ -268,38 +271,84 @@ describe("archive pair management", () => {
         symbol: "GOLD",
         resolution: "HOUR",
         addedAt: 1785664800,
+        collectFrom: 1780394400,
         latestCandle: null,
         collection: "never_collected",
       },
     ]);
   });
 
-  it("sends the pair as a body and returns what the archive took on", async () => {
+  it("sends every pair and the start moment as one body, and reads back per-pair results", async () => {
     server.use(
       http.post(`${HTTP_BASE}/pairs`, async ({ request }) => {
-        expect(await request.json()).toEqual({ symbol: "US100", resolution: "MINUTE" });
+        expect(await request.json()).toEqual({
+          pairs: [
+            { symbol: "US100", resolution: "MINUTE" },
+            { symbol: "US100", resolution: "HOUR" },
+          ],
+          collect_from: "2026-08-01T00:00:00.000Z",
+        });
         return HttpResponse.json(
           {
-            symbol: "US100",
-            resolution: "MINUTE",
-            added_at: "2026-08-08T09:00:00Z",
-            latest_candle: null,
-            collection: "never_collected",
+            results: [
+              {
+                symbol: "US100",
+                resolution: "MINUTE",
+                pair: {
+                  symbol: "US100",
+                  resolution: "MINUTE",
+                  added_at: "2026-08-08T09:00:00Z",
+                  collect_from: "2026-08-01T00:00:00Z",
+                  latest_candle: null,
+                  collection: "never_collected",
+                },
+                refused: null,
+              },
+              {
+                symbol: "US100",
+                resolution: "HOUR",
+                pair: null,
+                refused: "already being archived",
+              },
+            ],
+            job_id: 42,
           },
           { status: 201 },
         );
       }),
     );
 
-    const pair = await source().trackPair("US100", "MINUTE", signal());
-    expect(pair).toMatchObject({ symbol: "US100", collection: "never_collected" });
+    const result = await source().trackPairs(
+      [
+        { symbol: "US100", resolution: "MINUTE" },
+        { symbol: "US100", resolution: "HOUR" },
+      ],
+      1785542400,
+      signal(),
+    );
+
+    expect(result.jobId).toBe(42);
+    expect(result.results[0]).toMatchObject({ symbol: "US100", refused: null });
+    expect(result.results[0].pair).toMatchObject({ symbol: "US100", collection: "never_collected" });
+    expect(result.results[1]).toMatchObject({ symbol: "US100", pair: null, refused: "already being archived" });
+  });
+
+  it("omits collect_from when none was given, so the archive falls back to its default depth", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/pairs`, async ({ request }) => {
+        expect(await request.json()).toEqual({ pairs: [{ symbol: "US100", resolution: "MINUTE" }] });
+        return HttpResponse.json({ results: [], job_id: 1 }, { status: 201 });
+      }),
+    );
+
+    await source().trackPairs([{ symbol: "US100", resolution: "MINUTE" }], null, signal());
   });
 
   // The ceiling is the reason the panel exists to be refused: the gateway holds
   // one provider connection per pair and the provider limits sessions. A
   // refusal that arrived as a generic failure would leave the operator with
   // nothing to act on.
-  it("keeps the reason a refusal gives, and marks it as a refusal rather than a fault", async () => {
+  it("keeps the reason a top-level refusal gives, and marks it as a refusal rather than a fault", async () => {
     server.use(
       http.post(`${HTTP_BASE}/pairs`, () =>
         HttpResponse.json(
@@ -309,7 +358,7 @@ describe("archive pair management", () => {
       ),
     );
 
-    const call = source().trackPair("US100", "MINUTE", signal());
+    const call = source().trackPairs([{ symbol: "US100", resolution: "MINUTE" }], null, signal());
     await expect(call).rejects.toMatchObject({
       kind: "refused",
       message: "20 pairs are already collected; raise MAX_TRACKED_PAIRS to add more",
@@ -326,9 +375,8 @@ describe("archive pair management", () => {
     // 504: the archive answered — it is the thing behind it that did not, and
     // retrying is worth doing. Compare `unreachable`, where the archive itself
     // never answered at all.
-    await expect(source().trackPair("US100", "MINUTE", signal())).rejects.toMatchObject({
-      kind: "upstream",
-    });
+    const call = source().trackPairs([{ symbol: "US100", resolution: "MINUTE" }], null, signal());
+    await expect(call).rejects.toMatchObject({ kind: "upstream" });
   });
 
   it("untracks with the resolution in the query, and reads no body back", async () => {
@@ -389,6 +437,7 @@ describe("archive: reading a subscription's refusal off the tracked list", () =>
     symbol,
     resolution,
     addedAt: 1785578400,
+    collectFrom: 1785578400,
     latestCandle: null,
     collection: "never_collected",
   });
@@ -399,7 +448,7 @@ describe("archive: reading a subscription's refusal off the tracked list", () =>
   it("names the pair and where to fix it, when nobody is collecting it", () => {
     const reason = readRefusalFromPairs([pair("GOLD", "HOUR")], "US100", "MINUTE_5");
     expect(reason).toContain("US100 MINUTE_5");
-    expect(reason).toContain("Archive tab");
+    expect(reason).toContain("Instruments tab");
   });
 
   it("finds no reason to stop when the pair is on the list", () => {
@@ -414,5 +463,220 @@ describe("archive: reading a subscription's refusal off the tracked list", () =>
     expect(readRefusalFromPairs([pair("US100", "MINUTE_5")], "US100", "HOUR")).toContain(
       "US100 HOUR",
     );
+  });
+});
+
+describe("archive: collection jobs", () => {
+  it("prices a job without creating anything", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/jobs/estimate`, async ({ request }) => {
+        expect(await request.json()).toEqual({
+          pairs: [{ symbol: "US100", resolution: "MINUTE" }],
+          collect_from: "2026-08-01T00:00:00.000Z",
+        });
+        return HttpResponse.json({
+          pairs: [
+            {
+              symbol: "US100",
+              resolution: "MINUTE",
+              effective_from: "2026-08-01T00:00:00Z",
+              clipped: false,
+              estimated_candles: 10080,
+              estimated_bytes: 967680,
+              unknown: false,
+            },
+          ],
+          total_estimated_candles: 10080,
+          total_estimated_bytes: 967680,
+        });
+      }),
+    );
+
+    const estimate = await source().estimateJob(
+      [{ symbol: "US100", resolution: "MINUTE" }],
+      1785542400,
+      signal(),
+    );
+
+    expect(estimate.totalEstimatedCandles).toBe(10080);
+    expect(estimate.pairs[0]).toMatchObject({
+      symbol: "US100",
+      clipped: false,
+      estimatedCandles: 10080,
+    });
+  });
+
+  it("marks a symbol the gateway does not know, without a numeric moment", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/jobs/estimate`, () =>
+        HttpResponse.json({
+          pairs: [
+            {
+              symbol: "NOPE",
+              resolution: "MINUTE",
+              effective_from: null,
+              clipped: false,
+              estimated_candles: 0,
+              estimated_bytes: 0,
+              unknown: true,
+            },
+          ],
+          total_estimated_candles: 0,
+          total_estimated_bytes: 0,
+        }),
+      ),
+    );
+
+    const estimate = await source().estimateJob(
+      [{ symbol: "NOPE", resolution: "MINUTE" }],
+      1785542400,
+      signal(),
+    );
+
+    expect(estimate.pairs[0].unknown).toBe(true);
+    expect(estimate.pairs[0].effectiveFrom).toBeNull();
+  });
+
+  it("lists jobs narrowed to a pair, with the query string carrying the filter", async () => {
+    let asked: URL | null = null;
+    server.use(
+      http.get(`${HTTP_BASE}/jobs`, ({ request }) => {
+        asked = new URL(request.url);
+        return HttpResponse.json([
+          {
+            job_id: 7,
+            symbol: "US100",
+            resolution: "MINUTE",
+            created_at: "2026-08-08T09:00:00Z",
+            requested_from: "2026-08-01T00:00:00Z",
+            attempt: 1,
+            status: "succeeded",
+            chunks_done: 1,
+            chunks_total: 1,
+            candles_written: 10080,
+            chunks: [],
+          },
+        ]);
+      }),
+    );
+
+    const jobs = await source().listJobs("US100", "MINUTE", signal());
+
+    expect(asked!.searchParams.get("symbol")).toBe("US100");
+    expect(asked!.searchParams.get("resolution")).toBe("MINUTE");
+    expect(jobs).toEqual([
+      {
+        jobId: 7,
+        symbol: "US100",
+        resolution: "MINUTE",
+        createdAt: 1786179600,
+        requestedFrom: 1785542400,
+        attempt: 1,
+        status: "succeeded",
+        chunksDone: 1,
+        chunksTotal: 1,
+        candlesWritten: 10080,
+        chunks: [],
+      },
+    ]);
+  });
+
+  it("lists every job with no filter, and sends no query string", async () => {
+    let asked: URL | null = null;
+    server.use(
+      http.get(`${HTTP_BASE}/jobs`, ({ request }) => {
+        asked = new URL(request.url);
+        return HttpResponse.json([]);
+      }),
+    );
+
+    await source().listJobs(null, null, signal());
+
+    expect(asked!.search).toBe("");
+  });
+
+  it("reads one job whole, including the pair presently in flight", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/jobs/7`, () =>
+        HttpResponse.json({
+          id: 7,
+          created_at: "2026-08-08T09:00:00Z",
+          requested_from: "2026-08-01T00:00:00Z",
+          attempt: 1,
+          status: "running",
+          chunks_done: 1,
+          chunks_total: 3,
+          candles_written: 5000,
+          running_pair: { symbol: "US100", resolution: "MINUTE" },
+          chunks: [
+            {
+              id: 1,
+              symbol: "US100",
+              resolution: "MINUTE",
+              chunk_start: "2026-08-07T00:00:00Z",
+              chunk_end: "2026-08-08T00:00:00Z",
+              state: "done",
+              attempt: 1,
+              candles_written: 5000,
+              requests: 5,
+              failure: null,
+              started_at: "2026-08-08T09:00:01Z",
+              finished_at: "2026-08-08T09:00:05Z",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const job = await source().readJob(7, signal());
+
+    expect(job.runningPair).toEqual({ symbol: "US100", resolution: "MINUTE" });
+    expect(job.chunks[0]).toMatchObject({ id: 1, state: "done", candlesWritten: 5000, failure: null });
+  });
+
+  it("retries a job and reads back the reset chunks", async () => {
+    let method = "";
+    server.use(
+      http.post(`${HTTP_BASE}/jobs/7/retry`, ({ request }) => {
+        method = request.method;
+        return HttpResponse.json({
+          id: 7,
+          created_at: "2026-08-08T09:00:00Z",
+          requested_from: "2026-08-01T00:00:00Z",
+          attempt: 2,
+          status: "running",
+          chunks_done: 1,
+          chunks_total: 2,
+          candles_written: 5000,
+          running_pair: null,
+          chunks: [],
+        });
+      }),
+    );
+
+    const job = await source().retryJob(7, signal());
+
+    expect(method).toBe("POST");
+    expect(job.attempt).toBe(2);
+  });
+
+  it("marks a retry with nothing to retry as a refusal", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/jobs/7/retry`, () =>
+        HttpResponse.json({ detail: "job 7 has no failed or interrupted chunk" }, { status: 409 }),
+      ),
+    );
+
+    await expect(source().retryJob(7, signal())).rejects.toMatchObject({ kind: "refused" });
+  });
+
+  it("marks retrying an unknown job as not-found", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/jobs/999/retry`, () =>
+        HttpResponse.json({ detail: "no collection job with id 999" }, { status: 404 }),
+      ),
+    );
+
+    await expect(source().retryJob(999, signal())).rejects.toMatchObject({ kind: "not-found" });
   });
 });

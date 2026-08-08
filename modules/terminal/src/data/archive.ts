@@ -4,11 +4,21 @@ import { parseIsoToEpochSeconds } from "./time";
 import { MarketDataError } from "./types";
 import type {
   Bar,
+  Chunk,
+  ChunkState,
   CollectionState,
+  Job,
+  JobEstimate,
+  JobPairView,
+  JobStatus,
   PairCoverage,
+  PairEstimate,
+  PairRequest,
   Resolution,
   StreamEvent,
   TrackedPair,
+  TrackedPairResult,
+  TrackPairsResult,
 } from "./types";
 import type { ArchiveAdmin, CandleSource, HistoryRequest } from "./source";
 
@@ -72,8 +82,79 @@ interface RawTrackedPair {
   symbol: string;
   resolution: string;
   added_at: string;
+  collect_from: string;
   latest_candle: string | null;
   collection: string;
+}
+
+interface RawChunk {
+  id: number;
+  symbol: string;
+  resolution: string;
+  chunk_start: string;
+  chunk_end: string;
+  state: string;
+  attempt: number;
+  candles_written: number;
+  requests: number;
+  failure: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+}
+
+interface RawJobPairView {
+  job_id: number;
+  symbol: string;
+  resolution: string;
+  created_at: string;
+  requested_from: string;
+  attempt: number;
+  status: string;
+  chunks_done: number;
+  chunks_total: number;
+  candles_written: number;
+  chunks: RawChunk[];
+}
+
+interface RawJob {
+  id: number;
+  created_at: string;
+  requested_from: string;
+  attempt: number;
+  status: string;
+  chunks_done: number;
+  chunks_total: number;
+  candles_written: number;
+  running_pair: { symbol: string; resolution: string } | null;
+  chunks: RawChunk[];
+}
+
+interface RawPairEstimate {
+  symbol: string;
+  resolution: string;
+  effective_from: string | null;
+  clipped: boolean;
+  estimated_candles: number;
+  estimated_bytes: number;
+  unknown: boolean;
+}
+
+interface RawJobEstimate {
+  pairs: RawPairEstimate[];
+  total_estimated_candles: number;
+  total_estimated_bytes: number;
+}
+
+interface RawTrackedPairResult {
+  symbol: string;
+  resolution: string;
+  pair: RawTrackedPair | null;
+  refused: string | null;
+}
+
+interface RawTrackPairsResult {
+  results: RawTrackedPairResult[];
+  job_id: number | null;
 }
 
 /** A candle missing any OHLC field (the provider reports this for a period with
@@ -99,8 +180,93 @@ function mapTrackedPair(raw: RawTrackedPair): TrackedPair {
     symbol: raw.symbol,
     resolution: raw.resolution as Resolution,
     addedAt: parseIsoToEpochSeconds(raw.added_at),
+    collectFrom: parseIsoToEpochSeconds(raw.collect_from),
     latestCandle: raw.latest_candle === null ? null : parseIsoToEpochSeconds(raw.latest_candle),
     collection: raw.collection as CollectionState,
+  };
+}
+
+function mapChunk(raw: RawChunk): Chunk {
+  return {
+    id: raw.id,
+    symbol: raw.symbol,
+    resolution: raw.resolution as Resolution,
+    chunkStart: parseIsoToEpochSeconds(raw.chunk_start),
+    chunkEnd: parseIsoToEpochSeconds(raw.chunk_end),
+    state: raw.state as ChunkState,
+    attempt: raw.attempt,
+    candlesWritten: raw.candles_written,
+    requests: raw.requests,
+    failure: raw.failure,
+    startedAt: raw.started_at === null ? null : parseIsoToEpochSeconds(raw.started_at),
+    finishedAt: raw.finished_at === null ? null : parseIsoToEpochSeconds(raw.finished_at),
+  };
+}
+
+function mapJobPairView(raw: RawJobPairView): JobPairView {
+  return {
+    jobId: raw.job_id,
+    symbol: raw.symbol,
+    resolution: raw.resolution as Resolution,
+    createdAt: parseIsoToEpochSeconds(raw.created_at),
+    requestedFrom: parseIsoToEpochSeconds(raw.requested_from),
+    attempt: raw.attempt,
+    status: raw.status as JobStatus,
+    chunksDone: raw.chunks_done,
+    chunksTotal: raw.chunks_total,
+    candlesWritten: raw.candles_written,
+    chunks: raw.chunks.map(mapChunk),
+  };
+}
+
+function mapJob(raw: RawJob): Job {
+  return {
+    id: raw.id,
+    createdAt: parseIsoToEpochSeconds(raw.created_at),
+    requestedFrom: parseIsoToEpochSeconds(raw.requested_from),
+    attempt: raw.attempt,
+    status: raw.status as JobStatus,
+    chunksDone: raw.chunks_done,
+    chunksTotal: raw.chunks_total,
+    candlesWritten: raw.candles_written,
+    runningPair: raw.running_pair
+      ? { symbol: raw.running_pair.symbol, resolution: raw.running_pair.resolution as Resolution }
+      : null,
+    chunks: raw.chunks.map(mapChunk),
+  };
+}
+
+function mapPairEstimate(raw: RawPairEstimate): PairEstimate {
+  return {
+    symbol: raw.symbol,
+    resolution: raw.resolution as Resolution,
+    effectiveFrom: raw.effective_from === null ? null : parseIsoToEpochSeconds(raw.effective_from),
+    clipped: raw.clipped,
+    estimatedCandles: raw.estimated_candles,
+    estimatedBytes: raw.estimated_bytes,
+    unknown: raw.unknown,
+  };
+}
+
+function mapJobEstimate(raw: RawJobEstimate): JobEstimate {
+  return {
+    pairs: raw.pairs.map(mapPairEstimate),
+    totalEstimatedCandles: raw.total_estimated_candles,
+    totalEstimatedBytes: raw.total_estimated_bytes,
+  };
+}
+
+function mapTrackPairsResult(raw: RawTrackPairsResult): TrackPairsResult {
+  return {
+    results: raw.results.map(
+      (result): TrackedPairResult => ({
+        symbol: result.symbol,
+        resolution: result.resolution as Resolution,
+        pair: result.pair === null ? null : mapTrackedPair(result.pair),
+        refused: result.refused,
+      }),
+    ),
+    jobId: raw.job_id,
   };
 }
 
@@ -185,7 +351,7 @@ export function readRefusalFromPairs(
     (pair) => pair.symbol === symbol && pair.resolution === resolution,
   );
   if (tracked) return null;
-  return `${symbol} ${resolution} is not being archived — add it in the Archive tab to start collecting it.`;
+  return `${symbol} ${resolution} is not being archived — add it in the Instruments tab to start collecting it.`;
 }
 
 export function createArchiveSource(httpBase: string, wsBase: string): ArchiveSource {
@@ -269,13 +435,16 @@ export function createArchiveSource(httpBase: string, wsBase: string): ArchiveSo
       return readPairs(signal);
     },
 
-    async trackPair(symbol, resolution, signal) {
-      const raw = await http.json<RawTrackedPair>(`${httpBase}/pairs`, {
+    async trackPairs(pairs: PairRequest[], collectFrom, signal) {
+      const raw = await http.json<RawTrackPairsResult>(`${httpBase}/pairs`, {
         signal,
         method: "POST",
-        body: { symbol, resolution },
+        body: {
+          pairs: pairs.map((pair) => ({ symbol: pair.symbol, resolution: pair.resolution })),
+          ...(collectFrom === null ? {} : { collect_from: toIso(collectFrom) }),
+        },
       });
-      return mapTrackedPair(raw);
+      return mapTrackPairsResult(raw);
     },
 
     async untrackPair(symbol, resolution, signal) {
@@ -300,6 +469,43 @@ export function createArchiveSource(httpBase: string, wsBase: string): ArchiveSo
         earliestReachable:
           raw.earliest_reachable === null ? null : parseIsoToEpochSeconds(raw.earliest_reachable),
       };
+    },
+
+    async estimateJob(pairs: PairRequest[], collectFrom, signal): Promise<JobEstimate> {
+      const raw = await http.json<RawJobEstimate>(`${httpBase}/jobs/estimate`, {
+        signal,
+        method: "POST",
+        body: {
+          pairs: pairs.map((pair) => ({ symbol: pair.symbol, resolution: pair.resolution })),
+          collect_from: toIso(collectFrom),
+        },
+      });
+      return mapJobEstimate(raw);
+    },
+
+    async listJobs(symbol, resolution, signal): Promise<JobPairView[]> {
+      const params = new URLSearchParams();
+      if (symbol !== null) params.set("symbol", symbol);
+      if (resolution !== null) params.set("resolution", resolution);
+      const query = params.toString();
+      const raw = await http.json<RawJobPairView[]>(
+        `${httpBase}/jobs${query ? `?${query}` : ""}`,
+        { signal },
+      );
+      return raw.map(mapJobPairView);
+    },
+
+    async readJob(jobId, signal): Promise<Job> {
+      const raw = await http.json<RawJob>(`${httpBase}/jobs/${jobId}`, { signal });
+      return mapJob(raw);
+    },
+
+    async retryJob(jobId, signal): Promise<Job> {
+      const raw = await http.json<RawJob>(`${httpBase}/jobs/${jobId}/retry`, {
+        signal,
+        method: "POST",
+      });
+      return mapJob(raw);
     },
   };
 }

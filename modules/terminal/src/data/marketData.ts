@@ -31,9 +31,16 @@ export const marketData: MarketDataSource = {
   history: (request, signal) => archiveSource.history(request, signal),
   subscribe: (symbol, resolution, sink) => archiveSource.subscribe(symbol, resolution, sink),
 
-  searchInstruments: (query, signal) => gateway.searchInstruments(query, signal),
-  listInstruments: (signal) => gateway.listInstruments(signal),
+  searchInstruments: (query, signal, assetClass) =>
+    gateway.searchInstruments(query, signal, assetClass),
+  listInstruments: (signal, assetClass) => gateway.listInstruments(signal, assetClass),
 };
+
+/** The instrument catalogue's own admin surface — asset classes, and a
+ *  class-narrowed listing — for the wizard's first two autocomplete steps.
+ *  Not part of `MarketDataSource`: no chart or search-as-you-type view has
+ *  any use for it. */
+export const instruments = gateway;
 
 /**
  * The same archive, seen as the thing the operator administers rather than the

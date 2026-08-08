@@ -1,11 +1,17 @@
 import type {
+  AssetClass,
   Bar,
   Instrument,
   InstrumentPage,
+  Job,
+  JobEstimate,
+  JobPairView,
   PairCoverage,
+  PairRequest,
   Resolution,
   StreamEvent,
   TrackedPair,
+  TrackPairsResult,
 } from "./types";
 
 export interface HistoryRequest {
@@ -62,9 +68,22 @@ export interface CandleSource extends SourcePart {
 /** The instrument catalogue, which stays with `capital-gateway` because that is
  *  who owns it. The archive does not pretend to own things it does not have. */
 export interface InstrumentSource extends SourcePart {
-  searchInstruments(query: string, signal: AbortSignal): Promise<Instrument[]>;
+  searchInstruments(
+    query: string,
+    signal: AbortSignal,
+    assetClass?: AssetClass,
+  ): Promise<Instrument[]>;
 
-  listInstruments(signal: AbortSignal): Promise<InstrumentPage>;
+  /** `assetClass` narrows the walk to one class and lifts the gateway's own
+   *  node budget for it — a wizard's second autocomplete needs "every
+   *  instrument in this class", not a catalogue slice cut short by a bound
+   *  sized for browsing everything. */
+  listInstruments(signal: AbortSignal, assetClass?: AssetClass): Promise<InstrumentPage>;
+
+  /** The classes the gateway describes instruments with — the wizard's first
+   *  autocomplete, sourced rather than hand-copied so it cannot drift from
+   *  what the gateway actually knows. */
+  listAssetClasses(signal: AbortSignal): Promise<AssetClass[]>;
 }
 
 /**
@@ -85,17 +104,44 @@ export interface MarketDataSource
 }
 
 /** Managing what the archive collects. Not part of `MarketDataSource`: this is
- *  administration rather than reading market data, and only the archive panel
- *  has any business with it. */
+ *  administration rather than reading market data, and only the Instruments
+ *  tab and Data History tab have any business with it. */
 export interface ArchiveAdmin {
   listPairs(signal: AbortSignal): Promise<TrackedPair[]>;
 
-  /** Starts collection. Refused — never silently ignored — when the ceiling is
-   *  full or the gateway will not serve the pair. */
-  trackPair(symbol: string, resolution: Resolution, signal: AbortSignal): Promise<TrackedPair>;
+  /** Starts collection for one or more pairs as a single decision. Each pair
+   *  is refused independently — never silently ignored — when the ceiling is
+   *  full or the gateway will not serve it; a refusal for one never withholds
+   *  the pairs that were fine. `collectFrom` null means the configured
+   *  default depth. */
+  trackPairs(
+    pairs: PairRequest[],
+    collectFrom: number | null,
+    signal: AbortSignal,
+  ): Promise<TrackPairsResult>;
 
   /** Stops collection. The candles already collected stay. */
   untrackPair(symbol: string, resolution: Resolution, signal: AbortSignal): Promise<void>;
 
   coverage(symbol: string, resolution: Resolution, signal: AbortSignal): Promise<PairCoverage>;
+
+  /** Prices a prospective job without creating it or tracking anything —
+   *  what the wizard's acceptance dialog reads before the operator commits. */
+  estimateJob(pairs: PairRequest[], collectFrom: number, signal: AbortSignal): Promise<JobEstimate>;
+
+  /** Every job, one row per pair it touched, newest first. `symbol`/
+   *  `resolution` narrow to one pair; both null reads every job. */
+  listJobs(
+    symbol: string | null,
+    resolution: Resolution | null,
+    signal: AbortSignal,
+  ): Promise<JobPairView[]>;
+
+  /** One job, whole — every pair and chunk it covers. */
+  readJob(jobId: number, signal: AbortSignal): Promise<Job>;
+
+  /** Retries a job's failed and interrupted chunks as a new attempt of the
+   *  same job. Rejects with a `MarketDataError` of kind `"refused"` when
+   *  there is nothing to retry. */
+  retryJob(jobId: number, signal: AbortSignal): Promise<Job>;
 }

@@ -1,6 +1,6 @@
 import { jsonClient } from "./http";
 import { MarketDataError } from "./types";
-import type { Instrument, InstrumentPage } from "./types";
+import type { AssetClass, Instrument, InstrumentPage } from "./types";
 import type { InstrumentSource } from "./source";
 
 /**
@@ -67,15 +67,24 @@ export function createGatewaySource(httpBase: string): InstrumentSource {
     label: "capital-gateway",
     whenUnreachable: "instrument search is unavailable",
 
-    async searchInstruments(query, signal) {
+    async searchInstruments(query, signal, assetClass) {
+      // The gateway's search has no class filter of its own — narrowed here so
+      // the wizard's second autocomplete never offers an instrument outside
+      // the class already chosen in its first step.
       const url = `${httpBase}/instruments/search?q=${encodeURIComponent(query)}`;
       const raw = await http.json<RawInstrument[]>(url, { signal });
-      return raw.map(mapInstrument);
+      const instruments = raw.map(mapInstrument);
+      return assetClass ? instruments.filter((i) => i.assetClass === assetClass) : instruments;
     },
 
-    async listInstruments(signal) {
-      const raw = await http.json<RawInstrumentPage>(`${httpBase}/instruments`, { signal });
+    async listInstruments(signal, assetClass) {
+      const url = `${httpBase}/instruments` + (assetClass ? `?asset_class=${assetClass}` : "");
+      const raw = await http.json<RawInstrumentPage>(url, { signal });
       return mapInstrumentPage(raw);
+    },
+
+    async listAssetClasses(signal) {
+      return await http.json<AssetClass[]>(`${httpBase}/asset-classes`, { signal });
     },
 
     async ping(signal) {

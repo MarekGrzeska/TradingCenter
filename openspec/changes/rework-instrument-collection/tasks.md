@@ -45,11 +45,11 @@
 
 ## 6. terminal: warstwa danych
 
-- [ ] 6.1 Typy zlecenia, kawałka, wyceny i klasy aktywów w `src/data/types.ts`, w słowniku terminala, nie w kształcie drutu
-- [ ] 6.2 Rozszerzyć `ArchiveAdmin` w `src/data/source.ts` o wycenę, tworzenie zlecenia dla wielu par, odczyt zleceń i ponowienie
-- [ ] 6.3 Implementacja w `src/data/archive.ts` z mapowaniem snake_case i istniejącym `mapStatus`, bez wycieku kształtów drutu poza plik
-- [ ] 6.4 `src/data/gatewaySource.ts` — wyliczenie instrumentów klasy oraz odczyt klas aktywów
-- [ ] 6.5 Testy warstwy danych na `httpDouble`
+- [x] 6.1 Typy zlecenia, kawałka, wyceny i klasy aktywów w `src/data/types.ts`, w słowniku terminala, nie w kształcie drutu
+- [x] 6.2 Rozszerzyć `ArchiveAdmin` w `src/data/source.ts` o wycenę, tworzenie zlecenia dla wielu par, odczyt zleceń i ponowienie
+- [x] 6.3 Implementacja w `src/data/archive.ts` z mapowaniem snake_case i istniejącym `mapStatus`, bez wycieku kształtów drutu poza plik
+- [x] 6.4 `src/data/gatewaySource.ts` — wyliczenie instrumentów klasy oraz odczyt klas aktywów
+- [x] 6.5 Testy warstwy danych na `httpDouble`
 
 ## 7. terminal: reużywalny autocomplete
 
