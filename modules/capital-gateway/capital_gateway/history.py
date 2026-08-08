@@ -85,6 +85,7 @@ async def collect(
     bars: int,
     fetch_page: FetchPage,
     still_wanted: Callable[[], Awaitable[bool]] | None = None,
+    anchor: datetime | None = None,
 ) -> CandleHistory:
     """Page backwards until ``bars`` candles are held, or the instrument runs out.
 
@@ -95,6 +96,12 @@ async def collect(
     derived from the calendar drifts: ask for 1000 five-minute candles ending Monday and
     the weekend hands back a couple of hundred, so a clock-stepped cursor would skip the
     days it assumed were there. Anchoring on data costs one more request instead.
+
+    ``anchor`` only shapes the *first* page — every page after it is cursored on data,
+    same as an unanchored read. Without it the first page asks for ``(None, None)``,
+    which the provider reads as "the newest candles", so a caller wanting a window that
+    ended months ago has no way to say so. ``None`` keeps today's behaviour: reach back
+    from now.
 
     ``still_wanted`` is checked before each request. A deep read is up to thirty calls
     over half a minute; without it, a client that gave up ten seconds in keeps spending
@@ -109,9 +116,12 @@ async def collect(
     while len(collected) < bars:
         if still_wanted is not None and not await still_wanted():
             break
-        date_from, date_to = (
-            window_before(cursor, resolution, per_request) if cursor else (None, None)
-        )
+        if cursor:
+            date_from, date_to = window_before(cursor, resolution, per_request)
+        elif anchor:
+            date_from, date_to = window_before(anchor, resolution, per_request)
+        else:
+            date_from, date_to = (None, None)
         requests += 1
         page = await fetch_page(date_from, date_to, per_request)
 

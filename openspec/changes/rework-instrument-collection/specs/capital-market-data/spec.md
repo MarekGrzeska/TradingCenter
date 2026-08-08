@@ -43,3 +43,25 @@ klas aktywów, jakimi opisuje instrumenty.
 
 - **WHEN** części katalogu nie da się odczytać
 - **THEN** ta część jest pomijana, a reszta zwracana, zamiast wywrócić cały odczyt
+
+## ADDED Requirements
+
+### Requirement: Głęboki odczyt zaczyna się w dowolnym momencie, nie tylko teraz
+
+Domyślnie głęboki odczyt sięga wstecz od chwili bieżącej — pierwsze stronicowane żądanie kotwiczy
+się na zegarze. Moduł MUST pozwolić wskazać moment, od którego odczyt ma się zacząć, żeby dało się
+dociągnąć okno leżące w przeszłości, a nie wyłącznie to, które styka się z teraźniejszością.
+Wskazanie takiego momentu MUST NOT zmieniać reguły stronicowania — każde kolejne okno nadal
+kotwiczy się na najstarszej już pobranej świecy; zmienia się wyłącznie punkt startowy pierwszego
+żądania.
+
+#### Scenario: Odczyt zakotwiczony w przeszłości
+
+- **WHEN** konsument prosi o głęboki odczyt, wskazując moment wcześniejszy niż chwila bieżąca
+- **THEN** pierwsze żądanie do providera kończy się na tym momencie, a nie na chwili bieżącej
+- **AND** kolejne żądania stronicują wstecz od niego tak samo jak przy odczycie niezakotwiczonym
+
+#### Scenario: Odczyt bez wskazanego momentu
+
+- **WHEN** konsument nie wskazuje momentu, od którego odczyt ma się zacząć
+- **THEN** odczyt zaczyna się od chwili bieżącej, jak dotychczas

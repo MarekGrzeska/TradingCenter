@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -202,6 +203,13 @@ async def history(
     symbol: str,
     resolution: Resolution = Query(Resolution.MINUTE_5),
     bars: int = Query(1000, ge=1, le=50_000, description="how many candles to reach back for"),
+    before: datetime | None = Query(
+        None,
+        description=(
+            "reach back from this instant instead of now, so a window that ended in the "
+            "past can be requested directly"
+        ),
+    ),
     a: CapitalAdapter = Depends(adapter),
 ):
     """Candles paged past the provider's per-request ceiling.
@@ -214,7 +222,7 @@ async def history(
     async def still_wanted() -> bool:
         return not await request.is_disconnected()
 
-    return await a.get_history(symbol, resolution, bars, still_wanted)
+    return await a.get_history(symbol, resolution, bars, still_wanted, anchor=before)
 
 
 # --- trading ---

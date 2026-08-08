@@ -59,6 +59,7 @@ HTTP, described by OpenAPI at `/docs`.
 | GET | `/instruments/search?q=` | `Instrument[]` |
 | GET | `/instruments/{symbol}/candles` | `Candle[]` — one request, at most 1000 |
 | GET | `/instruments/{symbol}/history` | `CandleHistory` — paged, with its cost |
+| GET | `/instruments/{symbol}/history?before=` | the same, reaching back from a past instant instead of now |
 | GET | `/positions` | `Position[]` |
 | POST | `/orders` | `Order` — MARKET fills, LIMIT/STOP rest |
 | DELETE | `/positions/{id}` | `Order` — close |
@@ -81,6 +82,13 @@ branch is still visited. What changes is the default bound: 300 nodes unfiltered
 class, because one class is a fraction of the catalogue and the same budget reaches that much
 further inside it. Whoever picks an instrument to archive out of such a list is committing to tens
 of minutes of backfill, and a list cut short costs them more than it costs somebody browsing.
+
+**A deep read reaches back from now, unless told otherwise.** `history.collect` pages backward,
+each window anchored on the oldest candle the previous page actually returned. Without `before`
+the first window has nothing to anchor on and asks the provider for "the newest candles" — which
+is why, unqualified, a deep read always ends at the present. `before` gives that first window an
+anchor of its own, so a caller can ask for a window that ended months or years ago directly,
+rather than only ever reaching the part of history nearest to now.
 
 **An answer is settled, not acknowledged.** A deal the provider has not resolved comes back
 `PENDING` with its reference — never `FILLED`.

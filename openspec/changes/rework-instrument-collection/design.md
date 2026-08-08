@@ -46,9 +46,20 @@ to dziesiątki takich żądań pod rząd.
 ### Kawałek to para i okno czasu, a nie strona odpowiedzi
 
 Zlecenie rozkłada się na kawałki `(symbol, rozdzielczość, od, do)`, gdzie okno mieści
-`MAX_BARS_PER_FILL` świec danej rozdzielczości. Kawałek jest **jednym** wywołaniem `fill_gap` — czyli
-dokładnie tym, czym jest dzisiaj jeden fill — więc reguła „moduł nie stronicuje sam" zostaje
+`MAX_BARS_PER_FILL` świec danej rozdzielczości. Kawałek jest **jednym** wywołaniem odczytu historii —
+czyli tym, czym jest dzisiaj jeden fill — więc reguła „moduł nie stronicuje sam" zostaje
 nienaruszona: to nadal gateway dzieli okno kawałka na strony po tysiąc.
+
+**Odkryte podczas implementacji, nie przewidziane przy planowaniu:** `GET
+/instruments/{symbol}/history` w `capital-gateway` dziś zawsze kotwiczy się na chwili bieżącej —
+`history.collect()` zaczyna pierwszą stronę od `(None, None)`, co provider czyta jako „najnowsze N
+świec". Nie ma jak zażądać okna leżącego w przeszłości, więc kawałek okna `(od, do)` sprzed
+miesięcy nie miał czym się wykonać. `capital-gateway` dostaje więc dodatkowy parametr `before`
+(`GET /instruments/{symbol}/history?before=...`), który zastępuje `(None, None)` pierwszej strony
+kotwicą podaną przez wywołującego; dalsze stronicowanie wstecz działa jak dotychczas, kotwicząc
+się na najstarszej pobranej świecy. Kawałek zamawia się jako `before=chunk_end`, `bars` policzone z
+`(chunk_end - chunk_start)` — patrz nowe wymaganie w `capital-market-data`, „Głęboki odczyt zaczyna
+się w dowolnym momencie, nie tylko teraz".
 
 Postęp zlecenia to `kawałki ukończone / kawałki wszystkie`. Dla `MINUTE` i 50 000 świec na kawałek
 jedno okno to ~35 dni, więc dziesięć lat historii minutowej to ~104 kawałki — pasek rusza się co
@@ -82,9 +93,12 @@ Nowa migracja `0005_collection_jobs.py`: `collection_jobs` (kto, kiedy, jaka dat
 zlecenia jest **wyprowadzany** ze stanów kawałków, a nie trzymany osobno — dwa źródła prawdy o tym
 samym rozjeżdżają się dokładnie wtedy, gdy proces ginie między zapisem jednego a drugiego.
 
-Start modułu przestempluje kawałki zostawione w stanie `running` na `interrupted`. To zamyka
-scenariusz „zlecenie przerwane zatrzymaniem" bez żadnego zegara ani heartbeatu: proces, który
-działa, jest jedynym, który może mieć kawałek w toku.
+Start modułu przestempluje na `interrupted` kawałki zostawione w stanie `running` **i** `pending` —
+runner nie przeżywa restartu, więc kawałek czekający w kolejce jest tak samo osierocony jak ten w
+trakcie żądania do gatewaya; różni je tylko to, że jeden zdążył wysłać żądanie, a drugi nie. To
+zamyka scenariusz „zlecenie przerwane zatrzymaniem" bez żadnego zegara ani heartbeatu: proces, który
+działa, jest jedynym, który może mieć kawałek w toku, i po jego starcie nic w bazie nie udaje, że coś
+się dzieje samo.
 
 *Rozważone i odrzucone:* trzymanie tego w pamięci i dopisanie do zakładki zdania „historia od
 ostatniego startu". Zakładka nazywa się Data History i po restarcie byłaby pusta akurat wtedy, kiedy

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
+from datetime import datetime
 
 import httpx
 
@@ -155,11 +156,14 @@ class CapitalAdapter:
         resolution: Resolution,
         bars: int,
         still_wanted: Callable[[], Awaitable[bool]] | None = None,
+        anchor: datetime | None = None,
     ) -> CandleHistory:
         """Candles further back than one request reaches.
 
         The paging rules live in ``history``; this supplies the one page fetch and the
-        judgement of what the provider's refusals mean.
+        judgement of what the provider's refusals mean. ``anchor`` shapes only the first
+        page — see ``history.collect`` — so a caller can reach for a window that ended
+        months ago instead of always reaching back from now.
         """
 
         async def fetch_page(
@@ -183,7 +187,7 @@ class CapitalAdapter:
                 raise GatewayError(f"capital.com {resp.status_code}: {resp.text[:200]}")
             return [mapping.candle_from_price(p, resolution) for p in resp.json().get("prices", [])]
 
-        return await history.collect(symbol, resolution, bars, fetch_page, still_wanted)
+        return await history.collect(symbol, resolution, bars, fetch_page, still_wanted, anchor)
 
     # --- trading ---
 

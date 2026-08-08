@@ -112,6 +112,39 @@ async def test_running_past_the_bottom_keeps_what_was_collected() -> None:
     assert result.requested == 100
 
 
+async def test_an_anchor_shapes_only_the_first_page() -> None:
+    anchor = datetime(2024, 1, 15, 0, 0, tzinfo=UTC)
+    first_page = candles(anchor, 2)
+    pages = [first_page, candles(anchor - STEP * 50, 2)]
+    seen: list[tuple[str | None, str | None]] = []
+
+    async def fetch(date_from, date_to, limit):
+        seen.append((date_from, date_to))
+        return pages.pop(0) if pages else []
+
+    await history.collect("GOLD", Resolution.MINUTE_5, 4, fetch, anchor=anchor)
+
+    # The first request now names a window ending at the anchor, not "the newest
+    # available" — this is what lets a caller reach for a window that ended in the past.
+    assert seen[0] == history.window_before(anchor, Resolution.MINUTE_5, 4)
+    # The second page still anchors on data actually received, exactly as an unanchored
+    # read would — the anchor only ever shapes the first request.
+    oldest_of_first_page = history.parse_candle_ts(first_page[0].ts)
+    assert seen[1][1] == history.iso_utc(oldest_of_first_page)
+
+
+async def test_no_anchor_keeps_reaching_back_from_now() -> None:
+    seen: list[tuple[str | None, str | None]] = []
+
+    async def fetch(date_from, date_to, limit):
+        seen.append((date_from, date_to))
+        return candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 3)
+
+    await history.collect("GOLD", Resolution.MINUTE_5, 3, fetch)
+
+    assert seen[0] == (None, None)
+
+
 async def test_a_window_with_no_progress_ends_the_loop() -> None:
     page = candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 3)
 

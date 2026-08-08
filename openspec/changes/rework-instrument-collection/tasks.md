@@ -5,6 +5,8 @@
 - [x] 1.3 Dodać `GET /asset-classes` zwracające zbiór klas, jakimi moduł opisuje instrumenty
 - [x] 1.4 Testy: wyliczenie jednej klasy zwraca wyłącznie tę klasę, klasa nieznana jest odmawiana z listą znanych, nieczytelna gałąź nadal jest pomijana zamiast wywracać odczyt
 - [x] 1.5 Uzupełnić README modułu o filtr klasy i o to, dlaczego zapytanie z filtrem ma własny pułap obchodu
+- [x] 1.6 *(odkryte podczas implementacji grupy 2)* Dołożyć `before` do `history.collect()`, `adapter.get_history` i `GET /instruments/{symbol}/history`, żeby głęboki odczyt dało się zakotwiczyć w przeszłości, nie tylko w chwili bieżącej — bez tego kawałek zlecenia starszy niż jeden fill nie ma czym się wykonać
+- [x] 1.7 Testy: odczyt zakotwiczony w przeszłości kończy pierwszą stronę na podanym momencie, dalsze stronicowanie wstecz działa jak dotychczas, brak kotwicy zachowuje dotychczasowe zachowanie
 
 ## 2. market-data: trwały stan zleceń
 
