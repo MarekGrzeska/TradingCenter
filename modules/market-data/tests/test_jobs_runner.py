@@ -63,11 +63,20 @@ class FakeHistory:
         self.history_ended = history_ended
         self.error = error
         self.calls: list[tuple[str, Resolution, int, datetime | None]] = []
+        # The `after` of each call, kept beside `calls` so assertions written before a
+        # floor existed stay readable.
+        self.floors: list[datetime | None] = []
 
     async def history(
-        self, symbol: str, resolution: Resolution, bars: int, before: datetime | None = None
+        self,
+        symbol: str,
+        resolution: Resolution,
+        bars: int,
+        before: datetime | None = None,
+        after: datetime | None = None,
     ) -> HistoryPage:
         self.calls.append((symbol, resolution, bars, before))
+        self.floors.append(after)
         if self.error is not None:
             raise self.error
         return HistoryPage(
@@ -149,6 +158,47 @@ async def test_a_chunk_with_nothing_returned_is_still_done_not_failed(pool) -> N
         reread = await read_job(conn, chunk.job_id)
     assert reread.chunks[0].state is ChunkState.DONE
     assert reread.chunks[0].candles_written == 0
+
+
+async def test_a_chunk_names_its_own_window_as_the_floor(pool) -> None:
+    await _tracked(pool)
+    chunk_start = NOW - timedelta(hours=1)
+    async with pool.acquire() as conn:
+        await create_job(conn, NOW, [plan(chunk_start=chunk_start, chunk_end=NOW)])
+        chunk = await claim_pending_chunk(conn)
+
+    history = FakeHistory([])
+    await execute_chunk(pool, history, chunk, asyncio.Semaphore(1))
+
+    assert history.floors == [chunk_start]
+
+
+async def test_a_chunk_stores_nothing_older_than_its_own_window(pool) -> None:
+    """The bug this exists for, in the shape that let it through.
+
+    `bars` counts candles and `periods_between` counts calendar periods, so for an
+    instrument shut part of the week the gateway hands back candles reaching well past
+    the window that was asked for. Every test here used to assert what was *requested*;
+    none asserted what landed in the archive, which is the only place the overshoot was
+    ever visible.
+    """
+    await _tracked(pool)
+    chunk_start = NOW - timedelta(hours=1)
+    async with pool.acquire() as conn:
+        await create_job(conn, NOW, [plan(chunk_start=chunk_start, chunk_end=NOW)])
+        chunk = await claim_pending_chunk(conn)
+
+    # Two inside the window, one two hours old — before the chunk ever begins.
+    history = FakeHistory([minute_candle(1), minute_candle(30), minute_candle(120)])
+    await execute_chunk(pool, history, chunk, asyncio.Semaphore(1))
+
+    async with pool.acquire() as conn:
+        stored = await read_candles(conn, "US100", Resolution.MINUTE)
+        reread = await read_job(conn, chunk.job_id)
+
+    assert [c.period_start for c in stored] == [NOW - timedelta(minutes=30), NOW - timedelta(minutes=1)]
+    # And the count the job reports is what it actually kept, not what arrived.
+    assert reread.chunks[0].candles_written == 2
 
 
 async def test_a_chunk_for_a_pair_deleted_mid_flight_writes_nothing(pool) -> None:
@@ -407,7 +457,7 @@ async def test_a_worker_keeps_going_after_one_chunk_raises(pool) -> None:
         def __init__(self) -> None:
             self.calls = 0
 
-        async def history(self, symbol, resolution, bars, before=None) -> HistoryPage:
+        async def history(self, symbol, resolution, bars, before=None, after=None) -> HistoryPage:
             self.calls += 1
             if self.calls == 1:
                 raise RuntimeError("the first one blew up")

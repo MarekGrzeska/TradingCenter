@@ -154,9 +154,9 @@ async def fill_gap(
     try:
         if limiter is not None:
             async with limiter:
-                page = await history.history(symbol, resolution, bars)
+                page = await history.history(symbol, resolution, bars, after=collect_from)
         else:
-            page = await history.history(symbol, resolution, bars)
+            page = await history.history(symbol, resolution, bars, after=collect_from)
     except GatewayError as err:
         # Named rather than raised on. A pair whose fill failed is not a reason to stop
         # collecting the others, and the reason has to survive to somewhere an operator
@@ -171,13 +171,19 @@ async def fill_gap(
         log.warning(outcome.describe())
         return outcome
 
+    # Nothing older than what this pair was asked to reach back to, whatever came back.
+    # `bars` counts candles and `collect_from` is a moment, and for an instrument shut
+    # part of the week the two do not line up — the gateway is asked to bound the read
+    # and does, but a promise about what the archive stores is not one to delegate.
+    within = [c for c in page.candles if c.period_start >= collect_from]
+
     written = 0
     covered_from = covered_to = None
-    if page.candles:
-        oldest = page.candles[0].period_start
-        newest = page.candles[-1].period_start
+    if within:
+        oldest = within[0].period_start
+        newest = within[-1].period_start
         async with pool.acquire() as conn:
-            written = await write_candles(conn, page.candles)
+            written = await write_candles(conn, within)
             # Verified up to the moment of the read, not up to the newest candle. The two
             # differ exactly when the market was shut for the tail of the window — and
             # recording only as far as the last candle is what would send this same

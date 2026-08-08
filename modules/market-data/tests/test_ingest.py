@@ -47,11 +47,25 @@ class FakeHistory:
         self.history_ended = history_ended
         self.error = error
         self.calls: list[tuple[str, Resolution, int]] = []
+        # The `after` of each call, kept beside `calls` rather than inside it so the
+        # assertions that predate a floor existing stay readable.
+        self.floors: list[datetime | None] = []
 
-    async def history(self, symbol: str, resolution: Resolution, bars: int) -> HistoryPage:
+    async def history(
+        self,
+        symbol: str,
+        resolution: Resolution,
+        bars: int,
+        before: datetime | None = None,
+        after: datetime | None = None,
+    ) -> HistoryPage:
         self.calls.append((symbol, resolution, bars))
+        self.floors.append(after)
         if self.error is not None:
             raise self.error
+        # Deliberately *not* honouring `after` here: the real gateway does, but the
+        # archive must not depend on that, and a double that filtered would hide
+        # whether `fill_gap` keeps its own half of the promise.
         return HistoryPage(
             symbol=symbol,
             resolution=resolution,
@@ -368,6 +382,33 @@ async def test_a_fill_for_a_pair_with_an_explicit_shallow_collect_from_does_not_
 
     [(_symbol, _resolution, bars)] = history.calls
     assert bars == 30  # not 5_000 — the depth this fix removes
+    # And the moment is named as a moment, which a bar count cannot express for an
+    # instrument that is not open around the clock.
+    assert history.floors == [collect_from]
+
+
+@pytest.mark.db
+async def test_a_fill_stores_nothing_older_than_collect_from(pool) -> None:
+    """The half the bar count cannot promise.
+
+    `bars` counts candles; `collect_from` is a moment. For an instrument shut part of
+    the week the gateway answers a request for N bars with candles spanning far more
+    than N periods — so clamping the count is not the same as honouring the date, and
+    only what reaches the archive proves which one happened.
+    """
+    collect_from = NOW - timedelta(minutes=30)
+    await _tracked(pool, collect_from=collect_from)
+    # One inside the window, one a full hour old — before the pair was ever asked to
+    # reach back to. The double deliberately does not filter; the real gateway would,
+    # and the archive must not lean on that.
+    history = FakeHistory([minute_candle(5), minute_candle(60)])
+
+    outcome = await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
+
+    async with pool.acquire() as conn:
+        stored = await read_candles(conn, "US100", Resolution.MINUTE)
+    assert [c.period_start for c in stored] == [NOW - timedelta(minutes=5)]
+    assert outcome.written == 1
 
 
 @pytest.mark.db
@@ -411,13 +452,13 @@ async def test_fills_do_not_run_more_at_once_than_the_budget_allows(pool) -> Non
     peak = 0
 
     class SlowHistory(FakeHistory):
-        async def history(self, symbol, resolution, bars):
+        async def history(self, symbol, resolution, bars, before=None, after=None):
             nonlocal in_flight, peak
             in_flight += 1
             peak = max(peak, in_flight)
             await asyncio.sleep(0.02)
             in_flight -= 1
-            return await super().history(symbol, resolution, bars)
+            return await super().history(symbol, resolution, bars, before, after)
 
     for n in range(5):
         await _tracked(pool, f"SYM{n}", Resolution.MINUTE)
@@ -449,13 +490,13 @@ async def test_a_larger_budget_lets_more_run(pool) -> None:
     peak = 0
 
     class SlowHistory(FakeHistory):
-        async def history(self, symbol, resolution, bars):
+        async def history(self, symbol, resolution, bars, before=None, after=None):
             nonlocal in_flight, peak
             in_flight += 1
             peak = max(peak, in_flight)
             await asyncio.sleep(0.02)
             in_flight -= 1
-            return await super().history(symbol, resolution, bars)
+            return await super().history(symbol, resolution, bars, before, after)
 
     for n in range(5):
         await _tracked(pool, f"SYM{n}", Resolution.MINUTE)

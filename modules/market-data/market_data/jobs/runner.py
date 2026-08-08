@@ -48,6 +48,14 @@ async def execute_chunk(
     what reaches back through it — this module does not page a second time
     (`capital-market-data` spec, "Historia jest stronicowana poza limit providera").
 
+    Both edges are named, and the older one is the load-bearing half. `bars` counts
+    *candles*, while `periods_between` counts *calendar periods* — for an instrument
+    shut part of the week the two differ by half again, and a chunk asking for a
+    January-to-August window's worth of bars was quietly handed candles reaching back to
+    the previous autumn. `after=chunk.chunk_start` says the bound in time, which a count
+    cannot; the filter below is the same promise kept locally, so this module never
+    depends on the gateway having honoured it.
+
     A refusal or an unreachable gateway settles the chunk as `failed`, named, and stops
     there — it does not raise, because one chunk's failure must not take a worker down
     with it (`market-data-jobs` spec, "Nieudany kawałek nie przerywa zlecenia").
@@ -56,7 +64,11 @@ async def execute_chunk(
     try:
         async with limiter:
             page = await history.history(
-                chunk.symbol, chunk.resolution, bars, before=chunk.chunk_end
+                chunk.symbol,
+                chunk.resolution,
+                bars,
+                before=chunk.chunk_end,
+                after=chunk.chunk_start,
             )
     except GatewayError as err:
         async with pool.acquire() as conn:
@@ -82,7 +94,11 @@ async def execute_chunk(
             )
             return
 
-        written = await write_candles(conn, page.candles) if page.candles else 0
+        # Nothing older than this chunk's own window, whatever came back. The gateway
+        # is asked to bound the read and does, but a promise about what the archive
+        # stores is not one to delegate.
+        within = [c for c in page.candles if c.period_start >= chunk.chunk_start]
+        written = await write_candles(conn, within) if within else 0
         # The requested window is what was verified, not only the span the candles
         # happen to occupy — an exhaustive read of an empty stretch is still a stretch
         # looked at, and using the requested edges keeps neighbouring chunks' coverage
@@ -95,10 +111,10 @@ async def execute_chunk(
             chunk.chunk_end,
             history_ended=page.history_ended,
         )
-        if page.candles and chunk.resolution is Resolution.MINUTE:
-            await refresh_all(
-                conn, chunk.symbol, page.candles[0].period_start, page.candles[-1].period_start
-            )
+        if within and chunk.resolution is Resolution.MINUTE:
+            # Over what was actually stored, not what arrived — rebuilding a bucket from
+            # minutes that were filtered out would derive a candle with no source.
+            await refresh_all(conn, chunk.symbol, within[0].period_start, within[-1].period_start)
 
         await finish_chunk_done(conn, chunk.id, written=written, requests=page.requests)
 
