@@ -61,13 +61,13 @@
 
 ## 8. terminal: połączona zakładka Instruments
 
-- [ ] 8.1 Usunąć wpis `archive` z `src/app/tabs.ts`, zostawiając `/archive` na stronie „nie ma takiej zakładki"; przenieść zawartość `src/archive/` do `src/instruments/` i skasować katalog `archive`
-- [ ] 8.2 Lista per instrument: jeden wiersz, wszystkie interwały skrótem w jednej kolumnie, moment rozpoczęcia archiwizowania, stan zbierania; grupowanie `/pairs` po symbolu po stronie terminala
-- [ ] 8.3 Wyróżnienie interwału, dla którego zbieranie nie nadąża albo ustało, wewnątrz wiersza
-- [ ] 8.4 Pokrycie po rozwinięciu instrumentu — osobno dla każdego interwału, z nazwaniem luk
-- [ ] 8.5 Zdejmowanie pojedynczego interwału i całego instrumentu, oba za potwierdzeniem wymieniającym, co przestanie być zbierane, i stwierdzającym, że świece zostają
-- [ ] 8.6 Zachować dotychczasowe rozróżnienie „nic nie jest archiwizowane" od „nie udało się zapytać"
-- [ ] 8.7 Testy widoku listy
+- [x] 8.1 Usunąć wpis `archive` z `src/app/tabs.ts`, zostawiając `/archive` na stronie „nie ma takiej zakładki"; przenieść zawartość `src/archive/` do `src/instruments/` i skasować katalog `archive`
+- [x] 8.2 Lista per instrument: jeden wiersz, wszystkie interwały skrótem w jednej kolumnie, moment rozpoczęcia archiwizowania, stan zbierania; grupowanie `/pairs` po symbolu po stronie terminala
+- [x] 8.3 Wyróżnienie interwału, dla którego zbieranie nie nadąża albo ustało, wewnątrz wiersza
+- [x] 8.4 Pokrycie po rozwinięciu instrumentu — osobno dla każdego interwału, z nazwaniem luk
+- [x] 8.5 Zdejmowanie pojedynczego interwału i całego instrumentu, oba za potwierdzeniem wymieniającym, co przestanie być zbierane, i stwierdzającym, że świece zostają
+- [x] 8.6 Zachować dotychczasowe rozróżnienie „nic nie jest archiwizowane" od „nie udało się zapytać"
+- [x] 8.7 Testy widoku listy
 
 ## 9. terminal: kreator dodawania i dialog akceptacji
 

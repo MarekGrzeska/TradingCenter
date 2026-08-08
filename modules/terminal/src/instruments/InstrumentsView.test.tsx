@@ -1,229 +1,241 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router";
-import type { Instrument } from "../data/types";
-import type { MarketDataSource } from "../data/source";
+import { MarketDataError } from "../data/types";
+import type { PairCoverage, Resolution, TrackedPair } from "../data/types";
 
-// Drives search results by hand so debounce and out-of-order answers are
-// testable rather than incidental.
-class SearchableSource implements MarketDataSource {
-  // The search never touches the archive, so the only part that matters here
-  // is the gateway's.
-  readonly parts = [
-    {
-      id: "gateway",
-      label: "capital-gateway",
-      whenUnreachable: "instrument search is unavailable",
-      ping: async () => {},
-    },
-  ];
+/**
+ * A stand-in archive the test drives — the list changes as the panel acts on
+ * it, the same way `market-data` would.
+ */
+class FakeArchive {
+  pairs: TrackedPair[] = [];
+  coverageAnswer: PairCoverage | null = null;
+  listFailure: Error | null = null;
+  untrackCalls: Array<{ symbol: string; resolution: Resolution }> = [];
 
-  searchCalls: string[] = [];
-  listCalls = 0;
-
-  private pending: Array<{ resolve(v: Instrument[]): void; reject(e: Error): void }> = [];
-  private listResult: { instruments: Instrument[]; count: number; truncated: boolean } = {
-    instruments: [],
-    count: 0,
-    truncated: false,
+  listPairs = async () => {
+    if (this.listFailure) throw this.listFailure;
+    return [...this.pairs];
   };
 
-  setCatalogue(instruments: Instrument[], truncated = false) {
-    this.listResult = { instruments, count: instruments.length, truncated };
-  }
+  untrackPair = async (symbol: string, resolution: Resolution) => {
+    this.untrackCalls.push({ symbol, resolution });
+    this.pairs = this.pairs.filter(
+      (pair) => !(pair.symbol === symbol && pair.resolution === resolution),
+    );
+  };
 
-  searchInstruments(query: string): Promise<Instrument[]> {
-    this.searchCalls.push(query);
-    return new Promise((resolve, reject) => this.pending.push({ resolve, reject }));
-  }
-
-  async listInstruments() {
-    this.listCalls++;
-    return this.listResult;
-  }
-
-  async history() {
-    return [];
-  }
-
-  subscribe() {
-    return () => {};
-  }
-
-  resolveSearch(index: number, instruments: Instrument[]) {
-    this.pending[index]?.resolve(instruments);
-  }
-
-  rejectSearch(index: number, message: string) {
-    this.pending[index]?.reject(new Error(message));
-  }
+  coverage = async (symbol: string, resolution: Resolution): Promise<PairCoverage> =>
+    this.coverageAnswer ?? { symbol, resolution, ranges: [], earliestReachable: null };
 }
 
-let source: SearchableSource;
+let fakeArchive: FakeArchive;
 
 vi.mock("../data/marketData", () => ({
-  // A getter, so each test's freshly constructed source is the one the view
-  // reads — the module is imported once, but `source` is reassigned per test.
-  get marketData() {
-    return source;
+  // A getter, so each test's freshly built double is the one the view reads.
+  get archive() {
+    return fakeArchive;
   },
 }));
 
 const { InstrumentsView } = await import("./InstrumentsView");
-const { gridStore } = await import("../grid/gridStore");
 
-function instrument(symbol: string, over: Partial<Instrument> = {}): Instrument {
+function pair(over: Partial<TrackedPair> = {}): TrackedPair {
   return {
-    symbol,
-    name: `${symbol} name`,
-    assetClass: "INDICES",
-    tradeable: true,
-    bid: 1,
-    ask: 2,
+    symbol: "US100",
+    resolution: "MINUTE",
+    addedAt: 1785578400, // 2026-08-01 10:00 UTC
+    collectFrom: 1785578400,
+    latestCandle: 1786113600, // 2026-08-07 14:40 UTC
+    collection: "collecting",
     ...over,
   };
 }
 
-function renderView() {
-  return render(
-    <MemoryRouter initialEntries={["/instruments"]}>
-      <Routes>
-        <Route path="/instruments" element={<InstrumentsView />} />
-        <Route path="/graph" element={<div>graph tab</div>} />
-      </Routes>
-    </MemoryRouter>,
-  );
-}
-
 beforeEach(() => {
-  source = new SearchableSource();
-  window.localStorage.clear();
-  gridStore.setActiveSlot("s1");
+  fakeArchive = new FakeArchive();
 });
 
-afterEach(() => {
-  vi.useRealTimers();
-});
+describe("Instruments list — grouping (terminal-data-manager spec)", () => {
+  it("puts every resolution of the same instrument in one row, abbreviated", async () => {
+    fakeArchive.pairs = [
+      pair({ resolution: "MINUTE" }),
+      pair({ resolution: "HOUR" }),
+      pair({ resolution: "DAY" }),
+      pair({ resolution: "WEEK" }),
+    ];
+    render(<InstrumentsView />);
 
-describe("Instruments search (terminal-instruments spec)", () => {
-  it("does not issue a request per keystroke", async () => {
-    // No fake timers: userEvent's own waits and a faked clock deadlock each
-    // other. `delay: null` types all four characters faster than the 250 ms
-    // debounce, which is exactly the condition being tested.
-    const user = userEvent.setup({ delay: null });
-    renderView();
-
-    await user.type(screen.getByLabelText("Search instruments"), "gold");
-    expect(source.searchCalls).toHaveLength(0);
-
-    // Four keystrokes, one request — for the final query, not a prefix.
-    await waitFor(() => expect(source.searchCalls).toEqual(["gold"]));
+    expect(await screen.findAllByText("US100")).toHaveLength(1);
+    const row = screen.getByTestId("instrument-US100");
+    expect(within(row).getByText("1m")).toBeInTheDocument();
+    expect(within(row).getByText("1h")).toBeInTheDocument();
+    expect(within(row).getByText("1D")).toBeInTheDocument();
+    expect(within(row).getByText("1W")).toBeInTheDocument();
   });
 
-  it("shows symbol, name, class and tradeability for each hit", async () => {
-    const user = userEvent.setup();
-    renderView();
-    await user.type(screen.getByLabelText("Search instruments"), "gold");
+  it("shows the earliest addition among its resolutions as when archiving began", async () => {
+    fakeArchive.pairs = [
+      pair({ resolution: "MINUTE", addedAt: 1785578400 }), // 2026-08-01
+      pair({ resolution: "HOUR", addedAt: 1780000000 }), // earlier
+    ];
+    render(<InstrumentsView />);
 
-    await waitFor(() => expect(source.searchCalls).toHaveLength(1));
-    source.resolveSearch(0, [
-      instrument("GOLD", { name: "Gold", assetClass: "COMMODITIES", bid: 2400.1, ask: 2400.4 }),
-    ]);
-
-    const row = await screen.findByText("GOLD");
-    const cells = row.closest("tr")!;
-    expect(within(cells).getByText("Gold")).toBeInTheDocument();
-    expect(within(cells).getByText("COMMODITIES")).toBeInTheDocument();
-    expect(within(cells).getByText("2400.1")).toBeInTheDocument();
-    expect(within(cells).getByText("yes")).toBeInTheDocument();
+    const row = await screen.findByTestId("instrument-US100");
+    expect(within(row).getByText(/2026-05-28/)).toBeInTheDocument();
   });
 
-  it("distinguishes no matches from a failed search", async () => {
-    const user = userEvent.setup();
-    const { unmount } = renderView();
-
-    await user.type(screen.getByLabelText("Search instruments"), "zzz");
-    await waitFor(() => expect(source.searchCalls).toHaveLength(1));
-    source.resolveSearch(0, []);
-    expect(await screen.findByText(/nothing matches/i)).toBeInTheDocument();
-
-    unmount();
-    source = new SearchableSource();
-    renderView();
-
-    await user.type(screen.getByLabelText("Search instruments"), "gold");
-    await waitFor(() => expect(source.searchCalls).toHaveLength(1));
-    source.rejectSearch(0, "gateway unreachable");
-    expect(await screen.findByText(/search failed: gateway unreachable/i)).toBeInTheDocument();
+  it("says nothing is archived rather than showing an empty table", async () => {
+    render(<InstrumentsView />);
+    expect(await screen.findByText(/nothing is being archived yet/i)).toBeInTheDocument();
   });
 
-  it("a slow answer to an earlier query never overwrites the current one", async () => {
-    const user = userEvent.setup();
-    renderView();
-    const field = screen.getByLabelText("Search instruments");
+  it("tells an unreachable archive apart from an empty one", async () => {
+    fakeArchive.listFailure = new MarketDataError(
+      "unreachable",
+      "the candle archive is not reachable",
+    );
+    render(<InstrumentsView />);
 
-    await user.type(field, "gol");
-    await waitFor(() => expect(source.searchCalls).toHaveLength(1));
-
-    await user.clear(field);
-    await user.type(field, "btc");
-    await waitFor(() => expect(source.searchCalls).toHaveLength(2));
-
-    // The current query answers first, then the abandoned one arrives late.
-    source.resolveSearch(1, [instrument("BTCUSD")]);
-    expect(await screen.findByText("BTCUSD")).toBeInTheDocument();
-
-    source.resolveSearch(0, [instrument("GOLD")]);
-    await new Promise((r) => setTimeout(r, 0));
-
-    expect(screen.getByText("BTCUSD")).toBeInTheDocument();
-    expect(screen.queryByText("GOLD")).not.toBeInTheDocument();
+    expect(await screen.findByText(/archive is not reachable/i)).toBeInTheDocument();
+    expect(screen.queryByText(/nothing is being archived yet/i)).not.toBeInTheDocument();
   });
 });
 
-describe("Instruments → grid (terminal-instruments spec)", () => {
-  it("puts the chosen instrument in the active slot and shows the chart", async () => {
-    const user = userEvent.setup();
-    gridStore.setActiveSlot("s3");
-    renderView();
+describe("Instruments list — a lagging interval", () => {
+  it("marks the row and the stalled interval out from the rest", async () => {
+    fakeArchive.pairs = [
+      pair({ resolution: "MINUTE", collection: "collecting" }),
+      pair({ resolution: "HOUR", collection: "stalled" }),
+    ];
+    render(<InstrumentsView />);
 
-    await user.type(screen.getByLabelText("Search instruments"), "tsla");
-    await waitFor(() => expect(source.searchCalls).toHaveLength(1));
-    source.resolveSearch(0, [instrument("TSLA")]);
-
-    await user.click(await screen.findByText("TSLA"));
-
-    expect(gridStore.getSnapshot().slots.s3.symbol).toBe("TSLA");
-    expect(screen.getByText("graph tab")).toBeInTheDocument();
+    const row = await screen.findByTestId("instrument-US100");
+    expect(row).toHaveAttribute("data-stalled", "true");
+    // The healthy resolution and the stalled one must not read the same way.
+    expect(within(row).getByText("1m").className).not.toBe(within(row).getByText("1h").className);
   });
 
-  it("charts a non-tradeable instrument, flagging that it cannot be traded", async () => {
-    const user = userEvent.setup();
-    renderView();
+  it("does not mark an instrument whose resolutions are all healthy", async () => {
+    fakeArchive.pairs = [pair({ resolution: "MINUTE", collection: "collecting" })];
+    render(<InstrumentsView />);
 
-    await user.type(screen.getByLabelText("Search instruments"), "idx");
-    await waitFor(() => expect(source.searchCalls).toHaveLength(1));
-    source.resolveSearch(0, [instrument("IDX1", { tradeable: false })]);
-
-    expect(await screen.findByText(/not tradeable/i)).toBeInTheDocument();
-
-    await user.click(screen.getByText("IDX1"));
-    expect(gridStore.getSnapshot().slots.s1.symbol).toBe("IDX1");
+    const row = await screen.findByTestId("instrument-US100");
+    expect(row).toHaveAttribute("data-stalled", "false");
   });
 });
 
-describe("Instruments catalogue", () => {
-  it("warns when the catalogue came back truncated", async () => {
-    source.setCatalogue([instrument("US100"), instrument("GOLD")], true);
-    renderView();
-    expect(await screen.findByText(/catalogue was cut short/i)).toBeInTheDocument();
+describe("Instruments list — coverage on expand", () => {
+  it("shows coverage for every resolution once the row is expanded", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair({ resolution: "MINUTE" }), pair({ resolution: "HOUR" })];
+    fakeArchive.coverageAnswer = {
+      symbol: "US100",
+      resolution: "MINUTE",
+      ranges: [{ from: 1785542400, to: 1786113600, historyEnded: true }],
+      earliestReachable: 1785542400,
+    };
+    render(<InstrumentsView />);
+
+    await user.click(await screen.findByText("US100"));
+
+    expect(await screen.findAllByText(/covered from/i)).toHaveLength(2);
+    expect(screen.getAllByText(/end of the provider's history/i)).toHaveLength(2);
   });
 
-  it("reports the count without a warning when complete", async () => {
-    source.setCatalogue([instrument("US100"), instrument("GOLD")], false);
-    renderView();
-    expect(await screen.findByText(/2 instruments/i)).toBeInTheDocument();
-    expect(screen.queryByText(/cut short/i)).not.toBeInTheDocument();
+  it("names the gaps when coverage is more than one stretch", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair()];
+    fakeArchive.coverageAnswer = {
+      symbol: "US100",
+      resolution: "MINUTE",
+      ranges: [
+        { from: 1785542400, to: 1785600000, historyEnded: false },
+        { from: 1785700000, to: 1786113600, historyEnded: false },
+      ],
+      earliestReachable: null,
+    };
+    render(<InstrumentsView />);
+
+    await user.click(await screen.findByText("US100"));
+    expect(await screen.findByText(/in 2 stretches, with gaps between them/i)).toBeInTheDocument();
+  });
+
+  it("says nothing is verified rather than showing an empty range", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair({ collection: "never_collected", latestCandle: null })];
+    render(<InstrumentsView />);
+
+    await user.click(await screen.findByText("US100"));
+    expect(await screen.findByText(/nothing verified yet for this interval/i)).toBeInTheDocument();
+  });
+});
+
+describe("Instruments list — removing a single interval", () => {
+  it("asks first, promises the candles stay, and drops only that interval", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair({ resolution: "MINUTE" }), pair({ resolution: "HOUR" })];
+    render(<InstrumentsView />);
+
+    await user.click(await screen.findByText("US100"));
+    await user.click(screen.getByRole("button", { name: /stop archiving us100 minute/i }));
+
+    expect(fakeArchive.untrackCalls).toHaveLength(0);
+    expect(screen.getByText(/candles already collected stay/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^stop collecting$/i }));
+
+    expect(fakeArchive.untrackCalls).toEqual([{ symbol: "US100", resolution: "MINUTE" }]);
+    await waitFor(() => {
+      const row = screen.getByTestId("instrument-US100");
+      expect(within(row).queryByText("1m")).not.toBeInTheDocument();
+      expect(within(row).getByText("1h")).toBeInTheDocument();
+    });
+  });
+
+  it("leaves the interval collecting when the confirmation is dismissed", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair()];
+    render(<InstrumentsView />);
+
+    await user.click(await screen.findByText("US100"));
+    await user.click(screen.getByRole("button", { name: /stop archiving us100 minute/i }));
+    await user.click(screen.getByRole("button", { name: /cancel/i }));
+
+    expect(fakeArchive.untrackCalls).toHaveLength(0);
+    expect(screen.getByTestId("instrument-US100")).toBeInTheDocument();
+  });
+});
+
+describe("Instruments list — removing a whole instrument", () => {
+  it("names every resolution that will stop, and removes the whole row once confirmed", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [
+      pair({ resolution: "MINUTE" }),
+      pair({ resolution: "HOUR" }),
+      pair({ symbol: "GOLD", resolution: "DAY" }),
+    ];
+    render(<InstrumentsView />);
+
+    await screen.findByText("US100");
+    await user.click(screen.getByRole("button", { name: "Stop archiving US100" }));
+
+    const confirmation = screen.getByText(/stop archiving us100 in/i);
+    expect(confirmation).toHaveTextContent("MINUTE");
+    expect(confirmation).toHaveTextContent("HOUR");
+    expect(fakeArchive.untrackCalls).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: /^stop collecting$/i }));
+
+    expect(fakeArchive.untrackCalls).toEqual(
+      expect.arrayContaining([
+        { symbol: "US100", resolution: "MINUTE" },
+        { symbol: "US100", resolution: "HOUR" },
+      ]),
+    );
+    await waitFor(() => expect(screen.queryByTestId("instrument-US100")).not.toBeInTheDocument());
+    // The other instrument is unrelated and stays exactly where it was.
+    expect(screen.getByTestId("instrument-GOLD")).toBeInTheDocument();
   });
 });

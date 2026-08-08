@@ -24,8 +24,7 @@ const IDLE: AsyncOptionsState<never> = { status: "idle", options: [], truncated:
  * Debounce plus protection against a stale answer overtaking a newer one:
  * each run owns a `cancelled` flag its cleanup sets, so a slow response to an
  * earlier query can never land after a faster response to a later one. This
- * is the logic every autocomplete in the terminal shares — extracted out of
- * `useInstrumentSearch`, which now sits on top of it (terminal-instruments
+ * is the logic every autocomplete in the terminal shares (terminal-instruments
  * spec, "Pisanie w polu wyszukiwania"; "Podpowiadanie zachowuje się wszędzie
  * tak samo").
  *

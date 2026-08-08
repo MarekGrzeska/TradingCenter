@@ -12,9 +12,6 @@ vi.mock("./grid/GridView", () => ({
 vi.mock("./instruments/InstrumentsView", () => ({
   InstrumentsView: () => <div>instruments stub</div>,
 }));
-vi.mock("./archive/ArchiveView", () => ({
-  ArchiveView: () => <div>archive stub</div>,
-}));
 // Neither back end is running under the test suite; both reachability checks
 // are stubbed so these tests assert routing, not connectivity.
 vi.mock("./data/marketData", () => ({
@@ -78,21 +75,15 @@ describe("App routing (terminal-shell spec)", () => {
     expect(window.location.pathname).toBe("/instruments");
   });
 
-  // The archive panel is a tab like any other — an entry in the registry, its
-  // own address, and a reload that comes back to it rather than to the default
-  // (terminal-data-manager spec, "Panel jest zakładką terminala").
-  it("gives the archive panel its own address, and returns to it on a reload", async () => {
-    const user = userEvent.setup();
-    const { unmount } = await renderApp();
-
-    await user.click(screen.getByRole("link", { name: "Archive" }));
-    expect(window.location.pathname).toBe("/archive");
-    expect(screen.getByText("archive stub")).toBeInTheDocument();
-
-    // What a refresh does: the tree goes, the address stays.
-    unmount();
+  // `Instruments` absorbed the old `Archive` tab rather than being renamed
+  // from it, so a bookmark to the old address must not resolve to anything —
+  // a silent redirect would be a second, hidden way to reach the same tab
+  // (design.md, "Zakładki: `Archive` znika, `Data History` dochodzi").
+  it("sends a stale /archive bookmark to the unknown-tab page, not a tab", async () => {
+    window.history.pushState({}, "", "/archive");
     await renderApp();
-    expect(screen.getByText("archive stub")).toBeInTheDocument();
+
+    expect(screen.getByText(/no tab lives at this address/i)).toBeInTheDocument();
   });
 
   it("shows an explicit placeholder for a not-yet-implemented tab, other tabs unaffected", async () => {
