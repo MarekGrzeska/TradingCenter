@@ -208,6 +208,11 @@ the market is open, which the gateway answers and this module does not. Without 
 state is `UNKNOWN` rather than a guess: there is no session calendar here, and inventing one is
 wrong twice a day.
 
+The same read carries the *oldest* candle of each pair, from the same aggregate. It is how far the
+data actually reaches, which `collect_from` — how far it was asked to reach — does not answer while
+a job is still running or the provider's history ends later. It rides on the list rather than being
+asked for per pair, because the panel draws it on every row.
+
 Those three minutes are measured, not padding. A closed minute candle took 52 to 169 seconds to
 reach the archive on 2026-08-08, so a perfectly healthy pair sits 112–229 seconds behind against a
 bare two-period threshold of 120 — and the state flipped between `COLLECTING` and `STALLED` between

@@ -341,6 +341,7 @@ async def pairs(request: Request, db=Depends(pool)) -> list[TrackedPairOut]:
             resolution=status.resolution,
             added_at=status.added_at,
             collect_from=status.collect_from,
+            earliest_candle=status.earliest_candle,
             latest_candle=status.latest_candle,
             collection=collection,
             last_fill=_fill_out(ingest.last_fill(status.symbol, status.resolution)),
@@ -443,6 +444,7 @@ def _tracked_pair_out(pair: TrackedPair) -> TrackedPairOut:
         resolution=pair.resolution,
         added_at=pair.added_at,
         collect_from=pair.collect_from,
+        earliest_candle=None,
         latest_candle=None,
         collection="never_collected",
     )

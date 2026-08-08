@@ -16,7 +16,9 @@ hold, so what gets collected is a standing decision — made, and taken back, on
 archive already collects, because a chart of a pair nobody collects has nothing to draw.
 
 **Tabs.** `Graph` is the grid of charts. `Instruments` is the one place that says what is
-archived — one row per instrument, every resolution of it in one column — and where an
+archived — one row per instrument, every resolution of it in one column, and since when
+there is data for it: one date when the resolutions agree, split per resolution when they
+reach differently far back — and where an
 instrument is added, through a wizard that prices the work before starting it. `Data
 History` is where that work is watched: what was pulled, how far a running pull has got,
 and where a failed one is retried.

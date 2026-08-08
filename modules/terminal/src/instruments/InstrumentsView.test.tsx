@@ -56,6 +56,7 @@ function pair(over: Partial<TrackedPair> = {}): TrackedPair {
     resolution: "MINUTE",
     addedAt: 1785578400, // 2026-08-01 10:00 UTC
     collectFrom: 1785578400,
+    earliestCandle: 1785542400, // 2026-08-01 00:00 UTC
     latestCandle: 1786113600, // 2026-08-07 14:40 UTC
     collection: "collecting",
     ...over,
@@ -84,15 +85,54 @@ describe("Instruments list — grouping (terminal-data-manager spec)", () => {
     expect(within(row).getByText("1W")).toBeInTheDocument();
   });
 
-  it("shows the earliest addition among its resolutions as when archiving began", async () => {
+  it("says since when there is data with one date when every resolution agrees", async () => {
     fakeArchive.pairs = [
-      pair({ resolution: "MINUTE", addedAt: 1785578400 }), // 2026-08-01
-      pair({ resolution: "HOUR", addedAt: 1780000000 }), // earlier
+      pair({ resolution: "MINUTE", earliestCandle: 1785542400 }), // 2026-08-01
+      pair({ resolution: "HOUR", earliestCandle: 1785542400 }),
     ];
     render(<InstrumentsView />);
 
     const row = await screen.findByTestId("instrument-US100");
-    expect(within(row).getByText(/2026-05-28/)).toBeInTheDocument();
+    // One date, said once — not the same date repeated per resolution.
+    expect(within(row).getAllByText(/2026-08-01/)).toHaveLength(1);
+  });
+
+  it("splits the date per resolution when they do not reach equally far back", async () => {
+    fakeArchive.pairs = [
+      pair({ resolution: "MINUTE", earliestCandle: 1785542400 }), // 2026-08-01
+      pair({ resolution: "MINUTE_5", earliestCandle: 1785542400 }),
+      pair({ resolution: "DAY", earliestCandle: 1577923200 }), // 2020-01-02
+    ];
+    render(<InstrumentsView />);
+
+    const row = await screen.findByTestId("instrument-US100");
+    const deepest = within(row).getByText(/2020-01-02/).closest("div");
+    // Which resolutions the deeper history belongs to has to be readable off
+    // the row; a bare pair of dates says nothing about which is which.
+    expect(deepest).toHaveTextContent("1D");
+    expect(within(row).getByText(/2026-08-01/).closest("div")).toHaveTextContent("1m · 5m");
+  });
+
+  it("says a resolution has nothing yet rather than leaving its date blank", async () => {
+    fakeArchive.pairs = [
+      pair({ resolution: "MINUTE", earliestCandle: null, collection: "never_collected" }),
+      pair({ resolution: "DAY", earliestCandle: 1577923200 }), // 2020-01-02
+    ];
+    render(<InstrumentsView />);
+
+    const row = await screen.findByTestId("instrument-US100");
+    expect(within(row).getByText("nothing yet").closest("div")).toHaveTextContent("1m");
+  });
+
+  it("says nothing yet for an instrument that has collected nothing at all", async () => {
+    fakeArchive.pairs = [
+      pair({ resolution: "MINUTE", earliestCandle: null, collection: "never_collected" }),
+      pair({ resolution: "DAY", earliestCandle: null, collection: "never_collected" }),
+    ];
+    render(<InstrumentsView />);
+
+    const row = await screen.findByTestId("instrument-US100");
+    expect(within(row).getByText("nothing yet")).toBeInTheDocument();
   });
 
   it("says nothing is archived rather than showing an empty table", async () => {

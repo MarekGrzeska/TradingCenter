@@ -133,6 +133,11 @@ class TrackedPairOut(BaseModel):
     collect_from: datetime = Field(
         description="the moment history for this pair is meant to reach back to"
     )
+    earliest_candle: datetime | None = Field(
+        default=None,
+        description="the oldest period collected — how far back the data actually reaches, "
+        "which is not `collect_from` (where it was asked to reach) — or null if none yet",
+    )
     latest_candle: datetime | None = Field(
         default=None, description="the newest period collected, or null if none yet"
     )

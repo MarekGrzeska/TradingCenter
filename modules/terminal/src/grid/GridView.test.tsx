@@ -57,7 +57,15 @@ const { gridStore, STORAGE_KEY } = await import("./gridStore");
 const { defaultGridConfig, SLOT_IDS } = await import("./model");
 
 function pair(symbol: string, resolution: Resolution): TrackedPair {
-  return { symbol, resolution, addedAt: 0, collectFrom: 0, latestCandle: null, collection: "collecting" };
+  return {
+    symbol,
+    resolution,
+    addedAt: 0,
+    collectFrom: 0,
+    earliestCandle: null,
+    latestCandle: null,
+    collection: "collecting",
+  };
 }
 
 function renderGrid() {

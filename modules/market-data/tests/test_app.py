@@ -388,6 +388,21 @@ async def test_the_list_carries_how_collection_is_going(api, pool) -> None:
     assert listed["collection"] in {"collecting", "stalled", "unknown"}
 
 
+async def test_the_list_carries_how_far_back_the_data_reaches(api, pool) -> None:
+    """The panel's "data since", answered without a request per pair.
+
+    It rides on the list because the alternative is the panel asking for coverage once
+    per tracked pair just to draw its rows.
+    """
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(0), candle(30)])
+
+    [listed] = (await api.get("/pairs")).json()
+
+    assert _at(listed["earliest_candle"]) == NOW - timedelta(minutes=30)
+
+
 async def test_a_late_pair_with_the_market_open_is_reported_stalled(api, pool) -> None:
     """The state the panel exists to show, reaching the panel at last.
 

@@ -83,6 +83,7 @@ interface RawTrackedPair {
   resolution: string;
   added_at: string;
   collect_from: string;
+  earliest_candle: string | null;
   latest_candle: string | null;
   collection: string;
 }
@@ -181,6 +182,8 @@ function mapTrackedPair(raw: RawTrackedPair): TrackedPair {
     resolution: raw.resolution as Resolution,
     addedAt: parseIsoToEpochSeconds(raw.added_at),
     collectFrom: parseIsoToEpochSeconds(raw.collect_from),
+    earliestCandle:
+      raw.earliest_candle === null ? null : parseIsoToEpochSeconds(raw.earliest_candle),
     latestCandle: raw.latest_candle === null ? null : parseIsoToEpochSeconds(raw.latest_candle),
     collection: raw.collection as CollectionState,
   };

@@ -44,7 +44,15 @@ function instrument(symbol: string, assetClass: AssetClass): Instrument {
 }
 
 function trackedPair(symbol: string, resolution: TrackedPair["resolution"]): TrackedPair {
-  return { symbol, resolution, addedAt: 0, collectFrom: 0, latestCandle: null, collection: "collecting" };
+  return {
+    symbol,
+    resolution,
+    addedAt: 0,
+    collectFrom: 0,
+    earliestCandle: null,
+    latestCandle: null,
+    collection: "collecting",
+  };
 }
 
 const signal = () => new AbortController().signal;

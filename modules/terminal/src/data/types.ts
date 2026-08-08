@@ -134,6 +134,10 @@ export interface TrackedPair {
   addedAt: number;
   /** The moment history for this pair is meant to reach back to. */
   collectFrom: number;
+  /** The oldest period collected — how far back the data reaches, which is not
+   *  `collectFrom`, where it was asked to reach. null when nothing has been
+   *  collected yet. */
+  earliestCandle: number | null;
   /** The newest period collected, or null when nothing has been yet. */
   latestCandle: number | null;
   collection: CollectionState;

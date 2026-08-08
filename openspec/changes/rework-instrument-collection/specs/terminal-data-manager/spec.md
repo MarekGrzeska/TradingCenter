@@ -27,16 +27,38 @@ zakładki przeglądającej katalog providera obok tej listy.
 
 Sama obecność instrumentu na liście nie dowodzi, że dane przychodzą. Panel MUST pokazywać jeden
 wiersz na instrument, a w nim wszystkie archiwizowane interwały tego instrumentu wypisane skrótowo
-w jednej kolumnie, od kiedy instrument jest archiwizowany oraz stan zbierania. Interwał, dla którego
+w jednej kolumnie, od kiedy dane są zebrane oraz stan zbierania. Interwał, dla którego
 zbieranie nie nadąża albo ustało, MUST być wyróżniony wewnątrz tej kolumny, żeby cicha awaria
 jednego interwału nie ginęła w wierszu wyglądającym poprawnie.
+
+Moment, od którego dane są, MUST być podany jako jedna data, gdy wszystkie interwały instrumentu
+sięgają równie daleko wstecz. Gdy sięgają różnie daleko, panel MUST rozbić go na tyle dat, ile jest
+różnych momentów, i przy każdej nazwać interwały, których dotyczy — jedna data byłaby wtedy
+nieprawdą o pozostałych interwałach. Interwał, który nie zebrał jeszcze nic, MUST być nazwany jako
+taki, a nie zostawiony z pustym miejscem.
 
 #### Scenario: Przegląd listy
 
 - **WHEN** operator patrzy na listę archiwizowanych instrumentów
 - **THEN** każdy instrument zajmuje jeden wiersz
-- **AND** wiersz podaje wszystkie jego interwały skrótowo w jednej kolumnie, moment rozpoczęcia
-  archiwizowania oraz stan zbierania
+- **AND** wiersz podaje wszystkie jego interwały skrótowo w jednej kolumnie, moment, od którego dane
+  są zebrane, oraz stan zbierania
+
+#### Scenario: Wszystkie interwały sięgają tak samo daleko
+
+- **WHEN** każdy archiwizowany interwał instrumentu ma dane od tego samego momentu
+- **THEN** wiersz podaje ten moment jeden raz
+
+#### Scenario: Interwały sięgają różnie daleko
+
+- **WHEN** dane dla interwałów instrumentu zaczynają się w różnych momentach
+- **THEN** wiersz podaje każdy z tych momentów osobno
+- **AND** przy każdym wymienia interwały, których dotyczy
+
+#### Scenario: Interwał bez zebranych danych
+
+- **WHEN** dla któregoś interwału instrumentu nie zebrano jeszcze żadnej świecy
+- **THEN** wiersz stwierdza to wprost dla tego interwału
 
 #### Scenario: Instrument w wielu interwałach
 

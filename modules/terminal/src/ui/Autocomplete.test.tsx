@@ -50,6 +50,7 @@ function trackedPair(symbol: string, resolution: TrackedPair["resolution"]): Tra
     resolution,
     addedAt: 0,
     collectFrom: 0,
+    earliestCandle: null,
     latestCandle: null,
     collection: "collecting",
   };

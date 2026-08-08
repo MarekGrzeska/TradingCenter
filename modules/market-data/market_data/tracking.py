@@ -106,6 +106,10 @@ class TrackedPairStatus(BaseModel):
     resolution: Resolution
     added_at: datetime
     collect_from: datetime
+    # The oldest period collected, which is how far back the data actually reaches —
+    # `collect_from` is only where it was asked to reach, and a job that has not finished
+    # (or a provider whose history ends later) leaves the two far apart.
+    earliest_candle: datetime | None
     latest_candle: datetime | None
     collection: CollectionState
 
@@ -165,11 +169,13 @@ _IS_TRACKED = """
      LIMIT 1
 """
 
-# One query for every tracked pair's newest candle rather than one query per pair. The
-# left join keeps a pair that has never collected anything, which is a state an operator
-# needs to see rather than a row that quietly goes missing.
+# One query for every tracked pair's oldest and newest candle rather than one query per
+# pair. The left join keeps a pair that has never collected anything, which is a state an
+# operator needs to see rather than a row that quietly goes missing.
 _SELECT_STATUS = """
-    SELECT t.symbol, t.resolution, t.added_at, t.collect_from, max(c.period_start) AS latest_candle
+    SELECT t.symbol, t.resolution, t.added_at, t.collect_from,
+           min(c.period_start) AS earliest_candle,
+           max(c.period_start) AS latest_candle
       FROM tracked_pairs t
       LEFT JOIN candles c
         ON c.symbol = t.symbol AND c.resolution = t.resolution
@@ -314,6 +320,7 @@ async def read_status(
                 resolution=resolution,
                 added_at=row["added_at"],
                 collect_from=row["collect_from"],
+                earliest_candle=row["earliest_candle"],
                 latest_candle=latest,
                 collection=collection_state(
                     resolution, latest, moment, lookup.get((row["symbol"], resolution))

@@ -352,6 +352,24 @@ async def test_the_status_carries_the_newest_candle(db: asyncpg.Connection) -> N
 
 
 @pytest.mark.db
+async def test_the_status_carries_the_oldest_candle(db: asyncpg.Connection) -> None:
+    """How far back the data reaches, which is not how far back it was asked to reach.
+
+    The panel answers "since when is there data for this instrument", and `collect_from`
+    would answer it wrongly for every pair whose job has not finished yet.
+    """
+    await track(db, "US100", Resolution.MINUTE, LIMIT)
+    await write_candles(
+        db,
+        [candle(period_start=MOMENT - timedelta(minutes=m)) for m in range(3)],
+    )
+
+    [status] = await read_status(db, now=MOMENT)
+
+    assert status.earliest_candle == MOMENT - timedelta(minutes=2)
+
+
+@pytest.mark.db
 async def test_a_pair_that_has_collected_nothing_still_appears(
     db: asyncpg.Connection,
 ) -> None:
@@ -361,6 +379,7 @@ async def test_a_pair_that_has_collected_nothing_still_appears(
 
     [status] = await read_status(db, now=MOMENT)
 
+    assert status.earliest_candle is None
     assert status.latest_candle is None
     assert status.collection is CollectionState.NEVER_COLLECTED
 

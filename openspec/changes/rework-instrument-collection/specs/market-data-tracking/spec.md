@@ -38,7 +38,8 @@ ją jako całość, zapisując każdą parę osobno.
 Operator MUST móc odczytać, co jest śledzone, i dla każdej pary zobaczyć, czy zbieranie faktycznie
 działa. Sama obecność na liście nie dowodzi, że dane przychodzą. Para MUST nieść też moment, od
 którego historia ma być pokryta, żeby dało się odróżnić parę zbieraną od tygodnia od pary, dla
-której zamówiono dziesięć lat wstecz.
+której zamówiono dziesięć lat wstecz, oraz znacznik czasu najstarszej zebranej świecy — dokąd dane
+faktycznie sięgają, co dla pary z niedokończonym zleceniem jest czymś innym niż zamówiona głębokość.
 
 #### Scenario: Odczyt listy śledzonych par
 
@@ -46,6 +47,12 @@ której zamówiono dziesięć lat wstecz.
 - **THEN** dla każdej dostaje symbol, rozdzielczość, stan połączenia oraz znacznik czasu najnowszej
   zebranej świecy
 - **AND** moment, od którego historia tej pary ma być pokryta
+- **AND** znacznik czasu najstarszej zebranej świecy, pusty dla pary, która nie zebrała jeszcze nic
+
+#### Scenario: Zamówiona głębokość jeszcze nieosiągnięta
+
+- **WHEN** dla pary zamówiono historię głębszą, niż zdążyła zostać zebrana
+- **THEN** lista podaje osobno moment zamówiony i moment, od którego dane faktycznie są
 
 #### Scenario: Zbieranie ustało po cichu
 

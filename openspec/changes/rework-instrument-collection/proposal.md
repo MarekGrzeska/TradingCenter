@@ -16,7 +16,8 @@ pary.
 
 - **BREAKING** Zakładki `Instruments` i `Archive` łączą się w jedną, `Instruments`. Pokazuje
   wyłącznie instrumenty archiwizowane — jeden wiersz na instrument, wszystkie jego interwały w
-  jednej kolumnie skrótem (`1m · 5m · 1h · 1D`), oraz od kiedy zbieranie trwa. Przeglądarka
+  jednej kolumnie skrótem (`1m · 5m · 1h · 1D`), oraz od kiedy dane są zebrane — jedną datą, gdy
+  wszystkie interwały sięgają równie daleko wstecz, i rozbitą na interwały, gdy nie. Przeglądarka
   katalogu providera znika jako osobny widok.
 - Dodawanie instrumentów przestaje być formularzem, a staje się kreatorem: autocomplete klasy
   aktywów → autocomplete instrumentu w tej klasie → multiselect interwałów → data **OD**. Autocomplete

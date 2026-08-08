@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { archive } from "../data/marketData";
 import { RESOLUTIONS } from "../data/types";
-import type { CollectionState, PairCoverage, TrackedPair } from "../data/types";
+import type { CollectionState, PairCoverage, Resolution, TrackedPair } from "../data/types";
 import { AddInstrumentWizard } from "./AddInstrumentWizard";
 import { formatInstant } from "./format";
 import { RESOLUTION_ABBR } from "./resolutionAbbr";
@@ -35,13 +35,44 @@ const COLLECTION_HINT: Record<CollectionState, string> = {
   unknown: "Behind, and nobody could say whether the market is open.",
 };
 
+/** How far back the data reaches, and for which resolutions. One entry when
+ *  every resolution reaches equally far back — which is the common case, since
+ *  they are usually collected by one job from one date — and one per distinct
+ *  moment otherwise. `since` is null for resolutions that have collected
+ *  nothing at all. */
+interface DataSince {
+  since: number | null;
+  resolutions: Resolution[];
+}
+
 interface InstrumentGroup {
   symbol: string;
   /** Sorted by `RESOLUTIONS`' own order, not insertion order. */
   pairs: TrackedPair[];
-  /** The earliest of its resolutions' `addedAt` — when archiving this
-   *  instrument began, not any one resolution added to it later. */
-  archivingSince: number;
+  /** Oldest first, so the row leads with the deepest history it has. */
+  dataSince: DataSince[];
+}
+
+/**
+ * Resolutions bucketed by the moment their data starts.
+ *
+ * An instrument whose four resolutions all begin at the same moment deserves
+ * one date, not the same date four times; one whose daily series reaches back
+ * years while its minute series reaches back a week deserves both numbers,
+ * because a single one of them would be a lie about the other.
+ */
+function dataSinceOf(pairs: TrackedPair[]): DataSince[] {
+  const byMoment = new Map<number | null, Resolution[]>();
+  for (const pair of pairs) {
+    const at = byMoment.get(pair.earliestCandle) ?? [];
+    at.push(pair.resolution);
+    byMoment.set(pair.earliestCandle, at);
+  }
+  return [...byMoment.entries()]
+    .map(([since, resolutions]) => ({ since, resolutions }))
+    // Nothing collected yet sorts last: it is the least informative line, and
+    // an operator scanning the column is looking for how deep the archive goes.
+    .sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
 }
 
 function groupBySymbol(pairs: TrackedPair[]): InstrumentGroup[] {
@@ -56,11 +87,7 @@ function groupBySymbol(pairs: TrackedPair[]): InstrumentGroup[] {
       const sorted = [...group].sort(
         (a, b) => RESOLUTIONS.indexOf(a.resolution) - RESOLUTIONS.indexOf(b.resolution),
       );
-      return {
-        symbol,
-        pairs: sorted,
-        archivingSince: Math.min(...sorted.map((pair) => pair.addedAt)),
-      };
+      return { symbol, pairs: sorted, dataSince: dataSinceOf(sorted) };
     })
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
 }
@@ -129,7 +156,7 @@ function InstrumentList({
             <tr>
               <th className="px-4 py-2 font-normal">Symbol</th>
               <th className="px-4 py-2 font-normal">Resolutions</th>
-              <th className="px-4 py-2 font-normal">Archiving since</th>
+              <th className="px-4 py-2 font-normal">Data since</th>
               <th className="px-4 py-2 font-normal" />
             </tr>
           </thead>
@@ -191,7 +218,9 @@ function InstrumentRow({ group, onChanged }: { group: InstrumentGroup; onChanged
             </span>
           ))}
         </td>
-        <td className="px-4 py-1.5 text-ink-muted">{formatInstant(group.archivingSince)}</td>
+        <td className="px-4 py-1.5 text-ink-muted">
+          <DataSinceCell entries={group.dataSince} />
+        </td>
         <td className="px-4 py-1.5 text-right">
           <button
             type="button"
@@ -248,6 +277,39 @@ function InstrumentRow({ group, onChanged }: { group: InstrumentGroup; onChanged
         </tr>
       )}
     </>
+  );
+}
+
+/**
+ * Since when there is data — one date when that answer is one date.
+ *
+ * The resolutions are named only when they disagree. Labelling a single moment
+ * with all four of an instrument's intervals says nothing the row does not
+ * already say, and the column exists to be read at a glance.
+ */
+function DataSinceCell({ entries }: { entries: DataSince[] }) {
+  if (entries.length === 1) {
+    const [only] = entries;
+    return only.since === null ? (
+      <span>nothing yet</span>
+    ) : (
+      <span className="text-ink-secondary">{formatInstant(only.since)}</span>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {entries.map((entry) => (
+        <div key={entry.since ?? "none"} className="flex items-baseline gap-2">
+          <span className="shrink-0 text-xs">
+            {entry.resolutions.map((resolution) => RESOLUTION_ABBR[resolution]).join(" · ")}
+          </span>
+          <span className={entry.since === null ? "" : "text-ink-secondary"}>
+            {entry.since === null ? "nothing yet" : formatInstant(entry.since)}
+          </span>
+        </div>
+      ))}
+    </div>
   );
 }
 
