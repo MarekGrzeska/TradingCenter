@@ -134,6 +134,60 @@ describe("Autocomplete: keyboard", () => {
   });
 });
 
+// The debounce and the stale-answer guard used to live in `useInstrumentSearch` and had
+// their own tests; the logic moved into `useAsyncOptions` and these follow it, because a
+// picker that fires per keystroke or lets a slow earlier answer win is the same bug
+// wherever it lives (terminal-instruments spec, "Pisanie w polu wyszukiwania").
+describe("Autocomplete: typing", () => {
+  it("does not issue a request per keystroke", async () => {
+    const user = userEvent.setup();
+    const source = stringSource(["Alpha", "Beta"]);
+    renderPicker({ source });
+
+    await user.click(screen.getByRole("combobox"));
+    // The focus itself opens the list and starts one fetch for the empty query; what
+    // must not happen is one more per character.
+    await waitFor(() => expect(source).toHaveBeenCalled());
+    const afterOpening = source.mock.calls.length;
+
+    await user.type(screen.getByRole("combobox"), "alph");
+    await waitFor(() =>
+      expect(screen.getByRole("option", { name: "Alpha" })).toBeInTheDocument(),
+    );
+
+    // Four characters, one fetch for the query they settled into.
+    expect(source.mock.calls.length - afterOpening).toBe(1);
+    expect(source.mock.calls.at(-1)![0]).toBe("alph");
+  });
+
+  it("shows the result of the last query typed, even when an earlier answer lands later", async () => {
+    const pending: Array<(value: { options: string[] }) => void> = [];
+    const source = vi.fn(
+      () => new Promise<{ options: string[] }>((resolve) => pending.push(resolve)),
+    );
+    const user = userEvent.setup();
+    renderPicker({ source });
+
+    await user.click(screen.getByRole("combobox"));
+    await user.type(screen.getByRole("combobox"), "a");
+    await waitFor(() => expect(pending.length).toBeGreaterThanOrEqual(1));
+    const firstQuery = pending.length - 1;
+
+    await user.type(screen.getByRole("combobox"), "b");
+    await waitFor(() => expect(pending.length).toBeGreaterThan(firstQuery + 1));
+
+    // The newer query answers first, then the older one — the order a slow network
+    // produces and the one a naive implementation gets wrong.
+    pending.at(-1)!({ options: ["Newer"] });
+    await waitFor(() => expect(screen.getByRole("option", { name: "Newer" })).toBeInTheDocument());
+
+    pending[firstQuery]({ options: ["Older"] });
+
+    await waitFor(() => expect(screen.getByRole("option", { name: "Newer" })).toBeInTheDocument());
+    expect(screen.queryByRole("option", { name: "Older" })).not.toBeInTheDocument();
+  });
+});
+
 describe("Autocomplete: states", () => {
   it("says plainly that nothing matched, rather than an empty list", async () => {
     renderPicker({ source: stringSource([]) });
