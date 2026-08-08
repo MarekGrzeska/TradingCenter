@@ -83,6 +83,27 @@ describe("App routing (terminal-shell spec)", () => {
     expect(window.location.pathname).toBe("/instruments");
   });
 
+  // Both tabs this change introduced are addressable, so a reload on either comes back
+  // to it (terminal-data-manager and terminal-collection-history specs, "Odświeżenie
+  // strony").
+  it("comes back to Data History on a reload rather than the default tab", async () => {
+    window.history.pushState({}, "", "/data-history");
+    await renderApp();
+
+    expect(window.location.pathname).toBe("/data-history");
+    expect(screen.getByText("data history stub")).toBeInTheDocument();
+  });
+
+  // One tab speaks about instruments, not two: the provider-catalogue browser is gone
+  // as a view of its own (terminal-data-manager spec, "Zakładki mówiące o instrumentach").
+  it("offers exactly one instruments tab and no catalogue or archive tab beside it", async () => {
+    await renderApp();
+
+    expect(screen.getAllByRole("link", { name: "Instruments" })).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: "Archive" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Catalogue" })).not.toBeInTheDocument();
+  });
+
   // `Instruments` absorbed the old `Archive` tab rather than being renamed
   // from it, so a bookmark to the old address must not resolve to anything —
   // a silent redirect would be a second, hidden way to reach the same tab

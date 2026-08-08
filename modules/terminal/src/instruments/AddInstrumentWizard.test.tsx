@@ -229,6 +229,25 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
     ]);
   });
 
+  // The operator decides on cost from these numbers, so their being calendar-period
+  // overestimates is part of what the dialog has to say (market-data-jobs spec,
+  // "Szacunek jest opisany jako szacunek").
+  it("says the numbers are estimates and why the real count comes in lower", async () => {
+    const user = userEvent.setup();
+    fakeArchive.estimateAnswer = {
+      pairs: [pairEstimate("BTCUSD", "MINUTE")],
+      totalEstimatedCandles: 1000,
+      totalEstimatedBytes: 64000,
+    };
+    renderWizard();
+
+    await reachDialog(user);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/these are estimates/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/market closed for part of the range/i)).toBeInTheDocument();
+  });
+
   it("marks a clipped range and a pair already being collected", async () => {
     const user = userEvent.setup();
     fakeArchive.estimateAnswer = {

@@ -400,6 +400,14 @@ function EstimateTable({
         Total: {estimate.totalEstimatedCandles.toLocaleString()} candles,{" "}
         {formatBytes(estimate.totalEstimatedBytes)}
       </p>
+      {/* Said plainly, because the operator is deciding on cost from it: these are
+          calendar periods, so any market shut for part of the range yields fewer
+          candles than this. High rather than low is the safe direction to be wrong in
+          (design.md, "Wycena liczy kawałki, a nie osobną formułę"). */}
+      <p className="mt-1 text-xs text-ink-muted">
+        These are estimates. Candles are counted as calendar periods, so a market closed
+        for part of the range — weekends, holidays — will collect fewer than shown.
+      </p>
     </>
   );
 }

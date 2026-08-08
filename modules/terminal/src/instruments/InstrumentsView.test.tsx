@@ -153,6 +153,24 @@ describe("Instruments list — coverage on expand", () => {
     expect(screen.getAllByText(/end of the provider's history/i)).toHaveLength(2);
   });
 
+  // How fresh the data is, per interval — the question a row's collection state answers
+  // qualitatively and this answers exactly (terminal-data-manager spec, "Świeżość
+  // danych").
+  it("gives the newest collected candle for each interval", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [
+      pair({ resolution: "MINUTE", latestCandle: 1786113600 }), // 2026-08-07 14:40 UTC
+      pair({ resolution: "HOUR", latestCandle: null }),
+    ];
+    render(<InstrumentsView />);
+
+    await user.click(await screen.findByText("US100"));
+
+    expect(await screen.findByText(/newest: 2026-08-07 14:40 UTC/)).toBeInTheDocument();
+    // Nothing collected yet is a dash, never a zero or a fabricated instant.
+    expect(screen.getByText(/newest: —/)).toBeInTheDocument();
+  });
+
   it("names the gaps when coverage is more than one stretch", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [pair()];
