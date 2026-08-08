@@ -104,13 +104,39 @@ function Get-PortOwner {
     return "$($proc.ProcessName) (pid $($proc.Id))"
 }
 
+# Whether the container this repository starts is itself what holds a port.
+#
+# Ctrl+C leaves the database running on purpose, so on the second run of the day
+# its port is legitimately taken - by us. Reporting that as a collision made the
+# normal case fail, and there was nothing to "stop first": `docker compose up -d`
+# on a container that is already up is a no-op.
+#
+# Asked of the container by name rather than of the port, because the port says
+# too little: Docker publishes every container's ports through one proxy process,
+# so the owning process means some container does - not which one, and another
+# project's PostgreSQL on this port is still the collision worth refusing.
+function Test-OurDatabaseContainer {
+    param([int]$Port)
+    if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { return $false }
+    $format = '{{if .State.Running}}{{range $port, $bindings := .NetworkSettings.Ports}}{{range $bindings}}{{.HostPort}} {{end}}{{end}}{{end}}'
+    $published = docker inspect -f $format tradingcenter-db 2>$null
+    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($published)) { return $false }
+    return ($published -split '\s+') -contains "$Port"
+}
+
+$dbAlreadyRunning = $false
+
 $ports = @($gatewayPort, $archivePort, $DbPort)
 if (-not $NoTerminal) { $ports += $terminalPort }
 foreach ($port in $ports) {
     $owner = Get-PortOwner -Port $port
-    if ($null -ne $owner) {
-        $problems += "port $port is already in use by $owner - stop it first, or it is a leftover run"
+    if ($null -eq $owner) { continue }
+    if ($port -eq $DbPort -and (Test-OurDatabaseContainer -Port $DbPort)) {
+        # Ours, and already up. Reused rather than reported.
+        $dbAlreadyRunning = $true
+        continue
     }
+    $problems += "port $port is already in use by $owner - stop it first, or it is a leftover run"
 }
 
 # The quiet disaster this guards against: the container comes up on one port, the
@@ -179,9 +205,16 @@ try {
         Write-Host "Removing the existing database volume..." -ForegroundColor Cyan
         $env:DB_PORT = "$DbPort"
         docker compose -f $composeFile down -v 2>&1 | Out-Null
+        $dbAlreadyRunning = $false
     }
 
-    Write-Host "Starting PostgreSQL in a container..." -ForegroundColor Cyan
+    # Run either way: `up -d` on a running container is a no-op, and on one whose
+    # definition has changed since it started it is the thing that reconciles it.
+    if ($dbAlreadyRunning) {
+        Write-Host "Reusing the database container already running on 127.0.0.1:$DbPort..." -ForegroundColor Cyan
+    } else {
+        Write-Host "Starting PostgreSQL in a container..." -ForegroundColor Cyan
+    }
     $env:DB_PORT = "$DbPort"
     docker compose -f $composeFile up -d db
     if ($LASTEXITCODE -ne 0) {
@@ -228,7 +261,7 @@ try {
     $gatewayJob = Start-Job -Name "gateway" -ScriptBlock {
         param($dir, $port)
         Set-Location $dir
-        uv run uvicorn capital_gateway.app:app --port $port 2>&1
+        uv run uvicorn capital_gateway.app:app --reload --port $port 2>&1
     } -ArgumentList $gatewayDir, $gatewayPort
 
     if (-not (Wait-ForHttp -Url "$gatewayUrl/capabilities" -Label "capital-gateway" `
@@ -247,7 +280,7 @@ try {
     $archiveJob = Start-Job -Name "archive" -ScriptBlock {
         param($dir, $port)
         Set-Location $dir
-        uv run uvicorn market_data.app:app --port $port 2>&1
+        uv run uvicorn market_data.app:app --reload --port $port 2>&1
     } -ArgumentList $archiveDir, $archivePort
 
     if (-not (Wait-ForHttp -Url "$archiveUrl/health" -Label "market-data" `

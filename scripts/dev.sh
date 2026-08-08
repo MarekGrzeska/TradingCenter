@@ -106,6 +106,26 @@ port_in_use() {
   return 1
 }
 
+# Whether the container this repository starts is itself what holds a port.
+#
+# Ctrl+C leaves the database running on purpose, so on the second run of the day
+# its port is legitimately taken — by us. Reporting that as a collision made the
+# normal case fail, and there was nothing to "stop first": `docker compose up -d`
+# on a container that is already up is a no-op.
+#
+# Asked of the container by name rather than of the port, because the port says
+# too little: Docker publishes every container's ports through one proxy process,
+# so "com.docker.backend owns it" means some container does — not which one, and
+# another project's PostgreSQL on this port is still the collision worth refusing.
+db_container_publishes() {
+  command -v docker >/dev/null 2>&1 || return 1
+  local published
+  published="$(docker inspect -f \
+    '{{if .State.Running}}{{range $port, $bindings := .NetworkSettings.Ports}}{{range $bindings}}{{.HostPort}} {{end}}{{end}}{{end}}' \
+    tradingcenter-db 2>/dev/null || true)"
+  [[ " $published " == *" $1 "* ]]
+}
+
 # Best-effort, for the message only: often empty, and that is fine.
 port_owner() {
   local pid
@@ -114,16 +134,22 @@ port_owner() {
   printf ' by %s (pid %s)' "$(ps -p "$pid" -o comm= 2>/dev/null || echo process)" "$pid"
 }
 
+DB_ALREADY_RUNNING=0
+
 ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$DB_PORT")
 (( START_TERMINAL )) && ports+=("$TERMINAL_PORT")
 for port in "${ports[@]}"; do
-  if port_in_use "$port"; then
-    owner="$(port_owner "$port" || true)"
-    if [[ "$port" == "$DB_PORT" ]]; then
-      problems+=("port $DB_PORT is already in use${owner} — it is meant for this repository's database container. Set DB_PORT to something free (and match it in modules/market-data/.env).")
-    else
-      problems+=("port $port is already in use${owner} — stop it, or it is a leftover run")
-    fi
+  port_in_use "$port" || continue
+  if [[ "$port" == "$DB_PORT" ]] && db_container_publishes "$DB_PORT"; then
+    # Ours, and already up. Reused rather than reported.
+    DB_ALREADY_RUNNING=1
+    continue
+  fi
+  owner="$(port_owner "$port" || true)"
+  if [[ "$port" == "$DB_PORT" ]]; then
+    problems+=("port $DB_PORT is already in use${owner}, and not by this repository's database container — it is the port that container needs. Set DB_PORT to something free (and match it in modules/market-data/.env).")
+  else
+    problems+=("port $port is already in use${owner} — stop it, or it is a leftover run")
   fi
 done
 
@@ -206,9 +232,16 @@ wait_for_http() {
 if (( FRESH )); then
   say "Removing the existing database volume..."
   docker compose -f "$REPO_ROOT/compose.yaml" down -v >/dev/null 2>&1 || true
+  DB_ALREADY_RUNNING=0
 fi
 
-say "Starting PostgreSQL in a container..."
+# Run either way: `up -d` on a running container is a no-op, and on one whose
+# definition has changed since it started it is the thing that reconciles it.
+if (( DB_ALREADY_RUNNING )); then
+  say "Reusing the database container already running on 127.0.0.1:$DB_PORT..."
+else
+  say "Starting PostgreSQL in a container..."
+fi
 if ! DB_PORT="$DB_PORT" docker compose -f "$REPO_ROOT/compose.yaml" up -d db; then
   fail "docker compose could not start the database."
   note "The reason is the line above. The two usual ones: the Docker daemon is not"
@@ -243,7 +276,7 @@ ok "Schema is up to date."
 # --- capital-gateway ----------------------------------------------------------
 
 say "Starting capital-gateway on port $GATEWAY_PORT..."
-run_service "gateway " "$BLUE" "$GATEWAY_DIR" uv run uvicorn capital_gateway.app:app --port "$GATEWAY_PORT"
+run_service "gateway " "$BLUE" "$GATEWAY_DIR" uv run uvicorn capital_gateway.app:app --reload --port "$GATEWAY_PORT"
 wait_for_http "$GATEWAY_URL/capabilities" "capital-gateway" || exit 1
 ok "capital-gateway is answering."
 
@@ -253,7 +286,7 @@ ok "capital-gateway is answering."
 # terminal, because the terminal's charts read it.
 
 say "Starting market-data on port $ARCHIVE_PORT..."
-run_service "archive " "$MAGENTA" "$ARCHIVE_DIR" uv run uvicorn market_data.app:app --port "$ARCHIVE_PORT"
+run_service "archive " "$MAGENTA" "$ARCHIVE_DIR" uv run uvicorn market_data.app:app --reload --port "$ARCHIVE_PORT"
 wait_for_http "$ARCHIVE_URL/health" "market-data" || exit 1
 ok "market-data is answering."
 
