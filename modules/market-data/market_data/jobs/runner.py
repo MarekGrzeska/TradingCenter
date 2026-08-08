@@ -17,11 +17,11 @@ from ..coverage import record_coverage
 from ..errors import GatewayError
 from ..gateway import GatewayHistory
 from ..models import Resolution
+from ..periods import periods_between
 from ..rollups import refresh_all
 from ..store import write_candles
 from ..tracking import is_tracked
 from .models import Chunk
-from .plan import periods_between
 from .store import (
     claim_pending_chunk,
     finish_chunk_done,

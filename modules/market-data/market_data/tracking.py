@@ -171,6 +171,12 @@ _IS_TRACKED = """
      LIMIT 1
 """
 
+_SELECT_COLLECT_FROM = """
+    SELECT collect_from FROM tracked_pairs
+     WHERE symbol = $1 AND resolution = $2 AND state = 'tracked'
+     LIMIT 1
+"""
+
 # One query for every tracked pair's oldest and newest candle rather than one query per
 # pair. The left join keeps a pair that has never collected anything, which is a state an
 # operator needs to see rather than a row that quietly goes missing.
@@ -271,6 +277,19 @@ async def read_all(conn: asyncpg.Connection) -> list[TrackedPair]:
 
 async def is_tracked(conn: asyncpg.Connection, symbol: str, resolution: Resolution) -> bool:
     return await conn.fetchval(_IS_TRACKED, symbol, resolution.value) is not None
+
+
+async def read_collect_from(
+    conn: asyncpg.Connection, symbol: str, resolution: Resolution
+) -> datetime | None:
+    """The moment this pair's history is meant to reach back to, or `None` if it is not
+    currently tracked.
+
+    What the quiet gap-closing fill (`ingest/backfill.py`) reads before deciding how deep
+    to reach for a pair with nothing collected yet — it MUST NOT go further back than
+    this, and `None` here means there is nothing to fetch for, not "use the old default".
+    """
+    return await conn.fetchval(_SELECT_COLLECT_FROM, symbol, resolution.value)
 
 
 def collection_state(

@@ -14,6 +14,7 @@ module reads a gateway timestamp; both forms arrive here and leave as one instan
 
 from __future__ import annotations
 
+import math
 from datetime import UTC, datetime, timedelta
 
 from .models import Resolution
@@ -37,6 +38,19 @@ PERIOD_SECONDS: dict[Resolution, int] = {
 
 def period_length(resolution: Resolution) -> timedelta:
     return timedelta(seconds=PERIOD_SECONDS[resolution])
+
+
+def periods_between(resolution: Resolution, start: datetime, end: datetime) -> int:
+    """How many candles of this resolution fit in `[start, end)`, rounded up.
+
+    Calendar periods, not a session calendar — a market shut for part of the window
+    yields fewer candles than this, never more, so the count this produces is a safe
+    overestimate rather than a guess that could come in short.
+    """
+    if end <= start:
+        return 0
+    seconds = (end - start).total_seconds()
+    return math.ceil(seconds / period_length(resolution).total_seconds())
 
 
 def from_iso(ts: str) -> datetime:

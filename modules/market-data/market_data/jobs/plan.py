@@ -10,7 +10,6 @@ guess computed a different way.
 
 from __future__ import annotations
 
-import math
 from datetime import datetime
 
 import asyncpg
@@ -19,25 +18,12 @@ from pydantic import BaseModel
 from ..coverage import earliest_reachable, uncovered_within
 from ..ingest.backfill import MAX_BARS_PER_FILL
 from ..models import Resolution
-from ..periods import period_length
+from ..periods import period_length, periods_between
 from .models import ChunkPlan
 
 
 class FutureRequest(Exception):
     """A moment later than now was asked for. There is no history there to reach for."""
-
-
-def periods_between(resolution: Resolution, start: datetime, end: datetime) -> int:
-    """How many candles of this resolution fit in `[start, end)`, rounded up.
-
-    Calendar periods, not a session calendar — a market shut for part of the window
-    yields fewer candles than this, never more, so the count this produces is a safe
-    overestimate rather than a guess that could come in short.
-    """
-    if end <= start:
-        return 0
-    seconds = (end - start).total_seconds()
-    return math.ceil(seconds / period_length(resolution).total_seconds())
 
 
 def split_into_windows(

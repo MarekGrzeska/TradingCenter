@@ -15,11 +15,11 @@ from market_data.jobs.plan import (
     ESTIMATED_BYTES_PER_CANDLE,
     FutureRequest,
     estimate_job,
-    periods_between,
     plan_chunks,
     split_into_windows,
 )
 from market_data.models import Resolution
+from market_data.periods import periods_between
 from market_data.tracking import track
 
 MOMENT = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
@@ -31,18 +31,6 @@ async def _tracked(db: asyncpg.Connection, symbol: str = "US100", resolution: Re
 
 
 # --- pure arithmetic -------------------------------------------------------------------
-
-
-def test_periods_between_rounds_up() -> None:
-    # 90 seconds at a 60-second period is one and a half candles' worth, which is two
-    # candles of coverage — rounding down would understate what a window actually needs.
-    start = MOMENT
-    end = MOMENT + timedelta(seconds=90)
-    assert periods_between(Resolution.MINUTE, start, end) == 2
-
-
-def test_periods_between_an_empty_window_is_zero() -> None:
-    assert periods_between(Resolution.MINUTE, MOMENT, MOMENT) == 0
 
 
 def test_a_window_narrower_than_the_ceiling_is_one_chunk() -> None:

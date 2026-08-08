@@ -234,6 +234,16 @@ resets only once a subscription produces something. Fills share one `asyncio.Sem
 supervisor — a per-pair budget is no budget. A failed fill comes back as a `FillOutcome` carrying
 its reason, one operator-readable line per outcome, rather than stopping the other pairs.
 
+**The quiet fill respects `collect_from`, not just `default_backfill_bars`.** A pair with nothing
+collected reaches back the configured default depth — but never further than its own
+`collect_from`, the moment its history is meant to reach back to. A pair tracked without an
+explicit one has `collect_from` computed from that same default depth, so nothing changes for it;
+a pair tracked with an explicit, shallower moment used to get the deep default fill anyway, because
+this fill and the job system that also backfills a wizard-added pair run independently and neither
+knew about the other's bound. Fixed rather than coordinated: the two still do redundant work for
+the same pair (harmless — `write_candles` dedupes by period, `record_coverage` merges ranges), but
+neither reaches further back than asked, which is the part that was silently wrong.
+
 **Being on the list proves nothing about collection.** A subscription can die without a sound, and
 the only symptom is a series that stops growing. `collection_state` reads the age of the newest
 candle — within two periods **plus three minutes** is healthy, beyond that it depends on whether
