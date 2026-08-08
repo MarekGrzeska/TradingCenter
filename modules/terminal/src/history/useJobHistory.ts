@@ -3,8 +3,14 @@ import type { ArchiveAdmin } from "../data/source";
 import type { JobPairView } from "../data/types";
 
 /** How often the tab re-asks, while it is open (`terminal-collection-history`
- *  spec, "Zakładka odświeża się sama"). */
-const POLL_MS = 30_000;
+ *  spec, "Zakładka odświeża się sama").
+ *
+ *  Ten seconds, not the thirty this started at. The read costs one query to the
+ *  archive's own database — never the gateway, so it cannot eat into the
+ *  provider budget the chunks themselves are queued behind — and a `MINUTE`
+ *  chunk settles every few tens of seconds, so thirty was slow enough to make a
+ *  working job look stalled. */
+const POLL_MS = 10_000;
 
 export type JobHistoryStatus = "loading" | "ready" | "unreachable";
 

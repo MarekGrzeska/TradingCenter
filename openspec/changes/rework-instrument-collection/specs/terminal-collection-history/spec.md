@@ -59,13 +59,15 @@ paska, który rusza się sam z upływem czasu.
 
 ### Requirement: Zakładka odświeża się sama
 
-Zakładka MUST odpytywać o stan dociągania co trzydzieści sekund, dopóki jest otwarta, żeby operator
-nie odświeżał strony ręcznie. Odpytywanie MUST ustawać, gdy operator opuszcza zakładkę.
+Zakładka MUST odpytywać o stan dociągania co dziesięć sekund, dopóki jest otwarta, żeby operator
+nie odświeżał strony ręcznie. Odpytywanie MUST ustawać, gdy operator opuszcza zakładkę. Odczyt
+MUST iść do bazy archiwum, nigdy do gatewaya, żeby częstsze odpytywanie nie uszczuplało budżetu
+żądań do providera, za którym stoją same kawałki.
 
 #### Scenario: Operator patrzy na trwające zlecenie
 
 - **WHEN** zakładka jest otwarta, a zlecenie trwa
-- **THEN** pokazany stan odświeża się co trzydzieści sekund bez działania operatora
+- **THEN** pokazany stan odświeża się co dziesięć sekund bez działania operatora
 
 #### Scenario: Nieudane odświeżenie
 

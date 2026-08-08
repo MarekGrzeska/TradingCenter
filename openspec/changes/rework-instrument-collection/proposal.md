@@ -39,7 +39,7 @@ pary.
   każdym starcie modułu.
 - Nowa zakładka terminala **Data History**: per instrument i per interwał — co i kiedy się
   dociągnęło, ile świec, jaki zakres, oraz stan. W toku pokazuje procent, po sukcesie zieloną
-  informację o zakończeniu, po porażce przyczynę i przycisk ponowienia. Odpytuje co 30 s.
+  informację o zakończeniu, po porażce przyczynę i przycisk ponowienia. Odpytuje co 10 s.
 - **BREAKING** Na wykres trafiają wyłącznie instrumenty archiwizowane. Pole symbolu w slocie siatki
   przestaje być polem tekstowym i staje się autocomplete, którego jedynym źródłem jest lista
   archiwizowanych par.

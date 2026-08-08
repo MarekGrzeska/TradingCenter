@@ -184,8 +184,10 @@ kosztująca dziesiątki minut dociągania podjęta na niepełnych danych.
   liczbę kawałków, więc koszt jest widoczny **przed** decyzją, a nie po niej.
 - **Postęp dla `DAY`/`WEEK` skacze 0 → 100** → uczciwe, ale wygląda jak zawieszenie. Zakładka
   pokazuje obok procentu parę właśnie obsługiwaną, więc widać, że coś się dzieje.
-- **Odpytywanie co 30 s przy wielu zleceniach** → odczyt idzie do własnej bazy, nie do gatewaya, i
-  jest jednym zapytaniem na całą zakładkę. Odpytywanie ustaje przy opuszczeniu zakładki.
+- **Odpytywanie co 10 s przy wielu zleceniach** → odczyt idzie do własnej bazy, nie do gatewaya, i
+  jest jednym zapytaniem na całą zakładkę, więc nie dotyka budżetu żądań do providera. Odpytywanie
+  ustaje przy opuszczeniu zakładki. Zaczęło się od 30 s i zostało skrócone: kawałek `MINUTE` osiada
+  co kilkadziesiąt sekund, więc przy 30 s pracujące zlecenie wyglądało na stojące.
 - **Szacunek zawyżony dla rynków z weekendem** → opisany jako szacunek; po zakończeniu Data History
   pokazuje liczbę faktyczną, więc rozjazd jest widoczny i wyjaśniony, a nie zaskakujący.
 - **`SymbolField` przestaje przyjmować symbol z ręki** → operator znający symbol traci najszybszą

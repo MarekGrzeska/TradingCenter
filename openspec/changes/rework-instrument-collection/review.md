@@ -51,7 +51,7 @@ napisaniem tego dokumentu.
 | Low | `terminal/src/instruments/AddInstrumentWizard.tsx:399` | design.md, „Wycena liczy kawałki, a nie osobną formułę", rozstrzygnął, że dialog powie wprost, iż liczby są szacunkiem zawyżonym o okresy zamkniętego rynku. Nie mówił tego. | FIXED w `975db5c` |
 
 Rozważone i **nie** zgłoszone jako defekt: `list_jobs` czyta każde zlecenie osobnym `read_job`
-(N+1 zapytań). Przy odpytywaniu co 30 s i limicie `MAX_TRACKED_PAIRS` to zapytania do własnej
+(N+1 zapytań). Przy odpytywaniu co 10 s i limicie `MAX_TRACKED_PAIRS` to zapytania do własnej
 bazy w liczbie rzędu dziesiątek — realne, ale nie na tyle, by przerabiać to zanim zaboli.
 
 ## Spec coverage
@@ -230,9 +230,9 @@ bazy w liczbie rzędu dziesiątek — realne, ale nie na tyle, by przerabiać to
 | · Zlecenie w toku | `CollectionHistoryView.test.tsx::shows a measured share of chunks done and candles written so far for a running job` |
 | · Postęp stoi | `CollectionHistoryView.test.tsx::shows a measured share of chunks done…` (udział liczony z kawałków osiadłych) — **luka częściowa, patrz Gaps** |
 | Zakładka odświeża się sama | — |
-| · Operator patrzy na trwające zlecenie | `CollectionHistoryView.test.tsx::refreshes on its own every 30 seconds, and stops once the tab is left` |
+| · Operator patrzy na trwające zlecenie | `CollectionHistoryView.test.tsx::refreshes on its own every 10 seconds, and stops once the tab is left` |
 | · Nieudane odświeżenie | `CollectionHistoryView.test.tsx::keeps the rows on screen when a refresh fails, and says the refresh failed` |
-| · Operator przechodzi na inną zakładkę | `CollectionHistoryView.test.tsx::refreshes on its own every 30 seconds, and stops once the tab is left` |
+| · Operator przechodzi na inną zakładkę | `CollectionHistoryView.test.tsx::refreshes on its own every 10 seconds, and stops once the tab is left` |
 | Zakończone dociąganie jest wyraźnie zakończone | — |
 | · Wszystko się udało | `CollectionHistoryView.test.tsx::marks a full success distinctly, with candles and the covered range` |
 | · Pokrycie częściowe | `CollectionHistoryView.test.tsx::marks partial coverage as its own state, and lists the failure reasons` |

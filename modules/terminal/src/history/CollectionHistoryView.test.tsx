@@ -244,7 +244,7 @@ describe("CollectionHistoryView — empty vs unreachable", () => {
 });
 
 describe("CollectionHistoryView — polling", () => {
-  it("refreshes on its own every 30 seconds, and stops once the tab is left", async () => {
+  it("refreshes on its own every 10 seconds, and stops once the tab is left", async () => {
     vi.useFakeTimers();
     fakeArchive.rows = [row({ status: "running", chunksDone: 1, chunksTotal: 4 })];
     const { unmount } = renderView();
@@ -253,11 +253,20 @@ describe("CollectionHistoryView — polling", () => {
       await vi.advanceTimersByTimeAsync(0);
     });
     expect(screen.getByText(/25% \(1\/4 chunks\)/)).toBeInTheDocument();
+    const afterFirstRead = fakeArchive.listCalls;
 
+    // Pinned from both sides, so this still constrains the interval if it changes:
+    // a longer one would not have fired by 10s, a shorter one would have fired before it.
     fakeArchive.rows = [row({ status: "running", chunksDone: 2, chunksTotal: 4 })];
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(9_900);
     });
+    expect(fakeArchive.listCalls).toBe(afterFirstRead);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    expect(fakeArchive.listCalls).toBe(afterFirstRead + 1);
     expect(screen.getByText(/50% \(2\/4 chunks\)/)).toBeInTheDocument();
 
     const callsBeforeUnmount = fakeArchive.listCalls;
@@ -280,7 +289,7 @@ describe("CollectionHistoryView — polling", () => {
 
     fakeArchive.listFailure = new Error("network blip");
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(30_000);
+      await vi.advanceTimersByTimeAsync(10_000);
     });
 
     expect(screen.getByTestId("history-1-US100-MINUTE")).toBeInTheDocument();
