@@ -91,6 +91,7 @@
 - [x] 10.7 Zdejmowanie pary z potwierdzeniem i informacją, że dane zostają
 - [x] 10.8 Odróżnienie pustej listy od nieosiągalnego archiwum
 - [x] 10.9 Test: dodanie i zdjęcie pary odzwierciedla się na liście
+- [x] 10.10 Środowisko lokalne: `compose.yaml` z bazą w kontenerze, usługi na hoście, `scripts/dev.sh` dla macOS i Linuksa obok istniejącego `dev.ps1`
 
 ## 11. Domknięcie
 
