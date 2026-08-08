@@ -164,8 +164,10 @@ def pool(request: Request):
     return request.app.state.pool
 
 
-def hub(request: Request) -> Hub:
-    return request.app.state.hub
+def hub(websocket: WebSocket) -> Hub:
+    # A WebSocket connection is not a Request: asking for one here leaves FastAPI with
+    # nothing to pass, and the handshake fails before it is ever accepted.
+    return websocket.app.state.hub
 
 
 @app.get("/", tags=["meta"])
