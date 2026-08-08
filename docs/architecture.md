@@ -6,21 +6,38 @@ One repository, many modules, no shared runtime. A module is a directory under `
 that runs on its own and publishes a contract. Nothing imports across that boundary.
 
 ```
-                    ┌──────────────────────────────┐
-   capital.com ────▶│  capital-gateway             │
-   (REST + WS)      │  trade · history · stream    │
-                    └──────────────┬───────────────┘
-                                   │ HTTP + WebSocket
-                    ┌──────────────┴───────────────┐
-                    │                              │
-                 terminal                  agents / backtests
-           charts · grid · search
+                  capital.com
+                  (REST + WS)
+                       │
+                       ▼
+        ┌──────────────────────────────┐
+        │  capital-gateway             │──────────┐
+        │  trade · history · stream    │          │
+        └──────────────┬───────────────┘          │
+                       │ HTTP + WebSocket         │ instruments
+                       ▼                          │
+        ┌──────────────────────────────┐          │
+        │  market-data                 │          │
+        │  archive · coverage · rollups│          │
+        └──────┬───────────────┬───────┘          │
+               │               │                  │
+               ▼               ▼                  │
+      agents / backtests    terminal ◀────────────┘
+                       charts · grid · search
+                          archive panel
 ```
 
 `terminal` is a consumer, not a peer: it publishes no contract of its own and nothing
-depends on it. It reads market data through one interface with a single implementation —
-the gateway — so a candle store, when there is one, arrives as a second implementation
-rather than a rewrite of the charts.
+depends on it. It reads market data through one interface, and that interface now has two
+implementations behind it — candles and the live stream from `market-data`, the instrument
+catalogue from `capital-gateway`, composed into a single instance the views never see
+through. The charts were not rewritten when the archive arrived, which is the whole point
+of having had the interface first.
+
+`market-data` sits between the two on purpose. capital.com counts its rate limit against the
+account rather than the process, so a second client anywhere spends the same allowance twice:
+the gateway owns the only door to the provider, and the archive refuses to start if its
+upstream URLs point anywhere else.
 
 ## Why no shared library
 
@@ -60,9 +77,14 @@ stays deliberate.
 ## Ownership of data
 
 A module owns its storage. `capital-gateway` deliberately owns none: it is a window onto a
-provider, not an archive. When an archive is wanted it belongs to a module whose job that
-is — giving one candle two origins, with only one of them reachable, is worse than not
-storing it at all.
+provider, not an archive. The archive is `market-data`, a module whose job that is — giving
+one candle two origins, with only one of them reachable, is worse than not storing it at all.
+
+It is also the first module here with state that cannot be recreated by restarting it, and
+that changes what a module directory contains: `migrations/` alongside the code, the schema
+written as the statements a deployment runs. Rebuilding three years of minute candles for a
+hundred instruments costs roughly 27 hours of provider calls, which is what turns backups
+from a good habit into a requirement.
 
 ## Relationship to TradingHub
 

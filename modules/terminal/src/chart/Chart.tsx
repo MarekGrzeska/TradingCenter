@@ -353,8 +353,21 @@ function FeedOverlay({
   return null;
 }
 
+/**
+ * Everything the chart has to say when it cannot draw: loading, empty, refused.
+ *
+ * `z-10` is load-bearing. Lightweight-charts mounts its canvases at `z-index`
+ * 1 and 2, and their container is `position: relative` without a `z-index`, so
+ * it opens no stacking context of its own and those canvases compete directly
+ * with this overlay. At the default level the veil loses to them and every one
+ * of these messages renders into the DOM, passes its test, and is painted over
+ * by an empty canvas — which is how it was found: in a browser, staring at four
+ * black panels whose text was there the whole time.
+ */
 function Veil({ children }: { children: React.ReactNode }) {
   return (
-    <div className="absolute inset-0 flex items-center justify-center bg-panel/80">{children}</div>
+    <div className="absolute inset-0 z-10 flex items-center justify-center bg-panel/80">
+      {children}
+    </div>
   );
 }

@@ -21,6 +21,20 @@ export type UrlFor = (symbol: string, resolution: Resolution) => string;
  *  an unrecognised frame is ignored rather than fatal. */
 export type Translate = (raw: string) => StreamEvent[];
 
+/**
+ * Why a connection that failed will keep failing — or `null` if the failure
+ * looks transient and retrying is the right answer.
+ *
+ * A browser cannot read the status of a rejected WebSocket handshake: a source
+ * that refuses with `403` before accepting is, to `WebSocket`, indistinguishable
+ * from a source that is down. Retrying forever is right for one and wrong for
+ * the other, and the difference matters to whoever is looking at the chart —
+ * "the archive is down" and "nobody chose to collect this pair" ask different
+ * things of them. Whoever supplies the socket also supplies the second question
+ * to ask when the first one gets no answer.
+ */
+export type Diagnose = (symbol: string, resolution: Resolution) => Promise<string | null>;
+
 type Sink = (event: StreamEvent) => void;
 
 interface HubEntry {
@@ -33,6 +47,10 @@ interface HubEntry {
   reconnectTimer: ReturnType<typeof setTimeout> | null;
   everConnected: boolean;
   torndown: boolean;
+  /** Asked once per run of failures, not once per attempt: the answer cannot
+   *  change between two retries seconds apart, and asking every time would put
+   *  a request on the source for every socket it is already refusing. */
+  diagnosed: boolean;
 }
 
 // min(30s, 2^attempt * 500ms), with ±20% jitter so many slots reconnecting at
@@ -68,17 +86,20 @@ export class SocketHub {
   private readonly translate: Translate;
   private readonly createSocket: SocketFactory;
   private readonly random: () => number;
+  private readonly diagnose: Diagnose | null;
 
   constructor(
     urlFor: UrlFor,
     translate: Translate,
     createSocket: SocketFactory = (url) => new WebSocket(url) as unknown as SocketLike,
     random: () => number = Math.random,
+    diagnose: Diagnose | null = null,
   ) {
     this.urlFor = urlFor;
     this.translate = translate;
     this.createSocket = createSocket;
     this.random = random;
+    this.diagnose = diagnose;
   }
 
   subscribe(symbol: string, resolution: Resolution, sink: Sink): () => void {
@@ -95,6 +116,7 @@ export class SocketHub {
         reconnectTimer: null,
         everConnected: false,
         torndown: false,
+        diagnosed: false,
       };
       this.entries.set(key, entry);
       this.connect(key, entry);
@@ -128,6 +150,7 @@ export class SocketHub {
     socket.onopen = () => {
       entry.everConnected = true;
       entry.reconnectAttempt = 0;
+      entry.diagnosed = false;
       entry.state = "connected";
       this.broadcast(entry, { kind: "status", state: "connected" });
       // Nothing else to do on a reconnect: the snapshot is on its way.
@@ -146,18 +169,50 @@ export class SocketHub {
     socket.onclose = (event) => {
       if (entry.torndown) return;
       if (event.code === REFUSAL_CLOSE_CODE) {
-        entry.state = "closed";
-        this.broadcast(entry, {
-          kind: "error",
-          message: event.reason || "subscription refused",
-        });
-        this.broadcast(entry, { kind: "status", state: "closed" });
+        this.refuse(entry, event.reason || "subscription refused");
         return;
       }
       entry.state = "reconnecting";
       this.broadcast(entry, { kind: "status", state: "reconnecting" });
+
+      // A close with no code to read may still be a refusal — a handshake the
+      // source rejected outright looks exactly like a source that is down. Ask
+      // before settling into a retry loop that cannot succeed.
+      if (this.diagnose && !entry.diagnosed) {
+        entry.diagnosed = true;
+        void this.askWhy(key, entry);
+        return;
+      }
       this.scheduleReconnect(key, entry);
     };
+  }
+
+  /** Runs the second question, then either stops or resumes retrying.
+   *
+   *  A diagnosis that itself fails resolves nothing and must not be treated as
+   *  "no reason found" — the source not answering is the case retrying exists
+   *  for. Either way the entry may have been torn down while the answer was in
+   *  flight, so both paths check before touching it. */
+  private async askWhy(key: string, entry: HubEntry): Promise<void> {
+    let reason: string | null = null;
+    try {
+      reason = await this.diagnose!(entry.symbol, entry.resolution);
+    } catch {
+      reason = null;
+    }
+    if (entry.torndown || !this.entries.has(key)) return;
+    if (reason !== null) {
+      this.refuse(entry, reason);
+      return;
+    }
+    this.scheduleReconnect(key, entry);
+  }
+
+  /** A failure that retrying cannot fix: say why, and stop. */
+  private refuse(entry: HubEntry, message: string): void {
+    entry.state = "closed";
+    this.broadcast(entry, { kind: "error", message });
+    this.broadcast(entry, { kind: "status", state: "closed" });
   }
 
   private scheduleReconnect(key: string, entry: HubEntry): void {

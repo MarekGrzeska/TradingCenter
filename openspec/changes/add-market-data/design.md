@@ -83,8 +83,22 @@ poprawnie i jest błędna — to samo rozstrzygnięcie, które podjął już `fo
 
 **Zweryfikowane, nie założone:** provider kotwiczy `HOUR_4` na północy UTC. Świece pobrane
 z gatewaya zaczynają się o 00, 04, 08, 12, 16 i 20 UTC, a `HOUR_4` wyliczone z serii minutowej
-zgadza się z nimi co do wartości. Sprawdzone na `BTCUSD` (rynek ciągły) i `US100` (rynek sesyjny),
-sierpień 2026 — `modules/market-data/tests/test_live.py`, za flagą `--run-live`.
+zgadza się z nimi co do wartości. Sprawdzone na `BTCUSD` i `US100` — dwóch instrumentach o możliwie
+różnych sesjach, bo gdyby kotwicą było otwarcie giełdy, a nie zegar, te dwa musiałyby się rozjechać.
+
+Kalendarze obu **zmierzone, nie przyjęte** — i za pierwszym razem przyjęte źle. Sobota 2026-08-08,
+15:11 UTC: `BTCUSD` i `ETHUSD` zgłaszają `marketStatus: TRADEABLE` i mają świecę minutową z trwającej
+właśnie minuty, a `US100`, `GOLD` i `EURUSD` są `CLOSED`, bez niczego od piątku 21:00 UTC. Czyli
+indeksy, forex i towary chodzą tu 23/5, a krypto handluje się również w weekend. Wspólna jest tylko
+dobowa przerwa około 21:00 UTC — stąd niepełny okres `HOUR_4` zaczynający się o 20:00.
+
+Uwaga na przyszłość, bo kosztowała jedno błędne rozpoznanie: tego samego ranka `BTCUSD` nie oddawał
+nic między 04:59 a co najmniej 06:04 UTC, razem z kwotowaniem. To była **awaria providera na
+instrumencie, który przez cały czas był `TRADEABLE`**, wzięta wtedy za weekend. Zatrzymana seria
+nie dowodzi zamkniętego rynku; dowodzi go `marketStatus`.
+
+Sierpień 2026 — `modules/market-data/tests/test_live.py`, za flagą `--run-live`. Część indeksowa
+wymaga dnia handlowego, krypto nie.
 
 Przy okazji wyszło coś, czego nikt nie zakładał: provider przerywa notowania na kilka minut około
 21:00 UTC, codziennie i dla obu instrumentów. Okres `HOUR_4` zaczynający się o 20:00 nigdy nie ma

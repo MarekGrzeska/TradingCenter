@@ -115,6 +115,22 @@ describe("Chart — feed states (terminal-chart spec)", () => {
     expect(source.subscribeCalls).toHaveLength(2);
   });
 
+  // jsdom computes no paint order, so this cannot assert what is on top — it
+  // asserts the one property that decides it. Found in a browser: the chart
+  // library mounts canvases at z-index 1 and 2 inside a container that opens no
+  // stacking context, so at the default level every message below rendered,
+  // passed its test, and was painted over by an empty canvas.
+  it("puts what it has to say above the chart library's canvases", async () => {
+    const { container } = renderChart(source);
+    await act(async () => {
+      source.refuse("US100 MINUTE_5 is not being archived");
+    });
+
+    const veil = container.querySelector(".absolute.inset-0.z-10");
+    expect(veil).not.toBeNull();
+    expect(veil).toHaveTextContent(/could not load us100/i);
+  });
+
   it("never asks for a history of its own — the subscription brings it", async () => {
     // The seam this change removed. A separate history read is exactly what
     // used to leave a window in which a closing candle could go missing.

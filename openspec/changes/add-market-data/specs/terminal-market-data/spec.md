@@ -38,6 +38,26 @@ Strumień MUST być wznawiany po zerwaniu, z odstępem rosnącym między próbam
 przerwy MUST zostać domknięta, ale terminal MUST NOT dociągać jej sam — subskrypcja rozpoczyna się
 snapshotem, więc ponowne połączenie przynosi brakujące świece razem ze stanem bieżącym.
 
+Odmowa, której ponawianie nie naprawi, MUST być odróżniona od zerwania i MUST NOT być ponawiana
+bez końca. Archiwum odmawia subskrypcji pary nieśledzonej **przed** handshake'em, a przeglądarka
+nie udostępnia statusu odrzuconego handshake'u — nieudane połączenie wygląda więc tak samo jak
+niedostępne archiwum. Terminal MUST rozstrzygnąć, które z dwojga zaszło, zanim osiądzie w pętli
+ponawiania, i MUST pokazać powód odmowy zamiast stanu wznawiania. Rozstrzygnięcie MUST kosztować
+najwyżej jedno pytanie na serię niepowodzeń, a jego własna porażka MUST być czytana jako „ponawiaj
+dalej", bo źródło, które nie odpowiada, jest właśnie tym przypadkiem, dla którego ponawianie
+istnieje.
+
+#### Scenario: Wykres pary, której nikt nie archiwizuje
+
+- **WHEN** widok subskrybuje parę, która nie jest śledzona, a archiwum odmawia połączenia
+- **THEN** wykres mówi, że ta para nie jest archiwizowana, i wskazuje, gdzie to zmienić
+- **AND** terminal przestaje ponawiać, zamiast pokazywać wznawianie bez końca
+
+#### Scenario: Archiwum nie odpowiada również na pytanie o powód
+
+- **WHEN** połączenie nie dochodzi do skutku, a rozstrzygnięcie powodu też się nie udaje
+- **THEN** terminal ponawia dalej z rosnącym odstępem, bo to jest przypadek zerwania
+
 #### Scenario: Połączenie pada
 
 - **WHEN** strumień się zrywa

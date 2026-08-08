@@ -95,8 +95,138 @@
 
 ## 11. Domknięcie
 
-- [ ] 11.1 `README.md` modułu: co, jak uruchomić, jak testować, kontrakt — na jeden ekran
-- [ ] 11.2 `docs/architecture.md` i `README.md` repozytorium: moduł w tabeli i na rysunku
-- [ ] 11.3 Uruchom pełną suitę obu modułów i terminala, zanotuj polecenie i wynik
-- [ ] 11.4 Przejdź ręcznie ścieżkę: dodaj parę w panelu, poczekaj na świece, otwórz wykres, zrestartuj moduł, sprawdź domknięcie luki
-- [ ] 11.5 Napisz `review.md` — dwa przejścia wymagane przez schemat, przed archiwizacją zmiany
+- [x] 11.1 `README.md` modułu: co, jak uruchomić, jak testować, kontrakt — na jeden ekran.
+      Ścięty z 373 do 195 linii, w układzie `capital-gateway` i `terminal`: what / run / test /
+      contract, a na końcu jedna sekcja z regułami i tym, co zostało zmierzone. Rozumowanie,
+      które powtarzało `design.md` (wybór bazy, odrzucenie widoku materializowanego), wypadło —
+      README opisuje kontrakt, nie decyzje.
+- [x] 11.2 `docs/architecture.md` i `README.md` repozytorium: moduł w tabeli i na rysunku.
+      Rysunek dostał `market-data` między gatewayem a terminalem, z osobnym kanałem instrumentów
+      omijającym archiwum — bo to jedyna rzecz, po którą terminal nadal chodzi do gatewaya.
+      Sekcja „Ownership of data" nazywa archiwum po imieniu i odnotowuje `migrations/` jako to,
+      co dochodzi do anatomii modułu ze stanem trwałym.
+- [x] 11.3 Uruchom pełną suitę obu modułów i terminala, zanotuj polecenie i wynik. Wszystko
+      czysto, na `docs/market-data-closeout`:
+
+      | Gdzie | Komenda | Wynik |
+      |---|---|---|
+      | capital-gateway | `uv run pytest -q` | 121 passed, 8 skipped, 2,1 s |
+      | capital-gateway | `uv run ruff check . && uv run ruff format --check .` | czysto, 30 plików |
+      | market-data | `uv run pytest -q` | 278 passed, 7 skipped, 12,5 s |
+      | market-data | `uv run pytest -m db -q` | 171 passed, 7 skipped, 107 deselected, 14,6 s |
+      | market-data | `uv run ruff check .` | czysto |
+      | terminal | `pnpm test` (`vitest run`) | **142 passed**, 13 plików, 5,8 s |
+      | terminal | `pnpm typecheck` / `pnpm lint` | czysto, bez wyjścia |
+      | terminal | `pnpm build` | `dist/` 421,46 kB (gzip 134,46 kB), 1,15 s |
+
+      Liczby terminala są **po** poprawkach z 11.4: 131 testów przed nimi, 142 po. Dziesięć
+      dołożonych pilnuje rzeczy, które ta suita przepuściła — kolizji prefiksu ze ścieżką
+      zakładki, rozstrzygania odmowy od zerwania i warstwy, na której rysuje się komunikat.
+
+      Pominięcia są zamierzone: 8 w gatewayu i 7 w archiwum to testy za `--run-live`, a 107
+      odrzuconych w `market-data` to zbiór `db` niewybrany przez domyślne uruchomienie. Testy
+      `-m db` wymagały działającego Dockera i przeszły przeciw kontenerowi jednorazowemu.
+
+      Uwaga do zanotowania, bo kosztowała czas: **`pnpm` nie stoi na PATH na tej maszynie** —
+      shim corepacka wywraca się na Node 25 (`ERR_VM_DYNAMIC_IMPORT_CALLBACK_MISSING`), a sam
+      `pnpm` z cache'a corepacka wymaga siebie na PATH, żeby uruchomić `pnpm install` w kontroli
+      zależności. Suita terminala szła przez shim wskazujący na `pnpm.cjs`. To środowisko, nie
+      repozytorium: `scripts/dev.sh` już schodzi na `npm`, gdy `pnpm` go nie ma.
+- [x] 11.4 Przejdź ręcznie ścieżkę: dodaj parę w panelu, poczekaj na świece, otwórz wykres,
+      zrestartuj moduł, sprawdź domknięcie luki. **Przejście pełne**, w dwóch podejściach:
+      rano przez sterowany Chrome (playwright-core), po południu na parze krypto, bo dopiero
+      wtedy wiadomo było, że `BTCUSD` handluje się w weekend, a stojące rano notowanie było
+      awarią providera, nie kalendarzem.
+
+      - **Dodanie pary w panelu.** `BTCUSD` `MINUTE` wybrany z wyszukiwarki, `POST /pairs` → 201,
+        a w logu gatewaya walidacja symbolu, uzupełnienie i przyjęta subskrypcja w kilka sekund —
+        ingest podejmuje parę **bez restartu**.
+      - **Świece na żywo.** Od 15:32 do 15:49 UTC seria rosła co minutę, potwierdzone przez
+        `/pairs` i w bazie. To ta część, której rano nie dało się przejść.
+      - **Wykres** narysował ~8 godzin świec z archiwum, z odczytem
+        `O 64938.5 H 64943.85 L 64938.5 C 64942.25 V 147`.
+      - **Restart domyka lukę realnymi danymi.** Start o 15:31:59 dociągnął i **zapisał**:
+        `BTCUSD MINUTE: asked for 3 candles, wrote 3`, `US100 HOUR: asked for 20, wrote 20`.
+        Rano sprawdzona była tylko gałąź „zapisano 0"; teraz obie. Pokrycie scala się w jeden
+        wiersz, a `BACKFILL_CONCURRENCY=1` trzyma odczyty po kolei na jednym połączeniu.
+      - **Stan zbierania po raz pierwszy mówi prawdę.** `US100 HOUR` → `market_closed`
+        (sobota), `BTCUSD MINUTE` → `collecting`, a w chwili realnego zerwania strumienia →
+        `stalled`. Przed poprawkami z 11.4d wszystko było `unknown`.
+
+      Wyszły przy tym trzy kolejne błędy, wszystkie widoczne **wyłącznie na żywo** — opisane
+      w 11.4d–f.
+
+- [x] 11.4a **Naprawiony:** panel archiwum był nieosiągalny pod własnym adresem. Proxy dev
+      trzymało prefiks `/archive`, a to jest ścieżka zakładki Archive — więc przeładowanie
+      zakładki, zakładka w przeglądarce i link, który wypisuje `scripts/dev.sh`, oddawały
+      `{"service":"market-data"}` zamiast aplikacji. Kliknięcie działało, bo router nigdy nie pyta
+      serwera, i **dlatego nie złapał tego żaden test**. To nie jest usterka serwera dev: cokolwiek
+      stanie przed dwoma backendami na produkcji, przesłoni zakładkę tak samo. Prefiks archiwum to
+      teraz `/archive-api` (`vite.config.ts`, `config.ts`, `.env.example`, README terminala), a
+      `config.test.ts` porównuje listę prefiksów backendów z listą ścieżek zakładek, żeby następny
+      prefiks nie mógł tego powtórzić. Poprawione też `dev.sh`, który wypisywał link do panelu
+      nawet przy `--no-terminal`.
+
+- [x] 11.4b **Naprawiony:** wykres niearchiwizowanej pary mówił „RECONNECTING" w kółko.
+      Archiwum odmawia subskrypcji pary, której nikt nie zbiera — i ma rację, tak stanowi
+      `market-data-api`. Ale odmawia **przed handshake'em**, gołym `403`, a przeglądarkowe
+      `WebSocket` nie udostępnia statusu odrzuconego handshake'u: strona widzi tylko „nie
+      połączyło się", czyli to samo, co przy archiwum wyłączonym. Na siatce `2x2` trzy z czterech
+      slotów były czarnym polem z plakietką `RECONNECTING` ponawianą bez końca (20 prób w 12 s),
+      podczas gdy prawdziwa odpowiedź brzmiała „tej pary nikt nie archiwizuje".
+
+      Wybrane rozwiązanie **(a)** — kontrakt archiwum bez zmian, decyzja „odmawiamy przed
+      handshake'em" zostaje. `SocketHub` dostał opcjonalne pytanie zadawane po nieudanym
+      połączeniu, a `archive.ts` odpowiada na nie czytając `GET /pairs`: pary nie ma na liście →
+      „`BTCUSD HOUR` is not being archived — add it in the Archive tab", stan `closed`, koniec
+      ponawiania. Para jest na liście albo `/pairs` też nie odpowiada → ponawianie trwa, bo to
+      jest właśnie przypadek zerwania. Pytanie zadawane **raz na serię niepowodzeń** i ponownie
+      dopiero po połączeniu, które zadziałało, oraz z własnym terminem (5 s), żeby wiszące
+      `/pairs` nie zamknęło pętli ponawiania na zawsze. Scenariusze dopisane do delty
+      `terminal-market-data`. W przeglądarce: 4 próby zamiast 20, a każdy slot podaje powód
+      i przycisk Retry.
+
+- [x] 11.4c **Naprawiony przy okazji, i groźniejszy:** komunikaty wykresu były niewidoczne.
+      `Veil` — to, co wykres pokazuje, gdy nie ma czego narysować: „Loading…", „No candles for…",
+      każdy błąd — jest `absolute inset-0` bez `z-index`, a lightweight-charts montuje swoje
+      canvasy z `z-index` 1 i 2 w kontenerze, który sam nie otwiera kontekstu stosu. Canvasy
+      wygrywały. Komunikat renderował się do DOM, **przechodził swój test** i był zamalowywany
+      pustym płótnem. Nie dało się tego złapać w jsdom, bo jsdom nie liczy kolejności malowania,
+      i nie dało się tego zobaczyć inaczej niż patrząc na cztery czarne panele, których tekst
+      był tam przez cały czas. `z-10` na `Veil`; test pilnuje samej własności, która o tym
+      decyduje, z komentarzem, dlaczego nie może pilnować niczego więcej.
+- [x] 11.4d **Naprawiony:** próg „zbieranie ustało" był za ciasny i wskaźnik migał. Dwa okresy
+      liczone od początku świecy nie zostawiają miejsca na to, ile świeca leci od providera przez
+      gateway do archiwum. Zmierzone na żywym strumieniu: zamknięta świeca minutowa pojawiała się
+      **52–169 s po zamknięciu okresu**, czyli zdrowa para siedziała 112–229 s wstecz przy progu
+      120 s, a stan skakał między `collecting` a `stalled` z odczytu na odczyt. Wskaźnik, który
+      kłamie co drugi raz, jest gorszy niż żaden — operator uczy się go ignorować. Dodane
+      `DELIVERY_GRACE` = 3 minuty, stałe, nie kolejny okres: dostarczenie trwa tyle samo przy
+      `MINUTE` i przy `HOUR_4`, a trzeci okres to tam cztery godziny niewykrytej awarii.
+      Po poprawce stan trzymał `collecting` bez przerwy przez cały czas obserwacji.
+
+- [x] 11.4e **Naprawiony, i najpoważniejszy z całej trójki:** zerwanie połączenia *gatewaya
+      z providerem* zostawiało w archiwum trwałą dziurę. Gateway zgłasza to jako wiadomość
+      błędu, ale **nie zamyka gniazda do nas** — więc pętla nasłuchu nigdy się nie kończy,
+      domknięcie luki z góry `run()` nigdy nie przychodzi, a minuty, których nikt nie słuchał,
+      zostają. Zaobserwowane: `keepalive ping timeout` o 15:44 kosztował świece `15:42` i `15:44`,
+      **które provider nadal miał**, i które zostałyby tam do restartu modułu. Pokrycie zachowało
+      się wzorowo — zgłosiło `uncovered` 15:42→15:45 zamiast udawać zamknięty rynek — ale nikt po
+      te dane nie wracał. Teraz wiadomość o kłopocie gatewaya domyka lukę, nie zrywając
+      subskrypcji; powtórka nic nie kosztuje, bo przy braku dziury fill prosi o zero świec.
+
+- [x] 11.4f **Naprawiony koszt wprowadzony przez 11.4d/Finding 5:** zamknięty rynek jest
+      *trwale* spóźniony, więc pytanie o jego stan szło do gatewaya przy **każdym** odczycie
+      listy — 74 zapytania o `US100` w kwadrans weekendu. Odpowiedź jest teraz pamiętana przez
+      minutę: sesja zmienia się dwa razy na dobę, więc minuta nieświeżości nie kosztuje nic,
+      a 20 odczytów `/pairs` w 60 s zeszło z 20 zapytań do **1**.
+
+- [x] 11.5 Napisz `review.md` — dwa przejścia wymagane przez schemat, przed archiwizacją zmiany.
+      Przejście po diffie (17 commitów od `5ed0345`) dało osiem ustaleń: sześć naprawionych, dwa
+      otwarte. Najpoważniejsze naprawione w tym przeglądzie — odczyt zakresu czytał tabelę rollupów
+      dla **każdej** rozdzielczości pochodnej, więc para śledzona na `HOUR` trzymała 5000 świec
+      i dostawała w odpowiedzi zero, przy pustym `uncovered`, czyli „rynek był zamknięty przez cały
+      dzień". Dwa otwarte (`market_open` bez producenta, postęp ingestu tylko w logu) zmieniają
+      kształt kontraktu i są opisane z rekomendacją zamiast dopisane. Przejście po pokryciu
+      przeszło wszystkie 62 scenariusze z sześciu delt; sześć luk, wszystkie zaakceptowane
+      i wyliczone.

@@ -183,3 +183,133 @@ describe("SocketHub", () => {
     expect(sockets).toHaveLength(1); // the dangling reconnect never re-opened a socket
   });
 });
+
+/**
+ * A close with no code to read.
+ *
+ * The archive refuses a pair nobody collects before the handshake, and a
+ * browser cannot see the status of a handshake that was rejected — so the page
+ * gets a connection that failed, indistinguishable from an archive that is
+ * down. Caught in a real browser, where three of four grid slots sat on
+ * "RECONNECTING" forever instead of saying nobody was collecting those pairs.
+ */
+describe("SocketHub asking why a socket would not open", () => {
+  let sockets: FakeSocket[];
+  let asked: Array<[string, string]>;
+
+  function hubThatDiagnoses(answer: () => Promise<string | null>): SocketHub {
+    return new SocketHub(
+      (symbol, resolution) => `ws://localhost/ws?symbol=${symbol}&resolution=${resolution}`,
+      translate,
+      (url) => {
+        const socket = new FakeSocket(url);
+        sockets.push(socket);
+        return socket;
+      },
+      () => 0.5,
+      (symbol, resolution) => {
+        asked.push([symbol, resolution]);
+        return answer();
+      },
+    );
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    sockets = [];
+    asked = [];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stops retrying and says why, when the answer is a reason", async () => {
+    const hub = hubThatDiagnoses(async () => "US100 MINUTE_5 is not being archived");
+    const events: StreamEvent[] = [];
+    hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+
+    sockets[0].drop();
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(asked).toEqual([["US100", "MINUTE_5"]]);
+    expect(events).toContainEqual({
+      kind: "error",
+      message: "US100 MINUTE_5 is not being archived",
+    });
+    expect(events.at(-1)).toEqual({ kind: "status", state: "closed" });
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sockets).toHaveLength(1); // never tried again
+  });
+
+  it("goes on retrying when there is no reason to stop", async () => {
+    const hub = hubThatDiagnoses(async () => null);
+    hub.subscribe("US100", "MINUTE_5", () => {});
+
+    sockets[0].drop();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(sockets).toHaveLength(2);
+  });
+
+  // The archive not answering is the case retrying exists for, so a failed
+  // diagnosis must not be read as "no reason found, therefore stop".
+  it("goes on retrying when the question itself fails", async () => {
+    const hub = hubThatDiagnoses(async () => {
+      throw new Error("the candle archive is not reachable");
+    });
+    hub.subscribe("US100", "MINUTE_5", () => {});
+
+    sockets[0].drop();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(sockets).toHaveLength(2);
+  });
+
+  it("asks once per run of failures, not once per attempt", async () => {
+    const hub = hubThatDiagnoses(async () => null);
+    hub.subscribe("US100", "MINUTE_5", () => {});
+
+    for (let i = 0; i < 4; i++) {
+      sockets.at(-1)!.drop();
+      await vi.advanceTimersByTimeAsync(30_000);
+    }
+
+    expect(sockets.length).toBeGreaterThan(4); // it kept reconnecting
+    expect(asked).toHaveLength(1); // and asked once, not five times
+  });
+
+  it("asks again after a connection that worked, since the answer can have changed", async () => {
+    const hub = hubThatDiagnoses(async () => null);
+    hub.subscribe("US100", "MINUTE_5", () => {});
+
+    sockets[0].drop();
+    await vi.advanceTimersByTimeAsync(1000);
+    expect(asked).toHaveLength(1);
+
+    sockets[1].open(); // a pair added in the Archive tab meanwhile
+    sockets[1].drop();
+    await vi.advanceTimersByTimeAsync(1000);
+
+    expect(asked).toHaveLength(2);
+  });
+
+  it("says nothing to a subscriber that has already left", async () => {
+    let release: (reason: string | null) => void = () => {};
+    const hub = hubThatDiagnoses(() => new Promise((resolve) => (release = resolve)));
+    const events: StreamEvent[] = [];
+    const unsub = hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+
+    sockets[0].drop();
+    unsub(); // the slot is closed while the question is still in flight
+    release("US100 MINUTE_5 is not being archived");
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect(events).not.toContainEqual(
+      expect.objectContaining({ kind: "error" }),
+    );
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sockets).toHaveLength(1);
+  });
+});

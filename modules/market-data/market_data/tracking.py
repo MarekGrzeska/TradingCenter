@@ -15,7 +15,7 @@ re-add has to close.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from enum import Enum
 
 import asyncpg
@@ -31,6 +31,22 @@ from .periods import period_length
 # moment the newest one is legitimately up to one period old, and a threshold of one
 # would call every healthy pair broken every period.
 STALE_AFTER_PERIODS = 2
+
+# Plus however long the candle takes to arrive once its period has closed, which is not
+# zero and does not scale with the resolution — it is the provider sealing the candle, the
+# gateway relaying it and this module storing it, and those take the same few seconds
+# whether the period was a minute or a day.
+#
+# **Measured, because two periods alone was wrong.** Watched against the live feed on
+# 2026-08-08: a closed minute candle appeared 52 to 169 seconds after its period ended, so
+# a healthy `MINUTE` pair sat 112–229 seconds behind against a threshold of 120. The state
+# flipped between `COLLECTING` and `STALLED` from one read to the next while nothing at all
+# was wrong, which is worse than having no indicator: an operator learns to ignore it.
+#
+# A fixed span rather than a third period, because a third period is nothing at `MINUTE`
+# and four extra hours at `HOUR_4`. Three minutes covers the slowest arrival seen with room
+# to spare, and costs a genuinely dead `MINUTE` pair three minutes of extra doubt.
+DELIVERY_GRACE = timedelta(minutes=3)
 
 
 class TrackingRefused(Exception):
@@ -225,12 +241,16 @@ def collection_state(
     `market_open` is passed in rather than worked out here. Whether an instrument is
     currently tradeable is the gateway's to answer — this module has no session calendar
     and inventing one would produce a confident wrong answer twice a day.
+
+    The threshold is two periods *plus* the time a candle takes to arrive once its period
+    has closed. Both halves are load-bearing, and the second one was measured rather than
+    reasoned about — see `DELIVERY_GRACE`.
     """
     if latest_candle is None:
         return CollectionState.NEVER_COLLECTED
 
     behind = now - latest_candle
-    if behind <= STALE_AFTER_PERIODS * period_length(resolution):
+    if behind <= STALE_AFTER_PERIODS * period_length(resolution) + DELIVERY_GRACE:
         return CollectionState.COLLECTING
     if market_open is None:
         return CollectionState.UNKNOWN

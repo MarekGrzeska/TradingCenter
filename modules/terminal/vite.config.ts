@@ -70,14 +70,22 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/api/, ""),
           configure: quietProxyErrors("capital-gateway", gateway),
         },
-        // One entry for both roads to the archive: `/archive/...` is its HTTP
-        // contract and `/archive/ws/candles` its subscription, and `ws: true`
-        // upgrades only the request that asks to be upgraded.
-        "/archive": {
+        // One entry for both roads to the archive: `/archive-api/...` is its
+        // HTTP contract and `/archive-api/ws/candles` its subscription, and
+        // `ws: true` upgrades only the request that asks to be upgraded.
+        //
+        // `-api` is not decoration. The prefix was `/archive`, which is also the
+        // Archive tab's route — so a proxy claiming that prefix shadowed the tab
+        // for anything that reaches the server: a reload, a bookmark, the link
+        // `scripts/dev.sh` prints. Clicking through still worked, because the
+        // router never asks, which is exactly why it survived the test suite.
+        // Whatever fronts the two back ends in production would shadow it the
+        // same way, so the fix is the prefix, not the dev server.
+        "/archive-api": {
           target: archive,
           ws: true,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/archive/, ""),
+          rewrite: (path) => path.replace(/^\/archive-api/, ""),
           configure: quietProxyErrors("market-data", archive),
         },
       },

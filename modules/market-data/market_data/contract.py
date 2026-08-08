@@ -97,6 +97,33 @@ class PairCoverageOut(BaseModel):
     )
 
 
+class FillOut(BaseModel):
+    """What this pair's most recent backfill did, and what it cost.
+
+    A fill can run for tens of minutes and fail on one pair while the others carry on, so
+    where it got to is part of what is being asked when somebody asks what is collected —
+    not something to go and read a log for. `summary` is the same one line the module
+    logs, so an operator comparing the two is comparing one sentence with itself.
+    """
+
+    finished_at: datetime | None = Field(
+        default=None, description="when this fill ended; null while it is still running"
+    )
+    requested: int = Field(description="candles asked of the gateway; 0 means nothing was asked")
+    written: int = Field(
+        default=0,
+        description="rows the archive took, which is not always how many arrived — a "
+        "streamed value never displaces a stored history one",
+    )
+    requests: int = Field(
+        default=0, description="provider calls the gateway made behind that one request"
+    )
+    failure: str | None = Field(
+        default=None, description="why it failed, named; null when it did not"
+    )
+    summary: str = Field(description="the whole outcome as one line, for a person")
+
+
 class TrackedPairOut(BaseModel):
     symbol: str
     resolution: Resolution
@@ -106,6 +133,11 @@ class TrackedPairOut(BaseModel):
     )
     collection: CollectionState = Field(
         description="whether data is actually arriving, as far as the archive can tell"
+    )
+    last_fill: FillOut | None = Field(
+        default=None,
+        description="the pair's most recent backfill, or null if none has run since the "
+        "module started — fills live in memory and do not survive a restart",
     )
 
 

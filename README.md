@@ -16,7 +16,8 @@ modules move here one at a time.
 | Module | What | Contract |
 |---|---|---|
 | [capital-gateway](modules/capital-gateway/) | capital.com — trading, deep history, a live stream. Demo only. | HTTP + WebSocket |
-| [terminal](modules/terminal/) | The operator's screen — charts in a grid, fed by the gateway. | consumes the gateway |
+| [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. | HTTP + WebSocket |
+| [terminal](modules/terminal/) | The operator's screen — charts in a grid, and what the archive collects. | consumes both |
 
 ## Layout
 

@@ -442,6 +442,44 @@ async def test_a_forming_candle_from_the_feed_is_not_stored(pool) -> None:
 
 
 @pytest.mark.db
+async def test_the_gateway_reporting_trouble_closes_the_gap_it_left(pool) -> None:
+    """Caught on the live feed, and invisible to every test that existed.
+
+    A keepalive timeout between the gateway and the provider does not close the socket
+    to us. The listening loop therefore never ends, the gap-closing at the top of `run`
+    never comes round, and the minutes the gateway spent disconnected stay missing —
+    measured on 2026-08-08 as two candles the provider still had, correctly reported as
+    uncovered and never fetched again until a restart.
+    """
+    missed = [minute_candle(2), minute_candle(1)]
+    history = FakeHistory(missed)
+    feed = fake_feed(
+        [
+            FeedStatus(state=FeedState.CONNECTED),
+            FeedFailure(message="sent 1011 (internal error) keepalive ping timeout"),
+        ]
+    )
+
+    await PairIngest(
+        pool=pool,
+        history=history,
+        stream_url="ws://gateway.test/ws/stream",
+        symbol="US100",
+        resolution=Resolution.MINUTE,
+        default_bars=100,
+        still_tracked=_tracked_then_not([True, True, False]),
+        subscribe_to=feed,
+        sleep=_no_sleep,
+    ).run()
+
+    # Twice: once at the top of the loop, once on hearing the gateway say it had trouble.
+    assert len(history.calls) >= 2
+    async with pool.acquire() as conn:
+        stored = await read_candles(conn, "US100", Resolution.MINUTE)
+    assert len(stored) == 2  # the stretch nobody was listening for came back
+
+
+@pytest.mark.db
 async def test_quotes_and_status_do_not_become_candles(pool) -> None:
     feed = fake_feed(
         [
