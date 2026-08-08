@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
 import { archive } from "../data/marketData";
 import { RESOLUTIONS } from "../data/types";
 import type { CollectionState, PairCoverage, Resolution, TrackedPair } from "../data/types";
@@ -92,16 +93,56 @@ function groupBySymbol(pairs: TrackedPair[]): InstrumentGroup[] {
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
 }
 
+/** What one Delete left behind — the only thing worth telling the operator
+ *  once the row or interval it names is already gone from the list above. */
+interface DeletionNotice {
+  symbol: string;
+  resolutions: Resolution[];
+  candlesRemoved: number;
+}
+
+/**
+ * Deleting cuts the row it names, so the confirmation of what happened can't
+ * live there — it lives here instead, above the list, until the operator
+ * dismisses it or deletes something else.
+ */
+function DeletionBanner({ notice, onDismiss }: { notice: DeletionNotice; onDismiss(): void }) {
+  return (
+    <p className="flex items-center gap-3 border-b border-border bg-panel px-4 py-2 text-xs text-ink-secondary">
+      <span>
+        Deleted {notice.candlesRemoved.toLocaleString()} candle
+        {notice.candlesRemoved === 1 ? "" : "s"} for {notice.symbol} in{" "}
+        {notice.resolutions.join(", ")}. See it in the{" "}
+        <Link to="/data-history" className="text-ink underline">
+          Data History
+        </Link>{" "}
+        tab.
+      </span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="ml-auto text-ink-muted hover:text-ink"
+      >
+        ×
+      </button>
+    </p>
+  );
+}
+
 export function InstrumentsView() {
   const list = useTrackedPairs(archive);
   const groups = useMemo(() => groupBySymbol(list.pairs), [list.pairs]);
+  const [deletion, setDeletion] = useState<DeletionNotice | null>(null);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <AddInstrumentWizard existingPairs={list.pairs} onCollected={list.reload} />
 
+      {deletion && <DeletionBanner notice={deletion} onDismiss={() => setDeletion(null)} />}
+
       <div className="min-h-0 flex-1 overflow-auto">
-        <InstrumentList list={list} groups={groups} />
+        <InstrumentList list={list} groups={groups} onDeleted={setDeletion} />
       </div>
     </div>
   );
@@ -110,9 +151,11 @@ export function InstrumentsView() {
 function InstrumentList({
   list,
   groups,
+  onDeleted,
 }: {
   list: ReturnType<typeof useTrackedPairs>;
   groups: InstrumentGroup[];
+  onDeleted(notice: DeletionNotice): void;
 }) {
   if (list.status === "loading") {
     return <p className="px-4 py-6 text-sm text-ink-muted">Reading the archive…</p>;
@@ -162,7 +205,12 @@ function InstrumentList({
           </thead>
           <tbody>
             {groups.map((group) => (
-              <InstrumentRow key={group.symbol} group={group} onChanged={list.reload} />
+              <InstrumentRow
+                key={group.symbol}
+                group={group}
+                onChanged={list.reload}
+                onDeleted={onDeleted}
+              />
             ))}
           </tbody>
         </table>
@@ -171,26 +219,59 @@ function InstrumentList({
   );
 }
 
-function InstrumentRow({ group, onChanged }: { group: InstrumentGroup; onChanged(): void }) {
+function InstrumentRow({
+  group,
+  onChanged,
+  onDeleted,
+}: {
+  group: InstrumentGroup;
+  onChanged(): void;
+  onDeleted(notice: DeletionNotice): void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
   const stalled = group.pairs.some((pair) => pair.collection === "stalled");
+  // The deepest history this instrument holds, across every interval — what a
+  // confirmation shows so the operator sees the size of what they are about
+  // to lose, not just which intervals.
+  const earliestData = group.dataSince.find((entry) => entry.since !== null)?.since ?? null;
 
-  const removeAll = useCallback(async () => {
+  const deleteAll = useCallback(async () => {
     setFailure(null);
-    try {
-      await Promise.all(
-        group.pairs.map((pair) =>
-          archive.untrackPair(pair.symbol, pair.resolution, new AbortController().signal),
-        ),
-      );
-      setConfirming(false);
+    const outcomes = await Promise.allSettled(
+      group.pairs.map((pair) =>
+        archive.deletePair(pair.symbol, pair.resolution, new AbortController().signal),
+      ),
+    );
+
+    const succeededResolutions: Resolution[] = [];
+    const failedResolutions: Resolution[] = [];
+    let candlesRemoved = 0;
+    outcomes.forEach((outcome, index) => {
+      const pair = group.pairs[index];
+      if (outcome.status === "fulfilled") {
+        succeededResolutions.push(pair.resolution);
+        candlesRemoved += outcome.value.candlesRemoved;
+      } else {
+        failedResolutions.push(pair.resolution);
+      }
+    });
+
+    if (succeededResolutions.length > 0) {
+      onDeleted({ symbol: group.symbol, resolutions: succeededResolutions, candlesRemoved });
       onChanged();
-    } catch (cause: unknown) {
-      setFailure(cause instanceof Error ? cause.message : "could not stop collecting");
     }
-  }, [group.pairs, onChanged]);
+
+    if (failedResolutions.length > 0) {
+      // What is left in `group.pairs` after `onChanged()` reloads is exactly
+      // what failed — the confirmation stays open, naming it, rather than
+      // closing over a partial success.
+      setFailure(`could not delete ${failedResolutions.join(", ")}`);
+    } else {
+      setConfirming(false);
+    }
+  }, [group.pairs, group.symbol, onChanged, onDeleted]);
 
   return (
     <>
@@ -224,14 +305,14 @@ function InstrumentRow({ group, onChanged }: { group: InstrumentGroup; onChanged
         <td className="px-4 py-1.5 text-right">
           <button
             type="button"
-            aria-label={`Stop archiving ${group.symbol}`}
+            aria-label={`Delete ${group.symbol}`}
             onClick={(e) => {
               e.stopPropagation();
               setConfirming(true);
             }}
             className="rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
           >
-            Stop
+            Delete
           </button>
         </td>
       </tr>
@@ -240,19 +321,21 @@ function InstrumentRow({ group, onChanged }: { group: InstrumentGroup; onChanged
         <tr className="border-t border-border bg-panel">
           <td colSpan={4} className="px-4 py-2">
             <div className="flex flex-wrap items-center gap-3 text-sm">
-              {/* Stopping is deliberate, and worth saying plainly that it costs
-                  nothing already collected — an archive that dropped data when
-                  its configuration changed would not be an archive. */}
+              {/* Deletion is irreversible, and the confirmation says so plainly
+                  — this replaces the old "the candles stay" assurance, which
+                  would now be a lie. */}
               <span className="text-ink">
-                Stop archiving {group.symbol} in {group.pairs.map((p) => p.resolution).join(", ")}?
-                The candles already collected stay in the archive.
+                Delete {group.symbol} in {group.pairs.map((p) => p.resolution).join(", ")}? This
+                permanently removes every candle already collected
+                {earliestData !== null && <> (data since {formatInstant(earliestData)})</>} — this
+                cannot be undone.
               </span>
               <button
                 type="button"
-                onClick={removeAll}
+                onClick={deleteAll}
                 className="rounded border border-down px-2 py-0.5 text-xs text-down hover:bg-panel-strong"
               >
-                Stop collecting
+                Delete data
               </button>
               <button
                 type="button"
@@ -271,7 +354,12 @@ function InstrumentRow({ group, onChanged }: { group: InstrumentGroup; onChanged
         <tr className="border-t border-border">
           <td colSpan={4} className="p-0">
             {group.pairs.map((pair) => (
-              <IntervalCoverage key={pair.resolution} pair={pair} onChanged={onChanged} />
+              <IntervalCoverage
+                key={pair.resolution}
+                pair={pair}
+                onChanged={onChanged}
+                onDeleted={onDeleted}
+              />
             ))}
           </td>
         </tr>
@@ -313,7 +401,15 @@ function DataSinceCell({ entries }: { entries: DataSince[] }) {
   );
 }
 
-function IntervalCoverage({ pair, onChanged }: { pair: TrackedPair; onChanged(): void }) {
+function IntervalCoverage({
+  pair,
+  onChanged,
+  onDeleted,
+}: {
+  pair: TrackedPair;
+  onChanged(): void;
+  onDeleted(notice: DeletionNotice): void;
+}) {
   const [coverage, setCoverage] = useState<PairCoverage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
@@ -341,16 +437,25 @@ function IntervalCoverage({ pair, onChanged }: { pair: TrackedPair; onChanged():
     };
   }, [pair.symbol, pair.resolution]);
 
-  const remove = useCallback(async () => {
+  const deleteInterval = useCallback(async () => {
     setFailure(null);
     try {
-      await archive.untrackPair(pair.symbol, pair.resolution, new AbortController().signal);
+      const result = await archive.deletePair(
+        pair.symbol,
+        pair.resolution,
+        new AbortController().signal,
+      );
       setConfirming(false);
+      onDeleted({
+        symbol: pair.symbol,
+        resolutions: [pair.resolution],
+        candlesRemoved: result.candlesRemoved,
+      });
       onChanged();
     } catch (cause: unknown) {
-      setFailure(cause instanceof Error ? cause.message : "could not stop collecting");
+      setFailure(cause instanceof Error ? cause.message : "could not delete this interval's data");
     }
-  }, [pair.symbol, pair.resolution, onChanged]);
+  }, [pair.symbol, pair.resolution, onChanged, onDeleted]);
 
   const first = coverage?.ranges[0];
   const last = coverage?.ranges.at(-1);
@@ -371,11 +476,11 @@ function IntervalCoverage({ pair, onChanged }: { pair: TrackedPair; onChanged():
         </span>
         <button
           type="button"
-          aria-label={`Stop archiving ${pair.symbol} ${pair.resolution}`}
+          aria-label={`Delete ${pair.symbol} ${pair.resolution}`}
           onClick={() => setConfirming(true)}
           className="ml-auto rounded border border-border px-2 py-0.5 text-ink-muted hover:text-ink"
         >
-          Stop
+          Delete
         </button>
       </div>
 
@@ -407,15 +512,17 @@ function IntervalCoverage({ pair, onChanged }: { pair: TrackedPair; onChanged():
       {confirming && (
         <div className="flex flex-wrap items-center gap-3 rounded border border-border bg-panel px-2 py-1.5">
           <span className="text-ink">
-            Stop archiving {pair.symbol} {pair.resolution}? The candles already collected stay in
-            the archive.
+            Delete {pair.symbol} {pair.resolution}? This permanently removes every candle already
+            collected
+            {pair.earliestCandle !== null && <> (data since {formatInstant(pair.earliestCandle)})</>}{" "}
+            — this cannot be undone.
           </span>
           <button
             type="button"
-            onClick={remove}
+            onClick={deleteInterval}
             className="rounded border border-down px-2 py-0.5 text-down hover:bg-panel-strong"
           >
-            Stop collecting
+            Delete data
           </button>
           <button
             type="button"

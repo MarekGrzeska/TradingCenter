@@ -7,6 +7,7 @@ import type {
   JobEstimate,
   JobPairView,
   PairCoverage,
+  PairDeletion,
   PairRequest,
   Resolution,
   StreamEvent,
@@ -120,10 +121,22 @@ export interface ArchiveAdmin {
     signal: AbortSignal,
   ): Promise<TrackPairsResult>;
 
-  /** Stops collection. The candles already collected stay. */
-  untrackPair(symbol: string, resolution: Resolution, signal: AbortSignal): Promise<void>;
+  /** Stops collection and irreversibly removes the pair's candles and
+   *  coverage. Resolves with what was removed — a count and, unless nothing
+   *  had ever been collected, the range it covered — which is what a
+   *  confirmation reports back once it is done. */
+  deletePair(symbol: string, resolution: Resolution, signal: AbortSignal): Promise<PairDeletion>;
 
   coverage(symbol: string, resolution: Resolution, signal: AbortSignal): Promise<PairCoverage>;
+
+  /** Every recorded deletion, newest first. `symbol`/`resolution` narrow to
+   *  one pair, the same shape `listJobs` narrows by, since the combined
+   *  history reads both. */
+  listDeletions(
+    symbol: string | null,
+    resolution: Resolution | null,
+    signal: AbortSignal,
+  ): Promise<PairDeletion[]>;
 
   /** Prices a prospective job without creating it or tracking anything —
    *  what the wizard's acceptance dialog reads before the operator commits. */

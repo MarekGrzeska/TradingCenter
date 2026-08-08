@@ -384,17 +384,90 @@ describe("archive pair management", () => {
     await expect(call).rejects.toMatchObject({ kind: "upstream" });
   });
 
-  it("untracks with the resolution in the query, and reads no body back", async () => {
+  it("deletes with the resolution in the query, and reads back what was removed", async () => {
     let asked: URL | null = null;
     server.use(
       http.delete(`${HTTP_BASE}/pairs/US100`, ({ request }) => {
         asked = new URL(request.url);
-        return new HttpResponse(null, { status: 204 });
+        return HttpResponse.json({
+          symbol: "US100",
+          resolution: "MINUTE",
+          deleted_at: "2026-08-08T10:00:00Z",
+          candles_removed: 42,
+          removed_from: "2026-08-01T00:00:00Z",
+          removed_to: "2026-08-07T14:40:00Z",
+        });
       }),
     );
 
-    await expect(source().untrackPair("US100", "MINUTE", signal())).resolves.toBeUndefined();
+    const deletion = await source().deletePair("US100", "MINUTE", signal());
     expect(asked!.searchParams.get("resolution")).toBe("MINUTE");
+    expect(deletion).toEqual({
+      symbol: "US100",
+      resolution: "MINUTE",
+      deletedAt: 1786183200,
+      candlesRemoved: 42,
+      removedFrom: 1785542400,
+      removedTo: 1786113600,
+    });
+  });
+
+  it("deletes a pair that had never collected anything, with a null range", async () => {
+    server.use(
+      http.delete(`${HTTP_BASE}/pairs/US100`, () =>
+        HttpResponse.json({
+          symbol: "US100",
+          resolution: "MINUTE",
+          deleted_at: "2026-08-08T10:00:00Z",
+          candles_removed: 0,
+          removed_from: null,
+          removed_to: null,
+        }),
+      ),
+    );
+
+    const deletion = await source().deletePair("US100", "MINUTE", signal());
+    expect(deletion.candlesRemoved).toBe(0);
+    expect(deletion.removedFrom).toBeNull();
+    expect(deletion.removedTo).toBeNull();
+  });
+
+  it("lists deletions, narrowed by symbol and resolution when given", async () => {
+    let asked: URL | null = null;
+    server.use(
+      http.get(`${HTTP_BASE}/deletions`, ({ request }) => {
+        asked = new URL(request.url);
+        return HttpResponse.json([
+          {
+            symbol: "US100",
+            resolution: "MINUTE",
+            deleted_at: "2026-08-08T10:00:00Z",
+            candles_removed: 5,
+            removed_from: "2026-08-01T00:00:00Z",
+            removed_to: "2026-08-07T14:40:00Z",
+          },
+        ]);
+      }),
+    );
+
+    const deletions = await source().listDeletions("US100", "MINUTE", signal());
+    expect(asked!.searchParams.get("symbol")).toBe("US100");
+    expect(asked!.searchParams.get("resolution")).toBe("MINUTE");
+    expect(deletions).toHaveLength(1);
+    expect(deletions[0].symbol).toBe("US100");
+  });
+
+  it("lists every deletion when neither symbol nor resolution is given", async () => {
+    let asked: URL | null = null;
+    server.use(
+      http.get(`${HTTP_BASE}/deletions`, ({ request }) => {
+        asked = new URL(request.url);
+        return HttpResponse.json([]);
+      }),
+    );
+
+    await source().listDeletions(null, null, signal());
+    expect(asked!.search).toBe("");
   });
 
   it("reads coverage, including the boundary the provider's history ends at", async () => {

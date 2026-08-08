@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { archive } from "../data/marketData";
 import { RESOLUTIONS } from "../data/types";
-import type { Chunk, JobPairView, JobStatus } from "../data/types";
+import type { Chunk, JobPairView, JobStatus, PairDeletion, Resolution } from "../data/types";
 import { formatInstant } from "../instruments/format";
 import { useJobHistory } from "./useJobHistory";
 import type { JobHistoryState } from "./useJobHistory";
@@ -49,33 +49,73 @@ function failureReasons(chunks: Chunk[]): string[] {
   return [...reasons];
 }
 
-function sortRows(rows: JobPairView[]): JobPairView[] {
-  // Symbol, then interval in its own canonical order, then newest attempt
-  // first within the same pair — never only the latest, as if earlier pulls
-  // never happened (terminal-collection-history spec, "Wiele dociągnięć tej
-  // samej pary").
-  return [...rows].sort((a, b) => {
+/** One line of the combined timeline — a pull or a skasowanie, never
+ *  confused for the other, since a job that succeeded and a deletion that
+ *  undid it read very differently and MUST NOT share a row shape
+ *  (terminal-collection-history spec, "Skasowanie odróżnia się od
+ *  dociągnięcia"). */
+type HistoryEntry =
+  | { kind: "job"; at: number; symbol: string; resolution: Resolution; job: JobPairView }
+  | { kind: "deletion"; at: number; symbol: string; resolution: Resolution; deletion: PairDeletion };
+
+/**
+ * Jobs and deletions, one instrument's story told in one order.
+ *
+ * A pull and the deletion that later undid it are two events about the same
+ * pair, and splitting them into two lists would lose the "why does this
+ * pair's range look shallower now" a reader is after — the deletion has to
+ * sit right next to the pull it follows, not in a table of its own.
+ */
+function combinedEntries(rows: JobPairView[], deletions: PairDeletion[]): HistoryEntry[] {
+  const entries: HistoryEntry[] = [
+    ...rows.map(
+      (job): HistoryEntry => ({
+        kind: "job",
+        at: job.createdAt,
+        symbol: job.symbol,
+        resolution: job.resolution,
+        job,
+      }),
+    ),
+    ...deletions.map(
+      (deletion): HistoryEntry => ({
+        kind: "deletion",
+        at: deletion.deletedAt,
+        symbol: deletion.symbol,
+        resolution: deletion.resolution,
+        deletion,
+      }),
+    ),
+  ];
+  // Symbol, then interval in its own canonical order, then newest event
+  // first within the same pair — never only the latest, as if nothing
+  // earlier ever happened (terminal-collection-history spec, "Wiele
+  // dociągnięć tej samej pary").
+  return entries.sort((a, b) => {
     if (a.symbol !== b.symbol) return a.symbol.localeCompare(b.symbol);
     const byResolution = RESOLUTIONS.indexOf(a.resolution) - RESOLUTIONS.indexOf(b.resolution);
     if (byResolution !== 0) return byResolution;
-    return b.createdAt - a.createdAt;
+    return b.at - a.at;
   });
 }
 
 export function CollectionHistoryView() {
   const history = useJobHistory(archive);
-  const rows = useMemo(() => sortRows(history.rows), [history.rows]);
+  const entries = useMemo(
+    () => combinedEntries(history.rows, history.deletions),
+    [history.rows, history.deletions],
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-auto">
-        <HistoryList history={history} rows={rows} />
+        <HistoryList history={history} entries={entries} />
       </div>
     </div>
   );
 }
 
-function HistoryList({ history, rows }: { history: JobHistoryState; rows: JobPairView[] }) {
+function HistoryList({ history, entries }: { history: JobHistoryState; entries: HistoryEntry[] }) {
   if (history.status === "loading") {
     return <p className="px-4 py-6 text-sm text-ink-muted">Reading collection history…</p>;
   }
@@ -108,7 +148,7 @@ function HistoryList({ history, rows }: { history: JobHistoryState; rows: JobPai
         </p>
       )}
 
-      {rows.length === 0 ? (
+      {entries.length === 0 ? (
         <p className="px-4 py-6 text-sm text-ink-muted">
           Nothing has been collected yet. Add an instrument in the{" "}
           <Link to="/instruments" className="text-ink underline">
@@ -122,7 +162,7 @@ function HistoryList({ history, rows }: { history: JobHistoryState; rows: JobPai
             <tr>
               <th className="px-4 py-2 font-normal">Symbol</th>
               <th className="px-4 py-2 font-normal">Resolution</th>
-              <th className="px-4 py-2 font-normal">Started</th>
+              <th className="px-4 py-2 font-normal">When</th>
               <th className="px-4 py-2 font-normal">Status</th>
               <th className="px-4 py-2 font-normal">Progress</th>
               <th className="px-4 py-2 font-normal">Range</th>
@@ -130,13 +170,20 @@ function HistoryList({ history, rows }: { history: JobHistoryState; rows: JobPai
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <HistoryRow
-                key={`${row.jobId}|${row.symbol}|${row.resolution}`}
-                row={row}
-                onChanged={history.reload}
-              />
-            ))}
+            {entries.map((entry) =>
+              entry.kind === "job" ? (
+                <HistoryRow
+                  key={`job|${entry.job.jobId}|${entry.symbol}|${entry.resolution}`}
+                  row={entry.job}
+                  onChanged={history.reload}
+                />
+              ) : (
+                <DeletionRow
+                  key={`deletion|${entry.symbol}|${entry.resolution}|${entry.at}`}
+                  deletion={entry.deletion}
+                />
+              ),
+            )}
           </tbody>
         </table>
       )}
@@ -250,5 +297,38 @@ function HistoryRow({ row, onChanged }: { row: JobPairView; onChanged(): void })
         </tr>
       )}
     </>
+  );
+}
+
+/**
+ * A skasowanie, in the same table a pull's row lives in — deliberately not
+ * styled like one. It is neither a success nor a failure, so it MUST NOT
+ * borrow `text-up` (reserved for a job that succeeded) or `text-critical`
+ * (a job that failed): reading it at a glance has to say "something was
+ * removed", not "something went wrong" or "something finished".
+ */
+function DeletionRow({ deletion }: { deletion: PairDeletion }) {
+  const { removedFrom, removedTo } = deletion;
+  return (
+    <tr
+      data-testid={`deletion-${deletion.symbol}-${deletion.resolution}-${deletion.deletedAt}`}
+      className="border-t border-border"
+    >
+      <td className="px-4 py-1.5 font-semibold text-ink">{deletion.symbol}</td>
+      <td className="px-4 py-1.5 text-ink-secondary">{deletion.resolution}</td>
+      <td className="px-4 py-1.5 text-ink-muted">{formatInstant(deletion.deletedAt)}</td>
+      <td className="px-4 py-1.5">
+        <span className="font-semibold text-ink-secondary">deleted</span>
+      </td>
+      <td className="px-4 py-1.5 text-ink-secondary">
+        −{deletion.candlesRemoved.toLocaleString()} candles
+      </td>
+      <td className="px-4 py-1.5 text-ink-secondary">
+        {removedFrom !== null && removedTo !== null
+          ? `${formatInstant(removedFrom)} → ${formatInstant(removedTo)}`
+          : "—"}
+      </td>
+      <td className="px-4 py-1.5" />
+    </tr>
   );
 }

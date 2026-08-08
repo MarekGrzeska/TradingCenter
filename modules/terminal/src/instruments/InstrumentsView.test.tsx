@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router";
 import { MarketDataError } from "../data/types";
 import type { PairCoverage, Resolution, TrackedPair } from "../data/types";
 
@@ -12,18 +13,36 @@ class FakeArchive {
   pairs: TrackedPair[] = [];
   coverageAnswer: PairCoverage | null = null;
   listFailure: Error | null = null;
-  untrackCalls: Array<{ symbol: string; resolution: Resolution }> = [];
+  deleteCalls: Array<{ symbol: string; resolution: Resolution }> = [];
+  /** Set to make one particular pair's deletion reject, the way a real
+   *  archive would for one interval while the rest of a whole-instrument
+   *  delete succeeds. */
+  deleteFailures = new Set<string>();
 
   listPairs = async () => {
     if (this.listFailure) throw this.listFailure;
     return [...this.pairs];
   };
 
-  untrackPair = async (symbol: string, resolution: Resolution) => {
-    this.untrackCalls.push({ symbol, resolution });
+  deletePair = async (symbol: string, resolution: Resolution) => {
+    this.deleteCalls.push({ symbol, resolution });
+    if (this.deleteFailures.has(`${symbol}|${resolution}`)) {
+      throw new Error(`could not delete ${symbol} ${resolution}`);
+    }
+    const removed = this.pairs.find(
+      (pair) => pair.symbol === symbol && pair.resolution === resolution,
+    );
     this.pairs = this.pairs.filter(
       (pair) => !(pair.symbol === symbol && pair.resolution === resolution),
     );
+    return {
+      symbol,
+      resolution,
+      deletedAt: 1786269600,
+      candlesRemoved: removed?.latestCandle === null ? 0 : 3,
+      removedFrom: removed?.earliestCandle ?? null,
+      removedTo: removed?.latestCandle ?? null,
+    };
   };
 
   coverage = async (symbol: string, resolution: Resolution): Promise<PairCoverage> =>
@@ -67,6 +86,16 @@ beforeEach(() => {
   fakeArchive = new FakeArchive();
 });
 
+// A successful delete renders a banner linking to `/data-history`, which
+// needs a router beneath it even in tests that never click Delete.
+function renderView() {
+  return render(
+    <MemoryRouter>
+      <InstrumentsView />
+    </MemoryRouter>,
+  );
+}
+
 describe("Instruments list — grouping (terminal-data-manager spec)", () => {
   it("puts every resolution of the same instrument in one row, abbreviated", async () => {
     fakeArchive.pairs = [
@@ -75,7 +104,7 @@ describe("Instruments list — grouping (terminal-data-manager spec)", () => {
       pair({ resolution: "DAY" }),
       pair({ resolution: "WEEK" }),
     ];
-    render(<InstrumentsView />);
+    renderView();
 
     expect(await screen.findAllByText("US100")).toHaveLength(1);
     const row = screen.getByTestId("instrument-US100");
@@ -90,7 +119,7 @@ describe("Instruments list — grouping (terminal-data-manager spec)", () => {
       pair({ resolution: "MINUTE", earliestCandle: 1785542400 }), // 2026-08-01
       pair({ resolution: "HOUR", earliestCandle: 1785542400 }),
     ];
-    render(<InstrumentsView />);
+    renderView();
 
     const row = await screen.findByTestId("instrument-US100");
     // One date, said once — not the same date repeated per resolution.
@@ -103,7 +132,7 @@ describe("Instruments list — grouping (terminal-data-manager spec)", () => {
       pair({ resolution: "MINUTE_5", earliestCandle: 1785542400 }),
       pair({ resolution: "DAY", earliestCandle: 1577923200 }), // 2020-01-02
     ];
-    render(<InstrumentsView />);
+    renderView();
 
     const row = await screen.findByTestId("instrument-US100");
     const deepest = within(row).getByText(/2020-01-02/).closest("div");
@@ -118,7 +147,7 @@ describe("Instruments list — grouping (terminal-data-manager spec)", () => {
       pair({ resolution: "MINUTE", earliestCandle: null, collection: "never_collected" }),
       pair({ resolution: "DAY", earliestCandle: 1577923200 }), // 2020-01-02
     ];
-    render(<InstrumentsView />);
+    renderView();
 
     const row = await screen.findByTestId("instrument-US100");
     expect(within(row).getByText("nothing yet").closest("div")).toHaveTextContent("1m");
@@ -129,14 +158,14 @@ describe("Instruments list — grouping (terminal-data-manager spec)", () => {
       pair({ resolution: "MINUTE", earliestCandle: null, collection: "never_collected" }),
       pair({ resolution: "DAY", earliestCandle: null, collection: "never_collected" }),
     ];
-    render(<InstrumentsView />);
+    renderView();
 
     const row = await screen.findByTestId("instrument-US100");
     expect(within(row).getByText("nothing yet")).toBeInTheDocument();
   });
 
   it("says nothing is archived rather than showing an empty table", async () => {
-    render(<InstrumentsView />);
+    renderView();
     expect(await screen.findByText(/nothing is being archived yet/i)).toBeInTheDocument();
   });
 
@@ -145,7 +174,7 @@ describe("Instruments list — grouping (terminal-data-manager spec)", () => {
       "unreachable",
       "the candle archive is not reachable",
     );
-    render(<InstrumentsView />);
+    renderView();
 
     expect(await screen.findByText(/archive is not reachable/i)).toBeInTheDocument();
     expect(screen.queryByText(/nothing is being archived yet/i)).not.toBeInTheDocument();
@@ -158,7 +187,7 @@ describe("Instruments list — a lagging interval", () => {
       pair({ resolution: "MINUTE", collection: "collecting" }),
       pair({ resolution: "HOUR", collection: "stalled" }),
     ];
-    render(<InstrumentsView />);
+    renderView();
 
     const row = await screen.findByTestId("instrument-US100");
     expect(row).toHaveAttribute("data-stalled", "true");
@@ -168,7 +197,7 @@ describe("Instruments list — a lagging interval", () => {
 
   it("does not mark an instrument whose resolutions are all healthy", async () => {
     fakeArchive.pairs = [pair({ resolution: "MINUTE", collection: "collecting" })];
-    render(<InstrumentsView />);
+    renderView();
 
     const row = await screen.findByTestId("instrument-US100");
     expect(row).toHaveAttribute("data-stalled", "false");
@@ -185,7 +214,7 @@ describe("Instruments list — coverage on expand", () => {
       ranges: [{ from: 1785542400, to: 1786113600, historyEnded: true }],
       earliestReachable: 1785542400,
     };
-    render(<InstrumentsView />);
+    renderView();
 
     await user.click(await screen.findByText("US100"));
 
@@ -202,7 +231,7 @@ describe("Instruments list — coverage on expand", () => {
       pair({ resolution: "MINUTE", latestCandle: 1786113600 }), // 2026-08-07 14:40 UTC
       pair({ resolution: "HOUR", latestCandle: null }),
     ];
-    render(<InstrumentsView />);
+    renderView();
 
     await user.click(await screen.findByText("US100"));
 
@@ -223,7 +252,7 @@ describe("Instruments list — coverage on expand", () => {
       ],
       earliestReachable: null,
     };
-    render(<InstrumentsView />);
+    renderView();
 
     await user.click(await screen.findByText("US100"));
     expect(await screen.findByText(/in 2 stretches, with gaps between them/i)).toBeInTheDocument();
@@ -232,28 +261,30 @@ describe("Instruments list — coverage on expand", () => {
   it("says nothing is verified rather than showing an empty range", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [pair({ collection: "never_collected", latestCandle: null })];
-    render(<InstrumentsView />);
+    renderView();
 
     await user.click(await screen.findByText("US100"));
     expect(await screen.findByText(/nothing verified yet for this interval/i)).toBeInTheDocument();
   });
 });
 
-describe("Instruments list — removing a single interval", () => {
-  it("asks first, promises the candles stay, and drops only that interval", async () => {
+describe("Instruments list — deleting a single interval", () => {
+  it("asks first, warns the removal is permanent, and drops only that interval", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [pair({ resolution: "MINUTE" }), pair({ resolution: "HOUR" })];
-    render(<InstrumentsView />);
+    renderView();
 
     await user.click(await screen.findByText("US100"));
-    await user.click(screen.getByRole("button", { name: /stop archiving us100 minute/i }));
+    await user.click(screen.getByRole("button", { name: /delete us100 minute/i }));
 
-    expect(fakeArchive.untrackCalls).toHaveLength(0);
-    expect(screen.getByText(/candles already collected stay/i)).toBeInTheDocument();
+    expect(fakeArchive.deleteCalls).toHaveLength(0);
+    expect(screen.getByText(/this cannot be undone/i)).toBeInTheDocument();
+    // The old assurance no longer holds — deleting removes the data.
+    expect(screen.queryByText(/candles already collected stay/i)).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /^stop collecting$/i }));
+    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
 
-    expect(fakeArchive.untrackCalls).toEqual([{ symbol: "US100", resolution: "MINUTE" }]);
+    expect(fakeArchive.deleteCalls).toEqual([{ symbol: "US100", resolution: "MINUTE" }]);
     await waitFor(() => {
       const row = screen.getByTestId("instrument-US100");
       expect(within(row).queryByText("1m")).not.toBeInTheDocument();
@@ -264,38 +295,69 @@ describe("Instruments list — removing a single interval", () => {
   it("leaves the interval collecting when the confirmation is dismissed", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [pair()];
-    render(<InstrumentsView />);
+    renderView();
 
     await user.click(await screen.findByText("US100"));
-    await user.click(screen.getByRole("button", { name: /stop archiving us100 minute/i }));
+    await user.click(screen.getByRole("button", { name: /delete us100 minute/i }));
     await user.click(screen.getByRole("button", { name: /cancel/i }));
 
-    expect(fakeArchive.untrackCalls).toHaveLength(0);
+    expect(fakeArchive.deleteCalls).toHaveLength(0);
     expect(screen.getByTestId("instrument-US100")).toBeInTheDocument();
+  });
+
+  it("reports how many candles were removed and points to Data History", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair({ resolution: "MINUTE", latestCandle: 1786113600 })];
+    renderView();
+
+    await user.click(await screen.findByText("US100"));
+    await user.click(screen.getByRole("button", { name: /delete us100 minute/i }));
+    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
+
+    expect(await screen.findByText(/deleted 3 candles for US100 in MINUTE/i)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /data history/i })).toHaveAttribute(
+      "href",
+      "/data-history",
+    );
+  });
+
+  it("says so and leaves the interval listed when deletion fails", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair()];
+    fakeArchive.deleteFailures.add("US100|MINUTE");
+    renderView();
+
+    await user.click(await screen.findByText("US100"));
+    await user.click(screen.getByRole("button", { name: /delete us100 minute/i }));
+    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
+
+    expect(await screen.findByText(/could not delete/i)).toBeInTheDocument();
+    expect(within(screen.getByTestId("instrument-US100")).getByText("1m")).toBeInTheDocument();
   });
 });
 
-describe("Instruments list — removing a whole instrument", () => {
-  it("names every resolution that will stop, and removes the whole row once confirmed", async () => {
+describe("Instruments list — deleting a whole instrument", () => {
+  it("names every resolution that will be deleted, and removes the whole row once confirmed", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [
       pair({ resolution: "MINUTE" }),
       pair({ resolution: "HOUR" }),
       pair({ symbol: "GOLD", resolution: "DAY" }),
     ];
-    render(<InstrumentsView />);
+    renderView();
 
     await screen.findByText("US100");
-    await user.click(screen.getByRole("button", { name: "Stop archiving US100" }));
+    await user.click(screen.getByRole("button", { name: "Delete US100" }));
 
-    const confirmation = screen.getByText(/stop archiving us100 in/i);
+    const confirmation = screen.getByText(/delete us100 in/i);
     expect(confirmation).toHaveTextContent("MINUTE");
     expect(confirmation).toHaveTextContent("HOUR");
-    expect(fakeArchive.untrackCalls).toHaveLength(0);
+    expect(confirmation).toHaveTextContent(/cannot be undone/i);
+    expect(fakeArchive.deleteCalls).toHaveLength(0);
 
-    await user.click(screen.getByRole("button", { name: /^stop collecting$/i }));
+    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
 
-    expect(fakeArchive.untrackCalls).toEqual(
+    expect(fakeArchive.deleteCalls).toEqual(
       expect.arrayContaining([
         { symbol: "US100", resolution: "MINUTE" },
         { symbol: "US100", resolution: "HOUR" },
@@ -304,5 +366,51 @@ describe("Instruments list — removing a whole instrument", () => {
     await waitFor(() => expect(screen.queryByTestId("instrument-US100")).not.toBeInTheDocument());
     // The other instrument is unrelated and stays exactly where it was.
     expect(screen.getByTestId("instrument-GOLD")).toBeInTheDocument();
+  });
+
+  it("reports the total removed across every interval that succeeded", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair({ resolution: "MINUTE" }), pair({ resolution: "HOUR" })];
+    renderView();
+
+    await screen.findByText("US100");
+    await user.click(screen.getByRole("button", { name: "Delete US100" }));
+    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
+
+    // Both pairs share the fake's fixed 3-candle answer, so two intervals sum to 6.
+    expect(await screen.findByText(/deleted 6 candles for US100 in MINUTE, HOUR/i)).toBeInTheDocument();
+  });
+
+  it("drops what succeeded, keeps what failed listed, and names it in the confirmation", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair({ resolution: "MINUTE" }), pair({ resolution: "HOUR" })];
+    fakeArchive.deleteFailures.add("US100|HOUR");
+    renderView();
+
+    await screen.findByText("US100");
+    await user.click(screen.getByRole("button", { name: "Delete US100" }));
+    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
+
+    await waitFor(() => {
+      const row = screen.getByTestId("instrument-US100");
+      expect(within(row).queryByText("1m")).not.toBeInTheDocument();
+      expect(within(row).getByText("1h")).toBeInTheDocument();
+    });
+    expect(screen.getByText(/could not delete HOUR/i)).toBeInTheDocument();
+  });
+
+  it("dismisses the deletion banner on request", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair()];
+    renderView();
+
+    await screen.findByText("US100");
+    await user.click(screen.getByRole("button", { name: "Delete US100" }));
+    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
+    await screen.findByText(/deleted 3 candles/i);
+
+    await user.click(screen.getByRole("button", { name: /dismiss/i }));
+
+    expect(screen.queryByText(/deleted 3 candles/i)).not.toBeInTheDocument();
   });
 });

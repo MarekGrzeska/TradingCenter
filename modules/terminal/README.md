@@ -11,9 +11,15 @@ call went where — the composition is `marketData.ts` and nothing else.
 
 **Nothing is archived because somebody looked at a chart.** Collecting a pair holds a
 provider connection open around the clock and the provider limits how many a session may
-hold, so what gets collected is a standing decision — made, and taken back, on the
-`Instruments` tab. It runs the other way too: a chart slot only offers instruments the
-archive already collects, because a chart of a pair nobody collects has nothing to draw.
+hold, so what gets collected is a standing decision — made on the `Instruments` tab. It
+runs the other way too: a chart slot only offers instruments the archive already
+collects, because a chart of a pair nobody collects has nothing to draw.
+
+**Deleting a pair removes its data — irreversibly.** There is no "stop but keep the
+candles" left in the terminal; `Instruments`' Delete stops collection and takes the data
+with it, in one confirmed step that says so plainly before it happens. What it removed is
+what makes a re-add later start from nothing rather than quietly inheriting a shorter
+range it was never given, and it stays visible afterwards as an entry in `Data History`.
 
 **Tabs.** `Graph` is the grid of charts. `Instruments` is the one place that says what is
 archived — one row per instrument, every resolution of it in one column, and since when
@@ -21,7 +27,8 @@ there is data for it: one date when the resolutions agree, split per resolution 
 reach differently far back — and where an
 instrument is added, through a wizard that prices the work before starting it. `Data
 History` is where that work is watched: what was pulled, how far a running pull has got,
-and where a failed one is retried.
+where a failed one is retried, and — in the same timeline — every deletion that has
+happened.
 
 ## What
 
@@ -43,9 +50,10 @@ and where a failed one is retried.
   symbol comes from the archived-instruments picker and its resolutions from what that
   instrument is archived in.
 - `instruments/` — the `Instruments` tab: what is archived, per instrument, and the wizard
-  and acceptance dialog that add to it.
+  and acceptance dialog that add to it; Delete, which removes a pair's data with it.
 - `history/` — the `Data History` tab: collection jobs per instrument and resolution, their
-  measured progress, and retrying the chunks that failed.
+  measured progress, retrying the chunks that failed, and every deletion, in one timeline
+  with the jobs.
 
 ## Run
 

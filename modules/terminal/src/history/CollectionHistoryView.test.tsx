@@ -3,12 +3,14 @@ import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { MarketDataError } from "../data/types";
-import type { Chunk, JobPairView } from "../data/types";
+import type { Chunk, JobPairView, PairDeletion } from "../data/types";
 
-/** A stand-in archive the test drives — `listJobs` answers change between
- *  polls, the same way a real one would while a job runs. */
+/** A stand-in archive the test drives — `listJobs` and `listDeletions`
+ *  answers change between polls, the same way a real one would while a job
+ *  runs or an operator deletes something. */
 class FakeArchive {
   rows: JobPairView[] = [];
+  deletions: PairDeletion[] = [];
   listFailure: Error | null = null;
   retryFailure: Error | null = null;
   listCalls = 0;
@@ -18,6 +20,11 @@ class FakeArchive {
     this.listCalls++;
     if (this.listFailure) throw this.listFailure;
     return [...this.rows];
+  };
+
+  listDeletions = async () => {
+    if (this.listFailure) throw this.listFailure;
+    return [...this.deletions];
   };
 
   retryJob = async (jobId: number) => {
@@ -70,6 +77,18 @@ function row(over: Partial<JobPairView> = {}): JobPairView {
     chunksTotal: 1,
     candlesWritten: 1000,
     chunks: [chunk()],
+    ...over,
+  };
+}
+
+function deletion(over: Partial<PairDeletion> = {}): PairDeletion {
+  return {
+    symbol: "US100",
+    resolution: "MINUTE",
+    deletedAt: 1786200000,
+    candlesRemoved: 250,
+    removedFrom: 1785542400,
+    removedTo: 1786113600,
     ...over,
   };
 }
@@ -136,6 +155,67 @@ describe("CollectionHistoryView — rows (terminal-collection-history spec)", ()
     const r = await screen.findByTestId("history-1-US100-MINUTE");
     expect(within(r).getByText(/25% \(2\/8 chunks\)/)).toBeInTheDocument();
     expect(within(r).getByText(/4,000 candles so far/)).toBeInTheDocument();
+  });
+});
+
+describe("CollectionHistoryView — deletions (delete-archived-pair-data)", () => {
+  it("shows a deletion alongside a pull, newest first", async () => {
+    fakeArchive.rows = [row({ jobId: 1, createdAt: 1000 })];
+    fakeArchive.deletions = [deletion({ deletedAt: 2000 })];
+    renderView();
+
+    const found = await screen.findAllByTestId(/^(history|deletion)-/);
+    expect(found.map((el) => el.getAttribute("data-testid"))).toEqual([
+      `deletion-US100-MINUTE-2000`,
+      "history-1-US100-MINUTE",
+    ]);
+  });
+
+  it("names the pair, when, how many candles, and the range they covered", async () => {
+    fakeArchive.deletions = [deletion({ candlesRemoved: 42 })];
+    renderView();
+
+    const r = await screen.findByTestId("deletion-US100-MINUTE-1786200000");
+    expect(within(r).getByText("US100")).toBeInTheDocument();
+    expect(within(r).getByText("MINUTE")).toBeInTheDocument();
+    expect(within(r).getByText(/−42 candles/)).toBeInTheDocument();
+    expect(within(r).getByText(/→/)).toBeInTheDocument();
+  });
+
+  it("shows a null range as a dash rather than a fabricated one", async () => {
+    fakeArchive.deletions = [deletion({ candlesRemoved: 0, removedFrom: null, removedTo: null })];
+    renderView();
+
+    const r = await screen.findByTestId("deletion-US100-MINUTE-1786200000");
+    expect(within(r).getByText("—")).toBeInTheDocument();
+  });
+
+  it("does not read as a success or a failure", async () => {
+    fakeArchive.deletions = [deletion()];
+    renderView();
+
+    const r = await screen.findByTestId("deletion-US100-MINUTE-1786200000");
+    const label = within(r).getByText("deleted");
+    expect(label).not.toHaveClass("text-up");
+    expect(label).not.toHaveClass("text-critical");
+    expect(label).not.toHaveClass("text-warning");
+  });
+
+  it("keeps an instrument's history readable after it was deleted in full", async () => {
+    fakeArchive.rows = [row()];
+    fakeArchive.deletions = [deletion()];
+    renderView();
+
+    expect(await screen.findByTestId("history-1-US100-MINUTE")).toBeInTheDocument();
+    expect(screen.getByTestId("deletion-US100-MINUTE-1786200000")).toBeInTheDocument();
+  });
+
+  it("counts a deletion on its own as history, not an empty tab", async () => {
+    fakeArchive.deletions = [deletion()];
+    renderView();
+
+    expect(await screen.findByTestId("deletion-US100-MINUTE-1786200000")).toBeInTheDocument();
+    expect(screen.queryByText(/nothing has been collected yet/i)).not.toBeInTheDocument();
   });
 });
 

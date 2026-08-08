@@ -12,6 +12,7 @@ import type {
   JobPairView,
   JobStatus,
   PairCoverage,
+  PairDeletion,
   PairEstimate,
   PairRequest,
   Resolution,
@@ -158,6 +159,15 @@ interface RawTrackPairsResult {
   job_id: number | null;
 }
 
+interface RawPairDeletion {
+  symbol: string;
+  resolution: string;
+  deleted_at: string;
+  candles_removed: number;
+  removed_from: string | null;
+  removed_to: string | null;
+}
+
 /** A candle missing any OHLC field (the provider reports this for a period with
  *  no trade) can't become a `Bar` — `Bar`'s fields are non-nullable by design,
  *  so such a candle is dropped rather than faked with a zero. */
@@ -256,6 +266,17 @@ function mapJobEstimate(raw: RawJobEstimate): JobEstimate {
     pairs: raw.pairs.map(mapPairEstimate),
     totalEstimatedCandles: raw.total_estimated_candles,
     totalEstimatedBytes: raw.total_estimated_bytes,
+  };
+}
+
+function mapPairDeletion(raw: RawPairDeletion): PairDeletion {
+  return {
+    symbol: raw.symbol,
+    resolution: raw.resolution as Resolution,
+    deletedAt: parseIsoToEpochSeconds(raw.deleted_at),
+    candlesRemoved: raw.candles_removed,
+    removedFrom: raw.removed_from === null ? null : parseIsoToEpochSeconds(raw.removed_from),
+    removedTo: raw.removed_to === null ? null : parseIsoToEpochSeconds(raw.removed_to),
   };
 }
 
@@ -450,12 +471,24 @@ export function createArchiveSource(httpBase: string, wsBase: string): ArchiveSo
       return mapTrackPairsResult(raw);
     },
 
-    async untrackPair(symbol, resolution, signal) {
-      // 204, no body to read.
-      await http.send(
+    async deletePair(symbol, resolution, signal): Promise<PairDeletion> {
+      const raw = await http.json<RawPairDeletion>(
         `${httpBase}/pairs/${encodeURIComponent(symbol)}?resolution=${resolution}`,
         { signal, method: "DELETE" },
       );
+      return mapPairDeletion(raw);
+    },
+
+    async listDeletions(symbol, resolution, signal): Promise<PairDeletion[]> {
+      const params = new URLSearchParams();
+      if (symbol !== null) params.set("symbol", symbol);
+      if (resolution !== null) params.set("resolution", resolution);
+      const query = params.toString();
+      const raw = await http.json<RawPairDeletion[]>(
+        `${httpBase}/deletions${query ? `?${query}` : ""}`,
+        { signal },
+      );
+      return raw.map(mapPairDeletion);
     },
 
     async coverage(symbol, resolution, signal): Promise<PairCoverage> {

@@ -24,13 +24,21 @@ function fakeArchiveAdmin(overrides: Partial<ArchiveAdmin> = {}): ArchiveAdmin {
   return {
     listPairs: vi.fn(async () => []),
     trackPairs: vi.fn(async () => ({ results: [], jobId: null })),
-    untrackPair: vi.fn(async () => {}),
+    deletePair: vi.fn(async () => ({
+      symbol: "",
+      resolution: "MINUTE" as const,
+      deletedAt: 0,
+      candlesRemoved: 0,
+      removedFrom: null,
+      removedTo: null,
+    })),
     coverage: vi.fn(async () => ({
       symbol: "",
       resolution: "MINUTE" as const,
       ranges: [],
       earliestReachable: null,
     })),
+    listDeletions: vi.fn(async () => []),
     estimateJob: vi.fn(async () => ({ pairs: [], totalEstimatedCandles: 0, totalEstimatedBytes: 0 })),
     listJobs: vi.fn(async () => []),
     readJob: vi.fn(),

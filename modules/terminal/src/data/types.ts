@@ -275,3 +275,21 @@ export interface TrackPairsResult {
    *  needed fetching. */
   jobId: number | null;
 }
+
+// --- deletion: kasowanie, a decision that removes data, not just a decision ---
+//
+// Only the Instruments tab (the Delete confirmation) and Data History tab (the
+// combined timeline) speak this. `market-data-tracking` spec, "Skasowanie
+// zostaje odnotowane".
+
+/** The trace one skasowanie leaves — what it removed, kept after the data
+ *  itself is gone. `removedFrom`/`removedTo` are null together when the pair
+ *  had never collected anything before it was deleted. */
+export interface PairDeletion {
+  symbol: string;
+  resolution: Resolution;
+  deletedAt: number;
+  candlesRemoved: number;
+  removedFrom: number | null;
+  removedTo: number | null;
+}
