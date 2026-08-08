@@ -7,10 +7,12 @@ whole reason this module exists instead of a list in a configuration file: a fil
 access to the machine and a restart, and neither belongs in the loop of "archive this
 too".
 
-Untracking stops collection and keeps every candle. An archive that discards data when
-its configuration changes is not an archive, so the row is flipped rather than deleted —
-which also leaves the record of when collection stopped, and that is the gap a later
-re-add has to close.
+Untracking stops collection and keeps every candle: the row is flipped rather than
+deleted, which also leaves the record of when collection stopped, and that is the gap a
+later re-add has to close. An archive MUST NOT discard data on its own — not on a
+configuration change, not on a restart — but an operator can ask for it directly, which
+is a different, explicit operation: `deletion.py`, built on top of `untrack` here rather
+than replacing it.
 """
 
 from __future__ import annotations
@@ -246,7 +248,9 @@ async def untrack(
     """Stop collecting a pair. Returns `None` if it was not being collected.
 
     The candles stay, and so does the row: the moment collection stopped is the left edge
-    of the gap that tracking it again will have to close.
+    of the gap that tracking it again will have to close. This is the flip alone — an
+    operator who wants the data gone too is `deletion.close_for_deletion`, which calls
+    this and adds skipping the pair's queued chunks, both in one transaction.
     """
     row = await conn.fetchrow(_UNTRACK, symbol, resolution.value)
     return _pair(row) if row else None

@@ -89,6 +89,16 @@ _SELECT_RANGE = """
      ORDER BY period_start
 """
 
+_SELECT_BOUNDS = """
+    SELECT count(*) AS removed, min(period_start) AS earliest, max(period_start) AS latest
+      FROM candles
+     WHERE symbol = $1 AND resolution = $2
+"""
+
+_DELETE_ALL = """
+    DELETE FROM candles WHERE symbol = $1 AND resolution = $2
+"""
+
 
 async def write_candles(conn: asyncpg.Connection, candles: Iterable[Candle]) -> int:
     """Store closed candles, overwriting what is already held for the same period.
@@ -173,6 +183,24 @@ async def read_latest_period(
     of the gap, and its absence means there is no edge because there is no data.
     """
     return await conn.fetchval(_SELECT_LATEST, symbol, resolution.value)
+
+
+async def delete_all_candles(
+    conn: asyncpg.Connection, symbol: str, resolution: Resolution
+) -> tuple[int, datetime | None, datetime | None]:
+    """Remove every candle stored for one pair — deliberate, and total.
+
+    Returns how many were removed and the oldest and newest `period_start` among them
+    (both `None` when there was nothing to remove), which is what a caller records as
+    the range that just disappeared. There is no partial form of this: a pair either
+    keeps every candle or none, per `market-data-tracking` spec, "Skasowanie pary
+    zatrzymuje zbieranie i usuwa jej dane".
+    """
+    row = await conn.fetchrow(_SELECT_BOUNDS, symbol, resolution.value)
+    removed, earliest, latest = row["removed"], row["earliest"], row["latest"]
+    if removed:
+        await conn.execute(_DELETE_ALL, symbol, resolution.value)
+    return removed, earliest, latest
 
 
 async def read_recent(

@@ -102,6 +102,17 @@ _MARK_FAILED = """
      WHERE id = $1
 """
 
+# Every chunk of a pair, across every job, still pending — not `running`, which a worker
+# already claimed and `execute_chunk`'s own tracked-pair check is what stops from
+# writing (`market-data-tracking` spec, "Kawałek nigdy nie zapisuje dla pary, której
+# nikt nie zbiera").
+_SKIP_PENDING_FOR_PAIR = """
+    UPDATE collection_job_chunks
+       SET state = 'skipped', finished_at = now()
+     WHERE symbol = $1 AND resolution = $2 AND state = 'pending'
+    RETURNING id
+"""
+
 # Every chunk of this job, for this pair, that is still pending and lies entirely at or
 # before the boundary just discovered. `chunk_end <= boundary` is deliberately not
 # `<`: a chunk touching the boundary exactly has nothing on its far side either.
@@ -266,6 +277,18 @@ async def finish_chunk_failed(
     conn: asyncpg.Connection, chunk_id: int, *, failure: str, requests: int
 ) -> None:
     await conn.execute(_MARK_FAILED, chunk_id, failure, requests)
+
+
+async def skip_pending_chunks_for_pair(
+    conn: asyncpg.Connection, symbol: str, resolution: Resolution
+) -> int:
+    """Every not-yet-claimed chunk of a pair, across every job it belongs to, settled as
+    skipped rather than run. Called right before deleting a pair's data, so nothing
+    claims new work for a pair whose data is about to disappear. Returns how many were
+    skipped.
+    """
+    rows = await conn.fetch(_SKIP_PENDING_FOR_PAIR, symbol, resolution.value)
+    return len(rows)
 
 
 async def skip_chunks_beyond_history(

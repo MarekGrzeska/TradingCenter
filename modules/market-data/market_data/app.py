@@ -28,6 +28,7 @@ from .contract import (
     JobOut,
     JobPairViewOut,
     PairCoverageOut,
+    PairDeletionOut,
     PairEstimateOut,
     Problem,
     TrackedPairOut,
@@ -38,6 +39,7 @@ from .contract import (
 )
 from .coverage import earliest_reachable, read_coverage, uncovered_within
 from .db import pool as make_pool
+from .deletion import close_for_deletion, delete_pair_data, read_deletions
 from .errors import GatewayError, GatewayRefused, GatewayUnreachable
 from .gateway import GatewayHistory, GatewayInstruments, http_client
 from .hub import Hub
@@ -68,7 +70,6 @@ from .tracking import (
     collection_state,
     is_tracked,
     read_status,
-    untrack,
 )
 
 log = logging.getLogger(__name__)
@@ -537,24 +538,52 @@ async def track_pairs(body: TrackPairRequest, request: Request) -> TrackPairsRes
 @app.delete(
     "/pairs/{symbol}",
     tags=["tracking"],
-    status_code=204,
+    response_model=PairDeletionOut,
     responses={404: {"model": Problem}},
-    summary="Stop collecting a pair",
-    description="The candles already collected stay. An archive that deletes on a "
-    "configuration change is not an archive.",
+    summary="Stop collecting a pair and delete its data",
+    description=(
+        "Stops collection, releases the provider connection, and removes every candle "
+        "and coverage range this pair holds — irreversibly. A symbol whose minute "
+        "series is deleted also loses the rollups computed from it. 404 for a pair not "
+        "currently tracked, which deletes nothing."
+    ),
 )
-async def untrack_pair(
+async def delete_pair(
     symbol: str, request: Request, resolution: Resolution = Query(Resolution.MINUTE)
-):
-    async with request.app.state.pool.acquire() as conn:
-        stopped = await untrack(conn, symbol, resolution)
+) -> PairDeletionOut:
+    pool = request.app.state.pool
+    async with pool.acquire() as conn:
+        stopped = await close_for_deletion(conn, symbol, resolution)
     if stopped is None:
-        return JSONResponse(
-            status_code=404,
-            content={"detail": f"{symbol} {resolution.value} is not being collected"},
+        raise HTTPException(
+            status_code=404, detail=f"{symbol} {resolution.value} is not being collected"
         )
+
+    # Between the two writes: the decision is already closed (nothing new claims this
+    # pair's chunks, and `is_tracked` already reads false for it), so this is what
+    # actually stops a live subscription — not a database write, and the reason the two
+    # transactions in `close_for_deletion`/`delete_pair_data` cannot be one.
     await request.app.state.ingest.sync()
-    return JSONResponse(status_code=204, content=None)
+
+    async with pool.acquire() as conn:
+        deletion = await delete_pair_data(conn, symbol, resolution)
+    return PairDeletionOut.of(deletion)
+
+
+@app.get(
+    "/deletions",
+    tags=["tracking"],
+    response_model=list[PairDeletionOut],
+    summary="Recorded deletions, newest first",
+)
+async def deletions(
+    symbol: str | None = Query(None),
+    resolution: Resolution | None = Query(None),
+    db=Depends(pool),
+) -> list[PairDeletionOut]:
+    async with db.acquire() as conn:
+        found = await read_deletions(conn, symbol, resolution)
+    return [PairDeletionOut.of(deletion) for deletion in found]
 
 
 # --- collection jobs ---

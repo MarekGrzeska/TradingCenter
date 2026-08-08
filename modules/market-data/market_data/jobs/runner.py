@@ -19,12 +19,14 @@ from ..gateway import GatewayHistory
 from ..models import Resolution
 from ..rollups import refresh_all
 from ..store import write_candles
+from ..tracking import is_tracked
 from .models import Chunk
 from .plan import periods_between
 from .store import (
     claim_pending_chunk,
     finish_chunk_done,
     finish_chunk_failed,
+    finish_chunk_skipped,
     skip_chunks_beyond_history,
 )
 
@@ -65,6 +67,21 @@ async def execute_chunk(
         return
 
     async with pool.acquire() as conn:
+        # The pair may have been deleted while this chunk's request was in flight — the
+        # gateway does not know that, so its answer still arrives, and writing it would
+        # resurrect data an operator just removed (`market-data-tracking` spec, "Kawałek
+        # nigdy nie zapisuje dla pary, której nikt nie zbiera"). Not narrower than
+        # "tracked": an untracked-but-not-deleted pair must not gain new candles either.
+        if not await is_tracked(conn, chunk.symbol, chunk.resolution):
+            await finish_chunk_skipped(conn, chunk.id, requests=page.requests)
+            log.info(
+                "chunk %d (%s %s) skipped: pair no longer tracked",
+                chunk.id,
+                chunk.symbol,
+                chunk.resolution.value,
+            )
+            return
+
         written = await write_candles(conn, page.candles) if page.candles else 0
         # The requested window is what was verified, not only the span the candles
         # happen to occupy — an exhaustive read of an empty stretch is still a stretch

@@ -25,6 +25,7 @@ from .store import (
     read_job,
     retry_job,
     skip_chunks_beyond_history,
+    skip_pending_chunks_for_pair,
 )
 
 __all__ = [
@@ -53,4 +54,5 @@ __all__ = [
     "read_job",
     "retry_job",
     "skip_chunks_beyond_history",
+    "skip_pending_chunks_for_pair",
 ]

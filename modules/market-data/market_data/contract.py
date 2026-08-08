@@ -13,6 +13,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, model_validator
 
+from .deletion import PairDeletion
 from .jobs.models import Chunk, ChunkState, Job, JobPairView, JobStatus
 from .jobs.plan import JobEstimate, PairEstimate
 from .models import Candle, PriceSide, Resolution
@@ -149,6 +150,35 @@ class TrackedPairOut(BaseModel):
         description="the pair's most recent backfill, or null if none has run since the "
         "module started — fills live in memory and do not survive a restart",
     )
+
+
+class PairDeletionOut(BaseModel):
+    """What `DELETE /pairs/{symbol}` and `GET /deletions` answer with — the trace of one
+    skasowanie, kept after the data itself is gone."""
+
+    symbol: str
+    resolution: Resolution
+    deleted_at: datetime
+    candles_removed: int = Field(description="how many candles were removed; 0 is a valid count")
+    removed_from: datetime | None = Field(
+        default=None,
+        description="the oldest removed candle's period; null together with "
+        "`removed_to` when the pair had never collected anything",
+    )
+    removed_to: datetime | None = Field(
+        default=None, description="the newest removed candle's period; null with `removed_from`"
+    )
+
+    @classmethod
+    def of(cls, deletion: PairDeletion) -> PairDeletionOut:
+        return cls(
+            symbol=deletion.symbol,
+            resolution=deletion.resolution,
+            deleted_at=deletion.deleted_at,
+            candles_removed=deletion.candles_removed,
+            removed_from=deletion.removed_from,
+            removed_to=deletion.removed_to,
+        )
 
 
 class PairRequest(BaseModel):

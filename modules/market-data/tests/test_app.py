@@ -126,7 +126,10 @@ async def pool(migrated_url: str):
 
     async with make_pool(migrated_url, max_size=5) as created:
         async with created.acquire() as conn:
-            await conn.execute("TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges, collection_jobs, collection_job_chunks")
+            await conn.execute(
+                "TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges, "
+                "collection_jobs, collection_job_chunks, pair_deletions"
+            )
         yield created
 
 
@@ -547,18 +550,19 @@ async def test_a_pair_whose_fill_has_not_run_says_so_rather_than_inventing_one(
     assert listed["last_fill"] is None
 
 
-async def test_a_pair_can_be_let_go_over_the_contract(api, pool) -> None:
+async def test_a_pair_can_be_deleted_over_the_contract(api, pool) -> None:
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
         await write_candles(conn, [candle(0)])
 
     response = await api.delete("/pairs/US100", params={"resolution": "MINUTE"})
 
-    assert response.status_code == 204
+    assert response.status_code == 200
+    body = response.json()
+    assert body["candles_removed"] == 1
     assert (await api.get("/pairs")).json() == []
-    # The candles stay. An archive that deletes on a configuration change is not one.
     async with pool.acquire() as conn:
-        assert len(await read_candles(conn, "US100", Resolution.MINUTE)) == 1
+        assert await read_candles(conn, "US100", Resolution.MINUTE) == []
 
 
 async def test_letting_go_of_a_pair_that_was_not_collected_is_a_404(api) -> None:
@@ -566,6 +570,48 @@ async def test_letting_go_of_a_pair_that_was_not_collected_is_a_404(api) -> None
 
     assert response.status_code == 404
     assert "not being collected" in response.json()["detail"]
+
+
+async def test_deleting_a_pair_a_404_does_not_touch_anything_else(api, pool) -> None:
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(0)])
+
+    response = await api.delete("/pairs/GOLD", params={"resolution": "MINUTE"})
+
+    assert response.status_code == 404
+    async with pool.acquire() as conn:
+        assert len(await read_candles(conn, "US100", Resolution.MINUTE)) == 1
+
+
+async def test_deleting_a_pair_with_nothing_collected_reports_zero(api, pool) -> None:
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+
+    response = await api.delete("/pairs/US100", params={"resolution": "MINUTE"})
+
+    body = response.json()
+    assert body["candles_removed"] == 0
+    assert body["removed_from"] is None
+    assert body["removed_to"] is None
+
+
+async def test_reading_deletions_narrowed_to_a_pair(api, pool) -> None:
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await track(conn, "GOLD", Resolution.HOUR, LIMIT)
+    await api.delete("/pairs/US100", params={"resolution": "MINUTE"})
+    await api.delete("/pairs/GOLD", params={"resolution": "HOUR"})
+
+    response = await api.get("/deletions", params={"symbol": "US100", "resolution": "MINUTE"})
+
+    assert [d["symbol"] for d in response.json()] == ["US100"]
+
+
+async def test_reading_deletions_with_none_recorded_is_an_empty_list(api) -> None:
+    response = await api.get("/deletions")
+
+    assert response.json() == []
 
 
 # --- 8.7: refusals that name themselves -----------------------------------------------
@@ -952,6 +998,7 @@ async def test_the_http_routes_are_all_described(api) -> None:
         "/coverage/{symbol}",
         "/pairs",
         "/pairs/{symbol}",
+        "/deletions",
         "/jobs/estimate",
         "/jobs",
         "/jobs/{job_id}",

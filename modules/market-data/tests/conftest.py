@@ -43,6 +43,7 @@ TABLES = (
     "coverage_ranges",
     "collection_jobs",
     "collection_job_chunks",
+    "pair_deletions",
 )
 
 

@@ -88,7 +88,7 @@ async def pool(migrated_url: str):
         async with created.acquire() as conn:
             await conn.execute(
                 "TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges, "
-                "collection_jobs, collection_job_chunks"
+                "collection_jobs, collection_job_chunks, pair_deletions"
             )
         yield created
 
@@ -149,6 +149,46 @@ async def test_a_chunk_with_nothing_returned_is_still_done_not_failed(pool) -> N
         reread = await read_job(conn, chunk.job_id)
     assert reread.chunks[0].state is ChunkState.DONE
     assert reread.chunks[0].candles_written == 0
+
+
+async def test_a_chunk_for_a_pair_deleted_mid_flight_writes_nothing(pool) -> None:
+    """The gateway answer for a chunk claimed before deletion still arrives after it —
+    `delete-archived-pair-data` design.md, "Kawałek nigdy nie zapisuje dla pary, której
+    nikt nie zbiera"."""
+    from market_data.deletion import close_for_deletion, delete_pair_data
+
+    await _tracked(pool)
+    async with pool.acquire() as conn:
+        await create_job(conn, NOW, [plan(chunk_start=NOW - timedelta(hours=1), chunk_end=NOW)])
+        chunk = await claim_pending_chunk(conn)
+        await close_for_deletion(conn, "US100", Resolution.MINUTE)
+        await delete_pair_data(conn, "US100", Resolution.MINUTE)
+
+    await execute_chunk(pool, FakeHistory([minute_candle(1)]), chunk, asyncio.Semaphore(1))
+
+    async with pool.acquire() as conn:
+        reread = await read_job(conn, chunk.job_id)
+        candles = await read_candles(conn, "US100", Resolution.MINUTE)
+    assert reread.chunks[0].state is ChunkState.SKIPPED
+    assert candles == []
+
+
+async def test_a_chunk_for_a_pair_merely_untracked_mid_flight_also_writes_nothing(
+    pool,
+) -> None:
+    from market_data.tracking import untrack
+
+    await _tracked(pool)
+    async with pool.acquire() as conn:
+        await create_job(conn, NOW, [plan(chunk_start=NOW - timedelta(hours=1), chunk_end=NOW)])
+        chunk = await claim_pending_chunk(conn)
+        await untrack(conn, "US100", Resolution.MINUTE)
+
+    await execute_chunk(pool, FakeHistory([minute_candle(1)]), chunk, asyncio.Semaphore(1))
+
+    async with pool.acquire() as conn:
+        candles = await read_candles(conn, "US100", Resolution.MINUTE)
+    assert candles == []
 
 
 async def test_the_full_window_is_recorded_as_covered_not_only_where_candles_landed(

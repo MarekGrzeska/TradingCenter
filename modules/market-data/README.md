@@ -98,7 +98,8 @@ HTTP, described by OpenAPI at `/docs`.
 | GET | `/coverage/{symbol}?resolution=` | verified ranges and the end of provider history |
 | GET | `/pairs` | what is collected, how collection is going, and where each pair's history starts |
 | POST | `/pairs` | start collecting one or more pairs, from a given moment |
-| DELETE | `/pairs/{symbol}?resolution=` | stop collecting it; the candles stay |
+| DELETE | `/pairs/{symbol}?resolution=` | stop collecting it **and delete its data**, irreversibly |
+| GET | `/deletions?symbol=&resolution=` | recorded deletions, newest first |
 | POST | `/jobs/estimate` | price a collection job without creating it |
 | GET | `/jobs?symbol=&resolution=` | jobs, one row per pair they touched |
 | GET | `/jobs/{id}` | one job, whole — every pair and chunk it covers |
@@ -115,6 +116,38 @@ quietly compared against an ask-side one is off by a spread that reads as a real
 and the setting to raise; a symbol the gateway will not serve is 422; a gateway that is down
 is 504 rather than 500, because the archive is fine and retrying it as though it were at fault
 is the wrong response.
+
+### Deleting a pair
+
+`DELETE /pairs/{symbol}` used to only flip a pair to untracked; the candles stayed, on the
+principle that an archive should not discard data as a side effect of a configuration change.
+That principle still holds — nothing here deletes on its own, on a restart, or because a pair
+was merely untracked — but it left no way to ask for data to actually go, and a pair re-added
+with a shorter range kept its old, wider one: the leftover coverage told planning the range was
+already fetched, so the next job pulled nothing.
+
+The endpoint now deletes: it stops collection, releases the provider connection, and removes
+every candle and coverage range the pair holds, in one transaction — a pair left with candles
+gone but coverage intact would look, to planning, exactly like a pair already fully collected.
+Deleting a symbol's `MINUTE` series also removes the rollups computed from it (`MINUTE_5` through
+`HOUR_4`), since those are a projection of the deleted series rather than data of their own.
+Deleting one resolution never touches another archived resolution of the same symbol.
+
+What survives deletion: the pair's row in `tracked_pairs` (kept for the foreign key every chunk
+and every deletion record relies on to name a pair tracking actually decided on), and every
+collection job that ever touched the pair — a job is a record of what happened, and deleting the
+data does not undo that it happened. What is added: a row in `pair_deletions`, readable through
+`GET /deletions`, naming the pair, when, how many candles were removed, and the range they
+covered (both null when there was nothing to remove) — without it, a pair's data reaching
+further back one day and less far the next would be a fact with no explanation.
+
+Deletion is not atomic with stopping the live subscription. It runs as two steps around one
+in-process operation: close the decision (untrack the pair, skip its still-pending chunks) inside
+one transaction, sync ingest — which is what actually closes the subscription and is not a
+database write — then remove the data inside a second transaction. A chunk already claimed when
+deletion starts can still finish afterwards; `execute_chunk` checks whether its pair is still
+tracked before writing, so a gateway answer that arrives after deletion is discarded rather than
+resurrecting what the operator just removed.
 
 ### Collection jobs
 

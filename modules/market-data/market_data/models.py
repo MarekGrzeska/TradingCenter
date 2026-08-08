@@ -117,8 +117,9 @@ class TrackedPairState(str, Enum):
     """Whether the operator currently wants this pair collected.
 
     An untracked pair keeps its row rather than losing it, so that tracking it again
-    knows when collection stopped and can close the gap. Its candles are never touched:
-    an archive that deletes data when configuration changes is not an archive.
+    knows when collection stopped and can close the gap. Its candles are untouched by
+    this alone — an archive MUST NOT delete data on a configuration change — but an
+    operator can ask for them to be removed directly; see `deletion.py`.
     """
 
     TRACKED = "tracked"
