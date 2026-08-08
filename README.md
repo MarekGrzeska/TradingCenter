@@ -72,8 +72,9 @@ Useful variants:
 ```
 
 The terminal has no offline mode: candles come from `market-data` and instruments from
-`capital-gateway`. Nothing is archived until a pair is added in the terminal's Archive panel,
-which is deliberate — collecting a pair holds a provider connection open around the clock.
+`capital-gateway`. Nothing is archived until an instrument is added on the terminal's
+`Instruments` tab, which is deliberate — collecting a pair holds a provider connection open
+around the clock.
 
 ## Workflow
 

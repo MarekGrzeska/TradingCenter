@@ -57,9 +57,10 @@ export interface Endpoints {
 // hasn't copied it yet, or a test/CI environment with no env file at all)
 // must fall back to "talk to the dev proxy", not crash the moment a source is
 // built.
-// `/archive-api`, not `/archive`: the latter is the Archive tab's own route, and
-// a back end answering that prefix shadows the tab for every request that
-// actually reaches a server. See the note in vite.config.ts.
+// The `-api` suffix keeps a back-end prefix clear of the tab routes: a back end
+// answering a prefix a tab also claims shadows that tab for every request which
+// actually reaches a server. A test compares the two lists so the next prefix
+// cannot repeat it. See the note in vite.config.ts.
 const DEFAULT_GATEWAY_HTTP = "/api";
 const DEFAULT_ARCHIVE_HTTP = "/archive-api";
 const DEFAULT_ARCHIVE_WS = "/archive-api/ws";

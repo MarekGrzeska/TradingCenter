@@ -101,7 +101,7 @@
 
 ## 12. Domknięcie
 
-- [ ] 12.1 `ruff` i `pytest` w `capital-gateway` i `market-data`, `pnpm lint` i testy w `terminal`
-- [ ] 12.2 Przejść ścieżkę end-to-end na uruchomionym zestawie: dodanie instrumentu w kilku interwałach od odległej daty, dialog, zlecenie, podgląd postępu, wymuszona porażka i ponowienie
-- [ ] 12.3 Zaktualizować README terminala o nowy układ zakładek oraz `docs/` tam, gdzie opisują zakładkę `Archive`
-- [ ] 12.4 `openspec validate rework-instrument-collection --strict`
+- [x] 12.1 `ruff` i `pytest` w `capital-gateway` i `market-data`, `pnpm lint` i testy w `terminal`
+- [ ] 12.2 Przejść ścieżkę end-to-end na uruchomionym zestawie: dodanie instrumentu w kilku interwałach od odległej daty, dialog, zlecenie, podgląd postępu, wymuszona porażka i ponowienie — *do ręcznego potwierdzenia przez operatora*
+- [x] 12.3 Zaktualizować README terminala o nowy układ zakładek oraz `docs/` tam, gdzie opisują zakładkę `Archive`
+- [x] 12.4 `openspec validate rework-instrument-collection --strict`

@@ -74,13 +74,13 @@ export default defineConfig(({ mode }) => {
         // HTTP contract and `/archive-api/ws/candles` its subscription, and
         // `ws: true` upgrades only the request that asks to be upgraded.
         //
-        // `-api` is not decoration. The prefix was `/archive`, which is also the
-        // Archive tab's route — so a proxy claiming that prefix shadowed the tab
-        // for anything that reaches the server: a reload, a bookmark, the link
-        // `scripts/dev.sh` prints. Clicking through still worked, because the
-        // router never asks, which is exactly why it survived the test suite.
-        // Whatever fronts the two back ends in production would shadow it the
-        // same way, so the fix is the prefix, not the dev server.
+        // `-api` is not decoration. The prefix was `/archive`, which back then
+        // was also a tab's route — so a proxy claiming that prefix shadowed the
+        // tab for anything that reaches the server: a reload, a bookmark, the
+        // link `scripts/dev.sh` prints. Clicking through still worked, because
+        // the router never asks, which is exactly why it survived the test
+        // suite. Whatever fronts the two back ends in production would shadow a
+        // tab the same way, so the fix is the prefix, not the dev server.
         "/archive-api": {
           target: archive,
           ws: true,
