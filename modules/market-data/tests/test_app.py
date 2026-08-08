@@ -101,7 +101,7 @@ async def pool(migrated_url: str):
 
     async with make_pool(migrated_url, max_size=5) as created:
         async with created.acquire() as conn:
-            await conn.execute("TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges")
+            await conn.execute("TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges, collection_jobs, collection_job_chunks")
         yield created
 
 

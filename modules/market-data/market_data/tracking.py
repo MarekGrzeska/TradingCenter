@@ -94,6 +94,9 @@ class TrackedPair(BaseModel):
     state: TrackedPairState
     added_at: datetime
     untracked_at: datetime | None = None
+    # The moment history for this pair is meant to reach back to — never later than the
+    # value it was tracked with, even across a re-track (see `track`'s docstring).
+    collect_from: datetime
 
 
 class TrackedPairStatus(BaseModel):
@@ -102,8 +105,19 @@ class TrackedPairStatus(BaseModel):
     symbol: str
     resolution: Resolution
     added_at: datetime
+    collect_from: datetime
     latest_candle: datetime | None
     collection: CollectionState
+
+
+def default_collect_from(resolution: Resolution, default_bars: int, now: datetime) -> datetime:
+    """Where history starts for a pair nobody gave an explicit moment for.
+
+    The same depth a single fill without a job has always reached back to — this is
+    what makes a plain `track()` call (no wizard, no job) behave exactly as it did
+    before `collect_from` existed.
+    """
+    return now - period_length(resolution) * default_bars
 
 
 # A single key rather than one per pair: the ceiling counts every tracked pair, so two
@@ -114,30 +128,33 @@ _LOCK_TRACKING = "SELECT pg_advisory_xact_lock(hashtextextended('market_data.tra
 _COUNT_TRACKED = "SELECT count(*) FROM tracked_pairs WHERE state = 'tracked'"
 
 _TRACK = """
-    INSERT INTO tracked_pairs (symbol, resolution, state, added_at, untracked_at)
-    VALUES ($1, $2, 'tracked', now(), NULL)
+    INSERT INTO tracked_pairs (symbol, resolution, state, added_at, untracked_at, collect_from)
+    VALUES ($1, $2, 'tracked', now(), NULL, $3)
     ON CONFLICT (symbol, resolution) DO UPDATE SET
         state = 'tracked',
-        untracked_at = NULL
-    RETURNING symbol, resolution, state, added_at, untracked_at
+        untracked_at = NULL,
+        -- Only ever earlier, never later: re-tracking with a later moment must not
+        -- abandon history the archive already committed to reaching.
+        collect_from = LEAST(tracked_pairs.collect_from, EXCLUDED.collect_from)
+    RETURNING symbol, resolution, state, added_at, untracked_at, collect_from
 """
 
 _UNTRACK = """
     UPDATE tracked_pairs
        SET state = 'untracked', untracked_at = now()
      WHERE symbol = $1 AND resolution = $2 AND state = 'tracked'
-    RETURNING symbol, resolution, state, added_at, untracked_at
+    RETURNING symbol, resolution, state, added_at, untracked_at, collect_from
 """
 
 _SELECT_TRACKED = """
-    SELECT symbol, resolution, state, added_at, untracked_at
+    SELECT symbol, resolution, state, added_at, untracked_at, collect_from
       FROM tracked_pairs
      WHERE state = 'tracked'
      ORDER BY added_at, symbol, resolution
 """
 
 _SELECT_ALL = """
-    SELECT symbol, resolution, state, added_at, untracked_at
+    SELECT symbol, resolution, state, added_at, untracked_at, collect_from
       FROM tracked_pairs
      ORDER BY added_at, symbol, resolution
 """
@@ -152,12 +169,12 @@ _IS_TRACKED = """
 # left join keeps a pair that has never collected anything, which is a state an operator
 # needs to see rather than a row that quietly goes missing.
 _SELECT_STATUS = """
-    SELECT t.symbol, t.resolution, t.added_at, max(c.period_start) AS latest_candle
+    SELECT t.symbol, t.resolution, t.added_at, t.collect_from, max(c.period_start) AS latest_candle
       FROM tracked_pairs t
       LEFT JOIN candles c
         ON c.symbol = t.symbol AND c.resolution = t.resolution
      WHERE t.state = 'tracked'
-     GROUP BY t.symbol, t.resolution, t.added_at
+     GROUP BY t.symbol, t.resolution, t.added_at, t.collect_from
      ORDER BY t.added_at, t.symbol, t.resolution
 """
 
@@ -169,11 +186,17 @@ def _pair(row: asyncpg.Record) -> TrackedPair:
         state=TrackedPairState(row["state"]),
         added_at=row["added_at"],
         untracked_at=row["untracked_at"],
+        collect_from=row["collect_from"],
     )
 
 
 async def track(
-    conn: asyncpg.Connection, symbol: str, resolution: Resolution, limit: int
+    conn: asyncpg.Connection,
+    symbol: str,
+    resolution: Resolution,
+    limit: int,
+    collect_from: datetime | None = None,
+    default_bars: int = 5000,
 ) -> TrackedPair:
     """Start collecting a pair, or raise `LimitReached` saying why not.
 
@@ -181,7 +204,17 @@ async def track(
     because it is the same standing decision resumed rather than a new one. Its candles
     were never touched, so what it needs on resumption is the gap closed, not a fresh
     start — which is what the preserved `untracked_at` was for.
+
+    `collect_from` is the moment history should reach back to. Left unset, it is worked
+    out from `default_bars` — the same depth a plain fill has always reached back to —
+    so a caller that never heard of jobs or wizards gets the old behaviour unchanged.
+    Re-tracking (or tracking again with an earlier moment) can only pull it earlier,
+    never push it later: see `_TRACK`'s `LEAST`.
     """
+    resolved_from = collect_from or default_collect_from(
+        resolution, default_bars, datetime.now(UTC)
+    )
+
     # The count and the insert have to be one atomic thing. Two additions racing each
     # other would otherwise both read `limit - 1` and both succeed, putting the archive one
     # provider connection over a ceiling that exists because the provider enforces it.
@@ -198,7 +231,7 @@ async def track(
                     f"or raise MAX_TRACKED_PAIRS deliberately."
                 )
 
-        return _pair(await conn.fetchrow(_TRACK, symbol, resolution.value))
+        return _pair(await conn.fetchrow(_TRACK, symbol, resolution.value, resolved_from))
 
 
 async def untrack(
@@ -280,6 +313,7 @@ async def read_status(
                 symbol=row["symbol"],
                 resolution=resolution,
                 added_at=row["added_at"],
+                collect_from=row["collect_from"],
                 latest_candle=latest,
                 collection=collection_state(
                     resolution, latest, moment, lookup.get((row["symbol"], resolution))
@@ -295,6 +329,8 @@ async def add_pair(
     symbol: str,
     resolution: Resolution,
     limit: int,
+    collect_from: datetime | None = None,
+    default_bars: int = 5000,
 ) -> TrackedPair:
     """Validate a pair against the gateway, then start collecting it.
 
@@ -320,4 +356,4 @@ async def add_pair(
             "it would archive nothing"
         )
 
-    return await track(conn, symbol, resolution, limit)
+    return await track(conn, symbol, resolution, limit, collect_from, default_bars)

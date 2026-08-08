@@ -36,6 +36,7 @@ from .gateway import GatewayHistory, GatewayInstruments, http_client
 from .hub import Hub
 from .ingest import Ingest
 from .ingest.live import store_closed_candle
+from .jobs import interrupt_orphaned_chunks
 from .models import Candle, PriceSide, Resolution
 from .rollups import DERIVABLE, read_derived
 from .store import read_candles, read_recent
@@ -114,6 +115,14 @@ async def lifespan(app: FastAPI):
         app.state.history = history
         app.state.instruments = GatewayInstruments(settings.gateway_base_url, client)
         app.state.ingest = ingest
+
+        # Before anything else touches the job tables: no runner survives a restart, so
+        # any chunk left `pending` or `running` from before this start was orphaned, not
+        # merely delayed (jobs/store.py, `interrupt_orphaned_chunks`).
+        async with pool.acquire() as conn:
+            interrupted = await interrupt_orphaned_chunks(conn)
+        if interrupted:
+            log.info("collection jobs: %d orphaned chunk(s) marked interrupted at startup", interrupted)
 
         await ingest.start()
         try:
@@ -408,6 +417,7 @@ async def track_pair(body: TrackPairRequest, request: Request) -> TrackedPairOut
             body.symbol,
             body.resolution,
             state.settings.max_tracked_pairs,
+            default_bars=state.settings.default_backfill_bars,
         )
     # Collection starts now rather than at the next restart.
     await state.ingest.sync()

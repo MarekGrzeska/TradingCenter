@@ -10,10 +10,11 @@
 
 ## 2. market-data: trwały stan zleceń
 
-- [ ] 2.1 Migracja `0005_collection_jobs.py` — tabele `collection_jobs` i `collection_job_chunks` oraz kolumna `collect_from` w `tracked_pairs`, wypełniona dla istniejących wierszy z `added_at` minus domyślna głębokość
-- [ ] 2.2 Moduł `market_data/jobs/store.py` — zapis i odczyt zleceń i kawałków, stan zlecenia wyprowadzany ze stanów kawałków, nigdy trzymany osobno
-- [ ] 2.3 Przestemplowanie kawałków `running` na `interrupted` przy starcie modułu, w miejscu, gdzie ingest już się synchronizuje
-- [ ] 2.4 Testy: stan zlecenia wynika z kawałków dla każdej kombinacji, restart zamienia kawałek w toku na przerwany, historia sprzed restartu jest odczytywalna
+- [x] 2.1 Migracja `0005_collection_jobs.py` — tabele `collection_jobs` i `collection_job_chunks` oraz kolumna `collect_from` w `tracked_pairs`, wypełniona dla istniejących wierszy z `added_at` minus domyślna głębokość
+- [x] 2.2 Moduł `market_data/jobs/store.py` — zapis i odczyt zleceń i kawałków, stan zlecenia wyprowadzany ze stanów kawałków, nigdy trzymany osobno
+- [x] 2.3 Przestemplowanie kawałków `pending` i `running` na `interrupted` przy starcie modułu (żaden runner nie przeżywa restartu), w miejscu, gdzie ingest już się synchronizuje
+- [x] 2.4 Testy: stan zlecenia wynika z kawałków dla każdej kombinacji, restart zamienia kawałek w toku i w kolejce na przerwany, historia sprzed restartu jest odczytywalna
+- [x] 2.5 *(odkryte podczas implementacji)* `tracking.track`/`add_pair` przyjmują i przechowują `collect_from`, z domyślną głębokością gdy nie podano i `LEAST` przy ponownym dodaniu, żeby zlecenia miały do czego kotwiczyć swoje kawałki
 
 ## 3. market-data: planowanie i wycena zlecenia
 

@@ -19,6 +19,7 @@ from market_data.tracking import (
     UnknownPair,
     add_pair,
     collection_state,
+    default_collect_from,
     is_tracked,
     read_all,
     read_status,
@@ -510,3 +511,64 @@ async def test_validation_happens_before_the_ceiling_is_spent(
         await add_pair(db, instruments, "NOPE", Resolution.MINUTE, limit=2)
 
     assert len(await read_tracked(db)) == 1
+
+
+# --- collect_from: where history is meant to reach back to ---------------------------
+
+
+def test_default_collect_from_is_default_bars_back() -> None:
+    now = MOMENT
+    result = default_collect_from(Resolution.MINUTE, 5000, now)
+    assert result == now - timedelta(minutes=5000)
+
+
+@pytest.mark.db
+async def test_a_pair_tracked_without_a_moment_gets_the_default_depth(
+    db: asyncpg.Connection,
+) -> None:
+    pair = await track(db, "US100", Resolution.MINUTE, LIMIT, default_bars=100)
+    expected = default_collect_from(Resolution.MINUTE, 100, pair.added_at)
+    assert abs((pair.collect_from - expected).total_seconds()) < 5
+
+
+@pytest.mark.db
+async def test_a_pair_tracked_with_an_explicit_moment_keeps_it(db: asyncpg.Connection) -> None:
+    wanted = MOMENT - timedelta(days=365)
+    pair = await track(db, "US100", Resolution.MINUTE, LIMIT, collect_from=wanted)
+    assert pair.collect_from == wanted
+
+
+@pytest.mark.db
+async def test_re_tracking_with_an_earlier_moment_pulls_collect_from_back(
+    db: asyncpg.Connection,
+) -> None:
+    await track(db, "US100", Resolution.MINUTE, LIMIT, collect_from=MOMENT - timedelta(days=30))
+    earlier = MOMENT - timedelta(days=365)
+
+    pair = await track(db, "US100", Resolution.MINUTE, LIMIT, collect_from=earlier)
+
+    assert pair.collect_from == earlier
+
+
+@pytest.mark.db
+async def test_re_tracking_with_a_later_moment_does_not_abandon_history(
+    db: asyncpg.Connection,
+) -> None:
+    # The archive already committed to reaching this far back; a later request must not
+    # walk that commitment back.
+    original = MOMENT - timedelta(days=365)
+    await track(db, "US100", Resolution.MINUTE, LIMIT, collect_from=original)
+
+    pair = await track(db, "US100", Resolution.MINUTE, LIMIT, collect_from=MOMENT - timedelta(days=30))
+
+    assert pair.collect_from == original
+
+
+@pytest.mark.db
+async def test_status_carries_collect_from(db: asyncpg.Connection) -> None:
+    wanted = MOMENT - timedelta(days=90)
+    await track(db, "US100", Resolution.MINUTE, LIMIT, collect_from=wanted)
+
+    [status] = await read_status(db, now=MOMENT)
+
+    assert status.collect_from == wanted

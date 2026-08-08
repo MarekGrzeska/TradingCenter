@@ -119,7 +119,11 @@ async def test_a_tracked_pair_is_identified_by_symbol_and_resolution(
 async def test_a_new_pair_is_tracked_and_stamped_with_when_it_was_added(
     db: asyncpg.Connection,
 ) -> None:
-    await db.execute("INSERT INTO tracked_pairs (symbol, resolution) VALUES ('US100', 'MINUTE')")
+    await db.execute(
+        "INSERT INTO tracked_pairs (symbol, resolution, collect_from)"
+        " VALUES ('US100', 'MINUTE', $1)",
+        MOMENT - timedelta(days=1),
+    )
     row = await db.fetchrow("SELECT state, added_at, untracked_at FROM tracked_pairs")
     assert row["state"] == "tracked"
     assert row["untracked_at"] is None
@@ -133,7 +137,11 @@ async def test_a_new_pair_is_tracked_and_stamped_with_when_it_was_added(
 async def test_untracking_records_when_collection_stopped(db: asyncpg.Connection) -> None:
     # The row survives untracking so that tracking the pair again knows which gap to
     # close, and so that the candles already collected are never in question.
-    await db.execute("INSERT INTO tracked_pairs (symbol, resolution) VALUES ('US100', 'MINUTE')")
+    await db.execute(
+        "INSERT INTO tracked_pairs (symbol, resolution, collect_from)"
+        " VALUES ('US100', 'MINUTE', $1)",
+        MOMENT - timedelta(days=1),
+    )
     await db.execute(
         "UPDATE tracked_pairs SET state = 'untracked', untracked_at = $1", MOMENT
     )
@@ -144,7 +152,11 @@ async def test_untracking_records_when_collection_stopped(db: asyncpg.Connection
 async def test_an_untracked_pair_without_a_stopping_point_is_refused(
     db: asyncpg.Connection,
 ) -> None:
-    await db.execute("INSERT INTO tracked_pairs (symbol, resolution) VALUES ('US100', 'MINUTE')")
+    await db.execute(
+        "INSERT INTO tracked_pairs (symbol, resolution, collect_from)"
+        " VALUES ('US100', 'MINUTE', $1)",
+        MOMENT - timedelta(days=1),
+    )
     with pytest.raises(CheckViolationError):
         await db.execute("UPDATE tracked_pairs SET state = 'untracked'")
 
@@ -154,9 +166,10 @@ async def test_a_tracked_pair_carrying_a_stopping_point_is_refused(
 ) -> None:
     with pytest.raises(CheckViolationError):
         await db.execute(
-            "INSERT INTO tracked_pairs (symbol, resolution, untracked_at)"
-            " VALUES ('US100', 'MINUTE', $1)",
+            "INSERT INTO tracked_pairs (symbol, resolution, collect_from, untracked_at)"
+            " VALUES ('US100', 'MINUTE', $2, $1)",
             MOMENT,
+            MOMENT - timedelta(days=1),
         )
 
 
@@ -212,6 +225,97 @@ async def test_ranges_without_a_provider_boundary_may_be_many(db: asyncpg.Connec
     assert await db.fetchval("SELECT count(*) FROM coverage_ranges") == 3
 
 
+# --- collection jobs (2.4) ----------------------------------------------------------
+
+
+async def _insert_tracked_pair(conn: asyncpg.Connection, **overrides) -> None:
+    values = {
+        "symbol": "US100",
+        "resolution": "MINUTE",
+        "collect_from": MOMENT - timedelta(days=1),
+        **overrides,
+    }
+    columns = ", ".join(values)
+    placeholders = ", ".join(f"${n}" for n in range(1, len(values) + 1))
+    await conn.execute(
+        f"INSERT INTO tracked_pairs ({columns}) VALUES ({placeholders})", *values.values()
+    )
+
+
+async def _insert_job(conn: asyncpg.Connection, **overrides) -> int:
+    values = {"requested_from": MOMENT - timedelta(days=1), **overrides}
+    columns = ", ".join(values)
+    placeholders = ", ".join(f"${n}" for n in range(1, len(values) + 1))
+    return await conn.fetchval(
+        f"INSERT INTO collection_jobs ({columns}) VALUES ({placeholders}) RETURNING id",
+        *values.values(),
+    )
+
+
+async def _insert_chunk(conn: asyncpg.Connection, job_id: int, **overrides) -> None:
+    values = {
+        "job_id": job_id,
+        "symbol": "US100",
+        "resolution": "MINUTE",
+        "chunk_start": MOMENT - timedelta(days=1),
+        "chunk_end": MOMENT,
+        **overrides,
+    }
+    columns = ", ".join(values)
+    placeholders = ", ".join(f"${n}" for n in range(1, len(values) + 1))
+    await conn.execute(
+        f"INSERT INTO collection_job_chunks ({columns}) VALUES ({placeholders})",
+        *values.values(),
+    )
+
+
+async def test_the_migrations_build_the_job_tables(db: asyncpg.Connection) -> None:
+    assert {"collection_jobs", "collection_job_chunks"} <= await _table_names(db)
+
+
+async def test_a_tracked_pair_carries_where_its_collection_starts(db: asyncpg.Connection) -> None:
+    await _insert_tracked_pair(db)
+    assert await db.fetchval("SELECT collect_from FROM tracked_pairs") == MOMENT - timedelta(
+        days=1
+    )
+
+
+async def test_a_job_defaults_to_its_first_attempt(db: asyncpg.Connection) -> None:
+    job_id = await _insert_job(db)
+    assert await db.fetchval("SELECT attempt FROM collection_jobs WHERE id = $1", job_id) == 1
+
+
+async def test_a_chunk_belongs_to_a_pair_that_is_actually_tracked(db: asyncpg.Connection) -> None:
+    # The foreign key is what makes a typo in a chunk's pair a rejected write rather than
+    # a row nothing will ever collect for.
+    job_id = await _insert_job(db)
+    with pytest.raises(asyncpg.exceptions.ForeignKeyViolationError):
+        await _insert_chunk(db, job_id)
+
+
+async def test_a_chunk_defaults_to_pending(db: asyncpg.Connection) -> None:
+    await _insert_tracked_pair(db)
+    job_id = await _insert_job(db)
+    await _insert_chunk(db, job_id)
+    assert await db.fetchval("SELECT state FROM collection_job_chunks") == "pending"
+
+
+async def test_an_inverted_chunk_window_is_refused(db: asyncpg.Connection) -> None:
+    await _insert_tracked_pair(db)
+    job_id = await _insert_job(db)
+    with pytest.raises(CheckViolationError):
+        await _insert_chunk(
+            db, job_id, chunk_start=MOMENT, chunk_end=MOMENT - timedelta(hours=1)
+        )
+
+
+async def test_a_chunk_state_the_module_does_not_know_is_refused(db: asyncpg.Connection) -> None:
+    await _insert_tracked_pair(db)
+    job_id = await _insert_job(db)
+    with pytest.raises(CheckViolationError):
+        await _insert_chunk(db, job_id, state="done_ish")
+
+
 # --- the migrations themselves ------------------------------------------------------
 
 
@@ -248,10 +352,12 @@ async def test_the_migrations_run_forwards_and_back(scratch_database_url: str) -
 
     # Alembic's environment calls asyncio.run, which refuses to nest inside the loop this
     # test is running on. A worker thread has no loop of its own, so it can.
+    tables = {"candles", "tracked_pairs", "coverage_ranges", "collection_jobs", "collection_job_chunks"}
+
     await asyncio.to_thread(command.upgrade, config, "head")
     async with connect(scratch_database_url) as conn:
-        assert {"candles", "tracked_pairs", "coverage_ranges"} <= await _table_names(conn)
+        assert tables <= await _table_names(conn)
 
     await asyncio.to_thread(command.downgrade, config, "base")
     async with connect(scratch_database_url) as conn:
-        assert await _table_names(conn) & {"candles", "tracked_pairs", "coverage_ranges"} == set()
+        assert await _table_names(conn) & tables == set()
