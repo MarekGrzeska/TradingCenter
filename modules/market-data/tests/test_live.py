@@ -15,11 +15,12 @@ Skipped unless `--run-live` is passed and a gateway is listening. Read-only, and
 a day of minutes for one pair, which is what the change's own constraint on the apply
 phase allows.
 
-**Run these on a trading day.** capital.com is 23/5 — every instrument here, including
-the crypto CFD — so at the weekend the provider hands back Friday's series and nothing
-newer, and the density check further down measures candles against a wall clock that now
-has two idle days in it. The failure would be real arithmetic about a series that is
-perfectly fine.
+**`INDEX_CFD` wants a trading day; `CRYPTO_CFD` does not.** capital.com runs its index,
+forex and commodity CFDs 23/5, so at the weekend `US100` hands back Friday's series and
+nothing newer — and the density check further down measures candles against a wall clock
+that now has two idle days in it, so it fails while telling the truth about a series that
+is perfectly fine. `BTCUSD` keeps trading, and the whole file can be run against it alone
+at the weekend with `-k crypto` if that is all that is wanted.
 
     uv run uvicorn capital_gateway.app:app --port 8010    # in modules/capital-gateway
     uv run pytest -m live --run-live
@@ -48,10 +49,17 @@ GATEWAY_URL = os.environ.get("MARKET_DATA_GATEWAY_URL", "http://localhost:8010")
 # being tested is whether the four-hour anchor follows the clock or a venue's open: if it
 # followed the open, two instruments opening at different times would disagree.
 #
-# Neither is continuous, and an earlier version of this file said BTCUSD was. It is a CFD
-# on bitcoin, not bitcoin — capital.com runs it 23/5 like everything else here, so it is
-# shut at the weekend and takes the same daily break. Bitcoin trading somewhere else at
-# 3am on Sunday has no bearing on what this provider will hand back.
+# Their schedules were measured rather than reasoned about, twice, because the first
+# answer was wrong. On Saturday 2026-08-08 at 15:11 UTC the provider reported BTCUSD and
+# ETHUSD `marketStatus: TRADEABLE` with a minute candle for the minute then in progress,
+# while US100, GOLD and EURUSD were `CLOSED` with nothing since Friday 21:00 UTC. So the
+# index is 23/5 and the crypto CFD trades the weekend too — it is a CFD, but the venue
+# behind it does not shut on Saturday.
+#
+# What is *not* a schedule: BTCUSD served nothing between 04:59 and at least 06:04 UTC
+# that same morning, with a quote that did not move for 90 s. An hour-plus outage on a
+# weekend, mistaken at the time for the instrument being shut. If a series here looks
+# frozen, check `marketStatus` before concluding anything about the calendar.
 CRYPTO_CFD = "BTCUSD"
 INDEX_CFD = "US100"
 

@@ -195,8 +195,14 @@ instruments: every interior four-hour period holds all 240 of its minutes except
 at 20:00, which holds 233–235. So `complete` is legitimately false for one period in six, forever,
 and is not a data-quality signal — coverage is what answers whether data is missing.
 
-**Nothing here is a continuous market, `BTCUSD` included.** It is a CFD on bitcoin rather than
-bitcoin: capital.com runs it 23/5 like everything else, so it is shut at the weekend and takes the
-same daily break, and that break is what the 20:00 period is short by. Bitcoin trading somewhere
-else at 3am on Sunday changes nothing about what this provider will hand back — which is why the
-live tests want a trading day, and why a pair that has stopped moving is not evidence of anything.
+**The two run on different calendars, and it was worth measuring which.** Saturday 2026-08-08,
+15:11 UTC: `BTCUSD` and `ETHUSD` reported `marketStatus: TRADEABLE` with a candle for the minute
+then in progress, while `US100`, `GOLD` and `EURUSD` were `CLOSED` with nothing since Friday 21:00
+UTC. Index, forex and commodity CFDs are 23/5 here; the crypto ones trade the weekend as well. Only
+the daily break around 21:00 is common to both.
+
+**A frozen series is not evidence of a closed market.** That same Saturday morning `BTCUSD` served
+nothing between 04:59 and at least 06:04 UTC, quote included — an hour-plus provider outage, on an
+instrument that `marketStatus` would have called `TRADEABLE` throughout. It was read at the time as
+the weekend. Ask the gateway what the market's status is before concluding anything from a series
+that stopped moving; that is the same distinction `collection_state` refuses to guess at.

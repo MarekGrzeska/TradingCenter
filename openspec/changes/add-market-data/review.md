@@ -9,14 +9,21 @@ z gatewaya, a operator decyduje z panelu, co jest zbierane.
 
 Świadomie niekompletne, i **nie jest to przeoczenie**: `CollectionState.STALLED` i `MARKET_CLOSED`
 są zaimplementowane i przetestowane, ale nieosiągalne przez kontrakt, bo nikt nie podaje
-`market_open` — a jedyny kandydat na to źródło okazał się przy pomiarze dwuznaczny (Finding 5).
-Postęp ingestu istnieje w pamięci i nie wychodzi poza log, choć spec każe go udostępniać
-(Finding 6). Obie rzeczy zmieniają kształt kontraktu, więc zostały opisane, nie dopisane.
+`market_open` (Finding 5). Źródło sygnału istnieje i gateway już je publikuje; otwarta jest
+wyłącznie decyzja, ile żądań wolno na to wydać. Postęp ingestu istnieje w pamięci i nie wychodzi
+poza log, choć spec każe go udostępniać (Finding 6). Obie rzeczy zmieniają kształt kontraktu, więc
+zostały opisane z rekomendacją, nie dopisane.
 
 Czego czytelnik za rok nie powinien wziąć za przeoczenie: **cztery z ośmiu ustaleń tego przeglądu
 wyszły z uruchomienia całości w przeglądarce, nie z czytania kodu ani z suity.** Każde z nich
 przechodziło swój test. To nie jest przypadek i nie jest argumentem przeciwko tym testom — jest
 argumentem za tym, żeby zadanie „przejdź ręcznie ścieżkę" zostało w każdej następnej zmianie.
+
+Drugi wniosek, tańszy do zignorowania i przez to warty zapisania: **dwa z ustaleń były najpierw
+zdiagnozowane źle, oba dlatego, że pomiar wziął awarię za regułę.** Cisza na `BTCUSD` przez
+godzinę w sobotę rano dała najpierw „krypto stoi w weekend", a potem — przez to samo skażone
+odczytanie — „`tradeable` nie znaczy, że rynek jest otwarty". Jedno pytanie do providera osiem
+godzin później obaliło oba. Kiedy pomiar zaskakuje, warto go powtórzyć, zanim się go zapisze.
 
 ## Verified
 
@@ -54,16 +61,26 @@ Poza suitą — **przeciw pełnemu stosowi na koncie demo**, przez `scripts/dev.
   `BTCUSD MINUTE` → 60 świec `derived=false`, `BTCUSD MINUTE_5` → 12 świec `derived=true`.
   Dwanaście pięciominutówek z sześćdziesięciu minut, czyli derywacja liczy to, co powinna.
 
-Czego **nie** udało się sprawdzić: **był weekend, a capital.com chodzi 23/5**. Nie tylko indeksy —
-`BTCUSD` też, bo to CFD na bitcoina, a nie bitcoin, więc stoi razem z resztą. Świece `BTCUSD`
-`MINUTE` kończą się u samego gatewaya na `04:59Z`, kwotowanie nie drgnęło przez 90 s obserwacji,
-`US100` stoi od piątku 20:00Z. Nic z tego nie jest awarią i nie należy tego tak czytać w przyszłości.
+Czego **nie** udało się sprawdzić, i dlaczego pierwsza diagnoza była zła. W oknie weryfikacji
+`BTCUSD` nie oddawał nic po `04:59Z`, kwotowanie nie drgnęło przez 90 s, `US100` stał od piątku
+20:00Z — odczytane jako weekend, bo była sobota. Dopytanie providera o godzinie **15:11 UTC tej
+samej soboty** mówi co innego:
+
+| Instrument | `marketStatus` | Ostatnia świeca minutowa |
+|---|---|---|
+| `BTCUSD`, `ETHUSD` | `TRADEABLE` | trwająca właśnie minuta |
+| `US100`, `GOLD`, `EURUSD` | `CLOSED` | piątek ~21:00 UTC |
+
+Czyli 23/5 dotyczy indeksów, forexu i towarów; **krypto handluje się także w weekend**. Poranna
+cisza na `BTCUSD` była **ponadgodzinną awarią providera na instrumencie, który przez cały czas był
+`TRADEABLE`** — nie kalendarzem. Zatrzymana seria nie dowodzi zamkniętego rynku, i to jest dokładnie
+rozróżnienie, którego `collection_state` odmawia dziś zgadywać (Finding 5).
 
 Sprawdzona więc została gałąź „poproszono o 65 świec, zapisano 0", a nie „zapisano 65":
-**domknięcie luki realnymi danymi pozostaje niezweryfikowane** i wymaga powtórzenia **w dzień
-handlowy**. To samo dotyczy testów `--run-live`: ich sprawdzenie gęstości mierzy świece względem
-zegara, więc weekend w oknie pomiaru wywróciłby je, mówiąc prawdę o serii, z którą wszystko jest
-w porządku.
+**domknięcie luki realnymi danymi pozostaje niezweryfikowane**. Da się je powtórzyć **na parze
+krypto o dowolnej porze** — dnia handlowego wymaga tylko część indeksowa, w tym sprawdzenie gęstości
+w testach `--run-live`, które mierzy świece względem zegara i wywróciłoby się na weekendzie, mówiąc
+prawdę o serii, z którą wszystko jest w porządku.
 
 ## Findings
 
@@ -76,15 +93,29 @@ w porządku.
 | Średnia | `market_data/app.py:266` | `read_status(conn)` nigdy nie dostaje `market_open`, więc `STALLED` i `MARKET_CLOSED` są przez kontrakt **nieosiągalne** — każda opóźniona para to `UNKNOWN`. Panel nigdy nie wyróżni pary, dla której zbieranie ustało. | OTWARTE |
 | Niska | `market_data/ingest/supervisor.py:70` | `Ingest.report()` i `Ingest.fills()` nie mają **żadnego wywołania** — ani w aplikacji, ani w testach. Postęp i przyczyny porażek zostają w logu, czego spec zabrania wprost. | OTWARTE |
 | Niska | `tests/test_app.py:21` | Dwa testy pisały świece wokół stałej `NOW` i czytały je **bez podania okna**, a `/candles` domyśla się ostatniej doby z zegara. Zdały każdy przebieg aż do 2026-08-08 12:00 UTC — doby po `NOW` — i wtedy zaczęły padać bez związku z kodem. | FIXED (ten przegląd) |
-| Niska | `tests/test_live.py:45`, `design.md`, `README.md` | Zapisane jako fakt, że `BTCUSD` to rynek ciągły — stała nazywała się `CONTINUOUS`, a docstring mówił „a 24/7 instrument". To CFD na bitcoina u brokera 23/5: stoi w weekend i bierze tę samą dobową przerwę. | FIXED (ten przegląd) |
+| Niska | `tests/test_live.py:45`, `design.md`, `README.md` | Kalendarze instrumentów były zapisane jako fakt i nigdy nie zmierzone — najpierw „`BTCUSD` to rynek ciągły", potem, po pierwszej korekcie, „wszystko chodzi 23/5". Obie wersje błędne: indeksy stoją w weekend, krypto nie. Zmierzone i zapisane z datą pomiaru. | FIXED (ten przegląd) |
 
-**Finding 5 — dlaczego nie zostało naprawione od ręki.** Oczywisty kandydat na źródło to `tradeable`
-z katalogu gatewaya, ale pomiar go podważa: `BTCUSD` w sobotę raportuje `tradeable: false`, mając
-jednocześnie żywe kwotowanie i świece do 04:59. Czyli `tradeable` mówi raczej „to konto może tym
-handlować" niż „rynek jest otwarty", a wzięcie go za to drugie dałoby dokładnie ten pewny błędny
-wynik, przed którym `collection_state` broni się dziś, zwracając `UNKNOWN`. Właściwym źródłem jest
-prawdopodobnie osobne pytanie do gatewaya o stan sesji instrumentu — czego gateway dziś nie
-publikuje. To zmiana kontraktu **dwóch** modułów i należy do osobnej propozycji.
+**Finding 5 — źródło sygnału istnieje, brakuje decyzji o koszcie.** Pierwsza wersja tego akapitu
+odradzała `tradeable` z katalogu gatewaya jako dwuznaczny, na podstawie `BTCUSD` raportowanego
+w sobotę jako `tradeable: false` przy żywym kwotowaniu. **Ten pomiar był skażony** — trafił
+w ponadgodzinną awarię providera. Powtórzony o 15:11 UTC daje odpowiedź czystą: `marketStatus` to
+`TRADEABLE` dla krypto i `CLOSED` dla zamkniętego indeksu, a gateway już to publikuje jako
+`Instrument.tradeable`. **Kontraktu gatewaya nie trzeba ruszać.**
+
+Zostaje jedna decyzja, i nie jest to decyzja o poprawności, tylko o koszcie. `GET /pairs` musiałby
+poznać stan rynku dla każdej pary na liście, a katalog gatewaya odpowiada na instrument, nie na
+listę — czyli do dwudziestu żądań przez tę samą bramkę dziesięciu na sekundę, przy każdym odświeżeniu
+panelu. Trzy wyjścia, w kolejności, w jakiej bym je rozważał:
+
+1. **Pytać z cache'em o krótkim terminie ważności** (rzędu minuty) w `market-data`. Stan sesji zmienia
+   się dwa razy na dobę, więc minuta świeżości jest hojna, a panel odpytywany co kilka sekund
+   kosztuje wtedy jedno żądanie na parę na minutę. Najmniejsza zmiana, żadnego nowego kontraktu.
+2. **Pytać tylko o pary, które i tak wyglądają na spóźnione.** Świeże pary nie potrzebują odpowiedzi
+   — `COLLECTING` nie zależy od `market_open` — więc koszt ponosi się wyłącznie tam, gdzie ma
+   rozstrzygnąć `STALLED` od `MARKET_CLOSED`. Zwykle to zero żądań.
+3. **Poprosić gateway o odczyt zbiorczy.** Najczystsze i najdroższe: zmiana w drugim module.
+
+Rekomendacja: **2, z 1 jako uzupełnieniem**, jeśli okaże się, że spóźnionych par bywa wiele naraz.
 
 **Finding 6 — rekomendacja.** Kod już istnieje i jest nieużywany; brakuje wyłącznie miejsca, w
 którym wychodzi. Najmniejsze sensowne: pole `last_fill` w każdym wierszu `GET /pairs`, bo to jest
