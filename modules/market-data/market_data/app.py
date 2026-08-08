@@ -44,6 +44,7 @@ from .hub import Hub
 from .ingest import Ingest
 from .ingest.live import store_closed_candle
 from .jobs import (
+    FutureRequest,
     JobRunner,
     NothingToRetry,
     UnknownJob,
@@ -182,6 +183,16 @@ async def _tracking_refused(request: Request, exc: TrackingRefused) -> JSONRespo
     # not in a state where it can be honoured.
     status = 409 if isinstance(exc, LimitReached) else 422
     return JSONResponse(status_code=status, content={"detail": str(exc)})
+
+
+@app.exception_handler(FutureRequest)
+async def _future_request(request: Request, exc: FutureRequest) -> JSONResponse:
+    # 422 and the reason in full: a start date after now is a request the module will
+    # never be able to honour, and the caller's next move is to pick a different date —
+    # which it can only do if told that is the problem (`market-data-jobs` spec, "Data w
+    # przyszłości"). Without this it fell to the catch-all below and read as a 500, which
+    # says "the archive broke" about a request that was simply wrong.
+    return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
 @app.exception_handler(GatewayError)
@@ -456,6 +467,15 @@ def _tracked_pair_out(pair: TrackedPair) -> TrackedPairOut:
 async def track_pairs(body: TrackPairRequest, request: Request) -> TrackPairsResult:
     state = request.app.state
     now = datetime.now(UTC)
+
+    # Refused here rather than left to `plan_chunks` below, which raises the same thing:
+    # by then the pairs would already be tracked and ingest already resynced, so the
+    # caller would get a refusal for a request that had nonetheless changed what the
+    # archive collects. A refusal has to cost nothing.
+    if body.collect_from is not None and body.collect_from > now:
+        raise FutureRequest(
+            f"{body.collect_from.isoformat()} is in the future; there is no history there"
+        )
 
     results: list[TrackedPairResult] = []
     accepted: list[TrackedPair] = []

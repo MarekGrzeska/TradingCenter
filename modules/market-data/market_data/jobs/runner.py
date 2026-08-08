@@ -167,7 +167,7 @@ class JobRunner:
                 await execute_chunk(self._pool, self._history, chunk, self._limiter)
             except asyncio.CancelledError:
                 raise
-            except Exception:
+            except Exception as err:
                 # A bug here must cost this one chunk, not silence a worker permanently
                 # — the same reasoning as `Ingest`'s own loop around a pair's feed.
                 log.exception(
@@ -176,3 +176,27 @@ class JobRunner:
                     chunk.symbol,
                     chunk.resolution.value,
                 )
+                # And it must cost the chunk *visibly*. `execute_chunk` names its own
+                # gateway failures, but anything past that — a write that hit the
+                # database wrong, a bug in this module — would otherwise leave the chunk
+                # `running` with nobody running it: no worker re-claims a running chunk,
+                # `retry_job` will not touch one, and the job reads as forever in
+                # progress until the next restart sweeps it. Settling it as `failed`
+                # here is what makes it retryable instead.
+                await self._fail_orphan(chunk, err)
+
+    async def _fail_orphan(self, chunk: Chunk, err: Exception) -> None:
+        """Settle a chunk whose execution raised past `execute_chunk`'s own handling.
+
+        Best effort by nature: the likeliest cause is the database itself, and this
+        needs the database to record anything. A failure here leaves the chunk for
+        `interrupt_orphaned_chunks` at the next start, which is where it would have been
+        anyway — never a reason to take the worker down with it.
+        """
+        try:
+            async with self._pool.acquire() as conn:
+                await finish_chunk_failed(
+                    conn, chunk.id, failure=f"{type(err).__name__}: {err}", requests=0
+                )
+        except Exception:
+            log.exception("could not record chunk %d as failed", chunk.id)

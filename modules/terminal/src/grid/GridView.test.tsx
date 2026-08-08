@@ -247,6 +247,30 @@ describe("GridView slot — archived-only symbols (terminal-grid spec)", () => {
 
     expect(within(screen.getByTestId("slot-s2")).getByText("GOLD")).toBeInTheDocument();
   });
+
+  // The symbol surviving is not enough. Charting US100 MINUTE_5 while the slot's own
+  // selector — narrowed to what is archived — shows HOUR_4 would have each contradict
+  // the other.
+  it("recognizes a remembered resolution that stopped being archived, and offers the ones left", async () => {
+    const user = userEvent.setup();
+    // US100 keeps HOUR_4 but loses MINUTE_5, which is what slot s1 remembers.
+    fakeArchive.pairs = fakeArchive.pairs.filter(
+      (p) => !(p.symbol === "US100" && p.resolution === "MINUTE_5"),
+    );
+    renderGrid();
+
+    const slot1 = within(screen.getByTestId("slot-s1"));
+    expect(await slot1.findByText(/no longer archived at/i)).toBeInTheDocument();
+    expect(slot1.getByText("MINUTE_5")).toBeInTheDocument();
+    // No chart for a pair nobody collects.
+    expect(slot1.queryByLabelText("Resolution")).not.toBeInTheDocument();
+
+    // The resolution that is still collected is one click away.
+    await user.click(slot1.getByRole("button", { name: "HOUR_4" }));
+
+    await waitFor(() => expect(gridStore.getSnapshot().slots.s1.resolution).toBe("HOUR_4"));
+    expect(within(screen.getByTestId("slot-s1")).getByLabelText("Resolution")).toBeInTheDocument();
+  });
 });
 
 // 6.7's connection claim is about the hub, not the DOM: two slots on the same

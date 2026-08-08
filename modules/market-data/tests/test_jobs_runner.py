@@ -315,3 +315,79 @@ async def test_stopping_the_runner_ends_its_workers(pool) -> None:
     await runner.start()
     await runner.stop()
     assert all(worker.done() for worker in runner._workers) or runner._workers == []
+
+
+async def test_a_chunk_whose_execution_raises_settles_failed_rather_than_stuck_running(
+    pool,
+) -> None:
+    """A chunk left `running` is worse than a chunk marked `failed`: no worker re-claims
+    one, `retry_job` refuses to touch one, and the job reads as forever in progress. So
+    anything raising past `execute_chunk`'s own gateway handling still has to settle."""
+    await _tracked(pool)
+    async with pool.acquire() as conn:
+        job = await create_job(
+            conn, NOW, [plan(chunk_start=NOW - timedelta(hours=1), chunk_end=NOW)]
+        )
+
+    class Exploding:
+        async def history(self, *args, **kwargs):
+            # Not a GatewayError — `execute_chunk` names those itself. This stands in for
+            # the rest: a bad write, a bug in this module.
+            raise RuntimeError("something nobody planned for")
+
+    runner = JobRunner(pool, Exploding(), limiter=asyncio.Semaphore(1))
+    await runner.start()
+    try:
+        await asyncio.sleep(0.1)
+        async with pool.acquire() as conn:
+            reread = await read_job(conn, job.id)
+    finally:
+        await runner.stop()
+
+    assert reread.chunks[0].state is ChunkState.FAILED
+    assert "something nobody planned for" in reread.chunks[0].failure
+    # And being failed is what makes it retryable at all.
+    assert reread.failed_chunks
+
+
+async def test_a_worker_keeps_going_after_one_chunk_raises(pool) -> None:
+    """One chunk's unplanned failure must not silence the worker for the rest."""
+    await _tracked(pool)
+    async with pool.acquire() as conn:
+        job = await create_job(
+            conn,
+            NOW,
+            [
+                plan(chunk_start=NOW - timedelta(hours=1), chunk_end=NOW),
+                plan(chunk_start=NOW - timedelta(hours=2), chunk_end=NOW - timedelta(hours=1)),
+            ],
+        )
+
+    class ExplodingOnce:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        async def history(self, symbol, resolution, bars, before=None) -> HistoryPage:
+            self.calls += 1
+            if self.calls == 1:
+                raise RuntimeError("the first one blew up")
+            return HistoryPage(
+                symbol=symbol,
+                resolution=resolution,
+                candles=[],
+                requested=bars,
+                requests=1,
+                history_ended=False,
+            )
+
+    runner = JobRunner(pool, ExplodingOnce(), limiter=asyncio.Semaphore(1))
+    await runner.start()
+    try:
+        await asyncio.sleep(0.2)
+        async with pool.acquire() as conn:
+            reread = await read_job(conn, job.id)
+    finally:
+        await runner.stop()
+
+    states = {chunk.state for chunk in reread.chunks}
+    assert states == {ChunkState.FAILED, ChunkState.DONE}

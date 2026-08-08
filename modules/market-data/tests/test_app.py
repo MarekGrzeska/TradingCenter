@@ -691,6 +691,42 @@ async def test_estimating_names_a_symbol_the_gateway_does_not_know(api) -> None:
     assert pair["estimated_candles"] == 0
 
 
+# A start date after now is the one date the module refuses outright, and the refusal has
+# to name itself — a 500 would say "the archive broke" about a request that was simply
+# wrong (`market-data-jobs` spec, "Data w przyszłości").
+async def test_estimating_from_a_future_date_is_refused_with_the_reason(api, pool) -> None:
+    # Ahead of the real clock, not of this module's frozen `NOW`: these endpoints compare
+    # against `datetime.now(UTC)`, so a date only after `NOW` is simply the recent past.
+    future = datetime.now(UTC) + timedelta(days=30)
+    response = await api.post(
+        "/jobs/estimate",
+        json={
+            "pairs": [{"symbol": "US100", "resolution": "MINUTE"}],
+            "collect_from": future.isoformat(),
+        },
+    )
+
+    assert response.status_code == 422
+    assert "future" in response.json()["detail"]
+
+
+async def test_tracking_from_a_future_date_is_refused_and_tracks_nothing(api, pool) -> None:
+    """The refusal has to cost nothing: `plan_chunks` would raise the same thing, but only
+    after the pairs were already tracked and ingest already resynced."""
+    future = datetime.now(UTC) + timedelta(days=30)
+    response = await api.post(
+        "/pairs",
+        json={
+            "pairs": [{"symbol": "US100", "resolution": "MINUTE"}],
+            "collect_from": future.isoformat(),
+        },
+    )
+
+    assert response.status_code == 422
+    assert "future" in response.json()["detail"]
+    assert (await api.get("/pairs")).json() == []
+
+
 async def test_reading_a_job_shows_every_pair_it_touched(api, pool) -> None:
     created = await api.post(
         "/pairs",

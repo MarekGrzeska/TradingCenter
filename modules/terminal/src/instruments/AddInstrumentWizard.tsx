@@ -46,6 +46,11 @@ function dateInputToEpochSeconds(value: string): number {
   return Math.floor(new Date(`${value}T00:00:00Z`).getTime() / 1000);
 }
 
+/** Identifies one prospective job — everything the acceptance dialog prices. */
+function requestKey(pairs: PairRequest[], collectFromInput: string): string {
+  return `${collectFromInput}|${pairs.map((p) => `${p.symbol}:${p.resolution}`).join(",")}`;
+}
+
 export function AddInstrumentWizard({
   existingPairs,
   onCollected,
@@ -187,7 +192,12 @@ export function AddInstrumentWizard({
       {missing && <p className="mt-2 text-xs text-ink-muted">{missing}</p>}
 
       {pending && (
+        // Keyed on the request, so a different one is structurally a different
+        // dialog: the price is fetched once per mount, and a dialog that
+        // re-rendered with new pairs would otherwise show the old estimate
+        // above a button that accepts the new ones.
         <AcceptanceDialog
+          key={requestKey(pending, collectFromInput)}
           pairs={pending}
           collectFrom={dateInputToEpochSeconds(collectFromInput)}
           existingPairs={existingPairs}
@@ -241,9 +251,10 @@ function AcceptanceDialog({
   const [acceptError, setAcceptError] = useState<string | null>(null);
   const [result, setResult] = useState<TrackPairsResult | null>(null);
 
-  // The dialog is mounted once per review, with the request it prices fixed
-  // for its whole lifetime — read through a ref so remembering it does not
-  // require re-running the price on every render.
+  // One mount per request — the caller keys this component on it — so the
+  // request is fixed for this dialog's whole lifetime. Held in a ref only
+  // because `pairs` is a fresh array every render: listing it as a dependency
+  // would re-price on every render rather than once.
   const requestRef = useRef({ pairs, collectFrom });
   requestRef.current = { pairs, collectFrom };
 
