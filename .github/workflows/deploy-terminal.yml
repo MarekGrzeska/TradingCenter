@@ -21,7 +21,7 @@ on:
 # own tooling supports today, not a choice made here. Flagged, not hidden.
 permissions:
   contents: read
-  pull_requests: write # Azure/static-web-apps-deploy comments preview URLs on PRs
+  pull-requests: write # Azure/static-web-apps-deploy comments preview URLs on PRs
 
 concurrency:
   group: deploy-terminal-${{ github.ref }}
@@ -59,7 +59,7 @@ jobs:
       - run: pnpm build
         env:
           VITE_ARCHIVE_HTTP: https://app-tradingcenter-market-data.azurewebsites.net
-          VITE_ARCHIVE_WS: wss://app-tradingcenter-market-data.azurewebsites.net/ws/candles
+          VITE_ARCHIVE_WS: wss://app-tradingcenter-market-data.azurewebsites.net/ws
 
       - uses: Azure/static-web-apps-deploy@v1
         with:

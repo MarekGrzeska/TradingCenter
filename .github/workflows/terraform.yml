@@ -62,11 +62,17 @@ jobs:
         id: plan
         continue-on-error: true
       - uses: actions/github-script@v7
+        env:
+          # Passed through the environment, not interpolated into the script string below:
+          # plan output is untrusted (it can contain resource values), and a backtick or
+          # `${` in it would otherwise break out of the template literal or run as script,
+          # in a job holding pull-requests: write and id-token: write.
+          PLAN: ${{ steps.plan.outputs.stdout }}
         with:
           script: |
             const output = `#### Terraform Plan
             \`\`\`
-            ${{ steps.plan.outputs.stdout }}
+            ${process.env.PLAN}
             \`\`\`
             `;
             github.rest.issues.createComment({

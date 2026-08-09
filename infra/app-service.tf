@@ -172,6 +172,15 @@ resource "azurerm_linux_web_app" "market_data" {
     GATEWAY_STREAM_URL = "wss://${local.capital_gateway_hostname}/ws/stream"
     GATEWAY_API_KEY    = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
 
+    # No credential in the URL and no AZURE_* triple here — config.py refuses a
+    # DATABASE_URL that carries one, and the App Service's own system-assigned identity
+    # is ambient (db.py's DefaultAzureCredential finds it with no configuration), unlike
+    # the developer machine's service principal in .env. DATABASE_USER is the role
+    # 5.7 created in Postgres for this identity — named after this app on purpose, so the
+    # two never drift apart.
+    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.prod.name}?sslmode=require"
+    DATABASE_USER = local.market_data_app_name
+
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.market_data_easy_auth.value
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string

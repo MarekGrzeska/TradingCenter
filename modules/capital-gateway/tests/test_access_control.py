@@ -142,8 +142,12 @@ def test_start_without_a_gateway_key_is_refused(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.delenv("GATEWAY_API_KEY", raising=False)
     from capital_gateway.config import Settings
 
+    # `_env_file=None`: Settings reads env_file=".env" by default, so a developer's own
+    # .env would still satisfy the required field and this test would pass only where the
+    # misconfiguration it checks for cannot happen. Disabling the file here isolates the
+    # check to the environment actually being deleted from, above.
     with pytest.raises(ValueError):
-        Settings()  # type: ignore[call-arg]
+        Settings(_env_file=None)  # type: ignore[call-arg]
 
 
 # --- the schema is off in production ---

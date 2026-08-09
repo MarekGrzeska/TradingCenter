@@ -73,9 +73,13 @@ async def lifespan(app: FastAPI):
 
 
 # The one route the hosting platform must reach with no credential, to decide whether
-# to restart the process. Exact match, not a prefix — a prefix match would be one typo
-# away from exempting a real route.
-_UNAUTHENTICATED_PATHS = frozenset({"/"})
+# to restart the process, plus the schema routes — a browser fetching /docs or
+# /openapi.json carries no X-Gateway-Key, so without this exemption they 401 instead of
+# serving the page they are meant to. Harmless in production: docs_url/openapi_url are
+# None there, so FastAPI has no route registered at either path regardless of what this
+# set exempts, and the request still ends in 404. Exact matches, not prefixes — a prefix
+# match would be one typo away from exempting a real route.
+_UNAUTHENTICATED_PATHS = frozenset({"/", "/docs", "/openapi.json"})
 
 
 class RequireGatewayKey(BaseHTTPMiddleware):
@@ -93,7 +97,10 @@ class RequireGatewayKey(BaseHTTPMiddleware):
 
         expected: str = request.app.state.settings.gateway_api_key
         provided = request.headers.get(API_KEY_HEADER, "")
-        if not provided or not hmac.compare_digest(provided, expected):
+        # Compared as bytes: hmac.compare_digest raises TypeError on a `str` containing a
+        # non-ASCII character, and a header can carry one — encoding first turns a caller
+        # sending garbage into the intended 401 instead of an unhandled 500.
+        if not provided or not hmac.compare_digest(provided.encode(), expected.encode()):
             return JSONResponse(
                 status_code=401, content={"detail": "missing or invalid caller key"}
             )
@@ -343,7 +350,9 @@ async def stream(websocket: WebSocket, the_hub: Hub = Depends(hub)) -> None:
     # caller with the hub for the instant between the two.
     expected: str = websocket.app.state.settings.gateway_api_key
     provided = websocket.headers.get(API_KEY_HEADER, "")
-    if not provided or not hmac.compare_digest(provided, expected):
+    # See RequireGatewayKey.dispatch above: compared as bytes so a non-ASCII header
+    # cannot turn a refused handshake into an unhandled exception.
+    if not provided or not hmac.compare_digest(provided.encode(), expected.encode()):
         await websocket.close(code=4401, reason="missing or invalid caller key")
         return
 

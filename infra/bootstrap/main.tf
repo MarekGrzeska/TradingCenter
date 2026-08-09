@@ -43,6 +43,13 @@ resource "azurerm_storage_account" "tfstate" {
   account_replication_type = "LRS"
   min_tls_version          = "TLS1_2"
 
+  # Off, on purpose: azurerm_storage_account always pulls the account's primary/secondary
+  # keys into Terraform state, and this root's state is committed (see .gitignore). Every
+  # caller already authenticates with Entra (`use_azuread_auth = true`, infra/main.tf), so
+  # the keys have no legitimate use — disabling shared key auth makes them permanently
+  # inert instead of live secrets sitting in a checked-in file.
+  shared_access_key_enabled = false
+
   blob_properties {
     versioning_enabled = true
     delete_retention_policy {
