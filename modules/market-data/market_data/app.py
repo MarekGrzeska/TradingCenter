@@ -70,7 +70,13 @@ async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
 
     async with (
-        make_pool(settings.database_url) as pool,
+        make_pool(
+            settings.database_url,
+            user=settings.database_user,
+            client_id=settings.azure_client_id,
+            client_secret=settings.azure_client_secret,
+            tenant_id=settings.azure_tenant_id,
+        ) as pool,
         http_client(settings.gateway_api_key) as client,
     ):
         history = GatewayHistory(settings.gateway_base_url, client)

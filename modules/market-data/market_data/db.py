@@ -15,12 +15,22 @@ call site.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 import asyncpg
+from azure.identity.aio import ClientSecretCredential, DefaultAzureCredential
+
+log = logging.getLogger(__name__)
 
 _SCHEME_SEPARATOR = "://"
+
+# Azure Database for PostgreSQL's own resource id — the audience every Entra token
+# presented to it must be issued for, whether the caller is a managed identity in Azure
+# or a service principal authenticating locally (design.md, "Do bazy — tożsamość").
+_AAD_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
 
 
 def asyncpg_dsn(database_url: str) -> str:
@@ -44,27 +54,176 @@ def sqlalchemy_url(database_url: str) -> str:
     return f"{scheme.split('+', 1)[0]}+asyncpg{_SCHEME_SEPARATOR}{rest}"
 
 
-@asynccontextmanager
-async def connect(database_url: str) -> AsyncIterator[asyncpg.Connection]:
-    """One connection, closed on the way out."""
-    conn = await asyncpg.connect(asyncpg_dsn(database_url))
-    try:
-        yield conn
-    finally:
-        await conn.close()
+def _connection_target(database_url: str) -> str:
+    """`host:port/dbname` — never a credential — for logging a connection failure."""
+    parsed = urlparse(asyncpg_dsn(database_url))
+    return f"{parsed.hostname}:{parsed.port or 5432}{parsed.path}"
+
+
+def _credential(
+    client_id: str | None, client_secret: str | None, tenant_id: str | None
+) -> ClientSecretCredential | DefaultAzureCredential:
+    """Which Entra credential this process authenticates to the database with.
+
+    All three present selects a service principal — local development's own identity
+    (`sp-tradingcenter-market-data-dev`, design.md, "Do bazy — tożsamość"), read from
+    `.env` since there is no ambient identity on a developer's machine to fall back on.
+    None of them present falls through to `DefaultAzureCredential`, which in Azure finds
+    the App Service's system-assigned managed identity with no configuration at all. A
+    partial set is a misconfiguration, not a mode to guess at — it is rejected rather
+    than silently treated as "no credential given".
+    """
+    values = (("client_id", client_id), ("client_secret", client_secret), ("tenant_id", tenant_id))
+    given = [name for name, value in values if value]
+    if given and len(given) < 3:
+        raise ValueError(
+            "client_id, client_secret and tenant_id must be given together or not at "
+            f"all — only {given} were set, which authenticates as nothing."
+        )
+    if client_id and client_secret and tenant_id:
+        return ClientSecretCredential(tenant_id, client_id, client_secret)
+    return DefaultAzureCredential()
+
+
+class _TokenProvider:
+    """Fetches an Entra token on every call.
+
+    asyncpg invokes this once per physical connection it opens — for a `pool`, that
+    means every connection the pool opens over its lifetime, not once at startup. That
+    is the point: it is what makes a connection opened after the previous token expired
+    (specs/market-data-database-connection, "Wygasające poświadczenie jest odnawiane")
+    just work, with no separate refresh loop to get wrong. `DefaultAzureCredential`
+    caches internally and only reaches the identity endpoint again once the cached token
+    is close to expiring, so this is not one network round-trip per connection either.
+    """
+
+    def __init__(self, credential: DefaultAzureCredential) -> None:
+        self._credential = credential
+
+    async def __call__(self) -> str:
+        try:
+            token = await self._credential.get_token(_AAD_SCOPE)
+        except Exception as err:
+            # Not retried and not papered over with a fallback password — one does not
+            # exist (specs/market-data-database-connection, "Moduł przedstawia się
+            # tożsamością, nie hasłem"). Whatever asyncpg does with this propagates up
+            # through `pool()`/`connect()` and fails startup.
+            raise RuntimeError(f"could not obtain a database credential: {err}") from err
+        return token.token
+
+
+def identity_connect_args(
+    user: str,
+    client_id: str | None,
+    client_secret: str | None,
+    tenant_id: str | None,
+) -> tuple[dict[str, object], ClientSecretCredential | DefaultAzureCredential]:
+    """`connect_args` for a SQLAlchemy engine reaching this database with identity auth.
+
+    For `migrations/env.py`, which drives its own engine rather than going through
+    `pool()`/`connect()` — SQLAlchemy's asyncpg dialect forwards `connect_args` straight
+    to `asyncpg.connect()`, so the same `user`/token-callable shape works there
+    unchanged. The credential is returned alongside so the caller can close it once the
+    engine is done; this function does not own that lifecycle the way `pool()`'s context
+    manager does.
+    """
+    credential = _credential(client_id, client_secret, tenant_id)
+    return {"user": user, "password": _TokenProvider(credential)}, credential
 
 
 @asynccontextmanager
-async def pool(database_url: str, min_size: int = 1, max_size: int = 10) -> AsyncIterator:
+async def connect(
+    database_url: str,
+    *,
+    user: str | None = None,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    tenant_id: str | None = None,
+) -> AsyncIterator[asyncpg.Connection]:
+    """One connection, closed on the way out.
+
+    `user` selects identity-based auth: an Entra token is fetched fresh at the moment
+    this connects and presented as the password, and `database_url` itself is expected
+    to carry no credential of its own. Omitted — as the test suite's throwaway
+    PostgreSQL needs — `database_url` is used exactly as given and the three `client_*`/
+    `tenant_id` arguments are ignored. See `_credential()` for what they select when
+    `user` is given.
+    """
+    if user is None:
+        try:
+            conn = await asyncpg.connect(asyncpg_dsn(database_url))
+        except Exception:
+            log.exception("could not connect to %s", _connection_target(database_url))
+            raise
+        try:
+            yield conn
+        finally:
+            await conn.close()
+        return
+
+    async with _credential(client_id, client_secret, tenant_id) as credential:
+        try:
+            conn = await asyncpg.connect(
+                asyncpg_dsn(database_url), user=user, password=_TokenProvider(credential)
+            )
+        except Exception:
+            log.exception("could not connect to %s as %s", _connection_target(database_url), user)
+            raise
+        try:
+            yield conn
+        finally:
+            await conn.close()
+
+
+@asynccontextmanager
+async def pool(
+    database_url: str,
+    *,
+    user: str | None = None,
+    client_id: str | None = None,
+    client_secret: str | None = None,
+    tenant_id: str | None = None,
+    min_size: int = 1,
+    max_size: int = 10,
+) -> AsyncIterator:
     """A pool, for the parts of the module that run as many things at once.
 
     Ingest needs one: a subscription per tracked pair, each writing as candles close, plus
     whatever backfills are running beside them. A single shared connection would serialise
     all of that behind whichever query got there first, and a connection per pair would
     open twenty of them to write one row a minute each.
+
+    `user`/`client_*`/`tenant_id` — see `connect()`. `app.py`'s lifespan always passes
+    `user`; the test suite's own pool usage (if any) does not, for the same reason
+    `connect()` does not.
     """
-    created = await asyncpg.create_pool(asyncpg_dsn(database_url), min_size=min_size, max_size=max_size)
-    try:
-        yield created
-    finally:
-        await created.close()
+    if user is None:
+        try:
+            created = await asyncpg.create_pool(
+                asyncpg_dsn(database_url), min_size=min_size, max_size=max_size
+            )
+        except Exception:
+            log.exception("could not connect to %s", _connection_target(database_url))
+            raise
+        try:
+            yield created
+        finally:
+            await created.close()
+        return
+
+    async with _credential(client_id, client_secret, tenant_id) as credential:
+        try:
+            created = await asyncpg.create_pool(
+                asyncpg_dsn(database_url),
+                user=user,
+                password=_TokenProvider(credential),
+                min_size=min_size,
+                max_size=max_size,
+            )
+        except Exception:
+            log.exception("could not connect to %s as %s", _connection_target(database_url), user)
+            raise
+        try:
+            yield created
+        finally:
+            await created.close()

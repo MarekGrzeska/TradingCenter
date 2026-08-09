@@ -16,7 +16,7 @@ Refusing to build the settings leaves nothing running to misuse.
 
 from __future__ import annotations
 
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
 
 from pydantic import ValidationInfo, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,6 +25,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # the demo, live and streaming hosts are all variants of it, and a rule tight enough
 # to name one of them is loose enough to let the others through.
 PROVIDER_HOST_MARKER = "capital.com"
+
+# `prefer`/`allow` still let the client fall back to plaintext if the server does not
+# offer TLS — specs/market-data-database-connection, "Połączenie z bazą jest
+# szyfrowane" requires the connection MUST be encrypted, not merely offered it.
+_TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 
 
 class Settings(BaseSettings):
@@ -40,7 +45,22 @@ class Settings(BaseSettings):
     gateway_api_key: str
 
     # --- the archive's own storage ---
+    #
+    # No password here, ever (design.md, "Do bazy — tożsamość, do capital.com — Key
+    # Vault"): `database_user` is the role this module authenticates as, and what it
+    # authenticates *with* is an Entra token fetched at connection time (db.py), not
+    # anything held in configuration. `sslmode=require` (or stricter) is mandatory in
+    # the URL — see `_requires_tls` below.
     database_url: str
+    database_user: str
+
+    # Unset in Azure — the App Service's own system-assigned managed identity needs no
+    # configuration, `db.py`'s `DefaultAzureCredential` finds it on its own. Set locally,
+    # together, to the dev service principal's credentials (`sp-tradingcenter-market-data-dev`,
+    # `infra/entra.tf`): there is no ambient identity on a developer's machine.
+    azure_client_id: str | None = None
+    azure_client_secret: str | None = None
+    azure_tenant_id: str | None = None
 
     # --- how much of the provider's allowance this module may take ---
     #
@@ -73,7 +93,7 @@ class Settings(BaseSettings):
             )
         return value.rstrip("/")
 
-    @field_validator("database_url", "gateway_api_key")
+    @field_validator("database_url", "database_user", "gateway_api_key")
     @classmethod
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:
         # pydantic already rejects a variable that is absent; this catches the one that is
@@ -81,6 +101,31 @@ class Settings(BaseSettings):
         if not value.strip():
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
+
+    @field_validator("database_url")
+    @classmethod
+    def _requires_tls(cls, value: str) -> str:
+        sslmode = parse_qs(urlparse(value).query).get("sslmode", [None])[0]
+        if sslmode not in _TLS_REQUIRING_SSLMODES:
+            raise ValueError(
+                f"DATABASE_URL does not require TLS (sslmode={sslmode!r}). The database "
+                "is off this machine, so the connection to it MUST be encrypted — set "
+                "sslmode=require (or verify-ca/verify-full)."
+            )
+        return value
+
+    @field_validator("database_url")
+    @classmethod
+    def _no_embedded_credential(cls, value: str) -> str:
+        parsed = urlparse(value)
+        if parsed.username or parsed.password:
+            raise ValueError(
+                "DATABASE_URL carries a username or password. This module authenticates "
+                "with an Entra token fetched at connection time (DATABASE_USER selects "
+                "the role) — a credential embedded in the URL is not read and should not "
+                "be there."
+            )
+        return value
 
     @field_validator("backfill_concurrency", "default_backfill_bars", "max_tracked_pairs")
     @classmethod

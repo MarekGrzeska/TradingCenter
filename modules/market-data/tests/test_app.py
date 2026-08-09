@@ -167,7 +167,14 @@ async def api(pool, migrated_url: str):
     app.state.pool = pool
     app.state.hub = Hub()
     app.state.settings = Settings(
-        database_url=migrated_url, gateway_api_key="test-gateway-key", _env_file=None
+        # Metadata only — the pool above is what actually reaches the database. A
+        # throwaway value that satisfies Settings' own rules (TLS required, no embedded
+        # credential) rather than `migrated_url`, which as testcontainers hands it out
+        # is neither.
+        database_url="postgresql://localhost:5432/test?sslmode=require",
+        database_user="test-user",
+        gateway_api_key="test-gateway-key",
+        _env_file=None,
     )
     app.state.instruments = FakeInstruments()
     app.state.ingest = FakeIngest()
@@ -637,7 +644,8 @@ async def test_reading_deletions_with_none_recorded_is_an_empty_list(api) -> Non
 
 async def test_going_over_the_ceiling_is_refused_with_the_reason(api, pool) -> None:
     app.state.settings = Settings(
-        database_url="postgresql://u:p@h/d",
+        database_url="postgresql://h:5432/d?sslmode=require",
+        database_user="test-user",
         gateway_api_key="test-gateway-key",
         max_tracked_pairs=1,
         _env_file=None,

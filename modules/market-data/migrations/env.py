@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from logging.config import fileConfig
+from urllib.parse import parse_qs, urlparse, urlunparse
 
 from alembic import context
 from sqlalchemy import pool
@@ -38,6 +39,28 @@ def _database_url() -> str:
     return sqlalchemy_url(Settings().database_url)
 
 
+def _identity_connect_args() -> tuple[dict, object | None]:
+    """Identity auth for the engine this migration run drives — the same mechanism
+    `db.py` uses for the application itself, so a migration proves the role it runs as
+    can do exactly what the running module will later need (specs/market-data-database-
+    connection). Empty when a test has already pointed `sqlalchemy.url` at its own
+    throwaway database (`_database_url()` above) — that connection carries its own
+    credential in the URL and has no module identity to speak of.
+    """
+    if config.get_main_option("sqlalchemy.url", None):
+        return {}, None
+    from market_data.config import Settings
+    from market_data.db import identity_connect_args
+
+    settings = Settings()
+    return identity_connect_args(
+        settings.database_user,
+        settings.azure_client_id,
+        settings.azure_client_secret,
+        settings.azure_tenant_id,
+    )
+
+
 def run_migrations_offline() -> None:
     context.configure(
         url=_database_url(),
@@ -57,13 +80,36 @@ def _run_migrations(connection) -> None:
 
 async def run_migrations_online() -> None:
     section = dict(config.get_section(config.config_ini_section) or {})
-    section["sqlalchemy.url"] = _database_url()
+    database_url = _database_url()
+    connect_args, credential = _identity_connect_args()
+    if credential is not None:
+        # SQLAlchemy's asyncpg dialect forwards a URL's query string as literal keyword
+        # arguments to `asyncpg.connect()` — `?sslmode=require` becomes a `sslmode=`
+        # kwarg, which asyncpg does not accept (it wants `ssl=`, and only when passed
+        # explicitly rather than through the DSN). asyncpg.connect() itself parses
+        # `sslmode` out of a DSN string fine, which is why `pool()`/`connect()` in
+        # db.py never need this: they hand asyncpg the DSN whole and never go through
+        # SQLAlchemy's URL/kwarg split. The mode still means something — carried into
+        # connect_args as `ssl` instead, and the query string dropped so SQLAlchemy
+        # cannot pass it along a second time.
+        parsed = urlparse(database_url)
+        sslmode = parse_qs(parsed.query).get("sslmode", [None])[0]
+        if sslmode:
+            connect_args["ssl"] = sslmode
+        database_url = urlunparse(parsed._replace(query=""))
+    section["sqlalchemy.url"] = database_url
     # NullPool because a migration run is one connection used once; a pool here would
     # only leave sockets open past the last statement.
-    engine = async_engine_from_config(section, prefix="sqlalchemy.", poolclass=pool.NullPool)
-    async with engine.connect() as connection:
-        await connection.run_sync(_run_migrations)
-    await engine.dispose()
+    engine = async_engine_from_config(
+        section, prefix="sqlalchemy.", poolclass=pool.NullPool, connect_args=connect_args
+    )
+    try:
+        async with engine.connect() as connection:
+            await connection.run_sync(_run_migrations)
+    finally:
+        await engine.dispose()
+        if credential is not None:
+            await credential.close()
 
 
 if context.is_offline_mode():

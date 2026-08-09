@@ -16,6 +16,14 @@ dependencies = [
     # extra is not optional here: it pulls greenlet, without which an async engine raises
     # at its first connect — and the only driver this module installs is an async one.
     "sqlalchemy[asyncio]>=2.0",
+    # The database credential: an Entra token for the module's own identity — a managed
+    # identity in Azure, a service principal (client secret) locally — fetched at
+    # connection time, never a stored password (design.md, "Do bazy — tożsamość").
+    # `azure.identity.aio`'s async transport imports aiohttp lazily and errors at first
+    # use, not at install time, if it is missing — an explicit dependency here, not a
+    # transitive one left to chance.
+    "azure-identity>=1.19",
+    "aiohttp>=3.10",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
