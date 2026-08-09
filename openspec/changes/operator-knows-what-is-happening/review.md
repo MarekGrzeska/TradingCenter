@@ -14,8 +14,10 @@ event. Focus handling, the tab trap and `Escape` are therefore written by hand i
 and tested there. `jsdom` stayed at `^25`; the bump was reverted, not kept.
 
 One spec sentence was also loosened after the code contradicted it — see FIXED-2 below. Nothing else
-is knowingly incomplete. The one requirement with no automated test is a structural one
-(`terminal-dialogs`, "Wszystkie dialogi wychodzą z jednego miejsca"), listed under Gaps.
+is knowingly incomplete. Every requirement in this change's specs has a test behind it, including
+the structural one (`terminal-dialogs`, "Wszystkie dialogi wychodzą z jednego miejsca") — that one
+is held by a test that reads the source rather than renders it, and was checked against a planted
+violation of each kind it forbids. What remains open is judgement, not coverage: see Gaps.
 
 ## Verified
 
@@ -25,12 +27,17 @@ modules/market-data $ uv run pytest -q           → 517 passed, 7 skipped in 28
 modules/terminal    $ pnpm lint                  → clean (eslint .)
 modules/terminal    $ pnpm typecheck             → clean (tsc -b --noEmit)
 modules/terminal    $ pnpm contract:check        → Contract is up to date.
-modules/terminal    $ pnpm test                  → 20 files, 264 passed (242 before this change)
+modules/terminal    $ pnpm test                  → 21 files, 267 passed (242 before this change)
 $ openspec validate operator-knows-what-is-happening --strict → valid
 ```
 
 The terminal suite was run once at the branch point as a baseline (242 passed) before anything was
-written, so the 22 new tests are the whole of the difference.
+written, so the 25 new tests are the whole of the difference.
+
+`dialogsComeFromOnePlace.test.ts` was checked against both violations it is meant to catch — a
+component rendering `role="dialog"` of its own, and a `window.confirm()` — each planted in
+`src/app/`, each failing the suite by name, each then removed. A test asserting the absence of
+something is worth exactly what its ability to fail is worth.
 
 ## Findings
 
@@ -99,17 +106,11 @@ that blew up while held, and a failure to *claim* holds no chunk to settle.
 | Escape w trakcie pracy | `ConfirmDialog.test.tsx::"Escape backs out, but not while the work is in flight"` |
 | Fokus po otwarciu | `ConfirmDialog.test.tsx::"keeps the keyboard inside it while it is open"` |
 | **terminal-dialogs — Wszystkie dialogi wychodzą z jednego miejsca** | |
-| Nowe pytanie o zgodę | no test — see Gaps |
-| Zmiana wspólnego zachowania | no test — see Gaps |
+| Nowe pytanie o zgodę | `dialogsComeFromOnePlace.test.ts::"has no second component announcing itself as a dialog"` + `::"never falls back to the browser's own confirm()"` |
+| Zmiana wspólnego zachowania | same two tests — a behaviour can only be changed in one place while `ConfirmDialog.tsx` is the only component allowed to be a dialog; the behaviours themselves are held by `ConfirmDialog.test.tsx` |
 
 ## Gaps
 
-- **`terminal-dialogs`, "Wszystkie dialogi wychodzą z jednego miejsca"** has no automated test, and
-  arguably cannot have a useful one: it is a claim about where code lives, not about behaviour. What
-  stands behind it is that `ConfirmDialog` is the only component in `src/` rendering
-  `role="dialog"`, that all three asking sites import it, and that the behaviours it owns are tested
-  once in `ConfirmDialog.test.tsx` rather than three times. A fourth confirmation written from
-  scratch would pass every test in this suite; only review catches that.
 - **The five-minute stall threshold is not calibrated against production.** It is one named constant
   (`STALL_AFTER_SECONDS`), chosen as comfortably above a healthy chunk and far below the forty
   minutes it took to notice. If it turns out to flag jobs merely waiting on the shared limiter, the
