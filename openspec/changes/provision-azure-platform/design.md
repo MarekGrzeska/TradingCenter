@@ -104,17 +104,43 @@ App Service odpytuje sondę bez poświadczenia i na tej podstawie restartuje apl
 więc nieunikniony i dlatego MUST być dokładnie jeden, a sonda MUST NOT ujawniać niczego poza
 żywotnością — obecna trasa `/` zwracająca nazwę i wersję modułu wymaga przeglądu pod tym kątem.
 
-### Jeden serwer bazy, dwie bazy logiczne, trzy role
+### Jeden serwer bazy, dwie bazy logiczne, cztery tożsamości
 
 Rozdział środowisk musi się zmieścić w jednej instancji, bo taki jest darmowy limit. Zostają dwie
-bazy — `market_data` i `market_data_dev` — i trzy role o rozłącznych uprawnieniach: aplikacyjna
-(RW na `market_data`), deweloperska (RW wyłącznie na `market_data_dev`), operatorska (`SELECT` na
-obu).
+bazy — `market_data` i `market_data_dev`.
+
+Ról jest **cztery, nie trzy**, i to jest poprawka wprowadzona dopiero przy wdrażaniu, nie w
+pierwotnym projekcie. Administrator Entra przypisany serwerowi w Azure Postgres Flexible Server
+**omija każdy `GRANT` na każdej bazie** — to nie jest rola z uprawnieniami, to superużytkownik.
+Pierwotny plan zakładał, że osobiste konto operatora (`mgrzeskait@outlook.com`) jest jednocześnie
+administratorem *i* tożsamością „deweloperską" czytaną przez `.env`. Przy wdrażaniu okazało się, że
+to zerowałoby całą ochronę: administrator i tak dobija do `market_data`, więc GRANT ograniczający
+rolę deweloperską do `market_data_dev` nic by nie chronił, gdyby ta rola była tym samym kontem co
+administrator.
+
+Rozwiązanie: **administrator zostaje wyłącznie do naprawy awarii i do DBeavera**, nigdy nie jest
+poświadczeniem czytanym automatycznie. Tożsamość „deweloperska" to osobny Service Principal
+(`sp-tradingcenter-market-data-dev`, `infra/entra.tf`, provider `azuread`) — RW wyłącznie na
+`market_data_dev`, `CONNECT` na `market_data` jawnie odebrany. Cztery tożsamości: administrator
+(człowiek, pełny dostęp, do awarii i DBeavera), aplikacyjna (tożsamość zarządzana App Service, RW
+na `market_data` — tworzona w grupie 5, bo potrzebuje App Service, który jeszcze nie istnieje),
+deweloperska (Service Principal, RW na `market_data_dev`), i **nie ma osobnej roli operatorskiej** —
+patrz niżej.
+
+**Konsekwencja zaakceptowana wprost**: skoro DBeaver łączy się kontem administratora, `SELECT`-only
+dla operatora — opisane w `docs/dbeaver-azure-connection.html` jako osobna, czwarta tożsamość — nie
+jest egzekwowalne wobec tego samego mechanizmu, który zezwala na wszystko. Dla projektu
+jednoosobowego to świadomy kompromis: administrator i tak ma pełny dostęp przez portal Azure, więc
+osobna rola tylko do przeglądania danych nie broni przed niczym, przed czym broniłaby się sama
+przez się. Rolę operatorską dałoby się odtworzyć jako piątą, osobną tożsamość — nieopłacalne teraz,
+możliwe później, jeśli do projektu dołączy ktoś drugi.
 
 Alternatywa odrzucona: jedna rola i rozdział wyłącznie przez nazwę bazy w `.env`. Nazwa w pliku
 konfiguracyjnym nie jest zabezpieczeniem — jest konwencją, a konwencja zawodzi dokładnie wtedy, gdy
 `alembic upgrade` idzie na archiwum warte dwadzieścia siedem godzin odtwarzania. **Rola deweloperska
-bez `CONNECT` na `market_data` czyni ten błąd niewykonalnym**, zamiast czynić go niezalecanym.
+bez `CONNECT` na `market_data` czyni ten błąd niewykonalnym**, zamiast czynić go niezalecanym — pod
+warunkiem, że rola deweloperska nie jest też administratorem, co jest właśnie tym, co ta poprawka
+naprawia.
 
 Alternatywa odrzucona: dwa schematy w jednej bazie. Migracje operują na schemacie domyślnym;
 drugi schemat komplikuje każdą przyszłą migrację.
@@ -127,11 +153,19 @@ Poświadczenia capital.com pochodzą od zewnętrznego providera i muszą gdzieś
 a w ustawieniach aplikacji wyłącznie odwołanie `@Microsoft.KeyVault(SecretUri=...)`. Wartość nie
 przechodzi przez kod Terraforma ani przez logi wdrożenia.
 
-Hasło do bazy nie musi istnieć w ogóle, więc nie istnieje: aplikacje łączą się tożsamością
-zarządzaną, deweloper swoim kontem po `az login`. Gdyby zostało w Key Vault, po przeniesieniu pracy
-lokalnej na Azure musiałoby wylądować w `.env` na laptopie — czyli hasło do serwera produkcyjnego
-na dysku. Cena tego wyboru to poświadczenie o ważności około godziny, które trzeba odnawiać;
-pobieranie tokenu wpina się w moment nawiązywania połączenia przez pulę, nie w start procesu.
+Hasło do bazy nie musi istnieć w ogóle, więc nie istnieje: aplikacja łączy się tożsamością
+zarządzaną, lokalny proces `market-data` — tożsamością Service Principal poświadczaną sekretem
+klienta Entra (patrz „Jeden serwer bazy, dwie bazy logiczne, cztery tożsamości" — **nie** osobistym
+kontem dewelopera po `az login`, bo to konto jest administratorem serwera i ominęłoby każdy GRANT).
+Gdyby hasło do bazy zostało w Key Vault, po przeniesieniu pracy lokalnej na Azure musiałoby wylądować
+w `.env` na laptopie — czyli hasło do serwera produkcyjnego na dysku. Cena tego wyboru to
+poświadczenie o ważności — dla tożsamości zarządzanej około godziny, dla Service Principal tyle, ile
+ważny jest jego token — które trzeba odnawiać; pobieranie tokenu wpina się w moment nawiązywania
+połączenia przez pulę, nie w start procesu.
+
+Do DBeavera i innej pracy ręcznej dewelopera (nie automatycznego procesu) `az login` własnym kontem
+zostaje — ale to konto jest administratorem serwera, więc widzi obie bazy z pełnymi prawami. Patrz
+wyżej, dlaczego to jest świadomy kompromis, nie przeoczenie.
 
 ### Bootstrap osobnym katalogiem ze stanem lokalnym
 

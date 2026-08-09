@@ -38,17 +38,30 @@ Przed włączeniem wymogu po stronie gatewaya — inaczej wszystko przestaje dzi
 
 ## 4. Baza
 
-- [ ] 4.1 `infra/main.tf` z backendem `azurerm` na kontenerze z grupy 3 oraz `infra/variables.tf` (region, nazwy, wersja Postgresa, adres dewelopera)
-- [ ] 4.2 `azurerm_postgresql_flexible_server`: `B_Standard_B1ms`, wersja 17, `storage_mb = 32768`, `backup_retention_days = 7`, `zone = "1"`
-- [ ] 4.3 Wymuś TLS na poziomie serwera
-- [ ] 4.4 Utwórz obie bazy: `market_data` i `market_data_dev`
-- [ ] 4.5 Przypisz administratora Entra dla serwera — droga powrotna przy błędnej konfiguracji ról
-- [ ] 4.6 Reguła firewalla na adres dewelopera czytany ze zmiennej
-- [ ] 4.7 Rola aplikacyjna: odczyt i zapis wyłącznie na `market_data`
-- [ ] 4.8 Rola deweloperska: odczyt i zapis wyłącznie na `market_data_dev`, **bez `CONNECT` na `market_data`**
-- [ ] 4.9 Rola operatorska: `SELECT` na obu bazach — konto do DBeavera
-- [ ] 4.10 Odbierz `PUBLIC` domyślne prawa na obu bazach
-- [ ] 4.11 **Sprawdź rozłączność ręcznie**: konto deweloperskie MUST dostać odmowę przy połączeniu z `market_data`, konto operatorskie MUST dostać odmowę przy `INSERT`. Zanotuj wynik w `review.md`
+**Odkrycie w trakcie realizacji, zmieniające plan:** administrator Entra serwera Postgres
+Flexible Server omija każdy `GRANT` na każdej bazie — to nie jest rola z uprawnieniami,
+to superużytkownik. Gdyby to samo konto (`mgrzeskait@outlook.com`) było jednocześnie
+tożsamością „deweloperską", cała ochrona przed pomyłkowym `alembic upgrade` na produkcji
+byłaby fikcją — administrator i tak dobija do `market_data`, GRANT-y go nie dotyczą.
+Rozstrzygnięcie z użytkownikiem: **osobny Service Principal** `sp-tradingcenter-market-data-dev`
+(`infra/entra.tf`, provider `azuread`) jako tożsamość „deweloperska" zamiast osobistego
+konta. Osobiste konto zostaje wyłącznie administratorem — do naprawy awarii i do
+DBeavera — nigdy poświadczeniem czytanym automatycznie przez proces. Konsekwencja dla
+roli „operatorskiej": skoro DBeaver i tak łączy się kontem administratora (per decyzję
+użytkownika), **`SELECT`-only wobec niego nie jest egzekwowalne** — zaakceptowane wprost
+jako ograniczenie dla projektu jednoosobowego, nie ukryte.
+
+- [x] 4.1 `infra/main.tf` z backendem `azurerm` na kontenerze z grupy 3 oraz `infra/variables.tf` (region, nazwy, wersja Postgresa, adres dewelopera)
+- [x] 4.2 `azurerm_postgresql_flexible_server`: `B_Standard_B1ms`, wersja 17, `storage_mb = 32768`, `backup_retention_days = 7`, `zone = "2"` (przypisane przez Azure przy tworzeniu, przypięte jawnie żeby plan nie chciał tego cofać)
+- [x] 4.3 Wymuś TLS na poziomie serwera — `require_secure_transport = ON`
+- [x] 4.4 Utwórz obie bazy: `market_data` i `market_data_dev`
+- [x] 4.5 Przypisz administratora Entra dla serwera (`mgrzeskait@outlook.com`) — droga powrotna przy błędnej konfiguracji ról, **wyłącznie do tego celu i do DBeavera, nigdy do automatycznych połączeń**
+- [x] 4.6 Reguła firewalla na adres dewelopera czytany ze zmiennej (`infra/terraform.tfvars`, gitignored)
+- [ ] 4.7 Rola aplikacyjna: odczyt i zapis wyłącznie na `market_data` — **przeniesione do grupy 5**: potrzebuje tożsamości zarządzanej App Service, która jeszcze nie istnieje
+- [x] 4.8 Rola deweloperska: `sp-tradingcenter-market-data-dev` (Service Principal, nie osobiste konto) — `CREATE`/`USAGE` na schemacie `public` w `market_data_dev`, `CONNECT` na `market_data_dev` odebrane od `PUBLIC` i nadane wyłącznie tej roli, **jawny `REVOKE ALL ... FROM` na `market_data`**
+- [x] 4.9 ~~Rola operatorska: `SELECT` na obu bazach~~ — **zmienione decyzją użytkownika**: operator (DBeaver) używa konta administratora; `docs/dbeaver-azure-connection.html` do poprawienia w grupie 11, żeby nie obiecywał uprawnienia, którego nie ma
+- [x] 4.10 Odbierz `PUBLIC` domyślne prawa na obu bazach — `REVOKE CONNECT ... FROM PUBLIC` na `market_data` i `market_data_dev`
+- [x] 4.11 **Sprawdzone ręcznie, nie tylko planem**: token roli deweloperskiej (client credentials flow) połączył się i wykonał `CREATE TABLE` na `market_data_dev`, a na `market_data` dostał `InsufficientPrivilegeError: permission denied for database "market_data" — User does not have CONNECT privilege`. Sprawdzenie roli operatorskiej nie dotyczy — patrz 4.9
 
 ## 5. Key Vault i plan aplikacji
 
@@ -58,6 +71,7 @@ Przed włączeniem wymogu po stronie gatewaya — inaczej wszystko przestaje dzi
 - [ ] 5.4 Aplikacja `market-data`: `always_on`, `websockets_enabled`, tożsamość `SystemAssigned`, Easy Auth z Entra ID
 - [ ] 5.5 Uprawnienia odczytu sekretów dla obu tożsamości; w ustawieniach aplikacji wyłącznie odwołania `@Microsoft.KeyVault(SecretUri=...)`
 - [ ] 5.6 Dopisz do reguły firewalla bazy adresy wyjściowe planu — czytane z zasobu, nigdy ręcznie
+- [ ] 5.7 **(dawne 4.7)** Rola aplikacyjna w Postgresie: `pgaadauth_create_principal_with_oid` na `object_id` tożsamości zarządzanej `market-data`, `CONNECT`+`CREATE`/`USAGE` wyłącznie na `market_data`, jawny `REVOKE ALL` na `market_data_dev`. Sprawdź ręcznie jak w 4.11, tym razem tokenem tożsamości zarządzanej
 - [ ] 5.7 `infra/monitoring.tf`: Application Insights
 - [ ] 5.8 `terraform fmt`, `terraform validate`, `apply`
 
