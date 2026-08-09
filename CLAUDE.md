@@ -19,7 +19,8 @@ modules/market-data       Python · the candle archive. Owns the PostgreSQL. Dep
 modules/terminal          React+TS · the operator's screen. Consumes both. Publishes nothing.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
-docs/                     architecture and reference
+docs/                     architecture and reference — only what is true today
+docs/archive/             research from before a decision; the road, not the state
 ```
 
 `terminal` is a consumer, not a peer — nothing depends on it. Call it the **terminal**,
