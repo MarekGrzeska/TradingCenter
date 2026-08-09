@@ -16,9 +16,9 @@
 
 ## 3. Dowód, że działa i że łapie
 
-- [ ] 3.1 Otworzyć PR i zobaczyć **zielony** przebieg wszystkich trzech zadań — w szczególności, że testy `db` faktycznie się wykonały, a nie pominęły
-- [ ] 3.2 Zobaczyć **czerwony** przebieg: tymczasowo zepsuć jedną rzecz z każdego rodzaju (test, lint, kontrakt), potwierdzić, że zadanie pada i mówi które, cofnąć
-- [ ] 3.3 Odnotować w review.md czas przebiegu i to, czy testy bazodanowe przeszły na Linuksie za pierwszym razem
+- [x] 3.1 Otworzyć PR i zobaczyć **zielony** przebieg wszystkich trzech zadań — w szczególności, że testy `db` faktycznie się wykonały, a nie pominęły *(przebieg 31309352112; 273 testy `db` przeszły na Linuksie za pierwszym razem)*
+- [x] 3.2 Zobaczyć **czerwony** przebieg: tymczasowo zepsuć jedną rzecz z każdego rodzaju (test, lint, kontrakt), potwierdzić, że zadanie pada i mówi które, cofnąć *(przebieg 31309449497: gateway padł na `ruff check`, market-data na `pytest`, terminal na `contract:check`; cofnięte)*
+- [x] 3.3 Odnotować w review.md czas przebiegu i to, czy testy bazodanowe przeszły na Linuksie za pierwszym razem *(73 s całości; tak)*
 
 ## 4. Blokada merge'a
 
