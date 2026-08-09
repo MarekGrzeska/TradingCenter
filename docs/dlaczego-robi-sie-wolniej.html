@@ -289,8 +289,33 @@
   to zdrowe i już się zwróciło (logika coverage i rollupów była „wrong twice", jak
   uczciwie przyznaje komentarz w CI), ale znaczy, że każdy task płaci podatek testowy.
   I&nbsp;<strong>markdown procesu to 29% wszystkiego, co ręcznie utrzymywane</strong> —
-  prawie tyle, co cały kod produkcyjny. Do tego dochodzi 22 specyfikacji capabilities,
-  które z każdą zmianą rosną i które każde <code>/opsx:apply</code> czyta.</p>
+  prawie tyle, co cały kod produkcyjny.</p>
+
+  <p>Pierwsza wersja dopisywała tu, że „do tego dochodzi 22 specyfikacji capabilities,
+  które z każdą zmianą rosną". To zdanie było mylące i doprowadziło do jednej wycofanej
+  później rekomendacji. Rozbicie tych 13,7&nbsp;tys. linii pokazuje, gdzie masa naprawdę
+  leży:</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Część openspec/</th><th>Linii</th><th>Czytana przy każdej zmianie?</th></tr>
+    <tr>
+      <td><code>specs/</code> — prawda o systemie, 22 pliki</td>
+      <td>3&nbsp;292</td>
+      <td>tak, ale tylko te capabilities, których zmiana dotyczy</td>
+    </tr>
+    <tr>
+      <td><code>changes/archive/</code> — papierologia 13 zamkniętych zmian</td>
+      <td><strong>10&nbsp;239</strong></td>
+      <td>nie, nigdy więcej</td>
+    </tr>
+  </table>
+  </div>
+
+  <p>Czyli <strong>75% prozy OpenSpec to archiwum</strong>, którego nikt już nie przeczyta —
+  średnio 790 linii na zamkniętą zmianę. Specyfikacje, jedyna część czytana ponownie, to
+  ćwiartka całości. To przesuwa cel: problemem nie jest kształt <code>specs/</code>, tylko
+  tempo, w jakim przybywa artefaktów na zmianę.</p>
 
   <div class="callout warn">
     <span class="tag">Teza potwierdziła się w trakcie pisania</span>
@@ -405,10 +430,9 @@
     w <code>openspec/config.yaml</code> i w hooku.</p>
     <p><strong>Budżet artefaktów</strong>: proposal ≤ 1 strona; <code>design.md</code>
     tylko, gdy istnieje realna decyzja z alternatywami; tasks nie powtarzają proposala.</p>
-    <p><strong>Konsolidacja capabilities</strong> przy najbliższym archive: 22 → ~10
-    (np. <code>capital-*</code> 5→2, <code>terminal-*</code> 8→4,
-    <code>market-data-*</code> 8→4). Mniejsza powierzchnia czytania dla każdej
-    przyszłej zmiany.</p>
+    <p><strong><s>Konsolidacja capabilities 22 → ~10.</s></strong> Ta rekomendacja została
+    <strong>wycofana</strong> — szczegóły w sekcji niżej. Powstała z policzenia plików,
+    nie z ich przeczytania.</p>
     <p><strong>Norma komentarzy</strong>: zostaje „dlaczego", znika narracja. Esej jest
     zasłużony tylko tam, gdzie dokumentuje pułapkę, w którą ktoś już wpadł.</p>
     <p><strong>Drugi worktree na stałe</strong>: osobny katalog trzymany gotowy do pracy
@@ -609,6 +633,53 @@
   tenant-wide w rękach czegoś, co odpala się z repozytorium, to duży promień rażenia za
   oszczędność jednego <code>terraform apply</code> w terminalu kilka razy w miesiącu.</p>
 
+  <h2><span class="no">Wycofane</span>Konsolidacja capabilities była złą diagnozą</h2>
+
+  <p>Ten dokument zalecał zejście z 22 capabilities do około dziesięciu. Przy próbie
+  wykonania okazało się, że rekomendacja powstała z <strong>policzenia plików, a nie z ich
+  przeczytania</strong> — i że jej wykonanie pogorszyłoby dokładnie tę rzecz, którą miała
+  poprawić. Trzy powody, każdy sprawdzalny:</p>
+
+  <p><strong>Nie ma czego konsolidować.</strong> 22 pliki mieszczą się w przedziale 61–285
+  linii i 4–12 wymagań, przy średniej 150 linii. Nie ma ani jednego kikuta na dwadzieścia
+  linii, ani jednego molocha. Każdy opisuje jedną, dającą się nazwać rzecz: kto ma prawo
+  wywołać gateway, czym jest instrument, co widzi operator na zakładce z historią. Sklejenie
+  „strumienia na żywo" z „handlem" daje worek, nie capability.</p>
+
+  <p><strong>Konsolidacja nie usuwa ani jednej linii.</strong> 3&nbsp;292 linie zostają
+  3&nbsp;292 liniami niezależnie od tego, w ilu plikach leżą. Argumentem miała być
+  „mniejsza powierzchnia czytania", ale ta zależy od granulacji <em>odwrotnie</em>, niż
+  zakładałem: zmiana czyta capabilities, których dotyczy. Przy 22 plikach czyta jeden,
+  może dwa. Po sklejeniu do dziesięciu ten sam kontekst wymagałby wciągnięcia pliku
+  trzykrotnie większego. <strong>Rekomendacja działała przeciw własnemu celowi.</strong></p>
+
+  <p><strong>Masa jest gdzie indziej.</strong> Archiwum zamkniętych zmian to 10&nbsp;239
+  linii wobec 3&nbsp;292 w specyfikacjach — trzy razy więcej prozy w miejscu, do którego
+  nikt nie wraca. Z czego składa się to archiwum:</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Artefakt</th><th>Linii w archiwum</th><th>Uwaga</th></tr>
+    <tr><td>delta specs</td><td>3&nbsp;924</td><td>po archiwizacji ich treść żyje już w <code>specs/</code></td></tr>
+    <tr><td><code>design.md</code></td><td>2&nbsp;316</td><td>najgrubszy pojedynczy artefakt na zmianę</td></tr>
+    <tr><td><code>review.md</code></td><td>1&nbsp;848</td><td>zarabia na siebie — to zapis, jak oceniono kod</td></tr>
+    <tr><td><code>tasks.md</code></td><td>1&nbsp;164</td><td>lista zrobionych rzeczy, przechowywana bezterminowo</td></tr>
+    <tr><td><code>proposal.md</code></td><td>987</td><td>najtańszy i najbardziej potrzebny</td></tr>
+  </table>
+  </div>
+
+  <p>Dlatego zamiast konsolidacji weszły dwie rzeczy, które celują tam, gdzie masa
+  rzeczywiście rośnie: <strong>reguła, kiedy w ogóle zakładać zmianę</strong> (wymaganie,
+  kontrakt między modułami albo infra — nic innego), oraz <strong>budżety artefaktów</strong>,
+  z których najważniejszy dotyczy <code>design.md</code>: pisze się go tylko, gdy istnieje
+  realna decyzja z alternatywami. Obie siedzą w <code>openspec/config.yaml</code>, skąd CLI
+  wciąga je do każdej generowanej instrukcji — sprawdzone przebiegiem, nie założone.</p>
+
+  <p>Zostaje pytanie otwarte, którego świadomie nie rozstrzygnąłem sam: <strong>czy
+  archiwum ma rosnąć bez końca.</strong> 3&nbsp;924 linie delta speców to opis zmian, które
+  już wsiąkły do <code>specs/</code>, a historię tego, co się kiedy zmieniło, trzyma git.
+  Kasowanie zapisów historycznych to nie jest decyzja do podjęcia mimochodem.</p>
+
   <h2><span class="no">Podsumowanie</span>Plan działania</h2>
 
   <ol class="plan">
@@ -625,11 +696,13 @@
     <li><strong><code>terraform apply</code> uruchamiany z Actions, z odmową na Entra.</strong>
       <span class="meta">zrobione · PR&nbsp;#34</span></li>
     <li><strong>Lekka ścieżka zmian w OpenSpec (pełny rytuał tylko dla specs/kontraktów/infra).</strong>
-      <span class="meta">1–2 h · ten tydzień</span></li>
+      <span class="meta">zrobione · PR&nbsp;#35, w <code>config.yaml</code></span></li>
     <li><strong>Filtry ścieżek w <code>checks.yml</code>.</strong>
       <span class="meta">zrobione · PR&nbsp;#34</span></li>
-    <li><strong>Konsolidacja capabilities 22 → ~10.</strong>
-      <span class="meta">2–3 h · przy najbliższym archive</span></li>
+    <li><strong>Budżety artefaktów (proposal, design, tasks, review).</strong>
+      <span class="meta">zrobione · PR&nbsp;#35, czyta je CLI</span></li>
+    <li><strong><s>Konsolidacja capabilities 22 → ~10.</s></strong>
+      <span class="meta">wycofane · zła diagnoza</span></li>
     <li><strong>Zapis budżetu złożoności w szablonie proposala.</strong>
       <span class="meta">30 min · przy najbliższym propose</span></li>
   </ol>
@@ -665,6 +738,14 @@
     dopisany po sprawdzeniu — nie z założenia — czego darmowy plan GitHuba faktycznie nie
     udostępnia. Dwie rekomendacje z pierwszej wersji okazały się przy realizacji częściowo
     błędne (smoke-check na <code>/health</code>, uwaga o branch protection) i są opisane
-    jako błędne, a nie po cichu poprawione.</p>
+    jako błędne, a nie po cichu poprawione. <strong>Szósta</strong>, w PR&nbsp;#35: lekka
+    ścieżka i budżety artefaktów weszły do <code>openspec/config.yaml</code>, a rekomendacja
+    konsolidacji capabilities została <em>wycofana</em> — przy próbie wykonania okazało się,
+    że działałaby przeciw własnemu celowi. To trzecia rekomendacja tego dokumentu obalona
+    przy realizacji; wszystkie trzy zostały tu jako obalone.</p>
+    <p>Warte odnotowania na przyszłość: każda z tych trzech pomyłek miała ten sam kształt —
+    wniosek wyciągnięty z <em>policzenia</em> czegoś (plików, endpointów, reguł GitHuba)
+    zamiast <em>sprawdzenia</em> tego. Audyt oparty na pomiarach jest tyle wart, ile
+    trafność tego, co zmierzono.</p>
   </footer>
 </main>

@@ -203,11 +203,54 @@ if [ -z "$TARGET" ]; then
   deny 'Name the change explicitly: openspec archive <change-name>. Without a name this hook cannot check that the change has been reviewed.'
 fi
 
-root=${CLAUDE_PROJECT_DIR:-$PWD}
-change_dir="$root/openspec/changes/$TARGET"
+# Which checkout the change lives in.
+#
+# `$CLAUDE_PROJECT_DIR` alone is wrong here, and it took a real archive to notice. It
+# names the *primary* worktree, so a change being archived from a secondary one
+# (`git worktree add`, which is how parallel work happens in this repo) was looked for in
+# a directory the command never touched. That both denies wrongly — the case that caught
+# it, a review.md written in one worktree and read for in another — and, worse, could
+# allow wrongly, if the primary worktree happened to hold a reviewed change of the same
+# name.
+#
+# So the command's own working directory comes first. The PreToolUse payload carries it;
+# older payloads may not, and then the fallbacks stand. From each candidate the search
+# walks upward, because `openspec archive` runs just as happily from a module directory
+# as from the repository root.
+#
+# What this still cannot see, and deliberately does not guess at: a command that changes
+# directory itself — `cd ../other-worktree && openspec archive x`. The payload reports the
+# shell's directory before the command runs, so the gate judges the tree the caller
+# started in. Reading the `cd` out of the command string would be guessing at shell
+# semantics this hook has no business reimplementing; archive from the checkout you are
+# in, which is what the fallback chain assumes.
+if command -v jq >/dev/null 2>&1; then
+  payload_cwd=$(printf '%s' "$raw" | jq -r '.cwd // empty' 2>/dev/null || true)
+fi
 
-# No such change: let OpenSpec produce its own error rather than inventing one here.
-[ -d "$change_dir" ] || allow
+find_change_dir() {
+  dir=$1
+  [ -n "$dir" ] || return 1
+  while :; do
+    if [ -d "$dir/openspec/changes/$TARGET" ]; then
+      printf '%s' "$dir/openspec/changes/$TARGET"
+      return 0
+    fi
+    parent=$(dirname "$dir")
+    [ "$parent" != "$dir" ] || return 1
+    dir=$parent
+  done
+}
+
+change_dir=""
+for candidate in "${payload_cwd:-}" "${CLAUDE_PROJECT_DIR:-}" "$PWD"; do
+  change_dir=$(find_change_dir "$candidate") && break
+  change_dir=""
+done
+
+# No such change anywhere in reach: let OpenSpec produce its own error rather than
+# inventing one here.
+[ -n "$change_dir" ] || allow
 [ -f "$change_dir/review.md" ] && allow
 
 deny "openspec/changes/$TARGET/review.md is missing. This project reviews a change before archiving it, and the review archives with the change - so it is written first, not skipped. Run: openspec instructions review --change $TARGET --json"

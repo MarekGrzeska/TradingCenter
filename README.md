@@ -77,6 +77,16 @@ around the clock.
 
 ## Workflow
 
+Not every change is an OpenSpec change. One is opened when the work will change a
+**requirement** (`openspec/specs/`), a **contract between modules**, or **infrastructure**
+(`infra/`). Everything else — bug fixes, refactors that keep behaviour, UI work adding no
+requirement, documentation, CI — is a branch, its tests and a pull request. That is not a
+lesser path and it skips no review; it skips paperwork describing work no spec has an
+opinion about. The rule is in [openspec/config.yaml](openspec/config.yaml), where the CLI
+reads it into every set of instructions it generates.
+
+When it is a change:
+
 | Situation | Command |
 |---|---|
 | Think an idea through | `/opsx:explore` |

@@ -80,7 +80,20 @@ design (`shared_access_key_enabled = false`, verified live). Don't "fix" that by
 
 ## Workflow
 
-Changes go through OpenSpec:
+**First decide whether this is an OpenSpec change at all.** Open one when the work will
+change a requirement (`openspec/specs/**`), a contract between modules
+(`market_data/contract.py`, `capital_gateway/dtos.py`, the terminal's generated contract),
+or infrastructure (`infra/**`). Otherwise: branch, tests, pull request — no proposal, no
+design, no review artifact. Bug fixes, behaviour-preserving refactors, UI work that adds no
+requirement, documentation, CI and tooling all take that path.
+
+The test is mechanical — name the files the work will touch. None in those three
+categories means there is nothing for a spec to say, and five artifacts describing it buy
+nothing. One in them means the full path, and then the paperwork is earned. The rule and
+the reasoning behind it live in `openspec/config.yaml`, which feeds them to every
+generated instruction.
+
+When it *is* a change:
 
 | Situation | Command |
 |---|---|

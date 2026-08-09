@@ -32,15 +32,50 @@ context: |
   runs standalone and communicates only through a published contract (HTTP/OpenAPI,
   CLI, or typed events) — no cross-module imports.
 
-# Per-artifact rules (optional)
-# Add custom rules for specific artifacts.
-# Example:
-#   rules:
-#     proposal:
-#       - Keep proposals under 500 words
-#       - Always include a "Non-goals" section
-#     tasks:
-#       - Break tasks into chunks of max 2 hours
+  NOT EVERY CHANGE IS AN OPENSPEC CHANGE. Open one when the work will change any
+  of these three, and otherwise do not:
+    1. a requirement — anything under openspec/specs/
+    2. a contract between modules — market_data/contract.py, capital_gateway/dtos.py,
+       or the terminal's generated contract
+    3. infrastructure — infra/**
+
+  Everything else is a branch, its tests, and a pull request: bug fixes, refactors
+  that keep behaviour, UI work that adds no requirement, documentation, CI, tooling.
+  Those are not lesser changes and they are not exempt from review — they are simply
+  not spec work, and wrapping them in five artifacts buys nothing.
+
+  The test is mechanical on purpose: name the files the work will touch, and if none
+  of them is in the three categories above, there is nothing for a spec to say. If
+  one is, the full path applies and the change is worth its paperwork.
+
+  Why this rule exists, in numbers measured on 10 August 2026: openspec/ held 13,699
+  lines, of which 3,292 were specs — the truth every change reads — and 10,239 were
+  the archived paperwork of 13 changes, roughly 790 lines per change. Over the single
+  change merged the evening this was measured, OpenSpec prose grew 445 lines against
+  197 lines of production code. The ritual, not the architecture, is what slows the
+  work down; see docs/dlaczego-robi-sie-wolniej.html.
+
+# Per-artifact rules
+#
+# Budgets, not style. Each of these exists because the artifact it names had grown
+# into a place where the same thing gets said a second time.
+rules:
+  proposal:
+    - One page. Why, what changes, which capabilities, impact — nothing else.
+    - Do not restate a requirement the delta spec is about to state properly.
+  design:
+    - Write it only when there is a real decision with alternatives that were
+      genuinely considered. A design.md that narrates the implementation is the
+      implementation written twice.
+    - When there is no such decision, say so in one line and move on. An empty
+      Decisions section is a better artifact than an invented one.
+  tasks:
+    - The work, not the reasoning. If a task needs a paragraph to justify it, that
+      paragraph belongs in design.md and the task belongs in one line.
+  review:
+    - 'A finding-free review is a legitimate result: do not pad the table.'
+    - Name the test that proves each scenario, file::test_name. A scenario with no
+      test is a gap and is listed as one.
 
 # Per-operation guidance (optional)
 # Add advisory guidance for how apply and archive work should be conducted.
