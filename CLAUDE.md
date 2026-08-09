@@ -1,0 +1,111 @@
+# CLAUDE.md
+
+Orientation for an agent working in this repo. `README.md` is the fuller narrative; this
+file is the map and the things that will bite you if you assume the usual defaults.
+
+## What this is
+
+A monorepo of **independent** modules supporting trading and research. Every module runs
+standalone — its own entrypoint, dependencies, tests and README — and modules cooperate
+only through a published contract (HTTP/OpenAPI or typed events).
+
+**There are no cross-module imports and no shared library.** This is the load-bearing rule
+of the architecture (`docs/architecture.md`, "Why no shared library"). If a change seems to
+need one, the change is wrong, not the rule.
+
+```
+modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
+modules/market-data       Python · the candle archive. Owns the PostgreSQL. Depends on the gateway.
+modules/terminal          React+TS · the operator's screen. Consumes both. Publishes nothing.
+infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
+openspec/                 specs (the truth) + change proposals
+docs/                     architecture and reference
+```
+
+`terminal` is a consumer, not a peer — nothing depends on it. Call it the **terminal**,
+never a "console" or "dashboard".
+
+## Commands
+
+Run these from the module directory. Nothing at the repo root builds or tests everything.
+
+| Module | Commands |
+|---|---|
+| `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010`<br>`uv run pytest` · `uv run ruff check .` |
+| `market-data` | `uv run alembic upgrade head` then `uv run uvicorn market_data.app:app --reload --port 8020`<br>`uv run pytest` · `uv run ruff check .` |
+| `terminal` | `pnpm dev` · `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm contract:check` |
+
+Test flags that matter:
+
+- `uv run pytest` alone runs unit tests; anything needing a database **skips** without Docker.
+- `uv run pytest -m db` — integration tests against a throwaway PostgreSQL container
+  (testcontainers, random port — safe to run in parallel). CI runs these.
+- `uv run pytest -m live --run-live` — needs a real Capital demo session. **Never run in
+  CI**, and see the session warning below.
+- `--run-live-trading` (gateway only) **writes**: it opens, amends and closes demo positions.
+
+The whole stack: `./scripts/dev.sh` (`--no-terminal` for back end only). It starts things
+in dependency order — migrations → gateway → market-data → terminal — waiting for each to
+actually answer. Ports are fixed: **8010** gateway, **8020** market-data, **5173** terminal.
+
+## Things that will bite you
+
+**No local database.** `market-data` writes to `market_data_dev` on the project's Azure
+PostgreSQL server. There is no container to start for development and Docker is not needed
+to run the stack — only to *test* market-data. `dev.sh` refuses to start if `DATABASE_URL`
+points anywhere other than `market_data_dev`; that guard is about production, not ports.
+
+**The terminal's contract is generated.** `src/data/contract.generated.ts` is built from the
+schema `market-data` derives from its own models. After changing anything in
+`market_data/contract.py`, run `pnpm contract:generate` in the terminal — CI's
+`contract:check` fails on a stale file, and it runs before the terminal's tests on purpose.
+
+**One Capital demo session exists.** capital.com invalidates the previous session on every
+new login (`capital_gateway/client.py`), so two gateway processes on the same account
+deauthenticate each other. Symptom: random 401s in both. Do not run two stacks at once.
+
+**Env files are per-module and gitignored.** Copy from `.env.example`. The gateway needs
+`CAPITAL_*` demo credentials plus its own `GATEWAY_API_KEY`; market-data needs the same
+`GATEWAY_API_KEY`, a `DATABASE_URL` and the `AZURE_*` identity it connects to Postgres with.
+
+**Terraform `apply` is the operator's job, never CI's.** CI plans only, deliberately —
+applying would hand the CI principal Entra directory write access. `infra/bootstrap/` keeps
+local state that *is* committed; its storage-account keys are in that file and are inert by
+design (`shared_access_key_enabled = false`, verified live). Don't "fix" that by rotating.
+
+## Workflow
+
+Changes go through OpenSpec:
+
+| Situation | Command |
+|---|---|
+| Think an idea through | `/opsx:explore` |
+| Propose a change | `/opsx:propose` |
+| Implement it | `/opsx:apply` |
+| Fold it into the specs | `/opsx:archive` |
+
+A change is not finished without a `review.md`; archiving one without it is the mistake the
+gate exists to catch. The gate is `.claude/hooks/require-review.ps1`, wired as a PreToolUse
+hook watching both `openspec archive` and a manual `mv` into `openspec/changes/archive/`.
+It is **PowerShell**, so on a machine without `pwsh` it does not run and the rule is yours
+to keep rather than the harness's to enforce.
+
+**Language convention, and it is not the obvious one:** OpenSpec artifacts are written in
+**Polish prose** with **English structure** — section headers, `### Requirement:`,
+`#### Scenario:`, `**WHEN**`/`**THEN**`, and RFC 2119 keywords (`MUST`, `SHALL`, …) stay
+literal English because the CLI parses them and `--strict` requires them. Polish "MUSI"
+does not satisfy the validator. Everything else — code, comments, identifiers, commit
+messages, module READMEs, this file — stays **English**. Recorded in `openspec/config.yaml`.
+
+Validate with `openspec validate <change> --strict`.
+
+## CI
+
+`.github/workflows/checks.yml` runs on every PR to `main` and every push to it: three jobs
+in parallel, one per module, running the same commands listed above. `live` tests stay out.
+Three `deploy-*.yml` workflows push images to GHCR and deploy to Azure App Service on
+pushes to `main` that touch the matching module. `terraform.yml` plans on infra PRs.
+
+Parallel work: use `git worktree` rather than a second clone — but the Azure dev database,
+the Capital session and the fixed ports are shared across worktrees, so only one agent at a
+time can run the stack or touch migrations.
