@@ -27,8 +27,17 @@ permissions:
   pull-requests: write # Azure/static-web-apps-deploy comments preview URLs on PRs
 
 concurrency:
-  group: deploy-terminal-${{ github.ref }}
-  cancel-in-progress: true
+  # Keyed by event, not by `github.ref` alone. Merging a PR fires two runs of this
+  # workflow in the same second — the push to `main` and the pull_request `closed` that
+  # tears the preview down — and under a ref-only key they landed in one group, where
+  # `cancel-in-progress` killed one of them. That is how 8f0786a reached `main` with its
+  # production deploy cancelled one second in, zero steps run, and the real site left
+  # serving the previous build while every check on the PR was green.
+  group: deploy-terminal-${{ github.event_name }}-${{ github.event.number || github.ref }}
+  # A superseded PR build is worth cancelling; a deploy to the real site is not. The
+  # same rule deploy-gateway.yml and deploy-market-data.yml already state as "never
+  # cancel a deploy mid-flight" — this workflow just has two kinds of run to tell apart.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   deploy:
