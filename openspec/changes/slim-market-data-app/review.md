@@ -12,9 +12,9 @@ an hour earlier in `generate-terminal-contract-from-openapi`, agrees. That order
 argued for in both proposals and it earned itself here: this is exactly the kind of
 rearranging where `operationId` or a tag moves unnoticed.
 
-Knowingly incomplete: task 5.4, a manual pass on a running stack, is left for the operator.
-A refactor that promises no behaviour change deserves confirming by behaviour, and the test
-suite is not that.
+Confirmed by behaviour, not only by tests: the operator submitted jobs, deleted data and
+walked the tabs on a running stack on 2026-08-09. A refactor promising no behaviour change
+deserves exactly that, and the suite is not it.
 
 ## Verified
 
@@ -65,9 +65,11 @@ schema check and the 435 tests are covering different things.
 
 ## Gaps
 
-- **Task 5.4** (manual pass on a running stack) is deferred to the operator: the wizard, a
-  job, `Data History`, a deletion, and a live chart. Every route was moved, including the
-  WebSocket, and no test drives a real gateway.
+- **Task 5.4** (manual pass on a running stack) — **passed** on 2026-08-09: jobs submitted,
+  data deleted, the tabs behaving as they did before. That matters more than the suite here.
+  Every route moved, including the WebSocket, and no test drives a real gateway, so an
+  identical OpenAPI document and 435 green tests still left the actual behaviour unwitnessed
+  until this.
 - **`app.py` still owns `candle_sink`**, which is arguably ingest's business rather than the
   HTTP layer's. Left alone deliberately: it is constructed in `lifespan` from `pool` and
   `hub`, so moving it would be a second refactor riding along inside this one. Named so the

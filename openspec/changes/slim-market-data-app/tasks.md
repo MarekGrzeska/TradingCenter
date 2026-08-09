@@ -39,4 +39,4 @@
 - [x] 5.1 `ruff` i `pytest` w `market-data`, łącznie z `pytest -m db` (435 passed, 7 skipped)
 - [x] 5.2 README `market-data`: gdzie teraz mieszkają trasy i gdzie logika, którą stamtąd wyjęto
 - [x] 5.3 `openspec validate slim-market-data-app --strict`
-- [ ] 5.4 Ręcznie na uruchomionym zestawie: kreator, zlecenie, `Data History`, usunięcie i wykres na żywo — refaktor bez zmiany zachowania trzeba potwierdzić zachowaniem, a nie samym pakietem testów; *do ręcznego potwierdzenia przez operatora*
+- [x] 5.4 Ręcznie na uruchomionym zestawie: kreator, zlecenie, `Data History`, usunięcie i wykres na żywo — refaktor bez zmiany zachowania trzeba potwierdzić zachowaniem, a nie samym pakietem testów — *potwierdzone przez operatora 2026-08-09: zlecenia złożone, dane usunięte, zakładki zachowują się jak przed refaktorem*
