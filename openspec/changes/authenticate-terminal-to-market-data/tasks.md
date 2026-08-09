@@ -3,30 +3,37 @@
 Idzie pierwsze i w całości lokalnie. Ścieżka strumienia nie może wyjść spod Easy Auth (grupa 2),
 zanim moduł nie zacznie sprawdzać biletów — inaczej powstaje otwarty WebSocket w internecie.
 
-- [ ] 1.1 Dodaj do `config.py` czas ważności biletu (domyślnie 30 s) oraz przełącznik „stoję za
+- [x] 1.1 Dodaj do `config.py` czas ważności biletu (domyślnie 30 s) oraz przełącznik „stoję za
       warstwą uwierzytelniającą"; przełącznik domyślnie wyłączony, w Azure włączany ustawieniem
-      aplikacji
-- [ ] 1.2 Napisz magazyn biletów: losowa wartość nieodgadywalna (`secrets.token_urlsafe`), zapis
+      aplikacji — `stream_ticket_ttl_seconds` i `require_authenticated_principal`
+- [x] 1.2 Napisz magazyn biletów: losowa wartość nieodgadywalna (`secrets.token_urlsafe`), zapis
       `bilet → (tożsamość, moment wygaśnięcia)`, zdjęcie przy użyciu, sprzątanie wygasłych przy
       okazji. Komentarz przy magazynie MUST mówić wprost, że jednoinstancyjność jest założeniem
       i co się psuje przy `worker_count > 1` (design.md, „Bilety żyją w pamięci procesu")
-- [ ] 1.3 Dodaj trasę wydającą bilet: czyta tożsamość wstrzykniętą przez Easy Auth
+- [x] 1.3 Dodaj trasę wydającą bilet: czyta tożsamość wstrzykniętą przez Easy Auth
       (`X-MS-CLIENT-PRINCIPAL-ID`), zwraca bilet i czas jego ważności. Z włączonym przełącznikiem
       z 1.1 brak tożsamości to odmowa `401` bez utworzenia biletu
-- [ ] 1.4 Wepnij sprawdzenie biletu w handshake `/ws/candles`: brak, nieznany, wygasły lub zużyty
+- [x] 1.4 Wepnij sprawdzenie biletu w handshake `/ws/candles`: brak, nieznany, wygasły lub zużyty
       bilet to odmowa **przed** przyjęciem połączenia i bez zapisania konsumenta do rozgłaszania
-- [ ] 1.5 Zadbaj, żeby odmowa z powodu biletu była odróżnialna od odmowy z powodu pary nieśledzonej
+- [x] 1.5 Zadbaj, żeby odmowa z powodu biletu była odróżnialna od odmowy z powodu pary nieśledzonej
       — dwie różne przyczyny, na które konsument reaguje inaczej (`specs/market-data-browser-access`,
       „Bez ważnego poświadczenia strumień się nie zestawia")
-- [ ] 1.6 Sprawdź, że ani bilet, ani token konsumenta nie trafiają do logów, komunikatów błędów ani
-      odpowiedzi; log odmowy niesie przyczynę, log wydania niesie sam fakt wydania
-- [ ] 1.7 Testy do wszystkich wymagań `specs/market-data-browser-access/spec.md`: wydanie biletu,
+- [x] 1.6 Sprawdź, że ani bilet, ani token konsumenta nie trafiają do logów, komunikatów błędów ani
+      odpowiedzi; log odmowy niesie przyczynę, log wydania niesie sam fakt wydania. Poprawiony
+      przy okazji docstring `Problem` w `contract.py`, twierdzący, że „na tej ścieżce nie ma
+      żadnego poświadczenia" — od tej zmiany jest
+- [x] 1.7 Testy do wszystkich wymagań `specs/market-data-browser-access/spec.md`: wydanie biletu,
       bilet użyty dwa razy, bilet wygasły, handshake bez biletu, handshake z biletem nieznanym,
       handshake z ważnym biletem dla pary nieśledzonej, odmowa wydania bez tożsamości przy włączonym
       przełączniku, wydanie bez tożsamości przy wyłączonym, brak wartości w logach
-- [ ] 1.8 Zaktualizuj `modules/market-data/.env.example` i `README.md` (w tym ograniczenie
+- [x] 1.8 Zaktualizuj `modules/market-data/.env.example` i `README.md` (w tym ograniczenie
       jednoinstancyjności i jego objaw)
-- [ ] 1.9 `ruff check`, `ruff format --check` i `pytest` zielone dla modułu
+- [x] 1.9 `ruff check` i `pytest` zielone dla modułu — 505 passed, 7 skipped. **`ruff format` nie
+      jest bramką tego repozytorium** (CI uruchamia sam `ruff check`), a uruchomiony przeformatował
+      28 nietkniętych plików; cofnięte. Odkryte przy pisaniu testu na higienę logów: `migrations/env.py`
+      wołał `fileConfig` z domyślnym `disable_existing_loggers=True`, więc alembic uruchamiany
+      w testach wyłączał **wszystkie** loggery `market_data.*` — każdy test na to, co moduł loguje,
+      przechodziłby z niewłaściwego powodu. Poprawione
 - [ ] 1.10 Wdróż `market-data` i potwierdź, że nic nie przestało działać: `/health` odpowiada,
       strumień nadal stoi za Easy Auth (a więc jest nieosiągalny z przeglądarki tak samo jak dziś)
 

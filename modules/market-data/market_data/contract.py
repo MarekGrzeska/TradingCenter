@@ -437,12 +437,27 @@ class JobOut(BaseModel):
         )
 
 
+class StreamTicketOut(BaseModel):
+    """Permission to open the stream once, and how long it stays good for.
+
+    The lifetime is answered rather than assumed so a consumer can tell a ticket it sat
+    on too long from one the archive never issued — the handshake itself cannot say,
+    since it refuses both the same way on purpose.
+    """
+
+    ticket: str = Field(description="Spend it on the next handshake. It works exactly once.")
+    expires_in_seconds: int = Field(
+        description="How long from now the ticket stays valid if it goes unused."
+    )
+
+
 class Problem(BaseModel):
     """A refusal that names itself.
 
-    Never a database error and never a credential — there is no credential on this path to
-    leak, and a raw `asyncpg` message tells a consumer nothing it can act on while telling
-    anyone reading the logs more about the schema than they need.
+    Never a database error and never a credential — a raw `asyncpg` message tells a
+    consumer nothing it can act on while telling anyone reading the logs more about the
+    schema than they need, and the caller's own token or stream ticket is never
+    something a refusal has any reason to quote back.
     """
 
     detail: str

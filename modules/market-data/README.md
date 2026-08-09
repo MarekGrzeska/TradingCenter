@@ -33,6 +33,7 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
   arrive — a change to jobs touches four routes that are all in one file and none of the
   others. `routers/deps.py` holds the two things a route reaches for, so a router never
   imports the module that mounts it.
+- `tickets.py` — one-time tickets, which are how a browser opens the stream. See below.
 - `contract.py`, `errors.py` — the shapes the module answers with, and refusals that name
   themselves instead of leaking a database error.
 - `market_status.py` — whether an instrument's market is open, remembered for a minute. It
@@ -101,6 +102,39 @@ is part of what is under test: a table left over from an earlier run is indistin
 a migration that works. Without Docker they skip with a reason rather than failing with a
 connection error, and the daemon check carries a two-second timeout, so a machine without
 Docker does not pay a minute of silence to reach the same skip.
+
+## How a browser opens the stream
+
+Every route here is meant to be reached with a token in the `Authorization` header, and
+in Azure something in front of the module (Easy Auth) checks it. `/ws/candles` is the one
+that cannot be: **the browser's WebSocket API takes no headers**, so there is nowhere to
+put the token, and putting it in the URL instead would write a credential valid for the
+better part of an hour into every access log.
+
+So the path is exempted from Easy Auth (`infra/app-service.tf`, `excluded_paths`) and
+guarded here instead. A consumer asks `POST /stream-tickets` — an ordinary request, with
+an ordinary header, checked in the ordinary way — and gets a **one-time ticket**, good for
+one handshake and for thirty seconds. It is spent the moment it is presented; a second
+attempt with the same ticket is refused, and so is one that sat unused too long. A ticket
+that leaks out of a log has already been used.
+
+Every attempt needs its own ticket, including every retry after a dropped connection.
+
+Two things to know before changing any of it:
+
+- **The ticket store is a dict in this process.** That works because the module runs as a
+  single always-on instance (`worker_count = 1`). A second worker or a second instance
+  would refuse tickets its neighbour issued, and the symptom — a stream that fails to
+  connect now and then — points nowhere near the cause. Moving the store into Postgres is
+  the answer if that day comes; `tickets.py` is the only file involved.
+- **CORS is configured on App Service, not here.** The preflight the browser sends before
+  a cross-origin request carries no credential at all, so Easy Auth would answer it with a
+  401 before this application saw it — CORS has to be answered by something standing in
+  front. Adding `CORSMiddleware` here would double the `Access-Control-Allow-Origin`
+  header, and a browser rejects a response carrying two.
+
+A consumer that is not a browser needs none of this: it sets a header on its own WebSocket
+client and Easy Auth handles it, exactly as on every other route.
 
 ## Contract
 
