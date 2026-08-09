@@ -2,20 +2,25 @@
 
 Znajdowanie instrumentu i wstawianie go tam, gdzie ma być oglądany: wyszukiwarka po frazie oraz
 droga z wyniku wyszukiwania do konkretnego slotu siatki.
-
 ## Requirements
-
 ### Requirement: Instrumenty wyszukuje się po frazie
 
 Terminal MUST pozwalać wyszukać instrumenty po frazie i MUST pokazać dla każdego wyniku symbol,
 nazwę, klasę aktywów oraz informację, czy da się nim handlować. Bieżące bid i ask MUST być pokazane
-tam, gdzie źródło je podaje.
+tam, gdzie źródło je podaje. Wyszukiwanie MUST być dostępne jako podpowiedzi przy polu wyboru
+instrumentu, a nie jako osobny widok listy — instrument wybiera się tam, gdzie jest potrzebny.
+Wyszukiwanie MUST dać się zawęzić do jednej klasy aktywów.
 
 #### Scenario: Wyszukiwanie po frazie
 
-- **WHEN** operator wpisuje frazę
+- **WHEN** operator wpisuje frazę w polu wyboru instrumentu
 - **THEN** terminal pokazuje pasujące instrumenty z symbolem, nazwą, klasą aktywów i flagą
   handlowalności
+
+#### Scenario: Wyszukiwanie zawężone do klasy
+
+- **WHEN** wybrana jest klasa aktywów, a operator wpisuje frazę
+- **THEN** podpowiedzi obejmują wyłącznie instrumenty tej klasy
 
 #### Scenario: Fraza bez wyników
 
@@ -33,33 +38,64 @@ tam, gdzie źródło je podaje.
 - **THEN** terminal MUST NOT wysyłać zapytania po każdym znaku
 - **AND** pokazuje wynik ostatniej wpisanej frazy, nawet gdy wcześniejsza odpowiedź wróci później
 
-### Requirement: Wynik wyszukiwania trafia do slotu
-
-Z wyniku wyszukiwania MUST dać się wstawić instrument do slotu siatki. Terminal MUST powiedzieć, do
-którego slotu instrument trafił, i MUST pokazać go tam bez ręcznego przechodzenia między zakładkami.
-
-#### Scenario: Wstawienie instrumentu do slotu
-
-- **WHEN** operator wybiera instrument z listy wyników
-- **THEN** instrument trafia do aktywnego slotu siatki
-- **AND** terminal pokazuje zakładkę wykresów z narysowaną serią tego instrumentu
-
-#### Scenario: Instrument nie jest handlowalny
-
-- **WHEN** wybrany instrument nie jest handlowalny
-- **THEN** wykres i tak go pokazuje, a informacja o braku handlowalności zostaje przy nim widoczna
-
 ### Requirement: Katalog instrumentów mówi, gdy jest niepełny
 
-Terminal MUST pozwalać wyliczyć katalog instrumentów i MUST pokazać, że wynik został ucięty, gdy
-źródło to zgłasza. Lista ucięta MUST NOT wyglądać jak kompletna.
+Terminal MUST pozwalać wyliczyć instrumenty danej klasy aktywów bez wpisywania frazy i MUST pokazać,
+że wynik został ucięty, gdy źródło to zgłasza. Lista ucięta MUST NOT wyglądać jak kompletna, bo
+operator wybierający z niej instrument do archiwizowania podejmuje decyzję na podstawie tego, co
+widzi.
+
+#### Scenario: Wyliczenie instrumentów klasy
+
+- **WHEN** operator wybiera klasę aktywów i nie wpisuje żadnej frazy
+- **THEN** terminal pokazuje instrumenty tej klasy do wyboru
 
 #### Scenario: Katalog ucięty
 
-- **WHEN** źródło zgłasza, że wyliczenie katalogu zostało ucięte
-- **THEN** terminal stwierdza to obok listy
+- **WHEN** źródło zgłasza, że wyliczenie zostało ucięte
+- **THEN** terminal stwierdza to przy podpowiedziach
+- **AND** wskazuje, że wpisanie frazy sięga poza to, co zostało wyliczone
 
 #### Scenario: Katalog kompletny
 
-- **WHEN** źródło zwraca katalog bez ucięcia
+- **WHEN** źródło zwraca wyliczenie bez ucięcia
 - **THEN** terminal podaje liczbę instrumentów bez ostrzeżenia o niekompletności
+
+### Requirement: Podpowiadanie zachowuje się wszędzie tak samo
+
+Terminal wybiera z listy w kilku miejscach — klasa aktywów, instrument, instrument archiwizowany na
+wykresie — i MUST zachowywać się w nich identycznie: wybór z klawiatury strzałkami i Enterem,
+zamknięcie Escape, jawny komunikat o braku dopasowań, jawny komunikat o porażce źródła z możliwością
+ponowienia oraz czytelne wskazanie, że wybór jest już dokonany i da się go cofnąć. Zachowanie tych
+pól MUST NOT różnić się między miejscami użycia.
+
+#### Scenario: Wybór z klawiatury
+
+- **WHEN** operator porusza się po podpowiedziach strzałkami i zatwierdza Enterem
+- **THEN** wybrana pozycja zostaje przyjęta, tak samo w każdym miejscu, gdzie terminal podpowiada
+
+#### Scenario: Rezygnacja z wyboru
+
+- **WHEN** operator naciska Escape przy otwartych podpowiedziach
+- **THEN** podpowiedzi zamykają się, a wcześniejszy wybór pozostaje nietknięty
+
+#### Scenario: Cofnięcie dokonanego wyboru
+
+- **WHEN** wybór jest już dokonany
+- **THEN** pole pokazuje, co zostało wybrane, i pozwala to wyczyścić bez przeładowania widoku
+
+### Requirement: Klasy aktywów są wyliczalne
+
+Terminal MUST pozwalać wybrać klasę aktywów z listy klas, których źródło używa, a nie z frazy
+wpisanej ręcznie. Lista MUST obejmować wszystkie klasy, jakimi źródło opisuje instrumenty.
+
+#### Scenario: Wybór klasy
+
+- **WHEN** operator otwiera pole klasy aktywów
+- **THEN** widzi klasy używane przez źródło i wybiera jedną z nich
+
+#### Scenario: Klasa spoza listy
+
+- **WHEN** operator wpisuje frazę niepasującą do żadnej klasy
+- **THEN** terminal stwierdza, że taka klasa nie istnieje, i nie pozwala przejść dalej
+
