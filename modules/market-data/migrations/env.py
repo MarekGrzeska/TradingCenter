@@ -59,6 +59,11 @@ def _identity_connect_args() -> tuple[dict, object | None]:
     from market_data.db import identity_connect_args
 
     settings = Settings()
+    # Local mode: no DATABASE_USER means the URL carries its own credential and points
+    # at loopback (config.py enforces both), so the engine needs no identity arguments —
+    # the same shape as a test's throwaway database.
+    if settings.database_user is None:
+        return {}, None
     return identity_connect_args(
         settings.database_user,
         settings.azure_client_id,

@@ -12,11 +12,12 @@ variable "postgres_version" {
 
 variable "developer_ip_address" {
   description = <<-EOT
-    The developer's own outbound IP, admitted to the database firewall so local
-    development can reach Azure directly instead of a container (design.md,
-    "Praca lokalna korzysta z market_data_dev na serwerze w Azure"). Changes when the
-    operator's ISP reassigns an address — see docs/dbeaver-azure-connection.html for
-    how to notice and fix that.
+    The operator's own outbound IP, admitted to the database firewall for the
+    operator-run tools that reach production directly: alembic migrations against
+    market_data and DBeaver (docs/dbeaver-azure-connection.html). Local development
+    does not use it — that runs on the compose.yaml container
+    (openspec/changes/local-dev-database-in-docker). Changes when the ISP reassigns
+    an address.
   EOT
   type        = string
 }

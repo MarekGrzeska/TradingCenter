@@ -220,7 +220,7 @@
 <main>
   <p class="eyebrow">TradingCenter · audyt tempa i złożoności · 9 sierpnia 2026</p>
   <h1>Dlaczego robi się wolniej</h1>
-  <p class="lead">Trzy dni, 212 commitów, działająca platforma w Azure — i uzasadnione
+  <p class="lead">Trzy dni, 226 commitów, działająca platforma w Azure — i uzasadnione
   wrażenie, że każdy kolejny task idzie ciężej niż poprzedni. Ten dokument odpowiada,
   co dokładnie spowalnia, co jest kosztem jednorazowym już zapłaconym, a co podatkiem,
   który będzie wracał — i co z każdym z nich zrobić.</p>
@@ -264,23 +264,23 @@
 
   <div class="stats">
     <div class="stat"><span class="v">3</span><span class="l">dni pracy<br>(7–9 sierpnia)</span></div>
-    <div class="stat"><span class="v">212</span><span class="l">commitów<br>na main</span></div>
-    <div class="stat"><span class="v">46,4 tys.</span><span class="l">linii utrzymywanych ręcznie</span></div>
-    <div class="stat"><span class="v">12 + 1</span><span class="l">zmian OpenSpec zamkniętych + w toku</span></div>
+    <div class="stat"><span class="v">226</span><span class="l">commitów<br>na main</span></div>
+    <div class="stat"><span class="v">47,6 tys.</span><span class="l">linii utrzymywanych ręcznie</span></div>
+    <div class="stat"><span class="v">13</span><span class="l">zamkniętych zmian OpenSpec</span></div>
   </div>
 
   <div class="viz">
-    <p class="viz-title">Co składa się na te 46,4 tys. linii</p>
-    <div class="bar" role="img" aria-label="Podział linii: kod produkcyjny 15,0 tys., testy 16,1 tys., OpenSpec 13,2 tys., infra i CI 2,1 tys.">
-      <div class="seg s1" style="flex: 15002" title="Kod produkcyjny — 15,0 tys. linii"></div>
-      <div class="seg s2" style="flex: 16129" title="Testy — 16,1 tys. linii"></div>
-      <div class="seg s3" style="flex: 13185" title="OpenSpec (markdown) — 13,2 tys. linii"></div>
-      <div class="seg s4" style="flex: 2091" title="Infra + CI + skrypty — 2,1 tys. linii"></div>
+    <p class="viz-title">Co składa się na te 47,6 tys. linii</p>
+    <div class="bar" role="img" aria-label="Podział linii: kod produkcyjny 15,2 tys., testy 16,6 tys., OpenSpec 13,6 tys., infra i CI 2,1 tys.">
+      <div class="seg s1" style="flex: 15199" title="Kod produkcyjny — 15,2 tys. linii"></div>
+      <div class="seg s2" style="flex: 16613" title="Testy — 16,6 tys. linii"></div>
+      <div class="seg s3" style="flex: 13630" title="OpenSpec (markdown) — 13,6 tys. linii"></div>
+      <div class="seg s4" style="flex: 2127" title="Infra + CI + skrypty — 2,1 tys. linii"></div>
     </div>
     <ul class="legend">
-      <li><span class="sw s1"></span>kod produkcyjny <span class="n">15,0 tys.</span></li>
-      <li><span class="sw s2"></span>testy <span class="n">16,1 tys.</span></li>
-      <li><span class="sw s3"></span>OpenSpec <span class="n">13,2 tys.</span></li>
+      <li><span class="sw s1"></span>kod produkcyjny <span class="n">15,2 tys.</span></li>
+      <li><span class="sw s2"></span>testy <span class="n">16,6 tys.</span></li>
+      <li><span class="sw s3"></span>OpenSpec <span class="n">13,6 tys.</span></li>
       <li><span class="sw s4"></span>infra + CI <span class="n">2,1 tys.</span></li>
     </ul>
   </div>
@@ -288,14 +288,27 @@
   <p>Dwie rzeczy rzucają się w oczy. <strong>Testów jest więcej niż kodu</strong> —
   to zdrowe i już się zwróciło (logika coverage i rollupów była „wrong twice", jak
   uczciwie przyznaje komentarz w CI), ale znaczy, że każdy task płaci podatek testowy.
-  I&nbsp;<strong>markdown procesu to 28% wszystkiego, co ręcznie utrzymywane</strong> —
-  prawie tyle, co cały kod produkcyjny. Do tego dochodzi 21 specyfikacji capabilities,
+  I&nbsp;<strong>markdown procesu to 29% wszystkiego, co ręcznie utrzymywane</strong> —
+  prawie tyle, co cały kod produkcyjny. Do tego dochodzi 22 specyfikacji capabilities,
   które z każdą zmianą rosną i które każde <code>/opsx:apply</code> czyta.</p>
+
+  <div class="callout warn">
+    <span class="tag">Teza potwierdziła się w trakcie pisania</span>
+    <p>Powyższe liczby są przeliczone kilka godzin po pierwszej wersji tego dokumentu,
+    po scaleniu jednej zmiany — <code>operator-knows-what-is-happening</code>. W tym
+    czasie <strong>proza OpenSpec urosła o 445 linii, a kod produkcyjny o 197</strong>.
+    Na każdą linię kodu, która trafiła na produkcję, przypadły <strong>2,3 linii
+    dokumentu procesu</strong>.</p>
+    <p>To nie jest zarzut wobec tej konkretnej zmiany — była porządna i miała
+    <code>review.md</code>. To pomiar tempa, w jakim rośnie rzecz, którą każda następna
+    sesja musi przeczytać, zanim cokolwiek napisze. Dokładnie ten mechanizm opisuje
+    sekcja niżej.</p>
+  </div>
 
   <h2><span class="no">Sprawa 1</span>Czas pracy Claude Code rośnie z każdym taskiem</h2>
 
-  <p>To nie jest złudzenie i nie jest to „wina OpenSpec" jako idei. Złożyły się cztery
-  konkretne mechanizmy:</p>
+  <p>To nie jest złudzenie i nie jest to „wina OpenSpec" jako idei. Złożyło się pięć
+  konkretnych mechanizmów — dwa z nich są już zamknięte:</p>
 
   <h3>Kontekst rośnie liniowo, a rytuał jest stały niezależnie od wagi zmiany</h3>
   <p>Każda zmiana — również drobna — przechodzi pełną ścieżkę: proposal, design, tasks,
@@ -313,13 +326,25 @@
   edycją prozy, którą trzeba uzgodnić z rzeczywistością — i Claude Code robi to
   sumiennie, płacąc czasem.</p>
 
-  <h3>Hook <code>require-review</code> prawdopodobnie nie działa na tym Macu</h3>
-  <p>Hook jest napisany w PowerShellu i zadeklarowany z <code>"shell": "powershell"</code>,
-  a <code>pwsh</code> <strong>nie jest zainstalowany</strong> na tej maszynie
-  (sprawdzone). Hook odpala się przy każdym wywołaniu Bash z timeoutem 15&nbsp;s — więc
-  albo cicho zawodzi (i brama review jest iluzoryczna), albo dokłada opóźnienie i szum
-  błędów do każdego wywołania narzędzia. Tak czy inaczej: do przepisania na basha,
-  z matcherem zawężonym do komend, które faktycznie archiwizują.</p>
+  <h3>Hook <code>require-review</code> nie działał wcale <span class="done">rozwiązane</span></h3>
+  <p>Hook był napisany w PowerShellu i zadeklarowany z <code>"shell": "powershell"</code>,
+  a <code>pwsh</code> <strong>nie jest zainstalowany</strong> na tej maszynie. Pierwsza
+  wersja tego dokumentu stawiała ostrożne „prawdopodobnie nie działa". Nie
+  prawdopodobnie: <strong>brama nie mogła się wykonać, a hook, który się nie wykonuje,
+  przepuszcza wszystko i nic o tym nie mówi</strong>. Przez cały czas pracy na macOS
+  <code>settings.json</code> opisywał regułę, która już nie obowiązywała.</p>
+  <p><strong>Zamknięte PR&nbsp;#31.</strong> Hook przepisany na basha (3.2, bo tyle ma
+  macOS), semantyka bez zmian i przypięta 25 testami w
+  <code>.claude/hooks/require-review.test.sh</code>. Przy okazji wyszło, że zawężenie
+  matchera nie jest kosmetyką: <code>Bash|PowerShell</code> jako regex bez kotwic łapał
+  także <code>BashOutput</code> — narzędzie, które w ogóle nie niesie komendy. Doszła też
+  szybka ścieżka: oba detektory wymagają literalnego <code>openspec</code>, więc payload
+  bez niego kończy pracę przed uruchomieniem parsera JSON. Koszt to ~9&nbsp;ms, a przy
+  faktycznym parsowaniu ~23&nbsp;ms.</p>
+  <p>Morał szerszy niż sam hook: <em>zabezpieczenie, którego nikt nie sprawdził
+  przebiegiem, jest hipotezą, a nie zabezpieczeniem.</em> Ten akurat kosztował zero, bo
+  nikt nie próbował zarchiwizować zmiany bez review — ale nikt też by się nie dowiedział,
+  gdyby próbował.</p>
 
   <h3>Nie ma CLAUDE.md <span class="done">rozwiązane</span></h3>
   <p>README jest znakomite, ale nie jest ładowane automatycznie do sesji. Każda sesja
@@ -380,7 +405,7 @@
     w <code>openspec/config.yaml</code> i w hooku.</p>
     <p><strong>Budżet artefaktów</strong>: proposal ≤ 1 strona; <code>design.md</code>
     tylko, gdy istnieje realna decyzja z alternatywami; tasks nie powtarzają proposala.</p>
-    <p><strong>Konsolidacja capabilities</strong> przy najbliższym archive: 21 → ~10
+    <p><strong>Konsolidacja capabilities</strong> przy najbliższym archive: 22 → ~10
     (np. <code>capital-*</code> 5→2, <code>terminal-*</code> 8→4,
     <code>market-data-*</code> 8→4). Mniejsza powierzchnia czytania dla każdej
     przyszłej zmiany.</p>
@@ -430,9 +455,9 @@
       <td><span class="pill keep">zostaw</span></td>
     </tr>
     <tr>
-      <td>Baza dev w Azure + osobny service principal + roczna rotacja sekretu + allowlist IP</td>
-      <td><strong>wraca co tydzień</strong>: latencja lokalnej pracy, IP po każdej zmianie sieci, rotacja</td>
-      <td><span class="pill freeze">świadomy podatek</span></td>
+      <td>Baza dev w Azure + osobny service principal + roczna rotacja sekretu</td>
+      <td>wracał co tydzień: latencja, IP po każdej zmianie sieci, rotacja — <strong>skasowany</strong></td>
+      <td><span class="pill keep">cofnięte</span></td>
     </tr>
     <tr>
       <td>Stan Terraforma bootstrapu w gicie (klucze storage unieszkodliwione)</td>
@@ -442,11 +467,27 @@
   </table>
   </div>
 
-  <p>Baza dev w Azure to decyzja świadoma i zapisana w README — wierność produkcji
-  zamiast kontenera. Uczciwie: to jest dziś największy <em>stały</em> podatek
-  infrastrukturalny tego projektu. Nie trzeba go cofać teraz; trzeba wiedzieć, że
-  jeśli tempo stanie się ważniejsze od wierności prod, powrót do lokalnego kontenera
-  dla dev (kontener już istnieje w testach) jest ruchem, który ten podatek kasuje.</p>
+  <div class="callout note">
+    <span class="tag">Jedyna rekomendacja z tego dokumentu, którą wykonano co do joty</span>
+    <p>Pierwsza wersja pisała o bazie dev w Azure: „nie trzeba tego cofać teraz; trzeba
+    wiedzieć, że jeśli tempo stanie się ważniejsze od wierności prod, powrót do lokalnego
+    kontenera jest ruchem, który ten podatek kasuje". <strong>Tempo okazało się
+    ważniejsze.</strong> Decyzja została odwrócona tego samego dnia, w którym ją podjęto —
+    PR&nbsp;#33, pełną ścieżką OpenSpec, bo dotykała specyfikacji.</p>
+    <p>Produkcja nie drgnęła. Zniknęła baza <code>market_data_dev</code>, service principal
+    z roczną rotacją i cały rytuał wokół nich; wrócił <code>compose.yaml</code>, przywrócony
+    dosłownie z commita, który go skasował — port 55432 z dala od pasma Postgres.app, bind
+    na pętli zwrotnej, healthcheck nazywający użytkownika i bazę. <code>terraform plan</code>
+    na tym PR pokazał dokładnie cztery destroy'e i ani jednej zmiany w produkcji.</p>
+    <p>Najciekawszy jest efekt uboczny: <strong>zabezpieczenie wyszło z tego
+    mocniejsze</strong>. Stary strażnik był grepem w <code>dev.sh</code> szukającym nazwy
+    bazy i nie widział groźniejszej pomyłki — <code>DefaultAzureCredential</code> na maszynie
+    operatora znajduje jego sesję <code>az login</code>, czyli tożsamość administratora
+    Postgresa, która omija każdy GRANT. Teraz brak <code>DATABASE_USER</code> oznacza, że
+    moduł w ogóle nie wychodzi poza pętlę zwrotną, i pilnuje tego <code>config.py</code> przy
+    starcie, a nie skrypt, którego ktoś może nie uruchomić. Usunięcie warstwy okazało się
+    bezpieczniejsze niż jej utrzymywanie — to nie jest reguła, ale w tym przypadku tak wyszło.</p>
+  </div>
 
   <div class="callout note">
     <span class="tag">Zasada na przyszłość</span>
@@ -496,7 +537,11 @@
       <strong>jeden plik markdown</strong> i mimo to uruchomił komplet —
       <code>capital-gateway</code> 14&nbsp;s, <code>market-data</code> 1&nbsp;min
       (z kontenerem Postgresa), <code>terminal</code> 1&nbsp;min. Dwie minuty i cały
-      kontener bazy za zmianę, która nie dotknęła ani jednej linii kodu.</li>
+      kontener bazy za zmianę, która nie dotknęła ani jednej linii kodu.
+      PR&nbsp;#31 powtórzył to samo: hook, <code>settings.json</code> i
+      <code>CLAUDE.md</code>, zero kodu modułów, 1&nbsp;min 15&nbsp;s pełnego przebiegu.
+      Trzy z czterech ostatnich PR-ów nie dotykały żadnego modułu, a każdy zapłacił
+      pełną stawkę.</li>
   </ul>
 
   <p>Jedno świadomie zostaje bez zmian: <strong>ręczny <code>terraform apply</code></strong>.
@@ -510,7 +555,9 @@
     <li><strong>CLAUDE.md z mapą repo i komendami.</strong>
       <span class="meta">zrobione · PR&nbsp;#27, na <code>main</code></span></li>
     <li><strong>Hook <code>require-review</code> przepisany na basha, matcher zawężony.</strong>
-      <span class="meta">30 min · dziś</span></li>
+      <span class="meta">zrobione · PR&nbsp;#31, z 25 testami</span></li>
+    <li><strong>Powrót bazy dev do kontenera; dev-SP i baza w Azure skasowane.</strong>
+      <span class="meta">zrobione · PR&nbsp;#33, pełną ścieżką OpenSpec</span></li>
     <li><strong>Drugi worktree jako stałe stanowisko pracy.</strong>
       <span class="meta">15 min · raz</span></li>
     <li><strong>Cache Dockera + smoke-check w trzech deploy workflowach.</strong>
@@ -519,7 +566,7 @@
       <span class="meta">1–2 h · ten tydzień</span></li>
     <li><strong>Filtry ścieżek w <code>checks.yml</code>.</strong>
       <span class="meta">1 h · ten tydzień</span></li>
-    <li><strong>Konsolidacja capabilities 21 → ~10.</strong>
+    <li><strong>Konsolidacja capabilities 22 → ~10.</strong>
       <span class="meta">2–3 h · przy najbliższym archive</span></li>
     <li><strong>Zapis budżetu złożoności w szablonie proposala.</strong>
       <span class="meta">30 min · przy najbliższym propose</span></li>
@@ -533,17 +580,24 @@
 
   <footer>
     <p>Metoda: analiza pełnego drzewa repozytorium (moduły, openspec, infra, workflowy,
-    hooki), historii gita (212 commitów, 7–9 sierpnia 2026) oraz pomiarów linii per
-    kategoria. Liczby: kod produkcyjny 15 002 linii (gateway 2 060, market-data 6 981 z
-    migracjami, terminal 5 961 bez testów i bez wygenerowanego kontraktu), testy 16 129,
-    OpenSpec 13 185, infra + CI + skrypty 2 091. Kod generowany
-    (<code>contract.generated.ts</code>, 1 432 linie) policzony osobno — nie jest
-    utrzymywany ręcznie.</p>
-    <p>Aktualizacja tego samego wieczoru: sprostowanie sprawy kluczy konta storage
-    (sprawdzone przeciw Azure, nie tylko odczytane z kodu), zamknięcie punktu o CLAUDE.md
-    po scaleniu PR&nbsp;#27, zmierzony czas checków dla PR-a zmieniającego jeden plik
-    markdown, oraz nowa sekcja o pracy równoległej — dopisana, bo powstała z praktyki:
-    ten dokument był aktualizowany w osobnym worktree obok agenta pracującego w tym
-    samym repozytorium nad inną zmianą.</p>
+    hooki), historii gita oraz pomiarów linii per kategoria. Liczby przeliczone na
+    <code>main</code> po scaleniu PR&nbsp;#32, stan na 226 commitów: kod produkcyjny
+    15 199 linii (gateway 2 060, market-data 6 981 z migracjami, terminal 6 158 bez
+    testów i bez wygenerowanego kontraktu), testy 16 613, OpenSpec 13 630, infra + CI +
+    skrypty 2 127. Kod generowany (<code>contract.generated.ts</code>, 1 444 linie)
+    policzony osobno — nie jest utrzymywany ręcznie.</p>
+    <p>Trzy aktualizacje tego samego wieczoru. <strong>Pierwsza</strong>: sprostowanie
+    sprawy kluczy konta storage — sprawdzone przeciw Azure, nie tylko odczytane z kodu.
+    <strong>Druga</strong>: zamknięcie punktu o CLAUDE.md po PR&nbsp;#27, zmierzony czas
+    checków dla PR-a zmieniającego jeden plik markdown, oraz sekcja o pracy równoległej,
+    dopisana z praktyki — ten dokument powstawał w osobnym worktree obok agenta
+    pracującego w tym samym repozytorium nad inną zmianą. <strong>Trzecia</strong>:
+    zamknięcie punktu o hooku po PR&nbsp;#31 (okazał się nie „prawdopodobnie
+    niedziałający", tylko niedziałający w ogóle) i przeliczenie wszystkich liczb, co dało
+    najmocniejszy pojedynczy dowód w całym dokumencie — proza rosnąca 2,3 raza szybciej
+    niż kod, zmierzona na jednej zmianie scalonej w trakcie pisania. <strong>Czwarta</strong>,
+    już w ramach PR&nbsp;#33: baza dev wraca do kontenera, a największy stały podatek
+    infrastrukturalny znika — dokument jedzie w tym samym PR co zmiana, którą opisuje,
+    więc opis i rzeczywistość nie mają jak się rozjechać.</p>
   </footer>
 </main>

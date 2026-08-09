@@ -67,12 +67,10 @@ resource "azurerm_postgresql_flexible_server_database" "prod" {
   charset   = "UTF8"
 }
 
-resource "azurerm_postgresql_flexible_server_database" "dev" {
-  name      = "market_data_dev"
-  server_id = azurerm_postgresql_flexible_server.main.id
-  collation = "en_US.utf8"
-  charset   = "UTF8"
-}
+# `market_data_dev` used to sit beside it — the database local development wrote to for
+# the one morning that arrangement lasted (openspec/changes/local-dev-database-in-docker).
+# Applying its removal DROPS it, data and all; dev data is disposable by definition, but
+# the operator should know that is what the plan's `destroy` means.
 
 # The App Service plan's own outbound addresses join this rule once the plan exists —
 # app-service.tf reads them off the resource rather than them being typed here, because

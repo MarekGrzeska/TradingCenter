@@ -112,16 +112,51 @@ def test_a_budget_below_one_names_itself(field: str) -> None:
     assert field.upper() in str(err.value)
 
 
-def test_a_missing_database_user_names_itself() -> None:
-    with pytest.raises(ValidationError) as err:
-        Settings(database_url=REQUIRED["database_url"], gateway_api_key="k", _env_file=None)
-    assert "database_user" in str(err.value)
+# specs/market-data-database-connection/spec.md, "Praca bez tożsamości nie wychodzi poza
+# maszynę" — DATABASE_USER selects the mode, and its absence narrows the module to loopback.
 
 
-def test_a_blank_database_user_names_itself() -> None:
+def test_no_database_user_with_a_loopback_url_is_local_mode() -> None:
+    s = Settings(
+        database_url="postgresql://market_data:change-me@127.0.0.1:55432/market_data",
+        gateway_api_key="k",
+        _env_file=None,
+    )
+    assert s.database_user is None
+
+
+def test_a_blank_database_user_means_local_mode_not_a_role_named_blank() -> None:
+    # An unfilled `DATABASE_USER=` line in a .env is the same intent as the line being
+    # absent — not an identity called "".
+    s = settings(
+        database_user="   ",
+        database_url="postgresql://market_data:change-me@localhost:55432/market_data",
+    )
+    assert s.database_user is None
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "postgresql://market_data:change-me@psql-tradingcenter.postgres.database.azure.com:5432/market_data",
+        "postgresql://db.internal.test:5432/market_data?sslmode=require",
+    ],
+)
+def test_no_database_user_with_a_remote_host_refuses_to_start(url: str) -> None:
+    # The quiet disaster this refuses: a .env aimed at production while nothing selects
+    # an identity — the module would otherwise write to the wrong database, or worse,
+    # authenticate as whatever ambient credential the machine happens to hold.
     with pytest.raises(ValidationError) as err:
-        settings(database_user="   ")
+        settings(database_user=None, database_url=url)
     assert "DATABASE_USER" in str(err.value)
+    assert "loopback" in str(err.value)
+
+
+def test_local_mode_does_not_require_tls() -> None:
+    # The TLS requirement's own rationale — traffic crossing a network the module does
+    # not control — does not hold on loopback (delta spec, "Baza lokalna bez szyfrowania").
+    url = "postgresql://market_data:change-me@127.0.0.1:55432/market_data"
+    assert settings(database_user=None, database_url=url).database_url == url
 
 
 # specs/market-data-database-connection/spec.md, "Połączenie z bazą jest szyfrowane".
