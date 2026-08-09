@@ -7,6 +7,7 @@ Group 4 of rework-instrument-collection.
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -481,3 +482,62 @@ async def test_a_worker_keeps_going_after_one_chunk_raises(pool) -> None:
 
     states = {chunk.state for chunk in reread.chunks}
     assert states == {ChunkState.FAILED, ChunkState.DONE}
+
+
+# --- a worker that dies must say so ---------------------------------------------------
+
+
+async def test_a_worker_that_dies_says_so(caplog) -> None:
+    """Otherwise nothing does, and every chunk after it sits `pending` forever.
+
+    A task that raises while still referenced never reports the exception — Python logs
+    it on garbage collection, and `JobRunner._workers` is the reference that prevents
+    that. Found the hard way: eight chunks pending in production across a restart and a
+    retry, with no log line and no exception anywhere to read.
+    """
+
+    class ExplodingPool:
+        def acquire(self):
+            raise RuntimeError("the pool is gone")
+
+    runner = JobRunner(ExplodingPool(), history=None, limiter=asyncio.Semaphore(1))
+
+    with caplog.at_level(logging.ERROR, logger="market_data.jobs.runner"):
+        await runner.start()
+        # Two passes: one for the worker to run and raise, one for the done-callback
+        # asyncio schedules with `call_soon`.
+        for _ in range(3):
+            await asyncio.sleep(0)
+
+    assert "died" in caplog.text
+    assert "no job will run" in caplog.text
+    assert "the pool is gone" in caplog.text
+
+
+async def test_a_worker_cancelled_on_shutdown_says_nothing(caplog) -> None:
+    """`stop()` is the normal way this ends, and an orderly shutdown is not an incident."""
+    runner = JobRunner(_IdlePool(), history=None, limiter=asyncio.Semaphore(1))
+    await runner.start()
+
+    with caplog.at_level(logging.ERROR, logger="market_data.jobs.runner"):
+        await runner.stop()
+        for _ in range(3):
+            await asyncio.sleep(0)
+
+    assert caplog.text == ""
+
+
+class _IdlePool:
+    """A pool whose connections find no work — the runner's idle path."""
+
+    def acquire(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def fetchrow(self, *args):
+        return None

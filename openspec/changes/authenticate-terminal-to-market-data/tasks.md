@@ -121,16 +121,37 @@ zanim moduł nie zacznie sprawdzać biletów — inaczej powstaje otwarty WebSoc
 
 ## 4. Wdrożenie i weryfikacja end-to-end
 
-- [ ] 4.1 Wdróż terminal i zaloguj się kontem organizacji
-- [ ] 4.2 Potwierdź, że wykres pokazuje świece z wdrożonego archiwum — snapshot przy subskrypcji
-      i świeca w budowie zmieniająca się na żywo
-- [ ] 4.3 Potwierdź, że wyszukiwarka instrumentów działa, czyli że trasy proxujące katalog też
-      niosą poświadczenie
-- [ ] 4.4 Potwierdź, że ingest zapisuje świece do bazy w Azure (odczyt pokrycia albo wiek
-      najnowszej świecy z metryki)
-- [ ] 4.5 Zerwij połączenie strumieniowe (odśwież stronę / uśpij kartę) i potwierdź, że wraca samo
-      — czyli że kolejna próba pobiera nowy bilet, zamiast użyć zużytego
-- [ ] 4.6 Potwierdź w logach App Service, że w adresach połączeń nie ma tokenu operatora
+- [x] 4.1 Wdróż terminal i zaloguj się kontem organizacji — logowanie przeszło bez ekranu zgody
+      (autoryzacja z góry działa). **Po drodze wyszedł błąd starszy niż ta zmiana:** Static Web Apps
+      nie miało `navigationFallback`, więc każdy adres poza `/` był 404 od dnia pierwszego wdrożenia
+      terminala. Logowanie tylko na to weszło jako pierwsze — MSAL wraca twardą nawigacją pod adres
+      zakładki. Naprawione w PR #23
+- [x] 4.2 Potwierdź, że wykres pokazuje świece z wdrożonego archiwum — potwierdzone w logach
+      kontenera: `POST /stream-tickets 200`, a zaraz po nim
+      `WebSocket /ws/candles?symbol=US100&resolution=MINUTE_5&ticket=… [accepted]`. Cały łańcuch
+      token → bilet → strumień działa
+- [x] 4.3 Potwierdź, że wyszukiwarka instrumentów działa — `GET /instruments?asset_class=INDICES 200`
+      i `GET /asset-classes 200` w logach, czyli trasy proxujące gateway niosą token tak samo jak
+      reszta
+- [x] 4.4 Potwierdź, że ingest zapisuje świece do bazy w Azure — **19 880 świec** w bazie `market_data`,
+      w tym po 5000 dla MINUTE_5/15/30 i 3697 dla HOUR, z zapisanym pokryciem. To backfill przy
+      dodaniu pary, nie zlecenie — patrz uwaga pod grupą
+- [x] 4.5 Zerwij połączenie strumieniowe i potwierdź, że wraca samo — zerwane restartem
+      `market-data`, wykres wrócił bez ingerencji. Zużytego biletu archiwum by nie przyjęło, więc
+      powrót jest dowodem, że próba kupiła nowy
+- [x] 4.6 Potwierdź w logach App Service, że w adresach połączeń nie ma tokenu operatora — w logu
+      widnieje `…&ticket=UCUWZvhpJNxnOUVjXPR8uBH2TpwK6KzGUT4ixLuCY-8` i **żadnego tokenu**. Bilet
+      w logu jest dokładnie tym, co `design.md` przewidział: w chwili zapisu był już zużyty
+
+**Znalezione przy okazji, poza zakresem tej zmiany.** Zlecenie zbierania stoi: osiem chunków
+w `pending`, `min(started_at)` puste, po restarcie i po `Retry` tak samo — powtarzalnie, mimo że
+pętla robocza odpytuje bazę co 5 s niezależnie od powiadomień. Wykluczone: brak uprawnień roli
+aplikacyjnej (ma `UPDATE` na wszystkich tabelach) oraz zablokowane wiersze (`FOR UPDATE SKIP LOCKED`
+pomijałby je po cichu — blokad nie ma). Przyczyna nierozpoznana. `JobRunner` nie był tą zmianą
+ruszany, a produkcyjnie to pierwsze zlecenie w historii (`id = 1`). Do osobnej zmiany, razem z drugą
+obserwacją: **logi `INFO` modułu nie docierają na produkcji nigdzie** — ani do stdout, ani do
+Application Insights (root logger stoi na `WARNING`) — więc linia `chunk N done: wrote X candles`
+jest niewidoczna, a „stoi" wygląda identycznie jak „działa i nie widać".
 
 ## 5. Domknięcie
 
