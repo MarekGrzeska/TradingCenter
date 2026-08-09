@@ -87,15 +87,26 @@ function combinedEntries(rows: JobPairView[], deletions: PairDeletion[]): Histor
       }),
     ),
   ];
-  // Symbol, then interval in its own canonical order, then newest event
-  // first within the same pair — never only the latest, as if nothing
-  // earlier ever happened (terminal-collection-history spec, "Wiele
-  // dociągnięć tej samej pary").
+  // Newest first, whatever the instrument. This tab is asked "what just
+  // happened" before anything else, and the answer to that is always the
+  // most recent row — sorted by symbol it landed wherever the alphabet put
+  // it (terminal-collection-history spec, "Historia jest ułożona od
+  // najnowszego zdarzenia").
+  //
+  // What that costs: a deletion no longer sits next to the pull it undid,
+  // because other pairs' events now fall between them. Taken deliberately —
+  // the pair's story can still be followed down the symbol column, while
+  // "what just happened" had no workaround at all (design.md).
+  //
+  // Symbol and interval stay on as the tiebreak, which is the one job they
+  // are right for. Seconds collide — a wizard submission creates every pair
+  // at the same `at` — and the two lists being merged arrive from two
+  // independent polls, so input order is no help even though the sort is
+  // stable. These keys are derived, total, and the same on every read.
   return entries.sort((a, b) => {
+    if (a.at !== b.at) return b.at - a.at;
     if (a.symbol !== b.symbol) return a.symbol.localeCompare(b.symbol);
-    const byResolution = RESOLUTIONS.indexOf(a.resolution) - RESOLUTIONS.indexOf(b.resolution);
-    if (byResolution !== 0) return byResolution;
-    return b.at - a.at;
+    return RESOLUTIONS.indexOf(a.resolution) - RESOLUTIONS.indexOf(b.resolution);
   });
 }
 
