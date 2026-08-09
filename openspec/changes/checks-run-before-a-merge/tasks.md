@@ -20,20 +20,10 @@
 - [x] 3.2 Zobaczyć **czerwony** przebieg: tymczasowo zepsuć jedną rzecz z każdego rodzaju (test, lint, kontrakt), potwierdzić, że zadanie pada i mówi które, cofnąć *(przebieg 31309449497: gateway padł na `ruff check`, market-data na `pytest`, terminal na `contract:check`; cofnięte)*
 - [x] 3.3 Odnotować w review.md czas przebiegu i to, czy testy bazodanowe przeszły na Linuksie za pierwszym razem *(73 s całości; tak)*
 
-## 4. Blokada merge'a
+## 4. Blokada merge'a — niewykonalna na tym planie
 
-- [ ] 4.1 Włączyć branch protection na `main` wymagające trzech kontekstów tego workflow — *to ustawienie repozytorium, nie plik; do wykonania przez właściciela repo*:
-      ```sh
-      gh api -X PUT repos/MarekGrzeska/TradingCenter/branches/main/protection \
-        -H "Accept: application/vnd.github+json" \
-        -f 'required_status_checks[strict]=true' \
-        -f 'required_status_checks[contexts][]=capital-gateway' \
-        -f 'required_status_checks[contexts][]=market-data' \
-        -f 'required_status_checks[contexts][]=terminal' \
-        -F 'enforce_admins=false' -F 'required_pull_request_reviews=null' \
-        -F 'restrictions=null'
-      ```
-- [ ] 4.2 Potwierdzić, że PR z czerwonym przebiegiem faktycznie nie daje się zmergować
+- [~] 4.1 Włączyć branch protection na `main` wymagające trzech kontekstów tego workflow — **nie da się**: `GET /repos/.../branches/main/protection` odpowiada `403 Upgrade to GitHub Pro or make this repository public`. Repozytorium jest prywatne na darmowym planie, więc branch protection i rulesets są niedostępne. To nie jest decyzja ani zaniechanie, tylko granica planu; do zrobienia, jeśli repo kiedyś stanie się publiczne albo dostanie Pro
+- [~] 4.2 Potwierdzić, że PR z czerwonym przebiegiem nie daje się zmergować — bezprzedmiotowe, dopóki 4.1 jest niewykonalne. Operator **chce zachować push wprost na `main`**, więc gdyby blokada kiedyś była możliwa, MUST zostać włączona z pominięciem dla właściciela (`enforce_admins: false`), a nie bez niego
 
 ## 5. Domknięcie
 

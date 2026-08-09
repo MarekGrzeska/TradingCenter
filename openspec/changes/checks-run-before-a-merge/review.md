@@ -8,9 +8,11 @@ It was proved both ways, which is the part worth reading. Green is easy to get a
 mistake for working; the run that matters is the one where three deliberate breaks each turned
 the right job red on the right step.
 
-Knowingly incomplete: branch protection. A workflow produces a status, and only a repository
-setting turns that into a merge that cannot happen. It is task 4 and it belongs to whoever owns
-the repository.
+Knowingly incomplete, and not by choice: **branch protection cannot be enabled here.** The
+repository is private on the free plan, and the API answers `403 Upgrade to GitHub Pro or make
+this repository public`. So the workflow is a status and stays one — a red run is visible on the
+pull request and nothing refuses the merge. Worth stating plainly rather than leaving as an
+unticked task that reads like neglect.
 
 ## Verified
 
@@ -67,9 +69,15 @@ contradicted it, and nothing except running it would have.
 
 ## Gaps
 
-- **Branch protection is not on.** Until it is, this workflow is a status nobody is obliged to
-  read, and from inside the repository that is indistinguishable from one that gates. The
-  `gh api` invocation is written out in tasks.md 4.1.
+- **Branch protection is not on, and cannot be** on this plan — private repository, free tier,
+  `403` from the API. This workflow is therefore a status nobody is obliged to read, and from
+  inside the repository that is indistinguishable from one that gates. The remaining defence is
+  a red X on the pull request and whoever is looking at it.
+
+  Recorded for whenever that changes: the operator wants to keep pushing directly to `main`, so
+  the rule would need `enforce_admins: false`. That keeps the owner's push and gates everyone
+  else — which on a solo repository makes the gate advisory for the only person using it. Real
+  enforcement and unrestricted direct push are not both available.
 - **The `live` tests still never run anywhere automatically.** Deliberate — they need provider
   credentials — but it means the gateway's contract with the real Capital API is checked only
   when somebody remembers to pass `--run-live`, which is the same weakness this change exists
