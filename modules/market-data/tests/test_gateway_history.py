@@ -7,7 +7,7 @@ import pytest
 import respx
 
 from market_data.errors import GatewayRefused, GatewayUnreachable, UnreadablePayload
-from market_data.gateway import GatewayHistory
+from market_data.gateway import GATEWAY_KEY_HEADER, GatewayHistory, http_client
 from market_data.models import CandleSource, PriceSide, Resolution
 
 BASE_URL = "http://gateway.test:8010"
@@ -244,3 +244,35 @@ async def test_a_candle_with_no_timestamp_is_not_silently_stored(reader: Gateway
 
     with pytest.raises(ValueError, match="no timestamp"):
         await reader.history("US100", Resolution.MINUTE, 1000)
+
+
+# --- specs/market-data-upstream-access: every REST call carries the caller key ------
+
+
+@respx.mock
+async def test_the_shared_client_carries_the_caller_key_on_every_request() -> None:
+    route = respx.get(HISTORY_URL).mock(
+        return_value=httpx.Response(200, json=gateway_history([gateway_candle("2026-08-07T12:00:00Z")]))
+    )
+
+    async with http_client("the-caller-key") as client:
+        await GatewayHistory(BASE_URL, client).history("US100", Resolution.MINUTE, 1000)
+
+    assert route.calls.last.request.headers[GATEWAY_KEY_HEADER] == "the-caller-key"
+
+
+@respx.mock
+async def test_a_401_from_the_gateway_is_a_refusal_not_an_empty_history(
+    reader: GatewayHistory,
+) -> None:
+    # capital-gateway answers a missing or wrong caller key with 401 before it ever asks
+    # the provider. That must surface as GatewayRefused, distinguishable from "the
+    # provider has nothing here" — never as an empty, successfully-read page.
+    respx.get(HISTORY_URL).mock(
+        return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
+    )
+
+    with pytest.raises(GatewayRefused) as err:
+        await reader.history("US100", Resolution.MINUTE, 1000)
+
+    assert err.value.status_code == 401

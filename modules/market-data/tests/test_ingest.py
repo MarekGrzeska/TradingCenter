@@ -87,7 +87,7 @@ def fake_feed(*batches):
     opened: list[int] = []
 
     @asynccontextmanager
-    async def subscribe_to(url, symbol, resolution) -> AsyncIterator:
+    async def subscribe_to(url, symbol, resolution, api_key) -> AsyncIterator:
         opened.append(1)
         batch = remaining.pop(0) if remaining else []
 
@@ -361,6 +361,25 @@ async def test_an_unreachable_gateway_is_reported_not_raised(pool) -> None:
     assert outcome.failure is not None
 
 
+@pytest.mark.db
+async def test_a_gateway_refusal_records_no_coverage(pool) -> None:
+    """specs/market-data-upstream-access: the gateway refusing a call (its 401 for a
+    missing or wrong caller key, surfaced here as GatewayRefused) must not be recorded
+    as coverage — that would tell a future reader this range was verified when it was
+    never even read."""
+    await _tracked(pool)
+    history = FakeHistory(error=GatewayRefused(401, "missing or invalid caller key"))
+
+    outcome = await fill_gap(
+        pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW
+    )
+
+    assert outcome.covered_from is None
+    assert outcome.covered_to is None
+    async with pool.acquire() as conn:
+        assert await read_coverage(conn, "US100", Resolution.MINUTE) == []
+
+
 # --- ingest-fill-respects-collect-from: end to end ------------------------------------
 
 
@@ -562,6 +581,7 @@ async def test_a_closed_candle_from_the_feed_is_stored(pool) -> None:
         resolution=Resolution.MINUTE,
         default_bars=100,
         still_tracked=_tracked_then_not(tracked),
+        gateway_api_key="test-gateway-key",
         subscribe_to=feed,
         sleep=_no_sleep,
     ).run()
@@ -585,6 +605,7 @@ async def test_a_forming_candle_from_the_feed_is_not_stored(pool) -> None:
         resolution=Resolution.MINUTE,
         default_bars=100,
         still_tracked=_tracked_then_not([True, False]),
+        gateway_api_key="test-gateway-key",
         subscribe_to=feed,
         sleep=_no_sleep,
     ).run()
@@ -621,6 +642,7 @@ async def test_the_gateway_reporting_trouble_closes_the_gap_it_left(pool) -> Non
         resolution=Resolution.MINUTE,
         default_bars=100,
         still_tracked=_tracked_then_not([True, True, False]),
+        gateway_api_key="test-gateway-key",
         subscribe_to=feed,
         sleep=_no_sleep,
     ).run()
@@ -651,6 +673,7 @@ async def test_quotes_and_status_do_not_become_candles(pool) -> None:
         resolution=Resolution.MINUTE,
         default_bars=100,
         still_tracked=_tracked_then_not([True, False]),
+        gateway_api_key="test-gateway-key",
         subscribe_to=feed,
         sleep=_no_sleep,
     ).run()
@@ -677,6 +700,7 @@ async def test_a_dropped_feed_is_resumed_while_the_pair_is_tracked(pool) -> None
         resolution=Resolution.MINUTE,
         default_bars=100,
         still_tracked=tracked_until_opened(feed, 3),
+        gateway_api_key="test-gateway-key",
         subscribe_to=feed,
         sleep=record,
     ).run()
@@ -723,6 +747,7 @@ async def test_a_resumed_subscription_closes_the_gap_it_left(pool) -> None:
         resolution=Resolution.MINUTE,
         default_bars=100,
         still_tracked=tracked_until_opened(feed, 2),
+        gateway_api_key="test-gateway-key",
         subscribe_to=feed,
         sleep=_no_sleep,
     ).run()
@@ -744,6 +769,7 @@ async def test_the_loop_ends_when_the_pair_stops_being_tracked(pool) -> None:
         resolution=Resolution.MINUTE,
         default_bars=100,
         still_tracked=_tracked_then_not([False]),
+        gateway_api_key="test-gateway-key",
         subscribe_to=feed,
         sleep=_no_sleep,
     ).run()
@@ -794,6 +820,7 @@ async def test_every_tracked_pair_is_collected_from_a_cold_start(pool) -> None:
         default_bars=100,
         subscribe_to=_never_ending_feed,
         sleep=_no_sleep,
+        gateway_api_key="test-gateway-key",
     )
     await ingest.start()
     try:
@@ -817,6 +844,7 @@ async def test_a_pair_added_later_is_collected_without_a_restart(pool) -> None:
         default_bars=100,
         subscribe_to=_never_ending_feed,
         sleep=_no_sleep,
+        gateway_api_key="test-gateway-key",
     )
     await ingest.start()
     try:
@@ -843,6 +871,7 @@ async def test_an_untracked_pair_stops_being_collected(pool) -> None:
         default_bars=100,
         subscribe_to=_never_ending_feed,
         sleep=_no_sleep,
+        gateway_api_key="test-gateway-key",
     )
     await ingest.start()
     try:
@@ -869,6 +898,7 @@ async def test_the_supervisor_reports_what_each_fill_did(pool) -> None:
         default_bars=100,
         subscribe_to=_never_ending_feed,
         sleep=_no_sleep,
+        gateway_api_key="test-gateway-key",
     )
     await ingest.start()
     try:
@@ -915,7 +945,7 @@ async def _no_sleep(_delay: float) -> None:
 
 
 @asynccontextmanager
-async def _never_ending_feed(url, symbol, resolution):
+async def _never_ending_feed(url, symbol, resolution, api_key):
     """A feed that stays open and says nothing, so a supervisor test is about supervision
     rather than about what the feed happened to send."""
 

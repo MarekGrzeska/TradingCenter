@@ -10,6 +10,7 @@ import websockets
 
 from market_data.errors import GatewayUnreachable, UnreadablePayload
 from market_data.gateway import (
+    GATEWAY_KEY_HEADER,
     CandleUpdate,
     FeedFailure,
     FeedState,
@@ -173,7 +174,7 @@ async def gateway_feed() -> AsyncIterator[str]:
 
 
 async def test_a_subscription_reads_the_feed_in_order(gateway_feed: str) -> None:
-    async with subscribe(gateway_feed, "US100", Resolution.MINUTE_5) as messages:
+    async with subscribe(gateway_feed, "US100", Resolution.MINUTE_5, "test-key") as messages:
         received = [message async for message in messages]
 
     # Five frames were sent; the orderbook is a kind this module does not consume.
@@ -206,7 +207,7 @@ async def test_the_socket_closes_when_the_caller_is_done(
     # somebody is listening, so a socket left open is a provider session spent on nobody.
     url, hung_up = idle_feed
 
-    async with subscribe(url, "US100", Resolution.MINUTE_5) as messages:
+    async with subscribe(url, "US100", Resolution.MINUTE_5, "test-key") as messages:
         assert isinstance(await anext(messages), FeedStatus)
         assert not hung_up.is_set()
 
@@ -215,5 +216,40 @@ async def test_the_socket_closes_when_the_caller_is_done(
 
 async def test_a_gateway_that_is_not_listening_is_named_as_unreachable() -> None:
     with pytest.raises(GatewayUnreachable, match="US100"):
-        async with subscribe("ws://127.0.0.1:1/ws/stream", "US100", Resolution.MINUTE_5):
+        async with subscribe("ws://127.0.0.1:1/ws/stream", "US100", Resolution.MINUTE_5, "test-key"):
             pass
+
+
+# --- specs/market-data-upstream-access: the handshake carries the caller key --------
+
+
+@pytest.fixture
+async def header_capturing_feed() -> AsyncIterator[tuple[str, list]]:  # list[Headers]
+    """A stand-in gateway that records the headers each handshake arrived with, so a
+    test can assert on what `subscribe` actually sent rather than trusting the argument
+    it was called with."""
+    seen: list = []
+
+    async def handler(connection) -> None:
+        # `Headers`, not `dict(...)`: HTTP header names are case-insensitive and the
+        # library normalises on read, but a plain dict conversion keeps whatever case
+        # the wire happened to use — asserting against that would be asserting on an
+        # accident, not on the guarantee.
+        seen.append(connection.request.headers)
+        await connection.close()
+
+    async with websockets.serve(handler, "127.0.0.1", 0) as server:
+        port = server.sockets[0].getsockname()[1]
+        yield f"ws://127.0.0.1:{port}/ws/stream", seen
+
+
+async def test_the_handshake_carries_the_caller_key(
+    header_capturing_feed: tuple[str, list],
+) -> None:
+    url, seen = header_capturing_feed
+
+    async with subscribe(url, "US100", Resolution.MINUTE_5, "the-caller-key") as messages:
+        with pytest.raises(StopAsyncIteration):
+            await anext(messages)
+
+    assert seen[0][GATEWAY_KEY_HEADER] == "the-caller-key"

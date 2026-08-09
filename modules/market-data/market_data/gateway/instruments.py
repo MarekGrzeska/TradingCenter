@@ -95,6 +95,49 @@ class GatewayInstruments:
                 return tradeable if isinstance(tradeable, bool) else None
         return None
 
+    # --- specs/market-data-api: the catalogue itself, proxied for the terminal --------
+    #
+    # capital-gateway is not public — the terminal cannot reach it directly (design.md,
+    # "Terminal osiąga katalog instrumentów przez market-data"). These three forward the
+    # gateway's own JSON unread: no model, no reshaping, so a field the gateway adds is
+    # visible here the same day rather than on the next release of this module.
+
+    async def catalogue(self, max_nodes: int | None, asset_class: str | None) -> dict:
+        params: dict[str, int | str] = {}
+        if max_nodes is not None:
+            params["max_nodes"] = max_nodes
+        if asset_class is not None:
+            params["asset_class"] = asset_class
+        return await self._get_json(f"{self._base_url}/instruments", params, "the catalogue")
+
+    async def search(self, q: str) -> list:
+        body = await self._get_json(f"{self._base_url}/instruments/search", {"q": q}, "a search")
+        if not isinstance(body, list):
+            raise UnreadablePayload("the gateway's search response was not a list")
+        return body
+
+    async def asset_classes(self) -> list:
+        body = await self._get_json(f"{self._base_url}/asset-classes", {}, "the asset classes")
+        if not isinstance(body, list):
+            raise UnreadablePayload("the gateway's asset classes were not a list")
+        return body
+
+    async def _get_json(self, url: str, params: dict, what: str):
+        try:
+            response = await self._client.get(url, params=params)
+        except httpx.RequestError as err:
+            raise GatewayUnreachable(f"the gateway did not answer for {what}: {err}") from err
+
+        if response.is_error:
+            raise GatewayRefused(response.status_code, _detail(response))
+
+        try:
+            return response.json()
+        except ValueError as err:
+            raise UnreadablePayload(
+                f"the gateway's response for {what} was not JSON: {err}"
+            ) from err
+
 
 def _detail(response: httpx.Response) -> str:
     try:

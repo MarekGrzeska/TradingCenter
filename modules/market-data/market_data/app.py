@@ -33,7 +33,7 @@ from .jobs import FutureRequest, JobRunner, interrupt_orphaned_chunks
 from .market_status import MarketStatus
 from .models import Candle
 from .openapi import add_stream_messages, require_response_fields
-from .routers import candles, jobs, meta, pairs, stream
+from .routers import candles, instruments, jobs, meta, pairs, stream
 from .tracking import LimitReached, TrackingRefused
 
 log = logging.getLogger(__name__)
@@ -69,7 +69,10 @@ def candle_sink(pool, hub: Hub):
 async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
 
-    async with make_pool(settings.database_url) as pool, http_client() as client:
+    async with (
+        make_pool(settings.database_url) as pool,
+        http_client(settings.gateway_api_key) as client,
+    ):
         history = GatewayHistory(settings.gateway_base_url, client)
         hub = Hub()
         # Shared with the job runner below, not one semaphore each — two gates that
@@ -85,6 +88,7 @@ async def lifespan(app: FastAPI):
             backfill_concurrency=settings.backfill_concurrency,
             limiter=fill_limiter,
             sink=candle_sink(pool, hub),
+            gateway_api_key=settings.gateway_api_key,
         )
         job_runner = JobRunner(
             pool, history, limiter=fill_limiter, concurrency=settings.backfill_concurrency
@@ -185,6 +189,7 @@ async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
 
 
 # Order matches the single module these came out of, so the published document lists its
-# paths exactly where it always did.
-for area in (meta, candles, pairs, jobs, stream):
+# paths exactly where it always did. `instruments` is new — see its module docstring —
+# and goes last, after everything this module owned before it.
+for area in (meta, candles, pairs, jobs, stream, instruments):
     app.include_router(area.router)

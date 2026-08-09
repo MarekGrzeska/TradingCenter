@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     # --- the gateway, this module's only upstream ---
     gateway_base_url: str = "http://localhost:8010"
     gateway_stream_url: str = "ws://localhost:8010/ws/stream"
+    # capital-gateway is not public — every REST call and every stream handshake must
+    # carry this, or the gateway answers 401 before capital.com is touched. Required,
+    # not defaulted: a module that started without it would run and archive nothing,
+    # and the gap would surface as silence hours later instead of as a refusal now.
+    gateway_api_key: str
 
     # --- the archive's own storage ---
     database_url: str
@@ -68,13 +73,13 @@ class Settings(BaseSettings):
             )
         return value.rstrip("/")
 
-    @field_validator("database_url")
+    @field_validator("database_url", "gateway_api_key")
     @classmethod
-    def _database_present(cls, value: str) -> str:
+    def _not_blank(cls, value: str, info: ValidationInfo) -> str:
         # pydantic already rejects a variable that is absent; this catches the one that is
         # present but empty, which is what an unfilled .env actually looks like.
         if not value.strip():
-            raise ValueError("DATABASE_URL is set but empty")
+            raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
     @field_validator("backfill_concurrency", "default_backfill_bars", "max_tracked_pairs")

@@ -12,8 +12,18 @@ import type { InstrumentSource } from "./source";
  * catalogue — and trading after it — so that is what remains here (design.md,
  * "Archiwum nie udaje właściciela rzeczy, których nie posiada").
  *
- * The practical consequence is worth stating: the search keeps working while
- * the archive is down, because it never went there.
+ * **The wire path changed, the ownership did not.** `capital-gateway` is not
+ * public — the terminal cannot reach it from the browser — so this now calls
+ * `market-data`, which proxies these three routes to the gateway unmodified
+ * (openspec/changes/provision-azure-platform, design.md, "Terminal osiąga
+ * katalog instrumentów przez market-data"). The paths and shapes below are
+ * still the gateway's own; only the host this source is constructed with
+ * changed, in `marketData.ts`. The practical consequence stated in the
+ * original design no longer holds exactly as written: a `market-data` outage
+ * now takes the search with it too, since both go through the same process.
+ * What still holds is that a *gateway* refusal (capital.com trouble, a bad
+ * caller key) is distinguishable from an archive outage — `market-data`
+ * answers those with a `502`, not a silently empty result.
  *
  * capital-gateway's wire shapes (snake_case, per its OpenAPI schema) are kept
  * private to this file.
@@ -88,7 +98,12 @@ export function createGatewaySource(httpBase: string): InstrumentSource {
     },
 
     async ping(signal) {
-      await http.json(`${httpBase}/capabilities`, { signal });
+      // Not /capabilities: that route is capital-gateway's own and this source
+      // no longer reaches it directly. /asset-classes is the cheapest route
+      // market-data proxies, and answering it proves the whole path this
+      // source actually depends on — market-data up, reachable, and itself
+      // able to reach the gateway — not just that market-data is up.
+      await http.json(`${httpBase}/asset-classes`, { signal });
     },
   };
 }

@@ -4,8 +4,12 @@ Three failures that look identical to a caller reading a short series — the ga
 down, the gateway refused, the gateway answered something unreadable — and that a
 consumer has to tell apart, because only one of them is worth retrying the same way.
 
-None of these carry a credential. There is none to leak on this path: the gateway holds
-the provider session, and this module talks to it unauthenticated over localhost.
+None of these carry the *provider's* credential — capital.com's session lives entirely
+inside the gateway, and nothing about it reaches this module. This module's own caller
+key (config.py's `gateway_api_key`, sent as `X-Gateway-Key`) is a different secret and
+travels only in the outbound request header, never in these exceptions: `GatewayRefused`
+carries only what the gateway's own error handler put in `detail`, which is never the
+key that was checked, right or wrong.
 """
 
 from __future__ import annotations

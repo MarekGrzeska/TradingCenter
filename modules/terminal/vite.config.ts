@@ -50,26 +50,22 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
   };
 }
 
-// The dev-time stand-in for whatever sits in front of the two back ends in production
-// (Front Door, Application Gateway, ...). The `*_PROXY_TARGET` variables are
-// server-side and read only here, distinct from `VITE_GATEWAY_HTTP` /
-// `VITE_ARCHIVE_HTTP` / `VITE_ARCHIVE_WS`, which are client-side and point at the
-// prefixes below in dev — see design.md.
+// The dev-time stand-in for whatever sits in front of market-data in production (Front
+// Door, Application Gateway, ...). `ARCHIVE_PROXY_TARGET` is server-side and read only
+// here, distinct from `VITE_ARCHIVE_HTTP` / `VITE_ARCHIVE_WS`, which are client-side and
+// point at the prefix below in dev — see design.md.
+//
+// capital-gateway has no entry of its own any more: it is not public, and market-data
+// proxies the one thing the terminal used to reach it for directly (the instrument
+// catalogue) — see gatewaySource.ts and openspec/changes/provision-azure-platform.
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const gateway = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
   const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
 
   return {
     plugins: [react(), tailwindcss()],
     server: {
       proxy: {
-        "/api": {
-          target: gateway,
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ""),
-          configure: quietProxyErrors("capital-gateway", gateway),
-        },
         // One entry for both roads to the archive: `/archive-api/...` is its
         // HTTP contract and `/archive-api/ws/candles` its subscription, and
         // `ws: true` upgrades only the request that asks to be upgraded.
@@ -79,8 +75,8 @@ export default defineConfig(({ mode }) => {
         // tab for anything that reaches the server: a reload, a bookmark, the
         // link `scripts/dev.sh` prints. Clicking through still worked, because
         // the router never asks, which is exactly why it survived the test
-        // suite. Whatever fronts the two back ends in production would shadow a
-        // tab the same way, so the fix is the prefix, not the dev server.
+        // suite. Whatever fronts market-data in production would shadow a tab
+        // the same way, so the fix is the prefix, not the dev server.
         "/archive-api": {
           target: archive,
           ws: true,

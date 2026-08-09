@@ -17,16 +17,16 @@ Idzie pierwsze i w całości lokalnie. Nic nie staje w internecie, zanim to nie 
 
 Przed włączeniem wymogu po stronie gatewaya — inaczej wszystko przestaje działać naraz.
 
-- [ ] 2.1 `market-data`: dodaj poświadczenie do żądań REST i do zestawiania WebSocketa; brak konfiguracji MUST przerwać start
-- [ ] 2.2 `market-data`: odróżnij odmowę dostępu od braku danych — odmowa MUST NOT zapisać pokrycia ani oznaczyć okresu jako zebranego
-- [ ] 2.3 `market-data`: poświadczenie nie trafia do logów
-- [ ] 2.4 Testy do `specs/market-data-upstream-access/spec.md`
-- [ ] 2.5 `market-data`: dodaj trasy proxy `GET /instruments`, `GET /instruments/search`, `GET /asset-classes` przekazujące do gatewaya własnym poświadczeniem, bez zmiany kształtu odpowiedzi
-- [ ] 2.6 `market-data`: odmowa gatewaya na trasie proxy MUST być rozróżnialna od pustego wyniku wyszukiwania
-- [ ] 2.7 Testy do `specs/market-data-api/spec.md` (delta tej zmiany)
-- [ ] 2.8 `terminal`: przepisz `gatewaySource.ts` na wywołania do `market-data`; usuń `gatewayHttp` z `config.ts` jako osobny adres i `GATEWAY_PROXY_TARGET` z `vite.config.ts`
-- [ ] 2.9 `terminal`: poświadczenie do `market-data` (Easy Auth), ścieżki API względne
-- [ ] 2.10 Uruchom oba moduły lokalnie z włączonym uwierzytelnianiem i potwierdź, że wyszukiwanie instrumentów w terminalu działa end-to-end przez `market-data`
+- [x] 2.1 `market-data`: dodaj poświadczenie do żądań REST i do zestawiania WebSocketa; brak konfiguracji MUST przerwać start — `gateway_api_key` w `Settings`, wspólny nagłówek na `http_client()` i `subscribe()`
+- [x] 2.2 `market-data`: odróżnij odmowę dostępu od braku danych — odmowa MUST NOT zapisać pokrycia ani oznaczyć okresu jako zebranego — **już zapewnione** przez istniejący `except GatewayError` w `backfill.py` (`GatewayRefused` dziedziczy po nim); dopisany tylko test to potwierdzający
+- [x] 2.3 `market-data`: poświadczenie nie trafia do logów — poprawiony też mylący docstring w `errors.py`, który twierdził, że na tej ścieżce nie ma żadnego poświadczenia
+- [x] 2.4 Testy do `specs/market-data-upstream-access/spec.md`
+- [x] 2.5 `market-data`: dodaj trasy proxy `GET /instruments`, `GET /instruments/search`, `GET /asset-classes` przekazujące do gatewaya własnym poświadczeniem, bez zmiany kształtu odpowiedzi
+- [x] 2.6 `market-data`: odmowa gatewaya na trasie proxy MUST być rozróżnialna od pustego wyniku wyszukiwania — istniejący globalny `@app.exception_handler(GatewayError)` już mapuje na 502/504
+- [x] 2.7 Testy do `specs/market-data-api/spec.md` (delta tej zmiany)
+- [x] 2.8 `terminal`: przepisz `gatewaySource.ts` na wywołania do `market-data`; usuń `gatewayHttp` z `config.ts`, proxy `/api` z `vite.config.ts` i `VITE_GATEWAY_HTTP`/`GATEWAY_PROXY_TARGET` z `.env.example`. `ping()` przełączony z `/capabilities` (gatewayowe, nieproxowane) na `/asset-classes`. Kontrakt terminala zregenerowany (`pnpm contract:generate`) pod nowe trasy `market-data`
+- [x] 2.9 `terminal`: ścieżki API względne — już tak działało (`archiveHttp`). Easy Auth to konfiguracja Static Web Apps, nie kod — wchodzi w grupie 5; nic tu do zaimplementowania
+- [x] 2.10 Uruchom oba moduły lokalnie z włączonym uwierzytelnianiem i potwierdź, że wyszukiwanie instrumentów w terminalu działa end-to-end przez `market-data` — **zweryfikowane na żywych procesach** (nie tylko testami): gateway i market-data odpalone lokalnie z pasującym kluczem, potwierdzone przez `curl`: `/` bez klucza 200, `/asset-classes` bez/ze złym kluczem 401×2, z kluczem 200; `market-data`'s proxy realnie sięga do capital.com i zwraca dane; WebSocket bez klucza dostaje realne HTTP 403 na handshake, z kluczem łączy się i odbiera `{"kind":"status","state":"connected"}`
 
 ## 3. Bootstrap stanu Terraforma
 

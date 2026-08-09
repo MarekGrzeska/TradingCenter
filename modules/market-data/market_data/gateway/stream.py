@@ -26,6 +26,7 @@ from websockets.exceptions import WebSocketException
 from ..errors import GatewayUnreachable, UnreadablePayload
 from ..models import Candle, CandleSource, PriceSide, Resolution
 from ..periods import from_epoch_millis, from_epoch_seconds
+from .history import GATEWAY_KEY_HEADER
 
 
 class FeedState(str, Enum):
@@ -168,7 +169,7 @@ _READERS = {
 
 @asynccontextmanager
 async def subscribe(
-    base_url: str, symbol: str, resolution: Resolution
+    base_url: str, symbol: str, resolution: Resolution, api_key: str
 ) -> AsyncIterator[AsyncIterator[StreamMessage]]:
     """One subscription, for as long as the socket lives.
 
@@ -179,7 +180,9 @@ async def subscribe(
     """
     url = stream_url(base_url, symbol, resolution)
     try:
-        connection = await websockets.connect(url)
+        connection = await websockets.connect(
+            url, additional_headers={GATEWAY_KEY_HEADER: api_key}
+        )
     except (OSError, WebSocketException) as err:
         raise GatewayUnreachable(
             f"could not subscribe to {symbol} {resolution.value} at the gateway: {err}"

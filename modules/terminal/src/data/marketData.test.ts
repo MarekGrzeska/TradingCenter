@@ -39,7 +39,7 @@ describe("the composed source", () => {
           uncovered: [],
         });
       }),
-      http.get(`${ORIGIN}/api/instruments/search`, ({ request }) => {
+      http.get(`${ORIGIN}/archive-api/instruments/search`, ({ request }) => {
         asked.push(new URL(request.url).pathname);
         return HttpResponse.json([]);
       }),
@@ -48,18 +48,21 @@ describe("the composed source", () => {
     await marketData.history({ symbol: "US100", resolution: "MINUTE", from: 0, to: 1 }, signal());
     await marketData.searchInstruments("us", signal());
 
-    expect(asked).toEqual(["/archive-api/candles/US100", "/api/instruments/search"]);
+    expect(asked).toEqual(["/archive-api/candles/US100", "/archive-api/instruments/search"]);
   });
 
-  it("keeps the instrument search working while the archive is unreachable", async () => {
-    // The risk the archive introduced: it sits on the chart's critical path.
-    // The answer is that it sits on nothing else — the catalogue never went
-    // there, so the terminal loses its candles and not itself (design.md,
-    // Risks: "Archiwum staje się na ścieżce krytycznej wykresu").
+  it("keeps the instrument search working while the archive's own data path is down", async () => {
+    // market-data now proxies the catalogue too (provision-azure-platform,
+    // design.md — capital-gateway is not public), so the two no longer fail
+    // fully independently: a `market-data` process outage takes both down.
+    // What still separates cleanly is *within* market-data — its
+    // database-backed routes (candles, health) and its gateway-proxy routes
+    // (search, asset classes) are handled independently, so one failing does
+    // not take the other with it. That is what this proves.
     server.use(
       http.get(`${ORIGIN}/archive-api/candles/US100`, () => HttpResponse.error()),
       http.get(`${ORIGIN}/archive-api/health`, () => HttpResponse.error()),
-      http.get(`${ORIGIN}/api/instruments/search`, () =>
+      http.get(`${ORIGIN}/archive-api/instruments/search`, () =>
         HttpResponse.json([
           {
             symbol: "US100",
@@ -71,7 +74,7 @@ describe("the composed source", () => {
           },
         ]),
       ),
-      http.get(`${ORIGIN}/api/capabilities`, () => HttpResponse.json({ provider: "capital.com" })),
+      http.get(`${ORIGIN}/archive-api/asset-classes`, () => HttpResponse.json(["INDICES"])),
     );
 
     await expect(

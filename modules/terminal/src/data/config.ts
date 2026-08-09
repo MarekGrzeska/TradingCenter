@@ -1,15 +1,18 @@
 /**
- * Where the two back ends live, each address accepting a relative path or a
- * full URL.
+ * Where the archive lives — the one back end the terminal now holds an
+ * address for — accepting a relative path or a full URL.
  *
  * HTTP and WebSocket are configured separately — see design.md, "Azure Static
  * Web Apps poda statyki, ale nie przeprowadzi strumienia". Static Web Apps
  * can't proxy the WebSocket, so whatever topology the app ends up deployed
  * behind, the two may need to point at different hosts.
  *
- * The gateway has no WebSocket address any more: the terminal reads its
- * catalogue and nothing else, and the stream it used to open there now comes
- * from the archive. This is the only place either decision gets made.
+ * `capital-gateway` has no address here at all. It never got a WebSocket one —
+ * the stream the terminal used to open there comes from the archive instead —
+ * and it lost its HTTP one too, once the gateway stopped being reachable from
+ * a browser: the instrument catalogue now comes through the archive, which
+ * proxies it (`gatewaySource.ts`, `marketData.ts`). This is the only place any
+ * of those decisions gets made.
  */
 
 const ABSOLUTE_URL = /^https?:\/\//i;
@@ -46,9 +49,10 @@ export function resolveWsBase(
 }
 
 export interface Endpoints {
-  /** `capital-gateway`, for the instrument catalogue. HTTP only. */
-  gatewayHttp: string;
-  /** `market-data`, for candles: a range read and the subscription. */
+  /** `market-data`, for candles — a range read and the subscription — and,
+   *  proxied through it, `capital-gateway`'s instrument catalogue. One
+   *  address for both, because the browser cannot reach the gateway on its
+   *  own any more. */
   archiveHttp: string;
   archiveWs: string;
 }
@@ -57,16 +61,14 @@ export interface Endpoints {
 // hasn't copied it yet, or a test/CI environment with no env file at all)
 // must fall back to "talk to the dev proxy", not crash the moment a source is
 // built.
-// The `-api` suffix keeps a back-end prefix clear of the tab routes: a back end
+// The `-api` suffix keeps this prefix clear of the tab routes: a back end
 // answering a prefix a tab also claims shadows that tab for every request which
-// actually reaches a server. A test compares the two lists so the next prefix
-// cannot repeat it. See the note in vite.config.ts.
-const DEFAULT_GATEWAY_HTTP = "/api";
+// actually reaches a server. A test compares it against the route list so a
+// future prefix cannot repeat the mistake. See the note in vite.config.ts.
 const DEFAULT_ARCHIVE_HTTP = "/archive-api";
 const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 
 export interface EnvVars {
-  VITE_GATEWAY_HTTP?: string;
   VITE_ARCHIVE_HTTP?: string;
   VITE_ARCHIVE_WS?: string;
 }
@@ -76,7 +78,6 @@ export function resolveEndpoints(
   loc: Pick<Location, "protocol" | "host"> = window.location,
 ): Endpoints {
   return {
-    gatewayHttp: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_GATEWAY_HTTP),
     archiveHttp: resolveHttpBase(env.VITE_ARCHIVE_HTTP || DEFAULT_ARCHIVE_HTTP),
     archiveWs: resolveWsBase(env.VITE_ARCHIVE_WS || DEFAULT_ARCHIVE_WS, loc),
   };

@@ -5,7 +5,10 @@ from pydantic import ValidationError
 
 from market_data.config import Settings
 
-REQUIRED = {"database_url": "postgresql://u:p@localhost:5432/market_data"}
+REQUIRED = {
+    "database_url": "postgresql://u:p@localhost:5432/market_data",
+    "gateway_api_key": "gateway-caller-key",
+}
 
 
 def settings(**overrides) -> Settings:
@@ -78,6 +81,21 @@ def test_a_blank_database_url_names_itself() -> None:
     with pytest.raises(ValidationError) as err:
         settings(database_url="   ")
     assert "DATABASE_URL" in str(err.value)
+
+
+def test_a_missing_gateway_api_key_names_itself() -> None:
+    # A module that started without it would run and archive nothing — capital-gateway
+    # answers 401 to every call, silently, hours before anyone notices the archive is
+    # not growing. Refusing to start turns that into an immediate, named failure.
+    with pytest.raises(ValidationError) as err:
+        Settings(database_url=REQUIRED["database_url"], _env_file=None)
+    assert "gateway_api_key" in str(err.value)
+
+
+def test_a_blank_gateway_api_key_names_itself() -> None:
+    with pytest.raises(ValidationError) as err:
+        settings(gateway_api_key="   ")
+    assert "GATEWAY_API_KEY" in str(err.value)
 
 
 @pytest.mark.parametrize(

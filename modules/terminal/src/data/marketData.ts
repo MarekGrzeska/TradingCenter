@@ -8,20 +8,28 @@ import type { ArchiveAdmin, MarketDataSource } from "./source";
  * ends it is made of.
  *
  * Candles and the live stream come from `market-data`, the archive; the
- * instrument catalogue comes from `capital-gateway`, which owns it. No view
- * knows that: they take `marketData` and call it, and the split is this file's
+ * instrument catalogue is `capital-gateway`'s, which owns it. No view knows
+ * that: they take `marketData` and call it, and the split is this file's
  * business alone (terminal-market-data spec, "Świece i instrumenty idą
  * z różnych miejsc"). That is also what makes it a rollback rather than a
  * rewrite if the archive ever has to come back out — the seam is here.
+ *
+ * **Both now go through the same host.** `capital-gateway` is not public, so
+ * the browser cannot reach it directly — `gatewaySource` calls `market-data`,
+ * which proxies its three catalogue routes to the gateway unread
+ * (`gatewaySource.ts` has the detail). The split above is still real — it is
+ * still the gateway's data and the gateway's rules — only the wire hop
+ * changed, which is exactly the kind of thing this seam exists to absorb
+ * without every view needing to know.
  *
  * A single module-level instance, so every view shares one socket hub — that
  * sharing is what makes six charts on the same pair one connection rather than
  * six.
  */
-const { gatewayHttp, archiveHttp, archiveWs } = resolveEndpoints();
+const { archiveHttp, archiveWs } = resolveEndpoints();
 
 const archiveSource = createArchiveSource(archiveHttp, archiveWs);
-const gateway = createGatewaySource(gatewayHttp);
+const gateway = createGatewaySource(archiveHttp);
 
 export const marketData: MarketDataSource = {
   // Ordered the way the shell reads them out, candles first: the archive is the

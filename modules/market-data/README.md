@@ -52,7 +52,7 @@ archive has actually verified.
 ## Run
 
 ```bash
-cp .env.example .env       # gateway URLs and a PostgreSQL connection
+cp .env.example .env       # gateway URLs, this module's caller key, a PostgreSQL connection
 docker compose -f ../../compose.yaml up -d db
 uv run alembic upgrade head
 uv run uvicorn market_data.app:app --reload --port 8020
@@ -69,6 +69,7 @@ in the order they need each other. Migrations step with `uv run alembic downgrad
 | --- | --- | --- |
 | `GATEWAY_BASE_URL` | `http://localhost:8010` | the gateway's HTTP contract |
 | `GATEWAY_STREAM_URL` | `ws://localhost:8010/ws/stream` | the gateway's live feed |
+| `GATEWAY_API_KEY` | — | required; must match the gateway's own key — it answers 401 without it |
 | `DATABASE_URL` | — | required; the archive's own storage |
 | `BACKFILL_CONCURRENCY` | `1` | deep fills allowed to run at once |
 | `DEFAULT_BACKFILL_BARS` | `5000` | how far back a newly tracked pair reaches |
@@ -126,6 +127,15 @@ deliberately needs no running stack: a check that needs one is a check nobody ru
 | GET | `/jobs?symbol=&resolution=` | jobs, one row per pair they touched |
 | GET | `/jobs/{id}` | one job, whole — every pair and chunk it covers |
 | POST | `/jobs/{id}/retry` | retry a job's failed or interrupted chunks |
+| GET | `/instruments?max_nodes=&asset_class=` | the catalogue, proxied from the gateway unread |
+| GET | `/instruments/search?q=` | a search, proxied from the gateway unread |
+| GET | `/asset-classes` | the classes the gateway describes instruments with |
+
+**The last three are a proxy, not a second catalogue.** `capital-gateway` is not public — the
+terminal cannot reach it directly — so these forward the gateway's own routes and its own JSON,
+unmodified, using the caller key this module already holds for its other calls to the gateway.
+A gateway refusal (its 401 for a missing or wrong key, or anything else) comes back as `502`,
+never as a quiet empty list.
 
 **A range read says what it is not saying.** `uncovered` carries the stretches of the
 requested window the archive never verified. That is not the same as periods with no candle:
