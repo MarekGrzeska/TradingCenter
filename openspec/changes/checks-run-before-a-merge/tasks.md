@@ -8,7 +8,7 @@
 - [x] 2.1 `.github/workflows/checks.yml`, wyzwalany na `pull_request` do `main` **i** na `push` do `main` — bezpośredni zapis na `main` też się zdarza
 - [x] 2.2 `concurrency` anulujące poprzedni przebieg tego samego PR-a; bez tego trzy pushy pod rząd to trzy komplety kontenerów
 - [x] 2.3 Zadanie `capital-gateway`: `uv run ruff check .`, `uv run pytest -q`
-- [x] 2.4 Zadanie `market-data`: `uv run ruff check .`, `uv run pytest -q` — **bez pomijania testów bazodanowych**; runner ma Dockera, więc testcontainers wstanie i te 7 testów po raz pierwszy pojedzie na Linuksie
+- [x] 2.4 Zadanie `market-data`: `uv run ruff check .`, `uv run pytest -q` — **bez pomijania testów bazodanowych**; runner ma Dockera, więc testcontainers wstanie i 273 testy `db` po raz pierwszy pojadą na Linuksie. *Uwaga: pominiętych zawsze jest 7 i to są testy `live`, nie `db` — pierwotnie napisałem tu, że to te bazodanowe, i było to nieprawdą; `db` nie pojawiały się w liczniku pominięć nigdy, bo lokalnie Docker chodzi*
 - [x] 2.5 Zadanie `terminal`: Node 22 + `pnpm` z `packageManager` + `uv` (bo `contract:check` sięga po Pythona `market-data`), `pnpm install --frozen-lockfile`, potem `contract:check`, `lint`, `typecheck`, `test`
 - [x] 2.6 `contract:check` **przed** testami — przestarzały kontrakt unieważnia wnioski, jakie testy wyciągają o drucie
 - [x] 2.7 Trzy zadania równolegle, każde z czytelną nazwą; porażka jednego modułu MUST NOT ukrywać wyniku pozostałych

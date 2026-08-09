@@ -14,8 +14,10 @@ Two facts shape everything below.
 `db` mark only when no Docker daemon can be found, and deliberately does *not* skip when Docker
 is installed but failing — its own comment says a silent skip on a machine that was supposed to
 have Docker is indistinguishable from a suite that passed. GitHub's `ubuntu-latest` has Docker,
-so testcontainers will start a real PostgreSQL and the 7 currently-skipped tests will run in CI.
-That is the intended outcome, not a side effect to work around.
+so testcontainers starts a real PostgreSQL and the **273** `db`-marked tests run there. They are
+not part of any local skip count — Docker runs on this machine, so they run here too; what skips
+locally is the 7 `live` tests, which need a Capital session and stay behind `--run-live` in both
+places.
 
 **`contract:check` spans two modules.** It shells into `modules/market-data` for
 `uv run python -m market_data.openapi` and pipes the result through a Node generator. A job

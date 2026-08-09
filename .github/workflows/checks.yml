@@ -47,10 +47,10 @@ jobs:
         with:
           enable-cache: true
       - run: uv run ruff check .
-      # The `db` tests are gated on Docker rather than on a flag, and this runner has it,
-      # so testcontainers starts a real PostgreSQL and they run here — the seven that skip
-      # on a machine without a daemon. That is the intent: they cover the coverage and
-      # rollup logic, which has been wrong twice.
+      # The 273 `db` tests are gated on Docker rather than on a flag, and this runner has
+      # it, so testcontainers starts a real PostgreSQL and they run. That is the intent:
+      # they cover the coverage and rollup logic, which has been wrong twice. The 7 that
+      # skip are the `live` ones, which need a Capital session and stay behind --run-live.
       - run: uv run pytest -q
 
   terminal:
