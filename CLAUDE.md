@@ -65,6 +65,7 @@ arrangement where dev ran on the Azure server; it was reversed the same day it w
 schema `market-data` derives from its own models. After changing anything in
 `market_data/contract.py`, run `pnpm contract:generate` in the terminal — CI's
 `contract:check` fails on a stale file, and it runs before the terminal's tests on purpose.
+The whole route a new field travels is below, under "A new field on market-data's wire".
 
 **One Capital demo session exists.** capital.com invalidates the previous session on every
 new login (`capital_gateway/client.py`), so two gateway processes on the same account
@@ -78,6 +79,38 @@ deauthenticate each other. Symptom: random 401s in both. Do not run two stacks a
 applying would hand the CI principal Entra directory write access. `infra/bootstrap/` keeps
 local state that *is* committed; its storage-account keys are in that file and are inert by
 design (`shared_access_key_enabled = false`, verified live). Don't "fix" that by rotating.
+
+## A new field on market-data's wire
+
+The most expensive routine change in this repo — five stops, and every one of them is
+somebody's job. Nothing here needs fixing; it needs to be read before starting rather than
+rediscovered from a red CI job.
+
+**It is an OpenSpec change.** `market_data/contract.py` is a contract between modules, so
+the full path applies — propose first.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `market_data/models.py`, or `tracking.py` / `jobs/models.py` | the field on the domain model, and the query that fills it. If it is stored, its migration in `migrations/` comes first. |
+| 2 | `market_data/contract.py` | the field on the `*Out` model. The domain model is not the wire: nothing is published until it is here. |
+| 3 | `modules/terminal` → `pnpm contract:generate` | rewrites `src/data/contract.generated.ts`. Never edited by hand. |
+| 4 | `src/data/archive.ts`, the `mapX` for that shape | snake_case → camelCase, plus the ISO → epoch-seconds conversion a chart indexes by. |
+| 5 | `src/data/types.ts`, then the component | the terminal's own shape. Nothing outside `archive.ts` ever sees a wire field. |
+
+What catches a missed step, and what does not:
+
+- **Stop 3 skipped** — `pnpm contract:check`, before the terminal's tests. `checks.yml`
+  runs the terminal's whole job whenever `contract.py` changes, so a Python-only diff
+  cannot slip past it.
+- **Stops 4 and 5 half-done** — `pnpm typecheck`, in both directions: a field in `types.ts`
+  with no mapper line fails the mapper's return, a mapper line with no field in `types.ts`
+  fails as an excess property, and an ISO string handed to a `number` fails on the spot.
+- **Stops 1 and 2 disagreeing** — *nothing fails*. A field added to the domain model and not
+  to the `*Out` is simply never published. This is the one stop to check by eye.
+
+A field on a **WebSocket** message travels a shorter route with the same rule: the models
+live in `market_data/hub.py`, and `openapi.py` hangs them into the published document by
+hand, because a WebSocket has no route for FastAPI to describe. Stops 3 to 5 are unchanged.
 
 ## Workflow
 
