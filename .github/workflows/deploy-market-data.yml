@@ -1,0 +1,52 @@
+name: deploy-market-data
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/market-data/**"
+      - ".github/workflows/deploy-market-data.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write # azure/login's OIDC exchange
+  packages: write # docker push to GHCR
+
+concurrency:
+  group: deploy-market-data
+  cancel-in-progress: false # never cancel a deploy mid-flight
+
+env:
+  IMAGE: ghcr.io/${{ github.repository }}/market-data
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Tagged with the commit, never `latest` — same reasoning as deploy-gateway.yml.
+      - uses: docker/build-push-action@v6
+        with:
+          context: modules/market-data
+          push: true
+          tags: ${{ env.IMAGE }}:${{ github.sha }}
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: app-tradingcenter-market-data
+          images: ${{ env.IMAGE }}:${{ github.sha }}

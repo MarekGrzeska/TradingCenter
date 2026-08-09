@@ -1,0 +1,71 @@
+name: deploy-terminal
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/terminal/**"
+      - ".github/workflows/deploy-terminal.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "modules/terminal/**"
+      - ".github/workflows/deploy-terminal.yml"
+  workflow_dispatch: {}
+
+# Static Web Apps' GitHub deployment path has no OIDC/federated-credential option as of
+# this writing — unlike the two App Service apps (deploy-gateway.yml, deploy-market-data.yml),
+# `Azure/static-web-apps-deploy` only takes a deployment token. That token
+# (AZURE_STATIC_WEB_APPS_API_TOKEN, from `terraform output terminal_api_key`) is a real,
+# narrow exception to design.md's "no stored Azure secret" goal — forced by what Azure's
+# own tooling supports today, not a choice made here. Flagged, not hidden.
+permissions:
+  contents: read
+  pull-requests: write # Azure/static-web-apps-deploy comments preview URLs on PRs
+
+concurrency:
+  group: deploy-terminal-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/terminal
+    # PRs get a preview environment; only `main` is the real site. Skipped entirely for
+    # PRs from forks, which never have access to the deployment token secret.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: modules/terminal/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: modules/terminal/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+
+      # Cross-origin, full-URL mode (src/data/config.ts) — market-data's real hostname,
+      # not a relative prefix. Static Web Apps cannot proxy the candle WebSocket at all,
+      # so a reverse proxy in front of market-data was never going to cover the whole
+      # picture; this is the mode the client code already supports for exactly that
+      # reason. The browser-side follow-through (CORS, the 401-from-fetch handling noted
+      # in app-service.tf's Easy Auth comment) is still open — flagged there, not solved
+      # here.
+      - run: pnpm build
+        env:
+          VITE_ARCHIVE_HTTP: https://app-tradingcenter-market-data.azurewebsites.net
+          VITE_ARCHIVE_WS: wss://app-tradingcenter-market-data.azurewebsites.net/ws
+
+      - uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "modules/terminal/dist"
+          output_location: ""
+          skip_app_build: true

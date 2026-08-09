@@ -80,3 +80,18 @@ temp/
 
 # --- Claude Code local ---
 .claude/settings.local.json
+
+# --- Terraform ---
+# infra/bootstrap/'s own local state is committed on purpose — its reproducibility
+# matters more than the noise (design.md, "Bootstrap osobnym katalogiem ze stanem
+# lokalnym"). It is NOT free of sensitive data: azurerm_storage_account always pulls the
+# account's access keys into state. shared_access_key_enabled = false on that resource
+# (infra/bootstrap/main.tf) is what makes the committed keys inert — commit the file only
+# after confirming that setting is applied. Everything else here uses a remote backend and
+# never has a local state file to ignore in the first place.
+infra/**/.terraform/
+infra/**/*.tfplan
+infra/**/terraform.tfstate.backup
+infra/**/tfplan
+*.tfvars
+!*.tfvars.example

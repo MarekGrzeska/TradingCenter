@@ -10,7 +10,7 @@ import pytest
 from market_data.app import app, candle_sink
 from market_data.config import Settings
 from market_data.coverage import record_coverage
-from market_data.errors import GatewayUnreachable
+from market_data.errors import GatewayRefused, GatewayUnreachable
 from market_data.hub import CandleChange, Hub, Snapshot
 from market_data.ingest.backfill import FillOutcome
 from market_data.market_status import MarketStatus
@@ -79,6 +79,29 @@ class FakeInstruments:
             raise self.error
         return self.market_open
 
+    # --- specs/market-data-api: the catalogue proxy ------------------------------
+
+    async def catalogue(self, max_nodes: int | None, asset_class: str | None) -> dict:
+        if self.error is not None:
+            raise self.error
+        return {
+            "instruments": [],
+            "count": 0,
+            "truncated": False,
+            "max_nodes": max_nodes,
+            "asset_class": asset_class,
+        }
+
+    async def search(self, q: str) -> list:
+        if self.error is not None:
+            raise self.error
+        return [{"symbol": q.upper(), "name": q, "asset_class": "CRYPTO", "tradeable": True}]
+
+    async def asset_classes(self) -> list:
+        if self.error is not None:
+            raise self.error
+        return ["CRYPTO", "SHARES"]
+
 
 class FakeInstrumentsBySymbol:
     """Like `FakeInstruments`, but collectability varies per symbol — for a multi-pair
@@ -143,7 +166,16 @@ async def api(pool, migrated_url: str):
     """
     app.state.pool = pool
     app.state.hub = Hub()
-    app.state.settings = Settings(database_url=migrated_url, _env_file=None)
+    app.state.settings = Settings(
+        # Metadata only — the pool above is what actually reaches the database. A
+        # throwaway value that satisfies Settings' own rules (TLS required, no embedded
+        # credential) rather than `migrated_url`, which as testcontainers hands it out
+        # is neither.
+        database_url="postgresql://localhost:5432/test?sslmode=require",
+        database_user="test-user",
+        gateway_api_key="test-gateway-key",
+        _env_file=None,
+    )
     app.state.instruments = FakeInstruments()
     app.state.ingest = FakeIngest()
     # Replaces the autouse fixture that used to clear a module-level dict: the cache is an
@@ -612,7 +644,11 @@ async def test_reading_deletions_with_none_recorded_is_an_empty_list(api) -> Non
 
 async def test_going_over_the_ceiling_is_refused_with_the_reason(api, pool) -> None:
     app.state.settings = Settings(
-        database_url="postgresql://u:p@h/d", max_tracked_pairs=1, _env_file=None
+        database_url="postgresql://h:5432/d?sslmode=require",
+        database_user="test-user",
+        gateway_api_key="test-gateway-key",
+        max_tracked_pairs=1,
+        _env_file=None,
     )
     await api.post("/pairs", json={"symbol": "US100", "resolution": "MINUTE"})
 
@@ -653,6 +689,68 @@ async def test_a_failure_never_carries_a_raw_database_error(api, pool) -> None:
     assert "see its logs" in detail
     for leak in ("asyncpg", "relation", "SELECT", "password", "candles"):
         assert leak not in detail
+
+
+# --- specs/market-data-api: the catalogue proxy ----------------------------------------
+#
+# capital-gateway is not public, so the terminal reaches the catalogue through here
+# instead — see design.md, "Terminal osiąga katalog instrumentów przez market-data".
+
+
+async def test_the_catalogue_is_the_gateways_own_shape_unread(api) -> None:
+    response = await api.get("/instruments")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "instruments": [],
+        "count": 0,
+        "truncated": False,
+        "max_nodes": None,
+        "asset_class": None,
+    }
+
+
+async def test_the_catalogue_forwards_its_query_parameters(api) -> None:
+    response = await api.get("/instruments", params={"max_nodes": 50, "asset_class": "CRYPTO"})
+
+    assert response.json()["max_nodes"] == 50
+    assert response.json()["asset_class"] == "CRYPTO"
+
+
+async def test_a_search_reaches_the_gateway_and_comes_back_unmodified(api) -> None:
+    response = await api.get("/instruments/search", params={"q": "gold"})
+
+    assert response.status_code == 200
+    assert response.json() == [
+        {"symbol": "GOLD", "name": "gold", "asset_class": "CRYPTO", "tradeable": True}
+    ]
+
+
+async def test_asset_classes_are_the_gateways_own_list(api) -> None:
+    response = await api.get("/asset-classes")
+
+    assert response.status_code == 200
+    assert response.json() == ["CRYPTO", "SHARES"]
+
+
+async def test_a_gateway_refusal_on_the_catalogue_is_not_an_empty_result(api) -> None:
+    """specs/market-data-api: an odmowa (the gateway's 401 for a missing or wrong caller
+    key, or any other refusal) must be distinguishable from an honest empty search — never
+    silently turned into one."""
+    app.state.instruments = FakeInstruments(error=GatewayRefused(401, "missing or invalid caller key"))
+
+    response = await api.get("/instruments/search", params={"q": "gold"})
+
+    assert response.status_code == 502
+    assert response.status_code != 200
+
+
+async def test_a_gateway_refusal_on_asset_classes_is_reported_not_hidden(api) -> None:
+    app.state.instruments = FakeInstruments(error=GatewayRefused(401, "missing or invalid caller key"))
+
+    response = await api.get("/asset-classes")
+
+    assert response.status_code == 502
 
 
 # --- 9: collection jobs, over the contract ----------------------------------------------

@@ -16,12 +16,14 @@ arrive twice.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from . import telemetry
 from .config import Settings
 from .db import pool as make_pool
 from .errors import GatewayError, GatewayUnreachable
@@ -33,7 +35,7 @@ from .jobs import FutureRequest, JobRunner, interrupt_orphaned_chunks
 from .market_status import MarketStatus
 from .models import Candle
 from .openapi import add_stream_messages, require_response_fields
-from .routers import candles, jobs, meta, pairs, stream
+from .routers import candles, instruments, jobs, meta, pairs, stream
 from .tracking import LimitReached, TrackingRefused
 
 log = logging.getLogger(__name__)
@@ -68,8 +70,18 @@ def candle_sink(pool, hub: Hub):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
+    telemetry.configure()
 
-    async with make_pool(settings.database_url) as pool, http_client() as client:
+    async with (
+        make_pool(
+            settings.database_url,
+            user=settings.database_user,
+            client_id=settings.azure_client_id,
+            client_secret=settings.azure_client_secret,
+            tenant_id=settings.azure_tenant_id,
+        ) as pool,
+        http_client(settings.gateway_api_key) as client,
+    ):
         history = GatewayHistory(settings.gateway_base_url, client)
         hub = Hub()
         # Shared with the job runner below, not one semaphore each — two gates that
@@ -85,6 +97,7 @@ async def lifespan(app: FastAPI):
             backfill_concurrency=settings.backfill_concurrency,
             limiter=fill_limiter,
             sink=candle_sink(pool, hub),
+            gateway_api_key=settings.gateway_api_key,
         )
         job_runner = JobRunner(
             pool, history, limiter=fill_limiter, concurrency=settings.backfill_concurrency
@@ -101,6 +114,9 @@ async def lifespan(app: FastAPI):
         # above, so a caller swapping that out is answered by the new one.
         app.state.market_status = MarketStatus()
 
+        candle_age = telemetry.CandleAgeGauge()
+        telemetry.register(candle_age)
+
         # Before anything else touches the job tables: no runner survives a restart, so
         # any chunk left `pending` or `running` from before this start was orphaned, not
         # merely delayed (jobs/store.py, `interrupt_orphaned_chunks`).
@@ -111,9 +127,17 @@ async def lifespan(app: FastAPI):
 
         await ingest.start()
         await job_runner.start()
+        candle_age_task = asyncio.create_task(
+            telemetry.refresh_loop(
+                pool, app.state.instruments, app.state.market_status, candle_age
+            )
+        )
         try:
             yield
         finally:
+            candle_age_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await candle_age_task
             await job_runner.stop()
             await ingest.stop()
 
@@ -185,6 +209,7 @@ async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
 
 
 # Order matches the single module these came out of, so the published document lists its
-# paths exactly where it always did.
-for area in (meta, candles, pairs, jobs, stream):
+# paths exactly where it always did. `instruments` is new — see its module docstring —
+# and goes last, after everything this module owned before it.
+for area in (meta, candles, pairs, jobs, stream, instruments):
     app.include_router(area.router)

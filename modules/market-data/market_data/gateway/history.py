@@ -27,11 +27,20 @@ from ..periods import from_iso
 # should be reported as unreachable now, not after three minutes of waiting.
 DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=300.0, write=10.0, pool=5.0)
 
+# Matches capital-gateway's API_KEY_HEADER. Duplicated rather than imported — the two
+# modules share no code, only the header name as a convention (architecture.md, "Why no
+# shared library") — so a rename on one side has to be a deliberate edit on the other,
+# not a silent break through a shared import. `stream.py` reuses this constant rather
+# than defining its own copy, because within this module — unlike across modules — one
+# name for the same header is simply not duplicating anything.
+GATEWAY_KEY_HEADER = "X-Gateway-Key"
 
-def http_client(timeout: httpx.Timeout = DEFAULT_TIMEOUT) -> httpx.AsyncClient:
-    """A client sized for deep reads. Owned by the caller, so a fill and an interactive
-    request can share one connection pool rather than opening one each."""
-    return httpx.AsyncClient(timeout=timeout)
+
+def http_client(api_key: str, timeout: httpx.Timeout = DEFAULT_TIMEOUT) -> httpx.AsyncClient:
+    """A client sized for deep reads, presenting this module's caller key on every
+    request. Owned by the caller, so a fill and an interactive request can share one
+    connection pool — and one set of default headers — rather than opening one each."""
+    return httpx.AsyncClient(timeout=timeout, headers={GATEWAY_KEY_HEADER: api_key})
 
 
 class HistoryPage(BaseModel):

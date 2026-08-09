@@ -47,41 +47,36 @@ describe("resolveWsBase", () => {
 describe("resolveEndpoints", () => {
   const devLoc = { protocol: "http:", host: "localhost:5173" };
 
-  it("resolves all three addresses independently from env", () => {
+  it("resolves both addresses independently from env", () => {
     const endpoints = resolveEndpoints(
       {
-        VITE_GATEWAY_HTTP: "/api",
         VITE_ARCHIVE_HTTP: "/archive-api",
         VITE_ARCHIVE_WS: "/archive-api/ws",
       },
       devLoc,
     );
     expect(endpoints).toEqual({
-      gatewayHttp: "/api",
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
     });
   });
 
-  it("resolves a fully split topology — static site, archive and gateway on three hosts", () => {
+  it("resolves a fully split topology — static site and archive on two hosts", () => {
     const endpoints = resolveEndpoints(
       {
-        VITE_GATEWAY_HTTP: "https://gateway.example.com",
         VITE_ARCHIVE_HTTP: "https://archive.example.com",
         VITE_ARCHIVE_WS: "wss://archive.example.com/ws",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
     expect(endpoints).toEqual({
-      gatewayHttp: "https://gateway.example.com",
       archiveHttp: "https://archive.example.com",
       archiveWs: "wss://archive.example.com/ws",
     });
   });
 
-  it("falls back to the dev-proxy prefixes when the env vars are unset, instead of throwing", () => {
+  it("falls back to the dev-proxy prefix when the env vars are unset, instead of throwing", () => {
     expect(resolveEndpoints({}, devLoc)).toEqual({
-      gatewayHttp: "/api",
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
     });
@@ -92,13 +87,13 @@ describe("resolveEndpoints", () => {
   // JSON instead of the app. Clicking through worked — the router never asks a
   // server — which is why nothing in this suite noticed.
   //
-  // A relative back-end prefix is only safe if no tab claims it, so the two
-  // lists are compared rather than each being eyeballed.
-  it("gives no back end a relative prefix that a tab route already claims", () => {
-    const { gatewayHttp, archiveHttp, archiveWs } = resolveEndpoints({}, devLoc);
+  // The relative prefix is only safe if no tab claims it, so it is compared
+  // against the route list rather than eyeballed.
+  it("gives the archive no relative prefix that a tab route already claims", () => {
+    const { archiveHttp, archiveWs } = resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
-    const prefixes = [gatewayHttp, archiveHttp, new URL(archiveWs).pathname]
+    const prefixes = [archiveHttp, new URL(archiveWs).pathname]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);
 

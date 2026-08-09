@@ -197,15 +197,19 @@ describe("gatewaySource.listAssetClasses", () => {
 });
 
 describe("gatewaySource.ping", () => {
-  it("resolves when /capabilities answers", async () => {
+  // Not /capabilities: this source no longer reaches the gateway directly, and
+  // that route is not one of the three market-data proxies. /asset-classes is
+  // the cheapest of the three and proves the whole path — market-data up, and
+  // able itself to reach the gateway — not just that market-data answers.
+  it("resolves when /asset-classes answers", async () => {
     server.use(
-      http.get(`${HTTP_BASE}/capabilities`, () => HttpResponse.json({ provider: "capital.com" })),
+      http.get(`${HTTP_BASE}/asset-classes`, () => HttpResponse.json(["CRYPTO", "SHARES"])),
     );
     await expect(source().ping(new AbortController().signal)).resolves.toBeUndefined();
   });
 
   it("rejects with unreachable when the gateway can't be reached", async () => {
-    server.use(http.get(`${HTTP_BASE}/capabilities`, () => HttpResponse.error()));
+    server.use(http.get(`${HTTP_BASE}/asset-classes`, () => HttpResponse.error()));
     await expect(source().ping(new AbortController().signal)).rejects.toMatchObject({
       kind: "unreachable",
     });

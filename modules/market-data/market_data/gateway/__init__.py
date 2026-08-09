@@ -5,7 +5,7 @@ for what is happening now. They spell a period start differently, so both go thr
 `market_data.periods` and arrive as the same instant.
 """
 
-from .history import DEFAULT_TIMEOUT, GatewayHistory, HistoryPage, http_client
+from .history import DEFAULT_TIMEOUT, GATEWAY_KEY_HEADER, GatewayHistory, HistoryPage, http_client
 from .instruments import GatewayInstruments
 from .stream import (
     CandleUpdate,
@@ -21,6 +21,7 @@ from .stream import (
 
 __all__ = [
     "DEFAULT_TIMEOUT",
+    "GATEWAY_KEY_HEADER",
     "CandleUpdate",
     "FeedFailure",
     "FeedState",

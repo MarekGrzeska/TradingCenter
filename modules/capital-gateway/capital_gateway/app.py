@@ -1,17 +1,26 @@
-"""The published surface: FastAPI over the adapter, plus the streaming WebSocket."""
+"""The published surface: FastAPI over the adapter, plus the streaming WebSocket.
+
+Every route below is a trading endpoint or reads toward one, with one exception: `/`,
+which the hosting platform polls with no credential to decide whether to restart the
+process. That single exception is why the credential check is middleware rather than a
+route dependency — a dependency would have to be added to every route by hand, and the
+one route someone forgets is the one that ships open.
+"""
 
 from __future__ import annotations
 
+import hmac
 from contextlib import asynccontextmanager
 from datetime import datetime
 
 from fastapi import Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from .adapter import CapitalAdapter
 from .client import CapitalClient
-from .config import Settings
+from .config import API_KEY_HEADER, Settings, is_production
 from .dtos import (
     Account,
     AssetClass,
@@ -63,6 +72,42 @@ async def lifespan(app: FastAPI):
         await client.aclose()
 
 
+# The one route the hosting platform must reach with no credential, to decide whether
+# to restart the process, plus the schema routes — a browser fetching /docs or
+# /openapi.json carries no X-Gateway-Key, so without this exemption they 401 instead of
+# serving the page they are meant to. Harmless in production: docs_url/openapi_url are
+# None there, so FastAPI has no route registered at either path regardless of what this
+# set exempts, and the request still ends in 404. Exact matches, not prefixes — a prefix
+# match would be one typo away from exempting a real route.
+_UNAUTHENTICATED_PATHS = frozenset({"/", "/docs", "/openapi.json"})
+
+
+class RequireGatewayKey(BaseHTTPMiddleware):
+    """Rejects every request but the health probe unless it carries the caller key.
+
+    `hmac.compare_digest` rather than `==`: a plain comparison returns as soon as the
+    first byte differs, and the time that takes leaks how many leading bytes a guess got
+    right. That timing channel is exactly the kind of thing not worth having on a
+    trading endpoint's front door.
+    """
+
+    async def dispatch(self, request: Request, call_next):
+        if request.url.path in _UNAUTHENTICATED_PATHS:
+            return await call_next(request)
+
+        expected: str = request.app.state.settings.gateway_api_key
+        provided = request.headers.get(API_KEY_HEADER, "")
+        # Compared as bytes: hmac.compare_digest raises TypeError on a `str` containing a
+        # non-ASCII character, and a header can carry one — encoding first turns a caller
+        # sending garbage into the intended 401 instead of an unhandled 500.
+        if not provided or not hmac.compare_digest(provided.encode(), expected.encode()):
+            return JSONResponse(
+                status_code=401, content={"detail": "missing or invalid caller key"}
+            )
+
+        return await call_next(request)
+
+
 app = FastAPI(
     title="TradingCenter · capital-gateway",
     description=(
@@ -74,7 +119,13 @@ app = FastAPI(
     ),
     version="0.1.0",
     lifespan=lifespan,
+    # A published schema hands anyone the exact shape of /orders and /positions/{id}.
+    # Fine off production, where the caller is a developer who already has the source;
+    # not fine on the endpoint actually reachable from the internet.
+    docs_url="/docs" if not is_production() else None,
+    openapi_url="/openapi.json" if not is_production() else None,
 )
+app.add_middleware(RequireGatewayKey)
 
 
 @app.exception_handler(GatewayError)
@@ -92,7 +143,10 @@ def hub(websocket: WebSocket) -> Hub:
 
 @app.get("/", tags=["meta"])
 async def root() -> dict:
-    return {"service": "capital-gateway", "provider": "capital.com", "docs": "/docs"}
+    """The health probe. The one route reachable with no caller key, so it MUST NOT
+    say anything beyond "this process is up" — no account, no session state, no route
+    list, nothing a caller couldn't already have inferred by finding the module."""
+    return {"service": "capital-gateway", "status": "ok"}
 
 
 @app.get("/capabilities", tags=["meta"], response_model=Capabilities)
@@ -291,6 +345,17 @@ async def stream(websocket: WebSocket, the_hub: Hub = Depends(hub)) -> None:
     Sends `candle` (forming and settled), `quote`, `status` and `error`. Reads nothing:
     the subscription is the query string, so there is no client protocol to get wrong.
     """
+    # HTTP middleware never sees a WebSocket handshake, so the caller key is checked
+    # here, before accept() — accepting first and closing after would register the
+    # caller with the hub for the instant between the two.
+    expected: str = websocket.app.state.settings.gateway_api_key
+    provided = websocket.headers.get(API_KEY_HEADER, "")
+    # See RequireGatewayKey.dispatch above: compared as bytes so a non-ASCII header
+    # cannot turn a refused handshake into an unhandled exception.
+    if not provided or not hmac.compare_digest(provided.encode(), expected.encode()):
+        await websocket.close(code=4401, reason="missing or invalid caller key")
+        return
+
     symbol = (websocket.query_params.get("symbol") or "").strip().upper()
     raw_resolution = websocket.query_params.get("resolution") or Resolution.MINUTE_5.value
 

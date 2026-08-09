@@ -1,0 +1,216 @@
+<title>DBeaver → PostgreSQL w Azure — konfiguracja połączenia</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 52rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 30rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.84rem; white-space: nowrap; }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>DBeaver → PostgreSQL w Azure</h1>
+<p class="lede">Jak podłączyć się do archiwum <code>market-data</code> z tej maszyny — i dlaczego robisz to innym kontem niż aplikacja.</p>
+<p class="meta">
+  Uzupełnienie sekcji 6 dokumentu <code>docs/azure-infrastructure-proposal.html</code><br>
+  Dotyczy stanu po przeniesieniu bazy deweloperskiej z kontenera do Azure
+</p>
+
+<h2>Zasada</h2>
+
+<p>Na serwerze stoją dwie bazy i trzy tożsamości. Rozdział nie jest formalnością — to jedyne, co dzieli lokalną pomyłkę od skasowanego archiwum, którego odtworzenie z brokera kosztuje około dwudziestu siedmiu godzin.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Kto się łączy</th><th>Do czego</th><th>Prawa</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><code>market-data</code> w App Service</td>
+      <td><code>market_data</code></td>
+      <td>odczyt i zapis <span class="dim">— tożsamość zarządzana</span></td>
+    </tr>
+    <tr>
+      <td>twój <code>.env</code> na laptopie</td>
+      <td><code>market_data_dev</code></td>
+      <td>odczyt i zapis <span class="dim">— Service Principal, bez dostępu do bazy produkcyjnej</span></td>
+    </tr>
+    <tr>
+      <td><strong>ty w DBeaverze</strong></td>
+      <td>obie</td>
+      <td><span class="pill bad">pełny dostęp</span> <span class="dim">— administrator serwera</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Trzy tożsamości, nie cztery</span>
+  <p>Pierwotny plan zakładał czwartą, osobną rolę operatorską z samym <code>SELECT</code> na <code>market_data</code>. Nie powstała: administrator Entra przypisany serwerowi omija każdy <code>GRANT</code> na każdej bazie — to nie jest rola z uprawnieniami, tylko superużytkownik — więc osobna rola tylko-do-odczytu niczego by nie chroniła przed tym samym kontem, którym i tak łączysz się w DBeaverze.</p>
+  <p><strong>Konsekwencja przyjęta świadomie:</strong> w DBeaverze masz pełny odczyt i zapis na obu bazach, produkcyjnej włącznie. Jedyna ochrona to nawyk i przełącznik <em>Read-only connection</em> niżej — nie egzekwuje go baza. Dla projektu jednoosobowego administrator i tak ma pełny dostęp przez portal Azure, więc osobna rola tylko do przeglądania nie broniłaby przed niczym, przed czym nie broni się już sama przez się. Gdyby do projektu dołączyła druga osoba, tu jest miejsce, żeby tę rolę jednak zbudować.</p>
+</div>
+
+<div class="callout bad">
+  <span class="tag">Czego nie robić</span>
+  <p><strong>Nie podawaj DBeaverowi konta z <code>.env</code>.</strong> Wygodne, kuszące, i dokładnie znosi zabezpieczenie, po które te konta zostały rozdzielone.</p>
+  <p>Sens podziału jest taki: konto, które program bierze <em>automatycznie</em> z pliku, nigdy nie widzi produkcji — nie ma jak, bo nie ma do niej <code>CONNECT</code>. Konto, którym <em>świadomie</em> klikasz w DBeaverze, widzi obie bazy w pełni — ale ty jesteś przy klawiaturze i widzisz, na której zakładce pracujesz. Zlanie ich w jedno usuwa tę drugą linię obrony: literówka w zmiennej środowiskowej zaczyna mieć taki sam skutek jak pomyłkowe kliknięcie w złej zakładce, zamiast żadnego.</p>
+</div>
+
+<h2>Połączenie krok po kroku</h2>
+
+<p>W DBeaverze: <strong>Database → New Database Connection → PostgreSQL</strong>.</p>
+
+<h3>Zakładka Main</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pole</th><th>Wartość</th></tr></thead>
+  <tbody>
+    <tr><td class="field">Host</td><td class="field">psql-tradingcenter.postgres.database.azure.com</td></tr>
+    <tr><td class="field">Port</td><td class="field">5432</td></tr>
+    <tr><td class="field">Database</td><td class="field">market_data <span class="dim">lub market_data_dev</span></td></tr>
+    <tr><td class="field">Username</td><td class="field">twój UPN Entra <span class="dim">— patrz uwaga niżej, to zwykle <strong>nie</strong> jest adres e-mail, którym się logujesz</span></td></tr>
+    <tr><td class="field">Password</td><td>token — patrz niżej</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Konto gościa (B2B) ma inny UPN niż login</span>
+  <p>Jeśli administratorem jest osobiste konto Microsoft (outlook.com, hotmail.com — nie konto firmowe z tego samego dzierżawcy), Entra widzi je jako gościa i nadaje mu wewnętrzny UPN w formacie <code>twoj-login_domena.com#EXT#@nazwa-dzierżawcy.onmicrosoft.com</code> — nie <code>twoj-login@domena.com</code>, którym się logujesz. Postgres sprawdza właśnie ten wewnętrzny UPN, więc podanie zwykłego adresu e-mail kończy się <code>password authentication failed</code>, mimo poprawnego tokenu.</p>
+  <p>Sprawdź swój dokładnie tym poleceniem — to samo, którym Terraform ustawił administratora (<code>infra/terraform.tfvars</code>, <code>postgres_admin_upn</code>):</p>
+  <pre><code>az ad signed-in-user show --query userPrincipalName -o tsv</code></pre>
+</div>
+
+<h3>Zakładka SSL</h3>
+
+<p>Zaznacz <strong>Use SSL</strong> i ustaw <code>SSL mode: require</code>. Serwer ma wymuszony TLS i bez tego odrzuci połączenie — komunikatem, który brzmi jak problem z hasłem, więc warto ustawić to od razu, a nie po dwudziestu minutach zgadywania.</p>
+
+<h3>Zakładka General — dla połączenia produkcyjnego</h3>
+
+<p>Zaznacz <strong>Read-only connection</strong> i nadaj połączeniu wyraźną nazwę, na przykład <code>PROD (read-only)</code>. Warto też przypisać mu czerwony kolor — DBeaver koloruje wtedy całą zakładkę edytora, co przy dwóch podobnie wyglądających połączeniach ratuje przed pomyłką skuteczniej niż uwaga.</p>
+
+<p>To blokada w interfejsie, <strong>nie zabezpieczenie</strong> — baza jej nie wymusza, bo administrator ma tam pełne prawa (patrz uwaga w sekcji Zasada). Ale kosztuje jedno kliknięcie i wyłapuje pomyłkę wcześniej — zanim zapytanie w ogóle wyruszy. Na tym etapie projektu jest to jedyna linia obrony na produkcji, więc warto ją zaznaczać, nie traktować jako formalność.</p>
+
+<h2>Hasłem jest token, który żyje godzinę</h2>
+
+<p>Logowanie idzie przez Entra ID, więc nie ma stałego hasła. W pole <em>Password</em> wkleja się token dostępu:</p>
+
+<pre><code>az account get-access-token \
+  --resource https://ossrdbms-aad.database.windows.net \
+  --query accessToken -o tsv</code></pre>
+
+<p>Na macOS wygodniej od razu do schowka:</p>
+
+<pre><code>az account get-access-token \
+  --resource https://ossrdbms-aad.database.windows.net \
+  --query accessToken -o tsv | pbcopy</code></pre>
+
+<div class="callout warn">
+  <span class="tag">To zirytuje</span>
+  <p><strong>Token wygasa po około godzinie</strong> i połączenie trzeba wtedy odświeżyć nowym. To realny koszt rezygnacji z hasła — nie blokuje pracy, ale wraca regularnie.</p>
+  <p><strong>Rozstrzygnięte:</strong> DBeaver <strong>Community</strong> nie ma natywnej obsługi Entra ID dla PostgreSQL-a — to funkcja edycji Lite/Enterprise/Ultimate (płatnych). W Community jedyne dwie drogi to ręczne wklejanie tokenu do pola <em>Password</em>, jak wyżej, albo skrypt odświeżający <code>~/.pgpass</code> nowym tokenem w tle, żeby DBeaver czytał go stamtąd zamiast pytać. Dla pracy kilka razy w tygodniu ręczne wklejanie jest prostsze niż utrzymywanie skryptu; wart rozważenia dopiero, gdy DBeaver jest otwarty przez cały dzień.</p>
+</div>
+
+<h2>Zanim zadzwonisz, że nie działa</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Objaw</th><th>Przyczyna</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>timeout, brak odpowiedzi</td>
+      <td><strong>Twoje IP wypadło z reguły firewalla.</strong> Operator zmienia adres bez uprzedzenia. Sprawdź aktualny (<code>curl ifconfig.me</code>) i odśwież regułę — to ten sam wpis, którego potrzebuje lokalny <code>market-data</code>, więc jeśli i on przestał się łączyć, masz potwierdzenie.</td>
+    </tr>
+    <tr>
+      <td>błąd uwierzytelnienia po jakimś czasie pracy</td>
+      <td>Token wygasł. Wygeneruj nowy.</td>
+    </tr>
+    <tr>
+      <td><code>password authentication failed</code>, token świeży</td>
+      <td>Najpewniej <em>Username</em>. Konto gościa (B2B) ma inny UPN niż login — patrz uwaga wyżej i <code>az ad signed-in-user show</code>.</td>
+    </tr>
+    <tr>
+      <td>połączenie odrzucone natychmiast</td>
+      <td>Brak SSL. Zakładka <em>SSL</em> → <code>require</code>.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<footer>
+  <p><strong>Powiązane dokumenty</strong></p>
+  <ul>
+    <li><code>docs/azure-infrastructure-proposal.html</code> — sekcja 6 opisuje, skąd wzięły się dwie bazy i trzy tożsamości</li>
+    <li><code>modules/market-data/.env.example</code> — połączenie, którego używa aplikacja</li>
+  </ul>
+</footer>
+
+</main>

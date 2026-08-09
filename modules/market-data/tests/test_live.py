@@ -22,8 +22,8 @@ that now has two idle days in it, so it fails while telling the truth about a se
 is perfectly fine. `BTCUSD` keeps trading, and the whole file can be run against it alone
 at the weekend with `-k crypto` if that is all that is wanted.
 
-    uv run uvicorn capital_gateway.app:app --port 8010    # in modules/capital-gateway
-    uv run pytest -m live --run-live
+    GATEWAY_API_KEY=k uv run uvicorn capital_gateway.app:app --port 8010  # in modules/capital-gateway
+    MARKET_DATA_GATEWAY_API_KEY=k uv run pytest -m live --run-live       # same k both places
 """
 
 from __future__ import annotations
@@ -44,6 +44,9 @@ from market_data.store import write_candles
 pytestmark = [pytest.mark.live, pytest.mark.db]
 
 GATEWAY_URL = os.environ.get("MARKET_DATA_GATEWAY_URL", "http://localhost:8010")
+# Must match the GATEWAY_API_KEY the gateway named above was started with — see the
+# module docstring for how to run one locally.
+GATEWAY_API_KEY = os.environ.get("MARKET_DATA_GATEWAY_API_KEY", "")
 
 # Two instruments whose sessions are as unlike as capital.com offers, because the thing
 # being tested is whether the four-hour anchor follows the clock or a venue's open: if it
@@ -74,7 +77,7 @@ TOLERANCE = 1e-6
 
 @pytest.fixture
 async def gateway():
-    async with http_client() as client:
+    async with http_client(GATEWAY_API_KEY) as client:
         try:
             await client.get(f"{GATEWAY_URL}/capabilities", timeout=5)
         except httpx.RequestError as err:

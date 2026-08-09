@@ -31,6 +31,7 @@ def adapter() -> CapitalAdapter:
             capital_api_key="k",
             capital_identifier="me@example.com",
             capital_password="p",
+            gateway_api_key="g",
             _env_file=None,
         )
     )

@@ -69,6 +69,7 @@ class PairIngest:
     resolution: Resolution
     default_bars: int
     still_tracked: Callable[[], Awaitable[bool]]
+    gateway_api_key: str
     limiter: object | None = None
     on_fill: Callable[[FillOutcome], None] | None = None
     # Where candles go instead of straight to storage. The contract layer supplies one
@@ -119,7 +120,9 @@ class PairIngest:
         )
 
     async def _listen(self) -> None:
-        async with self.subscribe_to(self.stream_url, self.symbol, self.resolution) as messages:
+        async with self.subscribe_to(
+            self.stream_url, self.symbol, self.resolution, self.gateway_api_key
+        ) as messages:
             async for message in messages:
                 if isinstance(message, CandleUpdate):
                     self.backoff.reset()

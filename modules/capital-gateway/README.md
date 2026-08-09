@@ -8,6 +8,13 @@ arrives when it closes — stays inside the module.
 **Demo only.** Any endpoint other than the demo host is refused at startup, so this cannot
 place an order with real money.
 
+**Every call needs this module's own caller key**, sent as `X-Gateway-Key` — a header
+missing or a value that mismatches is `401` before capital.com is touched, on every route
+and at WebSocket handshake alike. The one exception is `GET /`, the health probe the
+hosting platform polls with no credential. This key has nothing to do with the capital.com
+credentials above it; it is what today's one caller, `market-data`, presents to this
+module, not what this module presents to the provider.
+
 ## What
 
 - `dtos.py` — the contract: `Instrument`, `Candle`, `CandleHistory`, `Account`, `Position`,
@@ -24,11 +31,19 @@ place an order with real money.
 ## Run
 
 ```bash
-cp .env.example .env      # capital.com DEMO credentials
+cp .env.example .env      # capital.com DEMO credentials + this module's own GATEWAY_API_KEY
 uv run uvicorn capital_gateway.app:app --reload --port 8010
 ```
 
-Swagger: <http://localhost:8010/docs>
+Swagger: <http://localhost:8010/docs> — published unless `GATEWAY_ENV=production`, where
+neither it nor `/openapi.json` exists, so the shape of `/orders` is not there to be found
+by whatever reaches the deployed process.
+
+Calling anything past `/` needs the header:
+
+```bash
+curl -H "X-Gateway-Key: $GATEWAY_API_KEY" http://localhost:8010/positions
+```
 
 ## Test
 
