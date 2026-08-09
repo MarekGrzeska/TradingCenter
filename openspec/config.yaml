@@ -77,14 +77,22 @@ rules:
     - Name the test that proves each scenario, file::test_name. A scenario with no
       test is a gap and is listed as one.
 
-# Per-operation guidance (optional)
-# Add advisory guidance for how apply and archive work should be conducted.
-# This is separate from artifact rules above.
-# Example:
-#   operations:
-#     apply:
-#       guidance:
-#         - Keep test summaries concise
-#     archive:
-#       guidance:
-#         - Summarize the archive outcome before finishing
+# Per-operation guidance
+#
+# What an archived change keeps, and what it stops keeping. Decided by the operator on
+# 10 August 2026 after the archive of thirteen changes had reached 10,239 lines and was
+# growing by roughly 790 a change.
+operations:
+  archive:
+    guidance:
+      - After the change directory has been moved into openspec/changes/archive/, run
+        scripts/trim-openspec-archive.sh from the repository root. It removes the delta
+        specs and the ticked tasks.md from every archived change, and keeps proposal.md,
+        design.md, review.md and .openspec.yaml.
+      - The reason, so the step is not cargo-cult. This very archive merged the delta into
+        openspec/specs/, which makes the copy left behind a frozen version of the truth,
+        and a checklist with every box ticked says less about what was done than the
+        commits do - with their diffs attached. What stays is what git cannot hand back in
+        readable form - why the change was opened, what was weighed, how it was judged.
+      - Run it after the move and never instead of it, and never before the spec sync has
+        been verified - the delta specs are what that sync reads.
