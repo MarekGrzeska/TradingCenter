@@ -3,9 +3,7 @@
 Jedno wejście na świece i strumień dla całego terminala: skąd biorą się dane, jak historia zszywa
 się z tym, co przychodzi na żywo, i jak wiele wykresów patrzących na to samo dzieli jedno
 połączenie zamiast otwierać po jednym każdy.
-
 ## Requirements
-
 ### Requirement: Źródło danych jest wymienne za jednym interfejsem
 
 Terminal MUST czytać świece i strumień wyłącznie przez jeden interfejs, opisujący odczyt historii
@@ -88,9 +86,19 @@ bez końca. Archiwum odmawia subskrypcji pary nieśledzonej **przed** handshake'
 nie udostępnia statusu odrzuconego handshake'u — nieudane połączenie wygląda więc tak samo jak
 niedostępne archiwum. Terminal MUST rozstrzygnąć, które z dwojga zaszło, zanim osiądzie w pętli
 ponawiania, i MUST pokazać powód odmowy zamiast stanu wznawiania. Rozstrzygnięcie MUST kosztować
-najwyżej jedno pytanie na serię niepowodzeń, a jego własna porażka MUST być czytana jako „ponawiaj
-dalej", bo źródło, które nie odpowiada, jest właśnie tym przypadkiem, dla którego ponawianie
-istnieje.
+najwyżej jedno pytanie na serię niepowodzeń.
+
+Zestawienie połączenia poprzedza pobranie poświadczenia jednorazowego, więc próba może się nie
+udać, zanim jakikolwiek socket zostanie otwarty, i przybywa trzeci rodzaj niepowodzenia obok
+zerwania i odmowy dotyczącej pary: **utrata tożsamości**. Terminal MUST odróżnić ją od obu
+pozostałych. Utrata tożsamości MUST zatrzymać ponawianie i MUST być pokazana jako wymagająca
+zalogowania, bo żadna liczba prób jej nie naprawi. Nieudane pobranie poświadczenia z innej
+przyczyny — archiwum nie odpowiada — MUST być czytane jako zerwanie i ponawiane.
+
+Ta sama reguła obowiązuje przy rozstrzyganiu powodu nieudanego handshake'u: porażka rozstrzygnięcia
+MUST być czytana jako „ponawiaj dalej", chyba że jest odmową dotyczącą tożsamości — wtedy MUST być
+czytana jako utrata tożsamości. Bez tego wyjątku wygasła sesja wyglądałaby jak niedostępne archiwum
+i ponawiałaby się bez końca, nigdy nie mówiąc operatorowi, że wystarczy się zalogować.
 
 #### Scenario: Wykres pary, której nikt nie archiwizuje
 
@@ -103,10 +111,29 @@ istnieje.
 - **WHEN** połączenie nie dochodzi do skutku, a rozstrzygnięcie powodu też się nie udaje
 - **THEN** terminal ponawia dalej z rosnącym odstępem, bo to jest przypadek zerwania
 
+#### Scenario: Rozstrzygnięcie powodu kończy się odmową z powodu tożsamości
+
+- **WHEN** połączenie nie dochodzi do skutku, a pytanie o powód zostaje odrzucone z powodu
+  tożsamości
+- **THEN** terminal przestaje ponawiać i pokazuje, że operator musi się zalogować
+- **AND** MUST NOT pokazywać tego jako niedostępności archiwum
+
+#### Scenario: Poświadczenie jednorazowe nie zostaje wydane, bo sesja wygasła
+
+- **WHEN** terminal prosi o poświadczenie jednorazowe, a archiwum odmawia z powodu tożsamości
+- **THEN** terminal nie otwiera połączenia i przestaje ponawiać
+- **AND** pokazuje, że operator musi się zalogować
+
+#### Scenario: Poświadczenie jednorazowe nie zostaje wydane, bo archiwum milczy
+
+- **WHEN** terminal prosi o poświadczenie jednorazowe, a archiwum nie odpowiada
+- **THEN** terminal ponawia próbę zestawienia z rosnącym odstępem, bo to jest przypadek zerwania
+
 #### Scenario: Połączenie pada
 
 - **WHEN** strumień się zrywa
 - **THEN** odbiorcy widzą stan wznawiania, a terminal ponawia próby z rosnącym odstępem
+- **AND** każda próba poprzedzona jest pobraniem świeżego poświadczenia jednorazowego
 
 #### Scenario: Połączenie wraca
 
@@ -146,3 +173,4 @@ sieci i MUST NOT nieść poświadczeń.
 
 - **WHEN** źródło danych nie odpowiada
 - **THEN** terminal dostaje błąd mówiący, że źródło jest nieosiągalne, a nie pustą serię świec
+
