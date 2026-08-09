@@ -1,0 +1,379 @@
+<title>Dlaczego terminal nie rozmawia z market-data — i trzy drogi wyjścia</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 52rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 30rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.84rem; white-space: nowrap; }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+<style>
+  .diagram { margin: 1.6rem 0; padding: 1.2rem; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow-x: auto; }
+  .diagram svg { display: block; margin: 0 auto; max-width: 100%; height: auto; }
+  .diagram figcaption { margin-top: 0.9rem; font-size: 0.85rem; color: var(--text-dim); text-align: center; }
+  .opt { border: 1px solid var(--border); border-radius: 6px; padding: 1.2rem 1.4rem; margin: 1.5rem 0; background: var(--surface); }
+  .opt h3 { margin-top: 0; }
+  .opt .verdict { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); }
+  .cost { display: grid; grid-template-columns: 7.5rem 1fr; gap: 0.5rem 1rem; margin: 1rem 0 0; font-size: 0.92rem; }
+  .cost dt { font-family: var(--mono); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-dim); padding-top: 0.2em; }
+  .cost dd { margin: 0; }
+  @media (max-width: 34rem) { .cost { grid-template-columns: 1fr; gap: 0.15rem 0; } .cost dd { margin-bottom: 0.7rem; } }
+</style>
+
+<main>
+
+<h1>Terminal nie rozmawia z market-data</h1>
+<p class="lede">Wszystko jest wdrożone i działa z osobna — a mimo to wykres nie zobaczy ani jednej świecy. Dlaczego, i co można z tym zrobić.</p>
+<p class="meta">
+  Zadanie 11.4 zmiany <code>provision-azure-platform</code><br>
+  Dokument do podjęcia decyzji — <strong>decyzja zapadła</strong>, patrz ramka poniżej
+</p>
+
+<div class="callout good">
+  <span class="tag">Rozstrzygnięte · 2026-08-09</span>
+  <p><strong>Wybrano opcję B</strong> — terminal zdobywa token Entra, a <code>market-data</code> zostaje
+  czystym API chronionym tokenem. Strumień otwiera się <strong>biletem jednorazowym</strong>, o który
+  terminal prosi zwykłym żądaniem HTTP i który wydaje archiwum: tożsamość sprawdza się tam, gdzie
+  nagłówki działają, a do miejsca, gdzie nie działają, przenosi się jej jednorazowy ślad.</p>
+  <p>Zrealizowane w zmianie <code>authenticate-terminal-to-market-data</code>. Wdrożone i potwierdzone
+  na żywo: logowanie kontem organizacji, wykres rysujący świece z archiwum, wyszukiwarka instrumentów
+  i powrót strumienia po zerwaniu. Pytanie otwarte z ostatniej sekcji — czy Easy Auth przyjmie token
+  aplikacji przeglądarkowej — <strong>rozstrzygnęło się na tak</strong>; wystarczyło wystawić zakres na
+  rejestracji <code>market-data</code> i dopisać obie postacie odbiorcy tokenu.</p>
+  <p>Jedna rzecz wypadła inaczej, niż zakładał ten dokument: zapytanie wstępne przeglądarki (CORS)
+  <strong>musi być obsłużone przez App Service, nie przez aplikację</strong> — Easy Auth odpowiedziałby
+  na nie <code>401</code>, zanim kontener je zobaczy, bo z definicji nie niesie ono żadnego
+  poświadczenia.</p>
+</div>
+
+<h2>W jednym zdaniu</h2>
+
+<p>Terminal i <code>market-data</code> stoją pod <strong>dwoma różnymi adresami</strong>, a mechanizm logowania, który wybraliśmy dla <code>market-data</code>, działa poprawnie tylko wtedy, gdy strona i usługa są pod <strong>tym samym adresem</strong>.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 660 210" role="img" aria-label="Terminal na jednym adresie, market-data na drugim, żądanie odbite z kodem 401">
+  <defs>
+    <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="var(--bad)"/>
+    </marker>
+  </defs>
+
+  <rect x="8" y="30" width="230" height="86" rx="7" fill="var(--surface-2)" stroke="var(--border)"/>
+  <text x="123" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--text)">Terminal</text>
+  <text x="123" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--text-dim)">white-pond-0508ffe0f</text>
+  <text x="123" y="92" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--text-dim)">.azurestaticapps.net</text>
+  <text x="123" y="108" text-anchor="middle" font-size="10.5" fill="var(--good)">strona się otwiera ✓</text>
+
+  <rect x="422" y="30" width="230" height="86" rx="7" fill="var(--surface-2)" stroke="var(--border)"/>
+  <text x="537" y="56" text-anchor="middle" font-size="14" font-weight="600" fill="var(--text)">market-data</text>
+  <text x="537" y="76" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--text-dim)">app-tradingcenter-market-data</text>
+  <text x="537" y="92" text-anchor="middle" font-size="11" font-family="monospace" fill="var(--text-dim)">.azurewebsites.net</text>
+  <text x="537" y="108" text-anchor="middle" font-size="10.5" fill="var(--good)">usługa działa ✓</text>
+
+  <line x1="243" y1="66" x2="412" y2="66" stroke="var(--bad)" stroke-width="2" marker-end="url(#tip)"/>
+  <text x="327" y="56" text-anchor="middle" font-size="11" fill="var(--text-dim)">„daj mi świece”</text>
+
+  <line x1="412" y1="92" x2="243" y2="92" stroke="var(--bad)" stroke-width="2" stroke-dasharray="5 3" marker-end="url(#tip)"/>
+  <text x="327" y="108" text-anchor="middle" font-size="11" font-weight="600" fill="var(--bad)">401 — kim jesteś?</text>
+
+  <text x="330" y="160" text-anchor="middle" font-size="12.5" fill="var(--text)">Terminal <tspan font-weight="600">wie</tspan>, kim jesteś. Nie ma jak tego udowodnić.</text>
+  <text x="330" y="182" text-anchor="middle" font-size="11.5" fill="var(--text-dim)">Dwa różne adresy = dwa osobne światy dla przeglądarki.</text>
+</svg>
+<figcaption>Obie strony są zdrowe. Problem jest w przestrzeni pomiędzy nimi.</figcaption>
+</div>
+
+<h2>Dlaczego przeglądarka nie chce pomóc</h2>
+
+<p>Gdy logujesz się przez Easy Auth, Azure odkłada w przeglądarce <strong>ciasteczko</strong> — mały bilet z napisem „ta osoba jest zalogowana”. Bilet jest wystawiony <em>dla adresu <code>app-tradingcenter-market-data.azurewebsites.net</code></em>.</p>
+
+<div class="callout">
+  <span class="tag">Analogia</span>
+  <p>To jak karta wstępu do biurowca. Działa w tym biurowcu. Nie zadziała w budynku obok — nawet jeśli obie firmy należą do ciebie, a ty stoisz w recepcji z tą samą kartą w ręku.</p>
+</div>
+
+<p>Terminal mieszka pod <em>innym</em> adresem. Kiedy jego kod woła <code>market-data</code>, przeglądarka uznaje to za <strong>ruch między obcymi stronami</strong> i celowo <strong>nie dokłada ciasteczka</strong>. Nie jest to błąd konfiguracji ani coś, co da się „włączyć” — to zabezpieczenie wbudowane w każdą współczesną przeglądarkę (ustawienie <code>SameSite</code>), które istnieje po to, żeby złośliwa strona nie mogła działać w twoim imieniu na twoim banku.</p>
+
+<p>Efekt jest taki, że <code>market-data</code> widzi żądanie bez żadnego dowodu tożsamości i odpowiada <code>401</code>. Zgodnie z tym, jak został skonfigurowany.</p>
+
+<h2>Drugi problem, gorszy: WebSocket</h2>
+
+<p>„Skoro ciasteczko nie przejdzie — wyślijmy token w nagłówku” to naturalny odruch i dla zwykłych żądań <strong>działa</strong>. Ale świece na wykresie nie płyną zwykłymi żądaniami, tylko <strong>WebSocketem</strong> — stałym połączeniem, które archiwum trzyma otwarte i którym dosyła każdą nową świecę.</p>
+
+<div class="callout bad">
+  <span class="tag">Ograniczenie, którego nie da się obejść w przeglądarce</span>
+  <p>Przeglądarkowe API WebSocketu <strong>nie pozwala ustawić żadnego własnego nagłówka</strong>. Nie ma tam gdzie włożyć tokenu. Nie jest to niedopatrzenie w naszym kodzie — po prostu ta funkcja nie istnieje, w żadnej przeglądarce.</p>
+  <p>WebSocket potrafi nieść <em>ciasteczko</em> — ale tylko takie, które przeglądarka uzna za swoje, czyli spod tego samego adresu. Wracamy do punktu wyjścia.</p>
+</div>
+
+<p>Dlatego to nie jest sytuacja „brakuje kawałka kodu”. Zestaw <em>dwa adresy + Easy Auth + WebSocket</em> nie ma czystego rozwiązania. Coś z tej trójki musi ustąpić — i o to jest ta decyzja.</p>
+
+<h2>Trzy drogi</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Droga</th><th>Co ustępuje</th><th>Ile pracy</th><th>Bezpieczeństwo</th><th>Miejsce na kolejne serwisy</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>A.</strong> Jeden adres</td>
+      <td>Static Web Apps znika</td>
+      <td>średnio</td>
+      <td><span class="pill good">logowanie Entra</span></td>
+      <td><span class="pill bad">zamyka drogę</span></td>
+    </tr>
+    <tr>
+      <td><strong>B.</strong> Tokeny w terminalu</td>
+      <td>WebSocket dostaje osobną furtkę</td>
+      <td>najwięcej</td>
+      <td><span class="pill good">logowanie Entra</span></td>
+      <td><span class="pill good">pełne</span></td>
+    </tr>
+    <tr>
+      <td><strong>D.</strong> Pośrednik przed terminalem</td>
+      <td>dochodzi nowy komponent</td>
+      <td>najwięcej</td>
+      <td><span class="pill good">logowanie Entra</span></td>
+      <td><span class="pill good">pełne</span></td>
+    </tr>
+    <tr>
+      <td><strong>C.</strong> Zamek na adres IP</td>
+      <td>Easy Auth znika</td>
+      <td><span class="pill good">najmniej</span></td>
+      <td>słabsze — patrz niżej</td>
+      <td>ograniczone</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Zanim przeczytasz opisy: co się zmienia, gdy dojdą kolejne serwisy</h2>
+
+<p>To jest pytanie, które przesądza wybór — i przy nim część powyższych ocen się odwraca.</p>
+
+<p>Przyszły serwis sięgający po dane z <code>market-data</code> <strong>nie ma żadnego z problemów opisanych wyżej</strong>. Nie jest przeglądarką: nie ma ciasteczek, nie obchodzi go <code>SameSite</code>, a jeśli otworzy WebSocket, zrobi to biblioteką, która pozwala ustawić dowolny nagłówek. Taki serwis bierze token swojej tożsamości zarządzanej i wysyła go w nagłówku — i <strong>Easy Auth, który mamy dziś, obsłuży to bez żadnej zmiany</strong>.</p>
+
+<div class="callout good">
+  <span class="tag">Wniosek, który porządkuje resztę</span>
+  <p>Kłopot sprawia <strong>wyłącznie przeglądarka</strong>. Konfiguracja <code>market-data</code> jest już dobra dla wszystkiego, co przyjdzie później.</p>
+  <p>Zasada, której warto się trzymać: <strong><code>market-data</code> zostaje czystym API chronionym tokenem.</strong> Wszystko, co tę własność psuje, zawęża przyszłość — a wszystko, co ją zachowuje, jej nie dotyka.</p>
+</div>
+
+<p>W tym świetle <strong>opcja A wypada najgorzej</strong>, mimo że rozwiązuje dzisiejszy problem najzgrabniej. Robi z <code>market-data</code> hosta interfejsu użytkownika — a wtedy trzeba wybrać <code>unauthenticated_action</code> dla całej usługi naraz: przekierowanie do logowania (dobre dla przeglądarki, mylące dla serwisu, który dostanie stronę HTML zamiast odmowy) albo <code>401</code> (dobre dla serwisu, bezużyteczne dla przeglądarki). Drugi interfejs też już się tam nie zmieści.</p>
+
+<p><strong>Opcja C</strong> zawęża inaczej: skoro obroną jest adres IP, każdy przyszły serwis musi albo mieć adres na liście, albo <code>market-data</code> zyskuje drugi, odmienny model dostępu obok pierwszego. Dokładnie ta „druga ścieżka uwierzytelniania”, którą <code>design.md</code> świadomie odrzucił przy gatewayu.</p>
+
+<p><strong>Opcje B i D</strong> zostawiają <code>market-data</code> czystym API. Różnią się tylko tym, <em>gdzie</em> kładą niewygodę przeglądarki.</p>
+
+<div class="opt">
+<h3>A. Terminal serwowany przez market-data</h3>
+<p class="verdict">Jeden adres na wszystko</p>
+
+<p>Zamiast trzymać terminal w osobnej usłudze, <code>market-data</code> sam oddaje pliki strony. Wtedy strona, dane i WebSocket są pod <strong>jednym adresem</strong> — a wszystkie trzy problemy wyżej znikają naraz, bo przestają być „ruchem między obcymi stronami”.</p>
+
+<div class="diagram">
+<svg viewBox="0 0 560 150" role="img" aria-label="Jeden adres obsługujący stronę, dane i WebSocket">
+  <rect x="150" y="22" width="260" height="98" rx="7" fill="var(--good-soft)" stroke="var(--good)"/>
+  <text x="280" y="46" text-anchor="middle" font-size="13.5" font-weight="600" fill="var(--text)">market-data</text>
+  <text x="280" y="63" text-anchor="middle" font-size="10.5" font-family="monospace" fill="var(--text-dim)">jeden adres</text>
+  <text x="280" y="86" text-anchor="middle" font-size="11.5" fill="var(--text)">strona · dane · WebSocket</text>
+  <text x="280" y="105" text-anchor="middle" font-size="11" fill="var(--good)">ciasteczko działa wszędzie ✓</text>
+  <text x="280" y="140" text-anchor="middle" font-size="11.5" fill="var(--text-dim)">Logowanie to zwykłe wejście na stronę — Azure przekieruje do Entra.</text>
+</svg>
+</div>
+
+<dl class="cost">
+  <dt>Zyskujesz</dt>
+  <dd>Prawdziwe logowanie kontem Microsoft, bez ani jednej linijki kodu od tokenów. Znika CORS. <strong>Znika też Static Web App — a wraz z nią token wdrożeniowy, jedyny przechowywany sekret Azure w całym projekcie.</strong></dd>
+  <dt>Płacisz</dt>
+  <dd>Terminal serwuje plan B1, który już chodzi na ~80% pamięci. Tracisz CDN (przy jednym użytkowniku — bez znaczenia). Wyrzucamy pracę włożoną w Static Web Apps i odwracamy decyzję z <code>design.md</code>.</dd>
+  <dt>Ryzyko</dt>
+  <dd>Najmniejsze z trzech: opiera się na mechanizmie, który Azure obsługuje sam, bez naszego kodu pośrodku.</dd>
+</dl>
+</div>
+
+<div class="opt">
+<h3>B. Tokeny pobierane przez terminal</h3>
+<p class="verdict">Zostawia obecny układ · <code>market-data</code> zostaje czystym API</p>
+
+<p>Terminal sam prosi Entra o token i dokłada go do każdego żądania. To jest dokładnie to, co <code>design.md</code> milcząco zakładał — i dla zwykłych żądań działa bez żadnych sztuczek.</p>
+
+<p>Zostaje WebSocket. Dobra wiadomość: Easy Auth potrafi <strong>chronić całą usługę i zwolnić jedną ścieżkę</strong> (<code>excluded_paths</code> — sprawdziłem, że nasza wersja narzędzi to obsługuje). Sam token nie powinien jednak wędrować w adresie połączenia, bo adresy lądują w logach serwera.</p>
+
+<p>Zamiast tego stosuje się <strong>bilet jednorazowy</strong>, wzorzec dobrze znany i tu wyjątkowo naturalny:</p>
+
+<div class="diagram">
+<svg viewBox="0 0 620 168" role="img" aria-label="Terminal wymienia token na jednorazowy bilet, którym otwiera WebSocket">
+  <rect x="8" y="24" width="150" height="60" rx="6" fill="var(--surface-2)" stroke="var(--border)"/>
+  <text x="83" y="49" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--text)">Terminal</text>
+  <text x="83" y="68" text-anchor="middle" font-size="10.5" fill="var(--text-dim)">ma token Entra</text>
+
+  <rect x="240" y="10" width="180" height="42" rx="6" fill="var(--good-soft)" stroke="var(--good)"/>
+  <text x="330" y="28" text-anchor="middle" font-size="11" fill="var(--text)">1 · zwykłe żądanie z tokenem</text>
+  <text x="330" y="43" text-anchor="middle" font-size="10.5" fill="var(--text-dim)">Easy Auth sprawdza tożsamość</text>
+
+  <rect x="240" y="60" width="180" height="42" rx="6" fill="var(--surface-2)" stroke="var(--border)"/>
+  <text x="330" y="78" text-anchor="middle" font-size="11" fill="var(--text)">2 · dostaje bilet</text>
+  <text x="330" y="93" text-anchor="middle" font-size="10.5" fill="var(--text-dim)">krótki, jednorazowy</text>
+
+  <rect x="240" y="110" width="180" height="42" rx="6" fill="var(--surface-2)" stroke="var(--border)"/>
+  <text x="330" y="128" text-anchor="middle" font-size="11" fill="var(--text)">3 · otwiera WebSocket</text>
+  <text x="330" y="143" text-anchor="middle" font-size="10.5" fill="var(--text-dim)">biletem, nie tokenem</text>
+
+  <rect x="462" y="24" width="150" height="60" rx="6" fill="var(--surface-2)" stroke="var(--border)"/>
+  <text x="537" y="49" text-anchor="middle" font-size="12.5" font-weight="600" fill="var(--text)">market-data</text>
+  <text x="537" y="68" text-anchor="middle" font-size="10.5" fill="var(--text-dim)">czyste API</text>
+
+  <line x1="160" y1="54" x2="236" y2="40" stroke="var(--border)" stroke-width="1.5"/>
+  <line x1="424" y1="40" x2="460" y2="50" stroke="var(--border)" stroke-width="1.5"/>
+  <line x1="424" y1="131" x2="460" y2="72" stroke="var(--border)" stroke-width="1.5"/>
+</svg>
+<figcaption>Token nigdy nie trafia do adresu. Bilet, gdyby wyciekł z logu, jest już zużyty.</figcaption>
+</div>
+
+<dl class="cost">
+  <dt>Zyskujesz</dt>
+  <dd>Nic nie trzeba przebudowywać — Static Web Apps zostaje, decyzje z <code>design.md</code> zostają. <strong><code>market-data</code> pozostaje czystym API</strong>, więc każdy przyszły serwis podłącza się dokładnie tak samo jak terminal, tylko bez części przeglądarkowej.</dd>
+  <dt>Płacisz</dt>
+  <dd>Najwięcej kodu: rejestracja aplikacji dla przeglądarki, biblioteka logowania w terminalu, obsługa wygasania tokenu, konfiguracja CORS oraz wydawanie i sprawdzanie biletów po stronie <code>market-data</code>.</dd>
+  <dt>Ryzyko</dt>
+  <dd>Jedyne miejsce w platformie, gdzie sami piszemy kod decydujący o dostępie — czyli jedyne, gdzie możemy się pomylić. Łagodzi to fakt, że trafia on do modułu z najlepszym pokryciem testami w projekcie, a Easy Auth i tak sprawdza tożsamość przy wydawaniu biletu.</dd>
+</dl>
+</div>
+
+<div class="opt">
+<h3>D. Pośrednik przed terminalem</h3>
+<p class="verdict">Przeglądarka nie wie nic o tokenach · <code>market-data</code> zostaje czystym API</p>
+
+<p>Terminal przestaje stać na Static Web Apps, a zaczyna być serwowany przez coś, co <strong>przy okazji przekazuje dalej</strong> jego żądania do <code>market-data</code>. Dla przeglądarki wszystko dzieje się pod jednym adresem — więc ciasteczko działa i WebSocket działa. Token do <code>market-data</code> trzyma pośrednik, nie przeglądarka.</p>
+
+<p>To klasyczny wzorzec (<em>backend for frontend</em>) i najczystsza odpowiedź na ten problem, jeśli interfejsów miałoby być kiedyś kilka.</p>
+
+<dl class="cost">
+  <dt>Zyskujesz</dt>
+  <dd>W kodzie przeglądarki <strong>nie ma nic o tokenach</strong>. <code>market-data</code> zostaje czystym API. Każdy kolejny interfejs dostaje swojego pośrednika i ten sam schemat.</dd>
+  <dt>Płacisz</dt>
+  <dd>Dochodzi komponent, który trzeba napisać i utrzymywać — w tym <strong>przekazywanie WebSocketu</strong>, co jest trudniejsze niż przekazywanie zwykłych żądań. Zajmuje pamięć na planie B1, który już chodzi na ~80%.</dd>
+  <dt>Ryzyko</dt>
+  <dd>Nowy element na ścieżce każdego żądania i każdej świecy. Przy jednym operatorze i jednym interfejsie to dużo maszynerii jak na problem, który ma dziś jednego klienta.</dd>
+</dl>
+</div>
+
+<div class="opt">
+<h3>C. Zamiast logowania — zamek na adres IP</h3>
+<p class="verdict">Najprostsze, najsłabsze</p>
+
+<p>Zdejmujemy Easy Auth i wpuszczamy do <code>market-data</code> wyłącznie ruch z twojego adresu IP. To <strong>dokładnie ten sam mechanizm</strong>, który już dziś chroni bazę danych — więc nie wprowadza do projektu nowego pomysłu, tylko powtarza istniejący.</p>
+
+<dl class="cost">
+  <dt>Zyskujesz</dt>
+  <dd>Najmniej pracy. Zero kodu od logowania. WebSocket działa od ręki, bo nie podlega żadnemu z opisanych ograniczeń.</dd>
+  <dt>Płacisz</dt>
+  <dd>Ochroną jest „ktokolwiek z tego adresu”, a nie „ty”. Zmiana adresu przez dostawcę internetu odcina cię od własnej platformy — <em>ten tryb awarii już znasz z bazy</em> i jest opisany w <code>docs/rotacja-poswiadczen.html</code>. Odwracamy decyzję z <code>design.md</code> o Easy Auth przed <code>market-data</code>.</dd>
+  <dt>Ryzyko</dt>
+  <dd>Techniczne — żadne. Za to jedyna opcja, w której <code>market-data</code> stoi w internecie bez logowania.</dd>
+</dl>
+</div>
+
+<h2>Co bym wybrał</h2>
+
+<div class="callout warn">
+  <span class="tag">Zmiana zdania — warto wiedzieć, dlaczego</span>
+  <p>Pierwsza wersja tego dokumentu rekomendowała <strong>A</strong>, ważąc wyłącznie dzisiejszy problem: jeden adres rozwiązuje trzy rzeczy naraz i usuwa jedyny przechowywany sekret Azure. To nadal prawda.</p>
+  <p>Ale pytanie „co, gdy dojdą kolejne serwisy” zmienia wynik, bo <strong>A jako jedyna psuje własność, na której będą stały</strong> — przestaje traktować <code>market-data</code> jak czyste API. Optymalizowałem pod stan obecny zamiast pod kierunek.</p>
+</div>
+
+<div class="callout good">
+  <span class="tag">Rekomendacja: B</span>
+  <p><strong>B utrzymuje <code>market-data</code> czystym API chronionym tokenem</strong> — czyli dokładnie w formie, której będzie potrzebował każdy przyszły serwis, i w której już dziś jest. Cała niewygoda przeglądarki zostaje zamknięta w dwóch miejscach: w kodzie terminala i w jednym punkcie <code>market-data</code> wydającym bilety.</p>
+  <p>Wobec D: D jest architektonicznie równie dobre i lepiej skaluje się na <em>wiele interfejsów</em> — ale interfejs jest jeden i nic nie zapowiada drugiego. D dokłada komponent przekazujący WebSocket na planie, który już chodzi na 80% pamięci. To dużo maszynerii przed problemem, którego jeszcze nie ma.</p>
+  <p>Gdyby kiedyś doszedł drugi interfejs, <strong>przejście z B do D nie wymaga ruszania <code>market-data</code></strong> — bo w obu jest tym samym czystym API. To jest najlepszy dowód, że B nie zamyka drogi.</p>
+</div>
+
+<p>Uczciwie o koszcie B: to najwięcej kodu z czterech opcji, i jedyna, w której sami piszemy fragment decydujący o dostępie. Nie jest to jednak kod rozrzucony po projekcie — to jeden punkt wydający bilet i jeden sprawdzający go przy otwarciu strumienia, w module, który ma dziś 487 testów.</p>
+
+<p>Co do A: warto zapisać, że nie została odrzucona jako zła. Rozwiązuje dzisiejszy problem najzgrabniej ze wszystkich i gdyby terminal miał być na zawsze jedynym klientem <code>market-data</code>, byłaby właściwym wyborem.</p>
+
+<div class="callout warn">
+  <span class="tag">Czego jeszcze nie sprawdziłem</span>
+  <p>Opis ograniczeń przeglądarki jest pewny, a to, że Easy Auth potrafi zwolnić pojedynczą ścieżkę (<code>excluded_paths</code>), sprawdziłem w wersji narzędzi, której używamy.</p>
+  <p>Nie potwierdziłem <strong>na żywo</strong>: czy Easy Auth przyjmie token wystawiony aplikacji przeglądarkowej bez dodatkowej konfiguracji odbiorcy tokenu — przy B jest to pierwsza rzecz do sprawdzenia, zanim powstanie reszta. Przy A zostaje pytanie o ciasteczko na WebSockecie (powinno działać, bo to ta sama strona), a przy C — czy <code>market-data</code> powinien dodatkowo sprawdzać nagłówek <code>Origin</code>.</p>
+</div>
+
+<h2>Niezależnie od wyboru</h2>
+
+<p>Ta praca <strong>nie miała wtedy swojego zadania</strong> w <code>tasks.md</code> — zadanie 11.4 zakładało tylko sprawdzenie działającej platformy, a nie zbudowanie brakującego kawałka. Zmiana takiej wagi powinna przejść przez OpenSpec: propozycję, decyzję zapisaną w <code>design.md</code> i własne zadania. Tak też się stało: powstała zmiana <code>authenticate-terminal-to-market-data</code>, a zadanie 11.4 zamknęło się dopiero jej grupą 4.</p>
+
+<footer>
+  Napisane, żeby wybór był świadomy. Wybór zapadł na <strong>B</strong>; decyzja i jej powód żyją teraz
+  w <code>design.md</code> zmiany <code>authenticate-terminal-to-market-data</code>, a ten plik zostaje
+  jako opis problemu, który do niej doprowadził — razem z odrzuconymi drogami, bo one też są częścią
+  odpowiedzi na pytanie „dlaczego tak".
+</footer>
+
+</main>
