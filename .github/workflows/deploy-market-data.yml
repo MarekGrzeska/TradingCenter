@@ -35,12 +35,17 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Same reasoning as deploy-gateway.yml: buildx starts cold every run otherwise.
+      - uses: docker/setup-buildx-action@v3
+
       # Tagged with the commit, never `latest` — same reasoning as deploy-gateway.yml.
       - uses: docker/build-push-action@v6
         with:
           context: modules/market-data
           push: true
           tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=market-data
+          cache-to: type=gha,scope=market-data,mode=max
 
       - uses: azure/login@v2
         with:
@@ -52,3 +57,38 @@ jobs:
         with:
           app-name: app-tradingcenter-market-data
           images: ${{ steps.image.outputs.name }}:${{ github.sha }}
+
+      # "Deployed" has meant "the request was accepted" up to here — and a container that
+      # will not start looks exactly like a successful deploy until someone opens the
+      # terminal hours later.
+      #
+      # `/ws/candles` is the probe, which needs explaining: every other path answers 401
+      # from Easy Auth *before* the request reaches the container, so a dead process and a
+      # healthy one are indistinguishable there. This one path is excluded from Easy Auth
+      # (infra/app-service.tf, `excluded_paths`) because a browser cannot put a header on
+      # a WebSocket handshake — so a plain GET travels all the way to the app, where the
+      # router has no GET handler for a WebSocket route and FastAPI answers 404 with a
+      # JSON body. That JSON is the signal: it can only have come from the running
+      # module. A stopped container gives App Service's own 5xx HTML instead.
+      #
+      # Sending no ticket is deliberate: the point is to reach the app, not to open a
+      # stream, and an unauthenticated GET is the cheapest way to prove the process is
+      # answering.
+      - name: Smoke-check the deployed module
+        run: |
+          set -euo pipefail
+          url="https://app-tradingcenter-market-data.azurewebsites.net/ws/candles"
+          for attempt in $(seq 1 12); do
+            code=$(curl -s -o /tmp/probe -w '%{http_code}' --max-time 20 "$url" || echo 000)
+            body=$(head -c 200 /tmp/probe 2>/dev/null || true)
+            echo "attempt $attempt: HTTP $code ${body}"
+            # 404 with FastAPI's JSON means the module itself answered. Anything 5xx, or
+            # a body that is not the app's, means the container is not serving yet.
+            if [ "$code" = "404" ] && printf '%s' "$body" | grep -q '"detail"'; then
+              echo "market-data is answering"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::market-data did not answer from its container after ~3 minutes (last HTTP $code)"
+          exit 1
