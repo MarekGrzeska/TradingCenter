@@ -1,3 +1,4 @@
+import type { components } from "./contract.generated";
 import { jsonClient } from "./http";
 import { SocketHub } from "./socketHub";
 import { parseIsoToEpochSeconds } from "./time";
@@ -39,134 +40,35 @@ import type { ArchiveAdmin, CandleSource, HistoryRequest } from "./source";
  * to this file. Nothing outside it ever sees one.
  */
 
-interface RawCandle {
-  time: string;
-  open: number | null;
-  high: number | null;
-  low: number | null;
-  close: number | null;
-  volume: number | null;
-}
+/**
+ * The wire shapes, taken from market-data's own OpenAPI document rather than described
+ * again here. They used to be thirteen hand-written interfaces, which is thirteen chances
+ * to disagree with the server and no way to find out: a renamed field would have arrived
+ * as `undefined`, passed through a mapper, and shown up as a blank cell rather than an
+ * error. Now a rename stops this file compiling, on the line that reads the field.
+ *
+ * Regenerate with `pnpm contract:generate` after changing a model in `contract.py`;
+ * `pnpm contract:check` fails when the committed file is stale.
+ */
+type Wire = components["schemas"];
 
-interface RawCandles {
-  symbol: string;
-  resolution: string;
-  price_side: string;
-  derived: boolean;
-  candles: RawCandle[];
-  uncovered: Array<{ from: string; to: string }>;
-}
-
-/** The subscription's candle, which is the archive's own storage shape rather
- *  than the range read's — `period_start` where the other says `time`, and a
- *  `forming` flag the range read has no use for. */
-interface RawStreamCandle {
-  symbol: string;
-  resolution: string;
-  period_start: string;
-  open: number | null;
-  high: number | null;
-  low: number | null;
-  close: number | null;
-  volume: number | null;
-  forming: boolean;
-}
-
-interface RawCoverage {
-  symbol: string;
-  resolution: string;
-  ranges: Array<{ from: string; to: string; history_ended: boolean }>;
-  earliest_reachable: string | null;
-}
-
-interface RawTrackedPair {
-  symbol: string;
-  resolution: string;
-  added_at: string;
-  collect_from: string;
-  earliest_candle: string | null;
-  latest_candle: string | null;
-  collection: string;
-}
-
-interface RawChunk {
-  id: number;
-  symbol: string;
-  resolution: string;
-  chunk_start: string;
-  chunk_end: string;
-  state: string;
-  attempt: number;
-  candles_written: number;
-  requests: number;
-  failure: string | null;
-  started_at: string | null;
-  finished_at: string | null;
-}
-
-interface RawJobPairView {
-  job_id: number;
-  symbol: string;
-  resolution: string;
-  created_at: string;
-  requested_from: string;
-  attempt: number;
-  status: string;
-  chunks_done: number;
-  chunks_total: number;
-  candles_written: number;
-  chunks: RawChunk[];
-}
-
-interface RawJob {
-  id: number;
-  created_at: string;
-  requested_from: string;
-  attempt: number;
-  status: string;
-  chunks_done: number;
-  chunks_total: number;
-  candles_written: number;
-  running_pair: { symbol: string; resolution: string } | null;
-  chunks: RawChunk[];
-}
-
-interface RawPairEstimate {
-  symbol: string;
-  resolution: string;
-  effective_from: string | null;
-  clipped: boolean;
-  estimated_candles: number;
-  estimated_bytes: number;
-  unknown: boolean;
-}
-
-interface RawJobEstimate {
-  pairs: RawPairEstimate[];
-  total_estimated_candles: number;
-  total_estimated_bytes: number;
-}
-
-interface RawTrackedPairResult {
-  symbol: string;
-  resolution: string;
-  pair: RawTrackedPair | null;
-  refused: string | null;
-}
-
-interface RawTrackPairsResult {
-  results: RawTrackedPairResult[];
-  job_id: number | null;
-}
-
-interface RawPairDeletion {
-  symbol: string;
-  resolution: string;
-  deleted_at: string;
-  candles_removed: number;
-  removed_from: string | null;
-  removed_to: string | null;
-}
+type RawCandle = Wire["CandleOut"];
+type RawCandles = Wire["CandlesOut"];
+/** The subscription's candle, which is the archive's own storage shape rather than the
+ *  one the range endpoint answers with. It has no HTTP path, so market-data publishes it
+ *  as a component on purpose (`openapi.py`). */
+type RawStreamCandle = Wire["Candle"];
+type RawCoverage = Wire["PairCoverageOut"];
+type RawTrackedPair = Wire["TrackedPairOut"];
+type RawChunk = Wire["ChunkOut"];
+type RawJobPairView = Wire["JobPairViewOut"];
+type RawJob = Wire["JobOut"];
+type RawPairEstimate = Wire["PairEstimateOut"];
+type RawJobEstimate = Wire["JobEstimateOut"];
+// No alias for `TrackedPairResult`: it was only ever named so the interface above could
+// refer to it, and that relationship now lives in the generated types.
+type RawTrackPairsResult = Wire["TrackPairsResult"];
+type RawPairDeletion = Wire["PairDeletionOut"];
 
 /** A candle missing any OHLC field (the provider reports this for a period with
  *  no trade) can't become a `Bar` — `Bar`'s fields are non-nullable by design,

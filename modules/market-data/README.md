@@ -26,8 +26,18 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
   however deep — and genuinely long (20 000 five-minute candles: 30 provider calls, 26 s), which
   is why the read timeout is minutes while the connect timeout stays at five seconds.
 - `hub.py` — fan-out to subscribers, and the hold that makes a snapshot airtight.
-- `app.py`, `contract.py`, `errors.py` — the published surface, the shapes it answers with,
-  and refusals that name themselves instead of leaking a database error.
+- `app.py` — assembly only: the lifespan, the error handling every route shares, and the
+  routers mounted onto it. Nothing that decides anything.
+- `routers/` — the routes, split by the area they serve rather than by verb: `meta`,
+  `candles`, `pairs`, `jobs`, `stream`. That is how the specs are organised and how changes
+  arrive — a change to jobs touches four routes that are all in one file and none of the
+  others. `routers/deps.py` holds the two things a route reaches for, so a router never
+  imports the module that mounts it.
+- `contract.py`, `errors.py` — the shapes the module answers with, and refusals that name
+  themselves instead of leaking a database error.
+- `market_status.py` — whether an instrument's market is open, remembered for a minute. It
+  is what lets the pair list tell a stalled pair from a shut market, and the minute is why
+  reading that list does not cost a gateway request per closed pair forever.
 - `migrations/` — the schema, as the statements a deployment actually runs. Handwritten SQL:
   there is no ORM model layer to diff against, so `--autogenerate` yields nothing useful.
 
@@ -90,6 +100,18 @@ Docker does not pay a minute of silence to reach the same skip.
 ## Contract
 
 HTTP, described by OpenAPI at `/docs`.
+
+The same document prints without starting anything — no database, no gateway, no settings,
+because FastAPI builds it from the models in `contract.py`:
+
+```sh
+uv run python -m market_data.openapi > schema.json
+```
+
+The terminal generates its wire types from that, instead of keeping a hand-written copy that
+nothing checks (`npm run contract:generate`, in `modules/terminal`). Change a model here and the
+terminal stops compiling at the line that reads the field — which is the point. Regenerating
+deliberately needs no running stack: a check that needs one is a check nobody runs.
 
 | Method | Path | Returns |
 |--------|------|---------|
@@ -176,8 +198,15 @@ the time.
 
 ### WebSocket — `/ws/candles?symbol=US100&resolution=MINUTE`
 
-Not in the OpenAPI schema: OpenAPI has no vocabulary for WebSocket payloads, so a path there
-would describe a contract it cannot state. A test keeps the path out of the schema.
+No path in the OpenAPI schema: OpenAPI has no vocabulary for a WebSocket, so an entry under
+`paths` would describe a contract it cannot state. A test keeps the path out.
+
+The **messages** are in the schema, as the `Snapshot` and `CandleChange` components. They are
+ordinary Pydantic models, they are the most-read part of this contract — a chart sees every
+candle through them — and the terminal generates its types from them rather than copying them
+by hand. `openapi.py` hangs them on the document FastAPI builds from the routes, and the app
+publishes that same augmented document, so `/openapi.json` and the dump below are the same
+bytes.
 
 ```jsonc
 // first, exactly once

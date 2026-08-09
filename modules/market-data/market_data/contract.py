@@ -17,7 +17,7 @@ from .deletion import PairDeletion
 from .jobs.models import Chunk, ChunkState, Job, JobPairView, JobStatus
 from .jobs.plan import JobEstimate, PairEstimate
 from .models import Candle, PriceSide, Resolution
-from .tracking import CollectionState
+from .tracking import CollectionState, TrackedPair
 
 
 class CandleOut(BaseModel):
@@ -126,6 +126,27 @@ class FillOut(BaseModel):
     )
     summary: str = Field(description="the whole outcome as one line, for a person")
 
+    @classmethod
+    def of(cls, outcome) -> FillOut | None:
+        """The last fill for one pair, or `None` when none has run.
+
+        `None` is not an absence of information — it says no fill has run since the module
+        started. The record is in memory, so a restart empties it.
+
+        Untyped on purpose: the outcome comes from `ingest`, and `ingest` reaches for these
+        models, so naming its type here would close a cycle for the sake of a hint.
+        """
+        if outcome is None:
+            return None
+        return cls(
+            finished_at=outcome.finished_at,
+            requested=outcome.requested,
+            written=outcome.written,
+            requests=outcome.requests,
+            failure=outcome.failure,
+            summary=outcome.describe(),
+        )
+
 
 class TrackedPairOut(BaseModel):
     symbol: str
@@ -150,6 +171,24 @@ class TrackedPairOut(BaseModel):
         description="the pair's most recent backfill, or null if none has run since the "
         "module started — fills live in memory and do not survive a restart",
     )
+
+    @classmethod
+    def of(cls, pair: TrackedPair) -> TrackedPairOut:
+        """A pair that has just started being tracked, before anything is collected.
+
+        The three unknowns are said explicitly rather than left to defaults: nothing has
+        been collected yet, so there is no earliest and no latest candle, and the state is
+        the one that means exactly that.
+        """
+        return cls(
+            symbol=pair.symbol,
+            resolution=pair.resolution,
+            added_at=pair.added_at,
+            collect_from=pair.collect_from,
+            earliest_candle=None,
+            latest_candle=None,
+            collection=CollectionState.NEVER_COLLECTED,
+        )
 
 
 class PairDeletionOut(BaseModel):
