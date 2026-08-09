@@ -47,24 +47,6 @@ par, które były śledzone przed zatrzymaniem.
 - **THEN** archiwizuje te same pary co przed zatrzymaniem
 - **AND** nie wymaga ponownego wskazania ich przez operatora
 
-### Requirement: Usunięcie zatrzymuje zbieranie, ale nie kasuje danych
-
-Operator MUST móc przestać śledzić parę. Usunięcie MUST zatrzymać zbieranie i zwolnić połączenie do
-providera, ale MUST NOT usuwać świec już zebranych — archiwum, które kasuje dane przy zmianie
-konfiguracji, nie jest archiwum.
-
-#### Scenario: Operator usuwa parę ze śledzonych
-
-- **WHEN** operator przestaje śledzić parę
-- **THEN** moduł zatrzymuje jej ingest i zamyka związane z nią połączenie
-- **AND** świece zebrane wcześniej pozostają odczytywalne
-
-#### Scenario: Ponowne dodanie wcześniej usuniętej pary
-
-- **WHEN** operator ponownie zaczyna śledzić parę usuniętą wcześniej
-- **THEN** moduł podejmuje zbieranie
-- **AND** domyka lukę powstałą w czasie, gdy para nie była śledzona
-
 ### Requirement: Śledzone pary są wyliczalne wraz ze swoim stanem
 
 Operator MUST móc odczytać, co jest śledzone, i dla każdej pary zobaczyć, czy zbieranie faktycznie
@@ -130,4 +112,67 @@ momentu MUST dostać go z domyślnej głębokości z konfiguracji.
 - **WHEN** operator dodaje parę już śledzoną, wskazując moment wcześniejszy niż zapamiętany
 - **THEN** para zapamiętuje ten wcześniejszy moment
 - **AND** powstaje zlecenie dociągnięcia brakującego, starszego zakresu
+
+### Requirement: Skasowanie pary zatrzymuje zbieranie i usuwa jej dane
+
+Operator MUST móc skasować parę. Skasowanie MUST zatrzymać zbieranie, zwolnić połączenie do
+providera oraz usunąć świece i zakresy pokrycia tej pary. Usunięcie świec i usunięcie pokrycia MUST
+być jedną operacją niepodzielną — para bez świec, ale z zachowanym pokryciem, wygląda dla planowania
+zleceń jak para już pobrana i nie zostałaby pobrana ponownie.
+
+Archiwum MUST NOT kasować danych z żadnego innego powodu niż jawne żądanie skasowania: ani samo z
+siebie, ani przy zmianie konfiguracji, ani przy zatrzymaniu i uruchomieniu modułu.
+
+#### Scenario: Operator kasuje parę
+
+- **WHEN** operator kasuje parę
+- **THEN** moduł zatrzymuje jej ingest i zamyka związane z nią połączenie
+- **AND** świece tej pary przestają być odczytywalne
+- **AND** zakresy pokrycia tej pary przestają istnieć
+
+#### Scenario: Ponowne dodanie pary skasowanej
+
+- **WHEN** operator dodaje parę skasowaną wcześniej, wskazując moment, od którego chce mieć historię
+- **THEN** żaden zakres nie uchodzi za już pokryty
+- **AND** cała wskazana historia zostaje dociągnięta od nowa
+
+#### Scenario: Skasowanie jednej pary nie rusza pozostałych
+
+- **WHEN** operator kasuje jeden interwał instrumentu archiwizowanego w kilku
+- **THEN** świece i pokrycie pozostałych interwałów tego instrumentu zostają nietknięte
+
+#### Scenario: Restart modułu
+
+- **WHEN** moduł zostaje zatrzymany i uruchomiony ponownie
+- **THEN** żadna para nie traci ani jednej świecy z tego powodu
+
+### Requirement: Skasowanie zostaje odnotowane
+
+Skasowanie MUST zostawić trwały ślad: która para, kiedy, ile świec zostało usuniętych i jaki zakres
+czasu obejmowały. Ślad MUST przeżyć restart modułu i MUST NOT zniknąć wraz z danymi, których dotyczy
+— bez niego cofnięcie się zasięgu danych jest zdarzeniem bez wytłumaczenia.
+
+Zlecenia dociągania tej pary MUST pozostać w historii po skasowaniu jej danych. Zlecenie jest
+zapisem tego, co się wydarzyło, a skasowanie danych tego nie odwraca.
+
+#### Scenario: Skasowanie pary z zebranymi danymi
+
+- **WHEN** zostaje skasowana para, dla której zebrano świece
+- **THEN** odnotowane zostaje, która para, kiedy, ile świec usunięto i jaki zakres czasu obejmowały
+
+#### Scenario: Skasowanie pary bez ani jednej świecy
+
+- **WHEN** zostaje skasowana para, która nie zebrała jeszcze nic
+- **THEN** skasowanie i tak zostaje odnotowane, z liczbą usuniętych świec równą zeru
+
+#### Scenario: Historia zleceń po skasowaniu
+
+- **WHEN** operator odczytuje historię dla pary, której dane zostały skasowane
+- **THEN** widzi wcześniejsze zlecenia dociągania tej pary
+- **AND** widzi odnotowane skasowanie
+
+#### Scenario: Restart po skasowaniu
+
+- **WHEN** moduł zostaje uruchomiony ponownie po skasowaniu pary
+- **THEN** odnotowane skasowanie jest nadal odczytywalne
 
