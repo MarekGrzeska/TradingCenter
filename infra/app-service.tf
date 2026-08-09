@@ -32,6 +32,23 @@ locals {
     for k, name in local.key_vault_secret_names :
     k => "${azurerm_key_vault.main.vault_uri}secrets/${name}/"
   }
+
+  # GHCR is private, because the repository is, so App Service needs a credential to pull
+  # at all — without these the container never starts and the site answers 503 with
+  # `ImagePullUnauthorizedFailure` in the docker log. Identical for both apps, so said
+  # once here rather than twice below.
+  #
+  # These belong in `application_stack`, not `app_settings`: the provider owns the three
+  # DOCKER_REGISTRY_SERVER_* settings and refuses them by name in app_settings ("cannot
+  # set a value for DOCKER_REGISTRY_SERVER_PASSWORD in app_settings"), because it writes
+  # them itself from the fields below.
+  #
+  # The alternative that needs no stored credential is Azure Container Registry, which
+  # App Service pulls from with its managed identity — rejected on cost: it is a paid
+  # resource and every other piece of this platform fits the free-tier grant.
+  ghcr_registry_url      = "https://ghcr.io"
+  ghcr_registry_username = "MarekGrzeska"
+  ghcr_registry_password = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.ghcr_pull_token})"
 }
 
 # capital-gateway: not public. design.md, "Uwierzytelnianie gatewaya w kodzie, nie w
@@ -60,6 +77,10 @@ resource "azurerm_linux_web_app" "capital_gateway" {
       # Placeholder — group 7's deploy workflow pushes the real GHCR image after the
       # first build. Terraform must not fight that: see the lifecycle block below.
       docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
     }
 
     dynamic "ip_restriction" {
@@ -141,6 +162,10 @@ resource "azurerm_linux_web_app" "market_data" {
 
     application_stack {
       docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
     }
   }
 

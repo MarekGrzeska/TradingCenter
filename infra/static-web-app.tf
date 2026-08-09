@@ -17,6 +17,15 @@ resource "azurerm_static_web_app" "terminal" {
 
   sku_tier = "Free"
   sku_size = "Free"
+
+  lifecycle {
+    # `Azure/static-web-apps-deploy` records which repository and branch it deployed
+    # from, so these appear on the resource after the first deploy even though nothing
+    # here sets them. Left to fight it out, Terraform would null them on every apply and
+    # the next deploy would write them straight back — perpetual drift over a value the
+    # deploy owns. Same reasoning as the App Service apps' docker_image_name.
+    ignore_changes = [repository_url, repository_branch]
+  }
 }
 
 output "terminal_default_host_name" {

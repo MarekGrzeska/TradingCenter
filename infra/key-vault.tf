@@ -58,6 +58,15 @@ locals {
     capital_identifier = "capital-identifier"
     capital_password   = "capital-password"
     gateway_api_key    = "gateway-api-key"
+
+    # A GitHub personal access token with `read:packages`, and nothing else — the only
+    # way App Service can pull from GHCR, which is private because the repository is.
+    # Both App Service apps reference it as DOCKER_REGISTRY_SERVER_PASSWORD.
+    #
+    # This is the one credential in the platform that expires on a calendar rather than
+    # on demand: it is a GitHub token, so neither managed identity nor Key Vault rotation
+    # applies. docs/rotacja-poswiadczen.html is where the renewal is written down.
+    ghcr_pull_token = "ghcr-pull-token"
   }
 }
 
