@@ -85,10 +85,11 @@ Changes go through OpenSpec:
 | Fold it into the specs | `/opsx:archive` |
 
 A change is not finished without a `review.md`; archiving one without it is the mistake the
-gate exists to catch. The gate is `.claude/hooks/require-review.ps1`, wired as a PreToolUse
-hook watching both `openspec archive` and a manual `mv` into `openspec/changes/archive/`.
-It is **PowerShell**, so on a machine without `pwsh` it does not run and the rule is yours
-to keep rather than the harness's to enforce.
+gate exists to catch. The gate is `.claude/hooks/require-review.sh`, a PreToolUse hook
+watching both `openspec archive` and a manual `mv` into `openspec/changes/archive/`. It
+needs `bash` — which means git-bash on Windows, where it would otherwise not run at all.
+After editing it, run `.claude/hooks/require-review.test.sh`; a hook that cannot execute
+allows everything and reports nothing, so it is not a thing to change untested.
 
 **Language convention, and it is not the obvious one:** OpenSpec artifacts are written in
 **Polish prose** with **English structure** — section headers, `### Requirement:`,
