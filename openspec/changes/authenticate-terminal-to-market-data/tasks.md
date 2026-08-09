@@ -39,19 +39,29 @@ zanim moduł nie zacznie sprawdzać biletów — inaczej powstaje otwarty WebSoc
 
 ## 2. Infrastruktura: rejestracje, zwolnienie ścieżki, CORS
 
-- [ ] 2.1 `infra/entra.tf`: wystaw zakres `access_as_user` na rejestracji
-      `market-data-easyauth`, nadaj jej `identifier_uris`
-- [ ] 2.2 `infra/entra.tf`: rejestracja SPA terminala z adresem powrotnym pod adresem Static Web
-      App, uprawnieniem do zakresu z 2.1 i wpisem autoryzującym ją z góry (bez ekranu zgody)
-- [ ] 2.3 `infra/app-service.tf`: `allowed_audiences` Easy Auth obejmuje identyfikator API,
-      a lista uznanych aplikacji — klienta z 2.2
-- [ ] 2.4 `infra/app-service.tf`: `excluded_paths` dla **dokładnie jednej** ścieżki `/ws/candles`;
+- [x] 2.1 Wystaw zakres `access_as_user` na rejestracji `market-data-easyauth`, nadaj jej
+      `identifier_uris` — zrobione **w `app-service.tf`**, nie w `entra.tf` jak zakładało zadanie:
+      tam ta rejestracja mieszka, a przenoszenie jej między plikami to szum w diffie bez zysku.
+      Przy okazji `requested_access_token_version = 2`, żeby token pasował do endpointu `/v2.0`,
+      którym skonfigurowany jest Easy Auth
+- [x] 2.2 `infra/entra.tf`: rejestracja SPA terminala z adresem powrotnym pod adresem Static Web
+      App, uprawnieniem do zakresu z 2.1 i wpisem autoryzującym ją z góry (bez ekranu zgody).
+      **Adres powrotny MUSI mieć ukośnik na końcu** — provider odrzuca URI bez niego, gdy nie ma
+      segmentu ścieżki, a domyślny `redirectUri` MSAL-a (`window.location.origin`) go nie ma;
+      stąd jawny `redirectUri` w kodzie terminala (3.1). Wyszło z `terraform plan`
+- [x] 2.3 `infra/app-service.tf`: `allowed_audiences` Easy Auth obejmuje identyfikator API,
+      a lista uznanych aplikacji — klienta z 2.2. Audiencje dwie: token proszony po nazwie zakresu
+      przychodzi z `api://…`, proszony jako `<client-id>/.default` — z identyfikatorem klienta
+- [x] 2.4 `infra/app-service.tf`: `excluded_paths` dla **dokładnie jednej** ścieżki `/ws/candles`;
       komentarz MUST mówić, że ochronę przejmuje sprawdzenie biletu w module
-- [ ] 2.5 `infra/app-service.tf`: CORS na poziomie App Service z adresem Static Web App,
+- [x] 2.5 `infra/app-service.tf`: CORS na poziomie App Service z adresem Static Web App,
       `support_credentials` wyłączone. Komentarz MUST zapisać zakaz dokładania `CORSMiddleware`
       w aplikacji (podwójny nagłówek — design.md, „CORS konfigurowany na App Service")
-- [ ] 2.6 `infra/app-service.tf`: ustawienie aplikacji włączające przełącznik z 1.1
-- [ ] 2.7 `terraform fmt`, `validate`, `plan`, `apply`
+- [x] 2.6 `infra/app-service.tf`: ustawienie aplikacji włączające przełącznik z 1.1
+- [ ] 2.7 `terraform fmt`, `validate`, `plan`, `apply` — **`fmt`, `validate` i `plan` czyste**
+      (4 do dodania, 2 do zmiany, 0 do usunięcia). `apply` **zostaje operatorowi**: workflow
+      `terraform.yml` świadomie uruchamia sam `plan`, bo `plan` w CI dostaje 403 na każdym
+      `azuread_application`. Ten krok wykonuje człowiek, lokalnie, na tym samym stanie
 - [ ] 2.8 **Zaraz po `apply`: sprawdź zapytanie wstępne.** `curl -i -X OPTIONS` na trasę archiwum
       z nagłówkami `Origin`, `Access-Control-Request-Method` i `Access-Control-Request-Headers:
       authorization`. Odpowiedź `200` z nagłówkami CORS — droga główna. Odpowiedź `401` — odwrót
