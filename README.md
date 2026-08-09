@@ -85,6 +85,27 @@ around the clock.
 | Implement it | `/opsx:apply` |
 | Fold it into the specs | `/opsx:archive` |
 
+### Checks
+
+Every pull request to `main`, and every push to it, runs
+[`.github/workflows/checks.yml`](.github/workflows/checks.yml): three jobs in parallel, one
+per module, running the same commands a developer runs.
+
+| Job | Runs |
+|---|---|
+| `capital-gateway` | `ruff check`, `pytest` |
+| `market-data` | `ruff check`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
+| `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
+
+`contract:check` runs before the terminal's tests on purpose: it compares
+`src/data/contract.generated.ts` against the schema `market-data` builds from its own models,
+and a stale contract makes every conclusion the suite reaches about the wire rest on an
+out-of-date premise. Regenerate with `pnpm contract:generate` after changing a model in
+`market_data/contract.py`.
+
+The `live` tests are not run — they need a real Capital demo session, and putting provider
+credentials in CI to earn a green tick is a bad trade. They stay behind `--run-live`.
+
 OpenSpec artifacts are written in **Polish**, with English structure and RFC 2119 keywords
 — the CLI parses the structure, and `--strict` requires a literal `SHALL` or `MUST`. The
 convention is recorded in [openspec/config.yaml](openspec/config.yaml). Code, comments,

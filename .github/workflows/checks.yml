@@ -1,0 +1,84 @@
+name: checks
+
+# Pull requests are the point. Pushes to `main` are the honest complement: `main` can be
+# written to directly — the OpenSpec archive commits were exactly that — and a rule
+# watching only one door watches none.
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+# Nothing here writes anything.
+permissions:
+  contents: read
+
+# Three pushes in a row should not mean three sets of PostgreSQL containers.
+concurrency:
+  group: checks-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capital-gateway:
+    name: capital-gateway
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/capital-gateway
+    steps:
+      - uses: actions/checkout@v4
+      # uv provisions the interpreter from `requires-python`, so there is no separate
+      # setup-python: two things deciding the version is one too many.
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      - run: uv run pytest -q
+
+  market-data:
+    name: market-data
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/market-data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      # The `db` tests are gated on Docker rather than on a flag, and this runner has it,
+      # so testcontainers starts a real PostgreSQL and they run here — the seven that skip
+      # on a machine without a daemon. That is the intent: they cover the coverage and
+      # rollup logic, which has been wrong twice.
+      - run: uv run pytest -q
+
+  terminal:
+    name: terminal
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/terminal
+    steps:
+      - uses: actions/checkout@v4
+      # Version comes from `packageManager` in package.json — one place both CI and a
+      # developer read, instead of knowledge living in a review document.
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: modules/terminal/pnpm-lock.yaml
+      # `contract:check` regenerates the wire types from market-data's Python, so this job
+      # needs both toolchains. Giving it uv is one step; giving a separate job Node and an
+      # install would duplicate the expensive half.
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: pnpm install --frozen-lockfile
+      # Before the tests, not after. A stale generated contract means every conclusion the
+      # suite reaches about the wire is drawn from an out-of-date premise.
+      - run: pnpm contract:check
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test

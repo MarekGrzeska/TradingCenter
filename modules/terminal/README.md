@@ -79,6 +79,10 @@ pnpm lint
 pnpm contract:check  # fails when src/data/contract.generated.ts is stale
 ```
 
+All four run on every pull request (`.github/workflows/checks.yml`). The `pnpm` version is
+pinned in `package.json`'s `packageManager`, so CI and a developer use the same one instead
+of it being knowledge somebody has to be told.
+
 The chart's canvas is not assertable, so chart and grid tests stub the charting library
 and assert what the component *asks it to draw*. What that cannot cover was checked by
 driving a real browser against the real back ends — see Findings.
