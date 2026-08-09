@@ -256,7 +256,7 @@
     (61–285 linii, bez kikutów i molochów — pomiar z PR&nbsp;#35).</p>
   </div>
 
-  <h2><span class="no">Sprawa 3</span>Szybszy rozwój: dwie rzeczy, reszta już zrobiona</h2>
+  <h2><span class="no">Sprawa 3</span>Szybszy rozwój: zapisać trasę, zwielokrotnić stanowiska</h2>
 
   <h3>Podróż nowego pola przez kontrakt — nazwać, nie naprawiać</h3>
   <p>Najdroższa pojedyncza operacja w tym repo to dodanie pola do odpowiedzi market-daty.
@@ -268,10 +268,59 @@
   CLAUDE.md jako checklist, żeby żadna sesja nie odkrywała jej po błędzie CI. Dziesięć
   minut.</p>
 
-  <h3>Drugi worktree na stałe — ostatni otwarty punkt audytu</h3>
-  <p>Wszystko inne z tamtej listy weszło. Zostało stanowisko numer dwa: katalog z
-  zainstalowanymi zależnościami i skopiowanymi <code>.env</code>, trzymany między zadaniami,
-  żeby praca równoległa kosztowała jedną komendę. Kwadrans, raz.</p>
+  <h3>Cztery stanowiska na stałe — trzy dodatkowe worktree</h3>
+  <p>Audyt proponował jedno dodatkowe stanowisko. Skoro równoległa praca sprawdziła się w
+  praktyce — ten dokument i poprzednie PR-y powstawały obok siebie — sensowniejszy jest
+  komplet: <strong>główny katalog plus trzy worktree, cztery sesje naraz</strong>, każdy
+  z zainstalowanymi zależnościami i skopiowanymi <code>.env</code>, trzymany między
+  zadaniami. Wtedy wejście w kolejne zadanie kosztuje jedną komendę, a nie kwadrans
+  instalacji.</p>
+
+  <p><strong>Koszt jest znany i mały.</strong> Zmierzone na tym repo: 276 MB
+  <code>node_modules</code> terminala, 117 MB <code>.venv</code> market-daty, 59 MB
+  gatewaya — <strong>452 MB na stanowisko</strong>, czyli około 1,4 GB za trzy dodatkowe.
+  Za to gitowe obiekty i historia są wspólne: worktree nie kopiuje repozytorium.</p>
+
+  <p><strong>Granicą nie jest git, tylko zasoby, których nie da się zwielokrotnić.</strong>
+  Sprawdziłem je w konfiguracji, nie z pamięci:</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Zasób</th><th>Ile jest</th><th>Co z tego wynika</th></tr>
+    <tr>
+      <td>Porty 8010 / 8020 / 5173</td>
+      <td class="n">jeden komplet</td>
+      <td><code>--strictPort</code> sprawia, że drugi <code>dev.sh</code> odmawia startu — awaria łagodna, ale stack uruchamia dokładnie jedno stanowisko</td>
+    </tr>
+    <tr>
+      <td>Sesja capital.com demo</td>
+      <td class="n">jedna</td>
+      <td>każde logowanie unieważnia poprzednie; dwa gateweye wzajemnie się wylogowują</td>
+    </tr>
+    <tr>
+      <td>Kontener bazy dev</td>
+      <td class="n">jeden</td>
+      <td><code>compose.yaml</code> ma na sztywno <code>name: tradingcenter</code>, <code>container_name</code> i nazwę wolumenu — <code>DB_PORT</code> jest parametrem, ale reszta nie, więc drugi <code>compose up</code> trafia w ten sam kontener, a nie w nowy</td>
+    </tr>
+    <tr>
+      <td>Testy <code>-m db</code></td>
+      <td class="n">bez ograniczeń</td>
+      <td>testcontainers podnosi własny Postgres na losowym porcie — te idą równolegle na wszystkich czterech</td>
+    </tr>
+  </table>
+  </div>
+
+  <p>Stąd podział ról, który z tego wynika sam: <strong>jedno stanowisko „na żywo"</strong>
+  — trzyma uruchomiony stack i sesję providera — oraz <strong>trzy „suche"</strong>, które
+  robią wszystko, co nie wymaga działających usług: testy jednostkowe i bazodanowe,
+  dokumentacja, infra, CI, refaktory weryfikowane suitą. To pokrywa większość pracy z
+  ostatnich dni: z sześciu PR-ów tej rundy dokładnie jeden potrzebował podniesionego
+  stacku.</p>
+
+  <p>Jedna zasada dyscypliny na koniec, bo bez niej cztery stanowiska zamienią się w cztery
+  konflikty: <strong>jedna sesja naraz dotyka <code>market-data</code></strong> — migracje
+  i baza dev są wspólne — a archiwizacje zmian OpenSpec robi się sekwencyjnie, bo wszystkie
+  piszą do tego samego <code>openspec/specs/</code>.</p>
 
   <h2><span class="no">Sprawa 4</span>Czytelność i rozwój: ocena, nie zmiany</h2>
 
@@ -307,8 +356,8 @@
       <span class="meta">10 min</span> <span class="pill do">do zrobienia</span></li>
     <li><strong>Usunąć <code>tracking.read_all</code>.</strong>
       <span class="meta">5 min</span> <span class="pill do">do zrobienia</span></li>
-    <li><strong>Drugi worktree na stałe.</strong>
-      <span class="meta">15 min · raz</span> <span class="pill do">do zrobienia</span></li>
+    <li><strong>Trzy dodatkowe worktree na stałe — cztery stanowiska równoległe.</strong>
+      <span class="meta">30 min · raz · ~1,4 GB</span> <span class="pill do">do zrobienia</span></li>
     <li><strong>Przycięcie archiwum OpenSpec (wariant B): −~5 000 linii.</strong>
       <span class="meta">1 h</span> <span class="pill ask">Twoja decyzja</span></li>
     <li><strong>Komentarze w terminalu: przycinać przy dotknięciu.</strong>
@@ -329,7 +378,9 @@
     upadła w konfrontacji z sondą; mapowania <code>archive.ts</code> policzone per pole
     (50 pól, 27 przemianowań); użycia funkcji eksportowanych przeszukane grepem łącznie z
     testami; struktura wszystkich większych plików obu modułów i terminala przejrzana
-    per funkcja. Dokument trzyma dyscyplinę z audytu: żadnej rekomendacji z samego
-    policzenia czegoś.</p>
+    per funkcja; koszt stanowiska zmierzony <code>du</code> na realnych katalogach
+    zależności, a singletony blokujące pracę równoległą odczytane z <code>compose.yaml</code>
+    i <code>scripts/dev.sh</code>, nie z pamięci. Dokument trzyma dyscyplinę z audytu:
+    żadnej rekomendacji z samego policzenia czegoś.</p>
   </footer>
 </main>
