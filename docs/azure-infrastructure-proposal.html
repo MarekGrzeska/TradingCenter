@@ -94,7 +94,7 @@
 <h1>TradingCenter w 100% na Azure</h1>
 <p class="lede">Propozycja infrastruktury dla <code>capital-gateway</code>, <code>terminal</code> i planowanego <code>market-data</code>. Wszystko opisane Terraformem, nic klikane ani tworzone przez CLI.</p>
 <p class="meta">
-  Stan na 2026-08-07 · ceny z Azure Retail Prices API, region Poland Central, USD, 730 h/mc, bez VAT<br>
+  Stan na 2026-08-09 · ceny z Azure Retail Prices API, region Poland Central, USD, 730 h/mc, bez VAT<br>
   Zakłada nowe konto <code>mgrzeskait@outlook.com</code> z ofertą <code>FreeTrial_2014-09-01</code> — potwierdzoną przez API
 </p>
 
@@ -105,6 +105,7 @@
     <li><strong>Od roku drugiego: ~$33 miesięcznie</strong>, gdy skończy się darmowy rok bazy.</li>
     <li><strong>Zero sekretów w repozytorium i zero w GitHubie</strong> — Key Vault plus logowanie OIDC.</li>
     <li><strong>Kopie zapasowe z odtwarzaniem do punktu w czasie</strong> — to jest ta rzecz, za którą tu naprawdę płacisz.</li>
+    <li><strong>Jedna baza dla wszystkiego</strong> — środowisko lokalne łączy się z tym samym serwerem w Azure. Kontener z bazą znika z <code>compose.yaml</code>; zostaje wyłącznie w testach.</li>
   </ul>
 </div>
 
@@ -132,14 +133,21 @@
         ┌────────────┴──────────────────┐
         │ PostgreSQL Flexible Server    │  B1ms · 32 GB
         │ backup 7 dni + PITR           │  darmowe przez 12 miesięcy
-        └───────────────────────────────┘
+        │                               │
+        │  market_data      ← prod      │
+        │  market_data_dev  ← lokalnie  │
+        └────────────▲──────────────────┘
+                     │ TLS, reguła firewalla na adres domowy
+              ┌──────┴────────┐
+              │ twój laptop   │  market-data uruchamiane lokalnie
+              └───────────────┘  bez kontenera z bazą
 
         ┌───────────────────────────────┐
         │ Static Web Apps  (plan Free)  │  terminal
         │ + wbudowane logowanie         │  CDN, TLS, własna domena
         └───────────────────────────────┘
 
-   Key Vault  ·  Application Insights  ·  budżet z alertem  ·  tfstate w Blob Storage</code></pre>
+   Key Vault  ·  Application Insights  ·  5 alertów  ·  tfstate w Blob Storage</code></pre>
 
 <h2>2. Dobór usług — z uzasadnieniem</h2>
 
@@ -194,7 +202,7 @@
   static-web-app.tf    terminal
   key-vault.tf         sejf + sekrety + uprawnienia dla tożsamości
   github-oidc.tf       aplikacja Entra + federacja + przypisanie ról
-  monitoring.tf        Application Insights + alerty + budżet
+  monitoring.tf        Application Insights + 5 reguł alertowych
   outputs.tf</code></pre>
 
 <h3>Rdzeń — jak to wygląda w kodzie</h3>
@@ -261,9 +269,10 @@ resource "azurerm_postgresql_flexible_server" "db" {
 
 <p>Porównaj z wariantem na VPS-ie, gdzie w GitHub Secrets musiałby leżeć klucz SSH do serwera. Tutaj nie ma czego wykraść, bo nie ma czego przechowywać.</p>
 
-<div class="callout">
-  <span class="tag">Rozwinięcie na później</span>
-  <p>Flexible Server obsługuje uwierzytelnianie przez Entra ID. Wtedy <code>market-data</code> łączy się z bazą <strong>swoją tożsamością zarządzaną, bez hasła w ogóle</strong> — znika ostatni sekret, który trzeba rotować. Na start zostawiłbym hasło w Key Vault, bo to jeden ruchomy element mniej przy pierwszym uruchomieniu.</p>
+<div class="callout warn">
+  <span class="tag">Uwierzytelnianie do bazy przez Entra ID — już nie „na później"</span>
+  <p>Flexible Server obsługuje uwierzytelnianie przez Entra ID: <code>market-data</code> łączy się wtedy z bazą <strong>swoją tożsamością zarządzaną, bez hasła w ogóle</strong>.</p>
+  <p>Dopóki baza deweloperska stała w kontenerze, było to udogodnienie, które spokojnie mogło poczekać. <strong>Odkąd środowisko lokalne łączy się z tym samym serwerem w Azure, staje się wymogiem</strong> — inaczej hasło do produkcyjnej bazy ląduje w <code>.env</code> na laptopie, czyli dokładnie ten jeden sekret na dysku, którego cała reszta tego planu unika. Z Entra wygląda to tak: <code>az login</code> lokalnie, tożsamość zarządzana w chmurze, hasła nie ma nigdzie.</p>
 </div>
 
 <h2>5. Sieć i dostęp</h2>
@@ -289,8 +298,8 @@ resource "azurerm_postgresql_flexible_server" "db" {
     </tr>
     <tr>
       <td><strong>baza</strong></td>
-      <td>tylko dla App Service</td>
-      <td>reguła firewalla na adresy wyjściowe planu, wymuszony TLS</td>
+      <td>App Service <span class="dim">+ adres domowy dewelopera</span></td>
+      <td>reguła firewalla na adresy wyjściowe planu i na twoje IP, wymuszony TLS, uwierzytelnianie Entra ID</td>
     </tr>
   </tbody>
 </table>
@@ -309,7 +318,52 @@ resource "azurerm_postgresql_flexible_server" "db" {
 
 <p>Dlatego w Terraformie czytaj je z zasobu (<code>possible_outbound_ip_address_list</code>), zamiast wpisywać ręcznie. Docelowe rozwiązanie to integracja z siecią wirtualną i prywatny endpoint bazy — ale to podnosi koszt i złożoność, więc na start wystarczy reguła wyliczana z kodu.</p>
 
-<h2>6. Wdrożenia</h2>
+<h2>6. Środowisko lokalne</h2>
+
+<p><strong>Kontener z bazą znika.</strong> Uruchamiając <code>market-data</code> na własnej maszynie, łączysz się z tym samym serwerem w Azure co produkcja. Jedna instalacja, jedna wersja Postgresa, jeden zestaw kopii zapasowych — i koniec z rozjazdem między „u mnie działa" a tym, co stoi w chmurze.</p>
+
+<h3>Dwie bazy, nie jedna</h3>
+
+<p>Ten sam serwer, ale <strong>dwie bazy logiczne i dwóch użytkowników</strong>:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Baza</th><th>Kto się łączy</th><th>Uprawnienia</th></tr></thead>
+  <tbody>
+    <tr><td><code>market_data</code></td><td><code>market-data</code> w App Service</td><td>tożsamość zarządzana aplikacji</td></tr>
+    <tr><td><code>market_data_dev</code></td><td>ty, z laptopa</td><td>twoje konto Entra — <strong>bez dostępu do bazy produkcyjnej</strong></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Nie kosztuje to nic — ta sama instancja, ten sam darmowy limit. Kupuje natomiast to, że lokalne <code>alembic upgrade</code> albo eksperyment z zapytaniem nie dotyka archiwum, którego odtworzenie liczy się w godzinach. Rozdział na osobnych użytkowników jest tu istotny: dwie bazy przy jednym koncie z pełnymi prawami to nie separacja, tylko dobre chęci.</p>
+
+<p>Do zaglądania do bazy narzędziem — DBeaver i podobne — służy <strong>trzecia tożsamość, z prawem wyłącznie do odczytu</strong>. Konfigurację opisuje osobna notatka: <code>docs/dbeaver-azure-connection.html</code>.</p>
+
+<h3>Testy zostają na kontenerach</h3>
+
+<p>To jest świadomy wyjątek, nie niedopatrzenie. <code>tests/conftest.py</code> stawia PostgreSQL przez testcontainers i robi <code>TRUNCATE</code> na wszystkich tabelach <strong>między testami</strong> — bo schemat jest tu tym, co jest testowane, a wiersz zostawiony przez poprzedni przebieg wygląda identycznie jak działająca migracja. Wskazanie tych testów na serwer w Azure kasuje archiwum przy pierwszym <code>pytest</code>, a przy współbieżnych przebiegach w CI kasuje je sobie nawzajem.</p>
+
+<p>Podział jest więc prosty: <strong>uruchamianie aplikacji → Azure, testy schematu → kontener</strong>. Docker przestaje być potrzebny do codziennej pracy, a pozostaje potrzebny do <code>pytest</code>.</p>
+
+<h3>Co to kosztuje</h3>
+
+<ul>
+  <li><strong>Latencja.</strong> Localhost odpowiadał poniżej milisekundy, Poland Central z domowego łącza odpowiada w 10–20 ms. Backfill to tysiące rund w obie strony, więc lokalne wypełnienie 5000 świec potrwa zauważalnie dłużej. Nie blokuje pracy, ale to odczujesz.</li>
+  <li><strong>Bez internetu nie ma developmentu.</strong> Pociąg i samolot wypadają z listy miejsc, w których da się pracować nad <code>market-data</code>.</li>
+  <li><strong>Adres domowy trafia do reguły firewalla</strong> — a operatorzy je zmieniają. Trzymaj go jako zmienną w <code>tfvars</code> ze skryptem, który ją odświeża, żeby „nagle nie łączy się z bazą" miało oczywistą przyczynę i jednominutową naprawę.</li>
+  <li><strong>Jeden vCPU dzielisz z produkcją.</strong> Ciężkie zapytanie puszczone lokalnie na B1ms konkuruje z ingestem, który w tym czasie zapisuje świece.</li>
+</ul>
+
+<h3>Do usunięcia z repozytorium</h3>
+
+<ul>
+  <li><code>compose.yaml</code> — w całości</li>
+  <li><code>docker compose up -d db</code> w <code>scripts/dev.sh</code> i <code>scripts/dev.ps1</code></li>
+  <li><code>DATABASE_URL</code> z portem 55432 w <code>modules/market-data/.env.example</code> — zastąpione połączeniem do Azure z <code>sslmode=require</code></li>
+</ul>
+
+<h2>7. Wdrożenia</h2>
 
 <pre><code>name: deploy
 
@@ -346,7 +400,7 @@ jobs:
 
 <p>Zwróć uwagę na <code>vars</code>, nie <code>secrets</code> — identyfikatory dzierżawy i subskrypcji nie są tajne, a hasła nie ma w ogóle. Terraform wdraża się osobnym przepływem, z <code>plan</code> na pull requestach i <code>apply</code> po scaleniu.</p>
 
-<h2>7. Kopie zapasowe i monitoring</h2>
+<h2>8. Kopie zapasowe i monitoring</h2>
 
 <div class="callout good">
   <span class="tag">Za to tu naprawdę płacisz</span>
@@ -356,13 +410,52 @@ jobs:
 
 <p><strong>Application Insights</strong> mieści się w darmowym limicie 5 GB miesięcznie i daje logi, wyjątki oraz metryki bez stawiania niczego. <strong>Alerty metryczne</strong> kosztują ~$0,10 za regułę miesięcznie.</p>
 
+<h3>Pięć alertów</h3>
+
+<p>Dobrane pod trzy rodzaje awarii: głośną (widać ją, tylko nie o trzeciej w nocy), cichą (nie widać jej wcale) i powolną (widać ją dopiero na fakturze).</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Alert</th><th>Metryka</th><th>Przed czym chroni</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Ingest stanął</strong></td>
+      <td>własna: wiek najnowszej świecy &gt; 15 min w godzinach handlu</td>
+      <td><span class="pill bad">cicha</span> aplikacja odpowiada 200, health check zielony, a świece nie przychodzą od godziny</td>
+    </tr>
+    <tr>
+      <td><strong>Baza nie odpowiada</strong></td>
+      <td><code>is_db_alive</code>, <code>connections_failed</code></td>
+      <td>B1ms to jedna instancja bez HA — jak padnie, stoi wszystko naraz</td>
+    </tr>
+    <tr>
+      <td><strong>Miejsce w bazie</strong></td>
+      <td><code>storage_percent</code> &gt; 80%</td>
+      <td>32 GB to sufit darmowego limitu, nie wybór wydajnościowy. Przy ~1,2 GB przyrostu rocznie i dwóch bazach na jednym serwerze chcesz wiedzieć z wyprzedzeniem, nie z rachunku</td>
+    </tr>
+    <tr>
+      <td><strong>Pamięć planu</strong></td>
+      <td><code>MemoryPercentage</code> &gt; 85%</td>
+      <td>dwie aplikacje Pythona dzielą 1,75 GB. To najbardziej prawdopodobny powód przyszłego przejścia na B2 — a ono przestawia adresy wyjściowe i psuje regułę firewalla bazy (sekcja 5). Lepiej to zaplanować niż odkryć</td>
+    </tr>
+    <tr>
+      <td><strong>5xx na gatewayu</strong></td>
+      <td><code>Http5xx</code></td>
+      <td>odróżnia „capital.com ma awarię" od „nasz kod się wywalił"</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>Świadomie bez alertu na CPU.</strong> Na B1 procesor skacze przy każdym backfillu i regule tej nie da się ustawić tak, żeby nie kłamała. Alert, który dzwoni bez powodu, uczy ignorowania wszystkich pozostałych — a pamięć jest tu i tak lepszym wskaźnikiem tego samego problemu.</p>
+
 <div class="callout warn">
   <span class="tag">Czego Azure za ciebie nie zrobi</span>
-  <p>Alert „ingest przestał zapisywać świece" musisz zbudować sam — Azure nie wie, co twoja aplikacja ma robić. Wystaw z <code>market-data</code> metrykę wieku najnowszej świecy, a alert na niej postaw już w Azure Monitor.</p>
+  <p>Pierwszy alert z tabeli — <strong>ten najważniejszy</strong> — musisz zbudować sam. Azure nie wie, co twoja aplikacja ma robić: widzi proces, który żyje i odpowiada, i to mu wystarcza. Wystaw z <code>market-data</code> metrykę wieku najnowszej świecy do Application Insights, a alert na niej postawisz już w Azure Monitor.</p>
   <p>To jest ten sam nakład pracy co na VPS-ie. Nie liczy się jako przewaga chmury — chmura daje tylko instalację hydrauliczną, nie sam czujnik.</p>
 </div>
 
-<h2>8. Koszty</h2>
+<h2>9. Koszty</h2>
 
 <div class="scroll">
 <table>
@@ -374,8 +467,8 @@ jobs:
     <tr><td>Key Vault <span class="dim">($0,03 / 10 tys. operacji)</span></td><td class="num">~0,01</td><td class="num">~0,01</td></tr>
     <tr><td>Application Insights <span class="dim">(5 GB w cenie)</span></td><td class="num">0,00</td><td class="num">0,00</td></tr>
     <tr><td>Blob Storage na stan Terraforma</td><td class="num">~0,10</td><td class="num">~0,10</td></tr>
-    <tr><td>Alerty metryczne <span class="dim">(3 reguły)</span></td><td class="num">~0,30</td><td class="num">~0,30</td></tr>
-    <tr class="total"><td><strong>Razem miesięcznie</strong></td><td class="num"><strong>~13,56</strong></td><td class="num"><strong>~32,47</strong></td></tr>
+    <tr><td>Alerty metryczne <span class="dim">(5 reguł)</span></td><td class="num">~0,50</td><td class="num">~0,50</td></tr>
+    <tr class="total"><td><strong>Razem miesięcznie</strong></td><td class="num"><strong>~13,76</strong></td><td class="num"><strong>~32,67</strong></td></tr>
   </tbody>
 </table>
 </div>
@@ -388,7 +481,7 @@ jobs:
   <p>Ta różnica kupuje: kopie zapasowe z PITR, brak własności systemu operacyjnego, wdrożenia bez przechowywanych sekretów i logowanie bez pisania kodu. Czy warta — zależy od tego, ile wart jest twój czas i jak bardzo nie chcesz być tym, kto o trzeciej w nocy odtwarza bazę.</p>
 </div>
 
-<h2>9. Pułapki</h2>
+<h2>10. Pułapki</h2>
 
 <div class="scroll">
 <table>
@@ -396,11 +489,11 @@ jobs:
   <tbody>
     <tr>
       <td><strong>Limit wydatków wyłączy wszystko po 30 dniach</strong></td>
-      <td><span class="pill bad">termin</span> Przejdź na Pay-As-You-Go przed trzydziestym dniem, inaczej subskrypcja zostaje wyłączona i darmowy rok przepada. Zaraz potem ustaw budżet z alertem, bo zdejmując limit zdejmujesz też zabezpieczenie.</td>
+      <td><span class="pill bad">termin</span> Przejdź na Pay-As-You-Go przed trzydziestym dniem, inaczej subskrypcja zostaje wyłączona i darmowy rok przepada. Świadomie rezygnujemy tu z alertu budżetowego — przy stałym, przewidywalnym rachunku ~$14 pilnuje tego alert na miejscu w bazie, który wyprzedza jedyny realny scenariusz wzrostu kosztu.</td>
     </tr>
     <tr>
       <td><strong>Darmowy limit to 750 godzin <em>jednego</em> B1ms</strong></td>
-      <td>Dwa serwery naraz przekraczają go natychmiast. Jedno środowisko, nie dev i prod osobno.</td>
+      <td>Dwa serwery naraz przekraczają go natychmiast. Stąd jeden serwer dla wszystkiego, a rozdział prod od dev na poziomie <strong>baz logicznych</strong>, nie instancji — sekcja 6.</td>
     </tr>
     <tr>
       <td><strong>App Service restartuje aplikacje</strong></td>
@@ -409,6 +502,18 @@ jobs:
     <tr>
       <td><strong>Adresy wyjściowe zmieniają się przy zmianie warstwy planu</strong></td>
       <td>Czytaj je z zasobu w Terraformie, nigdy nie wpisuj ręcznie.</td>
+    </tr>
+    <tr>
+      <td><strong>Lokalna migracja trafia na serwer produkcyjny</strong></td>
+      <td>Odkąd nie ma bazy w kontenerze, <code>alembic upgrade</code> puszczony z laptopa idzie do Azure. Dlatego konto deweloperskie <strong>nie może mieć praw do bazy <code>market_data</code></strong> — to jedyne zabezpieczenie, którego nie da się obejść pomyłką w zmiennej środowiskowej.</td>
+    </tr>
+    <tr>
+      <td><strong>Testy nadal potrzebują Dockera</strong></td>
+      <td>Kontener znika z codziennej pracy, ale zostaje w <code>pytest</code>. Testy robią <code>TRUNCATE</code> między przypadkami — wskazanie ich na Azure kasuje archiwum. To ma zostać niemożliwe, nie tylko niezalecane.</td>
+    </tr>
+    <tr>
+      <td><strong>Adres domowy w regule firewalla wygasa</strong></td>
+      <td>Operator zmieni ci IP i baza przestanie odpowiadać z laptopa. Trzymaj go jako zmienną w <code>tfvars</code> ze skryptem odświeżającym, żeby naprawa trwała minutę.</td>
     </tr>
     <tr>
       <td><strong>Key Vault ma miękkie usuwanie</strong></td>
@@ -422,7 +527,7 @@ jobs:
 </table>
 </div>
 
-<h2>10. Kolejność prac</h2>
+<h2>11. Kolejność prac</h2>
 
 <ol class="steps">
   <li>
@@ -434,12 +539,12 @@ jobs:
     <p>Grupa zasobów, konto magazynu i kontener na stan. Raz, z lokalnym stanem.</p>
   </li>
   <li>
-    <b>Zdejmij limit wydatków i ustaw budżet</b>
+    <b>Zdejmij limit wydatków</b>
     <p><span class="pill bad">przed 30. dniem</span> Inaczej reszta planu nie ma na czym stanąć.</p>
   </li>
   <li>
     <b>Terraform: baza, plan, Key Vault, Application Insights</b>
-    <p>Baza pierwsza, bo od niej zależy reszta konfiguracji.</p>
+    <p>Baza pierwsza, bo od niej zależy reszta konfiguracji. Od razu dwie bazy logiczne, dwóch użytkowników i uwierzytelnianie Entra ID — dokładanie tego później oznacza migrację działającego archiwum.</p>
   </li>
   <li>
     <b>Federacja OIDC dla GitHub Actions</b>
@@ -454,14 +559,19 @@ jobs:
     <p>Z wbudowanym logowaniem. Ścieżki API na względne, żeby działały za bramką.</p>
   </li>
   <li>
+    <b>Przełącz środowisko lokalne na Azure</b>
+    <p>Usuń <code>compose.yaml</code>, wyczyść <code>scripts/dev.*</code>, zmień <code>.env.example</code>. Testy zostawiasz na testcontainers. Robisz to <strong>zanim</strong> zaczniesz pisać kod <code>market-data</code>, żeby nie budować go na środowisku, które zaraz znika.</p>
+  </li>
+  <li>
     <b>Dopiero teraz <code>market-data</code></b>
-    <p>Na gotowej infrastrukturze, z bazą, sekretami i wdrożeniami, które już działają.</p>
+    <p>Na gotowej infrastrukturze, z bazą, sekretami i wdrożeniami, które już działają. Metryka wieku najnowszej świecy powstaje razem z ingestem, nie po nim.</p>
   </li>
 </ol>
 
 <footer>
   <p><strong>Powiązane dokumenty</strong></p>
   <ul>
+    <li><code>docs/dbeaver-azure-connection.html</code> — połączenie z bazą narzędziem, konto read-only</li>
     <li><code>docs/vps-plan.html</code> — ten sam system na VPS: deploye, sekrety, autoryzacja</li>
     <li><code>docs/vps-deployment-proposal.html</code> — architektura na VPS, dobór maszyny, kopie zapasowe</li>
     <li><code>docs/azure-postgres-cost-research.html</code> — koszty bazy na Azure, edycje TimescaleDB</li>
