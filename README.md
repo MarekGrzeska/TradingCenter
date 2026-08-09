@@ -52,14 +52,17 @@ The order is not tidiness. `market-data` subscribes to the gateway as it starts,
 terminal's charts read `market-data`, so starting anything early only fills the console with
 retries. Each step waits for the one before it to actually answer. Ctrl+C stops the services.
 
-**No database runs locally.** `market-data` writes to `market_data_dev` on the project's Azure
-Postgres server (`openspec/changes/provision-azure-platform`, design.md, "Praca lokalna
-korzysta z market_data_dev na serwerze w Azure") — there is no local container to start, and
-Docker is not needed to run this stack any more. It is still needed to *test* `market-data`
-(see Checks, below): the `db`-marked tests run against a throwaway PostgreSQL container, since
-the schema itself is part of what they check. The scripts refuse to start if
-`modules/market-data/.env` points `DATABASE_URL` at anything other than `market_data_dev` —
-production is a mistake this checks for, not a port.
+**The database is local again.** `market-data` writes to the PostgreSQL container in
+[compose.yaml](compose.yaml), which the scripts start first — so Docker is a requirement for
+running the stack, not only for testing it. The archive survives Ctrl+C and
+`docker compose down`; only `down -v` forgets it. (For one morning this was `market_data_dev`
+on the Azure server, for production fidelity; the standing tax — latency, an IP allowlist, a
+yearly secret rotation — cost more than the fidelity bought, and
+`openspec/changes/local-dev-database-in-docker` reversed it. Production stays in Azure.)
+The scripts refuse to start if `modules/market-data/.env` points `DATABASE_URL` at any host
+that is not loopback, and the module itself refuses the same at startup: without an identity
+configured it does not reach beyond the machine, so pointing a local run at production is a
+named error, not a quiet write.
 
 Useful variants:
 

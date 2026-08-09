@@ -11,9 +11,9 @@
 # the console with proxy errors that mean nothing. Each step waits for the one
 # before it to actually answer, not merely to have been launched.
 #
-# The database is not started here — it is `market_data_dev` on the Azure server
-# (openspec/changes/provision-azure-platform, design.md, "Praca lokalna korzysta z
-# market_data_dev na serwerze w Azure"). Nothing local to wait on before migrations.
+# The database is the container in ../compose.yaml — started here, before migrations
+# (openspec/changes/local-dev-database-in-docker; the spell in Azure is over, production
+# stays there and development does not). `docker compose down` keeps the data.
 #
 #   ./scripts/dev.sh              # everything
 #   ./scripts/dev.sh --no-terminal    # back end only, e.g. to run the live tests
@@ -65,8 +65,16 @@ problems=()
 
 command -v uv >/dev/null 2>&1 || problems+=("uv is not on PATH (runs both Python services) — https://docs.astral.sh/uv/")
 
+# The database lives in a container again, so Docker is back to being a requirement for
+# running the stack, not only for testing market-data.
+if ! command -v docker >/dev/null 2>&1; then
+  problems+=("docker is not on PATH (runs the database, compose.yaml) — https://docs.docker.com/get-docker/")
+elif ! docker info >/dev/null 2>&1; then
+  problems+=("docker is installed but the daemon is not answering — start Docker Desktop (or the service)")
+fi
+
 [[ -f "$GATEWAY_DIR/.env" ]] || problems+=("$GATEWAY_DIR/.env is missing — copy .env.example and fill in demo credentials")
-[[ -f "$ARCHIVE_DIR/.env" ]] || problems+=("$ARCHIVE_DIR/.env is missing — copy .env.example and fill in the database identity")
+[[ -f "$ARCHIVE_DIR/.env" ]] || problems+=("$ARCHIVE_DIR/.env is missing — copy .env.example; the defaults match compose.yaml")
 
 if (( START_TERMINAL )); then
   if command -v pnpm >/dev/null 2>&1; then
@@ -110,13 +118,16 @@ for port in "${ports[@]}"; do
   problems+=("port $port is already in use${owner} — stop it, or it is a leftover run")
 done
 
-# The quiet disaster this guards against: `.env` pointing at `market_data` — the
-# production database — instead of `market_data_dev`. Nothing about running the
-# module locally would fail; it would just migrate and fill the wrong database.
-archive_db_name="$(sed -n 's|^DATABASE_URL=.*/\([a-zA-Z0-9_]*\)\(?.*\)\{0,1\}$|\1|p' "$ARCHIVE_DIR/.env" 2>/dev/null | head -1)"
-if [[ -n "$archive_db_name" && "$archive_db_name" != "market_data_dev" ]]; then
-  problems+=("modules/market-data/.env's DATABASE_URL names database '$archive_db_name', not 'market_data_dev' — local runs MUST NOT point at production")
-fi
+# The quiet disaster this guards against: `.env` still pointing at the Azure server —
+# production, or the retired dev database — instead of the local container. config.py
+# refuses the same thing at startup (no DATABASE_USER means loopback only); repeating
+# the check here just refuses earlier, before anything has been launched, with the file
+# to fix named. Reads the host between the optional `user:pass@` and the port/path.
+archive_db_host="$(sed -n 's|^DATABASE_URL=[a-z+]*://\([^@/]*@\)\{0,1\}\([^:/?]*\).*|\2|p' "$ARCHIVE_DIR/.env" 2>/dev/null | head -1)"
+case "$archive_db_host" in
+  ""|localhost|127.*|::1) ;;
+  *) problems+=("modules/market-data/.env's DATABASE_URL points at '$archive_db_host' — local runs use the compose.yaml container (localhost), never a remote database") ;;
+esac
 
 if (( ${#problems[@]} )); then
   fail "Cannot start:"
@@ -180,10 +191,20 @@ wait_for_http() {
   return 1
 }
 
-# --- migrations -----------------------------------------------------------------
+# --- the database ---------------------------------------------------------------
 #
-# No "start the database" step — it is already running, in Azure (market_data_dev,
-# see the .env check above).
+# `--wait` blocks on the healthcheck in compose.yaml, which names the user and the
+# database on purpose: a bare `pg_isready` answers before first-boot initialisation
+# finishes, and the migrations below would then race it.
+
+say "Starting the database container..."
+if ! ( cd "$REPO_ROOT" && docker compose up -d --wait db ); then
+  fail "the database container did not become healthy — 'docker compose logs db' has the reason."
+  exit 1
+fi
+ok "Database is up."
+
+# --- migrations -----------------------------------------------------------------
 
 # Applied every run, not only on a fresh one: a checkout that has just pulled a
 # new migration is exactly the case where forgetting this produces an error that
@@ -229,7 +250,7 @@ if (( START_TERMINAL )); then
 fi
 echo "  market-data docs    $ARCHIVE_URL/docs"
 echo "  Gateway docs        $GATEWAY_URL/docs"
-echo "  Database            market_data_dev @ Azure"
+echo "  Database            market_data @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
 echo
 note "Nothing is archived until a pair is added in the Archive panel — that is deliberate."
 note "Ctrl+C to stop the services."

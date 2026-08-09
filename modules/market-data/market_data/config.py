@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from urllib.parse import parse_qs, urlparse
 
-from pydantic import ValidationInfo, field_validator
+from pydantic import ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Any host carrying this belongs to the provider. Matched as a substring on purpose:
@@ -46,18 +46,23 @@ class Settings(BaseSettings):
 
     # --- the archive's own storage ---
     #
-    # No password here, ever (design.md, "Do bazy — tożsamość, do capital.com — Key
-    # Vault"): `database_user` is the role this module authenticates as, and what it
-    # authenticates *with* is an Entra token fetched at connection time (db.py), not
-    # anything held in configuration. `sslmode=require` (or stricter) is mandatory in
-    # the URL — see `_requires_tls` below.
+    # `database_user` selects between the module's two connection modes, and it is the
+    # only switch (openspec: market-data-database-connection):
+    #
+    #   set    — identity mode, the remote/production shape. The value is the Postgres
+    #            role this module authenticates as; what it authenticates *with* is an
+    #            Entra token fetched at connection time (db.py). The URL must require
+    #            TLS and must not carry a credential of its own.
+    #   unset  — local mode. `DATABASE_URL` is used exactly as given, password and all,
+    #            and must point at this machine's loopback — without an identity this
+    #            module refuses to reach beyond localhost, so a `.env` pointing at
+    #            production is a startup error rather than a quiet write.
     database_url: str
-    database_user: str
+    database_user: str | None = None
 
-    # Unset in Azure — the App Service's own system-assigned managed identity needs no
-    # configuration, `db.py`'s `DefaultAzureCredential` finds it on its own. Set locally,
-    # together, to the dev service principal's credentials (`sp-tradingcenter-market-data-dev`,
-    # `infra/entra.tf`): there is no ambient identity on a developer's machine.
+    # Identity mode only, and unset even there when running in Azure — the App Service's
+    # system-assigned managed identity needs no configuration, `db.py`'s
+    # `DefaultAzureCredential` finds it on its own.
     azure_client_id: str | None = None
     azure_client_secret: str | None = None
     azure_tenant_id: str | None = None
@@ -113,7 +118,7 @@ class Settings(BaseSettings):
             )
         return value.rstrip("/")
 
-    @field_validator("database_url", "database_user", "gateway_api_key")
+    @field_validator("database_url", "gateway_api_key")
     @classmethod
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:
         # pydantic already rejects a variable that is absent; this catches the one that is
@@ -122,30 +127,58 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_url")
+    @field_validator("database_user")
     @classmethod
-    def _requires_tls(cls, value: str) -> str:
-        sslmode = parse_qs(urlparse(value).query).get("sslmode", [None])[0]
-        if sslmode not in _TLS_REQUIRING_SSLMODES:
-            raise ValueError(
-                f"DATABASE_URL does not require TLS (sslmode={sslmode!r}). The database "
-                "is off this machine, so the connection to it MUST be encrypted — set "
-                "sslmode=require (or verify-ca/verify-full)."
-            )
-        return value
+    def _blank_means_unset(cls, value: str | None) -> str | None:
+        # `DATABASE_USER=` left in a .env is the same intent as the line being absent —
+        # local mode — not a role named "".
+        if value is None or not value.strip():
+            return None
+        return value.strip()
 
-    @field_validator("database_url")
-    @classmethod
-    def _no_embedded_credential(cls, value: str) -> str:
-        parsed = urlparse(value)
-        if parsed.username or parsed.password:
+    @model_validator(mode="after")
+    def _connection_mode_is_coherent(self) -> Settings:
+        """The two connection modes, each with its own failure to refuse.
+
+        Identity mode (`database_user` set — production's shape, `infra/app-service.tf`):
+        the database is off this machine, so the URL must require TLS and must not carry
+        a credential that would never be read anyway.
+
+        Local mode (`database_user` unset): the URL is used exactly as given, password
+        and all — and must point at loopback. Without an identity this module refuses to
+        reach beyond this machine: a `.env` aimed at production fails here at startup
+        instead of quietly writing (openspec: market-data-database-connection, "Praca bez
+        tożsamości nie wychodzi poza maszynę").
+        """
+        parsed = urlparse(self.database_url)
+        if self.database_user is not None:
+            sslmode = parse_qs(parsed.query).get("sslmode", [None])[0]
+            if sslmode not in _TLS_REQUIRING_SSLMODES:
+                raise ValueError(
+                    f"DATABASE_URL does not require TLS (sslmode={sslmode!r}). With "
+                    "DATABASE_USER set this module connects to a database off this "
+                    "machine, so the connection MUST be encrypted — set sslmode=require "
+                    "(or verify-ca/verify-full)."
+                )
+            if parsed.username or parsed.password:
+                raise ValueError(
+                    "DATABASE_URL carries a username or password. With DATABASE_USER set "
+                    "this module authenticates with an Entra token fetched at connection "
+                    "time — a credential embedded in the URL is not read and should not "
+                    "be there."
+                )
+            return self
+
+        host = (parsed.hostname or "").lower()
+        if not (host == "localhost" or host.startswith("127.") or host == "::1"):
             raise ValueError(
-                "DATABASE_URL carries a username or password. This module authenticates "
-                "with an Entra token fetched at connection time (DATABASE_USER selects "
-                "the role) — a credential embedded in the URL is not read and should not "
-                "be there."
+                f"DATABASE_URL points at {host!r} with no DATABASE_USER set. Without an "
+                "identity this module only connects to a database on this machine's "
+                "loopback — a remote database (production included) needs DATABASE_USER "
+                "and an Entra identity, and local work belongs on the compose.yaml "
+                "container."
             )
-        return value
+        return self
 
     @field_validator(
         "backfill_concurrency",

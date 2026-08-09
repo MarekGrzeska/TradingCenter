@@ -50,10 +50,15 @@ actually answer. Ports are fixed: **8010** gateway, **8020** market-data, **5173
 
 ## Things that will bite you
 
-**No local database.** `market-data` writes to `market_data_dev` on the project's Azure
-PostgreSQL server. There is no container to start for development and Docker is not needed
-to run the stack — only to *test* market-data. `dev.sh` refuses to start if `DATABASE_URL`
-points anywhere other than `market_data_dev`; that guard is about production, not ports.
+**The dev database is the compose.yaml container.** `market-data` writes to a local
+PostgreSQL on `127.0.0.1:55432`, which the dev scripts start first — Docker is required to
+run the stack, not only to test it. Leaving `DATABASE_USER` unset is what selects this
+local mode, and it narrows the module to loopback: a `DATABASE_URL` pointing at any remote
+host (production included) is refused at startup, by `dev.sh` and by `config.py` both.
+Production connects with an Entra identity instead — `DATABASE_USER` set in
+`infra/app-service.tf` — and that path is not for local use. (Do not "restore" the brief
+arrangement where dev ran on the Azure server; it was reversed the same day it was made —
+`openspec/changes/local-dev-database-in-docker`.)
 
 **The terminal's contract is generated.** `src/data/contract.generated.ts` is built from the
 schema `market-data` derives from its own models. After changing anything in
@@ -107,6 +112,7 @@ in parallel, one per module, running the same commands listed above. `live` test
 Three `deploy-*.yml` workflows push images to GHCR and deploy to Azure App Service on
 pushes to `main` that touch the matching module. `terraform.yml` plans on infra PRs.
 
-Parallel work: use `git worktree` rather than a second clone — but the Azure dev database,
-the Capital session and the fixed ports are shared across worktrees, so only one agent at a
+Parallel work: use `git worktree` rather than a second clone — but the dev database
+container (one `compose.yaml` project, one volume), the Capital session and the fixed ports
+are shared across worktrees, so only one agent at a
 time can run the stack or touch migrations.

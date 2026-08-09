@@ -11,10 +11,10 @@
     fills the console with proxy errors that mean nothing. Each step waits for
     the one before it to answer, not merely to have been launched.
 
-    The database is not started here — it is `market_data_dev` on the Azure
-    server (openspec/changes/provision-azure-platform, design.md, "Praca lokalna
-    korzysta z market_data_dev na serwerze w Azure"). The services run here,
-    where they reload on save and can be attached to.
+    The database is the container in ..\compose.yaml — started here, before
+    migrations (openspec/changes/local-dev-database-in-docker). The services run
+    here on the host, where they reload on save and can be attached to;
+    `docker compose down` stops the database and keeps the data.
 
     Neither module depends on this script: each still starts on its own with the
     command in its README. `scripts/dev.sh` is the macOS and Linux counterpart.
@@ -60,13 +60,24 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
     $problems += "uv is not on PATH (runs both Python services) - https://docs.astral.sh/uv/"
 }
 
+# The database lives in a container again, so Docker is back to being a requirement
+# for running the stack, not only for testing market-data.
+if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
+    $problems += "docker is not on PATH (runs the database, compose.yaml) - https://docs.docker.com/get-docker/"
+} else {
+    docker info *> $null
+    if ($LASTEXITCODE -ne 0) {
+        $problems += "docker is installed but the daemon is not answering - start Docker Desktop"
+    }
+}
+
 $gatewayEnv = Join-Path $gatewayDir ".env"
 if (-not (Test-Path $gatewayEnv)) {
     $problems += "$gatewayEnv is missing - copy .env.example and fill in demo credentials"
 }
 $archiveEnv = Join-Path $archiveDir ".env"
 if (-not (Test-Path $archiveEnv)) {
-    $problems += "$archiveEnv is missing - copy .env.example and fill in the database identity"
+    $problems += "$archiveEnv is missing - copy .env.example; the defaults match compose.yaml"
 }
 
 if (-not $NoTerminal) {
@@ -98,15 +109,17 @@ foreach ($port in $ports) {
     $problems += "port $port is already in use by $owner - stop it first, or it is a leftover run"
 }
 
-# The quiet disaster this guards against: `.env` pointing at `market_data` - the
-# production database - instead of `market_data_dev`. Nothing about running the
-# module locally would fail; it would just migrate and fill the wrong database.
+# The quiet disaster this guards against: `.env` still pointing at the Azure server -
+# production, or the retired dev database - instead of the local container. config.py
+# refuses the same thing at startup (no DATABASE_USER means loopback only); repeating
+# the check here just refuses earlier, before anything has been launched, with the
+# file to fix named. Reads the host between the optional `user:pass@` and the port.
 if (Test-Path $archiveEnv) {
     $urlLine = Select-String -Path $archiveEnv -Pattern '^DATABASE_URL=' | Select-Object -First 1
-    if ($null -ne $urlLine -and $urlLine.Line -match '/([a-zA-Z0-9_]+)(\?.*)?$') {
-        $dbName = $Matches[1]
-        if ($dbName -ne "market_data_dev") {
-            $problems += "modules\market-data\.env's DATABASE_URL names database '$dbName', not 'market_data_dev' - local runs MUST NOT point at production"
+    if ($null -ne $urlLine -and $urlLine.Line -match '^DATABASE_URL=[a-z+]+://(?:[^@/]+@)?(?<dbhost>[^:/?]+)') {
+        $dbHost = $Matches['dbhost']
+        if ($dbHost -ne "localhost" -and $dbHost -notlike "127.*" -and $dbHost -ne "::1") {
+            $problems += "modules\market-data\.env's DATABASE_URL points at '$dbHost' - local runs use the compose.yaml container (localhost), never a remote database"
         }
     }
 }
@@ -156,10 +169,25 @@ function Wait-ForHttp {
 }
 
 try {
-    # --- migrations ---
+    # --- the database ---
     #
-    # No "start the database" step - it is already running, in Azure
-    # (market_data_dev, see the .env check above).
+    # `--wait` blocks on the healthcheck in compose.yaml, which names the user and
+    # the database on purpose: a bare `pg_isready` answers before first-boot
+    # initialisation finishes, and the migrations below would then race it.
+    Write-Host "Starting the database container..." -ForegroundColor Cyan
+    Push-Location $repoRoot
+    try {
+        docker compose up -d --wait db
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "the database container did not become healthy - 'docker compose logs db' has the reason." -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+    Write-Host "Database is up." -ForegroundColor Green
+
+    # --- migrations ---
 
     # Applied every run, not only on a fresh one: a checkout that has just pulled
     # a new migration is exactly the case where forgetting this produces an error
@@ -233,7 +261,7 @@ try {
     }
     Write-Host "  market-data docs    $archiveUrl/docs"
     Write-Host "  Gateway docs        $gatewayUrl/docs"
-    Write-Host "  Database            market_data_dev @ Azure"
+    Write-Host "  Database            market_data @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
     Write-Host ""
     Write-Host "Nothing is archived until a pair is added in the Archive panel - that is deliberate." -ForegroundColor DarkGray
     Write-Host "Ctrl+C to stop the services." -ForegroundColor DarkGray
