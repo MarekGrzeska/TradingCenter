@@ -88,9 +88,11 @@ Behaviors stated as MUST inside requirement prose rather than as their own scena
 
 ## Gaps
 
-- **Task 7.4** (manual end-to-end pass on a running stack) is deferred to the operator and is not
-  part of this review's verification. It is the only check that exercises a real session calendar;
-  every test here uses a fake gateway whose "market closed" behaviour is one I wrote.
+- **Task 7.4** (manual end-to-end pass on a running stack) — **passed** on 2026-08-09, at the third
+  attempt: US100 in `5m`–`1W` from 2026-01-01, no interval reaching before that date and no chunk
+  settled as `skipped`. It is the only check that exercises a real session calendar; every test here
+  uses a fake gateway whose "market closed" behaviour is one I wrote, which is exactly why the first
+  two attempts passed the suite and failed live.
 - The bulk-skip guard lives entirely in the gateway. `execute_chunk` still trusts
   `page.history_ended` without a second opinion, so a genuinely wrong ending from the provider would
   still skip queued chunks. Left as is — the gateway is where the information is — but named,

@@ -54,4 +54,4 @@ trwała granica instrumentu i uruchamia `skip_chunks_beyond_history` — kawałe
 - [x] 7.1 `ruff` i `pytest` w `market-data` (415 passed, 7 skipped) oraz w `capital-gateway` (140 passed, 8 skipped)
 - [x] 7.2 README modułu: `ingest/backfill.py`'s section (or wherever `fill_gap`/quiet-fill behavior is documented) says it respects `collect_from`, not a bare configured depth
 - [x] 7.3 `openspec validate ingest-fill-respects-collect-from --strict`
-- [ ] 7.4 Ręczne potwierdzenie na uruchomionym zestawie: wyczyścić archiwum, dodać US100 w `5m`–`1W` z datą OD 2026-01-01, sprawdzić w `Instruments`' „Data since", że żaden interwał nie sięga przed tę datę — w szczególności `5m`, oraz że w `collection_job_chunks` żaden kawałek nie jest `skipped` — *do ręcznego potwierdzenia przez operatora*
+- [x] 7.4 Ręczne potwierdzenie na uruchomionym zestawie: wyczyścić archiwum, dodać US100 w `5m`–`1W` z datą OD 2026-01-01, sprawdzić w `Instruments`' „Data since", że żaden interwał nie sięga przed tę datę — w szczególności `5m`, oraz że w `collection_job_chunks` żaden kawałek nie jest `skipped` — *potwierdzone przez operatora 2026-08-09, za trzecim podejściem*

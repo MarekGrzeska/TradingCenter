@@ -282,6 +282,15 @@ blokuje archiwizacji zmiany; każdy jest świadomym pozostawieniem, nie przeocze
   (`test_jobs_plan.py::test_a_moment_before_provider_history_is_clipped_not_refused`) i widoczne w
   dialogu (`marks a clipped range…`), ale nie ma testu terminala mówiącego „rok 1850 przechodzi
   przez kreator bez błędu walidacji".
-- **Zadanie 12.2, ścieżka end-to-end** — nieuruchomione. Nic w tej zmianie nie dotknęło
-  prawdziwego providera ani prawdziwej bazy poza testami; pozostawione operatorowi do ręcznego
-  potwierdzenia przed archiwizacją.
+- **Zadanie 12.2, ścieżka end-to-end** — przeszła częściowo, na żywo, 2026-08-09: dodanie
+  instrumentu w interwałach `5m`–`1W` od zadanej daty, dialog akceptacji, zlecenie i podgląd
+  postępu potwierdzone przez operatora wielokrotnie (US100). **Wymuszona porażka kawałka
+  i ponowienie pozostają nieprzejściowane na uruchomionym zestawie** — pokryte wyłącznie testami
+  z podstawionym gatewayem, i to jest jedyna noga tej ścieżki, o której wiadomo tyle, ile mówią
+  testy.
+
+  Warto to czytać w kontekście tego, co te przejścia na żywo faktycznie wykryły: trzy błędy
+  w głębokości pobierania, których cały zielony pakiet testów nie złapał, bo podstawiony gateway
+  zamykał rynek tak, jak napisał go autor testu (`ingest-fill-respects-collect-from`, review.md).
+  Ścieżka porażki i ponowienia ma dziś dokładnie ten sam status, jaki miała wtedy ścieżka
+  głębokości.

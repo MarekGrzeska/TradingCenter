@@ -47,4 +47,4 @@
 - [x] 7.1 `ruff` i `pytest` w `market-data` (407 passed, 7 skipped), lint i testy w `terminal` (220 passed)
 - [x] 7.2 README terminala o zakładce `Instruments` i o tym, że kasowanie jest nieodwracalne (README `market-data` zaktualizowane wcześniej, w grupie 3)
 - [x] 7.3 `openspec validate delete-archived-pair-data --strict`
-- [ ] 7.4 Przejść ścieżkę na uruchomionym zestawie: instrument w kilku interwałach, skasowanie jednego interwału, skasowanie całego instrumentu, ponowne dodanie z krótszym zakresem i sprawdzenie, że kolumna `Data since` pokazuje nowy zakres — *do ręcznego potwierdzenia przez operatora*
+- [x] 7.4 Przejść ścieżkę na uruchomionym zestawie: instrument w kilku interwałach, skasowanie jednego interwału, skasowanie całego instrumentu, ponowne dodanie z krótszym zakresem i sprawdzenie, że kolumna `Data since` pokazuje nowy zakres — *potwierdzone przez operatora 2026-08-09; to właśnie ta ścieżka („dałem stop, zaczytałem raz jeszcze z mniejszym zakresem, a widzę stary") otworzyła tę zmianę*

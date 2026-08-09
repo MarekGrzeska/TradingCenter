@@ -75,4 +75,4 @@ open rather than fixed under this change's scope — see Findings, first row.
 ## Gaps
 
 - **"Kasowanie przerwane w połowie"** (market-data-store) has no dedicated test. `delete_pair_data` and `close_for_deletion` each run inside `async with conn.transaction():`, the same primitive `coverage.record_coverage` already relies on elsewhere in this codebase without its own fault-injection test — asserting atomicity here would need forcing a mid-transaction failure on a real `asyncpg` connection, which is disproportionate to what it would prove beyond "the database's transaction guarantee holds." Left as a structural guarantee rather than a tested one, consistent with how the rest of the module treats `conn.transaction()`.
-- **Task 7.4** (manual end-to-end pass) is explicitly deferred to the operator per tasks.md and is not part of this review's verification.
+- **Task 7.4** (manual end-to-end pass) — **passed** on 2026-08-09: delete one interval, delete the whole instrument, re-add with a shorter range, `Data since` showing the new range. That last step is the symptom that opened this change, so it is the one worth naming as confirmed rather than merely reviewed.

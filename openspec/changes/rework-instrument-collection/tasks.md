@@ -103,6 +103,6 @@
 ## 12. Domknięcie
 
 - [x] 12.1 `ruff` i `pytest` w `capital-gateway` i `market-data`, `pnpm lint` i testy w `terminal`
-- [ ] 12.2 Przejść ścieżkę end-to-end na uruchomionym zestawie: dodanie instrumentu w kilku interwałach od odległej daty, dialog, zlecenie, podgląd postępu, wymuszona porażka i ponowienie — *do ręcznego potwierdzenia przez operatora*
+- [ ] 12.2 Przejść ścieżkę end-to-end na uruchomionym zestawie: dodanie instrumentu w kilku interwałach od odległej daty, dialog, zlecenie, podgląd postępu, wymuszona porażka i ponowienie — *częściowo potwierdzone przez operatora 2026-08-09: dodanie, dialog, zlecenie i podgląd postępu przeszły wielokrotnie na żywo (US100, `5m`–`1W`). **Zostaje wymuszona porażka kawałka i ponowienie** — jedyna noga tej ścieżki, której nikt nie przeszedł na uruchomionym zestawie; pokryta wyłącznie testami z podstawionym gatewayem*
 - [x] 12.3 Zaktualizować README terminala o nowy układ zakładek oraz `docs/` tam, gdzie opisują zakładkę `Archive`
 - [x] 12.4 `openspec validate rework-instrument-collection --strict`
