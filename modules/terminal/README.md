@@ -87,6 +87,22 @@ The chart's canvas is not assertable, so chart and grid tests stub the charting 
 and assert what the component *asks it to draw*. What that cannot cover was checked by
 driving a real browser against the real back ends — see Findings.
 
+## Deployed routing
+
+`public/staticwebapp.config.json` tells Azure Static Web Apps to answer any address it
+has no file for with `index.html`, and the router takes it from there. Without it **every
+address except `/` is a 404** — a reload, a bookmarked tab, or anything that navigates for
+real rather than through the router.
+
+That was true from the day this was first deployed and nobody noticed, because clicking
+between tabs never asks a server anything. Signing in is what surfaced it: MSAL returns
+the operator to the address they started from, as a full navigation, and that address is a
+tab.
+
+It lives in `public/` because the deploy uploads `dist/` and that is what Vite copies
+there. `/assets/*` is excluded, so a genuinely missing bundle stays a 404 rather than
+being answered with an HTML page the browser would try to run as JavaScript.
+
 ## Signing in
 
 Deployed, the terminal and `market-data` sit on two different hostnames, so the cookie

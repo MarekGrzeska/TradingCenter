@@ -34,8 +34,12 @@ zanim moduł nie zacznie sprawdzać biletów — inaczej powstaje otwarty WebSoc
       wołał `fileConfig` z domyślnym `disable_existing_loggers=True`, więc alembic uruchamiany
       w testach wyłączał **wszystkie** loggery `market_data.*` — każdy test na to, co moduł loguje,
       przechodziłby z niewłaściwego powodu. Poprawione
-- [ ] 1.10 Wdróż `market-data` i potwierdź, że nic nie przestało działać: `/health` odpowiada,
-      strumień nadal stoi za Easy Auth (a więc jest nieosiągalny z przeglądarki tak samo jak dziś)
+- [x] 1.10 Wdróż `market-data` i potwierdź, że nic nie przestało działać: `/health` odpowiada,
+      strumień nadal stoi za Easy Auth — wdrożone z merge'a PR #22, obraz na App Service to
+      `…:beba4a6`. Przed `apply` **oba** żądania odbijał Easy Auth (`401`, `WWW-Authenticate:
+      Bearer`), co jest właśnie dowodem, że strumień był nadal przykryty. „`/health` odpowiada"
+      nie da się sprawdzić z zewnątrz, bo Easy Auth odpowiada pierwszy; potwierdzone pośrednio
+      w 2.9, gdzie aplikacja odpowiada na zwolnionej ścieżce
 
 ## 2. Infrastruktura: rejestracje, zwolnienie ścieżki, CORS
 
@@ -58,16 +62,25 @@ zanim moduł nie zacznie sprawdzać biletów — inaczej powstaje otwarty WebSoc
       `support_credentials` wyłączone. Komentarz MUST zapisać zakaz dokładania `CORSMiddleware`
       w aplikacji (podwójny nagłówek — design.md, „CORS konfigurowany na App Service")
 - [x] 2.6 `infra/app-service.tf`: ustawienie aplikacji włączające przełącznik z 1.1
-- [ ] 2.7 `terraform fmt`, `validate`, `plan`, `apply` — **`fmt`, `validate` i `plan` czyste**
-      (4 do dodania, 2 do zmiany, 0 do usunięcia). `apply` **zostaje operatorowi**: workflow
-      `terraform.yml` świadomie uruchamia sam `plan`, bo `plan` w CI dostaje 403 na każdym
-      `azuread_application`. Ten krok wykonuje człowiek, lokalnie, na tym samym stanie
-- [ ] 2.8 **Zaraz po `apply`: sprawdź zapytanie wstępne.** `curl -i -X OPTIONS` na trasę archiwum
-      z nagłówkami `Origin`, `Access-Control-Request-Method` i `Access-Control-Request-Headers:
-      authorization`. Odpowiedź `200` z nagłówkami CORS — droga główna. Odpowiedź `401` — odwrót
-      opisany w `design.md` (Risks), i wtedy rozstrzygnięcie z użytkownikiem **przed** grupą 3
-- [ ] 2.9 Potwierdź `curl`-em, że `/ws/candles` nie jest już przechwytywane przez Easy Auth: bez
-      biletu odpowiada odmową modułu, nie stroną logowania ani `401` platformy
+- [x] 2.7 `terraform fmt`, `validate`, `plan`, `apply` — wszystko czyste, `apply` wykonany na
+      polecenie operatora z zapisanego planu (`plan -out` → `apply <plan>`, więc zastosowano
+      dokładnie to, co przejrzano): **4 added, 2 changed, 0 destroyed**. Uwaga na przyszłość:
+      `plan` w CI **nie** dostaje 403 na `azuread_application`, wbrew komentarzowi w
+      `terraform.yml` — check `plan` w PR #22 przeszedł i dał ten sam wynik co lokalny.
+      Komentarz opisuje stan sprzed naprawy `var.operator_object_id` i wymaga poprawki osobno
+- [x] 2.8 **Zaraz po `apply`: sprawdź zapytanie wstępne** — **`200` z `Access-Control-Allow-Origin`
+      i `Access-Control-Allow-Headers: authorization`. Droga główna; odwrót z `design.md`
+      niepotrzebny.** Wbudowany CORS App Service faktycznie obsługuje preflight przed Easy Auth.
+      **Pułapka do zapamiętania:** przez pierwsze ~60 s po `apply` ta sama próba zwracała `401`
+      od Easy Auth, a `excluded_paths` też jeszcze nie działało — konfiguracja auth propaguje się
+      z opóźnieniem. Sprawdzenie zrobione za wcześnie mówi „odwrót" o czymś, co działa
+- [x] 2.9 Potwierdź `curl`-em, że `/ws/candles` nie jest już przechwytywane przez Easy Auth —
+      potwierdzone w logach kontenera: `"WebSocket /ws/candles?symbol=US100&resolution=MINUTE" 403`,
+      `connection rejected (403 Forbidden)`. To jest nasz strażnik: `websocket.close(1008)` przed
+      `accept()` wychodzi na zewnątrz jako HTTP 403. `GET` na tę samą ścieżkę daje `404` z FastAPI,
+      co osobno dowodzi, że odpowiada aplikacja, a nie platforma.
+      **Nagłówek `x-ms-middleware-request-id` nie odróżnia Easy Auth od aplikacji** — dochodzi do
+      obu; rozróżnia dopiero `401` z `WWW-Authenticate: Bearer`
 
 ## 3. `terminal`: tożsamość i bilet
 
