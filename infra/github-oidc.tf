@@ -97,11 +97,30 @@ resource "azurerm_role_assignment" "github_actions_contributor" {
 # for something already known. The name and resource group are fixed by bootstrap/ and
 # are equally hardcoded there.
 locals {
-  tfstate_storage_account_id = join("", [
+  tfstate_resource_group_id = join("", [
     "/subscriptions/${data.azurerm_client_config.current.subscription_id}",
     "/resourceGroups/rg-tradingcenter-tfstate",
+  ])
+  tfstate_storage_account_id = join("", [
+    local.tfstate_resource_group_id,
     "/providers/Microsoft.Storage/storageAccounts/sttradingcenterstate",
   ])
+}
+
+# `Reader` on the state resource group, so `terraform plan` in CI can refresh the two
+# role assignments below. They are the only resources this root manages outside
+# `rg-tradingcenter`, and CI's grant there was data-plane only: it could read and write
+# the state blob but not see the assignment that let it, which failed the plan on
+# `Microsoft.Authorization/roleAssignments/read`.
+#
+# Reader is `*/read` at this scope and nothing more — CI cannot change anything here, and
+# does not apply in the first place. The alternative, moving these assignments into
+# `bootstrap/` where the storage account is created, does not work: bootstrap runs before
+# this root exists and so cannot name the CI principal these grants are for.
+resource "azurerm_role_assignment" "github_actions_tfstate_reader" {
+  scope                = local.tfstate_resource_group_id
+  role_definition_name = "Reader"
+  principal_id         = azuread_service_principal.github_actions.object_id
 }
 
 resource "azurerm_role_assignment" "github_actions_tfstate" {
