@@ -91,6 +91,18 @@ Docker does not pay a minute of silence to reach the same skip.
 
 HTTP, described by OpenAPI at `/docs`.
 
+The same document prints without starting anything — no database, no gateway, no settings,
+because FastAPI builds it from the models in `contract.py`:
+
+```sh
+uv run python -m market_data.openapi > schema.json
+```
+
+The terminal generates its wire types from that, instead of keeping a hand-written copy that
+nothing checks (`npm run contract:generate`, in `modules/terminal`). Change a model here and the
+terminal stops compiling at the line that reads the field — which is the point. Regenerating
+deliberately needs no running stack: a check that needs one is a check nobody runs.
+
 | Method | Path | Returns |
 |--------|------|---------|
 | GET | `/health` | whether the database answers, and what is being collected |
@@ -176,8 +188,15 @@ the time.
 
 ### WebSocket — `/ws/candles?symbol=US100&resolution=MINUTE`
 
-Not in the OpenAPI schema: OpenAPI has no vocabulary for WebSocket payloads, so a path there
-would describe a contract it cannot state. A test keeps the path out of the schema.
+No path in the OpenAPI schema: OpenAPI has no vocabulary for a WebSocket, so an entry under
+`paths` would describe a contract it cannot state. A test keeps the path out.
+
+The **messages** are in the schema, as the `Snapshot` and `CandleChange` components. They are
+ordinary Pydantic models, they are the most-read part of this contract — a chart sees every
+candle through them — and the terminal generates its types from them rather than copying them
+by hand. `openapi.py` hangs them on the document FastAPI builds from the routes, and the app
+publishes that same augmented document, so `/openapi.json` and the dump below are the same
+bytes.
 
 ```jsonc
 // first, exactly once

@@ -59,6 +59,7 @@ from .jobs import (
     retry_job,
 )
 from .models import Candle, PriceSide, Resolution
+from .openapi import add_stream_messages, require_response_fields
 from .rollups import DERIVABLE, read_derived
 from .store import read_candles, read_recent
 from .tracking import (
@@ -170,12 +171,27 @@ app = FastAPI(
         "The candle archive. Reads a range with the parts it never collected marked, "
         "serves a subscription whose first message is a snapshot, and manages which pairs "
         "are collected. Candles are built from the **bid** side, matching capital-gateway. "
-        "The WebSocket at /ws/candles is not described by this schema — see the module "
-        "README."
+        "The WebSocket at /ws/candles has no path here — OpenAPI has no place for one — "
+        "but the messages it sends are published as the `Snapshot` and `CandleChange` "
+        "schemas, so a consumer can be generated against them."
     ),
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# The subscription's message shapes, hung on the document FastAPI builds from the routes.
+# Wrapping rather than replacing keeps FastAPI's own construction untouched, and mutating
+# the dict it caches means the served `/openapi.json` and the dumped one are the same
+# bytes — a generator reading one and a human reading the other must never see two
+# different contracts (`openapi.py`).
+_routes_openapi = app.openapi
+
+
+def _openapi_with_stream() -> dict:
+    return require_response_fields(add_stream_messages(_routes_openapi()))
+
+
+app.openapi = _openapi_with_stream  # type: ignore[method-assign]
 
 
 @app.exception_handler(TrackingRefused)

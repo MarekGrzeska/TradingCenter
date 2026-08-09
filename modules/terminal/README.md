@@ -72,9 +72,10 @@ against it; the archive is started separately (see `modules/market-data/README.m
 ## Test
 
 ```bash
-pnpm test        # vitest — data layer, shell, autocomplete, chart, grid, instruments, history
+pnpm test            # vitest — data layer, shell, autocomplete, chart, grid, instruments, history
 pnpm typecheck
 pnpm lint
+pnpm contract:check  # fails when src/data/contract.generated.ts is stale
 ```
 
 The chart's canvas is not assertable, so chart and grid tests stub the charting library
@@ -84,6 +85,25 @@ driving a real browser against the real back ends — see Findings.
 ## Contract
 
 This module consumes; it publishes nothing.
+
+**The wire types are generated, not copied.** `src/data/contract.generated.ts` comes from
+`market-data`'s own OpenAPI document — including the subscription's `Snapshot` and
+`CandleChange`, which have no HTTP path and are published as components on purpose. The
+thirteen hand-written `Raw*` interfaces in `archive.ts` are now one-line aliases into it.
+
+```bash
+pnpm contract:generate   # after a model changes in market-data's contract.py
+pnpm contract:check      # fails if the committed file is stale
+```
+
+Regenerating needs no running server: the document is printed straight from the Python
+models (`uv run python -m market_data.openapi`). That is deliberate — a check that needs a
+live stack is a check nobody runs, which is how the two copies of this contract drifted
+apart before it existed. A renamed field now stops this module compiling, on the line that
+reads it, instead of arriving as `undefined` and showing up as a blank cell.
+
+The `map*` functions stay hand-written. They are not transcription: they turn ISO strings
+into epoch seconds, which is what keeps one timestamp spelling across the module.
 
 From `market-data` — everything about candles:
 
