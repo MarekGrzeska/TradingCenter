@@ -174,12 +174,20 @@ the Status column above and Re-verified after fixes.
   limit (3.5, a billing decision), the application role (4.7, folded into group 5), the first gateway
   deploy (7.4, blocked on merging to `main` by the OIDC subject filter), and end-to-end verification
   (11.4, which cannot run before 7.4).
+  **Closed since — all four, as of 2026-08-09.** 3.5 is signed over to the operator (a spending
+  decision, not a verification, and it has a September deadline). 4.7 is 5.7, done and checked
+  against the live database. 7.4 deployed green after the GHCR image-name fix in PR #20. 11.4 was
+  carried out in the follow-up change `authenticate-terminal-to-market-data`, which proves all three
+  of its parts on the deployed platform.
 - **No application has been deployed yet.** Findings 2-4 were all first-deploy failures, and they
   survived review-by-reading precisely because no deploy had been attempted; 11.4 is the task that
   would have caught them. The infrastructure side of that gap is now closed — the pipeline has run,
   and running it is what produced the four findings above, including the Key Vault one that reading
   the source three times did not. What remains unproven is the application deploy itself: no image
   has been built, pushed or started in App Service.
+  **No longer true as of 2026-08-09** — both `capital-gateway` and `market-data` are built, pushed
+  and running in App Service, and the terminal is live on Static Web Apps. This paragraph records
+  where the review stood, not where the platform stands.
 - **The reviewer's own reading missed the worst defect in the branch.** The Key Vault lockout was
   invisible in the source because it depends on *who runs Terraform*, and every run until that point
   had been the operator's. Worth remembering as a shape: a `data.azurerm_client_config.current` in a
