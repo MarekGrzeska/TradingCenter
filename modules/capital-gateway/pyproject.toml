@@ -22,6 +22,17 @@ line-length = 100
 # FastAPI's Depends()/Query() in argument defaults are idiomatic, not the B008 bug.
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
 
+[tool.pyright]
+# The module itself. The suite is deliberately outside: its fakes are structural on
+# purpose — a class with the three methods a caller actually uses — and satisfying a
+# checker there would mean a Protocol per seam, bought with nothing the tests do not
+# already prove by running.
+include = ["capital_gateway"]
+# Basic, not strict, and that is the whole point of the step. Basic reads the code as
+# written and asks whether it holds together; strict would additionally demand an
+# annotation on everything, which is a different project with a different payoff.
+typeCheckingMode = "basic"
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 pythonpath = ["."]
@@ -33,6 +44,10 @@ markers = [
 
 [dependency-groups]
 dev = [
+    # Pinned exactly, unlike the rest of this list. A type checker that upgrades itself
+    # decides when this repository's CI turns red, and it does so between two runs of the
+    # same commit — the one kind of failure that teaches nothing. Raised deliberately.
+    "pyright==1.1.411",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "respx>=0.21",

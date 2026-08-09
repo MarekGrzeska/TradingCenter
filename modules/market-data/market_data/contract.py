@@ -17,6 +17,7 @@ from .deletion import PairDeletion
 from .jobs.models import Chunk, ChunkState, Job, JobPairView, JobStatus
 from .jobs.plan import JobEstimate, PairEstimate
 from .models import Candle, PriceSide, Resolution
+from .rollups import DerivedCandle
 from .tracking import CollectionState, TrackedPair
 
 
@@ -31,7 +32,7 @@ class CandleOut(BaseModel):
     volume: float | None = None
 
     @classmethod
-    def of(cls, candle: Candle) -> CandleOut:
+    def of(cls, candle: Candle | DerivedCandle) -> CandleOut:
         return cls(
             time=candle.period_start,
             open=candle.open,
@@ -45,7 +46,12 @@ class CandleOut(BaseModel):
 class Uncovered(BaseModel):
     """A stretch of the requested range the archive has never looked at."""
 
-    from_: datetime = Field(alias="from")
+    # `from` on the wire, `from_` in Python, because the wire name is a keyword here.
+    # Written as the two one-way aliases rather than one `alias=`: a type checker builds
+    # this model's `__init__` from `alias` alone and then rejects `Uncovered(from_=...)`
+    # at every call site. The published document is the same either way — both aliases
+    # say `from`, and `populate_by_name` keeps the Python name accepted on input.
+    from_: datetime = Field(validation_alias="from", serialization_alias="from")
     to: datetime
 
     model_config = {"populate_by_name": True}
@@ -78,7 +84,8 @@ class CandlesOut(BaseModel):
 
 
 class CoverageOut(BaseModel):
-    from_: datetime = Field(alias="from")
+    # Two one-way aliases for one wire name — see `Uncovered.from_`.
+    from_: datetime = Field(validation_alias="from", serialization_alias="from")
     to: datetime
     history_ended: bool = Field(
         description="true when the provider has nothing older than `from`"
@@ -256,6 +263,10 @@ class TrackPairRequest(BaseModel):
     def resolved_pairs(self) -> list[PairRequest]:
         if self.pairs is not None:
             return self.pairs
+        # `_one_shape_only` has already refused a body with neither, so the single-pair
+        # shape always carries a symbol. Stated here because that guarantee lives in a
+        # different method and nothing but this line depends on it.
+        assert self.symbol is not None
         return [PairRequest(symbol=self.symbol, resolution=self.resolution)]
 
 

@@ -15,7 +15,7 @@ from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
-from market_data.db import sqlalchemy_url
+from market_data.db import Credential, sqlalchemy_url
 
 config = context.config
 
@@ -42,10 +42,12 @@ def _database_url() -> str:
     # the environment just to get this far.
     from market_data.config import Settings
 
-    return sqlalchemy_url(Settings().database_url)
+    # `call-arg` ignored as in `app.py`: every field of `Settings` comes from the
+    # environment, and a type checker reading only the class sees required arguments.
+    return sqlalchemy_url(Settings().database_url)  # type: ignore[call-arg]
 
 
-def _identity_connect_args() -> tuple[dict, object | None]:
+def _identity_connect_args() -> tuple[dict, Credential | None]:
     """Identity auth for the engine this migration run drives — the same mechanism
     `db.py` uses for the application itself, so a migration proves the role it runs as
     can do exactly what the running module will later need (specs/market-data-database-
@@ -58,7 +60,7 @@ def _identity_connect_args() -> tuple[dict, object | None]:
     from market_data.config import Settings
     from market_data.db import identity_connect_args
 
-    settings = Settings()
+    settings = Settings()  # type: ignore[call-arg]
     # Local mode: no DATABASE_USER means the URL carries its own credential and points
     # at loopback (config.py enforces both), so the engine needs no identity arguments —
     # the same shape as a test's throwaway database.

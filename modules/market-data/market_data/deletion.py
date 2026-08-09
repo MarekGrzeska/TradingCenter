@@ -34,6 +34,7 @@ import asyncpg
 from pydantic import BaseModel
 
 from .coverage import delete_all_coverage
+from .db import fetch_one
 from .jobs.store import skip_pending_chunks_for_pair
 from .models import Resolution
 from .rollups import delete_all_for_symbol
@@ -101,8 +102,8 @@ async def delete_pair_data(
         await delete_all_coverage(conn, symbol, resolution)
         if resolution is Resolution.MINUTE:
             await delete_all_for_symbol(conn, symbol)
-        row = await conn.fetchrow(
-            _INSERT_DELETION, symbol, resolution.value, removed, earliest, latest
+        row = await fetch_one(
+            conn, _INSERT_DELETION, symbol, resolution.value, removed, earliest, latest
         )
 
     return PairDeletion(

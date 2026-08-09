@@ -129,7 +129,11 @@ class CapitalAdapter:
         seen: set[str] = set()
         out: list[Instrument] = []
         for m in markets:
-            epic = m.get("epic")
+            # Subscripted, not `.get`: the epic is the instrument's identity and
+            # `instrument_from_market` requires it two lines down, so a market without one
+            # is a provider payload nobody can read — better said here than deduplicated
+            # under a `None` key first.
+            epic = m["epic"]
             # The same instrument hangs under several branches, so without this the
             # catalogue reports duplicates as separate instruments.
             if epic in seen:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from fastapi import (
@@ -21,7 +22,7 @@ from ..contract import (
 )
 from ..coverage import earliest_reachable, read_coverage, uncovered_within
 from ..models import Candle, PriceSide, Resolution
-from ..rollups import DERIVABLE, read_derived
+from ..rollups import DERIVABLE, DerivedCandle, read_derived
 from ..store import read_candles
 from .deps import pool
 
@@ -70,10 +71,12 @@ async def candles(
         # the rollup table unconditionally answered such a pair with an empty series
         # while coverage said the range was verified — which reads as "the market was
         # shut all day", the one confident wrong answer this module exists to prevent.
-        series: list[Candle] = list(await read_candles(conn, symbol, resolution, start, end))
+        series: Sequence[Candle | DerivedCandle] = await read_candles(
+            conn, symbol, resolution, start, end
+        )
         derived = False
         if not series and resolution in DERIVABLE:
-            series = list(await read_derived(conn, symbol, resolution, start, end))
+            series = await read_derived(conn, symbol, resolution, start, end)
             derived = True
         gaps = await uncovered_within(conn, symbol, resolution, start, end)
 

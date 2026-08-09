@@ -11,6 +11,7 @@ from datetime import datetime
 
 import asyncpg
 
+from ..db import fetch_one
 from ..models import Resolution
 from .models import (
     RETRYABLE_CHUNK_STATES,
@@ -172,7 +173,7 @@ async def create_job(
     was nothing left to fetch for it.
     """
     async with conn.transaction():
-        row = await conn.fetchrow(_INSERT_JOB, requested_from)
+        row = await fetch_one(conn, _INSERT_JOB, requested_from)
         job_id = row["id"]
         for plan in plans:
             await conn.execute(
@@ -323,7 +324,7 @@ async def retry_job(conn: asyncpg.Connection, job_id: int) -> Job:
         )
 
     async with conn.transaction():
-        row = await conn.fetchrow(_BUMP_JOB_ATTEMPT, job_id)
+        row = await fetch_one(conn, _BUMP_JOB_ATTEMPT, job_id)
         new_attempt = row["attempt"]
         await conn.fetch(
             _RESET_RETRYABLE_CHUNKS,

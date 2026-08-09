@@ -32,6 +32,12 @@ _SCHEME_SEPARATOR = "://"
 # or a service principal authenticating locally (design.md, "Do bazy — tożsamość").
 _AAD_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
 
+# The two shapes the database credential takes: a service principal locally, the App
+# Service's managed identity in Azure. Named once because three signatures hand the same
+# value along, and a narrower annotation on any one of them is a claim this module cannot
+# keep — which is exactly what it was before, and what a type checker noticed.
+Credential = ClientSecretCredential | DefaultAzureCredential
+
 
 def asyncpg_dsn(database_url: str) -> str:
     """The URL as asyncpg takes it: scheme without a driver suffix."""
@@ -62,7 +68,7 @@ def _connection_target(database_url: str) -> str:
 
 def _credential(
     client_id: str | None, client_secret: str | None, tenant_id: str | None
-) -> ClientSecretCredential | DefaultAzureCredential:
+) -> Credential:
     """Which Entra credential this process authenticates to the database with.
 
     All three present selects a service principal — local development's own identity
@@ -97,7 +103,7 @@ class _TokenProvider:
     is close to expiring, so this is not one network round-trip per connection either.
     """
 
-    def __init__(self, credential: DefaultAzureCredential) -> None:
+    def __init__(self, credential: Credential) -> None:
         self._credential = credential
 
     async def __call__(self) -> str:
@@ -117,7 +123,7 @@ def identity_connect_args(
     client_id: str | None,
     client_secret: str | None,
     tenant_id: str | None,
-) -> tuple[dict[str, object], ClientSecretCredential | DefaultAzureCredential]:
+) -> tuple[dict[str, object], Credential]:
     """`connect_args` for a SQLAlchemy engine reaching this database with identity auth.
 
     For `migrations/env.py`, which drives its own engine rather than going through
@@ -227,3 +233,21 @@ async def pool(
             yield created
         finally:
             await created.close()
+
+
+async def fetch_one(conn: asyncpg.Connection, query: str, *args: object) -> asyncpg.Record:
+    """`fetchrow` for a statement that cannot answer with nothing.
+
+    An `INSERT … RETURNING` and an aggregate `SELECT` each produce exactly one row, but
+    asyncpg types every `fetchrow` as optional because most statements can miss. Indexing
+    the result straight away is therefore right and unprovable at the same time, and the
+    proof lives in the query three lines above — until someone moves one of the two.
+
+    Named here instead of assumed at six call sites. A statement that does come back empty
+    is a broken invariant, and reading it as such beats a `TypeError` further down about a
+    `None` whose origin is no longer visible.
+    """
+    row = await conn.fetchrow(query, *args)
+    if row is None:
+        raise RuntimeError(f"no row from a statement that always returns one: {query.strip()}")
+    return row

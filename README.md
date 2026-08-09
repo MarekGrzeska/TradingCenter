@@ -109,8 +109,8 @@ one case it was written for.
 
 | Job | Runs |
 |---|---|
-| `capital-gateway` | `ruff check`, `pytest` |
-| `market-data` | `ruff check`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
+| `capital-gateway` | `ruff check`, `pyright`, `pytest` |
+| `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
 | `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
 
 `contract:check` runs before the terminal's tests on purpose: it compares

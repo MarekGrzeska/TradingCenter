@@ -97,6 +97,7 @@ uv run pytest                      # unit tests only; anything needing a databas
 uv run pytest -m db                # integration tests, needs a running Docker daemon
 uv run pytest -m live --run-live   # reads through a real gateway on :8010
 uv run ruff check .
+uv run pyright                     # types, over `market_data/` and `migrations/`
 ```
 
 Tests marked `db` run against a throwaway PostgreSQL container, started for the session and
