@@ -109,6 +109,14 @@ needs `bash` — which means git-bash on Windows, where it would otherwise not r
 After editing it, run `.claude/hooks/require-review.test.sh`; a hook that cannot execute
 allows everything and reports nothing, so it is not a thing to change untested.
 
+**An archived change keeps three artifacts, not five.** Once the directory has moved into
+`openspec/changes/archive/`, run `scripts/trim-openspec-archive.sh`: it removes the delta
+specs and the ticked `tasks.md`. The delta was merged into `openspec/specs/` by that same
+archive, and what was done and when is git's, with the diffs attached. `proposal.md`,
+`design.md` and `review.md` stay — those are what git cannot hand back in readable form.
+The rule rides in `openspec/config.yaml` under `operations.archive`, so `/opsx:archive` is
+told it; `--check` in CI is what catches the archive where it was not.
+
 **Language convention, and it is not the obvious one:** OpenSpec artifacts are written in
 **Polish prose** with **English structure** — section headers, `### Requirement:`,
 `#### Scenario:`, `**WHEN**`/`**THEN**`, and RFC 2119 keywords (`MUST`, `SHALL`, …) stay

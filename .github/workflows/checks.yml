@@ -39,6 +39,7 @@ jobs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
       market-data: ${{ steps.filter.outputs.market-data }}
       terminal: ${{ steps.filter.outputs.terminal }}
+      openspec: ${{ steps.filter.outputs.openspec }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -77,12 +78,15 @@ jobs:
           # own directory alone would let a contract change land with the check that
           # exists to catch it never running — the exact failure the check was added for.
           terminal='^modules/terminal/|^modules/market-data/market_data/contract\.py$'
+          # The archive-shape check, plus the script that is the shape.
+          specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
 
-          for name in capital-gateway market-data terminal; do
+          for name in capital-gateway market-data terminal openspec; do
             case "$name" in
               capital-gateway) pattern="$gateway" ;;
               market-data)     pattern="$archive" ;;
               terminal)        pattern="$terminal" ;;
+              openspec)        pattern="$specs" ;;
             esac
             if matches "$pattern|$self"; then
               echo "$name=true" >> "$GITHUB_OUTPUT"
@@ -167,3 +171,22 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+  # An archived change keeps proposal, design and review. Its delta specs were merged into
+  # `openspec/specs/` by the archive itself and its ticked `tasks.md` is a worse account of
+  # the work than the commits are, so both are removed on the way in — and a copy that
+  # lives twice is a copy that drifts.
+  #
+  # `/opsx:archive` is told to run the script (`openspec/config.yaml`, `operations.archive`,
+  # verified to reach the workflow through `openspec instructions archive --json`). That
+  # channel is advisory by its own contract, which makes it the right place for the rule
+  # and the wrong place to leave it alone: this step is what notices the archive where it
+  # was not followed. One checkout and one script — there is nothing to install.
+  openspec:
+    name: openspec
+    needs: changes
+    if: needs.changes.outputs.openspec == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/trim-openspec-archive.sh --check
