@@ -37,6 +37,19 @@ log = logging.getLogger(__name__)
 # status this module already has cached, for no fresher an answer.
 REFRESH_INTERVAL_SECONDS = 60
 
+# Libraries that talk at INFO about their own plumbing, held to WARNING once the root
+# logger has a level at all.
+#
+# `azure` is the one that matters, and it is not merely noise: the Application Insights
+# exporter logs each telemetry upload — "Transmission succeeded: Item received: 3" — and
+# that log line is itself telemetry, which is uploaded, which is logged. A quiet process
+# produced 165 entries in fifteen minutes, nearly all of them the exporter describing
+# itself. `azure.identity` adds three lines per token, several times a second at startup.
+#
+# The rest is ordinary volume: one line per outbound gateway request, which this module
+# already reports in terms of what the request was *for*.
+NOISY_LOGGERS = ("azure", "httpx", "httpcore", "urllib3")
+
 
 class CandleAgeGauge:
     """The last-computed age, in seconds, of each pair's newest candle — for pairs whose
@@ -92,6 +105,8 @@ def configure_logging() -> None:
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
         stream=sys.stdout,
     )
+    for name in NOISY_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
 
 
 def register(gauge: CandleAgeGauge) -> None:

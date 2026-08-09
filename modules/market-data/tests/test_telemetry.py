@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
+from market_data import telemetry
 from market_data.errors import GatewayUnreachable
 from market_data.market_status import MarketStatus
 from market_data.models import Candle, CandleSource, Resolution
@@ -136,3 +138,43 @@ async def test_a_gateway_that_will_not_say_still_reports_the_pair(db) -> None:
     ages = await compute_ages(_FakePool(db), Unreachable(), MarketStatus(), now=NOW)
 
     assert ("US100", "MINUTE") in ages
+
+
+# --- logging configuration ------------------------------------------------------------
+
+
+def test_configure_logging_gives_the_root_logger_a_level_and_a_handler(monkeypatch) -> None:
+    """Without this the module writes into the void: uvicorn configures only its own
+    three loggers, so the root keeps its default WARNING and no handler at all."""
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", [])
+    monkeypatch.setattr(root, "level", logging.WARNING)
+
+    telemetry.configure_logging()
+
+    assert root.handlers
+    assert root.level == logging.INFO
+
+
+def test_configure_logging_silences_the_exporter_that_would_describe_itself(monkeypatch) -> None:
+    """The Application Insights exporter logs every telemetry upload, and that line is
+    itself telemetry — uploaded, then logged again. Left alone it fills the log with an
+    account of its own plumbing."""
+    monkeypatch.setattr(logging.getLogger(), "handlers", [])
+    logging.getLogger("azure").setLevel(logging.NOTSET)
+
+    telemetry.configure_logging()
+
+    assert logging.getLogger("azure").level == logging.WARNING
+    for name in telemetry.NOISY_LOGGERS:
+        assert logging.getLogger(name).level == logging.WARNING
+
+
+def test_log_level_can_be_turned_down_without_a_deploy(monkeypatch) -> None:
+    monkeypatch.setenv("LOG_LEVEL", "warning")
+    root = logging.getLogger()
+    monkeypatch.setattr(root, "handlers", [])
+
+    telemetry.configure_logging()
+
+    assert root.level == logging.WARNING
