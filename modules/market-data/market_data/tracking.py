@@ -162,12 +162,6 @@ _SELECT_TRACKED = """
      ORDER BY added_at, symbol, resolution
 """
 
-_SELECT_ALL = """
-    SELECT symbol, resolution, state, added_at, untracked_at, collect_from
-      FROM tracked_pairs
-     ORDER BY added_at, symbol, resolution
-"""
-
 _IS_TRACKED = """
     SELECT 1 FROM tracked_pairs
      WHERE symbol = $1 AND resolution = $2 AND state = 'tracked'
@@ -271,11 +265,6 @@ async def read_tracked(conn: asyncpg.Connection) -> list[TrackedPair]:
     This is what a restart reads. There is no list in a file to disagree with it.
     """
     return [_pair(row) for row in await conn.fetch(_SELECT_TRACKED)]
-
-
-async def read_all(conn: asyncpg.Connection) -> list[TrackedPair]:
-    """Every pair ever tracked, including the ones that were stopped."""
-    return [_pair(row) for row in await conn.fetch(_SELECT_ALL)]
 
 
 async def is_tracked(conn: asyncpg.Connection, symbol: str, resolution: Resolution) -> bool:

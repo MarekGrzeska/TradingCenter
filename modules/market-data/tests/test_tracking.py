@@ -21,7 +21,6 @@ from market_data.tracking import (
     collection_state,
     default_collect_from,
     is_tracked,
-    read_all,
     read_status,
     read_tracked,
     track,
@@ -31,6 +30,17 @@ from market_data.tracking import (
 MOMENT = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
 BASE_URL = "http://gateway.test:8010"
 LIMIT = 20
+
+
+async def all_pairs(db: asyncpg.Connection) -> list[asyncpg.Record]:
+    """Every row of `tracked_pairs`, the stopped ones included.
+
+    Read from the table rather than through the module, because nothing in the module
+    reads it this way: collection asks `read_tracked`, which is the live pairs only. A
+    reader that exists solely to be asserted on is a reader free to drift away from what
+    the code actually does.
+    """
+    return await db.fetch("SELECT state FROM tracked_pairs ORDER BY added_at, symbol")
 
 
 def candle(symbol: str = "US100", resolution: Resolution = Resolution.MINUTE, **overrides):
@@ -289,7 +299,7 @@ async def test_a_stopped_pair_is_still_on_the_record(db: asyncpg.Connection) -> 
     await track(db, "US100", Resolution.MINUTE, LIMIT)
     await untrack(db, "US100", Resolution.MINUTE)
 
-    assert [p.state for p in await read_all(db)] == [TrackedPairState.UNTRACKED]
+    assert [row["state"] for row in await all_pairs(db)] == [TrackedPairState.UNTRACKED]
 
 
 @pytest.mark.db
@@ -303,7 +313,7 @@ async def test_tracking_a_stopped_pair_again_resumes_the_same_decision(
 
     assert resumed.added_at == original.added_at
     assert resumed.untracked_at is None
-    assert len(await read_all(db)) == 1
+    assert len(await all_pairs(db)) == 1
 
 
 # --- 6.5: the configuration outliving the process ------------------------------------
