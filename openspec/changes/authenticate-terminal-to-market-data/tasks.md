@@ -71,35 +71,39 @@ zanim moduł nie zacznie sprawdzać biletów — inaczej powstaje otwarty WebSoc
 
 ## 3. `terminal`: tożsamość i bilet
 
-- [ ] 3.1 Dodaj `@azure/msal-browser`; moduł `src/auth/` opakowujący logowanie przekierowaniem,
+- [x] 3.1 Dodaj `@azure/msal-browser`; moduł `src/auth/` opakowujący logowanie przekierowaniem,
       ciche odnawianie i pobranie tokenu dla zakresu archiwum. Pamięć podręczna w `sessionStorage`
-- [ ] 3.2 Konfiguracja tożsamości w `config.ts` (`VITE_ENTRA_*`) — jej **brak** oznacza pracę bez
+- [x] 3.2 Konfiguracja tożsamości w `config.ts` (`VITE_ENTRA_*`) — jej **brak** oznacza pracę bez
       tokenu, nie awarię; testy jak dla pozostałych zmiennych (`config.test.ts`)
-- [ ] 3.3 Rozstrzygnij przekierowanie z logowania w `main.tsx`, zanim aplikacja się zamontuje —
+- [x] 3.3 Rozstrzygnij przekierowanie z logowania w `main.tsx`, zanim aplikacja się zamontuje —
       pierwszy render już subskrybuje świece
-- [ ] 3.4 `http.ts`: `jsonClient` dostaje dostawcę tokenu i dokłada `Authorization` do każdego
+- [x] 3.4 `http.ts`: `jsonClient` dostaje dostawcę tokenu i dokłada `Authorization` do każdego
       żądania; `archive.ts` i `gatewaySource.ts` MUST NOT wiedzieć o tokenie
-- [ ] 3.5 `http.ts`: jedna ponowna próba po odmowie z powodu tożsamości, po cichym odnowieniu
+- [x] 3.5 `http.ts`: jedna ponowna próba po odmowie z powodu tożsamości, po cichym odnowieniu
       tokenu, ze strażnikiem przed pętlą „odmowa → odnowienie → odmowa"
-- [ ] 3.6 `archive.ts`: pobranie świeżego biletu przed **każdą** próbą zestawienia strumienia,
+- [x] 3.6 `archive.ts`: pobranie świeżego biletu przed **każdą** próbą zestawienia strumienia,
       w tym przed każdą próbą po zerwaniu; bilet trafia do adresu, token MUST NOT
-- [ ] 3.7 `socketHub.ts`: utrata tożsamości jako trzeci rodzaj niepowodzenia obok zerwania
+- [x] 3.7 `socketHub.ts`: utrata tożsamości jako trzeci rodzaj niepowodzenia obok zerwania
       i odmowy dotyczącej pary — zatrzymuje ponawianie i mówi „zaloguj się"; nieudane pobranie
       biletu z innej przyczyny nadal znaczy „ponawiaj"
       (`specs/terminal-market-data/spec.md`, wymaganie zmodyfikowane)
-- [ ] 3.8 Powłoka pokazuje stan zalogowania obok stanu źródeł danych, z akcją logowania; stan
+- [x] 3.8 Powłoka pokazuje stan zalogowania obok stanu źródeł danych, z akcją logowania; stan
       „niezalogowany" MUST NOT być pokazany jako niedostępność archiwum
-- [ ] 3.9 `pnpm contract:generate` — trasa wydająca bilety wchodzi do kontraktu; `contract:check`
-      zielony
-- [ ] 3.10 Testy do `specs/terminal-identity/spec.md` i do zmodyfikowanego wymagania
+- [x] 3.9 `pnpm contract:generate` — trasa wydająca bilety wchodzi do kontraktu; `contract:check`
+      zielony. `archive.ts` czyta bilet przez wygenerowany `StreamTicketOut`, nie przez kształt
+      wpisany ręcznie
+- [x] 3.10 Testy do `specs/terminal-identity/spec.md` i do zmodyfikowanego wymagania
       w `specs/terminal-market-data/spec.md`: nagłówek dokładany do każdego żądania, odmowa
       naprawiona odnowieniem, odmowa go przeżywająca, brak pętli, świeży bilet na każdą próbę,
       utrata tożsamości zatrzymuje ponawianie, brak poświadczeń w komunikatach, tryb bez
       konfiguracji
-- [ ] 3.11 Zaktualizuj `modules/terminal/.env.example` i `README.md` (w tym pułapka konta gościa
+- [x] 3.11 Zaktualizuj `modules/terminal/.env.example` i `README.md` (w tym pułapka konta gościa
       B2B logującego się innym UPN-em)
-- [ ] 3.12 `pnpm test`, `lint`, `typecheck` zielone
-- [ ] 3.13 `.github/workflows/deploy-terminal.yml`: przekaż `VITE_ENTRA_*` do builda. Są to
+- [x] 3.12 `pnpm test`, `lint`, `typecheck` zielone — 239 passed (17 plików). Zestawienie połączenia
+      przestało być synchroniczne (najpierw bilet, potem socket), więc testy hubu i siatki czekają
+      teraz jedno przejście pętli zdarzeń przed sięgnięciem po socket. Podwójka HTTP w `src/test/`
+      przekazuje nagłówki — bez tego nie dało się sprawdzić, że token w ogóle wychodzi
+- [x] 3.13 `.github/workflows/deploy-terminal.yml`: przekaż `VITE_ENTRA_*` do builda. Są to
       identyfikatory publiczne — idą jawnie albo przez `vars`, **nigdy przez `secrets`**
 
 ## 4. Wdrożenie i weryfikacja end-to-end

@@ -759,3 +759,141 @@ describe("archive: collection jobs", () => {
     await expect(source().retryJob(999, signal())).rejects.toMatchObject({ kind: "not-found" });
   });
 });
+
+/**
+ * Opening the stream, which costs a ticket.
+ *
+ * A browser cannot put a header on a WebSocket handshake, so the operator's
+ * token cannot travel with one. The archive answers that with a ticket good
+ * once — asked for over HTTP, where headers work, and spent on the address.
+ * These check the two properties the arrangement rests on: the token never
+ * reaches the address, and no ticket is ever used twice.
+ */
+describe("archive.subscribe (the ticket the handshake costs)", () => {
+  /** Constructible on purpose: the hub reaches the socket through `new
+   *  WebSocket(url)`, and an arrow function cannot be `new`-ed. */
+  function socketSpy() {
+    const urls: string[] = [];
+    const opened: FakeBrowserSocket[] = [];
+    function FakeBrowserSocket(this: FakeBrowserSocket, url: string) {
+      urls.push(url);
+      this.onopen = null;
+      this.onclose = null;
+      this.onerror = null;
+      this.onmessage = null;
+      this.close = () => {};
+      opened.push(this);
+    }
+    return { urls, opened, factory: FakeBrowserSocket as unknown as typeof WebSocket };
+  }
+
+  interface FakeBrowserSocket {
+    onopen: (() => void) | null;
+    onclose: ((event: { code: number; reason: string }) => void) | null;
+    onerror: (() => void) | null;
+    onmessage: ((event: { data: string }) => void) | null;
+    close: () => void;
+  }
+
+  /** `createArchiveSource` builds its own hub, so the socket is reached the
+   *  only way a test can reach it: through the global the browser would use.
+   *
+   *  Installed for the whole test rather than around the `subscribe` call. The
+   *  hub asks for a ticket before it dials, so the socket is constructed a
+   *  microtask *after* `subscribe` returns — restoring the global on the way
+   *  out of a synchronous block would put the real one back first, and the
+   *  spy would see nothing. */
+  let restoreWebSocket: (() => void) | null = null;
+
+  function installFakeWebSocket(factory: typeof WebSocket): void {
+    const original = globalThis.WebSocket;
+    (globalThis as { WebSocket: unknown }).WebSocket = factory;
+    restoreWebSocket = () => {
+      (globalThis as { WebSocket: unknown }).WebSocket = original;
+    };
+  }
+
+  afterEach(() => {
+    restoreWebSocket?.();
+    restoreWebSocket = null;
+  });
+
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("asks for a ticket and puts it in the address, never the token", async () => {
+    let authorization: string | null = null;
+    let issued = 0;
+    server.use(
+      http.post(`${HTTP_BASE}/stream-tickets`, ({ request }) => {
+        authorization = request.headers.get("Authorization");
+        issued += 1;
+        return HttpResponse.json({ ticket: "ticket-one", expires_in_seconds: 30 });
+      }),
+    );
+    const spy = socketSpy();
+    const identity = {
+      state: () => "signed-in" as const,
+      subscribe: () => () => {},
+      token: async () => "operator-token",
+      refresh: async () => "operator-token",
+      signIn: () => {},
+    };
+
+    installFakeWebSocket(spy.factory);
+    createArchiveSource(HTTP_BASE, "ws://archive.test/ws", identity).subscribe(
+      "US100",
+      "MINUTE_5" as Resolution,
+      () => {},
+    );
+    await settle();
+
+    expect(issued).toBe(1);
+    // The token proves who is asking, over HTTP, where a header exists…
+    expect(authorization).toBe("Bearer operator-token");
+    // …and the address carries only what is worthless a second later.
+    expect(spy.urls[0]).toContain("ticket=ticket-one");
+    expect(spy.urls[0]).not.toContain("operator-token");
+  });
+
+  it("asks for a new ticket on every attempt, because a spent one is not a ticket", async () => {
+    let issued = 0;
+    server.use(
+      http.post(`${HTTP_BASE}/stream-tickets`, () => {
+        issued += 1;
+        return HttpResponse.json({ ticket: `ticket-${issued}`, expires_in_seconds: 30 });
+      }),
+      // The reconnect loop asks this before settling in; answering keeps the
+      // test about tickets rather than about diagnosis.
+      http.get(`${HTTP_BASE}/pairs`, () =>
+        HttpResponse.json([
+          {
+            symbol: "US100",
+            resolution: "MINUTE_5",
+            added_at: "2026-08-09T12:00:00Z",
+            collect_from: "2026-08-09T12:00:00Z",
+            earliest_candle: null,
+            latest_candle: null,
+            collection: "collecting",
+          },
+        ]),
+      ),
+    );
+    const spy = socketSpy();
+
+    installFakeWebSocket(spy.factory);
+    createArchiveSource(HTTP_BASE, "ws://archive.test/ws").subscribe(
+      "US100",
+      "MINUTE_5" as Resolution,
+      () => {},
+    );
+    await settle();
+    // The connection drops; the hub diagnoses, finds the pair is collected, and
+    // retries — which must cost a second ticket, not repeat the first.
+    spy.opened[0].onclose?.({ code: 1006, reason: "" });
+    await new Promise((resolve) => setTimeout(resolve, 900));
+
+    expect(spy.urls).toHaveLength(2);
+    expect(spy.urls[0]).toContain("ticket=ticket-1");
+    expect(spy.urls[1]).toContain("ticket=ticket-2");
+  });
+});

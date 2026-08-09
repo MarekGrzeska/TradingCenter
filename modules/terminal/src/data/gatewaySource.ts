@@ -1,3 +1,4 @@
+import { noIdentity, type Identity } from "../auth/identity";
 import { jsonClient } from "./http";
 import { MarketDataError } from "./types";
 import type { AssetClass, Instrument, InstrumentPage } from "./types";
@@ -69,8 +70,14 @@ function mapStatus(status: number, detail: string): MarketDataError {
   return new MarketDataError("unknown", detail);
 }
 
-export function createGatewaySource(httpBase: string): InstrumentSource {
-  const http = jsonClient("capital-gateway", mapStatus);
+export function createGatewaySource(
+  httpBase: string,
+  identity: Identity = noIdentity,
+): InstrumentSource {
+  // The same identity the archive uses, because this is the same deployment: the
+  // catalogue is the gateway's data, but the address answering for it is
+  // market-data's, behind the same authenticator.
+  const http = jsonClient("capital-gateway", mapStatus, identity);
 
   return {
     id: "gateway",

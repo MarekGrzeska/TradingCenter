@@ -1,4 +1,9 @@
-import type { ConnectionState, Resolution, StreamEvent } from "./types";
+import { MarketDataError, type ConnectionState, type Resolution, type StreamEvent } from "./types";
+
+/** The one failure whose answer is "sign in" rather than "try again". */
+function isSignedOut(cause: unknown): cause is MarketDataError {
+  return cause instanceof MarketDataError && cause.kind === "unauthenticated";
+}
 
 /** The subset of the WebSocket surface the hub touches — injectable so tests
  *  drive a fake transport instead of a real socket. */
@@ -12,8 +17,19 @@ export interface SocketLike {
 
 export type SocketFactory = (url: string) => SocketLike;
 
-/** Where one pair's stream lives. */
-export type UrlFor = (symbol: string, resolution: Resolution) => string;
+/**
+ * Where one pair's stream lives — asked afresh for every attempt, including
+ * every retry after a drop.
+ *
+ * It is a promise because the address is not a constant any more. The archive
+ * hands out a one-time ticket for the handshake (a browser cannot put a header
+ * on one), so composing the URL means asking for a ticket, and a ticket already
+ * spent is no ticket at all. Nothing here reuses an address.
+ *
+ * Rejecting is meaningful: a rejection that is a `MarketDataError` of kind
+ * `unauthenticated` stops the retrying, and any other rejection resumes it.
+ */
+export type UrlFor = (symbol: string, resolution: Resolution) => Promise<string>;
 
 /** One received frame, in the terminal's vocabulary. Returning a list rather
  *  than one event lets a single frame mean several things — a snapshot carrying
@@ -143,8 +159,33 @@ export class SocketHub {
   private connect(key: string, entry: HubEntry): void {
     entry.state = entry.everConnected ? "reconnecting" : "connecting";
     this.broadcast(entry, { kind: "status", state: entry.state });
+    void this.open(key, entry);
+  }
 
-    const socket = this.createSocket(this.urlFor(entry.symbol, entry.resolution));
+  /** The attempt itself, which now begins with a wait: the address has to be
+   *  asked for before it can be dialled.
+   *
+   *  Three ways it can end before a socket exists. The entry was torn down while
+   *  the address was in flight — drop it, silently, because nobody is listening.
+   *  The operator is signed out — stop, and say so, because no number of
+   *  attempts will produce an address. Anything else — retry, because a source
+   *  that will not answer right now is the case retrying exists for. */
+  private async open(key: string, entry: HubEntry): Promise<void> {
+    let url: string;
+    try {
+      url = await this.urlFor(entry.symbol, entry.resolution);
+    } catch (cause) {
+      if (entry.torndown || !this.entries.has(key)) return;
+      if (isSignedOut(cause)) {
+        this.refuse(entry, cause.message);
+        return;
+      }
+      this.scheduleReconnect(key, entry);
+      return;
+    }
+    if (entry.torndown || !this.entries.has(key)) return;
+
+    const socket = this.createSocket(url);
     entry.socket = socket;
 
     socket.onopen = () => {
@@ -191,13 +232,24 @@ export class SocketHub {
    *
    *  A diagnosis that itself fails resolves nothing and must not be treated as
    *  "no reason found" — the source not answering is the case retrying exists
-   *  for. Either way the entry may have been torn down while the answer was in
-   *  flight, so both paths check before touching it. */
+   *  for. **With one exception**: a diagnosis refused because the operator is
+   *  signed out has resolved something, and the answer is not "retry". Without
+   *  that exception an expired session looks exactly like an unreachable
+   *  archive, and the terminal would retry it forever while never saying the
+   *  one thing that would fix it.
+   *
+   *  Either way the entry may have been torn down while the answer was in
+   *  flight, so every path checks before touching it. */
   private async askWhy(key: string, entry: HubEntry): Promise<void> {
     let reason: string | null = null;
     try {
       reason = await this.diagnose!(entry.symbol, entry.resolution);
-    } catch {
+    } catch (cause) {
+      if (entry.torndown || !this.entries.has(key)) return;
+      if (isSignedOut(cause)) {
+        this.refuse(entry, cause.message);
+        return;
+      }
       reason = null;
     }
     if (entry.torndown || !this.entries.has(key)) return;

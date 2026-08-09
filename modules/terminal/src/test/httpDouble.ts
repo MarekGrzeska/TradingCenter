@@ -75,9 +75,14 @@ export function setupServer(...initial: Handler[]): MockServer {
     const url = new URL(raw, globalThis.location?.href ?? "http://localhost").href;
     const method = (init?.method ?? "GET").toUpperCase();
     const body = init?.body;
+    // Carried through because a resolver now has a reason to read them: the
+    // shared client attaches the operator's token itself, and the only way to
+    // assert that it did is to look at what arrived.
+    const headers = new Headers(init?.headers as HeadersInit | undefined);
     const request = {
       url,
       method,
+      headers,
       async json() {
         return typeof body === "string" ? JSON.parse(body) : body;
       },

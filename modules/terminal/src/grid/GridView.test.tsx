@@ -295,10 +295,14 @@ describe("Grid connection sharing (terminal-market-data spec)", () => {
     }
   }
 
-  it("shares one connection between two slots on the same pair, and frees it with the last", () => {
+  /** A socket exists one microtask after `subscribe`, not on the next line: the
+   *  hub asks the archive for a one-time stream ticket before it dials. */
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+  it("shares one connection between two slots on the same pair, and frees it with the last", async () => {
     const sockets: FakeSocket[] = [];
     const hub = new SocketHub(
-      (symbol, resolution) => `ws://test/ws/candles?symbol=${symbol}&resolution=${resolution}`,
+      async (symbol, resolution) => `ws://test/ws/candles?symbol=${symbol}&resolution=${resolution}`,
       () => [],
       () => {
         const socket = new FakeSocket();
@@ -311,6 +315,7 @@ describe("Grid connection sharing (terminal-market-data spec)", () => {
     const unsubA = hub.subscribe("US100", "MINUTE_5", () => {});
     const unsubB = hub.subscribe("US100", "MINUTE_5", () => {});
     const unsubC = hub.subscribe("GOLD", "MINUTE_5", () => {});
+    await settle();
 
     expect(sockets).toHaveLength(2);
     expect(hub.activeConnectionCount()).toBe(2);
@@ -327,10 +332,10 @@ describe("Grid connection sharing (terminal-market-data spec)", () => {
     expect(sockets[0].closed).toBe(true);
   });
 
-  it("opens at most one connection per pair for a full 3x2 of distinct pairs", () => {
+  it("opens at most one connection per pair for a full 3x2 of distinct pairs", async () => {
     const sockets: FakeSocket[] = [];
     const hub = new SocketHub(
-      (symbol, resolution) => `ws://test/ws/candles?symbol=${symbol}&resolution=${resolution}`,
+      async (symbol, resolution) => `ws://test/ws/candles?symbol=${symbol}&resolution=${resolution}`,
       () => [],
       () => {
         const socket = new FakeSocket();
@@ -350,6 +355,7 @@ describe("Grid connection sharing (terminal-market-data spec)", () => {
     const unsubs = pairs.map(([symbol, resolution]) =>
       hub.subscribe(symbol, resolution, () => {}),
     );
+    await settle();
 
     expect(sockets).toHaveLength(6);
     expect(hub.activeConnectionCount()).toBe(6);

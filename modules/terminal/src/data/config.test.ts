@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TABS } from "../app/tabs";
-import { resolveEndpoints, resolveHttpBase, resolveWsBase } from "./config";
+import { resolveEndpoints, resolveEntra, resolveHttpBase, resolveWsBase } from "./config";
 
 describe("resolveHttpBase", () => {
   it("passes a relative path through, trimmed", () => {
@@ -101,5 +101,38 @@ describe("resolveEndpoints", () => {
     for (const prefix of prefixes) {
       expect(routes.has(prefix)).toBe(false);
     }
+  });
+});
+
+describe("resolveEntra", () => {
+  const complete = {
+    VITE_ENTRA_CLIENT_ID: "a-client-id",
+    VITE_ENTRA_TENANT_ID: "a-tenant-id",
+    VITE_ENTRA_SCOPE: "api://market-data/access_as_user",
+  };
+
+  it("reads the three values when they are all there", () => {
+    expect(resolveEntra(complete)).toEqual({
+      clientId: "a-client-id",
+      tenantId: "a-tenant-id",
+      scope: "api://market-data/access_as_user",
+    });
+  });
+
+  // Not a misconfiguration: locally the archive has nothing in front of it, and
+  // a terminal that demanded a tenant before it would start would make `pnpm
+  // dev` depend on Azure.
+  it("answers with no identity when none is configured", () => {
+    expect(resolveEntra({})).toBeNull();
+  });
+
+  it("refuses a partial set rather than half-signing anybody in", () => {
+    // Two out of three is a typo. Starting anyway turns it into a sign-in that
+    // fails much later with a message about audiences, a long way from the line
+    // that caused it.
+    expect(() => resolveEntra({ VITE_ENTRA_CLIENT_ID: "a-client-id" })).toThrow(/together/);
+    expect(() =>
+      resolveEntra({ ...complete, VITE_ENTRA_SCOPE: "   " }),
+    ).toThrow(/together/);
   });
 });

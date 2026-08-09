@@ -71,6 +71,43 @@ const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
   VITE_ARCHIVE_WS?: string;
+  VITE_ENTRA_CLIENT_ID?: string;
+  VITE_ENTRA_TENANT_ID?: string;
+  VITE_ENTRA_SCOPE?: string;
+}
+
+/** Which Entra registration the terminal signs the operator in against, and
+ *  what it asks a token *for*. The scope names the archive, not the terminal:
+ *  the token is presented to `market-data`, and Entra will only mint one for a
+ *  resource that was asked for by name. */
+export interface EntraConfig {
+  clientId: string;
+  tenantId: string;
+  scope: string;
+}
+
+/**
+ * The identity configuration, or `null` when there is none.
+ *
+ * `null` is a working mode, not a misconfiguration. Locally the archive runs on
+ * the same machine with nothing in front of it, and a terminal that demanded a
+ * sign-in before it would start would make `pnpm dev` depend on a tenant. All
+ * three values or none: two out of three is a typo, and starting anyway would
+ * turn it into a sign-in that fails much later with a message about audiences.
+ */
+export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null {
+  const clientId = env.VITE_ENTRA_CLIENT_ID?.trim();
+  const tenantId = env.VITE_ENTRA_TENANT_ID?.trim();
+  const scope = env.VITE_ENTRA_SCOPE?.trim();
+
+  if (!clientId && !tenantId && !scope) return null;
+  if (!clientId || !tenantId || !scope) {
+    throw new Error(
+      "VITE_ENTRA_CLIENT_ID, VITE_ENTRA_TENANT_ID and VITE_ENTRA_SCOPE must be set together " +
+        "or left out together — a partial set cannot sign anyone in.",
+    );
+  }
+  return { clientId, tenantId, scope };
 }
 
 export function resolveEndpoints(
