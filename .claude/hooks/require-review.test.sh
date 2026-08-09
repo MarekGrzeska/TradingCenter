@@ -88,6 +88,40 @@ check_raw "empty stdin"                            ''
 check_raw "input that is not JSON"                 'openspec archive no-review'
 check_raw "a payload carrying no command"          '{"tool_name":"BashOutput","tool_input":{"bash_id":"x"}}'
 
+# The worktree case, which is why this section exists at all: parallel work in this repo
+# happens in `git worktree` checkouts, and CLAUDE_PROJECT_DIR names only the primary one.
+# A gate that read it alone judged a change by a directory the command never touched.
+echo "worktrees"
+
+second=$(mktemp -d)
+mkdir -p "$second/openspec/changes/no-review" "$second/openspec/changes/with-review" "$second/modules/market-data"
+printf '## Verdict\n' > "$second/openspec/changes/with-review/review.md"
+
+worktree_case() { # <label> <expected> <payload cwd> <change>
+  payload=$(python3 -c 'import json,sys; print(json.dumps({"tool_name":"Bash","cwd":sys.argv[1],"tool_input":{"command":"openspec archive "+sys.argv[2]}}))' "$3" "$4")
+  output=$(printf '%s' "$payload" | "$hook")
+  if printf '%s' "$output" | grep -q '"permissionDecision":"deny"'; then actual=deny; else actual=allow; fi
+  if [ "$actual" = "$2" ]; then
+    pass=$((pass + 1)); printf '  ok    %s\n' "$1"
+  else
+    fail=$((fail + 1)); printf '  FAIL  %s — expected %s, got %s\n' "$1" "$2" "$actual"
+  fi
+}
+
+# CLAUDE_PROJECT_DIR still points at the fixture from above, where `no-review` has no
+# review either — so these prove the payload's cwd is what decides, not that both agree.
+worktree_case "a second worktree's unreviewed change"  deny  "$second" no-review
+worktree_case "a second worktree's reviewed change"    allow "$second" with-review
+worktree_case "from a module directory inside it"      allow "$second/modules/market-data" with-review
+
+# The dangerous direction: the primary worktree holds a reviewed change of the same name,
+# the one being archived has not been reviewed. Reading CLAUDE_PROJECT_DIR would allow it.
+printf '## Verdict\n' > "$CLAUDE_PROJECT_DIR/openspec/changes/no-review/review.md"
+worktree_case "primary's review does not cover another tree" deny "$second" no-review
+rm -f "$CLAUDE_PROJECT_DIR/openspec/changes/no-review/review.md"
+
+rm -rf "$second"
+
 echo
 echo "passed: $pass, failed: $fail"
 [ "$fail" -eq 0 ]
