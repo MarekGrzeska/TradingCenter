@@ -15,7 +15,14 @@ from collections.abc import Awaitable, Callable
 
 from ..dtos import Resolution
 from .forming import Bar, FormingCandle
-from .messages import CandleMessage, ErrorMessage, Message, QuoteMessage, StatusMessage
+from .messages import (
+    CandleMessage,
+    ErrorMessage,
+    Message,
+    QuoteMessage,
+    StatusMessage,
+    StreamState,
+)
 from .upstream import Upstream
 
 Subscriber = Callable[[Message], Awaitable[None]]
@@ -31,7 +38,7 @@ class Room:
         self.upstream: Upstream | None = None
         # Remembered so a subscriber joining a live room is told the feed is up rather
         # than waiting in silence for the next provider event.
-        self.state: str = "connecting"
+        self.state: StreamState = "connecting"
 
     async def deliver(self, subscriber: Subscriber, message: Message) -> bool:
         """Send to one subscriber, dropping it if the send fails.

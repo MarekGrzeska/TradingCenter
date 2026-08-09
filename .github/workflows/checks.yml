@@ -109,6 +109,9 @@ jobs:
         with:
           enable-cache: true
       - run: uv run ruff check .
+      # Types, which ruff does not check. Scope and mode are in `[tool.pyright]`; the
+      # version is pinned in the same file, so this step answers the same way twice.
+      - run: uv run pyright
       - run: uv run pytest -q
 
   market-data:
@@ -125,6 +128,9 @@ jobs:
         with:
           enable-cache: true
       - run: uv run ruff check .
+      # Types, which ruff does not check. Scope and mode are in `[tool.pyright]`; the
+      # version is pinned in the same file, so this step answers the same way twice.
+      - run: uv run pyright
       # The 273 `db` tests are gated on Docker rather than on a flag, and this runner has
       # it, so testcontainers starts a real PostgreSQL and they run. That is the intent:
       # they cover the coverage and rollup logic, which has been wrong twice. The 7 that

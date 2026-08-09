@@ -22,6 +22,7 @@ import logging
 import os
 import sys
 from datetime import UTC, datetime
+from typing import cast
 
 import asyncpg
 from opentelemetry import metrics
@@ -137,7 +138,12 @@ async def compute_ages(
     """
     moment = now or datetime.now(UTC)
     async with pool.acquire() as conn:
-        statuses = await read_status(conn, now=moment)
+        # A pool hands out a proxy that forwards everything to a connection without being
+        # one, so every signature in this module naming `asyncpg.Connection` is wrong
+        # about pooled callers by the letter and right by every method it uses. This is
+        # the only place that mismatch is visible — the routers reach the pool through an
+        # untyped dependency — and it is a narrowing here, not a widening everywhere.
+        statuses = await read_status(cast(asyncpg.Connection, conn), now=moment)
     decided = await decide_late_pairs(instruments, market_status, statuses, moment)
 
     ages: dict[tuple[str, str], float] = {}

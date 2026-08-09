@@ -52,6 +52,7 @@ uv run pytest                     # fixtures + respx-mocked; no network
 uv run pytest --run-live          # + read-only smoke tests against the real demo API
 uv run pytest --run-live-trading  # + tests that open, amend and close demo positions
 uv run ruff check . && uv run ruff format --check .
+uv run pyright                    # types, over `capital_gateway/`
 ```
 
 `--run-live-trading` has its own flag because it **writes**: it opens a position, amends

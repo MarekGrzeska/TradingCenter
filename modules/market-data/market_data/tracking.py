@@ -24,6 +24,7 @@ from enum import Enum
 import asyncpg
 from pydantic import BaseModel
 
+from .db import fetch_one
 from .errors import GatewayRefused, GatewayUnreachable
 from .gateway.instruments import GatewayInstruments
 from .market_status import MarketStatus
@@ -133,7 +134,7 @@ def default_collect_from(resolution: Resolution, default_bars: int, now: datetim
 # their own rows. `hashtextextended` gives the bigint the advisory lock functions take.
 _LOCK_TRACKING = "SELECT pg_advisory_xact_lock(hashtextextended('market_data.tracked_pairs', 0))"
 
-_COUNT_TRACKED = "SELECT count(*) FROM tracked_pairs WHERE state = 'tracked'"
+_COUNT_TRACKED = "SELECT count(*) AS tracked FROM tracked_pairs WHERE state = 'tracked'"
 
 _TRACK = """
     INSERT INTO tracked_pairs (symbol, resolution, state, added_at, untracked_at, collect_from)
@@ -238,7 +239,7 @@ async def track(
         await conn.execute(_LOCK_TRACKING)
 
         if not await conn.fetchval(_IS_TRACKED, symbol, resolution.value):
-            tracked = await conn.fetchval(_COUNT_TRACKED)
+            tracked = (await fetch_one(conn, _COUNT_TRACKED))["tracked"]
             if tracked >= limit:
                 raise LimitReached(
                     f"already collecting {tracked} pairs, which is the configured ceiling "
@@ -247,7 +248,7 @@ async def track(
                     f"or raise MAX_TRACKED_PAIRS deliberately."
                 )
 
-        return _pair(await conn.fetchrow(_TRACK, symbol, resolution.value, resolved_from))
+        return _pair(await fetch_one(conn, _TRACK, symbol, resolution.value, resolved_from))
 
 
 async def untrack(

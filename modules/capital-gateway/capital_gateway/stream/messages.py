@@ -53,9 +53,15 @@ class QuoteMessage(BaseModel):
     ask: float
 
 
+# The four states a feed can be in, named once: the hub remembers the current one to
+# greet a late subscriber with, and this message publishes it. Two spellings of the same
+# set is how the pair drifts apart.
+StreamState = Literal["connecting", "connected", "reconnecting", "closed"]
+
+
 class StatusMessage(BaseModel):
     kind: Literal["status"] = "status"
-    state: Literal["connecting", "connected", "reconnecting", "closed"]
+    state: StreamState
 
 
 class ErrorMessage(BaseModel):

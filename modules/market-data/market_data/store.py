@@ -18,6 +18,7 @@ from datetime import datetime
 
 import asyncpg
 
+from .db import fetch_one
 from .models import Candle, CandleSource, PriceSide, Resolution
 
 
@@ -196,7 +197,7 @@ async def delete_all_candles(
     keeps every candle or none, per `market-data-tracking` spec, "Skasowanie pary
     zatrzymuje zbieranie i usuwa jej dane".
     """
-    row = await conn.fetchrow(_SELECT_BOUNDS, symbol, resolution.value)
+    row = await fetch_one(conn, _SELECT_BOUNDS, symbol, resolution.value)
     removed, earliest, latest = row["removed"], row["earliest"], row["latest"]
     if removed:
         await conn.execute(_DELETE_ALL, symbol, resolution.value)
