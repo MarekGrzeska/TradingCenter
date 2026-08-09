@@ -19,15 +19,19 @@ concurrency:
   group: deploy-gateway
   cancel-in-progress: false # never cancel a deploy mid-flight
 
-env:
-  IMAGE: ghcr.io/${{ github.repository }}/capital-gateway
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
+
+      # `github.repository` is `MarekGrzeska/TradingCenter`, and a Docker reference must
+      # be lowercase — buildx refuses the tag outright ("repository name must be
+      # lowercase") before it builds anything. Lowercased here rather than hardcoded so a
+      # rename of the account or the repository still produces the right image name.
+      - id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/capital-gateway" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v3
         with:
@@ -41,7 +45,7 @@ jobs:
         with:
           context: modules/capital-gateway
           push: true
-          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
 
       - uses: azure/login@v2
         with:
@@ -52,4 +56,4 @@ jobs:
       - uses: azure/webapps-deploy@v3
         with:
           app-name: app-tradingcenter-gateway
-          images: ${{ env.IMAGE }}:${{ github.sha }}
+          images: ${{ steps.image.outputs.name }}:${{ github.sha }}

@@ -17,15 +17,17 @@ concurrency:
   group: deploy-market-data
   cancel-in-progress: false # never cancel a deploy mid-flight
 
-env:
-  IMAGE: ghcr.io/${{ github.repository }}/market-data
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     environment: production
     steps:
       - uses: actions/checkout@v4
+
+      # Lowercased for the same reason as deploy-gateway.yml — a Docker reference cannot
+      # carry the capitals in `github.repository`.
+      - id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/market-data" >> "$GITHUB_OUTPUT"
 
       - uses: docker/login-action@v3
         with:
@@ -38,7 +40,7 @@ jobs:
         with:
           context: modules/market-data
           push: true
-          tags: ${{ env.IMAGE }}:${{ github.sha }}
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
 
       - uses: azure/login@v2
         with:
@@ -49,4 +51,4 @@ jobs:
       - uses: azure/webapps-deploy@v3
         with:
           app-name: app-tradingcenter-market-data
-          images: ${{ env.IMAGE }}:${{ github.sha }}
+          images: ${{ steps.image.outputs.name }}:${{ github.sha }}
