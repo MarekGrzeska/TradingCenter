@@ -52,25 +52,29 @@ archive has actually verified.
 ## Run
 
 ```bash
-cp .env.example .env       # gateway URLs, this module's caller key, a PostgreSQL connection
-docker compose -f ../../compose.yaml up -d db
+cp .env.example .env       # gateway URLs, this module's caller key, the database identity
 uv run alembic upgrade head
 uv run uvicorn market_data.app:app --reload --port 8020
 ```
 
-Needs `capital-gateway` running on `http://localhost:8010` and a PostgreSQL to write to. The
-repository's `compose.yaml` provides one on **port 55432** — not 5432, because a developer
-machine very often already runs PostgreSQL of its own, and migrating somebody else's database
-by accident is worse than failing to connect. `.env.example` already points there.
-`../../scripts/dev.sh` (or `dev.ps1`) does all of the above plus the gateway and the terminal,
-in the order they need each other. Migrations step with `uv run alembic downgrade -1`.
+Needs `capital-gateway` running on `http://localhost:8010` and a PostgreSQL to write to — the
+`market_data_dev` database on the project's Azure server, not a local container
+(openspec/changes/provision-azure-platform, design.md, "Praca lokalna korzysta z
+market_data_dev na serwerze w Azure"). Docker is not needed to run this module locally any
+more; it is still needed to *test* it (see Test, below). `.env.example` has the host and the
+database name already filled in — only the four `AZURE_*`/`DATABASE_USER` identity values need
+filling from `terraform output` in `infra/`. `../../scripts/dev.sh` (or `dev.ps1`) does all of
+the above plus the gateway and the terminal, in the order they need each other. Migrations step
+with `uv run alembic downgrade -1`.
 
 | Variable | Default | What it is |
 | --- | --- | --- |
 | `GATEWAY_BASE_URL` | `http://localhost:8010` | the gateway's HTTP contract |
 | `GATEWAY_STREAM_URL` | `ws://localhost:8010/ws/stream` | the gateway's live feed |
 | `GATEWAY_API_KEY` | — | required; must match the gateway's own key — it answers 401 without it |
-| `DATABASE_URL` | — | required; the archive's own storage |
+| `DATABASE_URL` | — | required; the archive's own storage — no credential, `sslmode=require` mandatory |
+| `DATABASE_USER` | — | required; the Postgres role this module authenticates as |
+| `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` | unset | the local development identity's credentials, together or not at all — unset in Azure, where the App Service's own managed identity needs no configuration |
 | `BACKFILL_CONCURRENCY` | `1` | deep fills allowed to run at once |
 | `DEFAULT_BACKFILL_BARS` | `5000` | how far back a newly tracked pair reaches |
 | `MAX_TRACKED_PAIRS` | `20` | ceiling on archived (symbol, resolution) pairs |

@@ -45,30 +45,26 @@ convenience wrappers; no module depends on one.
 Both bring the same things up in the same order:
 
 ```
-database (container)  ->  migrations  ->  capital-gateway  ->  market-data  ->  terminal
+migrations  ->  capital-gateway  ->  market-data  ->  terminal
 ```
 
 The order is not tidiness. `market-data` subscribes to the gateway as it starts, and the
 terminal's charts read `market-data`, so starting anything early only fills the console with
-retries. Each step waits for the one before it to actually answer. Ctrl+C stops the services;
-the database keeps running until `docker compose down`.
+retries. Each step waits for the one before it to actually answer. Ctrl+C stops the services.
 
-**Only PostgreSQL runs in a container** — see [compose.yaml](compose.yaml). The services run on
-the host, where they reload on save and can be attached to; the database is the one dependency
-that is a chore to install per machine and the one where everybody wanting the same version is
-the point.
-
-It listens on **55432**, not 5432. A developer machine very often already runs PostgreSQL of
-its own, and Postgres.app runs one instance per installed major version on consecutive ports
-from 5432 up — the machine this was written on answered on both 5432 and 5433. Colliding fails
-at best; at worst it succeeds, and the archive migrates somebody else's database. The scripts
-refuse to start if `modules/market-data/.env` disagrees with the port they are about to use.
+**No database runs locally.** `market-data` writes to `market_data_dev` on the project's Azure
+Postgres server (`openspec/changes/provision-azure-platform`, design.md, "Praca lokalna
+korzysta z market_data_dev na serwerze w Azure") — there is no local container to start, and
+Docker is not needed to run this stack any more. It is still needed to *test* `market-data`
+(see Checks, below): the `db`-marked tests run against a throwaway PostgreSQL container, since
+the schema itself is part of what they check. The scripts refuse to start if
+`modules/market-data/.env` points `DATABASE_URL` at anything other than `market_data_dev` —
+production is a mistake this checks for, not a port.
 
 Useful variants:
 
 ```bash
 ./scripts/dev.sh --no-terminal   # back end only — what the live tests need
-./scripts/dev.sh --fresh         # drop the archive and start empty
 ```
 
 The terminal has no offline mode: candles come from `market-data` and instruments from
