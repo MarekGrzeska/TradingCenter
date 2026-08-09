@@ -62,8 +62,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Version comes from `packageManager` in package.json — one place both CI and a
-      # developer read, instead of knowledge living in a review document.
+      # developer read, instead of knowledge living in a review document. The path is
+      # spelled out because `defaults.run.working-directory` applies to `run` steps and
+      # not to actions: without it this looks for a package.json in the repository root,
+      # where there is none, and fails before anything is installed.
       - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: modules/terminal/package.json
       - uses: actions/setup-node@v4
         with:
           node-version: 22
