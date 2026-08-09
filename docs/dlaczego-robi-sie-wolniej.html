@@ -455,9 +455,9 @@
       <td><span class="pill keep">zostaw</span></td>
     </tr>
     <tr>
-      <td>Baza dev w Azure + osobny service principal + roczna rotacja sekretu + allowlist IP</td>
-      <td><strong>wraca co tydzień</strong>: latencja lokalnej pracy, IP po każdej zmianie sieci, rotacja</td>
-      <td><span class="pill freeze">świadomy podatek</span></td>
+      <td>Baza dev w Azure + osobny service principal + roczna rotacja sekretu</td>
+      <td>wracał co tydzień: latencja, IP po każdej zmianie sieci, rotacja — <strong>skasowany</strong></td>
+      <td><span class="pill keep">cofnięte</span></td>
     </tr>
     <tr>
       <td>Stan Terraforma bootstrapu w gicie (klucze storage unieszkodliwione)</td>
@@ -467,11 +467,27 @@
   </table>
   </div>
 
-  <p>Baza dev w Azure to decyzja świadoma i zapisana w README — wierność produkcji
-  zamiast kontenera. Uczciwie: to jest dziś największy <em>stały</em> podatek
-  infrastrukturalny tego projektu. Nie trzeba go cofać teraz; trzeba wiedzieć, że
-  jeśli tempo stanie się ważniejsze od wierności prod, powrót do lokalnego kontenera
-  dla dev (kontener już istnieje w testach) jest ruchem, który ten podatek kasuje.</p>
+  <div class="callout note">
+    <span class="tag">Jedyna rekomendacja z tego dokumentu, którą wykonano co do joty</span>
+    <p>Pierwsza wersja pisała o bazie dev w Azure: „nie trzeba tego cofać teraz; trzeba
+    wiedzieć, że jeśli tempo stanie się ważniejsze od wierności prod, powrót do lokalnego
+    kontenera jest ruchem, który ten podatek kasuje". <strong>Tempo okazało się
+    ważniejsze.</strong> Decyzja została odwrócona tego samego dnia, w którym ją podjęto —
+    PR&nbsp;#33, pełną ścieżką OpenSpec, bo dotykała specyfikacji.</p>
+    <p>Produkcja nie drgnęła. Zniknęła baza <code>market_data_dev</code>, service principal
+    z roczną rotacją i cały rytuał wokół nich; wrócił <code>compose.yaml</code>, przywrócony
+    dosłownie z commita, który go skasował — port 55432 z dala od pasma Postgres.app, bind
+    na pętli zwrotnej, healthcheck nazywający użytkownika i bazę. <code>terraform plan</code>
+    na tym PR pokazał dokładnie cztery destroy'e i ani jednej zmiany w produkcji.</p>
+    <p>Najciekawszy jest efekt uboczny: <strong>zabezpieczenie wyszło z tego
+    mocniejsze</strong>. Stary strażnik był grepem w <code>dev.sh</code> szukającym nazwy
+    bazy i nie widział groźniejszej pomyłki — <code>DefaultAzureCredential</code> na maszynie
+    operatora znajduje jego sesję <code>az login</code>, czyli tożsamość administratora
+    Postgresa, która omija każdy GRANT. Teraz brak <code>DATABASE_USER</code> oznacza, że
+    moduł w ogóle nie wychodzi poza pętlę zwrotną, i pilnuje tego <code>config.py</code> przy
+    starcie, a nie skrypt, którego ktoś może nie uruchomić. Usunięcie warstwy okazało się
+    bezpieczniejsze niż jej utrzymywanie — to nie jest reguła, ale w tym przypadku tak wyszło.</p>
+  </div>
 
   <div class="callout note">
     <span class="tag">Zasada na przyszłość</span>
@@ -540,6 +556,8 @@
       <span class="meta">zrobione · PR&nbsp;#27, na <code>main</code></span></li>
     <li><strong>Hook <code>require-review</code> przepisany na basha, matcher zawężony.</strong>
       <span class="meta">zrobione · PR&nbsp;#31, z 25 testami</span></li>
+    <li><strong>Powrót bazy dev do kontenera; dev-SP i baza w Azure skasowane.</strong>
+      <span class="meta">zrobione · PR&nbsp;#33, pełną ścieżką OpenSpec</span></li>
     <li><strong>Drugi worktree jako stałe stanowisko pracy.</strong>
       <span class="meta">15 min · raz</span></li>
     <li><strong>Cache Dockera + smoke-check w trzech deploy workflowach.</strong>
@@ -577,6 +595,9 @@
     zamknięcie punktu o hooku po PR&nbsp;#31 (okazał się nie „prawdopodobnie
     niedziałający", tylko niedziałający w ogóle) i przeliczenie wszystkich liczb, co dało
     najmocniejszy pojedynczy dowód w całym dokumencie — proza rosnąca 2,3 raza szybciej
-    niż kod, zmierzona na jednej zmianie scalonej w trakcie pisania.</p>
+    niż kod, zmierzona na jednej zmianie scalonej w trakcie pisania. <strong>Czwarta</strong>,
+    już w ramach PR&nbsp;#33: baza dev wraca do kontenera, a największy stały podatek
+    infrastrukturalny znika — dokument jedzie w tym samym PR co zmiana, którą opisuje,
+    więc opis i rzeczywistość nie mają jak się rozjechać.</p>
   </footer>
 </main>
