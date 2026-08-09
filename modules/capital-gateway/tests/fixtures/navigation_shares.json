@@ -1,0 +1,30 @@
+{
+  "markets": [
+    {
+      "instrumentName": "Apple Inc",
+      "expiry": "-",
+      "epic": "AAPL",
+      "symbol": "AAPL",
+      "instrumentType": "SHARES",
+      "marketStatus": "TRADEABLE",
+      "lotSize": 1,
+      "bid": 268.41,
+      "offer": 268.53,
+      "streamingPricesAvailable": true,
+      "scalingFactor": 1
+    },
+    {
+      "instrumentName": "Microsoft Corp",
+      "expiry": "-",
+      "epic": "MSFT",
+      "symbol": "MSFT",
+      "instrumentType": "SHARES",
+      "marketStatus": "TRADEABLE",
+      "lotSize": 1,
+      "bid": 512.06,
+      "offer": 512.24,
+      "streamingPricesAvailable": true,
+      "scalingFactor": 1
+    }
+  ]
+}

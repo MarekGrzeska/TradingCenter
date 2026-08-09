@@ -36,7 +36,15 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 # Emptied between tests so that one test's rows are never another's premise. TRUNCATE
 # rather than dropping and re-migrating: the schema is the same for every test, and
 # re-running three migrations per test buys nothing.
-TABLES = ("candles", "derived_candles", "tracked_pairs", "coverage_ranges")
+TABLES = (
+    "candles",
+    "derived_candles",
+    "tracked_pairs",
+    "coverage_ranges",
+    "collection_jobs",
+    "collection_job_chunks",
+    "pair_deletions",
+)
 
 
 # Generous, because Docker Desktop wakes its VM lazily and a first call after an idle

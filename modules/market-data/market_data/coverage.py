@@ -85,6 +85,10 @@ _SELECT_HISTORY_END = """
      LIMIT 1
 """
 
+_DELETE_ALL = """
+    DELETE FROM coverage_ranges WHERE symbol = $1 AND resolution = $2
+"""
+
 
 async def record_coverage(
     conn: asyncpg.Connection,
@@ -195,6 +199,20 @@ async def absence_at(
     if await is_covered(conn, symbol, resolution, moment):
         return Absence.MARKET_CLOSED
     return Absence.NOT_COLLECTED
+
+
+async def delete_all_coverage(
+    conn: asyncpg.Connection, symbol: str, resolution: Resolution
+) -> None:
+    """Remove every verified range for one pair.
+
+    Coverage and candles must disappear together — a range that outlives its candles
+    tells planning a period is already fetched when nothing is there
+    (`market-data-store` spec, "Skasowanie danych pary zdejmuje też jej pokrycie"). The
+    caller is the one holding both deletions in a single transaction; this function only
+    ever does its own half.
+    """
+    await conn.execute(_DELETE_ALL, symbol, resolution.value)
 
 
 async def earliest_reachable(

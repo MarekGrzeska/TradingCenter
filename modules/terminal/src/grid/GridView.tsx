@@ -1,12 +1,32 @@
-import { useSyncExternalStore } from "react";
+import { useMemo, useSyncExternalStore } from "react";
+import { Link } from "react-router";
 import { Chart } from "../chart/Chart";
-import { marketData } from "../data/marketData";
+import { archive, marketData } from "../data/marketData";
+import type { Resolution, TrackedPair } from "../data/types";
+import { useTrackedPairs } from "../instruments/useTrackedPairs";
 import { gridStore } from "./gridStore";
 import { SymbolField } from "./SymbolField";
 import { LAYOUTS, LAYOUT_IDS, visibleSlotIds, type SlotId } from "./model";
 
+function groupResolutionsBySymbol(pairs: TrackedPair[]): Map<string, Resolution[]> {
+  const map = new Map<string, Resolution[]>();
+  for (const pair of pairs) {
+    const resolutions = map.get(pair.symbol) ?? [];
+    resolutions.push(pair.resolution);
+    map.set(pair.symbol, resolutions);
+  }
+  return map;
+}
+
 export function GridView() {
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
+  // Read once and shared by every slot, rather than one poll per slot — six
+  // slots asking independently would be six requests for the same list.
+  const archived = useTrackedPairs(archive);
+  const resolutionsBySymbol = useMemo(
+    () => groupResolutionsBySymbol(archived.pairs),
+    [archived.pairs],
+  );
 
   const visible = visibleSlotIds(config.layout);
   const { cols, rows } = LAYOUTS[config.layout];
@@ -42,16 +62,49 @@ export function GridView() {
         }}
       >
         {visible.map((slotId) => (
-          <Slot key={slotId} slotId={slotId} active={config.activeSlot === slotId} />
+          <Slot
+            key={slotId}
+            slotId={slotId}
+            active={config.activeSlot === slotId}
+            archivedStatus={archived.status}
+            resolutionsBySymbol={resolutionsBySymbol}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function Slot({ slotId, active }: { slotId: SlotId; active: boolean }) {
+function Slot({
+  slotId,
+  active,
+  archivedStatus,
+  resolutionsBySymbol,
+}: {
+  slotId: SlotId;
+  active: boolean;
+  archivedStatus: ReturnType<typeof useTrackedPairs>["status"];
+  resolutionsBySymbol: Map<string, Resolution[]>;
+}) {
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
   const slot = config.slots[slotId];
+  const allowedResolutions = slot.symbol ? resolutionsBySymbol.get(slot.symbol) : undefined;
+
+  // Only a definite "no" — a fetch that actually finished and came back
+  // without this pair — counts as stale. `unreachable` must never read as
+  // "no longer archived": the slot keeps showing what it already had
+  // (terminal-grid spec, "Listy archiwizowanych nie da się odczytać").
+  //
+  // The resolution counts as much as the symbol. A slot remembering US100
+  // `MINUTE_5` after only `HOUR_4` was left archived for US100 would otherwise
+  // chart a pair nobody collects while its own selector — narrowed to the
+  // archived ones — displayed a different resolution entirely, each
+  // contradicting the other.
+  const answered = slot.symbol !== null && archivedStatus === "ready";
+  const staleSymbol = answered && allowedResolutions === undefined;
+  const staleResolution =
+    answered && allowedResolutions !== undefined && !allowedResolutions.includes(slot.resolution);
+  const stale = staleSymbol || staleResolution;
 
   return (
     // Marking the slot the moment focus lands anywhere inside it, not just on
@@ -68,29 +121,29 @@ function Slot({ slotId, active }: { slotId: SlotId; active: boolean }) {
     >
       {slot.symbol === null ? (
         <EmptySlot slotId={slotId} />
+      ) : stale ? (
+        <StaleSlot
+          slotId={slotId}
+          symbol={slot.symbol}
+          resolution={staleResolution ? slot.resolution : null}
+          stillArchivedAt={staleResolution ? (allowedResolutions ?? []) : []}
+        />
       ) : (
         <Chart
           source={marketData}
           symbol={slot.symbol}
           resolution={slot.resolution}
+          resolutions={allowedResolutions}
           onResolutionChange={(resolution) => gridStore.setSlotResolution(slotId, resolution)}
           headerLeft={
-            <span className="flex items-center gap-1">
-              <SymbolField
-                label={`Symbol for slot ${slotId}`}
-                value={slot.symbol}
-                onCommit={(symbol) => gridStore.setSlotSymbol(slotId, symbol)}
-              />
-              <button
-                type="button"
-                aria-label={`Clear slot ${slotId}`}
-                title="Empty this slot"
-                onClick={() => gridStore.clearSlotSymbol(slotId)}
-                className="px-1 text-xs text-ink-muted hover:text-ink"
-              >
-                ×
-              </button>
-            </span>
+            <SymbolField
+              label={`Symbol for slot ${slotId}`}
+              value={{ symbol: slot.symbol, resolutions: allowedResolutions ?? [] }}
+              onChange={(instrument) => {
+                if (instrument) gridStore.setSlotSymbol(slotId, instrument.symbol);
+                else gridStore.clearSlotSymbol(slotId);
+              }}
+            />
           }
         />
       )}
@@ -105,9 +158,81 @@ function EmptySlot({ slotId }: { slotId: SlotId }) {
       <SymbolField
         label={`Symbol for slot ${slotId}`}
         value={null}
-        onCommit={(symbol) => gridStore.setSlotSymbol(slotId, symbol)}
+        onChange={(instrument) => {
+          if (instrument) gridStore.setSlotSymbol(slotId, instrument.symbol);
+        }}
       />
-      <p className="text-xs text-ink-muted">or find one on the Instruments tab</p>
+    </div>
+  );
+}
+
+/** A slot whose remembered pair stopped being archived between sessions —
+ *  recognized rather than left to loop on a subscription the archive will
+ *  keep refusing (terminal-grid spec, "Slot zapamiętany traci ważność, gdy
+ *  instrument przestaje być archiwizowany").
+ *
+ *  `resolution` is set only when the symbol is still archived and it is this
+ *  resolution that is gone; then `stillArchivedAt` carries the ones that are
+ *  left, so switching is one click rather than a re-pick. */
+function StaleSlot({
+  slotId,
+  symbol,
+  resolution,
+  stillArchivedAt,
+}: {
+  slotId: SlotId;
+  symbol: string;
+  resolution: Resolution | null;
+  stillArchivedAt: readonly Resolution[];
+}) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2 bg-panel px-4 text-center">
+      <p className="text-sm text-ink-muted">
+        <span className="font-semibold text-ink">{symbol}</span>
+        {resolution === null ? (
+          <> is no longer archived.</>
+        ) : (
+          <>
+            {" "}
+            is no longer archived at{" "}
+            <span className="font-semibold text-ink">{resolution}</span>.
+          </>
+        )}
+      </p>
+
+      {stillArchivedAt.length > 0 ? (
+        <>
+          <p className="text-xs text-ink-muted">Still collected at:</p>
+          <div className="flex flex-wrap justify-center gap-1">
+            {stillArchivedAt.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => gridStore.setSlotResolution(slotId, r)}
+                className="rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        </>
+      ) : (
+        <p className="text-xs text-ink-muted">
+          Add it again in the{" "}
+          <Link to="/instruments" className="text-ink underline">
+            Instruments
+          </Link>{" "}
+          tab, or pick a different instrument below.
+        </p>
+      )}
+
+      <SymbolField
+        label={`Symbol for slot ${slotId}`}
+        value={null}
+        onChange={(instrument) => {
+          if (instrument) gridStore.setSlotSymbol(slotId, instrument.symbol);
+        }}
+      />
     </div>
   );
 }

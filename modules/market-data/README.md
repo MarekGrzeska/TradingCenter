@@ -96,9 +96,14 @@ HTTP, described by OpenAPI at `/docs`.
 | GET | `/health` | whether the database answers, and what is being collected |
 | GET | `/candles/{symbol}?resolution=&from=&to=` | the series, **plus what was never collected** |
 | GET | `/coverage/{symbol}?resolution=` | verified ranges and the end of provider history |
-| GET | `/pairs` | what is collected, how collection is going, and what the last fill did |
-| POST | `/pairs` | start collecting a pair |
-| DELETE | `/pairs/{symbol}?resolution=` | stop collecting it; the candles stay |
+| GET | `/pairs` | what is collected, how collection is going, and where each pair's history starts |
+| POST | `/pairs` | start collecting one or more pairs, from a given moment |
+| DELETE | `/pairs/{symbol}?resolution=` | stop collecting it **and delete its data**, irreversibly |
+| GET | `/deletions?symbol=&resolution=` | recorded deletions, newest first |
+| POST | `/jobs/estimate` | price a collection job without creating it |
+| GET | `/jobs?symbol=&resolution=` | jobs, one row per pair they touched |
+| GET | `/jobs/{id}` | one job, whole — every pair and chunk it covers |
+| POST | `/jobs/{id}/retry` | retry a job's failed or interrupted chunks |
 
 **A range read says what it is not saying.** `uncovered` carries the stretches of the
 requested window the archive never verified. That is not the same as periods with no candle:
@@ -111,6 +116,63 @@ quietly compared against an ask-side one is off by a spread that reads as a real
 and the setting to raise; a symbol the gateway will not serve is 422; a gateway that is down
 is 504 rather than 500, because the archive is fine and retrying it as though it were at fault
 is the wrong response.
+
+### Deleting a pair
+
+`DELETE /pairs/{symbol}` used to only flip a pair to untracked; the candles stayed, on the
+principle that an archive should not discard data as a side effect of a configuration change.
+That principle still holds — nothing here deletes on its own, on a restart, or because a pair
+was merely untracked — but it left no way to ask for data to actually go, and a pair re-added
+with a shorter range kept its old, wider one: the leftover coverage told planning the range was
+already fetched, so the next job pulled nothing.
+
+The endpoint now deletes: it stops collection, releases the provider connection, and removes
+every candle and coverage range the pair holds, in one transaction — a pair left with candles
+gone but coverage intact would look, to planning, exactly like a pair already fully collected.
+Deleting a symbol's `MINUTE` series also removes the rollups computed from it (`MINUTE_5` through
+`HOUR_4`), since those are a projection of the deleted series rather than data of their own.
+Deleting one resolution never touches another archived resolution of the same symbol.
+
+What survives deletion: the pair's row in `tracked_pairs` (kept for the foreign key every chunk
+and every deletion record relies on to name a pair tracking actually decided on), and every
+collection job that ever touched the pair — a job is a record of what happened, and deleting the
+data does not undo that it happened. What is added: a row in `pair_deletions`, readable through
+`GET /deletions`, naming the pair, when, how many candles were removed, and the range they
+covered (both null when there was nothing to remove) — without it, a pair's data reaching
+further back one day and less far the next would be a fact with no explanation.
+
+Deletion is not atomic with stopping the live subscription. It runs as two steps around one
+in-process operation: close the decision (untrack the pair, skip its still-pending chunks) inside
+one transaction, sync ingest — which is what actually closes the subscription and is not a
+database write — then remove the data inside a second transaction. A chunk already claimed when
+deletion starts can still finish afterwards; `execute_chunk` checks whether its pair is still
+tracked before writing, so a gateway answer that arrives after deletion is discarded rather than
+resurrecting what the operator just removed.
+
+### Collection jobs
+
+`POST /pairs` still takes the original single-pair body (`symbol`, `resolution`) and it still
+means the configured default depth — nothing that spoke to this endpoint before needs to
+change. It also takes a `pairs` list plus a `collect_from` moment, adding several pairs as one
+decision. Accepting at least one pair that needed history behind it creates a **job**: a
+durable record, split into **chunks** — one pair, one time window, one gateway request each,
+newest first. A chunk that fails is named and does not stop the others; a chunk that discovers
+the end of the provider's own history settles as done and every chunk still queued behind it
+for that pair is skipped in bulk, rather than each spending a request to rediscover the same
+edge. `collect_from` earlier than the provider's own history is clipped, never refused — asking
+for 1850 means "everything there is."
+
+A job's status (`running`, `succeeded`, `partial`, `failed`, `interrupted`) is never stored; it
+is derived from its chunks' states every time it is read, so a process that dies mid-job cannot
+leave two disagreeing records of the same fact. Restarting flips every chunk left `pending` or
+`running` to `interrupted` — no runner survives a restart, so a chunk still queued is exactly as
+orphaned as one mid-request. `POST /jobs/{id}/retry` resets only `failed` and `interrupted`
+chunks, as a new attempt of the same job; it is refused with 409 when there is nothing to retry.
+
+`POST /jobs/estimate` runs the same planning a job creation would — without writing anything —
+so a caller can price a decision before making it. The estimate is honest about being one: it
+counts calendar periods, not a session calendar, so it overstates a market that is shut part of
+the time.
 
 ### WebSocket — `/ws/candles?symbol=US100&resolution=MINUTE`
 
@@ -172,12 +234,27 @@ resets only once a subscription produces something. Fills share one `asyncio.Sem
 supervisor — a per-pair budget is no budget. A failed fill comes back as a `FillOutcome` carrying
 its reason, one operator-readable line per outcome, rather than stopping the other pairs.
 
+**The quiet fill respects `collect_from`, not just `default_backfill_bars`.** A pair with nothing
+collected reaches back the configured default depth — but never further than its own
+`collect_from`, the moment its history is meant to reach back to. A pair tracked without an
+explicit one has `collect_from` computed from that same default depth, so nothing changes for it;
+a pair tracked with an explicit, shallower moment used to get the deep default fill anyway, because
+this fill and the job system that also backfills a wizard-added pair run independently and neither
+knew about the other's bound. Fixed rather than coordinated: the two still do redundant work for
+the same pair (harmless — `write_candles` dedupes by period, `record_coverage` merges ranges), but
+neither reaches further back than asked, which is the part that was silently wrong.
+
 **Being on the list proves nothing about collection.** A subscription can die without a sound, and
 the only symptom is a series that stops growing. `collection_state` reads the age of the newest
 candle — within two periods **plus three minutes** is healthy, beyond that it depends on whether
 the market is open, which the gateway answers and this module does not. Without that answer the
 state is `UNKNOWN` rather than a guess: there is no session calendar here, and inventing one is
 wrong twice a day.
+
+The same read carries the *oldest* candle of each pair, from the same aggregate. It is how far the
+data actually reaches, which `collect_from` — how far it was asked to reach — does not answer while
+a job is still running or the provider's history ends later. It rides on the list rather than being
+asked for per pair, because the panel draws it on every row.
 
 Those three minutes are measured, not padding. A closed minute candle took 52 to 169 seconds to
 reach the archive on 2026-08-08, so a perfectly healthy pair sits 112–229 seconds behind against a

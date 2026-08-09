@@ -57,6 +57,7 @@ def test_every_route_appears_in_the_published_schema(client: TestClient) -> None
         "/capabilities",
         "/accounts",
         "/accounts/active",
+        "/asset-classes",
         "/instruments",
         "/instruments/search",
         "/instruments/{symbol}/candles",
@@ -80,6 +81,90 @@ def test_capabilities_name_the_environment(client: TestClient) -> None:
 
     assert body["environment"] == "demo"
     assert body["has_streaming"] is True
+
+
+@respx.mock
+def test_an_unknown_asset_class_is_refused_by_naming_the_known_ones(client: TestClient) -> None:
+    mock_login()
+
+    with client:
+        response = client.get("/instruments", params={"asset_class": "STONKS"})
+
+    assert response.status_code == 422
+    detail = response.json()["detail"]
+    # The caller's next move is to pick a different class, so the refusal hands them the
+    # ones there are rather than only rejecting the one they tried.
+    assert "STONKS" in detail
+    assert "CRYPTO" in detail and "SHARES" in detail
+
+
+@respx.mock
+def test_a_before_parameter_anchors_the_deep_read_in_the_past(client: TestClient) -> None:
+    mock_login()
+    prices = respx.get(f"{API}/prices/GOLD")
+    prices.mock(
+        return_value=httpx.Response(
+            200, json={"prices": [{"snapshotTimeUTC": "2024-01-15T00:00:00"}]}
+        )
+    )
+
+    with client:
+        response = client.get(
+            "/instruments/GOLD/history",
+            params={"resolution": "MINUTE_5", "bars": 2, "before": "2024-01-15T00:00:00Z"},
+        )
+
+    assert response.status_code == 200
+    # The route accepted the anchor and reached the provider at all — the window
+    # arithmetic itself is covered in test_history.py; this only proves the parameter is
+    # wired from the query string through to the adapter.
+    request_made = prices.calls.last.request
+    assert "2024-01-14" in str(request_made.url) or "2024-01-15" in str(request_made.url)
+
+
+@respx.mock
+def test_an_after_parameter_bounds_the_deep_read_in_the_past(client: TestClient) -> None:
+    mock_login()
+    prices = respx.get(f"{API}/prices/GOLD")
+    prices.mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "prices": [
+                    {"snapshotTimeUTC": "2024-01-01T00:00:00"},  # older than the floor
+                    {"snapshotTimeUTC": "2024-01-15T00:00:00"},
+                ]
+            },
+        )
+    )
+
+    with client:
+        response = client.get(
+            "/instruments/GOLD/history",
+            params={
+                "resolution": "MINUTE_5",
+                "bars": 1000,
+                "before": "2024-01-15T00:00:00Z",
+                # Inside the window 1000 five-minute candles would otherwise span
+                # (~3.5 days), so it is the floor that decides where the request starts.
+                "after": "2024-01-14T00:00:00Z",
+            },
+        )
+
+    assert response.status_code == 200
+    body = response.json()
+    # The candle from before the floor came back inside the provider's page and was
+    # dropped; only the one at or after it survives.
+    assert [c["ts"] for c in body["candles"]] == ["2024-01-15T00:00:00Z"]
+    # And the window asked for never reached past the floor in the first place.
+    assert "from=2024-01-14T00%3A00%3A00" in str(prices.calls.last.request.url)
+
+
+def test_the_asset_classes_are_published(client: TestClient) -> None:
+    with client:
+        body = client.get("/asset-classes").json()
+
+    assert set(body) == {"SHARES", "INDICES", "CRYPTO", "CURRENCIES", "COMMODITIES", "OTHER"}
 
 
 # --- nothing leaks ---

@@ -1,215 +1,595 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
-import { useNavigate } from "react-router";
-import { marketData } from "../data/marketData";
-import { gridStore } from "../grid/gridStore";
-import type { Instrument, InstrumentPage } from "../data/types";
-import { useInstrumentSearch } from "./useInstrumentSearch";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router";
+import { archive } from "../data/marketData";
+import { RESOLUTIONS } from "../data/types";
+import type { CollectionState, PairCoverage, Resolution, TrackedPair } from "../data/types";
+import { AddInstrumentWizard } from "./AddInstrumentWizard";
+import { formatInstant } from "./format";
+import { RESOLUTION_ABBR } from "./resolutionAbbr";
+import { useTrackedPairs } from "./useTrackedPairs";
 
-export function InstrumentsView() {
-  const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
-  const navigate = useNavigate();
+/**
+ * What the archive is collecting, one row per instrument.
+ *
+ * This used to be two tabs: a catalogue browser and a per-pair archive list,
+ * where the same instrument in four resolutions took four rows. Neither
+ * question the operator actually asks — *what are we archiving, and is it
+ * keeping up* — was answered by either one directly (proposal.md, Why). This
+ * view answers both: a row is an instrument, its resolutions are one column,
+ * and expanding it shows coverage and lets a resolution — or the whole
+ * instrument — stop being collected.
+ */
 
-  const [query, setQuery] = useState("");
-  const search = useInstrumentSearch(marketData, query);
+const COLLECTION_LABEL: Record<CollectionState, string> = {
+  never_collected: "nothing yet",
+  collecting: "collecting",
+  stalled: "stalled",
+  market_closed: "market closed",
+  unknown: "unknown",
+};
 
-  const assign = useCallback(
-    (instrument: Instrument) => {
-      // Straight into the active slot and onto the chart — no manual tab
-      // switch (terminal-instruments spec, "Wstawienie instrumentu do slotu").
-      gridStore.assignToActiveSlot(instrument.symbol);
-      navigate("/graph");
-    },
-    [navigate],
+const COLLECTION_HINT: Record<CollectionState, string> = {
+  never_collected: "Added, but no candle has been written yet.",
+  collecting: "The newest candle is as recent as it should be.",
+  stalled: "The newest candle is older than two periods and the market is open — nothing is arriving.",
+  market_closed: "Behind, but the market is shut, so there is nothing to collect.",
+  unknown: "Behind, and nobody could say whether the market is open.",
+};
+
+/** How far back the data reaches, and for which resolutions. One entry when
+ *  every resolution reaches equally far back — which is the common case, since
+ *  they are usually collected by one job from one date — and one per distinct
+ *  moment otherwise. `since` is null for resolutions that have collected
+ *  nothing at all. */
+interface DataSince {
+  since: number | null;
+  resolutions: Resolution[];
+}
+
+interface InstrumentGroup {
+  symbol: string;
+  /** Sorted by `RESOLUTIONS`' own order, not insertion order. */
+  pairs: TrackedPair[];
+  /** Oldest first, so the row leads with the deepest history it has. */
+  dataSince: DataSince[];
+}
+
+/**
+ * Resolutions bucketed by the moment their data starts.
+ *
+ * An instrument whose four resolutions all begin at the same moment deserves
+ * one date, not the same date four times; one whose daily series reaches back
+ * years while its minute series reaches back a week deserves both numbers,
+ * because a single one of them would be a lie about the other.
+ */
+function dataSinceOf(pairs: TrackedPair[]): DataSince[] {
+  const byMoment = new Map<number | null, Resolution[]>();
+  for (const pair of pairs) {
+    const at = byMoment.get(pair.earliestCandle) ?? [];
+    at.push(pair.resolution);
+    byMoment.set(pair.earliestCandle, at);
+  }
+  return [...byMoment.entries()]
+    .map(([since, resolutions]) => ({ since, resolutions }))
+    // Nothing collected yet sorts last: it is the least informative line, and
+    // an operator scanning the column is looking for how deep the archive goes.
+    .sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
+}
+
+function groupBySymbol(pairs: TrackedPair[]): InstrumentGroup[] {
+  const bySymbol = new Map<string, TrackedPair[]>();
+  for (const pair of pairs) {
+    const group = bySymbol.get(pair.symbol) ?? [];
+    group.push(pair);
+    bySymbol.set(pair.symbol, group);
+  }
+  return [...bySymbol.entries()]
+    .map(([symbol, group]) => {
+      const sorted = [...group].sort(
+        (a, b) => RESOLUTIONS.indexOf(a.resolution) - RESOLUTIONS.indexOf(b.resolution),
+      );
+      return { symbol, pairs: sorted, dataSince: dataSinceOf(sorted) };
+    })
+    .sort((a, b) => a.symbol.localeCompare(b.symbol));
+}
+
+/** What one Delete left behind — the only thing worth telling the operator
+ *  once the row or interval it names is already gone from the list above. */
+interface DeletionNotice {
+  symbol: string;
+  resolutions: Resolution[];
+  candlesRemoved: number;
+}
+
+/**
+ * Deleting cuts the row it names, so the confirmation of what happened can't
+ * live there — it lives here instead, above the list, until the operator
+ * dismisses it or deletes something else.
+ */
+function DeletionBanner({ notice, onDismiss }: { notice: DeletionNotice; onDismiss(): void }) {
+  return (
+    <p className="flex items-center gap-3 border-b border-border bg-panel px-4 py-2 text-xs text-ink-secondary">
+      <span>
+        Deleted {notice.candlesRemoved.toLocaleString()} candle
+        {notice.candlesRemoved === 1 ? "" : "s"} for {notice.symbol} in{" "}
+        {notice.resolutions.join(", ")}. See it in the{" "}
+        <Link to="/data-history" className="text-ink underline">
+          Data History
+        </Link>{" "}
+        tab.
+      </span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss"
+        className="ml-auto text-ink-muted hover:text-ink"
+      >
+        ×
+      </button>
+    </p>
   );
+}
+
+/**
+ * The one confirmation both Delete buttons raise — a modal, the same shape as the
+ * wizard's acceptance dialog, because deleting is the same weight of decision as
+ * starting to collect and the two should not read differently.
+ *
+ * It owns nothing but the asking: `onConfirm` does the deleting and reports back
+ * what failed, so the two call sites keep their own handling of a partial success.
+ */
+function DeleteDialog({
+  symbol,
+  resolutions,
+  dataSince,
+  failure,
+  onConfirm,
+  onCancel,
+}: {
+  symbol: string;
+  resolutions: Resolution[];
+  dataSince: number | null;
+  failure: string | null;
+  onConfirm(): void | Promise<void>;
+  onCancel(): void;
+}) {
+  const [deleting, setDeleting] = useState(false);
+
+  const confirm = useCallback(async () => {
+    setDeleting(true);
+    try {
+      await onConfirm();
+    } finally {
+      setDeleting(false);
+    }
+  }, [onConfirm]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-4 py-3">
-        <input
-          aria-label="Search instruments"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search instruments…"
-          spellCheck={false}
-          autoComplete="off"
-          className="w-72 rounded border border-border bg-panel px-2 py-1 text-sm text-ink placeholder:text-ink-muted"
-        />
-        <span className="text-xs text-ink-muted">
-          Selecting an instrument fills slot <strong className="text-ink">{config.activeSlot}</strong>
-        </span>
-      </div>
+    <div
+      role="dialog"
+      aria-label={`Delete ${symbol}`}
+      className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
+    >
+      <div className="max-h-[85vh] w-full max-w-lg overflow-auto rounded border border-border bg-panel-strong p-4 text-sm">
+        <h2 className="text-base font-semibold text-ink">Delete {symbol}?</h2>
 
-      <div className="min-h-0 flex-1 overflow-auto">
-        {query.trim() === "" ? (
-          <Catalogue onPick={assign} />
-        ) : (
-          <SearchResults search={search} onPick={assign} query={query} />
+        <p className="mt-3 text-ink">
+          This permanently removes every candle collected for{" "}
+          <span className="text-ink">{resolutions.join(", ")}</span>, and the record of what
+          was covered. It cannot be undone.
+        </p>
+
+        {dataSince !== null && (
+          <p className="mt-2 text-ink-secondary">
+            Data reaches back to <span className="text-ink">{formatInstant(dataSince)}</span>.
+          </p>
         )}
+
+        <p className="mt-2 text-ink-muted">
+          Collecting stops too — add the instrument again to start over from a new date.
+        </p>
+
+        {failure && <p className="mt-3 text-critical">{failure}</p>}
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded border border-border px-3 py-1 text-ink-muted hover:text-ink"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={deleting}
+            onClick={confirm}
+            className="rounded border border-down px-3 py-1 text-down hover:bg-panel disabled:opacity-40"
+          >
+            {deleting ? "Deleting…" : "Delete data"}
+          </button>
+        </div>
       </div>
     </div>
   );
 }
 
-function SearchResults({
-  search,
-  onPick,
-  query,
-}: {
-  search: ReturnType<typeof useInstrumentSearch>;
-  onPick(instrument: Instrument): void;
-  query: string;
-}) {
-  if (search.status === "searching") {
-    return <Message>Searching…</Message>;
-  }
-  if (search.status === "error") {
-    return (
-      <Message tone="error">
-        Search failed: {search.error}
-        <br />
-        <span className="text-ink-muted">Adjust the query or try again.</span>
-      </Message>
-    );
-  }
-  if (search.status === "no-results") {
-    // Distinct from an error, and from an empty list with no explanation.
-    return <Message>Nothing matches “{query.trim()}”.</Message>;
-  }
-  return <InstrumentTable instruments={search.instruments} onPick={onPick} />;
+export function InstrumentsView() {
+  const list = useTrackedPairs(archive);
+  const groups = useMemo(() => groupBySymbol(list.pairs), [list.pairs]);
+  const [deletion, setDeletion] = useState<DeletionNotice | null>(null);
+
+  return (
+    <div className="flex h-full min-h-0 flex-col">
+      <AddInstrumentWizard existingPairs={list.pairs} onCollected={list.reload} />
+
+      {deletion && <DeletionBanner notice={deletion} onDismiss={() => setDeletion(null)} />}
+
+      <div className="min-h-0 flex-1 overflow-auto">
+        <InstrumentList list={list} groups={groups} onDeleted={setDeletion} />
+      </div>
+    </div>
+  );
 }
 
-function Catalogue({ onPick }: { onPick(instrument: Instrument): void }) {
-  const [page, setPage] = useState<InstrumentPage | null>(null);
+function InstrumentList({
+  list,
+  groups,
+  onDeleted,
+}: {
+  list: ReturnType<typeof useTrackedPairs>;
+  groups: InstrumentGroup[];
+  onDeleted(notice: DeletionNotice): void;
+}) {
+  if (list.status === "loading") {
+    return <p className="px-4 py-6 text-sm text-ink-muted">Reading the archive…</p>;
+  }
+
+  // An empty list and an unanswered question are the same empty array, and
+  // only one of them means the operator has nothing set up.
+  if (list.status === "unreachable") {
+    return (
+      <p className="px-4 py-6 text-sm text-critical">
+        The archive is not reachable, so what it is collecting is unknown — this is not an
+        empty list. {list.error}
+        <button
+          type="button"
+          onClick={list.reload}
+          className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
+        >
+          Retry
+        </button>
+      </p>
+    );
+  }
+
+  return (
+    <>
+      {list.error && (
+        // The rows below are the last good answer; saying so beats replacing
+        // them with an error over one missed refresh.
+        <p className="px-4 pt-3 text-xs text-warning">
+          The last refresh failed ({list.error}); the rows below may be out of date.
+        </p>
+      )}
+
+      {groups.length === 0 ? (
+        <p className="px-4 py-6 text-sm text-ink-muted">
+          Nothing is being archived yet. Add an instrument above to start collecting one.
+        </p>
+      ) : (
+        <table className="w-full text-sm">
+          <thead className="sticky top-0 bg-canvas text-left text-xs text-ink-muted">
+            <tr>
+              <th className="px-4 py-2 font-normal">Symbol</th>
+              <th className="px-4 py-2 font-normal">Resolutions</th>
+              <th className="px-4 py-2 font-normal">Data since</th>
+              <th className="px-4 py-2 font-normal" />
+            </tr>
+          </thead>
+          <tbody>
+            {groups.map((group) => (
+              <InstrumentRow
+                key={group.symbol}
+                group={group}
+                onChanged={list.reload}
+                onDeleted={onDeleted}
+              />
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}
+
+function InstrumentRow({
+  group,
+  onChanged,
+  onDeleted,
+}: {
+  group: InstrumentGroup;
+  onChanged(): void;
+  onDeleted(notice: DeletionNotice): void;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
+  const stalled = group.pairs.some((pair) => pair.collection === "stalled");
+  // The deepest history this instrument holds, across every interval — what a
+  // confirmation shows so the operator sees the size of what they are about
+  // to lose, not just which intervals.
+  const earliestData = group.dataSince.find((entry) => entry.since !== null)?.since ?? null;
+
+  const deleteAll = useCallback(async () => {
+    setFailure(null);
+    const outcomes = await Promise.allSettled(
+      group.pairs.map((pair) =>
+        archive.deletePair(pair.symbol, pair.resolution, new AbortController().signal),
+      ),
+    );
+
+    const succeededResolutions: Resolution[] = [];
+    const failedResolutions: Resolution[] = [];
+    let candlesRemoved = 0;
+    outcomes.forEach((outcome, index) => {
+      const pair = group.pairs[index];
+      if (outcome.status === "fulfilled") {
+        succeededResolutions.push(pair.resolution);
+        candlesRemoved += outcome.value.candlesRemoved;
+      } else {
+        failedResolutions.push(pair.resolution);
+      }
+    });
+
+    if (succeededResolutions.length > 0) {
+      onDeleted({ symbol: group.symbol, resolutions: succeededResolutions, candlesRemoved });
+      onChanged();
+    }
+
+    if (failedResolutions.length > 0) {
+      // What is left in `group.pairs` after `onChanged()` reloads is exactly
+      // what failed — the confirmation stays open, naming it, rather than
+      // closing over a partial success.
+      setFailure(`could not delete ${failedResolutions.join(", ")}`);
+    } else {
+      setConfirming(false);
+    }
+  }, [group.pairs, group.symbol, onChanged, onDeleted]);
+
+  return (
+    <>
+      <tr
+        onClick={() => setExpanded((v) => !v)}
+        data-testid={`instrument-${group.symbol}`}
+        data-stalled={stalled}
+        className={`cursor-pointer border-t border-border hover:bg-panel ${
+          stalled ? "border-l-2 border-l-down" : ""
+        }`}
+      >
+        <td className="px-4 py-1.5 font-semibold text-ink">{group.symbol}</td>
+        <td className="px-4 py-1.5">
+          {group.pairs.map((pair, index) => (
+            <span key={pair.resolution}>
+              {index > 0 && <span className="text-ink-muted"> · </span>}
+              <span
+                title={COLLECTION_HINT[pair.collection]}
+                className={
+                  pair.collection === "stalled" ? "font-semibold text-down" : "text-ink-secondary"
+                }
+              >
+                {RESOLUTION_ABBR[pair.resolution]}
+              </span>
+            </span>
+          ))}
+        </td>
+        <td className="px-4 py-1.5 text-ink-muted">
+          <DataSinceCell entries={group.dataSince} />
+        </td>
+        <td className="px-4 py-1.5 text-right">
+          <button
+            type="button"
+            aria-label={`Delete ${group.symbol}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              setConfirming(true);
+            }}
+            className="rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
+          >
+            Delete
+          </button>
+        </td>
+      </tr>
+
+      {confirming && (
+        <tr>
+          <td colSpan={4} className="p-0">
+            <DeleteDialog
+              symbol={group.symbol}
+              resolutions={group.pairs.map((pair) => pair.resolution)}
+              dataSince={earliestData}
+              failure={failure}
+              onConfirm={deleteAll}
+              onCancel={() => {
+                setFailure(null);
+                setConfirming(false);
+              }}
+            />
+          </td>
+        </tr>
+      )}
+
+      {expanded && (
+        <tr className="border-t border-border">
+          <td colSpan={4} className="p-0">
+            {group.pairs.map((pair) => (
+              <IntervalCoverage
+                key={pair.resolution}
+                pair={pair}
+                onChanged={onChanged}
+                onDeleted={onDeleted}
+              />
+            ))}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
+/**
+ * Since when there is data — one date when that answer is one date.
+ *
+ * The resolutions are named only when they disagree. Labelling a single moment
+ * with all four of an instrument's intervals says nothing the row does not
+ * already say, and the column exists to be read at a glance.
+ */
+function DataSinceCell({ entries }: { entries: DataSince[] }) {
+  if (entries.length === 1) {
+    const [only] = entries;
+    return only.since === null ? (
+      <span>nothing yet</span>
+    ) : (
+      <span className="text-ink-secondary">{formatInstant(only.since)}</span>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      {entries.map((entry) => (
+        <div key={entry.since ?? "none"} className="flex items-baseline gap-2">
+          <span className="shrink-0 text-xs">
+            {entry.resolutions.map((resolution) => RESOLUTION_ABBR[resolution]).join(" · ")}
+          </span>
+          <span className={entry.since === null ? "" : "text-ink-secondary"}>
+            {entry.since === null ? "nothing yet" : formatInstant(entry.since)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function IntervalCoverage({
+  pair,
+  onChanged,
+  onDeleted,
+}: {
+  pair: TrackedPair;
+  onChanged(): void;
+  onDeleted(notice: DeletionNotice): void;
+}) {
+  const [coverage, setCoverage] = useState<PairCoverage | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
+  const [confirming, setConfirming] = useState(false);
+  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     const controller = new AbortController();
-    setPage(null);
+    setCoverage(null);
     setError(null);
 
-    marketData
-      .listInstruments(controller.signal)
+    archive
+      .coverage(pair.symbol, pair.resolution, controller.signal)
       .then((result) => {
-        if (!cancelled) setPage(result);
+        if (!cancelled) setCoverage(result);
       })
       .catch((cause: unknown) => {
         if (cancelled || controller.signal.aborted) return;
-        setError(cause instanceof Error ? cause.message : "could not list instruments");
+        setError(cause instanceof Error ? cause.message : "could not read coverage");
       });
 
     return () => {
       cancelled = true;
       controller.abort();
     };
-  }, [attempt]);
+  }, [pair.symbol, pair.resolution]);
 
-  if (error) {
-    return (
-      <Message tone="error">
-        {error}
+  const deleteInterval = useCallback(async () => {
+    setFailure(null);
+    try {
+      const result = await archive.deletePair(
+        pair.symbol,
+        pair.resolution,
+        new AbortController().signal,
+      );
+      setConfirming(false);
+      onDeleted({
+        symbol: pair.symbol,
+        resolutions: [pair.resolution],
+        candlesRemoved: result.candlesRemoved,
+      });
+      onChanged();
+    } catch (cause: unknown) {
+      setFailure(cause instanceof Error ? cause.message : "could not delete this interval's data");
+    }
+  }, [pair.symbol, pair.resolution, onChanged, onDeleted]);
+
+  const first = coverage?.ranges[0];
+  const last = coverage?.ranges.at(-1);
+  const stalled = pair.collection === "stalled";
+
+  return (
+    <div className="flex flex-col gap-1 border-t border-border px-4 py-2 text-xs first:border-t-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-semibold text-ink">{RESOLUTION_ABBR[pair.resolution]}</span>
+        <span
+          title={COLLECTION_HINT[pair.collection]}
+          className={stalled ? "font-semibold text-down" : "text-ink-secondary"}
+        >
+          {COLLECTION_LABEL[pair.collection]}
+        </span>
+        <span className="text-ink-muted">
+          newest: {pair.latestCandle === null ? "—" : formatInstant(pair.latestCandle)}
+        </span>
         <button
           type="button"
-          onClick={() => setAttempt((n) => n + 1)}
-          className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
+          aria-label={`Delete ${pair.symbol} ${pair.resolution}`}
+          onClick={() => setConfirming(true)}
+          className="ml-auto rounded border border-border px-2 py-0.5 text-ink-muted hover:text-ink"
         >
-          Retry
+          Delete
         </button>
-      </Message>
-    );
-  }
+      </div>
 
-  if (!page) {
-    return <Message>Loading the catalogue…</Message>;
-  }
-
-  return (
-    <>
-      <p className="px-4 py-2 text-xs text-ink-muted">
-        {page.count} instruments
-        {page.truncated && (
-          // The gateway walks a bounded slice of the provider's tree; a
-          // partial catalogue must never read as the whole one.
-          <span className="ml-2 text-warning">
-            — the catalogue was cut short; search to reach anything not listed
-          </span>
-        )}
-      </p>
-      <InstrumentTable instruments={page.instruments} onPick={onPick} />
-    </>
-  );
-}
-
-function InstrumentTable({
-  instruments,
-  onPick,
-}: {
-  instruments: Instrument[];
-  onPick(instrument: Instrument): void;
-}) {
-  return (
-    <table className="w-full text-sm">
-      <thead className="sticky top-0 bg-canvas text-left text-xs text-ink-muted">
-        <tr>
-          <th className="px-4 py-2 font-normal">Symbol</th>
-          <th className="px-4 py-2 font-normal">Name</th>
-          <th className="px-4 py-2 font-normal">Class</th>
-          <th className="px-4 py-2 text-right font-normal">Bid</th>
-          <th className="px-4 py-2 text-right font-normal">Ask</th>
-          <th className="px-4 py-2 font-normal">Tradeable</th>
-        </tr>
-      </thead>
-      <tbody>
-        {instruments.map((instrument) => (
-          <tr
-            key={instrument.symbol}
-            onClick={() => onPick(instrument)}
-            tabIndex={0}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                onPick(instrument);
-              }
-            }}
-            className="cursor-pointer border-t border-border hover:bg-panel focus:bg-panel focus:outline-none"
-          >
-            <td className="px-4 py-1.5 font-semibold text-ink">{instrument.symbol}</td>
-            <td className="px-4 py-1.5 text-ink-secondary">{instrument.name}</td>
-            <td className="px-4 py-1.5 text-ink-muted">{instrument.assetClass}</td>
-            <td className="px-4 py-1.5 text-right text-ink-secondary">
-              {instrument.bid ?? "—"}
-            </td>
-            <td className="px-4 py-1.5 text-right text-ink-secondary">
-              {instrument.ask ?? "—"}
-            </td>
-            <td className="px-4 py-1.5">
-              {instrument.tradeable ? (
-                <span className="text-ink-muted">yes</span>
-              ) : (
-                // Charted all the same — only trading is off the table.
-                <span className="text-warning" title="Not tradeable; it can still be charted.">
-                  not tradeable
-                </span>
-              )}
-            </td>
-          </tr>
+      {error && <p className="text-critical">{error}</p>}
+      {!error && !coverage && <p className="text-ink-muted">Reading coverage…</p>}
+      {coverage &&
+        (first && last ? (
+          <p className="text-ink-secondary">
+            Covered from <span className="text-ink">{formatInstant(first.from)}</span> to{" "}
+            <span className="text-ink">{formatInstant(last.to)}</span>
+            {coverage.ranges.length > 1 && (
+              // Coverage is stored merged, so more than one range means real
+              // stretches nobody has looked at between them.
+              <span className="text-warning">
+                {" "}
+                — in {coverage.ranges.length} stretches, with gaps between them
+              </span>
+            )}{" "}
+            {first.historyEnded
+              ? "— reached the end of the provider's history."
+              : coverage.earliestReachable === null
+                ? "— the provider's history has not been reached yet."
+                : `— the provider has nothing older than ${formatInstant(coverage.earliestReachable)}.`}
+          </p>
+        ) : (
+          <p className="text-ink-muted">Nothing verified yet for this interval.</p>
         ))}
-      </tbody>
-    </table>
-  );
-}
 
-function Message({
-  children,
-  tone = "muted",
-}: {
-  children: React.ReactNode;
-  tone?: "muted" | "error";
-}) {
-  return (
-    <p className={`px-4 py-6 text-sm ${tone === "error" ? "text-critical" : "text-ink-muted"}`}>
-      {children}
-    </p>
+      {confirming && (
+        <DeleteDialog
+          symbol={pair.symbol}
+          resolutions={[pair.resolution]}
+          dataSince={pair.earliestCandle}
+          failure={failure}
+          onConfirm={deleteInterval}
+          onCancel={() => {
+            setFailure(null);
+            setConfirming(false);
+          }}
+        />
+      )}
+    </div>
   );
 }

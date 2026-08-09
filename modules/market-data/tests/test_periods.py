@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from market_data.periods import from_epoch_millis, from_epoch_seconds, from_iso
+from market_data.models import Resolution
+from market_data.periods import from_epoch_millis, from_epoch_seconds, from_iso, periods_between
 
 MOMENT = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
 EPOCH_SECONDS = 1_786_104_000
@@ -56,3 +57,15 @@ def test_epoch_millis_are_read_as_utc() -> None:
 
 def test_both_forms_of_the_same_period_are_one_instant() -> None:
     assert from_iso("2026-08-07T12:00:00Z") == from_epoch_seconds(EPOCH_SECONDS)
+
+
+def test_periods_between_rounds_up() -> None:
+    # 90 seconds at a 60-second period is one and a half candles' worth, which is two
+    # candles of coverage — rounding down would understate what a window actually needs.
+    start = MOMENT
+    end = MOMENT + timedelta(seconds=90)
+    assert periods_between(Resolution.MINUTE, start, end) == 2
+
+
+def test_periods_between_an_empty_window_is_zero() -> None:
+    assert periods_between(Resolution.MINUTE, MOMENT, MOMENT) == 0

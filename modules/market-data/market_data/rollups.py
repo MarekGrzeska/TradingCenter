@@ -159,6 +159,10 @@ _DELETE_RANGE = """
        AND period_start < $4
 """
 
+_DELETE_ALL_FOR_SYMBOL = """
+    DELETE FROM derived_candles WHERE symbol = $1
+"""
+
 
 async def refresh(
     conn: asyncpg.Connection,
@@ -214,6 +218,18 @@ async def refresh_all(
         resolution: await refresh(conn, symbol, resolution, since, until)
         for resolution in DERIVABLE
     }
+
+
+async def delete_all_for_symbol(conn: asyncpg.Connection, symbol: str) -> None:
+    """Remove every rollup built from one symbol's minute series, across all of
+    `DERIVABLE` at once — there is nothing here to narrow by resolution, since every
+    rollup for a symbol is a projection of the same minute series.
+
+    Called when that minute series is deleted: a rollup left behind would answer a
+    derived-resolution read with candles computed from data the operator just removed
+    (`market-data-store` spec, "Skasowanie serii, z której wyliczane są inne").
+    """
+    await conn.execute(_DELETE_ALL_FOR_SYMBOL, symbol)
 
 
 async def read_derived(

@@ -12,8 +12,8 @@ vi.mock("./grid/GridView", () => ({
 vi.mock("./instruments/InstrumentsView", () => ({
   InstrumentsView: () => <div>instruments stub</div>,
 }));
-vi.mock("./archive/ArchiveView", () => ({
-  ArchiveView: () => <div>archive stub</div>,
+vi.mock("./history/CollectionHistoryView", () => ({
+  CollectionHistoryView: () => <div>data history stub</div>,
 }));
 // Neither back end is running under the test suite; both reachability checks
 // are stubbed so these tests assert routing, not connectivity.
@@ -70,6 +70,11 @@ describe("App routing (terminal-shell spec)", () => {
 
     expect(window.location.pathname).toBe("/instruments");
     expect(screen.getByText("instruments stub")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "Data History" }));
+
+    expect(window.location.pathname).toBe("/data-history");
+    expect(screen.getByText("data history stub")).toBeInTheDocument();
   });
 
   it("loading an address directly shows that tab, not the default", async () => {
@@ -78,21 +83,36 @@ describe("App routing (terminal-shell spec)", () => {
     expect(window.location.pathname).toBe("/instruments");
   });
 
-  // The archive panel is a tab like any other — an entry in the registry, its
-  // own address, and a reload that comes back to it rather than to the default
-  // (terminal-data-manager spec, "Panel jest zakładką terminala").
-  it("gives the archive panel its own address, and returns to it on a reload", async () => {
-    const user = userEvent.setup();
-    const { unmount } = await renderApp();
-
-    await user.click(screen.getByRole("link", { name: "Archive" }));
-    expect(window.location.pathname).toBe("/archive");
-    expect(screen.getByText("archive stub")).toBeInTheDocument();
-
-    // What a refresh does: the tree goes, the address stays.
-    unmount();
+  // Both tabs this change introduced are addressable, so a reload on either comes back
+  // to it (terminal-data-manager and terminal-collection-history specs, "Odświeżenie
+  // strony").
+  it("comes back to Data History on a reload rather than the default tab", async () => {
+    window.history.pushState({}, "", "/data-history");
     await renderApp();
-    expect(screen.getByText("archive stub")).toBeInTheDocument();
+
+    expect(window.location.pathname).toBe("/data-history");
+    expect(screen.getByText("data history stub")).toBeInTheDocument();
+  });
+
+  // One tab speaks about instruments, not two: the provider-catalogue browser is gone
+  // as a view of its own (terminal-data-manager spec, "Zakładki mówiące o instrumentach").
+  it("offers exactly one instruments tab and no catalogue or archive tab beside it", async () => {
+    await renderApp();
+
+    expect(screen.getAllByRole("link", { name: "Instruments" })).toHaveLength(1);
+    expect(screen.queryByRole("link", { name: "Archive" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Catalogue" })).not.toBeInTheDocument();
+  });
+
+  // `Instruments` absorbed the old `Archive` tab rather than being renamed
+  // from it, so a bookmark to the old address must not resolve to anything —
+  // a silent redirect would be a second, hidden way to reach the same tab
+  // (design.md, "Zakładki: `Archive` znika, `Data History` dochodzi").
+  it("sends a stale /archive bookmark to the unknown-tab page, not a tab", async () => {
+    window.history.pushState({}, "", "/archive");
+    await renderApp();
+
+    expect(screen.getByText(/no tab lives at this address/i)).toBeInTheDocument();
   });
 
   it("shows an explicit placeholder for a not-yet-implemented tab, other tabs unaffected", async () => {

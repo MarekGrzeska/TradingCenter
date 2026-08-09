@@ -11,8 +11,24 @@ call went where — the composition is `marketData.ts` and nothing else.
 
 **Nothing is archived because somebody looked at a chart.** Collecting a pair holds a
 provider connection open around the clock and the provider limits how many a session may
-hold, so what gets collected is a standing decision — made, and taken back, on the Archive
-tab.
+hold, so what gets collected is a standing decision — made on the `Instruments` tab. It
+runs the other way too: a chart slot only offers instruments the archive already
+collects, because a chart of a pair nobody collects has nothing to draw.
+
+**Deleting a pair removes its data — irreversibly.** There is no "stop but keep the
+candles" left in the terminal; `Instruments`' Delete stops collection and takes the data
+with it, in one confirmed step that says so plainly before it happens. What it removed is
+what makes a re-add later start from nothing rather than quietly inheriting a shorter
+range it was never given, and it stays visible afterwards as an entry in `Data History`.
+
+**Tabs.** `Graph` is the grid of charts. `Instruments` is the one place that says what is
+archived — one row per instrument, every resolution of it in one column, and since when
+there is data for it: one date when the resolutions agree, split per resolution when they
+reach differently far back — and where an
+instrument is added, through a wizard that prices the work before starting it. `Data
+History` is where that work is watched: what was pulled, how far a running pull has got,
+where a failed one is retried, and — in the same timeline — every deletion that has
+happened.
 
 ## What
 
@@ -26,11 +42,18 @@ tab.
   addresses).
 - `app/` — the shell: tab registry, routing, theme, connection indicator, per-view error
   boundary.
+- `ui/` — `Autocomplete`, the one position picker the whole terminal uses, plus the three
+  sources it is given (asset classes, instruments in a class, archived instruments) and the
+  debounce-and-stale-guard hook underneath it.
 - `chart/` — the reusable candlestick chart, identical standalone and in a grid slot.
-- `grid/` — six slots with fixed identities, layout presets, and persistence.
-- `instruments/` — search and catalogue, feeding instruments into the active slot.
-- `archive/` — the panel where the operator decides what `market-data` collects, and sees
-  whether collection is actually happening.
+- `grid/` — six slots with fixed identities, layout presets, and persistence. A slot's
+  symbol comes from the archived-instruments picker and its resolutions from what that
+  instrument is archived in.
+- `instruments/` — the `Instruments` tab: what is archived, per instrument, and the wizard
+  and acceptance dialog that add to it; Delete, which removes a pair's data with it.
+- `history/` — the `Data History` tab: collection jobs per instrument and resolution, their
+  measured progress, retrying the chunks that failed, and every deletion, in one timeline
+  with the jobs.
 
 ## Run
 
@@ -49,7 +72,7 @@ against it; the archive is started separately (see `modules/market-data/README.m
 ## Test
 
 ```bash
-pnpm test        # vitest — data layer, shell, chart, grid, instruments, archive panel
+pnpm test        # vitest — data layer, shell, autocomplete, chart, grid, instruments, history
 pnpm typecheck
 pnpm lint
 ```
@@ -70,6 +93,9 @@ From `market-data` — everything about candles:
 | `GET /candles/{symbol}?resolution=&from=&to=` | a range read, with what was never collected marked |
 | `GET /coverage/{symbol}?resolution=` | how far the archive reaches for a pair |
 | `GET /pairs`, `POST /pairs`, `DELETE /pairs/{symbol}` | what is collected, as the operator decides it |
+| `POST /jobs/estimate` | what a prospective pull would cost, before anything is created |
+| `GET /jobs`, `GET /jobs/{id}` | collection jobs and their progress, per pair |
+| `POST /jobs/{id}/retry` | re-run only the chunks that failed |
 | `GET /health` | the reachability check behind the connection indicator |
 
 From `capital-gateway` — the catalogue, which is its:
@@ -77,7 +103,8 @@ From `capital-gateway` — the catalogue, which is its:
 | Direction | What |
 |---|---|
 | `GET /instruments/search?q=` | search results |
-| `GET /instruments` | the catalogue, with its `truncated` flag |
+| `GET /instruments?asset_class=` | the catalogue, or one class of it, with its `truncated` flag |
+| `GET /asset-classes` | the classes it describes instruments with |
 | `GET /capabilities` | its own reachability check |
 
 **The archive's HTTP and WebSocket base addresses are configured separately** —
@@ -89,8 +116,8 @@ Locally both are relative and Vite's dev proxy carries them. The gateway needs n
 address any more: the terminal reads its catalogue and nothing else.
 
 **A relative prefix must not be a tab's route.** The archive answers on `/archive-api`, not
-`/archive`, because `/archive` is the Archive tab — and a back end holding that prefix
-shadows the tab for every request that reaches a server, which is a reload or a bookmark but
+`/archive`, which back then was a tab's route — a back end holding a prefix a tab also claims
+shadows that tab for every request that reaches a server, which is a reload or a bookmark but
 never a click. A test compares the two lists so the next prefix cannot repeat it.
 
 ## Findings

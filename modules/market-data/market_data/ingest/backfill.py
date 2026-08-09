@@ -22,9 +22,10 @@ from ..coverage import record_coverage
 from ..errors import GatewayError
 from ..gateway import GatewayHistory
 from ..models import Resolution
-from ..periods import period_length
+from ..periods import period_length, periods_between
 from ..rollups import refresh_all
 from ..store import read_latest_period, write_candles
+from ..tracking import read_collect_from
 
 log = logging.getLogger(__name__)
 
@@ -84,11 +85,17 @@ def bars_to_close_gap(
     latest_candle: datetime | None,
     now: datetime,
     default_bars: int,
+    collect_from: datetime,
 ) -> int:
     """How many candles to ask for, or zero when the archive is already current.
 
-    A pair that has collected nothing reaches back `default_bars`. A pair that has been
-    collecting asks only for what it missed.
+    A pair that has collected nothing reaches back `default_bars` — but never further
+    than `collect_from`, the moment this pair's history is meant to reach back to. For a
+    pair tracked without an explicit one, `collect_from` was itself computed from
+    `default_bars` (`tracking.default_collect_from`), so the two agree and nothing here
+    changes; the clamp only ever bites for a pair given a shallower, explicit moment. A
+    pair that has been collecting asks only for what it missed, which cannot run past
+    `collect_from` in the first place.
 
     Zero is the important answer. At any moment the newest closed candle is up to one
     period old — the current period has not finished, so the provider does not have it
@@ -96,7 +103,7 @@ def bars_to_close_gap(
     a candle nobody has yet.
     """
     if latest_candle is None:
-        return min(default_bars, MAX_BARS_PER_FILL)
+        return min(default_bars, MAX_BARS_PER_FILL, periods_between(resolution, collect_from, now))
 
     period = period_length(resolution)
     behind = now - latest_candle
@@ -126,8 +133,17 @@ async def fill_gap(
 
     async with pool.acquire() as conn:
         latest = await read_latest_period(conn, symbol, resolution)
+        collect_from = await read_collect_from(conn, symbol, resolution)
 
-    bars = bars_to_close_gap(resolution, latest, moment, default_bars)
+    if collect_from is None:
+        # Untracked in the gap between `PairIngest.run()`'s own `still_tracked()` check
+        # and this read — nothing to fetch for a pair nobody is tracking anymore, never
+        # a fall-back to the old unclamped depth.
+        outcome = FillOutcome(symbol=symbol, resolution=resolution, requested=0, finished_at=moment)
+        log.info(outcome.describe())
+        return outcome
+
+    bars = bars_to_close_gap(resolution, latest, moment, default_bars, collect_from)
     if bars == 0:
         outcome = FillOutcome(
             symbol=symbol, resolution=resolution, requested=0, finished_at=moment
@@ -138,9 +154,9 @@ async def fill_gap(
     try:
         if limiter is not None:
             async with limiter:
-                page = await history.history(symbol, resolution, bars)
+                page = await history.history(symbol, resolution, bars, after=collect_from)
         else:
-            page = await history.history(symbol, resolution, bars)
+            page = await history.history(symbol, resolution, bars, after=collect_from)
     except GatewayError as err:
         # Named rather than raised on. A pair whose fill failed is not a reason to stop
         # collecting the others, and the reason has to survive to somewhere an operator
@@ -155,13 +171,19 @@ async def fill_gap(
         log.warning(outcome.describe())
         return outcome
 
+    # Nothing older than what this pair was asked to reach back to, whatever came back.
+    # `bars` counts candles and `collect_from` is a moment, and for an instrument shut
+    # part of the week the two do not line up — the gateway is asked to bound the read
+    # and does, but a promise about what the archive stores is not one to delegate.
+    within = [c for c in page.candles if c.period_start >= collect_from]
+
     written = 0
     covered_from = covered_to = None
-    if page.candles:
-        oldest = page.candles[0].period_start
-        newest = page.candles[-1].period_start
+    if within:
+        oldest = within[0].period_start
+        newest = within[-1].period_start
         async with pool.acquire() as conn:
-            written = await write_candles(conn, page.candles)
+            written = await write_candles(conn, within)
             # Verified up to the moment of the read, not up to the newest candle. The two
             # differ exactly when the market was shut for the tail of the window — and
             # recording only as far as the last candle is what would send this same

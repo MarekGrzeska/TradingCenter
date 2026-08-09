@@ -132,6 +132,12 @@ export interface TrackedPair {
   resolution: Resolution;
   /** Epoch seconds, like every other instant here. */
   addedAt: number;
+  /** The moment history for this pair is meant to reach back to. */
+  collectFrom: number;
+  /** The oldest period collected — how far back the data reaches, which is not
+   *  `collectFrom`, where it was asked to reach. null when nothing has been
+   *  collected yet. */
+  earliestCandle: number | null;
   /** The newest period collected, or null when nothing has been yet. */
   latestCandle: number | null;
   collection: CollectionState;
@@ -154,4 +160,136 @@ export interface PairCoverage {
   /** The oldest moment worth asking the provider about. null means the end of
    *  its history has not been reached yet — never "there is no limit". */
   earliestReachable: number | null;
+}
+
+// --- collection jobs: dociąganie historii, jako coś operator zleca i śledzi ---
+//
+// Only the Instruments tab's wizard and the Data History tab speak these — the
+// chart never sees one. `market-data-jobs` spec: a job is the decision, a
+// chunk is one pair, one window, one gateway request.
+
+/** One chunk's life. `interrupted` means the module restarted while this
+ *  chunk was queued or in flight — never a failure of the chunk itself. */
+export type ChunkState = "pending" | "running" | "done" | "failed" | "skipped" | "interrupted";
+
+export interface Chunk {
+  id: number;
+  symbol: string;
+  resolution: Resolution;
+  /** Epoch seconds, half-open: `chunkStart` inclusive, `chunkEnd` exclusive. */
+  chunkStart: number;
+  chunkEnd: number;
+  state: ChunkState;
+  attempt: number;
+  candlesWritten: number;
+  requests: number;
+  /** Why this chunk failed, named — null when it did not. */
+  failure: string | null;
+  startedAt: number | null;
+  finishedAt: number | null;
+}
+
+/** Never stored, always derived from a job's chunks — see `market-data-jobs`
+ *  spec, "Historia zleceń przeżywa restart". `running` covers a chunk merely
+ *  queued, not only one actually in flight: a runner is what makes `pending`
+ *  mean "about to happen" rather than "stuck". */
+export type JobStatus = "running" | "succeeded" | "partial" | "failed" | "interrupted";
+
+/** One job, narrowed to one pair it touched — what the Data History tab reads.
+ *  A job spanning four pairs is four of these, each with only that pair's
+ *  chunks. */
+export interface JobPairView {
+  jobId: number;
+  symbol: string;
+  resolution: Resolution;
+  createdAt: number;
+  requestedFrom: number;
+  attempt: number;
+  status: JobStatus;
+  chunksDone: number;
+  chunksTotal: number;
+  candlesWritten: number;
+  chunks: Chunk[];
+}
+
+/** A whole job — every pair and chunk it covers. What the wizard's acceptance
+ *  dialog gets back, and what a single job reads as. */
+export interface Job {
+  id: number;
+  createdAt: number;
+  requestedFrom: number;
+  attempt: number;
+  status: JobStatus;
+  chunksDone: number;
+  chunksTotal: number;
+  candlesWritten: number;
+  /** The pair a chunk is presently in flight for, or null when nothing is
+   *  running right now. */
+  runningPair: { symbol: string; resolution: Resolution } | null;
+  chunks: Chunk[];
+}
+
+/** What one pair in a prospective job would cost — before anything is
+ *  fetched. `market-data-jobs` spec, "Zlecenie da się wycenić przed jego
+ *  uruchomieniem". */
+export interface PairEstimate {
+  symbol: string;
+  resolution: Resolution;
+  /** What the requested start was actually clipped to; null when the symbol
+   *  is unknown to the gateway. */
+  effectiveFrom: number | null;
+  /** True when `effectiveFrom` differs from what was requested — the
+   *  provider's own history, or what the archive already holds, fell short. */
+  clipped: boolean;
+  estimatedCandles: number;
+  estimatedBytes: number;
+  /** True when the gateway does not know this symbol at all. */
+  unknown: boolean;
+}
+
+export interface JobEstimate {
+  pairs: PairEstimate[];
+  totalEstimatedCandles: number;
+  totalEstimatedBytes: number;
+}
+
+/** One pair as named in a request — dodawany, wyceniany. */
+export interface PairRequest {
+  symbol: string;
+  resolution: Resolution;
+}
+
+/** One pair's outcome from adding several at once — a refusal for one must
+ *  never be indistinguishable from silence about it. */
+export interface TrackedPairResult {
+  symbol: string;
+  resolution: Resolution;
+  pair: TrackedPair | null;
+  /** Why this pair was refused; null when it was accepted. */
+  refused: string | null;
+}
+
+export interface TrackPairsResult {
+  results: TrackedPairResult[];
+  /** The backfill job covering the accepted pairs, or null when nothing
+   *  needed fetching. */
+  jobId: number | null;
+}
+
+// --- deletion: kasowanie, a decision that removes data, not just a decision ---
+//
+// Only the Instruments tab (the Delete confirmation) and Data History tab (the
+// combined timeline) speak this. `market-data-tracking` spec, "Skasowanie
+// zostaje odnotowane".
+
+/** The trace one skasowanie leaves — what it removed, kept after the data
+ *  itself is gone. `removedFrom`/`removedTo` are null together when the pair
+ *  had never collected anything before it was deleted. */
+export interface PairDeletion {
+  symbol: string;
+  resolution: Resolution;
+  deletedAt: number;
+  candlesRemoved: number;
+  removedFrom: number | null;
+  removedTo: number | null;
 }

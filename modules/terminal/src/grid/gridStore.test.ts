@@ -121,13 +121,4 @@ describe("createGridStore", () => {
     store.setLayout(store.getSnapshot().layout);
     expect(listener).not.toHaveBeenCalled();
   });
-
-  it("assigns an instrument to whichever slot is active", () => {
-    const store = createGridStore(memoryStorage());
-    store.setActiveSlot("s3");
-    const landed = store.assignToActiveSlot("TSLA");
-
-    expect(landed).toBe("s3");
-    expect(store.getSnapshot().slots.s3.symbol).toBe("TSLA");
-  });
 });

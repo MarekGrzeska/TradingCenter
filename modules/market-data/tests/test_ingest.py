@@ -47,11 +47,25 @@ class FakeHistory:
         self.history_ended = history_ended
         self.error = error
         self.calls: list[tuple[str, Resolution, int]] = []
+        # The `after` of each call, kept beside `calls` rather than inside it so the
+        # assertions that predate a floor existing stay readable.
+        self.floors: list[datetime | None] = []
 
-    async def history(self, symbol: str, resolution: Resolution, bars: int) -> HistoryPage:
+    async def history(
+        self,
+        symbol: str,
+        resolution: Resolution,
+        bars: int,
+        before: datetime | None = None,
+        after: datetime | None = None,
+    ) -> HistoryPage:
         self.calls.append((symbol, resolution, bars))
+        self.floors.append(after)
         if self.error is not None:
             raise self.error
+        # Deliberately *not* honouring `after` here: the real gateway does, but the
+        # archive must not depend on that, and a double that filtered would hide
+        # whether `fill_gap` keeps its own half of the promise.
         return HistoryPage(
             symbol=symbol,
             resolution=resolution,
@@ -93,15 +107,36 @@ async def pool(migrated_url: str):
 
     async with make_pool(migrated_url, max_size=5) as created:
         async with created.acquire() as conn:
-            await conn.execute("TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges")
+            await conn.execute(
+                "TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges, "
+                "collection_jobs, collection_job_chunks, pair_deletions"
+            )
         yield created
+
+
+async def _tracked(
+    pool,
+    symbol: str = "US100",
+    resolution: Resolution = Resolution.MINUTE,
+    collect_from: datetime | None = None,
+) -> None:
+    """`fill_gap` now reads a pair's `collect_from` from `tracked_pairs` before deciding
+    how deep to reach — so every test that fills a pair needs a real tracked row, not
+    only a fake `still_tracked`. Deep by default, so a test that does not care about the
+    clamp keeps its pre-existing bar counts."""
+    async with pool.acquire() as conn:
+        await track(conn, symbol, resolution, LIMIT, collect_from=collect_from or DEEP)
 
 
 # --- the arithmetic that decides whether to ask at all (7.8) -------------------------
 
+# A collect_from deep enough that it never clips what `default_bars` alone would have
+# asked for — what every test below uses unless it is specifically testing the clamp.
+DEEP = NOW - timedelta(days=3650)
+
 
 def test_a_pair_that_has_nothing_reaches_back_the_default() -> None:
-    assert bars_to_close_gap(Resolution.MINUTE, None, NOW, default_bars=5_000) == 5_000
+    assert bars_to_close_gap(Resolution.MINUTE, None, NOW, default_bars=5_000, collect_from=DEEP) == 5_000
 
 
 def test_a_current_pair_asks_for_nothing() -> None:
@@ -109,32 +144,70 @@ def test_a_current_pair_asks_for_nothing() -> None:
     # has not finished and the provider does not have it either. Treating that as a gap
     # would send a request every period, forever, for a candle nobody has yet.
     latest = NOW - timedelta(minutes=1)
-    assert bars_to_close_gap(Resolution.MINUTE, latest, NOW, default_bars=5_000) == 0
+    assert bars_to_close_gap(Resolution.MINUTE, latest, NOW, default_bars=5_000, collect_from=DEEP) == 0
 
 
 def test_a_pair_one_period_behind_asks_for_nothing() -> None:
     latest = NOW - timedelta(minutes=1, seconds=59)
-    assert bars_to_close_gap(Resolution.MINUTE, latest, NOW, default_bars=5_000) == 0
+    assert bars_to_close_gap(Resolution.MINUTE, latest, NOW, default_bars=5_000, collect_from=DEEP) == 0
 
 
 def test_a_pair_behind_by_a_break_asks_for_what_it_missed() -> None:
     latest = NOW - timedelta(minutes=30)
     # Twenty-nine missing periods plus a little overlap, so the seam is covered twice
     # rather than nearly.
-    assert bars_to_close_gap(Resolution.MINUTE, latest, NOW, default_bars=5_000) == 31
+    assert bars_to_close_gap(Resolution.MINUTE, latest, NOW, default_bars=5_000, collect_from=DEEP) == 31
 
 
 def test_the_gap_is_measured_in_the_pair_s_own_periods() -> None:
     latest = NOW - timedelta(hours=5)
-    assert bars_to_close_gap(Resolution.HOUR, latest, NOW, default_bars=5_000) == 6
-    assert bars_to_close_gap(Resolution.DAY, latest, NOW, default_bars=5_000) == 0
+    assert bars_to_close_gap(Resolution.HOUR, latest, NOW, default_bars=5_000, collect_from=DEEP) == 6
+    assert bars_to_close_gap(Resolution.DAY, latest, NOW, default_bars=5_000, collect_from=DEEP) == 0
 
 
 def test_a_request_is_never_larger_than_the_gateway_accepts() -> None:
     # The gateway refuses more than 50 000 with a validation error rather than clamping.
-    assert bars_to_close_gap(Resolution.MINUTE, None, NOW, default_bars=200_000) == 50_000
+    assert (
+        bars_to_close_gap(Resolution.MINUTE, None, NOW, default_bars=200_000, collect_from=DEEP)
+        == 50_000
+    )
     latest = NOW - timedelta(days=365)
-    assert bars_to_close_gap(Resolution.MINUTE, latest, NOW, default_bars=100) == 50_000
+    assert bars_to_close_gap(Resolution.MINUTE, latest, NOW, default_bars=100, collect_from=DEEP) == 50_000
+
+
+# --- ingest-fill-respects-collect-from: the clamp itself -----------------------------
+
+
+def test_a_pair_with_nothing_collected_does_not_reach_past_collect_from() -> None:
+    # collect_from is 10 days back; default_bars alone would ask for 5000 minutes
+    # (a touch under 3.5 days), so this test's collect_from is not the binding
+    # constraint — the next one is where the clamp actually bites.
+    collect_from = NOW - timedelta(days=10)
+    assert (
+        bars_to_close_gap(Resolution.MINUTE, None, NOW, default_bars=5_000, collect_from=collect_from)
+        == 5_000
+    )
+
+
+def test_an_explicit_shallow_collect_from_clamps_below_the_default() -> None:
+    # DAY at default_bars=5000 would reach back years; collect_from asks for only 30
+    # days, and MUST win.
+    collect_from = NOW - timedelta(days=30)
+    assert (
+        bars_to_close_gap(Resolution.DAY, None, NOW, default_bars=5_000, collect_from=collect_from)
+        == 30
+    )
+
+
+def test_a_pair_with_no_explicit_collect_from_is_unaffected() -> None:
+    # The depth `default_collect_from` would have computed for a pair given no explicit
+    # date — collect_from and default_bars agree, so the clamp is a no-op, matching
+    # behavior before this change existed.
+    collect_from = NOW - timedelta(minutes=5_000)
+    assert (
+        bars_to_close_gap(Resolution.MINUTE, None, NOW, default_bars=5_000, collect_from=collect_from)
+        == 5_000
+    )
 
 
 # --- 7.3 and 7.8: filling, and not filling -------------------------------------------
@@ -143,6 +216,7 @@ def test_a_request_is_never_larger_than_the_gateway_accepts() -> None:
 @pytest.mark.db
 async def test_a_start_after_a_break_fetches_the_missing_stretch(pool) -> None:
     """7.8, first half."""
+    await _tracked(pool)
     async with pool.acquire() as conn:
         await write_candles(conn, [minute_candle(30)])
     history = FakeHistory([minute_candle(m) for m in range(1, 30)])
@@ -160,6 +234,7 @@ async def test_a_start_after_a_break_fetches_the_missing_stretch(pool) -> None:
 @pytest.mark.db
 async def test_a_start_without_a_break_sends_no_request(pool) -> None:
     """7.8, second half — the half that costs the provider's budget when it is wrong."""
+    await _tracked(pool)
     async with pool.acquire() as conn:
         await write_candles(conn, [minute_candle(1)])
     history = FakeHistory([minute_candle(m) for m in range(1, 30)])
@@ -175,6 +250,7 @@ async def test_a_start_without_a_break_sends_no_request(pool) -> None:
 
 @pytest.mark.db
 async def test_a_first_fill_reaches_back_the_configured_depth(pool) -> None:
+    await _tracked(pool)
     history = FakeHistory([minute_candle(m) for m in range(1, 5)])
 
     await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
@@ -186,6 +262,7 @@ async def test_a_first_fill_reaches_back_the_configured_depth(pool) -> None:
 async def test_a_fill_is_one_request_however_deep(pool) -> None:
     # The gateway pages past the provider's ceiling itself and owns the rate gate. A
     # second pager here would drift from it and spend the budget twice.
+    await _tracked(pool)
     history = FakeHistory([minute_candle(m) for m in range(1, 5)], requests=63)
 
     outcome = await fill_gap(
@@ -198,6 +275,7 @@ async def test_a_fill_is_one_request_however_deep(pool) -> None:
 
 @pytest.mark.db
 async def test_a_fill_records_what_it_verified(pool) -> None:
+    await _tracked(pool)
     history = FakeHistory([minute_candle(m) for m in range(1, 30)])
 
     await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
@@ -213,6 +291,7 @@ async def test_a_fill_records_what_it_verified(pool) -> None:
 
 @pytest.mark.db
 async def test_the_end_of_provider_history_is_recorded_as_a_boundary(pool) -> None:
+    await _tracked(pool)
     history = FakeHistory([minute_candle(m) for m in range(1, 5)], history_ended=True)
 
     outcome = await fill_gap(
@@ -227,6 +306,7 @@ async def test_the_end_of_provider_history_is_recorded_as_a_boundary(pool) -> No
 
 @pytest.mark.db
 async def test_a_minute_fill_folds_into_the_derived_resolutions(pool) -> None:
+    await _tracked(pool)
     history = FakeHistory([minute_candle(m) for m in range(1, 20)])
 
     await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
@@ -240,6 +320,7 @@ async def test_an_empty_answer_verifies_nothing(pool) -> None:
     # The gateway pages backwards from now, so with no candles at all there is no telling
     # how far back it looked. Claiming coverage would be claiming to have checked a
     # stretch nobody checked.
+    await _tracked(pool)
     history = FakeHistory([])
 
     await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
@@ -256,6 +337,7 @@ async def test_a_failed_fill_names_its_reason_and_does_not_raise(pool) -> None:
     # One pair's failure is not a reason to stop collecting the others, so it comes back
     # as an outcome rather than an exception — but it must not come back looking like
     # success either.
+    await _tracked(pool, "NOPE", Resolution.MINUTE)
     history = FakeHistory(error=GatewayRefused(404, "unknown symbol 'NOPE'"))
 
     outcome = await fill_gap(
@@ -269,6 +351,7 @@ async def test_a_failed_fill_names_its_reason_and_does_not_raise(pool) -> None:
 
 @pytest.mark.db
 async def test_an_unreachable_gateway_is_reported_not_raised(pool) -> None:
+    await _tracked(pool)
     history = FakeHistory(error=GatewayUnreachable("connection refused"))
 
     outcome = await fill_gap(
@@ -276,6 +359,68 @@ async def test_an_unreachable_gateway_is_reported_not_raised(pool) -> None:
     )
 
     assert outcome.failure is not None
+
+
+# --- ingest-fill-respects-collect-from: end to end ------------------------------------
+
+
+@pytest.mark.db
+async def test_a_fill_for_a_pair_with_an_explicit_shallow_collect_from_does_not_reach_past_it(
+    pool,
+) -> None:
+    """The incident this fix is for: an operator adds a pair with an explicit, recent
+    collect_from, and the quiet fill used to reach back the configured default depth
+    anyway — years further than asked, for a resolution coarse enough that the default's
+    calendar span outruns the requested one (`DAY` at `default_bars=5_000` is years;
+    `collect_from` here asks for 30 days).
+    """
+    collect_from = NOW - timedelta(days=30)
+    await _tracked(pool, "US100", Resolution.DAY, collect_from=collect_from)
+    history = FakeHistory([])
+
+    await fill_gap(pool, history, "US100", Resolution.DAY, default_bars=5_000, now=NOW)
+
+    [(_symbol, _resolution, bars)] = history.calls
+    assert bars == 30  # not 5_000 — the depth this fix removes
+    # And the moment is named as a moment, which a bar count cannot express for an
+    # instrument that is not open around the clock.
+    assert history.floors == [collect_from]
+
+
+@pytest.mark.db
+async def test_a_fill_stores_nothing_older_than_collect_from(pool) -> None:
+    """The half the bar count cannot promise.
+
+    `bars` counts candles; `collect_from` is a moment. For an instrument shut part of
+    the week the gateway answers a request for N bars with candles spanning far more
+    than N periods — so clamping the count is not the same as honouring the date, and
+    only what reaches the archive proves which one happened.
+    """
+    collect_from = NOW - timedelta(minutes=30)
+    await _tracked(pool, collect_from=collect_from)
+    # One inside the window, one a full hour old — before the pair was ever asked to
+    # reach back to. The double deliberately does not filter; the real gateway would,
+    # and the archive must not lean on that.
+    history = FakeHistory([minute_candle(5), minute_candle(60)])
+
+    outcome = await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
+
+    async with pool.acquire() as conn:
+        stored = await read_candles(conn, "US100", Resolution.MINUTE)
+    assert [c.period_start for c in stored] == [NOW - timedelta(minutes=5)]
+    assert outcome.written == 1
+
+
+@pytest.mark.db
+async def test_a_fill_for_a_pair_no_longer_tracked_requests_nothing(pool) -> None:
+    # Not tracked at all — the same answer `fill_gap` gives a pair untracked in the
+    # narrow window between `PairIngest`'s own `still_tracked()` check and this read.
+    history = FakeHistory([minute_candle(1)])
+
+    outcome = await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
+
+    assert history.calls == []
+    assert outcome.requested == 0
 
 
 def test_an_outcome_reads_as_a_sentence() -> None:
@@ -307,14 +452,16 @@ async def test_fills_do_not_run_more_at_once_than_the_budget_allows(pool) -> Non
     peak = 0
 
     class SlowHistory(FakeHistory):
-        async def history(self, symbol, resolution, bars):
+        async def history(self, symbol, resolution, bars, before=None, after=None):
             nonlocal in_flight, peak
             in_flight += 1
             peak = max(peak, in_flight)
             await asyncio.sleep(0.02)
             in_flight -= 1
-            return await super().history(symbol, resolution, bars)
+            return await super().history(symbol, resolution, bars, before, after)
 
+    for n in range(5):
+        await _tracked(pool, f"SYM{n}", Resolution.MINUTE)
     limiter = asyncio.Semaphore(1)
     histories = [SlowHistory([minute_candle(1, symbol=f"SYM{n}")]) for n in range(5)]
     await asyncio.gather(
@@ -343,14 +490,16 @@ async def test_a_larger_budget_lets_more_run(pool) -> None:
     peak = 0
 
     class SlowHistory(FakeHistory):
-        async def history(self, symbol, resolution, bars):
+        async def history(self, symbol, resolution, bars, before=None, after=None):
             nonlocal in_flight, peak
             in_flight += 1
             peak = max(peak, in_flight)
             await asyncio.sleep(0.02)
             in_flight -= 1
-            return await super().history(symbol, resolution, bars)
+            return await super().history(symbol, resolution, bars, before, after)
 
+    for n in range(5):
+        await _tracked(pool, f"SYM{n}", Resolution.MINUTE)
     limiter = asyncio.Semaphore(3)
     await asyncio.gather(
         *(
@@ -374,6 +523,7 @@ async def test_a_larger_budget_lets_more_run(pool) -> None:
 async def test_deciding_not_to_fetch_never_waits_for_the_budget(pool) -> None:
     # The limiter is taken around the provider call only. A pair that needs nothing must
     # not queue behind another pair's deep fill just to discover that.
+    await _tracked(pool)
     async with pool.acquire() as conn:
         await write_candles(conn, [minute_candle(1)])
     held = asyncio.Semaphore(1)
@@ -400,6 +550,7 @@ async def test_deciding_not_to_fetch_never_waits_for_the_budget(pool) -> None:
 
 @pytest.mark.db
 async def test_a_closed_candle_from_the_feed_is_stored(pool) -> None:
+    await _tracked(pool)
     tracked = [True, False]  # collect once, then the pair stops being tracked
     feed = fake_feed([CandleUpdate(candle=minute_candle(1, source=CandleSource.STREAM))])
 
@@ -422,6 +573,7 @@ async def test_a_closed_candle_from_the_feed_is_stored(pool) -> None:
 
 @pytest.mark.db
 async def test_a_forming_candle_from_the_feed_is_not_stored(pool) -> None:
+    await _tracked(pool)
     forming = minute_candle(0, source=CandleSource.STREAM, forming=True)
     feed = fake_feed([CandleUpdate(candle=forming)])
 
@@ -451,6 +603,7 @@ async def test_the_gateway_reporting_trouble_closes_the_gap_it_left(pool) -> Non
     measured on 2026-08-08 as two candles the provider still had, correctly reported as
     uncovered and never fetched again until a restart.
     """
+    await _tracked(pool)
     missed = [minute_candle(2), minute_candle(1)]
     history = FakeHistory(missed)
     feed = fake_feed(
@@ -481,6 +634,7 @@ async def test_the_gateway_reporting_trouble_closes_the_gap_it_left(pool) -> Non
 
 @pytest.mark.db
 async def test_quotes_and_status_do_not_become_candles(pool) -> None:
+    await _tracked(pool)
     feed = fake_feed(
         [
             FeedStatus(state=FeedState.CONNECTED),
@@ -508,6 +662,7 @@ async def test_quotes_and_status_do_not_become_candles(pool) -> None:
 @pytest.mark.db
 async def test_a_dropped_feed_is_resumed_while_the_pair_is_tracked(pool) -> None:
     """7.2."""
+    await _tracked(pool)
     feed = fake_feed([], [], [])  # three connections, each ending straight away
     delays: list[float] = []
 
@@ -554,6 +709,7 @@ async def test_a_feed_that_produced_something_starts_over_from_the_first_delay(
 async def test_a_resumed_subscription_closes_the_gap_it_left(pool) -> None:
     """7.5. Reconnecting without fetching leaves a hole that looks exactly like a market
     that was shut."""
+    await _tracked(pool)
     async with pool.acquire() as conn:
         await write_candles(conn, [minute_candle(30)])
     history = FakeHistory([minute_candle(m) for m in range(1, 30)])
@@ -593,6 +749,32 @@ async def test_the_loop_ends_when_the_pair_stops_being_tracked(pool) -> None:
     ).run()
 
     assert feed.opened == []
+
+
+def test_a_supplied_limiter_is_used_instead_of_a_private_one() -> None:
+    # So a collection job runner can share the same fill budget rather than getting a
+    # second gate that happens to allow the same count (design.md, "Zlecenia dzielą
+    # budżet ruchu z resztą modułu").
+    shared = asyncio.Semaphore(3)
+    ingest = Ingest(
+        pool=None,
+        history=FakeHistory([]),
+        stream_url="ws://gateway.test/ws/stream",
+        default_bars=100,
+        limiter=shared,
+    )
+    assert ingest._limiter is shared
+
+
+def test_without_a_supplied_limiter_ingest_builds_its_own() -> None:
+    ingest = Ingest(
+        pool=None,
+        history=FakeHistory([]),
+        stream_url="ws://gateway.test/ws/stream",
+        default_bars=100,
+        backfill_concurrency=2,
+    )
+    assert isinstance(ingest._limiter, asyncio.Semaphore)
 
 
 # --- 7.4 and the supervisor ----------------------------------------------------------

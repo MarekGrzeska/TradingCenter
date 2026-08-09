@@ -77,6 +77,50 @@ describe("gatewaySource.searchInstruments", () => {
     await source().searchInstruments("gold", new AbortController().signal);
     expect(seen).toEqual(["gateway.test"]);
   });
+
+  // The gateway's own search has no class filter — the wizard's second
+  // autocomplete narrows what it got back instead, so it never offers an
+  // instrument outside the class already chosen in its first step.
+  it("narrows to the asset class client-side, since the gateway does not filter search", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/instruments/search`, () =>
+        HttpResponse.json([
+          {
+            symbol: "GOLD",
+            name: "Gold",
+            asset_class: "COMMODITIES",
+            tradeable: true,
+            bid: 2400.1,
+            ask: 2400.4,
+          },
+          {
+            symbol: "BTCUSD",
+            name: "Bitcoin",
+            asset_class: "CRYPTO",
+            tradeable: true,
+            bid: 60000,
+            ask: 60010,
+          },
+        ]),
+      ),
+    );
+
+    const result = await source().searchInstruments(
+      "o",
+      new AbortController().signal,
+      "COMMODITIES",
+    );
+    expect(result).toEqual([
+      {
+        symbol: "GOLD",
+        name: "Gold",
+        assetClass: "COMMODITIES",
+        tradeable: true,
+        bid: 2400.1,
+        ask: 2400.4,
+      },
+    ]);
+  });
 });
 
 describe("gatewaySource.listInstruments", () => {
@@ -96,12 +140,59 @@ describe("gatewaySource.listInstruments", () => {
     expect(page).toEqual({ instruments: [], count: 300, truncated: true });
   });
 
+  it("sends asset_class in the query when a class is given", async () => {
+    let asked: URL | null = null;
+    server.use(
+      http.get(`${HTTP_BASE}/instruments`, ({ request }) => {
+        asked = new URL(request.url);
+        return HttpResponse.json({ instruments: [], count: 0, truncated: false });
+      }),
+    );
+
+    await source().listInstruments(new AbortController().signal, "CRYPTO");
+    expect(asked!.searchParams.get("asset_class")).toBe("CRYPTO");
+  });
+
+  it("sends no asset_class when none is given", async () => {
+    let asked: URL | null = null;
+    server.use(
+      http.get(`${HTTP_BASE}/instruments`, ({ request }) => {
+        asked = new URL(request.url);
+        return HttpResponse.json({ instruments: [], count: 0, truncated: false });
+      }),
+    );
+
+    await source().listInstruments(new AbortController().signal);
+    expect(asked!.searchParams.has("asset_class")).toBe(false);
+  });
+
   it("maps a network failure to unreachable, not a raw fetch error", async () => {
     server.use(http.get(`${HTTP_BASE}/instruments`, () => HttpResponse.error()));
 
     await expect(
       source().listInstruments(new AbortController().signal),
     ).rejects.toMatchObject({ kind: "unreachable", message: "capital-gateway is not reachable" });
+  });
+});
+
+describe("gatewaySource.listAssetClasses", () => {
+  it("reads the classes the gateway describes instruments with", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/asset-classes`, () =>
+        HttpResponse.json(["CRYPTO", "COMMODITIES", "INDICES"]),
+      ),
+    );
+
+    const classes = await source().listAssetClasses(new AbortController().signal);
+    expect(classes).toEqual(["CRYPTO", "COMMODITIES", "INDICES"]);
+  });
+
+  it("maps a network failure to unreachable", async () => {
+    server.use(http.get(`${HTTP_BASE}/asset-classes`, () => HttpResponse.error()));
+
+    await expect(
+      source().listAssetClasses(new AbortController().signal),
+    ).rejects.toMatchObject({ kind: "unreachable" });
   });
 });
 

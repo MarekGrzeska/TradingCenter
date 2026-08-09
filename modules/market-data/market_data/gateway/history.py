@@ -13,6 +13,8 @@ seconds. The timeout below is sized for that, not for a local API.
 
 from __future__ import annotations
 
+from datetime import datetime
+
 import httpx
 from pydantic import BaseModel, ValidationError
 
@@ -58,15 +60,36 @@ class GatewayHistory:
         self._base_url = base_url.rstrip("/")
         self._client = client
 
-    async def history(self, symbol: str, resolution: Resolution, bars: int) -> HistoryPage:
-        """Reach back `bars` candles for one pair.
+    async def history(
+        self,
+        symbol: str,
+        resolution: Resolution,
+        bars: int,
+        before: datetime | None = None,
+        after: datetime | None = None,
+    ) -> HistoryPage:
+        """Reach back `bars` candles for one pair, ending at `before` rather than now
+        and stopping at `after`.
 
         Everything comes back closed, on the bid side, and marked as having come from a
         history read — which is what later lets a history value outrank a streamed one
         for the same period.
+
+        `before` is what lets a chunk (`jobs/plan.py`) ask for a window that ended
+        months or years ago instead of always reaching back from the present — see
+        `capital-market-data` spec, "Głęboki odczyt zaczyna się w dowolnym momencie".
+
+        `after` is the other edge, and the only way to bound a read in *time*: `bars`
+        counts candles, and an instrument shut part of the week hands back `bars`
+        candles spanning far more calendar time than `bars` periods. Without it a read
+        for "since January" quietly collects the previous autumn too.
         """
         url = f"{self._base_url}/instruments/{symbol}/history"
-        params = {"resolution": resolution.value, "bars": bars}
+        params: dict[str, str | int] = {"resolution": resolution.value, "bars": bars}
+        if before is not None:
+            params["before"] = before.isoformat()
+        if after is not None:
+            params["after"] = after.isoformat()
 
         try:
             response = await self._client.get(url, params=params)

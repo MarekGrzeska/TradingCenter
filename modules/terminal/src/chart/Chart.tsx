@@ -25,6 +25,12 @@ export interface ChartProps {
   /** Rendered at the left of the header — the grid puts its symbol picker
    *  here; a standalone chart passes nothing and just shows the symbol. */
   headerLeft?: React.ReactNode;
+  /** Resolutions offered by the selector. Defaults to every one this
+   *  terminal knows — a caller that can say which are actually archived for
+   *  this symbol (the grid slot) narrows it, so the picker never offers a
+   *  resolution that can only end in a refusal (terminal-grid spec, "Slot ma
+   *  własny instrument i własny interwał"). */
+  resolutions?: readonly Resolution[];
 }
 
 function toCandlestick(bar: Bar): CandlestickData<Time> {
@@ -58,6 +64,7 @@ export function Chart({
   resolution,
   onResolutionChange,
   headerLeft,
+  resolutions = RESOLUTIONS,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -241,7 +248,7 @@ export function Chart({
           onChange={(e) => onResolutionChange(e.target.value as Resolution)}
           className="rounded border border-border bg-panel-strong px-1.5 py-0.5 text-xs text-ink"
         >
-          {RESOLUTIONS.map((r) => (
+          {resolutions.map((r) => (
             <option key={r} value={r}>
               {r}
             </option>

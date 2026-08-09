@@ -112,6 +112,39 @@ async def test_running_past_the_bottom_keeps_what_was_collected() -> None:
     assert result.requested == 100
 
 
+async def test_an_anchor_shapes_only_the_first_page() -> None:
+    anchor = datetime(2024, 1, 15, 0, 0, tzinfo=UTC)
+    first_page = candles(anchor, 2)
+    pages = [first_page, candles(anchor - STEP * 50, 2)]
+    seen: list[tuple[str | None, str | None]] = []
+
+    async def fetch(date_from, date_to, limit):
+        seen.append((date_from, date_to))
+        return pages.pop(0) if pages else []
+
+    await history.collect("GOLD", Resolution.MINUTE_5, 4, fetch, anchor=anchor)
+
+    # The first request now names a window ending at the anchor, not "the newest
+    # available" — this is what lets a caller reach for a window that ended in the past.
+    assert seen[0] == history.window_before(anchor, Resolution.MINUTE_5, 4)
+    # The second page still anchors on data actually received, exactly as an unanchored
+    # read would — the anchor only ever shapes the first request.
+    oldest_of_first_page = history.parse_candle_ts(first_page[0].ts)
+    assert seen[1][1] == history.iso_utc(oldest_of_first_page)
+
+
+async def test_no_anchor_keeps_reaching_back_from_now() -> None:
+    seen: list[tuple[str | None, str | None]] = []
+
+    async def fetch(date_from, date_to, limit):
+        seen.append((date_from, date_to))
+        return candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 3)
+
+    await history.collect("GOLD", Resolution.MINUTE_5, 3, fetch)
+
+    assert seen[0] == (None, None)
+
+
 async def test_a_window_with_no_progress_ends_the_loop() -> None:
     page = candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 3)
 
@@ -147,6 +180,176 @@ async def test_a_satisfied_request_does_not_claim_history_ended() -> None:
 
     assert result.count == 5
     assert result.history_ended is False
+
+
+# --- the floor: a lower bound in time, which `bars` cannot express -------------------
+
+
+async def test_a_floor_drops_candles_older_than_it() -> None:
+    # The whole point: `bars` counts candles, so an instrument shut half the week hands
+    # back candles reaching much further into the past than the caller wanted. Nothing
+    # older than the floor may come out, however it arrived.
+    newest = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    floor = newest - STEP * 2
+    page = candles(newest, 6)  # reaches back well past the floor
+
+    async def fetch(date_from, date_to, limit):
+        return page
+
+    result = await history.collect("GOLD", Resolution.MINUTE_5, 6, fetch, after=floor)
+
+    assert [history.parse_candle_ts(c.ts) for c in result.candles] == [
+        floor,
+        floor + STEP,
+        newest,
+    ]
+
+
+async def test_a_window_never_reaches_past_the_floor() -> None:
+    # Clamped rather than merely filtered afterwards, so a request is never spent on
+    # candles that would be discarded on arrival.
+    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    floor = anchor - STEP * 3
+    seen: list[tuple[str | None, str | None]] = []
+
+    async def fetch(date_from, date_to, limit):
+        seen.append((date_from, date_to))
+        return candles(anchor, 4)
+
+    await history.collect("GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor)
+
+    # Without the clamp this window would reach back 999 periods, not three.
+    assert seen[0] == (history.iso_utc(floor), history.iso_utc(anchor))
+
+
+async def test_reaching_the_floor_stops_the_paging() -> None:
+    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    floor = anchor - STEP * 3
+    calls = 0
+
+    async def fetch(date_from, date_to, limit):
+        nonlocal calls
+        calls += 1
+        return candles(anchor, 4)  # oldest is exactly the floor
+
+    result = await history.collect(
+        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
+    )
+
+    assert calls == 1  # nothing older is worth asking for
+    assert result.count == 4
+
+
+async def test_reaching_the_floor_is_not_the_end_of_provider_history() -> None:
+    """`history_ended` is recorded downstream as a permanent boundary — claiming it
+    because the *caller* asked for less would stop the next, deeper read being made."""
+    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    floor = anchor - STEP * 3
+
+    async def fetch(date_from, date_to, limit):
+        return candles(anchor, 4)
+
+    result = await history.collect(
+        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
+    )
+
+    assert result.history_ended is False
+
+
+async def test_an_empty_window_at_the_floor_is_not_the_end_of_history_either() -> None:
+    # The floor can land inside a stretch the market was shut for, so the clamped window
+    # holds nothing. That is the caller's bound being reached, not the provider running
+    # out of data.
+    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    floor = anchor - STEP * 3
+
+    async def fetch(date_from, date_to, limit):
+        return []
+
+    result = await history.collect(
+        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
+    )
+
+    assert result.history_ended is False
+
+
+async def test_running_out_of_provider_data_above_the_floor_still_ends_history() -> None:
+    # The floor must not mask a genuine ending. `floor` is far enough back that no window
+    # is ever clamped to it, so running out is unambiguously the provider's own bottom
+    # rather than the caller's bound being reached.
+    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    floor = anchor - STEP * 100_000
+    pages = [candles(anchor, 3)]
+
+    async def fetch(date_from, date_to, limit):
+        return pages.pop(0) if pages else None  # not-found: the bottom of history
+
+    result = await history.collect(
+        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
+    )
+
+    assert result.history_ended is True
+
+
+async def test_not_found_for_a_window_clamped_to_the_floor_is_not_an_ending() -> None:
+    """The one that cost six weeks of candles.
+
+    Capital answers `error.prices.not-found` for a window holding nothing, and the last
+    window of a floored read is narrow and often lands in a shut market. Read as an
+    ending it becomes a stored boundary, and every older chunk still queued is skipped
+    behind it — so this must say "the floor was reached", not "the provider is empty".
+    """
+    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    floor = anchor - STEP * 4
+    pages = [candles(anchor, 2)]  # reaches 13:55, still above the floor
+
+    async def fetch(date_from, date_to, limit):
+        return pages.pop(0) if pages else None
+
+    result = await history.collect(
+        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
+    )
+
+    assert result.history_ended is False
+    assert result.count == 2
+
+
+async def test_no_progress_at_a_window_clamped_to_the_floor_is_not_an_ending() -> None:
+    """The other half of the same lesson — the half that survived fixing the first.
+
+    A floored read pages down to the oldest candle its windows hold, then asks once more
+    about the sliver left between that candle and the floor. The provider answers with
+    the candle it already sent: no progress, but equally no statement about its own
+    bottom. Measured on 5-minute US100 floored at 2026-02-16 07:01:23 — paging stopped
+    on the 07:05 candle, the 3½-minute sliver below returned that same candle, and
+    reading it as an ending skipped every chunk queued back to 1 January.
+    """
+    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    floor = anchor - STEP * 3 - timedelta(minutes=3)  # a sliver below the oldest candle
+
+    async def fetch(date_from, date_to, limit):
+        return candles(anchor, 4)  # reaching down to 13:45, never below it
+
+    result = await history.collect(
+        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
+    )
+
+    assert result.history_ended is False
+    assert result.count == 4
+    assert result.requests == 2  # the second one is the sliver
+
+
+async def test_no_floor_leaves_the_read_exactly_as_it_was() -> None:
+    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    seen: list[tuple[str | None, str | None]] = []
+
+    async def fetch(date_from, date_to, limit):
+        seen.append((date_from, date_to))
+        return candles(anchor, 4)
+
+    await history.collect("GOLD", Resolution.MINUTE_5, 4, fetch, anchor=anchor)
+
+    assert seen[0] == history.window_before(anchor, Resolution.MINUTE_5, 4)
 
 
 async def test_paging_stops_when_the_caller_is_gone() -> None:

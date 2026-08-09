@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { ArchiveView } from "../archive/ArchiveView";
+import { CollectionHistoryView } from "../history/CollectionHistoryView";
 import { GridView } from "../grid/GridView";
 import { InstrumentsView } from "../instruments/InstrumentsView";
 
@@ -8,9 +8,11 @@ import { InstrumentsView } from "../instruments/InstrumentsView";
  * from this list, so adding a tab is an entry here, not a change to either.
  * terminal-shell spec, "Rejestr zakładek jest otwarty".
  *
- * `Graph` and `Instruments` start as `coming-soon` placeholders here and flip
- * to `ready` once their views land (groups 6 and 7). `Positions`, `Orders` and
- * `Account` are `coming-soon` for the life of this change — see proposal.md.
+ * `Archive` is gone rather than renamed: `Instruments` absorbed it, so a
+ * stale `/archive` bookmark falls through to the unknown-tab page rather than
+ * a silent redirect (design.md, "Zakładki: `Archive` znika, `Data History`
+ * dochodzi"). `Positions`, `Orders` and `Account` are `coming-soon` for the
+ * life of this change — see proposal.md.
  */
 export type TabStatus = "ready" | "coming-soon";
 
@@ -40,10 +42,13 @@ export const TABS: TabDefinition[] = [
     status: "ready",
     Component: InstrumentsView,
   },
-  // Adding a tab is an entry here and nothing else — which is what the registry
-  // was for. Nothing in the bar, the routing or the other tabs changed to make
-  // room for this one.
-  { id: "archive", label: "Archive", path: "archive", status: "ready", Component: ArchiveView },
+  {
+    id: "data-history",
+    label: "Data History",
+    path: "data-history",
+    status: "ready",
+    Component: CollectionHistoryView,
+  },
   { id: "positions", label: "Positions", path: "positions", status: "coming-soon" },
   { id: "orders", label: "Orders", path: "orders", status: "coming-soon" },
   { id: "account", label: "Account", path: "account", status: "coming-soon" },

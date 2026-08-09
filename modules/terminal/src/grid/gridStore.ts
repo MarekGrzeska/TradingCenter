@@ -22,9 +22,6 @@ export interface GridStore {
    *  practice. */
   clearSlotSymbol(slot: SlotId): void;
   setSlotResolution(slot: SlotId, resolution: Resolution): void;
-  /** Put an instrument into whichever slot is active — what the Instruments
-   *  tab calls (terminal-instruments spec). Returns the slot it landed in. */
-  assignToActiveSlot(symbol: string): SlotId;
 }
 
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
@@ -86,11 +83,6 @@ export function createGridStore(storage: Storage | null = safeLocalStorage()): G
     },
     setSlotResolution(slot, resolution) {
       updateSlot(slot, { resolution });
-    },
-    assignToActiveSlot(symbol) {
-      const slot = config.activeSlot;
-      updateSlot(slot, { symbol });
-      return slot;
     },
   };
 }
