@@ -100,21 +100,27 @@
     <tr>
       <td>twój <code>.env</code> na laptopie</td>
       <td><code>market_data_dev</code></td>
-      <td>odczyt i zapis <span class="dim">— bez dostępu do bazy produkcyjnej</span></td>
+      <td>odczyt i zapis <span class="dim">— Service Principal, bez dostępu do bazy produkcyjnej</span></td>
     </tr>
     <tr>
       <td><strong>ty w DBeaverze</strong></td>
       <td>obie</td>
-      <td><span class="pill bad">tylko odczyt</span> na <code>market_data</code></td>
+      <td><span class="pill bad">pełny dostęp</span> <span class="dim">— administrator serwera</span></td>
     </tr>
   </tbody>
 </table>
 </div>
 
+<div class="callout warn">
+  <span class="tag">Trzy tożsamości, nie cztery</span>
+  <p>Pierwotny plan zakładał czwartą, osobną rolę operatorską z samym <code>SELECT</code> na <code>market_data</code>. Nie powstała: administrator Entra przypisany serwerowi omija każdy <code>GRANT</code> na każdej bazie — to nie jest rola z uprawnieniami, tylko superużytkownik — więc osobna rola tylko-do-odczytu niczego by nie chroniła przed tym samym kontem, którym i tak łączysz się w DBeaverze.</p>
+  <p><strong>Konsekwencja przyjęta świadomie:</strong> w DBeaverze masz pełny odczyt i zapis na obu bazach, produkcyjnej włącznie. Jedyna ochrona to nawyk i przełącznik <em>Read-only connection</em> niżej — nie egzekwuje go baza. Dla projektu jednoosobowego administrator i tak ma pełny dostęp przez portal Azure, więc osobna rola tylko do przeglądania nie broniłaby przed niczym, przed czym nie broni się już sama przez się. Gdyby do projektu dołączyła druga osoba, tu jest miejsce, żeby tę rolę jednak zbudować.</p>
+</div>
+
 <div class="callout bad">
   <span class="tag">Czego nie robić</span>
   <p><strong>Nie podawaj DBeaverowi konta z <code>.env</code>.</strong> Wygodne, kuszące, i dokładnie znosi zabezpieczenie, po które te konta zostały rozdzielone.</p>
-  <p>Sens podziału jest taki: konto, które program bierze <em>automatycznie</em> z pliku, nie ma jak zaszkodzić produkcji. Konto, którym <em>świadomie</em> klikasz w narzędziu, produkcję widzi — ale niczego w niej nie zmieni. Zlanie ich w jedno przywraca sytuację, w której literówka w jednej zmiennej środowiskowej puszcza <code>alembic upgrade</code> na archiwum.</p>
+  <p>Sens podziału jest taki: konto, które program bierze <em>automatycznie</em> z pliku, nigdy nie widzi produkcji — nie ma jak, bo nie ma do niej <code>CONNECT</code>. Konto, którym <em>świadomie</em> klikasz w DBeaverze, widzi obie bazy w pełni — ale ty jesteś przy klawiaturze i widzisz, na której zakładce pracujesz. Zlanie ich w jedno usuwa tę drugą linię obrony: literówka w zmiennej środowiskowej zaczyna mieć taki sam skutek jak pomyłkowe kliknięcie w złej zakładce, zamiast żadnego.</p>
 </div>
 
 <h2>Połączenie krok po kroku</h2>
@@ -130,10 +136,17 @@
     <tr><td class="field">Host</td><td class="field">psql-tradingcenter.postgres.database.azure.com</td></tr>
     <tr><td class="field">Port</td><td class="field">5432</td></tr>
     <tr><td class="field">Database</td><td class="field">market_data <span class="dim">lub market_data_dev</span></td></tr>
-    <tr><td class="field">Username</td><td class="field">twój login Entra <span class="dim">(adres e-mail konta Azure)</span></td></tr>
+    <tr><td class="field">Username</td><td class="field">twój UPN Entra <span class="dim">— patrz uwaga niżej, to zwykle <strong>nie</strong> jest adres e-mail, którym się logujesz</span></td></tr>
     <tr><td class="field">Password</td><td>token — patrz niżej</td></tr>
   </tbody>
 </table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Konto gościa (B2B) ma inny UPN niż login</span>
+  <p>Jeśli administratorem jest osobiste konto Microsoft (outlook.com, hotmail.com — nie konto firmowe z tego samego dzierżawcy), Entra widzi je jako gościa i nadaje mu wewnętrzny UPN w formacie <code>twoj-login_domena.com#EXT#@nazwa-dzierżawcy.onmicrosoft.com</code> — nie <code>twoj-login@domena.com</code>, którym się logujesz. Postgres sprawdza właśnie ten wewnętrzny UPN, więc podanie zwykłego adresu e-mail kończy się <code>password authentication failed</code>, mimo poprawnego tokenu.</p>
+  <p>Sprawdź swój dokładnie tym poleceniem — to samo, którym Terraform ustawił administratora (<code>infra/terraform.tfvars</code>, <code>postgres_admin_upn</code>):</p>
+  <pre><code>az ad signed-in-user show --query userPrincipalName -o tsv</code></pre>
 </div>
 
 <h3>Zakładka SSL</h3>
@@ -144,7 +157,7 @@
 
 <p>Zaznacz <strong>Read-only connection</strong> i nadaj połączeniu wyraźną nazwę, na przykład <code>PROD (read-only)</code>. Warto też przypisać mu czerwony kolor — DBeaver koloruje wtedy całą zakładkę edytora, co przy dwóch podobnie wyglądających połączeniach ratuje przed pomyłką skuteczniej niż uwaga.</p>
 
-<p>To blokada w interfejsie, nie zabezpieczenie: prawdziwym jest brak praw <code>INSERT</code> i <code>UPDATE</code> po stronie bazy. Ale kosztuje jedno kliknięcie i wyłapuje pomyłkę wcześniej — zanim zapytanie w ogóle wyruszy.</p>
+<p>To blokada w interfejsie, <strong>nie zabezpieczenie</strong> — baza jej nie wymusza, bo administrator ma tam pełne prawa (patrz uwaga w sekcji Zasada). Ale kosztuje jedno kliknięcie i wyłapuje pomyłkę wcześniej — zanim zapytanie w ogóle wyruszy. Na tym etapie projektu jest to jedyna linia obrony na produkcji, więc warto ją zaznaczać, nie traktować jako formalność.</p>
 
 <h2>Hasłem jest token, który żyje godzinę</h2>
 
@@ -163,7 +176,7 @@
 <div class="callout warn">
   <span class="tag">To zirytuje</span>
   <p><strong>Token wygasa po około godzinie</strong> i połączenie trzeba wtedy odświeżyć nowym. To realny koszt rezygnacji z hasła — nie blokuje pracy, ale wraca regularnie.</p>
-  <p>Jeśli okaże się męczący, są dwa wyjścia: skrypt odświeżający <code>~/.pgpass</code>, albo natywna obsługa Entra dla PostgreSQL-a w DBeaverze. <strong>Nie potwierdziłem, czy ta druga jest w edycji Community</strong> — sprawdź w swojej instalacji (<em>Authentication</em> na zakładce <em>Main</em>), zanim się na niej oprzesz.</p>
+  <p><strong>Rozstrzygnięte:</strong> DBeaver <strong>Community</strong> nie ma natywnej obsługi Entra ID dla PostgreSQL-a — to funkcja edycji Lite/Enterprise/Ultimate (płatnych). W Community jedyne dwie drogi to ręczne wklejanie tokenu do pola <em>Password</em>, jak wyżej, albo skrypt odświeżający <code>~/.pgpass</code> nowym tokenem w tle, żeby DBeaver czytał go stamtąd zamiast pytać. Dla pracy kilka razy w tygodniu ręczne wklejanie jest prostsze niż utrzymywanie skryptu; wart rozważenia dopiero, gdy DBeaver jest otwarty przez cały dzień.</p>
 </div>
 
 <h2>Zanim zadzwonisz, że nie działa</h2>
@@ -181,8 +194,8 @@
       <td>Token wygasł. Wygeneruj nowy.</td>
     </tr>
     <tr>
-      <td><code>permission denied for table …</code> na produkcji</td>
-      <td>Działa poprawnie. Twoje konto ma tam wyłącznie <code>SELECT</code> — jeśli naprawdę potrzebujesz zapisu na produkcji, jest to decyzja do podjęcia świadomie, nie przez podniesienie sobie uprawnień w biegu.</td>
+      <td><code>password authentication failed</code>, token świeży</td>
+      <td>Najpewniej <em>Username</em>. Konto gościa (B2B) ma inny UPN niż login — patrz uwaga wyżej i <code>az ad signed-in-user show</code>.</td>
     </tr>
     <tr>
       <td>połączenie odrzucone natychmiast</td>

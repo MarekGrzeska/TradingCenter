@@ -281,3 +281,7 @@ na dysku, o ile nie wykonano `docker compose down -v`.
   zadania w grupie 1.
 - Czy DBeaver w edycji Community obsługuje Entra ID dla PostgreSQL-a natywnie, czy token trzeba
   wklejać co godzinę. Dotyczy wyłącznie wygody operatora i treści `docs/dbeaver-azure-connection.html`.
+  **Rozstrzygnięte (grupa 11):** nie obsługuje — natywna obsługa Entra ID jest funkcją płatnych
+  edycji (Lite/Enterprise/Ultimate), nie Community. `docs/dbeaver-azure-connection.html` zaktualizowany:
+  ręczne wklejanie tokenu zostaje, ze wskazaniem skryptu odświeżającego `~/.pgpass` jako alternatywy
+  dla kogoś, kto trzyma DBeavera otwartego cały dzień.
