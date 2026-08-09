@@ -100,26 +100,26 @@ Zakładka zostaje płaska i ułożona od najnowszego zdarzenia (`terminal-collec
 prostsze miejsce na przycisk — złamałoby ten porządek, czyli cofnęłoby zamkniętą już zmianę
 `data-history-newest-first`.
 
-### Wspólny dialog na natywnym `<dialog>`
+### Wspólny dialog: `div role="dialog"` z fokusem pilnowanym ręcznie
 
-Nowy komponent w `src/ui/` opakowuje natywny element `<dialog>` otwierany przez `showModal()`.
-Fokus przenoszony do środka, uwięziony wewnątrz, oddawany z powrotem po zamknięciu, `Escape`,
-warstwa nad resztą strony i bezwładność tła — to wszystko daje platforma. Zdarzenie `cancel` jest
-przechwytywane, gdy trwa potwierdzona praca, bo wtedy dialog ma zostać (spec `terminal-dialogs`,
-„Dialog zostaje na ekranie, dopóki praca trwa").
+Nowy komponent w `src/ui/` bierze: tytuł, treść, nazwę akcji potwierdzającej, funkcję wykonującą
+pracę i sposób zamknięcia. Praca w toku, blokada drugiego kliknięcia, błąd pokazany w środku,
+`Escape` oraz fokus — przeniesiony do środka, uwięziony wewnątrz i oddany po zamknięciu — należą do
+niego. Miejsce pytające dostarcza treść i skutek, nic więcej.
 
-Komponent bierze: tytuł, treść, nazwę akcji potwierdzającej, funkcję wykonującą pracę i sposób
-zamknięcia. Praca w toku, blokada drugiego kliknięcia i błąd pokazany w środku należą do niego —
-miejsce pytające dostarcza treść i skutek, nic więcej.
+**Natywny `<dialog>` z `showModal()` był pierwszym wyborem i został odrzucony po sprawdzeniu.**
+Dawałby pułapkę na fokus, `Escape`, warstwę nad stroną i bezwładność tła za darmo — ale żadna wersja
+`jsdom` tego nie implementuje. Sprawdzone kolejno 25, 26 i 30: `HTMLDialogElement-impl.js` jest
+w każdej z nich pustą klasą bez `showModal`, `close` i zdarzenia `cancel`. Testy musiałyby stać na
+polyfillu napisanym na ich potrzeby, czyli sprawdzać coś innego niż to, co jedzie na produkcję.
 
-**Alternatywa — własny `div` z ręcznym pilnowaniem fokusu** (dzisiejszy kształt obu dialogów) —
-odrzucona: ręczna pułapka na fokus to sto linii, które psują się cicho i których nikt nie ogląda,
-dopóki ktoś nie wejdzie klawiaturą.
+Ręczna pułapka na fokus jest tym, czym zawsze była — kodem, który psuje się cicho — ale tutaj jest
+w jednym pliku, ma testy sprawdzające dokładnie to, co robi, i mieści się w kilkudziesięciu
+liniach. Delegowane i nieprzetestowane przegrywa z napisanym i przetestowanym.
 
-**Koszt**: `jsdom` w wersji 25 nie zna `showModal()`. Podnosimy go do `^26` (tam element `<dialog>`
-jest zaimplementowany) — zmiana wyłącznie w `devDependencies`. Gdyby wsparcie okazało się
-niewystarczające do przetestowania zachowań, zostają one utrzymane w komponencie, a testy sprawdzają
-je przez jego własne wejścia; przeglądarka pozostaje źródłem prawdy.
+**Koszt**: lista elementów, na które można wejść tabem, jest odpytywana przy każdym naciśnięciu
+`Tab`, a nie zapamiętywana — zawartość dialogu zmienia się, gdy praca rusza (przycisk staje się
+nieaktywny), a lista sprzed tej chwili uwięziłaby fokus na czymś, co go nie przyjmie.
 
 Trzy istniejące miejsca przechodzą na ten komponent w jednej zmianie: kreator, kasowanie i
 ponowienie. Zostawienie któregokolwiek po staremu odbiera całej zasadzie sens, bo to właśnie
@@ -156,9 +156,11 @@ strony w pętli nie da się przeczytać. Ryzyko ograniczone tym, że znacznik je
 odejściem ze strony, więc jego brak po powrocie oznaczałby wyłączony `sessionStorage`, w którym
 i tak nie działa MSAL. Test w scenariuszu „powrót bez zalogowania" pilnuje tego wprost.
 
-**Podniesienie `jsdom` psuje testy niezwiązane ze zmianą** → jsdom jest tylko `devDependency`;
-weryfikacja to jedno uruchomienie całego zestawu testów terminala zaraz po podniesieniu, przed
-napisaniem czegokolwiek nowego.
+**Ręczna pułapka na fokus rozjeżdża się z tym, co robi przeglądarka** → zachowania są opisane
+w spec'u `terminal-dialogs` i przetestowane na komponencie; przeglądarka pozostaje źródłem prawdy
+i pierwszy operator wchodzący klawiaturą jest ostatecznym sprawdzianem. Gdy `jsdom` w końcu
+zaimplementuje `<dialog>`, cała ta warstwa da się usunąć bez ruszania miejsc pytających — o to
+chodziło w postawieniu jej w jednym pliku.
 
 **Klikalny wiersz tabeli myli się z zaznaczaniem tekstu** → wiersz dostaje jawną rolę przycisku
 w kolumnie akcji i obsługę klawiatury; otwarcie dialogu przez kliknięcie gdziekolwiek w wierszu jest

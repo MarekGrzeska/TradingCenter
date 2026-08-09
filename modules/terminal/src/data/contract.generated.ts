@@ -583,6 +583,12 @@ export interface components {
             /** Id */
             id: number;
             /**
+             * Last Activity At
+             * Format: date-time
+             * @description When something last happened in this job — a chunk starting counts, not only one settling. Falls back to the job's creation while no chunk has been claimed yet.
+             */
+            last_activity_at: string;
+            /**
              * Requested From
              * Format: date-time
              */
@@ -612,6 +618,12 @@ export interface components {
             created_at: string;
             /** Job Id */
             job_id: number;
+            /**
+             * Last Activity At
+             * Format: date-time
+             * @description When something last happened for this pair — a chunk starting counts, not only one settling, so a long chunk reads as work rather than a stall. Falls back to the job's creation while no chunk has been claimed yet. This is the only field that tells a running job apart from a stuck one: progress and candle counts look identical for both.
+             */
+            last_activity_at: string;
             /**
              * Requested From
              * Format: date-time

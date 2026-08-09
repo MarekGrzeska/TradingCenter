@@ -32,7 +32,7 @@ class FakeArchive {
     if (this.retryFailure) throw this.retryFailure;
     // The view never reads the returned Job — it always reloads from
     // `listJobs` afterwards, so a minimal stand-in is enough here.
-    return { id: jobId, createdAt: 0, requestedFrom: 0, attempt: 2, status: "running", chunksDone: 0, chunksTotal: 0, candlesWritten: 0, runningPair: null, chunks: [] };
+    return { id: jobId, createdAt: 0, requestedFrom: 0, attempt: 2, status: "running", chunksDone: 0, chunksTotal: 0, candlesWritten: 0, lastActivityAt: 0, runningPair: null, chunks: [] };
   };
 }
 
@@ -76,6 +76,7 @@ function row(over: Partial<JobPairView> = {}): JobPairView {
     chunksDone: 1,
     chunksTotal: 1,
     candlesWritten: 1000,
+    lastActivityAt: 1785542500,
     chunks: [chunk()],
     ...over,
   };
@@ -313,8 +314,63 @@ describe("CollectionHistoryView — success vs partial coverage", () => {
   });
 });
 
-describe("CollectionHistoryView — retry", () => {
-  it("says what will be retried before doing it, and moves the row to running once queued", async () => {
+describe("CollectionHistoryView — the job dialog and retry", () => {
+  it("opens the whole job from one pair's row, including pairs the row does not show", async () => {
+    const user = userEvent.setup();
+    fakeArchive.rows = [
+      row({ symbol: "US100", resolution: "MINUTE" }),
+      row({ symbol: "GOLD", resolution: "HOUR", candlesWritten: 500 }),
+    ];
+    renderView();
+
+    await user.click(await screen.findByTestId("history-1-US100-MINUTE"));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText("US100")).toBeInTheDocument();
+    expect(within(dialog).getByText("GOLD")).toBeInTheDocument();
+    expect(within(dialog).getByText(/2 pairs/i)).toBeInTheDocument();
+  });
+
+  it("opens from the keyboard too, without a pointer", async () => {
+    const user = userEvent.setup();
+    fakeArchive.rows = [row()];
+    renderView();
+
+    await screen.findByTestId("history-1-US100-MINUTE");
+    await user.tab();
+
+    expect(screen.getByRole("button", { name: /job 1 details/i })).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+  });
+
+  it("opens nothing from a deletion entry, which came from no job", async () => {
+    const user = userEvent.setup();
+    fakeArchive.deletions = [deletion()];
+    renderView();
+
+    await user.click(await screen.findByTestId("deletion-US100-MINUTE-1786200000"));
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("keeps retry off the pair's row, where it would promise less than it does", async () => {
+    fakeArchive.rows = [
+      row({
+        status: "failed",
+        chunksDone: 0,
+        chunksTotal: 1,
+        chunks: [chunk({ state: "failed", failure: "gateway refused" })],
+      }),
+    ];
+    renderView();
+
+    const r = await screen.findByTestId("history-1-US100-MINUTE");
+    expect(within(r).queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
+  });
+
+  it("says what the retry covers before doing it, and moves the rows to running once queued", async () => {
     const user = userEvent.setup();
     fakeArchive.rows = [
       row({
@@ -326,26 +382,34 @@ describe("CollectionHistoryView — retry", () => {
     ];
     renderView();
 
-    await user.click(await screen.findByRole("button", { name: /retry us100 minute/i }));
-    expect(screen.getByText(/retry 1 chunk for us100 minute/i)).toBeInTheDocument();
+    await user.click(await screen.findByTestId("history-1-US100-MINUTE"));
+
+    const dialog = await screen.findByRole("dialog");
+    // The scope, spelled out: this is the job, not the row it was opened from.
+    expect(within(dialog).getByText(/re-runs 1 failed chunk across 1 pair/i)).toBeInTheDocument();
+    // And why it failed, where the decision to retry is being made.
+    expect(within(dialog).getByText("gateway refused")).toBeInTheDocument();
     expect(fakeArchive.retryCalls).toHaveLength(0);
 
     fakeArchive.rows = [row({ status: "running", chunksDone: 0, chunksTotal: 1 })];
-    await user.click(screen.getByRole("button", { name: /^retry$/i }));
+    await user.click(screen.getByRole("button", { name: /retry job/i }));
 
     expect(fakeArchive.retryCalls).toEqual([1]);
     await waitFor(() => expect(screen.getByText("running")).toBeInTheDocument());
   });
 
   it("does not offer retry for a fully succeeded pull", async () => {
+    const user = userEvent.setup();
     fakeArchive.rows = [row({ status: "succeeded" })];
     renderView();
 
-    await screen.findByTestId("history-1-US100-MINUTE");
-    expect(screen.queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
+    await user.click(await screen.findByTestId("history-1-US100-MINUTE"));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).queryByRole("button", { name: /retry/i })).not.toBeInTheDocument();
   });
 
-  it("leaves the row as failed, not running, when the retry request itself fails", async () => {
+  it("leaves the rows as failed, not running, when the retry request itself fails", async () => {
     const user = userEvent.setup();
     fakeArchive.rows = [
       row({ status: "failed", chunks: [chunk({ state: "failed", failure: "gateway refused" })] }),
@@ -353,12 +417,56 @@ describe("CollectionHistoryView — retry", () => {
     fakeArchive.retryFailure = new MarketDataError("upstream", "market-data is not reachable");
     renderView();
 
-    await user.click(await screen.findByRole("button", { name: /retry us100 minute/i }));
-    await user.click(screen.getByRole("button", { name: /^retry$/i }));
+    await user.click(await screen.findByTestId("history-1-US100-MINUTE"));
+    await user.click(await screen.findByRole("button", { name: /retry job/i }));
 
-    expect(await screen.findByText(/market-data is not reachable/i)).toBeInTheDocument();
-    expect(screen.getByText("failed")).toBeInTheDocument();
+    // The reason stays with the decision it explains, and the dialog stays open.
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/market-data is not reachable/i)).toBeInTheDocument();
+    expect(screen.getByTestId("history-1-US100-MINUTE")).toBeInTheDocument();
     expect(screen.queryByText("running")).not.toBeInTheDocument();
+  });
+});
+
+describe("CollectionHistoryView — a job that has stopped moving", () => {
+  it("says how long nothing has happened, and marks a running pull that has stalled", async () => {
+    const now = Math.floor(Date.now() / 1000);
+    fakeArchive.rows = [
+      row({
+        symbol: "US100",
+        status: "running",
+        chunksDone: 1,
+        chunksTotal: 4,
+        lastActivityAt: now - 42 * 60,
+      }),
+      row({
+        jobId: 2,
+        symbol: "GOLD",
+        status: "running",
+        chunksDone: 1,
+        chunksTotal: 4,
+        lastActivityAt: now - 30,
+      }),
+    ];
+    renderView();
+
+    const stuck = await screen.findByTestId("history-1-US100-MINUTE");
+    const working = screen.getByTestId("history-2-GOLD-MINUTE");
+
+    // Visible on the row itself — no dialog, no log, no waiting forty minutes.
+    expect(within(stuck).getByText(/nothing for 42 min/i)).toBeInTheDocument();
+    expect(within(working).getByText(/nothing for under a minute/i)).toBeInTheDocument();
+
+    expect(stuck).toHaveAttribute("data-stalled", "true");
+    expect(working).toHaveAttribute("data-stalled", "false");
+  });
+
+  it("says nothing about idleness for a pull that has finished", async () => {
+    fakeArchive.rows = [row({ status: "succeeded", lastActivityAt: 1785542500 })];
+    renderView();
+
+    const r = await screen.findByTestId("history-1-US100-MINUTE");
+    expect(within(r).queryByText(/nothing for/i)).not.toBeInTheDocument();
   });
 });
 

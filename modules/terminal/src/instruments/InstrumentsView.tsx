@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { archive } from "../data/marketData";
 import { RESOLUTIONS } from "../data/types";
 import type { CollectionState, PairCoverage, Resolution, TrackedPair } from "../data/types";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { AddInstrumentWizard } from "./AddInstrumentWizard";
 import { formatInstant } from "./format";
 import { RESOLUTION_ABBR } from "./resolutionAbbr";
@@ -131,85 +132,53 @@ function DeletionBanner({ notice, onDismiss }: { notice: DeletionNotice; onDismi
 }
 
 /**
- * The one confirmation both Delete buttons raise — a modal, the same shape as the
- * wizard's acceptance dialog, because deleting is the same weight of decision as
- * starting to collect and the two should not read differently.
+ * The one confirmation both Delete buttons raise, on the terminal's shared dialog
+ * — deleting is the same weight of decision as starting to collect, and the two
+ * must not read differently (`terminal-dialogs` spec).
  *
- * It owns nothing but the asking: `onConfirm` does the deleting and reports back
- * what failed, so the two call sites keep their own handling of a partial success.
+ * It owns nothing but what the question says. `onConfirm` does the deleting and
+ * *throws* what failed: staying open, naming the reason and offering another go
+ * belong to the dialog, so neither call site writes that again.
  */
 function DeleteDialog({
   symbol,
   resolutions,
   dataSince,
-  failure,
   onConfirm,
   onCancel,
 }: {
   symbol: string;
   resolutions: Resolution[];
   dataSince: number | null;
-  failure: string | null;
   onConfirm(): void | Promise<void>;
   onCancel(): void;
 }) {
-  const [deleting, setDeleting] = useState(false);
-
-  const confirm = useCallback(async () => {
-    setDeleting(true);
-    try {
-      await onConfirm();
-    } finally {
-      setDeleting(false);
-    }
-  }, [onConfirm]);
-
   return (
-    <div
-      role="dialog"
-      aria-label={`Delete ${symbol}`}
-      className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
+    <ConfirmDialog
+      title={`Delete ${symbol}?`}
+      confirmLabel="Delete data"
+      busyLabel="Deleting…"
+      tone="danger"
+      fallbackError="could not delete this data"
+      onConfirm={onConfirm}
+      onClose={onCancel}
     >
-      <div className="max-h-[85vh] w-full max-w-lg overflow-auto rounded border border-border bg-panel-strong p-4 text-sm">
-        <h2 className="text-base font-semibold text-ink">Delete {symbol}?</h2>
+      <p className="mt-3 text-ink">
+        This permanently removes every candle collected for{" "}
+        <span className="text-ink">{resolutions.join(", ")}</span>, and the record of what was
+        covered. It cannot be undone.
+      </p>
 
-        <p className="mt-3 text-ink">
-          This permanently removes every candle collected for{" "}
-          <span className="text-ink">{resolutions.join(", ")}</span>, and the record of what
-          was covered. It cannot be undone.
+      {dataSince !== null && (
+        <p className="mt-2 text-ink-secondary">
+          Data reaches back to <span className="text-ink">{formatInstant(dataSince)}</span>.
         </p>
+      )}
 
-        {dataSince !== null && (
-          <p className="mt-2 text-ink-secondary">
-            Data reaches back to <span className="text-ink">{formatInstant(dataSince)}</span>.
-          </p>
-        )}
-
-        <p className="mt-2 text-ink-muted">
-          Collecting stops too — add the instrument again to start over from a new date.
-        </p>
-
-        {failure && <p className="mt-3 text-critical">{failure}</p>}
-
-        <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onCancel}
-            className="rounded border border-border px-3 py-1 text-ink-muted hover:text-ink"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={deleting}
-            onClick={confirm}
-            className="rounded border border-down px-3 py-1 text-down hover:bg-panel disabled:opacity-40"
-          >
-            {deleting ? "Deleting…" : "Delete data"}
-          </button>
-        </div>
-      </div>
-    </div>
+      <p className="mt-2 text-ink-muted">
+        Collecting stops too — add the instrument again to start over from a new date.
+      </p>
+    </ConfirmDialog>
   );
 }
 
@@ -313,7 +282,6 @@ function InstrumentRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
   const stalled = group.pairs.some((pair) => pair.collection === "stalled");
   // The deepest history this instrument holds, across every interval — what a
   // confirmation shows so the operator sees the size of what they are about
@@ -321,7 +289,6 @@ function InstrumentRow({
   const earliestData = group.dataSince.find((entry) => entry.since !== null)?.since ?? null;
 
   const deleteAll = useCallback(async () => {
-    setFailure(null);
     const outcomes = await Promise.allSettled(
       group.pairs.map((pair) =>
         archive.deletePair(pair.symbol, pair.resolution, new AbortController().signal),
@@ -348,11 +315,10 @@ function InstrumentRow({
 
     if (failedResolutions.length > 0) {
       // What is left in `group.pairs` after `onChanged()` reloads is exactly
-      // what failed — the confirmation stays open, naming it, rather than
-      // closing over a partial success.
-      setFailure(`could not delete ${failedResolutions.join(", ")}`);
-    } else {
-      setConfirming(false);
+      // what failed. Thrown rather than returned: the dialog stays open on a
+      // rejection and names it, which is what a partial success has to look
+      // like — never a dialog that closes over half a job.
+      throw new Error(`could not delete ${failedResolutions.join(", ")}`);
     }
   }, [group.pairs, group.symbol, onChanged, onDeleted]);
 
@@ -407,12 +373,8 @@ function InstrumentRow({
               symbol={group.symbol}
               resolutions={group.pairs.map((pair) => pair.resolution)}
               dataSince={earliestData}
-              failure={failure}
               onConfirm={deleteAll}
-              onCancel={() => {
-                setFailure(null);
-                setConfirming(false);
-              }}
+              onCancel={() => setConfirming(false)}
             />
           </td>
         </tr>
@@ -481,7 +443,6 @@ function IntervalCoverage({
   const [coverage, setCoverage] = useState<PairCoverage | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [failure, setFailure] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -506,23 +467,19 @@ function IntervalCoverage({
   }, [pair.symbol, pair.resolution]);
 
   const deleteInterval = useCallback(async () => {
-    setFailure(null);
-    try {
-      const result = await archive.deletePair(
-        pair.symbol,
-        pair.resolution,
-        new AbortController().signal,
-      );
-      setConfirming(false);
-      onDeleted({
-        symbol: pair.symbol,
-        resolutions: [pair.resolution],
-        candlesRemoved: result.candlesRemoved,
-      });
-      onChanged();
-    } catch (cause: unknown) {
-      setFailure(cause instanceof Error ? cause.message : "could not delete this interval's data");
-    }
+    // A rejection here is the dialog's to show — it stays open, names the
+    // reason and leaves another go on the table.
+    const result = await archive.deletePair(
+      pair.symbol,
+      pair.resolution,
+      new AbortController().signal,
+    );
+    onDeleted({
+      symbol: pair.symbol,
+      resolutions: [pair.resolution],
+      candlesRemoved: result.candlesRemoved,
+    });
+    onChanged();
   }, [pair.symbol, pair.resolution, onChanged, onDeleted]);
 
   const first = coverage?.ranges[0];
@@ -582,12 +539,8 @@ function IntervalCoverage({
           symbol={pair.symbol}
           resolutions={[pair.resolution]}
           dataSince={pair.earliestCandle}
-          failure={failure}
           onConfirm={deleteInterval}
-          onCancel={() => {
-            setFailure(null);
-            setConfirming(false);
-          }}
+          onCancel={() => setConfirming(false)}
         />
       )}
     </div>

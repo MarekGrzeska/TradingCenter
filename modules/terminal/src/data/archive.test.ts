@@ -633,6 +633,7 @@ describe("archive: collection jobs", () => {
             chunks_done: 1,
             chunks_total: 1,
             candles_written: 10080,
+            last_activity_at: "2026-08-08T09:05:00Z",
             chunks: [],
           },
         ]);
@@ -655,6 +656,7 @@ describe("archive: collection jobs", () => {
         chunksDone: 1,
         chunksTotal: 1,
         candlesWritten: 10080,
+        lastActivityAt: 1786179900,
         chunks: [],
       },
     ]);
@@ -686,6 +688,7 @@ describe("archive: collection jobs", () => {
           chunks_done: 1,
           chunks_total: 3,
           candles_written: 5000,
+          last_activity_at: "2026-08-08T09:00:05Z",
           running_pair: { symbol: "US100", resolution: "MINUTE" },
           chunks: [
             {
@@ -727,6 +730,7 @@ describe("archive: collection jobs", () => {
           chunks_done: 1,
           chunks_total: 2,
           candles_written: 5000,
+          last_activity_at: "2026-08-08T09:00:05Z",
           running_pair: null,
           chunks: [],
         });

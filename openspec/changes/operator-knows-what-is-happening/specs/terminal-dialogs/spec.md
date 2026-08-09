@@ -57,8 +57,13 @@ operator zatwierdza wtedy coś innego, niż przeczytał.
 ### Requirement: Dialog zostaje na ekranie, dopóki praca trwa
 
 Po potwierdzeniu dialog MUST pozostać otwarty do rozstrzygnięcia pracy i MUST powiedzieć, że praca
-trwa. Dialog MUST NOT dopuścić do potwierdzenia tej samej pracy dwa razy z rzędu. Dopiero
-powodzenie MUST zamknąć dialog.
+trwa. Dialog MUST NOT dopuścić do potwierdzenia tej samej pracy dwa razy z rzędu.
+
+Powodzenie MUST zakończyć pytanie: dialog MUST się zamknąć albo zastąpić pytanie wynikiem, który
+operator już tylko przyjmuje do wiadomości. Zastąpienie wynikiem jest dopuszczalne wtedy i tylko
+wtedy, gdy praca zwróciła coś, czego widok pod dialogiem nie pokaże — częściową odmowę, listę tego,
+co faktycznie ruszyło. Dialog pokazujący wynik MUST NOT nieść akcji, która wykonałaby tę samą pracę
+po raz drugi.
 
 #### Scenario: Praca trwa
 
@@ -68,9 +73,16 @@ powodzenie MUST zamknąć dialog.
 
 #### Scenario: Praca się udaje
 
-- **WHEN** potwierdzona praca kończy się powodzeniem
+- **WHEN** potwierdzona praca kończy się powodzeniem, a odpowiedź nie niesie nic ponad sam fakt
 - **THEN** dialog się zamyka
 - **AND** widok pod nim pokazuje stan po tej pracy
+
+#### Scenario: Praca udaje się połowicznie
+
+- **WHEN** potwierdzona praca zwraca wynik, którego widok pod dialogiem nie pokaże — na przykład
+  odmowę części tego, o co poszła
+- **THEN** dialog zastępuje pytanie tym wynikiem
+- **AND** nie da się z niego zlecić tej samej pracy drugi raz
 
 ### Requirement: Nieudana praca zostaje w dialogu
 

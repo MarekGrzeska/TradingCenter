@@ -132,6 +132,7 @@ function mapJobPairView(raw: RawJobPairView): JobPairView {
     chunksDone: raw.chunks_done,
     chunksTotal: raw.chunks_total,
     candlesWritten: raw.candles_written,
+    lastActivityAt: parseIsoToEpochSeconds(raw.last_activity_at),
     chunks: raw.chunks.map(mapChunk),
   };
 }
@@ -146,6 +147,7 @@ function mapJob(raw: RawJob): Job {
     chunksDone: raw.chunks_done,
     chunksTotal: raw.chunks_total,
     candlesWritten: raw.candles_written,
+    lastActivityAt: parseIsoToEpochSeconds(raw.last_activity_at),
     runningPair: raw.running_pair
       ? { symbol: raw.running_pair.symbol, resolution: raw.running_pair.resolution as Resolution }
       : null,

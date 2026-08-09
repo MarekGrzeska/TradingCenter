@@ -2,6 +2,7 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import { App } from "./App";
+import { startSignInIfNeeded } from "./auth/autoSignIn";
 import { identity } from "./data/marketData";
 
 const container = document.getElementById("root");
@@ -31,6 +32,12 @@ async function start(): Promise<void> {
   await initialize?.().catch((cause: unknown) => {
     console.error("could not resolve the sign-in state", cause);
   });
+
+  // Before mounting, not from inside a view: a mounted terminal immediately
+  // subscribes to candles, is refused, and renders an error the operator sees
+  // flash by on the way to a sign-in page they were always going to. Nothing is
+  // rendered when this takes over — the page is leaving.
+  if (startSignInIfNeeded(identity)) return;
 
   createRoot(container!).render(
     <StrictMode>
