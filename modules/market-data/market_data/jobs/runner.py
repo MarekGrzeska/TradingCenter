@@ -140,6 +140,29 @@ async def execute_chunk(
     )
 
 
+def _report_worker_death(worker: asyncio.Task) -> None:
+    """Say so when a worker stops, because otherwise nothing does.
+
+    A task that raises and is still referenced never reports it: Python logs
+    "Task exception was never retrieved" when the task is *garbage collected*, and
+    `JobRunner._workers` is exactly the reference that stops that from happening. The
+    loop below catches everything around `execute_chunk`, so the exposed stretch is
+    small — claiming a chunk, and waiting — but a failure anywhere in it silently ends
+    the only thing that runs jobs, and every chunk after it sits `pending` forever with
+    nothing anywhere saying why.
+
+    Seen in production: eight chunks pending across a restart and a retry, no log line,
+    no exception, no way in from outside.
+    """
+    if worker.cancelled():
+        return  # `stop()` — the normal way this ends.
+    error = worker.exception()
+    if error is not None:
+        log.error("job runner worker %s died; no job will run", worker.get_name(), exc_info=error)
+    else:
+        log.error("job runner worker %s returned; no job will run", worker.get_name())
+
+
 class JobRunner:
     """Works every job's pending chunks, worker count bounded by `concurrency`, all of
     them drawing from one shared fill budget with the rest of this module.
@@ -172,6 +195,8 @@ class JobRunner:
             asyncio.create_task(self._worker_loop(), name=f"job-runner-{n}")
             for n in range(self._concurrency)
         ]
+        for worker in self._workers:
+            worker.add_done_callback(_report_worker_death)
 
     async def stop(self) -> None:
         for worker in self._workers:

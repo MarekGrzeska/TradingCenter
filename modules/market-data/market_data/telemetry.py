@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import sys
 from datetime import UTC, datetime
 
 import asyncpg
@@ -58,14 +59,39 @@ class CandleAgeGauge:
 
 
 def configure() -> None:
-    """Wires the OpenTelemetry SDK to Application Insights — only when there is one to
-    wire to. Called once, from `lifespan`, before anything registers a metric.
+    """Wires up logging, and Application Insights when there is one to wire to. Called
+    once, from `lifespan`, before anything registers a metric.
     """
+    configure_logging()
     if not os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):
         return
     from azure.monitor.opentelemetry import configure_azure_monitor
 
     configure_azure_monitor()
+
+
+def configure_logging() -> None:
+    """Give the root logger a level and somewhere to write, because nothing else does.
+
+    Uvicorn configures its own three loggers and leaves the root alone, so a deployed
+    container printed `GET /pairs 200` and not one line this module wrote: the root
+    logger's default level is WARNING, and it had no handler regardless. Application
+    Insights was no better — the handler Azure Monitor attaches to the root logger is
+    gated by that same level, so `INFO` never reached it either.
+
+    What that cost, concretely: a collection job that never started looked exactly like
+    one running quietly, because `chunk N done: wrote X candles` had nowhere to go. The
+    module was not silent — nobody had told it where to speak.
+
+    `LOG_LEVEL` overrides, for turning the volume down without a deploy. `basicConfig` is
+    a no-op if the root logger already has a handler, which is the right behaviour: a
+    caller who configured logging themselves keeps their configuration.
+    """
+    logging.basicConfig(
+        level=os.environ.get("LOG_LEVEL", "INFO").upper(),
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        stream=sys.stdout,
+    )
 
 
 def register(gauge: CandleAgeGauge) -> None:
