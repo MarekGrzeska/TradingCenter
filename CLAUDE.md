@@ -107,10 +107,21 @@ Validate with `openspec validate <change> --strict`.
 
 ## CI
 
-`.github/workflows/checks.yml` runs on every PR to `main` and every push to it: three jobs
-in parallel, one per module, running the same commands listed above. `live` tests stay out.
-Three `deploy-*.yml` workflows push images to GHCR and deploy to Azure App Service on
-pushes to `main` that touch the matching module. `terraform.yml` plans on infra PRs.
+`.github/workflows/checks.yml` runs on every PR to `main` and every push to it: one job per
+module, running the same commands listed above, and **only for the modules the diff can
+have broken** — a `changes` job works that out first. `live` tests stay out. If you touch
+`market_data/contract.py`, expect the terminal's job to run too; that is deliberate, since
+`contract:check` is the check for exactly that pairing.
+
+There is no branch protection on this repository — a private repo on the free plan cannot
+have it — so a skipped job blocks nothing. If that changes, the filter needs stand-in jobs
+or a required check will sit pending forever.
+
+Three `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
+the matching module, each ending in a smoke check of the deployed thing.
+`terraform.yml` plans on infra PRs; `terraform-apply.yml` is a manual `workflow_dispatch`
+that applies — and refuses any plan touching `azuread_*`, because CI holds
+`Application.Read.All` and not write. Entra changes are applied locally by the operator.
 
 Parallel work: use `git worktree` rather than a second clone — but the dev database
 container (one `compose.yaml` project, one volume), the Capital session and the fixed ports

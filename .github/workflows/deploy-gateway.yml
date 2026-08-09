@@ -41,11 +41,18 @@ jobs:
 
       # Tagged with the commit, never `latest` — design.md: a moving tag makes "what is
       # deployed" stop being an answerable question and turns rollback into guesswork.
+      # buildx keeps no state between runs, so without this every deploy reinstalls the
+      # whole dependency tree to produce a layer it built yesterday. `mode=max` caches
+      # the intermediate stages too, which is where that time actually goes.
+      - uses: docker/setup-buildx-action@v3
+
       - uses: docker/build-push-action@v6
         with:
           context: modules/capital-gateway
           push: true
           tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=capital-gateway
+          cache-to: type=gha,scope=capital-gateway,mode=max
 
       - uses: azure/login@v2
         with:
@@ -57,3 +64,38 @@ jobs:
         with:
           app-name: app-tradingcenter-gateway
           images: ${{ steps.image.outputs.name }}:${{ github.sha }}
+
+      # "Deployed" has meant "the request was accepted" up to here. It has been wrong
+      # before — a container that will not start looks exactly like a successful deploy
+      # until someone opens the terminal.
+      #
+      # This module cannot be smoke-tested over HTTP from here, and that is by design:
+      # `ip_restriction_default_action = "Deny"` (infra/app-service.tf) admits only
+      # market-data's outbound addresses, so a runner gets 403 whether the container is
+      # healthy or dead. Opening the firewall to check on it would cost more than the
+      # check is worth. So the control plane answers instead, over the same OIDC session
+      # the deploy used.
+      #
+      # What this proves: the site is running and the image App Service will serve is the
+      # one this run pushed. What it does not prove: that the process inside came up.
+      # market-data's own smoke check covers the end of that path — it calls this module
+      # on every candle it archives, and would go unhealthy if the gateway were down.
+      - name: Confirm the deployed image is this commit's
+        run: |
+          set -euo pipefail
+          expected="${{ steps.image.outputs.name }}:${{ github.sha }}"
+          for attempt in $(seq 1 10); do
+            state=$(az webapp show --name app-tradingcenter-gateway \
+              --resource-group rg-tradingcenter --query state -o tsv)
+            image=$(az webapp config container show --name app-tradingcenter-gateway \
+              --resource-group rg-tradingcenter \
+              --query "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value | [0]" -o tsv)
+            echo "attempt $attempt: state=$state image=${image:-none}"
+            if [ "$state" = "Running" ] && [ "${image#DOCKER|}" = "$expected" ]; then
+              echo "deployed: $expected"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::app-tradingcenter-gateway is not serving $expected — state=$state image=${image:-none}"
+          exit 1

@@ -1,0 +1,132 @@
+name: terraform-apply
+
+# Applying infrastructure from GitHub, deliberately started by a person.
+#
+# ## Why this is not a review-and-approve button
+#
+# The obvious design is a job with `environment: infrastructure` and a required reviewer,
+# which pauses the run and shows "Review deployments" in the Actions tab. That is exactly
+# what was wanted here and it cannot be had: **required-reviewer protection rules are not
+# available for private repositories on the free plan.** Creating one answers
+#
+#     422 — Failed to create the environment protection rule. Please ensure the billing
+#     plan supports the required reviewers protection rule.
+#
+# and branch protection is unavailable for the same reason. So the gate is the thing the
+# free plan does support: a manual `workflow_dispatch` with a confirmation typed into it.
+# Actions → terraform-apply → Run workflow → type `apply`.
+#
+# The review still happens, one step earlier: terraform.yml posts the plan as a comment on
+# the pull request that changes `infra/`, and that comment is what there is to read. This
+# workflow re-plans and prints it again before applying, so a run is never applying
+# something nobody could see.
+#
+# ## Why it can still refuse
+#
+# The CI principal holds `Application.Read.All` on Microsoft Graph and deliberately not
+# `.ReadWrite.All` (infra/github-oidc.tf). Reading is enough to *plan* every Entra object
+# this root manages; changing one needs write, which nothing in the pipeline had a use for
+# until this workflow existed — and tenant-wide directory write, held by whatever can
+# trigger a workflow, is a larger privilege than a platform one person operates should
+# hand out for the convenience of not opening a terminal.
+#
+# So this workflow inspects its own plan and refuses up front when the plan touches an
+# `azuread_*` resource, naming the resources and telling the operator to apply locally.
+# That is a legible refusal in the first thirty seconds instead of a Graph 403 halfway
+# through an apply that has already changed half of Azure. Every azurerm change — App
+# Service settings, the database, monitoring, Key Vault, firewall rules — applies here
+# normally, and those are the ordinary case.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "apply" to confirm — this changes real infrastructure'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write # the azurerm/azuread providers' own OIDC exchange
+
+concurrency:
+  # The state lock is the real constraint; queueing here just turns a lock error into a
+  # wait. Never cancel: a cancelled apply is the one way to lose track of what was done.
+  group: terraform
+  cancel-in-progress: false
+
+env:
+  ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+  ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+  ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+  ARM_USE_OIDC: true
+  # The same five values terraform.yml passes, for the same reason: `terraform.tfvars` is
+  # per-operator and gitignored, and none of these five is a credential.
+  TF_VAR_developer_ip_address: ${{ vars.TF_VAR_DEVELOPER_IP_ADDRESS }}
+  TF_VAR_operator_email: ${{ vars.TF_VAR_OPERATOR_EMAIL }}
+  TF_VAR_operator_object_id: ${{ vars.TF_VAR_OPERATOR_OBJECT_ID }}
+  TF_VAR_postgres_admin_object_id: ${{ vars.TF_VAR_POSTGRES_ADMIN_OBJECT_ID }}
+  TF_VAR_postgres_admin_upn: ${{ vars.TF_VAR_POSTGRES_ADMIN_UPN }}
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    # `production` carries no protection rule on this plan either, but it scopes the
+    # federated credential the same way the three deploy workflows do — the subject the
+    # OIDC token presents is `environment:production`, and github-oidc.tf registered it.
+    environment: production
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - name: Check the confirmation
+        if: inputs.confirm != 'apply'
+        run: |
+          echo "::error::Type 'apply' to confirm. Got: '${{ inputs.confirm }}'"
+          exit 1
+
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.7"
+          # The wrapper rewrites stdout, which the plan inspection below reads.
+          terraform_wrapper: false
+
+      - run: terraform init -input=false
+
+      - name: Plan
+        run: terraform plan -input=false -no-color -out=tfplan
+
+      - name: Refuse a plan that changes Entra objects
+        run: |
+          set -euo pipefail
+          # `terraform show -json` rather than grepping the human output: a resource
+          # address never moves in the JSON, and "no changes" is an empty list rather than
+          # a sentence that could be reworded by a future Terraform.
+          entra=$(terraform show -json tfplan | jq -r '
+            (.resource_changes // [])[]
+            | select(.type | startswith("azuread_"))
+            | select([.change.actions[] | select(. != "no-op")] | length > 0)
+            | .address
+          ')
+          if [ -n "$entra" ]; then
+            echo "::error::This plan changes Entra objects, which CI may read but not write (infra/github-oidc.tf grants Application.Read.All only). Run 'terraform apply' locally instead."
+            echo "Entra resources in this plan:"
+            printf '%s\n' "$entra" | sed 's/^/  /'
+            exit 1
+          fi
+          echo "No Entra objects in this plan — safe for CI to apply."
+
+      - name: What is about to happen
+        run: terraform show -no-color tfplan
+
+      # The saved plan, never a fresh one: what was printed above is exactly what runs.
+      - name: Apply
+        run: terraform apply -input=false -no-color tfplan
+
+      - name: Confirm the state settled
+        run: |
+          set -euo pipefail
+          # Exit 2 means "there are still changes", which after an apply means something
+          # did not take — worth failing on rather than leaving for the next plan to find.
+          terraform plan -input=false -no-color -detailed-exitcode

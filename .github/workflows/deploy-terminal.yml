@@ -98,6 +98,32 @@ jobs:
           output_location: ""
           skip_app_build: true
 
+      # Only for the real site — a preview build lives on a generated hostname this does
+      # not know, and the action comments that URL on the PR anyway.
+      #
+      # Two assertions, because one of them has already been wrong here: the site answers,
+      # and a *tab address* answers rather than the 404 page. Deep links broke once before
+      # (13:13 on 9 August, "serve tab addresses, not Static Web Apps' 404 page") — a
+      # single-page app whose host does not rewrite unknown paths to index.html serves the
+      # root perfectly while every bookmark 404s.
+      - name: Smoke-check the deployed terminal
+        if: github.event_name != 'pull_request'
+        run: |
+          set -euo pipefail
+          base="https://white-pond-0508ffe0f.7.azurestaticapps.net"
+          for attempt in $(seq 1 10); do
+            root=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base/" || echo 000)
+            deep=$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base/instruments" || echo 000)
+            echo "attempt $attempt: / -> $root, /instruments -> $deep"
+            if [ "$root" = "200" ] && [ "$deep" = "200" ]; then
+              echo "terminal is serving, deep links included"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::terminal did not serve both / ($root) and /instruments ($deep)"
+          exit 1
+
   # Take the preview environment down with the PR that created it.
   #
   # Without this, every merged PR that touched the terminal leaves its environment

@@ -19,8 +19,84 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Which modules this change can possibly have broken.
+  #
+  # Every pull request used to run all three suites, PostgreSQL container included, even
+  # when it touched one markdown file — PR #27 changed a single one and paid two minutes
+  # for it, and three of the four pull requests around it touched no module at all.
+  #
+  # Computed here with git rather than with a paths-filter action: the rule is four lines
+  # of shell, and it stays legible next to the reasons below instead of inside a
+  # third-party action's inputs.
+  #
+  # There is no branch protection on this repository (a private repository on the free
+  # plan cannot have any), so a skipped job blocks nothing and needs no green stand-in.
+  # If protection is ever bought, revisit this: a *required* check that never runs leaves
+  # a pull request permanently pending, and the fix is a stand-in job, not deleting this.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
+      market-data: ${{ steps.filter.outputs.market-data }}
+      terminal: ${{ steps.filter.outputs.terminal }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Both diffs below need the base commit, which a shallow clone does not have.
+          fetch-depth: 0
+      - id: filter
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            # A push's `before` is all-zeroes for the first push to a branch, and points
+            # at a commit that no longer exists after a force-push. Either way, falling
+            # back to the parent of HEAD keeps the diff honest rather than empty — and an
+            # empty diff here would skip every job, which is the one wrong answer.
+            base="${{ github.event.before }}"
+            if [ -z "$base" ] || [ "$base" = "0000000000000000000000000000000000000000" ] \
+               || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+              base="$(git rev-parse HEAD^ 2>/dev/null || git rev-parse HEAD)"
+            fi
+          fi
+          changed="$(git diff --name-only "$base" HEAD)"
+          echo "changed files:"
+          echo "$changed" | sed 's/^/  /'
+
+          matches() { printf '%s\n' "$changed" | grep -qE "$1"; }
+
+          # This workflow itself is in every list: a change to how the checks run has to
+          # be exercised by running them.
+          self='^\.github/workflows/checks\.yml$'
+
+          gateway='^modules/capital-gateway/'
+          archive='^modules/market-data/'
+          # The terminal's `contract:check` compares its generated types against the
+          # schema market-data builds from `contract.py`. Filtering the terminal on its
+          # own directory alone would let a contract change land with the check that
+          # exists to catch it never running — the exact failure the check was added for.
+          terminal='^modules/terminal/|^modules/market-data/market_data/contract\.py$'
+
+          for name in capital-gateway market-data terminal; do
+            case "$name" in
+              capital-gateway) pattern="$gateway" ;;
+              market-data)     pattern="$archive" ;;
+              terminal)        pattern="$terminal" ;;
+            esac
+            if matches "$pattern|$self"; then
+              echo "$name=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "$name=false" >> "$GITHUB_OUTPUT"
+            fi
+          done
+          echo "--- decisions ---"
+          cat "$GITHUB_OUTPUT"
+
   capital-gateway:
     name: capital-gateway
+    needs: changes
+    if: needs.changes.outputs.capital-gateway == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,6 +113,8 @@ jobs:
 
   market-data:
     name: market-data
+    needs: changes
+    if: needs.changes.outputs.market-data == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -55,6 +133,8 @@ jobs:
 
   terminal:
     name: terminal
+    needs: changes
+    if: needs.changes.outputs.terminal == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:

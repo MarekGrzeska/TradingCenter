@@ -524,11 +524,21 @@
   <ul class="tight">
     <li><strong>Docker buduje bez cache'a.</strong> Żaden z trzech deploy workflowów nie
       ma <code>cache-from/cache-to: type=gha</code> — każdy deploy buduje obraz od zera.
-      Kwadrans pracy, kilka minut zysku na każdym deployu od dziś do końca projektu.</li>
+      <em>Zamknięte PR&nbsp;#34</em>, wraz z <code>setup-buildx-action</code>, bez którego
+      cache nie ma gdzie usiąść.</li>
     <li><strong>Deploy kończy się na „wysłano", nie „działa".</strong> Po
-      <code>webapps-deploy</code> nie ma smoke-checku. O nieudanym starcie kontenera
-      dowiadujesz się z terminala. Jeden krok z <code>curl</code> do <code>/health</code>
-      z retry zamyka tę lukę.</li>
+      <code>webapps-deploy</code> nie ma smoke-checku — o nieudanym starcie kontenera
+      dowiadujesz się z terminala. <em>Zamknięte PR&nbsp;#34, ale nie tak, jak ten
+      dokument zakładał.</em> „Jeden krok z <code>curl</code> do <code>/health</code>"
+      okazał się bezwartościowy w dwóch z trzech przypadków, co widać dopiero po
+      odpytaniu żywych adresów: <code>market-data</code> odpowiada 401 z Easy Auth
+      <em>zanim</em> żądanie dojdzie do kontenera, więc martwy i zdrowy proces wyglądają
+      identycznie; <code>capital-gateway</code> odpowiada 403, bo wpuszcza wyłącznie
+      adresy market-daty i runner GitHuba nigdy się do niego nie dostanie. Sondą dla
+      archiwum jest więc <code>/ws/candles</code> — jedyna ścieżka wyłączona z Easy Auth,
+      gdzie FastAPI zwraca 404 z własnym JSON-em, i to ten JSON jest dowodem, że proces
+      żyje. Gateway sprawdzany jest przez control plane Azure. To jest różnica między
+      smoke-checkiem a zielonym ptaszkiem.</li>
     <li><strong>Każdy PR uruchamia wszystkie trzy moduły</strong> — w tym 273 testy
       bazodanowe z kontenerem Postgresa — także wtedy, gdy zmiana dotyczy wyłącznie
       terminala. Filtr ścieżek (z uwagą na required checks w branch protection) skróci
@@ -541,13 +551,63 @@
       PR&nbsp;#31 powtórzył to samo: hook, <code>settings.json</code> i
       <code>CLAUDE.md</code>, zero kodu modułów, 1&nbsp;min 15&nbsp;s pełnego przebiegu.
       Trzy z czterech ostatnich PR-ów nie dotykały żadnego modułu, a każdy zapłacił
-      pełną stawkę.</li>
+      pełną stawkę. <em>Zamknięte PR&nbsp;#34.</em> Uwaga o branch protection okazała się
+      bezprzedmiotowa — prywatne repo na darmowym planie w ogóle jej nie ma, więc
+      pominięty job niczego nie blokuje. Za to wyszła pułapka, której dokument nie
+      przewidział: <code>contract:check</code> w terminalu porównuje się ze schematem
+      <code>market-data</code>, więc filtr po samym katalogu terminala przepuściłby
+      nieaktualny kontrakt — dokładnie ten przypadek, dla którego ten check istnieje.
+      Job terminala jedzie więc także wtedy, gdy zmienia się
+      <code>market_data/contract.py</code>.</li>
   </ul>
 
-  <p>Jedno świadomie zostaje bez zmian: <strong>ręczny <code>terraform apply</code></strong>.
-  Uzasadnienie w <code>terraform.yml</code> — CI z prawem zapisu do katalogu Entra to
-  większy przywilej, niż cokolwiek innego w projekcie posiada — jest słuszne dla
-  platformy jednej osoby, a apply nie jest wąskim gardłem.</p>
+  <h3>Dlaczego <code>apply</code> nie klika się w GitHubie</h3>
+
+  <p>Pierwsza wersja tego dokumentu zbywała temat jednym zdaniem: apply zostaje u
+  operatora, bo CI z prawem zapisu do katalogu Entra to większy przywilej niż cokolwiek
+  innego w projekcie. To wciąż prawda, ale to była <strong>tylko połowa</strong> odpowiedzi,
+  a druga połowa jest bardziej prozaiczna.</p>
+
+  <p>Naturalny kształt to job z <code>environment</code> i wymaganym recenzentem — przebieg
+  zatrzymuje się, w zakładce Actions pojawia się „Review deployments", klikasz i leci.
+  <strong>Tego nie da się tu mieć</strong>: reguły ochrony środowisk z wymaganym recenzentem
+  nie są dostępne dla repozytoriów prywatnych na darmowym planie. Próba założenia takiej
+  reguły odpowiada wprost:</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Próba</th><th>Odpowiedź GitHuba</th></tr>
+    <tr>
+      <td>środowisko z wymaganym recenzentem</td>
+      <td><code>422 — Please ensure the billing plan supports the required reviewers
+        protection rule</code></td>
+    </tr>
+    <tr>
+      <td>odczyt branch protection na <code>main</code></td>
+      <td><code>403 — Upgrade to GitHub Pro or make this repository public</code></td>
+    </tr>
+  </table>
+  </div>
+
+  <p>Czyli: to nie było przeoczenie ani świadoma rezygnacja z wygody — bramki po prostu nie
+  ma w tym planie. Przy okazji tłumaczy to coś jeszcze: skoro branch protection nie istnieje,
+  <strong>żaden check nigdy niczego nie blokował</strong>, a zielone ptaszki na PR-ach były
+  informacją, nie warunkiem. Dobrze o tym wiedzieć, zanim ktoś oprze na nich zaufanie.</p>
+
+  <p><strong>Co zrobiono zamiast tego (PR&nbsp;#34).</strong>
+  <code>terraform-apply.yml</code> uruchamiany ręcznie z Actions, z potwierdzeniem
+  wpisywanym z klawiatury — bramką jest świadome uruchomienie, a planem do przeczytania ten,
+  który <code>terraform.yml</code> komentuje na PR-ze. Do tego jedna rzecz, której zwykły
+  workflow by nie zrobił: <strong>przebieg czyta własny plan i odmawia</strong>, gdy ten
+  dotyka obiektu Entra — bo CI ma <code>Application.Read.All</code>, nie
+  <code>ReadWrite</code>. Zamiast 403 z Microsoft Graph w połowie apply, dostajesz w
+  trzydziestej sekundzie listę zasobów i informację, że te trzeba puścić lokalnie. Zmiany
+  <code>azurerm</code> — App Service, baza, monitoring, Key Vault — idą z GitHuba normalnie,
+  i to jest przypadek zwykły.</p>
+
+  <p>Nadaniem CI prawa zapisu do katalogu świadomie się nie zajęto. Uprawnienie
+  tenant-wide w rękach czegoś, co odpala się z repozytorium, to duży promień rażenia za
+  oszczędność jednego <code>terraform apply</code> w terminalu kilka razy w miesiącu.</p>
 
   <h2><span class="no">Podsumowanie</span>Plan działania</h2>
 
@@ -560,12 +620,14 @@
       <span class="meta">zrobione · PR&nbsp;#33, pełną ścieżką OpenSpec</span></li>
     <li><strong>Drugi worktree jako stałe stanowisko pracy.</strong>
       <span class="meta">15 min · raz</span></li>
-    <li><strong>Cache Dockera + smoke-check w trzech deploy workflowach.</strong>
-      <span class="meta">1 h · przy najbliższym deployu</span></li>
+    <li><strong>Cache Dockera + smoke-checki w trzech deploy workflowach.</strong>
+      <span class="meta">zrobione · PR&nbsp;#34</span></li>
+    <li><strong><code>terraform apply</code> uruchamiany z Actions, z odmową na Entra.</strong>
+      <span class="meta">zrobione · PR&nbsp;#34</span></li>
     <li><strong>Lekka ścieżka zmian w OpenSpec (pełny rytuał tylko dla specs/kontraktów/infra).</strong>
       <span class="meta">1–2 h · ten tydzień</span></li>
     <li><strong>Filtry ścieżek w <code>checks.yml</code>.</strong>
-      <span class="meta">1 h · ten tydzień</span></li>
+      <span class="meta">zrobione · PR&nbsp;#34</span></li>
     <li><strong>Konsolidacja capabilities 22 → ~10.</strong>
       <span class="meta">2–3 h · przy najbliższym archive</span></li>
     <li><strong>Zapis budżetu złożoności w szablonie proposala.</strong>
@@ -598,6 +660,11 @@
     niż kod, zmierzona na jednej zmianie scalonej w trakcie pisania. <strong>Czwarta</strong>,
     już w ramach PR&nbsp;#33: baza dev wraca do kontenera, a największy stały podatek
     infrastrukturalny znika — dokument jedzie w tym samym PR co zmiana, którą opisuje,
-    więc opis i rzeczywistość nie mają jak się rozjechać.</p>
+    więc opis i rzeczywistość nie mają jak się rozjechać. <strong>Piąta</strong>, w
+    PR&nbsp;#34: zamknięte trzy punkty o CI, a rozdział o <code>apply</code> z GitHuba
+    dopisany po sprawdzeniu — nie z założenia — czego darmowy plan GitHuba faktycznie nie
+    udostępnia. Dwie rekomendacje z pierwszej wersji okazały się przy realizacji częściowo
+    błędne (smoke-check na <code>/health</code>, uwaga o branch protection) i są opisane
+    jako błędne, a nie po cichu poprawione.</p>
   </footer>
 </main>
