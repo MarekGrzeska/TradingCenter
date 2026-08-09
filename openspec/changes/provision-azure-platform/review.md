@@ -16,10 +16,16 @@ for. The three deploy-breaking High findings and the four Medium findings are co
 re-running the same commands as the first pass (see Verified) but **not yet committed** — this file
 was updated in the same working-tree state as the fixes, ahead of that commit.
 
+**Second update:** pushing the branch ran the pipeline for the first time, which produced four more
+findings — recorded under Findings in their own table. One of them is worse than anything in the
+original eight: an apply from CI would have destroyed the operator's Key Vault access policy and
+recreated it pointing at the CI principal. It was invisible to reading because it depends on which
+identity runs Terraform, and until that push only the operator ever had. `terraform apply` is now
+the operator's job and CI plans only.
+
 What a later reader should not mistake for oversight: Easy Auth on market-data (`Return401`) with a
-terminal that sends no token, and the four open tasks in `tasks.md`, are all deliberate and
-documented — the deployed pair is known to be non-functional until the browser-side 401 handling
-lands. Nothing in this pass touched that or `tasks.md`; both are unchanged from the first review.
+terminal that sends no token is deliberate and documented — the deployed pair is known to be
+non-functional until the browser-side 401 handling lands.
 
 ## Verified
 
@@ -81,6 +87,28 @@ Verdict update above and finding 1's row.
 | Medium | `modules/capital-gateway/capital_gateway/app.py:96`, `:346` | `hmac.compare_digest` on `str` raises `TypeError` for non-ASCII input. Headers are latin-1 decoded, so any high byte in `X-Gateway-Key` produces an unhandled `500` instead of `401` — reachable with no credential, and it feeds the `alert-gateway-http-5xx` rule. Compare on bytes instead. | **Fixed** — both call sites now compare `.encode()`d bytes (`app.py:103` and `:355`) |
 | Medium | `.github/workflows/terraform.yml:69` | `${{ steps.plan.outputs.stdout }}` is interpolated into a JS template literal inside `actions/github-script`. A backtick or `${` in plan output breaks the step or executes as script, in a job holding `pull-requests: write` and `id-token: write`. Pass the plan through `env:` and read `process.env` in the script. | **Fixed** — plan output passed via `env: PLAN` and read as `process.env.PLAN` (`terraform.yml:65-75`) |
 
+### Found by running the pipeline, after the table above
+
+The eight findings above came from reading. Pushing the branch ran `terraform.yml` for the
+first time and produced four more, listed here rather than folded into the table because
+they were found a different way and none of them is visible in the source alone.
+
+| Severity | Where | Finding | Status |
+|---|---|---|---|
+| Critical | `infra/key-vault.tf:37`, `infra/github-oidc.tf:110` | Both took their principal from `data.azurerm_client_config.current.object_id` — *whoever is running Terraform*. Locally that is the operator; in Actions it is the CI service principal. CI's plan read `object_id ... -> ... # forces replacement` on `azurerm_key_vault_access_policy.operator`: an apply from CI would have **destroyed the operator's own Key Vault access policy and recreated it pointing at CI**, locking the only person who writes secret values out of the vault. `azurerm_role_assignment.operator_tfstate` had the same shape. | **Fixed** — both read an explicit `var.operator_object_id`; it resolves to the same identity, so the local plan shows neither resource at all |
+| High | `infra/github-oidc.tf` (the whole root) | The CI principal has **no Microsoft Graph access**, so `terraform plan` 403s (`Authorization_RequestDenied`) refreshing all three `azuread_application` resources. This root has never been plannable, let alone applyable, from CI. | **Fixed** — `Application.Read.All` granted via `azuread_app_role_assignment`; read, not write, because CI no longer applies |
+| High | `infra/github-oidc.tf:91` | `data "azurerm_storage_account" "tfstate"` is a management-plane GET, and CI holds only `Storage Blob Data Contributor` there — a data-plane role that does not include `Microsoft.Storage/storageAccounts/read`. 403 on every plan. | **Fixed** — the id is composed from the names `bootstrap/` already hardcodes, so nothing is asked of Azure |
+| Medium | `.github/workflows/terraform.yml` | The `apply` job could never have worked: applying this root needs directory write, which CI does not have and should not be given for a platform one person operates. | **Fixed** — the `apply` job is removed and `terraform apply` is the operator's, run locally. The three application deploy workflows still authenticate through OIDC, unchanged |
+
+A separate OIDC failure preceded all four and is worth recording because the symptom
+misleads: GitHub has migrated this repository to **immutable subject claims**, so the
+token presents `repo:MarekGrzeska@48219464/TradingCenter@1326647472:...` and matches
+neither name-based federated credential. Entra refuses with `AADSTS700213`, but the
+provider retries first, so it surfaces as `terraform init` sitting on "Initializing the
+backend..." for seven and a half minutes before failing. Fixed by registering both
+subject forms (`infra/github-oidc.tf`). This is what task 7.4 was actually blocked on —
+its recorded reason (the `ref:refs/heads/main` filter) was not the whole story.
+
 Finding 1 was the one that decided whether this branch could be pushed as it stood, and it no longer
 blocks that: `shared_access_key_enabled = false` is live on the storage account, applied the same way
 any other change to this root would be, and confirmed independently with `az storage account show`
@@ -125,6 +153,11 @@ the Status column above and Re-verified after fixes.
 - **The Static Web App deploy stores a secret**, against design.md's "no stored Azure secret" goal:
   `Azure/static-web-apps-deploy` accepts only a deployment token. The workflow says so in a comment
   rather than hiding it, which is the right handling — it is forced by Azure's tooling, not chosen.
+- **`terraform apply` no longer runs in CI**, narrowing design.md's "Wdrożenia przez OIDC". The
+  decision it rests on stands — the three application deploys still authenticate through OIDC with
+  nothing stored — but infrastructure is now applied by the operator, because applying this root
+  requires directory write and CI is not a privilege worth granting that to. Recorded in
+  `terraform.yml`'s own header, not only here.
 - **The bootstrap state was committed on the premise that it holds nothing sensitive.** The decision
   to keep bootstrap state local and readable is design.md's; the premise attached to it in
   `.gitignore` was wrong, and finding 1 was the consequence. `.gitignore`'s comment now says what is
@@ -141,10 +174,16 @@ the Status column above and Re-verified after fixes.
   limit (3.5, a billing decision), the application role (4.7, folded into group 5), the first gateway
   deploy (7.4, blocked on merging to `main` by the OIDC subject filter), and end-to-end verification
   (11.4, which cannot run before 7.4).
-- **Nothing here has been deployed.** Findings 2-4 were all first-deploy failures, and they survived
-  review-by-reading precisely because no deploy has been attempted; 11.4 is the task that would have
-  caught them. Their fixes are `terraform validate`/YAML-correct but likewise unproven by a live
-  deploy — that still waits on 7.4. The infrastructure code's real test has not run yet.
+- **No application has been deployed yet.** Findings 2-4 were all first-deploy failures, and they
+  survived review-by-reading precisely because no deploy had been attempted; 11.4 is the task that
+  would have caught them. The infrastructure side of that gap is now closed — the pipeline has run,
+  and running it is what produced the four findings above, including the Key Vault one that reading
+  the source three times did not. What remains unproven is the application deploy itself: no image
+  has been built, pushed or started in App Service.
+- **The reviewer's own reading missed the worst defect in the branch.** The Key Vault lockout was
+  invisible in the source because it depends on *who runs Terraform*, and every run until that point
+  had been the operator's. Worth remembering as a shape: a `data.azurerm_client_config.current` in a
+  root that two different identities can apply is a latent identity swap, not a convenience.
 - **Easy Auth on market-data is on with `Return401` while the terminal sends no token.** Documented
   in both the code and `tasks.md` as open work, so not a finding — but it means the deployed pair is
   non-functional until the browser-side 401 and CORS handling lands, and no task currently owns that.
