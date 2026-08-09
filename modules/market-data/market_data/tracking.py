@@ -17,6 +17,7 @@ than replacing it.
 
 from __future__ import annotations
 
+import asyncio
 from datetime import UTC, datetime, timedelta
 from enum import Enum
 
@@ -25,6 +26,7 @@ from pydantic import BaseModel
 
 from .errors import GatewayRefused, GatewayUnreachable
 from .gateway.instruments import GatewayInstruments
+from .market_status import MarketStatus
 from .models import Resolution, TrackedPairState
 from .periods import period_length
 
@@ -387,3 +389,44 @@ async def add_pair(
         )
 
     return await track(conn, symbol, resolution, limit, collect_from, default_bars)
+
+
+async def decide_late_pairs(
+    instruments: GatewayInstruments,
+    market_status: MarketStatus,
+    statuses: list[TrackedPairStatus],
+    moment: datetime,
+) -> list[tuple[TrackedPairStatus, CollectionState]]:
+    """Turn `UNKNOWN` into `STALLED` or `MARKET_CLOSED` where the gateway can say which.
+
+    **Only the late ones are asked about.** A pair whose newest candle is fresh reads
+    `COLLECTING` whatever the market is doing, so a request about it would spend the
+    gateway's shared allowance to learn nothing that changes an answer. On a healthy
+    archive that leaves nothing to ask, and this costs one round trip per late *symbol* —
+    not per pair, because the same instrument at two resolutions has one market.
+
+    A gateway that will not answer leaves the state `UNKNOWN`, which is what it already
+    was. The list is the archive's own and worth returning; not knowing why one pair is
+    late is not a reason to fail the whole read.
+    """
+    late = sorted(
+        {status.symbol for status in statuses if status.collection is CollectionState.UNKNOWN}
+    )
+    if not late:
+        return [(status, status.collection) for status in statuses]
+
+    open_now = dict(
+        await asyncio.gather(*(market_status.of(instruments, symbol) for symbol in late))
+    )
+
+    decided = []
+    for status in statuses:
+        collection = status.collection
+        if collection is CollectionState.UNKNOWN:
+            is_open = open_now.get(status.symbol)
+            if is_open is not None:
+                collection = collection_state(
+                    status.resolution, status.latest_candle, moment, is_open
+                )
+        decided.append((status, collection))
+    return decided

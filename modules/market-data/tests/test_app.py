@@ -13,6 +13,7 @@ from market_data.coverage import record_coverage
 from market_data.errors import GatewayUnreachable
 from market_data.hub import CandleChange, Hub, Snapshot
 from market_data.ingest.backfill import FillOutcome
+from market_data.market_status import MarketStatus
 from market_data.models import Candle, CandleSource, Resolution
 from market_data.rollups import refresh_all
 from market_data.store import read_candles, write_candles
@@ -133,17 +134,6 @@ async def pool(migrated_url: str):
         yield created
 
 
-@pytest.fixture(autouse=True)
-def _forget_market_status():
-    """The market-status cache is module-level, so one test's answer would otherwise be
-    the next test's premise."""
-    from market_data.app import _market_status_cache
-
-    _market_status_cache.clear()
-    yield
-    _market_status_cache.clear()
-
-
 @pytest.fixture
 async def api(pool, migrated_url: str):
     """The app wired to a real database, with the two things that reach outward faked.
@@ -156,6 +146,9 @@ async def api(pool, migrated_url: str):
     app.state.settings = Settings(database_url=migrated_url, _env_file=None)
     app.state.instruments = FakeInstruments()
     app.state.ingest = FakeIngest()
+    # Replaces the autouse fixture that used to clear a module-level dict: the cache is an
+    # object now, so a fresh app gets a fresh one and no test inherits another's answer.
+    app.state.market_status = MarketStatus()
     app.state.job_runner = FakeJobRunner()
 
     # `raise_app_exceptions=False` so the app's own error handling is what the test sees.
@@ -1214,7 +1207,7 @@ class FakeWebSocket:
 async def test_subscribing_to_a_pair_nobody_collects_is_refused(api, pool) -> None:
     """8.9. Subscribing must not quietly start collecting either — that is the decision
     the ceiling exists to keep deliberate."""
-    from market_data.app import candle_feed
+    from market_data.routers.stream import candle_feed
 
     socket = FakeWebSocket(symbol="US100", resolution="MINUTE")
 
@@ -1228,7 +1221,7 @@ async def test_subscribing_to_a_pair_nobody_collects_is_refused(api, pool) -> No
 
 
 async def test_subscribing_to_a_collected_pair_is_accepted(api, pool) -> None:
-    from market_data.app import candle_feed
+    from market_data.routers.stream import candle_feed
 
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
@@ -1259,7 +1252,7 @@ async def test_a_subscription_is_accepted_through_the_router_too(api, pool) -> N
 
 
 async def test_a_subscription_without_a_symbol_is_refused_before_the_handshake(api) -> None:
-    from market_data.app import candle_feed
+    from market_data.routers.stream import candle_feed
 
     socket = FakeWebSocket(resolution="MINUTE")
 
@@ -1270,7 +1263,7 @@ async def test_a_subscription_without_a_symbol_is_refused_before_the_handshake(a
 
 
 async def test_a_subscription_with_an_unknown_resolution_is_refused(api) -> None:
-    from market_data.app import candle_feed
+    from market_data.routers.stream import candle_feed
 
     socket = FakeWebSocket(symbol="US100", resolution="MINUTE_2")
 
