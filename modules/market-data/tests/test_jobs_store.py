@@ -420,3 +420,73 @@ async def test_a_job_spanning_two_pairs_reads_whole_through_read_job(
     whole = await read_job(db, created.id)
 
     assert len(whole.chunks) == 2
+
+
+# --- when something last happened ------------------------------------------------------
+
+
+@pytest.mark.db
+async def test_a_running_chunk_is_the_jobs_last_activity(db: asyncpg.Connection) -> None:
+    """The forty-minute evening in one assertion: a job whose only sign of life is a
+    chunk that started is dated from that start, not from the chunk before it."""
+    await _tracked(db)
+    job = await create_job(db, MOMENT, [plan(), plan(chunk_start=MOMENT - timedelta(days=2))])
+
+    first = await claim_pending_chunk(db)
+    await finish_chunk_done(db, first.id, written=10, requests=1)
+    running = await claim_pending_chunk(db)
+
+    reread = await read_job(db, job.id)
+    settled = next(c for c in reread.chunks if c.id == first.id)
+    started = next(c for c in reread.chunks if c.id == running.id)
+
+    assert reread.last_activity_at == started.started_at
+    assert reread.last_activity_at > settled.finished_at
+
+
+@pytest.mark.db
+async def test_a_job_with_nothing_started_yet_dates_from_its_creation(
+    db: asyncpg.Connection,
+) -> None:
+    # "Since when has nothing happened" has to have an answer even before the first
+    # chunk is claimed, or a job queued behind a stuck one reads as having no age.
+    await _tracked(db)
+    job = await create_job(db, MOMENT, [plan()])
+
+    reread = await read_job(db, job.id)
+
+    assert reread.last_activity_at == job.created_at
+
+
+@pytest.mark.db
+async def test_a_pair_row_counts_only_its_own_pairs_activity(db: asyncpg.Connection) -> None:
+    await _tracked(db, "US100", Resolution.MINUTE)
+    await _tracked(db, "US100", Resolution.HOUR)
+    job = await create_job(
+        db, MOMENT, [plan(resolution=Resolution.MINUTE), plan(resolution=Resolution.HOUR)]
+    )
+
+    # Only the minute pair does any work; the hour pair sits untouched.
+    working = await claim_pending_chunk(db)
+    await finish_chunk_done(db, working.id, written=5, requests=1)
+
+    views = {v.resolution: v for v in await list_jobs(db)}
+
+    assert views[Resolution.MINUTE].last_activity_at > job.created_at
+    assert views[Resolution.HOUR].last_activity_at == job.created_at
+
+
+@pytest.mark.db
+async def test_a_stalled_job_reports_the_same_moment_on_every_read(
+    db: asyncpg.Connection,
+) -> None:
+    # The tab re-reads every ten seconds. A moment that crept forward with each read
+    # would make a stuck job look busy — which is the failure this exists to catch.
+    await _tracked(db)
+    job = await create_job(db, MOMENT, [plan()])
+    await claim_pending_chunk(db)
+
+    first = (await read_job(db, job.id)).last_activity_at
+    second = (await read_job(db, job.id)).last_activity_at
+
+    assert first == second

@@ -37,6 +37,15 @@ log = logging.getLogger(__name__)
 # so it can afford to be unhurried.
 IDLE_POLL_SECONDS = 5.0
 
+# How long a worker waits after failing to take work, and how far that wait grows while
+# it keeps failing. The cause is almost always the database, which comes back in minutes
+# rather than milliseconds: retrying every five seconds for an hour buys nothing but 720
+# identical log lines and 720 connection attempts. The ceiling keeps the return to work
+# inside a minute of the cause clearing, which is nothing against a job measured in tens
+# of minutes.
+FAILURE_BACKOFF_SECONDS = 5.0
+MAX_FAILURE_BACKOFF_SECONDS = 60.0
+
 
 async def execute_chunk(
     pool, history: GatewayHistory, chunk: Chunk, limiter: asyncio.Semaphore
@@ -146,10 +155,10 @@ def _report_worker_death(worker: asyncio.Task) -> None:
     A task that raises and is still referenced never reports it: Python logs
     "Task exception was never retrieved" when the task is *garbage collected*, and
     `JobRunner._workers` is exactly the reference that stops that from happening. The
-    loop below catches everything around `execute_chunk`, so the exposed stretch is
-    small — claiming a chunk, and waiting — but a failure anywhere in it silently ends
-    the only thing that runs jobs, and every chunk after it sits `pending` forever with
-    nothing anywhere saying why.
+    loop below now catches everything it can reach, so a worker ending on its own should
+    not happen at all — which is precisely why this stays. An end nobody planned for is
+    the end of every job this module would ever run, and it must not be the quietest
+    thing that ever happened here.
 
     Seen in production: eight chunks pending across a restart and a retry, no log line,
     no exception, no way in from outside.
@@ -192,7 +201,7 @@ class JobRunner:
 
     async def start(self) -> None:
         self._workers = [
-            asyncio.create_task(self._worker_loop(), name=f"job-runner-{n}")
+            asyncio.create_task(self._worker_loop(f"job-runner-{n}"), name=f"job-runner-{n}")
             for n in range(self._concurrency)
         ]
         for worker in self._workers:
@@ -208,17 +217,43 @@ class JobRunner:
                 pass
         self._workers = []
 
-    async def _worker_loop(self) -> None:
-        while True:
-            async with self._pool.acquire() as conn:
-                chunk = await claim_pending_chunk(conn)
+    async def _worker_loop(self, name: str) -> None:
+        """Take work, do it, repeat — for as long as the process lives.
 
-            if chunk is None:
-                self._wake.clear()
-                try:
-                    await asyncio.wait_for(self._wake.wait(), timeout=IDLE_POLL_SECONDS)
-                except TimeoutError:
-                    pass
+        Two failures are possible here and they are not the same failure. A chunk that
+        blows up is one entry in a job's history and one thing to retry; taking work is
+        what every future chunk depends on, so a failure *there* ends collection for the
+        whole module with nothing written anywhere, because there is no chunk in hand to
+        write it against. Both are handled, separately, and neither ends this loop —
+        only `stop()` does (`market-data-jobs` spec, "Mechanizm wykonujący kawałki
+        przeżywa własną awarię").
+        """
+        backoff = FAILURE_BACKOFF_SECONDS
+        while True:
+            try:
+                async with self._pool.acquire() as conn:
+                    chunk = await claim_pending_chunk(conn)
+                backoff = FAILURE_BACKOFF_SECONDS
+
+                if chunk is None:
+                    self._wake.clear()
+                    try:
+                        await asyncio.wait_for(self._wake.wait(), timeout=IDLE_POLL_SECONDS)
+                    except TimeoutError:
+                        pass
+                    continue
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                # Nothing was claimed, so there is nothing to settle as failed — the
+                # only thing to do is say what happened and come back for it. Waiting
+                # longer each time keeps an outage that lasts an hour from filling the
+                # log with the same line 720 times.
+                log.exception(
+                    "job runner worker %s could not take work; trying again in %ss", name, backoff
+                )
+                await asyncio.sleep(backoff)
+                backoff = min(backoff * 2, MAX_FAILURE_BACKOFF_SECONDS)
                 continue
 
             try:

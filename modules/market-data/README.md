@@ -239,6 +239,17 @@ leave two disagreeing records of the same fact. Restarting flips every chunk lef
 orphaned as one mid-request. `POST /jobs/{id}/retry` resets only `failed` and `interrupted`
 chunks, as a new attempt of the same job; it is refused with 409 when there is nothing to retry.
 
+A job also answers **when something last happened in it** — `last_activity_at`, the newest of
+its chunks' starts and finishes, and the job's own creation while nothing has been claimed yet.
+A chunk that started counts: a chunk working for forty minutes and a chunk stuck for forty
+minutes report the same progress and the same candle count, and this is the only field that
+separates them.
+
+The worker loop survives its own failures. A chunk that blows up is settled as `failed` and the
+worker moves on; a failure in *taking* work — the database underneath the claim — is logged and
+retried after a wait that doubles from 5s to a 60s ceiling, because that failure used to end
+collection for the whole module until somebody restarted it. Only shutdown ends the loop.
+
 `POST /jobs/estimate` runs the same planning a job creation would — without writing anything —
 so a caller can price a decision before making it. The estimate is honest about being one: it
 counts calendar periods, not a session calendar, so it overstates a market that is shut part of

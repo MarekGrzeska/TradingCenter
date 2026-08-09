@@ -216,6 +216,11 @@ export interface JobPairView {
   chunksDone: number;
   chunksTotal: number;
   candlesWritten: number;
+  /** Epoch seconds: when something last happened for this pair — a chunk
+   *  starting counts, not only one settling. The job's own creation while
+   *  nothing has been claimed yet. Progress and candle counts read the same for
+   *  a job that is working and one that is stuck; this is what separates them. */
+  lastActivityAt: number;
   chunks: Chunk[];
 }
 
@@ -230,6 +235,8 @@ export interface Job {
   chunksDone: number;
   chunksTotal: number;
   candlesWritten: number;
+  /** Epoch seconds — see `JobPairView.lastActivityAt`, across every pair. */
+  lastActivityAt: number;
   /** The pair a chunk is presently in flight for, or null when nothing is
    *  running right now. */
   runningPair: { symbol: string; resolution: Resolution } | null;

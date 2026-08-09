@@ -4,6 +4,7 @@ import { archive } from "../data/marketData";
 import { RESOLUTIONS } from "../data/types";
 import type { Chunk, JobPairView, JobStatus, PairDeletion, Resolution } from "../data/types";
 import { formatInstant } from "../instruments/format";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { useJobHistory } from "./useJobHistory";
 import type { JobHistoryState } from "./useJobHistory";
 
@@ -13,6 +14,32 @@ import type { JobHistoryState } from "./useJobHistory";
  * dociągnięte, how far a running one has got, and where to retry what
  * failed without touching the pair's archived status at all.
  */
+
+/**
+ * How long a running pull may show no sign of life before the tab says so.
+ *
+ * One chunk is one gateway request under the shared limiter, so five minutes is
+ * comfortably above anything healthy and far below the forty minutes it took to
+ * notice a job had stopped (proposal.md, Why). This is a display threshold, not
+ * a judgement the archive makes: the fact is `lastActivityAt`, and calling it
+ * worrying belongs to the view that already re-reads every ten seconds.
+ */
+const STALL_AFTER_SECONDS = 5 * 60;
+
+/** "3 min", "2 h 10 min" — coarse on purpose. The question is "is anything
+ *  happening", and seconds of precision would suggest an accuracy that a
+ *  ten-second poll does not have. */
+function elapsedLabel(seconds: number): string {
+  if (seconds < 60) return "under a minute";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `${hours} h ${minutes % 60} min`;
+}
+
+function secondsSince(moment: number): number {
+  return Math.max(0, Math.floor(Date.now() / 1000) - moment);
+}
 
 const STATUS_LABEL: Record<JobStatus, string> = {
   running: "running",
@@ -116,17 +143,42 @@ export function CollectionHistoryView() {
     () => combinedEntries(history.rows, history.deletions),
     [history.rows, history.deletions],
   );
+  // Which job is open, not a copy of it: the dialog is built from the rows
+  // below on every render, so the ten-second poll refreshes what it shows
+  // instead of leaving a snapshot ageing on screen.
+  const [openJobId, setOpenJobId] = useState<number | null>(null);
+  const openRows = useMemo(
+    () => (openJobId === null ? [] : history.rows.filter((r) => r.jobId === openJobId)),
+    [history.rows, openJobId],
+  );
 
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="min-h-0 flex-1 overflow-auto">
-        <HistoryList history={history} entries={entries} />
+        <HistoryList history={history} entries={entries} onOpenJob={setOpenJobId} />
       </div>
+
+      {openJobId !== null && openRows.length > 0 && (
+        <JobDialog
+          jobId={openJobId}
+          rows={openRows}
+          onChanged={history.reload}
+          onClose={() => setOpenJobId(null)}
+        />
+      )}
     </div>
   );
 }
 
-function HistoryList({ history, entries }: { history: JobHistoryState; entries: HistoryEntry[] }) {
+function HistoryList({
+  history,
+  entries,
+  onOpenJob,
+}: {
+  history: JobHistoryState;
+  entries: HistoryEntry[];
+  onOpenJob(jobId: number): void;
+}) {
   if (history.status === "loading") {
     return <p className="px-4 py-6 text-sm text-ink-muted">Reading collection history…</p>;
   }
@@ -186,7 +238,7 @@ function HistoryList({ history, entries }: { history: JobHistoryState; entries: 
                 <HistoryRow
                   key={`job|${entry.job.jobId}|${entry.symbol}|${entry.resolution}`}
                   row={entry.job}
-                  onChanged={history.reload}
+                  onOpenJob={onOpenJob}
                 />
               ) : (
                 <DeletionRow
@@ -202,41 +254,26 @@ function HistoryList({ history, entries }: { history: JobHistoryState; entries: 
   );
 }
 
-function HistoryRow({ row, onChanged }: { row: JobPairView; onChanged(): void }) {
-  const [confirming, setConfirming] = useState(false);
-  const [retrying, setRetrying] = useState(false);
-  const [retryError, setRetryError] = useState<string | null>(null);
-
-  const retryableChunks = row.chunks.filter(
-    (chunk) => chunk.state === "failed" || chunk.state === "interrupted",
-  );
+function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: number): void }) {
   const reasons = failureReasons(row.chunks);
   const range = chunkRange(row.chunks);
   const pct = row.chunksTotal > 0 ? Math.round((row.chunksDone / row.chunksTotal) * 100) : 0;
   const explainsItself = row.status !== "running" && row.status !== "succeeded";
 
-  const retry = useCallback(async () => {
-    setRetryError(null);
-    setRetrying(true);
-    try {
-      await archive.retryJob(row.jobId, new AbortController().signal);
-      setConfirming(false);
-      onChanged();
-    } catch (cause: unknown) {
-      // A retry request that itself fails must not read as a retry that
-      // started — the row stays exactly as it was (terminal-collection-history
-      // spec, "Ponowienie samo zawodzi").
-      setRetryError(cause instanceof Error ? cause.message : "could not queue the retry");
-    } finally {
-      setRetrying(false);
-    }
-  }, [row.jobId, onChanged]);
+  // Only worth saying while something is supposed to be happening. On a job
+  // that finished, "nothing since" is not news.
+  const idleFor = row.status === "running" ? secondsSince(row.lastActivityAt) : null;
+  const stalled = idleFor !== null && idleFor >= STALL_AFTER_SECONDS;
 
   return (
     <>
       <tr
         data-testid={`history-${row.jobId}-${row.symbol}-${row.resolution}`}
-        className="border-t border-border"
+        data-stalled={stalled}
+        onClick={() => onOpenJob(row.jobId)}
+        className={`cursor-pointer border-t border-border hover:bg-panel ${
+          stalled ? "border-l-2 border-l-warning" : ""
+        }`}
       >
         <td className="px-4 py-1.5 font-semibold text-ink">{row.symbol}</td>
         <td className="px-4 py-1.5 text-ink-secondary">{row.resolution}</td>
@@ -248,7 +285,13 @@ function HistoryRow({ row, onChanged }: { row: JobPairView; onChanged(): void })
           {row.status === "running" ? (
             <>
               {pct}% ({row.chunksDone}/{row.chunksTotal} chunks) ·{" "}
-              {row.candlesWritten.toLocaleString()} candles so far
+              {row.candlesWritten.toLocaleString()} candles so far ·{" "}
+              {/* The one number that tells work apart from a standstill: the two
+                  read identically in every other column (terminal-collection-history
+                  spec, "Praca w toku pokazuje mierzony postęp"). */}
+              <span className={stalled ? "font-semibold text-warning" : undefined}>
+                nothing for {elapsedLabel(idleFor ?? 0)}
+              </span>
             </>
           ) : (
             <>{row.candlesWritten.toLocaleString()} candles</>
@@ -258,16 +301,23 @@ function HistoryRow({ row, onChanged }: { row: JobPairView; onChanged(): void })
           {range ? `${formatInstant(range.start)} → ${formatInstant(range.end)}` : "—"}
         </td>
         <td className="px-4 py-1.5 text-right">
-          {retryableChunks.length > 0 && (
-            <button
-              type="button"
-              aria-label={`Retry ${row.symbol} ${row.resolution}`}
-              onClick={() => setConfirming(true)}
-              className="rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
-            >
-              Retry
-            </button>
-          )}
+          {/* Where Retry used to sit. It retried the whole job from beside one
+              pair, which is a promise the position contradicted; the job — every
+              pair of it — is what the dialog behind this shows and retries
+              (terminal-collection-history spec, "Ponowienie stoi przy całości,
+              nie przy parze"). Keyboard-reachable in its own right, so opening a
+              job never needs a pointer. */}
+          <button
+            type="button"
+            aria-label={`Job ${row.jobId} details`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenJob(row.jobId);
+            }}
+            className="rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
+          >
+            Job #{row.jobId}
+          </button>
         </td>
       </tr>
 
@@ -279,35 +329,138 @@ function HistoryRow({ row, onChanged }: { row: JobPairView; onChanged(): void })
         </tr>
       )}
 
-      {confirming && (
-        <tr className="border-t border-border bg-panel">
-          <td colSpan={7} className="px-4 py-2">
-            <div className="flex flex-wrap items-center gap-3 text-sm">
-              <span className="text-ink">
-                Retry {retryableChunks.length} chunk{retryableChunks.length === 1 ? "" : "s"} for{" "}
-                {row.symbol} {row.resolution}?
-              </span>
-              <button
-                type="button"
-                disabled={retrying}
-                onClick={retry}
-                className="rounded border border-accent px-2 py-0.5 text-xs text-ink hover:bg-panel-strong disabled:opacity-50"
-              >
-                {retrying ? "Retrying…" : "Retry"}
-              </button>
-              <button
-                type="button"
-                onClick={() => setConfirming(false)}
-                className="rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
-              >
-                Cancel
-              </button>
-              {retryError && <span className="text-critical">{retryError}</span>}
-            </div>
-          </td>
-        </tr>
+    </>
+  );
+}
+
+/**
+ * One collection job, whole — the only place it is visible as one thing.
+ *
+ * The tab is a flat timeline of pairs, newest event first, and it stays that
+ * way: the answer to "what just happened" is always the most recent row, and
+ * grouping by job would put it wherever its job happened to start
+ * (terminal-collection-history spec, "Historia jest ułożona od najnowszego
+ * zdarzenia"). So the job is assembled here instead, out of the rows already on
+ * screen — no second request, no second freshness clock, and it moves with the
+ * ten-second poll while it stays open.
+ *
+ * Retry lives here because this is where its scope is visible. It re-runs every
+ * failed chunk of every pair the job touched, which is exactly what the button
+ * beside a single pair's row used to do while looking like it did less.
+ */
+function JobDialog({
+  jobId,
+  rows,
+  onChanged,
+  onClose,
+}: {
+  jobId: number;
+  rows: JobPairView[];
+  onChanged(): void;
+  onClose(): void;
+}) {
+  const chunks = rows.flatMap((row) => row.chunks);
+  const retryable = chunks.filter(
+    (chunk) => chunk.state === "failed" || chunk.state === "interrupted",
+  );
+  const pairsWithFailures = rows.filter((row) =>
+    row.chunks.some((chunk) => chunk.state === "failed" || chunk.state === "interrupted"),
+  );
+  const reasons = failureReasons(chunks);
+  const running = rows.some((row) => row.status === "running");
+  const lastActivity = Math.max(...rows.map((row) => row.lastActivityAt));
+
+  const retry = useCallback(async () => {
+    await archive.retryJob(jobId, new AbortController().signal);
+    onChanged();
+  }, [jobId, onChanged]);
+
+  const body = (
+    <>
+      <p className="mt-3 text-ink-secondary">
+        {rows.length} pair{rows.length === 1 ? "" : "s"}, started {formatInstant(rows[0].createdAt)}
+        {rows[0].attempt > 1 && ` · attempt ${rows[0].attempt}`}
+        {running && ` · nothing for ${elapsedLabel(secondsSince(lastActivity))}`}
+      </p>
+
+      <table className="mt-3 w-full text-xs">
+        <thead className="text-left text-ink-muted">
+          <tr>
+            <th className="px-2 py-1 font-normal">Symbol</th>
+            <th className="px-2 py-1 font-normal">Resolution</th>
+            <th className="px-2 py-1 font-normal">Status</th>
+            <th className="px-2 py-1 font-normal">Chunks</th>
+            <th className="px-2 py-1 text-right font-normal">Candles</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={`${row.symbol}|${row.resolution}`} className="border-t border-border">
+              <td className="px-2 py-1.5 font-semibold text-ink">{row.symbol}</td>
+              <td className="px-2 py-1.5 text-ink-secondary">{row.resolution}</td>
+              <td className="px-2 py-1.5">
+                <span className={STATUS_CLASS[row.status]}>{STATUS_LABEL[row.status]}</span>
+              </td>
+              <td className="px-2 py-1.5 text-ink-secondary">
+                {row.chunksDone}/{row.chunksTotal}
+              </td>
+              <td className="px-2 py-1.5 text-right text-ink-secondary">
+                {row.candlesWritten.toLocaleString()}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {reasons.length > 0 && (
+        <div className="mt-3">
+          <p className="text-critical">Why chunks failed:</p>
+          <ul className="mt-1 list-disc pl-5 text-critical">
+            {reasons.map((reason) => (
+              <li key={reason}>{reason}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {retryable.length > 0 && (
+        // Said in full before it is done, because the scope is the whole point:
+        // this is the job, not the row the operator opened it from.
+        <p className="mt-3 text-ink">
+          Retrying re-runs {retryable.length} failed chunk{retryable.length === 1 ? "" : "s"} across{" "}
+          {pairsWithFailures.length} pair{pairsWithFailures.length === 1 ? "" : "s"}. Chunks already
+          collected are left alone.
+        </p>
       )}
     </>
+  );
+
+  if (retryable.length === 0) {
+    return (
+      <ConfirmDialog
+        title={`Collection job #${jobId}`}
+        confirmLabel="Close"
+        busyLabel="Close"
+        cancelLabel={null}
+        onConfirm={() => {}}
+        onClose={onClose}
+      >
+        {body}
+      </ConfirmDialog>
+    );
+  }
+
+  return (
+    <ConfirmDialog
+      title={`Collection job #${jobId}`}
+      confirmLabel="Retry job"
+      busyLabel="Retrying…"
+      fallbackError="could not queue the retry"
+      onConfirm={retry}
+      onClose={onClose}
+    >
+      {body}
+    </ConfirmDialog>
   );
 }
 

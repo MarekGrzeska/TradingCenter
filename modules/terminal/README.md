@@ -45,7 +45,10 @@ before it is asked anything else.
   boundary.
 - `ui/` — `Autocomplete`, the one position picker the whole terminal uses, plus the three
   sources it is given (asset classes, instruments in a class, archived instruments) and the
-  debounce-and-stale-guard hook underneath it.
+  debounce-and-stale-guard hook underneath it; and `ConfirmDialog`, the one way the terminal
+  asks for consent. Every question that precedes something irreversible goes through it —
+  never a row glued under a table — and it owns the work in flight, the second click, the
+  failure that has to stay with its decision, `Escape` and the focus trap.
 - `chart/` — the reusable candlestick chart, identical standalone and in a grid slot.
 - `grid/` — six slots with fixed identities, layout presets, and persistence. A slot's
   symbol comes from the archived-instruments picker and its resolutions from what that
@@ -53,8 +56,10 @@ before it is asked anything else.
 - `instruments/` — the `Instruments` tab: what is archived, per instrument, and the wizard
   and acceptance dialog that add to it; Delete, which removes a pair's data with it.
 - `history/` — the `Data History` tab: collection jobs per instrument and resolution, their
-  measured progress, retrying the chunks that failed, and every deletion, in one timeline
-  with the jobs, ordered newest first.
+  measured progress and how long since anything last happened in them, and every deletion,
+  in one timeline with the jobs, ordered newest first. A row opens the job it came from as a
+  whole — every pair, every failure, and the one Retry, which covers the whole job because
+  that is what it has always done.
 
 ## Run
 
@@ -118,9 +123,15 @@ near a URL; a ticket that leaks out of a log has already been spent.
 
 Three states, not two. `unconfigured` is what a local run has: no `VITE_ENTRA_*`, no
 credential attached, nobody asked to sign in, and no sign-in indicator in the top bar.
-Being signed *out* is a different thing, shown as itself and fixed from the top bar — an
-expired session and an unreachable archive empty the same screen, and only one of them is
-fixed from here.
+Being signed *out* is a different thing, shown as itself — an expired session and an
+unreachable archive empty the same screen, and only one of them is fixed from here.
+
+With identity configured, a signed-out terminal **sends itself to sign in**, once per page
+load, before anything is rendered: nothing is visible without a token, so waiting for the
+operator to find the button asks them to guess the only move there is. Exactly once —
+`sessionStorage` carries a marker written before the page leaves, so a return that is still
+signed out stops there and leaves it to the button in the top bar. A redirect loop is the
+one failure an operator cannot click their way out of.
 
 **If sign-in fails with an account you expect to work**, check which account. A guest
 (B2B) account signs in under a different UPN than its own address — the same trap

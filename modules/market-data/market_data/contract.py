@@ -384,6 +384,15 @@ class JobPairViewOut(BaseModel):
     chunks_done: int
     chunks_total: int
     candles_written: int
+    last_activity_at: datetime = Field(
+        description=(
+            "When something last happened for this pair — a chunk starting counts, not "
+            "only one settling, so a long chunk reads as work rather than a stall. Falls "
+            "back to the job's creation while no chunk has been claimed yet. This is the "
+            "only field that tells a running job apart from a stuck one: progress and "
+            "candle counts look identical for both."
+        )
+    )
     chunks: list[ChunkOut]
 
     @classmethod
@@ -400,6 +409,7 @@ class JobPairViewOut(BaseModel):
             chunks_done=done,
             chunks_total=total,
             candles_written=view.candles_written,
+            last_activity_at=view.last_activity_at,
             chunks=[ChunkOut.of(chunk) for chunk in view.chunks],
         )
 
@@ -416,6 +426,13 @@ class JobOut(BaseModel):
     chunks_done: int
     chunks_total: int
     candles_written: int
+    last_activity_at: datetime = Field(
+        description=(
+            "When something last happened in this job — a chunk starting counts, not "
+            "only one settling. Falls back to the job's creation while no chunk has been "
+            "claimed yet."
+        )
+    )
     running_pair: RunningPair | None = None
     chunks: list[ChunkOut]
 
@@ -432,6 +449,7 @@ class JobOut(BaseModel):
             chunks_done=done,
             chunks_total=total,
             candles_written=job.candles_written,
+            last_activity_at=job.last_activity_at,
             running_pair=RunningPair(symbol=running[0], resolution=running[1]) if running else None,
             chunks=[ChunkOut.of(chunk) for chunk in job.chunks],
         )

@@ -118,6 +118,30 @@ def _progress(chunks: list[Chunk]) -> tuple[int, int]:
     return done, len(chunks)
 
 
+def _last_activity(chunks: list[Chunk], created_at: datetime) -> datetime:
+    """When something last happened here — a chunk starting counts, not only one settling.
+
+    A chunk that has been running for forty minutes *is* the last thing that happened,
+    and counting only `finished_at` would date the job from the chunk before it: a job
+    that is working would then look stalled, which is the mistake this answers in the
+    opposite direction. Progress and candle counts cannot tell the two apart at all —
+    a chunk working for forty minutes and a chunk stuck for forty minutes report exactly
+    the same numbers, and only this moment separates them (`market-data-jobs` spec,
+    "Zlecenie podaje moment swojej ostatniej aktywności").
+
+    Falls back to the job's own creation so the question "since when has nothing
+    happened" always has an answer, including for a job whose first chunk has yet to be
+    claimed.
+    """
+    moments = [
+        moment
+        for chunk in chunks
+        for moment in (chunk.finished_at, chunk.started_at)
+        if moment is not None
+    ]
+    return max(moments) if moments else created_at
+
+
 def _running_pair(chunks: list[Chunk]) -> tuple[str, Resolution] | None:
     for chunk in chunks:
         if chunk.state is ChunkState.RUNNING:
@@ -149,6 +173,10 @@ class Job(BaseModel):
     @property
     def progress(self) -> tuple[int, int]:
         return _progress(self.chunks)
+
+    @property
+    def last_activity_at(self) -> datetime:
+        return _last_activity(self.chunks, self.created_at)
 
     @property
     def running_pair(self) -> tuple[str, Resolution] | None:
@@ -191,6 +219,12 @@ class JobPairView(BaseModel):
     @property
     def progress(self) -> tuple[int, int]:
         return _progress(self.chunks)
+
+    @property
+    def last_activity_at(self) -> datetime:
+        # This pair's own chunks only — another pair of the same job working away says
+        # nothing about whether this one is moving.
+        return _last_activity(self.chunks, self.created_at)
 
 
 def narrow_to_pairs(job: Job) -> list[JobPairView]:

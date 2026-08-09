@@ -16,7 +16,7 @@ from market_data.coverage import read_coverage
 from market_data.errors import GatewayRefused, GatewayUnreachable
 from market_data.gateway import HistoryPage
 from market_data.jobs.models import ChunkPlan, ChunkState
-from market_data.jobs.runner import JobRunner, execute_chunk
+from market_data.jobs.runner import JobRunner, _report_worker_death, execute_chunk
 from market_data.jobs.store import claim_pending_chunk, create_job, read_job
 from market_data.models import Candle, CandleSource, Resolution
 from market_data.store import read_candles
@@ -484,34 +484,129 @@ async def test_a_worker_keeps_going_after_one_chunk_raises(pool) -> None:
     assert states == {ChunkState.FAILED, ChunkState.DONE}
 
 
+# --- taking work is where the loop used to die ----------------------------------------
+
+
+class _FlakyPool:
+    """A pool that refuses to hand out a connection until it is told to stop.
+
+    Stands in for the failure the loop was blind to: not the gateway, not the chunk, but
+    the database underneath `claim_pending_chunk`. Before, one of these ended the worker
+    for the life of the process.
+    """
+
+    def __init__(self, real, failures: int) -> None:
+        self._real = real
+        self.remaining = failures
+        self.attempts = 0
+
+    def acquire(self):
+        self.attempts += 1
+        if self.remaining > 0:
+            self.remaining -= 1
+            raise RuntimeError("the pool is gone")
+        return self._real.acquire()
+
+
+async def test_a_worker_survives_a_failure_taking_work_and_carries_on(pool, monkeypatch) -> None:
+    """The forty-minute evening, in the shape that caused it: one failure between chunks
+    used to mean nothing was ever collected again until somebody restarted the module."""
+    monkeypatch.setattr("market_data.jobs.runner.FAILURE_BACKOFF_SECONDS", 0.01)
+    await _tracked(pool)
+    async with pool.acquire() as conn:
+        job = await create_job(
+            conn, NOW, [plan(chunk_start=NOW - timedelta(hours=1), chunk_end=NOW)]
+        )
+
+    flaky = _FlakyPool(pool, failures=1)
+    runner = JobRunner(flaky, FakeHistory([minute_candle(1)]), limiter=asyncio.Semaphore(1))
+    await runner.start()
+    try:
+        await asyncio.sleep(0.2)
+        async with pool.acquire() as conn:
+            reread = await read_job(conn, job.id)
+    finally:
+        await runner.stop()
+
+    assert reread.chunks[0].state is ChunkState.DONE
+    assert flaky.attempts > 1  # it came back for the work by itself
+
+
+async def test_a_worker_failing_to_take_work_waits_longer_each_time(
+    pool, caplog, monkeypatch
+) -> None:
+    """A database out for an hour must not cost 720 identical log lines and 720
+    connection attempts — the wait grows, up to a ceiling."""
+    monkeypatch.setattr("market_data.jobs.runner.FAILURE_BACKOFF_SECONDS", 0.01)
+    monkeypatch.setattr("market_data.jobs.runner.MAX_FAILURE_BACKOFF_SECONDS", 0.04)
+
+    flaky = _FlakyPool(pool, failures=1000)
+    runner = JobRunner(flaky, FakeHistory([]), limiter=asyncio.Semaphore(1))
+
+    with caplog.at_level(logging.ERROR, logger="market_data.jobs.runner"):
+        await runner.start()
+        try:
+            await asyncio.sleep(0.25)
+        finally:
+            await runner.stop()
+
+    # Spinning would be thousands of attempts in a quarter of a second.
+    assert 2 <= flaky.attempts <= 30
+    assert "could not take work" in caplog.text
+    assert "the pool is gone" in caplog.text
+    # And the wait grows rather than staying where it started.
+    assert "trying again in 0.01s" in caplog.text
+    assert "trying again in 0.02s" in caplog.text
+    assert "trying again in 0.08s" not in caplog.text  # capped at 0.04
+
+
+async def test_a_worker_stopped_while_waiting_out_a_failure_ends_quietly(pool, caplog) -> None:
+    """`stop()` is the one thing that MUST end the loop, including mid-backoff — and an
+    orderly shutdown is not an incident."""
+    flaky = _FlakyPool(pool, failures=1000)
+    runner = JobRunner(flaky, FakeHistory([]), limiter=asyncio.Semaphore(1))
+    await runner.start()
+    await asyncio.sleep(0.02)  # long enough to fail once and settle into the wait
+
+    with caplog.at_level(logging.ERROR, logger="market_data.jobs.runner"):
+        await runner.stop()
+        for _ in range(3):
+            await asyncio.sleep(0)
+
+    assert "died" not in caplog.text
+    assert "returned" not in caplog.text
+    assert all(worker.done() for worker in runner._workers) or runner._workers == []
+
+
 # --- a worker that dies must say so ---------------------------------------------------
 
 
 async def test_a_worker_that_dies_says_so(caplog) -> None:
-    """Otherwise nothing does, and every chunk after it sits `pending` forever.
+    """The loop now catches everything it can reach, so this should never fire — which
+    is exactly why it stays.
 
     A task that raises while still referenced never reports the exception — Python logs
     it on garbage collection, and `JobRunner._workers` is the reference that prevents
     that. Found the hard way: eight chunks pending in production across a restart and a
-    retry, with no log line and no exception anywhere to read.
+    retry, with no log line and no exception anywhere to read. An end nobody planned for
+    is the end of every job this module would run, and it must not be silent.
     """
 
-    class ExplodingPool:
-        def acquire(self):
-            raise RuntimeError("the pool is gone")
+    async def dies() -> None:
+        raise RuntimeError("something outside the loop's reach")
 
-    runner = JobRunner(ExplodingPool(), history=None, limiter=asyncio.Semaphore(1))
+    worker = asyncio.create_task(dies(), name="job-runner-0")
+    worker.add_done_callback(_report_worker_death)
 
     with caplog.at_level(logging.ERROR, logger="market_data.jobs.runner"):
-        await runner.start()
-        # Two passes: one for the worker to run and raise, one for the done-callback
-        # asyncio schedules with `call_soon`.
+        with pytest.raises(RuntimeError):
+            await worker
         for _ in range(3):
             await asyncio.sleep(0)
 
     assert "died" in caplog.text
     assert "no job will run" in caplog.text
-    assert "the pool is gone" in caplog.text
+    assert "something outside the loop's reach" in caplog.text
 
 
 async def test_a_worker_cancelled_on_shutdown_says_nothing(caplog) -> None:

@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { archive, instruments } from "../data/marketData";
 import { Autocomplete } from "../ui/Autocomplete";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { assetClassSource, instrumentInClassSource } from "../ui/autocompleteSources";
 import { RESOLUTIONS } from "../data/types";
 import type {
@@ -286,8 +287,6 @@ function AcceptanceDialog({
 }) {
   const [estimate, setEstimate] = useState<JobEstimate | null>(null);
   const [estimateError, setEstimateError] = useState<string | null>(null);
-  const [accepting, setAccepting] = useState(false);
-  const [acceptError, setAcceptError] = useState<string | null>(null);
   const [result, setResult] = useState<TrackPairsResult | null>(null);
 
   // One mount per request — the caller keys this component on it — so the
@@ -320,68 +319,55 @@ function AcceptanceDialog({
   }, []);
 
   const accept = useCallback(async () => {
-    setAcceptError(null);
-    setAccepting(true);
-    try {
-      const outcome = await archive.trackPairs(
-        requestRef.current.pairs,
-        requestRef.current.collectFrom,
-        new AbortController().signal,
-      );
-      setResult(outcome);
-    } catch (cause: unknown) {
-      setAcceptError(cause instanceof Error ? cause.message : "could not start collecting");
-    } finally {
-      setAccepting(false);
-    }
+    const outcome = await archive.trackPairs(
+      requestRef.current.pairs,
+      requestRef.current.collectFrom,
+      new AbortController().signal,
+    );
+    setResult(outcome);
   }, []);
 
+  // Accepting does not close this: what came back is the answer to the question,
+  // and refusals in particular have to be read where the decision was made. So
+  // the same dialog stays, with a result inside it and nothing left to cancel.
+  if (result) {
+    const accepted = result.results.filter((r) => r.refused === null);
+    return (
+      <ConfirmDialog
+        title={accepted.length > 0 ? "Collecting started" : "Nothing was added"}
+        confirmLabel="Done"
+        busyLabel="Done"
+        cancelLabel={null}
+        onConfirm={() => {}}
+        onClose={onAccepted}
+      >
+        <ResultSummary result={result} />
+      </ConfirmDialog>
+    );
+  }
+
   return (
-    <div
-      role="dialog"
-      aria-label="Confirm collection"
-      className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4"
+    <ConfirmDialog
+      title="Confirm collection"
+      confirmLabel="Start collecting"
+      busyLabel="Starting…"
+      confirmDisabled={!estimate || estimateError !== null}
+      fallbackError="could not start collecting"
+      // What comes back is not just "it worked": the archive may have refused
+      // some of the pairs, and that has to be read where the decision was made
+      // rather than vanish with the dialog.
+      closeOnSuccess={false}
+      onConfirm={accept}
+      onClose={onClose}
     >
-      <div className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded border border-border bg-panel-strong p-4 text-sm">
-        {result ? (
-          <ResultSummary result={result} onDone={onAccepted} />
-        ) : (
-          <>
-            <h2 className="text-base font-semibold text-ink">Confirm collection</h2>
-
-            {estimateError && (
-              <p className="mt-3 text-critical">
-                Could not price this job: {estimateError}. Nothing has been added.
-              </p>
-            )}
-            {!estimateError && !estimate && <p className="mt-3 text-ink-muted">Pricing…</p>}
-            {estimate && (
-              <EstimateTable estimate={estimate} existingPairs={existingPairs} />
-            )}
-
-            {acceptError && <p className="mt-3 text-critical">{acceptError}</p>}
-
-            <div className="mt-4 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded border border-border px-3 py-1 text-ink-muted hover:text-ink"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={!estimate || estimateError !== null || accepting}
-                onClick={accept}
-                className="rounded border border-accent px-3 py-1 text-ink hover:bg-panel disabled:opacity-40"
-              >
-                {accepting ? "Starting…" : "Start collecting"}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
+      {estimateError && (
+        <p className="mt-3 text-critical">
+          Could not price this job: {estimateError}. Nothing has been added.
+        </p>
+      )}
+      {!estimateError && !estimate && <p className="mt-3 text-ink-muted">Pricing…</p>}
+      {estimate && <EstimateTable estimate={estimate} existingPairs={existingPairs} />}
+    </ConfirmDialog>
   );
 }
 
@@ -466,16 +452,12 @@ function EstimateRow({ pair, alreadyCollected }: { pair: PairEstimate; alreadyCo
   );
 }
 
-function ResultSummary({ result, onDone }: { result: TrackPairsResult; onDone(): void }) {
+function ResultSummary({ result }: { result: TrackPairsResult }) {
   const accepted = result.results.filter((r) => r.refused === null);
   const refused = result.results.filter((r) => r.refused !== null);
 
   return (
     <div>
-      <h2 className="text-base font-semibold text-ink">
-        {accepted.length > 0 ? "Collecting started" : "Nothing was added"}
-      </h2>
-
       {accepted.length > 0 && (
         <div className="mt-3">
           <p className="text-ink">Now archiving:</p>
@@ -510,16 +492,6 @@ function ResultSummary({ result, onDone }: { result: TrackPairsResult; onDone():
           </ul>
         </div>
       )}
-
-      <div className="mt-4 flex justify-end">
-        <button
-          type="button"
-          onClick={onDone}
-          className="rounded border border-border px-3 py-1 text-ink hover:bg-panel"
-        >
-          Done
-        </button>
-      </div>
     </div>
   );
 }
