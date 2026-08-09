@@ -166,26 +166,32 @@
   <code>openspec/changes/archive/</code> delta specs to 3&nbsp;924 linie — opis zmian,
   których treść <em>już wsiąkła</em> do <code>openspec/specs/</code> przy archiwizacji, a
   historię „co i kiedy" trzyma git. Do tego 1&nbsp;164 linie odhaczonych
-  <code>tasks.md</code>. Propozycja do <strong>Twojej decyzji</strong>, bo to kasowanie
-  zapisu historycznego:</p>
+  <code>tasks.md</code>. Decyzja należała do operatora, bo to kasowanie zapisu
+  historycznego:</p>
   <div class="tablewrap">
   <table>
     <tr><th>Wariant</th><th>Co zostaje w archiwum zmiany</th><th>Efekt</th></tr>
     <tr>
-      <td><strong>A — nic nie ruszać</strong></td>
+      <td>A — nic nie ruszać</td>
       <td>wszystko (5 artefaktów)</td>
       <td class="n">10 239 linii, rośnie ~790/zmianę</td>
     </tr>
     <tr>
-      <td><strong>B — przyciąć do sensu</strong></td>
+      <td><strong>B — przyciąć do sensu</strong> <span class="pill keep">wybrane</span></td>
       <td><code>proposal.md</code> (dlaczego) + <code>review.md</code> (jak oceniono) + <code>design.md</code> tam, gdzie była decyzja</td>
       <td class="n">−~5 000 linii teraz, −~40% na każdą przyszłą</td>
     </tr>
   </table>
   </div>
-  <p>Za B przemawia to, że delta i tasks nie niosą informacji, której nie ma gdzie indziej;
-  za A — że archiwum nic nie kosztuje poza objętością, bo nikt go nie czyta. Skłaniam się
-  ku B, ale nie wykonam tego bez Twojego „tak".</p>
+  <p><strong>Wybrany został wariant B</strong> (decyzja operatora, 10 sierpnia). Za nim
+  przemawiało to, że delta specs i odhaczone <code>tasks.md</code> nie niosą informacji,
+  której nie ma gdzie indziej: treść delty jest w <code>openspec/specs/</code>, a „co i
+  kiedy się zmieniło" trzyma historia gita. Zostaje to, czego git nie odtworzy w czytelnej
+  formie — <em>dlaczego</em> zmiana powstała i <em>jak oceniono</em> jej kod.</p>
+  <p>Wykonanie ma dwie części, i druga jest ważniejsza od pierwszej: jednorazowe przycięcie
+  trzynastu zamkniętych zmian, oraz dopisanie tej reguły do kroku archiwizacji, żeby
+  przycinanie działo się samo przy każdym kolejnym <code>/opsx:archive</code> — inaczej za
+  miesiąc archiwum urośnie z powrotem, a dokument będzie opisywał stan, którego nie ma.</p>
 
   <h3>Martwy kod: jest, ale śladowy</h3>
   <p>Przeszukanie użyć funkcji eksportowanych przez moduły znalazło jedną martwą:
@@ -358,8 +364,9 @@
       <span class="meta">5 min</span> <span class="pill do">do zrobienia</span></li>
     <li><strong>Trzy dodatkowe worktree na stałe — cztery stanowiska równoległe.</strong>
       <span class="meta">30 min · raz · ~1,4 GB</span> <span class="pill do">do zrobienia</span></li>
-    <li><strong>Przycięcie archiwum OpenSpec (wariant B): −~5 000 linii.</strong>
-      <span class="meta">1 h</span> <span class="pill ask">Twoja decyzja</span></li>
+    <li><strong>Przycięcie archiwum OpenSpec, wariant B: −~5 000 linii, plus reguła
+      w kroku archiwizacji, żeby nie odrosło.</strong>
+      <span class="meta">1 h · decyzja zapadła</span> <span class="pill do">do zrobienia</span></li>
     <li><strong>Komentarze w terminalu: przycinać przy dotknięciu.</strong>
       <span class="meta">ciągłe</span> <span class="pill keep">norma</span></li>
   </ol>
