@@ -11,7 +11,7 @@ from fastapi import WebSocketDisconnect
 from fastapi.testclient import TestClient
 
 from capital_gateway.app import app
-from capital_gateway.config import DEMO_BASE_URL
+from capital_gateway.config import API_KEY_HEADER, DEMO_BASE_URL
 from tests.conftest import load_fixture
 
 API = f"{DEMO_BASE_URL}/api/v1"
@@ -22,6 +22,7 @@ SECRETS = {
     "password": "hunter2",
     "cst": "cst-token-value",
     "security_token": "x-security-token-value",
+    "gateway_key": "gateway-caller-key",
 }
 
 
@@ -30,7 +31,11 @@ def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
     monkeypatch.setenv("CAPITAL_API_KEY", SECRETS["api_key"])
     monkeypatch.setenv("CAPITAL_IDENTIFIER", SECRETS["identifier"])
     monkeypatch.setenv("CAPITAL_PASSWORD", SECRETS["password"])
-    return TestClient(app)
+    monkeypatch.setenv("GATEWAY_API_KEY", SECRETS["gateway_key"])
+    # Every route past "/" requires this header — see test_access_control.py for the
+    # middleware itself. Setting it as a default header here keeps every other test in
+    # this file about the route it names, not about authentication.
+    return TestClient(app, headers={API_KEY_HEADER: SECRETS["gateway_key"]})
 
 
 def mock_login() -> None:

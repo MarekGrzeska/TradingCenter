@@ -56,6 +56,8 @@ def _no_ambient_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
         "CAPITAL_PASSWORD",
         "CAPITAL_BASE_URL",
         "CAPITAL_STREAM_URL",
+        "GATEWAY_API_KEY",
+        "GATEWAY_ENV",
     ):
         monkeypatch.delenv(name, raising=False)
 

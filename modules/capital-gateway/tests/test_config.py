@@ -9,6 +9,7 @@ CREDS = {
     "capital_api_key": "k",
     "capital_identifier": "me@example.com",
     "capital_password": "p",
+    "gateway_api_key": "g",
 }
 
 
@@ -49,14 +50,18 @@ def test_a_trailing_slash_is_not_a_different_host() -> None:
     assert settings(capital_base_url=f"{DEMO_BASE_URL}/").capital_base_url == DEMO_BASE_URL
 
 
-@pytest.mark.parametrize("field", ["capital_api_key", "capital_identifier", "capital_password"])
+@pytest.mark.parametrize(
+    "field", ["capital_api_key", "capital_identifier", "capital_password", "gateway_api_key"]
+)
 def test_a_missing_credential_names_itself(field: str) -> None:
     with pytest.raises(ValidationError) as err:
         Settings(**{k: v for k, v in CREDS.items() if k != field}, _env_file=None)
     assert field in str(err.value)
 
 
-@pytest.mark.parametrize("field", ["capital_api_key", "capital_identifier", "capital_password"])
+@pytest.mark.parametrize(
+    "field", ["capital_api_key", "capital_identifier", "capital_password", "gateway_api_key"]
+)
 def test_a_blank_credential_names_itself(field: str) -> None:
     # An unfilled .env sets the variable to "" rather than leaving it out, which pydantic
     # accepts as a string. Without this the module would start and fail at the first login.
