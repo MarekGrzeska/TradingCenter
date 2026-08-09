@@ -6,11 +6,17 @@ name: terraform
 # There is deliberately no `apply` job. This root manages Entra applications and two
 # operator-scoped grants, and letting CI apply it would mean handing the CI principal
 # directory write access — a bigger privilege than anything else in this project holds,
-# for a platform one person operates. Two concrete failures made the choice rather than
-# an abstract worry: `terraform plan` in CI 403s on every `azuread_application` because
-# the principal has no Microsoft Graph access at all, and — before key-vault.tf and
-# github-oidc.tf were fixed to read `var.operator_object_id` — it planned to destroy the
-# operator's own Key Vault access policy and recreate it pointing at CI.
+# for a platform one person operates. The concrete failure that made the choice rather
+# than an abstract worry: before key-vault.tf and github-oidc.tf were fixed to read
+# `var.operator_object_id`, a plan from CI proposed destroying the operator's own Key
+# Vault access policy and recreating it pointing at CI.
+#
+# This comment used to claim a second reason — that `plan` in CI 403s on every
+# `azuread_application` for want of Graph access. It does not, and has not since that
+# same fix: the plan on the pull request that added the terminal's registration came back
+# clean and matched the operator's local plan resource for resource. Corrected rather than
+# deleted, because "CI cannot even read the directory" is the sort of belief that quietly
+# rules out ideas it should not. The reason above stands on its own.
 #
 # So `terraform apply` stays with the operator, run locally against the same state. This
 # is a narrowing of design.md's "Wdrożenia przez OIDC", not an abandonment of it: the

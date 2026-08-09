@@ -155,12 +155,19 @@ jest niewidoczna, a „stoi" wygląda identycznie jak „działa i nie widać".
 
 ## 5. Domknięcie
 
-- [ ] 5.1 Wprowadź `docs/terminal-market-data-auth.html` do repozytorium jako zapis decyzji,
-      z dopiskiem, która opcja została wybrana i w jakiej zmianie zrealizowana
-- [ ] 5.2 Zdejmij nieaktualny komentarz w `infra/app-service.tf` przy `unauthenticated_action`
-      („Client-side handling of the 401 … flagged here, not solved here") — właśnie przestał być
-      prawdą — i zaktualizuj komentarz o CORS w `deploy-terminal.yml`
-- [ ] 5.3 Zamknij zadanie 11.4 w `openspec/changes/provision-azure-platform/tasks.md`, wskazując
+- [x] 5.1 Wprowadź `docs/terminal-market-data-auth.html` do repozytorium jako zapis decyzji,
+      z dopiskiem, która opcja została wybrana i w jakiej zmianie zrealizowana — dopisana ramka
+      „Rozstrzygnięte" na górze, poprawiony nagłówek i stopka. Zamknięte też pytanie otwarte samego
+      dokumentu (czy Easy Auth przyjmie token aplikacji przeglądarkowej — przyjmie) i odnotowane, że
+      CORS musiał wylądować na App Service, wbrew temu, co dokument zakładał
+- [x] 5.2 Zdejmij nieaktualny komentarz w `infra/app-service.tf` przy `unauthenticated_action`
+      i zaktualizuj komentarz o CORS w `deploy-terminal.yml` — oba zrobione przy grupach 2 i 3.
+      Doszedł trzeci, znaleziony po drodze: nagłówek `terraform.yml` twierdził, że `plan` w CI
+      dostaje 403 na każdym `azuread_application`. Nie dostaje — check `plan` w PR #22 przeszedł
+      i dał ten sam wynik co lokalny. Poprawione, nie usunięte: powód, dla którego `apply` zostaje
+      u operatora, stoi o własnych siłach i jest ważniejszy niż nieprawdziwa przesłanka obok
+- [x] 5.3 Zamknij zadanie 11.4 w `openspec/changes/provision-azure-platform/tasks.md`, wskazując
       tę zmianę jako to, czego brakowało
-- [ ] 5.4 `openspec validate authenticate-terminal-to-market-data --strict`, a następnie `review.md`
-      wg szablonu projektu
+- [x] 5.4 `openspec validate authenticate-terminal-to-market-data --strict`, a następnie `review.md`
+      wg szablonu projektu — osiem znalezisk, z czego pięć naprawionych, trzy zostawione następnej
+      zmianie wraz z uzasadnieniem
