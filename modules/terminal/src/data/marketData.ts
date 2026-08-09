@@ -6,38 +6,28 @@ import { createGatewaySource } from "./gatewaySource";
 import type { ArchiveAdmin, MarketDataSource } from "./source";
 
 /**
- * The one market-data source the app runs on — and, behind it, the two back
- * ends it is made of.
+ * The one market-data source the app runs on, and the two back ends behind it.
  *
- * Candles and the live stream come from `market-data`, the archive; the
- * instrument catalogue is `capital-gateway`'s, which owns it. No view knows
- * that: they take `marketData` and call it, and the split is this file's
- * business alone (terminal-market-data spec, "Świece i instrumenty idą
- * z różnych miejsc"). That is also what makes it a rollback rather than a
- * rewrite if the archive ever has to come back out — the seam is here.
+ * Candles and the live stream come from the archive; the instrument catalogue is
+ * `capital-gateway`'s, which owns it. No view knows that (terminal-market-data spec,
+ * "Świece i instrumenty idą z różnych miejsc"), and keeping the seam here is what makes
+ * the archive a rollback rather than a rewrite if it ever has to come back out.
  *
- * **Both now go through the same host.** `capital-gateway` is not public, so
- * the browser cannot reach it directly — `gatewaySource` calls `market-data`,
- * which proxies its three catalogue routes to the gateway unread
- * (`gatewaySource.ts` has the detail). The split above is still real — it is
- * still the gateway's data and the gateway's rules — only the wire hop
- * changed, which is exactly the kind of thing this seam exists to absorb
- * without every view needing to know.
+ * Both reach the same host: `capital-gateway` is not public, so `gatewaySource` calls
+ * `market-data`, which proxies the three catalogue routes to it unread. Whose data and
+ * whose rules is unchanged — only the wire hop, which is what this seam absorbs.
  *
- * A single module-level instance, so every view shares one socket hub — that
- * sharing is what makes six charts on the same pair one connection rather than
- * six.
+ * A single module-level instance, so six charts on one pair share one socket rather
+ * than opening six.
  */
 const { archiveHttp, archiveWs } = resolveEndpoints();
 
 /**
- * The operator's identity, or the absence of one.
- *
- * Decided here, once, for the same reason the two back ends are composed here:
- * it is a wiring decision, and every view that consumed it directly would be a
- * view that had to know about Entra. `null` configuration is a working mode —
- * local development, where the archive has nothing in front of it — and it
- * produces an identity that answers "no credential" rather than one that fails.
+ * The operator's identity, or the absence of one. A wiring decision, made here for the
+ * same reason the back ends are composed here: a view that consumed it directly would be
+ * a view that had to know about Entra. `null` configuration is a working mode — local
+ * development, nothing in front of the archive — and answers "no credential" rather than
+ * failing.
  */
 export const identity: Identity = (() => {
   const config = resolveEntra();

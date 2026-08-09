@@ -114,22 +114,15 @@ function combinedEntries(rows: JobPairView[], deletions: PairDeletion[]): Histor
       }),
     ),
   ];
-  // Newest first, whatever the instrument. This tab is asked "what just
-  // happened" before anything else, and the answer to that is always the
-  // most recent row — sorted by symbol it landed wherever the alphabet put
-  // it (terminal-collection-history spec, "Historia jest ułożona od
-  // najnowszego zdarzenia").
+  // Newest first, whatever the instrument: this tab is asked "what just happened" before
+  // anything else (terminal-collection-history spec, "Historia jest ułożona od
+  // najnowszego zdarzenia"). The cost, taken deliberately, is that a deletion no longer
+  // sits beside the pull it undid — that story can still be followed down the symbol
+  // column, while "what just happened" had no workaround at all (design.md).
   //
-  // What that costs: a deletion no longer sits next to the pull it undid,
-  // because other pairs' events now fall between them. Taken deliberately —
-  // the pair's story can still be followed down the symbol column, while
-  // "what just happened" had no workaround at all (design.md).
-  //
-  // Symbol and interval stay on as the tiebreak, which is the one job they
-  // are right for. Seconds collide — a wizard submission creates every pair
-  // at the same `at` — and the two lists being merged arrive from two
-  // independent polls, so input order is no help even though the sort is
-  // stable. These keys are derived, total, and the same on every read.
+  // Symbol and interval are the tiebreak because seconds collide — a wizard submission
+  // stamps every pair with the same `at` — and the two lists come from independent
+  // polls, so input order is no help even though the sort is stable.
   return entries.sort((a, b) => {
     if (a.at !== b.at) return b.at - a.at;
     if (a.symbol !== b.symbol) return a.symbol.localeCompare(b.symbol);
@@ -334,19 +327,14 @@ function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: num
 }
 
 /**
- * One collection job, whole — the only place it is visible as one thing.
+ * One collection job, whole — the only place it is visible as one thing. The tab stays a
+ * flat timeline because grouping by job would file the newest event wherever its job
+ * happened to start, so the job is assembled here out of rows already on screen: no
+ * second request, no second freshness clock, and it moves with the ten-second poll.
  *
- * The tab is a flat timeline of pairs, newest event first, and it stays that
- * way: the answer to "what just happened" is always the most recent row, and
- * grouping by job would put it wherever its job happened to start
- * (terminal-collection-history spec, "Historia jest ułożona od najnowszego
- * zdarzenia"). So the job is assembled here instead, out of the rows already on
- * screen — no second request, no second freshness clock, and it moves with the
- * ten-second poll while it stays open.
- *
- * Retry lives here because this is where its scope is visible. It re-runs every
- * failed chunk of every pair the job touched, which is exactly what the button
- * beside a single pair's row used to do while looking like it did less.
+ * Retry lives here because this is where its scope is visible — it re-runs every failed
+ * chunk of every pair the job touched, which is what the per-row button used to do while
+ * looking like it did less.
  */
 function JobDialog({
   jobId,

@@ -1,18 +1,12 @@
 /**
- * Where the archive lives — the one back end the terminal now holds an
- * address for — accepting a relative path or a full URL.
+ * Where the archive lives — the one back end the terminal holds an address for —
+ * accepting a relative path or a full URL.
  *
- * HTTP and WebSocket are configured separately — see design.md, "Azure Static
- * Web Apps poda statyki, ale nie przeprowadzi strumienia". Static Web Apps
- * can't proxy the WebSocket, so whatever topology the app ends up deployed
- * behind, the two may need to point at different hosts.
- *
- * `capital-gateway` has no address here at all. It never got a WebSocket one —
- * the stream the terminal used to open there comes from the archive instead —
- * and it lost its HTTP one too, once the gateway stopped being reachable from
- * a browser: the instrument catalogue now comes through the archive, which
- * proxies it (`gatewaySource.ts`, `marketData.ts`). This is the only place any
- * of those decisions gets made.
+ * HTTP and WebSocket are configured separately because Static Web Apps cannot proxy the
+ * socket (design.md, "Azure Static Web Apps poda statyki, ale nie przeprowadzi
+ * strumienia"), so the two may need different hosts. `capital-gateway` has no address
+ * here at all: it is not reachable from a browser, and its catalogue arrives proxied
+ * through the archive.
  */
 
 const ABSOLUTE_URL = /^https?:\/\//i;
@@ -57,14 +51,11 @@ export interface Endpoints {
   archiveWs: string;
 }
 
-// Same defaults as .env.example — a missing .env (a fresh checkout that
-// hasn't copied it yet, or a test/CI environment with no env file at all)
-// must fall back to "talk to the dev proxy", not crash the moment a source is
-// built.
-// The `-api` suffix keeps this prefix clear of the tab routes: a back end
-// answering a prefix a tab also claims shadows that tab for every request which
-// actually reaches a server. A test compares it against the route list so a
-// future prefix cannot repeat the mistake. See the note in vite.config.ts.
+// Same defaults as .env.example: a checkout without one falls back to the dev proxy
+// rather than crashing the moment a source is built. The `-api` suffix keeps the prefix
+// clear of the tab routes — a back end answering a prefix a tab also claims shadows that
+// tab — and a test compares it against the route list so a future prefix cannot repeat
+// the mistake. See the note in vite.config.ts.
 const DEFAULT_ARCHIVE_HTTP = "/archive-api";
 const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 

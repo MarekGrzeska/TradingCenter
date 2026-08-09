@@ -118,6 +118,14 @@ messages, module READMEs, this file — stays **English**. Recorded in `openspec
 
 Validate with `openspec validate <change> --strict`.
 
+**Comments carry the reason, not the narration.** A comment retelling the line beneath it
+is something the next reader has to parse twice; one naming a measurement, a constraint or
+an approach that was tried and failed is the only record of it. The essays had gathered in
+the terminal — measured 10 August: ~7% comment lines in Python against 15% there — and one
+deliberate pass has since trimmed the longest of them. From here it happens at the moment a
+file is touched, not in bulk: rewriting comments wholesale is churn, and the reason a
+comment exists is usually clearest to whoever is already reading the code around it.
+
 ## CI
 
 `.github/workflows/checks.yml` runs on every PR to `main` and every push to it: one job per

@@ -11,32 +11,22 @@ if (!container) {
 }
 
 /**
- * Sign-in is resolved before the app mounts, never alongside it.
- *
- * The operator comes back from Entra to this page with the answer in the URL,
- * and MSAL is the only thing that can read it. Meanwhile the first render
- * subscribes to candles, which asks for a token — and a token asked for while
- * the redirect is still unresolved belongs to nobody, so the subscription is
- * refused and the chart shows a signed-out operator who is in the middle of
- * signing in.
- *
- * Nothing to do in the local mode: `identity` is then the one with no session
- * to resolve, and this resolves immediately.
+ * Sign-in is resolved before the app mounts, never alongside it. The operator returns
+ * from Entra with the answer in the URL and only MSAL can read it, while the first
+ * render is already asking for a token — one asked for mid-redirect belongs to nobody,
+ * so the subscription is refused and the chart reports a signed-out operator who is in
+ * the middle of signing in. In local mode there is no session to resolve.
  */
 async function start(): Promise<void> {
   const initialize = (identity as { initialize?: () => Promise<void> }).initialize;
-  // A failure here is not a reason to show nothing. The terminal renders
-  // signed-out, which is a state it can already say out loud and recover from
-  // by sending the operator through sign-in — a blank page says nothing and
-  // recovers from nothing.
+  // A failure here renders signed-out rather than nothing: that is a state the terminal
+  // can say out loud and recover from, and a blank page is neither.
   await initialize?.().catch((cause: unknown) => {
     console.error("could not resolve the sign-in state", cause);
   });
 
-  // Before mounting, not from inside a view: a mounted terminal immediately
-  // subscribes to candles, is refused, and renders an error the operator sees
-  // flash by on the way to a sign-in page they were always going to. Nothing is
-  // rendered when this takes over — the page is leaving.
+  // Before mounting, not from inside a view: a mounted terminal subscribes, is refused,
+  // and flashes an error on the way to a sign-in page it was always going to.
   if (startSignInIfNeeded(identity)) return;
 
   createRoot(container!).render(

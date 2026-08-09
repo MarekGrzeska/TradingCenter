@@ -30,17 +30,13 @@ export interface JobHistoryState {
 }
 
 /**
- * What has been pulled and what has been deleted, kept current — the same
- * shape of state as `useTrackedPairs`, for the same reason: a failed poll
- * must not blank rows that are already on screen, and "nothing has run yet"
- * must read differently from "nobody could be asked" (terminal-collection-history
- * spec, "Zakładka odróżnia brak historii od braku odpowiedzi").
+ * What has been pulled and what has been deleted, kept current — the same shape of state
+ * as `useTrackedPairs` and for the same reason (terminal-collection-history spec,
+ * "Zakładka odróżnia brak historii od braku odpowiedzi").
  *
- * The two reads are treated as one unit: either both land or neither does.
- * A deletion cutting a pair's history short is exactly the kind of thing an
- * operator reading this tab needs to see reliably, so there is no version of
- * "jobs refreshed, deletions did not" worth distinguishing from a plain
- * failed poll.
+ * The two reads land together or not at all: a deletion cutting a pair's history short
+ * is what this tab exists to show, so "jobs refreshed, deletions did not" is not a state
+ * worth telling apart from a failed poll.
  */
 export function useJobHistory(admin: ArchiveAdmin): JobHistoryState {
   const [rows, setRows] = useState<JobPairView[]>([]);

@@ -8,24 +8,15 @@ import type { EntraConfig } from "../data/config";
 import { createListeners, SignedOut, type Identity, type IdentityState } from "./identity";
 
 /**
- * The only file that knows Entra exists.
+ * The only file that knows Entra exists; everything else takes an `Identity` and asks it
+ * for a token.
  *
- * Everything else takes an `Identity` (`identity.ts`) and asks it for a token.
- * That seam is not ceremony: it is what lets the data layer's tests describe a
- * signed-out operator in two lines instead of standing up a sign-in flow, and
- * it is what would make swapping the provider a change to one file.
+ * Redirect, not a popup: a popup dies under a blocker and leaves an operator staring at
+ * a terminal that will not load. The full page load it costs is affordable — the grid
+ * layout is in `localStorage` and MSAL returns to the address it left from.
  *
- * **Redirect, not a popup.** A popup dies under a blocker and leaves an
- * operator staring at a terminal that will not load, with nothing on screen
- * saying why. A redirect costs a full page load, which the terminal can afford:
- * the grid layout lives in `localStorage` (`gridStore.ts`), and MSAL returns to
- * the address it left from, so the operator comes back to the view they were
- * on.
- *
- * **`sessionStorage`, not memory and not `localStorage`.** Memory would lose
- * the account on every reload and send the operator through sign-in each time;
- * `localStorage` would keep it after the tab is closed. Surviving a reload and
- * dying with the tab is the right shape for a terminal.
+ * `sessionStorage`, because memory would send the operator through sign-in on every
+ * reload and `localStorage` would keep the account after the tab is closed.
  */
 export function createEntraIdentity(config: EntraConfig): Identity {
   const listeners = createListeners();

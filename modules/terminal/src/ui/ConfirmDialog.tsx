@@ -2,28 +2,20 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
 
 /**
- * The one way the terminal asks for consent.
+ * The one way the terminal asks for consent — the wizard, deleting a pair's data,
+ * retrying a job. Never asked in place (`terminal-dialogs` spec, "Pytanie o zgodę jest
+ * dialogiem, nie interfejsem w miejscu"): a question sitting next to one row reads as
+ * being about that row, and position speaks louder than any caption.
  *
- * Every question the terminal asks before doing something it cannot undo goes
- * through here — the collection wizard, deleting a pair's data, retrying a job.
- * Asking in place, with a row glued under the table or a panel unfolded beneath
- * a button, is not an option any more (`terminal-dialogs` spec, "Pytanie o zgodę
- * jest dialogiem, nie interfejsem w miejscu"): a question sitting next to one row
- * reads as being about that row, and position speaks louder than any caption.
+ * What the caller does not own: work in flight, the second click, the failure and the
+ * keyboard. `onConfirm` is awaited with the dialog still up, and a rejection is named
+ * inside it — a message thrown at the view the dialog just left has lost the decision it
+ * explains.
  *
- * **What the caller does not own**: work in flight, the second click, the
- * failure, and the keyboard. `onConfirm` is awaited; while it runs the dialog
- * stays put and says so, and a rejection is named *inside* the dialog with the
- * question still on screen. A message thrown at the view the dialog just
- * vanished from has lost the decision it explains.
- *
- * **Focus and `Escape` are handled here, by hand.** The native `<dialog>` gives
- * all of this away for free and was the first choice — but no version of jsdom
- * implements `showModal()` (checked 25, 26 and 30), so every one of these
- * behaviours would have been asserted against a polyfill written for the tests
- * rather than against the thing that ships. Hand-rolled and tested beats
- * delegated and untested; the trap below is small enough to read in one sitting
- * and lives in exactly one file.
+ * Focus and `Escape` are hand-rolled because no version of jsdom implements
+ * `<dialog>.showModal()` (checked 25, 26 and 30), so the native route would put every
+ * one of these behaviours behind a polyfill written for the tests rather than the thing
+ * that ships.
  */
 
 /** Everything inside the panel a Tab can land on. Queried per keystroke rather

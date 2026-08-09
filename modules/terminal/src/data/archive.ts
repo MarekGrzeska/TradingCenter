@@ -26,27 +26,23 @@ import type {
 import type { ArchiveAdmin, CandleSource, HistoryRequest } from "./source";
 
 /**
- * The candle side of the terminal's source: `market-data`, over its HTTP
- * contract and its subscription.
+ * The candle side of the terminal's source: `market-data`, over its HTTP contract and
+ * its subscription.
  *
- * The subscription is why this module exists in the shape it does. The gateway
- * serves changes and nothing else, so a chart reading it had to fetch a history
- * and splice the stream onto it, and between the two lay a window in which a
- * candle could close unseen. The archive's first message is the series itself,
- * read while its room is held still — so there is nothing to splice, nothing to
- * fetch after a reconnect, and no duplicate to filter (design.md, "Archiwum
- * jest dla terminala jedynym źródłem świec i strumienia").
+ * The subscription is why this module has the shape it does. Its first message is the
+ * series itself, read while the archive holds its room still, so there is nothing to
+ * splice, nothing to fetch after a reconnect and no duplicate to filter (design.md,
+ * "Archiwum jest dla terminala jedynym źródłem świec i strumienia").
  *
- * `market-data`'s wire shapes (snake_case, per its OpenAPI schema) are private
- * to this file. Nothing outside it ever sees one.
+ * `market-data`'s wire shapes (snake_case, per its OpenAPI schema) are private to this
+ * file. Nothing outside it ever sees one.
  */
 
 /**
  * The wire shapes, taken from market-data's own OpenAPI document rather than described
- * again here. They used to be thirteen hand-written interfaces, which is thirteen chances
- * to disagree with the server and no way to find out: a renamed field would have arrived
- * as `undefined`, passed through a mapper, and shown up as a blank cell rather than an
- * error. Now a rename stops this file compiling, on the line that reads the field.
+ * again here — thirteen hand-written interfaces were thirteen chances to disagree with
+ * the server silently, a renamed field arriving as `undefined` and showing up as a blank
+ * cell. Now a rename stops this file compiling, on the line that reads the field.
  *
  * Regenerate with `pnpm contract:generate` after changing a model in `contract.py`;
  * `pnpm contract:check` fails when the committed file is stale.
@@ -304,18 +300,11 @@ export function createArchiveSource(
   /**
    * Why a subscription that would not open is going to stay shut.
    *
-   * The archive refuses a pair nobody chose to collect *before* the handshake,
-   * which is the right call — it never hands back a socket that dies a moment
-   * later — but it means the refusal is an HTTP status the browser will not
-   * show us. What reaches the page is a connection that failed, the same shape
-   * as an archive that is down, and the two deserve opposite responses: one is
-   * worth retrying, the other is worth telling the operator about.
-   *
-   * So the question gets asked a second way. `/pairs` is the same list the
-   * Archive tab reads, and a pair missing from it is a settled answer: nothing
-   * is collecting this, and nothing will until somebody decides otherwise. Any
-   * other outcome — the pair is listed, or `/pairs` cannot be reached either —
-   * returns `null`, and the hub goes on retrying.
+   * The archive refuses an uncollected pair before the handshake, so the refusal is an
+   * HTTP status the browser will not show — what reaches the page looks exactly like an
+   * archive that is down, and the two deserve opposite responses. So the question is
+   * asked a second way: a pair missing from `/pairs` is a settled answer. Anything else,
+   * including `/pairs` being unreachable, returns `null` and the hub goes on retrying.
    */
   async function whyRefused(symbol: string, resolution: Resolution): Promise<string | null> {
     // The question gets a deadline. An archive that accepts the request and
@@ -332,19 +321,15 @@ export function createArchiveSource(
   }
 
   /**
-   * Where one pair's stream lives — which is not a constant, because opening it
-   * costs a ticket.
+   * Where one pair's stream lives — not a constant, because opening it costs a ticket.
    *
-   * A browser cannot put a header on a WebSocket handshake, so the operator's
-   * token has no way to reach it. The archive's answer is a **one-time ticket**:
-   * asked for here, over HTTP, where the token travels in a header the ordinary
-   * way, and spent on the handshake, where it cannot. The token itself never
-   * goes near the address — addresses end up in server logs, and a token is good
-   * for the better part of an hour after one is written.
+   * A browser cannot put a header on a WebSocket handshake, so the token cannot reach
+   * it. The archive's answer is a one-time ticket, asked for here over HTTP where the
+   * header works normally. The token itself never goes near the address: addresses end
+   * up in server logs, and a token stays good for the better part of an hour.
    *
-   * One ticket per attempt, and no caching. A spent ticket is refused, so a
-   * reconnect that reused the last one would fail every time and look exactly
-   * like an archive that had gone away.
+   * One ticket per attempt, never cached — a spent ticket is refused, and a reconnect
+   * reusing the last one would fail every time and look like an archive that had gone.
    */
   async function streamUrl(symbol: string, resolution: Resolution): Promise<string> {
     // No caller-supplied signal: this runs inside the hub's reconnect loop,
