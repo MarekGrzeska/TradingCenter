@@ -213,6 +213,48 @@ az webapp restart --name app-tradingcenter-market-data --resource-group rg-tradi
 
 <p>Potem to samo w <code>modules/capital-gateway/.env</code> i <code>modules/market-data/.env</code> — obie strony muszą trzymać identyczną wartość.</p>
 
+<h2>Rzecz pokrewna: migracje bazy produkcyjnej</h2>
+
+<p>Nie jest to rotacja, ale mieszka w tej samej szufladzie „rzeczy, które robi się rzadko i za każdym razem od zera". Baza <code>market_data</code> należy do tożsamości zarządzanej <code>market-data</code>, a jej tokenu <strong>nie da się zdobyć spoza App Service</strong> — istnieje wyłącznie w procesie kontenera. Z laptopa dostanie się tam tylko twoje konto administratora.</p>
+
+<p>Gdyby migracje puścić po prostu jako administrator, właścicielem tabel zostałbyś ty, a aplikacja potrzebowałaby osobnych <code>GRANT</code>-ów przy każdej nowej tabeli. Na <code>market_data_dev</code> tak nie jest — tam właścicielem jest ta sama rola, która bazy używa. Poniższe trzy kroki utrzymują tę samą własność na produkcji.</p>
+
+<h3>1. Niech twoja sesja działa jako rola aplikacji</h3>
+
+<p>Jednorazowe <code>GRANT</code> członkostwa, a potem ustawienie zawężone do <em>tej jednej bazy</em> — sesje przeciw <code>market_data_dev</code> zostają nietknięte:</p>
+
+<pre><code>GRANT "app-tradingcenter-market-data" TO "&lt;twój UPN&gt;";
+ALTER ROLE "&lt;twój UPN&gt;" IN DATABASE market_data
+  SET role = "app-tradingcenter-market-data";</code></pre>
+
+<h3>2. Puść migracje</h3>
+
+<p><code>DefaultAzureCredential</code> czyta <code>AZURE_*</code> wprost ze zmiennych procesu, więc lokalny <code>.env</code> z poświadczeniami dewelopera musi zniknąć z pola widzenia — inaczej alembic uwierzytelni się jako Service Principal deweloperski, który do <code>market_data</code> nie ma <code>CONNECT</code>. Puste stringi nie wystarczą: biblioteka wywraca się na nich osobno.</p>
+
+<pre><code>cd modules/market-data
+mv .env .env.tmp-hidden
+
+env -u AZURE_CLIENT_ID -u AZURE_CLIENT_SECRET -u AZURE_TENANT_ID \
+  DATABASE_URL="postgresql://psql-tradingcenter.postgres.database.azure.com:5432/market_data?sslmode=require" \
+  DATABASE_USER="&lt;twój UPN&gt;" \
+  GATEWAY_API_KEY="not-used-by-migrations" \
+  uv run alembic upgrade head
+
+mv .env.tmp-hidden .env</code></pre>
+
+<h3>3. Cofnij ustawienie i sprawdź własność</h3>
+
+<pre><code>SET ROLE NONE;   -- nie RESET ROLE: ten wraca do wartości domyślnej,
+                 -- czyli dokładnie do tego, co próbujesz cofnąć
+ALTER ROLE "&lt;twój UPN&gt;" IN DATABASE market_data RESET role;
+
+select tablename, tableowner from pg_tables where schemaname = 'public';</code></pre>
+
+<div class="callout warn">
+  <span class="tag">Objaw, gdy o tym zapomnisz</span>
+  <p>Wdrożenie w GitHub Actions jest zielone, obraz się pobiera, kontener startuje — i wychodzi z kodem 3 po kilkudziesięciu sekundach. W logu startowym: <code>asyncpg.exceptions.UndefinedTableError: relation "…" does not exist</code>. Tożsamość zarządzana połączyła się z bazą poprawnie; po prostu nie ma tam jeszcze tabel.</p>
+</div>
+
 <h2>Rzecz pokrewna: twój adres IP</h2>
 
 <p>Nie jest poświadczeniem, ale psuje się tak samo cicho. Firewall bazy przepuszcza dokładnie jeden adres deweloperski, a dostawca internetu potrafi go zmienić bez uprzedzenia. Objaw: lokalny <code>market-data</code> i DBeaver nagle nie łączą się z bazą, mimo że nic nie zmieniałeś.</p>
