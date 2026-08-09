@@ -38,6 +38,16 @@ vi.mock("./data/marketData", () => ({
     history: async () => [],
     subscribe: () => () => {},
   },
+  // The unconfigured identity, which is what a local run has: the top bar shows
+  // no sign-in state at all, so these tests keep asserting on routing and the
+  // two back ends without a third indicator appearing beside them.
+  identity: {
+    state: () => "unconfigured",
+    subscribe: () => () => {},
+    token: async () => null,
+    refresh: async () => null,
+    signIn: () => {},
+  },
 }));
 
 const { App } = await import("./App");

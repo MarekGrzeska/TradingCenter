@@ -20,7 +20,13 @@ from market_data.db import sqlalchemy_url
 config = context.config
 
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # `disable_existing_loggers=False`, against `fileConfig`'s default. Alembic runs
+    # in-process during tests (the migrated container in `conftest.py`), and the default
+    # switches off every logger that already exists — which is every `market_data.*`
+    # logger, since importing the module created them. The module then runs with its
+    # logging silently dead, so a test asserting on what is and is not logged passes for
+    # the wrong reason and would keep passing if the line it checks were deleted.
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # No metadata to compare against, and none wanted: the tables are handwritten SQL and the
 # runtime queries them through asyncpg, so there is no model layer for `--autogenerate` to

@@ -79,6 +79,26 @@ class Settings(BaseSettings):
     # guess to discover by having the feed die.
     max_tracked_pairs: int = 20
 
+    # --- how a browser gets in ---
+    #
+    # A ticket is minted for one handshake and dies on use (`tickets.py`). This is the
+    # window between asking for one and spending it: enough for a slow network, short
+    # enough that a ticket sitting in a log is worthless long before anyone reads it.
+    # Single use is the real protection — this is the second line, for the ticket nobody
+    # ever spent.
+    stream_ticket_ttl_seconds: int = 30
+
+    # Whether a platform authenticator stands in front of this module. Where it does,
+    # only a caller it has already identified may be handed a ticket, and a request
+    # arriving without an identity is refused rather than served.
+    #
+    # The module MUST NOT simply assume the layer in front is doing its job: one wrong
+    # line in Terraform would otherwise leave a ticket factory open to the internet —
+    # which is an open stream — and nothing about it would look wrong from here. Set in
+    # Azure (`infra/app-service.tf`); off locally, where nothing stands in front and
+    # there is no identity to have.
+    require_authenticated_principal: bool = False
+
     @field_validator("gateway_base_url", "gateway_stream_url")
     @classmethod
     def _not_the_provider(cls, value: str, info: ValidationInfo) -> str:
@@ -127,7 +147,12 @@ class Settings(BaseSettings):
             )
         return value
 
-    @field_validator("backfill_concurrency", "default_backfill_bars", "max_tracked_pairs")
+    @field_validator(
+        "backfill_concurrency",
+        "default_backfill_bars",
+        "max_tracked_pairs",
+        "stream_ticket_ttl_seconds",
+    )
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:
         if value < 1:

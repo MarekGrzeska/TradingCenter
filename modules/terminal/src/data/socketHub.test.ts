@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SocketHub, type SocketLike } from "./socketHub";
-import type { StreamEvent } from "./types";
+import { MarketDataError, type StreamEvent } from "./types";
 
 class FakeSocket implements SocketLike {
   onopen: (() => void) | null = null;
@@ -37,6 +37,17 @@ class FakeSocket implements SocketLike {
 const translate = (raw: string): StreamEvent[] =>
   raw === "" ? [] : [{ kind: "error", message: raw }];
 
+/**
+ * Lets an attempt reach the point of having a socket.
+ *
+ * The hub asks for an address before it dials — the archive's stream costs a
+ * one-time ticket, so the address is a promise now — and a socket therefore
+ * exists a microtask after `subscribe`, not on the line after it. Every test
+ * that reaches for `sockets[0]` waits here first. Anything that assumes
+ * otherwise is asserting on a race.
+ */
+const settle = () => vi.advanceTimersByTimeAsync(0);
+
 describe("SocketHub", () => {
   let sockets: FakeSocket[];
   let hub: SocketHub;
@@ -45,7 +56,7 @@ describe("SocketHub", () => {
     vi.useFakeTimers();
     sockets = [];
     hub = new SocketHub(
-      (symbol, resolution) => `ws://localhost/ws/candles?symbol=${symbol}&resolution=${resolution}`,
+      async (symbol, resolution) => `ws://localhost/ws/candles?symbol=${symbol}&resolution=${resolution}`,
       translate,
       (url) => {
         const socket = new FakeSocket(url);
@@ -60,33 +71,37 @@ describe("SocketHub", () => {
     vi.useRealTimers();
   });
 
-  it("opens one socket for the first subscriber, addressed at the pair", () => {
+  it("opens one socket for the first subscriber, addressed at the pair", async () => {
     hub.subscribe("US100", "MINUTE_5", () => {});
+    await settle();
     expect(sockets).toHaveLength(1);
     expect(sockets[0].url).toBe(
       "ws://localhost/ws/candles?symbol=US100&resolution=MINUTE_5",
     );
   });
 
-  it("shares one socket between subscribers to the same pair", () => {
+  it("shares one socket between subscribers to the same pair", async () => {
     hub.subscribe("US100", "MINUTE_5", () => {});
     hub.subscribe("US100", "MINUTE_5", () => {});
+    await settle();
     expect(sockets).toHaveLength(1);
     expect(hub.activeConnectionCount()).toBe(1);
   });
 
-  it("opens a separate socket per distinct pair", () => {
+  it("opens a separate socket per distinct pair", async () => {
     hub.subscribe("US100", "MINUTE_5", () => {});
     hub.subscribe("US100", "MINUTE_15", () => {});
     hub.subscribe("GOLD", "MINUTE_5", () => {});
+    await settle();
     expect(sockets).toHaveLength(3);
     expect(hub.activeConnectionCount()).toBe(3);
   });
 
-  it("fans every translated event out to every sink sharing the pair", () => {
+  it("fans every translated event out to every sink sharing the pair", async () => {
     const events: StreamEvent[][] = [[], []];
     hub.subscribe("US100", "MINUTE_5", (e) => events[0].push(e));
     hub.subscribe("US100", "MINUTE_5", (e) => events[1].push(e));
+    await settle();
     sockets[0].open();
     sockets[0].message("a frame");
 
@@ -95,18 +110,20 @@ describe("SocketHub", () => {
     }
   });
 
-  it("drops a frame the translation makes nothing of, instead of passing it on", () => {
+  it("drops a frame the translation makes nothing of, instead of passing it on", async () => {
     const events: StreamEvent[] = [];
     hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
     sockets[0].open();
     const before = events.length;
     sockets[0].message("");
     expect(events).toHaveLength(before);
   });
 
-  it("closes the socket only once the last subscriber leaves", () => {
+  it("closes the socket only once the last subscriber leaves", async () => {
     const unsubA = hub.subscribe("US100", "MINUTE_5", () => {});
     const unsubB = hub.subscribe("US100", "MINUTE_5", () => {});
+    await settle();
     unsubA();
     expect(sockets[0].closed).toBe(false);
     expect(hub.activeConnectionCount()).toBe(1);
@@ -115,25 +132,28 @@ describe("SocketHub", () => {
     expect(hub.activeConnectionCount()).toBe(0);
   });
 
-  it("delivers the current status immediately to a newly joining sink", () => {
+  it("delivers the current status immediately to a newly joining sink", async () => {
     hub.subscribe("US100", "MINUTE_5", () => {});
+    await settle();
     sockets[0].open();
 
     const events: StreamEvent[] = [];
     hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
     expect(events).toEqual([{ kind: "status", state: "connected" }]);
   });
 
-  it("reconnects on an unexpected drop with growing backoff, and reopens the socket", () => {
+  it("reconnects on an unexpected drop with growing backoff, and reopens the socket", async () => {
     const events: StreamEvent[] = [];
     hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
     sockets[0].open();
     sockets[0].drop(1006, "connection reset");
 
     expect(events.at(-1)).toEqual({ kind: "status", state: "reconnecting" });
     expect(sockets).toHaveLength(1); // not yet reconnected — waiting out the backoff
 
-    vi.advanceTimersByTime(500 * 0.8 + 500 * 0.4 * 0.5); // attempt 0: 2^0*500 * (0.8+0.2)
+    await vi.advanceTimersByTimeAsync(500 * 0.8 + 500 * 0.4 * 0.5); // attempt 0: 2^0*500 * (0.8+0.2)
     expect(sockets).toHaveLength(2);
   });
 
@@ -142,12 +162,13 @@ describe("SocketHub", () => {
   // reconnecting delivers the missed bars by itself — the hub reopens the
   // socket and does nothing else (terminal-market-data spec, "Połączenie
   // wraca": the terminal MUST NOT ask for the gap separately).
-  it("asks for nothing after a reconnect beyond reopening the socket", () => {
+  it("asks for nothing after a reconnect beyond reopening the socket", async () => {
     const events: StreamEvent[] = [];
     hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
     sockets[0].open();
     sockets[0].drop();
-    vi.advanceTimersByTime(1000);
+    await vi.advanceTimersByTimeAsync(1000);
     sockets[1].open();
 
     expect(sockets).toHaveLength(2);
@@ -158,9 +179,10 @@ describe("SocketHub", () => {
     expect(events.at(-1)).toEqual({ kind: "error", message: "the snapshot" });
   });
 
-  it("treats a refusal close (1008) as terminal, not transient", () => {
+  it("treats a refusal close (1008) as terminal, not transient", async () => {
     const events: StreamEvent[] = [];
     hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
     sockets[0].drop(1008, "US100 MINUTE_5 is not being collected");
 
     expect(events).toContainEqual({
@@ -169,17 +191,18 @@ describe("SocketHub", () => {
     });
     expect(events.at(-1)).toEqual({ kind: "status", state: "closed" });
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(sockets).toHaveLength(1); // no reconnect attempted
   });
 
-  it("stops reconnecting once every subscriber has left before the timer fires", () => {
+  it("stops reconnecting once every subscriber has left before the timer fires", async () => {
     const unsub = hub.subscribe("US100", "MINUTE_5", () => {});
+    await settle();
     sockets[0].open();
     sockets[0].drop();
     unsub();
 
-    vi.advanceTimersByTime(60_000);
+    await vi.advanceTimersByTimeAsync(60_000);
     expect(sockets).toHaveLength(1); // the dangling reconnect never re-opened a socket
   });
 });
@@ -199,7 +222,7 @@ describe("SocketHub asking why a socket would not open", () => {
 
   function hubThatDiagnoses(answer: () => Promise<string | null>): SocketHub {
     return new SocketHub(
-      (symbol, resolution) => `ws://localhost/ws?symbol=${symbol}&resolution=${resolution}`,
+      async (symbol, resolution) => `ws://localhost/ws?symbol=${symbol}&resolution=${resolution}`,
       translate,
       (url) => {
         const socket = new FakeSocket(url);
@@ -228,6 +251,7 @@ describe("SocketHub asking why a socket would not open", () => {
     const hub = hubThatDiagnoses(async () => "US100 MINUTE_5 is not being archived");
     const events: StreamEvent[] = [];
     hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
 
     sockets[0].drop();
     await vi.advanceTimersByTimeAsync(0);
@@ -246,6 +270,7 @@ describe("SocketHub asking why a socket would not open", () => {
   it("goes on retrying when there is no reason to stop", async () => {
     const hub = hubThatDiagnoses(async () => null);
     hub.subscribe("US100", "MINUTE_5", () => {});
+    await settle();
 
     sockets[0].drop();
     await vi.advanceTimersByTimeAsync(1000);
@@ -260,6 +285,7 @@ describe("SocketHub asking why a socket would not open", () => {
       throw new Error("the candle archive is not reachable");
     });
     hub.subscribe("US100", "MINUTE_5", () => {});
+    await settle();
 
     sockets[0].drop();
     await vi.advanceTimersByTimeAsync(1000);
@@ -270,6 +296,7 @@ describe("SocketHub asking why a socket would not open", () => {
   it("asks once per run of failures, not once per attempt", async () => {
     const hub = hubThatDiagnoses(async () => null);
     hub.subscribe("US100", "MINUTE_5", () => {});
+    await settle();
 
     for (let i = 0; i < 4; i++) {
       sockets.at(-1)!.drop();
@@ -283,6 +310,7 @@ describe("SocketHub asking why a socket would not open", () => {
   it("asks again after a connection that worked, since the answer can have changed", async () => {
     const hub = hubThatDiagnoses(async () => null);
     hub.subscribe("US100", "MINUTE_5", () => {});
+    await settle();
 
     sockets[0].drop();
     await vi.advanceTimersByTimeAsync(1000);
@@ -300,6 +328,7 @@ describe("SocketHub asking why a socket would not open", () => {
     const hub = hubThatDiagnoses(() => new Promise((resolve) => (release = resolve)));
     const events: StreamEvent[] = [];
     const unsub = hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
 
     sockets[0].drop();
     unsub(); // the slot is closed while the question is still in flight
@@ -311,5 +340,112 @@ describe("SocketHub asking why a socket would not open", () => {
     );
     await vi.advanceTimersByTimeAsync(60_000);
     expect(sockets).toHaveLength(1);
+  });
+});
+
+/**
+ * The third way an attempt can fail.
+ *
+ * Two were already here: the connection dropped (retry) and the pair is not
+ * collected (stop, and say so). Getting an address now costs a request, so a
+ * signed-out operator is a third — and it is the one the old rules would have
+ * got wrong, because "the question failed, so keep retrying" is exactly what an
+ * expired session looks like from the outside. It would have retried forever
+ * while never saying the one thing that fixes it
+ * (terminal-market-data spec, "Zerwane połączenie wraca samo i mówi o sobie").
+ */
+describe("SocketHub when the operator is signed out", () => {
+  const signedOut = () => new MarketDataError("unauthenticated", "you are signed out — sign in");
+
+  let sockets: FakeSocket[];
+
+  function hubThatCannotAddress(fail: () => Error, diagnose?: () => Promise<string | null>) {
+    return new SocketHub(
+      async () => {
+        throw fail();
+      },
+      translate,
+      (url) => {
+        const socket = new FakeSocket(url);
+        sockets.push(socket);
+        return socket;
+      },
+      () => 0.5,
+      diagnose ? () => diagnose() : null,
+    );
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    sockets = [];
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("stops trying and says to sign in, rather than reporting a dead source", async () => {
+    const events: StreamEvent[] = [];
+    const hub = hubThatCannotAddress(signedOut);
+
+    hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
+
+    expect(events).toContainEqual({
+      kind: "error",
+      message: "you are signed out — sign in",
+    });
+    expect(events.at(-1)).toEqual({ kind: "status", state: "closed" });
+
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(sockets).toHaveLength(0); // never dialled, and never will
+  });
+
+  it("keeps retrying when the address could not be got for any other reason", async () => {
+    // The archive being briefly unreachable is not a signed-out session, and
+    // treating it as one would send the operator through a sign-in that fixes
+    // nothing — and that they may not be able to complete while it is down.
+    const hub = hubThatCannotAddress(() => new Error("the candle archive is not reachable"));
+    const events: StreamEvent[] = [];
+
+    hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
+
+    expect(events.at(-1)).toEqual({ kind: "status", state: "connecting" });
+    expect(events).not.toContainEqual(expect.objectContaining({ kind: "error" }));
+  });
+
+  it("stops when the diagnosis is itself refused for want of an identity", async () => {
+    // The handshake failed and the second question — "is this pair even
+    // collected?" — is refused too, because the session is gone. Under the old
+    // rule a failed diagnosis meant "keep retrying"; here it means the opposite,
+    // and the difference is the whole point of this case.
+    const events: StreamEvent[] = [];
+    let address = 0;
+    const hub = new SocketHub(
+      async (symbol, resolution) => {
+        address += 1;
+        return `ws://localhost/ws?symbol=${symbol}&resolution=${resolution}`;
+      },
+      translate,
+      (url) => {
+        const socket = new FakeSocket(url);
+        sockets.push(socket);
+        return socket;
+      },
+      () => 0.5,
+      async () => {
+        throw signedOut();
+      },
+    );
+
+    hub.subscribe("US100", "MINUTE_5", (e) => events.push(e));
+    await settle();
+    sockets[0].drop();
+    await settle();
+
+    expect(events.at(-1)).toEqual({ kind: "status", state: "closed" });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(address).toBe(1); // no second attempt, so no second ticket asked for
   });
 });

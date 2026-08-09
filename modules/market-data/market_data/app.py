@@ -19,6 +19,7 @@ import asyncio
 import contextlib
 import logging
 from contextlib import asynccontextmanager
+from datetime import timedelta
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -36,6 +37,7 @@ from .market_status import MarketStatus
 from .models import Candle
 from .openapi import add_stream_messages, require_response_fields
 from .routers import candles, instruments, jobs, meta, pairs, stream
+from .tickets import TicketStore
 from .tracking import LimitReached, TrackingRefused
 
 log = logging.getLogger(__name__)
@@ -106,6 +108,10 @@ async def lifespan(app: FastAPI):
         app.state.settings = settings
         app.state.pool = pool
         app.state.hub = hub
+        # Lives as long as the process and no longer. A restart voids the tickets in
+        # flight, which costs at most one failed handshake — the consumer's answer to
+        # that is the same as to any other refusal: ask for another and try again.
+        app.state.tickets = TicketStore(timedelta(seconds=settings.stream_ticket_ttl_seconds))
         app.state.history = history
         app.state.instruments = GatewayInstruments(settings.gateway_base_url, client)
         app.state.ingest = ingest
@@ -154,6 +160,19 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+# No CORS middleware here, and adding one would break the browser rather than help it.
+#
+# The terminal calls this module across origins, so every request carrying an
+# `Authorization` header is preceded by an `OPTIONS` preflight — which by definition
+# carries no credential of any kind. Easy Auth, set to `Return401`, would answer that
+# preflight with a 401 before the application ever saw it, so CORS has to be answered by
+# something standing in front of Easy Auth: App Service's own, configured in
+# `infra/app-service.tf`. Two layers both appending `Access-Control-Allow-Origin` produce
+# a doubled header, and a browser rejects a response carrying two.
+#
+# Locally the question does not arise: Vite proxies this module under the page's own
+# origin, so nothing is cross-origin to begin with.
 
 # The subscription's message shapes, hung on the document FastAPI builds from the routes.
 # Wrapping rather than replacing keeps FastAPI's own construction untouched, and mutating

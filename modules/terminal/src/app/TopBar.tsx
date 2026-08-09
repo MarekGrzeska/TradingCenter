@@ -1,5 +1,7 @@
+import { identity } from "../data/marketData";
 import { marketData } from "../data/marketData";
 import type { SourcePart } from "../data/source";
+import { useIdentityState } from "./useIdentityState";
 import { useSourceHealth, type SourceHealth } from "./useSourceHealth";
 
 const HEALTH_LABEL: Record<SourceHealth, string> = {
@@ -16,6 +18,7 @@ const HEALTH_DOT: Record<SourceHealth, string> = {
 
 export function TopBar() {
   const health = useSourceHealth(marketData.parts);
+  const signedIn = useIdentityState(identity);
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-4 border-b border-border bg-panel px-4">
@@ -26,11 +29,42 @@ export function TopBar() {
           candles anywhere, while no gateway means the instrument search stops
           and the charts carry on. An operator has to be able to tell which. */}
       <div className="ml-auto flex items-center gap-4 text-sm text-ink-muted">
+        {/* Sign-in sits beside them and not among them, because it is not a
+            back end — and it is the first thing to read when nothing is
+            arriving. An expired session and an archive that is down empty the
+            same screen; only one of them is fixed from here. Absent entirely
+            when no identity is configured: there is nothing to be signed out
+            of, and an indicator saying so would be noise on every dev run. */}
+        {signedIn !== "unconfigured" && <SignInState signedIn={signedIn === "signed-in"} />}
         {marketData.parts.map((part) => (
           <PartHealth key={part.id} part={part} health={health[part.id] ?? "checking"} />
         ))}
       </div>
     </header>
+  );
+}
+
+function SignInState({ signedIn }: { signedIn: boolean }) {
+  if (signedIn) {
+    return (
+      <span className="flex items-center gap-2">
+        <span className="h-2 w-2 rounded-full bg-up" aria-hidden />
+        <span>signed in</span>
+      </span>
+    );
+  }
+  return (
+    <span className="flex items-center gap-2">
+      <span className="h-2 w-2 rounded-full bg-down" aria-hidden />
+      <span className="text-down">signed out</span>
+      <button
+        type="button"
+        onClick={() => identity.signIn()}
+        className="rounded border border-border px-2 py-0.5 text-ink hover:bg-panel-strong"
+      >
+        Sign in
+      </button>
+    </span>
   );
 }
 

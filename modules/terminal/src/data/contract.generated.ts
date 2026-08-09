@@ -272,6 +272,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/stream-tickets": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * A one-time ticket for opening the candle stream
+         * @description A browser cannot put a header on a WebSocket handshake, so a consumer running in one proves who it is here — where headers work — and spends the answer there. The ticket is good for one handshake and for a few seconds; asking again is the only way to get another, including after a dropped connection.
+         */
+        post: operations["issue_stream_ticket_stream_tickets_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -711,9 +731,10 @@ export interface components {
          * Problem
          * @description A refusal that names itself.
          *
-         *     Never a database error and never a credential — there is no credential on this path to
-         *     leak, and a raw `asyncpg` message tells a consumer nothing it can act on while telling
-         *     anyone reading the logs more about the schema than they need.
+         *     Never a database error and never a credential — a raw `asyncpg` message tells a
+         *     consumer nothing it can act on while telling anyone reading the logs more about the
+         *     schema than they need, and the caller's own token or stream ticket is never
+         *     something a refusal has any reason to quote back.
          */
         Problem: {
             /** Detail */
@@ -753,6 +774,26 @@ export interface components {
             resolution: components["schemas"]["Resolution"];
             /** Symbol */
             symbol: string;
+        };
+        /**
+         * StreamTicketOut
+         * @description Permission to open the stream once, and how long it stays good for.
+         *
+         *     The lifetime is answered rather than assumed so a consumer can tell a ticket it sat
+         *     on too long from one the archive never issued — the handshake itself cannot say,
+         *     since it refuses both the same way on purpose.
+         */
+        StreamTicketOut: {
+            /**
+             * Expires In Seconds
+             * @description How long from now the ticket stays valid if it goes unused.
+             */
+            expires_in_seconds: number;
+            /**
+             * Ticket
+             * @description Spend it on the next handshake. It works exactly once.
+             */
+            ticket: string;
         };
         /**
          * TrackPairRequest
@@ -1355,6 +1396,35 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_stream_ticket_stream_tickets_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StreamTicketOut"];
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                 };
             };
         };

@@ -87,6 +87,29 @@ The chart's canvas is not assertable, so chart and grid tests stub the charting 
 and assert what the component *asks it to draw*. What that cannot cover was checked by
 driving a real browser against the real back ends — see Findings.
 
+## Signing in
+
+Deployed, the terminal and `market-data` sit on two different hostnames, so the cookie
+Easy Auth would rather use never leaves the browser. The terminal holds an **Entra token**
+instead (`src/auth/`), and the shared HTTP client attaches it to every request — no
+adapter and no route mentions it, which is what stops a route added later from quietly
+going out bare.
+
+The candle stream cannot carry a header at all: the browser's WebSocket API has nowhere to
+put one. So before every handshake — including every retry after a drop — the terminal asks
+the archive for a **one-time ticket** and puts that in the address. The token never goes
+near a URL; a ticket that leaks out of a log has already been spent.
+
+Three states, not two. `unconfigured` is what a local run has: no `VITE_ENTRA_*`, no
+credential attached, nobody asked to sign in, and no sign-in indicator in the top bar.
+Being signed *out* is a different thing, shown as itself and fixed from the top bar — an
+expired session and an unreachable archive empty the same screen, and only one of them is
+fixed from here.
+
+**If sign-in fails with an account you expect to work**, check which account. A guest
+(B2B) account signs in under a different UPN than its own address — the same trap
+documented for DBeaver in `docs/dbeaver-azure-connection.html`.
+
 ## Contract
 
 This module consumes; it publishes nothing.

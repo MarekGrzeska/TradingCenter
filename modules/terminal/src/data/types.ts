@@ -93,6 +93,13 @@ export type MarketDataErrorKind =
   /** The archive answered, but on behalf of something behind it that did not.
    *  Retrying is worth doing; nothing about the request is wrong. */
   | "upstream"
+  /** Not you, rather than not that. Nothing about the request was wrong and
+   *  retrying it unchanged cannot help — the operator has to sign in. Kept
+   *  apart from `unreachable` for exactly that reason: one is a source that is
+   *  down and the other is a source that is fine and does not know who is
+   *  asking, and showing the second as the first sends somebody looking at
+   *  Azure for a problem that a sign-in would fix. */
+  | "unauthenticated"
   | "unreachable"
   | "unknown";
 

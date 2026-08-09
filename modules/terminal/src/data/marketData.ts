@@ -1,5 +1,7 @@
+import { createEntraIdentity } from "../auth/entra";
+import { noIdentity, type Identity } from "../auth/identity";
 import { createArchiveSource } from "./archive";
-import { resolveEndpoints } from "./config";
+import { resolveEndpoints, resolveEntra } from "./config";
 import { createGatewaySource } from "./gatewaySource";
 import type { ArchiveAdmin, MarketDataSource } from "./source";
 
@@ -28,8 +30,22 @@ import type { ArchiveAdmin, MarketDataSource } from "./source";
  */
 const { archiveHttp, archiveWs } = resolveEndpoints();
 
-const archiveSource = createArchiveSource(archiveHttp, archiveWs);
-const gateway = createGatewaySource(archiveHttp);
+/**
+ * The operator's identity, or the absence of one.
+ *
+ * Decided here, once, for the same reason the two back ends are composed here:
+ * it is a wiring decision, and every view that consumed it directly would be a
+ * view that had to know about Entra. `null` configuration is a working mode —
+ * local development, where the archive has nothing in front of it — and it
+ * produces an identity that answers "no credential" rather than one that fails.
+ */
+export const identity: Identity = (() => {
+  const config = resolveEntra();
+  return config === null ? noIdentity : createEntraIdentity(config);
+})();
+
+const archiveSource = createArchiveSource(archiveHttp, archiveWs, identity);
+const gateway = createGatewaySource(archiveHttp, identity);
 
 export const marketData: MarketDataSource = {
   // Ordered the way the shell reads them out, candles first: the archive is the

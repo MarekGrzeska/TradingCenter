@@ -1,3 +1,4 @@
+import { noIdentity, type Identity } from "../auth/identity";
 import type { components } from "./contract.generated";
 import { jsonClient } from "./http";
 import { SocketHub } from "./socketHub";
@@ -69,6 +70,7 @@ type RawJobEstimate = Wire["JobEstimateOut"];
 // refer to it, and that relationship now lives in the generated types.
 type RawTrackPairsResult = Wire["TrackPairsResult"];
 type RawPairDeletion = Wire["PairDeletionOut"];
+type RawStreamTicket = Wire["StreamTicketOut"];
 
 /** A candle missing any OHLC field (the provider reports this for a period with
  *  no trade) can't become a `Bar` — `Bar`'s fields are non-nullable by design,
@@ -260,6 +262,11 @@ export type ArchiveSource = CandleSource & ArchiveAdmin;
  *  it and the fallback — keep retrying — is the safe one. */
 const DIAGNOSIS_TIMEOUT_MS = 5_000;
 
+/** How long asking for a stream ticket may take before the attempt counts as
+ *  failed. Shorter than the diagnosis above: nothing is on screen waiting for
+ *  it yet, and the socket it precedes cannot open until it answers. */
+const TICKET_TIMEOUT_MS = 5_000;
+
 /**
  * What the tracked-pair list says about a subscription that would not open, or
  * `null` if it says nothing that should stop the retrying.
@@ -280,8 +287,12 @@ export function readRefusalFromPairs(
   return `${symbol} ${resolution} is not being archived — add it in the Instruments tab to start collecting it.`;
 }
 
-export function createArchiveSource(httpBase: string, wsBase: string): ArchiveSource {
-  const http = jsonClient("the candle archive", mapStatus);
+export function createArchiveSource(
+  httpBase: string,
+  wsBase: string,
+  identity: Identity = noIdentity,
+): ArchiveSource {
+  const http = jsonClient("the candle archive", mapStatus, identity);
 
   async function readPairs(signal: AbortSignal): Promise<TrackedPair[]> {
     const raw = await http.json<RawTrackedPair[]>(`${httpBase}/pairs`, { signal });
@@ -318,14 +329,44 @@ export function createArchiveSource(httpBase: string, wsBase: string): ArchiveSo
     }
   }
 
-  const hub = new SocketHub(
-    (symbol, resolution) =>
-      `${wsBase}/candles?symbol=${encodeURIComponent(symbol)}&resolution=${resolution}`,
-    translateMessage,
-    undefined,
-    undefined,
-    whyRefused,
-  );
+  /**
+   * Where one pair's stream lives — which is not a constant, because opening it
+   * costs a ticket.
+   *
+   * A browser cannot put a header on a WebSocket handshake, so the operator's
+   * token has no way to reach it. The archive's answer is a **one-time ticket**:
+   * asked for here, over HTTP, where the token travels in a header the ordinary
+   * way, and spent on the handshake, where it cannot. The token itself never
+   * goes near the address — addresses end up in server logs, and a token is good
+   * for the better part of an hour after one is written.
+   *
+   * One ticket per attempt, and no caching. A spent ticket is refused, so a
+   * reconnect that reused the last one would fail every time and look exactly
+   * like an archive that had gone away.
+   */
+  async function streamUrl(symbol: string, resolution: Resolution): Promise<string> {
+    // No caller-supplied signal: this runs inside the hub's reconnect loop,
+    // which has no request to attach to. The deadline is its own, and its
+    // failure is a failed attempt like any other — the hub retries it.
+    const abort = new AbortController();
+    const deadline = setTimeout(() => abort.abort(), TICKET_TIMEOUT_MS);
+    let ticket: string;
+    try {
+      const issued = await http.json<RawStreamTicket>(`${httpBase}/stream-tickets`, {
+        method: "POST",
+        signal: abort.signal,
+      });
+      ticket = issued.ticket;
+    } finally {
+      clearTimeout(deadline);
+    }
+    return (
+      `${wsBase}/candles?symbol=${encodeURIComponent(symbol)}` +
+      `&resolution=${resolution}&ticket=${encodeURIComponent(ticket)}`
+    );
+  }
+
+  const hub = new SocketHub(streamUrl, translateMessage, undefined, undefined, whyRefused);
 
   return {
     id: "archive",

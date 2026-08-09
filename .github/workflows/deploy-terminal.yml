@@ -53,13 +53,25 @@ jobs:
       # not a relative prefix. Static Web Apps cannot proxy the candle WebSocket at all,
       # so a reverse proxy in front of market-data was never going to cover the whole
       # picture; this is the mode the client code already supports for exactly that
-      # reason. The browser-side follow-through (CORS, the 401-from-fetch handling noted
-      # in app-service.tf's Easy Auth comment) is still open — flagged there, not solved
-      # here.
+      # reason. What makes cross-origin actually work now lives on both sides: CORS on
+      # App Service and the Entra token below.
+      #
+      # The three VITE_ENTRA_* values are **public** — a client id, a tenant id and a
+      # scope name travel in every authorization request the browser makes and are
+      # visible to anyone with the developer tools open. They go through `vars`, never
+      # `secrets`; this workflow still stores exactly one secret, and it is the Static
+      # Web Apps deployment token flagged above.
+      #
+      # Left unset, the build produces a terminal that attaches no credential — which is
+      # the local mode and would fail against the deployed archive. `terraform output
+      # terminal_entra_client_id` / `_tenant_id` / `_scope` produce the three values.
       - run: pnpm build
         env:
           VITE_ARCHIVE_HTTP: https://app-tradingcenter-market-data.azurewebsites.net
           VITE_ARCHIVE_WS: wss://app-tradingcenter-market-data.azurewebsites.net/ws
+          VITE_ENTRA_CLIENT_ID: ${{ vars.TERMINAL_ENTRA_CLIENT_ID }}
+          VITE_ENTRA_TENANT_ID: ${{ vars.TERMINAL_ENTRA_TENANT_ID }}
+          VITE_ENTRA_SCOPE: ${{ vars.TERMINAL_ENTRA_SCOPE }}
 
       - uses: Azure/static-web-apps-deploy@v1
         with:

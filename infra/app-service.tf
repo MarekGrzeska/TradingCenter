@@ -28,6 +28,18 @@ locals {
   capital_gateway_hostname = "${local.capital_gateway_app_name}.azurewebsites.net"
   market_data_hostname     = "${local.market_data_app_name}.azurewebsites.net"
 
+  # What `market-data` is called when it is the *resource* a token is asked for, rather
+  # than the app serving a request. The terminal asks Entra for `<uri>/<scope>`; Easy
+  # Auth accepts a token whose audience is this.
+  market_data_api_uri   = "api://tradingcenter-market-data"
+  market_data_api_scope = "access_as_user"
+
+  # Where the terminal is served from. One string, used in three places that MUST agree:
+  # the SPA registration's redirect URI, the origin market-data allows a browser to call
+  # it from, and the address the deploy workflow builds against. Read from the resource
+  # rather than typed, because Static Web Apps invents the name.
+  terminal_origin = "https://${azurerm_static_web_app.terminal.default_host_name}"
+
   kv_secret_uri = {
     for k, name in local.key_vault_secret_names :
     k => "${azurerm_key_vault.main.vault_uri}secrets/${name}/"
@@ -119,8 +131,40 @@ resource "azurerm_linux_web_app" "capital_gateway" {
 # market-data: public, but Easy Auth-gated — design.md, "Easy Auth zostaje tam, gdzie po
 # drugiej stronie jest przeglądarka — przed market-data". `terminal` is the browser-side
 # caller (via Static Web Apps, group 7); the gateway never sees a browser at all.
+#
+# This registration is also the **API** half of the pair: `terminal` (entra.tf) is a
+# separate client registration that asks Entra for a token *for this one* and sends it in
+# an `Authorization` header. Two registrations rather than one that plays both parts,
+# because which is the client and which is the resource is the whole content of the
+# arrangement — market-data is an API for however many consumers arrive, and the terminal
+# is the first of them.
 resource "azuread_application" "market_data_easy_auth" {
   display_name = "app-tradingcenter-market-data-easyauth"
+
+  # A static name, not `api://<client-id>`: the client id is computed by this very
+  # resource, and a resource cannot refer to itself.
+  identifier_uris = [local.market_data_api_uri]
+
+  api {
+    # v2 tokens, matching the `/v2.0` tenant endpoint Easy Auth is configured with below.
+    # A v1 token against a v2 endpoint is rejected for its `iss` claim, and the error
+    # says nothing about versions.
+    requested_access_token_version = 2
+
+    # The one scope this API exposes. `User` — consented by the signing-in operator, not
+    # requiring an admin — because that is exactly what it is: the operator reaching
+    # their own archive through their own terminal.
+    oauth2_permission_scope {
+      id                         = random_uuid.market_data_scope.result
+      value                      = local.market_data_api_scope
+      type                       = "User"
+      enabled                    = true
+      admin_consent_display_name = "Read and manage the candle archive"
+      admin_consent_description  = "Allows the app to reach market-data as the signed-in operator."
+      user_consent_display_name  = "Read and manage your candle archive"
+      user_consent_description   = "Allows the app to reach market-data as you."
+    }
+  }
 
   web {
     redirect_uris = ["https://${local.market_data_hostname}/.auth/login/aad/callback"]
@@ -130,6 +174,10 @@ resource "azuread_application" "market_data_easy_auth" {
     }
   }
 }
+
+# Generated once and kept in state. A scope id must be a stable GUID: regenerating it
+# would revoke the terminal's permission and re-grant a different one on every apply.
+resource "random_uuid" "market_data_scope" {}
 
 resource "azuread_service_principal" "market_data_easy_auth" {
   client_id = azuread_application.market_data_easy_auth.client_id
@@ -160,6 +208,27 @@ resource "azurerm_linux_web_app" "market_data" {
     always_on          = true
     websockets_enabled = true
 
+    # CORS belongs **here and not in the application**, and the reason is the preflight.
+    # A cross-origin request carrying an `Authorization` header is preceded by an
+    # `OPTIONS` that by definition carries no credential at all; Easy Auth, set to
+    # `Return401` below, would answer it with a 401 before the container saw it, and no
+    # browser request would ever get through however good its token. App Service's own
+    # CORS stands in front of Easy Auth, which is exactly where the answer has to come
+    # from.
+    #
+    # Consequence to carry forward: **`market_data` MUST NOT add a CORS middleware of its
+    # own.** Two layers each appending `Access-Control-Allow-Origin` produce a doubled
+    # header, and a browser rejects a response carrying two — the same note sits in
+    # `market_data/app.py`.
+    #
+    # `support_credentials` stays off: the terminal sends a bearer token, never a cookie,
+    # and turning it on would forbid the wildcard-free origin list from ever being
+    # widened without thought.
+    cors {
+      allowed_origins     = [local.terminal_origin]
+      support_credentials = false
+    }
+
     application_stack {
       docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
 
@@ -172,19 +241,45 @@ resource "azurerm_linux_web_app" "market_data" {
   # Return401, not RedirectToLoginPage: `terminal` reaches this app through `fetch()`,
   # not top-level browser navigation, and a redirect response handed to `fetch` resolves
   # to an HTML login page masquerading as a JSON body instead of a request `terminal`
-  # can react to. Client-side handling of the 401 (send the user through
-  # /.auth/login/aad) is application work, not infrastructure — flagged here, not
-  # solved here; it isn't one of this group's tasks.
+  # can react to. The terminal handles that 401 itself — it holds an Entra token and
+  # renews it (`src/auth/`), which is what makes the cookie Easy Auth would rather use
+  # unnecessary.
   auth_settings_v2 {
     auth_enabled           = true
     require_authentication = true
     unauthenticated_action = "Return401"
     default_provider       = "azureactivedirectory"
 
+    # The candle stream, and nothing else. A browser cannot put a header on a WebSocket
+    # handshake — the API has no room for one — so Easy Auth would be checking for a
+    # cookie the browser will not send across two hostnames, and would refuse every
+    # subscription forever.
+    #
+    # **Exempt from Easy Auth is not exempt from authentication.** The module guards this
+    # path itself, with a one-time ticket it issues over HTTP where headers do work
+    # (`market_data/tickets.py`). Deploy order follows from that and is not
+    # interchangeable: the module learned to check tickets before this line existed,
+    # because the reverse leaves an open WebSocket on the internet in between.
+    excluded_paths = ["/ws/candles"]
+
     active_directory_v2 {
       client_id                  = azuread_application.market_data_easy_auth.client_id
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      # Two audiences for one API: a token asked for by scope name arrives with the
+      # `api://` uri as its audience, one asked for as `<client-id>/.default` arrives
+      # with the client id. Accepting both means neither spelling of the request is a
+      # silent 401 later.
+      allowed_audiences = [
+        local.market_data_api_uri,
+        azuread_application.market_data_easy_auth.client_id,
+      ]
+
+      # Which clients may present a token at all. Today that is the terminal and nothing
+      # else; a future service reaching this API adds itself here, deliberately, rather
+      # than inheriting access by having a token from the same tenant.
+      allowed_applications = [azuread_application.terminal.client_id]
     }
 
     login {
@@ -207,6 +302,12 @@ resource "azurerm_linux_web_app" "market_data" {
     DATABASE_USER = local.market_data_app_name
 
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.market_data_easy_auth.value
+
+    # Something *is* in front of this app, so the module refuses to hand out stream
+    # tickets to a request Easy Auth did not identify. It does not take that on trust:
+    # were `auth_settings_v2` above switched off by a careless edit, this setting is what
+    # turns an open ticket factory — which is an open stream — into a refusal.
+    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
   }

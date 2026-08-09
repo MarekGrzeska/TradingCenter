@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from datetime import UTC, datetime, timedelta
 
 import httpx
@@ -17,6 +18,7 @@ from market_data.market_status import MarketStatus
 from market_data.models import Candle, CandleSource, Resolution
 from market_data.rollups import refresh_all
 from market_data.store import read_candles, write_candles
+from market_data.tickets import TicketStore
 from market_data.tracking import track
 
 pytestmark = pytest.mark.db
@@ -182,6 +184,7 @@ async def api(pool, migrated_url: str):
     # object now, so a fresh app gets a fresh one and no test inherits another's answer.
     app.state.market_status = MarketStatus()
     app.state.job_runner = FakeJobRunner()
+    app.state.tickets = TicketStore(timedelta(seconds=30))
 
     # `raise_app_exceptions=False` so the app's own error handling is what the test sees.
     # With the default, the transport re-raises whatever the app raised and the 500 the
@@ -1302,12 +1305,21 @@ class FakeWebSocket:
         raise WebSocketDisconnect(1000)
 
 
+def a_ticket() -> str:
+    """A live ticket, from the store the app is actually running with.
+
+    Spelled out at every call site rather than defaulted inside `FakeWebSocket`, because
+    a default would mean no test could tell whether the guard was there at all.
+    """
+    return app.state.tickets.issue("test-principal").value
+
+
 async def test_subscribing_to_a_pair_nobody_collects_is_refused(api, pool) -> None:
     """8.9. Subscribing must not quietly start collecting either — that is the decision
     the ceiling exists to keep deliberate."""
     from market_data.routers.stream import candle_feed
 
-    socket = FakeWebSocket(symbol="US100", resolution="MINUTE")
+    socket = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=a_ticket())
 
     await candle_feed(socket, app.state.hub)
 
@@ -1324,7 +1336,7 @@ async def test_subscribing_to_a_collected_pair_is_accepted(api, pool) -> None:
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
         await write_candles(conn, [candle(0)])
-    socket = FakeWebSocket(symbol="US100", resolution="MINUTE")
+    socket = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=a_ticket())
 
     await candle_feed(socket, app.state.hub)
 
@@ -1343,7 +1355,7 @@ async def test_a_subscription_is_accepted_through_the_router_too(api, pool) -> N
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
         await write_candles(conn, [candle(0)])
 
-    sent = await _handshake("symbol=US100&resolution=MINUTE")
+    sent = await _handshake(f"symbol=US100&resolution=MINUTE&ticket={a_ticket()}")
 
     assert sent[0]["type"] == "websocket.accept"
     assert json.loads(sent[1]["text"])["kind"] == "snapshot"
@@ -1352,7 +1364,7 @@ async def test_a_subscription_is_accepted_through_the_router_too(api, pool) -> N
 async def test_a_subscription_without_a_symbol_is_refused_before_the_handshake(api) -> None:
     from market_data.routers.stream import candle_feed
 
-    socket = FakeWebSocket(resolution="MINUTE")
+    socket = FakeWebSocket(resolution="MINUTE", ticket=a_ticket())
 
     await candle_feed(socket, app.state.hub)
 
@@ -1363,12 +1375,171 @@ async def test_a_subscription_without_a_symbol_is_refused_before_the_handshake(a
 async def test_a_subscription_with_an_unknown_resolution_is_refused(api) -> None:
     from market_data.routers.stream import candle_feed
 
-    socket = FakeWebSocket(symbol="US100", resolution="MINUTE_2")
+    socket = FakeWebSocket(symbol="US100", resolution="MINUTE_2", ticket=a_ticket())
 
     await candle_feed(socket, app.state.hub)
 
     assert socket.accepted is False
     assert "unknown resolution" in socket.closed[1]
+
+
+# --- specs/market-data-browser-access: how a browser gets in -------------------------
+
+
+async def test_a_ticket_is_issued_with_the_time_it_stays_good_for(api) -> None:
+    response = await api.post("/stream-tickets")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["ticket"]
+    assert body["expires_in_seconds"] == 30
+
+
+async def test_a_ticket_records_the_principal_the_platform_identified(api) -> None:
+    await api.post("/stream-tickets", headers={"X-MS-CLIENT-PRINCIPAL-ID": "operator-object-id"})
+
+    (ticket,) = app.state.tickets._issued.values()
+    assert ticket.issued_to == "operator-object-id"
+
+
+async def test_a_ticket_is_refused_when_the_platform_identified_nobody(api) -> None:
+    """The module does not take it on trust that the layer in front is doing its job.
+    Configured to stand behind one, a request arriving with no identity means that layer
+    is not there — and the answer is to stop minting keys, not to mint one anyway."""
+    app.state.settings = app.state.settings.model_copy(
+        update={"require_authenticated_principal": True}
+    )
+
+    response = await api.post("/stream-tickets")
+
+    assert response.status_code == 401
+    assert len(app.state.tickets) == 0
+
+
+async def test_a_ticket_is_issued_without_a_principal_when_nothing_stands_in_front(api) -> None:
+    """Local development: nothing is in front, so there is no identity to have — and the
+    handshake still demands a ticket, so it is the same code path either way."""
+    assert app.state.settings.require_authenticated_principal is False
+
+    response = await api.post("/stream-tickets")
+
+    assert response.status_code == 200
+
+
+async def test_the_ticket_route_is_not_under_the_path_exempted_from_easy_auth(api) -> None:
+    """`infra/app-service.tf` exempts `/ws/candles` from Easy Auth because a browser
+    cannot authenticate a handshake. A ticket factory sharing that prefix would be one
+    careless match away from being exempt too — which is an open stream."""
+    schema = (await api.get("/openapi.json")).json()
+
+    assert "/stream-tickets" in schema["paths"]
+    assert not any(path.startswith("/ws") for path in schema["paths"])
+
+
+async def test_a_handshake_without_a_ticket_is_refused(api, pool) -> None:
+    from market_data.routers.stream import candle_feed
+
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+    socket = FakeWebSocket(symbol="US100", resolution="MINUTE")
+
+    await candle_feed(socket, app.state.hub)
+
+    assert socket.accepted is False
+    assert "ticket" in socket.closed[1]
+
+
+async def test_a_handshake_with_a_ticket_the_archive_never_issued_is_refused(api) -> None:
+    from market_data.routers.stream import candle_feed
+
+    socket = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket="not-one-of-ours")
+
+    await candle_feed(socket, app.state.hub)
+
+    assert socket.accepted is False
+    assert "ticket" in socket.closed[1]
+
+
+async def test_a_ticket_works_once_and_the_first_connection_survives_the_second_try(
+    api, pool
+) -> None:
+    from market_data.routers.stream import candle_feed
+
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(0)])
+    ticket = a_ticket()
+
+    first = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=ticket)
+    await candle_feed(first, app.state.hub)
+    second = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=ticket)
+    await candle_feed(second, app.state.hub)
+
+    assert first.accepted is True
+    assert first.closed is None, "the second attempt must not disturb the connection it copies"
+    assert second.accepted is False
+    assert "ticket" in second.closed[1]
+
+
+async def test_a_handshake_with_an_expired_ticket_is_refused(api, pool) -> None:
+    from market_data.routers.stream import candle_feed
+
+    clock = [datetime(2026, 8, 9, 12, 0, tzinfo=UTC)]
+    app.state.tickets = TicketStore(timedelta(seconds=30), now=lambda: clock[0])
+    ticket = app.state.tickets.issue("test-principal").value
+    clock[0] += timedelta(seconds=31)
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+
+    socket = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=ticket)
+    await candle_feed(socket, app.state.hub)
+
+    assert socket.accepted is False
+    assert "ticket" in socket.closed[1]
+
+
+async def test_the_two_reasons_a_handshake_is_refused_are_told_apart(api, pool) -> None:
+    """One is fixed by authenticating again, the other only by collecting the pair. A
+    consumer that cannot tell them apart retries the wrong one forever."""
+    from market_data.routers.stream import candle_feed
+
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+
+    no_ticket = FakeWebSocket(symbol="US100", resolution="MINUTE")
+    await candle_feed(no_ticket, app.state.hub)
+    untracked = FakeWebSocket(symbol="EURUSD", resolution="MINUTE", ticket=a_ticket())
+    await candle_feed(untracked, app.state.hub)
+
+    assert no_ticket.closed[1] != untracked.closed[1]
+    assert "ticket" in no_ticket.closed[1]
+    assert "not being collected" in untracked.closed[1]
+
+
+async def test_no_ticket_value_reaches_the_logs(api, pool, caplog) -> None:
+    from market_data.routers.stream import candle_feed
+
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(0)])
+
+    with caplog.at_level(logging.INFO, logger="market_data.routers.stream"):
+        issued = (
+            await api.post(
+                "/stream-tickets", headers={"X-MS-CLIENT-PRINCIPAL-ID": "operator-object-id"}
+            )
+        ).json()["ticket"]
+        accepted = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=issued)
+        await candle_feed(accepted, app.state.hub)
+        refused = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=issued)
+        await candle_feed(refused, app.state.hub)
+
+    assert accepted.accepted is True
+    assert refused.accepted is False
+    assert issued not in caplog.text
+    # The fact is worth having; the value never is.
+    assert "stream ticket issued to operator-object-id" in caplog.text
+    assert "no valid ticket" in caplog.text
 
 
 def _at(stamp: str) -> datetime:

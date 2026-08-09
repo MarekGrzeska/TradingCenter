@@ -1,3 +1,4 @@
+import { noIdentity, SignedOut, SIGNED_OUT_MESSAGE, type Identity } from "../auth/identity";
 import { MarketDataError } from "./types";
 
 /**
@@ -38,18 +39,36 @@ async function parseErrorDetail(response: Response): Promise<string> {
   return response.statusText || `HTTP ${response.status}`;
 }
 
-/** An HTTP client for one back end: `label` names it in the one message it has
- *  to compose itself, and `mapStatus` decides what its refusals mean. */
-export function jsonClient(label: string, mapStatus: StatusMapper) {
-  async function send(url: string, request: JsonRequest): Promise<Response> {
-    let response: Response;
+/** The status that means "not you" rather than "not that". Both back ends are
+ *  the same deployment behind the same authenticator, so unlike every other
+ *  status this one means the same thing whichever adapter asked — which is why
+ *  it is handled here and not in a `mapStatus`. */
+const UNAUTHENTICATED = 401;
+
+/**
+ * An HTTP client for one back end: `label` names it in the one message it has
+ * to compose itself, and `mapStatus` decides what its refusals mean.
+ *
+ * `identity` is where the operator's credential comes from, and attaching it is
+ * this function's job rather than each call site's. That is deliberate and
+ * load-bearing: a route added to `archive.ts` or `gatewaySource.ts` later
+ * carries a token because it cannot not carry one, instead of because whoever
+ * wrote it remembered. Neither of those files mentions a token anywhere.
+ *
+ * Left out, it is the identity that has none — the local mode, where requests
+ * go out bare exactly as they always did.
+ */
+export function jsonClient(label: string, mapStatus: StatusMapper, identity: Identity = noIdentity) {
+  async function attempt(url: string, request: JsonRequest, token: string | null) {
     try {
-      response = await fetch(url, {
+      return await fetch(url, {
         method: request.method ?? "GET",
         signal: request.signal,
-        ...(request.body === undefined
-          ? {}
-          : { headers: { "Content-Type": "application/json" }, body: JSON.stringify(request.body) }),
+        headers: {
+          ...(request.body === undefined ? {} : { "Content-Type": "application/json" }),
+          ...(token === null ? {} : { Authorization: `Bearer ${token}` }),
+        },
+        ...(request.body === undefined ? {} : { body: JSON.stringify(request.body) }),
       });
     } catch (cause) {
       // An abort is the caller's own doing and must stay distinguishable from
@@ -58,6 +77,38 @@ export function jsonClient(label: string, mapStatus: StatusMapper) {
         throw cause;
       }
       throw new MarketDataError("unreachable", `${label} is not reachable`);
+    }
+  }
+
+  async function send(url: string, request: JsonRequest): Promise<Response> {
+    let token: string | null;
+    try {
+      token = await identity.token();
+    } catch (cause) {
+      throw asUnauthenticated(cause);
+    }
+
+    let response = await attempt(url, request, token);
+
+    // One retry, and exactly one. A token can expire between being read from
+    // the cache and reaching the archive, and renewing it silently is better
+    // than showing the operator a failure they can do nothing about. Bounding
+    // it at a single attempt is what keeps "refused → renew → refused" from
+    // becoming a loop that hammers both the archive and the token endpoint.
+    if (response.status === UNAUTHENTICATED && token !== null) {
+      try {
+        token = await identity.refresh();
+      } catch (cause) {
+        throw asUnauthenticated(cause);
+      }
+      response = await attempt(url, request, token);
+    }
+
+    if (response.status === UNAUTHENTICATED) {
+      // Survived the renewal, so it is the session and not the token. The
+      // detail from the server is dropped on purpose: it describes an audience
+      // or an issuer, and the operator's move is the same either way.
+      throw new MarketDataError("unauthenticated", SIGNED_OUT_MESSAGE);
     }
     if (!response.ok) {
       throw mapStatus(response.status, await parseErrorDetail(response));
@@ -71,4 +122,15 @@ export function jsonClient(label: string, mapStatus: StatusMapper) {
       return (await send(url, request)).json() as Promise<T>;
     },
   };
+}
+
+/** `SignedOut` from the identity layer, said in the data layer's own vocabulary
+ *  so no caller has to know both. Anything else — the token endpoint being
+ *  briefly unreachable — is not a signed-out session and passes through
+ *  untouched, because retrying is the right answer to it and is not the right
+ *  answer to the other. */
+function asUnauthenticated(cause: unknown): unknown {
+  return cause instanceof SignedOut
+    ? new MarketDataError("unauthenticated", cause.message)
+    : cause;
 }
