@@ -84,3 +84,22 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "developer" {
   start_ip_address = var.developer_ip_address
   end_ip_address   = var.developer_ip_address
 }
+
+# market-data is the only app that talks to the database — capital-gateway never
+# touches it. One rule per address, read straight off market-data's own resource so a
+# future plan-tier change (which reassigns these) is never a manual firewall edit.
+#
+# First-time convergence needs two applies: `possible_outbound_ip_address_list` is not
+# knowable until the web app exists, and a resource-level `for_each` (unlike a `dynamic`
+# block's) refuses to plan against a value that is only "known after apply". Run
+# `terraform apply -target=azurerm_linux_web_app.market_data` once, then the normal
+# unrestricted `terraform apply` — every apply after that converges in one step, because
+# the value is already in state.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "market_data_outbound" {
+  for_each = toset(azurerm_linux_web_app.market_data.possible_outbound_ip_address_list)
+
+  name             = "AllowMarketDataOutbound-${replace(each.value, ".", "-")}"
+  server_id        = azurerm_postgresql_flexible_server.main.id
+  start_ip_address = each.value
+  end_ip_address   = each.value
+}
