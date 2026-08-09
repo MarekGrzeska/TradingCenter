@@ -24,6 +24,12 @@ dependencies = [
     # transitive one left to chance.
     "azure-identity>=1.19",
     "aiohttp>=3.10",
+    # The candle-age metric the most important alert stands on (design.md, group 10) —
+    # auto-configures the OpenTelemetry SDK to export to Application Insights from
+    # APPLICATIONINSIGHTS_CONNECTION_STRING. Unset (every local run), it is a no-op:
+    # metric calls succeed against OpenTelemetry's default no-op provider instead of
+    # failing, which is why telemetry.py never checks for the variable itself.
+    "azure-monitor-opentelemetry>=1.6",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.

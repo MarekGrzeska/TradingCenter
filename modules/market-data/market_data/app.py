@@ -16,12 +16,14 @@ arrive twice.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from . import telemetry
 from .config import Settings
 from .db import pool as make_pool
 from .errors import GatewayError, GatewayUnreachable
@@ -68,6 +70,7 @@ def candle_sink(pool, hub: Hub):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
+    telemetry.configure()
 
     async with (
         make_pool(
@@ -111,6 +114,9 @@ async def lifespan(app: FastAPI):
         # above, so a caller swapping that out is answered by the new one.
         app.state.market_status = MarketStatus()
 
+        candle_age = telemetry.CandleAgeGauge()
+        telemetry.register(candle_age)
+
         # Before anything else touches the job tables: no runner survives a restart, so
         # any chunk left `pending` or `running` from before this start was orphaned, not
         # merely delayed (jobs/store.py, `interrupt_orphaned_chunks`).
@@ -121,9 +127,17 @@ async def lifespan(app: FastAPI):
 
         await ingest.start()
         await job_runner.start()
+        candle_age_task = asyncio.create_task(
+            telemetry.refresh_loop(
+                pool, app.state.instruments, app.state.market_status, candle_age
+            )
+        )
         try:
             yield
         finally:
+            candle_age_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await candle_age_task
             await job_runner.stop()
             await ingest.stop()
 

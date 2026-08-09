@@ -115,13 +115,13 @@ jako ograniczenie dla projektu jednoosobowego, nie ukryte.
 
 ## 10. Monitoring
 
-- [ ] 10.1 Wystaw z `market-data` metrykę wieku najnowszej świecy do Application Insights — bez niej najważniejszy alert nie ma na czym stanąć
-- [ ] 10.2 Alert: wiek najnowszej świecy przekracza próg w godzinach handlu
-- [ ] 10.3 Alert: baza nie odpowiada (`is_db_alive`, `connections_failed`)
-- [ ] 10.4 Alert: `storage_percent > 80%`
-- [ ] 10.5 Alert: `MemoryPercentage > 85%` na planie
-- [ ] 10.6 Alert: `Http5xx` na gatewayu
-- [ ] 10.7 **Bez alertu na CPU** — na `B1` procesor skacze przy każdym uzupełnianiu i reguła kłamałaby; potwierdź, że nie powstał
+- [x] 10.1 Wystaw z `market-data` metrykę wieku najnowszej świecy do Application Insights — bez niej najważniejszy alert nie ma na czym stanąć — `market_data/telemetry.py`: `market_data.candle_age_seconds`, gauge obserwowalny OpenTelemetry, odświeżany co 60s w tle (`refresh_loop`), wyłącznie dla par, których gateway nie zgłasza jako `MARKET_CLOSED`. `azure-monitor-opentelemetry` konfigurowane wyłącznie gdy `APPLICATIONINSIGHTS_CONNECTION_STRING` ustawiony — lokalnie no-op. 7 nowych testów (`test_telemetry.py`), zweryfikowane też na żywo (start modułu przeciw realnej bazie, `/health` 200, czyste zamknięcie pętli)
+- [x] 10.2 Alert: wiek najnowszej świecy przekracza próg w godzinach handlu — `alert-candle-age-stale` na `market_data.candle_age_seconds` > 600s. „W godzinach handlu” zakodowane w samej metryce (10.1 pomija pary z zamkniętym rynkiem), nie w harmonogramie alertu. `skip_metric_validation = true` — moduł jeszcze nie wdrożony (7.4), metryka nigdy nie dotarła do Application Insights, więc walidacja definicji metryki po stronie Azure odrzuciłaby regułę
+- [x] 10.3 Alert: baza nie odpowiada (`is_db_alive`, `connections_failed`) — `alert-database-connections-failed` na wbudowaną metrykę Postgres Flexible Server `connections_failed` > 0. `is_db_alive` potraktowane jako opis zamiaru, nie osobna metryka do zbudowania — nie istnieje jako wbudowana metryka platformy, a `/health` już zwraca stan bazy przez HTTP
+- [x] 10.4 Alert: `storage_percent > 80%` — `alert-database-storage-high`
+- [x] 10.5 Alert: `MemoryPercentage > 85%` na planie — `alert-plan-memory-high`
+- [x] 10.6 Alert: `Http5xx` na gatewayu — `alert-gateway-http-5xx`
+- [x] 10.7 **Bez alertu na CPU** — na `B1` procesor skacze przy każdym uzupełnianiu i reguła kłamałaby; potwierdzone: w `monitoring.tf` nie ma `azurerm_monitor_metric_alert` na CPU, z komentarzem wprost mówiącym, że tak ma zostać. Grupa alertów woła jeden `azurerm_monitor_action_group` (e-mail operatora — nowa zmienna `operator_email`, per-operator jak reszta `terraform.tfvars`, powielona jako `TF_VAR_OPERATOR_EMAIL` w GitHub vars dla CI)
 
 ## 11. Domknięcie
 

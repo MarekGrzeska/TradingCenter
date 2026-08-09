@@ -36,10 +36,11 @@ env:
   ARM_USE_OIDC: true
   # `infra/terraform.tfvars` is gitignored on purpose (variables.tf: per-operator, not
   # per-project — the next person running this root has their own IP and identity). CI
-  # is not a person; it needs the same three values the operator's own tfvars carries,
-  # so they are mirrored here as repository vars. None of the three is a secret — an IP
-  # address and two Entra object ids/UPNs are not credentials.
+  # is not a person; it needs the same four values the operator's own tfvars carries, so
+  # they are mirrored here as repository vars. None of the four is a secret — an IP
+  # address, two Entra object ids/UPNs and a notification address are not credentials.
   TF_VAR_developer_ip_address: ${{ vars.TF_VAR_DEVELOPER_IP_ADDRESS }}
+  TF_VAR_operator_email: ${{ vars.TF_VAR_OPERATOR_EMAIL }}
   TF_VAR_postgres_admin_object_id: ${{ vars.TF_VAR_POSTGRES_ADMIN_OBJECT_ID }}
   TF_VAR_postgres_admin_upn: ${{ vars.TF_VAR_POSTGRES_ADMIN_UPN }}
 

@@ -30,3 +30,8 @@ variable "postgres_admin_upn" {
   description = "Entra user principal name of the human administrator for the Postgres server."
   type        = string
 }
+
+variable "operator_email" {
+  description = "Where the monitoring alerts (infra/monitoring.tf) go — a single-operator project, so a person, not a distribution list."
+  type        = string
+}

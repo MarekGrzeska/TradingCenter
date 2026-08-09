@@ -9,3 +9,6 @@ developer_ip_address = "203.0.113.10"
 # az ad signed-in-user show --query "{id:id, upn:userPrincipalName}"
 postgres_admin_object_id = "00000000-0000-0000-0000-000000000000"
 postgres_admin_upn       = "you@example.com"
+
+# Where the alerts in infra/monitoring.tf go.
+operator_email = "you@example.com"
