@@ -12,7 +12,6 @@ documentation:
 
 from __future__ import annotations
 
-import json  # DELIBERATE BREAK
 from collections.abc import Awaitable, Callable
 from datetime import UTC, datetime, timedelta
 

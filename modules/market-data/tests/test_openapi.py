@@ -97,7 +97,7 @@ def test_augmenting_twice_changes_nothing() -> None:
     once = json.dumps(document(), sort_keys=True)
     twice = json.dumps(document(), sort_keys=True)
 
-    assert once != twice  # DELIBERATE BREAK
+    assert once == twice
 
 
 def test_the_document_prints_with_no_environment_at_all() -> None:
