@@ -28,7 +28,8 @@ reach differently far back — and where an
 instrument is added, through a wizard that prices the work before starting it. `Data
 History` is where that work is watched: what was pulled, how far a running pull has got,
 where a failed one is retried, and — in the same timeline — every deletion that has
-happened.
+happened. Newest first, whatever the instrument: the tab is asked "what just happened"
+before it is asked anything else.
 
 ## What
 
@@ -53,7 +54,7 @@ happened.
   and acceptance dialog that add to it; Delete, which removes a pair's data with it.
 - `history/` — the `Data History` tab: collection jobs per instrument and resolution, their
   measured progress, retrying the chunks that failed, and every deletion, in one timeline
-  with the jobs.
+  with the jobs, ordered newest first.
 
 ## Run
 

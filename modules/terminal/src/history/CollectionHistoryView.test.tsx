@@ -140,6 +140,51 @@ describe("CollectionHistoryView — rows (terminal-collection-history spec)", ()
     ]);
   });
 
+  it("puts the newest event first even when its symbol sorts later", async () => {
+    // GOLD before US100 alphabetically, and after it in time. Time is what wins.
+    fakeArchive.rows = [
+      row({ jobId: 1, symbol: "GOLD", createdAt: 1000 }),
+      row({ jobId: 2, symbol: "US100", createdAt: 2000 }),
+    ];
+    renderView();
+
+    const found = await screen.findAllByTestId(/^history-/);
+    expect(found.map((el) => el.getAttribute("data-testid"))).toEqual([
+      "history-2-US100-MINUTE",
+      "history-1-GOLD-MINUTE",
+    ]);
+  });
+
+  it("orders events of the same moment the same way however they arrive", async () => {
+    // The shape a wizard submission makes: several pairs created together, so every
+    // `createdAt` is identical. The two lists behind this view come from independent
+    // polls, so a stable sort over an unstable input order guarantees nothing — the
+    // tiebreak has to be derived from the data.
+    const together = [
+      row({ jobId: 1, symbol: "US100", resolution: "HOUR", createdAt: 5000 }),
+      row({ jobId: 2, symbol: "GOLD", resolution: "MINUTE", createdAt: 5000 }),
+      row({ jobId: 3, symbol: "US100", resolution: "MINUTE", createdAt: 5000 }),
+    ];
+    const expected = [
+      "history-2-GOLD-MINUTE",
+      "history-3-US100-MINUTE",
+      "history-1-US100-HOUR",
+    ];
+
+    fakeArchive.rows = together;
+    const first = renderView();
+    expect(
+      (await screen.findAllByTestId(/^history-/)).map((el) => el.getAttribute("data-testid")),
+    ).toEqual(expected);
+    first.unmount();
+
+    fakeArchive.rows = [...together].reverse();
+    renderView();
+    expect(
+      (await screen.findAllByTestId(/^history-/)).map((el) => el.getAttribute("data-testid")),
+    ).toEqual(expected);
+  });
+
   it("shows a measured share of chunks done and candles written so far for a running job", async () => {
     fakeArchive.rows = [
       row({
@@ -168,6 +213,20 @@ describe("CollectionHistoryView — deletions (delete-archived-pair-data)", () =
     expect(found.map((el) => el.getAttribute("data-testid"))).toEqual([
       `deletion-US100-MINUTE-2000`,
       "history-1-US100-MINUTE",
+    ]);
+  });
+
+  it("puts a deletion above an older pull of a different instrument", async () => {
+    // The reason the tab exists to be glanced at: whatever just happened is the top row,
+    // even when it happened to an instrument whose name sorts last.
+    fakeArchive.rows = [row({ jobId: 1, symbol: "GOLD", createdAt: 1000 })];
+    fakeArchive.deletions = [deletion({ symbol: "US100", deletedAt: 2000 })];
+    renderView();
+
+    const found = await screen.findAllByTestId(/^(history|deletion)-/);
+    expect(found.map((el) => el.getAttribute("data-testid"))).toEqual([
+      "deletion-US100-MINUTE-2000",
+      "history-1-GOLD-MINUTE",
     ]);
   });
 
