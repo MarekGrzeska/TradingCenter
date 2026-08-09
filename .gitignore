@@ -80,3 +80,14 @@ temp/
 
 # --- Claude Code local ---
 .claude/settings.local.json
+
+# --- Terraform ---
+# infra/bootstrap/'s own local state is committed on purpose — it carries nothing
+# sensitive and its reproducibility matters more than the noise (design.md,
+# "Bootstrap osobnym katalogiem ze stanem lokalnym"). Everything else here uses a
+# remote backend and never has a local state file to ignore in the first place.
+infra/**/.terraform/
+infra/**/*.tfplan
+infra/**/tfplan
+*.tfvars
+!*.tfvars.example

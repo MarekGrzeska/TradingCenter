@@ -30,11 +30,11 @@ Przed włączeniem wymogu po stronie gatewaya — inaczej wszystko przestaje dzi
 
 ## 3. Bootstrap stanu Terraforma
 
-- [ ] 3.1 `infra/bootstrap/` z providerem `azurerm` i stanem lokalnym — bez backendu zdalnego, bo to on tu powstaje
-- [ ] 3.2 Grupa zasobów, konto magazynu i kontener na stan; włącz wersjonowanie blobów
-- [ ] 3.3 `terraform apply` w `bootstrap/`, nazwy do `outputs.tf`
-- [ ] 3.4 Dopisz `infra/**/*.tfstate*` i `infra/**/.terraform/` do `.gitignore`
-- [ ] 3.5 **Zdejmij limit wydatków subskrypcji** — krok operatorski, MUST być wykonany przed trzydziestym dniem od założenia konta
+- [x] 3.1 `infra/bootstrap/` z providerem `azurerm` i stanem lokalnym — bez backendu zdalnego, bo to on tu powstaje
+- [x] 3.2 Grupa zasobów (`rg-tradingcenter-tfstate`), konto magazynu (`sttradingcenterstate`) i kontener (`tfstate`); wersjonowanie blobów włączone, retencja usuniętych 30 dni
+- [x] 3.3 `terraform apply` w `bootstrap/` — zastosowane na subskrypcji `mgrzeskait@outlook.com` / `FreeTrial_2014-09-01`, nazwy w `outputs.tf`
+- [x] 3.4 `.gitignore` — `infra/**/.terraform/` i `*.tfplan` zignorowane; **stan bootstrapu i `.terraform.lock.hcl` commitowane celowo** (design.md: „nic wrażliwego", a odtwarzalność tego jednorazowego roota jest warta więcej niż szum w diffie)
+- [ ] 3.5 **Zdejmij limit wydatków subskrypcji** — krok operatorski, MUST być wykonany przed trzydziestym dniem od założenia konta. Poza zasięgiem automatyzacji: to decyzja o rozliczeniach, nie coś do zrobienia z CLI
 
 ## 4. Baza
 
