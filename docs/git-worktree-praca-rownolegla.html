@@ -1,0 +1,370 @@
+<title>Git worktree — jedno repo, kilka biurek</title>
+<style>
+  :root {
+    --bg: #f7f8fa; --surface: #ffffff; --surface-2: #eceef2; --sunken: #f1f3f6;
+    --text: #171a20; --text-dim: #5a6272; --text-faint: #8c94a3;
+    --border: #dcdfe6; --border-strong: #c3c8d3;
+    --accent: #2a5aa8; --accent-soft: #e6ecf7;
+    --brass: #8a6212; --brass-soft: #f6eedd;
+    --good: #2c6a4c; --good-soft: #e3efe8;
+    --bad: #963630; --bad-soft: #f8e7e5;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #14171c; --surface: #1c2027; --surface-2: #242932; --sunken: #191d23;
+      --text: #e6e9ef; --text-dim: #9aa3b2; --text-faint: #6f7889;
+      --border: #2f353f; --border-strong: #414958;
+      --accent: #7aa6e8; --accent-soft: #1b2532;
+      --brass: #d5a959; --brass-soft: #2a2418;
+      --good: #79c39d; --good-soft: #1a2922;
+      --bad: #e0857c; --bad-soft: #2d1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #14171c; --surface: #1c2027; --surface-2: #242932; --sunken: #191d23;
+    --text: #e6e9ef; --text-dim: #9aa3b2; --text-faint: #6f7889;
+    --border: #2f353f; --border-strong: #414958;
+    --accent: #7aa6e8; --accent-soft: #1b2532;
+    --brass: #d5a959; --brass-soft: #2a2418;
+    --good: #79c39d; --good-soft: #1a2922;
+    --bad: #e0857c; --bad-soft: #2d1e1c;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.68;
+    margin: 0;
+    padding: 3rem 1.25rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 52rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.65rem, 4.2vw, 2.15rem); line-height: 1.14; letter-spacing: -0.022em; font-weight: 650; margin: 0 0 0.55rem; text-wrap: balance; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.012em; font-weight: 620; margin: 3.2rem 0 0.3rem; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); text-wrap: balance; }
+  h3 { font-size: 1rem; font-weight: 620; margin: 2rem 0 0.4rem; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+
+  .lede { color: var(--text-dim); font-size: 1.05rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-faint); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.4rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.05rem 1.3rem; margin: 1.75rem 0; }
+  .callout.brass { border-left-color: var(--brass); background: var(--brass-soft); }
+  .callout.good  { border-left-color: var(--good);  background: var(--good-soft); }
+  .callout.bad   { border-left-color: var(--bad);   background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.35rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.field { font-family: var(--mono); font-size: 0.84rem; }
+  .dim { color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.62; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+  pre .c { color: var(--text-faint); }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.shared { color: var(--accent); border-color: var(--accent); background: var(--accent-soft); }
+  .pill.own    { color: var(--good);   border-color: var(--good);   background: var(--good-soft); }
+  .pill.outside{ color: var(--brass);  border-color: var(--brass);  background: var(--brass-soft); }
+
+  figure { margin: 2rem 0; padding: 1.25rem 1rem 0.9rem; background: var(--sunken); border: 1px solid var(--border); border-radius: 8px; overflow-x: auto; }
+  figure svg { display: block; width: 100%; max-width: 100%; height: auto; color: var(--text-dim); }
+  figcaption { margin-top: 0.85rem; font-size: 0.85rem; line-height: 1.55; color: var(--text-dim); border-top: 1px solid var(--border); padding-top: 0.7rem; }
+  .svg-box { fill: var(--surface); stroke: var(--border-strong); stroke-width: 1.5; }
+  .svg-box-accent { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+  .svg-box-brass { fill: var(--brass-soft); stroke: var(--brass); stroke-width: 1.5; }
+  .svg-t { fill: var(--text); font-size: 13px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  .svg-m { fill: var(--text); font-size: 12.5px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .svg-s { fill: var(--text-dim); font-size: 11.5px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+  .svg-l { fill: var(--text-dim); font-size: 11px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .svg-line { stroke: var(--border-strong); stroke-width: 1.5; fill: none; }
+  .svg-line-accent { stroke: var(--accent); stroke-width: 1.75; fill: none; }
+  .svg-line-brass { stroke: var(--brass); stroke-width: 1.75; fill: none; }
+
+  details { margin: 1.2rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); padding: 0.6rem 1rem; }
+  summary { cursor: pointer; font-weight: 600; font-size: 0.93rem; }
+  details[open] summary { margin-bottom: 0.4rem; }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>Git worktree — jedno repo, kilka biurek</h1>
+<p class="lede">Jak trzymać kilka gałęzi rozpakowanych naraz, po co to komu przy pracy z kilkoma agentami — i co takiej równoległości i tak nie da się zrównoleglić.</p>
+<p class="meta">
+  Wprowadzenie dla tego repozytorium<br>
+  Uzupełnia sekcję <em>Workflow</em> w <code>CLAUDE.md</code>
+</p>
+
+<h2>Problem: katalog roboczy jest jeden</h2>
+
+<p>Zwykłe repozytorium ma jeden katalog z plikami. <code>git checkout</code> nie kopiuje niczego obok — <strong>przepisuje to samo miejsce na dysku</strong>. Przełączenie gałęzi znaczy więc, że pliki, które przed chwilą czytałeś, zmieniają się pod ręką: edytor pokazuje inną wersję, serwer deweloperski przeładowuje inny kod, a niezacommitowane zmiany albo jadą z tobą na drugą gałąź, albo blokują przełączenie.</p>
+
+<p>Przy jednym zadaniu naraz to nie przeszkadza. Przeszkadza, gdy zadania są dwa: pilna poprawka w trakcie dużej przebudowy, przegląd cudzej gałęzi bez porzucania własnej, dwa agenty pracujące jednocześnie. Klasyczne obejścia to <code>git stash</code> (kruche — kolejka schowków jest wspólna i łatwo w niej zgubić rachubę) albo drugi <code>git clone</code> (działa, ale to osobne repozytorium: własna kopia całej historii, własne <code>remote</code>, własne gałęzie, które trzeba ręcznie synchronizować).</p>
+
+<p><strong>Worktree to trzecia droga:</strong> jedno repozytorium, kilka katalogów roboczych. Historia, gałęzie i <code>remote</code> pozostają wspólne — mnożą się tylko rozpakowane pliki.</p>
+
+<figure>
+<svg viewBox="0 0 700 286" role="img" aria-label="Jedno repozytorium .git zasila trzy osobne katalogi robocze, każdy z inną gałęzią">
+  <defs>
+    <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+
+  <rect class="svg-box-accent" x="16" y="72" width="196" height="142" rx="8"/>
+  <text class="svg-t" x="114" y="108" text-anchor="middle" font-weight="600">jedno repozytorium</text>
+  <text class="svg-m" x="114" y="134" text-anchor="middle">TradingCenter/.git</text>
+  <text class="svg-s" x="114" y="163" text-anchor="middle">obiekty · gałęzie</text>
+  <text class="svg-s" x="114" y="181" text-anchor="middle">historia · remote</text>
+
+  <g color="var(--accent)">
+    <path class="svg-line-accent" d="M 212 143 C 268 143 268 58 320 58" marker-end="url(#ar)"/>
+    <path class="svg-line-accent" d="M 212 143 L 320 143" marker-end="url(#ar)"/>
+    <path class="svg-line-accent" d="M 212 143 C 268 143 268 228 320 228" marker-end="url(#ar)"/>
+  </g>
+  <text class="svg-l" x="266" y="132" text-anchor="middle">wspólna</text>
+  <text class="svg-l" x="266" y="147" text-anchor="middle">historia</text>
+
+  <rect class="svg-box" x="326" y="28" width="358" height="60" rx="8"/>
+  <text class="svg-m" x="344" y="52">TradingCenter/</text>
+  <text class="svg-s" x="344" y="72">gałąź <tspan class="svg-l">main</tspan> — katalog główny</text>
+
+  <rect class="svg-box" x="326" y="113" width="358" height="60" rx="8"/>
+  <text class="svg-m" x="344" y="137">TradingCenter-devdb/</text>
+  <text class="svg-s" x="344" y="157">gałąź <tspan class="svg-l">feat/local-dev-database-in-docker</tspan></text>
+
+  <rect class="svg-box" x="326" y="198" width="358" height="60" rx="8"/>
+  <text class="svg-m" x="344" y="222">TradingCenter-ci/</text>
+  <text class="svg-s" x="344" y="242">gałąź <tspan class="svg-l">ci/faster-and-apply-from-github</tspan></text>
+</svg>
+<figcaption>Trzy katalogi, trzy komplety plików, trzy niezależne <code>HEAD</code>-y — ale jeden magazyn obiektów. Commit zrobiony w dowolnym z nich jest natychmiast widoczny dla pozostałych, bo trafia do tej samej historii.</figcaption>
+</figure>
+
+<h2>Cztery polecenia, które wystarczą</h2>
+
+<pre><code><span class="c"># nowa gałąź + nowy katalog obok repozytorium</span>
+git worktree add -b docs/git-worktree ../TradingCenter-article main
+
+<span class="c"># istniejąca gałąź (np. czyjś PR do przejrzenia)</span>
+git worktree add ../TradingCenter-review feat/terminal-market-data-auth
+
+<span class="c"># co w tej chwili gdzie stoi</span>
+git worktree list
+
+<span class="c"># sprzątanie po skończonej robocie</span>
+git worktree remove ../TradingCenter-review</code></pre>
+
+<p>Ostatni argument <code>add</code> to punkt startowy — bez niego nowa gałąź odbija od bieżącego <code>HEAD</code>, co przy pracy na gałęzi tematycznej rzadko jest tym, o co chodziło. Warto pisać <code>main</code> jawnie.</p>
+
+<p>Nazwa katalogu jest dowolna, ale konwencja tego repozytorium to katalog <strong>siostrzany</strong>, nazwany <code>TradingCenter-&lt;temat&gt;</code>. Katalog <em>wewnątrz</em> repozytorium też zadziała, tylko trzeba go potem dopisać do <code>.gitignore</code>, żeby git nie zaczął go traktować jak zwykłe pliki projektu.</p>
+
+<div class="callout">
+  <span class="tag">Jedna gałąź stoi w jednym miejscu</span>
+  <p>Git nie pozwoli wypakować tej samej gałęzi w dwóch worktree naraz:</p>
+  <pre><code>fatal: 'main' is already checked out at '/Users/…/TradingCenter'</code></pre>
+  <p>To nie ograniczenie do obejścia — to właśnie zabezpieczenie, dla którego całość działa. Dwa katalogi commitujące na tę samą gałąź nadpisywałyby sobie wskaźnik gałęzi i każdy widziałby cudze commity jako „zniknięte” zmiany. Stąd naturalna zasada: <strong>jeden worktree, jedna gałąź, jedno zadanie</strong>.</p>
+</div>
+
+<h2>Co jest wspólne, a co własne</h2>
+
+<p>To jest cała mechanika worktree i jedyna rzecz, którą warto zapamiętać dosłownie. Plik <code>.git</code> w dodatkowym worktree nie jest katalogiem, tylko jedną linijką wskazującą z powrotem na <code>.git/worktrees/&lt;nazwa&gt;</code> w repozytorium głównym. Wszystko, co siedzi w magazynie obiektów, jest jedno na wszystkich; wszystko, co opisuje <em>stan pracy</em>, jest osobne.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Rzecz</th><th>Zasięg</th><th>Co z tego wynika</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>commity, tagi, historia</td>
+      <td><span class="pill shared">wspólne</span></td>
+      <td>commit w jednym worktree widać z pozostałych od razu, bez <code>push</code> i <code>fetch</code></td>
+    </tr>
+    <tr>
+      <td>gałęzie i <code>remote</code></td>
+      <td><span class="pill shared">wspólne</span></td>
+      <td>jeden <code>git fetch</code> aktualizuje wszystkie; jedna lista gałęzi dla całości</td>
+    </tr>
+    <tr>
+      <td><code>git stash</code></td>
+      <td><span class="pill shared">wspólne</span></td>
+      <td>schowek zrobiony tu widać tam — najczęstsza pułapka, bo intuicja podpowiada odwrotnie</td>
+    </tr>
+    <tr>
+      <td><code>.git/config</code>, hooki</td>
+      <td><span class="pill shared">wspólne</span></td>
+      <td>hook <code>require-review.sh</code> działa jednakowo w każdym worktree</td>
+    </tr>
+    <tr>
+      <td>pliki robocze, <code>HEAD</code>, index</td>
+      <td><span class="pill own">własne</span></td>
+      <td>istota rzeczy: edycje i staging jednego worktree są niewidoczne dla drugiego</td>
+    </tr>
+    <tr>
+      <td>stan <code>rebase</code>, <code>merge</code>, <code>bisect</code></td>
+      <td><span class="pill own">własne</span></td>
+      <td>przerwany rebase nie blokuje pracy w sąsiednim katalogu</td>
+    </tr>
+    <tr>
+      <td>pliki nieśledzone i ignorowane</td>
+      <td><span class="pill own">własne</span></td>
+      <td><code>.env</code>, <code>.venv</code>, <code>node_modules</code> — <strong>nowy worktree dostaje pusto</strong> i trzeba je odtworzyć</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p>Ostatni wiersz to jedyny realny koszt wejścia. Świeży worktree ma pliki z gita i nic poza tym, więc zanim cokolwiek uruchomisz:</p>
+
+<pre><code><span class="c"># pliki środowiskowe — nie ma ich w repozytorium, więc kopiujesz z sąsiada</span>
+cp ../TradingCenter/modules/capital-gateway/.env modules/capital-gateway/.env
+cp ../TradingCenter/modules/market-data/.env      modules/market-data/.env
+
+<span class="c"># zależności — osobne dla każdego katalogu</span>
+cd modules/market-data &amp;&amp; uv sync
+cd ../../modules/terminal &amp;&amp; pnpm install</code></pre>
+
+<h2>Kilka agentów, kilka worktree</h2>
+
+<p>Agent pracuje tak samo jak człowiek: czyta pliki, zapisuje pliki, uruchamia testy. Dwa agenty w jednym katalogu roboczym to dwie osoby piszące w jednym zeszycie — jeden zmienia plik między odczytem a zapisem drugiego, testy wywracają się na cudzej niedokończonej edycji, a <code>git checkout</code> zrobiony przez jednego wyciąga drugiemu pliki spod palców.</p>
+
+<p>Worktree usuwa całą tę klasę problemów jednym ruchem: <strong>każdy agent dostaje własny katalog i własną gałąź.</strong> Nie muszą się umawiać, kto teraz pisze, bo fizycznie nie dotykają tych samych plików. Praca spotyka się dopiero tam, gdzie ma się spotykać — w historii gita, przez pull requesty do <code>main</code>.</p>
+
+<p>Konflikty nie znikają, ale zmieniają charakter: zamiast rozjeżdżonego stanu na dysku, który trudno nawet zauważyć, dostajesz zwykły konflikt merge’a — widoczny, opisany, rozwiązywany narzędziem, które do tego służy.</p>
+
+<div class="callout good">
+  <span class="tag">Praktyczny podział</span>
+  <p>Jedno zadanie na worktree, nazwa katalogu z tematu zadania, gałąź od <code>main</code>. Po scaleniu PR-a katalog się usuwa. Cztery równoległe wątki to cztery katalogi obok siebie — <code>git worktree list</code> jest wtedy najkrótszym opisem tego, co się w projekcie dzieje.</p>
+</div>
+
+<h2>Czego worktree nie rozdziela</h2>
+
+<p>I tu jest granica, o którą naprawdę się zawadza. Git rozdziela <em>pliki</em>. Nie rozdziela niczego poza sobą — a uruchomiony projekt to nie tylko pliki. Porty TCP, kontener bazy, sesja u brokera: te zasoby są jedne na całą maszynę, niezależnie od tego, w ilu katalogach stoi kod.</p>
+
+<figure>
+<svg viewBox="0 0 700 268" role="img" aria-label="Trzy worktree mają osobne pliki, ale sięgają po te same porty, ten sam kontener bazy i tę samą sesję brokera">
+  <defs>
+    <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"/>
+    </marker>
+  </defs>
+
+  <rect class="svg-box" x="14" y="24" width="200" height="52" rx="8"/>
+  <text class="svg-m" x="30" y="48">TradingCenter/</text>
+  <text class="svg-s" x="30" y="66">agent A</text>
+
+  <rect class="svg-box" x="14" y="108" width="200" height="52" rx="8"/>
+  <text class="svg-m" x="30" y="132">TradingCenter-ci/</text>
+  <text class="svg-s" x="30" y="150">agent B</text>
+
+  <rect class="svg-box" x="14" y="192" width="200" height="52" rx="8"/>
+  <text class="svg-m" x="30" y="216">TradingCenter-devdb/</text>
+  <text class="svg-s" x="30" y="234">agent C</text>
+
+  <text class="svg-l" x="114" y="94" text-anchor="middle">pliki osobne ✓</text>
+  <text class="svg-l" x="114" y="178" text-anchor="middle">pliki osobne ✓</text>
+
+  <g color="var(--brass)">
+    <path class="svg-line-brass" d="M 214 50 C 300 50 320 134 420 134" marker-end="url(#ar2)"/>
+    <path class="svg-line-brass" d="M 214 134 L 420 134" marker-end="url(#ar2)"/>
+    <path class="svg-line-brass" d="M 214 218 C 300 218 320 134 420 134" marker-end="url(#ar2)"/>
+  </g>
+  <text class="svg-l" x="316" y="124" text-anchor="middle">sięgają po</text>
+  <text class="svg-l" x="316" y="150" text-anchor="middle">to samo</text>
+
+  <rect class="svg-box-brass" x="426" y="34" width="258" height="200" rx="8"/>
+  <text class="svg-t" x="446" y="64" font-weight="600">jedna maszyna</text>
+  <text class="svg-m" x="446" y="98">porty 8010 · 8020 · 5173</text>
+  <text class="svg-m" x="446" y="128">kontener Postgres</text>
+  <text class="svg-s" x="446" y="148">compose.yaml — jeden wolumen</text>
+  <text class="svg-m" x="446" y="180">sesja demo capital.com</text>
+  <text class="svg-s" x="446" y="200">nowe logowanie unieważnia stare</text>
+</svg>
+<figcaption>Lewa strona zwielokrotnia się dowolnie, prawa nie zwielokrotnia się wcale. Stąd zasada: równolegle pisze wielu, ale <strong>stack uruchamia jeden</strong>.</figcaption>
+</figure>
+
+<div class="callout brass">
+  <span class="tag">Trzy kolizje w tym repozytorium</span>
+  <ul>
+    <li><strong>Porty są stałe</strong> — 8010 gateway, 8020 market-data, 5173 terminal. Drugi <code>./scripts/dev.sh</code> nie wystartuje albo, gorzej, podepnie się pod cudzy proces.</li>
+    <li><strong>Baza to jeden kontener</strong> z <code>compose.yaml</code>, jeden projekt Dockera i jeden wolumen. Migracja puszczona w jednym worktree zmienia schemat, który widzą wszystkie pozostałe.</li>
+    <li><strong>Sesja demo capital.com jest jedna</strong> — każde nowe logowanie unieważnia poprzednie (<code>capital_gateway/client.py</code>). Dwa gateway’e na tym samym koncie wzajemnie się wylogowują, a objaw to losowe 401 w obu.</li>
+  </ul>
+  <p style="margin-bottom:0"><strong>Wniosek:</strong> równolegle można pisać kod, czytać, planować i uruchamiać testy jednostkowe. Testy <code>-m db</code> są bezpieczne, bo testcontainers podnosi własny kontener na losowym porcie. Ale pełny stack i migracje — jeden agent naraz.</p>
+</div>
+
+<h2>Sprzątanie i typowe zgrzyty</h2>
+
+<p><code>git worktree remove</code> kasuje katalog, ale <strong>nie kasuje gałęzi</strong> — bo gałąź jest wspólną własnością repozytorium, nie tego katalogu. Po scaleniu PR-a usuwa się ją osobno.</p>
+
+<pre><code>git worktree remove ../TradingCenter-article
+git branch -d docs/git-worktree      <span class="c"># osobno, dopiero po merge’u</span></code></pre>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Objaw</th><th>Przyczyna i co zrobić</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">is already checked out at …</td>
+      <td>Ta gałąź stoi w innym worktree. <code>git worktree list</code> pokaże gdzie. Albo pracuj tam, albo zrób nową gałąź.</td>
+    </tr>
+    <tr>
+      <td class="field">contains modified or untracked files</td>
+      <td><code>remove</code> broni się przed skasowaniem niezacommitowanej pracy. Zacommituj — albo <code>--force</code>, jeśli świadomie wyrzucasz.</td>
+    </tr>
+    <tr>
+      <td>worktree na liście, katalogu nie ma</td>
+      <td>Katalog skasowany ręcznie, wpis został. <code>git worktree prune</code> czyści listę.</td>
+    </tr>
+    <tr>
+      <td>testy padają na brak <code>.env</code> albo zależności</td>
+      <td>Świeży worktree nie dziedziczy plików ignorowanych. Skopiuj <code>.env</code>, uruchom <code>uv sync</code> / <code>pnpm install</code>.</td>
+    </tr>
+    <tr>
+      <td>„gdzie mój stash?”</td>
+      <td>Tam gdzie zawsze — schowki są wspólne dla całego repozytorium. <code>git stash list</code> działa z każdego worktree.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<details>
+  <summary>Worktree kontra <code>git clone</code> — kiedy który</summary>
+  <p><strong>Worktree</strong>, gdy chodzi o równoległą pracę nad tym samym projektem: jedna historia, jeden <code>fetch</code>, commity od razu widoczne wszędzie, kilkaset megabajtów historii trzymane raz.</p>
+  <p><strong>Osobny <code>clone</code></strong>, gdy potrzebna jest prawdziwa izolacja: eksperyment, który może zepsuć repozytorium, praca na cudzym forku z innymi <code>remote</code>, albo test świeżego rozpakowania projektu od zera. Za tę izolację płaci się ręczną synchronizacją i duplikatem historii.</p>
+</details>
+
+<h2>Ściągawka</h2>
+
+<pre><code>git worktree add -b &lt;gałąź&gt; &lt;ścieżka&gt; main   <span class="c"># nowa gałąź w nowym katalogu</span>
+git worktree add &lt;ścieżka&gt; &lt;gałąź&gt;            <span class="c"># istniejąca gałąź</span>
+git worktree list                             <span class="c"># co gdzie stoi</span>
+git worktree remove &lt;ścieżka&gt;                 <span class="c"># usuń katalog (gałąź zostaje)</span>
+git worktree prune                            <span class="c"># posprzątaj wpisy po ręcznie skasowanych</span>
+git worktree lock &lt;ścieżka&gt;                   <span class="c"># chroń przed prune (dysk zewnętrzny)</span></code></pre>
+
+<footer>
+  <p><strong>Powiązane</strong></p>
+  <ul>
+    <li><code>CLAUDE.md</code> — sekcja <em>Workflow</em>: konwencja worktree i ograniczenia pracy równoległej w tym repozytorium</li>
+    <li><code>compose.yaml</code>, <code>scripts/dev.sh</code> — zasoby współdzielone między worktree</li>
+    <li><code>git help worktree</code> — pełna dokumentacja poleceń</li>
+  </ul>
+</footer>
+
+</main>
