@@ -28,13 +28,18 @@ resource "azurerm_key_vault" "main" {
   soft_delete_retention_days = 90
 }
 
-# The signed-in operator (Terraform's own caller, mgrzeskait@outlook.com) needs full
-# secret access to run `az keyvault secret set` after apply — nothing else in this root
-# writes a secret value here.
+# The human operator (mgrzeskait@outlook.com) needs full secret access to run
+# `az keyvault secret set` after apply — nothing else in this root writes a secret value
+# here.
+#
+# `var.operator_object_id`, not `data.azurerm_client_config.current.object_id`: the data
+# source is whoever is running Terraform, so a `terraform apply` from CI would hand this
+# policy to the CI service principal and take it away from the operator. See the
+# variable's own description for how that surfaced.
 resource "azurerm_key_vault_access_policy" "operator" {
   key_vault_id = azurerm_key_vault.main.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = data.azurerm_client_config.current.object_id
+  object_id    = var.operator_object_id
 
   secret_permissions = ["Get", "List", "Set", "Delete", "Purge", "Recover"]
 }

@@ -1,14 +1,23 @@
 name: terraform
 
-# design.md, "Wdrożenia przez OIDC": a diff before it's applied, not after — plan on
-# every PR that touches infra/, apply only once that diff has landed on `main`.
+# A diff before it is applied — plan on every PR that touches infra/, so the change is
+# reviewable next to the code that causes it.
+#
+# There is deliberately no `apply` job. This root manages Entra applications and two
+# operator-scoped grants, and letting CI apply it would mean handing the CI principal
+# directory write access — a bigger privilege than anything else in this project holds,
+# for a platform one person operates. Two concrete failures made the choice rather than
+# an abstract worry: `terraform plan` in CI 403s on every `azuread_application` because
+# the principal has no Microsoft Graph access at all, and — before key-vault.tf and
+# github-oidc.tf were fixed to read `var.operator_object_id` — it planned to destroy the
+# operator's own Key Vault access policy and recreate it pointing at CI.
+#
+# So `terraform apply` stays with the operator, run locally against the same state. This
+# is a narrowing of design.md's "Wdrożenia przez OIDC", not an abandonment of it: the
+# three application deploy workflows still authenticate through OIDC with no stored
+# secret, which is what that decision was about. Infrastructure is the exception.
 on:
   pull_request:
-    branches: [main]
-    paths:
-      - "infra/**"
-      - ".github/workflows/terraform.yml"
-  push:
     branches: [main]
     paths:
       - "infra/**"
@@ -20,33 +29,29 @@ permissions:
   pull-requests: write # posts the plan as a PR comment
 
 concurrency:
-  # One run at a time full stop, plan or apply: two plans against the same state just
-  # race the lock (bootstrap/, group 3); a plan racing an apply would plan against
-  # state an apply is about to move out from under it.
+  # One run at a time: two plans against the same state just race the lock (bootstrap/,
+  # group 3), and the operator's own local apply takes that same lock.
   group: terraform
   cancel-in-progress: false
 
 env:
-  # The `pull_request` federated credential (github-oidc.tf) refuses `apply`'s token
-  # outright for anything but `main` — this is a second, redundant gate, not the only
-  # one.
   ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
   ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
   ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
   ARM_USE_OIDC: true
   # `infra/terraform.tfvars` is gitignored on purpose (variables.tf: per-operator, not
   # per-project — the next person running this root has their own IP and identity). CI
-  # is not a person; it needs the same four values the operator's own tfvars carries, so
-  # they are mirrored here as repository vars. None of the four is a secret — an IP
-  # address, two Entra object ids/UPNs and a notification address are not credentials.
+  # is not a person; it needs the same five values the operator's own tfvars carries, so
+  # they are mirrored here as repository vars. None of the five is a secret — an IP
+  # address, three Entra object ids/UPNs and a notification address are not credentials.
   TF_VAR_developer_ip_address: ${{ vars.TF_VAR_DEVELOPER_IP_ADDRESS }}
   TF_VAR_operator_email: ${{ vars.TF_VAR_OPERATOR_EMAIL }}
+  TF_VAR_operator_object_id: ${{ vars.TF_VAR_OPERATOR_OBJECT_ID }}
   TF_VAR_postgres_admin_object_id: ${{ vars.TF_VAR_POSTGRES_ADMIN_OBJECT_ID }}
   TF_VAR_postgres_admin_upn: ${{ vars.TF_VAR_POSTGRES_ADMIN_UPN }}
 
 jobs:
   plan:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -83,18 +88,3 @@ jobs:
             });
       - if: steps.plan.outcome == 'failure'
         run: exit 1
-
-  apply:
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    environment: production
-    defaults:
-      run:
-        working-directory: infra
-    steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: "1.5.7"
-      - run: terraform init
-      - run: terraform apply -auto-approve -input=false

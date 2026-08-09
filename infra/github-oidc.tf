@@ -86,15 +86,26 @@ resource "azurerm_role_assignment" "github_actions_contributor" {
 }
 
 # The state backend lives in a different resource group (infra/bootstrap/, group 3) and
-# is not managed by this root — looked up, not created, so `terraform plan` in CI can
-# read/write state without an access key (backend `use_azuread_auth`, main.tf).
-data "azurerm_storage_account" "tfstate" {
-  name                = "sttradingcenterstate"
-  resource_group_name = "rg-tradingcenter-tfstate"
+# is not managed by this root — only referred to, as the scope of the two role
+# assignments below.
+#
+# Composed as a string rather than read with `data "azurerm_storage_account"`: that data
+# source is a management-plane GET, and the CI identity deliberately holds only
+# `Storage Blob Data Contributor` here — a data-plane role that does not include
+# `Microsoft.Storage/storageAccounts/read`. The lookup therefore 403'd every `terraform
+# plan` in CI, and the only ways out were to widen CI's access or to stop asking Azure
+# for something already known. The name and resource group are fixed by bootstrap/ and
+# are equally hardcoded there.
+locals {
+  tfstate_storage_account_id = join("", [
+    "/subscriptions/${data.azurerm_client_config.current.subscription_id}",
+    "/resourceGroups/rg-tradingcenter-tfstate",
+    "/providers/Microsoft.Storage/storageAccounts/sttradingcenterstate",
+  ])
 }
 
 resource "azurerm_role_assignment" "github_actions_tfstate" {
-  scope                = data.azurerm_storage_account.tfstate.id
+  scope                = local.tfstate_storage_account_id
   role_definition_name = "Storage Blob Data Contributor"
   principal_id         = azuread_service_principal.github_actions.object_id
 }
@@ -104,10 +115,34 @@ resource "azurerm_role_assignment" "github_actions_tfstate" {
 # with the backend still on the storage account's access key (main.tf), specifically so
 # that switching the backend to `use_azuread_auth = true` afterward doesn't lock the
 # operator's own `terraform` out of the state it just wrote this role assignment into.
+#
+# `var.operator_object_id` for the same reason as the Key Vault policy in key-vault.tf:
+# read from the current client, this would name whoever ran the apply, so an apply from
+# CI would quietly move the operator's own state access onto the CI principal.
 resource "azurerm_role_assignment" "operator_tfstate" {
-  scope                = data.azurerm_storage_account.tfstate.id
+  scope                = local.tfstate_storage_account_id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = data.azurerm_client_config.current.object_id
+  principal_id         = var.operator_object_id
+}
+
+# Read-only access to the directory, and only because `terraform plan` needs it: this
+# root manages three Entra applications (entra.tf, app-service.tf, and this file), and a
+# principal with no Microsoft Graph access at all cannot even refresh them — every plan
+# in CI failed with `Authorization_RequestDenied` on all three before this grant.
+#
+# `Application.Read.All`, deliberately not `Application.ReadWrite.All` or
+# `.ReadWrite.OwnedBy`: CI plans and never applies (see .github/workflows/terraform.yml),
+# so write access to the directory would be a privilege nothing in the pipeline uses. It
+# is still a tenant-wide read of app registration metadata — worth knowing about, and the
+# reason the grant is spelled out here rather than clicked into the portal.
+data "azuread_service_principal" "msgraph" {
+  client_id = "00000003-0000-0000-c000-000000000000" # Microsoft Graph, the same everywhere
+}
+
+resource "azuread_app_role_assignment" "github_actions_directory_read" {
+  app_role_id         = data.azuread_service_principal.msgraph.app_role_ids["Application.Read.All"]
+  principal_object_id = azuread_service_principal.github_actions.object_id
+  resource_object_id  = data.azuread_service_principal.msgraph.object_id
 }
 
 output "github_actions_client_id" {
