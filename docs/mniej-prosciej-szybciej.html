@@ -1,0 +1,335 @@
+<title>Mniej, prościej, szybciej — plan usprawnień</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #faf9f5;
+    --panel: #f0f1f3;
+    --ink: #1a1d20;
+    --ink-2: #4e565e;
+    --ink-3: #7a828a;
+    --rule: #dfdfd8;
+    --accent: #1d5a9e;
+    --accent-soft: #e4ecf5;
+    --warn: #a05e12;
+    --warn-soft: #f5ead8;
+    --good: #0e6b52;
+    --good-soft: #e3ede8;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", Charter, "Charter BT", Georgia, "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #14171a;
+      --panel: #1b2025;
+      --ink: #e6e9ec;
+      --ink-2: #a8b0b8;
+      --ink-3: #79828a;
+      --rule: #2a3138;
+      --accent: #5b9bd9;
+      --accent-soft: #1a2836;
+      --warn: #d99a4e;
+      --warn-soft: #2d251a;
+      --good: #4cc9a0;
+      --good-soft: #1c2b25;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #14171a;
+    --panel: #1b2025;
+    --ink: #e6e9ec;
+    --ink-2: #a8b0b8;
+    --ink-3: #79828a;
+    --rule: #2a3138;
+    --accent: #5b9bd9;
+    --accent-soft: #1a2836;
+    --warn: #d99a4e;
+    --warn-soft: #2d251a;
+    --good: #4cc9a0;
+    --good-soft: #1c2b25;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    margin: 0;
+    padding: 3.5rem 1.25rem 5rem;
+  }
+  main { max-width: 44rem; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent); margin: 0 0 1rem;
+  }
+  h1 {
+    font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.15; font-weight: 600;
+    text-wrap: balance; margin: 0 0 0.75rem;
+  }
+  .lead { font-size: 1.1875rem; color: var(--ink-2); margin: 0 0 2.5rem; text-wrap: balance; }
+
+  h2 {
+    font-size: 1.4rem; font-weight: 600; text-wrap: balance;
+    margin: 3rem 0 0.25rem; padding-top: 2rem; border-top: 1px solid var(--rule);
+  }
+  h2 .no {
+    font-family: var(--mono); font-size: 0.8rem; color: var(--ink-3);
+    display: block; letter-spacing: 0.12em; margin-bottom: 0.4rem;
+  }
+  h3 { font-size: 1.05rem; font-weight: 600; margin: 1.75rem 0 0.5rem; }
+  p { margin: 0.75rem 0; }
+  a { color: var(--accent); }
+  code {
+    font-family: var(--mono); font-size: 0.85em; background: var(--panel);
+    border-radius: 3px; padding: 0.08em 0.35em; white-space: nowrap;
+  }
+  strong { font-weight: 600; }
+
+  .callout { border-radius: 6px; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  .callout p { margin: 0.4rem 0; }
+  .callout .tag {
+    font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.12em;
+    text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 0.35rem;
+  }
+  .callout.note { background: var(--accent-soft); }
+  .callout.note .tag { color: var(--accent); }
+  .callout.warn { background: var(--warn-soft); }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.good { background: var(--good-soft); }
+  .callout.good .tag { color: var(--good); }
+
+  .tablewrap { overflow-x: auto; margin: 1.25rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
+  th {
+    font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.1em;
+    text-transform: uppercase; font-weight: 600; color: var(--ink-3);
+    text-align: left; padding: 0.5rem 0.9rem 0.5rem 0; border-bottom: 1px solid var(--rule);
+  }
+  td { padding: 0.6rem 0.9rem 0.6rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td:last-child, th:last-child { padding-right: 0; }
+  td.n { font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  .pill {
+    font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.06em;
+    font-weight: 700; text-transform: uppercase; border-radius: 999px;
+    padding: 0.15rem 0.6rem; white-space: nowrap;
+  }
+  .pill.do { background: var(--accent-soft); color: var(--accent); }
+  .pill.ask { background: var(--warn-soft); color: var(--warn); }
+  .pill.keep { background: var(--good-soft); color: var(--good); }
+
+  ul.tight { margin: 0.75rem 0; padding-left: 1.3rem; }
+  ul.tight li { margin: 0.5rem 0; }
+  ol.plan { margin: 1.25rem 0; padding-left: 1.4rem; }
+  ol.plan li { margin: 0.6rem 0; }
+  ol.plan .meta { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-3); white-space: nowrap; }
+
+  footer {
+    margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--rule);
+    font-size: 0.875rem; color: var(--ink-3);
+  }
+</style>
+
+<main>
+  <p class="eyebrow">TradingCenter · plan usprawnień · 10 sierpnia 2026</p>
+  <h1>Mniej, prościej, szybciej</h1>
+  <p class="lead">Ciąg dalszy audytu tempa — tym razem od strony samego kodu: co usunąć,
+  co poprawić, czego świadomie nie ruszać. Po trzech rekomendacjach audytu obalonych przy
+  realizacji obowiązuje tu jedna dyscyplina: <strong>każda propozycja pochodzi z
+  przeczytania lub uruchomienia czegoś</strong>, i przy każdej stoi dowód.</p>
+
+  <div class="callout good">
+    <span class="tag">Stan wyjściowy — co już załatwione</span>
+    <p>Od audytu weszły: lekka ścieżka zmian i budżety artefaktów (PR&nbsp;#35), filtry
+    ścieżek i smoke-checki w CI (#34), baza dev w kontenerze (#33), działający hook
+    review (#31, poprawiony w #35), CLAUDE.md (#27). Ten dokument zaczyna się tam, gdzie
+    tamten skończył — poniżej wyłącznie rzeczy nowe.</p>
+  </div>
+
+  <h2><span class="no">Sprawa 1</span>Objętość: co realnie można zdjąć</h2>
+
+  <h3>Sześć dokumentów researchu po podjętych decyzjach</h3>
+  <p>W <code>docs/</code> leżą obok siebie dokumenty referencyjne (architektura, procedura
+  DBeaver, rotacja poświadczeń) i <strong>research sprzed decyzji, które już zapadły</strong>:
+  dwa plany wdrożenia na VPS, porównanie kosztów chmur, research cen Postgresa, notatka o
+  Microsoft for Startups — wszystkie z 7 sierpnia, sprzed wyboru Azure — oraz
+  „co zostało do domknięcia", snapshot, którego wszystkie trzy punkty są domknięte.
+  Propozycja: <code>docs/archive/</code> i jedno zdanie w README, że to, co tam leży, opisuje
+  drogę do decyzji, nie stan. Kasować nie trzeba — chodzi o to, żeby katalog, który się
+  otwiera przy każdej sesji, zawierał tylko rzeczy prawdziwe dziś.</p>
+
+  <h3>Archiwum OpenSpec: 3 924 linie, które żyją podwójnie</h3>
+  <p>To pytanie otwarte z PR&nbsp;#35, teraz z konkretną propozycją. W
+  <code>openspec/changes/archive/</code> delta specs to 3&nbsp;924 linie — opis zmian,
+  których treść <em>już wsiąkła</em> do <code>openspec/specs/</code> przy archiwizacji, a
+  historię „co i kiedy" trzyma git. Do tego 1&nbsp;164 linie odhaczonych
+  <code>tasks.md</code>. Propozycja do <strong>Twojej decyzji</strong>, bo to kasowanie
+  zapisu historycznego:</p>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Wariant</th><th>Co zostaje w archiwum zmiany</th><th>Efekt</th></tr>
+    <tr>
+      <td><strong>A — nic nie ruszać</strong></td>
+      <td>wszystko (5 artefaktów)</td>
+      <td class="n">10 239 linii, rośnie ~790/zmianę</td>
+    </tr>
+    <tr>
+      <td><strong>B — przyciąć do sensu</strong></td>
+      <td><code>proposal.md</code> (dlaczego) + <code>review.md</code> (jak oceniono) + <code>design.md</code> tam, gdzie była decyzja</td>
+      <td class="n">−~5 000 linii teraz, −~40% na każdą przyszłą</td>
+    </tr>
+  </table>
+  </div>
+  <p>Za B przemawia to, że delta i tasks nie niosą informacji, której nie ma gdzie indziej;
+  za A — że archiwum nic nie kosztuje poza objętością, bo nikt go nie czyta. Skłaniam się
+  ku B, ale nie wykonam tego bez Twojego „tak".</p>
+
+  <h3>Martwy kod: jest, ale śladowy</h3>
+  <p>Przeszukanie użyć funkcji eksportowanych przez moduły znalazło jedną martwą:
+  <code>tracking.read_all</code> — wołają ją wyłącznie testy, produkcyjnie nic. To
+  pięć minut sprzątania i tyle; celowo <strong>nie</strong> proponuję cyklicznego
+  narzędzia do martwego kodu, bo w projekcie tej wielkości to rytuał bez zwrotu.</p>
+
+  <h3>Czego nie zdejmować, choć kusi</h3>
+  <ul class="tight">
+    <li><strong>Warstwa mapowań w terminalu</strong> (<code>archive.ts</code>, ~10 funkcji
+      <code>mapX</code>). Policzyłem: z 50 mapowanych pól 27 to przemianowania
+      snake_case→camelCase — ale niemal każda funkcja robi też realną pracę, konwersję dat
+      ISO→epoch dla wykresów. Aliasowanie camelCase w pydantic zdjęłoby połowę przemianowań
+      i <em>żadnej</em> konwersji; zysk nie pokrywa ryzyka ruszenia całego kontraktu.</li>
+    <li><strong><code>contract.py</code> z modelami <code>*Out</code></strong> — wygląda na
+      podwójną robotę wobec modeli domenowych, ale to jest źródło generowanego kontraktu
+      terminala i granica, na której CI łapie dryf. Zdublowanie jest ceną, nie błędem.</li>
+    <li><strong><code>capital-gateway/app.py</code> w jednym pliku (387 linii)</strong> —
+      całe publiczne API modułu na jednym ekranie to zaleta; rozbicie na routery dodałoby
+      pliki, nie odjęło złożoności.</li>
+  </ul>
+
+  <h2><span class="no">Sprawa 2</span>Dobre praktyki: jedna realna luka i jedno dokręcenie</h2>
+
+  <h3>Python nie ma type-checkera — i pyright ma na ten temat 23 uwagi</h3>
+  <p>Ruff sprawdza styl i oczywiste błędy, ale nie typy. Odpaliłem pyright (tryb basic) na
+  obu modułach:</p>
+  <div class="tablewrap">
+  <table>
+    <tr><th>Moduł</th><th>Błędy</th><th>Dominujące kategorie</th></tr>
+    <tr><td><code>market-data</code></td><td class="n">21</td>
+      <td><code>reportOptionalSubscript</code> ×9, <code>reportArgumentType</code> ×6</td></tr>
+    <tr><td><code>capital-gateway</code></td><td class="n">2</td>
+      <td><code>reportArgumentType</code> ×2</td></tr>
+  </table>
+  </div>
+  <p>Uczciwie: sprawdziłem próbki i <strong>żaden nie wygląda na błąd, który dziś
+  wybucha</strong>. Typowy przypadek to <code>fetchrow</code> po <code>INSERT…RETURNING</code>
+  indeksowany bez sprawdzenia <code>None</code> (bezpieczne w kontekście, nieudowodnione w
+  typach) albo za wąska adnotacja na unii poświadczeń w <code>db.py</code>. Ale to jest
+  dokładnie ta klasa założeń, która pęka przy refaktorze — ktoś przenosi wywołanie, kontekst
+  znika, założenie zostaje. Koszt domknięcia: ~2 h na wyzerowanie 23 uwag, potem jeden tani
+  krok w obu jobach CI. W kodzie, gdzie pół świata to <code>async</code> i opcjonalne
+  rekordy z bazy, to najlepszy stosunek ceny do wartości z całej tej listy.</p>
+
+  <h3>Ruff bez przypiętej wersji — CI zmienia zdanie bez pytania</h3>
+  <p>Oba moduły deklarują <code>ruff&gt;=0.7</code>, więc CI bierze najnowszy. Sprawdziłem,
+  co to znaczy w praktyce: dzisiejszy resolve to 0.16.2 z <strong>413 aktywnymi
+  regułami</strong> — szerszymi niż cokolwiek, co było domyślne przy 0.7. Do tej pory
+  nowe reguły grały na korzyść (UP037 złapał realną usterkę w <code>config.py</code>), ale
+  mechanizm jest odwrócony: to wydawca lintera decyduje, kiedy Twoje CI robi się czerwone.
+  Przypiąć dokładną wersję w obu <code>pyproject.toml</code>, podbijać świadomie. Pięć minut.</p>
+
+  <h3>Kultura komentarzy: eseje przeniosły się do terminala</h3>
+  <p>Norma „zostaje «dlaczego», znika narracja" weszła do CLAUDE.md, ale zmierzyłem stan
+  zastany: Python ma ~7% linii komentarza, <strong>terminal ~18%</strong>. To tam żyje
+  kultura esejów. Bez akcji masowej — przepisywanie komentarzy hurtem to churn bez wartości —
+  ale przy każdym dotknięciu pliku w <code>src/</code> przycinać narrację do zdania z
+  powodem. Grawitacja zrobi resztę.</p>
+
+  <div class="callout good">
+    <span class="tag">Co jest dobre i ma tak zostać — sprawdzone, nie założone</span>
+    <p><code>tsconfig</code> ze <code>strict</code> + <code>noUnusedLocals/Parameters</code>;
+    wszystkie dialogi faktycznie idą przez jeden <code>ConfirmDialog</code> (grep po
+    komponentach — zero lokalnych implementacji po #32); testy mają wspólne helpery
+    (<code>src/test/</code>, konftesty po 81–159 linii, bez kopiuj-wklej); testcontainers
+    zamiast mocków tam, gdzie testowany jest schemat; specyfikacje równo pocięte
+    (61–285 linii, bez kikutów i molochów — pomiar z PR&nbsp;#35).</p>
+  </div>
+
+  <h2><span class="no">Sprawa 3</span>Szybszy rozwój: dwie rzeczy, reszta już zrobiona</h2>
+
+  <h3>Podróż nowego pola przez kontrakt — nazwać, nie naprawiać</h3>
+  <p>Najdroższa pojedyncza operacja w tym repo to dodanie pola do odpowiedzi market-daty.
+  Trasa: model domenowy → <code>contract.py</code> (<code>*Out</code>) →
+  <code>pnpm contract:generate</code> → <code>mapX</code> w <code>archive.ts</code> →
+  <code>types.ts</code> → komponent. Pięć przystanków, i CI pilnuje każdego przejścia
+  (<code>contract:check</code>, filtr ścieżek z #34 wie o sprzężeniu). Tu <strong>nie ma nic
+  do naprawienia</strong> — każda stacja robi swoją pracę — ale trasa powinna być zapisana w
+  CLAUDE.md jako checklist, żeby żadna sesja nie odkrywała jej po błędzie CI. Dziesięć
+  minut.</p>
+
+  <h3>Drugi worktree na stałe — ostatni otwarty punkt audytu</h3>
+  <p>Wszystko inne z tamtej listy weszło. Zostało stanowisko numer dwa: katalog z
+  zainstalowanymi zależnościami i skopiowanymi <code>.env</code>, trzymany między zadaniami,
+  żeby praca równoległa kosztowała jedną komendę. Kwadrans, raz.</p>
+
+  <h2><span class="no">Sprawa 4</span>Czytelność i rozwój: ocena, nie zmiany</h2>
+
+  <p><strong>Architektura jest czytelna i rozszerzalna w jeden konkretny sposób.</strong>
+  Nowa funkcja w istniejącym module ma oczywiste miejsce (szwy w market-dacie są wyraźne:
+  <code>jobs/</code>, <code>ingest/</code>, <code>rollups</code>, <code>tracking</code> —
+  każdy z własnym plikiem i testami). Nowy moduł to nowy katalog z opublikowanym kontraktem
+  — wzorzec jest ustanowiony trzykrotnie. Ryzyko do pilnowania jest jedno:
+  <strong>market-data to środek ciężkości</strong> (6,3 tys. z 15,2 tys. linii
+  produkcyjnych) i wszystkie przyszłe pomysły — agenty, backtesty — będą chciały do niego
+  wejść. Odpowiedź brzmi: wchodzą przez jego HTTP API jako osobne moduły, nigdy jako kolejny
+  podpakiet.</p>
+
+  <div class="callout warn">
+    <span class="tag">Antywzorzec do odrzucania w przyszłych propozycjach</span>
+    <p>„Drugi provider danych" będzie kusił, żeby z gatewaya zrobić abstrakcję z
+    pluginami. Właściwy ruch w tej architekturze jest inny i tańszy: <strong>drugi
+    provider = drugi moduł gatewaya</strong> z tym samym kształtem kontraktu, a market-data
+    dostaje drugi upstream. Zero warstw abstrakcji na zapas — dokładnie tak, jak mówi
+    budżet złożoności z <code>openspec/config.yaml</code>.</p>
+  </div>
+
+  <h2><span class="no">Podsumowanie</span>Plan działania</h2>
+
+  <ol class="plan">
+    <li><strong>Pyright w trybie basic: wyzerować 23 uwagi, dodać krok do CI.</strong>
+      <span class="meta">~2 h · największy zwrot</span> <span class="pill do">do zrobienia</span></li>
+    <li><strong>Przypiąć wersję ruff w obu modułach.</strong>
+      <span class="meta">5 min</span> <span class="pill do">do zrobienia</span></li>
+    <li><strong><code>docs/archive/</code> dla sześciu dokumentów po decyzjach.</strong>
+      <span class="meta">15 min</span> <span class="pill do">do zrobienia</span></li>
+    <li><strong>Checklist „nowe pole w kontrakcie" w CLAUDE.md.</strong>
+      <span class="meta">10 min</span> <span class="pill do">do zrobienia</span></li>
+    <li><strong>Usunąć <code>tracking.read_all</code>.</strong>
+      <span class="meta">5 min</span> <span class="pill do">do zrobienia</span></li>
+    <li><strong>Drugi worktree na stałe.</strong>
+      <span class="meta">15 min · raz</span> <span class="pill do">do zrobienia</span></li>
+    <li><strong>Przycięcie archiwum OpenSpec (wariant B): −~5 000 linii.</strong>
+      <span class="meta">1 h</span> <span class="pill ask">Twoja decyzja</span></li>
+    <li><strong>Komentarze w terminalu: przycinać przy dotknięciu.</strong>
+      <span class="meta">ciągłe</span> <span class="pill keep">norma</span></li>
+  </ol>
+
+  <p>Sedno tej rundy: <strong>kod jest w lepszym stanie, niż sugerowałaby jego historia
+  powstania.</strong> Trzy dni pracy z agentem nie zostawiły ani zgnilizny, ani litanii
+  TODO — zostawiły jedną lukę narzędziową (typy w Pythonie), trochę balastu dokumentowego
+  i kilka miejsc, gdzie trzeba zapisać „nie ruszać", zanim ktoś to „ulepszy". Największe
+  rezerwy tempa nie siedzą już w kodzie, tylko tam, gdzie zostały po audycie: w dyscyplinie
+  procesu, który od #35 sam pilnuje swojego rozmiaru.</p>
+
+  <footer>
+    <p>Metoda: pyright uruchomiony na obu modułach Pythona (nie założony — 23 błędy
+    policzone z JSON-a, próbki sprawdzone w kodzie); aktywne reguły ruff odczytane z
+    <code>--show-settings</code> po tym, jak hipoteza o „martwej konfiguracji bugbear"
+    upadła w konfrontacji z sondą; mapowania <code>archive.ts</code> policzone per pole
+    (50 pól, 27 przemianowań); użycia funkcji eksportowanych przeszukane grepem łącznie z
+    testami; struktura wszystkich większych plików obu modułów i terminala przejrzana
+    per funkcja. Dokument trzyma dyscyplinę z audytu: żadnej rekomendacji z samego
+    policzenia czegoś.</p>
+  </footer>
+</main>
