@@ -22,10 +22,16 @@ modules move here one at a time.
 ## Layout
 
 ```
-modules/    one directory per module, each standalone
-openspec/   specs (the truth) and change proposals
-docs/       architecture and reference
+modules/       one directory per module, each standalone
+openspec/      specs (the truth) and change proposals
+docs/          architecture and reference
+docs/archive/  the road to a decision, not the state after it
 ```
+
+What sits in `docs/archive/` was true when it was written and is kept for the reasoning
+rather than the conclusion — cost research and two deployment plans from before Azure was
+chosen, and one list of open items that are now all closed. Nothing there describes how the
+system works today; `docs/` itself is meant to open at any time and contain only that.
 
 ## Stack
 
