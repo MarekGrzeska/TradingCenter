@@ -26,18 +26,39 @@ locals {
   github_repo_immutable = "MarekGrzeska@48219464/TradingCenter@1326647472"
 }
 
-# One credential per subject GitHub actually presents: pushes to `main` run the deploy
-# and `terraform apply` workflows, pull requests run `terraform plan`. Scoping to these
-# two subjects (rather than a wildcard `repo:owner/repo:*`) means a token minted for any
-# other ref — a random branch, a fork's PR — is simply refused by Entra before it ever
-# reaches Azure.
+# One credential per subject GitHub actually presents, rather than a wildcard
+# `repo:owner/repo:*` — a token minted for anything else is refused by Entra before it
+# reaches Azure. There are three such subjects, and which one a job gets is not obvious:
+#
+#   :pull_request           — terraform plan
+#   :environment:production — all three deploy workflows
+#   :ref:refs/heads/main    — a push to main from a job with no `environment:`
+#
+# The middle one is the trap. A job that declares `environment: production` is issued
+# `...:environment:<name>` *instead of* the ref subject, not in addition to it, so the
+# `main_branch` credential below never matched a single deploy — every one of them failed
+# `azure/login` with AADSTS700213 until `production` was registered too.
+#
+# `main_branch` currently matches nothing: no workflow pushes to main without an
+# environment. It is kept because that is a property of today's workflows, not a decision
+# — the day one runs, this is the credential it needs, and its absence would look exactly
+# like the failure above.
 resource "azuread_application_federated_identity_credential" "main_branch" {
   application_id = azuread_application.github_actions.id
   display_name   = "github-main-branch"
-  description    = "Pushes to main — deploy workflows and terraform apply"
+  description    = "Pushes to main from a job with no environment — currently none"
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
   subject        = "repo:${local.github_repo}:ref:refs/heads/main"
+}
+
+resource "azuread_application_federated_identity_credential" "production_environment" {
+  application_id = azuread_application.github_actions.id
+  display_name   = "github-production-environment"
+  description    = "The three deploy workflows, which all run in the production environment"
+  audiences      = ["api://AzureADTokenExchange"]
+  issuer         = "https://token.actions.githubusercontent.com"
+  subject        = "repo:${local.github_repo}:environment:production"
 }
 
 resource "azuread_application_federated_identity_credential" "pull_request" {
@@ -49,23 +70,32 @@ resource "azuread_application_federated_identity_credential" "pull_request" {
   subject        = "repo:${local.github_repo}:pull_request"
 }
 
-# The same two subjects again, in the immutable-id form GitHub actually presents today.
+# The same three subjects again, in the immutable-id form GitHub actually presents today.
 # Both forms are registered deliberately: a federated credential only ever *matches* the
 # subject in the token, so an extra one that matches nothing costs nothing and refuses
-# nothing (Entra allows 20 per application). Keeping the name-based pair means CI is not
+# nothing (Entra allows 20 per application). Keeping the name-based set means CI is not
 # at the mercy of exactly when GitHub's migration lands on this repository, in either
 # direction.
 #
-# Once the rollout has settled and every run presents the id form, the two name-based
+# Once the rollout has settled and every run presents the id form, the three name-based
 # credentials above are dead weight and can be deleted — the scoping argument for them
-# carries over unchanged to these two.
+# carries over unchanged to these three.
 resource "azuread_application_federated_identity_credential" "main_branch_immutable" {
   application_id = azuread_application.github_actions.id
   display_name   = "github-main-branch-immutable"
-  description    = "Pushes to main, immutable-id subject — deploy workflows and terraform apply"
+  description    = "Pushes to main from a job with no environment, immutable-id subject"
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
   subject        = "repo:${local.github_repo_immutable}:ref:refs/heads/main"
+}
+
+resource "azuread_application_federated_identity_credential" "production_environment_immutable" {
+  application_id = azuread_application.github_actions.id
+  display_name   = "github-production-environment-immutable"
+  description    = "The three deploy workflows, immutable-id subject — this is the one they present"
+  audiences      = ["api://AzureADTokenExchange"]
+  issuer         = "https://token.actions.githubusercontent.com"
+  subject        = "repo:${local.github_repo_immutable}:environment:production"
 }
 
 resource "azuread_application_federated_identity_credential" "pull_request_immutable" {
