@@ -1,0 +1,549 @@
+<title>Dlaczego robi się wolniej — audyt tempa i złożoności</title>
+<style>
+  :root {
+    color-scheme: light;
+    --paper: #faf9f5;
+    --panel: #f2f1ea;
+    --ink: #1a201d;
+    --ink-2: #4e5a54;
+    --ink-3: #7a847e;
+    --rule: #e0ded4;
+    --accent: #0e6b52;
+    --accent-soft: #e3ede8;
+    --warn: #a05e12;
+    --warn-soft: #f5ead8;
+    --crit: #a83229;
+    --crit-soft: #f6e4e1;
+    --s1: #2a78d6;  /* kod produkcyjny */
+    --s2: #eb6834;  /* testy */
+    --s3: #1baf7a;  /* openspec */
+    --s4: #eda100;  /* infra + ci */
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --serif: "Iowan Old Style", Charter, "Charter BT", Georgia, "Times New Roman", serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --paper: #141816;
+      --panel: #1b211e;
+      --ink: #e6eae6;
+      --ink-2: #a8b2ab;
+      --ink-3: #79837c;
+      --rule: #2a322d;
+      --accent: #4cc9a0;
+      --accent-soft: #1c2b25;
+      --warn: #d99a4e;
+      --warn-soft: #2d251a;
+      --crit: #e07a70;
+      --crit-soft: #31201d;
+      --s1: #3987e5;
+      --s2: #d95926;
+      --s3: #199e70;
+      --s4: #c98500;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --paper: #141816;
+    --panel: #1b211e;
+    --ink: #e6eae6;
+    --ink-2: #a8b2ab;
+    --ink-3: #79837c;
+    --rule: #2a322d;
+    --accent: #4cc9a0;
+    --accent-soft: #1c2b25;
+    --warn: #d99a4e;
+    --warn-soft: #2d251a;
+    --crit: #e07a70;
+    --crit-soft: #31201d;
+    --s1: #3987e5;
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+  }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--serif);
+    font-size: 1.0625rem;
+    line-height: 1.65;
+    margin: 0;
+    padding: 3.5rem 1.25rem 5rem;
+  }
+  main { max-width: 44rem; margin: 0 auto; }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 1rem;
+  }
+  h1 {
+    font-size: clamp(1.9rem, 5vw, 2.6rem);
+    line-height: 1.15;
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 0 0 0.75rem;
+  }
+  .lead { font-size: 1.1875rem; color: var(--ink-2); margin: 0 0 2.5rem; text-wrap: balance; }
+
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    text-wrap: balance;
+    margin: 3rem 0 0.25rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--rule);
+  }
+  h2 .no {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    color: var(--ink-3);
+    display: block;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.4rem;
+  }
+  h3 { font-size: 1.05rem; font-weight: 600; margin: 1.75rem 0 0.5rem; }
+  h3 .done {
+    font-family: var(--mono); font-size: 0.625rem; letter-spacing: 0.1em;
+    text-transform: uppercase; font-weight: 700; vertical-align: 0.18em;
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 999px; padding: 0.2rem 0.55rem; margin-left: 0.5rem;
+  }
+  p { margin: 0.75rem 0; }
+  a { color: var(--accent); }
+  code, .path {
+    font-family: var(--mono);
+    font-size: 0.85em;
+    background: var(--panel);
+    border-radius: 3px;
+    padding: 0.08em 0.35em;
+    white-space: nowrap;
+  }
+  strong { font-weight: 600; }
+
+  /* verdict list */
+  .verdict { margin: 1.5rem 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.9rem; }
+  .verdict li { border-left: 3px solid var(--accent); padding: 0.1rem 0 0.1rem 1rem; }
+  .verdict b { display: block; font-weight: 600; }
+  .verdict span { color: var(--ink-2); }
+
+  /* callouts */
+  .callout { border-radius: 6px; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+  .callout p { margin: 0.4rem 0; }
+  .callout .tag {
+    font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.12em;
+    text-transform: uppercase; font-weight: 700; display: block; margin-bottom: 0.35rem;
+  }
+  .callout.crit { background: var(--crit-soft); }
+  .callout.crit .tag { color: var(--crit); }
+  .callout.warn { background: var(--warn-soft); }
+  .callout.warn .tag { color: var(--warn); }
+  .callout.note { background: var(--accent-soft); }
+  .callout.note .tag { color: var(--accent); }
+
+  /* stat tiles */
+  .stats {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+    gap: 0.75rem; margin: 1.75rem 0;
+  }
+  .stat { background: var(--panel); border-radius: 6px; padding: 0.9rem 1rem; }
+  .stat .v {
+    font-family: var(--mono); font-size: 1.55rem; font-weight: 600;
+    font-variant-numeric: tabular-nums; display: block; line-height: 1.2;
+  }
+  .stat .l { font-size: 0.8rem; color: var(--ink-2); line-height: 1.35; display: block; margin-top: 0.25rem; }
+
+  /* composition bar */
+  .viz { margin: 2rem 0 0.5rem; }
+  .viz-title { font-size: 0.9375rem; font-weight: 600; margin: 0 0 0.75rem; }
+  .bar { display: flex; height: 26px; border-radius: 4px; overflow: hidden; gap: 2px; background: var(--paper); }
+  .bar .seg { min-width: 3px; }
+  .bar .seg.s1 { background: var(--s1); }
+  .bar .seg.s2 { background: var(--s2); }
+  .bar .seg.s3 { background: var(--s3); }
+  .bar .seg.s4 { background: var(--s4); }
+  .legend { list-style: none; margin: 0.9rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.4rem 1.5rem; }
+  .legend li { display: flex; align-items: baseline; gap: 0.5rem; font-size: 0.875rem; color: var(--ink-2); }
+  .legend .sw { width: 10px; height: 10px; border-radius: 2px; align-self: center; flex: none; }
+  .legend .sw.s1 { background: var(--s1); }
+  .legend .sw.s2 { background: var(--s2); }
+  .legend .sw.s3 { background: var(--s3); }
+  .legend .sw.s4 { background: var(--s4); }
+  .legend .n { font-family: var(--mono); font-variant-numeric: tabular-nums; color: var(--ink); }
+
+  /* tables */
+  .tablewrap { overflow-x: auto; margin: 1.25rem 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9375rem; }
+  th {
+    font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.1em;
+    text-transform: uppercase; font-weight: 600; color: var(--ink-3);
+    text-align: left; padding: 0.5rem 0.9rem 0.5rem 0; border-bottom: 1px solid var(--rule);
+  }
+  td { padding: 0.6rem 0.9rem 0.6rem 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td:last-child, th:last-child { padding-right: 0; }
+  .pill {
+    font-family: var(--mono); font-size: 0.6875rem; letter-spacing: 0.06em;
+    font-weight: 700; text-transform: uppercase; border-radius: 999px;
+    padding: 0.15rem 0.6rem; white-space: nowrap;
+  }
+  .pill.keep { background: var(--accent-soft); color: var(--accent); }
+  .pill.freeze { background: var(--warn-soft); color: var(--warn); }
+  .pill.fix { background: var(--crit-soft); color: var(--crit); }
+
+  /* timeline */
+  .timeline { list-style: none; margin: 1.25rem 0; padding: 0; border-left: 2px solid var(--rule); }
+  .timeline li { padding: 0 0 1rem 1.25rem; position: relative; }
+  .timeline li::before {
+    content: ""; position: absolute; left: -6px; top: 0.45em;
+    width: 8px; height: 8px; border-radius: 50%; background: var(--ink-3);
+  }
+  .timeline li.hot::before { background: var(--warn); }
+  .timeline .t { font-family: var(--mono); font-size: 0.8rem; color: var(--ink-3); display: block; }
+
+  ol.plan { margin: 1.25rem 0; padding-left: 1.4rem; }
+  ol.plan li { margin: 0.6rem 0; }
+  ol.plan .meta { font-family: var(--mono); font-size: 0.75rem; color: var(--ink-3); white-space: nowrap; }
+
+  ul.tight { margin: 0.75rem 0; padding-left: 1.3rem; }
+  ul.tight li { margin: 0.5rem 0; }
+
+  footer {
+    margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--rule);
+    font-size: 0.875rem; color: var(--ink-3);
+  }
+</style>
+
+<main>
+  <p class="eyebrow">TradingCenter · audyt tempa i złożoności · 9 sierpnia 2026</p>
+  <h1>Dlaczego robi się wolniej</h1>
+  <p class="lead">Trzy dni, 212 commitów, działająca platforma w Azure — i uzasadnione
+  wrażenie, że każdy kolejny task idzie ciężej niż poprzedni. Ten dokument odpowiada,
+  co dokładnie spowalnia, co jest kosztem jednorazowym już zapłaconym, a co podatkiem,
+  który będzie wracał — i co z każdym z nich zrobić.</p>
+
+  <ul class="verdict">
+    <li><b>Spowalnia proces, nie architektura.</b>
+      <span>Pełny rytuał OpenSpec stosowany do każdej zmiany — również drobnej — plus
+      kultura komentarzy‑esejów generują 13&nbsp;tys. linii prozy, którą Claude Code musi
+      czytać i utrzymywać. Ten koszt rośnie liniowo z każdą zamkniętą zmianą.</span></li>
+    <li><b>Architektura modułów jest zdrowa; przeskalowana jest warstwa tożsamości.</b>
+      <span>Trzy moduły z generowanym kontraktem to właściwy rozmiar. Ale Entra, osobne
+      pryncypały, rotacje i allowlisty IP są zwymiarowane jak dla zespołu w firmie —
+      a chronią konto demo i odtwarzalną bazę świec.</span></li>
+    <li><b>Piątkowy deployment był kosztem jednorazowym — z dwoma wyjątkami.</b>
+      <span>Tarcie OIDC/GHCR nie wróci. Wróci za to brak cache'a Dockera przy każdym
+      deployu i komplet testów wszystkich modułów przy każdym PR.</span></li>
+  </ul>
+
+  <div class="callout note">
+    <span class="tag">Sprostowanie — pierwsza wersja tego dokumentu myliła się</span>
+    <p>Pierwotnie stało tu ostrzeżenie, że <code>infra/bootstrap/terraform.tfstate</code>
+    zawiera <strong>żywy</strong> klucz konta storage i wymaga natychmiastowej rotacji.
+    Plik faktycznie jest zacommitowany i faktycznie zawiera
+    <code>primary_access_key</code> — ale ten klucz <strong>nie działa</strong>, i to nie
+    przez przypadek.</p>
+    <p><code>infra/bootstrap/main.tf</code> ustawia <code>shared_access_key_enabled =
+    false</code> z komentarzem wyjaśniającym dokładnie ten problem: skoro stan tego roota
+    jest commitowany, a wszyscy i tak uwierzytelniają się przez Entra
+    (<code>use_azuread_auth = true</code>), klucze zostają trwale unieszkodliwione zamiast
+    być żywymi sekretami w pliku pod kontrolą wersji. Azure potwierdza
+    (<code>allowSharedKeyAccess: false</code>), a próba użycia klucza z repo kończy się
+    <code>KeyBasedAuthenticationNotPermitted</code>. Znalezienie jest też już zamknięte —
+    opisuje je <code>review.md</code> zmiany <code>provision-azure-platform</code>.</p>
+    <p><strong>Do zrobienia: nic.</strong> Rotacja byłaby operacją na żywej infrastrukturze
+    bez żadnego zysku. Jedyne resztkowe ryzyko to ponowne włączenie dostępu kluczem, a
+    ponieważ kod Terraforma przypina tę wartość do <code>false</code>, zmiana klikana w
+    portalu zostanie cofnięta przy najbliższym <code>apply</code>.</p>
+  </div>
+
+  <h2><span class="no">Stan po trzech dniach</span>Liczby</h2>
+
+  <div class="stats">
+    <div class="stat"><span class="v">3</span><span class="l">dni pracy<br>(7–9 sierpnia)</span></div>
+    <div class="stat"><span class="v">212</span><span class="l">commitów<br>na main</span></div>
+    <div class="stat"><span class="v">46,4 tys.</span><span class="l">linii utrzymywanych ręcznie</span></div>
+    <div class="stat"><span class="v">12 + 1</span><span class="l">zmian OpenSpec zamkniętych + w toku</span></div>
+  </div>
+
+  <div class="viz">
+    <p class="viz-title">Co składa się na te 46,4 tys. linii</p>
+    <div class="bar" role="img" aria-label="Podział linii: kod produkcyjny 15,0 tys., testy 16,1 tys., OpenSpec 13,2 tys., infra i CI 2,1 tys.">
+      <div class="seg s1" style="flex: 15002" title="Kod produkcyjny — 15,0 tys. linii"></div>
+      <div class="seg s2" style="flex: 16129" title="Testy — 16,1 tys. linii"></div>
+      <div class="seg s3" style="flex: 13185" title="OpenSpec (markdown) — 13,2 tys. linii"></div>
+      <div class="seg s4" style="flex: 2091" title="Infra + CI + skrypty — 2,1 tys. linii"></div>
+    </div>
+    <ul class="legend">
+      <li><span class="sw s1"></span>kod produkcyjny <span class="n">15,0 tys.</span></li>
+      <li><span class="sw s2"></span>testy <span class="n">16,1 tys.</span></li>
+      <li><span class="sw s3"></span>OpenSpec <span class="n">13,2 tys.</span></li>
+      <li><span class="sw s4"></span>infra + CI <span class="n">2,1 tys.</span></li>
+    </ul>
+  </div>
+
+  <p>Dwie rzeczy rzucają się w oczy. <strong>Testów jest więcej niż kodu</strong> —
+  to zdrowe i już się zwróciło (logika coverage i rollupów była „wrong twice", jak
+  uczciwie przyznaje komentarz w CI), ale znaczy, że każdy task płaci podatek testowy.
+  I&nbsp;<strong>markdown procesu to 28% wszystkiego, co ręcznie utrzymywane</strong> —
+  prawie tyle, co cały kod produkcyjny. Do tego dochodzi 21 specyfikacji capabilities,
+  które z każdą zmianą rosną i które każde <code>/opsx:apply</code> czyta.</p>
+
+  <h2><span class="no">Sprawa 1</span>Czas pracy Claude Code rośnie z każdym taskiem</h2>
+
+  <p>To nie jest złudzenie i nie jest to „wina OpenSpec" jako idei. Złożyły się cztery
+  konkretne mechanizmy:</p>
+
+  <h3>Kontekst rośnie liniowo, a rytuał jest stały niezależnie od wagi zmiany</h3>
+  <p>Każda zmiana — również drobna — przechodzi pełną ścieżkę: proposal, design, tasks,
+  delta specs, implementacja, <code>review.md</code>, archiwizacja. Zmiana
+  <code>data-history-newest-first</code> (odwrócenie sortowania w tabeli) kosztowała
+  202 linie markdownu plus review plus PR. Jednocześnie baza, którą trzeba przeczytać,
+  żeby cokolwiek zrobić zgodnie ze specyfikacją, rośnie z każdym archive. Sesja z 7
+  sierpnia startowała z pustym katalogiem specs; dzisiejsza startuje z 21 plikami.</p>
+
+  <h3>Komentarze są literaturą</h3>
+  <p>Komentarze w tym repo to eseje — z historią decyzji, sprostowaniami wcześniejszych
+  przekonań i morałem. To piękna kultura i część z nich (jak wyjaśnienie biletów w
+  <code>tickets.py</code> albo powód braku <code>apply</code> w CI) broni się w całości.
+  Ale norma „każdy komentarz jest narracją" znaczy, że każda edycja kodu jest też
+  edycją prozy, którą trzeba uzgodnić z rzeczywistością — i Claude Code robi to
+  sumiennie, płacąc czasem.</p>
+
+  <h3>Hook <code>require-review</code> prawdopodobnie nie działa na tym Macu</h3>
+  <p>Hook jest napisany w PowerShellu i zadeklarowany z <code>"shell": "powershell"</code>,
+  a <code>pwsh</code> <strong>nie jest zainstalowany</strong> na tej maszynie
+  (sprawdzone). Hook odpala się przy każdym wywołaniu Bash z timeoutem 15&nbsp;s — więc
+  albo cicho zawodzi (i brama review jest iluzoryczna), albo dokłada opóźnienie i szum
+  błędów do każdego wywołania narzędzia. Tak czy inaczej: do przepisania na basha,
+  z matcherem zawężonym do komend, które faktycznie archiwizują.</p>
+
+  <h3>Nie ma CLAUDE.md <span class="done">rozwiązane</span></h3>
+  <p>README jest znakomite, ale nie jest ładowane automatycznie do sesji. Każda sesja
+  odkrywała strukturę repo od zera — koszt płacony na starcie każdego taska.
+  <strong>Zamknięte PR&nbsp;#27</strong>: <code>CLAUDE.md</code> jest na <code>main</code>
+  i zawiera mapę modułów, prawdziwe komendy per moduł, konwencję językową OpenSpec oraz
+  cztery pułapki, na które wchodzi się przy założeniu domyślnych nawyków.</p>
+
+  <h3>Praca idzie szeregowo, choć nie musi</h3>
+  <p>Cały czas mierzony w tym dokumencie to czas <em>ścienny</em> jednej sesji robiącej
+  jedną rzecz naraz. Tymczasem repo znosi kilka równoległych stanowisk — nie przez drugi
+  klon, tylko przez <code>git worktree</code>: jedno repo, kilka katalogów roboczych,
+  osobny branch i osobny indeks w każdym. Ten dokument powstał właśnie tak, obok agenta
+  pracującego równolegle nad inną zmianą, i żadna z tych prac nie zobaczyła edycji
+  drugiej.</p>
+  <p>Granicą nie jest git, tylko cztery zasoby, których worktree <strong>nie
+  dzieli</strong>:</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Zasób</th><th>Co się dzieje przy dwóch naraz</th></tr>
+    <tr>
+      <td>Baza <code>market_data_dev</code> w Azure</td>
+      <td>jedna baza dla wszystkich worktree — dwie migracje z dwóch branchy rozjeżdżają
+        schemat, a objaw wychodzi później i wygląda jak błąd w kodzie</td>
+    </tr>
+    <tr>
+      <td>Sesja capital.com demo</td>
+      <td>każde nowe logowanie unieważnia poprzednie, więc dwa gateweye wzajemnie się
+        wylogowują — losowe 401 w obu naraz</td>
+    </tr>
+    <tr>
+      <td>Porty 8010 / 8020 / 5173</td>
+      <td>drugi <code>dev.sh</code> odmawia startu — awaria łagodna, bo <code>--strictPort</code>
+        woli błąd niż ciche zajęcie innego portu</td>
+    </tr>
+    <tr>
+      <td><code>openspec/specs/</code> przy archiwizacji</td>
+      <td>osobne katalogi w <code>changes/</code> nie kolidują, ale <code>archive</code> obu
+        zmian pisze do tych samych plików specyfikacji</td>
+    </tr>
+  </table>
+  </div>
+
+  <p>Wniosek praktyczny: <strong>jeden agent naraz na <code>market-data</code> i na
+  uruchomionym stacku</strong>, ale dokumentacja, infra, CI i praca w terminalu na innych
+  plikach idą równolegle bez ryzyka. To najtańsza dostępna dźwignia na czas ścienny —
+  nie przyspiesza pojedynczego taska, tylko pozwala mieć dwa w locie. Koszt wejścia to
+  <code>uv sync</code>, <code>pnpm install</code> i skopiowanie dwóch plików
+  <code>.env</code>, bo wszystkie trzy są gitignorowane i nowy worktree startuje pusty.</p>
+
+  <div class="callout note">
+    <span class="tag">Co zrobić</span>
+    <p><strong>Dwie ścieżki zmian</strong> — największy pojedynczy zysk. Pełny rytuał
+    OpenSpec tylko wtedy, gdy zmiana modyfikuje wymaganie w <code>specs/</code>, kontrakt
+    między modułami albo infra. Poprawki, kosmetyka UI i drobne fixy: branch → testy →
+    PR, bez proposal/design/review. Kryterium jest mechaniczne, więc da się je zapisać
+    w <code>openspec/config.yaml</code> i w hooku.</p>
+    <p><strong>Budżet artefaktów</strong>: proposal ≤ 1 strona; <code>design.md</code>
+    tylko, gdy istnieje realna decyzja z alternatywami; tasks nie powtarzają proposala.</p>
+    <p><strong>Konsolidacja capabilities</strong> przy najbliższym archive: 21 → ~10
+    (np. <code>capital-*</code> 5→2, <code>terminal-*</code> 8→4,
+    <code>market-data-*</code> 8→4). Mniejsza powierzchnia czytania dla każdej
+    przyszłej zmiany.</p>
+    <p><strong>Norma komentarzy</strong>: zostaje „dlaczego", znika narracja. Esej jest
+    zasłużony tylko tam, gdzie dokumentuje pułapkę, w którą ktoś już wpadł.</p>
+    <p><strong>Drugi worktree na stałe</strong>: osobny katalog trzymany gotowy do pracy
+    (zależności zainstalowane, <code>.env</code> na miejscu), żeby drugie stanowisko
+    kosztowało jedną komendę, a nie kwadrans przygotowań.</p>
+  </div>
+
+  <h2><span class="no">Sprawa 2</span>Czy architektura jest za złożona jak na aplikację osobistą?</h2>
+
+  <p><strong>Rdzeń — nie.</strong> Trzy moduły z opublikowanym kontraktem, zakaz
+  cross-importów, kontrakt terminala generowany ze schematu <code>market-data</code>
+  i sprawdzany w CI — to jest właściwy rozmiar dla tego, co robisz, i to nie ta część
+  spowalnia. Gateway ma 2 tys. linii, serce <code>market-data</code> to porządne, ale
+  nie przerośnięte 6,3 tys. Nie ma tu warstw dla warstw.</p>
+
+  <p><strong>Przeskalowana jest warstwa tożsamości i platformy.</strong> Zanim ocenimy
+  mechanizmy, nazwijmy, co naprawdę jest chronione: klucz API Capital do konta
+  <em>demo</em> (bez pieniędzy), baza świec (odtwarzalna z historii providera), koszty
+  subskrypcji Azure i laptop operatora. Nie ma użytkowników publicznych, danych
+  osobowych ani środków na rachunku. To jest model zagrożeń jednej osoby — a warstwa
+  security jest zwymiarowana jak dla zespołu:</p>
+
+  <div class="tablewrap">
+  <table>
+    <tr><th>Mechanizm</th><th>Koszt stały</th><th>Werdykt</th></tr>
+    <tr>
+      <td>Easy Auth + rejestracja SPA + bilety jednorazowe na WebSocket</td>
+      <td>niski — zapłacony raz, bilety to 97 linii</td>
+      <td><span class="pill keep">zostaw</span></td>
+    </tr>
+    <tr>
+      <td>OIDC dla deployów (zero sekretów w repo)</td>
+      <td>zerowy po skonfigurowaniu</td>
+      <td><span class="pill keep">zostaw</span></td>
+    </tr>
+    <tr>
+      <td>Key Vault</td>
+      <td>niski</td>
+      <td><span class="pill keep">zostaw</span></td>
+    </tr>
+    <tr>
+      <td>Alerty o świeżości świec, bazie, gatewayu</td>
+      <td>niski — a pilnują sedna aplikacji</td>
+      <td><span class="pill keep">zostaw</span></td>
+    </tr>
+    <tr>
+      <td>Baza dev w Azure + osobny service principal + roczna rotacja sekretu + allowlist IP</td>
+      <td><strong>wraca co tydzień</strong>: latencja lokalnej pracy, IP po każdej zmianie sieci, rotacja</td>
+      <td><span class="pill freeze">świadomy podatek</span></td>
+    </tr>
+    <tr>
+      <td>Stan Terraforma bootstrapu w gicie (klucze storage unieszkodliwione)</td>
+      <td>zerowy — klucze są martwe, sprawdzone przeciw Azure</td>
+      <td><span class="pill keep">zostaw</span></td>
+    </tr>
+  </table>
+  </div>
+
+  <p>Baza dev w Azure to decyzja świadoma i zapisana w README — wierność produkcji
+  zamiast kontenera. Uczciwie: to jest dziś największy <em>stały</em> podatek
+  infrastrukturalny tego projektu. Nie trzeba go cofać teraz; trzeba wiedzieć, że
+  jeśli tempo stanie się ważniejsze od wierności prod, powrót do lokalnego kontenera
+  dla dev (kontener już istnieje w testach) jest ruchem, który ten podatek kasuje.</p>
+
+  <div class="callout note">
+    <span class="tag">Zasada na przyszłość</span>
+    <p><strong>Budżet złożoności.</strong> Nowy mechanizm bezpieczeństwa wchodzi tylko
+    wtedy, gdy chroni realne aktywo z listy powyżej — nie hipotetyczne. W szablonie
+    proposala warto dodać sekcję „czego świadomie nie robimy", żeby każda zmiana
+    musiała nazwać granicę, której nie przekracza. To, co już zbudowane, działa i jest
+    opłacone — nie wyrywać, ale <strong>zamrozić zakres</strong>: nie dokładać kolejnych
+    warstw tożsamości, dopóki nie pojawi się drugi człowiek albo prawdziwe pieniądze.</p>
+  </div>
+
+  <h2><span class="no">Sprawa 3</span>CI/CD, deployment i infra</h2>
+
+  <p>Piątkowe popołudnie wyglądało tak:</p>
+
+  <ul class="timeline">
+    <li><span class="t">17:04–17:29</span>Platforma wjeżdża w czterech commitach: Key Vault,
+      App Service, OIDC, Dockerfile'y, alerty. Do tego momentu — szybko.</li>
+    <li class="hot"><span class="t">18:27–19:44</span>Pięć poprawek z rzędu, każda w cyklu
+      commit → push → czekanie na workflow: federated credentials dla niewłaściwego
+      subjectu OIDC, wielkie litery w nazwie obrazu GHCR, dwa podejścia do poświadczeń
+      pull dla App Service, subject dla environmentu. <strong>~2,5 godziny na tarcie
+      integracyjne Azure↔GitHub.</strong></li>
+    <li><span class="t">20:17–21:56</span>Auth terminala do market-data: plan, bilety,
+      rejestracje, rollout — duża zmiana zamknięta w niecałe dwie godziny.</li>
+  </ul>
+
+  <p><strong>Diagnoza: to był koszt jednorazowy.</strong> Subjecty OIDC i nazewnictwo
+  GHCR konfiguruje się raz; żadna z tych pięciu poprawek nie wróci przy kolejnym
+  deployu. To nie architektura była wolna — to pierwsza integracja dwóch chmur, robiona
+  na ślepo, bo każdą hipotezę weryfikuje dopiero przebieg workflow. Wnioski, które
+  <em>zostają</em>, są trzy:</p>
+
+  <ul class="tight">
+    <li><strong>Docker buduje bez cache'a.</strong> Żaden z trzech deploy workflowów nie
+      ma <code>cache-from/cache-to: type=gha</code> — każdy deploy buduje obraz od zera.
+      Kwadrans pracy, kilka minut zysku na każdym deployu od dziś do końca projektu.</li>
+    <li><strong>Deploy kończy się na „wysłano", nie „działa".</strong> Po
+      <code>webapps-deploy</code> nie ma smoke-checku. O nieudanym starcie kontenera
+      dowiadujesz się z terminala. Jeden krok z <code>curl</code> do <code>/health</code>
+      z retry zamyka tę lukę.</li>
+    <li><strong>Każdy PR uruchamia wszystkie trzy moduły</strong> — w tym 273 testy
+      bazodanowe z kontenerem Postgresa — także wtedy, gdy zmiana dotyczy wyłącznie
+      terminala. Filtr ścieżek (z uwagą na required checks w branch protection) skróci
+      typowy PR o kilka minut.
+      <br><em>Zmierzone po napisaniu tego dokumentu:</em> PR&nbsp;#27 dodawał
+      <strong>jeden plik markdown</strong> i mimo to uruchomił komplet —
+      <code>capital-gateway</code> 14&nbsp;s, <code>market-data</code> 1&nbsp;min
+      (z kontenerem Postgresa), <code>terminal</code> 1&nbsp;min. Dwie minuty i cały
+      kontener bazy za zmianę, która nie dotknęła ani jednej linii kodu.</li>
+  </ul>
+
+  <p>Jedno świadomie zostaje bez zmian: <strong>ręczny <code>terraform apply</code></strong>.
+  Uzasadnienie w <code>terraform.yml</code> — CI z prawem zapisu do katalogu Entra to
+  większy przywilej, niż cokolwiek innego w projekcie posiada — jest słuszne dla
+  platformy jednej osoby, a apply nie jest wąskim gardłem.</p>
+
+  <h2><span class="no">Podsumowanie</span>Plan działania</h2>
+
+  <ol class="plan">
+    <li><strong>CLAUDE.md z mapą repo i komendami.</strong>
+      <span class="meta">zrobione · PR&nbsp;#27, na <code>main</code></span></li>
+    <li><strong>Hook <code>require-review</code> przepisany na basha, matcher zawężony.</strong>
+      <span class="meta">30 min · dziś</span></li>
+    <li><strong>Drugi worktree jako stałe stanowisko pracy.</strong>
+      <span class="meta">15 min · raz</span></li>
+    <li><strong>Cache Dockera + smoke-check w trzech deploy workflowach.</strong>
+      <span class="meta">1 h · przy najbliższym deployu</span></li>
+    <li><strong>Lekka ścieżka zmian w OpenSpec (pełny rytuał tylko dla specs/kontraktów/infra).</strong>
+      <span class="meta">1–2 h · ten tydzień</span></li>
+    <li><strong>Filtry ścieżek w <code>checks.yml</code>.</strong>
+      <span class="meta">1 h · ten tydzień</span></li>
+    <li><strong>Konsolidacja capabilities 21 → ~10.</strong>
+      <span class="meta">2–3 h · przy najbliższym archive</span></li>
+    <li><strong>Zapis budżetu złożoności w szablonie proposala.</strong>
+      <span class="meta">30 min · przy najbliższym propose</span></li>
+  </ol>
+
+  <p>Sedno: <strong>nie budujesz za dużo aplikacji — budujesz za dużo procesu wokół
+  niej i za dużo tożsamości pod nią.</strong> Moduły zostawić w spokoju. Proces
+  odchudzić tam, gdzie zmiana jest drobna. Warstwę security zamrozić na tym, co już
+  działa, i odzyskać godziny, które dziś idą na rytuał — bo to one, nie architektura,
+  są powodem, dla którego każdy task jest wolniejszy od poprzedniego.</p>
+
+  <footer>
+    <p>Metoda: analiza pełnego drzewa repozytorium (moduły, openspec, infra, workflowy,
+    hooki), historii gita (212 commitów, 7–9 sierpnia 2026) oraz pomiarów linii per
+    kategoria. Liczby: kod produkcyjny 15 002 linii (gateway 2 060, market-data 6 981 z
+    migracjami, terminal 5 961 bez testów i bez wygenerowanego kontraktu), testy 16 129,
+    OpenSpec 13 185, infra + CI + skrypty 2 091. Kod generowany
+    (<code>contract.generated.ts</code>, 1 432 linie) policzony osobno — nie jest
+    utrzymywany ręcznie.</p>
+    <p>Aktualizacja tego samego wieczoru: sprostowanie sprawy kluczy konta storage
+    (sprawdzone przeciw Azure, nie tylko odczytane z kodu), zamknięcie punktu o CLAUDE.md
+    po scaleniu PR&nbsp;#27, zmierzony czas checków dla PR-a zmieniającego jeden plik
+    markdown, oraz nowa sekcja o pracy równoległej — dopisana, bo powstała z praktyki:
+    ten dokument był aktualizowany w osobnym worktree obok agenta pracującego w tym
+    samym repozytorium nad inną zmianą.</p>
+  </footer>
+</main>
