@@ -1,0 +1,237 @@
+<title>Rotacja poświadczeń — co wygasa, kiedy i jak to odnowić</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 52rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.9rem; min-width: 30rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.84rem; white-space: nowrap; }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>Rotacja poświadczeń</h1>
+<p class="lede">Co w tej platformie wygasa samo, czego się nie da zapomnieć bezkarnie, i co zrobić, gdy termin minie.</p>
+<p class="meta">
+  Dotyczy stanu po zmianie <code>provision-azure-platform</code><br>
+  Powiązane: <code>docs/dbeaver-azure-connection.html</code>, <code>infra/key-vault.tf</code>, <code>infra/entra.tf</code>
+</p>
+
+<h2>Zasada</h2>
+
+<p>Większość tej platformy nie ma czego rotować, i to jest wybór, nie przypadek. Baza nie zna żadnego hasła — każde połączenie bierze świeży token Entra w momencie nawiązywania, więc nie ma tam poświadczenia, które mogłoby wyciec albo wygasnąć. Wdrożenia nie trzymają sekretu do Azure — GitHub Actions wymienia własny token OIDC na token Azure przy każdym uruchomieniu. Klucze dostępu do konta magazynu stanu są wyłączone na poziomie konta, więc te, które siedzą w zacommitowanym pliku stanu, są trwale martwe.</p>
+
+<p>Zostaje krótka lista rzeczy, które <em>naprawdę</em> wygasają. Ta strona jest o nich.</p>
+
+<div class="callout warn">
+  <span class="tag">Dwie daty warte zapisania w kalendarzu</span>
+  <p>Oba sekrety aplikacji Entra wygasają <strong>9 sierpnia 2027</strong>. Terraform ich nie odnowi sam — ma na <code>end_date</code> jawne <code>ignore_changes</code>, bo bez tego każdy <code>plan</code> chciałby je rotować (<code>timestamp()</code> nigdy nie zwraca dwa razy tej samej wartości). Odnowienie jest ręczne i opisane niżej.</p>
+</div>
+
+<h2>Co wygasa</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Poświadczenie</th><th>Gdzie mieszka</th><th>Termin</th><th>Co się psuje</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">ghcr-pull-token</td>
+      <td>Key Vault → <code>DOCKER_REGISTRY_SERVER_PASSWORD</code> w obu App Service</td>
+      <td>wg ustawienia PAT-a w GitHubie</td>
+      <td>Obie usługi zwracają <span class="pill bad">503</span>; w logu kontenera <code>ImagePullUnauthorizedFailure</code></td>
+    </tr>
+    <tr>
+      <td class="field">easy-auth</td>
+      <td>rejestracja Entra <code>app-tradingcenter-market-data-easyauth</code></td>
+      <td><strong>2027-08-09</strong></td>
+      <td><code>market-data</code> przestaje uwierzytelniać wywołania z przeglądarki</td>
+    </tr>
+    <tr>
+      <td class="field">local-market-data-dev</td>
+      <td>rejestracja Entra <code>sp-tradingcenter-market-data-dev</code>, kopia w lokalnym <code>.env</code></td>
+      <td><strong>2027-08-09</strong></td>
+      <td>Lokalny <code>market-data</code> nie łączy się z <code>market_data_dev</code></td>
+    </tr>
+    <tr>
+      <td class="field">AZURE_STATIC_WEB_APPS_API_TOKEN</td>
+      <td>GitHub Secrets</td>
+      <td>bezterminowy <span class="dim">— ale zmienia się, gdy Static Web App powstaje na nowo</span></td>
+      <td><code>deploy-terminal</code> pada na kroku wdrożenia</td>
+    </tr>
+    <tr>
+      <td class="field">gateway-api-key</td>
+      <td>Key Vault <span class="dim">(czytany przez oba moduły)</span> + dwa lokalne <code>.env</code></td>
+      <td>bezterminowy <span class="dim">— rotujesz, kiedy chcesz</span></td>
+      <td>Rozjazd między kopiami: <code>market-data</code> dostaje <span class="pill bad">401</span> z gatewaya</td>
+    </tr>
+    <tr>
+      <td class="field">capital-api-key<br>capital-identifier<br>capital-password</td>
+      <td>Key Vault + lokalny <code>.env</code> gatewaya</td>
+      <td>gdy zmienisz je u brokera</td>
+      <td>Gateway nie loguje się do capital.com — brak świec i brak strumienia</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout good">
+  <span class="tag">Czego rotować nie trzeba, i dlaczego</span>
+  <ul>
+    <li><strong>Hasło do bazy</strong> — nie istnieje. <code>password_auth_enabled = false</code> na serwerze; aplikacja i twój lokalny proces biorą token Entra przy każdym nowym połączeniu, a biblioteka odnawia go sama.</li>
+    <li><strong>Sekret do Azure w GitHubie</strong> — nie istnieje. Wdrożenia idą przez federację OIDC, a poświadczenia federowane nie mają daty ważności.</li>
+    <li><strong>Klucze konta magazynu stanu</strong> — wyłączone (<code>shared_access_key_enabled = false</code>). Terraform sięga do stanu tożsamością Entra.</li>
+  </ul>
+</div>
+
+<h2>Jak odnowić</h2>
+
+<h3>Token do GHCR</h3>
+
+<p>App Service musi mieć czym pobrać obraz z GHCR-a, bo repozytorium jest prywatne. Token to zwykły PAT z <strong>jednym</strong> zakresem — <code>read:packages</code>. Nie nadawaj mu więcej; nic więcej nie robi.</p>
+
+<ol>
+  <li>Nowy token: <a href="https://github.com/settings/tokens">github.com/settings/tokens</a> → <em>Generate new token (classic)</em> → zaznacz wyłącznie <code>read:packages</code>.</li>
+  <li>Wstaw go do sejfu i zrestartuj obie aplikacje — restart jest po to, żeby nie czekać, aż App Service odświeży referencję do Key Vaulta sam z siebie:</li>
+</ol>
+
+<pre><code>az keyvault secret set --vault-name kv-tradingctr-58hw \
+  --name ghcr-pull-token --value &lt;NOWY_TOKEN&gt;
+
+az webapp restart --name app-tradingcenter-gateway     --resource-group rg-tradingcenter
+az webapp restart --name app-tradingcenter-market-data --resource-group rg-tradingcenter</code></pre>
+
+<p>Sprawdzenie, że zadziałało — obie powinny odpowiedzieć czymś innym niż 503:</p>
+
+<pre><code>curl -o /dev/null -w '%{http_code}\n' https://app-tradingcenter-gateway.azurewebsites.net/</code></pre>
+
+<div class="callout">
+  <span class="tag">Co zobaczysz, gdy token wygaśnie</span>
+  <p>Strona odpowiada <code>503</code>, a wdrożenie w GitHub Actions jest <strong>zielone</strong> — bo workflow zbudował obraz, wypchnął go i przypisał do App Service, i to wszystko się udało. Nie udało się dopiero pobranie obrazu przez Azure, a to dzieje się już poza pipeline'em. Log kontenera:</p>
+  <pre><code>az webapp log download --name app-tradingcenter-market-data \
+  --resource-group rg-tradingcenter --log-file logi.zip</code></pre>
+  <p>W środku <code>LogFiles/*_docker.log</code> — szukaj <code>ImagePullUnauthorizedFailure</code>.</p>
+</div>
+
+<h3>Sekrety aplikacji Entra</h3>
+
+<p>Terraform zna te zasoby, ale celowo nie pilnuje ich daty ważności. Odnowienie to wymuszone odtworzenie — jednego albo drugiego, w katalogu <code>infra/</code>:</p>
+
+<pre><code>terraform apply -replace=azuread_application_password.market_data_easy_auth
+terraform apply -replace=azuread_application_password.market_data_dev</code></pre>
+
+<p><strong>Easy Auth</strong> nie wymaga nic więcej: nowa wartość wchodzi do ustawień <code>market-data</code> tym samym <code>apply</code>, bo ustawienie czyta ją wprost z zasobu.</p>
+
+<p><strong>Tożsamość deweloperska</strong> tak — jej sekret żyje też w twoim lokalnym pliku, a tam Terraform nie sięga:</p>
+
+<pre><code>terraform output -raw market_data_dev_client_secret</code></pre>
+
+<p>Wynik wklej do <code>modules/market-data/.env</code> jako <code>AZURE_CLIENT_SECRET</code>.</p>
+
+<h3>Token wdrożeniowy Static Web Apps</h3>
+
+<p>Jedyny sekret Azure trzymany po stronie GitHuba, i jedyny dlatego, że <code>Azure/static-web-apps-deploy</code> nie ma ścieżki OIDC. Jeśli Static Web App kiedykolwiek powstanie na nowo, token trzeba przenieść:</p>
+
+<pre><code>gh secret set AZURE_STATIC_WEB_APPS_API_TOKEN \
+  --body "$(terraform output -raw terminal_api_key)"</code></pre>
+
+<h3>Klucz między modułami</h3>
+
+<p><code>gateway-api-key</code> to jedna wartość w <strong>trzech</strong> miejscach: w sejfie (skąd czytają obie wdrożone usługi) oraz w dwóch lokalnych plikach <code>.env</code>. Rotacja oznacza podmianę wszędzie, inaczej <code>market-data</code> zacznie dostawać <code>401</code> od gatewaya.</p>
+
+<pre><code>az keyvault secret set --vault-name kv-tradingctr-58hw \
+  --name gateway-api-key --value &lt;NOWY_KLUCZ&gt;
+
+az webapp restart --name app-tradingcenter-gateway     --resource-group rg-tradingcenter
+az webapp restart --name app-tradingcenter-market-data --resource-group rg-tradingcenter</code></pre>
+
+<p>Potem to samo w <code>modules/capital-gateway/.env</code> i <code>modules/market-data/.env</code> — obie strony muszą trzymać identyczną wartość.</p>
+
+<h2>Rzecz pokrewna: twój adres IP</h2>
+
+<p>Nie jest poświadczeniem, ale psuje się tak samo cicho. Firewall bazy przepuszcza dokładnie jeden adres deweloperski, a dostawca internetu potrafi go zmienić bez uprzedzenia. Objaw: lokalny <code>market-data</code> i DBeaver nagle nie łączą się z bazą, mimo że nic nie zmieniałeś.</p>
+
+<pre><code>curl ifconfig.me</code></pre>
+
+<p>Nowy adres wpisz w dwóch miejscach — <code>infra/terraform.tfvars</code> (lokalnie, plik jest gitignorowany) i w zmiennej repozytorium, z której korzysta <code>terraform plan</code> w CI:</p>
+
+<pre><code>gh variable set TF_VAR_DEVELOPER_IP_ADDRESS --body &lt;NOWY_ADRES&gt;</code></pre>
+
+<p>Następnie <code>terraform apply</code> w <code>infra/</code>. Bez zmiany w obu miejscach naraz plan w CI będzie pokazywał różnicę względem tego, co masz lokalnie.</p>
+
+<div class="callout bad">
+  <span class="tag">Uwaga na koniec</span>
+  <p><code>terraform apply</code> dla tej platformy uruchamiasz <strong>ty, lokalnie</strong> — nie ma go w CI i nie jest to niedopatrzenie. Ten root zarządza obiektami katalogu Entra, a nadanie pipeline'owi prawa zapisu do katalogu byłoby większym uprawnieniem niż cokolwiek innego w tym projekcie. CI robi wyłącznie <code>plan</code> na pull requestach. Powód jest zapisany w nagłówku <code>.github/workflows/terraform.yml</code>.</p>
+</div>
+
+<footer>
+  Gdy coś tu przestanie być prawdą — zmieni się nazwa sejfu, dojdzie czwarty sekret, zniknie PAT na rzecz Azure Container Registry — popraw ten plik przy tej samej zmianie, nie później.
+</footer>
+
+</main>

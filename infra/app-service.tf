@@ -32,6 +32,20 @@ locals {
     for k, name in local.key_vault_secret_names :
     k => "${azurerm_key_vault.main.vault_uri}secrets/${name}/"
   }
+
+  # GHCR is private, because the repository is, so App Service needs a credential to pull
+  # at all — without these three the container never starts and the site answers 503 with
+  # `ImagePullUnauthorizedFailure` in the docker log. Identical for both apps, so said
+  # once here rather than twice below.
+  #
+  # The alternative that needs no stored credential is Azure Container Registry, which
+  # App Service pulls from with its managed identity — rejected on cost: it is a paid
+  # resource and every other piece of this platform fits the free-tier grant.
+  ghcr_pull_settings = {
+    DOCKER_REGISTRY_SERVER_URL      = "https://ghcr.io"
+    DOCKER_REGISTRY_SERVER_USERNAME = "MarekGrzeska"
+    DOCKER_REGISTRY_SERVER_PASSWORD = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.ghcr_pull_token})"
+  }
 }
 
 # capital-gateway: not public. design.md, "Uwierzytelnianie gatewaya w kodzie, nie w
@@ -74,7 +88,7 @@ resource "azurerm_linux_web_app" "capital_gateway" {
     }
   }
 
-  app_settings = {
+  app_settings = merge(local.ghcr_pull_settings, {
     GATEWAY_ENV        = "production"
     CAPITAL_BASE_URL   = "https://demo-api-capital.backend-capital.com"
     CAPITAL_STREAM_URL = "wss://api-streaming-capital.backend-capital.com/connect"
@@ -85,7 +99,7 @@ resource "azurerm_linux_web_app" "capital_gateway" {
     GATEWAY_API_KEY    = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-  }
+  })
 
   lifecycle {
     # The deploy workflow (group 7) sets the real image tag with `az webapp config
@@ -167,7 +181,7 @@ resource "azurerm_linux_web_app" "market_data" {
     }
   }
 
-  app_settings = {
+  app_settings = merge(local.ghcr_pull_settings, {
     GATEWAY_BASE_URL   = "https://${local.capital_gateway_hostname}"
     GATEWAY_STREAM_URL = "wss://${local.capital_gateway_hostname}/ws/stream"
     GATEWAY_API_KEY    = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
@@ -184,7 +198,7 @@ resource "azurerm_linux_web_app" "market_data" {
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.market_data_easy_auth.value
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
-  }
+  })
 
   lifecycle {
     ignore_changes = [site_config[0].application_stack[0].docker_image_name]
