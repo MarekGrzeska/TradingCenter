@@ -249,3 +249,159 @@ async def test_the_response_names_its_side_and_algorithm_version(api) -> None:
 
     assert body["price_side"] == "bid"
     assert body["algorithm_version"] >= 1
+
+
+# --- W1, punkty i poziomy: markers, cluster levels, cross-resolution levels ----------
+
+
+async def test_swing_points_are_returned_as_markers(api, pool) -> None:
+    # A clean up-down-up wiggle so bar 5 (offset 25) is an unambiguous swing high
+    # confirmed by n=2 bars either side.
+    heights = {
+        30: 0.0, 29: 0.2, 28: 0.4, 27: 0.6, 26: 0.8,
+        25: 2.0,
+        24: 0.8, 23: 0.6, 22: 0.4, 21: 0.2, 20: 0.0,
+    }
+    async with pool.acquire() as conn:
+        await write_candles(
+            conn,
+            [
+                candle(m, high=100.0 + heights.get(m, 0.0), low=99.0, close=99.5, open=99.5)
+                for m in range(30, -1, -1)
+            ],
+        )
+
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "MINUTE",
+            "from": (NOW - timedelta(minutes=29)).isoformat(),
+            "to": (NOW + timedelta(minutes=1)).isoformat(),
+            "specs": [{"id": "swing_points", "params": {"n": 2}}],
+        },
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    [result] = body["results"]
+    assert result["lines"] is None
+    assert result["markers"] is not None
+    swing_high = next(m for m in result["markers"] if m["label"] == "Swing High")
+    assert swing_high["price"] == pytest.approx(102.0)
+    assert datetime.fromisoformat(swing_high["time"]) == NOW - timedelta(minutes=25)
+
+
+async def test_level_clusters_are_returned_with_a_count(api, pool) -> None:
+    heights = {
+        30: 0.0, 29: 0.2, 28: 0.4, 27: 0.6, 26: 3.0,
+        25: 0.6, 24: 0.4, 23: 0.2, 22: 0.0, 21: 0.2,
+        20: 0.4, 19: 0.6, 18: 3.05,
+        17: 0.6, 16: 0.4, 15: 0.2, 14: 0.0,
+    }
+    async with pool.acquire() as conn:
+        await write_candles(
+            conn,
+            [
+                candle(m, high=100.0 + heights.get(m, 0.0), low=99.0, close=99.5, open=99.5)
+                for m in range(30, -1, -1)
+            ],
+        )
+
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "MINUTE",
+            "from": (NOW - timedelta(minutes=29)).isoformat(),
+            "to": (NOW + timedelta(minutes=1)).isoformat(),
+            "specs": [{"id": "level_clusters", "params": {"n": 2, "tol": 1.0, "atr_period": 5}}],
+        },
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    [result] = body["results"]
+    assert result["levels"] is not None
+    equal_highs = [lvl for lvl in result["levels"] if lvl["label"] == "Equal High"]
+    assert len(equal_highs) == 1
+    assert equal_highs[0]["count"] == 2
+
+
+async def test_htf_levels_day_reads_the_previous_closed_day(api, pool) -> None:
+    """Task 3.11: PDH/PDL on a MINUTE_15 series carry the previous day's own
+    OHLC, valid from that day's close — not from the start of the series."""
+    day_before = datetime(2026, 8, 5, tzinfo=UTC)
+    display_day = datetime(2026, 8, 6, tzinfo=UTC)
+
+    async with pool.acquire() as conn:
+        await write_candles(
+            conn,
+            [
+                Candle(
+                    symbol="US100",
+                    resolution=Resolution.DAY,
+                    period_start=day_before,
+                    open=100.0,
+                    high=110.0,
+                    low=95.0,
+                    close=105.0,
+                    source=CandleSource.HISTORY,
+                ),
+                Candle(
+                    symbol="US100",
+                    resolution=Resolution.DAY,
+                    period_start=display_day,
+                    open=105.0,
+                    high=120.0,
+                    low=100.0,
+                    close=115.0,
+                    source=CandleSource.HISTORY,
+                ),
+            ],
+        )
+        await write_candles(
+            conn,
+            [
+                candle(0, resolution=Resolution.MINUTE_15, period_start=display_day + timedelta(minutes=m))
+                for m in range(0, 24 * 60, 15)
+            ],
+        )
+
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "MINUTE_15",
+            "from": display_day.isoformat(),
+            "to": (display_day + timedelta(days=1)).isoformat(),
+            "specs": [{"id": "htf_levels_day"}],
+        },
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    [result] = body["results"]
+    at_display_day = [
+        lvl for lvl in result["levels"] if datetime.fromisoformat(lvl["from"]) == display_day
+    ]
+    pd_high = next(lvl for lvl in at_display_day if lvl["label"] == "PD High")
+    pd_low = next(lvl for lvl in at_display_day if lvl["label"] == "PD Low")
+    assert pd_high["price"] == pytest.approx(110.0)
+    assert pd_low["price"] == pytest.approx(95.0)
+
+
+async def test_htf_levels_refused_without_the_day_series(api, pool) -> None:
+    """Acceptance criterion: cross-resolution reads must not break on a pair
+    collected only at MINUTE — they refuse cleanly instead."""
+    async with pool.acquire() as conn:
+        await write_candles(conn, [candle(m) for m in range(30, -1, -1)])
+
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "MINUTE",
+            "from": (NOW - timedelta(minutes=10)).isoformat(),
+            "to": NOW.isoformat(),
+            "specs": [{"id": "htf_levels_day"}],
+        },
+    )
+    assert response.status_code == 422
+    assert "DAY" in response.json()["detail"]
