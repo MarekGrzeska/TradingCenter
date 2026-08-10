@@ -18,16 +18,12 @@ export interface SocketLike {
 export type SocketFactory = (url: string) => SocketLike;
 
 /**
- * Where one pair's stream lives — asked afresh for every attempt, including
- * every retry after a drop.
+ * Where one pair's stream lives — asked afresh for every attempt, retries included,
+ * because the archive hands out a one-time ticket for the handshake (a browser cannot
+ * put a header on one) and a spent ticket is no ticket at all.
  *
- * It is a promise because the address is not a constant any more. The archive
- * hands out a one-time ticket for the handshake (a browser cannot put a header
- * on one), so composing the URL means asking for a ticket, and a ticket already
- * spent is no ticket at all. Nothing here reuses an address.
- *
- * Rejecting is meaningful: a rejection that is a `MarketDataError` of kind
- * `unauthenticated` stops the retrying, and any other rejection resumes it.
+ * Rejecting is meaningful: a `MarketDataError` of kind `unauthenticated` stops the
+ * retrying, any other rejection resumes it.
  */
 export type UrlFor = (symbol: string, resolution: Resolution) => Promise<string>;
 
@@ -38,16 +34,13 @@ export type UrlFor = (symbol: string, resolution: Resolution) => Promise<string>
 export type Translate = (raw: string) => StreamEvent[];
 
 /**
- * Why a connection that failed will keep failing — or `null` if the failure
- * looks transient and retrying is the right answer.
+ * Why a connection that failed will keep failing, or `null` when the failure looks
+ * transient.
  *
- * A browser cannot read the status of a rejected WebSocket handshake: a source
- * that refuses with `403` before accepting is, to `WebSocket`, indistinguishable
- * from a source that is down. Retrying forever is right for one and wrong for
- * the other, and the difference matters to whoever is looking at the chart —
- * "the archive is down" and "nobody chose to collect this pair" ask different
- * things of them. Whoever supplies the socket also supplies the second question
- * to ask when the first one gets no answer.
+ * A browser cannot read the status of a rejected WebSocket handshake, so a source
+ * refusing with `403` is indistinguishable from one that is down — and "the archive is
+ * down" and "nobody chose to collect this pair" ask different things of whoever is
+ * looking at the chart. Whoever supplies the socket supplies this second question too.
  */
 export type Diagnose = (symbol: string, resolution: Resolution) => Promise<string | null>;
 
@@ -79,22 +72,17 @@ function backoffMs(attempt: number, random: () => number): number {
 const REFUSAL_CLOSE_CODE = 1008; // "refused before accepting" — see the archive's README
 
 /**
- * Ref-counted per (symbol, resolution) WebSocket: the first subscriber opens
- * the connection, later subscribers to the same pair share it, and the last one
- * leaving closes it — terminal-market-data spec, "Jedno połączenie obsługuje
- * wielu odbiorców tej samej pary". Reconnects on drop with growing backoff.
+ * Ref-counted per (symbol, resolution) WebSocket: the first subscriber opens the
+ * connection, later ones share it, the last one closes it (terminal-market-data spec,
+ * "Jedno połączenie obsługuje wielu odbiorców tej samej pary"). Reconnects on drop with
+ * growing backoff.
  *
- * **No gap-filling.** There used to be one here: on reconnect the hub fetched
- * recent bars and worked out how far back the outage reached, because the
- * stream it read carried nothing but changes. The archive's subscription opens
- * with a snapshot, and reconnecting therefore delivers the missed bars as a
- * matter of course — the gap closes because the protocol has no gap, not
- * because the browser went looking for one (design.md, "Archiwum jest dla
- * terminala jedynym źródłem świec i strumienia").
+ * No gap-filling, deliberately: the archive's subscription opens with a snapshot, so a
+ * reconnect delivers the missed bars as a matter of course. The gap closes because the
+ * protocol has none, not because the browser went looking for one.
  *
- * The protocol itself is not this class's business: `urlFor` says where a pair
- * lives and `translate` says what a frame means, both supplied by whoever is
- * being read.
+ * The protocol itself is not this class's business — `urlFor` says where a pair lives
+ * and `translate` says what a frame means, both supplied by whoever is being read.
  */
 export class SocketHub {
   private readonly entries = new Map<string, HubEntry>();

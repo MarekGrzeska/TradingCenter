@@ -46,17 +46,13 @@ async function parseErrorDetail(response: Response): Promise<string> {
 const UNAUTHENTICATED = 401;
 
 /**
- * An HTTP client for one back end: `label` names it in the one message it has
- * to compose itself, and `mapStatus` decides what its refusals mean.
+ * An HTTP client for one back end: `label` names it in the one message it composes
+ * itself, and `mapStatus` decides what its refusals mean.
  *
- * `identity` is where the operator's credential comes from, and attaching it is
- * this function's job rather than each call site's. That is deliberate and
- * load-bearing: a route added to `archive.ts` or `gatewaySource.ts` later
- * carries a token because it cannot not carry one, instead of because whoever
- * wrote it remembered. Neither of those files mentions a token anywhere.
- *
- * Left out, it is the identity that has none — the local mode, where requests
- * go out bare exactly as they always did.
+ * Attaching the credential is this function's job rather than each call site's, and that
+ * is load-bearing: a route added to `archive.ts` or `gatewaySource.ts` later carries a
+ * token because it cannot not carry one. Neither file mentions a token anywhere. Left
+ * out, `identity` is the one with none — local mode, requests go out bare.
  */
 export function jsonClient(label: string, mapStatus: StatusMapper, identity: Identity = noIdentity) {
   async function attempt(url: string, request: JsonRequest, token: string | null) {

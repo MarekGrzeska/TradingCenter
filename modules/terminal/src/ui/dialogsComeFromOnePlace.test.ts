@@ -3,20 +3,17 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * `terminal-dialogs` spec, "Wszystkie dialogi wychodzą z jednego miejsca" — the one
- * requirement of that spec that is a claim about *where code lives* rather than about
- * behaviour, and so the one no rendering test can hold.
+ * `terminal-dialogs` spec, "Wszystkie dialogi wychodzą z jednego miejsca" — a claim about
+ * where code lives rather than about behaviour, so no rendering test can hold it.
  *
- * What it is for: the failure it prevents is nobody's mistake in particular. A fourth
- * confirmation, written from scratch because it was three lines to start with, passes
- * every test in this suite while quietly missing the focus trap, or `Escape`, or the
- * error that has to stay with its decision. Dialogs drift apart one behaviour at a
- * time, and the operator stops knowing what to expect.
+ * The failure it prevents is nobody's mistake in particular: a fourth confirmation,
+ * written from scratch because it was three lines to start with, passes every other test
+ * here while quietly missing the focus trap, or `Escape`, or the error that has to stay
+ * with its decision.
  *
- * So this reads the source. Crude on purpose: a component that asks for consent has to
- * come from `ConfirmDialog`, and the two cheap ways around it — announcing `role="dialog"`
- * by hand, or falling back to the browser's own `confirm()` — are named here so that
- * taking either one fails out loud instead of being noticed at review, or not at all.
+ * So this reads the source, crudely on purpose. The two cheap ways around `ConfirmDialog`
+ * — announcing `role="dialog"` by hand, or the browser's own `confirm()` — are named here
+ * so taking either fails out loud rather than at review, or not at all.
  */
 
 // Vitest runs from the module root. The first test below checks that this found

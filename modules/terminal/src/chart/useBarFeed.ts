@@ -19,22 +19,14 @@ export interface BarFeed {
 }
 
 /**
- * Owns one (symbol, resolution) feed: subscribe, and draw what arrives.
+ * Owns one (symbol, resolution) feed: subscribe, and draw what arrives. Nothing is
+ * spliced — the subscription's first message *is* the history, taken while the archive
+ * holds its room still, and a reconnect brings a fresh one rather than a gap to chase
+ * (design.md, "Archiwum jest dla terminala jedynym źródłem świec i strumienia").
  *
- * It used to read a history and splice the stream onto it, and the splice was
- * the hard part — between the read finishing and the first message there was a
- * window in which a candle could close unseen, which is where the old "on
- * resume, close the gap" rule came from. The archive's subscription opens with
- * a snapshot of the series, taken while its room is held still, so there is no
- * window to cover: the first message *is* the history, and a reconnect brings a
- * fresh one rather than a gap to chase (design.md, "Archiwum jest dla terminala
- * jedynym źródłem świec i strumienia").
- *
- * Bars are handed to `sink` imperatively and never held in React state — six
- * slots at roughly five quotes a second each would otherwise re-render the tree
- * ~30 times a second (design.md, "Wykres pisze do canvasu, nie do stanu
- * Reacta"). Only what changes rarely — status, error, connection state — lives
- * in state here.
+ * Bars go to `sink` imperatively and never into React state: six slots at roughly five
+ * quotes a second would re-render the tree ~30 times a second (design.md, "Wykres pisze
+ * do canvasu, nie do stanu Reacta"). Only what changes rarely lives in state here.
  */
 export function useBarFeed(
   source: MarketDataSource,

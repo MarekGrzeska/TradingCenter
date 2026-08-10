@@ -1,20 +1,14 @@
 import type { EntraConfig } from "../data/config";
 
 /**
- * Who the operator is, as everything else in the terminal needs to know it.
+ * Who the operator is, as the rest of the terminal needs to know it. `entra.ts` is the
+ * only file that knows Entra exists and this interface is the seam — which is also what
+ * lets a test hand the data layer a two-line object instead of a sign-in flow.
  *
- * The data layer asks for a token and gets one; the shell asks for a state and
- * shows it. Neither knows that Entra exists, which is the point — `entra.ts`
- * is the only file that does, and this interface is the seam. It is also what
- * makes the data layer testable at all: a test hands it a two-line object
- * instead of standing up a sign-in flow.
- *
- * There are three states rather than two, and the third is not an error. A
- * terminal running against `localhost` has **no identity configured**, talks to
- * an archive with nothing in front of it, and must not ask anybody to sign in
- * — that is `unconfigured`. Not being signed in when identity *is* configured
- * is a different thing entirely, and the difference is what stops the shell
- * from telling a developer their local session expired.
+ * Three states, not two, and the third is not an error: a terminal against `localhost`
+ * has no identity configured and must not ask anybody to sign in. Keeping that apart
+ * from `signed-out` is what stops the shell telling a developer their local session
+ * expired.
  */
 export type IdentityState = "unconfigured" | "signed-out" | "signed-in";
 
@@ -56,12 +50,10 @@ export interface Identity {
 }
 
 /**
- * What the terminal runs on when nothing is configured — local development,
- * and every test that does not care about identity.
- *
- * `token()` answering `null` rather than throwing is the whole of it: requests
- * go out bare, exactly as they did before any of this existed, and nothing
- * anywhere has to branch on "are we in local mode".
+ * What the terminal runs on when nothing is configured — local development, and every
+ * test that does not care about identity. `token()` answering `null` rather than
+ * throwing is the whole of it: requests go out bare, and nothing anywhere has to branch
+ * on "are we in local mode".
  */
 export const noIdentity: Identity = {
   state: () => "unconfigured",

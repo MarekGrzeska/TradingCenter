@@ -21,17 +21,12 @@ import { RESOLUTION_ABBR } from "./resolutionAbbr";
 
 /**
  * Adding instruments as a decision made once, not one blind click per pair
- * (proposal.md, "Dodawanie instrumentów przestaje być formularzem"). The
- * wizard only collects what to collect — class, instrument, resolutions, and
- * how far back — and never starts anything itself; committing opens the
- * acceptance dialog, which is the only thing that calls `trackPairs`
- * (terminal-data-manager spec, "Zatwierdzenie kreatora otwiera dialog
- * akceptacji").
+ * (proposal.md, "Dodawanie instrumentów przestaje być formularzem"). The wizard only
+ * collects what to collect and starts nothing itself: committing opens the acceptance
+ * dialog, the only thing that calls `trackPairs`.
  *
- * A date earlier than the provider's history is not validated here at all —
- * it means "everything available", clipped server-side, not a client-side
- * error (terminal-data-manager spec, "Podana data jest wcześniejsza niż
- * historia providera").
+ * A date earlier than the provider's history is not validated here — it means
+ * "everything available" and is clipped server-side, not a client-side error.
  */
 
 function asDateInput(date: Date): string {
@@ -44,18 +39,13 @@ function todayDateInput(): string {
 
 /** The start of the current year — year to date.
  *
- *  Deliberately not "everything available". An arbitrarily early date is a
- *  legitimate request — it clips rather than fails (design.md, "Data OD jest
- *  przycinana, nigdy odrzucana") — but as a *default* it is the wrong one: at
- *  `MINUTE` a decade is around a hundred chunks per pair, so every operator
- *  who never touched this field would be committing hundreds of gateway
- *  requests without deciding to. Deep history stays one edit away; it just
- *  stops being what happens by accident.
+ *  Deliberately not "everything available": at `MINUTE` a decade is around a hundred
+ *  chunks per pair, so every operator who never touched this field would commit hundreds
+ *  of gateway requests without deciding to. Deep history stays one edit away.
  *
- *  A round boundary rather than a rolling window, so the same instrument added
- *  twice in a month asks for the same range both times. The trade is that the
- *  default is shallow in January — which is the safe direction for a default
- *  that costs provider requests. */
+ *  A round boundary rather than a rolling window, so the same instrument added twice in
+ *  a month asks for the same range both times. It is shallow in January, which is the
+ *  safe direction for a default that costs provider requests. */
 function defaultCollectFromInput(): string {
   return `${new Date().getUTCFullYear()}-01-01`;
 }

@@ -1,15 +1,11 @@
 /**
  * A stand-in for the slice of `msw` this suite used, backed by swapping
- * `globalThis.fetch`.
+ * `globalThis.fetch`. `msw` stopped intercepting on Node 25 — a matching request hangs
+ * rather than answering, which reads exactly like the code under test being broken — and
+ * answering a `fetch` needs no service worker.
  *
- * `msw` stopped intercepting anything on Node 25: a request matching a
- * registered handler hangs instead of answering, so every test that touched
- * HTTP either timed out or reported the back end as unreachable — which reads
- * exactly like the code under test being broken. Its whole job here was to
- * answer a `fetch`, and a test suite does not need a service worker to do that.
- *
- * The shape is deliberately msw's, so the tests that were written against it
- * did not have to be rewritten to say the same things.
+ * The shape is deliberately msw's, so the tests written against it still say the same
+ * things.
  */
 
 type Resolver = (context: { request: Request }) => Response | Promise<Response>;

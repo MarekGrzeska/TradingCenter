@@ -1,24 +1,15 @@
 import type { Identity } from "./identity";
 
 /**
- * Sending the operator to sign in without being asked to.
+ * Sending the operator to sign in without being asked to: a terminal with no identity
+ * shows no candle, no instrument and no history (`terminal-identity` spec, "Operator
+ * loguje się kontem organizacji").
  *
- * A terminal with no identity shows no candle, no instrument and no history, so
- * waiting for the operator to find a button in the corner asks them to guess the
- * one thing that has to happen anyway (`terminal-identity` spec, "Operator loguje
- * się kontem organizacji").
- *
- * The whole risk of doing this is the redirect loop, which is the one failure an
- * operator cannot break out of: a page that sends itself back to sign-in after
- * every unsuccessful return can be neither read nor recovered. Hence the marker
- * — written *before* the page leaves, so a return that finds it there means "we
- * already tried this once", and the terminal stays put with its own signed-out
- * state and a button.
- *
- * `sessionStorage` rather than a module variable, because the redirect is a full
- * page load and module memory does not survive it. It dies with the tab, which
- * is the right lifetime — and it is where MSAL keeps its own session, for the
- * same reason.
+ * The whole risk is the redirect loop, the one failure an operator cannot break out of.
+ * Hence this marker, written *before* the page leaves, so a return that finds it means
+ * "already tried once" and the terminal stays put with a button. `sessionStorage`
+ * because the redirect is a full page load that module memory does not survive, and it
+ * dies with the tab — where MSAL keeps its own session, for the same reason.
  */
 export const SIGN_IN_ATTEMPTED_KEY = "tc.terminal.sign-in-attempted";
 

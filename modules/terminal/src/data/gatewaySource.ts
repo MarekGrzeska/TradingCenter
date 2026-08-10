@@ -5,29 +5,18 @@ import type { AssetClass, Instrument, InstrumentPage } from "./types";
 import type { InstrumentSource } from "./source";
 
 /**
- * The instrument catalogue, which is `capital-gateway`'s and stays there.
+ * The instrument catalogue, which is `capital-gateway`'s and stays there — the archive
+ * does not pretend to own what it does not have (design.md, "Archiwum nie udaje
+ * właściciela rzeczy, których nie posiada").
  *
- * This used to serve candles too. It no longer does: the archive keeps them,
- * and it keeps yesterday's as well as today's, which a window onto the provider
- * by definition cannot. What the gateway owns and the archive does not is the
- * catalogue — and trading after it — so that is what remains here (design.md,
- * "Archiwum nie udaje właściciela rzeczy, których nie posiada").
+ * The wire path changed, the ownership did not: the gateway is not reachable from a
+ * browser, so this calls `market-data`, which proxies these three routes unmodified.
+ * One consequence is worth knowing — an archive outage now takes the search with it,
+ * because both go through the same process. A *gateway* refusal is still told apart
+ * from that: `market-data` answers it with a `502` rather than an empty result.
  *
- * **The wire path changed, the ownership did not.** `capital-gateway` is not
- * public — the terminal cannot reach it from the browser — so this now calls
- * `market-data`, which proxies these three routes to the gateway unmodified
- * (openspec/changes/provision-azure-platform, design.md, "Terminal osiąga
- * katalog instrumentów przez market-data"). The paths and shapes below are
- * still the gateway's own; only the host this source is constructed with
- * changed, in `marketData.ts`. The practical consequence stated in the
- * original design no longer holds exactly as written: a `market-data` outage
- * now takes the search with it too, since both go through the same process.
- * What still holds is that a *gateway* refusal (capital.com trouble, a bad
- * caller key) is distinguishable from an archive outage — `market-data`
- * answers those with a `502`, not a silently empty result.
- *
- * capital-gateway's wire shapes (snake_case, per its OpenAPI schema) are kept
- * private to this file.
+ * The gateway's wire shapes (snake_case, per its OpenAPI schema) stay private to this
+ * file.
  */
 
 interface RawInstrument {

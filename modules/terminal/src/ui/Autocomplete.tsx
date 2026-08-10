@@ -31,17 +31,14 @@ export interface AutocompleteProps<T> {
 }
 
 /**
- * One reusable position picker for the whole terminal: asset class,
- * instrument in a class, instrument already archived. Behavior is identical
- * everywhere it appears — arrow keys and Enter to choose, Escape to close
- * without touching whatever was already chosen, an explicit empty state, an
- * explicit failure with retry, and a made choice that is visible and can be
- * cleared without reloading the view (terminal-instruments spec,
- * "Podpowiadanie zachowuje się wszędzie tak samo").
+ * One reusable picker for the whole terminal — asset class, instrument in a class,
+ * instrument already archived — behaving identically everywhere: arrows and Enter to
+ * choose, Escape to close without disturbing the current choice, explicit empty and
+ * failure states (terminal-instruments spec, "Podpowiadanie zachowuje się wszędzie tak
+ * samo").
  *
- * A value and an open query are mutually exclusive: once something is chosen
- * the field shows it, not an editable input — clearing it is what returns to
- * picking.
+ * A value and an open query are mutually exclusive: once something is chosen the field
+ * shows it rather than an input, and clearing it is what returns to picking.
  */
 export function Autocomplete<T>({
   value,

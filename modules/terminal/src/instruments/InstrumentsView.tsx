@@ -10,15 +10,10 @@ import { RESOLUTION_ABBR } from "./resolutionAbbr";
 import { useTrackedPairs } from "./useTrackedPairs";
 
 /**
- * What the archive is collecting, one row per instrument.
- *
- * This used to be two tabs: a catalogue browser and a per-pair archive list,
- * where the same instrument in four resolutions took four rows. Neither
- * question the operator actually asks — *what are we archiving, and is it
- * keeping up* — was answered by either one directly (proposal.md, Why). This
- * view answers both: a row is an instrument, its resolutions are one column,
- * and expanding it shows coverage and lets a resolution — or the whole
- * instrument — stop being collected.
+ * What the archive is collecting, one row per instrument — because the questions an
+ * operator actually asks are *what are we archiving* and *is it keeping up*, and the two
+ * tabs this replaced answered neither directly (proposal.md, Why). Resolutions are a
+ * column, and expanding a row shows coverage and stops collection.
  */
 
 const COLLECTION_LABEL: Record<CollectionState, string> = {

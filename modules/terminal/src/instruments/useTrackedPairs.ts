@@ -18,17 +18,13 @@ export interface TrackedPairsState {
 }
 
 /**
- * What the archive is collecting, kept current.
+ * What the archive is collecting, kept current. `status` separates "nothing is being
+ * archived" from "nobody could be asked" — both are an empty array, and only one means
+ * the operator has nothing set up (terminal-data-manager spec, "Panel mówi, gdy archiwum
+ * nie odpowiada").
  *
- * `status` separates "nothing is being archived" from "nobody could be asked" —
- * the two look identical as an empty array, and only one of them means the
- * operator has nothing set up (terminal-data-manager spec, "Panel mówi, gdy
- * archiwum nie odpowiada").
- *
- * A failed poll does not blank a list that is already on screen: the pairs
- * shown stay, and the failure is reported beside them. Replacing real rows with
- * an error because one refresh out of many missed would be a worse answer than
- * slightly stale rows.
+ * A failed poll does not blank rows already on screen; the failure is reported beside
+ * them. Slightly stale rows beat an error where real data was.
  */
 export function useTrackedPairs(admin: ArchiveAdmin): TrackedPairsState {
   const [pairs, setPairs] = useState<TrackedPair[]>([]);
