@@ -123,10 +123,10 @@
   a bez niej nowy `market-data` odpowiada pięćsetką na każdy odczyt pokrycia
   (`/candles`, `/coverage`, `/jobs/estimate`, `POST /pairs`). **Zrobione w złej
   kolejności** — migracja poszła po wdrożeniu, ręcznie, po awarii; opis w `review.md`.
-- [ ] 8.3 Odzyskać US100: poprosić o dane od 2024-01-01 dla siedmiu rozdzielczości
+- [x] 8.3 Odzyskać US100: poprosić o dane od 2024-01-01 dla siedmiu rozdzielczości
   i sprawdzić `GET /coverage/US100?resolution=DAY`.
-- [ ] 8.4 Sprawdzić na wykresie, że `DAY` i `WEEK` pokazują bieżącą świecę zaraz po
+- [x] 8.4 Sprawdzić na wykresie, że `DAY` i `WEEK` pokazują bieżącą świecę zaraz po
   otwarciu i że jej cena się rusza, a nie stoi.
-- [ ] 8.5 Sprawdzić w archiwum, że bieżący okres dzienny **nie** jest zapisany, a poprzedni
+- [x] 8.5 Sprawdzić w archiwum, że bieżący okres dzienny **nie** jest zapisany, a poprzedni
   jest — `GET /candles/US100?resolution=DAY` przy otwartym rynku.
-- [ ] 8.6 Napisać `review.md` — bez niego zmiany nie da się zarchiwizować.
+- [x] 8.6 Napisać `review.md` — bez niego zmiany nie da się zarchiwizować.

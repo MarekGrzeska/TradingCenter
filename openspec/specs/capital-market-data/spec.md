@@ -96,6 +96,14 @@ nie dowiedział się niczego. Rozróżnienie jest kosztowne w jedną stronę: ko
 stwierdzenie jako trwałą granicę instrumentu i pomija na jego podstawie pracę, do której nigdy
 potem nie wróci.
 
+Ta sama cena obowiązuje w drugą stronę: stwierdzenie MUST NOT paść na podstawie okna, z którego
+moduł nie zebrał ani jednej świecy. Odmowa danych dla pierwszego okna odczytu nie odróżnia „nic
+starszego nie ma" od „na to konkretne okno nie dostałem odpowiedzi" — provider odpowiada brakiem
+danych także wtedy, gdy okno wypada poza godzinami, których nie zna, albo gdy odpytany jest
+o instrument chwilowo bez notowań. Koniec historii MUST być stwierdzony wyłącznie tam, gdzie
+odczyt zdążył zejść po danych: dopiero okno kotwiczone na świecy, którą ten odczyt już trzyma,
+mówi coś o tym, co leży pod nią.
+
 #### Scenario: Prośba o więcej świec, niż mieści jedno żądanie
 
 - **WHEN** konsument prosi o więcej świec, niż provider podaje w jednym żądaniu
@@ -112,6 +120,13 @@ potem nie wróci.
 
 - **WHEN** kolejne okno nie daje świecy starszej niż najstarsza już posiadana
 - **THEN** stronicowanie kończy się, zamiast powtarzać to samo okno
+
+#### Scenario: Pierwsze okno odczytu nic nie przynosi
+
+- **WHEN** provider odpowiada brakiem danych na pierwsze okno odczytu, więc moduł nie zebrał
+  jeszcze ani jednej świecy
+- **THEN** odczyt kończy się i zwraca pustą serię, co nie jest błędem
+- **AND** odpowiedź MUST NOT stwierdzać, że historia instrumentu się skończyła
 
 #### Scenario: Odczyt ograniczony momentem, nie liczbą
 
@@ -172,3 +187,48 @@ kotwiczy się na najstarszej już pobranej świecy; zmienia się wyłącznie pun
 - **WHEN** konsument nie wskazuje momentu, od którego odczyt ma się zacząć
 - **THEN** odczyt zaczyna się od chwili bieżącej, jak dotychczas
 
+### Requirement: Odczyt historii mówi, który okres jeszcze trwa
+
+Provider oddaje świece aż do chwili bieżącej, więc najnowsza z nich należy zwykle do okresu,
+który się jeszcze nie domknął. Taka świeca ma komplet pól i niczym się nie różni od
+zamkniętej, a jej wartości zmienią się jeszcze wielokrotnie. Konsument, który jej nie
+odróżni, utrwali cenę w połowie okresu jako wynik całego okresu — i nie dowie się o tym
+nigdy, bo dane wyglądają poprawnie.
+
+Moduł MUST przy każdej świecy stwierdzić, czy jej okres się już domknął. Stwierdzenie MUST
+wynikać z pomiaru, nie z założenia po stronie konsumenta — moduł jest jedynym miejscem,
+które rozmawia z providerem, i jedynym, które może to wiedzieć.
+
+Dla rozdzielczości o stałej długości okresu wystarczy arytmetyka. Dla rozdzielczości,
+których granica zależy od sesji rynku, moduł MUST NOT jej wyliczać z zegara — granica
+dzienna zgadnięta z północy UTC wygląda poprawnie i jest błędna. Dla nich rozstrzyga stan
+rynku instrumentu: dopóki rynek jest otwarty, jego najnowsza świeca należy do okresu, który
+trwa.
+
+Odczyt zakotwiczony w przeszłości nie ma świecy w budowie: jego najnowszy okres zamknął się
+dawno, niezależnie od tego, co rynek robi teraz.
+
+#### Scenario: Najnowsza świeca odczytu sięgającego teraźniejszości
+
+- **WHEN** konsument prosi o świece do chwili bieżącej w rozdzielczości o stałej długości
+  okresu, a okres najnowszej świecy jeszcze się nie skończył
+- **THEN** ta świeca jest oznaczona jako należąca do okresu, który trwa
+- **AND** każda starsza świeca w tej samej odpowiedzi jest oznaczona jako zamknięta
+
+#### Scenario: Rozdzielczość, której granica zależy od sesji rynku
+
+- **WHEN** konsument prosi o świece do chwili bieżącej w rozdzielczości dziennej albo
+  tygodniowej, a rynek instrumentu jest w tej chwili otwarty
+- **THEN** najnowsza świeca jest oznaczona jako należąca do okresu, który trwa
+- **AND** oznaczenie MUST NOT wynikać z granicy okresu wyliczonej z zegara
+
+#### Scenario: Rynek zamknięty
+
+- **WHEN** konsument prosi o świece w rozdzielczości dziennej albo tygodniowej, a rynek
+  instrumentu jest zamknięty
+- **THEN** wszystkie zwrócone świece są oznaczone jako zamknięte
+
+#### Scenario: Odczyt zakotwiczony w przeszłości
+
+- **WHEN** konsument prosi o świece kończące się w momencie wcześniejszym niż chwila bieżąca
+- **THEN** wszystkie zwrócone świece są oznaczone jako zamknięte
