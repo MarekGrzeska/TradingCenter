@@ -11,6 +11,8 @@ leaves is the contract in ``messages``.
 
 from __future__ import annotations
 
+import logging
+import time
 from collections.abc import Awaitable, Callable
 
 from ..dtos import Resolution
@@ -25,12 +27,32 @@ from .messages import (
 )
 from .upstream import Upstream
 
+log = logging.getLogger(__name__)
+
 Subscriber = Callable[[Message], Awaitable[None]]
 UpstreamFactory = Callable[[str, Resolution, Callable[[dict], Awaitable[None]]], Upstream]
 
+# Where the current period starts, as the provider reports it. Injected the same way the
+# upstream is, so this module still knows nothing about transports. ``None`` means the
+# provider could not say — a room then publishes no forming candle rather than guessing
+# one, which for a daily boundary is the whole point.
+CurrentPeriod = Callable[[str, Resolution], Awaitable[Bar | None]]
+
+# How long a room waits before asking again where the current period starts. Without it a
+# provider that keeps answering with the period that just ended would be asked once per
+# quote — hundreds of times a minute on a liquid instrument, through the same rate gate
+# an operator's chart reads through. Every quote still moves the price; only the boundary
+# lookup is paced.
+BOUNDARY_RETRY_SECONDS = 30.0
+
 
 class Room:
-    def __init__(self, epic: str, resolution: Resolution) -> None:
+    def __init__(
+        self,
+        epic: str,
+        resolution: Resolution,
+        current_period: CurrentPeriod | None = None,
+    ) -> None:
         self.epic = epic
         self.resolution = resolution
         self.subscribers: set[Subscriber] = set()
@@ -39,6 +61,52 @@ class Room:
         # Remembered so a subscriber joining a live room is told the feed is up rather
         # than waiting in silence for the next provider event.
         self.state: StreamState = "connecting"
+        self._current_period = current_period
+        self._retry_boundary_after = 0.0
+
+    async def place_boundary(self) -> None:
+        """Ask the provider where the current period starts, at most every so often.
+
+        Only ever reached for a resolution whose boundary follows the venue's session.
+        A provider that answers with the period that has already ended — which happens
+        between a period closing and the next one producing its first candle — leaves the
+        room silent and tries again later, because a bar placed by arithmetic here is the
+        candle this whole change exists to stop publishing.
+        """
+        if self._current_period is None:
+            return
+        now = time.monotonic()
+        if now < self._retry_boundary_after:
+            return
+
+        try:
+            bar = await self._current_period(self.epic, self.resolution)
+        except Exception as err:  # noqa: BLE001 - a boundary read must not kill the feed
+            self._retry_boundary_after = now + BOUNDARY_RETRY_SECONDS
+            log.warning(
+                "could not read the current period for %s %s: %s",
+                self.epic,
+                self.resolution.value,
+                err,
+            )
+            return
+
+        held = self.forming.current
+        if bar is None or (held is not None and bar.time <= held.time):
+            # Nothing newer than the period already known to be over. Saying so is worth
+            # a line: it is the difference between "the provider is slow to open the next
+            # candle" and "this room is broken".
+            self._retry_boundary_after = now + BOUNDARY_RETRY_SECONDS
+            log.info(
+                "%s %s: no period newer than the one that closed; waiting",
+                self.epic,
+                self.resolution.value,
+            )
+            return
+        # No pacing on success: a seeded room stops needing a boundary, so nothing calls
+        # this again until the provider seals the period or the feed drops — and both are
+        # news rather than a retry.
+        self.forming.seed(bar)
 
     async def deliver(self, subscriber: Subscriber, message: Message) -> bool:
         """Send to one subscriber, dropping it if the send fails.
@@ -68,6 +136,11 @@ class Room:
             await self.broadcast(
                 QuoteMessage(symbol=self.epic, time=ts_ms, bid=bid, ask=float(event["ask"]))
             )
+            # The quote is published either way; only the candle needs a boundary. A
+            # market with no forming candle is still a market whose price is moving, and
+            # the two must not fail together.
+            if self.forming.needs_boundary:
+                await self.place_boundary()
             # The bid side, matching both the sealed candles and the REST history.
             bar = self.forming.on_quote(ts_ms, bid)
             if bar is not None:
@@ -87,6 +160,12 @@ class Room:
 
         elif kind == "status":
             self.state = event["state"]
+            if self.state != "connected":
+                # The period may roll over while the feed is down, and the bar in hand is
+                # then the wrong one to extend. Cheaper to re-read the boundary than to
+                # publish a day's candle stretched across two days.
+                self.forming.invalidate()
+                self._retry_boundary_after = 0.0
             await self.broadcast(StatusMessage(state=event["state"]))
 
         elif kind == "error":
@@ -106,8 +185,11 @@ class Room:
 
 
 class Hub:
-    def __init__(self, make_upstream: UpstreamFactory) -> None:
+    def __init__(
+        self, make_upstream: UpstreamFactory, current_period: CurrentPeriod | None = None
+    ) -> None:
         self._make_upstream = make_upstream
+        self._current_period = current_period
         self._rooms: dict[tuple[str, Resolution], Room] = {}
 
     def room_count(self) -> int:
@@ -117,10 +199,15 @@ class Hub:
         key = (epic, resolution)
         room = self._rooms.get(key)
         if room is None:
-            room = Room(epic, resolution)
+            room = Room(epic, resolution, self._current_period)
             self._rooms[key] = room
             room.upstream = self._make_upstream(epic, resolution, room.on_upstream)
             room.upstream.start()
+            # Before the first quote rather than because of it. A daily period is sealed
+            # once a day, so a room that waited for the provider to name the boundary
+            # published nothing for up to that long — the failure this answers.
+            if room.forming.needs_boundary:
+                await room.place_boundary()
         room.subscribers.add(subscriber)
         if not await room.deliver(subscriber, StatusMessage(state=room.state)):
             return

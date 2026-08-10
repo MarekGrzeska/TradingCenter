@@ -27,23 +27,23 @@
 
 ## 3. capital-gateway: zasiew granicy okresu dla `DAY` i `WEEK`
 
-- [ ] 3.1 Dodać `Room` wstrzykiwaną funkcję odczytu bieżącej świecy dla pary, tym samym
+- [x] 3.1 Dodać `Room` wstrzykiwaną funkcję odczytu bieżącej świecy dla pary, tym samym
   wzorcem co `UpstreamFactory` — `stream/` nie może zacząć znać transportu.
-- [ ] 3.2 W `stream/forming.py` rozdzielić „nie znam granicy" od „mam świecę": rozdzielczość
+- [x] 3.2 W `stream/forming.py` rozdzielić „nie znam granicy" od „mam świecę": rozdzielczość
   bez stałej granicy okresu przyjmuje granicę z zewnątrz, zamiast czekać na zamkniętą świecę.
-- [ ] 3.3 Zablokować rozciąganie świecy zamkniętej: po zamknięciu okresu przez providera
+- [x] 3.3 Zablokować rozciąganie świecy zamkniętej: po zamknięciu okresu przez providera
   kolejne kwotowanie MUST NOT dokleić się do tamtej świecy.
-- [ ] 3.4 Wpiąć przeładowanie granicy w trzy zdarzenia: otwarcie pokoju, pierwsze kwotowanie
+- [x] 3.4 Wpiąć przeładowanie granicy w trzy zdarzenia: otwarcie pokoju, pierwsze kwotowanie
   po zamknięciu świecy, ponowne połączenie po zerwaniu. Gałąź degradacji według wyniku 1.2.
-- [ ] 3.5 Test: pokój `DAY` otwarty bez ani jednej zamkniętej świecy publikuje świecę
+- [x] 3.5 Test: pokój `DAY` otwarty bez ani jednej zamkniętej świecy publikuje świecę
   w budowie po pierwszym kwotowaniu.
-- [ ] 3.6 Test: kwotowanie po zamknięciu świecy otwiera nowy okres, a świeca zamknięta
+- [x] 3.6 Test: kwotowanie po zamknięciu świecy otwiera nowy okres, a świeca zamknięta
   zostaje nietknięta.
-- [ ] 3.7 Test: odczyt granicy, który zawiódł, nie publikuje świecy w budowie, a kwotowania
+- [x] 3.7 Test: odczyt granicy, który zawiódł, nie publikuje świecy w budowie, a kwotowania
   idą dalej.
-- [ ] 3.8 Test: rozdzielczości ze stałą granicą okresu zachowują się dokładnie jak dotąd —
+- [x] 3.8 Test: rozdzielczości ze stałą granicą okresu zachowują się dokładnie jak dotąd —
   żadnego dodatkowego odczytu.
-- [ ] 3.9 `uv run pytest`, `uv run ruff check .`, `uv run pyright`.
+- [x] 3.9 `uv run pytest`, `uv run ruff check .`, `uv run pyright`.
 
 ## 4. capital-gateway: odczyt historii mówi, który okres jeszcze trwa
 

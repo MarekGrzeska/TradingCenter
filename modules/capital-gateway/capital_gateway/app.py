@@ -37,6 +37,8 @@ from .dtos import (
     WorkingOrder,
 )
 from .errors import GatewayError
+from .history import parse_candle_ts
+from .stream.forming import Bar
 from .stream.hub import Hub
 from .stream.upstream import Upstream
 
@@ -55,15 +57,42 @@ async def lifespan(app: FastAPI):
             await client.login()
         return client.stream_tokens()
 
+    adapter = CapitalAdapter(client)
+
+    async def current_period(epic: str, resolution: Resolution) -> Bar | None:
+        """Where the period a room is currently building starts.
+
+        Only asked for DAY and WEEK, whose boundary follows the venue's session rather
+        than the clock, and only when nothing cheaper can answer. One candle: the
+        provider's newest is the period it is in, and its stamp is the boundary this
+        module is not allowed to compute.
+        """
+        candles = await adapter.get_candles(epic, resolution, 1)
+        if not candles:
+            return None
+        newest = candles[-1]
+        if not newest.forming or newest.open is None:
+            # A settled candle says where a period that has *ended* began, which is not
+            # the question. Left unanswered rather than approximated.
+            return None
+        return Bar(
+            time=int(parse_candle_ts(newest.ts).timestamp()),
+            open=newest.open,
+            high=newest.high if newest.high is not None else newest.open,
+            low=newest.low if newest.low is not None else newest.open,
+            close=newest.close if newest.close is not None else newest.open,
+        )
+
     hub = Hub(
         lambda epic, resolution, emit: Upstream(
             settings.capital_stream_url, epic, resolution, tokens, emit
-        )
+        ),
+        current_period,
     )
 
     app.state.settings = settings
     app.state.client = client
-    app.state.adapter = CapitalAdapter(client)
+    app.state.adapter = adapter
     app.state.hub = hub
     try:
         yield

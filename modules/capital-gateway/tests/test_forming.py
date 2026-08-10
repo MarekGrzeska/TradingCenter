@@ -83,14 +83,68 @@ def test_a_session_bound_resolution_never_guesses_a_boundary(resolution: Resolut
     # Nothing to extend yet, and no arithmetic boundary worth trusting: a daily candle
     # starts at the venue's session open, not at UTC midnight.
     assert f.on_quote(BASE_MS, 100.0) is None
+    assert f.needs_boundary is True
 
-    f.on_sealed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
-    # A day later — still folded into the last known candle, because only the provider
-    # knows where the session ended.
-    bar = f.on_quote(BASE_MS + 86_400_000, 120.0)
 
+@pytest.mark.parametrize("resolution", [Resolution.DAY, Resolution.WEEK])
+def test_a_seeded_period_takes_quotes_without_any_arithmetic(resolution: Resolution) -> None:
+    """The boundary comes from the provider, and from there the folding is the same as
+    everywhere else."""
+    f = FormingCandle(resolution)
+    f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
+
+    assert f.needs_boundary is False
+    bar = f.on_quote(BASE_MS + 3_600_000, 120.0)
+
+    assert bar is not None
     assert bar.time == BASE_S
     assert bar.high == 120.0
+    assert bar.close == 120.0
+
+
+@pytest.mark.parametrize("resolution", [Resolution.DAY, Resolution.WEEK])
+def test_a_sealed_candle_is_never_stretched_into_the_next_period(
+    resolution: Resolution,
+) -> None:
+    """The defect this replaced.
+
+    A sealed daily candle used to absorb every quote that followed it, because the only
+    boundary the module had was that candle's own start. What reached a chart was
+    yesterday's candle carrying today's high — marked forming, and wrong in a way nothing
+    downstream could detect.
+    """
+    f = FormingCandle(resolution)
+    f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
+    sealed = f.on_sealed(Bar(time=BASE_S, open=100.0, high=105.0, low=99.0, close=104.0))
+
+    assert f.needs_boundary is True
+    assert f.on_quote(BASE_MS + 86_400_000, 120.0) is None
+    assert sealed.high == 105.0
+    assert f.current == sealed
+
+
+@pytest.mark.parametrize("resolution", [Resolution.DAY, Resolution.WEEK])
+def test_a_break_in_the_feed_forgets_where_the_period_starts(resolution: Resolution) -> None:
+    """The period may roll over while nobody is watching, so the bar in hand is no longer
+    known to be the one quotes belong to."""
+    f = FormingCandle(resolution)
+    f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
+
+    f.invalidate()
+
+    assert f.needs_boundary is True
+    assert f.on_quote(BASE_MS + 1_000, 101.0) is None
+
+
+def test_a_fixed_period_resolution_never_needs_a_boundary() -> None:
+    f = FormingCandle(Resolution.MINUTE_5)
+    assert f.needs_boundary is False
+
+    f.on_sealed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
+    f.invalidate()
+
+    assert f.needs_boundary is False
+    assert f.on_quote(BASE_MS + 300_000, 110.0) is not None
 
 
 def test_an_out_of_order_quote_does_not_rewind_the_candle() -> None:
