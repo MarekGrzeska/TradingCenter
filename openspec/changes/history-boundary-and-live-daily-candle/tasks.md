@@ -88,21 +88,21 @@
 
 ## 6. market-data: archiwum przestaje utrwalać okres, który trwa
 
-- [ ] 6.1 W `market_data/gateway/history.py` czytać pole z odpowiedzi gatewaya zamiast
+- [x] 6.1 W `market_data/gateway/history.py` czytać pole z odpowiedzi gatewaya zamiast
   wpisywać „zamknięta" na sztywno.
-- [ ] 6.2 Sprawdzić, że `store.write_candles` odrzuca taką świecę — reguła istnieje, chodzi
+- [x] 6.2 Sprawdzić, że `store.write_candles` odrzuca taką świecę — reguła istnieje, chodzi
   o potwierdzenie, że wreszcie ma na czym zadziałać, a nie o nowy kod.
-- [ ] 6.3 Rozstrzygnąć, gdzie odsiać świecę w budowie, żeby `FormingCandleRejected` nie
+- [x] 6.3 Rozstrzygnąć, gdzie odsiać świecę w budowie, żeby `FormingCandleRejected` nie
   wywracało całego wsadu: `fill_gap` i `execute_chunk` filtrują serię przed zapisem, tak jak
   już filtrują po `chunk_start`. Zakres pokrycia zostaje niezmieniony — okres był sprawdzony.
-- [ ] 6.4 Test: odczyt historii ze świecą trwającą zapisuje wszystkie pozostałe, a tamtej
+- [x] 6.4 Test: odczyt historii ze świecą trwającą zapisuje wszystkie pozostałe, a tamtej
   nie.
-- [ ] 6.5 Test: pokrycie po takim zapisie obejmuje ten sam zakres co dotąd.
-- [ ] 6.6 Test regresji na `bars_to_close_gap`: para, której najnowsza świeca jest zamknięta,
+- [x] 6.5 Test: pokrycie po takim zapisie obejmuje ten sam zakres co dotąd.
+- [x] 6.6 Test regresji na `bars_to_close_gap`: para, której najnowsza świeca jest zamknięta,
   a bieżący okres trwa, prosi o uzupełnienie zamiast uznać się za bieżącą.
-- [ ] 6.7 Sprawdzić rollupy: `refresh_all` liczy z tego, co zapisane, więc odsianie świecy
+- [x] 6.7 Sprawdzić rollupy: `refresh_all` liczy z tego, co zapisane, więc odsianie świecy
   minutowej w budowie nie może zostawić kubełka zbudowanego z niepełnych danych.
-- [ ] 6.8 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright`.
+- [x] 6.8 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright`.
 
 ## 7. terminal: „od kiedy faktycznie zebrano" bez nowego pola na wire
 

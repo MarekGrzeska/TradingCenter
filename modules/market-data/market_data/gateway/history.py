@@ -80,9 +80,12 @@ class GatewayHistory:
         """Reach back `bars` candles for one pair, ending at `before` rather than now
         and stopping at `after`.
 
-        Everything comes back closed, on the bid side, and marked as having come from a
-        history read — which is what later lets a history value outrank a streamed one
-        for the same period.
+        Everything comes back on the bid side and marked as having come from a history
+        read — which is what later lets a history value outrank a streamed one for the
+        same period. Not everything comes back closed: a read reaching the present
+        includes the period it is in, and the newest candle says so. Filtering that out
+        is the caller's job, because the caller is also the one recording what the read
+        verified, and the period was verified whether or not it is over.
 
         `before` is what lets a chunk (`jobs/plan.py`) ask for a window that ended
         months or years ago instead of always reaching back from the present — see
@@ -130,7 +133,10 @@ class GatewayHistory:
                 volume=row.volume,
                 price_side=PriceSide.BID,
                 source=CandleSource.HISTORY,
-                forming=False,
+                # Read, not assumed. A read that reaches the present brings back the
+                # period it is in, and stamping the lot as settled put a price from
+                # halfway through a period into the archive as the period's result.
+                forming=row.forming,
             )
             for row in payload.candles
         ]
@@ -172,6 +178,9 @@ class _Candle(BaseModel):
     low: float | None = None
     close: float | None = None
     volume: float | None = None
+    # Defaulted, so a gateway too old to say still parses. The default is the reading this
+    # module made for years anyway — it just used to be the only one available.
+    forming: bool = False
 
 
 class _CandleHistory(BaseModel):

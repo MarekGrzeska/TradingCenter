@@ -382,6 +382,31 @@ async def test_history_ended_bulk_skips_older_pending_chunks_of_the_same_pair(po
     assert by_window[(older.chunk_start, older.chunk_end)] is ChunkState.SKIPPED
 
 
+async def test_a_chunk_does_not_store_the_period_still_running(pool) -> None:
+    """The newest chunk of a job ends at the present, so its read brings back the period
+    in progress. Its values are not the period's result yet, and the archive keeps
+    results."""
+    await _tracked(pool)
+    only = plan(chunk_start=NOW - timedelta(hours=1), chunk_end=NOW)
+    async with pool.acquire() as conn:
+        await create_job(conn, NOW, [only])
+        claimed = await claim_pending_chunk(conn)
+
+    history = FakeHistory([minute_candle(2), minute_candle(1), minute_candle(0, forming=True)])
+    await execute_chunk(pool, history, claimed, asyncio.Semaphore(1))
+
+    async with pool.acquire() as conn:
+        stored = await read_candles(conn, "US100", Resolution.MINUTE)
+        # Still verified: the read looked at the stretch whether or not the last period
+        # in it is over, and narrowing coverage would have the next job ask again.
+        [covered] = await read_coverage(conn, "US100", Resolution.MINUTE)
+    assert [c.period_start for c in stored] == [
+        NOW - timedelta(minutes=2),
+        NOW - timedelta(minutes=1),
+    ]
+    assert covered.range_end == NOW
+
+
 async def test_a_chunk_that_brought_back_nothing_records_no_boundary(pool) -> None:
     """`history_ended` with an empty page says the read ran out, not where. Recorded
     against the window's own edge it announced as measured a stretch nobody looked at —

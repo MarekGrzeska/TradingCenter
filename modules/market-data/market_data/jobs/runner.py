@@ -105,8 +105,14 @@ async def execute_chunk(
 
         # Nothing older than this chunk's own window, whatever came back. The gateway
         # is asked to bound the read and does, but a promise about what the archive
-        # stores is not one to delegate.
-        within = [c for c in page.candles if c.period_start >= chunk.chunk_start]
+        # stores is not one to delegate. And nothing still forming: the newest chunk of a
+        # job ends at the present, so its read brings back the period in progress, whose
+        # values are not the period's result yet.
+        within = [
+            c
+            for c in page.candles
+            if c.period_start >= chunk.chunk_start and not c.forming
+        ]
         written = await write_candles(conn, within) if within else 0
         # The requested window is what was verified, not only the span the candles
         # happen to occupy — an exhaustive read of an empty stretch is still a stretch
