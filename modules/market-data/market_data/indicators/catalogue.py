@@ -524,8 +524,13 @@ _CHOPPINESS = IndicatorSpec(
 
 def _compute_aroon(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
     period = int(p["period"])
-    bars_since_high = kernel.rolling_argmax(s.high, period)
-    bars_since_low = kernel.rolling_argmin(s.low, period)
+    # A `period + 1`-bar window, not `period` — "days since the extreme" counts
+    # today as day zero and looks back `period` days from it, which is
+    # `period + 1` candles end to end (Chande's original definition, and
+    # TA-Lib's; a plain `period`-bar window can never report "the extreme is
+    # today", the one case this caught when checked against TA-Lib in 2.11).
+    bars_since_high = kernel.rolling_argmax(s.high, period + 1)
+    bars_since_low = kernel.rolling_argmin(s.low, period + 1)
     return {
         "aroon_up": 100 * (period - bars_since_high) / period,
         "aroon_down": 100 * (period - bars_since_low) / period,
@@ -543,7 +548,7 @@ _AROON = IndicatorSpec(
         LineSpec(key="aroon_down", label="Aroon Down {period}"),
     ),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False),
-    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"]) + 1),
     compute=_compute_aroon,
 )
 
