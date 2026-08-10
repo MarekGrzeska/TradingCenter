@@ -9,6 +9,9 @@ dependencies = [
     "httpx>=0.27",
     "websockets>=13",
     "pydantic-settings>=2.2",
+    # Exports this module's logs to Application Insights when a connection string is
+    # configured, and is inert without one. Same version market-data pins.
+    "azure-monitor-opentelemetry>=1.6",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
