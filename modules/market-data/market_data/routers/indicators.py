@@ -82,7 +82,10 @@ def _entry_out(entry: IndicatorSpec) -> IndicatorCatalogueEntryOut:
             IndicatorParamOut(name=p.name, type=p.type, default=p.default, min=p.min, max=p.max)
             for p in entry.params
         ],
-        lines=[IndicatorLineSpecOut(key=line.key, label=line.label) for line in entry.lines],
+        lines=[
+            IndicatorLineSpecOut(key=line.key, label=line.label, style=line.style)
+            for line in entry.lines
+        ],
         render=_render_out(entry),
         warmup_kind=entry.warmup.kind,
     )

@@ -70,6 +70,10 @@ class ParamOutOfRange(ValueError):
 class LineSpec:
     key: str
     label: str
+    # Overrides the entry's own `render.style` for this one line — MACD's
+    # histogram line inside an otherwise line-style entry, and the only reason
+    # this field exists. `None` means: use the entry's `render.style`.
+    style: Literal["line", "dots", "histogram"] | None = None
 
 
 @dataclass(frozen=True)

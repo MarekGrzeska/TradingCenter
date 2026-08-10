@@ -323,7 +323,7 @@ export function indicatorEntry(
     group: "averages",
     output: "lines",
     params: [{ name: "period", type: "int", default: 20, min: 2, max: 5000 }],
-    lines: [{ key: "ema", label: "EMA {period}" }],
+    lines: [{ key: "ema", label: "EMA {period}", style: null }],
     render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
     warmupKind: "decay",
     ...overrides,
