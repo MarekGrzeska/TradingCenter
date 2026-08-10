@@ -24,7 +24,7 @@ from datetime import timedelta
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from . import telemetry
+from . import schema_version, telemetry
 from .config import Settings
 from .db import pool as make_pool
 from .errors import GatewayError, GatewayUnreachable
@@ -84,6 +84,12 @@ async def lifespan(app: FastAPI):
         ) as pool,
         http_client(settings.gateway_api_key) as client,
     ):
+        # Before anything is built on top of it: a schema that does not match this image
+        # makes every query below a guess, and the only honest thing a process can do
+        # about that is not start (`schema_version.py`).
+        async with pool.acquire() as conn:
+            await schema_version.verify(conn)
+
         history = GatewayHistory(settings.gateway_base_url, client)
         hub = Hub()
         # Shared with the job runner below, not one semaphore each — two gates that

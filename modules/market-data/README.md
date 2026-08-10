@@ -65,6 +65,12 @@ it and edits nothing about the database. `../../scripts/dev.sh` (or `dev.ps1`) d
 the above plus the gateway and the terminal, in the order they need each other. Migrations
 step with `uv run alembic downgrade -1`.
 
+`alembic upgrade head` is not optional and never implicit — the container will not run it
+(`Dockerfile`), and since a deploy on 10 August landed new code on the previous schema, the
+module refuses to start when the two disagree (`schema_version.py`). Skipping it fails at
+startup with the revision it found and the revision it wanted, rather than serving `500`
+from the four routes that read the new tables.
+
 Leaving `DATABASE_USER` unset is what makes this local mode, and it cuts the module down to
 loopback: without an identity it refuses any remote host, production included
 (openspec: `market-data-database-connection`). The remote shape — Entra identity, TLS, no
