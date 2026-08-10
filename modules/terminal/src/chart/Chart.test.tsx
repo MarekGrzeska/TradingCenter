@@ -8,6 +8,7 @@ import {
   fakeChartApi,
   makeFakeChart,
 } from "./testDoubles";
+import type { Bar } from "../data/types";
 
 const stub = createChartStub();
 
@@ -17,6 +18,7 @@ vi.mock("lightweight-charts", () => ({
   CandlestickSeries: { type: "Candlestick" },
   ColorType: { Solid: "solid" },
   CrosshairMode: { Normal: 0 },
+  LineStyle: { Dashed: 2 },
   createChart: (_container: HTMLElement) => {
     const chart = makeFakeChart();
     stub.charts.push(chart);
@@ -353,6 +355,12 @@ describe("Chart — older history (terminal-chart spec)", () => {
    *  page from, and short enough to compute the expected window by hand. */
   const drawn = [bar(100, 1), bar(160, 2), bar(220, 3)];
 
+  /** `count` candles a minute apart, the newest of them one minute before the
+   *  drawn series starts — a page as the archive would answer one. */
+  function olderPage(count: number): Bar[] {
+    return Array.from({ length: count }, (_, index) => bar(100 - (count - index) * 60, 0.5));
+  }
+
   async function drawAndPan(range = { from: -5, to: 30 }) {
     renderChart(source);
     await act(async () => {
@@ -364,41 +372,61 @@ describe("Chart — older history (terminal-chart spec)", () => {
   }
 
   it("asks for a range ending at the oldest drawn candle", async () => {
-    source.historyPages = [[bar(40, 0.5)]];
+    source.historyPages = [olderPage(60)];
     await drawAndPan();
 
     // The window is the span the drawn candles occupy (220 - 100), taken
     // backwards from the oldest of them — never forwards, so the live edge the
     // subscription owns is not asked for a second time.
-    expect(source.historyCalls).toEqual([
-      { symbol: "US100", resolution: "MINUTE_5", from: -20, to: 100 },
-    ]);
-    expect(stub.latest().series[0].data().map((c) => c.time)).toEqual([40, 100, 160, 220]);
+    expect(source.historyCalls[0]).toEqual({
+      symbol: "US100",
+      resolution: "MINUTE_5",
+      from: -20,
+      to: 100,
+    });
+    expect(stub.latest().series[0].data()).toHaveLength(63);
+  });
+
+  it("stops once the viewport has candles to its left again", async () => {
+    // One page wide enough to put the margin back is one page: the pager is
+    // asking "does the operator have room to keep dragging", not "is there more
+    // history in the archive".
+    source.historyPages = [olderPage(60), olderPage(60)];
+    await drawAndPan();
+
+    expect(source.historyCalls).toHaveLength(1);
+  });
+
+  it("keeps paging when a page is too small to fill the margin", async () => {
+    // The bug this replaced: the chart compared logical indices across a series
+    // that had just grown at the front, so after a page or two the comparison
+    // could no longer be satisfied and paging stopped for good.
+    source.historyPages = [olderPage(2), olderPage(60)];
+    await drawAndPan();
+
+    expect(source.historyCalls).toHaveLength(2);
+    // The second window ends where the first page left the series, not where
+    // the drawn candles used to start.
+    expect(source.historyCalls[1].to).toBe(-20);
+  });
+
+  it("stops when a page brings nothing the series did not already have", async () => {
+    // A source answering with candles already drawn would otherwise be asked
+    // the same question forever.
+    source.historyPages = [[bar(100, 1)], [bar(100, 1)]];
+    await drawAndPan();
+
+    expect(source.historyCalls).toHaveLength(1);
+    expect(screen.getByText(/start of history/i)).toBeInTheDocument();
   });
 
   it("keeps the operator looking at the same candles after a page lands", async () => {
-    source.historyPages = [[bar(-20, 0.4), bar(40, 0.5)]];
+    source.historyPages = [olderPage(60)];
     await drawAndPan({ from: -5, to: 30 });
 
-    // Two candles joined the front, so every logical index moved by two; the
-    // frame moves with them or the chart jumps under the cursor.
-    expect(stub.latest().rangesSet.at(-1)).toEqual({ from: -3, to: 32 });
-  });
-
-  it("does not chain a second page off its own frame correction", async () => {
-    // Correcting the frame is itself a range change, and the corrected frame is
-    // still near the left edge. Left alone it would ask for the next page, and
-    // that one for the one after it — the whole archive on a single drag.
-    source.historyPages = [[bar(-20, 0.4), bar(40, 0.5)], [bar(-80, 0.3)]];
-    await drawAndPan();
-
-    // The corrected frame, reported by the time scale once the page is in and
-    // the read is over — the moment the loop would start.
-    await act(async () => {
-      stub.latest().pan(stub.latest().visibleRange!);
-    });
-
-    expect(source.historyCalls).toHaveLength(1);
+    // Sixty candles joined the front, so every logical index moved by sixty;
+    // the frame moves with them or the chart jumps under the cursor.
+    expect(stub.latest().rangesSet.at(-1)).toEqual({ from: 55, to: 90 });
   });
 
   it("says it is loading, and does not start a second read while one is in flight", async () => {
@@ -413,31 +441,33 @@ describe("Chart — older history (terminal-chart spec)", () => {
     expect(source.historyCalls).toHaveLength(1);
 
     await act(async () => {
-      source.releaseHistory([bar(40, 0.5)]);
+      source.releaseHistory(olderPage(60));
     });
     expect(screen.queryByText(/loading older/i)).not.toBeInTheDocument();
   });
 
   it("walks past empty windows before calling it the start of history", async () => {
     // A weekend, a holiday and a pause in collection all look like this: a
-    // range with no candles in it. One of them is not the end of the archive.
-    source.historyPages = [[], [], [], []];
+    // range with no candles in it. None of them is the end of the archive, and
+    // four windows — which is what this used to walk — reached back three days,
+    // less than a long Easter weekend.
+    source.historyPages = [];
     await drawAndPan();
 
-    expect(source.historyCalls).toHaveLength(4);
-    // Each window doubles, so the four of them reach back eight times the first.
+    expect(source.historyCalls).toHaveLength(8);
+    // Each window doubles, so the eight of them reach back 255 times the first.
     expect(source.historyCalls.at(-1)).toEqual({
       symbol: "US100",
       resolution: "MINUTE_5",
-      from: -1700,
-      to: -740,
+      from: -30500,
+      to: -15140,
     });
     expect(screen.getByText(/start of history/i)).toBeInTheDocument();
 
     await act(async () => {
       stub.latest().pan({ from: -9, to: 26 });
     });
-    expect(source.historyCalls).toHaveLength(4);
+    expect(source.historyCalls).toHaveLength(8);
   });
 
   it("keeps the drawn candles when a page fails, and retries on demand", async () => {
@@ -456,12 +486,10 @@ describe("Chart — older history (terminal-chart spec)", () => {
     expect(source.historyCalls).toHaveLength(1);
 
     source.historyFailure = null;
-    source.historyPages = [[bar(40, 0.5)]];
+    source.historyPages = [olderPage(60)];
     await user.click(screen.getByRole("button", { name: /retry/i }));
 
-    await waitFor(() =>
-      expect(stub.latest().series[0].data().map((c) => c.time)).toEqual([40, 100, 160, 220]),
-    );
+    await waitFor(() => expect(stub.latest().series[0].data()).toHaveLength(63));
     expect(screen.queryByText(/older history failed/i)).not.toBeInTheDocument();
   });
 
@@ -486,14 +514,14 @@ describe("Chart — older history (terminal-chart spec)", () => {
     await waitFor(() => expect(source.subscribeCalls).toHaveLength(2));
     await act(async () => {
       source.snapshotTo(1, [bar(1000, 9)]);
-      source.releaseHistory([bar(40, 0.5)]);
+      source.releaseHistory(olderPage(60));
     });
 
     expect(stub.latest().series[0].data().map((c) => c.time)).toEqual([1000]);
   });
 
   it("does not throw the frame back to the right when the stream reconnects", async () => {
-    source.historyPages = [[bar(40, 0.5)]];
+    source.historyPages = [olderPage(60)];
     await drawAndPan();
     const fittedOnce = stub.latest().fitContentCalls;
 
@@ -504,6 +532,68 @@ describe("Chart — older history (terminal-chart spec)", () => {
     });
 
     expect(stub.latest().fitContentCalls).toBe(fittedOnce);
-    expect(stub.latest().series[0].data().map((c) => c.time)).toEqual([40, 100, 160, 220, 280]);
+    expect(stub.latest().series[0].data().at(-1)?.time).toBe(280);
+  });
+});
+
+describe("Chart — the price on the right-hand scale", () => {
+  it("leaves the library's own last-value label off", async () => {
+    // It is sourced from the last *visible* bar, so panning into history had it
+    // announce the price of whatever candle sat at the edge of the viewport.
+    renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    expect(stub.latest().series[0].options).toMatchObject({
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
+  });
+
+  it("marks the newest close, and follows it as the candle forms", async () => {
+    renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 50), bar(160, 60)]);
+    });
+    await waitFor(() => expect(stub.latest().series[0].priceLine()?.options.price).toBe(60));
+
+    await act(async () => {
+      source.emit({ kind: "bar", bar: bar(220, 70, true) });
+    });
+    await waitFor(() => expect(stub.latest().series[0].priceLine()?.options.price).toBe(70));
+  });
+
+  it("stays on the newest close when the operator pans back into history", async () => {
+    source.historyPages = [];
+    renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 50), bar(160, 60), bar(220, 70)]);
+    });
+    await act(async () => {
+      stub.latest().pan({ from: -5, to: 30 });
+    });
+
+    expect(stub.latest().series[0].priceLine()?.options.price).toBe(70);
+  });
+
+  it("takes its mark down when the chart is emptied for a new symbol", async () => {
+    const { rerender, onResolutionChange } = renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 50)]);
+    });
+    const line = stub.latest().series[0].priceLine();
+    expect(line).toBeDefined();
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="GOLD"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+      />,
+    );
+
+    await waitFor(() => expect(line?.removed).toBe(true));
   });
 });

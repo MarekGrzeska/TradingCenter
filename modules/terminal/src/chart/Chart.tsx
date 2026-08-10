@@ -5,7 +5,9 @@ import {
   CrosshairMode,
   createChart,
   type CandlestickData,
+  LineStyle,
   type IChartApi,
+  type IPriceLine,
   type ISeriesApi,
   type LogicalRange,
   type MouseEventParams,
@@ -15,7 +17,7 @@ import {
 import { findBar, mergeBar, mergeSeries } from "../data/merge";
 import { RESOLUTIONS, type Bar, type Resolution } from "../data/types";
 import type { MarketDataSource } from "../data/source";
-import { candlestickColors, readChartColors } from "./theme";
+import { candlestickColors, readChartColors, type ChartColors } from "./theme";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
 
@@ -51,11 +53,11 @@ interface Readout {
   hovered: boolean;
 }
 
-/** How close to the left edge of the drawn series a pan has to come before the
- *  next page is asked for, counted in bars. Far enough that the page usually
- *  arrives before the operator reaches the edge, near enough that opening a
- *  chart and leaving it alone asks for nothing. */
-const OLDER_TRIGGER_BARS = 20;
+/** How few candles may be left to the viewport's left before older ones are
+ *  fetched, counted in bars. It is both the trigger and the target: the pager
+ *  keeps going until the viewport has at least this much history behind it, so
+ *  one drag to the edge is answered with a screenful rather than a page. */
+const OLDER_MARGIN_BARS = 50;
 
 /**
  * One candlestick chart, defined entirely by `symbol` + `resolution` — the same
@@ -81,13 +83,10 @@ export function Chart({
   // The pan handler is attached once, with the chart; the pager it calls is
   // recreated whenever symbol, resolution or source change.
   const requestOlderRef = useRef<() => void>(() => {});
-  // How far left the frame had reached when the last page was asked for.
-  // Prepending candles moves every logical index to the right and the chart
-  // corrects the frame by exactly that much — which the time scale reports as
-  // another range change. Without this, that correction would ask for the next
-  // page, and that one for the one after it, all the way back through the
-  // archive on a single drag.
-  const requestedFromRef = useRef(Number.POSITIVE_INFINITY);
+  // The current price, drawn as a line with its own axis label — see
+  // `syncPriceLine` for why the series' built-in one does not do.
+  const priceLineRef = useRef<IPriceLine | null>(null);
+  const colorsRef = useRef<ChartColors | null>(null);
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -121,10 +120,22 @@ export function Chart({
       width: container.clientWidth,
       height: container.clientHeight,
     });
-    const series = chart.addSeries(CandlestickSeries, candlestickColors(colors));
+    const series = chart.addSeries(CandlestickSeries, {
+      ...candlestickColors(colors),
+      // Both of the series' own price markers are off, and one of them is the
+      // point: the price-axis label the library draws is sourced from the last
+      // *visible* bar (`SeriesPriceAxisView` asks for `lastValueData(false)`,
+      // whatever `priceLineSource` says), so panning into history left the
+      // right-hand scale announcing the price of whatever candle happened to be
+      // at the edge of the viewport. The chart draws its own instead, always at
+      // the newest candle.
+      lastValueVisible: false,
+      priceLineVisible: false,
+    });
 
     chartRef.current = chart;
     seriesRef.current = series;
+    colorsRef.current = colors;
 
     // Whatever the feed already delivered before this effect re-ran (a
     // StrictMode remount, most often) is redrawn rather than lost.
@@ -133,14 +144,13 @@ export function Chart({
       chart.timeScale().fitContent();
     }
 
-    // Panning past the left edge of what is drawn is the whole trigger for
+    // Panning towards the left edge of what is drawn is the whole trigger for
     // loading older candles (terminal-chart spec, "Wykres dociąga starszą
-    // historię przy przewijaniu w lewo").
+    // historię przy przewijaniu w lewo"). How much gets loaded is not decided
+    // here: the pager keeps asking until `needsMore` below says the margin is
+    // filled, which is what stops it looping on its own frame correction.
     const onRangeChange = (range: LogicalRange | null) => {
-      if (!range || range.from >= OLDER_TRIGGER_BARS) return;
-      if (range.from >= requestedFromRef.current) return;
-      requestedFromRef.current = range.from;
-      requestOlderRef.current();
+      if (range && range.from < OLDER_MARGIN_BARS) requestOlderRef.current();
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange);
 
@@ -158,6 +168,8 @@ export function Chart({
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
+      // The line belonged to the series that just went away with the chart.
+      priceLineRef.current = null;
     };
   }, []);
 
@@ -175,6 +187,44 @@ export function Chart({
     },
     [],
   );
+
+  /**
+   * The right-hand scale says what the market is doing now, not what it was doing at the
+   * left edge of the viewport.
+   *
+   * The library's own last-value label reads the last *visible* bar, so a chart panned
+   * back a week labelled the scale with a week-old price — the one number on screen an
+   * operator is most likely to act on. A price line of our own carries the newest close
+   * instead, and follows it as the candle forms.
+   */
+  useEffect(() => {
+    const series = seriesRef.current;
+    if (!series) return;
+
+    if (!latestBar) {
+      if (priceLineRef.current) {
+        series.removePriceLine(priceLineRef.current);
+        priceLineRef.current = null;
+      }
+      return;
+    }
+
+    const colors = colorsRef.current ?? readChartColors();
+    const rising = latestBar.close >= latestBar.open;
+    const options = {
+      price: latestBar.close,
+      color: rising ? colors.up : colors.down,
+      lineWidth: 1 as const,
+      lineStyle: LineStyle.Dashed,
+      axisLabelVisible: true,
+      axisLabelColor: rising ? colors.up : colors.down,
+      axisLabelTextColor: colors.surface,
+      title: "",
+    };
+
+    if (priceLineRef.current) priceLineRef.current.applyOptions(options);
+    else priceLineRef.current = series.createPriceLine(options);
+  }, [latestBar]);
 
   // --- crosshair readout, coalesced to one state write per frame ---
   useEffect(() => {
@@ -299,7 +349,14 @@ export function Chart({
   );
 
   const olderReader: OlderBarsReader = useMemo(
-    () => ({ readSeries: () => barsRef.current, deliver: applyOlder }),
+    () => ({
+      readSeries: () => barsRef.current,
+      deliver: applyOlder,
+      needsMore: () => {
+        const range = chartRef.current?.timeScale().getVisibleLogicalRange();
+        return range ? range.from < OLDER_MARGIN_BARS : false;
+      },
+    }),
     [applyOlder],
   );
 
@@ -311,7 +368,6 @@ export function Chart({
   useEffect(() => {
     barsRef.current = [];
     seriesRef.current?.setData([]);
-    requestedFromRef.current = Number.POSITIVE_INFINITY;
     setReadout(null);
     setLatestBar(null);
   }, [source, symbol, resolution]);

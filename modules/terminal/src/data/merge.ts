@@ -38,14 +38,55 @@ export function mergeBar(series: readonly Bar[], incoming: Bar): Bar[] {
   return next;
 }
 
-/** Fold `mergeBar` over many incoming bars — history merged with a reconnect's
- *  gap-fill, or a batch of history pages joined in order. */
+/**
+ * Two series into one, sorted by `time`, with no duplicate timestamp — a reconnect's
+ * gap-fill folded into what is drawn, or a page of older candles joined to the front.
+ * Where both carry the same period, `incoming` wins.
+ *
+ * A single linear pass, not `mergeBar` per bar. That fold copies the whole array for
+ * every incoming candle, which is nothing for a gap-fill of three and several million
+ * element copies for a 300-candle page merged into a series of thousands — felt as a
+ * stutter every time the chart paged history in.
+ */
 export function mergeSeries(base: readonly Bar[], incoming: readonly Bar[]): Bar[] {
-  let result: Bar[] = base as Bar[];
-  for (const bar of incoming) {
-    result = mergeBar(result, bar);
+  if (incoming.length === 0) return base as Bar[];
+  if (base.length === 0) return sorted(incoming);
+
+  const right = sorted(incoming);
+  const result: Bar[] = [];
+  let i = 0;
+  let j = 0;
+
+  while (i < base.length && j < right.length) {
+    const left = base[i];
+    const next = right[j];
+    if (left.time < next.time) {
+      result.push(left);
+      i++;
+    } else if (left.time > next.time) {
+      result.push(next);
+      j++;
+    } else {
+      result.push(next);
+      i++;
+      j++;
+    }
   }
+  while (i < base.length) result.push(base[i++]);
+  while (j < right.length) result.push(right[j++]);
   return result;
+}
+
+/** `incoming` is sorted in practice — both a snapshot and a range read answer in order —
+ *  but the merge is only linear if it is, so an out-of-order batch is put in order rather
+ *  than trusted. Checking costs one pass and almost always finds nothing to do. */
+function sorted(bars: readonly Bar[]): Bar[] {
+  for (let index = 1; index < bars.length; index++) {
+    if (bars[index - 1].time > bars[index].time) {
+      return [...bars].sort((a, b) => a.time - b.time);
+    }
+  }
+  return [...bars];
 }
 
 /** The bar at exactly `time`, or undefined. Binary search — the chart calls
