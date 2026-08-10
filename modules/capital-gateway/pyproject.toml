@@ -51,5 +51,11 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "respx>=0.21",
-    "ruff>=0.7",
+    # Pinned exactly, not a floor. `>=0.7` meant CI took whatever was newest, which today
+    # resolves to 0.16.2 with 413 rules active — a far wider set than anything 0.7 ran by
+    # default. New rules have been worth having (UP037 caught a real defect in
+    # market-data's config.py), but with a floor it is the linter's publisher who decides
+    # when a commit that was green turns red. Raised deliberately, and in step with the
+    # other module: two modules linting at different versions is two standards.
+    "ruff==0.16.2",
 ]

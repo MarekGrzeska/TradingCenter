@@ -15,8 +15,13 @@ import pytest
 from market_data.coverage import read_coverage
 from market_data.errors import GatewayRefused, GatewayUnreachable
 from market_data.gateway import HistoryPage
-from market_data.jobs.models import ChunkPlan, ChunkState
-from market_data.jobs.runner import JobRunner, _report_worker_death, execute_chunk
+from market_data.jobs.models import ChunkPlan, ChunkState, JobStatus
+from market_data.jobs.runner import (
+    IDLE_POLL_SECONDS,
+    JobRunner,
+    _report_worker_death,
+    execute_chunk,
+)
 from market_data.jobs.store import claim_pending_chunk, create_job, read_job
 from market_data.models import Candle, CandleSource, Resolution
 from market_data.store import read_candles
@@ -106,6 +111,39 @@ async def pool(migrated_url: str):
 async def _tracked(pool, symbol: str = "US100", resolution: Resolution = Resolution.MINUTE):
     async with pool.acquire() as conn:
         await track(conn, symbol, resolution, LIMIT, collect_from=NOW - timedelta(days=3650))
+
+
+# How long a test waits for a running worker to finish with a job. Generous because it is
+# not a budget being asserted: `_settled` returns the moment the job settles, so a healthy
+# run never spends more than the work actually takes. It only has to outlast the slowest
+# machine the suite runs on, and that machine is not this one.
+SETTLE_TIMEOUT = 5.0
+
+
+async def _settled(pool, job_id: int, timeout: float = SETTLE_TIMEOUT):
+    """Read a job back until no chunk of it is open any more, and return it.
+
+    What these tests want to wait for is "the worker has finished with this job", and the
+    job says so itself: `status` is derived from its chunks and leaves `running` exactly
+    when the last one settles. Polling for that beats sleeping a fixed stretch in both
+    directions — a fast machine stops waiting as soon as the work is done, and a slow one
+    is not called a failure for being slow. A tenth of a second was enough here and not
+    in CI, where these round trips go to a container sharing a runner with everything
+    else in the job: two of the tests below failed there on a branch whose whole diff was
+    a pinned ruff version.
+
+    A timeout returns the job as it was last read rather than raising, so the caller's own
+    assertion is what reports the state — `running` where `done` was expected says more
+    than any message this helper could invent.
+    """
+    loop = asyncio.get_running_loop()
+    deadline = loop.time() + timeout
+    while True:
+        async with pool.acquire() as conn:
+            job = await read_job(conn, job_id)
+        if job.status is not JobStatus.RUNNING or loop.time() >= deadline:
+            return job
+        await asyncio.sleep(0.01)
 
 
 # --- execute_chunk: the happy path ----------------------------------------------------
@@ -370,9 +408,7 @@ async def test_the_runner_claims_and_settles_a_pending_chunk(pool) -> None:
     runner = JobRunner(pool, FakeHistory([minute_candle(1)]), limiter=asyncio.Semaphore(1))
     await runner.start()
     try:
-        await asyncio.sleep(0.1)
-        async with pool.acquire() as conn:
-            reread = await read_job(conn, job.id)
+        reread = await _settled(pool, job.id)
     finally:
         await runner.stop()
 
@@ -392,9 +428,10 @@ async def test_notify_wakes_an_idle_worker_without_waiting_for_the_poll(pool) ->
             )
         runner.notify()
 
-        await asyncio.sleep(0.1)
-        async with pool.acquire() as conn:
-            reread = await read_job(conn, job.id)
+        # Well inside the runner's own idle poll, which is what this test is asserting
+        # against: waiting past `IDLE_POLL_SECONDS` would let the fallback poll find the
+        # job by itself and pass this test with `notify()` doing nothing at all.
+        reread = await _settled(pool, job.id, timeout=IDLE_POLL_SECONDS / 2)
     finally:
         await runner.stop()
 
@@ -429,9 +466,7 @@ async def test_a_chunk_whose_execution_raises_settles_failed_rather_than_stuck_r
     runner = JobRunner(pool, Exploding(), limiter=asyncio.Semaphore(1))
     await runner.start()
     try:
-        await asyncio.sleep(0.1)
-        async with pool.acquire() as conn:
-            reread = await read_job(conn, job.id)
+        reread = await _settled(pool, job.id)
     finally:
         await runner.stop()
 
@@ -474,9 +509,7 @@ async def test_a_worker_keeps_going_after_one_chunk_raises(pool) -> None:
     runner = JobRunner(pool, ExplodingOnce(), limiter=asyncio.Semaphore(1))
     await runner.start()
     try:
-        await asyncio.sleep(0.2)
-        async with pool.acquire() as conn:
-            reread = await read_job(conn, job.id)
+        reread = await _settled(pool, job.id)
     finally:
         await runner.stop()
 
@@ -522,9 +555,7 @@ async def test_a_worker_survives_a_failure_taking_work_and_carries_on(pool, monk
     runner = JobRunner(flaky, FakeHistory([minute_candle(1)]), limiter=asyncio.Semaphore(1))
     await runner.start()
     try:
-        await asyncio.sleep(0.2)
-        async with pool.acquire() as conn:
-            reread = await read_job(conn, job.id)
+        reread = await _settled(pool, job.id)
     finally:
         await runner.stop()
 
