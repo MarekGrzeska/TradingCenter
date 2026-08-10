@@ -1,0 +1,1146 @@
+<title>Wskaźniki techniczne — gdzie je liczyć i jak pokazać na wykresie</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 58rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.9rem; margin: 1.5rem 0 0.4rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 34rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; }
+  td.num { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.79rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; margin: 1.4rem 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.9rem 1.1rem; }
+  .card h4 { margin-top: 0; }
+  .card p { margin: 0.4rem 0; font-size: 0.9rem; }
+
+  figure { margin: 1.6rem 0; }
+  figcaption { color: var(--text-dim); font-size: 0.83rem; margin-top: 0.5rem; }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>Wskaźniki techniczne</h1>
+<p class="lede">Gdzie je policzyć, żeby wynik był powtarzalny, jak je opisać w kontrakcie i jak narysować w terminalu — plus co z tego naprawdę służy SMC i price action. Bez niczego, co dotyka wolumenu.</p>
+<p class="meta">
+  Research przed decyzją — nic z tego nie jest jeszcze stanem repozytorium.<br>
+  Dotyczy: <code>modules/market-data</code>, <code>modules/terminal</code>, <code>infra/app-service.tf</code><br>
+  Sprawdzone wobec: <code>lightweight-charts@5.0.9</code>, <code>market_data/rollups.py</code>, <code>market_data/periods.py</code>, <code>terminal/src/data/config.ts</code>
+</p>
+
+<h2>Odpowiedź na pytanie otwarte</h2>
+
+<div class="callout good">
+  <span class="tag">Rekomendacja</span>
+  <p><strong>To wciąż <code>market-data</code></strong> — nowy obszar w istniejącym module (<code>market_data/indicators/</code> + router <code>/indicators</code>), nie nowy moduł. Cztery powody są konkretne i wszystkie leżą w tym repozytorium, nie w gustach architektonicznych:</p>
+  <ol>
+    <li><strong>Przeglądarka nie dosięgnie niczego innego.</strong> <code>capital-gateway</code> ma <code>ip_restriction_default_action = "Deny"</code> i listę dozwolonych adresów wychodzących <code>market-data</code>; katalog instrumentów jedzie do terminala <em>przez</em> archiwum (<code>terminal/src/data/config.ts</code>: „capital-gateway has no address here at all"). Trzeci moduł widoczny z przeglądarki to trzecia konfiguracja Easy Auth, trzeci CORS na poziomie App Service, trzeci wpis w <code>parts</code> i trzeci adres w konfiguracji terminala.</li>
+    <li><strong>Plan B1 nie ma miejsca.</strong> Oba kontenery stoją na jednym <code>azurerm_service_plan</code> B1 z <code>worker_count = 1</code>, a próg alertu pamięci właśnie podniesiono do 92% („The B1 plan both apps share is over 92% memory", <code>infra/monitoring.tf</code>). Trzeci <code>always_on</code> oznacza zmianę SKU, czyli koszt — a nie linijkę Terraforma.</li>
+    <li><strong>Dane są w bazie <code>market-data</code>.</strong> Osobny moduł musiałby zaciągać świece po HTTP, bo modułowi nie wolno sięgnąć do cudzej bazy. 5000 świec to ~400 kB JSON-a w jedną stronę, na każde żądanie, plus odpowiedź z liniami z powrotem.</li>
+    <li><strong>Precedens już jest.</strong> <code>rollups.py</code> to liczenie na własnej serii, nie samo przechowywanie. Wskaźniki są tą samą rodziną operacji: czysta funkcja świec, których moduł jest właścicielem.</li>
+  </ol>
+</div>
+
+<p>Koszt tej decyzji trzeba nazwać, bo jest realny: opis modułu w <code>CLAUDE.md</code> brzmi „the candle archive", a archiwum, które liczy 120 wskaźników, jest już czymś więcej. Zdanie do poprawienia przy tej samej zmianie: archiwum <em>odpowiada na pytania o serię, której jest właścicielem</em>.</p>
+
+<div class="callout">
+  <span class="tag">Furtka wyjściowa, wpisana w projekt od pierwszego dnia</span>
+  <p>Jądro liczące (<code>market_data/indicators/kernel.py</code>) <strong>nie importuje ani FastAPI, ani asyncpg</strong>. Bierze listy liczb, oddaje listy liczb. Router jest jedyną rzeczą, która wie o HTTP i o puli połączeń. Jeśli kiedyś obliczenia trzeba będzie odciąć — bo CPU zacznie przeszkadzać strumieniowi albo bo backtesty urosną — wyniesienie ich do <code>modules/analytics</code> jest przeniesieniem katalogu i napisaniem nowego routera, a nie przepisywaniem matematyki.</p>
+</div>
+
+<h2>Czego tu nie ma: wolumen</h2>
+
+<p>Decyzja pochodzi od operatora i jest słuszna, ale warto zapisać, że <strong>to archiwum potwierdza ją samo z siebie</strong>, niezależnie od tego, co CFD-owy wolumen znaczy u brokera. Dwa fakty z kodu:</p>
+
+<ul>
+  <li><code>rollups.py</code>, komentarz przy agregacji: <em>„a stream candle never carries volume at all, so mixed periods are the normal case"</em>. Świeca ze strumienia nie ma wolumenu w ogóle.</li>
+  <li>Ta sama agregacja liczy wolumen bucketu tylko wtedy, gdy <em>każda</em> minuta go miała: <code>CASE WHEN count(volume) = count(*) THEN sum(volume) END</code>. Skoro część minut przychodzi strumieniem, wolumen świec pochodnych (MINUTE_5…HOUR_4) jest w praktyce <code>NULL</code>.</li>
+</ul>
+
+<p>Czyli: wskaźnik wolumenowy w tym systemie nie byłby „mniej wiarygodny". Byłby pusty na większości rozdzielczości i niepusty na MINUTE — czyli dawałby dwie różne odpowiedzi zależnie od tego, o co się go zapyta. To gorsze niż brak.</p>
+
+<h4>Odpada zatem</h4>
+<div class="scroll">
+<table>
+  <thead><tr><th>Wskaźnik</th><th>Dlaczego odpada</th></tr></thead>
+  <tbody>
+    <tr><td class="field">OBV, PVT, NVI/PVI</td><td>Skumulowany wolumen ze znakiem — jedna dziura w danych psuje całą serię do końca.</td></tr>
+    <tr><td class="field">A/D Line, Chaikin Money Flow, Chaikin Oscillator</td><td>Mnożnik przepływu × wolumen.</td></tr>
+    <tr><td class="field">Money Flow Index</td><td>„RSI ważony wolumenem" — bez wagi to zwykłe RSI na cenie typowej.</td></tr>
+    <tr><td class="field">VWAP, anchored VWAP</td><td>Z definicji średnia ważona wolumenem. Bez niego jest to średnia z ceny typowej, czyli inny wskaźnik pod cudzą nazwą.</td></tr>
+    <tr><td class="field">Volume Profile, TPO / Market Profile</td><td>Rozkład obrotu po cenach.</td></tr>
+    <tr><td class="field">VWMA, Force Index, Ease of Movement, Klinger, Demand Index, Twiggs MF</td><td>Wolumen jako waga albo mnożnik.</td></tr>
+    <tr><td class="field">Oscylatory wolumenu, Volume RSI</td><td>Wolumen jako jedyne wejście.</td></tr>
+    <tr><td class="field" style="opacity:.75">TRIN/ARMS, A/D breadth, McClellan</td><td>Inny powód: potrzebują szerokości rynku (setek instrumentów), a nie jednej pary.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout good">
+  <span class="tag">Dobra wiadomość</span>
+  <p>Cała rodzina estymatorów zmienności z samego OHLC — <strong>Parkinson, Garman–Klass, Rogers–Satchell, Yang–Zhang</strong> — jest tu wręcz na swoim miejscu. Powstały dokładnie po to, żeby wycisnąć więcej informacji z zakresu świecy niż daje odchylenie zamknięć, i żadna z nich wolumenu nie widzi. Dla CFD to lepszy zestaw niż to, czego zwykle używa się na akcjach.</p>
+  <p>Podobnie <em>Chaikin Volatility</em>: mimo nazwiska liczy się z rozpiętości <code>H−L</code>, nie z obrotu. Zostaje.</p>
+</div>
+
+<h2>Co znaczy „deterministycznie"</h2>
+
+<p>To jest właściwy trzon całej sprawy, bo naiwne „ta sama funkcja na tych samych danych" nie wystarcza. Wskaźnik rekurencyjny — EMA, RSI, ATR, wszystko wygładzane po Wilderze — zależy od <em>całej</em> historii przed pytanym punktem. Ten sam EMA(50) policzony od stycznia i policzony od marca to na 1 kwietnia dwie różne liczby.</p>
+
+<h3>Rozgrzewka jako liczba, nie jako przeczucie</h3>
+
+<p>Filtr pierwszego rzędu tłumi wpływ zasiewu geometrycznie. Waga pierwszej próbki po <code>m</code> świecach wynosi <code>(1−α)^m</code>. Jeśli zażądać, żeby ta waga spadła poniżej <code>ε = 1e−9</code> — poniżej rozdzielczości, w jakiej ktokolwiek ogląda cenę — to:</p>
+
+<pre><code>m = ceil( ln(ε) / ln(1 − α) )        ε = 1e-9
+
+EMA(n),  α = 2/(n+1)   →  m ≈ 10 · (n+1)      EMA(20)  → 207 świec
+Wilder(n), α = 1/n     →  m ≈ 21 · n          RSI(14)  → 280 świec
+Heikin-Ashi, α = 1/2   →  m = 30 świec</code></pre>
+
+<p>Stąd bierze się reguła kontraktu: <strong>moduł zawsze czyta więcej świec, niż zapytano</strong>. Żądanie od 1 kwietnia dla EMA(50) czyta od 1 kwietnia minus 510 świec, liczy całość i oddaje tylko okno, o które proszono. Odpowiedź mówi, dokąd naprawdę sięgnęła (<code>warmup_from</code>), więc konsument wie, czy wartość jest już „ustabilizowana", czy jeszcze nie — bo archiwum mogło po prostu nie mieć aż tylu świec.</p>
+
+<p>To zamienia gwarancję z <em>„zasiewamy tak samo"</em> (co jest umową, którą łatwo złamać przy refaktorze) w <em>„wpływ zasiewu jest poniżej precyzji odczytu"</em> (co jest własnością matematyczną i da się przetestować).</p>
+
+<h3>Wskaźniki, których to nie ratuje</h3>
+
+<div class="callout warn">
+  <span class="tag">Osobna kategoria: stan, nie tłumienie</span>
+  <p><strong>Parabolic SAR, SuperTrend, ZigZag, Renko, Kagi, P&amp;F</strong> nie mają tłumienia. Mają <em>stan</em> — kierunek, aktywny ekstremum, otwarta cegła — który raz przełączony może przetrwać dowolnie długo. Nie istnieje <code>m</code>, po którym dwa różne punkty startu się zgodzą.</p>
+  <p>Dla nich obowiązuje inna reguła: <strong>kotwica</strong>. Liczone są zawsze od najstarszej świecy w pokryciu (<code>coverage_ranges</code>) dla tej pary i rozdzielczości, a odpowiedź podaje kotwicę jawnie. Konsekwencja, którą trzeba zaakceptować i zapisać: dociągnięcie starszej historii backfillem <em>zmienia dzisiejszą wartość SAR-a</em>. To nie jest błąd, to jest natura wskaźnika — ale musi być widoczne, a nie odkryte przez kogoś, kto porównał dwa zrzuty ekranu.</p>
+</div>
+
+<h3>Pozostałe wymagania, w formie, którą da się przełożyć na spec</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wymaganie</th><th>Dlaczego</th></tr></thead>
+  <tbody>
+    <tr><td>Obliczenie MUSI być czystą funkcją <code>(świece, spec)</code> — bez zegara, bez losowości, bez locale.</td><td>Inaczej „ten sam wykres jutro" nie znaczy nic.</td></tr>
+    <tr><td><code>float64</code>, ustalona kolejność operacji; żadnych zrównoleglonych redukcji.</td><td>Sumowanie w innej kolejności daje inny ostatni bit. Przy 5000 świec to niewidoczne, przy porównywaniu dwóch wdrożeń — już nie.</td></tr>
+    <tr><td>Przed rozgrzewką MUSI być <code>null</code>, nigdy <code>0</code>.</td><td>Zero na wykresie RSI to linia przy dolnej krawędzi, którą ktoś odczyta jako wyprzedanie.</td></tr>
+    <tr><td>Serwer NIE zaokrągla. Zaokrągla prezentacja.</td><td>Zaokrąglenie w kontrakcie jest nieodwracalne i zależy od instrumentu.</td></tr>
+    <tr><td>Indeksem jest numer świecy, nie czas.</td><td>Weekend CFD to brak świec, a nie świece o zerowym ruchu. „EMA(20)" znaczy 20 świec, cokolwiek między nimi się działo.</td></tr>
+    <tr><td><code>uncovered</code> z <code>CandlesOut</code> MUSI jechać dalej w odpowiedzi wskaźnikowej.</td><td>Wskaźnik policzony przez dziurę w danych jest pewnym siebie kłamstwem — dokładnie to, czemu ten moduł ma zapobiegać.</td></tr>
+    <tr><td>Świeca w budowie: wartość oznaczona jako nieustalona, nigdy przechowywana.</td><td>Ta sama zasada, którą już stosuje <code>hub.py</code> dla <code>forming</code>.</td></tr>
+    <tr><td>Katalog niesie <code>algorithm_version</code>.</td><td>Zmiana wzoru jest zmianą kontraktu. Bez numeru dwa wdrożenia różnią się po cichu.</td></tr>
+    <tr><td>Niekompletny bucket pochodny (<code>complete = false</code>) MUSI być oznaczony.</td><td><code>rollups.py</code> to już wie o świecach; wskaźnik na niepełnym bucketcie zaniża zakres i podbija ATR.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Czego nie przechowujemy — i dlaczego to nie jest lenistwo</h3>
+
+<p>Rollupy są w tabeli, bo są <em>jednym</em> obiektem na parę i rozdzielczość i czyta je każdy konsument. Wskaźniki są sparametryzowane: EMA(9), EMA(21), EMA(50), EMA(200), EMA(37) bo ktoś tak kliknął. Przestrzeń kluczy cache'a jest nieograniczona, a determinizm sprawia, że przeliczenie jest tanie i zawsze zgodne. <strong>Liczymy przy odczycie, nie przechowujemy nic.</strong> Efekt uboczny: żadnej migracji, żadnej inwalidacji przy backfillu, żadnego wzrostu bazy.</p>
+
+<h2>Lista wskaźników</h2>
+
+<p>Kolumna <em>Rozgrzewka</em> to <code>warmup_bars</code> z reguły wyżej: <code>n</code> dla filtrów skończonych (FIR), wzór dla rekurencyjnych (IIR), <span class="pill warn">kotwica</span> dla zależnych od stanu. <em>Panel</em>: <code>cena</code> = nakładka na świece, <code>własny</code> = osobny panel pod wykresem.</p>
+
+<h3>A. Średnie i wygładzenia <span class="dim">— panel: cena</span></h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wskaźnik</th><th>Parametry</th><th>Linie</th><th>Rozgrzewka</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td class="field">SMA</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Baza dla połowy reszty listy.</td></tr>
+    <tr><td class="field">EMA</td><td class="num">n</td><td class="num">1</td><td class="num">10(n+1)</td><td>α = 2/(n+1).</td></tr>
+    <tr><td class="field">WMA</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Wagi liniowe.</td></tr>
+    <tr><td class="field">SMMA / RMA (Wilder)</td><td class="num">n</td><td class="num">1</td><td class="num">21n</td><td>α = 1/n. Wygładzenie pod RSI/ATR/ADX.</td></tr>
+    <tr><td class="field">DEMA</td><td class="num">n</td><td class="num">1</td><td class="num">20(n+1)</td><td>2·EMA − EMA(EMA).</td></tr>
+    <tr><td class="field">TEMA</td><td class="num">n</td><td class="num">1</td><td class="num">30(n+1)</td><td>Trzy poziomy EMA.</td></tr>
+    <tr><td class="field">TRIMA</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>SMA z SMA — FIR mimo wyglądu.</td></tr>
+    <tr><td class="field">HMA (Hull)</td><td class="num">n</td><td class="num">1</td><td class="num">n+√n</td><td>Bardzo szybka reakcja, mały opóźniacz.</td></tr>
+    <tr><td class="field">ZLEMA</td><td class="num">n</td><td class="num">1</td><td class="num">10(n+1)</td><td>EMA na cenie skorygowanej o opóźnienie.</td></tr>
+    <tr><td class="field">ALMA</td><td class="num">n, offset, sigma</td><td class="num">1</td><td class="num">n</td><td>Okno Gaussa z przesuwanym środkiem.</td></tr>
+    <tr><td class="field">LSMA / regresja</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Punkt końcowy regresji liniowej z okna.</td></tr>
+    <tr><td class="field">KAMA</td><td class="num">n, fast, slow</td><td class="num">1</td><td class="num">21·slow</td><td>α adaptacyjne od efektywności ruchu.</td></tr>
+    <tr><td class="field">VIDYA</td><td class="num">n, CMO n</td><td class="num">1</td><td class="num">21n</td><td>α skalowane przez CMO.</td></tr>
+    <tr><td class="field">T3 (Tillson)</td><td class="num">n, v</td><td class="num">1</td><td class="num">60(n+1)</td><td>Sześć EMA — najdłuższa rozgrzewka w tabeli.</td></tr>
+    <tr><td class="field">McGinley Dynamic</td><td class="num">n</td><td class="num">1</td><td class="num">21n</td><td>Mianownik zależny od odchylenia ceny.</td></tr>
+    <tr><td class="field">GMMA (Guppy)</td><td class="num">—</td><td class="num">12</td><td class="num">10·61</td><td>Wiązka 12 EMA (3…60). Jeden wpis, dwanaście linii.</td></tr>
+    <tr><td class="field">Median / Typical / Weighted Price</td><td class="num">—</td><td class="num">1</td><td class="num">0</td><td>Nie wskaźniki, ale wejścia dla innych — warto mieć w katalogu.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>B. Wstęgi i kanały <span class="dim">— panel: cena</span></h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wskaźnik</th><th>Parametry</th><th>Linie</th><th>Rozgrzewka</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td class="field">Bollinger Bands</td><td class="num">n, k</td><td class="num">3</td><td class="num">n</td><td>σ <strong>populacyjne</strong>, nie próbkowe — to decyzja kontraktowa, biblioteki się tu różnią.</td></tr>
+    <tr><td class="field">Bollinger %B</td><td class="num">n, k</td><td class="num">1</td><td class="num">n</td><td>Własny panel, skala 0–1.</td></tr>
+    <tr><td class="field">Bollinger Bandwidth</td><td class="num">n, k</td><td class="num">1</td><td class="num">n</td><td>Własny panel. Ściśnięcie wstęg jako liczba.</td></tr>
+    <tr><td class="field">Keltner Channel</td><td class="num">n, m, ATR n</td><td class="num">3</td><td class="num">max(10(n+1), 21·ATRn)</td><td>EMA ± m·ATR.</td></tr>
+    <tr><td class="field">Donchian Channel</td><td class="num">n</td><td class="num">3</td><td class="num">n</td><td>Rolling max/min. Podstawa turtle.</td></tr>
+    <tr><td class="field">STARC Bands</td><td class="num">n, m</td><td class="num">3</td><td class="num">21·ATRn</td><td>SMA ± m·ATR.</td></tr>
+    <tr><td class="field">Koperty MA</td><td class="num">n, %</td><td class="num">3</td><td class="num">n</td><td>Najprostszy kanał, wciąż używany.</td></tr>
+    <tr><td class="field">Standard Error Bands</td><td class="num">n, k</td><td class="num">3</td><td class="num">n</td><td>Regresja ± k·błąd standardowy.</td></tr>
+    <tr><td class="field">Kanał regresji liniowej</td><td class="num">n, k</td><td class="num">3</td><td class="num">n</td><td>Regresja ± k·σ reszt.</td></tr>
+    <tr><td class="field">Acceleration Bands</td><td class="num">n</td><td class="num">3</td><td class="num">n</td><td>Szerokość z (H−L)/(H+L).</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>C. Trend i struktura <span class="dim">— panel: cena</span></h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wskaźnik</th><th>Parametry</th><th>Linie</th><th>Rozgrzewka</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td class="field">Ichimoku Kinko Hyo</td><td class="num">9, 26, 52, 26</td><td class="num">5 + chmura</td><td class="num">52</td><td>Dwie linie przesunięte <em>w przyszłość</em> — patrz sekcja o wykresie, to jest realny problem.</td></tr>
+    <tr><td class="field">Parabolic SAR</td><td class="num">step, max</td><td class="num">1 (kropki)</td><td><span class="pill warn">kotwica</span></td><td>Zależny od stanu.</td></tr>
+    <tr><td class="field">SuperTrend</td><td class="num">n, m</td><td class="num">1 (dwubarwna)</td><td><span class="pill warn">kotwica</span></td><td>Zmiana koloru przy przełączeniu — patrz sekcja o rysowaniu.</td></tr>
+    <tr><td class="field">Chandelier Exit</td><td class="num">n, m</td><td class="num">2</td><td class="num">21n</td><td>Trailing stop na ATR.</td></tr>
+    <tr><td class="field">Alligator (Williams)</td><td class="num">13/8/5, 8/5/3</td><td class="num">3</td><td class="num">21·13</td><td>Trzy SMMA przesunięte w przód — ten sam problem co Ichimoku.</td></tr>
+    <tr><td class="field">Punkty pivot</td><td class="num">typ, okres</td><td class="num">5–9</td><td class="num">1 okres</td><td>Classic / Fibonacci / Camarilla / Woodie / DeMark. Liczone z <em>poprzedniej</em> świecy D/W/M, czyli z innej rozdzielczości niż rysowana.</td></tr>
+    <tr><td class="field">Fraktale Williamsa</td><td class="num">n=2</td><td class="num">markery</td><td class="num">2n+1</td><td>Potwierdzenie 2 świece po fakcie. To opóźnienie, nie przemalowywanie — ale musi być zaraportowane jako opóźnienie.</td></tr>
+    <tr><td class="field">Swing High / Low, HH-HL-LH-LL</td><td class="num">n</td><td class="num">markery</td><td class="num">2n+1</td><td>Baza pod strukturę rynku (BOS/CHoCH).</td></tr>
+    <tr><td class="field">Darvas Box</td><td class="num">n</td><td class="num">2</td><td class="num">n</td><td>Prostokąty — rysowane prymitywem, nie serią.</td></tr>
+    <tr><td class="field">HHV / LLV</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Ekstrema kroczące jako osobne linie.</td></tr>
+    <tr><td class="field">ZigZag</td><td class="num">%, tryb</td><td class="num">1</td><td><span class="pill bad">przemalowuje</span></td><td>Ostatnia noga zmienia się wstecz. Albo rysować wyłącznie nogi zamknięte, albo nie rysować wcale.</td></tr>
+    <tr><td class="field">Zniesienia Fibonacciego</td><td class="num">kotwice</td><td class="num">6–8</td><td>—</td><td>Deterministyczne <em>tylko</em> gdy kotwice pochodzą z reguły (fraktal, ZigZag). Ręcznie stawiane to rysunek operatora, nie wskaźnik.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>D. Oscylatory momentum <span class="dim">— panel: własny</span></h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wskaźnik</th><th>Parametry</th><th>Linie</th><th>Skala</th><th>Rozgrzewka</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td class="field">RSI (Wilder)</td><td class="num">n=14</td><td class="num">1</td><td class="num">0–100</td><td class="num">21n</td><td>Poziomy odniesienia 30/70.</td></tr>
+    <tr><td class="field">Stochastic</td><td class="num">n, smK, smD</td><td class="num">2</td><td class="num">0–100</td><td class="num">n+smK+smD</td><td>20/80.</td></tr>
+    <tr><td class="field">Stochastic RSI</td><td class="num">rsi n, stoch n</td><td class="num">2</td><td class="num">0–100</td><td class="num">21·rsiN + n</td><td>Bardzo szybki, bardzo szumny.</td></tr>
+    <tr><td class="field">Williams %R</td><td class="num">n</td><td class="num">1</td><td class="num">−100–0</td><td class="num">n</td><td>Stochastic odwrócony.</td></tr>
+    <tr><td class="field">CCI</td><td class="num">n</td><td class="num">1</td><td class="num">swobodna</td><td class="num">2n</td><td>Średnie odchylenie bezwzględne, nie σ.</td></tr>
+    <tr><td class="field">ROC / Momentum</td><td class="num">n</td><td class="num">1</td><td class="num">swobodna</td><td class="num">n</td><td>ROC w %, Momentum w punktach.</td></tr>
+    <tr><td class="field">MACD</td><td class="num">12, 26, 9</td><td class="num">3</td><td class="num">swobodna</td><td class="num">≈370</td><td>Histogram jako <code>HistogramSeries</code> z kolorem na punkt.</td></tr>
+    <tr><td class="field">PPO</td><td class="num">12, 26, 9</td><td class="num">3</td><td class="num">%</td><td class="num">≈370</td><td>MACD w procentach — porównywalny między instrumentami.</td></tr>
+    <tr><td class="field">TRIX</td><td class="num">n</td><td class="num">2</td><td class="num">%</td><td class="num">30(n+1)</td><td>Zmiana potrójnej EMA.</td></tr>
+    <tr><td class="field">TSI</td><td class="num">r=25, s=13</td><td class="num">2</td><td class="num">−100–100</td><td class="num">10(r+1)+10(s+1)</td><td>Podwójnie wygładzone momentum.</td></tr>
+    <tr><td class="field">Ultimate Oscillator</td><td class="num">7, 14, 28</td><td class="num">1</td><td class="num">0–100</td><td class="num">28</td><td>Trzy okna w jednej liczbie.</td></tr>
+    <tr><td class="field">Awesome Oscillator</td><td class="num">5, 34</td><td class="num">1 hist.</td><td class="num">swobodna</td><td class="num">34</td><td>Na cenie medianowej. Histogram dwubarwny.</td></tr>
+    <tr><td class="field">Accelerator Oscillator</td><td class="num">5, 34</td><td class="num">1 hist.</td><td class="num">swobodna</td><td class="num">39</td><td>AO − SMA5(AO).</td></tr>
+    <tr><td class="field">CMO (Chande)</td><td class="num">n</td><td class="num">1</td><td class="num">−100–100</td><td class="num">n</td><td>Bez wygładzenia Wildera — stąd FIR.</td></tr>
+    <tr><td class="field">RVI (Relative Vigor)</td><td class="num">n</td><td class="num">2</td><td class="num">swobodna</td><td class="num">n+3</td><td>(C−O)/(H−L), wyłącznie OHLC.</td></tr>
+    <tr><td class="field">Fisher Transform</td><td class="num">n</td><td class="num">2</td><td class="num">swobodna</td><td class="num">n+30</td><td>Wyostrza ekstrema.</td></tr>
+    <tr><td class="field">Coppock Curve</td><td class="num">11, 14, 10</td><td class="num">1</td><td class="num">swobodna</td><td class="num">≈35</td><td>Sygnał długoterminowy, ma sens na DAY/WEEK.</td></tr>
+    <tr><td class="field">KST</td><td class="num">4×ROC + 4×SMA</td><td class="num">2</td><td class="num">swobodna</td><td class="num">≈45</td><td>Cztery skale momentum zsumowane z wagami.</td></tr>
+    <tr><td class="field">DPO</td><td class="num">n</td><td class="num">1</td><td class="num">swobodna</td><td class="num">n</td><td><span class="pill warn">niekauzalny</span> — z definicji przesunięty o n/2+1 wstecz. Da się, ale trzeba to napisać w UI.</td></tr>
+    <tr><td class="field">Elder Ray</td><td class="num">13</td><td class="num">2 hist.</td><td class="num">swobodna</td><td class="num">140</td><td>Bull = H − EMA13, Bear = L − EMA13.</td></tr>
+    <tr><td class="field">Balance of Power</td><td class="num">n (wygł.)</td><td class="num">1</td><td class="num">−1–1</td><td class="num">n</td><td>(C−O)/(H−L). Zero wolumenu, mimo nazwy.</td></tr>
+    <tr><td class="field">Schaff Trend Cycle</td><td class="num">23,50,10,3</td><td class="num">1</td><td class="num">0–100</td><td class="num">≈550</td><td>Stochastic na MACD, dwa razy.</td></tr>
+    <tr><td class="field">Connors RSI</td><td class="num">3, 2, 100</td><td class="num">1</td><td class="num">0–100</td><td class="num">≈100</td><td>RSI + RSI serii + percentyl ROC. Bez wolumenu.</td></tr>
+    <tr><td class="field">QQE</td><td class="num">14, 5, 4.236</td><td class="num">2</td><td class="num">0–100</td><td class="num">≈400</td><td>RSI wygładzony z pasmem ATR-podobnym.</td></tr>
+    <tr><td class="field">RMI</td><td class="num">n, lag</td><td class="num">1</td><td class="num">0–100</td><td class="num">21n</td><td>RSI z porównaniem do świecy sprzed <code>lag</code>.</td></tr>
+    <tr><td class="field">Chande Forecast Oscillator</td><td class="num">n</td><td class="num">1</td><td class="num">%</td><td class="num">n</td><td>Odchylenie ceny od prognozy regresji.</td></tr>
+    <tr><td class="field">Z-Score ceny</td><td class="num">n</td><td class="num">1</td><td class="num">σ</td><td class="num">n</td><td>Najprostsza miara „jak daleko od normy".</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>E. Siła i kierunek trendu <span class="dim">— panel: własny</span></h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wskaźnik</th><th>Parametry</th><th>Linie</th><th>Rozgrzewka</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td class="field">ADX / +DI / −DI</td><td class="num">n=14</td><td class="num">3</td><td class="num">≈2·21n</td><td>Wilder <em>dwa razy</em> — dlatego rozgrzewka podwójna (~580 świec przy 14).</td></tr>
+    <tr><td class="field">ADXR</td><td class="num">n</td><td class="num">1</td><td class="num">≈2·21n + n</td><td>Średnia ADX z ADX sprzed n.</td></tr>
+    <tr><td class="field">Vortex</td><td class="num">n=14</td><td class="num">2</td><td class="num">n</td><td>VI+ / VI−, przecięcia jako sygnał.</td></tr>
+    <tr><td class="field">Aroon Up/Down + Oscylator</td><td class="num">n=25</td><td class="num">3</td><td class="num">n</td><td>Liczy świece od ekstremum — czysto pozycyjny.</td></tr>
+    <tr><td class="field">Choppiness Index</td><td class="num">n=14</td><td class="num">1</td><td class="num">21n</td><td>0–100: trend czy zakres. Bardzo praktyczny filtr.</td></tr>
+    <tr><td class="field">Random Walk Index</td><td class="num">n</td><td class="num">2</td><td class="num">21n</td><td>Ruch względem błądzenia losowego.</td></tr>
+    <tr><td class="field">Trend Intensity Index</td><td class="num">n</td><td class="num">1</td><td class="num">2n</td><td>Udział odchyleń dodatnich od SMA.</td></tr>
+    <tr><td class="field">Nachylenie regresji</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Kierunek jako liczba, nie jako wrażenie.</td></tr>
+    <tr><td class="field">R² regresji</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Ile z ruchu tłumaczy linia prosta.</td></tr>
+    <tr><td class="field">Mass Index</td><td class="num">9, 25</td><td class="num">1</td><td class="num">≈120</td><td>Rozszerzanie zakresu jako zapowiedź odwrotu.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>F. Zmienność <span class="dim">— panel: własny</span></h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wskaźnik</th><th>Parametry</th><th>Linie</th><th>Rozgrzewka</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td class="field">True Range</td><td class="num">—</td><td class="num">1</td><td class="num">1</td><td>Uwzględnia lukę względem poprzedniego zamknięcia — na CFD po weekendzie skacze i tak ma być.</td></tr>
+    <tr><td class="field">ATR (Wilder)</td><td class="num">n=14</td><td class="num">1</td><td class="num">21n</td><td>Fundament Keltnera, SuperTrendu, Chandeliera.</td></tr>
+    <tr><td class="field">ATR% / NATR</td><td class="num">n</td><td class="num">1</td><td class="num">21n</td><td>ATR do ceny — porównywalny między instrumentami.</td></tr>
+    <tr><td class="field">Odchylenie standardowe</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Populacyjne, spójnie z Bollingerem.</td></tr>
+    <tr><td class="field">Zmienność historyczna</td><td class="num">n, świec/rok</td><td class="num">1</td><td class="num">n</td><td>Annualizacja wymaga liczby świec w roku, a ta dla CFD <strong>nie jest</strong> 252 — musi być parametrem, nie stałą.</td></tr>
+    <tr><td class="field">Parkinson</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Z H/L. Ok. 5× efektywniejszy statystycznie niż z zamknięć.</td></tr>
+    <tr><td class="field">Garman–Klass</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Pełne OHLC.</td></tr>
+    <tr><td class="field">Rogers–Satchell</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Odporny na dryf.</td></tr>
+    <tr><td class="field">Yang–Zhang</td><td class="num">n</td><td class="num">1</td><td class="num">n+1</td><td>Uwzględnia lukę nocną. Najlepszy estymator z tej czwórki.</td></tr>
+    <tr><td class="field">Chaikin Volatility</td><td class="num">n, ROC n</td><td class="num">1</td><td class="num">10(n+1)</td><td>Z <code>H−L</code>. Nazwisko myli — wolumenu tu nie ma.</td></tr>
+    <tr><td class="field">Ulcer Index</td><td class="num">n</td><td class="num">1</td><td class="num">n</td><td>Mierzy obsunięcie, nie wahanie. Inna informacja niż ATR.</td></tr>
+    <tr><td class="field">Relative Volatility Index</td><td class="num">n</td><td class="num">1</td><td class="num">21n</td><td>RSI liczone na σ zamiast na cenie.</td></tr>
+    <tr><td class="field">Percentyl zakresu</td><td class="num">n, okno</td><td class="num">1</td><td class="num">okno</td><td>„Czy dzisiejszy zakres jest duży" — bez odniesienia to pytanie bez treści.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>G. Statystyka i relacja do drugiego instrumentu <span class="dim">— panel: własny</span></h3>
+
+<div class="callout warn">
+  <span class="tag">Wymaga rozszerzenia kontraktu</span>
+  <p>Ta grupa potrzebuje <em>drugiej</em> serii, czyli pola <code>compare</code> w żądaniu i uzgodnienia świec po czasie — a dwa CFD mają różne kalendarze sesji, więc uzgodnienie samo jest decyzją (przecięcie czasów? forward-fill? odrzucenie niedopasowanych?). Poza etapem 1.</p>
+</div>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wskaźnik</th><th>Parametry</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td class="field">Korelacja krocząca</td><td class="num">n, symbol B</td><td>Pearson na zwrotach logarytmicznych, nie na cenach.</td></tr>
+    <tr><td class="field">Beta</td><td class="num">n, symbol B</td><td>Kowariancja / wariancja B.</td></tr>
+    <tr><td class="field">Spread / iloraz A÷B</td><td class="num">symbol B</td><td>Podstawa pod pair trading.</td></tr>
+    <tr><td class="field">Siła względna A÷B</td><td class="num">n, symbol B</td><td>Znormalizowany iloraz.</td></tr>
+    <tr><td class="field">Skośność / kurtoza krocząca</td><td class="num">n</td><td>Kształt rozkładu zwrotów.</td></tr>
+    <tr><td class="field">Autokorelacja</td><td class="num">n, lag</td><td>Czy w ogóle jest co przewidywać.</td></tr>
+    <tr><td class="field">Percentyl ceny</td><td class="num">n</td><td>Pozycja w rozkładzie z okna.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>H. Serie pochodne <span class="dim">— zastępują świece, nie nakładają się na nie</span></h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Seria</th><th>Rozgrzewka</th><th>Problem</th></tr></thead>
+  <tbody>
+    <tr><td class="field">Heikin-Ashi</td><td class="num">30</td><td>Rekurencyjna (<code>HA_open</code> zależy od poprzedniej), ale tłumienie α=½ jest szybkie. Bezpieczna.</td></tr>
+    <tr><td class="field">Renko</td><td><span class="pill warn">kotwica</span></td><td>Cegły nie mają czasu. <code>lightweight-charts</code> indeksuje po czasie, więc trzeba nadać im czas świecy, która cegłę domknęła — oś staje się nierówna, ale biblioteka to przyjmie.</td></tr>
+    <tr><td class="field">Line Break</td><td><span class="pill warn">kotwica</span></td><td>Jak wyżej.</td></tr>
+    <tr><td class="field">Kagi / Point &amp; Figure</td><td><span class="pill warn">kotwica</span></td><td>Jak wyżej, plus rysunek nie jest serią OHLC — wymaga własnego renderera.</td></tr>
+    <tr><td class="field">Range bars</td><td><span class="pill warn">kotwica</span></td><td>Jak wyżej.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>I. Formacje świecowe <span class="dim">— markery, nie linie</span></h3>
+
+<p>Wszystkie deterministyczne na samym OHLC, wszystkie o zerowej rozgrzewce poza własnym oknem (1–5 świec). Uwaga zasadnicza: <strong>definicje różnią się między źródłami</strong> — „ile korpusu to doji" nie ma jednej odpowiedzi. Definicja jest tu kontraktem i musi mieć wersję (<code>pattern_set</code>), tak samo jak <code>algorithm_version</code>.</p>
+
+<div class="grid2">
+  <div class="card">
+    <h4>Jedna świeca</h4>
+    <p>Doji (zwykłe, długonogie, ważka, nagrobek) · Marubozu · Młot · Odwrócony młot · Wisielec · Spadająca gwiazda · Bąk · Pin bar</p>
+  </div>
+  <div class="card">
+    <h4>Dwie świece</h4>
+    <p>Objęcie hossy/bessy · Harami + Harami Cross · Zasłona ciemnej chmury · Przenikanie · Pęseta szczyt/dno · Inside bar · Outside bar</p>
+  </div>
+  <div class="card">
+    <h4>Trzy i więcej</h4>
+    <p>Gwiazda poranna/wieczorna (+ wersja z doji) · Trzej biali żołnierze · Trzy czarne kruki · Three Inside Up/Down · Three Outside Up/Down · Rosnące/spadające trzy metody</p>
+  </div>
+  <div class="card">
+    <h4>Sygnały z innych wskaźników</h4>
+    <p>Przecięcia (MACD × sygnał, DI+ × DI−, cena × MA) · Wyjścia RSI ze stref · Dywergencje cena ↔ oscylator · Ściśnięcie Bollingera</p>
+  </div>
+</div>
+
+<p class="dim">Razem z tabelami A–H daje to ok. <strong>120 pozycji katalogu</strong>, z czego ~75 to linie na wykresie, ~35 to markery, reszta to serie pochodne i wejścia pomocnicze.</p>
+
+<h2>Co z tego służy SMC i price action</h2>
+
+<div class="callout warn">
+  <span class="tag">Granica przesunięta — czytać razem z planem</span>
+  <p>Ta sekcja opisuje pojęcia SMC tak, jak są używane, i część z nich traktuje jako gotowe wskaźniki (order block, BOS, sweep). <strong>Plan wdrożenia zawęża to celowo:</strong> moduł wskaźników dostarcza miary i geometrię, werdykty składa z nich przyszły moduł strategii. Poniższe zostaje jako mapa pojęć i uzasadnienie, <em>które</em> miary są potrzebne — ale zakres do zbudowania jest w <code>docs/wskazniki-plan-wdrozenia.html</code>.</p>
+</div>
+
+<p>Pytanie postawione wprost, więc odpowiedź wprost: <strong>ze wszystkich stu dwudziestu pozycji wyżej strategia SMC potrzebuje w zasadzie jednej — ATR-a.</strong> Reszta jej narzędzi to nie wskaźniki, tylko wykrywanie struktury: punkty zwrotne, luki, strefy, zdarzenia. To inna klasa obiektu i inny kształt wyjścia.</p>
+
+<div class="callout good">
+  <span class="tag">Paradoks, który działa na naszą korzyść</span>
+  <p>SMC pasuje do tego modułu <em>lepiej</em> niż średnie kroczące. Fair Value Gap to funkcja trzech sąsiednich świec: <code>low[i] &gt; high[i-2]</code> i już. Zero wygładzania, zero α, zero zasiewu, <strong>zero rozgrzewki</strong>. Cała trudna część rozdziału o determinizmie — tłumienie, kotwice, 580 świec pod ADX — dotyczy klasycznych wskaźników, nie tego.</p>
+  <p>Kłopot SMC jest gdzie indziej: nie w matematyce, tylko w tym, że definicje są nieformalne i każdy je rysuje trochę inaczej. Czyli <strong>definicja jest kontraktem</strong>, dokładnie jak przy formacjach świecowych — i tak samo musi mieć wersję.</p>
+</div>
+
+<h3>Fundament — bez tego nie ma reszty</h3>
+
+<p>Sześć pozycji, na których stoi wszystko inne. Każda deterministyczna, każda z samego OHLC, żadna bez wolumenu nie traci nic.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pojęcie</th><th>Reguła</th><th>Wyjście</th><th>Rozgrzewka</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">Swing High / Low</td>
+      <td>Fraktal: <code>high[i]</code> wyższy niż <code>n</code> świec po obu stronach.</td>
+      <td>markery</td>
+      <td class="num">2n+1</td>
+    </tr>
+    <tr>
+      <td class="field">FVG / imbalance</td>
+      <td>Byczy: <code>low[i] &gt; high[i-2]</code>. Niedźwiedzi: <code>high[i] &lt; low[i-2]</code>.</td>
+      <td><strong>strefa</strong></td>
+      <td class="num">3</td>
+    </tr>
+    <tr>
+      <td class="field">Displacement</td>
+      <td><code>|close − open| &gt; k · ATR(n)</code>, domyślnie k = 1,5.</td>
+      <td>flaga na świecy</td>
+      <td class="num">21n</td>
+    </tr>
+    <tr>
+      <td class="field">BOS <span class="dim">(Break of Structure)</span></td>
+      <td>Zamknięcie za ostatnim potwierdzonym swingiem <em>zgodnie</em> z kierunkiem struktury.</td>
+      <td>zdarzenie + poziom</td>
+      <td><span class="pill warn">kotwica</span></td>
+    </tr>
+    <tr>
+      <td class="field">CHoCH <span class="dim">(Change of Character)</span></td>
+      <td>Pierwsze złamanie struktury <em>przeciw</em> dotychczasowemu kierunkowi.</td>
+      <td>zdarzenie + poziom</td>
+      <td><span class="pill warn">kotwica</span></td>
+    </tr>
+    <tr>
+      <td class="field">ATR</td>
+      <td>Już w grupie F. Tutaj: próg displacementu, tolerancja EQH/EQL, wielkość stopa, szerokość strefy.</td>
+      <td>linia</td>
+      <td class="num">21n</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Jedna decyzja rządzi całą grupą</span>
+  <p><code>swing_strength</code> — ile świec z każdej strony musi być niższych, żeby to był swing. Zmień z 2 na 3 i zmieniają się <em>wszystkie</em> swingi, a więc każdy BOS, każdy CHoCH, każdy Order Block i cały premium/discount. Trzy wskaźniki SMC policzone z różnym <code>swing_strength</code> na jednym wykresie sprzeczają się ze sobą i operator widzi bałagan.</p>
+  <p>Wniosek dla kontraktu: <strong>kontekst struktury musi być jednym obiektem</strong>. Albo wszystkie wskaźniki strukturalne dziedziczą jeden parametr z żądania, albo katalog wymusza go jako wspólny. Nie: „każdy ma swój, domyślnie 2".</p>
+</div>
+
+<h3>Warstwa druga — to, po co się do SMC przychodzi</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pojęcie</th><th>Reguła</th><th>Wyjście</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">Order Block</td>
+      <td>Ostatnia świeca przeciwna przed displacementem, który zrobił BOS.</td>
+      <td><strong>strefa</strong> ze stanem</td>
+      <td>Znany dopiero po potwierdzeniu BOS — to <em>opóźnienie</em>, nie przemalowanie. Musi być zaraportowane jako opóźnienie, tak jak fraktale.</td>
+    </tr>
+    <tr>
+      <td class="field">Breaker Block</td>
+      <td>OB, który został przebity i teraz działa z drugiej strony.</td>
+      <td>strefa</td>
+      <td>Wymaga śledzenia stanu OB w czasie → <span class="pill warn">kotwica</span>.</td>
+    </tr>
+    <tr>
+      <td class="field">Mitigation Block</td>
+      <td>OB dotknięty, ale nieprzebity.</td>
+      <td>strefa</td>
+      <td>Ten sam mechanizm stanu.</td>
+    </tr>
+    <tr>
+      <td class="field">Rejection / Propulsion Block</td>
+      <td>Warianty OB liczone z knota zamiast z korpusu.</td>
+      <td>strefa</td>
+      <td>Parametr <code>body|wick</code>, nie osobny wskaźnik.</td>
+    </tr>
+    <tr>
+      <td class="field">Unicorn</td>
+      <td>Część wspólna Breakera i FVG.</td>
+      <td>strefa</td>
+      <td>Czysta operacja na dwóch zbiorach stref — darmowa, gdy oba są.</td>
+    </tr>
+    <tr>
+      <td class="field">Inverse FVG</td>
+      <td>FVG wypełniony i zamknięty po drugiej stronie.</td>
+      <td>strefa</td>
+      <td>Stan, nie nowa detekcja.</td>
+    </tr>
+    <tr>
+      <td class="field">Consequent Encroachment</td>
+      <td>Środek FVG (50%).</td>
+      <td>poziom</td>
+      <td>Jedna linijka na już istniejącej strefie.</td>
+    </tr>
+    <tr>
+      <td class="field">EQH / EQL</td>
+      <td>≥2 ekstrema w tolerancji <code>t · ATR</code> od siebie.</td>
+      <td>strefa płynności</td>
+      <td>Tolerancja <strong>musi</strong> być w ATR, nie w punktach — inaczej parametr nie przenosi się między instrumentami.</td>
+    </tr>
+    <tr>
+      <td class="field">Liquidity sweep / stop hunt</td>
+      <td>Wybicie EQH/EQL i powrót do zakresu w ≤ <code>k</code> świec.</td>
+      <td>zdarzenie</td>
+      <td>Najsilniejszy sygnał całej metody i jednocześnie najwrażliwszy na <code>k</code>.</td>
+    </tr>
+    <tr>
+      <td class="field">Turtle soup</td>
+      <td>Sweep + CHoCH w tę samą stronę.</td>
+      <td>zdarzenie</td>
+      <td>Złożenie dwóch powyższych.</td>
+    </tr>
+    <tr>
+      <td class="field">Dealing range + Premium/Discount</td>
+      <td>Ostatni swing high ↔ swing low, podział na 50%.</td>
+      <td>strefa</td>
+      <td>Podstawa „gdzie wolno kupować".</td>
+    </tr>
+    <tr>
+      <td class="field">OTE</td>
+      <td>Zniesienie 0,618–0,79 dealing range.</td>
+      <td>strefa</td>
+      <td>Fibonacci z <em>regułowymi</em> kotwicami — czyli deterministyczny, w odróżnieniu od ręcznego.</td>
+    </tr>
+    <tr>
+      <td class="field">PDH/PDL, PWH/PWL</td>
+      <td>Ekstrema poprzedniej świecy DAY / WEEK.</td>
+      <td>promienie</td>
+      <td>Odczyt z <em>innej</em> rozdzielczości niż rysowana — ten sam mechanizm, co punkty pivot.</td>
+    </tr>
+    <tr>
+      <td class="field">Otwarcie dnia / tygodnia</td>
+      <td><code>open</code> bieżącej świecy D / W.</td>
+      <td>promień</td>
+      <td>Najtańszy użyteczny poziom w całym zestawie.</td>
+    </tr>
+    <tr>
+      <td class="field">Volume Imbalance</td>
+      <td>Luka <em>między korpusami</em> przy stykających się knotach: <code>open[i] &gt; close[i-1]</code> bez luki H/L.</td>
+      <td>strefa</td>
+      <td><strong>Nazwa myli — wolumenu tu nie ma.</strong> Ta sama pułapka co Chaikin Volatility. Zostaje.</td>
+    </tr>
+    <tr>
+      <td class="field">Sesje / killzones</td>
+      <td>Zakres godzinowy (Azja, Londyn, NY AM/PM).</td>
+      <td>strefa czasowa</td>
+      <td>Wymaga jawnej strefy czasowej i obsługi DST — patrz pułapki niżej.</td>
+    </tr>
+    <tr>
+      <td class="field">Initial Balance / opening range</td>
+      <td>Ekstrema pierwszych <code>n</code> minut sesji.</td>
+      <td>promienie</td>
+      <td>Zależy od definicji otwarcia sesji, czyli znowu od kalendarza.</td>
+    </tr>
+    <tr>
+      <td class="field">Power of 3</td>
+      <td>Sesja dzielona na akumulację → manipulację → dystrybucję.</td>
+      <td>złożone</td>
+      <td>Najmniej formalne pojęcie w tym zestawie. Ostatnie w kolejce.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Confluence — klasyczne wskaźniki, które w tej metodzie mają sens</h3>
+
+<p>Krótka lista, bo SMC z zasady ich nie używa. Te akurat robią robotę, której struktura nie robi:</p>
+
+<div class="grid2">
+  <div class="card">
+    <h4>Filtr reżimu</h4>
+    <p><strong>Choppiness Index</strong> lub <strong>ADX</strong>. Odpowiadają na pytanie, którego struktura nie zadaje: czy w ogóle jest trend, w którym „break of structure" cokolwiek znaczy. W zakresie BOS-y sypią się co kilka świec i nic nie znaczą.</p>
+  </div>
+  <div class="card">
+    <h4>Płynność za darmo</h4>
+    <p><strong>Donchian / HHV-LLV</strong> — ekstremum z <code>n</code> świec to dokładnie ten poziom, pod którym leżą zlecenia stop. Wskaźnik już jest w grupie B; jako „gdzie jest płynność" działa bez żadnej nowej matematyki.</p>
+  </div>
+  <div class="card">
+    <h4>Potwierdzenie wejścia</h4>
+    <p><strong>Formacje z grupy I</strong> — pin bar, objęcie, inside bar. W price action to jest cały trigger; w SMC — potwierdzenie reakcji na strefie.</p>
+  </div>
+  <div class="card">
+    <h4>Dywergencja</h4>
+    <p><strong>RSI / MACD</strong> klasycznie, ale SMC woli <strong>SMT</strong> — rozjazd dwóch skorelowanych instrumentów. To grupa G, czyli potrzebuje pola <code>compare</code>. Etap 4.</p>
+  </div>
+  <div class="card">
+    <h4>Kompresja przed ruchem</h4>
+    <p><strong>NR4 / NR7</strong>, łańcuchy inside barów, <strong>Bollinger Bandwidth</strong>. Mierzą to samo co „akumulacja" w Power of 3, tylko liczbą.</p>
+  </div>
+  <div class="card">
+    <h4>Czego <em>nie</em> brać</h4>
+    <p>Stochastic, CCI, Williams %R, wiązki średnich. Nie dlatego, że złe — dlatego że opisują to samo, co struktura, tylko z opóźnieniem, i zaśmiecają ekran, na którym liczy się widoczność stref.</p>
+  </div>
+</div>
+
+<h3>Czego nie dowieziemy, i czym to zastąpić</h3>
+
+<p>Połowa narzędzi reklamowanych jako „smart money" na innych platformach stoi na wolumenie albo na taśmie. Trzeba to powiedzieć na wejściu, bo inaczej ktoś będzie ich szukał w wybieraku.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Narzędzie</th><th>Dlaczego odpada</th><th>Zastępnik</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">VWAP sesyjny, anchored VWAP</td>
+      <td>Waga = wolumen.</td>
+      <td><strong>TWAP sesyjny</strong> na cenie typowej — średnia ważona czasem zamiast obrotem. Inna liczba, ta sama rola „środka sesji".</td>
+    </tr>
+    <tr>
+      <td class="field">Volume Profile, POC, VAH/VAL</td>
+      <td>Rozkład obrotu po cenach.</td>
+      <td><strong>TPO / profil czasowy</strong> — patrz niżej. Realny zastępnik, nie proteza.</td>
+    </tr>
+    <tr>
+      <td class="field">Footprint, delta, orderflow imbalance</td>
+      <td>Potrzebuje taśmy transakcyjnej. Gateway podaje świece i kwotowania, nie printy.</td>
+      <td><span class="pill bad">brak</span> — i nie da się tego obejść.</td>
+    </tr>
+    <tr>
+      <td class="field">DOM, heatmapa płynności</td>
+      <td>Arkusz zleceń. CFD go nie ma w ogóle — market maker nie jest giełdą.</td>
+      <td><span class="pill bad">brak</span></td>
+    </tr>
+    <tr>
+      <td class="field">Smart Money Index i pochodne</td>
+      <td>Obrót w pierwszej vs ostatniej godzinie sesji.</td>
+      <td><span class="pill bad">brak</span> — ale <em>zakres</em> pierwszej i ostatniej godziny liczymy bez problemu.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout good">
+  <span class="tag">TPO — najlepszy pojedynczy pomysł tej sekcji</span>
+  <p>Profil wolumenowy da się zastąpić <strong>profilem czasowym</strong>, i to bez żadnego kompromisu, bo TPO (Time Price Opportunity) z definicji <em>nie liczy obrotu</em> — liczy, ile czasu cena spędziła na danym poziomie. Wejściem jest seria minutowa, którą archiwum ma:</p>
+  <ul>
+    <li>każda świeca minutowa pokrywa przedział <code>[low, high]</code>,</li>
+    <li>dziel oś ceny na kubełki (szerokość: <code>ATR ÷ 20</code> albo krok instrumentu × k),</li>
+    <li>zlicz, ile minut dotknęło każdego kubełka,</li>
+    <li><strong>POC</strong> = kubełek z największą liczbą minut, <strong>value area</strong> = najwęższy przedział wokół POC obejmujący 70% zliczeń.</li>
+  </ul>
+  <p>W pełni deterministyczne, zero wolumenu, zero rekurencji. Dwie konsekwencje architektoniczne: wymaga czytania serii <code>MINUTE</code> nawet gdy rysowany jest HOUR_4 (odczyt międzyrozdzielczościowy, jak pivoty), a rysowane jest jako <em>poziomy histogram przy krawędzi wykresu</em> — czyli prymityw panelu, nie seria.</p>
+</div>
+
+<h3>Pułapki CFD, które w SMC bolą inaczej niż gdzie indziej</h3>
+
+<div class="callout bad">
+  <span class="tag">Luka weekendowa udaje FVG</span>
+  <p>Piątkowe zamknięcie i niedzielne otwarcie to na wykresie trzy świece z podręcznikową luką — <code>low[i] &gt; high[i-2]</code> spełnione idealnie. Detektor zgłosi Fair Value Gap, a to nie jest imbalance tylko przerwa w handlu. Na CFD zdarza się <strong>co tydzień, na każdym instrumencie</strong>, więc nie jest to przypadek brzegowy.</p>
+  <p>Odpowiedź: archiwum wie, gdzie jest przerwa — ma <code>coverage_ranges</code> i wie, że nie brakuje tam danych, tylko rynku. Detekcja FVG musi mieć parametr <code>skip_session_gaps</code>, domyślnie włączony, i oznaczać luki sesyjne osobnym typem, a nie chować je po cichu.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Killzone w jakiej strefie czasowej</span>
+  <p>Killzone są definiowane w czasie nowojorskim, terminal formatuje wszystko w czasie warszawskim (<code>ui/formatTime.ts</code>), a świece w archiwum są w UTC. Trzy strefy, dwa różne kalendarze zmiany czasu — USA przestawia zegar w inny weekend niż Europa, więc przez dwa tygodnie w roku różnica Warszawa↔Nowy Jork wynosi 5 godzin zamiast 6.</p>
+  <p>Strefa musi być <strong>jawnym parametrem wskaźnika</strong>, a granice sesji liczone w tej strefie, nie przez dodanie stałego przesunięcia do UTC. Stałe przesunięcie działa dziesięć i pół miesiąca w roku, co jest najgorszym możliwym wynikiem — błąd znajdzie się w marcu i w listopadzie, i za każdym razem będzie wyglądał na coś innego.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Wszystko jest po stronie bid</span>
+  <p>Archiwum trzyma <code>PriceSide.BID</code>. Sweep to z definicji przebicie ekstremum knotem, a knot po stronie bid leży o spread niżej niż na wykresie mid, który operator zna z platformy brokera. Ta sama świeca może „zebrać płynność" u nas i nie zebrać jej tam, gdzie patrzy operator — przy ciasnych EQH różnica jednego spreadu decyduje.</p>
+  <p>Nic z tym nie robimy poza jednym: tolerancja EQH/EQL i progi sweepa <strong>w jednostkach ATR</strong>, nigdy w punktach, plus <code>price_side</code> widoczne w odpowiedzi i w UI.</p>
+</div>
+
+<h3>Co to robi kontraktowi</h3>
+
+<p>Najważniejszy wniosek całej sekcji, i dobrze, że pojawił się teraz, a nie po wdrożeniu: <strong>SMC nie produkuje linii.</strong> Produkuje prostokąty ze stanem i zdarzenia w punktach. Kontrakt naszkicowany niżej zna tylko <code>lines</code> — gdyby zostawić go tak, dołożenie Order Blocków byłoby zmianą łamiącą.</p>
+
+<p>Trzy rodzaje wyjścia zamiast jednego, od pierwszego dnia:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Rodzaj</th><th>Kształt</th><th>Kto go używa</th></tr></thead>
+  <tbody>
+    <tr><td class="field">lines</td><td><code>(number | null)[]</code> po jednej na świecę</td><td>Wszystko z grup A–G</td></tr>
+    <tr><td class="field">markers</td><td>zdarzenia w punkcie: czas, cena, etykieta</td><td>Formacje, fraktale, BOS/CHoCH, sweep</td></tr>
+    <tr><td class="field">zones</td><td>prostokąt: <code>from</code>, <code>to</code> (lub <code>null</code> = wciąż otwarty), <code>top</code>, <code>bottom</code>, <code>state</code>, <code>direction</code></td><td>FVG, OB, breakery, premium/discount, sesje, EQH/EQL</td></tr>
+    <tr><td class="field">levels</td><td>promień: <code>from</code>, <code>price</code>, <code>until_touched</code></td><td>PDH/PDL, otwarcia, POC, consequent encroachment</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p><code>state</code> przy strefie to <code>unmitigated | touched | mitigated | inverted</code> — i to jest właśnie ta informacja, która czyni Order Block użytecznym, a której linia nie umie przenieść.</p>
+
+<h2>Gdzie to policzyć — cztery drogi</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Droga</th><th>Za</th><th>Przeciw</th><th>Werdykt</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>A.</strong> Wewnątrz <code>market-data</code></td>
+      <td>Dane na miejscu, zero nowej infrastruktury, jeden adres dla przeglądarki, gotowy Easy Auth i CORS, jeden generator kontraktu.</td>
+      <td>Moduł przestaje być tylko archiwum. CPU dzieli pętlę zdarzeń z ingestem i hubem.</td>
+      <td><span class="pill good">wybrane</span></td>
+    </tr>
+    <tr>
+      <td><strong>B.</strong> Nowy moduł <code>analytics</code></td>
+      <td>Czysta granica, własne tempo wdrożeń, własne zależności, da się usunąć katalogiem.</td>
+      <td>Świece przez HTTP w obie strony. Trzeci <code>always_on</code> na planie B1, który już alarmuje przy 92% pamięci. Trzecia konfiguracja uwierzytelniania i trzeci adres w terminalu.</td>
+      <td>Później, jeśli obliczenia zaczną przeszkadzać</td>
+    </tr>
+    <tr>
+      <td><strong>C.</strong> W terminalu (TypeScript)</td>
+      <td>Zero opóźnienia, działa natychmiast na świecy w budowie, świece już są w <code>barsRef</code>.</td>
+      <td>Agenty i backtesty (są na diagramie w <code>docs/architecture.md</code>) nie mają z tego nic. Prędzej czy później druga implementacja tej samej matematyki w Pythonie — i wtedy „deterministycznie" przestaje cokolwiek znaczyć.</td>
+      <td>Nie</td>
+    </tr>
+    <tr>
+      <td><strong>D.</strong> Funkcje okienkowe SQL</td>
+      <td>Dane się nie ruszają.</td>
+      <td>Rekurencja (EMA, Wilder, SAR) w SQL to albo <code>WITH RECURSIVE</code> po jednym wierszu, albo PL/pgSQL. Testowanie i wersjonowanie wzorów staje się migracją.</td>
+      <td>Nie</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Ryzyko CPU w wariancie A, i co z nim zrobić</h3>
+
+<p>To jedyny poważny zarzut wobec wybranej drogi, więc bez owijania: pętla rekurencyjna w Pythonie <strong>trzyma GIL</strong>, a więc przerzucenie jej do wątku <em>nie pomoże</em> — strumień świec i tak stanie. Odpowiedź jest inna i bardziej w stylu tego repozytorium: <strong>jawny sufit i jawna odmowa</strong>.</p>
+
+<ul>
+  <li>Twardy limit na żądanie: <code>świece × linie ≤ 200 000</code> (np. 10 000 świec × 20 linii). Powyżej — <code>422</code> nazywające limit, tak jak <code>_window()</code> odmawia przy <code>to &lt; from</code>.</li>
+  <li>Semafor na obliczeniach: <code>N</code> równoległych żądań wskaźnikowych, reszta czeka. Strumień nigdy nie konkuruje z dwudziestoma naraz.</li>
+  <li>Budżet do zmierzenia <em>przed</em> decyzją, nie po: p95 poniżej 150 ms dla 5000 świec × 10 wskaźników. Rząd wielkości z szacunku — pętla po 5000 floatów to ~0,5–1 ms, więc 10 wskaźników ≈ 10 ms — ale to trzeba zmierzyć, bo od tego zależy, czy wariant A wystarczy na rok czy na kwartał.</li>
+  <li>Gdyby zabrakło: wektoryzacja filtrów IIR przez <code>scipy.signal.lfilter</code> (dokładnie ta sama rekurencja, w C, zwalnia GIL). Cena: ~35 MB w obrazie. Do rozważenia dopiero po pomiarze.</li>
+</ul>
+
+<h2>Jądro obliczeniowe — biblioteka czy własne</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Opcja</th><th>Zasięg</th><th>Problem</th></tr></thead>
+  <tbody>
+    <tr><td class="field">TA-Lib</td><td>~150 wskaźników, standard branżowy</td><td>Zależność od biblioteki C w obrazie Dockera. Własna koncepcja „unstable period" i własne zasiewy, których nie da się nadpisać per-wywołanie — czyli determinizm na <em>jej</em> warunkach, nie naszych.</td></tr>
+    <tr><td class="field">pandas-ta</td><td>~130</td><td>Utrzymanie stanęło; pandas wchodzi do zależności runtime'u modułu, który dziś nie ma nawet numpy.</td></tr>
+    <tr><td class="field">ta (bukosabino)</td><td>~40</td><td>Za mało na tę listę. Też ciągnie pandas.</td></tr>
+    <tr><td class="field">talipp</td><td>~90, przyrostowe</td><td>Kuszące pod etap 3 (O(1) na świecę), ale API stanowe — a stan to dokładnie to, czego determinizm nie lubi.</td></tr>
+    <tr><td class="field">własne na numpy</td><td>tyle, ile napiszemy</td><td>Praca. Za to pełna kontrola nad zasiewem, rozgrzewką i wersją wzoru.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout good">
+  <span class="tag">Rekomendacja</span>
+  <p><strong>Własne jądro z ~20 prymitywów, TA-Lib wyłącznie jako wyrocznia testowa</strong> (zależność <code>dev</code>, nigdy w obrazie).</p>
+  <p>Prymitywy: <code>sma</code>, <code>ema</code>, <code>rma</code>, <code>wma</code>, <code>stdev</code>, <code>true_range</code>, <code>rolling_max/min</code>, <code>rolling_argmax/argmin</code>, <code>linreg</code>, <code>mean_abs_dev</code>, <code>highest/lowest_since</code>, <code>crossover</code>, <code>shift</code>, <code>diff</code>, <code>cum_max</code>. Z tych dwudziestu składa się ok. 90% listy powyżej — RSI to <code>rma</code> dwóch strumieni, ATR to <code>rma(true_range)</code>, ADX to <code>rma</code> na <code>rma</code>, Keltner to <code>ema ± m·atr</code>.</p>
+  <p>Test: pliki wzorcowe (golden files) — ustalona syntetyczna seria świec i zacommitowane oczekiwane wyniki. Każda zmiana wzoru pokazuje się jako diff, dokładnie jak <code>contract.generated.ts</code>. Do tego porównanie z TA-Lib z jawną tolerancją i <em>spisanymi</em> znanymi różnicami (bo TA-Lib zasiewa inaczej i to nie jest błąd żadnej ze stron).</p>
+</div>
+
+<h3>Test, który faktycznie sprawdza determinizm</h3>
+
+<pre><code># Nie „czy wynik jest poprawny", tylko „czy wynik nie zależy od tego,
+# gdzie zaczęliśmy czytać" — bo to jest cała obietnica.
+
+@pytest.mark.parametrize("spec", EVERY_DECAYING_INDICATOR)
+def test_wartosc_nie_zalezy_od_punktu_startu(spec):
+    seria = deterministyczna_seria(4000)
+    m = warmup_bars(spec)
+
+    dluga  = compute(spec, seria)[-500:]
+    krotka = compute(spec, seria[-(500 + m):])[-500:]
+
+    assert dluga == pytest.approx(krotka, rel=1e-9)</code></pre>
+
+<p>Dla wskaźników z kotwicą (SAR, SuperTrend, ZigZag, Renko) ten test <em>musi</em> być pominięty jawnie, z komentarzem, że pominięcie jest ich definicją — a nie luką w pokryciu.</p>
+
+<h2>Kształt kontraktu</h2>
+
+<h3>Katalog: <code>GET /indicators</code></h3>
+
+<p>To jest pomysł, który się najbardziej opłaca. Terminal <strong>nie zna listy wskaźników</strong> — buduje z niej swój wybierak. Dodanie Vortexa albo EMA(200) nie dotyka wtedy terminala w ogóle.</p>
+
+<pre><code>{
+  "algorithm_version": 3,
+  "pattern_set": 1,
+  "indicators": [
+    {
+      "id": "ema",
+      "name": "Exponential Moving Average",
+      "group": "averages",
+      "inputs": ["close"],
+      "params": [
+        {"name": "period", "type": "int", "default": 20, "min": 2, "max": 5000}
+      ],
+      "lines": [{"key": "ema", "label": "EMA {period}"}],
+      "render": {"pane": "price", "style": "line", "scale": "price"},
+      "warmup": {"kind": "decay", "bars": "ceil(ln(1e-9) / ln(1 - 2/(period+1)))"}
+    },
+    {
+      "id": "rsi",
+      "name": "Relative Strength Index",
+      "group": "momentum",
+      "inputs": ["close"],
+      "params": [{"name": "period", "type": "int", "default": 14, "min": 2, "max": 5000}],
+      "lines": [{"key": "rsi", "label": "RSI {period}"}],
+      "render": {
+        "pane": "own", "style": "line", "scale": "fixed",
+        "range": [0, 100], "levels": [30, 70]
+      },
+      "warmup": {"kind": "decay", "bars": "ceil(ln(1e-9) / ln(1 - 1/period))"}
+    },
+    {
+      "id": "psar",
+      "name": "Parabolic SAR",
+      "group": "trend",
+      "params": [
+        {"name": "step", "type": "float", "default": 0.02},
+        {"name": "max",  "type": "float", "default": 0.2}
+      ],
+      "lines": [{"key": "sar", "label": "SAR"}],
+      "render": {"pane": "price", "style": "dots", "scale": "price"},
+      "warmup": {"kind": "anchored"}
+    }
+  ]
+}</code></pre>
+
+<h3>Obliczenie: <code>POST /indicators/{symbol}</code></h3>
+
+<p>POST, nie GET, z jednego powodu: dziesięć wskaźników z parametrami nie mieści się sensownie w query stringu, a wykres prosi o wszystkie naraz — jedno żądanie zamiast dziesięciu na jedno odświeżenie.</p>
+
+<pre><code>POST /indicators/US100
+{
+  "resolution": "MINUTE_15",
+  "from": "2026-08-01T00:00:00Z",
+  "to":   "2026-08-10T00:00:00Z",
+  "specs": [
+    {"id": "ema",  "params": {"period": 20}},
+    {"id": "ema",  "params": {"period": 50}},
+    {"id": "bbands", "params": {"period": 20, "k": 2}},
+    {"id": "rsi",  "params": {"period": 14}}
+  ]
+}</code></pre>
+
+<pre><code>{
+  "symbol": "US100",
+  "resolution": "MINUTE_15",
+  "price_side": "bid",
+  "derived": true,
+  "algorithm_version": 3,
+
+  "times": ["2026-08-01T00:00:00Z", "..."],
+  "warmup_from": "2026-07-26T08:15:00Z",
+  "uncovered": [{"from": "2026-08-03T22:00:00Z", "to": "2026-08-04T06:00:00Z"}],
+
+  "series": [
+    {
+      "id": "ema", "params": {"period": 20},
+      "warmup_bars": 210,
+      "settled": true,
+      "lines": {"ema": [21042.5, 21044.1, null, "..."]}
+    },
+    {
+      "id": "bbands", "params": {"period": 20, "k": 2},
+      "warmup_bars": 20,
+      "settled": true,
+      "lines": {"upper": ["..."], "middle": ["..."], "lower": ["..."]}
+    },
+    {
+      "id": "order_blocks", "params": {"swing_strength": 2, "displacement_atr": 1.5},
+      "warmup_bars": null, "anchored_at": "2026-05-14T06:00:00Z",
+      "settled": true,
+      "zones": [
+        {
+          "from": "2026-08-04T13:15:00Z", "to": null,
+          "top": 21118.4, "bottom": 21102.0,
+          "direction": "bullish", "state": "unmitigated",
+          "confirmed_at": "2026-08-04T14:00:00Z"
+        }
+      ]
+    },
+    {
+      "id": "pdh_pdl", "params": {},
+      "settled": true,
+      "levels": [
+        {"from": "2026-08-07T00:00:00Z", "price": 21240.0, "label": "PDH", "until_touched": true}
+      ]
+    }
+  ]
+}</code></pre>
+
+<h4>Sześć decyzji zaszytych w tym kształcie</h4>
+<ul>
+  <li><strong><code>times</code> raz, nie przy każdej linii.</strong> Dwadzieścia linii × 5000 znaczników ISO to 2 MB samych dat.</li>
+  <li><strong><code>warmup_from</code> mówi, dokąd moduł naprawdę sięgnął.</strong> Jeśli archiwum nie miało tylu świec, <code>settled: false</code> i konsument wie, że patrzy na wartość jeszcze niedogrzaną.</li>
+  <li><strong><code>uncovered</code> przechodzi z <code>CandlesOut</code> bez zmian.</strong> Ten sam kształt, ta sama semantyka, żadnego nowego słownika.</li>
+  <li><strong><code>null</code> w liniach, nigdy <code>0</code>.</strong> W TypeScripcie <code>(number | null)[]</code>, w <code>lightweight-charts</code> mapowane na <code>WhitespaceData</code>.</li>
+  <li><strong>Cztery rodzaje wyjścia, nie jeden</strong> — <code>lines</code>, <code>markers</code>, <code>zones</code>, <code>levels</code>. Wpis niesie ten, który ma sens; nigdy dwa naraz. Bez <code>zones</code> od pierwszego dnia dołożenie SMC byłoby zmianą łamiącą.</li>
+  <li><strong><code>anchored_at</code> zamiast <code>warmup_bars</code></strong> tam, gdzie wskaźnik ma stan, a nie tłumienie. Jawnie <code>null</code> w jednym polu i data w drugim, żeby konsument nie musiał zgadywać, do której kategorii trafił.</li>
+</ul>
+
+<h2>Rysowanie: lightweight-charts 5.0.9</h2>
+
+<p>Wszystko poniżej sprawdzone w <code>node_modules/lightweight-charts/dist/typings.d.ts</code> zainstalowanej wersji, nie w dokumentacji ogólnej.</p>
+
+<h3>Co jest, i działa</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Potrzeba</th><th>API</th><th>Status</th></tr></thead>
+  <tbody>
+    <tr><td>Osobne panele pod oscylatory</td><td class="field">chart.addPane() → IPaneApi</td><td><span class="pill good">natywnie w v5</span></td></tr>
+    <tr><td>Seria w konkretnym panelu</td><td class="field">pane.addSeries(LineSeries, opts)<br>chart.addSeries(def, opts, paneIndex)</td><td><span class="pill good">jest</span></td></tr>
+    <tr><td>Proporcje paneli</td><td class="field">pane.setStretchFactor(n)<br>pane.setHeight(px)</td><td><span class="pill good">jest</span></td></tr>
+    <tr><td>Przeniesienie serii między panelami</td><td class="field">series.moveToPane(i)</td><td><span class="pill good">jest</span></td></tr>
+    <tr><td>Markery formacji</td><td class="field">createSeriesMarkers(series, markers)</td><td><span class="pill warn">zmiana API</span> — <code>series.setMarkers()</code> w v5 <strong>nie istnieje</strong>; markery są wtyczką</td></tr>
+    <tr><td>Poziomy odniesienia (RSI 30/70)</td><td class="field">series.createPriceLine({...})</td><td><span class="pill good">jest</span> — <code>Chart.tsx</code> już tego używa dla ceny bieżącej</td></tr>
+    <tr><td>Histogram MACD, kolor na słupek</td><td class="field">HistogramSeries + color w punkcie</td><td><span class="pill good">jest</span></td></tr>
+    <tr><td>Kropki SAR-a</td><td class="field">LineSeries { lineVisible: false, pointMarkersVisible: true }</td><td><span class="pill good">jest</span></td></tr>
+    <tr><td>Wyłączenie nakładki z autoskalowania</td><td class="field">autoscaleInfoProvider: () =&gt; null</td><td><span class="pill good">jest</span></td></tr>
+    <tr><td>Wypełnienie wstęgi (Bollinger, chmura)</td><td class="field">ICustomSeriesPaneView / IPanePrimitive</td><td><span class="pill warn">do napisania</span> — brak gotowego typu serii</td></tr>
+    <tr><td>Prostokąty stref (FVG, order block, sesja)</td><td class="field">series.attachPrimitive(ISeriesPrimitive)</td><td><span class="pill warn">do napisania</span> — brak typu „rectangle"</td></tr>
+    <tr><td>Promienie poziomów (PDH/PDL, otwarcia)</td><td class="field">createPriceLine <span class="dim">albo</span> prymityw</td><td><span class="pill warn">połowicznie</span> — <code>createPriceLine</code> ciągnie przez całą szerokość, nie od zadanego czasu</td></tr>
+    <tr><td>Profil poziomy (TPO / POC)</td><td class="field">pane.attachPrimitive(IPanePrimitive)</td><td><span class="pill warn">do napisania</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Szkic: RSI w osobnym panelu</h3>
+
+<pre><code>const rsiPane = chart.addPane();
+rsiPane.setStretchFactor(0.25);          // ~20% wysokości przy jednym panelu ceny
+
+const rsi = rsiPane.addSeries(LineSeries, {
+  priceScaleId: "right",
+  lastValueVisible: false,
+  priceLineVisible: false,
+});
+rsi.setData(times.map((t, i) =&gt;
+  values[i] === null ? { time: t } : { time: t, value: values[i] }   // null → WhitespaceData
+));
+
+// Poziomy 30/70 — tym samym mechanizmem, którego Chart.tsx używa na cenę bieżącą
+for (const level of [30, 70]) {
+  rsi.createPriceLine({ price: level, lineStyle: LineStyle.Dashed, color: colors.grid });
+}</code></pre>
+
+<h3>Pięć pułapek, które wyjdą dopiero na ekranie</h3>
+
+<div class="callout warn">
+  <span class="tag">1 — autoskalowanie ceny</span>
+  <p>Nakładka na panelu ceny <em>bierze udział</em> w autoskalowaniu. EMA(200) na wykresie 15-minutowym potrafi być kilka procent poniżej ceny bieżącej i spłaszczyć świece do paska. Wstęgi Bollingera mają uczestniczyć (są informacją o zakresie), długie średnie raczej nie. To musi być <strong>własnością wpisu w katalogu</strong>, nie decyzją, którą ktoś podejmie raz w kodzie: <code>render.autoscale: true | false</code>.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">2 — linia zmieniająca kolor w połowie</span>
+  <p>Jedna <code>LineSeries</code> ma jeden kolor. SuperTrend, dwubarwna chmura Ichimoku i dwubarwny histogram AO tego nie spełniają. Rozwiązanie dla linii: <strong>dwie serie, w tym samym panelu, z <code>WhitespaceData</code> tam, gdzie dana wersja jest nieaktywna</strong> — luka w jednej pokrywa się z widocznym odcinkiem drugiej. Dla histogramu prościej: <code>HistogramSeries</code> przyjmuje <code>color</code> na punkt.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">3 — wstęgi bez wypełnienia</span>
+  <p>Nie ma typu „band". Trzy <code>LineSeries</code> narysują Bollingera poprawnie, ale bez zacieniowania w środku. Dwie nakładające się <code>AreaSeries</code> to hack, który psuje się przy przecięciu linii i w ciemnym motywie. Właściwa droga: <strong>jedna własna seria <code>BandSeries</code></strong> przez <code>ICustomSeriesPaneView</code>, obsługująca Bollingera, Keltnera, Donchiana <em>i</em> chmurę Ichimoku (ta ostatnia z przełączeniem koloru tam, gdzie linie się mijają). Jedna wtyczka, cztery zastosowania.</p>
+</div>
+
+<div class="callout bad">
+  <span class="tag">4 — Ichimoku wybiega w przyszłość, a terminal nie wie, kiedy jest przyszłość</span>
+  <p>Senkou A i B są przesunięte <strong>26 świec do przodu</strong>. <code>lightweight-charts</code> narysuje je tylko wtedy, gdy te przyszłe znaczniki czasu <em>istnieją</em> na osi — czyli gdy podamy dla nich <code>WhitespaceData</code>. Terminal ich nie wyliczy: <code>src/data/types.ts</code> <em>celowo</em> nie zna długości okresu („Deliberately absent: a per-resolution period length"), a nawet gdyby znał, 26 świec od piątkowego wieczoru wpada w weekend, gdy rynku nie ma.</p>
+  <p>Serwer też nie jest w lepszej sytuacji: <code>periods.py</code> ma <code>PERIOD_SECONDS</code>, ale z jawnym zastrzeżeniem, że dla DAY i WEEK to nadmiarowe przybliżenie, a <code>market_status.py</code> zna tylko „otwarte / zamknięte teraz", nie kalendarz sesji.</p>
+  <p><strong>Wniosek na etap 1: Ichimoku i Alligator rysujemy bez wysunięcia w przód</strong> — linie kończą się na ostatniej świecy, a UI to mówi. Projekcja w przyszłość jest osobną zmianą, opartą na kalendarzu sesji, którego dziś w systemie nie ma. Lepiej narysować mniej i powiedzieć to, niż wypisać przyszłe daty z arytmetyki, która w piątek wieczorem kłamie.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">5 — legenda i odczyt pod kursorem</span>
+  <p>Biblioteka nie rysuje legendy. Terminal ma już własny odczyt OHLC w nagłówku (<code>OhlcReadout</code>) i ten sam mechanizm — <code>subscribeCrosshairMove</code> + <code>param.seriesData.get(series)</code> — poda wartości wskaźników pod kursorem. Trzeba to zrobić od razu: dwanaście bezimiennych linii na jednym panelu to nie jest wykres, tylko makaron.</p>
+  <p>Przy okazji paleta: kolory muszą przyjść z <code>chart/theme.ts</code> (tokeny, jasny i ciemny motyw), a nie z literałów przy każdej serii. Potrzeba ~8 rozróżnialnych barw kategorycznych działających w obu motywach.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">6 — prostokątów nie ma w bibliotece wcale</span>
+  <p>Cała warstwa SMC to strefy: FVG, order blocki, premium/discount, killzone, EQH/EQL. <code>lightweight-charts</code> nie ma typu „rectangle" — są tylko serie indeksowane czasem i prymitywy rysujące po canvasie (<code>attachPrimitive</code>). Czyli jeden <strong>reużywalny <code>ZonePrimitive</code></strong>, który dostaje listę prostokątów i sam rysuje: to on obsłuży wszystkie strefy naraz.</p>
+  <p>Dwie rzeczy do przewidzenia w nim od początku. Po pierwsze <strong>strefa otwarta</strong> (<code>to: null</code>) musi ciągnąć się do prawej krawędzi i przesuwać razem z nią przy panoramowaniu — prymityw rysuje się co klatkę, więc to wychodzi naturalnie, ale tylko gdy koniec liczy się z widocznego zakresu, a nie zapisuje raz. Po drugie <strong>selekcja po widoku</strong>: kilka tysięcy świec potrafi dać kilkaset FVG, a rysowanie wszystkich, w tym tych poza ekranem, to marnowanie klatki na każdym przewinięciu.</p>
+  <p>Promienie poziomów mają podobny haczyk: <code>createPriceLine</code> istnieje, ale rysuje przez <em>całą</em> szerokość wykresu. PDH ma się zaczynać w momencie zamknięcia poprzedniego dnia, nie w prehistorii — więc też prymityw.</p>
+</div>
+
+<h3>Wydajność rysowania</h3>
+<p>Nie jest wąskim gardłem. Biblioteka radzi sobie z setkami tysięcy punktów; realny wykres to ≤30 serii × ≤5000 punktów. Dwie zasady i wystarczy: przy nowej świecy <code>series.update()</code>, nigdy <code>setData()</code>; przy zmianie symbolu/rozdzielczości serie wskaźników kasować razem ze świecami — <code>Chart.tsx</code> już ma na to efekt czyszczący (<code>[source, symbol, resolution]</code>).</p>
+
+<h2>Ścieżka nowego wskaźnika</h2>
+
+<p>Odpowiednik rozdziału „A new field on market-data's wire" z <code>CLAUDE.md</code> — i tym razem krótszy, co jest właśnie efektem katalogu.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>#</th><th>Gdzie</th><th>Co</th></tr></thead>
+  <tbody>
+    <tr><td class="num">1</td><td class="field">market_data/indicators/kernel.py</td><td>Wzór, złożony z prymitywów. Plus plik wzorcowy z oczekiwanym wynikiem.</td></tr>
+    <tr><td class="num">2</td><td class="field">market_data/indicators/catalogue.py</td><td>Wpis: id, parametry, linie, <code>render</code>, reguła rozgrzewki.</td></tr>
+    <tr><td class="num">3</td><td class="field">— nic —</td><td><strong>Terminal nie wymaga zmiany.</strong> Wybierak buduje się z katalogu, rysowanie ze stylu, który już istnieje.</td></tr>
+    <tr><td class="num">4</td><td class="field">terminal/src/chart/indicators/</td><td><em>Tylko</em> gdy pojawia się nowy <em>styl</em> rysowania (pierwsza wstęga, pierwsze markery, pierwsze kropki). Nie przy nowym wskaźniku w istniejącym stylu.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Co złapie błąd, a co nie:</p>
+<ul>
+  <li><strong>Zły wzór</strong> — plik wzorcowy i porównanie z TA-Lib.</li>
+  <li><strong>Zła rozgrzewka</strong> — test niezależności od punktu startu wyżej. To on wyłapie przypadek „EMA zasiane pierwszą wartością zamiast SMA".</li>
+  <li><strong>Wpis w katalogu niezgodny z jądrem</strong> (np. linia <code>upper</code> zadeklarowana, ale nieprodukowana) — <em>nic tego nie złapie samo z siebie</em>. Potrzebny jeden test, który dla <strong>każdego</strong> wpisu w katalogu liczy go na krótkiej serii i sprawdza, że zwrócone klucze linii są dokładnie tymi zadeklarowanymi. To jest odpowiednik ostrzeżenia „Stops 1 and 2 disagreeing — <em>nothing fails</em>" z <code>CLAUDE.md</code>.</li>
+</ul>
+
+<h2>Etapy</h2>
+
+<div class="grid2">
+  <div class="card">
+    <h4>Etap 1 — szkielet</h4>
+    <p><strong>Zakres:</strong> jądro (20 prymitywów), katalog, <code>GET /indicators</code>, <code>POST /indicators/{symbol}</code>, ~15 wskaźników: SMA, EMA, WMA, RMA, Bollinger, Keltner, Donchian, ATR, RSI, MACD, Stochastic, ADX, CCI, ROC, Aroon.</p>
+    <p><strong>Terminal:</strong> nakładki na panelu ceny + jeden panel oscylatora, wybierak z katalogu, odczyt pod kursorem, stan zapisany w slocie siatki.</p>
+    <p><strong>Bez:</strong> wstęg z wypełnieniem, markerów, na żywo.</p>
+  </div>
+  <div class="card">
+    <h4>Etap 2 — szerokość</h4>
+    <p>Reszta grup A–F (~60 wskaźników), <code>BandSeries</code> jako własna seria, markery formacji przez <code>createSeriesMarkers</code>, Heikin-Ashi jako podmiana serii świec, wiele paneli oscylatorów naraz.</p>
+  </div>
+  <div class="card">
+    <h4>Etap 3 — struktura <span class="dim">(SMC / price action)</span></h4>
+    <p><strong>Fundament najpierw</strong>, bo jest tani i niczego nie potrzebuje: swingi, FVG, displacement, BOS/CHoCH, PDH/PDL, otwarcia D/W, EQH/EQL. Same reguły lokalne, zero rozgrzewki.</p>
+    <p><strong>Warunek wstępny:</strong> <code>ZonePrimitive</code> w terminalu i <code>zones</code>/<code>levels</code> w kontrakcie — bez tego nie ma czym tego narysować.</p>
+    <p>Potem warstwa ze stanem: order blocki, breakery, sweepy, premium/discount, OTE. Na końcu TPO/POC, bo wymaga odczytu serii minutowej pod inną rozdzielczość.</p>
+  </div>
+  <div class="card">
+    <h4>Etap 4 — na żywo</h4>
+    <p>Najtańsza droga, nie najefektowniejsza: skoro wskaźnik jest czystą funkcją, to <strong>po zamknięciu świecy terminal dopytuje o krótki ogon</strong> (ostatnie <code>k</code> świec) tym samym POST-em. Raz na minutę na parę, bez nowego protokołu i bez stanu przyrostowego po stronie serwera.</p>
+    <p>Świeca w budowie: albo linia się nie rusza do zamknięcia, albo rysowana kreską przerywaną z jawną etykietą. Dopiero gdy to okaże się za wolne — subskrypcja <code>/ws/indicators</code> obok istniejącej.</p>
+  </div>
+  <div class="card">
+    <h4>Etap 5 — relacyjne</h4>
+    <p>Grupa G: pole <code>compare</code> w żądaniu, uzgadnianie dwóch kalendarzy sesji. Osobno, bo to nowa klasa problemów, nie kolejny wzór. Tu też trafia <strong>SMT divergence</strong>, jedyne narzędzie SMC, które potrzebuje drugiego instrumentu.</p>
+  </div>
+</div>
+
+<h2>Ryzyka i rzeczy do zmierzenia przed decyzją</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Rzecz</th><th>Dlaczego istotna</th><th>Jak sprawdzić</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Czas liczenia 5000 świec × 10 wskaźników</td>
+      <td>Decyduje, czy wariant A wystarczy, czy od razu trzeba scipy albo osobny moduł.</td>
+      <td>Prototyp jądra na 5 wskaźnikach + <code>timeit</code>. Pół dnia.</td>
+    </tr>
+    <tr>
+      <td>Głębokość archiwum vs rozgrzewka</td>
+      <td>ADX(14) chce ~580 świec wstecz, T3(5) ~360. Jeśli para jest zbierana od tygodnia na HOUR_4, tych świec fizycznie nie ma i <code>settled</code> będzie <code>false</code> — trzeba wiedzieć, jak często.</td>
+      <td>Zapytanie o <code>candle_count</code> po parach na produkcji.</td>
+    </tr>
+    <tr>
+      <td>Bucket niekompletny na końcu serii pochodnej</td>
+      <td>Najnowszy bucket MINUTE_5…HOUR_4 ma <code>complete = false</code> prawie zawsze. Wskaźnik liczony na zaniżonym zakresie zafałszuje ATR i wstęgi.</td>
+      <td>Decyzja: pomijać ostatni niekompletny czy oznaczać. Dziś <code>CandleOut</code> tego nie publikuje — być może właśnie tu trzeba dołożyć pole.</td>
+    </tr>
+    <tr>
+      <td>Rozmiar odpowiedzi</td>
+      <td>20 linii × 5000 punktów to ~1 MB JSON-a na odświeżenie wykresu.</td>
+      <td>Kompresja jest w App Service. Zmierzyć realny rozmiar po gzipie zanim wymyśli się coś sprytniejszego.</td>
+    </tr>
+    <tr>
+      <td>SAR/SuperTrend a backfill</td>
+      <td>Dociągnięcie historii zmienia dzisiejsze wartości. Operator to zobaczy i uzna za błąd.</td>
+      <td>Zapisać w spec jako scenariusz i pokazać kotwicę w UI.</td>
+    </tr>
+    <tr>
+      <td>Bid, nie mid</td>
+      <td>Całe archiwum to <code>PriceSide.BID</code>. Wskaźniki będą po stronie bid — inaczej niż u brokera pokazującego mid.</td>
+      <td>Nic do zrobienia poza odbiciem <code>price_side</code> w odpowiedzi i etykietą w UI.</td>
+    </tr>
+    <tr>
+      <td>Luka weekendowa wykrywana jako FVG</td>
+      <td>Zdarza się co tydzień na każdym instrumencie, więc nie jest przypadkiem brzegowym — detektor bez filtra zaleje wykres fałszywymi strefami.</td>
+      <td>Policzyć na miesiącu danych, ile FVG wypada na granicy sesji. Parametr <code>skip_session_gaps</code> domyślnie włączony.</td>
+    </tr>
+    <tr>
+      <td>Spójność <code>swing_strength</code> między wskaźnikami strukturalnymi</td>
+      <td>BOS z parametrem 2 i order block z parametrem 3 na jednym wykresie pokazują sprzeczną strukturę. Nic tego nie wykryje automatycznie.</td>
+      <td>Decyzja projektowa przed etapem 3: jeden wspólny kontekst struktury w żądaniu zamiast parametru per wskaźnik.</td>
+    </tr>
+    <tr>
+      <td>Liczba stref na ekranie</td>
+      <td>Kilka tysięcy świec to kilkaset FVG. Rysowanie wszystkich co klatkę zabija panoramowanie.</td>
+      <td>Selekcja po widocznym zakresie w <code>ZonePrimitive</code> + limit „ostatnie N niezmitygowanych" w żądaniu.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Pytania do rozstrzygnięcia</h2>
+
+<ol>
+  <li><strong>Ile naprawdę potrzeba na start?</strong> Ta lista to 120 pozycji, ale realnie używa się kilkunastu. Etap 1 z piętnastoma dobrze zrobionymi jest lepszy niż sto policzonych „mniej więcej" — a katalog sprawia, że dołożenie kolejnych jest tanie.</li>
+  <li><strong>Czy formacje świecowe to ten sam mechanizm?</strong> Zwracają markery, nie liczby. Mieszczą się w tym kontrakcie (linia może być listą zdarzeń), ale można je też potraktować jako osobny zasób <code>/patterns</code>. Skłaniam się ku jednemu katalogowi z polem <code>render.style: "markers"</code> — jeden wybierak dla operatora.</li>
+  <li><strong>Kto trzyma wybór operatora?</strong> Wskaźniki na slocie siatki muszą przeżyć odświeżenie strony. <code>gridStore</code> już zapisuje symbol i rozdzielczość na slot — dołożenie listy wskaźników to naturalne miejsce, ale rośnie tam zapisywany stan.</li>
+  <li><strong>DAY i WEEK.</strong> Rozgrzewka ADX(14) to 580 świec dziennych, czyli ponad dwa lata historii. Czy zbieramy tak głęboko? Jeśli nie, część wskaźników na tych rozdzielczościach będzie stale <code>settled: false</code> i trzeba zdecydować, czy je w ogóle oferować.</li>
+  <li><strong>Czyja definicja SMC?</strong> „Order block" u trzech autorów to trzy różne rzeczy — z korpusu czy z knota, potwierdzony przez BOS czy przez samo displacement, unieważniony dotknięciem czy zamknięciem. Trzeba wybrać <em>jedną</em> i zapisać ją w spec jako scenariusze, a nie zostawić w kodzie. Wersja (<code>pattern_set</code>) daje potem drogę do zmiany zdania bez cichego przestawienia komuś wykresu.</li>
+  <li><strong>Czy SMC wchodzi kolejnością przed grupą F?</strong> Jeżeli to jest strategia, którą faktycznie handlujesz, to fundament z etapu 3 (swingi, FVG, BOS, PDH/PDL) jest wart więcej niż trzydzieści kolejnych oscylatorów z etapu 2 — i jest tańszy, bo bez rozgrzewki. Kolejność etapów 2 i 3 jest do zamiany, ale <code>ZonePrimitive</code> i <code>zones</code> w kontrakcie muszą wtedy powstać wcześniej.</li>
+</ol>
+
+<div class="callout">
+  <span class="tag">Ścieżka procesowa</span>
+  <p>To będzie <strong>zmiana OpenSpec</strong>, i to bez wątpliwości: dotyka <code>market_data/contract.py</code>, czyli kontraktu między modułami, oraz wprowadza nowe wymagania (nowa spec <code>market-data-indicators</code> plus delta do <code>terminal-chart</code>). Pełna ścieżka: <code>/opsx:propose</code> → <code>/opsx:apply</code> → <code>review.md</code> → <code>/opsx:archive</code>. Artefakty po polsku, struktura i słowa kluczowe RFC 2119 po angielsku.</p>
+</div>
+
+<footer>
+  Ten plik jest researchem sprzed decyzji, nie opisem stanu. Gdy decyzja zapadnie — przenieść do <code>docs/archive/</code> i zostawić w <code>docs/</code> tylko to, co będzie prawdą o działającym systemie.
+</footer>
+
+</main>

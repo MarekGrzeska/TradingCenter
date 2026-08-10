@@ -1,0 +1,702 @@
+<title>Wskaźniki — plan wdrożenia</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 56rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.9rem; margin: 1.5rem 0 0.4rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.82rem; }
+  td.num { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.79rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  .stage { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.2rem 0; }
+  .stage > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .stage .no { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.05em 0.45em; }
+  .stage dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.8rem 0 0; font-size: 0.92rem; }
+  .stage dt { font-family: var(--mono); font-size: 0.73rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); padding-top: 0.22rem; }
+  .stage dd { margin: 0; }
+  @media (max-width: 34rem) { .stage dl { grid-template-columns: 1fr; gap: 0.15rem; } .stage dd { margin-bottom: 0.6rem; } }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>Wskaźniki — plan wdrożenia</h1>
+<p class="lede">Zestaw wiarygodnych, policzalnych narzędzi. Przydatnych w SMC i price action, ale z żadną strategią niezwiązanych — strategie dostaną własny moduł i będą tego zestawu konsumentem.</p>
+<p class="meta">
+  Plan, nie research. Research: <code>docs/wskazniki-techniczne.html</code><br>
+  Dotyczy: <code>modules/market-data</code>, <code>modules/terminal</code><br>
+  Status: przed <code>/opsx:propose</code>
+</p>
+
+<h2>Zasada, która wyznacza granicę</h2>
+
+<div class="callout good">
+  <span class="tag">Jedno zdanie, z którego wynika cała reszta</span>
+  <p><strong>Wskaźnik mierzy. Strategia orzeka.</strong></p>
+  <p>Moduł wskaźników odpowiada na pytania, które mają jedną odpowiedź niezależną od szkoły: <em>ile wynosi zakres tej świecy w jednostkach ATR</em>, <em>gdzie był ostatni punkt zwrotny</em>, <em>czy między świecą sprzed dwóch okresów a bieżącą jest niepokryty przedział cen</em>. Nie odpowiada na pytania, na które trzy szkoły dają trzy odpowiedzi: <em>czy to był order block</em>, <em>czy struktura się złamała</em>, <em>czy to było zbieranie płynności</em>.</p>
+</div>
+
+<p>To nie jest ostrożność. To jest warunek tego, żeby narzędzia przeżyły zmianę zdania o strategii. Werdykt zaszyty we wskaźniku ma stały próg, stałą definicję i stałą nazwę — i w dniu, w którym uznasz, że displacement to 1,2 ATR a nie 1,5, albo że order block liczy się z knota a nie z korpusu, trzeba wydać nową wersję modułu danych, żeby zmienić zdanie o handlu. Miara ciągła nie ma tego problemu: próg stawia ten, kto podejmuje decyzję.</p>
+
+<h3>Jak to wygląda w praktyce</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Zamiast dostarczyć</th><th>Dostarczamy</th><th>Kto stawia próg</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">displacement: true|false</td>
+      <td class="field">bar_range_atr: 1.82</td>
+      <td>Strategia. Jedna chce 1,5, druga 2,0, trzecia percentyl z ostatnich 200 świec.</td>
+    </tr>
+    <tr>
+      <td class="field">bos: true <span class="dim">(break of structure)</span></td>
+      <td class="field">last_swing_high / last_swing_low <span class="dim">— linie schodkowe</span></td>
+      <td>Strategia. Porównanie zamknięcia z poziomem to jedna linijka po jej stronie — i to ona decyduje, czy liczy się zamknięcie, czy dotknięcie.</td>
+    </tr>
+    <tr>
+      <td class="field">order_block <span class="dim">(strefa z werdyktem)</span></td>
+      <td class="field">swing_points + bar_range_atr + range_gap</td>
+      <td>Strategia. Ma z czego złożyć każdy z pięciu wariantów definicji, nie prosząc nas o zmianę.</td>
+    </tr>
+    <tr>
+      <td class="field">liquidity_sweep: true</td>
+      <td class="field">rolling_extreme + wick_up_ratio + close_position</td>
+      <td>Strategia. „Knot przebił, zamknięcie wróciło" składa się z trzech liczb, które już ma.</td>
+    </tr>
+    <tr>
+      <td class="field">fvg <span class="dim">(nazwa jednej szkoły)</span></td>
+      <td class="field">range_gap <span class="dim">— z aliasem „FVG" w katalogu</span></td>
+      <td>Nikt. To ten sam obiekt — zmienia się tylko nazwa w kontrakcie, żeby kontrakt nie należał do jednej szkoły. Alias sprawia, że w wyszukiwarce terminala „FVG" wciąż działa.</td>
+    </tr>
+    <tr>
+      <td class="field">state: mitigated | inverted</td>
+      <td class="field">touched_at, filled_at <span class="dim">— fakty z historii ceny</span></td>
+      <td>Strategia. „Cena weszła w tę strefę o 14:15" to fakt. „Strefa jest zmitygowana" to już interpretacja.</td>
+    </tr>
+    <tr>
+      <td class="field">killzone: london | ny</td>
+      <td class="field">session_range(od, do, strefa czasowa)</td>
+      <td>Operator/strategia. My dostarczamy mechanizm okien czasowych, nie czyjąś listę godzin.</td>
+    </tr>
+    <tr>
+      <td class="field">premium | discount</td>
+      <td class="field">range_position: 0.73</td>
+      <td>Strategia. Podział na 50% jest umową, nie pomiarem.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Reguła operacyjna, którą łatwo złamać w pośpiechu</span>
+  <p>Jeżeli nowy wpis w katalogu wymaga <strong>progu z domyślną wartością wziętą z literatury</strong> — to jest znak, że przekraczamy granicę. Próg wolno mieć jako parametr (bo bez niego niektóre rzeczy nie mają definicji), ale wtedy jego wartość ma być <em>widoczna w żądaniu</em>, a nie ukryta w domyślnej stałej, o której konsument się nie dowie.</p>
+  <p>Test do zadania sobie przy każdym wpisie: <em>czy dwie osoby handlujące inaczej zgodziłyby się co do tej liczby?</em> Jeśli tak — to miara. Jeśli nie — to strategia i tu nie należy.</p>
+</div>
+
+<h2>Co dostarczamy — cztery warstwy</h2>
+
+<p>Zestaw dzieli się na warstwy nie tematycznie, tylko po <strong>kształcie wyjścia</strong>, bo to kształt decyduje, ile pracy kosztuje kontrakt i rysowanie. Warstwa niżej jest budulcem dla warstwy wyżej i nic nie przeskakuje szczebla.</p>
+
+<pre><code>  ┌──────────────────────────────────────────────────────────────┐
+  │ W3  ROZKŁADY          profil czasowy (TPO), POC, value area  │
+  ├──────────────────────────────────────────────────────────────┤
+  │ W2  STREFY            luki cenowe · okna sesji · zakres      │
+  │     prostokąty        wstępny · pasma wokół poziomów         │
+  ├──────────────────────────────────────────────────────────────┤
+  │ W1  PUNKTY I POZIOMY  punkty zwrotne · ostatni punkt zwrotny │
+  │     markery, promienie ekstrema kroczące · poziomy z wyższego│
+  │                       interwału · skupiska ekstremów         │
+  ├──────────────────────────────────────────────────────────────┤
+  │ W0  MIARY CIĄGŁE      jedna liczba na świecę, zawsze:        │
+  │     linie             ATR · geometria świecy · zmienność ·   │
+  │                       reżim · klasyczne oscylatory           │
+  ├──────────────────────────────────────────────────────────────┤
+  │     JĄDRO             ~20 prymitywów. Nie publikowane.       │
+  └──────────────────────────────────────────────────────────────┘</code></pre>
+
+<h3>W0 — miary ciągłe</h3>
+
+<p>Jedna liczba na świecę, zawsze obecna. Najtańsza warstwa i jedyna, która daje się użyć bez żadnego kodu po stronie konsumenta. Tu leży ATR, od którego zależy niemal wszystko inne.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Grupa</th><th>Co zawiera</th><th>Po co w SMC / PA</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Skala ruchu</strong></td>
+      <td class="field">true_range, atr, atr_pct</td>
+      <td>Jednostka, w której wyraża się <em>wszystkie</em> progi i tolerancje. Bez tego parametr nie przenosi się między instrumentami.</td>
+    </tr>
+    <tr>
+      <td><strong>Geometria świecy</strong></td>
+      <td class="field">bar_range_atr, body_ratio, wick_up_ratio, wick_down_ratio, close_position, gap_prev_close_atr</td>
+      <td>Sześć liczb, z których składa się każda formacja świecowa i większość „reakcji na strefie". Znormalizowane, więc porównywalne między świecami i instrumentami.</td>
+    </tr>
+    <tr>
+      <td><strong>Położenie w zakresie</strong></td>
+      <td class="field">range_position(n), zscore(n), percentile_rank(n)</td>
+      <td>„Gdzie jesteśmy względem ostatnich n świec" — bez nazywania połówek premium i discount.</td>
+    </tr>
+    <tr>
+      <td><strong>Zmienność z OHLC</strong></td>
+      <td class="field">stdev, parkinson, garman_klass, rogers_satchell, yang_zhang, ulcer</td>
+      <td>Rodzina bez wolumenu, zaprojektowana dokładnie pod dane, które mamy.</td>
+    </tr>
+    <tr>
+      <td><strong>Reżim</strong></td>
+      <td class="field">adx, di_plus, di_minus, choppiness, aroon, vortex, linreg_slope, r_squared</td>
+      <td>Odpowiedź na pytanie, którego geometria nie zadaje: czy w ogóle jest trend, w którym łamanie struktury coś znaczy.</td>
+    </tr>
+    <tr>
+      <td><strong>Średnie</strong></td>
+      <td class="field">sma, ema, wma, rma, hma, dema, tema, kama, alma, lsma, …</td>
+      <td>Bias i punkt odniesienia. Tanie, bo wszystkie z tych samych prymitywów.</td>
+    </tr>
+    <tr>
+      <td><strong>Oscylatory</strong></td>
+      <td class="field">rsi, macd, stoch, cci, roc, tsi, cmo, …</td>
+      <td>Głównie pod dywergencje i pod te strategie, które nie są SMC. Kosztują prawie nic, bo składają się z gotowych prymitywów.</td>
+    </tr>
+    <tr>
+      <td><strong>Wstęgi i kanały</strong></td>
+      <td class="field">bbands, keltner, donchian, envelope, linreg_channel</td>
+      <td>Donchian to jednocześnie „gdzie leżą ekstrema z n świec" — ta sama liczba służy dwóm bardzo różnym rzeczom.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>W1 — punkty i poziomy</h3>
+
+<p>Rzadkie zdarzenia i linie odniesienia. Tu wchodzi geometria wykresu, wciąż bez żadnej interpretacji.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pozycja</th><th>Definicja mechaniczna</th><th>Wyjście</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">swing_points(n)</td>
+      <td>Ekstremum wyższe/niższe niż <code>n</code> świec po obu stronach. Potwierdzone <code>n</code> świec po fakcie — i tak zaraportowane.</td>
+      <td>markery</td>
+    </tr>
+    <tr>
+      <td class="field">last_swing_high(n)<br>last_swing_low(n)</td>
+      <td>Ostatni potwierdzony punkt zwrotny, przeniesiony w prawo jako linia schodkowa.</td>
+      <td>linia</td>
+    </tr>
+    <tr>
+      <td class="field">rolling_extreme(n)</td>
+      <td>Maksimum/minimum z <code>n</code> świec. To samo, co krawędzie Donchiana — jeden wzór, dwa zastosowania.</td>
+      <td>linia</td>
+    </tr>
+    <tr>
+      <td class="field">htf_levels(okres)</td>
+      <td>OHLC poprzedniego okresu wyższego interwału plus otwarcie bieżącego. Odczyt międzyrozdzielczościowy.</td>
+      <td>promienie</td>
+    </tr>
+    <tr>
+      <td class="field">pivots(typ, okres)</td>
+      <td>Classic / Fibonacci / Camarilla / Woodie / DeMark. Arytmetyka na jednej świecy, zero uznaniowości.</td>
+      <td>promienie</td>
+    </tr>
+    <tr>
+      <td class="field">level_clusters(n, tol)</td>
+      <td>Poziomy, przy których ≥2 ekstrema mieszczą się w tolerancji <code>tol · ATR</code>. Zwraca poziom i liczność.</td>
+      <td>poziomy z wagą</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout">
+  <span class="tag">Dlaczego <code>last_swing_high</code> jest ważniejszy, niż wygląda</span>
+  <p>To jest pozycja, która pozwala <em>nie</em> dostarczać BOS-a. Konsument dostaje ciągłą linię „ostatni potwierdzony szczyt" i porównuje z nią zamknięcie sam — jedną operacją, bez trzymania stanu, bez pamiętania historii swingów. Cała komplikacja zostaje po naszej stronie, cała decyzja po jego.</p>
+  <p>Bez tej linii strategia musiałaby wziąć listę markerów i odtworzyć z nich stan — czyli napisać połowę tego modułu jeszcze raz. To jest dokładnie granica, którą warto postawić w tym miejscu.</p>
+</div>
+
+<h3>W2 — strefy</h3>
+
+<p>Prostokąty. Kształt, którego dzisiejszy kontrakt archiwum nie zna wcale, i główny powód, dla którego etapy trzeba ustawić w tej, a nie innej kolejności.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pozycja</th><th>Definicja mechaniczna</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">range_gap(kierunek)</td>
+      <td>Przedział cen niepokryty przez trzy kolejne świece: <code>low[i] &gt; high[i-2]</code> albo odwrotnie.</td>
+      <td>Alias katalogowy: „FVG", „imbalance". Niesie <code>touched_at</code> i <code>filled_at</code>, nie „state".</td>
+    </tr>
+    <tr>
+      <td class="field">body_gap</td>
+      <td>Luka między korpusami przy stykających się zakresach.</td>
+      <td>Alias: „volume imbalance" — nazwa myląca, wolumenu w tym nie ma.</td>
+    </tr>
+    <tr>
+      <td class="field">session_gap</td>
+      <td>Przerwa w handlu, rozpoznana z <code>coverage_ranges</code>, nie z kształtu świec.</td>
+      <td><strong>Osobny typ, nie odmiana <code>range_gap</code>.</strong> Bez tego każdy weekend produkuje fałszywą lukę cenową.</td>
+    </tr>
+    <tr>
+      <td class="field">session_range(od, do, tz)</td>
+      <td>Zakres cen w oknie czasowym, powtarzanym codziennie. Okna podaje wywołujący.</td>
+      <td>Mechanizm, nie czyjaś lista godzin. Strefa czasowa jawna, DST liczone z kalendarza.</td>
+    </tr>
+    <tr>
+      <td class="field">opening_range(okno, n)</td>
+      <td>Ekstrema pierwszych <code>n</code> minut zadanego okna.</td>
+      <td>Wariant powyższego.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>W3 — rozkłady</h3>
+
+<p>Jedna pozycja, ale osobna warstwa, bo ma własny kształt wyjścia i własny sposób rysowania.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pozycja</th><th>Definicja</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">time_profile(okno, kubełek)</td>
+      <td>Ile minut cena spędziła w każdym kubełku cenowym. Zwraca histogram, POC i przedział obejmujący 70% zliczeń.</td>
+      <td>Wejściem jest seria <code>MINUTE</code> — także wtedy, gdy rysowany jest HOUR_4. Zastępuje profil wolumenowy bez kompromisu, bo TPO z definicji liczy czas, nie obrót.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Sprawdzian: czy z tego da się złożyć to, po co przyszliśmy</h2>
+
+<p>Granica jest postawiona dobrze tylko wtedy, gdy po drugiej stronie da się pracować. Poniżej to samo, co poprzedni dokument dostarczał jako gotowe werdykty — złożone z warstw W0–W2 po stronie konsumenta. Kolumna po prawej to szkic, nie kod, ale pokazuje rząd trudności.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pojęcie SMC</th><th>Z czego się składa</th><th>Ile to pracy u konsumenta</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Break of structure</td>
+      <td class="field">close &gt; last_swing_high</td>
+      <td>Jedno porównanie.</td>
+    </tr>
+    <tr>
+      <td>Change of character</td>
+      <td class="field">BOS w kierunku przeciwnym do poprzedniego</td>
+      <td>Porównanie + jedna zmienna stanu.</td>
+    </tr>
+    <tr>
+      <td>Displacement</td>
+      <td class="field">bar_range_atr &gt; próg</td>
+      <td>Jedno porównanie, próg własny.</td>
+    </tr>
+    <tr>
+      <td>Order block</td>
+      <td class="field">ostatnia świeca o przeciwnym znaku (close−open) przed serią z bar_range_atr &gt; próg, która przebiła last_swing_high</td>
+      <td>Kilkanaście linii. Cała uznaniowość — z korpusu czy z knota, ile świec impulsu — zostaje u konsumenta, gdzie jej miejsce.</td>
+    </tr>
+    <tr>
+      <td>Equal highs / lows</td>
+      <td class="field">level_clusters(n, tol) na ekstremach górnych</td>
+      <td>Gotowe, wystarczy odfiltrować liczność.</td>
+    </tr>
+    <tr>
+      <td>Liquidity sweep</td>
+      <td class="field">high &gt; rolling_extreme(n) sprzed świecy ∧ close_position &lt; próg</td>
+      <td>Dwa porównania.</td>
+    </tr>
+    <tr>
+      <td>Premium / discount</td>
+      <td class="field">range_position &gtrless 0.5</td>
+      <td>Jedno porównanie.</td>
+    </tr>
+    <tr>
+      <td>OTE</td>
+      <td class="field">range_position w [0.21, 0.38] licząc od kierunku ruchu</td>
+      <td>Jeden przedział.</td>
+    </tr>
+    <tr>
+      <td>Turtle soup</td>
+      <td class="field">sweep ∧ CHoCH w oknie k świec</td>
+      <td>Złożenie dwóch powyższych.</td>
+    </tr>
+    <tr>
+      <td>Unicorn</td>
+      <td class="field">część wspólna strefy breakera i range_gap</td>
+      <td>Przecięcie dwóch prostokątów.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout good">
+  <span class="tag">Wniosek ze sprawdzianu</span>
+  <p>Wszystko powyżej to <strong>porównania i przecięcia</strong> — nie ma tam ani jednej pętli po świecach, ani jednego wygładzania, ani jednej rzeczy wymagającej dostępu do bazy. Czyli moduł strategii nie będzie musiał liczyć wskaźników od nowa i nie będzie musiał sięgać po świece: wystarczy mu odpowiedź z <code>/indicators</code>.</p>
+  <p>To jest test wystarczalności zestawu i zarazem uzasadnienie, dlaczego <code>last_swing_high</code> i <code>bar_range_atr</code> muszą się w nim znaleźć, choć w żadnej klasycznej liście wskaźników ich nie ma.</p>
+</div>
+
+<h2>Czego świadomie nie dostarczamy</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Rzecz</th><th>Dlaczego nie tutaj</th><th>Dokąd trafi</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Order blocki, breakery, mitigation, unicorny</td>
+      <td>Każde z nich to definicja jednej szkoły z co najmniej trzema wariantami.</td>
+      <td>Moduł strategii</td>
+    </tr>
+    <tr>
+      <td>BOS, CHoCH, MSS, struktura rynku</td>
+      <td>Wynik zależy od <code>swing_strength</code> i od tego, czy liczy się zamknięcie czy dotknięcie. Dwie umowy, nie pomiar.</td>
+      <td>Moduł strategii</td>
+    </tr>
+    <tr>
+      <td>Sweepy, stop hunty, turtle soup</td>
+      <td>Zdarzenie definiowane progiem i oknem czasowym.</td>
+      <td>Moduł strategii</td>
+    </tr>
+    <tr>
+      <td>Killzone jako nazwane godziny</td>
+      <td>Mechanizm okien dostarczamy; czyjeś godziny to konfiguracja strategii.</td>
+      <td>Moduł strategii / konfiguracja</td>
+    </tr>
+    <tr>
+      <td>Sygnały wejścia, stopy, targety, R:R</td>
+      <td>Poza zakresem w oczywisty sposób.</td>
+      <td>Moduł strategii</td>
+    </tr>
+    <tr>
+      <td>ZigZag</td>
+      <td>Przemalowuje ostatnią nogę — czyli łamie obietnicę powtarzalności, która jest tu głównym produktem.</td>
+      <td><span class="pill bad">nigdzie</span> — <code>swing_points</code> daje to samo bez cofania się</td>
+    </tr>
+    <tr>
+      <td>Parabolic SAR, SuperTrend, Renko, Kagi, P&amp;F</td>
+      <td>Zależne od stanu, więc dociągnięcie starszej historii zmienia dzisiejszą wartość. Wpuszczalne, ale nie na początek i nie bez jawnej kotwicy w odpowiedzi.</td>
+      <td>Później, jako osobna kategoria</td>
+    </tr>
+    <tr>
+      <td>Wszystko wolumenowe</td>
+      <td>Wolumen świec pochodnych jest w tym archiwum niemal zawsze pusty — nie „mniej wiarygodny", tylko strukturalnie nieobecny.</td>
+      <td><span class="pill bad">nigdzie</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Kontrakt — minimalny rdzeń</h2>
+
+<p>Dwa zasoby i cztery kształty wyjścia. Pełny szkic pól jest w dokumencie researchowym; tutaj tylko to, co plan musi ustalić <em>przed</em> pierwszą linijką kodu, bo później jest to zmiana łamiąca.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Ustalenie</th><th>Treść</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Katalog jest danymi</strong></td><td><code>GET /indicators</code> zwraca listę wpisów z parametrami, kształtem wyjścia i podpowiedzią rysowania. Terminal buduje z tego wybierak, więc nowy wskaźnik <em>nie wymaga zmiany w terminalu</em>.</td></tr>
+    <tr><td><strong>Cztery kształty od pierwszego dnia</strong></td><td><code>lines</code> · <code>markers</code> · <code>zones</code> · <code>levels</code>. Nawet jeśli etap 0 produkuje tylko <code>lines</code>, pozostałe trzy muszą już istnieć w modelu — dołożenie ich później to zmiana łamiąca.</td></tr>
+    <tr><td><strong>Wersja algorytmów</strong></td><td><code>algorithm_version</code> w katalogu i w każdej odpowiedzi. Zmiana wzoru jest zmianą kontraktu.</td></tr>
+    <tr><td><strong>Aliasy</strong></td><td>Wpis niesie <code>aliases: ["FVG", "imbalance"]</code>. Kontrakt zostaje neutralny, wyszukiwarka w terminalu działa po nazwach, których operator faktycznie używa.</td></tr>
+    <tr><td><strong>Rozgrzewka jawna</strong></td><td>Serwer czyta więcej świec, niż zapytano, i mówi ile (<code>warmup_from</code>, <code>settled</code>). Reguła: <code>m = ceil(ln(1e-9) / ln(1−α))</code>.</td></tr>
+    <tr><td><strong><code>uncovered</code> przechodzi dalej</strong></td><td>Bez zmiany kształtu, prosto z <code>CandlesOut</code>. Wskaźnik policzony przez dziurę w danych musi być rozpoznawalny.</td></tr>
+    <tr><td><strong>Język</strong></td><td>Kontrakt, identyfikatory i UI po angielsku — jak reszta kodu. Po polsku tylko artefakty OpenSpec i ten dokument.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Plan etapów</h2>
+
+<p>Każdy etap kończy się czymś działającym na ekranie — nie „warstwą gotową do integracji". Rozmiar podany względnie, bo bezwzględne dni z tego miejsca byłyby zmyślone.</p>
+
+<div class="stage">
+  <h3><span class="no">E0</span> Szkielet, który przechodzi na wylot</h3>
+  <dl>
+    <dt>Zakres</dt>
+    <dd>Jądro z 5 prymitywami (<code>sma</code>, <code>ema</code>, <code>rma</code>, <code>stdev</code>, <code>true_range</code>). Katalog z trzema wpisami: <code>sma</code>, <code>ema</code>, <code>atr</code>. <code>GET /indicators</code>, <code>POST /indicators/{symbol}</code>. Cztery kształty wyjścia w modelach, choć używany jeden. Terminal: wybierak z katalogu, jedna nakładka na panelu ceny.</dd>
+    <dt>Po co</dt>
+    <dd>Przebić całą ścieżkę — od modelu Pydantic, przez wygenerowany kontrakt, po piksel — zanim powstanie sto wskaźników do przepisania, jeśli ścieżka okaże się zła.</dd>
+    <dt>Ukończone gdy</dt>
+    <dd>EMA(20) widoczna na wykresie i znika po odznaczeniu · <code>pnpm contract:check</code> zielone · pliki wzorcowe dla trzech wskaźników · test niezależności od punktu startu przechodzi dla EMA i ATR · limit żądania odmawia z <code>422</code> nazywającym granicę.</dd>
+    <dt>Rozmiar</dt>
+    <dd><span class="pill">M</span> — najwięcej tu kosztuje kontrakt i generator, nie matematyka.</dd>
+    <dt>OpenSpec</dt>
+    <dd><code>add-indicator-contract</code> — nowa spec <code>market-data-indicators</code> + delta do <code>terminal-chart</code></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E1</span> Miary ciągłe <span class="dim">(warstwa W0)</span></h3>
+  <dl>
+    <dt>Zakres</dt>
+    <dd>Reszta prymitywów. Cała geometria świecy, położenie w zakresie, zmienność OHLC, reżim, średnie, oscylatory, wstęgi. Terminal: własne panele, poziomy odniesienia, odczyt wartości pod kursorem, zapis wyboru w slocie siatki.</dd>
+    <dt>Po co</dt>
+    <dd>Tu leży ATR i cała szóstka geometrii świecy — czyli fundament, na którym opierają się progi każdej późniejszej warstwy <em>i</em> przyszłej strategii.</dd>
+    <dt>Ukończone gdy</dt>
+    <dd>RSI w osobnym panelu z liniami 30/70 · MACD z histogramem dwubarwnym · <code>bar_range_atr</code> policzone i widoczne · wybór wskaźników przeżywa odświeżenie strony · test spójności katalogu z jądrem (każdy wpis zwraca dokładnie zadeklarowane klucze) · pomiar p95 na 5000 świec × 10 wskaźników.</dd>
+    <dt>Rozmiar</dt>
+    <dd><span class="pill">L</span> — najwięcej pozycji, ale najniższe ryzyko: same funkcje z prymitywów.</dd>
+    <dt>OpenSpec</dt>
+    <dd><code>add-continuous-measures</code></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E2</span> Punkty i poziomy <span class="dim">(warstwa W1)</span></h3>
+  <dl>
+    <dt>Zakres</dt>
+    <dd>Punkty zwrotne, <code>last_swing_*</code> jako linie schodkowe, ekstrema kroczące, poziomy z wyższego interwału, pivoty, skupiska ekstremów. Terminal: markery przez <code>createSeriesMarkers</code>, prymityw promieni (bo <code>createPriceLine</code> ciągnie przez całą szerokość, a PDH ma się zaczynać w konkretnym momencie).</dd>
+    <dt>Po co</dt>
+    <dd>Pierwszy etap, który daje coś, czego klasyczne biblioteki wskaźników nie mają — i pierwszy naprawdę użyteczny dla price action.</dd>
+    <dt>Ukończone gdy</dt>
+    <dd>PDH/PDL i otwarcie dnia rysują się na wykresie 15-minutowym z właściwego dnia · punkty zwrotne pojawiają się z zadeklarowanym opóźnieniem <code>n</code> świec i to opóźnienie jest w odpowiedzi · <code>last_swing_high</code> jest linią bez dziur po pierwszym potwierdzeniu · odczyt międzyrozdzielczościowy nie psuje się na parze zbieranej tylko na MINUTE.</dd>
+    <dt>Rozmiar</dt>
+    <dd><span class="pill">M</span></dd>
+    <dt>OpenSpec</dt>
+    <dd><code>add-structure-levels</code></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E3</span> Strefy <span class="dim">(warstwa W2)</span></h3>
+  <dl>
+    <dt>Zakres</dt>
+    <dd>Luki cenowe z rozdzieleniem na rynkowe i sesyjne, luki między korpusami, okna sesji z jawną strefą czasową, zakres wstępny. Terminal: jeden <code>ZonePrimitive</code> obsługujący wszystkie prostokąty, z selekcją po widocznym zakresie.</dd>
+    <dt>Po co</dt>
+    <dd>Najbardziej wyczekiwana warstwa i jednocześnie ta, w której najłatwiej przekroczyć granicę w stronę strategii. Dostarczamy prostokąt i dwa fakty o nim (<code>touched_at</code>, <code>filled_at</code>) — nic więcej.</dd>
+    <dt>Ukończone gdy</dt>
+    <dd>Luka weekendowa <strong>nie</strong> jest raportowana jako luka cenowa i da się to pokazać na konkretnym piątku · 300 stref na ekranie nie psuje płynności panoramowania · strefa otwarta ciągnie się do prawej krawędzi przy przewijaniu · okno sesji trafia w te same godziny w marcu i w listopadzie.</dd>
+    <dt>Rozmiar</dt>
+    <dd><span class="pill">L</span> — połowa kosztu jest w terminalu, nie w Pythonie.</dd>
+    <dt>OpenSpec</dt>
+    <dd><code>add-price-zones</code></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E4</span> Rozkłady <span class="dim">(warstwa W3)</span></h3>
+  <dl>
+    <dt>Zakres</dt>
+    <dd>Profil czasowy z serii minutowej: histogram, POC, przedział 70%. Terminal: prymityw panelu rysujący poziomy histogram przy krawędzi.</dd>
+    <dt>Po co</dt>
+    <dd>Jedyny sensowny zamiennik profilu wolumenowego przy danych bez wolumenu — i nie proteza, bo TPO nigdy obrotu nie liczyło.</dd>
+    <dt>Ukończone gdy</dt>
+    <dd>POC dla wczorajszej sesji zgadza się z ręcznym przeliczeniem na próbce · odczyt serii minutowej pod wykresem HOUR_4 mieści się w budżecie czasu · brak serii minutowej dla pary jest odmową, która to mówi, a nie pustym profilem.</dd>
+    <dt>Rozmiar</dt>
+    <dd><span class="pill">M</span></dd>
+    <dt>OpenSpec</dt>
+    <dd><code>add-time-profile</code></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E5</span> Na żywo</h3>
+  <dl>
+    <dt>Zakres</dt>
+    <dd>Po zamknięciu świecy terminal dopytuje o krótki ogon tym samym POST-em. Świeca w budowie: linia stoi albo jest kreskowana z etykietą — do wyboru w UI, nie w kontrakcie.</dd>
+    <dt>Po co</dt>
+    <dd>Najtańsza droga do „wykres żyje": raz na minutę na parę, żadnego nowego protokołu, żadnego stanu przyrostowego po stronie serwera. Subskrypcja <code>/ws/indicators</code> dopiero gdyby to okazało się za wolne.</dd>
+    <dt>Ukończone gdy</dt>
+    <dd>Wskaźniki nadążają za świecami bez migotania · zmiana symbolu kasuje serie wskaźników razem ze świecami · zerwany strumień nie zostawia linii zamrożonej bez oznaczenia.</dd>
+    <dt>Rozmiar</dt>
+    <dd><span class="pill">S</span></dd>
+    <dt>OpenSpec</dt>
+    <dd><code>indicators-follow-live-candles</code></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E6</span> Drugi instrument</h3>
+  <dl>
+    <dt>Zakres</dt>
+    <dd>Pole <code>compare</code>, uzgadnianie dwóch kalendarzy sesji, korelacja / beta / iloraz.</dd>
+    <dt>Po co</dt>
+    <dd>Osobno, bo to nowa klasa problemów: dwa CFD mają różne godziny, więc „ta sama świeca" przestaje być oczywista.</dd>
+    <dt>Ukończone gdy</dt>
+    <dd>Reguła uzgadniania jest zapisana w spec i widoczna w odpowiedzi · brak pokrycia po jednej stronie nie produkuje cichego zera.</dd>
+    <dt>Rozmiar</dt>
+    <dd><span class="pill">M</span></dd>
+    <dt>OpenSpec</dt>
+    <dd><code>add-comparative-measures</code></dd>
+  </dl>
+</div>
+
+<h3>Zależności</h3>
+
+<pre><code>E0 ──▶ E1 ──▶ E2 ──▶ E3 ──▶ E4
+ │              │      │
+ │              └──────┴──▶ (potrzebują ATR z E1 do progów w jednostkach ATR)
+ │
+ ├──▶ E5   po E1 wystarczy — działa dla każdej warstwy, która już jest
+ └──▶ E6   po E1, niezależnie od E2–E4</code></pre>
+
+<p>Twarde blokady są dwie i obie w E0: <strong>cztery kształty wyjścia w modelu</strong> i <strong>katalog jako dane</strong>. Bez pierwszego E2 i E3 są zmianą łamiącą. Bez drugiego każdy kolejny wskaźnik dotyka terminala, i etap E1 rośnie z „napisać wzory" do „napisać wzory i sto razy zmienić UI".</p>
+
+<div class="callout warn">
+  <span class="tag">Kolejność jest do zamiany, ale nie dowolnie</span>
+  <p>Jeśli SMC jest tym, do czego to naprawdę służy, to <strong>E2 przed E1</strong> ma sens: punkty zwrotne, poziomy z wyższego interwału i ekstrema kroczące są warte więcej niż trzydzieści oscylatorów. Warunek: ATR i geometria świecy muszą wtedy zostać wyjęte z E1 i wciągnięte do E0, bo bez ATR-a tolerancje w E2 nie mają w czym być wyrażone.</p>
+</div>
+
+<h2>Co trzeba wiedzieć przed E0</h2>
+
+<p>Cztery pomiary. Wszystkie tanie, wszystkie zmieniają plan, jeśli wyjdą inaczej, niż zakładam.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pomiar</th><th>Zakładam</th><th>Co jeśli inaczej</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Czas liczenia: 5000 świec × 10 wskaźników</td>
+      <td>&lt; 50 ms</td>
+      <td>Powyżej ~300 ms wraca temat osobnego procesu albo <code>scipy.signal.lfilter</code> do filtrów rekurencyjnych.</td>
+    </tr>
+    <tr>
+      <td>Głębokość archiwum na parę i rozdzielczość</td>
+      <td>Wystarcza na rozgrzewkę większości pozycji</td>
+      <td>Jeśli nie — część wskaźników na DAY/WEEK będzie stale <code>settled: false</code> i trzeba zdecydować, czy je w ogóle oferować.</td>
+    </tr>
+    <tr>
+      <td>Rozmiar odpowiedzi po gzipie: 20 linii × 5000 punktów</td>
+      <td>Poniżej 200 kB</td>
+      <td>Powyżej — kodowanie liczb zamiast JSON-a albo dzielenie żądania. Nie optymalizować przed pomiarem.</td>
+    </tr>
+    <tr>
+      <td>Ile luk trzyświecowych na miesiącu danych wypada na granicy sesji</td>
+      <td>Kilka procent, ale regularnie</td>
+      <td>Jeśli to większość — filtr sesyjny wchodzi do E3 jako warunek konieczny, nie jako parametr z domyślną wartością.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Przyszły moduł strategii — czego od nas będzie chciał</h2>
+
+<p>Nie budujemy go teraz, ale trzy rzeczy trzeba przewidzieć, żeby później nie okazały się zmianą łamiącą.</p>
+
+<ul>
+  <li><strong>Identyfikatory są stabilne.</strong> <code>ema</code> zostaje <code>ema</code>. Strategia będzie się do nich odwoływać w konfiguracji, którą ktoś zapisze i uruchomi za pół roku.</li>
+  <li><strong>Uwierzytelnienie inne niż przeglądarki.</strong> Dziś <code>market-data</code> zna Easy Auth i bilet na strumień — obie ścieżki są pod przeglądarkę. Moduł strategii będzie wołał serwer z serwera. To jest do przewidzenia teraz i do rozwiązania później; wystarczy nie zamykać sobie drogi, zakładając w projekcie, że po drugiej stronie zawsze siedzi człowiek.</li>
+  <li><strong>Odpowiedź musi wystarczyć bez świec.</strong> Sprawdzian wyżej pokazuje, że wystarcza — pod warunkiem że <code>times</code> jedzie w odpowiedzi i że strategia może poprosić o kilka wskaźników naraz na wspólnej osi czasu. Obie rzeczy są w kontrakcie od E0.</li>
+</ul>
+
+<h2>Ryzyka planu</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Ryzyko</th><th>Objaw</th><th>Odpowiedź</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Rozlanie granicy</strong> — dołożenie „małego" werdyktu, bo akurat wygodnie</td>
+      <td>W katalogu pojawia się wpis z progiem, którego domyślna wartość pochodzi z kursu, a nie z pomiaru.</td>
+      <td>Test przy każdym wpisie: czy dwie osoby handlujące inaczej zgodziłyby się co do tej liczby. Zapisać go w <code>review.md</code> jako pozycję do sprawdzenia.</td>
+    </tr>
+    <tr>
+      <td><strong>Katalog rozjeżdża się z jądrem</strong></td>
+      <td>Wpis deklaruje linię, której obliczenie nie zwraca. Nic tego nie wykryje samo.</td>
+      <td>Jeden test, który liczy <em>każdy</em> wpis na krótkiej serii i porównuje klucze wyjścia z deklaracją. Do E0, nie później.</td>
+    </tr>
+    <tr>
+      <td><strong>Zmiana wzoru bez zmiany wersji</strong></td>
+      <td>Dwa wdrożenia rysują inny wykres z tych samych danych i nikt nie wie kiedy się to zaczęło.</td>
+      <td><code>algorithm_version</code> podnoszona w tym samym commicie co wzór; pliki wzorcowe pokazują diff, więc nie da się tego zrobić przypadkiem.</td>
+    </tr>
+    <tr>
+      <td><strong>Zakres E1 puchnie</strong></td>
+      <td>„Skoro już piszemy oscylatory, to dołóżmy jeszcze dwadzieścia."</td>
+      <td>E1 zamyka lista ustalona przy proposalu. Kolejne wskaźniki to osobne, tanie zmiany — właśnie po to katalog jest danymi.</td>
+    </tr>
+    <tr>
+      <td><strong>Terminal staje się wąskim gardłem</strong></td>
+      <td>Python gotowy, ale nic nie widać, bo brakuje prymitywu do rysowania.</td>
+      <td>W E2 i E3 prymityw terminala jest częścią zakresu etapu, a nie „integracją po".</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Pierwszy krok</h2>
+
+<p>Jedna zmiana OpenSpec, <code>add-indicator-contract</code>, obejmująca dokładnie E0. Do rozstrzygnięcia w niej trzy rzeczy i tylko one:</p>
+
+<ol>
+  <li><strong>Cztery kształty wyjścia</strong> — ich pola, i to, że wpis niesie zawsze dokładnie jeden.</li>
+  <li><strong>Katalog jako dane</strong> — co zawiera wpis, żeby terminal umiał zbudować z niego wybierak i wybrać sposób rysowania bez wiedzy o konkretnym wskaźniku.</li>
+  <li><strong>Sufit żądania</strong> — iloczyn świec i linii, powyżej którego moduł odmawia, i kształt tej odmowy.</li>
+</ol>
+
+<p>Reszta — który wskaźnik, w jakim etapie — jest już tania do zmiany. Te trzy nie są.</p>
+
+<footer>
+  Dokument planistyczny. Kiedy E0 zostanie zamknięte, prawdą o systemie staje się spec <code>market-data-indicators</code>, a ten plik zostaje tym, czym jest — zapisem, jak zamierzaliśmy to zrobić. Wtedy do <code>docs/archive/</code>.
+</footer>
+
+</main>
