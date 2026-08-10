@@ -139,6 +139,48 @@ class TestShiftDiff:
         assert result[2] == pytest.approx(15.0)
 
 
+class TestAlma:
+    def test_flat_series_returns_the_flat_value(self):
+        result = kernel.alma([5.0] * 6, 4, offset=0.85, sigma=6.0)
+        assert result[-1] == pytest.approx(5.0)
+        assert math.isnan(result[0])
+        assert math.isnan(result[2])
+        assert not math.isnan(result[3])
+
+    def test_weights_sum_to_one_on_a_ramp(self):
+        # A perfectly linear ramp: any weighted average of it lands back on the
+        # ramp's own value at the window's centre of mass, regardless of the
+        # weight shape, as long as the weights sum to one.
+        values = [1.0, 2.0, 3.0, 4.0, 5.0]
+        result = kernel.alma(values, 5, offset=0.5, sigma=6.0)
+        assert result[-1] == pytest.approx(3.0)
+
+
+class TestKama:
+    def test_nan_before_the_efficiency_ratios_first_window(self):
+        result = kernel.kama([1.0, 2.0, 3.0], 5, fast=2, slow=30)
+        assert all(math.isnan(v) for v in result)
+
+    def test_seeded_at_period_minus_one_then_never_nan(self):
+        values = [100.0, 101.0, 99.0, 102.0, 98.0, 103.0, 97.0, 104.0]
+        result = kernel.kama(values, 3, fast=2, slow=30)
+        assert math.isnan(result[1])
+        assert result[2] == pytest.approx(values[2])
+        assert not any(math.isnan(v) for v in result[2:])
+
+    def test_a_straight_trend_settles_at_the_steady_state_lag(self):
+        # Perfect efficiency (no chop) drives the smoothing constant to a fixed
+        # `fast_sc ** 2` every bar, so this is an ordinary fixed-alpha recursive
+        # filter fed a straight ramp — its steady-state lag behind the ramp has a
+        # closed form: `(1 - alpha) / alpha` per unit of slope.
+        values = [float(100 + i) for i in range(30)]
+        result = kernel.kama(values, 5, fast=2, slow=30)
+        fast_sc = 2.0 / 3.0
+        alpha = fast_sc**2
+        steady_state_lag = (1 - alpha) / alpha
+        assert result[-1] == pytest.approx(values[-1] - steady_state_lag, abs=0.05)
+
+
 class TestCross:
     def test_detects_upward_and_downward_crossings(self):
         a = [1.0, 2.0, 4.0, 3.0, 1.0]

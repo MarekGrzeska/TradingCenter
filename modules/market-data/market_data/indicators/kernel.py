@@ -262,6 +262,60 @@ def cross(a: FloatArray, b: FloatArray) -> np.ndarray:
     return out
 
 
+def alma(values: FloatArray, period: int, offset: float, sigma: float) -> np.ndarray:
+    """Arnaud Legoux moving average — `wma`'s sibling with a Gaussian weight over
+    the window instead of a linear ramp. `offset` in `[0, 1]` slides the bell's
+    peak from the window's oldest bar (`0`) to its current one (`1`); `sigma`
+    controls how wide the bell is. A finite window, same as `wma` — no recursion,
+    so no seed to warm up."""
+    arr = _as_float64(values)
+    out = np.full(arr.shape, np.nan, dtype=np.float64)
+    if period < 1 or len(arr) < period:
+        return out
+    m = offset * (period - 1)
+    s = period / sigma
+    j = np.arange(period, dtype=np.float64)
+    weights = np.exp(-((j - m) ** 2) / (2 * s * s))
+    windows = np.lib.stride_tricks.sliding_window_view(arr, period)
+    out[period - 1 :] = windows @ weights / weights.sum()
+    return out
+
+
+def kama(values: FloatArray, period: int, fast: int, slow: int) -> np.ndarray:
+    """Kaufman's adaptive moving average — a recursive filter whose smoothing
+    constant tightens toward `fast` while the market trends efficiently and
+    relaxes toward `slow` while it chops, unlike `ema`/`rma`'s fixed one.
+
+    Seeded at bar `period - 1` with that bar's own value, once the efficiency
+    ratio has its first `period`-bar window to read. `warmup.kama_warmup_bars`
+    bounds the seed's influence using `slow` alone: every bar's actual constant
+    is at least as fast-decaying as the slow one, since `fast_sc >= slow_sc` by
+    construction, so treating the whole filter as if it always used the slowest
+    case only ever overestimates how long the seed lingers.
+    """
+    arr = _as_float64(values)
+    n = len(arr)
+    out = np.full(n, np.nan, dtype=np.float64)
+    if period < 1 or n <= period:
+        return out
+
+    change = np.abs(arr[period:] - arr[:-period])
+    abs_diff = np.abs(np.diff(arr))
+    volatility = np.lib.stride_tricks.sliding_window_view(abs_diff, period).sum(axis=1)
+    with np.errstate(invalid="ignore", divide="ignore"):
+        efficiency_ratio = np.where(volatility != 0, change / volatility, 0.0)
+
+    fast_sc = 2.0 / (fast + 1)
+    slow_sc = 2.0 / (slow + 1)
+    smoothing = (efficiency_ratio * (fast_sc - slow_sc) + slow_sc) ** 2
+
+    out[period - 1] = arr[period - 1]
+    for offset_i in range(len(smoothing)):
+        i = period + offset_i
+        out[i] = out[i - 1] + smoothing[offset_i] * (arr[i] - out[i - 1])
+    return out
+
+
 def true_range(high: FloatArray, low: FloatArray, close: FloatArray) -> np.ndarray:
     """The greatest of today's range and today's move from yesterday's close.
 
