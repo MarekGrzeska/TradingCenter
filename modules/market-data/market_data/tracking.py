@@ -236,10 +236,11 @@ async def track(
             tracked = (await fetch_one(conn, _COUNT_TRACKED))["tracked"]
             if tracked >= limit:
                 raise LimitReached(
-                    f"already collecting {tracked} pairs, which is the configured ceiling "
-                    f"of {limit}. The gateway holds one provider connection per pair and the "
-                    f"provider limits how many a session may hold, so stop collecting a pair "
-                    f"or raise MAX_TRACKED_PAIRS deliberately."
+                    f"already collecting {tracked} (symbol, resolution) pairs, which is the "
+                    f"configured ceiling of {limit}. One instrument on several time frames "
+                    f"is several pairs. The gateway holds one provider connection per pair "
+                    f"and the provider limits how many a session may hold, so stop "
+                    f"collecting a pair or raise MAX_TRACKED_PAIRS deliberately."
                 )
 
         return _pair(await fetch_one(conn, _TRACK, symbol, resolution.value, resolved_from))

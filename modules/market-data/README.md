@@ -81,14 +81,15 @@ credential in the URL — is production's, selected by `DATABASE_USER` in
 | `AZURE_CLIENT_ID`, `AZURE_CLIENT_SECRET`, `AZURE_TENANT_ID` | unset | identity mode only, together or not at all — and unset even in Azure, where the App Service's own managed identity needs no configuration |
 | `BACKFILL_CONCURRENCY` | `1` | deep fills allowed to run at once |
 | `DEFAULT_BACKFILL_BARS` | `5000` | how far back a newly tracked pair reaches |
-| `MAX_TRACKED_PAIRS` | `20` | ceiling on archived (symbol, resolution) pairs |
+| `MAX_TRACKED_PAIRS` | `160` | ceiling on archived (symbol, resolution) pairs — 20 instruments across all eight resolutions |
 
 The last three are budgets rather than preferences, and each default is the cautious end. One
 deep fill is dozens of back-to-back requests through the gateway's shared rate gate, so two at
 once are enough to starve the chart an operator is looking at right now. The ceiling is real —
 the gateway holds one provider connection per `(symbol, resolution)` and the provider limits
 how many a session may hold — and the number is a budget to raise on evidence, not one to
-discover by having the feed die.
+discover by having the feed die. Read what it counts before setting it: an operator watching
+one instrument on every time frame spends eight of the budget, not one.
 
 ## Test
 

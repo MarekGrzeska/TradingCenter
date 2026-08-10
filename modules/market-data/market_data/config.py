@@ -79,10 +79,13 @@ class Settings(BaseSettings):
     default_backfill_bars: int = 5000
 
     # The gateway holds one provider connection per (symbol, resolution) and the provider
-    # limits how many a session may hold. The ceiling is therefore real, and the number
-    # below is deliberately conservative: it is a budget to raise on evidence, not a
-    # guess to discover by having the feed die.
-    max_tracked_pairs: int = 20
+    # limits how many a session may hold. The ceiling is therefore real, and it is a budget
+    # to raise on evidence, not a guess to discover by having the feed die.
+    #
+    # It counts pairs, not instruments — the earlier 20 read as "20 instruments" and was
+    # spent by three. One instrument watched across every `Resolution` is 8 pairs, so the
+    # number below is 20 instruments' worth of them.
+    max_tracked_pairs: int = 160
 
     # --- how a browser gets in ---
     #
