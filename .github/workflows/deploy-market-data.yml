@@ -74,6 +74,14 @@ jobs:
       # Sending no ticket is deliberate: the point is to reach the app, not to open a
       # stream, and an unauthenticated GET is the cheapest way to prove the process is
       # answering.
+      #
+      # This probe also carries the schema, which is not obvious from the path it calls.
+      # The module compares the database's revision with the one its image ships and
+      # refuses to start when they differ (`market_data/schema.py`), so a deploy landing
+      # on an unmigrated database has no container to answer this GET, and the loop below
+      # runs out and fails the job. That pairing is deliberate: probing a route that reads
+      # the schema directly is impossible from here, because Easy Auth answers 401 in
+      # front of every path but this one (infra/app-service.tf, `excluded_paths`).
       - name: Smoke-check the deployed module
         run: |
           set -euo pipefail
