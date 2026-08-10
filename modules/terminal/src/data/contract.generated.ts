@@ -205,7 +205,11 @@ export interface paths {
         get: operations["job_jobs__job_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Remove a job from the collection history
+         * @description Removes the job and every chunk it was planned into. **No candle is deleted**: the data this job collected, and the coverage that follows from it, stay in the archive — deleting a pair's data is `DELETE /pairs/{symbol}` and is a different operation. Refused with 409 while any chunk is still pending or running, since its result would be written against a job that no longer exists.
+         */
+        delete: operations["remove_jobs__job_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1002,7 +1006,7 @@ export interface operations {
                     "application/json": components["schemas"]["CandlesOut"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1268,6 +1272,53 @@ export interface operations {
             };
         };
     };
+    remove_jobs__job_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                job_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     retry_jobs__job_id__retry_post: {
         parameters: {
             query?: never;
@@ -1359,7 +1410,7 @@ export interface operations {
                     "application/json": components["schemas"]["TrackPairsResult"];
                 };
             };
-            /** @description Unprocessable Entity */
+            /** @description Unprocessable Content */
             422: {
                 headers: {
                     [name: string]: unknown;

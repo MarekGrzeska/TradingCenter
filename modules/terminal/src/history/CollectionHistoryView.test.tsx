@@ -13,8 +13,10 @@ class FakeArchive {
   deletions: PairDeletion[] = [];
   listFailure: Error | null = null;
   retryFailure: Error | null = null;
+  deleteFailure: Error | null = null;
   listCalls = 0;
   retryCalls: number[] = [];
+  deleteCalls: number[] = [];
 
   listJobs = async () => {
     this.listCalls++;
@@ -33,6 +35,13 @@ class FakeArchive {
     // The view never reads the returned Job — it always reloads from
     // `listJobs` afterwards, so a minimal stand-in is enough here.
     return { id: jobId, createdAt: 0, requestedFrom: 0, attempt: 2, status: "running", chunksDone: 0, chunksTotal: 0, candlesWritten: 0, lastActivityAt: 0, runningPair: null, chunks: [] };
+  };
+
+  deleteJob = async (jobId: number) => {
+    this.deleteCalls.push(jobId);
+    if (this.deleteFailure) throw this.deleteFailure;
+    // What the archive does: the entry goes, the candles it collected do not.
+    this.rows = this.rows.filter((row) => row.jobId !== jobId);
   };
 }
 
@@ -524,6 +533,100 @@ describe("CollectionHistoryView — the job dialog and retry", () => {
     expect(await within(dialog).findByText(/market-data is not reachable/i)).toBeInTheDocument();
     expect(screen.getByTestId("history-1-US100-MINUTE")).toBeInTheDocument();
     expect(screen.queryByText("running")).not.toBeInTheDocument();
+  });
+});
+
+describe("CollectionHistoryView — removing an entry from the history", () => {
+  it("removes the job's rows once the operator confirms", async () => {
+    const user = userEvent.setup();
+    fakeArchive.rows = [
+      row({ symbol: "US100", resolution: "MINUTE" }),
+      row({ symbol: "GOLD", resolution: "HOUR" }),
+      row({ jobId: 2, symbol: "US100", resolution: "HOUR" }),
+    ];
+    renderView();
+
+    await user.click(await screen.findByTestId("history-1-US100-MINUTE"));
+    await user.click(await screen.findByRole("button", { name: /remove from history/i }));
+    await user.click(await screen.findByRole("button", { name: /^remove$/i }));
+
+    expect(fakeArchive.deleteCalls).toEqual([1]);
+    await waitFor(() =>
+      expect(screen.queryByTestId("history-1-US100-MINUTE")).not.toBeInTheDocument(),
+    );
+    // Every pair of that job, not only the row it was opened from — and nothing else.
+    expect(screen.queryByTestId("history-1-GOLD-HOUR")).not.toBeInTheDocument();
+    expect(screen.getByTestId("history-2-US100-HOUR")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("says how much it covers and that the candles stay, before removing anything", async () => {
+    const user = userEvent.setup();
+    fakeArchive.rows = [
+      row({ symbol: "US100", resolution: "MINUTE" }),
+      row({ symbol: "GOLD", resolution: "HOUR" }),
+    ];
+    renderView();
+
+    await user.click(await screen.findByTestId("history-1-US100-MINUTE"));
+    await user.click(await screen.findByRole("button", { name: /remove from history/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByText(/2 pairs and 2 chunks/i)).toBeInTheDocument();
+    // The sentence that separates this from deleting a pair's data.
+    expect(within(dialog).getByText(/stay in the archive/i)).toBeInTheDocument();
+    expect(fakeArchive.deleteCalls).toHaveLength(0);
+  });
+
+  it("keeps removal off the pair's row, where it would promise less than it does", async () => {
+    fakeArchive.rows = [row()];
+    renderView();
+
+    const r = await screen.findByTestId("history-1-US100-MINUTE");
+    expect(within(r).queryByRole("button", { name: /remove/i })).not.toBeInTheDocument();
+  });
+
+  it("does not offer removal while the job is still running, and says why", async () => {
+    const user = userEvent.setup();
+    fakeArchive.rows = [row({ status: "running", chunksDone: 0, chunksTotal: 2 })];
+    renderView();
+
+    await user.click(await screen.findByTestId("history-1-US100-MINUTE"));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(
+      within(dialog).queryByRole("button", { name: /remove from history/i }),
+    ).not.toBeInTheDocument();
+    expect(within(dialog).getByText(/cannot be removed .* still running/i)).toBeInTheDocument();
+  });
+
+  it("keeps the rows and names the reason when the removal itself fails", async () => {
+    const user = userEvent.setup();
+    fakeArchive.rows = [row()];
+    fakeArchive.deleteFailure = new MarketDataError("upstream", "market-data is not reachable");
+    renderView();
+
+    await user.click(await screen.findByTestId("history-1-US100-MINUTE"));
+    await user.click(await screen.findByRole("button", { name: /remove from history/i }));
+    await user.click(await screen.findByRole("button", { name: /^remove$/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    expect(await within(dialog).findByText(/market-data is not reachable/i)).toBeInTheDocument();
+    expect(screen.getByTestId("history-1-US100-MINUTE")).toBeInTheDocument();
+  });
+
+  it("goes back to the job rather than closing everything when the question is declined", async () => {
+    const user = userEvent.setup();
+    fakeArchive.rows = [row()];
+    renderView();
+
+    await user.click(await screen.findByTestId("history-1-US100-MINUTE"));
+    await user.click(await screen.findByRole("button", { name: /remove from history/i }));
+    await user.click(await screen.findByRole("button", { name: /cancel/i }));
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /remove from history/i })).toBeInTheDocument();
+    expect(fakeArchive.deleteCalls).toHaveLength(0);
   });
 });
 

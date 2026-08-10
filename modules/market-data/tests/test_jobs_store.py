@@ -12,12 +12,15 @@ from datetime import UTC, datetime, timedelta
 import asyncpg
 import pytest
 
+from market_data.coverage import read_coverage, record_coverage
 from market_data.jobs.models import ChunkPlan, ChunkState, JobStatus, derive_status
 from market_data.jobs.store import (
+    JobStillRunning,
     NothingToRetry,
     UnknownJob,
     claim_pending_chunk,
     create_job,
+    delete_job,
     finish_chunk_done,
     finish_chunk_failed,
     finish_chunk_skipped,
@@ -27,7 +30,8 @@ from market_data.jobs.store import (
     retry_job,
     skip_chunks_beyond_history,
 )
-from market_data.models import Resolution
+from market_data.models import Candle, CandleSource, Resolution
+from market_data.store import read_candles, write_candles
 from market_data.tracking import track
 
 MOMENT = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
@@ -43,6 +47,20 @@ def plan(symbol: str = "US100", resolution: Resolution = Resolution.MINUTE, **ov
         **overrides,
     }
     return ChunkPlan(**values)
+
+
+def _candle(period_start: datetime, symbol: str = "US100") -> Candle:
+    return Candle(
+        symbol=symbol,
+        resolution=Resolution.MINUTE,
+        period_start=period_start,
+        open=100.0,
+        high=101.0,
+        low=99.0,
+        close=100.5,
+        volume=10.0,
+        source=CandleSource.HISTORY,
+    )
 
 
 async def _tracked(db: asyncpg.Connection, symbol: str = "US100", resolution: Resolution = Resolution.MINUTE):
@@ -490,3 +508,121 @@ async def test_a_stalled_job_reports_the_same_moment_on_every_read(
     second = (await read_job(db, job.id)).last_activity_at
 
     assert first == second
+
+
+# --- removing a job from the history ---------------------------------------------------
+
+
+@pytest.mark.db
+async def test_deleting_a_settled_job_takes_its_chunks_with_it(db: asyncpg.Connection) -> None:
+    await _tracked(db)
+    job = await create_job(db, MOMENT, [plan()])
+    claimed = await claim_pending_chunk(db)
+    await finish_chunk_done(db, claimed.id, written=120, requests=3)
+
+    await delete_job(db, job.id)
+
+    assert await read_job(db, job.id) is None
+    left = await db.fetchval(
+        "SELECT count(*) FROM collection_job_chunks WHERE job_id = $1", job.id
+    )
+    assert left == 0
+
+
+@pytest.mark.db
+async def test_deleting_a_job_with_a_pending_chunk_is_refused(db: asyncpg.Connection) -> None:
+    # `pending` is refused for the same reason `running` is: the runner claims it a
+    # moment later and writes its result against a job that would no longer exist.
+    await _tracked(db)
+    job = await create_job(db, MOMENT, [plan()])
+
+    with pytest.raises(JobStillRunning):
+        await delete_job(db, job.id)
+
+    reread = await read_job(db, job.id)
+    assert reread is not None
+    assert len(reread.chunks) == 1
+
+
+@pytest.mark.db
+async def test_deleting_a_job_with_a_running_chunk_is_refused(db: asyncpg.Connection) -> None:
+    await _tracked(db)
+    job = await create_job(db, MOMENT, [plan()])
+    await claim_pending_chunk(db)
+
+    with pytest.raises(JobStillRunning):
+        await delete_job(db, job.id)
+
+    assert (await read_job(db, job.id)) is not None
+
+
+@pytest.mark.db
+async def test_deleting_a_failed_job_is_allowed(db: asyncpg.Connection) -> None:
+    # Nothing is open, so nothing can be racing — a job worth removing is usually one
+    # that went wrong.
+    await _tracked(db)
+    job = await create_job(db, MOMENT, [plan()])
+    claimed = await claim_pending_chunk(db)
+    await finish_chunk_failed(db, claimed.id, failure="the gateway refused with 502", requests=1)
+
+    await delete_job(db, job.id)
+
+    assert await read_job(db, job.id) is None
+
+
+@pytest.mark.db
+async def test_deleting_an_unknown_job_is_refused_and_removes_nothing(
+    db: asyncpg.Connection,
+) -> None:
+    await _tracked(db)
+    job = await create_job(db, MOMENT, [plan()])
+
+    with pytest.raises(UnknownJob):
+        await delete_job(db, 999_999)
+
+    assert await read_job(db, job.id) is not None
+
+
+@pytest.mark.db
+async def test_deleting_one_job_leaves_the_pairs_other_jobs_alone(
+    db: asyncpg.Connection,
+) -> None:
+    await _tracked(db)
+    first = await create_job(db, MOMENT - timedelta(days=1), [plan()])
+    claimed = await claim_pending_chunk(db)
+    await finish_chunk_done(db, claimed.id, written=40, requests=1)
+    second = await create_job(db, MOMENT, [plan()])
+    running = await claim_pending_chunk(db)
+    await finish_chunk_failed(db, running.id, failure="nope", requests=1)
+
+    await delete_job(db, second.id)
+
+    kept = await read_job(db, first.id)
+    assert kept is not None
+    assert kept.status is JobStatus.SUCCEEDED
+    assert kept.candles_written == 40
+    assert [v.job_id for v in await list_jobs(db)] == [first.id]
+
+
+@pytest.mark.db
+async def test_deleting_a_job_leaves_its_candles_and_coverage_untouched(
+    db: asyncpg.Connection,
+) -> None:
+    """The whole point of the operation, in one assertion: history says what was done,
+    it does not hold the data, and removing the record MUST NOT undo the work."""
+    await _tracked(db)
+    job = await create_job(db, MOMENT, [plan()])
+    claimed = await claim_pending_chunk(db)
+    await write_candles(db, [_candle(MOMENT - timedelta(minutes=n)) for n in range(3)])
+    await record_coverage(db, "US100", Resolution.MINUTE, MOMENT - timedelta(days=1), MOMENT)
+    await finish_chunk_done(db, claimed.id, written=3, requests=1)
+
+    await delete_job(db, job.id)
+
+    # Half-open, like every range in this module — hence the minute past `MOMENT`.
+    kept = await read_candles(
+        db, "US100", Resolution.MINUTE, MOMENT - timedelta(days=1), MOMENT + timedelta(minutes=1)
+    )
+    assert len(kept) == 3
+    ranges = await read_coverage(db, "US100", Resolution.MINUTE)
+    assert [(r.range_start, r.range_end) for r in ranges] == [(MOMENT - timedelta(days=1), MOMENT)]

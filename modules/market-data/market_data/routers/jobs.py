@@ -22,8 +22,10 @@ from ..contract import (
 )
 from ..errors import GatewayRefused
 from ..jobs import (
+    JobStillRunning,
     NothingToRetry,
     UnknownJob,
+    delete_job,
     estimate_job,
     list_jobs,
     read_job,
@@ -109,6 +111,30 @@ async def job(job_id: int, db=Depends(pool)) -> JobOut:
     if found is None:
         raise HTTPException(status_code=404, detail=f"no collection job with id {job_id}")
     return JobOut.of(found)
+
+
+@router.delete(
+    "/jobs/{job_id}",
+    tags=["jobs"],
+    status_code=204,
+    responses={404: {"model": Problem}, 409: {"model": Problem}},
+    summary="Remove a job from the collection history",
+    description=(
+        "Removes the job and every chunk it was planned into. **No candle is deleted**: "
+        "the data this job collected, and the coverage that follows from it, stay in the "
+        "archive — deleting a pair's data is `DELETE /pairs/{symbol}` and is a different "
+        "operation. Refused with 409 while any chunk is still pending or running, since "
+        "its result would be written against a job that no longer exists."
+    ),
+)
+async def remove(job_id: int, db=Depends(pool)) -> None:
+    async with db.acquire() as conn:
+        try:
+            await delete_job(conn, job_id)
+        except UnknownJob as err:
+            raise HTTPException(status_code=404, detail=str(err)) from err
+        except JobStillRunning as err:
+            raise HTTPException(status_code=409, detail=str(err)) from err
 
 
 @router.post(

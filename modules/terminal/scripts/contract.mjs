@@ -38,6 +38,10 @@ function schemaJson() {
     return execFileSync("uv", ["run", "python", "-m", "market_data.openapi"], {
       cwd: marketData,
       encoding: "utf8",
+      // Windows pipes Python's stdout through the ANSI codepage unless told otherwise,
+      // which turned every em dash in a docstring into U+FFFD and made the committed
+      // file differ by encoding alone depending on who regenerated it.
+      env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
       maxBuffer: 32 * 1024 * 1024,
     });
   } catch (err) {
@@ -58,7 +62,15 @@ function generate() {
     const schema = join(scratch, "openapi.json");
     const emitted = join(scratch, "contract.ts");
     writeFileSync(schema, schemaJson());
-    execFileSync("npx", ["openapi-typescript", schema, "-o", emitted], {
+    // The generator's own JS, run by this node — not `npx`, and not the `.bin` shim.
+    // Both of those are `.cmd` files on Windows, which node refuses to spawn without a
+    // shell (since the 2024 argument-injection fix), so `pnpm contract:generate` failed
+    // there with `spawnSync npx ENOENT` while working everywhere else.
+    const manifest = fileURLToPath(import.meta.resolve("openapi-typescript/package.json"));
+    const cli = join(dirname(manifest), JSON.parse(readFileSync(manifest, "utf8")).bin[
+      "openapi-typescript"
+    ]);
+    execFileSync(process.execPath, [cli, schema, "-o", emitted], {
       cwd: terminal,
       encoding: "utf8",
       stdio: ["ignore", "ignore", "inherit"],

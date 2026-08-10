@@ -1167,6 +1167,55 @@ async def test_retrying_a_failed_job_resets_only_it_and_wakes_the_runner(api, po
     assert retried["chunk_start"] and retried["chunk_end"]
 
 
+async def test_removing_a_settled_job_from_the_history_is_204_and_it_is_gone(
+    api, pool
+) -> None:
+    job_id = await _deep_job(api)
+    async with pool.acquire() as conn:
+        total = await conn.fetchval(
+            "SELECT count(*) FROM collection_job_chunks WHERE job_id = $1", job_id
+        )
+    await _set_chunk_states(pool, job_id, *(["done"] * total))
+
+    response = await api.delete(f"/jobs/{job_id}")
+
+    assert response.status_code == 204
+    assert (await api.get(f"/jobs/{job_id}")).status_code == 404
+    assert job_id not in {row["job_id"] for row in (await api.get("/jobs")).json()}
+
+
+async def test_removing_a_job_with_work_still_open_is_409(api, pool) -> None:
+    job_id = await _deep_job(api)
+    # Straight from `/pairs`, so every chunk is still pending — the state a runner
+    # claims from, and the reason this is refused rather than raced.
+    response = await api.delete(f"/jobs/{job_id}")
+
+    assert response.status_code == 409
+    assert (await api.get(f"/jobs/{job_id}")).status_code == 200
+
+
+async def test_removing_an_unknown_job_is_404(api) -> None:
+    response = await api.delete("/jobs/999999")
+    assert response.status_code == 404
+
+
+async def test_removing_a_job_keeps_the_candles_it_collected(api, pool) -> None:
+    """The 204 says the history entry went; this says the archive did not."""
+    job_id = await _deep_job(api)
+    async with pool.acquire() as conn:
+        total = await conn.fetchval(
+            "SELECT count(*) FROM collection_job_chunks WHERE job_id = $1", job_id
+        )
+        await write_candles(conn, [candle(n) for n in range(3)])
+    await _set_chunk_states(pool, job_id, *(["done"] * total))
+
+    await api.delete(f"/jobs/{job_id}")
+
+    async with pool.acquire() as conn:
+        left = await conn.fetchval("SELECT count(*) FROM candles WHERE symbol = 'US100'")
+    assert left == 3
+
+
 # --- 8.8: the schema describes the HTTP contract and nothing else ---------------------
 
 

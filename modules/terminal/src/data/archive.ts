@@ -473,5 +473,11 @@ export function createArchiveSource(
       });
       return mapJob(raw);
     },
+
+    async deleteJob(jobId, signal): Promise<void> {
+      // 204, so `send` rather than `json` — there is no body, and asking for one
+      // would fail on the success path.
+      await http.send(`${httpBase}/jobs/${jobId}`, { signal, method: "DELETE" });
+    },
   };
 }

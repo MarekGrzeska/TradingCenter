@@ -762,6 +762,44 @@ describe("archive: collection jobs", () => {
 
     await expect(source().retryJob(999, signal())).rejects.toMatchObject({ kind: "not-found" });
   });
+
+  it("deletes a job with no body to read back", async () => {
+    // The archive answers 204, so asking for JSON here would fail on the success
+    // path — the one thing worth pinning about this call.
+    let method = "";
+    server.use(
+      http.delete(`${HTTP_BASE}/jobs/7`, ({ request }) => {
+        method = request.method;
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+
+    await expect(source().deleteJob(7, signal())).resolves.toBeUndefined();
+    expect(method).toBe("DELETE");
+  });
+
+  it("marks deleting a job that is still running as a refusal", async () => {
+    server.use(
+      http.delete(`${HTTP_BASE}/jobs/7`, () =>
+        HttpResponse.json(
+          { detail: "job 7 still has chunks pending or running" },
+          { status: 409 },
+        ),
+      ),
+    );
+
+    await expect(source().deleteJob(7, signal())).rejects.toMatchObject({ kind: "refused" });
+  });
+
+  it("marks deleting an unknown job as not-found", async () => {
+    server.use(
+      http.delete(`${HTTP_BASE}/jobs/999`, () =>
+        HttpResponse.json({ detail: "no collection job with id 999" }, { status: 404 }),
+      ),
+    );
+
+    await expect(source().deleteJob(999, signal())).rejects.toMatchObject({ kind: "not-found" });
+  });
 });
 
 /**
