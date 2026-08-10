@@ -11,7 +11,7 @@ import {
   indicatorResult,
   makeFakeChart,
 } from "./testDoubles";
-import type { Bar } from "../data/types";
+import type { Bar, IndicatorSelection } from "../data/types";
 import { readChartColors } from "./theme";
 
 const stub = createChartStub();
@@ -40,6 +40,8 @@ function renderChart(
     symbol: string;
     resolution: "MINUTE_5" | "HOUR";
     indicatorSource: FakeIndicatorSource;
+    initialIndicatorSelections: IndicatorSelection[];
+    onIndicatorSelectionsChange: (selections: IndicatorSelection[]) => void;
   }>,
 ) {
   const onResolutionChange = vi.fn();
@@ -50,6 +52,8 @@ function renderChart(
       symbol={props?.symbol ?? "US100"}
       resolution={props?.resolution ?? "MINUTE_5"}
       onResolutionChange={onResolutionChange}
+      initialIndicatorSelections={props?.initialIndicatorSelections}
+      onIndicatorSelectionsChange={props?.onIndicatorSelectionsChange}
     />,
   );
   return { ...view, onResolutionChange };
@@ -650,6 +654,73 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(lineSeries()[0].data()).toEqual([
       { time: 100, value: 10 },
       { time: 200, value: 20 },
+    ]);
+  });
+
+  it("restores a saved selection on mount, computes it without a click, and notifies every later change", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    const onIndicatorSelectionsChange = vi.fn();
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "ema", params: { period: 20 } }],
+      onIndicatorSelectionsChange,
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    expect(indicators.computeCalls[0]).toMatchObject({ specs: [{ id: "ema" }] });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    expect(await screen.findByRole("checkbox", { name: /^ema$/i })).toBeChecked();
+
+    // Toggling it off is a real change — the caller (the grid slot) hears
+    // about it so it can save the new, now-empty selection.
+    await userEvent.click(screen.getByRole("checkbox", { name: /^ema$/i }));
+    expect(onIndicatorSelectionsChange).toHaveBeenCalledWith([]);
+  });
+
+  it("skips a saved selection the catalogue no longer offers, and says so, without discarding it from the next save", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry({ id: "ema" })];
+    const onIndicatorSelectionsChange = vi.fn();
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { id: "retired_indicator", params: {} },
+        { id: "ema", params: { period: 20 } },
+      ],
+      onIndicatorSelectionsChange,
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    // Only the wskaźnik the catalogue still recognizes is ever asked for.
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    expect(indicators.computeCalls[0].specs).toEqual([{ id: "ema", params: { period: 20 } }]);
+
+    expect(await screen.findByText(/1 saved indicator unavailable/i)).toBeInTheDocument();
+
+    // An unrelated edit (toggling EMA off) must not silently drop the entry
+    // the catalogue does not recognize — nothing here decided it is gone for
+    // good, only that it cannot be drawn right now.
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+    expect(onIndicatorSelectionsChange).toHaveBeenLastCalledWith([
+      { id: "retired_indicator", params: {} },
     ]);
   });
 

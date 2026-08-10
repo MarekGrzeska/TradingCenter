@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
+import { FakeIndicatorSource, indicatorEntry } from "../chart/testDoubles";
 import { SocketHub, type SocketLike } from "../data/socketHub";
 import type { Resolution, TrackedPair } from "../data/types";
 
@@ -45,6 +46,7 @@ class FakeArchive {
 }
 
 let fakeArchive: FakeArchive;
+let fakeIndicators: FakeIndicatorSource | undefined;
 
 // A quiet candle source. The grid's job is layout and slot wiring, not data,
 // and a live source would push state updates into these tests at arbitrary
@@ -62,9 +64,12 @@ vi.mock("../data/marketData", () => ({
   get archive() {
     return fakeArchive;
   },
-  // Undefined, same as a caller passing no `indicatorSource` at all: the grid's
-  // own tests are about layout and slot wiring, not the indicator picker.
-  indicators: undefined,
+  // Undefined by default, same as a caller passing no `indicatorSource` at
+  // all — the grid's own tests are about layout and slot wiring, not the
+  // indicator picker, except the one that is.
+  get indicators() {
+    return fakeIndicators;
+  },
 }));
 
 const { GridView } = await import("./GridView");
@@ -121,6 +126,8 @@ beforeEach(() => {
     pair("SILVER", "MINUTE_5"),
     pair("TSLA", "MINUTE_5"),
   ];
+
+  fakeIndicators = undefined;
 });
 
 describe("GridView layout (terminal-grid spec)", () => {
@@ -219,6 +226,29 @@ describe("GridView layout (terminal-grid spec)", () => {
       ) as HTMLSelectElement;
       expect(select.options).toHaveLength(2);
     });
+  });
+
+  it("restores a slot's chosen wskaźniki across a remount, the same as its instrument", async () => {
+    fakeIndicators = new FakeIndicatorSource();
+    fakeIndicators.catalogueEntries = [indicatorEntry({ id: "ema" })];
+    const user = userEvent.setup();
+
+    const { unmount } = renderGrid();
+    const slot1 = within(screen.getByTestId("slot-s1"));
+    await user.click(await slot1.findByRole("button", { name: /indicators/i }));
+    await user.click(await slot1.findByRole("checkbox", { name: /^ema$/i }));
+
+    await waitFor(() =>
+      expect(gridStore.getSnapshot().slots.s1.indicators).toEqual([
+        { id: "ema", params: { period: 20 } },
+      ]),
+    );
+    unmount();
+
+    renderGrid();
+    const remountedSlot1 = within(screen.getByTestId("slot-s1"));
+    await user.click(await remountedSlot1.findByRole("button", { name: /indicators/i }));
+    expect(await remountedSlot1.findByRole("checkbox", { name: /^ema$/i })).toBeChecked();
   });
 });
 

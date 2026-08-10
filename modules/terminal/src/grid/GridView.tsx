@@ -160,6 +160,8 @@ function Slot({
           resolution={slot.resolution}
           resolutions={allowedResolutions}
           onResolutionChange={(resolution) => gridStore.setSlotResolution(slotId, resolution)}
+          initialIndicatorSelections={slot.indicators}
+          onIndicatorSelectionsChange={(next) => gridStore.setSlotIndicators(slotId, next)}
           headerLeft={
             <SymbolField
               label={`Symbol for slot ${slotId}`}

@@ -58,6 +58,14 @@ export interface ChartProps {
    *  behind it. Omitted, the chart draws candles exactly as before — a caller
    *  with nowhere to compute wskaźniki simply does not offer them. */
   indicatorSource?: IndicatorSource;
+  /** What the operator had selected when this chart last mounted — omitted, it
+   *  starts with none. Read once, not kept in sync afterward: a caller that
+   *  persists selections (the grid slot) restores from here and is notified of
+   *  every change via `onIndicatorSelectionsChange`, the same way it owns
+   *  `resolution` — but as an initial value rather than a controlled one, since
+   *  nothing here needs the reverse (an external reset mid-session). */
+  initialIndicatorSelections?: IndicatorSelection[];
+  onIndicatorSelectionsChange?(selections: IndicatorSelection[]): void;
 }
 
 /** Price-pane overlays and own-pane oscillators both draw today — only the
@@ -115,6 +123,8 @@ export function Chart({
   headerLeft,
   resolutions = RESOLUTIONS,
   indicatorSource,
+  initialIndicatorSelections,
+  onIndicatorSelectionsChange,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -154,23 +164,54 @@ export function Chart({
   const latestFrameRef = useRef(0);
 
   // --- wskaźniki: chosen by the operator, computed over whatever the chart draws ---
-  const [indicatorSelections, setIndicatorSelections] = useState<IndicatorSelection[]>([]);
+  const [indicatorSelections, setIndicatorSelectionsState] = useState<IndicatorSelection[]>(
+    () => initialIndicatorSelections ?? [],
+  );
+  // A ref, not a dependency: notifying the caller must not itself be a reason
+  // to redo anything below, only a side effect of the operator's own action.
+  const onIndicatorSelectionsChangeRef = useRef(onIndicatorSelectionsChange);
+  onIndicatorSelectionsChangeRef.current = onIndicatorSelectionsChange;
+  const setIndicatorSelections = useCallback((next: IndicatorSelection[]) => {
+    setIndicatorSelectionsState(next);
+    onIndicatorSelectionsChangeRef.current?.(next);
+  }, []);
   // The range wskaźniki are computed over — set from what `redraw` actually drew, not
   // from every live tick, so a wskaźnik does not refetch on each forming-candle update
   // (design.md's "na żywo" is a later etap; see `useIndicators`).
   const [barsRange, setBarsRange] = useState<BarsRange | null>(null);
 
   const catalogue = useIndicatorCatalogue(indicatorSource);
+  const catalogueById = useMemo(
+    () => new Map(catalogue.entries.map((entry) => [entry.id, entry] as const)),
+    [catalogue.entries],
+  );
+  // A selection restored from a saved slot may name a wskaźnik the catalogue no
+  // longer offers (a removed entry, or storage from a build that had a
+  // different one). Dropped from what actually computes and draws — surfaced
+  // in the header instead — but never rewritten in the caller's storage on its
+  // own: only an explicit change through the picker does that (terminal-grid
+  // spec, "wpis nieznany katalogowi pomijany z komunikatem"). Skipped entirely
+  // while the catalogue is still loading or failed to load, so a slow or
+  // flaky read never reads as "the archive removed everything".
+  const { knownIndicatorSelections, unknownIndicatorIds } = useMemo(() => {
+    if (catalogue.status !== "ready") {
+      return { knownIndicatorSelections: indicatorSelections, unknownIndicatorIds: [] as string[] };
+    }
+    const known: IndicatorSelection[] = [];
+    const unknown: string[] = [];
+    for (const selection of indicatorSelections) {
+      if (catalogueById.has(selection.id)) known.push(selection);
+      else unknown.push(selection.id);
+    }
+    return { knownIndicatorSelections: known, unknownIndicatorIds: unknown };
+  }, [indicatorSelections, catalogue.status, catalogueById]);
+
   const indicatorsState = useIndicators(
     indicatorSource,
     symbol,
     resolution,
-    indicatorSelections,
+    knownIndicatorSelections,
     barsRange,
-  );
-  const catalogueById = useMemo(
-    () => new Map(catalogue.entries.map((entry) => [entry.id, entry] as const)),
-    [catalogue.entries],
   );
 
   // --- the chart instance itself: created once, never on data change ---
@@ -644,10 +685,26 @@ export function Chart({
           {indicatorSource && (
             <IndicatorPicker
               entries={catalogue.entries}
-              selections={indicatorSelections}
-              onChange={setIndicatorSelections}
+              selections={knownIndicatorSelections}
+              onChange={(next) => {
+                // An unknown selection is never touched by an edit to a known
+                // one — only a change that names it (impossible: it has no
+                // checkbox) or a later catalogue read that recognizes it again
+                // moves it out of this list.
+                const stillUnknown = indicatorSelections.filter((s) => !catalogueById.has(s.id));
+                setIndicatorSelections([...stillUnknown, ...next]);
+              }}
               canDraw={canDrawIndicator}
             />
+          )}
+          {unknownIndicatorIds.length > 0 && (
+            <span
+              title={`No longer offered by the indicator catalogue: ${unknownIndicatorIds.join(", ")}`}
+              className="rounded border border-warning/40 px-1.5 py-0.5 text-[10px] tracking-wide text-warning uppercase"
+            >
+              {unknownIndicatorIds.length} saved {unknownIndicatorIds.length === 1 ? "indicator" : "indicators"}{" "}
+              unavailable
+            </span>
           )}
           {unsettledIndicators.length > 0 && (
             <span
