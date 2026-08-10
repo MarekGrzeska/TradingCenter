@@ -631,6 +631,11 @@ export interface components {
         /** IndicatorLevelOut */
         IndicatorLevelOut: {
             /**
+             * Count
+             * @description how many extrema support this level; null for a level that carries no weight, e.g. a pivot or a previous-period edge
+             */
+            count: number | null;
+            /**
              * From
              * Format: date-time
              */
