@@ -106,13 +106,13 @@
 
 ## 7. terminal: „od kiedy faktycznie zebrano" bez nowego pola na wire
 
-- [ ] 7.1 W historii zbierania wyliczyć zakres faktycznie objęty z kawałków, które już
+- [x] 7.1 W historii zbierania wyliczyć zakres faktycznie objęty z kawałków, które już
   przychodzą (`chunks`): najstarszy `chunk_start` wśród tych w stanie `done`.
-- [ ] 7.2 Pokazać go obok daty, o którą poproszono, żeby wiersz „0 świec" dał się odróżnić
+- [x] 7.2 Pokazać go obok daty, o którą poproszono, żeby wiersz „0 świec" dał się odróżnić
   od awarii.
-- [ ] 7.3 Test komponentu na obu przypadkach: zebrano płycej, niż proszono, i zebrano
+- [x] 7.3 Test komponentu na obu przypadkach: zebrano płycej, niż proszono, i zebrano
   wszystko.
-- [ ] 7.4 `pnpm test`, `pnpm lint`, `pnpm typecheck`. `pnpm contract:generate` nie jest
+- [x] 7.4 `pnpm test`, `pnpm lint`, `pnpm typecheck`. `pnpm contract:generate` nie jest
   potrzebne — kontrakt `market-data` się nie zmienia; potwierdzić przez `pnpm contract:check`.
 
 ## 8. Domknięcie

@@ -202,6 +202,68 @@ describe("CollectionHistoryView — rows (terminal-collection-history spec)", ()
     expect(within(r).getByText(/25% \(2\/8 chunks\)/)).toBeInTheDocument();
     expect(within(r).getByText(/4,000 candles so far/)).toBeInTheDocument();
   });
+
+  it("says how far back the work actually got when it fell short of the range asked for", async () => {
+    // The provider turned out to have nothing below the second chunk, so the older ones
+    // were skipped. "2024 → today, 0 candles" reads as a failure and is a correct answer.
+    fakeArchive.rows = [
+      row({
+        candlesWritten: 500,
+        chunksDone: 1,
+        chunksTotal: 2,
+        chunks: [
+          chunk({ id: 1, state: "done", chunkStart: 1785542400, chunkEnd: 1785600000 }),
+          chunk({ id: 2, state: "skipped", chunkStart: 1700000000, chunkEnd: 1785542400 }),
+        ],
+      }),
+    ];
+    renderView();
+
+    const r = await screen.findByTestId("history-1-US100-MINUTE");
+    expect(within(r).getByText(/collected from/)).toBeInTheDocument();
+  });
+
+  it("says nothing was reachable when every chunk was skipped", async () => {
+    fakeArchive.rows = [
+      row({
+        candlesWritten: 0,
+        chunksDone: 1,
+        chunksTotal: 1,
+        chunks: [chunk({ state: "skipped" })],
+      }),
+    ];
+    renderView();
+
+    const r = await screen.findByTestId("history-1-US100-MINUTE");
+    expect(within(r).getByText(/nothing in this range to collect/)).toBeInTheDocument();
+  });
+
+  it("stays quiet when the work covered everything it was asked for", async () => {
+    fakeArchive.rows = [row()];
+    renderView();
+
+    const r = await screen.findByTestId("history-1-US100-MINUTE");
+    expect(within(r).queryByText(/collected from/)).not.toBeInTheDocument();
+    expect(within(r).queryByText(/nothing in this range/)).not.toBeInTheDocument();
+  });
+
+  it("does not call a job shallow while its older chunks are still queued", async () => {
+    fakeArchive.rows = [
+      row({
+        status: "running",
+        chunksDone: 1,
+        chunksTotal: 2,
+        chunks: [
+          chunk({ id: 1, state: "done", chunkStart: 1785542400, chunkEnd: 1785600000 }),
+          chunk({ id: 2, state: "pending", chunkStart: 1700000000, chunkEnd: 1785542400 }),
+        ],
+      }),
+    ];
+    renderView();
+
+    const r = await screen.findByTestId("history-1-US100-MINUTE");
+    expect(within(r).queryByText(/collected from/)).not.toBeInTheDocument();
+  });
 });
 
 describe("CollectionHistoryView — deletions (delete-archived-pair-data)", () => {
