@@ -122,7 +122,7 @@ resource "azurerm_monitor_metric_alert" "plan_memory" {
   name                = "alert-plan-memory-high"
   resource_group_name = azurerm_resource_group.main.name
   scopes              = [azurerm_service_plan.main.id]
-  description         = "The B1 plan both apps share is over 85% memory."
+  description         = "The B1 plan both apps share is over 92% memory."
   severity            = 2
   frequency           = "PT5M"
   window_size         = "PT15M"
@@ -132,7 +132,7 @@ resource "azurerm_monitor_metric_alert" "plan_memory" {
     metric_name      = "MemoryPercentage"
     aggregation      = "Average"
     operator         = "GreaterThan"
-    threshold        = 85
+    threshold        = 92
   }
 
   action {
