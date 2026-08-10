@@ -4,9 +4,11 @@ import {
   ColorType,
   CrosshairMode,
   createChart,
+  createSeriesMarkers,
   type CandlestickData,
   type HistogramData,
   HistogramSeries,
+  type ISeriesMarkersPluginApi,
   type LineData,
   LineSeries,
   LineStyle,
@@ -16,6 +18,7 @@ import {
   type ISeriesApi,
   type LogicalRange,
   type MouseEventParams,
+  type SeriesMarker,
   type Time,
   type TickMarkType,
   type UTCTimestamp,
@@ -37,6 +40,7 @@ import { candlestickColors, indicatorLineColor, readChartColors, type ChartColor
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
 import { type BarsRange, type IndicatorsState, useIndicators } from "./indicators/useIndicators";
 import { useIndicatorCatalogue } from "./indicators/useIndicatorCatalogue";
+import { RayPrimitive } from "./RayPrimitive";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
 
@@ -68,13 +72,22 @@ export interface ChartProps {
   onIndicatorSelectionsChange?(selections: IndicatorSelection[]): void;
 }
 
-/** Price-pane overlays and own-pane oscillators both draw today — only the
- *  three later output shapes (markers, zones, levels) do not yet have a
- *  primitive to draw with (E2-E4). Kept as a predicate rather than a filter on
- *  the catalogue itself: the picker still lists every wskaźnik the archive
- *  offers, this only decides which of them the operator may currently pick. */
+/** Price-pane overlays, own-pane oscillators, price-pane markers and
+ *  price-pane levels all draw today — only `zones` has no primitive yet (E3).
+ *  Markers and levels are price-pane only so far because every entry the
+ *  catalogue offers in those shapes (`swing_points`, `htf_levels_*`,
+ *  `pivots_*`, `level_clusters`) draws on the candles, not in a pane of its
+ *  own. Kept as a predicate rather than a filter on the catalogue itself: the
+ *  picker still lists every wskaźnik the archive offers, this only decides
+ *  which of them the operator may currently pick. */
 function canDrawIndicator(entry: IndicatorCatalogueEntry): boolean {
-  return (entry.render.pane === "price" || entry.render.pane === "own") && entry.output === "lines";
+  if (entry.output === "lines") {
+    return entry.render.pane === "price" || entry.render.pane === "own";
+  }
+  if (entry.output === "markers" || entry.output === "levels") {
+    return entry.render.pane === "price";
+  }
+  return false;
 }
 
 /** The price pane's own stretch factor, set once at chart creation so an
@@ -153,6 +166,14 @@ export function Chart({
   const levelLinesRef = useRef<
     Map<string, { series: ISeriesApi<"Line"> | ISeriesApi<"Histogram">; lines: IPriceLine[] }>
   >(new Map());
+  // One `createSeriesMarkers` plugin per (wskaźnik, params) whose output is
+  // `markers` — `swing_points`, so far — attached to the price series, since
+  // `canDrawIndicator` only offers markers/levels entries drawn on it.
+  const markerPluginsRef = useRef<Map<string, ISeriesMarkersPluginApi<Time>>>(new Map());
+  // One `RayPrimitive` per (wskaźnik, params) whose output is `levels` —
+  // `htf_levels_*`, `pivots_*`, `level_clusters` — replacing its levels
+  // wholesale on every recompute rather than being torn down and rebuilt.
+  const rayPrimitivesRef = useRef<Map<string, RayPrimitive>>(new Map());
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -295,6 +316,8 @@ export function Chart({
     const indicatorSeries = indicatorSeriesRef.current;
     const ownPanes = ownPanesRef.current;
     const levelLines = levelLinesRef.current;
+    const markerPlugins = markerPluginsRef.current;
+    const rayPrimitives = rayPrimitivesRef.current;
     return () => {
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
@@ -303,12 +326,15 @@ export function Chart({
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
       priceLineRef.current = null;
-      // Every wskaźnik series, pane and reference level belonged to it too —
-      // `chart.remove()` already freed them, this only stops the sync effect
-      // below from reaching for one that is gone.
+      // Every wskaźnik series, pane, reference level, marker plugin and ray
+      // primitive belonged to it too — `chart.remove()` already freed them,
+      // this only stops the sync effect below from reaching for one that is
+      // gone.
       indicatorSeries.clear();
       ownPanes.clear();
       levelLines.clear();
+      markerPlugins.clear();
+      rayPrimitives.clear();
     };
   }, []);
 
@@ -534,10 +560,64 @@ export function Chart({
 
     for (const result of indicatorsState.results) {
       const entry = catalogueById.get(result.id);
-      if (!entry || !result.lines || !canDrawIndicator(entry)) continue;
+      if (!entry || !canDrawIndicator(entry)) continue;
 
       const paramsKey = entry.params.map((p) => result.params[p.name]).join(",");
       const ownPaneKey = `${result.id}|${paramsKey}`;
+
+      if (entry.output === "markers") {
+        if (!result.markers) continue;
+        activeResults.add(ownPaneKey);
+        const priceSeries = seriesRef.current;
+        if (!priceSeries) continue;
+        const color = indicatorLineColor(colors, colorIndex++);
+        const markers: SeriesMarker<Time>[] = result.markers.map((point) =>
+          point.price === null
+            ? { time: point.time as UTCTimestamp, position: "inBar", shape: "circle", color, text: point.label }
+            : {
+                time: point.time as UTCTimestamp,
+                position: "atPriceMiddle",
+                price: point.price,
+                shape: "circle",
+                color,
+                text: point.label,
+              },
+        );
+        let plugin = markerPluginsRef.current.get(ownPaneKey);
+        if (!plugin) {
+          plugin = createSeriesMarkers(priceSeries, []);
+          markerPluginsRef.current.set(ownPaneKey, plugin);
+        }
+        plugin.setMarkers(markers);
+        continue;
+      }
+
+      if (entry.output === "levels") {
+        if (!result.levels) continue;
+        activeResults.add(ownPaneKey);
+        const priceSeries = seriesRef.current;
+        if (!priceSeries) continue;
+        const color = indicatorLineColor(colors, colorIndex++);
+        let ray = rayPrimitivesRef.current.get(ownPaneKey);
+        if (!ray) {
+          ray = new RayPrimitive(color);
+          priceSeries.attachPrimitive(ray);
+          rayPrimitivesRef.current.set(ownPaneKey, ray);
+        }
+        ray.setColor(color);
+        ray.setLevels(
+          result.levels.map((level) => ({
+            time: level.from as UTCTimestamp,
+            price: level.price,
+            label: level.label,
+          })),
+        );
+        continue;
+      }
+
+      // entry.output === "lines" from here on — `canDrawIndicator` refuses
+      // every other combination.
+      if (!result.lines) continue;
       activeResults.add(ownPaneKey);
 
       let paneIndex: number | undefined;
@@ -657,6 +737,18 @@ export function Chart({
       if (activeResults.has(key)) continue;
       for (const priceLine of lines) series.removePriceLine(priceLine);
       levelLinesRef.current.delete(key);
+    }
+
+    for (const [key, plugin] of markerPluginsRef.current) {
+      if (activeResults.has(key)) continue;
+      plugin.detach();
+      markerPluginsRef.current.delete(key);
+    }
+
+    for (const [key, ray] of rayPrimitivesRef.current) {
+      if (activeResults.has(key)) continue;
+      seriesRef.current?.detachPrimitive(ray);
+      rayPrimitivesRef.current.delete(key);
     }
   }, [indicatorsState.results, indicatorsState.times, catalogueById]);
 

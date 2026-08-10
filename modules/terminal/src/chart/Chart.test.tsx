@@ -1,12 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { FakeSeries } from "./testDoubles";
 import {
   ControllableSource,
   FakeIndicatorSource,
   bar,
   createChartStub,
   fakeChartApi,
+  fakeCreateSeriesMarkers,
   indicatorEntry,
   indicatorResult,
   makeFakeChart,
@@ -30,6 +32,8 @@ vi.mock("lightweight-charts", () => ({
     stub.charts.push(chart);
     return fakeChartApi(chart);
   },
+  createSeriesMarkers: (series: FakeSeries, markers: unknown[] = []) =>
+    fakeCreateSeriesMarkers(series, markers),
 }));
 
 const { Chart } = await import("./Chart");
@@ -1155,18 +1159,18 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
       indicatorEntry({
-        id: "swing_points",
-        name: "Swing Points",
-        // markers/zones/levels have no drawing primitive until E2-E4 — a
-        // price- or own-pane "lines" entry (atr, rsi, …) is drawable from E1.
-        output: "markers",
+        id: "range_gap",
+        name: "Range Gap",
+        // `zones` has no drawing primitive until E3 — markers and levels
+        // (price-pane) became drawable in E2, alongside price/own "lines".
+        output: "zones",
       }),
     ];
     renderChart(source, { indicatorSource: indicators });
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
 
-    expect(await screen.findByRole("checkbox", { name: /^swing_points$/i })).toBeDisabled();
+    expect(await screen.findByRole("checkbox", { name: /^range_gap$/i })).toBeDisabled();
   });
 
   it("makes an own-pane wskaźnik (RSI, ATR, …) selectable and drawable, not just price-pane overlays", async () => {
@@ -1185,5 +1189,233 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
 
     expect(await screen.findByRole("checkbox", { name: /^atr$/i })).not.toBeDisabled();
+  });
+});
+
+describe("Chart — wskaźniki markers (terminal-chart spec, task 3.8)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const swingPointsEntry = indicatorEntry({
+    id: "swing_points",
+    name: "Swing Points",
+    output: "markers",
+    params: [{ name: "n", type: "int", default: 2, min: 1, max: 50 }],
+    lines: [],
+    render: { pane: "price", style: "dots", scale: "price", autoscale: true, range: null, levels: [] },
+  });
+
+  it("draws a markers-output wskaźnik through createSeriesMarkers on the price series", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [swingPointsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({
+            id: "swing_points",
+            params: { n: 2 },
+            lines: null,
+            markers: [{ time: 100, label: "Swing High", price: 105 }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "swing_points", params: { n: 2 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    await waitFor(() => expect(priceSeries().markerPlugins).toHaveLength(1));
+
+    const [plugin] = priceSeries().markerPlugins;
+    expect(plugin.markers).toEqual([
+      expect.objectContaining({ time: 100, price: 105, text: "Swing High" }),
+    ]);
+    expect(plugin.detached).toBe(false);
+  });
+
+  it("stops drawing the markers once the wskaźnik is deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [swingPointsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "swing_points",
+            params: { n: 2 },
+            lines: null,
+            markers: [{ time: 100, label: "Swing High", price: 105 }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "swing_points", params: { n: 2 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().markerPlugins).toHaveLength(1));
+    const [plugin] = priceSeries().markerPlugins;
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^swing_points$/i }));
+
+    await waitFor(() => expect(plugin.detached).toBe(true));
+  });
+});
+
+describe("Chart — wskaźniki levels / ray primitive (terminal-chart spec, task 3.9)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const htfLevelsEntry = indicatorEntry({
+    id: "htf_levels_day",
+    name: "Previous Day Levels",
+    output: "levels",
+    params: [],
+    lines: [],
+    render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
+  });
+
+  it("attaches one ray primitive per (wskaźnik, params), not one per level", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [htfLevelsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "htf_levels_day",
+            params: {},
+            lines: null,
+            levels: [
+              { from: 100, price: 110, label: "PD High", count: null },
+              { from: 100, price: 95, label: "PD Low", count: null },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "htf_levels_day", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("updates the same primitive's levels on recompute instead of attaching a new one", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [htfLevelsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "htf_levels_day",
+            params: {},
+            lines: null,
+            levels: [{ from: 100, price: 110, label: "PD High", count: null }],
+          }),
+        ],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({
+            id: "htf_levels_day",
+            params: {},
+            lines: null,
+            levels: [{ from: 200, price: 130, label: "PD High", count: null }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "htf_levels_day", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(2));
+
+    // Still exactly one primitive on the series — the second recompute updated
+    // it in place rather than attaching a second one alongside the first.
+    expect(priceSeries().primitives).toHaveLength(1);
+  });
+
+  it("detaches the ray primitive once the wskaźnik is deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [htfLevelsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "htf_levels_day",
+            params: {},
+            lines: null,
+            levels: [{ from: 100, price: 110, label: "PD High", count: null }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "htf_levels_day", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^htf_levels_day$/i }));
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
   });
 });

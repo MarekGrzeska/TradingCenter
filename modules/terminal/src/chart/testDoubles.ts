@@ -87,6 +87,17 @@ export interface FakePriceLine {
   applyOptions(options: Record<string, unknown>): void;
 }
 
+/** What `createSeriesMarkers(series, …)` hands back — task 3.8. One per series;
+ *  `Chart.tsx` keeps its own map from (wskaźnik, params) to the plugin instead
+ *  of asking the series for it, so this only needs to record the last call. */
+export interface FakeMarkerPlugin {
+  series: FakeSeries;
+  markers: unknown[];
+  detached: boolean;
+  setMarkers(markers: unknown[]): void;
+  detach(): void;
+}
+
 export interface FakeSeries {
   /** `"Candlestick"`, `"Line"` or `"Histogram"` — read off the series-definition
    *  object the mocked `lightweight-charts` module exports, the same way the
@@ -112,6 +123,15 @@ export interface FakeSeries {
   removePriceLine(line: FakePriceLine): void;
   /** The one price line still on the series, if any. */
   priceLine(): FakePriceLine | undefined;
+  /** Task 3.9's ray primitive attaches here — `RayPrimitive` itself is the real
+   *  class, never mocked, so this only has to record what got attached. */
+  primitives: unknown[];
+  attachPrimitive(primitive: unknown): void;
+  detachPrimitive(primitive: unknown): void;
+  /** Every `createSeriesMarkers(series, …)` call made against this series —
+   *  `Chart.tsx` keeps at most one live per (wskaźnik, params), so a test
+   *  reads the last one to see what is actually still on screen. */
+  markerPlugins: FakeMarkerPlugin[];
 }
 
 export function createChartStub(): ChartStub {
@@ -272,7 +292,35 @@ export function makeFakeSeries(
     priceLine() {
       return this.priceLines.find((line) => !line.removed);
     },
+    primitives: [],
+    attachPrimitive(primitive) {
+      this.primitives.push(primitive);
+    },
+    detachPrimitive(primitive) {
+      this.primitives = this.primitives.filter((existing) => existing !== primitive);
+    },
+    markerPlugins: [],
   };
+}
+
+/** The mocked module's `createSeriesMarkers` — one `FakeMarkerPlugin` per call,
+ *  the same "new object each time, `Chart.tsx` keeps the reference" shape the
+ *  real plugin API has. Recorded on the series too, so a test can find it
+ *  without `Chart.tsx` having to hand the reference back. */
+export function fakeCreateSeriesMarkers(series: FakeSeries, markers: unknown[] = []): FakeMarkerPlugin {
+  const plugin: FakeMarkerPlugin = {
+    series,
+    markers: [...markers],
+    detached: false,
+    setMarkers(next) {
+      this.markers = [...next];
+    },
+    detach() {
+      this.detached = true;
+    },
+  };
+  series.markerPlugins.push(plugin);
+  return plugin;
 }
 
 /**
