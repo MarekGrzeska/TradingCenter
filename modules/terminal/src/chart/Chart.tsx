@@ -41,8 +41,10 @@ import { IndicatorPicker } from "./indicators/IndicatorPicker";
 import { type BarsRange, type IndicatorsState, useIndicators } from "./indicators/useIndicators";
 import { useIndicatorCatalogue } from "./indicators/useIndicatorCatalogue";
 import { RayPrimitive } from "./RayPrimitive";
+import { TimeProfilePrimitive, type ProfileBar } from "./TimeProfilePrimitive";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
+import { ZonePrimitive, type DrawnZone } from "./ZonePrimitive";
 
 export interface ChartProps {
   source: MarketDataSource;
@@ -72,19 +74,21 @@ export interface ChartProps {
   onIndicatorSelectionsChange?(selections: IndicatorSelection[]): void;
 }
 
-/** Price-pane overlays, own-pane oscillators, price-pane markers and
- *  price-pane levels all draw today — only `zones` has no primitive yet (E3).
- *  Markers and levels are price-pane only so far because every entry the
- *  catalogue offers in those shapes (`swing_points`, `htf_levels_*`,
- *  `pivots_*`, `level_clusters`) draws on the candles, not in a pane of its
- *  own. Kept as a predicate rather than a filter on the catalogue itself: the
+/** Price-pane overlays, own-pane oscillators, price-pane markers, price-pane
+ *  levels and price-pane zones all draw today. Every one of them is
+ *  price-pane only because every entry the catalogue offers in those shapes
+ *  draws on the candles, not in a pane of its own — `render.style ===
+ *  "histogram"` on a `levels` entry (`time_profile`) still routes to
+ *  `TimeProfilePrimitive` rather than `RayPrimitive` further down, but it is
+ *  a *drawing* choice, not a *drawable* one, so it does not belong here.
+ *  Kept as a predicate rather than a filter on the catalogue itself: the
  *  picker still lists every wskaźnik the archive offers, this only decides
  *  which of them the operator may currently pick. */
 function canDrawIndicator(entry: IndicatorCatalogueEntry): boolean {
   if (entry.output === "lines") {
     return entry.render.pane === "price" || entry.render.pane === "own";
   }
-  if (entry.output === "markers" || entry.output === "levels") {
+  if (entry.output === "markers" || entry.output === "levels" || entry.output === "zones") {
     return entry.render.pane === "price";
   }
   return false;
@@ -170,10 +174,18 @@ export function Chart({
   // `markers` — `swing_points`, so far — attached to the price series, since
   // `canDrawIndicator` only offers markers/levels entries drawn on it.
   const markerPluginsRef = useRef<Map<string, ISeriesMarkersPluginApi<Time>>>(new Map());
-  // One `RayPrimitive` per (wskaźnik, params) whose output is `levels` —
-  // `htf_levels_*`, `pivots_*`, `level_clusters` — replacing its levels
-  // wholesale on every recompute rather than being torn down and rebuilt.
+  // One `RayPrimitive` per (wskaźnik, params) whose output is `levels` and
+  // whose `render.style` is not `"histogram"` — `htf_levels_*`, `pivots_*`,
+  // `level_clusters` — replacing its levels wholesale on every recompute
+  // rather than being torn down and rebuilt.
   const rayPrimitivesRef = useRef<Map<string, RayPrimitive>>(new Map());
+  // One `ZonePrimitive` per (wskaźnik, params) whose output is `zones` —
+  // `range_gap`, `body_gap`, `session_range_*`, `opening_range` (task 4.7).
+  const zonePrimitivesRef = useRef<Map<string, ZonePrimitive>>(new Map());
+  // One `TimeProfilePrimitive` per (wskaźnik, params) whose output is
+  // `levels` with `render.style === "histogram"` — `time_profile`, the one
+  // entry that draws a histogram rather than reference rays (task 5.4).
+  const timeProfilePrimitivesRef = useRef<Map<string, TimeProfilePrimitive>>(new Map());
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -318,6 +330,8 @@ export function Chart({
     const levelLines = levelLinesRef.current;
     const markerPlugins = markerPluginsRef.current;
     const rayPrimitives = rayPrimitivesRef.current;
+    const zonePrimitives = zonePrimitivesRef.current;
+    const timeProfilePrimitives = timeProfilePrimitivesRef.current;
     return () => {
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
@@ -326,7 +340,7 @@ export function Chart({
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
       priceLineRef.current = null;
-      // Every wskaźnik series, pane, reference level, marker plugin and ray
+      // Every wskaźnik series, pane, reference level, marker plugin and
       // primitive belonged to it too — `chart.remove()` already freed them,
       // this only stops the sync effect below from reaching for one that is
       // gone.
@@ -335,6 +349,8 @@ export function Chart({
       levelLines.clear();
       markerPlugins.clear();
       rayPrimitives.clear();
+      zonePrimitives.clear();
+      timeProfilePrimitives.clear();
     };
   }, []);
 
@@ -500,6 +516,15 @@ export function Chart({
     if (!last || bar.time >= last.time) {
       // The hot path: replace the forming bar, or open a new one.
       seriesRef.current?.update(toCandlestick(bar));
+      if (last && bar.time > last.time) {
+        // `bar` opened a new period, which means `last` — the one this
+        // request never saw settled — just closed. Slide `barsRange.to` to
+        // it and let `useIndicators` requery, same request shape, nothing
+        // new (task 6.1). Still not on every tick: `bar.time === last.time`
+        // above (the forming candle itself moving) never reaches here, which
+        // is what keeps task 6.2 true.
+        setBarsRange(previous.length > 0 ? { from: previous[0].time, to: last.time } : null);
+      }
     } else {
       // Older than what is drawn — a reconnect's gap fill. `update()` rejects
       // going backwards, so the merged series is redrawn wholesale. Rare by
@@ -592,6 +617,40 @@ export function Chart({
         continue;
       }
 
+      if (entry.output === "levels" && entry.render.style === "histogram") {
+        // `time_profile`, so far the only entry that pairs the two — a
+        // histogram panel instead of the reference rays every other `levels`
+        // entry draws (task 5.4).
+        if (!result.levels) continue;
+        activeResults.add(ownPaneKey);
+        const priceSeries = seriesRef.current;
+        if (!priceSeries) continue;
+        // `indicatorLines[0]` is `--color-accent` — the categorical palette's
+        // first slot (`theme.ts`), reused here rather than drawing from the
+        // per-line cycle: the point of control is one highlight, not a series
+        // of same-role lines that need to stay distinguishable from each other.
+        const profileColors = { bar: colors.inkMuted, pointOfControl: colors.indicatorLines[0] };
+        let profile = timeProfilePrimitivesRef.current.get(ownPaneKey);
+        if (!profile) {
+          profile = new TimeProfilePrimitive(profileColors);
+          priceSeries.attachPrimitive(profile);
+          timeProfilePrimitivesRef.current.set(ownPaneKey, profile);
+        }
+        profile.setColors(profileColors);
+        // `VAH`/`VAL` carry `count: null` — summary edges, not buckets, and
+        // the histogram itself has nothing to draw for them (`ProfileBar`'s
+        // own doc).
+        const bars: ProfileBar[] = result.levels
+          .filter((level) => level.count !== null)
+          .map((level) => ({
+            price: level.price,
+            count: level.count as number,
+            isPointOfControl: level.label === "POC",
+          }));
+        profile.setBars(bars);
+        continue;
+      }
+
       if (entry.output === "levels") {
         if (!result.levels) continue;
         activeResults.add(ownPaneKey);
@@ -612,6 +671,29 @@ export function Chart({
             label: level.label,
           })),
         );
+        continue;
+      }
+
+      if (entry.output === "zones") {
+        if (!result.zones) continue;
+        activeResults.add(ownPaneKey);
+        const priceSeries = seriesRef.current;
+        if (!priceSeries) continue;
+        let zonePrimitive = zonePrimitivesRef.current.get(ownPaneKey);
+        if (!zonePrimitive) {
+          zonePrimitive = new ZonePrimitive({ bullish: colors.up, bearish: colors.down, neutral: colors.inkMuted });
+          priceSeries.attachPrimitive(zonePrimitive);
+          zonePrimitivesRef.current.set(ownPaneKey, zonePrimitive);
+        }
+        zonePrimitive.setColors({ bullish: colors.up, bearish: colors.down, neutral: colors.inkMuted });
+        const zones: DrawnZone[] = result.zones.map((zone) => ({
+          from: zone.from as UTCTimestamp,
+          to: zone.to === null ? null : (zone.to as UTCTimestamp),
+          top: zone.top,
+          bottom: zone.bottom,
+          direction: zone.direction,
+        }));
+        zonePrimitive.setZones(zones);
         continue;
       }
 
@@ -749,6 +831,18 @@ export function Chart({
       if (activeResults.has(key)) continue;
       seriesRef.current?.detachPrimitive(ray);
       rayPrimitivesRef.current.delete(key);
+    }
+
+    for (const [key, zonePrimitive] of zonePrimitivesRef.current) {
+      if (activeResults.has(key)) continue;
+      seriesRef.current?.detachPrimitive(zonePrimitive);
+      zonePrimitivesRef.current.delete(key);
+    }
+
+    for (const [key, profile] of timeProfilePrimitivesRef.current) {
+      if (activeResults.has(key)) continue;
+      seriesRef.current?.detachPrimitive(profile);
+      timeProfilePrimitivesRef.current.delete(key);
     }
   }, [indicatorsState.results, indicatorsState.times, catalogueById]);
 
