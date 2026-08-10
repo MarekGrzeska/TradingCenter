@@ -12,6 +12,7 @@ import {
   makeFakeChart,
 } from "./testDoubles";
 import type { Bar } from "../data/types";
+import { readChartColors } from "./theme";
 
 const stub = createChartStub();
 
@@ -20,6 +21,7 @@ const stub = createChartStub();
 vi.mock("lightweight-charts", () => ({
   CandlestickSeries: { type: "Candlestick" },
   LineSeries: { type: "Line" },
+  HistogramSeries: { type: "Histogram" },
   ColorType: { Solid: "solid" },
   CrosshairMode: { Normal: 0 },
   LineStyle: { Dashed: 2 },
@@ -738,6 +740,66 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     await waitFor(() => expect(lineSeries()).toHaveLength(0));
     // Explicitly removed, not just orphaned along with the series it sat on.
     expect(rsiLine.priceLines.every((l) => l.removed)).toBe(true);
+  });
+
+  it("draws MACD's histogram line as a two-color Histogram series beside its two Line series", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "macd",
+        params: [
+          { name: "fast_period", type: "int", default: 12, min: 2, max: 5000 },
+          { name: "slow_period", type: "int", default: 26, min: 2, max: 5000 },
+          { name: "signal_period", type: "int", default: 9, min: 2, max: 5000 },
+        ],
+        lines: [
+          { key: "macd", label: "MACD {fast_period},{slow_period}", style: null },
+          { key: "signal", label: "Signal {signal_period}", style: null },
+          { key: "histogram", label: "Histogram", style: "histogram" },
+        ],
+        render: { pane: "own", style: "line", scale: "own", autoscale: true, range: null, levels: [] },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200, 300],
+        results: [
+          indicatorResult({
+            id: "macd",
+            params: { fast_period: 12, slow_period: 26, signal_period: 9 },
+            lines: {
+              macd: [1, 2, 3],
+              signal: [0.5, 0.5, 0.5],
+              histogram: [0.5, -1.5, 2.5],
+            },
+          }),
+        ],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2), bar(300, 3)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^macd$/i }));
+
+    await waitFor(() =>
+      expect(stub.latest().series.filter((s) => s.type === "Histogram")).toHaveLength(1),
+    );
+    expect(lineSeries()).toHaveLength(2); // macd, signal — the histogram line is not among them
+
+    const histogram = stub.latest().series.find((s) => s.type === "Histogram")!;
+    const colors = readChartColors();
+    expect(histogram.data()).toEqual([
+      { time: 100, value: 0.5, color: colors.up },
+      { time: 200, value: -1.5, color: colors.down },
+      { time: 300, value: 2.5, color: colors.up },
+    ]);
   });
 
   it("draws a missing value as a whitespace point, never as zero", async () => {

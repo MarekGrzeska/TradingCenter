@@ -5,6 +5,8 @@ import {
   CrosshairMode,
   createChart,
   type CandlestickData,
+  type HistogramData,
+  HistogramSeries,
   type LineData,
   LineSeries,
   LineStyle,
@@ -125,8 +127,11 @@ export function Chart({
   // `syncPriceLine` for why the series' built-in one does not do.
   const priceLineRef = useRef<IPriceLine | null>(null);
   const colorsRef = useRef<ChartColors | null>(null);
-  // One line series per (wskaźnik, params, line key) — see the sync effect below.
-  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  // One series per (wskaźnik, params, line key) — Line unless the line asks for
+  // a histogram (MACD's, so far) — see the sync effect below.
+  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(
+    new Map(),
+  );
   // One pane per (wskaźnik, params) whose `render.pane` is "own" — RSI and MACD
   // each get their own row, the way every other charting platform draws them,
   // rather than sharing one oscillator pane between wskaźniki that disagree
@@ -135,9 +140,9 @@ export function Chart({
   // The catalogue's reference-level hint (RSI's 30/70, …) drawn once per
   // (wskaźnik, params) rather than recomputed every render — the levels never
   // change while the selection is active, only the lines they sit behind do.
-  const levelLinesRef = useRef<Map<string, { series: ISeriesApi<"Line">; lines: IPriceLine[] }>>(
-    new Map(),
-  );
+  const levelLinesRef = useRef<
+    Map<string, { series: ISeriesApi<"Line"> | ISeriesApi<"Histogram">; lines: IPriceLine[] }>
+  >(new Map());
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -506,38 +511,65 @@ export function Chart({
         paneIndex = pane.paneIndex();
       }
 
-      let firstLine: ISeriesApi<"Line"> | undefined;
+      let firstLine: ISeriesApi<"Line"> | ISeriesApi<"Histogram"> | undefined;
 
       for (const lineSpec of entry.lines) {
         const key = `${result.id}|${paramsKey}|${lineSpec.key}`;
         active.add(key);
         const values = result.lines[lineSpec.key] ?? [];
-        const points: (LineData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
-          (time, i) => {
-            const value = values[i];
-            return value === null || value === undefined
-              ? { time: time as UTCTimestamp }
-              : { time: time as UTCTimestamp, value };
-          },
-        );
+        // A line overrides the entry's own style for itself alone — MACD's
+        // histogram sitting beside two ordinary lines in the same entry.
+        const style = lineSpec.style ?? entry.render.style;
 
-        let line = indicatorSeriesRef.current.get(key);
-        if (!line) {
-          line = chart.addSeries(
-            LineSeries,
-            {
-              color: indicatorLineColor(colors, colorIndex),
-              lineWidth: 1,
-              lastValueVisible: false,
-              priceLineVisible: false,
-              ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
+        let series = indicatorSeriesRef.current.get(key);
+        if (style === "histogram") {
+          const points: (HistogramData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
+            (time, i) => {
+              const value = values[i];
+              return value === null || value === undefined
+                ? { time: time as UTCTimestamp }
+                : { time: time as UTCTimestamp, value, color: value >= 0 ? colors.up : colors.down };
             },
-            paneIndex,
           );
-          indicatorSeriesRef.current.set(key, line);
+          if (!series) {
+            series = chart.addSeries(
+              HistogramSeries,
+              {
+                lastValueVisible: false,
+                priceLineVisible: false,
+                ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
+              },
+              paneIndex,
+            );
+            indicatorSeriesRef.current.set(key, series);
+          }
+          series.setData(points);
+        } else {
+          const points: (LineData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
+            (time, i) => {
+              const value = values[i];
+              return value === null || value === undefined
+                ? { time: time as UTCTimestamp }
+                : { time: time as UTCTimestamp, value };
+            },
+          );
+          if (!series) {
+            series = chart.addSeries(
+              LineSeries,
+              {
+                color: indicatorLineColor(colors, colorIndex),
+                lineWidth: 1,
+                lastValueVisible: false,
+                priceLineVisible: false,
+                ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
+              },
+              paneIndex,
+            );
+            indicatorSeriesRef.current.set(key, series);
+          }
+          series.setData(points);
         }
-        line.setData(points);
-        firstLine ??= line;
+        firstLine ??= series;
         colorIndex++;
       }
 

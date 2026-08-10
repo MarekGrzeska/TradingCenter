@@ -9,6 +9,7 @@ import type { Resolution, TrackedPair } from "../data/types";
 vi.mock("lightweight-charts", () => ({
   CandlestickSeries: { type: "Candlestick" },
   LineSeries: { type: "Line" },
+  HistogramSeries: { type: "Histogram" },
   ColorType: { Solid: "solid" },
   CrosshairMode: { Normal: 0 },
   LineStyle: { Dashed: 2 },
