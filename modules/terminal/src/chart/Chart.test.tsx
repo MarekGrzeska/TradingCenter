@@ -611,7 +611,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
 
-    expect(await screen.findByText("Exponential Moving Average")).toBeInTheDocument();
+    expect(await screen.findByText("EMA")).toBeInTheDocument();
   });
 
   it("computes the chosen wskaźnik over the range the chart actually drew, and draws a line", async () => {
@@ -633,7 +633,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     });
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
-    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
 
     await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
     expect(indicators.computeCalls[0]).toMatchObject({
@@ -670,7 +670,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     });
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
-    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
 
     await waitFor(() => expect(lineSeries()).toHaveLength(1));
     const [first] = lineSeries()[0].data();
@@ -697,7 +697,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     });
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
-    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
 
     expect(await screen.findByText(/warming up/i)).toBeInTheDocument();
     await waitFor(() => expect(lineSeries()).toHaveLength(1));
@@ -713,7 +713,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     });
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
-    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
 
     expect(await screen.findByText(/indicators unavailable/i)).toBeInTheDocument();
     // The candlestick series is untouched — still whatever the snapshot drew.
@@ -743,7 +743,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     });
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
-    const checkbox = await screen.findByRole("checkbox", { name: /exponential moving average/i });
+    const checkbox = await screen.findByRole("checkbox", { name: /^ema$/i });
     await userEvent.click(checkbox);
     await waitFor(() => expect(lineSeries()).toHaveLength(1));
     const line = lineSeries()[0];
@@ -772,7 +772,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
       source.snapshot([bar(100, 1)]);
     });
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
-    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
     await waitFor(() => expect(lineSeries()).toHaveLength(1));
 
     rerender(
@@ -806,7 +806,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
       source.snapshot([bar(100, 1)]);
     });
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
-    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
     await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
 
     const periodInput = screen.getByLabelText("period");
@@ -832,6 +832,6 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
 
-    expect(await screen.findByRole("checkbox", { name: /average true range/i })).toBeDisabled();
+    expect(await screen.findByRole("checkbox", { name: /^atr$/i })).toBeDisabled();
   });
 });

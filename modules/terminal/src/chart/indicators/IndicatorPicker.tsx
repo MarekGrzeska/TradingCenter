@@ -100,7 +100,7 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
                     disabled={!drawable}
                     onChange={() => toggle(entry)}
                   />
-                  {entry.name}
+                  <span title={entry.name}>{entry.id.toUpperCase()}</span>
                 </label>
 
                 {selection && entry.params.length > 0 && (
