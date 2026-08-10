@@ -68,4 +68,25 @@ describe("mergeSeries", () => {
     const newer = [bar(200, 2), bar(300, 3)]; // page boundary re-fetched, as history.py does
     expect(mergeSeries(older, newer)).toEqual([bar(100, 1), bar(200, 2), bar(300, 3)]);
   });
+
+  it("joins a page of older candles onto the front", () => {
+    const drawn = [bar(300, 3), bar(400, 4)];
+    const page = [bar(100, 1), bar(200, 2)];
+    expect(mergeSeries(drawn, page)).toEqual([bar(100, 1), bar(200, 2), bar(300, 3), bar(400, 4)]);
+  });
+
+  it("puts an out-of-order batch in order rather than trusting it", () => {
+    // The merge is linear only while both sides are sorted, and a source that
+    // answered out of order would otherwise interleave into nonsense.
+    expect(mergeSeries([bar(200, 2)], [bar(300, 3), bar(100, 1)])).toEqual([
+      bar(100, 1),
+      bar(200, 2),
+      bar(300, 3),
+    ]);
+  });
+
+  it("leaves the base untouched when there is nothing to merge", () => {
+    const base = [bar(100, 1)];
+    expect(mergeSeries(base, [])).toEqual(base);
+  });
 });

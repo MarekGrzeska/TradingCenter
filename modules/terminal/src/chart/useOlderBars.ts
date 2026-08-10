@@ -9,12 +9,16 @@ export interface OlderBarsReader {
   readSeries(): readonly Bar[];
   /** Bars older than the drawn series, to be merged into it. */
   deliver(bars: Bar[]): void;
+  /** True while the viewport still has too few candles to its left. The pager
+   *  keeps fetching until this goes false, so one drag to the edge is answered
+   *  with as much history as the screen needs — not with one page per drag. */
+  needsMore(): boolean;
 }
 
 export interface OlderBars {
   status: OlderBarsStatus;
   error: string | null;
-  /** Ask for the page older than what is drawn. Ignored while a page is in
+  /** Ask for the candles older than what is drawn. Ignored while a read is in
    *  flight, after the archive ran out, and after a failure — a failure waits
    *  for `retry`, so a pan against a dead archive is not a request loop. */
   requestOlder(): void;
@@ -29,11 +33,22 @@ export interface OlderBars {
  *  candles but far more than eight hours of clock. */
 const PAGE_BARS = 300;
 
-/** Empty windows walked through before this pair counts as having no more
- *  history. One empty window means nothing: a weekend, a holiday and a pause in
- *  collection all look exactly like a range with no candles in it. The window
- *  doubles each time, so four of them reach back eight times the first. */
-const EMPTY_WINDOWS = 4;
+/**
+ * Empty windows walked through before this pair counts as having no more history.
+ *
+ * One empty window means nothing: a weekend, a holiday and a pause in collection all look
+ * exactly like a range with no candles in it. Each window doubles, so eight of them reach
+ * back 255 times the first — at a five-hour base window that is nearly two months, which
+ * no market closure comes near. Four of them (which is what this was) reached back three
+ * days, and a long Easter weekend was enough to have a chart announce the start of history
+ * in the middle of the archive.
+ */
+const EMPTY_WINDOWS = 8;
+
+/** Pages fetched for one request before it stops of its own accord. Only a source
+ *  answering with a handful of candles per window gets anywhere near this; it exists so a
+ *  pathological one cannot spin. */
+const MAX_PAGES = 20;
 
 /** Floor for the window, for the case where the drawn bars share a timestamp
  *  span of zero — a single settled bar plus a forming one, most often. Without
@@ -47,13 +62,14 @@ function pageSpan(series: readonly Bar[]): number {
 }
 
 /**
- * Older candles, a page at a time, for one (symbol, resolution).
+ * Older candles for one (symbol, resolution), fetched until the viewport has enough of
+ * them to its left.
  *
  * This is a range read, which is the thing the hub took away from charts — and it stays
  * taken away for the live edge. Every read here ends at the oldest *drawn* bar, so it can
  * only ever touch periods already settled: the right-hand edge, the forming candle and
  * everything a reconnect fills still come from the subscription's snapshot alone
- * (design.md, "Odczyt zakresu wraca do wykresu, a to on kiedyś tworzył szew").
+ * (design.md of `chart-loads-older-candles`, "Odczyt zakresu wraca do wykresu").
  */
 export function useOlderBars(
   source: MarketDataSource,
@@ -94,39 +110,55 @@ export function useOlderBars(
 
   const load = useCallback(async () => {
     if (busyRef.current || blockedRef.current) return;
-
-    const series = readerRef.current.readSeries();
     // Two bars are the least that can say how long a page is worth asking for.
-    if (series.length < 2) return;
+    if (readerRef.current.readSeries().length < 2) return;
 
     const generation = generationRef.current;
-    // `??=` covers the one call that could beat the effect below to it; every
+    // `??=` covers the one call that could beat the effect above to it; every
     // later call gets the controller that effect installed for this pair.
     const controller = (abortRef.current ??= new AbortController());
     busyRef.current = true;
     setStatus("loading");
 
-    let cursor = series[0].time;
-    let span = pageSpan(series);
-
     try {
-      for (let window = 0; window < EMPTY_WINDOWS; window++) {
-        const bars = await source.history(
-          { symbol, resolution, from: cursor - span, to: cursor },
-          controller.signal,
-        );
-        if (generation !== generationRef.current) return;
+      for (let page = 0; page < MAX_PAGES; page++) {
+        const series = readerRef.current.readSeries();
+        let cursor = series[0].time;
+        let span = pageSpan(series);
+        let bars: Bar[] = [];
 
-        if (bars.length > 0) {
-          readerRef.current.deliver(bars);
-          setStatus("idle");
+        // Walk back until a window has candles in it. An empty one is a closed
+        // market as often as it is the end of the archive.
+        for (let window = 0; window < EMPTY_WINDOWS && bars.length === 0; window++) {
+          bars = await source.history(
+            { symbol, resolution, from: cursor - span, to: cursor },
+            controller.signal,
+          );
+          if (generation !== generationRef.current) return;
+          cursor -= span;
+          span *= 2;
+        }
+
+        if (bars.length === 0) {
+          blockedRef.current = true;
+          setStatus("exhausted");
           return;
         }
-        cursor -= span;
-        span *= 2;
+
+        readerRef.current.deliver(bars);
+
+        // A page that leaves the series starting where it started is a page of
+        // candles already drawn. Asking again would ask the same question, so
+        // the archive counts as having nothing older.
+        if (readerRef.current.readSeries()[0]?.time >= series[0].time) {
+          blockedRef.current = true;
+          setStatus("exhausted");
+          return;
+        }
+
+        if (!readerRef.current.needsMore()) break;
       }
-      blockedRef.current = true;
-      setStatus("exhausted");
+      setStatus("idle");
     } catch (cause: unknown) {
       if (generation !== generationRef.current || controller.signal.aborted) return;
       blockedRef.current = true;

@@ -10,6 +10,7 @@ vi.mock("lightweight-charts", () => ({
   CandlestickSeries: { type: "Candlestick" },
   ColorType: { Solid: "solid" },
   CrosshairMode: { Normal: 0 },
+  LineStyle: { Dashed: 2 },
   createChart: () => ({
     addSeries: () => ({ setData: () => {}, update: () => {} }),
     remove: () => {},

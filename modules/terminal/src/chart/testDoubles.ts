@@ -38,13 +38,26 @@ export interface Candle {
   close: number;
 }
 
+export interface FakePriceLine {
+  options: Record<string, unknown>;
+  removed: boolean;
+  applyOptions(options: Record<string, unknown>): void;
+}
+
 export interface FakeSeries {
+  /** The options the chart created this series with. */
+  options: Record<string, unknown>;
   setDataCalls: Candle[][];
   updateCalls: Candle[];
   /** Whatever setData/update has left on screen. */
   data(): Candle[];
   setData(data: Candle[]): void;
   update(candle: Candle): void;
+  priceLines: FakePriceLine[];
+  createPriceLine(options: Record<string, unknown>): FakePriceLine;
+  removePriceLine(line: FakePriceLine): void;
+  /** The one price line still on the series, if any. */
+  priceLine(): FakePriceLine | undefined;
 }
 
 export function createChartStub(): ChartStub {
@@ -79,8 +92,8 @@ export function makeFakeChart(): FakeChart {
  *  `FakeChart` the test can then read and drive. */
 export function fakeChartApi(chart: FakeChart) {
   return {
-    addSeries: () => {
-      const series = makeFakeSeries();
+    addSeries: (_type: unknown, options: Record<string, unknown> = {}) => {
+      const series = makeFakeSeries(options);
       chart.series.push(series);
       return series;
     },
@@ -113,9 +126,10 @@ export function fakeChartApi(chart: FakeChart) {
   };
 }
 
-export function makeFakeSeries(): FakeSeries {
+export function makeFakeSeries(options: Record<string, unknown> = {}): FakeSeries {
   let current: Candle[] = [];
   return {
+    options,
     setDataCalls: [],
     updateCalls: [],
     data: () => current,
@@ -128,6 +142,24 @@ export function makeFakeSeries(): FakeSeries {
       const index = current.findIndex((c) => c.time === candle.time);
       if (index >= 0) current[index] = candle;
       else current.push(candle);
+    },
+    priceLines: [],
+    createPriceLine(options) {
+      const line: FakePriceLine = {
+        options,
+        removed: false,
+        applyOptions(next) {
+          this.options = { ...this.options, ...next };
+        },
+      };
+      this.priceLines.push(line);
+      return line;
+    },
+    removePriceLine(line) {
+      line.removed = true;
+    },
+    priceLine() {
+      return this.priceLines.find((line) => !line.removed);
     },
   };
 }

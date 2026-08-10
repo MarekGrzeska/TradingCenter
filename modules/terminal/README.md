@@ -52,7 +52,10 @@ before it is asked anything else.
 - `chart/` — the reusable candlestick chart, identical standalone and in a grid slot. The
   live edge comes from the subscription's snapshot; panning left pages older candles in from
   the archive's range endpoint (`useOlderBars.ts`), which never reads anything newer than the
-  oldest candle already drawn.
+  oldest candle already drawn and keeps paging until the viewport has a margin of candles to
+  its left again. The price marked on the right-hand scale is the chart's own: the library's
+  label reads the last *visible* bar, which in a chart panned into history is not the price
+  anyone means.
 - `grid/` — six slots with fixed identities, layout presets, and persistence. A slot's
   symbol is picked from a plain list of what the archive collects — the grid reads `/pairs`
   once for all six — and its resolutions from what that instrument is archived in.
