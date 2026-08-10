@@ -589,6 +589,11 @@ class IndicatorLevelOut(BaseModel):
     from_: datetime = Field(validation_alias="from", serialization_alias="from")
     price: float
     label: str | None = None
+    count: int | None = Field(
+        default=None,
+        description="how many extrema support this level; null for a level that "
+        "carries no weight, e.g. a pivot or a previous-period edge",
+    )
 
     model_config = {"populate_by_name": True}
 
