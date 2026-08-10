@@ -16,8 +16,8 @@ import type {
   TrackedPair,
   TrackPairsResult,
 } from "../data/types";
-import { formatBytes, formatInstant } from "./format";
-import { RESOLUTION_ABBR } from "./resolutionAbbr";
+import { formatBytes, formatInstant, todayInWarsaw, warsawMidnightEpochSeconds } from "../ui/formatTime";
+import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 
 /**
  * Adding instruments as a decision made once, not one blind click per pair
@@ -29,15 +29,8 @@ import { RESOLUTION_ABBR } from "./resolutionAbbr";
  * "everything available" and is clipped server-side, not a client-side error.
  */
 
-function asDateInput(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
-function todayDateInput(): string {
-  return asDateInput(new Date());
-}
-
-/** The start of the current year — year to date.
+/** The start of the current year — year to date, as the operator's own Warsaw
+ *  calendar sees "current".
  *
  *  Deliberately not "everything available": at `MINUTE` a decade is around a hundred
  *  chunks per pair, so every operator who never touched this field would commit hundreds
@@ -47,11 +40,7 @@ function todayDateInput(): string {
  *  a month asks for the same range both times. It is shallow in January, which is the
  *  safe direction for a default that costs provider requests. */
 function defaultCollectFromInput(): string {
-  return `${new Date().getUTCFullYear()}-01-01`;
-}
-
-function dateInputToEpochSeconds(value: string): number {
-  return Math.floor(new Date(`${value}T00:00:00Z`).getTime() / 1000);
+  return `${todayInWarsaw().slice(0, 4)}-01-01`;
 }
 
 /** Identifies one prospective job — everything the acceptance dialog prices. */
@@ -167,7 +156,7 @@ export function AddInstrumentWizard({
                     : "border-border text-ink-muted hover:text-ink"
                 }`}
               >
-                {RESOLUTION_ABBR[r]}
+                {RESOLUTION_LABEL[r]}
               </button>
             ))}
           </div>
@@ -178,7 +167,7 @@ export function AddInstrumentWizard({
             type="date"
             aria-label="History from"
             value={collectFromInput}
-            max={todayDateInput()}
+            max={todayInWarsaw()}
             onChange={(e) => setCollectFromInput(e.target.value)}
             className="rounded border border-border bg-panel-strong px-2 py-1 text-xs text-ink"
           />
@@ -204,7 +193,7 @@ export function AddInstrumentWizard({
         <AcceptanceDialog
           key={requestKey(pending, collectFromInput)}
           pairs={pending}
-          collectFrom={dateInputToEpochSeconds(collectFromInput)}
+          collectFrom={warsawMidnightEpochSeconds(collectFromInput)}
           existingPairs={existingPairs}
           onClose={() => setPending(null)}
           onAccepted={afterAccepted}
@@ -411,7 +400,7 @@ function EstimateRow({ pair, alreadyCollected }: { pair: PairEstimate; alreadyCo
     return (
       <tr className="border-t border-border">
         <td className="px-2 py-1.5 font-semibold text-ink">{pair.symbol}</td>
-        <td className="px-2 py-1.5 text-ink-secondary">{pair.resolution}</td>
+        <td className="px-2 py-1.5 text-ink-secondary">{RESOLUTION_LABEL[pair.resolution]}</td>
         <td colSpan={3} className="px-2 py-1.5 text-critical">
           not offered by the gateway
         </td>
@@ -429,7 +418,7 @@ function EstimateRow({ pair, alreadyCollected }: { pair: PairEstimate; alreadyCo
           </span>
         )}
       </td>
-      <td className="px-2 py-1.5 text-ink-secondary">{pair.resolution}</td>
+      <td className="px-2 py-1.5 text-ink-secondary">{RESOLUTION_LABEL[pair.resolution]}</td>
       <td className="px-2 py-1.5 text-ink-secondary">
         {pair.effectiveFrom === null ? "—" : formatInstant(pair.effectiveFrom)} → now
         {pair.clipped && <span className="ml-1 text-warning">(clipped)</span>}
@@ -454,7 +443,7 @@ function ResultSummary({ result }: { result: TrackPairsResult }) {
           <ul className="mt-1 list-disc pl-5 text-ink-secondary">
             {accepted.map((r) => (
               <li key={`${r.symbol}|${r.resolution}`}>
-                {r.symbol} {r.resolution}
+                {r.symbol} {RESOLUTION_LABEL[r.resolution]}
               </li>
             ))}
           </ul>
@@ -476,7 +465,7 @@ function ResultSummary({ result }: { result: TrackPairsResult }) {
           <ul className="mt-1 list-disc pl-5 text-critical">
             {refused.map((r) => (
               <li key={`${r.symbol}|${r.resolution}`}>
-                {r.symbol} {r.resolution}: {r.refused}
+                {r.symbol} {RESOLUTION_LABEL[r.resolution]}: {r.refused}
               </li>
             ))}
           </ul>

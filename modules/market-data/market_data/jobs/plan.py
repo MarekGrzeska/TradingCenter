@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from ..coverage import uncovered_within
 from ..ingest.backfill import MAX_BARS_PER_FILL
-from ..models import Resolution
+from ..models import ESTIMATED_BYTES_PER_CANDLE, Resolution
 from ..periods import period_length, periods_between
 from .models import ChunkPlan
 
@@ -126,13 +126,6 @@ class JobEstimate(BaseModel):
     pairs: list[PairEstimate]
     total_estimated_candles: int
     total_estimated_bytes: int
-
-
-# A rough, deliberately round figure for one stored candle: eight numeric columns plus
-# per-row overhead. Never exact — session calendars are not consulted here — and the
-# estimate says so; see `terminal-data-manager` spec, "Zatwierdzenie kreatora otwiera
-# dialog akceptacji".
-ESTIMATED_BYTES_PER_CANDLE = 96
 
 
 async def estimate_job(

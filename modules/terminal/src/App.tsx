@@ -1,6 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 import { Shell } from "./app/Shell";
-import { ComingSoon } from "./app/ComingSoon";
 import { NotFound } from "./app/NotFound";
 import { ViewErrorBoundary } from "./app/ViewErrorBoundary";
 import { DEFAULT_TAB_PATH, TABS } from "./app/tabs";
@@ -17,7 +16,7 @@ export function App() {
               path={tab.path}
               element={
                 <ViewErrorBoundary>
-                  {tab.status === "ready" ? <tab.Component /> : <ComingSoon label={tab.label} />}
+                  <tab.Component />
                 </ViewErrorBoundary>
               }
             />

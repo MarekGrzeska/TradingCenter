@@ -148,6 +148,13 @@ export interface TrackedPair {
   /** The newest period collected, or null when nothing has been yet. */
   latestCandle: number | null;
   collection: CollectionState;
+  /** How many candles are collected for this pair. Zero for a pair that has
+   *  collected nothing, never absent. */
+  candleCount: number;
+  /** A rough estimate of the storage those candles take, derived from
+   *  `candleCount` the same way a job's price is (`market-data-api` spec,
+   *  "Śledzone pary są zarządzalne przez kontrakt"). */
+  estimatedBytes: number;
 }
 
 /** A stretch of time the archive has actually verified for a pair — which is

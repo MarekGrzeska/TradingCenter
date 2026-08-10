@@ -12,11 +12,14 @@ import {
   type LogicalRange,
   type MouseEventParams,
   type Time,
+  type TickMarkType,
   type UTCTimestamp,
 } from "lightweight-charts";
 import { findBar, mergeBar, mergeSeries } from "../data/merge";
 import { RESOLUTIONS, type Bar, type Resolution } from "../data/types";
 import type { MarketDataSource } from "../data/source";
+import { formatCrosshairTime, formatInstant, formatTickMark } from "../ui/formatTime";
+import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { candlestickColors, readChartColors, type ChartColors } from "./theme";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
@@ -114,7 +117,19 @@ export function Chart({
         horzLines: { color: colors.grid },
       },
       rightPriceScale: { borderColor: colors.axis },
-      timeScale: { borderColor: colors.axis, timeVisible: true, secondsVisible: false },
+      // Both formatters read Warsaw's calendar instead of the library's own UTC one —
+      // the candles' timestamps are untouched, only their labels (design.md, "Strefa:
+      // formatowanie, nie przesuwanie znaczników").
+      localization: {
+        timeFormatter: (time: Time) => formatCrosshairTime(time as number),
+      },
+      timeScale: {
+        borderColor: colors.axis,
+        timeVisible: true,
+        secondsVisible: false,
+        tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) =>
+          formatTickMark(time as number, tickMarkType),
+      },
       crosshair: { mode: CrosshairMode.Normal },
       autoSize: false,
       width: container.clientWidth,
@@ -378,7 +393,6 @@ export function Chart({
 
   const shown: Readout | null =
     readout ?? (latestBar ? { bar: latestBar, hovered: false } : null);
-  const lastIsForming = latestBar?.forming ?? false;
 
   const staleStream = feed.streamState === "reconnecting" || feed.streamState === "closed";
 
@@ -395,7 +409,7 @@ export function Chart({
         >
           {resolutions.map((r) => (
             <option key={r} value={r}>
-              {r}
+              {RESOLUTION_LABEL[r]}
             </option>
           ))}
         </select>
@@ -404,14 +418,6 @@ export function Chart({
 
         <div className="ml-auto flex items-center gap-2">
           <OlderHistoryState older={older} />
-          {lastIsForming && !shown?.hovered && (
-            <span
-              title="This candle is still being built from quotes and will change."
-              className="rounded border border-warning/40 px-1.5 py-0.5 text-[10px] tracking-wide text-warning uppercase"
-            >
-              forming
-            </span>
-          )}
           {staleStream && (
             <span className="rounded border border-down/40 px-1.5 py-0.5 text-[10px] tracking-wide text-down uppercase">
               {feed.streamState === "closed" ? "stream closed" : "reconnecting"}
@@ -484,17 +490,7 @@ function OhlcReadout({ bar }: { bar: Bar }) {
       <Field label="H" value={bar.high} />
       <Field label="L" value={bar.low} />
       <Field label="C" value={bar.close} />
-      <span className="text-ink-muted">
-        V{" "}
-        {bar.volume === null ? (
-          // Not zero — the stream simply doesn't carry volume (see the
-          // gateway README). Saying "0" would be a claim about the market.
-          <span title="This source does not report volume for live candles.">n/a</span>
-        ) : (
-          <span className="text-ink">{bar.volume}</span>
-        )}
-      </span>
-      <time className="text-ink-muted">{new Date(bar.time * 1000).toISOString().slice(0, 16).replace("T", " ")}</time>
+      <time className="text-ink-muted">{formatInstant(bar.time)}</time>
     </span>
   );
 }
@@ -528,7 +524,7 @@ function FeedOverlay({
     return (
       <Veil>
         <span className="text-sm text-ink-muted">
-          No candles for {symbol} at {resolution}.
+          No candles for {symbol} at {RESOLUTION_LABEL[resolution]}.
         </span>
       </Veil>
     );

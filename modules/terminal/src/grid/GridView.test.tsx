@@ -72,6 +72,8 @@ function pair(symbol: string, resolution: Resolution): TrackedPair {
     earliestCandle: null,
     latestCandle: null,
     collection: "collecting",
+    candleCount: 0,
+    estimatedBytes: 0,
   };
 }
 
@@ -301,12 +303,12 @@ describe("GridView slot — archived-only symbols (terminal-grid spec)", () => {
 
     const slot1 = within(screen.getByTestId("slot-s1"));
     expect(await slot1.findByText(/no longer archived at/i)).toBeInTheDocument();
-    expect(slot1.getByText("MINUTE_5")).toBeInTheDocument();
+    expect(slot1.getByText("m5")).toBeInTheDocument();
     // No chart for a pair nobody collects.
     expect(slot1.queryByLabelText("Resolution")).not.toBeInTheDocument();
 
     // The resolution that is still collected is one click away.
-    await user.click(slot1.getByRole("button", { name: "HOUR_4" }));
+    await user.click(slot1.getByRole("button", { name: "h4" }));
 
     await waitFor(() => expect(gridStore.getSnapshot().slots.s1.resolution).toBe("HOUR_4"));
     expect(within(screen.getByTestId("slot-s1")).getByLabelText("Resolution")).toBeInTheDocument();

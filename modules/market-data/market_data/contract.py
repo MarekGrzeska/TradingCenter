@@ -178,6 +178,11 @@ class TrackedPairOut(BaseModel):
         description="the pair's most recent backfill, or null if none has run since the "
         "module started — fills live in memory and do not survive a restart",
     )
+    candle_count: int = Field(description="how many candles are collected for this pair")
+    estimated_bytes: int = Field(
+        description="a rough estimate of how much storage those candles take, derived "
+        "from `candle_count` the same way a job's price is"
+    )
 
     @classmethod
     def of(cls, pair: TrackedPair) -> TrackedPairOut:
@@ -185,7 +190,8 @@ class TrackedPairOut(BaseModel):
 
         The three unknowns are said explicitly rather than left to defaults: nothing has
         been collected yet, so there is no earliest and no latest candle, and the state is
-        the one that means exactly that.
+        the one that means exactly that. `candle_count` is zero for the same reason, not
+        because it is unknown.
         """
         return cls(
             symbol=pair.symbol,
@@ -195,6 +201,8 @@ class TrackedPairOut(BaseModel):
             earliest_candle=None,
             latest_candle=None,
             collection=CollectionState.NEVER_COLLECTED,
+            candle_count=0,
+            estimated_bytes=0,
         )
 
 

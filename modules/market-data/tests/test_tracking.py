@@ -380,6 +380,19 @@ async def test_the_status_carries_the_oldest_candle(db: asyncpg.Connection) -> N
 
 
 @pytest.mark.db
+async def test_the_status_carries_the_candle_count(db: asyncpg.Connection) -> None:
+    await track(db, "US100", Resolution.MINUTE, LIMIT)
+    await write_candles(
+        db,
+        [candle(period_start=MOMENT - timedelta(minutes=m)) for m in range(3)],
+    )
+
+    [status] = await read_status(db, now=MOMENT)
+
+    assert status.candle_count == 3
+
+
+@pytest.mark.db
 async def test_a_pair_that_has_collected_nothing_still_appears(
     db: asyncpg.Connection,
 ) -> None:
@@ -392,6 +405,9 @@ async def test_a_pair_that_has_collected_nothing_still_appears(
     assert status.earliest_candle is None
     assert status.latest_candle is None
     assert status.collection is CollectionState.NEVER_COLLECTED
+    # A LEFT JOIN with no matching candle still joins one NULL row, so `count(*)` would
+    # have reported one candle instead of zero — this is the check that catches it.
+    assert status.candle_count == 0
 
 
 @pytest.mark.db

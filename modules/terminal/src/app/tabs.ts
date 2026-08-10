@@ -11,47 +11,25 @@ import { InstrumentsView } from "../instruments/InstrumentsView";
  * `Archive` is gone rather than renamed: `Instruments` absorbed it, so a
  * stale `/archive` bookmark falls through to the unknown-tab page rather than
  * a silent redirect (design.md, "Zakładki: `Archive` znika, `Data History`
- * dochodzi"). `Positions`, `Orders` and `Account` are `coming-soon` for the
- * life of this change — see proposal.md.
+ * dochodzi"). Every entry here has a view — a tab with none does not belong
+ * in the registry (terminal-shell spec, "Rejestr zakładek jest otwarty").
  */
-export type TabStatus = "ready" | "coming-soon";
-
-export interface ReadyTab {
+export interface TabDefinition {
   id: string;
   label: string;
   path: string;
-  status: "ready";
   Component: ComponentType;
 }
 
-export interface ComingSoonTab {
-  id: string;
-  label: string;
-  path: string;
-  status: "coming-soon";
-}
-
-export type TabDefinition = ReadyTab | ComingSoonTab;
-
 export const TABS: TabDefinition[] = [
-  { id: "graph", label: "Graph", path: "graph", status: "ready", Component: GridView },
-  {
-    id: "instruments",
-    label: "Instruments",
-    path: "instruments",
-    status: "ready",
-    Component: InstrumentsView,
-  },
+  { id: "graph", label: "Graph", path: "graph", Component: GridView },
+  { id: "instruments", label: "Instruments", path: "instruments", Component: InstrumentsView },
   {
     id: "data-history",
     label: "Data History",
     path: "data-history",
-    status: "ready",
     Component: CollectionHistoryView,
   },
-  { id: "positions", label: "Positions", path: "positions", status: "coming-soon" },
-  { id: "orders", label: "Orders", path: "orders", status: "coming-soon" },
-  { id: "account", label: "Account", path: "account", status: "coming-soon" },
 ];
 
 export const DEFAULT_TAB_PATH = "graph";

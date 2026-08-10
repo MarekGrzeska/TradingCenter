@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { MarketDataError } from "../data/types";
@@ -78,6 +78,8 @@ function pair(over: Partial<TrackedPair> = {}): TrackedPair {
     earliestCandle: 1785542400, // 2026-08-01 00:00 UTC
     latestCandle: 1786113600, // 2026-08-07 14:40 UTC
     collection: "collecting",
+    candleCount: 12431,
+    estimatedBytes: 1193376,
     ...over,
   };
 }
@@ -108,60 +110,10 @@ describe("Instruments list — grouping (terminal-data-manager spec)", () => {
 
     expect(await screen.findAllByText("US100")).toHaveLength(1);
     const row = screen.getByTestId("instrument-US100");
-    expect(within(row).getByText("1m")).toBeInTheDocument();
-    expect(within(row).getByText("1h")).toBeInTheDocument();
-    expect(within(row).getByText("1D")).toBeInTheDocument();
-    expect(within(row).getByText("1W")).toBeInTheDocument();
-  });
-
-  it("says since when there is data with one date when every resolution agrees", async () => {
-    fakeArchive.pairs = [
-      pair({ resolution: "MINUTE", earliestCandle: 1785542400 }), // 2026-08-01
-      pair({ resolution: "HOUR", earliestCandle: 1785542400 }),
-    ];
-    renderView();
-
-    const row = await screen.findByTestId("instrument-US100");
-    // One date, said once — not the same date repeated per resolution.
-    expect(within(row).getAllByText(/2026-08-01/)).toHaveLength(1);
-  });
-
-  it("splits the date per resolution when they do not reach equally far back", async () => {
-    fakeArchive.pairs = [
-      pair({ resolution: "MINUTE", earliestCandle: 1785542400 }), // 2026-08-01
-      pair({ resolution: "MINUTE_5", earliestCandle: 1785542400 }),
-      pair({ resolution: "DAY", earliestCandle: 1577923200 }), // 2020-01-02
-    ];
-    renderView();
-
-    const row = await screen.findByTestId("instrument-US100");
-    const deepest = within(row).getByText(/2020-01-02/).closest("div");
-    // Which resolutions the deeper history belongs to has to be readable off
-    // the row; a bare pair of dates says nothing about which is which.
-    expect(deepest).toHaveTextContent("1D");
-    expect(within(row).getByText(/2026-08-01/).closest("div")).toHaveTextContent("1m · 5m");
-  });
-
-  it("says a resolution has nothing yet rather than leaving its date blank", async () => {
-    fakeArchive.pairs = [
-      pair({ resolution: "MINUTE", earliestCandle: null, collection: "never_collected" }),
-      pair({ resolution: "DAY", earliestCandle: 1577923200 }), // 2020-01-02
-    ];
-    renderView();
-
-    const row = await screen.findByTestId("instrument-US100");
-    expect(within(row).getByText("nothing yet").closest("div")).toHaveTextContent("1m");
-  });
-
-  it("says nothing yet for an instrument that has collected nothing at all", async () => {
-    fakeArchive.pairs = [
-      pair({ resolution: "MINUTE", earliestCandle: null, collection: "never_collected" }),
-      pair({ resolution: "DAY", earliestCandle: null, collection: "never_collected" }),
-    ];
-    renderView();
-
-    const row = await screen.findByTestId("instrument-US100");
-    expect(within(row).getByText("nothing yet")).toBeInTheDocument();
+    expect(within(row).getByText("m1")).toBeInTheDocument();
+    expect(within(row).getByText("h1")).toBeInTheDocument();
+    expect(within(row).getByText("day")).toBeInTheDocument();
+    expect(within(row).getByText("week")).toBeInTheDocument();
   });
 
   it("says nothing is archived rather than showing an empty table", async () => {
@@ -192,7 +144,7 @@ describe("Instruments list — a lagging interval", () => {
     const row = await screen.findByTestId("instrument-US100");
     expect(row).toHaveAttribute("data-stalled", "true");
     // The healthy resolution and the stalled one must not read the same way.
-    expect(within(row).getByText("1m").className).not.toBe(within(row).getByText("1h").className);
+    expect(within(row).getByText("m1").className).not.toBe(within(row).getByText("h1").className);
   });
 
   it("does not mark an instrument whose resolutions are all healthy", async () => {
@@ -204,40 +156,88 @@ describe("Instruments list — a lagging interval", () => {
   });
 });
 
-describe("Instruments list — coverage on expand", () => {
-  it("shows coverage for every resolution once the row is expanded", async () => {
-    const user = userEvent.setup();
-    fakeArchive.pairs = [pair({ resolution: "MINUTE" }), pair({ resolution: "HOUR" })];
-    fakeArchive.coverageAnswer = {
-      symbol: "US100",
-      resolution: "MINUTE",
-      ranges: [{ from: 1785542400, to: 1786113600, historyEnded: true }],
-      earliestReachable: 1785542400,
-    };
-    renderView();
-
-    await user.click(await screen.findByText("US100"));
-
-    expect(await screen.findAllByText(/covered from/i)).toHaveLength(2);
-    expect(screen.getAllByText(/end of the provider's history/i)).toHaveLength(2);
-  });
-
-  // How fresh the data is, per interval — the question a row's collection state answers
-  // qualitatively and this answers exactly (terminal-data-manager spec, "Świeżość
-  // danych").
-  it("gives the newest collected candle for each interval", async () => {
+describe("Instruments list — volume per interval, on expand", () => {
+  it("shows how many candles are collected, roughly how much they take, and since when", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [
-      pair({ resolution: "MINUTE", latestCandle: 1786113600 }), // 2026-08-07 14:40 UTC
-      pair({ resolution: "HOUR", latestCandle: null }),
+      pair({
+        resolution: "MINUTE",
+        candleCount: 12431,
+        estimatedBytes: 1193376,
+        earliestCandle: 1785542400, // 2026-08-01
+      }),
     ];
     renderView();
 
     await user.click(await screen.findByText("US100"));
 
-    expect(await screen.findByText(/newest: 2026-08-07 14:40 UTC/)).toBeInTheDocument();
-    // Nothing collected yet is a dash, never a zero or a fabricated instant.
-    expect(screen.getByText(/newest: —/)).toBeInTheDocument();
+    expect(await screen.findByText(/12,431 candles/)).toBeInTheDocument();
+    expect(screen.getByText(/1\.1 MB/)).toBeInTheDocument();
+    expect(screen.getByText(/2026-08-01/)).toBeInTheDocument();
+  });
+
+  it("names an interval that has collected nothing, rather than showing a zero", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [
+      pair({
+        resolution: "MINUTE",
+        candleCount: 0,
+        estimatedBytes: 0,
+        earliestCandle: null,
+        latestCandle: null,
+        collection: "never_collected",
+      }),
+    ];
+    renderView();
+
+    await user.click(await screen.findByText("US100"));
+
+    expect(await screen.findByText(/nothing collected yet/i)).toBeInTheDocument();
+    expect(screen.queryByText(/0 candles/)).not.toBeInTheDocument();
+  });
+
+  it("gives each interval its own since, when they reach back different distances", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [
+      pair({ resolution: "MINUTE", earliestCandle: 1785542400 }), // 2026-08-01
+      pair({ resolution: "DAY", earliestCandle: 1577923200 }), // 2020-01-02
+    ];
+    renderView();
+
+    await user.click(await screen.findByText("US100"));
+
+    expect(await screen.findByText(/2026-08-01/)).toBeInTheDocument();
+    expect(screen.getByText(/2020-01-02/)).toBeInTheDocument();
+  });
+});
+
+describe("Instruments list — coverage gaps, on expand", () => {
+  it("says nothing about coverage when it is one continuous range", async () => {
+    const user = userEvent.setup();
+    fakeArchive.pairs = [pair()];
+    let coverageRequested: () => void;
+    const requested = new Promise<void>((resolve) => {
+      coverageRequested = resolve;
+    });
+    fakeArchive.coverage = async (symbol: string, resolution: Resolution) => {
+      coverageRequested();
+      return {
+        symbol,
+        resolution,
+        ranges: [{ from: 1785542400, to: 1786113600, historyEnded: true }],
+        earliestReachable: 1785542400,
+      };
+    };
+    renderView();
+
+    await user.click(await screen.findByText("US100"));
+    await requested;
+    // One continuous range still has to reach the component and be applied
+    // before its absence from the screen means anything.
+    await act(async () => {});
+
+    expect(screen.queryByText(/stretches/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/covered from/i)).not.toBeInTheDocument();
   });
 
   it("names the gaps when coverage is more than one stretch", async () => {
@@ -255,16 +255,9 @@ describe("Instruments list — coverage on expand", () => {
     renderView();
 
     await user.click(await screen.findByText("US100"));
-    expect(await screen.findByText(/in 2 stretches, with gaps between them/i)).toBeInTheDocument();
-  });
-
-  it("says nothing is verified rather than showing an empty range", async () => {
-    const user = userEvent.setup();
-    fakeArchive.pairs = [pair({ collection: "never_collected", latestCandle: null })];
-    renderView();
-
-    await user.click(await screen.findByText("US100"));
-    expect(await screen.findByText(/nothing verified yet for this interval/i)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/coverage has gaps — 2 stretches, not one continuous range/i),
+    ).toBeInTheDocument();
   });
 });
 
@@ -289,8 +282,8 @@ describe("Instruments list — deleting a single interval", () => {
     expect(fakeArchive.deleteCalls).toEqual([{ symbol: "US100", resolution: "MINUTE" }]);
     await waitFor(() => {
       const row = screen.getByTestId("instrument-US100");
-      expect(within(row).queryByText("1m")).not.toBeInTheDocument();
-      expect(within(row).getByText("1h")).toBeInTheDocument();
+      expect(within(row).queryByText("m1")).not.toBeInTheDocument();
+      expect(within(row).getByText("h1")).toBeInTheDocument();
     });
   });
 
@@ -334,7 +327,7 @@ describe("Instruments list — deleting a single interval", () => {
     await user.click(screen.getByRole("button", { name: /^delete data$/i }));
 
     expect(await screen.findByText(/could not delete/i)).toBeInTheDocument();
-    expect(within(screen.getByTestId("instrument-US100")).getByText("1m")).toBeInTheDocument();
+    expect(within(screen.getByTestId("instrument-US100")).getByText("m1")).toBeInTheDocument();
   });
 });
 
@@ -395,8 +388,8 @@ describe("Instruments list — deleting a whole instrument", () => {
 
     await waitFor(() => {
       const row = screen.getByTestId("instrument-US100");
-      expect(within(row).queryByText("1m")).not.toBeInTheDocument();
-      expect(within(row).getByText("1h")).toBeInTheDocument();
+      expect(within(row).queryByText("m1")).not.toBeInTheDocument();
+      expect(within(row).getByText("h1")).toBeInTheDocument();
     });
     expect(screen.getByText(/could not delete HOUR/i)).toBeInTheDocument();
   });

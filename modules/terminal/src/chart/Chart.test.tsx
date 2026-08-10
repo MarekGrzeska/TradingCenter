@@ -52,6 +52,18 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe("Chart — resolution picker (terminal-shell spec)", () => {
+  it("shows the terminal's own interval labels, never the wire's names", () => {
+    renderChart(source, { resolution: "MINUTE_5" });
+
+    const select = screen.getByLabelText("Resolution") as HTMLSelectElement;
+    const labels = [...select.options].map((option) => option.textContent);
+
+    expect(labels).toEqual(["m1", "m5", "m15", "m30", "h1", "h4", "day", "week"]);
+    expect(labels).not.toContain("MINUTE_5");
+  });
+});
+
 describe("Chart — feed states (terminal-chart spec)", () => {
   it("says it is loading before the snapshot lands", () => {
     renderChart(source);
@@ -77,7 +89,7 @@ describe("Chart — feed states (terminal-chart spec)", () => {
     await act(async () => {
       source.snapshot([]);
     });
-    expect(screen.getByText(/no candles for us100 at minute_5/i)).toBeInTheDocument();
+    expect(screen.getByText(/no candles for us100 at m5/i)).toBeInTheDocument();
   });
 
   it("names a refused subscription and retries it on demand", async () => {
@@ -192,34 +204,6 @@ describe("Chart — live bars", () => {
     expect(series.data().map((c) => c.time)).toEqual([100, 200, 300]);
   });
 
-  it("flags a forming candle and drops the flag once it settles", async () => {
-    renderChart(source);
-    await act(async () => {
-      source.snapshot([], bar(100, 1, true));
-    });
-    // The snapshot's forming bar reaches the header on the next animation
-    // frame, like any other live bar.
-    await waitFor(() => expect(screen.getByText(/forming/i)).toBeInTheDocument());
-
-    await act(async () => {
-      source.emit({ kind: "bar", bar: bar(100, 1.2, false) });
-    });
-    // Live bars reach the header on the next animation frame, so the badge
-    // clears a frame after the canvas does.
-    await waitFor(() => expect(screen.queryByText(/forming/i)).not.toBeInTheDocument());
-  });
-
-  it("shows a missing volume as unavailable, never as zero", async () => {
-    renderChart(source);
-    await act(async () => {
-      // Prices well away from 0 so a stray "0" in the readout could only be
-      // the volume field.
-      source.snapshot([bar(100, 50, false, null)]);
-    });
-    expect(screen.getByText("n/a")).toBeInTheDocument();
-    expect(screen.queryByText("0")).not.toBeInTheDocument();
-  });
-
   it("keeps a bar that arrived before the snapshot did", async () => {
     renderChart(source);
 
@@ -235,15 +219,15 @@ describe("Chart — live bars", () => {
 
     const series = stub.latest().series[0];
     expect(series.data().map((c) => c.time)).toEqual([100, 200, 300]);
-    expect(screen.getByText(/forming/i)).toBeInTheDocument();
   });
 
-  it("shows a real volume when the source carries one", async () => {
+  it("never shows volume, even when the source carries one", async () => {
     renderChart(source);
     await act(async () => {
       source.snapshot([bar(100, 1, false, 1234)]);
     });
-    expect(screen.getByText("1234")).toBeInTheDocument();
+    expect(screen.queryByText("1234")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^V\b/)).not.toBeInTheDocument();
   });
 });
 

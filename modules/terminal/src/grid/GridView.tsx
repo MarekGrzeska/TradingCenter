@@ -4,6 +4,7 @@ import { Chart } from "../chart/Chart";
 import { archive, marketData } from "../data/marketData";
 import type { Resolution, TrackedPair } from "../data/types";
 import { useTrackedPairs } from "../instruments/useTrackedPairs";
+import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { gridStore } from "./gridStore";
 import { SymbolField } from "./SymbolField";
 import { LAYOUTS, LAYOUT_IDS, visibleSlotIds, type SlotId } from "./model";
@@ -236,7 +237,7 @@ function StaleSlot({
           <>
             {" "}
             is no longer archived at{" "}
-            <span className="font-semibold text-ink">{resolution}</span>.
+            <span className="font-semibold text-ink">{RESOLUTION_LABEL[resolution]}</span>.
           </>
         )}
       </p>
@@ -252,7 +253,7 @@ function StaleSlot({
                 onClick={() => gridStore.setSlotResolution(slotId, r)}
                 className="rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
               >
-                {r}
+                {RESOLUTION_LABEL[r]}
               </button>
             ))}
           </div>

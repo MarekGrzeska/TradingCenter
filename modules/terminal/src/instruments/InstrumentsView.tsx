@@ -5,8 +5,8 @@ import { RESOLUTIONS } from "../data/types";
 import type { CollectionState, PairCoverage, Resolution, TrackedPair } from "../data/types";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { AddInstrumentWizard } from "./AddInstrumentWizard";
-import { formatInstant } from "./format";
-import { RESOLUTION_ABBR } from "./resolutionAbbr";
+import { formatBytes, formatInstant } from "../ui/formatTime";
+import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { useTrackedPairs } from "./useTrackedPairs";
 
 /**
@@ -16,14 +16,6 @@ import { useTrackedPairs } from "./useTrackedPairs";
  * column, and expanding a row shows coverage and stops collection.
  */
 
-const COLLECTION_LABEL: Record<CollectionState, string> = {
-  never_collected: "nothing yet",
-  collecting: "collecting",
-  stalled: "stalled",
-  market_closed: "market closed",
-  unknown: "unknown",
-};
-
 const COLLECTION_HINT: Record<CollectionState, string> = {
   never_collected: "Added, but no candle has been written yet.",
   collecting: "The newest candle is as recent as it should be.",
@@ -32,44 +24,10 @@ const COLLECTION_HINT: Record<CollectionState, string> = {
   unknown: "Behind, and nobody could say whether the market is open.",
 };
 
-/** How far back the data reaches, and for which resolutions. One entry when
- *  every resolution reaches equally far back — which is the common case, since
- *  they are usually collected by one job from one date — and one per distinct
- *  moment otherwise. `since` is null for resolutions that have collected
- *  nothing at all. */
-interface DataSince {
-  since: number | null;
-  resolutions: Resolution[];
-}
-
 interface InstrumentGroup {
   symbol: string;
   /** Sorted by `RESOLUTIONS`' own order, not insertion order. */
   pairs: TrackedPair[];
-  /** Oldest first, so the row leads with the deepest history it has. */
-  dataSince: DataSince[];
-}
-
-/**
- * Resolutions bucketed by the moment their data starts.
- *
- * An instrument whose four resolutions all begin at the same moment deserves
- * one date, not the same date four times; one whose daily series reaches back
- * years while its minute series reaches back a week deserves both numbers,
- * because a single one of them would be a lie about the other.
- */
-function dataSinceOf(pairs: TrackedPair[]): DataSince[] {
-  const byMoment = new Map<number | null, Resolution[]>();
-  for (const pair of pairs) {
-    const at = byMoment.get(pair.earliestCandle) ?? [];
-    at.push(pair.resolution);
-    byMoment.set(pair.earliestCandle, at);
-  }
-  return [...byMoment.entries()]
-    .map(([since, resolutions]) => ({ since, resolutions }))
-    // Nothing collected yet sorts last: it is the least informative line, and
-    // an operator scanning the column is looking for how deep the archive goes.
-    .sort((a, b) => (a.since ?? Infinity) - (b.since ?? Infinity));
 }
 
 function groupBySymbol(pairs: TrackedPair[]): InstrumentGroup[] {
@@ -84,9 +42,21 @@ function groupBySymbol(pairs: TrackedPair[]): InstrumentGroup[] {
       const sorted = [...group].sort(
         (a, b) => RESOLUTIONS.indexOf(a.resolution) - RESOLUTIONS.indexOf(b.resolution),
       );
-      return { symbol, pairs: sorted, dataSince: dataSinceOf(sorted) };
+      return { symbol, pairs: sorted };
     })
     .sort((a, b) => a.symbol.localeCompare(b.symbol));
+}
+
+/** The deepest history this instrument holds, across every interval — what a
+ *  whole-instrument delete confirmation shows so the operator sees the size
+ *  of what they are about to lose. Null when no interval has collected
+ *  anything yet. */
+function earliestDataOf(pairs: TrackedPair[]): number | null {
+  return pairs.reduce<number | null>((oldest, pair) => {
+    if (pair.earliestCandle === null) return oldest;
+    if (oldest === null) return pair.earliestCandle;
+    return Math.min(oldest, pair.earliestCandle);
+  }, null);
 }
 
 /** What one Delete left behind — the only thing worth telling the operator
@@ -246,7 +216,6 @@ function InstrumentList({
             <tr>
               <th className="px-4 py-2 font-normal">Symbol</th>
               <th className="px-4 py-2 font-normal">Resolutions</th>
-              <th className="px-4 py-2 font-normal">Data since</th>
               <th className="px-4 py-2 font-normal" />
             </tr>
           </thead>
@@ -278,10 +247,7 @@ function InstrumentRow({
   const [expanded, setExpanded] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const stalled = group.pairs.some((pair) => pair.collection === "stalled");
-  // The deepest history this instrument holds, across every interval — what a
-  // confirmation shows so the operator sees the size of what they are about
-  // to lose, not just which intervals.
-  const earliestData = group.dataSince.find((entry) => entry.since !== null)?.since ?? null;
+  const earliestData = earliestDataOf(group.pairs);
 
   const deleteAll = useCallback(async () => {
     const outcomes = await Promise.allSettled(
@@ -338,13 +304,10 @@ function InstrumentRow({
                   pair.collection === "stalled" ? "font-semibold text-down" : "text-ink-secondary"
                 }
               >
-                {RESOLUTION_ABBR[pair.resolution]}
+                {RESOLUTION_LABEL[pair.resolution]}
               </span>
             </span>
           ))}
-        </td>
-        <td className="px-4 py-1.5 text-ink-muted">
-          <DataSinceCell entries={group.dataSince} />
         </td>
         <td className="px-4 py-1.5 text-right">
           <button
@@ -363,7 +326,7 @@ function InstrumentRow({
 
       {confirming && (
         <tr>
-          <td colSpan={4} className="p-0">
+          <td colSpan={3} className="p-0">
             <DeleteDialog
               symbol={group.symbol}
               resolutions={group.pairs.map((pair) => pair.resolution)}
@@ -377,7 +340,7 @@ function InstrumentRow({
 
       {expanded && (
         <tr className="border-t border-border">
-          <td colSpan={4} className="p-0">
+          <td colSpan={3} className="p-0">
             {group.pairs.map((pair) => (
               <IntervalCoverage
                 key={pair.resolution}
@@ -394,35 +357,36 @@ function InstrumentRow({
 }
 
 /**
- * Since when there is data — one date when that answer is one date.
- *
- * The resolutions are named only when they disagree. Labelling a single moment
- * with all four of an instrument's intervals says nothing the row does not
- * already say, and the column exists to be read at a glance.
+ * How much of this interval is actually archived: how many candles, roughly how much
+ * storage they take, and since when — the question expanding a row exists to answer
+ * (`terminal-data-manager` spec, "Rozwinięcie instrumentu podaje objętość zebranych
+ * danych"). An interval that has collected nothing says so, rather than showing a zero
+ * that could be mistaken for a measurement.
  */
-function DataSinceCell({ entries }: { entries: DataSince[] }) {
-  if (entries.length === 1) {
-    const [only] = entries;
-    return only.since === null ? (
-      <span>nothing yet</span>
-    ) : (
-      <span className="text-ink-secondary">{formatInstant(only.since)}</span>
-    );
+function IntervalVolume({ pair }: { pair: TrackedPair }) {
+  if (pair.candleCount === 0) {
+    // Spans the three number columns: there is no number to line up with.
+    return <span className="col-span-3 text-ink-muted">nothing collected yet</span>;
   }
-
   return (
-    <div className="flex flex-col gap-0.5">
-      {entries.map((entry) => (
-        <div key={entry.since ?? "none"} className="flex items-baseline gap-2">
-          <span className="shrink-0 text-xs">
-            {entry.resolutions.map((resolution) => RESOLUTION_ABBR[resolution]).join(" · ")}
-          </span>
-          <span className={entry.since === null ? "" : "text-ink-secondary"}>
-            {entry.since === null ? "nothing yet" : formatInstant(entry.since)}
-          </span>
-        </div>
-      ))}
-    </div>
+    <>
+      {/* Right-aligned so the counts stack by their ones place down the column, and
+          `tabular-nums` so the digits are the same width — without it a column of
+          proportional figures still zig-zags. */}
+      <span className="text-right tabular-nums text-ink-secondary">
+        {pair.candleCount.toLocaleString()} candles
+      </span>
+      <span className="text-right tabular-nums text-ink-secondary">
+        {formatBytes(pair.estimatedBytes)}
+      </span>
+      <span className="text-ink-secondary">
+        {pair.earliestCandle !== null && (
+          <>
+            since <span className="text-ink">{formatInstant(pair.earliestCandle)}</span>
+          </>
+        )}
+      </span>
+    </>
   );
 }
 
@@ -477,57 +441,33 @@ function IntervalCoverage({
     onChanged();
   }, [pair.symbol, pair.resolution, onChanged, onDeleted]);
 
-  const first = coverage?.ranges[0];
-  const last = coverage?.ranges.at(-1);
-  const stalled = pair.collection === "stalled";
-
   return (
     <div className="flex flex-col gap-1 border-t border-border px-4 py-2 text-xs first:border-t-0">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="font-semibold text-ink">{RESOLUTION_ABBR[pair.resolution]}</span>
-        <span
-          title={COLLECTION_HINT[pair.collection]}
-          className={stalled ? "font-semibold text-down" : "text-ink-secondary"}
-        >
-          {COLLECTION_LABEL[pair.collection]}
-        </span>
-        <span className="text-ink-muted">
-          newest: {pair.latestCandle === null ? "—" : formatInstant(pair.latestCandle)}
-        </span>
+      {/* One grid template, identical in every interval row, so the columns line up
+          down the whole expansion — which is the point: an operator compares m1's
+          count against h4's by reading down, not by re-reading each line. */}
+      <div className="grid grid-cols-[2.5rem_7rem_4.5rem_1fr_auto] items-center gap-x-4">
+        <span className="font-semibold text-ink">{RESOLUTION_LABEL[pair.resolution]}</span>
+        <IntervalVolume pair={pair} />
         <button
           type="button"
           aria-label={`Delete ${pair.symbol} ${pair.resolution}`}
           onClick={() => setConfirming(true)}
-          className="ml-auto rounded border border-border px-2 py-0.5 text-ink-muted hover:text-ink"
+          className="rounded border border-border px-2 py-0.5 text-ink-muted hover:text-ink"
         >
           Delete
         </button>
       </div>
 
       {error && <p className="text-critical">{error}</p>}
-      {!error && !coverage && <p className="text-ink-muted">Reading coverage…</p>}
-      {coverage &&
-        (first && last ? (
-          <p className="text-ink-secondary">
-            Covered from <span className="text-ink">{formatInstant(first.from)}</span> to{" "}
-            <span className="text-ink">{formatInstant(last.to)}</span>
-            {coverage.ranges.length > 1 && (
-              // Coverage is stored merged, so more than one range means real
-              // stretches nobody has looked at between them.
-              <span className="text-warning">
-                {" "}
-                — in {coverage.ranges.length} stretches, with gaps between them
-              </span>
-            )}{" "}
-            {first.historyEnded
-              ? "— reached the end of the provider's history."
-              : coverage.earliestReachable === null
-                ? "— the provider's history has not been reached yet."
-                : `— the provider has nothing older than ${formatInstant(coverage.earliestReachable)}.`}
-          </p>
-        ) : (
-          <p className="text-ink-muted">Nothing verified yet for this interval.</p>
-        ))}
+      {/* Silent unless there is something to warn about: a fully covered interval's
+          bounds are already said by "since", above — repeating them here would say
+          nothing the operator does not already know. */}
+      {!error && coverage && coverage.ranges.length > 1 && (
+        <p className="text-warning">
+          Coverage has gaps — {coverage.ranges.length} stretches, not one continuous range.
+        </p>
+      )}
 
       {confirming && (
         <DeleteDialog

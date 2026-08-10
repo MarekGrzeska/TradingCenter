@@ -30,7 +30,7 @@ from ..jobs import (
     create_job,
     plan_chunks,
 )
-from ..models import Resolution
+from ..models import ESTIMATED_BYTES_PER_CANDLE, Resolution
 from ..tracking import (
     LimitReached,
     TrackedPair,
@@ -72,6 +72,8 @@ async def pairs(request: Request, db=Depends(pool)) -> list[TrackedPairOut]:
             latest_candle=status.latest_candle,
             collection=collection,
             last_fill=FillOut.of(ingest.last_fill(status.symbol, status.resolution)),
+            candle_count=status.candle_count,
+            estimated_bytes=status.candle_count * ESTIMATED_BYTES_PER_CANDLE,
         )
         for status, collection in decided
     ]

@@ -15,7 +15,7 @@ from market_data.errors import GatewayRefused, GatewayUnreachable
 from market_data.hub import CandleChange, Hub, Snapshot
 from market_data.ingest.backfill import FillOutcome
 from market_data.market_status import MarketStatus
-from market_data.models import Candle, CandleSource, Resolution
+from market_data.models import ESTIMATED_BYTES_PER_CANDLE, Candle, CandleSource, Resolution
 from market_data.rollups import refresh_all
 from market_data.store import read_candles, write_candles
 from market_data.tickets import TicketStore
@@ -528,6 +528,29 @@ async def test_the_list_carries_how_far_back_the_data_reaches(api, pool) -> None
     [listed] = (await api.get("/pairs")).json()
 
     assert _at(listed["earliest_candle"]) == NOW - timedelta(minutes=30)
+
+
+async def test_the_list_carries_how_much_is_collected(api, pool) -> None:
+    """How many candles, and roughly how much they take — the date range alone cannot
+    say (`market-data-api` spec, "Śledzone pary są zarządzalne przez kontrakt")."""
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await write_candles(conn, [candle(0), candle(30), candle(60)])
+
+    [listed] = (await api.get("/pairs")).json()
+
+    assert listed["candle_count"] == 3
+    assert listed["estimated_bytes"] == 3 * ESTIMATED_BYTES_PER_CANDLE
+
+
+async def test_a_pair_with_nothing_collected_reports_zero_candles(api, pool) -> None:
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+
+    [listed] = (await api.get("/pairs")).json()
+
+    assert listed["candle_count"] == 0
+    assert listed["estimated_bytes"] == 0
 
 
 async def test_a_late_pair_with_the_market_open_is_reported_stalled(api, pool) -> None:
