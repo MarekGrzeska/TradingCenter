@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Awaitable, Callable
-from datetime import datetime
+from datetime import UTC, datetime
 
 import httpx
 
@@ -147,12 +147,28 @@ class CapitalAdapter:
             instruments=out, count=len(out), truncated=truncated, nodes_visited=visited
         )
 
+    async def _market_open(self, symbol: str) -> bool:
+        """Whether the venue is trading this instrument right now.
+
+        The only thing that knows where a daily period ends is the provider, so this is
+        what stands in for a boundary this module refuses to compute. Called lazily —
+        `history.mark_forming` awaits it only when nothing cheaper can decide.
+        """
+        resp = await self._c.market(symbol)
+        if resp.status_code == 404:
+            raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
+        snapshot = self._json_ok(resp).get("snapshot") or {}
+        return snapshot.get("marketStatus") == "TRADEABLE"
+
     async def get_candles(self, symbol: str, resolution: Resolution, limit: int) -> list[Candle]:
         resp = await self._c.prices(symbol, resolution.value, limit)
         if resp.status_code == 404:
             raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
         data = self._json_ok(resp)
-        return [mapping.candle_from_price(p, resolution) for p in data.get("prices", [])]
+        candles = [mapping.candle_from_price(p, resolution) for p in data.get("prices", [])]
+        return await history.mark_forming(
+            candles, resolution, datetime.now(UTC), lambda: self._market_open(symbol)
+        )
 
     async def get_history(
         self,
@@ -194,9 +210,13 @@ class CapitalAdapter:
                 raise GatewayError(f"capital.com {resp.status_code}: {resp.text[:200]}")
             return [mapping.candle_from_price(p, resolution) for p in resp.json().get("prices", [])]
 
-        return await history.collect(
+        page = await history.collect(
             symbol, resolution, bars, fetch_page, still_wanted, anchor, floor
         )
+        marked = await history.mark_forming(
+            page.candles, resolution, datetime.now(UTC), lambda: self._market_open(symbol)
+        )
+        return page.model_copy(update={"candles": marked})
 
     # --- trading ---
 

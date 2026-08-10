@@ -89,6 +89,75 @@ def window_before(
 # which the provider reports as an error and this module treats as an ending.
 FetchPage = Callable[[str | None, str | None, int], Awaitable[list[Candle] | None]]
 
+# Answers "is this instrument's market open right now". Injected rather than reached for,
+# same as ``FetchPage``, so the rule below stays testable without a transport underneath.
+MarketOpen = Callable[[], Awaitable[bool]]
+
+# The resolutions whose period is a fixed number of seconds, so "is now inside this
+# candle's period" is arithmetic and exact. DAY and WEEK are absent for the reason they
+# are absent from every other such list in this repository: their boundary follows the
+# venue's session, and one computed from UTC midnight looks right and is wrong.
+FIXED_PERIOD = frozenset(
+    {
+        Resolution.MINUTE,
+        Resolution.MINUTE_5,
+        Resolution.MINUTE_15,
+        Resolution.MINUTE_30,
+        Resolution.HOUR,
+        Resolution.HOUR_4,
+    }
+)
+
+
+async def mark_forming(
+    candles: list[Candle],
+    resolution: Resolution,
+    now: datetime,
+    market_open: MarketOpen | None = None,
+) -> list[Candle]:
+    """Say which candle, if any, covers a period that has not finished.
+
+    Only the newest can: every candle before it is closed by the existence of the one
+    after it.
+
+    ``PERIOD_SECONDS`` is used as an upper bound on staleness, not as a boundary. A
+    candle older than one whole period cannot be the running one whatever the venue's
+    calendar does — the bound overstates elapsed time, which is the safe direction here
+    for the same reason it is safe when sizing a window. Past that filter the two classes
+    of resolution part ways:
+
+    - fixed period: the bound *is* the boundary, so the answer is already exact and
+      ``market_open`` is never consulted;
+    - ``DAY`` and ``WEEK``: the venue decides, and the only thing that knows is the
+      provider. An open market with a candle less than a day old is a period in progress;
+      a shut one has closed whatever it was building. ``market_open`` is awaited only
+      here, so a deep read of old history never spends the request.
+
+    Returns a new list. A candle is a value, and a read that marks one in place would
+    change a page the caller may still be holding.
+    """
+    if not candles:
+        return candles
+
+    newest = candles[-1]
+    started = parse_candle_ts(newest.ts)
+    if started + timedelta(seconds=PERIOD_SECONDS[resolution]) <= now:
+        return candles
+
+    if resolution in FIXED_PERIOD:
+        running = True
+    elif market_open is None:
+        # Nothing to ask. Left closed rather than guessed: storing a settled candle that
+        # was still moving is the failure this exists to prevent, but withholding one
+        # forever is also a failure, and only the first is silent.
+        running = False
+    else:
+        running = await market_open()
+
+    if not running:
+        return candles
+    return [*candles[:-1], newest.model_copy(update={"forming": True})]
+
 
 async def collect(
     symbol: str,

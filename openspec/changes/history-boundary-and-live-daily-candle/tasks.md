@@ -47,21 +47,21 @@
 
 ## 4. capital-gateway: odczyt historii mówi, który okres jeszcze trwa
 
-- [ ] 4.1 W `capital_gateway/dtos.py` dodać na `Candle` pole mówiące, czy okres się domknął.
+- [x] 4.1 W `capital_gateway/dtos.py` dodać na `Candle` pole mówiące, czy okres się domknął.
   To zmiana kontraktu między modułami — sprawdzić, czy `openapi.py` opisuje ją tam, gdzie
   trzeba.
-- [ ] 4.2 Wyznaczanie dla rozdzielczości o stałej długości okresu: arytmetyka na
+- [x] 4.2 Wyznaczanie dla rozdzielczości o stałej długości okresu: arytmetyka na
   `PERIOD_SECONDS`, które `history.py` już trzyma.
-- [ ] 4.3 Wyznaczanie dla `DAY` i `WEEK`: rozstrzyga stan rynku instrumentu (`tradeable`
+- [x] 4.3 Wyznaczanie dla `DAY` i `WEEK`: rozstrzyga stan rynku instrumentu (`tradeable`
   z `mapping.py`), nigdy arytmetyka na granicy sesji.
-- [ ] 4.4 Odczyt zakotwiczony w przeszłości nie oznacza żadnej świecy jako trwającej.
-- [ ] 4.5 Test: odczyt do chwili bieżącej na `MINUTE_5` — najnowsza świeca oznaczona jako
+- [x] 4.4 Odczyt zakotwiczony w przeszłości nie oznacza żadnej świecy jako trwającej.
+- [x] 4.5 Test: odczyt do chwili bieżącej na `MINUTE_5` — najnowsza świeca oznaczona jako
   trwająca, wszystkie starsze jako zamknięte.
-- [ ] 4.6 Test: `DAY` przy rynku otwartym — najnowsza trwająca; przy rynku zamkniętym —
+- [x] 4.6 Test: `DAY` przy rynku otwartym — najnowsza trwająca; przy rynku zamkniętym —
   wszystkie zamknięte.
-- [ ] 4.7 Test: odczyt z `before` w przeszłości — wszystkie świece zamknięte, niezależnie od
+- [x] 4.7 Test: odczyt z `before` w przeszłości — wszystkie świece zamknięte, niezależnie od
   stanu rynku.
-- [ ] 4.8 `uv run pytest`, `uv run ruff check .`, `uv run pyright`.
+- [x] 4.8 `uv run pytest`, `uv run ruff check .`, `uv run pyright`.
 
 ## 5. market-data: granica powstaje z pomiaru i daje się unieważnić
 

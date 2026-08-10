@@ -90,6 +90,12 @@ class Candle(BaseModel):
     close: float | None = None
     volume: float | None = None
     resolution: Resolution
+    # True while the period this candle covers has not finished. The provider serves
+    # candles up to the present, so a read reaching now hands back the period it is in —
+    # complete in every field and still going to change. A consumer that cannot tell will
+    # store a price from halfway through a period as the period's result, and nothing
+    # downstream ever looks wrong enough to catch it.
+    forming: bool = False
 
 
 class CandleHistory(BaseModel):
