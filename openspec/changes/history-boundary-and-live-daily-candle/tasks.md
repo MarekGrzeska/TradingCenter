@@ -117,7 +117,7 @@
 
 ## 8. Domknięcie
 
-- [ ] 8.1 `openspec validate history-boundary-and-live-daily-candle --strict`.
+- [x] 8.1 `openspec validate history-boundary-and-live-daily-candle --strict`.
 - [ ] 8.2 Wdrożyć w kolejności z `design.md`: najpierw `capital-gateway` w całości, potem
   `market-data`.
 - [ ] 8.3 Odzyskać US100: poprosić o dane od 2024-01-01 dla siedmiu rozdzielczości
