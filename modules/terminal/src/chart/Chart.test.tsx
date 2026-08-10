@@ -692,6 +692,54 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(stub.latest().panesList).toHaveLength(1);
   });
 
+  it("draws the catalogue's reference levels (RSI's 30/70) once, and removes them when deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "rsi",
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: "rsi", label: "RSI {period}", style: null }],
+        render: {
+          pane: "own",
+          style: "line",
+          scale: "fixed",
+          autoscale: false,
+          range: [0, 100],
+          levels: [30, 70],
+        },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ id: "rsi", params: { period: 14 }, lines: { rsi: [40, 60] } }),
+        ],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^rsi$/i }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    const rsiLine = lineSeries()[0];
+    const levelPrices = rsiLine.priceLines.filter((l) => !l.removed).map((l) => l.options.price);
+    expect(levelPrices).toEqual([30, 70]);
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^rsi$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(0));
+    // Explicitly removed, not just orphaned along with the series it sat on.
+    expect(rsiLine.priceLines.every((l) => l.removed)).toBe(true);
+  });
+
   it("draws a missing value as a whitespace point, never as zero", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [indicatorEntry()];

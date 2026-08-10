@@ -132,6 +132,12 @@ export function Chart({
   // rather than sharing one oscillator pane between wskaźniki that disagree
   // about scale.
   const ownPanesRef = useRef<Map<string, IPaneApi<Time>>>(new Map());
+  // The catalogue's reference-level hint (RSI's 30/70, …) drawn once per
+  // (wskaźnik, params) rather than recomputed every render — the levels never
+  // change while the selection is active, only the lines they sit behind do.
+  const levelLinesRef = useRef<Map<string, { series: ISeriesApi<"Line">; lines: IPriceLine[] }>>(
+    new Map(),
+  );
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -242,6 +248,7 @@ export function Chart({
 
     const indicatorSeries = indicatorSeriesRef.current;
     const ownPanes = ownPanesRef.current;
+    const levelLines = levelLinesRef.current;
     return () => {
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
@@ -250,11 +257,12 @@ export function Chart({
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
       priceLineRef.current = null;
-      // Every wskaźnik series and pane belonged to it too — `chart.remove()`
-      // already freed them, this only stops the sync effect below from reaching
-      // for one that is gone.
+      // Every wskaźnik series, pane and reference level belonged to it too —
+      // `chart.remove()` already freed them, this only stops the sync effect
+      // below from reaching for one that is gone.
       indicatorSeries.clear();
       ownPanes.clear();
+      levelLines.clear();
     };
   }, []);
 
@@ -475,6 +483,7 @@ export function Chart({
 
     const active = new Set<string>();
     const activeOwnPanes = new Set<string>();
+    const activeResults = new Set<string>();
     let colorIndex = 0;
 
     for (const result of indicatorsState.results) {
@@ -483,6 +492,7 @@ export function Chart({
 
       const paramsKey = entry.params.map((p) => result.params[p.name]).join(",");
       const ownPaneKey = `${result.id}|${paramsKey}`;
+      activeResults.add(ownPaneKey);
 
       let paneIndex: number | undefined;
       if (entry.render.pane === "own") {
@@ -495,6 +505,8 @@ export function Chart({
         }
         paneIndex = pane.paneIndex();
       }
+
+      let firstLine: ISeriesApi<"Line"> | undefined;
 
       for (const lineSpec of entry.lines) {
         const key = `${result.id}|${paramsKey}|${lineSpec.key}`;
@@ -525,7 +537,25 @@ export function Chart({
           indicatorSeriesRef.current.set(key, line);
         }
         line.setData(points);
+        firstLine ??= line;
         colorIndex++;
+      }
+
+      // Reference levels (RSI's 30/70, …) — drawn once per (id, params) on
+      // whichever line happens to be first, since every line an entry declares
+      // shares that pane's one price scale.
+      if (entry.render.levels.length > 0 && firstLine && !levelLinesRef.current.has(ownPaneKey)) {
+        const priceLines = entry.render.levels.map((level) =>
+          firstLine.createPriceLine({
+            price: level,
+            color: colors.inkMuted,
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: "",
+          }),
+        );
+        levelLinesRef.current.set(ownPaneKey, { series: firstLine, lines: priceLines });
       }
     }
 
@@ -539,6 +569,12 @@ export function Chart({
       if (activeOwnPanes.has(ownPaneKey)) continue;
       chart.removePane(pane.paneIndex());
       ownPanesRef.current.delete(ownPaneKey);
+    }
+
+    for (const [key, { series, lines }] of levelLinesRef.current) {
+      if (activeResults.has(key)) continue;
+      for (const priceLine of lines) series.removePriceLine(priceLine);
+      levelLinesRef.current.delete(key);
     }
   }, [indicatorsState.results, indicatorsState.times, catalogueById]);
 
