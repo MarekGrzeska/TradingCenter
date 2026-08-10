@@ -172,6 +172,9 @@ def _safe_divide(numerator: np.ndarray, denominator: np.ndarray) -> np.ndarray:
         return numerator / denominator
 
 
+_LN2 = float(np.log(2.0))
+
+
 _ATR_PCT = IndicatorSpec(
     id="atr_pct",
     name="Average True Range %",
@@ -314,6 +317,138 @@ _ZSCORE = IndicatorSpec(
     },
 )
 
+# --- zmienność z OHLC: a family with no volume in it at all, built for exactly
+# the data this archive has (docs/wskazniki-plan-wdrozenia.html, "Zmienność z
+# OHLC"). None of these annualise — the module has no trading calendar to
+# annualise against (design.md, Ichimoku/Alligator decision) — so every one reads
+# in the same per-bar log-return units as the others. ---
+
+_STDEV = IndicatorSpec(
+    id="stdev",
+    name="Standard Deviation",
+    group="volatility_estimators",
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="stdev", label="StDev {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {"stdev": kernel.stdev(s.close, int(p["period"]))},
+)
+
+
+def _compute_parkinson(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    log_hl_sq = np.log(s.high / s.low) ** 2
+    variance = kernel.sma(log_hl_sq, period) / (4 * _LN2)
+    return {"parkinson": np.sqrt(np.clip(variance, 0, None))}
+
+
+_PARKINSON = IndicatorSpec(
+    id="parkinson",
+    name="Parkinson Volatility",
+    group="volatility_estimators",
+    inputs=("high", "low"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="parkinson", label="Parkinson {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_parkinson,
+)
+
+
+def _compute_garman_klass(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    per_bar = 0.5 * np.log(s.high / s.low) ** 2 - (2 * _LN2 - 1) * np.log(s.close / s.open) ** 2
+    variance = kernel.sma(per_bar, period)
+    return {"garman_klass": np.sqrt(np.clip(variance, 0, None))}
+
+
+_GARMAN_KLASS = IndicatorSpec(
+    id="garman_klass",
+    name="Garman-Klass Volatility",
+    group="volatility_estimators",
+    inputs=("open", "high", "low", "close"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="garman_klass", label="Garman-Klass {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_garman_klass,
+)
+
+
+def _compute_rogers_satchell(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    per_bar = np.log(s.high / s.close) * np.log(s.high / s.open) + np.log(s.low / s.close) * np.log(
+        s.low / s.open
+    )
+    variance = kernel.sma(per_bar, period)
+    return {"rogers_satchell": np.sqrt(np.clip(variance, 0, None))}
+
+
+_ROGERS_SATCHELL = IndicatorSpec(
+    id="rogers_satchell",
+    name="Rogers-Satchell Volatility",
+    group="volatility_estimators",
+    inputs=("open", "high", "low", "close"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="rogers_satchell", label="Rogers-Satchell {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_rogers_satchell,
+)
+
+
+def _compute_yang_zhang(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    prev_close = kernel.shift(s.close, 1)
+    overnight = np.log(_safe_divide(s.open, prev_close))
+    open_to_close = np.log(s.close / s.open)
+    rs_per_bar = np.log(s.high / s.close) * np.log(s.high / s.open) + np.log(s.low / s.close) * np.log(
+        s.low / s.open
+    )
+
+    k = 0.34 / (1.34 + (period + 1) / (period - 1))
+    overnight_var = kernel.stdev(overnight, period, ddof=1) ** 2
+    open_close_var = kernel.stdev(open_to_close, period, ddof=1) ** 2
+    rs_var = kernel.sma(rs_per_bar, period)
+
+    variance = overnight_var + k * open_close_var + (1 - k) * rs_var
+    return {"yang_zhang": np.sqrt(np.clip(variance, 0, None))}
+
+
+_YANG_ZHANG = IndicatorSpec(
+    id="yang_zhang",
+    name="Yang-Zhang Volatility",
+    group="volatility_estimators",
+    inputs=("open", "high", "low", "close"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="yang_zhang", label="Yang-Zhang {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"]) + 1),
+    compute=_compute_yang_zhang,
+)
+
+
+def _compute_ulcer(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    highest_close = kernel.rolling_max(s.close, period)
+    drawdown_pct = 100 * _safe_divide(s.close - highest_close, highest_close)
+    return {"ulcer": np.sqrt(kernel.sma(drawdown_pct**2, period))}
+
+
+_ULCER = IndicatorSpec(
+    id="ulcer",
+    name="Ulcer Index",
+    group="volatility_estimators",
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="ulcer", label="Ulcer {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    # Doubly rolling — the highest-close window, then the mean-square-drawdown
+    # window on top of it — so it needs two window's worth of history, the same
+    # "sum of consecutive windows" rule `stoch` and `hma` use below.
+    warmup=Warmup(kind="fixed", bars=lambda p: 2 * int(p["period"])),
+    compute=_compute_ulcer,
+)
+
 # Ordered as it is meant to be offered — averages first, since `sma` and `ema` are the
 # entries every future wskaźnik in this group will sit beside.
 CATALOGUE: tuple[IndicatorSpec, ...] = (
@@ -329,6 +464,12 @@ CATALOGUE: tuple[IndicatorSpec, ...] = (
     _GAP_PREV_CLOSE_ATR,
     _RANGE_POSITION,
     _ZSCORE,
+    _STDEV,
+    _PARKINSON,
+    _GARMAN_KLASS,
+    _ROGERS_SATCHELL,
+    _YANG_ZHANG,
+    _ULCER,
 )
 
 _BY_ID: dict[str, IndicatorSpec] = {entry.id: entry for entry in CATALOGUE}
