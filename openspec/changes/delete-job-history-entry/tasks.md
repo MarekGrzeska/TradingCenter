@@ -50,5 +50,5 @@
 
 ## 6. Domknięcie
 
-- [ ] 6.1 `openspec validate delete-job-history-entry --strict`
-- [ ] 6.2 `review.md`
+- [x] 6.1 `openspec validate delete-job-history-entry --strict`
+- [x] 6.2 `review.md`
