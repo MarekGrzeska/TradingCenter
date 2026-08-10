@@ -29,6 +29,7 @@ Uruchomione na `feat/delete-job-history-entry`, commit `151cecc`:
 | `pnpm contract:check` (terminal) | `Contract is up to date.` |
 | `pnpm test` (terminal) | `3 failed, 293 passed` — te same trzy porażki co na czystym drzewie (`284 passed` przed zmianą, 9 testów dopisanych) |
 | `pnpm typecheck`, `pnpm lint` | bez uwag |
+| CI na PR #58, commit `c133aaf` | `changes`, `market-data`, `terminal`, `openspec`, `deploy` — wszystkie `pass`; `capital-gateway` pominięty filtrem diffu |
 
 Obie serie wcześniejszych porażek są środowiskowe i widoczne wyłącznie na tej maszynie:
 
@@ -48,6 +49,7 @@ Obie serie wcześniejszych porażek są środowiskowe i widoczne wyłącznie na 
 | medium | `modules/terminal/scripts/contract.mjs:65` | `execFileSync("npx", …)` — node 22 nie uruchomi `npx.cmd` bez powłoki, więc `pnpm contract:generate` kończyło się `spawnSync npx ENOENT`; przystanek 3 drogi kontraktu był na Windows niewykonalny, a `contract:check` niemożliwy do uruchomienia lokalnie | FIXED w `151cecc` — uruchamiane jest `bin/cli.js` generatora przez `process.execPath` |
 | medium | `modules/terminal/scripts/contract.mjs:38` | stdout Pythona wracał w kodowaniu ANSI, więc pierwszy udany `generate` zamienił każdą półpauzę w dokumencie na `U+FFFD` — 24 linie różnicy nieopisujące żadnej zmiany kontraktu, a plik jest w repozytorium | FIXED w `151cecc` — `PYTHONIOENCODING=utf-8` i `PYTHONUTF8=1` dla tego podprocesu |
 | low | `tests/test_jobs_store.py` (test dopisywany w tej zmianie) | odczyt świec liczony do `MOMENT` włącznie, a zakresy w tym module są półotwarte — test przechodził z 2 zamiast 3 świec i mylnie oskarżał `delete_job` | FIXED przed commitem `151cecc` |
+| high | `modules/terminal/scripts/contract.mjs:38` | wygenerowany kontrakt zależał od tego, który interpreter podstawiło uv: `requires-python = ">=3.12"` daje 3.12.3 na runnerze i 3.14 tutaj, a Python 3.13 przemianował frazę statusu 422 z „Unprocessable Entity" na „Unprocessable Content" — FastAPI bierze ją ze standardowej biblioteki i drukuje do schematu. `contract:check` przechodził lokalnie i wywracał się w CI na pliku, który dopiero co przegenerowano | FIXED w `c133aaf` — generacja prosi o 3.12 (dno tego samego `requires-python`) w osobnym, jednorazowym środowisku, żeby nie przebudować `market-data/.venv` pod kimś, kto tam pracuje |
 
 Poza tym w diffie nie ma zastrzeżeń. Wyścig z runnerem — jedyne miejsce, gdzie ta operacja
 mogła być naprawdę niepoprawna — jest domknięty w obie strony: `SELECT … FOR UPDATE` na
@@ -55,9 +57,10 @@ kawałkach zlecenia sprawia, że `_CLAIM_PENDING_CHUNK` (z `FOR UPDATE SKIP LOCK
 wiersze trzymane przez usuwanie, a jeśli runner był pierwszy, usuwanie czeka na jego
 commit i czyta już `running`, po czym odmawia.
 
-Zmiana kontraktu niesie jedną linię niezwiązaną z tą zdolnością: FastAPI drukuje dziś
-`Unprocessable Content` tam, gdzie zatwierdzona wersja pliku miała `Unprocessable Entity`.
-To zaległy dryf generatora, wyrównany przy okazji, a nie skutek nowej ścieżki.
+Zmiana kontraktu nie niesie ani jednej linii niezwiązanej z tą zdolnością. Pierwsze
+podejście niosło dwie — `Unprocessable Content` zamiast `Unprocessable Entity` — i
+wyglądały na zaległy dryf generatora wyrównany przy okazji. Nie były: to była wersja
+Pythona, którą akurat podstawiło uv, i CI je odrzuciło. Poprawka jest w tabeli wyżej.
 
 ## Spec coverage
 
