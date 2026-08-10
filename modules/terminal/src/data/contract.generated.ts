@@ -1006,7 +1006,7 @@ export interface operations {
                     "application/json": components["schemas"]["CandlesOut"];
                 };
             };
-            /** @description Unprocessable Content */
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;
@@ -1410,7 +1410,7 @@ export interface operations {
                     "application/json": components["schemas"]["TrackPairsResult"];
                 };
             };
-            /** @description Unprocessable Content */
+            /** @description Unprocessable Entity */
             422: {
                 headers: {
                     [name: string]: unknown;

@@ -33,15 +33,33 @@ const BANNER = `/**
  */
 `;
 
-function schemaJson() {
+function schemaJson(envDir) {
   try {
-    return execFileSync("uv", ["run", "python", "-m", "market_data.openapi"], {
+    // `--python 3.12`, the floor of market-data's own `requires-python`, because this
+    // document is committed and must come out the same everywhere. Left to itself uv
+    // takes whatever interpreter satisfies that floor — 3.12 on the CI runner, 3.14 on a
+    // developer's machine — and the two disagree: 3.13 renamed HTTP 422's reason phrase
+    // from "Unprocessable Entity" to "Unprocessable Content", which FastAPI reads from
+    // the stdlib and prints into the schema. Regenerating on a newer Python therefore
+    // produced a diff describing no contract change and failed `contract:check` in CI.
+    // uv fetches the interpreter if it is missing; the module's tests still run on
+    // whatever `requires-python` allows.
+    return execFileSync("uv", ["run", "--python", "3.12", "python", "-m", "market_data.openapi"], {
       cwd: marketData,
       encoding: "utf8",
       // Windows pipes Python's stdout through the ANSI codepage unless told otherwise,
       // which turned every em dash in a docstring into U+FFFD and made the committed
       // file differ by encoding alone depending on who regenerated it.
-      env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
+      //
+      // The pinned interpreter gets its own throwaway environment, so generating the
+      // contract does not quietly rebuild `market-data/.venv` on 3.12 underneath whoever
+      // is working there.
+      env: {
+        ...process.env,
+        PYTHONIOENCODING: "utf-8",
+        PYTHONUTF8: "1",
+        UV_PROJECT_ENVIRONMENT: envDir,
+      },
       maxBuffer: 32 * 1024 * 1024,
     });
   } catch (err) {
@@ -61,7 +79,7 @@ function generate() {
   try {
     const schema = join(scratch, "openapi.json");
     const emitted = join(scratch, "contract.ts");
-    writeFileSync(schema, schemaJson());
+    writeFileSync(schema, schemaJson(join(scratch, "python-env")));
     // The generator's own JS, run by this node — not `npx`, and not the `.bin` shim.
     // Both of those are `.cmd` files on Windows, which node refuses to spawn without a
     // shell (since the 2024 argument-injection fix), so `pnpm contract:generate` failed
