@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import time
+from datetime import UTC, datetime
 
 import pytest
 
@@ -154,3 +155,101 @@ async def test_the_stream_delivers_a_sealed_candle(settings: Settings) -> None:
     assert candle.low <= candle.close <= candle.high
     # Published once per period despite the provider sending both price sides.
     assert len({c.time for c in sealed}) == len(sealed)
+
+
+# --- what the provider's history actually contains, measured rather than assumed ---
+#
+# Three things this module now depends on, none of them documented by capital.com. They
+# are read-only and cheap; they exist so a provider changing its mind is a red test here
+# rather than a wrong candle in somebody's archive.
+
+
+def _newest_period_start(history_ts: str) -> datetime:
+    """The provider's stamp, read the way `history.parse_candle_ts` reads it."""
+    parsed = datetime.fromisoformat(history_ts.rstrip("Z"))
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+async def test_a_history_read_reaching_now_includes_the_period_still_running(
+    settings: Settings,
+) -> None:
+    """The newest candle of a read that reaches the present belongs to a period that has
+    not finished yet.
+
+    `market-data` stored that candle as a settled fact until this was measured, on the
+    strength of a comment asserting the opposite ("the current period has not finished,
+    so the provider does not have it either"). Both readings cannot be right, and the
+    one that was written down was never checked.
+
+    MINUTE_5 because its boundary is arithmetic, so "is this the period we are in" has an
+    exact answer without asking the venue about its session.
+    """
+    adapter = CapitalAdapter(CapitalClient(settings))
+    try:
+        instruments = await adapter.search_instruments(EPIC)
+        if not any(i.symbol == EPIC and i.tradeable for i in instruments):
+            pytest.skip("US100 is shut; the period still running is the point of this test")
+
+        candles = await adapter.get_candles(EPIC, Resolution.MINUTE_5, 3)
+        assert candles
+
+        newest = _newest_period_start(candles[-1].ts)
+        bucket = datetime.now(UTC).timestamp() // 300 * 300
+        assert newest.timestamp() == bucket, (
+            "the newest candle is not the period we are in — the provider serves only "
+            "settled candles after all, and `forming` may be a constant here"
+        )
+    finally:
+        await adapter.aclose()
+
+
+async def test_a_daily_read_reaching_now_includes_today(settings: Settings) -> None:
+    """The same claim for DAY, which is the one that cannot be checked by arithmetic.
+
+    No bucket comparison: a daily boundary follows the venue's session, and computing one
+    is exactly what this module refuses to do. The weaker check is the one that is
+    honest — today's candle is present while the market is open — and it is enough to
+    decide whether `tradeable` is a usable source of truth for "this period is running".
+    """
+    adapter = CapitalAdapter(CapitalClient(settings))
+    try:
+        instruments = await adapter.search_instruments(EPIC)
+        if not any(i.symbol == EPIC and i.tradeable for i in instruments):
+            pytest.skip("US100 is shut; nothing is running to observe")
+
+        candles = await adapter.get_candles(EPIC, Resolution.DAY, 3)
+        assert candles
+
+        newest = _newest_period_start(candles[-1].ts)
+        assert newest.date() == datetime.now(UTC).date(), (
+            "no candle for today while the market is open — the daily period being "
+            "served is one that already closed, and the stream cannot be seeded from it"
+        )
+    finally:
+        await adapter.aclose()
+
+
+async def test_market_status_tracks_the_session(settings: Settings) -> None:
+    """`tradeable` is what decides whether a daily candle is still forming, so it has to
+    mean the session and not merely "this instrument exists".
+
+    Measured against the quotes, which are the other observable of the same fact: a
+    market the provider calls tradeable is one whose quotes move.
+    """
+    adapter = CapitalAdapter(CapitalClient(settings))
+    try:
+        instruments = await adapter.search_instruments(EPIC)
+        found = [i for i in instruments if i.symbol == EPIC]
+        assert found, "US100 is not in the provider's catalogue"
+        tradeable = found[0].tradeable
+    finally:
+        await adapter.aclose()
+
+    received = await _watch(settings, Resolution.MINUTE_5, until="quote", timeout=20)
+    quoted = any(isinstance(m, QuoteMessage) for m in received)
+
+    assert quoted == tradeable, (
+        f"the catalogue says tradeable={tradeable} and the stream "
+        f"{'delivered' if quoted else 'delivered no'} quotes; one of the two is not "
+        "about the session"
+    )

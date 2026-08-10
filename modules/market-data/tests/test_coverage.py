@@ -9,6 +9,7 @@ import pytest
 from market_data.coverage import (
     Absence,
     absence_at,
+    clear_history_boundary,
     earliest_reachable,
     is_covered,
     read_coverage,
@@ -150,9 +151,19 @@ async def test_recording_returns_the_range_as_it_now_stands(db: asyncpg.Connecti
 
 
 async def test_the_end_of_provider_history_is_remembered(db: asyncpg.Connection) -> None:
-    await record_coverage(db, *PAIR, at(0), at(60), history_ended=True)
+    # The boundary lies where the read ran out, which is not the edge the read asked
+    # about: a window from at(0) that came back with nothing older than at(20) proves
+    # something about at(20) and nothing about at(0).
+    await record_coverage(db, *PAIR, at(0), at(60), history_ended=True, history_ends_at=at(20))
 
-    assert await earliest_reachable(db, *PAIR) == at(0)
+    assert await earliest_reachable(db, *PAIR) == at(20)
+
+
+async def test_a_boundary_must_say_where_it_lies(db: asyncpg.Connection) -> None:
+    """Refused rather than defaulted. A boundary placed at the requested edge announces
+    as measured a stretch nobody looked at, and it is then kept and acted on."""
+    with pytest.raises(ValueError, match="where it lies"):
+        await record_coverage(db, *PAIR, at(0), at(60), history_ended=True)
 
 
 async def test_a_pair_that_has_not_reached_the_end_has_no_boundary(
@@ -168,20 +179,72 @@ async def test_a_pair_that_has_not_reached_the_end_has_no_boundary(
 async def test_the_boundary_survives_a_later_merge(db: asyncpg.Connection) -> None:
     # Nothing can be older than it: a range starting before the provider's own first
     # candle is not something a backfill can produce.
-    await record_coverage(db, *PAIR, at(0), at(60), history_ended=True)
+    await record_coverage(db, *PAIR, at(0), at(60), history_ended=True, history_ends_at=at(20))
     await record_coverage(db, *PAIR, at(30), at(120))
 
     [covered] = await read_coverage(db, *PAIR)
     assert covered.history_ended is True
-    assert await earliest_reachable(db, *PAIR) == at(0)
+    assert await earliest_reachable(db, *PAIR) == at(20)
+
+
+async def test_a_merge_does_not_drag_the_boundary_down_to_the_range_start(
+    db: asyncpg.Connection,
+) -> None:
+    """The defect this column replaced.
+
+    The boundary used to be read off `range_start`, and ranges merge — so a range meeting
+    an older one end to end produced one row starting at the older edge, and the boundary
+    slid there with it. On US100 that put "the provider has nothing before this" at the
+    earliest moment the pair had ever verified.
+    """
+    await record_coverage(db, *PAIR, at(60), at(120), history_ended=True, history_ends_at=at(80))
+    await record_coverage(db, *PAIR, at(0), at(70))
+
+    [covered] = await read_coverage(db, *PAIR)
+    assert covered.range_start == at(0)
+    assert covered.history_ends_at == at(80)
+    assert await earliest_reachable(db, *PAIR) == at(80)
+
+
+async def test_the_deeper_of_two_boundaries_wins_a_merge(db: asyncpg.Connection) -> None:
+    """Two can only disagree by one having been measured when the provider held less, and
+    the earlier one is the one that was demonstrated."""
+    await record_coverage(db, *PAIR, at(60), at(120), history_ended=True, history_ends_at=at(80))
+    await record_coverage(db, *PAIR, at(0), at(70), history_ended=True, history_ends_at=at(10))
+
+    assert await earliest_reachable(db, *PAIR) == at(10)
+
+
+async def test_a_deeper_request_drops_the_boundary_and_keeps_the_coverage(
+    db: asyncpg.Connection,
+) -> None:
+    """No candle and no verified range is given up — only the claim that there is nothing
+    below. Deleting the pair used to be the only way to retract it."""
+    await record_coverage(db, *PAIR, at(0), at(120), history_ended=True, history_ends_at=at(20))
+
+    dropped = await clear_history_boundary(db, *PAIR)
+
+    assert dropped == at(20)
+    assert await earliest_reachable(db, *PAIR) is None
+    [covered] = await read_coverage(db, *PAIR)
+    assert (covered.range_start, covered.range_end) == (at(0), at(120))
+    assert covered.history_ended is False
+
+
+async def test_dropping_a_boundary_that_is_not_there_is_not_an_error(
+    db: asyncpg.Connection,
+) -> None:
+    await record_coverage(db, *PAIR, at(0), at(120))
+
+    assert await clear_history_boundary(db, *PAIR) is None
 
 
 async def test_a_pair_keeps_one_boundary_after_merging(db: asyncpg.Connection) -> None:
     # Two would be two answers to how far back there is anything left to fetch. The
     # partial unique index refuses them; merging has to not produce them in the first
     # place.
-    await record_coverage(db, *PAIR, at(0), at(60), history_ended=True)
-    await record_coverage(db, *PAIR, at(50), at(120), history_ended=True)
+    await record_coverage(db, *PAIR, at(0), at(60), history_ended=True, history_ends_at=at(10))
+    await record_coverage(db, *PAIR, at(50), at(120), history_ended=True, history_ends_at=at(55))
 
     covered = await read_coverage(db, *PAIR)
     assert len(covered) == 1

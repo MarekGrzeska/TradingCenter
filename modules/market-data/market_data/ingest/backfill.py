@@ -175,7 +175,13 @@ async def fill_gap(
     # `bars` counts candles and `collect_from` is a moment, and for an instrument shut
     # part of the week the two do not line up — the gateway is asked to bound the read
     # and does, but a promise about what the archive stores is not one to delegate.
-    within = [c for c in page.candles if c.period_start >= collect_from]
+    # Two filters, and they answer different questions. `collect_from` is how far back
+    # this pair was asked to reach; `forming` is whether a period is over. The second one
+    # is why the fill's own arithmetic works: `bars_to_close_gap` measures the gap from
+    # the newest candle held, so storing the period in progress would make the pair look
+    # current and stop the next fill from asking — leaving the partial values in place
+    # until they aged out two periods later.
+    within = [c for c in page.candles if c.period_start >= collect_from and not c.forming]
 
     written = 0
     covered_from = covered_to = None
@@ -195,6 +201,10 @@ async def fill_gap(
                 oldest,
                 max(newest + period_length(resolution), moment),
                 history_ended=page.history_ended,
+                # Where the read ran out, which for a fill is the oldest candle it came
+                # back with. Never the moment it was clipped to: that is the caller's own
+                # bound and says nothing about what the provider holds below it.
+                history_ends_at=oldest if page.history_ended else None,
             )
             covered_from, covered_to = covered.range_start, covered.range_end
             if resolution is Resolution.MINUTE:

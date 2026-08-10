@@ -112,6 +112,65 @@ async def test_running_past_the_bottom_keeps_what_was_collected() -> None:
     assert result.requested == 100
 
 
+async def test_an_empty_first_window_is_not_the_end_of_history() -> None:
+    """`not-found` before a single candle has been collected says nothing about the
+    bottom of the instrument.
+
+    The window is where the caller's anchor put it, not where data put it, and the
+    provider answers `not-found` to more questions than "there is nothing older". Read as
+    an ending it cost US100 its whole history below January 2026: a permanent boundary
+    was recorded there, and every later request to reach 2024 planned nothing and
+    reported success.
+    """
+
+    async def fetch(date_from, date_to, limit):
+        return None  # error.prices.not-found, on the very first window
+
+    result = await history.collect("GOLD", Resolution.MINUTE_5, 100, fetch)
+
+    assert result.count == 0
+    assert result.history_ended is False
+    assert result.requests == 1
+
+
+async def test_an_empty_first_window_with_an_anchor_is_not_an_ending_either() -> None:
+    """The same read as above with a past anchor — the shape a job chunk uses, and the
+    one that produced the failure in production."""
+
+    async def fetch(date_from, date_to, limit):
+        return None
+
+    result = await history.collect(
+        "GOLD",
+        Resolution.MINUTE_5,
+        100,
+        fetch,
+        anchor=datetime(2026, 1, 1, tzinfo=UTC),
+        after=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+
+    assert result.count == 0
+    assert result.history_ended is False
+
+
+async def test_an_empty_window_after_a_full_one_still_ends_history() -> None:
+    """The behaviour the change must not weaken: once a page has anchored the read, a
+    window running out is the provider's own bottom."""
+    calls = 0
+
+    async def fetch(date_from, date_to, limit):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 3)
+        return None
+
+    result = await history.collect("GOLD", Resolution.MINUTE_5, 100, fetch)
+
+    assert result.count == 3
+    assert result.history_ended is True
+
+
 async def test_an_anchor_shapes_only_the_first_page() -> None:
     anchor = datetime(2024, 1, 15, 0, 0, tzinfo=UTC)
     first_page = candles(anchor, 2)
@@ -405,4 +464,147 @@ async def test_the_adapter_treats_not_found_as_an_ending(adapter: CapitalAdapter
     # distinction decides whether a caller keeps a partial series or gets an exception.
     assert result.count == 1
     assert result.history_ended is True
+    await adapter.aclose()
+
+
+# --- which candle is still forming ---
+
+
+async def _open() -> bool:
+    return True
+
+
+async def _shut() -> bool:
+    return False
+
+
+async def test_the_newest_candle_of_a_read_reaching_now_is_forming() -> None:
+    """MINUTE_5, where the boundary is arithmetic, so the answer is exact and the market
+    is never consulted."""
+    now = datetime(2026, 7, 23, 14, 3, tzinfo=UTC)
+    page = candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 3)
+
+    marked = await history.mark_forming(page, Resolution.MINUTE_5, now, _shut)
+
+    assert [c.forming for c in marked] == [False, False, True]
+
+
+async def test_a_period_that_has_ended_is_not_forming() -> None:
+    now = datetime(2026, 7, 23, 14, 7, tzinfo=UTC)
+    page = candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 3)
+
+    marked = await history.mark_forming(page, Resolution.MINUTE_5, now, _open)
+
+    assert [c.forming for c in marked] == [False, False, False]
+
+
+async def test_a_daily_candle_is_forming_while_the_market_is_open() -> None:
+    now = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    page = [
+        Candle(ts="2026-07-22T00:00:00Z", resolution=Resolution.DAY),
+        Candle(ts="2026-07-23T00:00:00Z", resolution=Resolution.DAY),
+    ]
+
+    marked = await history.mark_forming(page, Resolution.DAY, now, _open)
+
+    assert [c.forming for c in marked] == [False, True]
+
+
+async def test_a_daily_candle_is_settled_once_the_market_shuts() -> None:
+    """The venue is the only thing that knows where a daily period ends, so a shut market
+    is what closes the candle — never arithmetic on UTC midnight."""
+    now = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    page = [Candle(ts="2026-07-23T00:00:00Z", resolution=Resolution.DAY)]
+
+    marked = await history.mark_forming(page, Resolution.DAY, now, _shut)
+
+    assert marked[0].forming is False
+
+
+async def test_a_read_anchored_in_the_past_has_nothing_forming() -> None:
+    """Every candle of a deep chunk closed long ago, whatever the market is doing now —
+    and the market is never asked, so the request is not spent."""
+    now = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+    page = [Candle(ts="2024-03-01T00:00:00Z", resolution=Resolution.DAY)]
+    asked = False
+
+    async def market_open() -> bool:
+        nonlocal asked
+        asked = True
+        return True
+
+    marked = await history.mark_forming(page, Resolution.DAY, now, market_open)
+
+    assert marked[0].forming is False
+    assert asked is False
+
+
+async def test_a_fixed_period_read_never_asks_about_the_market() -> None:
+    now = datetime(2026, 7, 23, 14, 3, tzinfo=UTC)
+    page = candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 2)
+    asked = False
+
+    async def market_open() -> bool:
+        nonlocal asked
+        asked = True
+        return True
+
+    marked = await history.mark_forming(page, Resolution.MINUTE_5, now, market_open)
+
+    assert marked[-1].forming is True
+    assert asked is False
+
+
+async def test_marking_leaves_the_page_it_was_given_alone() -> None:
+    now = datetime(2026, 7, 23, 14, 3, tzinfo=UTC)
+    page = candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 2)
+
+    await history.mark_forming(page, Resolution.MINUTE_5, now, _open)
+
+    assert all(c.forming is False for c in page)
+
+
+async def test_an_empty_page_marks_nothing() -> None:
+    assert await history.mark_forming([], Resolution.DAY, datetime.now(UTC), _open) == []
+
+
+@respx.mock
+async def test_the_adapter_asks_the_market_before_calling_a_daily_candle_settled(
+    adapter: CapitalAdapter,
+) -> None:
+    """End to end for the one resolution that cannot be decided by arithmetic."""
+    today = datetime.now(UTC).strftime("%Y-%m-%dT00:00:00")
+    respx.post(f"{API}/session").mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
+    )
+    respx.get(f"{API}/prices/GOLD").mock(
+        return_value=httpx.Response(200, json={"prices": [{"snapshotTimeUTC": today}]})
+    )
+    market = respx.get(f"{API}/markets/GOLD").mock(
+        return_value=httpx.Response(200, json={"snapshot": {"marketStatus": "TRADEABLE"}})
+    )
+
+    result = await adapter.get_candles("GOLD", Resolution.DAY, 1)
+
+    assert result[-1].forming is True
+    assert market.called
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_a_shut_market_settles_todays_daily_candle(adapter: CapitalAdapter) -> None:
+    today = datetime.now(UTC).strftime("%Y-%m-%dT00:00:00")
+    respx.post(f"{API}/session").mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
+    )
+    respx.get(f"{API}/prices/GOLD").mock(
+        return_value=httpx.Response(200, json={"prices": [{"snapshotTimeUTC": today}]})
+    )
+    respx.get(f"{API}/markets/GOLD").mock(
+        return_value=httpx.Response(200, json={"snapshot": {"marketStatus": "CLOSED"}})
+    )
+
+    result = await adapter.get_candles("GOLD", Resolution.DAY, 1)
+
+    assert result[-1].forming is False
     await adapter.aclose()

@@ -10,7 +10,7 @@ import pytest
 
 from market_data.app import app, candle_sink
 from market_data.config import Settings
-from market_data.coverage import record_coverage
+from market_data.coverage import earliest_reachable, record_coverage
 from market_data.errors import GatewayRefused, GatewayUnreachable
 from market_data.hub import CandleChange, Hub, Snapshot
 from market_data.ingest.backfill import FillOutcome
@@ -369,6 +369,7 @@ async def test_coverage_reads_back_over_the_contract(api, pool) -> None:
             NOW - timedelta(hours=1),
             NOW,
             history_ended=True,
+            history_ends_at=NOW - timedelta(minutes=45),
         )
 
     body = (await api.get("/coverage/US100")).json()
@@ -376,7 +377,8 @@ async def test_coverage_reads_back_over_the_contract(api, pool) -> None:
     [covered] = body["ranges"]
     assert (_at(covered["from"]), _at(covered["to"])) == (NOW - timedelta(hours=1), NOW)
     assert covered["history_ended"] is True
-    assert _at(body["earliest_reachable"]) == NOW - timedelta(hours=1)
+    # Where the read ran out, not the edge it asked about.
+    assert _at(body["earliest_reachable"]) == NOW - timedelta(minutes=45)
 
 
 async def test_a_pair_with_no_coverage_says_so_without_failing(api) -> None:
@@ -400,6 +402,100 @@ async def test_a_pair_can_be_taken_on_over_the_contract(api, pool) -> None:
     assert body["results"][0]["pair"]["symbol"] == "US100"
     assert body["results"][0]["refused"] is None
     assert [p["symbol"] for p in (await api.get("/pairs")).json()] == ["US100"]
+
+
+async def test_asking_deeper_than_the_boundary_drops_it_and_plans_the_whole_range(
+    api, pool
+) -> None:
+    """The recovery path, and the only one an operator has: asking again.
+
+    US100 held a boundary at January 2026 and every request to reach 2024 was silently
+    raised to it, planned nothing, and reported itself done. There is no button for this
+    and there should not be — reaching deeper *is* the instruction to measure again.
+    """
+    boundary = NOW - timedelta(days=30)
+    async with pool.acquire() as conn:
+        await record_coverage(
+            conn,
+            "US100",
+            Resolution.MINUTE,
+            boundary,
+            NOW,
+            history_ended=True,
+            history_ends_at=boundary,
+        )
+
+    response = await api.post(
+        "/pairs",
+        json={
+            "symbol": "US100",
+            "resolution": "MINUTE",
+            "collect_from": (NOW - timedelta(days=90)).isoformat(),
+        },
+    )
+
+    assert response.status_code == 201
+    job_id = response.json()["job_id"]
+    async with pool.acquire() as conn:
+        assert await earliest_reachable(conn, "US100", Resolution.MINUTE) is None
+    chunks = (await api.get(f"/jobs/{job_id}")).json()["chunks"]
+    assert chunks, "a deeper request must plan the work that measures the boundary again"
+    assert _at(min(c["chunk_start"] for c in chunks)) == NOW - timedelta(days=90)
+
+
+async def test_re_adding_a_pair_without_a_date_leaves_the_boundary_alone(api, pool) -> None:
+    """A pair's `collect_from` is the deepest moment it was *ever* asked to reach, kept by
+    `LEAST` so re-tracking cannot abandon history already promised. Read as this request's
+    intent it makes every re-add look like a deeper one — dropping a boundary nobody
+    questioned, and replanning the whole span below it."""
+    boundary = NOW - timedelta(days=30)
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT, collect_from=NOW - timedelta(days=90))
+        await record_coverage(
+            conn,
+            "US100",
+            Resolution.MINUTE,
+            boundary,
+            NOW,
+            history_ended=True,
+            history_ends_at=boundary,
+        )
+
+    response = await api.post("/pairs", json={"symbol": "US100", "resolution": "MINUTE"})
+
+    assert response.status_code == 201
+    async with pool.acquire() as conn:
+        assert await earliest_reachable(conn, "US100", Resolution.MINUTE) == boundary
+
+
+async def test_pricing_the_same_request_leaves_the_boundary_alone(api, pool) -> None:
+    """An estimate is a question. It has to price what the job would do — and it does,
+    because planning does not read the boundary either — without ordering anything."""
+    boundary = NOW - timedelta(days=30)
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        await record_coverage(
+            conn,
+            "US100",
+            Resolution.MINUTE,
+            boundary,
+            NOW,
+            history_ended=True,
+            history_ends_at=boundary,
+        )
+
+    response = await api.post(
+        "/jobs/estimate",
+        json={
+            "pairs": [{"symbol": "US100", "resolution": "MINUTE"}],
+            "collect_from": (NOW - timedelta(days=90)).isoformat(),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["pairs"][0]["estimated_candles"] > 0
+    async with pool.acquire() as conn:
+        assert await earliest_reachable(conn, "US100", Resolution.MINUTE) == boundary
 
 
 async def test_taking_a_pair_on_starts_collecting_it_without_a_restart(api) -> None:

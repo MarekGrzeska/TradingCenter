@@ -12,7 +12,7 @@ from datetime import UTC, datetime, timedelta
 
 import pytest
 
-from market_data.coverage import read_coverage
+from market_data.coverage import earliest_reachable, read_coverage
 from market_data.errors import GatewayRefused, GatewayUnreachable
 from market_data.gateway import HistoryPage
 from market_data.jobs.models import ChunkPlan, ChunkState, JobStatus
@@ -366,16 +366,67 @@ async def test_history_ended_bulk_skips_older_pending_chunks_of_the_same_pair(po
     async with pool.acquire() as conn:
         second_claimed = await claim_pending_chunk(conn)  # boundary_chunk
 
-    # This one discovers the end of history.
+    # This one discovers the end of history — and brings back the candle that places it.
+    # A read that returned nothing could not say where the boundary lies, and does not get
+    # to skip anything on the strength of it.
+    oldest = minute_candle(int(timedelta(days=2).total_seconds() // 60) - 1)
     await execute_chunk(
-        pool, FakeHistory([], history_ended=True), second_claimed, asyncio.Semaphore(1)
+        pool, FakeHistory([oldest], history_ended=True), second_claimed, asyncio.Semaphore(1)
     )
 
     async with pool.acquire() as conn:
         reread = await read_job(conn, job.id)
+        assert await earliest_reachable(conn, "US100", Resolution.MINUTE) == oldest.period_start
     by_window = {(c.chunk_start, c.chunk_end): c.state for c in reread.chunks}
     assert by_window[(boundary_chunk.chunk_start, boundary_chunk.chunk_end)] is ChunkState.DONE
     assert by_window[(older.chunk_start, older.chunk_end)] is ChunkState.SKIPPED
+
+
+async def test_a_chunk_does_not_store_the_period_still_running(pool) -> None:
+    """The newest chunk of a job ends at the present, so its read brings back the period
+    in progress. Its values are not the period's result yet, and the archive keeps
+    results."""
+    await _tracked(pool)
+    only = plan(chunk_start=NOW - timedelta(hours=1), chunk_end=NOW)
+    async with pool.acquire() as conn:
+        await create_job(conn, NOW, [only])
+        claimed = await claim_pending_chunk(conn)
+
+    history = FakeHistory([minute_candle(2), minute_candle(1), minute_candle(0, forming=True)])
+    await execute_chunk(pool, history, claimed, asyncio.Semaphore(1))
+
+    async with pool.acquire() as conn:
+        stored = await read_candles(conn, "US100", Resolution.MINUTE)
+        # Still verified: the read looked at the stretch whether or not the last period
+        # in it is over, and narrowing coverage would have the next job ask again.
+        [covered] = await read_coverage(conn, "US100", Resolution.MINUTE)
+    assert [c.period_start for c in stored] == [
+        NOW - timedelta(minutes=2),
+        NOW - timedelta(minutes=1),
+    ]
+    assert covered.range_end == NOW
+
+
+async def test_a_chunk_that_brought_back_nothing_records_no_boundary(pool) -> None:
+    """`history_ended` with an empty page says the read ran out, not where. Recorded
+    against the window's own edge it announced as measured a stretch nobody looked at —
+    and then kept it, which is how US100 lost every request to reach below 2026."""
+    await _tracked(pool)
+    newest = plan(chunk_start=NOW - timedelta(days=1), chunk_end=NOW)
+    older = plan(chunk_start=NOW - timedelta(days=2), chunk_end=NOW - timedelta(days=1))
+    async with pool.acquire() as conn:
+        job = await create_job(conn, NOW, [newest, older])
+        claimed = await claim_pending_chunk(conn)
+
+    await execute_chunk(pool, FakeHistory([], history_ended=True), claimed, asyncio.Semaphore(1))
+
+    async with pool.acquire() as conn:
+        assert await earliest_reachable(conn, "US100", Resolution.MINUTE) is None
+        reread = await read_job(conn, job.id)
+    by_window = {(c.chunk_start, c.chunk_end): c.state for c in reread.chunks}
+    assert by_window[(newest.chunk_start, newest.chunk_end)] is ChunkState.DONE
+    # Still to be attempted: nothing was learned about what lies below it.
+    assert by_window[(older.chunk_start, older.chunk_end)] is ChunkState.PENDING
 
 
 async def test_a_pair_untouched_by_the_boundary_is_not_skipped(pool) -> None:

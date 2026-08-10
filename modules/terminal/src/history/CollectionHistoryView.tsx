@@ -65,6 +65,17 @@ function chunkRange(chunks: Chunk[]): { start: number; end: number } | null {
   };
 }
 
+/** How far back the work actually got, which is not always how far it was planned to.
+ *
+ *  A chunk is skipped when the provider turns out to have nothing below it, so a job
+ *  asked for 2024 against an instrument whose history starts in 2026 plans the whole
+ *  span and collects the top of it. Without this the row said "2024 → today, 0 candles",
+ *  which reads as a failure and was a correct answer nobody could see. Derived from the
+ *  chunks the row already carries — no field on the wire holds it. */
+function collectedRange(chunks: Chunk[]): { start: number; end: number } | null {
+  return chunkRange(chunks.filter((c) => c.state === "done"));
+}
+
 function failureReasons(chunks: Chunk[]): string[] {
   const reasons = new Set<string>();
   for (const chunk of chunks) {
@@ -250,6 +261,15 @@ function HistoryList({
 function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: number): void }) {
   const reasons = failureReasons(row.chunks);
   const range = chunkRange(row.chunks);
+  const collected = collectedRange(row.chunks);
+  // Only for a job that finished cleanly. A range still filling in is not a shortfall,
+  // and a chunk that *failed* says nothing about what the provider holds — reading its
+  // absence as "the history stops here" turns an outage into a claim about the
+  // instrument. `succeeded` is exactly the case where every unfinished chunk was
+  // skipped, which is the provider having answered.
+  const whole = row.status === "succeeded" && range !== null;
+  const shallow = whole && collected !== null && collected.start > range.start;
+  const nothingReached = whole && collected === null;
   const pct = row.chunksTotal > 0 ? Math.round((row.chunksDone / row.chunksTotal) * 100) : 0;
   const explainsItself = row.status !== "running" && row.status !== "succeeded";
 
@@ -292,6 +312,14 @@ function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: num
         </td>
         <td className="px-4 py-1.5 text-ink-secondary">
           {range ? `${formatInstant(range.start)} → ${formatInstant(range.end)}` : "—"}
+          {shallow && collected && (
+            <div className="text-xs text-warning">
+              collected from {formatInstant(collected.start)}
+            </div>
+          )}
+          {nothingReached && (
+            <div className="text-xs text-warning">nothing in this range to collect</div>
+          )}
         </td>
         <td className="px-4 py-1.5 text-right">
           {/* Where Retry used to sit. It retried the whole job from beside one

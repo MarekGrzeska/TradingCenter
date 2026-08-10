@@ -6,6 +6,7 @@ from collections.abc import Awaitable, Callable
 from typing import ClassVar
 
 from capital_gateway.dtos import Resolution
+from capital_gateway.stream.forming import Bar
 from capital_gateway.stream.hub import Hub
 from capital_gateway.stream.messages import (
     CandleMessage,
@@ -249,3 +250,209 @@ async def test_closing_the_hub_stops_every_connection() -> None:
 
     assert all(u.stopped == 1 for u in FakeUpstream.instances)
     assert hub.room_count() == 0
+
+
+# --- the boundary a session-bound resolution cannot compute ---
+
+
+def make_seeded_hub(
+    bars: list[Bar | None],
+) -> tuple[Hub, list[tuple[str, Resolution]]]:
+    """A hub whose rooms can ask where the current period starts, answering from `bars`
+    in order and repeating the last answer once it runs out."""
+    asked: list[tuple[str, Resolution]] = []
+    FakeUpstream.instances = []
+
+    async def current_period(epic: str, resolution: Resolution) -> Bar | None:
+        asked.append((epic, resolution))
+        return bars[min(len(asked) - 1, len(bars) - 1)]
+
+    hub = Hub(
+        lambda epic, resolution, emit: FakeUpstream(epic, resolution, emit), current_period
+    )
+    return hub, asked
+
+
+async def test_a_daily_room_publishes_before_the_provider_seals_anything() -> None:
+    """The defect in one test: a daily candle is sealed once a day, so a room that waited
+    for one published nothing for up to that long."""
+    hub, asked = make_seeded_hub([Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0)])
+    subscriber, received = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    await FakeUpstream.instances[0].emit(
+        {"kind": "quote", "t": BASE_MS + 3_600_000, "bid": 120.0, "ask": 120.2}
+    )
+
+    candles = [m for m in received if isinstance(m, CandleMessage)]
+    assert candles, "no forming candle, and no sealed candle is coming for hours"
+    assert candles[-1].forming is True
+    assert candles[-1].time == BASE_S
+    assert candles[-1].high == 120.0
+    assert asked == [("US100", Resolution.DAY)]
+
+
+async def test_a_daily_room_asks_again_once_the_provider_seals_the_period() -> None:
+    first = Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0)
+    second = Bar(
+        time=BASE_S + 86_400, open=104.0, high=104.0, low=104.0, close=104.0
+    )
+    hub, asked = make_seeded_hub([first, second])
+    subscriber, received = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    upstream = FakeUpstream.instances[0]
+    await upstream.emit(
+        {
+            "kind": "sealed",
+            "t": BASE_S * 1000,
+            "o": 100.0,
+            "h": 105.0,
+            "l": 99.0,
+            "c": 104.0,
+        }
+    )
+    await upstream.emit(
+        {"kind": "quote", "t": (BASE_S + 86_400 + 60) * 1000, "bid": 120.0, "ask": 120.2}
+    )
+
+    assert len(asked) == 2, "the seal moved the boundary and nobody but the provider knows where"
+    candles = [m for m in received if isinstance(m, CandleMessage)]
+    settled = [c for c in candles if not c.forming]
+    assert settled[-1].time == BASE_S
+    assert settled[-1].high == 105.0, "the sealed candle kept its own range"
+    assert candles[-1].forming is True
+    assert candles[-1].time == BASE_S + 86_400, "the new period, not the one that closed"
+
+
+async def test_a_provider_with_no_newer_period_leaves_the_room_silent() -> None:
+    """The degradation, and it is the honest one: a bar placed by arithmetic here is the
+    candle this change exists to stop publishing."""
+    hub, _ = make_seeded_hub([None])
+    subscriber, received = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    await FakeUpstream.instances[0].emit(
+        {"kind": "quote", "t": BASE_MS, "bid": 120.0, "ask": 120.2}
+    )
+
+    assert not [m for m in received if isinstance(m, CandleMessage)]
+    # The price still moves; only the candle is withheld.
+    assert [m for m in received if isinstance(m, QuoteMessage)]
+
+
+async def test_a_boundary_read_that_raises_does_not_take_the_feed_with_it() -> None:
+    FakeUpstream.instances = []
+
+    async def current_period(epic: str, resolution: Resolution) -> Bar | None:
+        raise RuntimeError("provider said no")
+
+    hub = Hub(
+        lambda epic, resolution, emit: FakeUpstream(epic, resolution, emit), current_period
+    )
+    subscriber, received = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    await FakeUpstream.instances[0].emit(
+        {"kind": "quote", "t": BASE_MS, "bid": 120.0, "ask": 120.2}
+    )
+
+    assert [m for m in received if isinstance(m, QuoteMessage)]
+    assert not [m for m in received if isinstance(m, CandleMessage)]
+
+
+async def test_a_fixed_period_room_never_asks_about_a_boundary() -> None:
+    hub, asked = make_seeded_hub([Bar(time=BASE_S, open=1.0, high=1.0, low=1.0, close=1.0)])
+    subscriber, received = collector()
+
+    await hub.subscribe("US100", Resolution.MINUTE_5, subscriber)
+    await FakeUpstream.instances[0].emit(
+        {"kind": "quote", "t": BASE_MS, "bid": 120.0, "ask": 120.2}
+    )
+
+    assert asked == []
+    candles = [m for m in received if isinstance(m, CandleMessage)]
+    assert candles[-1].forming is True
+
+
+async def test_a_provider_that_keeps_saying_no_is_not_asked_once_per_quote() -> None:
+    """A liquid instrument quotes hundreds of times a minute, and every one of those
+    would otherwise become a request through the same rate gate an operator's chart reads
+    through."""
+    hub, asked = make_seeded_hub([None])
+    subscriber, _ = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    upstream = FakeUpstream.instances[0]
+    for n in range(20):
+        await upstream.emit(
+            {"kind": "quote", "t": BASE_MS + n * 1_000, "bid": 120.0, "ask": 120.2}
+        )
+
+    assert len(asked) == 1
+
+
+async def test_a_reconnect_re_reads_the_boundary_it_may_have_missed() -> None:
+    """The period can roll over while the feed is down, so the bar in hand is no longer
+    known to be the one quotes belong to."""
+    first = Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0)
+    second = Bar(time=BASE_S + 86_400, open=104.0, high=104.0, low=104.0, close=104.0)
+    hub, asked = make_seeded_hub([first, second])
+    subscriber, received = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    upstream = FakeUpstream.instances[0]
+    await upstream.emit({"kind": "status", "state": "reconnecting"})
+    await upstream.emit(
+        {"kind": "quote", "t": (BASE_S + 86_400 + 60) * 1000, "bid": 130.0, "ask": 130.2}
+    )
+
+    assert len(asked) == 2
+    candles = [m for m in received if isinstance(m, CandleMessage)]
+    assert candles[-1].time == BASE_S + 86_400
+
+
+async def test_a_reconnect_inside_the_same_period_keeps_publishing() -> None:
+    """The ordinary drop, and the one that must not cost a day of chart.
+
+    A feed blip inside a daily period leaves the boundary unconfirmed but not moved, so
+    the provider hands the same period back. Read as "no progress" — the right reading
+    after a seal — the room fell silent for the rest of the period.
+    """
+    held = Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0)
+    hub, asked = make_seeded_hub([held, held])
+    subscriber, received = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    upstream = FakeUpstream.instances[0]
+    await upstream.emit({"kind": "status", "state": "reconnecting"})
+    await upstream.emit({"kind": "status", "state": "connected"})
+    for n in range(3):
+        await upstream.emit(
+            {"kind": "quote", "t": BASE_MS + n * 1_000, "bid": 120.0 + n, "ask": 121.0}
+        )
+
+    assert len(asked) == 2
+    candles = [m for m in received if isinstance(m, CandleMessage)]
+    assert candles, "a blip must not stop the chart until the next period"
+    assert candles[-1].forming is True
+    assert candles[-1].time == BASE_S
+    assert candles[-1].high == 122.0
+
+
+async def test_a_late_joiner_is_not_handed_a_finished_period_as_forming() -> None:
+    """Between a seal and the next boundary read the room holds a bar whose period is
+    over. Handing it to a joiner as forming charts a closed period as still moving."""
+    hub, _ = make_seeded_hub([Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0), None])
+    first, _ = collector()
+    await hub.subscribe("US100", Resolution.DAY, first)
+    await FakeUpstream.instances[0].emit(
+        {"kind": "sealed", "t": BASE_S * 1000, "o": 100.0, "h": 105.0, "l": 99.0, "c": 104.0}
+    )
+
+    joiner, got = collector()
+    await hub.subscribe("US100", Resolution.DAY, joiner)
+
+    [candle] = [m for m in got if isinstance(m, CandleMessage)]
+    assert candle.forming is False
+    assert candle.time == BASE_S

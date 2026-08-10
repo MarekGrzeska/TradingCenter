@@ -12,7 +12,7 @@ from market_data.errors import GatewayRefused, GatewayUnreachable
 from market_data.gateway import CandleUpdate, FeedFailure, FeedState, FeedStatus, HistoryPage, Quote
 from market_data.ingest import Backoff, Ingest, PairIngest, bars_to_close_gap, fill_gap
 from market_data.models import Candle, CandleSource, Resolution
-from market_data.rollups import read_derived
+from market_data.rollups import bucket_start, read_derived
 from market_data.store import read_candles, write_candles
 from market_data.tracking import track, untrack
 
@@ -150,6 +150,30 @@ def test_a_current_pair_asks_for_nothing() -> None:
 def test_a_pair_one_period_behind_asks_for_nothing() -> None:
     latest = NOW - timedelta(minutes=1, seconds=59)
     assert bars_to_close_gap(Resolution.MINUTE, latest, NOW, default_bars=5_000, collect_from=DEEP) == 0
+
+
+def test_the_arithmetic_holds_because_the_running_period_is_never_stored() -> None:
+    """The comment above says the provider does not have the current period. It does, and
+    for a while the archive stored it — which put `latest_candle` inside the period now
+    running, so the gap read as zero and the fill stopped asking. The partial candle then
+    sat there until it aged out two periods later.
+
+    The rule is restored by keeping that candle out of the archive, not by changing this
+    sum: the newest *stored* candle is a closed one, and a pair that has fallen behind
+    still asks.
+    """
+    assert (
+        bars_to_close_gap(
+            Resolution.DAY, NOW, NOW, default_bars=5_000, collect_from=DEEP
+        )
+        == 0
+    ), "a period that has only just started is not a gap"
+    assert (
+        bars_to_close_gap(
+            Resolution.DAY, NOW - timedelta(days=3), NOW, default_bars=5_000, collect_from=DEEP
+        )
+        == 4
+    ), "and a pair three days behind still asks for what it missed"
 
 
 def test_a_pair_behind_by_a_break_asks_for_what_it_missed() -> None:
@@ -428,6 +452,85 @@ async def test_a_fill_stores_nothing_older_than_collect_from(pool) -> None:
         stored = await read_candles(conn, "US100", Resolution.MINUTE)
     assert [c.period_start for c in stored] == [NOW - timedelta(minutes=5)]
     assert outcome.written == 1
+
+
+@pytest.mark.db
+async def test_a_fill_does_not_store_the_period_still_running(pool) -> None:
+    """The archive's oldest rule, finally with something to bite on.
+
+    "No forming candle is stored" was keyed on a marking, and a candle from a history
+    read never carried one — `market-data` stamped every one of them settled. So a read
+    reaching the present put the period it was in into the archive as that period's
+    result: a price from halfway through, indistinguishable from a closed candle.
+    """
+    await _tracked(pool)
+    history = FakeHistory([minute_candle(2), minute_candle(1), minute_candle(0, forming=True)])
+
+    outcome = await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
+
+    async with pool.acquire() as conn:
+        stored = await read_candles(conn, "US100", Resolution.MINUTE)
+    assert [c.period_start for c in stored] == [
+        NOW - timedelta(minutes=2),
+        NOW - timedelta(minutes=1),
+    ]
+    assert outcome.written == 2
+
+
+@pytest.mark.db
+async def test_the_period_still_running_was_verified_even_though_it_was_not_stored(
+    pool,
+) -> None:
+    """Coverage records what was looked at, and the read did look at it. Narrowing the
+    range to the stored candles would make the archive ask about the same stretch again
+    on every fill."""
+    await _tracked(pool)
+    history = FakeHistory([minute_candle(2), minute_candle(0, forming=True)])
+
+    outcome = await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
+
+    assert outcome.covered_to is not None
+    assert outcome.covered_to >= NOW
+
+
+@pytest.mark.db
+async def test_a_fill_of_nothing_but_a_running_period_writes_nothing(pool) -> None:
+    await _tracked(pool)
+    history = FakeHistory([minute_candle(0, forming=True)])
+
+    outcome = await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
+
+    assert outcome.written == 0
+    async with pool.acquire() as conn:
+        assert await read_candles(conn, "US100", Resolution.MINUTE) == []
+
+
+@pytest.mark.db
+async def test_a_rollup_is_never_built_from_a_minute_still_running(pool) -> None:
+    """Derived resolutions are computed from what is stored, so keeping the running
+    minute out of the archive is also what keeps it out of every bucket above it. A
+    five-minute candle built from a minute that is still moving would be wrong in the
+    same silent way, one level up."""
+    await _tracked(pool)
+    bucket = NOW.replace(minute=(NOW.minute // 5) * 5, second=0, microsecond=0)
+    minutes = [
+        minute_candle(int((NOW - bucket).total_seconds() // 60) - offset)
+        for offset in range(3)
+    ]
+    minutes[-1] = minutes[-1].model_copy(update={"forming": True})
+    history = FakeHistory(minutes)
+
+    await fill_gap(pool, history, "US100", Resolution.MINUTE, default_bars=5_000, now=NOW)
+
+    async with pool.acquire() as conn:
+        stored = await read_candles(conn, "US100", Resolution.MINUTE)
+        derived = await read_derived(conn, "US100", Resolution.MINUTE_5)
+    assert all(c.period_start != minutes[-1].period_start for c in stored)
+    for candle in derived:
+        assert candle.minutes_present == sum(
+            1 for c in stored if bucket_start(c.period_start, Resolution.MINUTE_5) == candle.period_start
+        )
+        assert candle.complete is False
 
 
 @pytest.mark.db

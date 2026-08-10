@@ -101,9 +101,13 @@ class CoverageRange(BaseModel):
     range_start: datetime
     range_end: datetime
 
-    # True when the provider answered that it has nothing older than `range_start`. That
-    # makes this the oldest boundary worth reaching for, and backfill stops there.
+    # True when the provider answered that it has nothing older than `history_ends_at`.
     history_ended: bool = False
+    # Where it ran out — the oldest candle that read brought back, not the edge the read
+    # asked about. The two are a whole window apart, and ranges merge, so reading the
+    # boundary off `range_start` put it wherever the pair's oldest coverage happened to
+    # begin.
+    history_ends_at: datetime | None = None
 
     @field_validator("range_start", "range_end")
     @classmethod

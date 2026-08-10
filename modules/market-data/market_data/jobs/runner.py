@@ -105,20 +105,34 @@ async def execute_chunk(
 
         # Nothing older than this chunk's own window, whatever came back. The gateway
         # is asked to bound the read and does, but a promise about what the archive
-        # stores is not one to delegate.
-        within = [c for c in page.candles if c.period_start >= chunk.chunk_start]
+        # stores is not one to delegate. And nothing still forming: the newest chunk of a
+        # job ends at the present, so its read brings back the period in progress, whose
+        # values are not the period's result yet.
+        within = [
+            c
+            for c in page.candles
+            if c.period_start >= chunk.chunk_start and not c.forming
+        ]
         written = await write_candles(conn, within) if within else 0
         # The requested window is what was verified, not only the span the candles
         # happen to occupy — an exhaustive read of an empty stretch is still a stretch
         # looked at, and using the requested edges keeps neighbouring chunks' coverage
         # touching with no seam between them.
+        #
+        # The boundary is the exception, and it is recorded where the data actually ran
+        # out rather than where this chunk asked. Those two are a whole window apart, and
+        # the wrong one announces as checked a stretch nobody looked at — which is then
+        # kept forever. A chunk that came back with nothing cannot place a boundary at
+        # all, so it records none: what it has is an absence, not an edge.
+        boundary = page.history_ended and bool(within)
         covered = await record_coverage(
             conn,
             chunk.symbol,
             chunk.resolution,
             chunk.chunk_start,
             chunk.chunk_end,
-            history_ended=page.history_ended,
+            history_ended=boundary,
+            history_ends_at=within[0].period_start if boundary else None,
         )
         if within and chunk.resolution is Resolution.MINUTE:
             # Over what was actually stored, not what arrived — rebuilding a bucket from
@@ -128,13 +142,17 @@ async def execute_chunk(
         await finish_chunk_done(conn, chunk.id, written=written, requests=page.requests)
 
         skipped = 0
-        if page.history_ended:
+        if covered.history_ends_at is not None:
             # Every chunk still queued behind this one — by construction older, by
             # construction past this boundary, since chunks run newest-first
             # (`plan.py`) — is settled here in bulk rather than each spending its own
             # request to rediscover the same edge.
+            #
+            # Against the boundary itself, not the merged range's start: the merged start
+            # is wherever this pair's oldest coverage begins, which is below the boundary
+            # and would leave the chunks in between to rediscover it one request each.
             skipped = await skip_chunks_beyond_history(
-                conn, chunk.job_id, chunk.symbol, chunk.resolution, covered.range_start
+                conn, chunk.job_id, chunk.symbol, chunk.resolution, covered.history_ends_at
             )
 
     log.info(

@@ -10,7 +10,7 @@ from datetime import UTC, datetime, timedelta
 import asyncpg
 import pytest
 
-from market_data.coverage import record_coverage
+from market_data.coverage import earliest_reachable, record_coverage
 from market_data.jobs.plan import (
     ESTIMATED_BYTES_PER_CANDLE,
     FutureRequest,
@@ -119,22 +119,37 @@ async def test_a_partly_covered_pair_plans_only_the_gap(db: asyncpg.Connection) 
 
 
 @pytest.mark.db
-async def test_a_moment_before_provider_history_is_clipped_not_refused(
+async def test_a_recorded_boundary_does_not_clip_a_deeper_request(
     db: asyncpg.Connection,
 ) -> None:
+    """The defect, in the place it was silent.
+
+    A boundary recorded once raised every later request up to it, so a pair whose boundary
+    was wrong — or merely stale, since the provider deepens its own history — could not be
+    deepened by any request at all. US100 asked for 2024 against a boundary at 2026 planned
+    no chunks and reported itself done with zero candles.
+
+    Planning no longer reads the boundary. Dropping it is the job-creating path's business
+    (`routers/pairs.py`), which is what keeps pricing free of writes.
+    """
     await _tracked(db)
     boundary = MOMENT - timedelta(days=30)
-    # A prior fill already reached the provider's own beginning.
     await record_coverage(
-        db, "US100", Resolution.MINUTE, boundary, MOMENT - timedelta(days=29), history_ended=True
+        db,
+        "US100",
+        Resolution.MINUTE,
+        boundary,
+        MOMENT - timedelta(days=29),
+        history_ended=True,
+        history_ends_at=boundary,
     )
 
-    requested_from = datetime(1850, 1, 1, tzinfo=UTC)
+    requested_from = MOMENT - timedelta(days=60)
     chunks, effective_from = await plan_chunks(db, "US100", Resolution.MINUTE, requested_from, MOMENT)
 
-    assert effective_from == boundary
-    for chunk in chunks:
-        assert chunk.chunk_start >= boundary
+    assert effective_from == requested_from
+    assert chunks, "a deeper request must plan the work that measures the boundary again"
+    assert min(chunk.chunk_start for chunk in chunks) == requested_from
 
 
 # --- estimating --------------------------------------------------------------------------
@@ -170,19 +185,32 @@ async def test_estimating_has_no_side_effects(db: asyncpg.Connection) -> None:
 
 
 @pytest.mark.db
-async def test_a_clipped_pair_says_so_in_its_estimate(db: asyncpg.Connection) -> None:
+async def test_an_estimate_prices_what_the_job_will_do_and_writes_nothing(
+    db: asyncpg.Connection,
+) -> None:
+    """The equality that makes a dialog worth showing: pricing and running compute the
+    same range. Pricing gets there by not reading the boundary rather than by dropping it,
+    which is what keeps it free of writes."""
     await _tracked(db)
     boundary = MOMENT - timedelta(days=10)
     await record_coverage(
-        db, "US100", Resolution.MINUTE, boundary, MOMENT - timedelta(days=9), history_ended=True
+        db,
+        "US100",
+        Resolution.MINUTE,
+        boundary,
+        MOMENT - timedelta(days=9),
+        history_ended=True,
+        history_ends_at=boundary,
     )
+    requested_from = MOMENT - timedelta(days=40)
 
-    result = await estimate_job(
-        db, [("US100", Resolution.MINUTE)], datetime(1850, 1, 1, tzinfo=UTC), MOMENT
-    )
+    result = await estimate_job(db, [("US100", Resolution.MINUTE)], requested_from, MOMENT)
+    chunks, _ = await plan_chunks(db, "US100", Resolution.MINUTE, requested_from, MOMENT)
 
-    assert result.pairs[0].clipped is True
-    assert result.pairs[0].effective_from == boundary
+    assert result.pairs[0].effective_from == requested_from
+    assert result.pairs[0].chunk_count == len(chunks)
+    # And the boundary is exactly where it was: an estimate is a question, not an order.
+    assert await earliest_reachable(db, "US100", Resolution.MINUTE) == boundary
 
 
 @pytest.mark.db
