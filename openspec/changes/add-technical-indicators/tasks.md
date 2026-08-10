@@ -30,23 +30,23 @@ grupa 7.
 
 ## 2. Miary ciągłe (E1)
 
-- [ ] 2.1 Pozostałe prymitywy: `rolling_argmax`, `rolling_argmin`, `linreg`, `mean_abs_dev`, `shift`, `diff`, `cross`
-- [ ] 2.2 Skala ruchu: `true_range`, `atr`, `atr_pct`
-- [ ] 2.3 Geometria świecy: `bar_range_atr`, `body_ratio`, `wick_up_ratio`, `wick_down_ratio`, `close_position`, `gap_prev_close_atr`
-- [ ] 2.4 Położenie w zakresie: `range_position`, `zscore`
-- [ ] 2.5 Zmienność z OHLC: `stdev`, `parkinson`, `garman_klass`, `rogers_satchell`, `yang_zhang`, `ulcer`
-- [ ] 2.6 Reżim: `adx` (z `+DI`/`−DI`), `choppiness`, `aroon`, `vortex`, `linreg_slope`, `r_squared`
-- [ ] 2.7 Średnie: `wma`, `rma`, `hma`, `kama`, `alma`, `lsma` (`sma` i `ema` z etapu 1)
-- [ ] 2.8 Oscylatory: `rsi`, `macd`, `stoch`, `stoch_rsi`, `cci`, `roc`, `williams_r`, `cmo`
-- [ ] 2.9 Wstęgi: `bbands`, `bbands_percent_b`, `bbands_bandwidth`, `keltner`, `donchian`, `envelope`
-- [ ] 2.10 Pliki wzorcowe dla całego zestawu
-- [ ] 2.11 TA-Lib jako zależność `dev`; porównanie z jawną tolerancją i spisaną listą znanych różnic
-- [ ] 2.12 Terminal: osobne panele oscylatorów przez `chart.addPane()` i `setStretchFactor`
-- [ ] 2.13 Terminal: poziomy odniesienia rysowane z podpowiedzi katalogu
-- [ ] 2.14 Terminal: histogram z kolorem na słupek (MACD)
-- [ ] 2.15 Terminal: odczyt wartości wskaźników pod kursorem obok OHLC, z nazwą i parametrami
-- [ ] 2.16 Terminal: zestaw wskaźników zapisywany w slocie siatki i odtwarzany; wpis nieznany katalogowi pomijany z komunikatem
-- [ ] 2.17 Pomiar p95 na pełnym zestawie; porównać z sufitem z 1.2
+- [x] 2.1 Pozostałe prymitywy: `rolling_argmax`, `rolling_argmin`, `linreg`, `mean_abs_dev`, `shift`, `diff`, `cross`
+- [x] 2.2 Skala ruchu: `true_range`, `atr`, `atr_pct`
+- [x] 2.3 Geometria świecy: `bar_range_atr`, `body_ratio`, `wick_up_ratio`, `wick_down_ratio`, `close_position`, `gap_prev_close_atr`
+- [x] 2.4 Położenie w zakresie: `range_position`, `zscore`
+- [x] 2.5 Zmienność z OHLC: `stdev`, `parkinson`, `garman_klass`, `rogers_satchell`, `yang_zhang`, `ulcer`
+- [x] 2.6 Reżim: `adx` (z `+DI`/`−DI`), `choppiness`, `aroon`, `vortex`, `linreg_slope`, `r_squared`
+- [x] 2.7 Średnie: `wma`, `rma`, `hma`, `kama`, `alma`, `lsma` (`sma` i `ema` z etapu 1)
+- [x] 2.8 Oscylatory: `rsi`, `macd`, `stoch`, `stoch_rsi`, `cci`, `roc`, `williams_r`, `cmo`
+- [x] 2.9 Wstęgi: `bbands`, `bbands_percent_b`, `bbands_bandwidth`, `keltner`, `donchian`, `envelope`
+- [x] 2.10 Pliki wzorcowe dla całego zestawu
+- [x] 2.11 TA-Lib jako zależność `dev`; porównanie z jawną tolerancją i spisaną listą znanych różnic
+- [x] 2.12 Terminal: osobne panele oscylatorów przez `chart.addPane()` i `setStretchFactor`
+- [x] 2.13 Terminal: poziomy odniesienia rysowane z podpowiedzi katalogu
+- [x] 2.14 Terminal: histogram z kolorem na słupek (MACD)
+- [x] 2.15 Terminal: odczyt wartości wskaźników pod kursorem obok OHLC, z nazwą i parametrami
+- [x] 2.16 Terminal: zestaw wskaźników zapisywany w slocie siatki i odtwarzany; wpis nieznany katalogowi pomijany z komunikatem
+- [x] 2.17 Pomiar p95 na pełnym zestawie; porównać z sufitem z 1.2
 
 ## 3. Punkty i poziomy (E2)
 
