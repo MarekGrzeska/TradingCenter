@@ -119,7 +119,9 @@
 
 - [x] 8.1 `openspec validate history-boundary-and-live-daily-candle --strict`.
 - [ ] 8.2 Wdrożyć w kolejności z `design.md`: najpierw `capital-gateway` w całości, potem
-  `market-data`.
+  **`uv run alembic upgrade head`**, dopiero potem `market-data`. Migracja nie jedzie ani
+  z obrazem, ani z workflow — `market-data` uruchomiony przed nią odpowiada pięćsetką na
+  każdy odczyt pokrycia (`/candles`, `/coverage`, `/jobs/estimate`, `POST /pairs`).
 - [ ] 8.3 Odzyskać US100: poprosić o dane od 2024-01-01 dla siedmiu rozdzielczości
   i sprawdzić `GET /coverage/US100?resolution=DAY`.
 - [ ] 8.4 Sprawdzić na wykresie, że `DAY` i `WEEK` pokazują bieżącą świecę zaraz po

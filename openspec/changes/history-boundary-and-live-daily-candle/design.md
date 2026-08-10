@@ -229,19 +229,33 @@ po grupach zadań.
 
 ## Migration Plan
 
-Bez migracji bazy i bez ręcznego zapisu do niej. Kolejność:
+**Jest migracja bazy i jest ona krokiem osobnym.** `0007` dokłada `history_ends_at`, a od
+niej zależy każdy odczyt pokrycia — czyli `/candles`, `/coverage`, `/jobs/estimate`
+i `POST /pairs`. Kod wdrożony przed nią nie degraduje się łagodnie: odpytuje kolumnę,
+której nie ma, i cały ten zestaw odpowiada pięćsetką. Ani `Dockerfile`, ani
+`deploy-market-data.yml` nie robią `alembic upgrade head` — to świadoma decyzja z 8.6
+(restart nie ma ścigać się o migrację) i znaczy, że robi to operator.
+
+Kolejność:
 
 1. Wdrożyć `capital-gateway` w całości — warunek na `history_ended`, oznaczanie świecy
    w budowie i zasiew strumienia razem. Osobno nie wolno: bez warunku `market-data` skasuje
    granicę i natychmiast zapisze ją ponownie z tego samego błędu, a bez zasiewu odjęcie
    świecy bieżącej z archiwum zabrałoby ją z wykresu, nie dając nic w zamian.
-2. Wdrożyć `market-data`. Do tej chwili nowe pole w DTO jest po prostu ignorowane —
-   `market-data` czyta odpowiedź gatewaya przez własny model, więc kolejność jest
+2. **`uv run alembic upgrade head`, zanim ruszy nowy `market-data`.** Migracja jest
+   addytywna i bezpieczna dla kodu w wersji sprzed niej: kolumna jest `NULL`-owalna,
+   a wiersze bez granicy check-constraint przepuszcza. Czyli okno między migracją
+   a wdrożeniem jest nieszkodliwe, a okno odwrotne — nie.
+3. Wdrożyć `market-data`. Nowe pole w DTO gatewaya było do tej chwili po prostu ignorowane
+   — `market-data` czyta odpowiedź gatewaya przez własny model, więc kolejność 1 → 3 jest
    bezpieczna w tę stronę i tylko w tę.
-3. Operator prosi o US100 od 2024-01-01 dla wszystkich siedmiu rozdzielczości. Granica
+4. Operator prosi o US100 od 2024-01-01 dla wszystkich siedmiu rozdzielczości. Granica
    zostaje zdjęta, zlecenie planuje pełny zakres i zbiera to, co provider ma.
-4. Sprawdzić `GET /coverage/US100?resolution=DAY`: `earliest_reachable` jest albo puste,
+5. Sprawdzić `GET /coverage/US100?resolution=DAY`: `earliest_reachable` jest albo puste,
    albo wskazuje moment, w którym faktycznie skończyły się dane.
 
-Wycofanie: rewert obu modułów. Flagi zdjęte do tego czasu zostają zdjęte, co jest bezpieczne
-— najgorsze, co robi brak granicy, to jedno dodatkowe żądanie przy kolejnym zleceniu.
+Wycofanie: rewert obu modułów, migracji **nie** cofać. Kolumna zostawiona na miejscu nie
+przeszkadza kodowi sprzed zmiany, a `downgrade -1` na działającej produkcji zabrałby
+kolumnę spod zapytań, które właśnie ją czytają — czyli powtórzyłby tę samą awarię
+z drugiej strony. Flagi zdjęte do czasu wycofania zostają zdjęte, co jest bezpieczne:
+najgorsze, co robi brak granicy, to jedno dodatkowe żądanie przy kolejnym zleceniu.
