@@ -43,6 +43,30 @@ from .stream.hub import Hub
 from .stream.upstream import Upstream
 
 
+async def stream_tokens_for(client: CapitalClient) -> tuple[str, str]:
+    """The pair the streaming protocol needs, from a session known to still answer.
+
+    The stream borrows the REST session and has no way of noticing that it stopped
+    working: a websocket never receives a 401. `client.authenticated` says the tokens
+    exist, not that the provider still honours them — and capital.com invalidates the
+    previous session on every new login anywhere on the account, so one `-m live` run, or
+    a second gateway process, leaves this one holding a pair of dead strings.
+
+    Trusting them is a reconnect loop that never recovers. Every attempt subscribes with
+    the same dead tokens, the provider refuses, the socket drops, and three seconds later
+    it happens again — for as long as nothing else makes a REST call. Measured as a real
+    hazard before running the live suite against the account production uses.
+
+    So the session is *checked* here rather than assumed, through the one path that
+    already heals itself: `request()` answers a 401 by logging in again and retrying, so
+    by the time this returns the tokens are ones the provider has just accepted. One
+    extra request per connection, and a connection is rare — the loop that would need
+    this often is exactly the loop it exists to break.
+    """
+    await client.session_details()
+    return client.stream_tokens()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Settings first, and outside a try: a live URL or a missing credential must stop
@@ -51,11 +75,7 @@ async def lifespan(app: FastAPI):
     client = CapitalClient(settings)
 
     async def tokens() -> tuple[str, str]:
-        # The stream has no credential of its own — it borrows the REST session, which
-        # is why a login is forced before the first connection rather than after it.
-        if not client.authenticated:
-            await client.login()
-        return client.stream_tokens()
+        return await stream_tokens_for(client)
 
     adapter = CapitalAdapter(client)
 

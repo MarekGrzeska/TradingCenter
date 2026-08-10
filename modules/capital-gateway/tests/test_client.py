@@ -7,6 +7,7 @@ import httpx
 import pytest
 import respx
 
+from capital_gateway.app import stream_tokens_for
 from capital_gateway.client import CapitalClient
 from capital_gateway.config import DEMO_BASE_URL, Settings
 from capital_gateway.rategate import RateGate
@@ -138,3 +139,61 @@ async def test_the_gate_lets_a_burst_through_up_to_its_limit() -> None:
 def test_stream_tokens_refuse_to_answer_before_a_session(client: CapitalClient) -> None:
     with pytest.raises(RuntimeError):
         client.stream_tokens()
+
+
+# --- the session the stream borrows ---
+
+
+@respx.mock
+async def test_stream_tokens_prove_the_session_still_answers(client: CapitalClient) -> None:
+    """A websocket never receives a 401, so the stream cannot notice its session died.
+    Checking costs one request per connection and is what stops a reconnect loop that
+    would otherwise retry with dead tokens forever."""
+    respx.post(SESSION).mock(return_value=login_response())
+    check = respx.get(SESSION).mock(return_value=httpx.Response(200, json={}))
+
+    cst, token = await stream_tokens_for(client)
+
+    assert (cst, token) == ("cst-1", "tok-1")
+    assert check.called
+    await client.aclose()
+
+
+@respx.mock
+async def test_a_session_invalidated_elsewhere_is_replaced_before_the_stream_uses_it(
+    client: CapitalClient,
+) -> None:
+    """capital.com invalidates the previous session on every new login anywhere on the
+    account. The tokens are then still present and still wrong — which is the state that
+    left a production stream reconnecting into nothing until some REST call happened by.
+    """
+    login = respx.post(SESSION)
+    login.side_effect = [login_response(), login_response("cst-2", "tok-2")]
+    check = respx.get(SESSION)
+    check.side_effect = [
+        httpx.Response(401, json={}),  # the session died while nobody was looking
+        httpx.Response(200, json={}),
+    ]
+
+    await client.login()
+    cst, token = await stream_tokens_for(client)
+
+    assert (cst, token) == ("cst-2", "tok-2"), "the stream must not carry the dead pair"
+    assert login.call_count == 2
+    await client.aclose()
+
+
+@respx.mock
+async def test_the_first_connection_logs_in_before_asking_for_tokens(
+    client: CapitalClient,
+) -> None:
+    """The behaviour this replaced, kept: with no session at all there is nothing to
+    check and a login is what produces one."""
+    login = respx.post(SESSION).mock(return_value=login_response())
+    respx.get(SESSION).mock(return_value=httpx.Response(200, json={}))
+
+    cst, token = await stream_tokens_for(client)
+
+    assert login.called
+    assert (cst, token) == ("cst-1", "tok-1")
+    await client.aclose()
