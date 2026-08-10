@@ -415,6 +415,9 @@ export interface IndicatorLevel {
   from: number;
   price: number;
   label: string | null;
+  /** How many extrema support this level — `level_clusters`' weight. Null for a
+   *  level that carries none, e.g. a pivot or a previous-period edge. */
+  count: number | null;
 }
 
 /** One requested wskaźnik's answer. Exactly one of `lines`/`markers`/`zones`/`levels`

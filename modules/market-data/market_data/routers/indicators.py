@@ -18,7 +18,9 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from ..contract import (
     IndicatorCatalogueEntryOut,
+    IndicatorLevelOut,
     IndicatorLineSpecOut,
+    IndicatorMarkerOut,
     IndicatorParamOut,
     IndicatorRenderOut,
     IndicatorResultOut,
@@ -38,7 +40,7 @@ from ..indicators.catalogue import (
     UnknownIndicator,
 )
 from ..indicators.catalogue import get as get_indicator
-from ..models import Candle, PriceSide
+from ..models import Candle, PriceSide, Resolution
 from ..periods import period_length, periods_between
 from ..rollups import DERIVABLE, DerivedCandle, read_derived
 from ..store import read_candles
@@ -162,6 +164,12 @@ async def compute(
     max_warmup_bars = max((entry.warmup_bars(params) for entry, params in resolved), default=0)
     extended_start = start - max_warmup_bars * period_length(body.resolution)
 
+    needed_htf_resolutions = {
+        entry.higher_resolution
+        for entry, _params in resolved
+        if entry.higher_resolution is not None
+    }
+
     async with limiter, db.acquire() as conn:
         rows: Sequence[Candle | DerivedCandle] = await read_candles(
             conn, symbol, body.resolution, extended_start, end
@@ -172,6 +180,20 @@ async def compute(
             derived = True
         gaps = await uncovered_within(conn, symbol, body.resolution, start, end)
 
+        htf_periods: dict[Resolution, list[tuple[datetime, Candle]]] = {}
+        for htf_resolution in needed_htf_resolutions:
+            htf_window_start = start - period_length(htf_resolution)
+            htf_candles = await read_candles(conn, symbol, htf_resolution, htf_window_start, end)
+            if not htf_candles:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"no {htf_resolution.value} series collected for {symbol!r}; "
+                        "htf_levels/pivots need it read at that resolution directly"
+                    ),
+                )
+            htf_periods[htf_resolution] = _htf_effective_periods(htf_candles, start, end)
+
     first_requested = 0
     while first_requested < len(rows) and rows[first_requested].period_start < start:
         first_requested += 1
@@ -181,7 +203,9 @@ async def compute(
     times_all = [row.period_start for row in rows]
 
     results = [
-        _result_out(entry, params, series, available_warmup_bars, first_requested)
+        _result_out(
+            entry, params, series, times_all, available_warmup_bars, first_requested, htf_periods
+        )
         for entry, params in resolved
     ]
 
@@ -208,14 +232,99 @@ def _build_series(rows: Sequence[Candle | DerivedCandle]) -> Series:
     return Series(open=column("open"), high=column("high"), low=column("low"), close=column("close"))
 
 
+def _htf_effective_periods(
+    htf_candles: Sequence[Candle], start: datetime, end: datetime
+) -> list[tuple[datetime, Candle]]:
+    """Which of a higher-resolution read's closed candles are in effect somewhere in
+    `[start, end)` — a candle's own close moment is the *next* candle's `period_start`,
+    read from the data rather than assumed (`DAY`/`WEEK` follow the venue's session,
+    not a fixed number of seconds — `rollups.py`'s reason for never flooring either).
+    The newest read candle has no next one to read that from, so its close is estimated
+    as one period-length later, the same safe-overstatement `periods.py` already uses
+    for sizing.
+
+    Kept to one candle per boundary crossed, plus the single one already in effect at
+    `start` — enough to draw an unbroken ray across the whole requested window without
+    the list growing with everything the archive has ever collected.
+    """
+    if not htf_candles:
+        return []
+    step = period_length(htf_candles[0].resolution)
+    closings: list[tuple[datetime, Candle]] = []
+    for i, row in enumerate(htf_candles):
+        close_moment = (
+            htf_candles[i + 1].period_start if i + 1 < len(htf_candles) else row.period_start + step
+        )
+        if close_moment <= end:
+            closings.append((close_moment, row))
+    closings.sort(key=lambda pair: pair[0])
+
+    kept = [pair for pair in closings if pair[0] > start]
+    prior = [pair for pair in closings if pair[0] <= start]
+    if prior:
+        kept = [prior[-1], *kept]
+    return kept
+
+
 def _result_out(
     entry: IndicatorSpec,
     params: dict[str, float],
     series: Series,
+    times_all: Sequence[datetime],
     available_warmup_bars: int,
     first_requested: int,
+    htf_periods: dict[Resolution, list[tuple[datetime, Candle]]],
 ) -> IndicatorResultOut:
     needed = entry.warmup_bars(params)
+    settled = available_warmup_bars >= needed
+
+    if entry.higher_resolution is not None:
+        assert entry.compute_htf_levels is not None, entry.id
+        levels: list[IndicatorLevelOut] = []
+        for close_moment, candle in htf_periods.get(entry.higher_resolution, []):
+            if (
+                candle.open is None
+                or candle.high is None
+                or candle.low is None
+                or candle.close is None
+            ):
+                continue
+            ohlc = (candle.open, candle.high, candle.low, candle.close)
+            levels.extend(
+                IndicatorLevelOut(from_=close_moment, price=level.price, label=level.label)
+                for level in entry.compute_htf_levels(ohlc)
+            )
+        return IndicatorResultOut(
+            id=entry.id, params=params, warmup_bars=0, settled=True, levels=levels
+        )
+
+    if entry.output == "markers":
+        assert entry.compute_markers is not None, entry.id
+        markers = [
+            IndicatorMarkerOut(time=times_all[point.bar], label=point.label, price=point.price)
+            for point in entry.compute_markers(series, params)
+            if point.bar >= first_requested
+        ]
+        return IndicatorResultOut(
+            id=entry.id, params=params, warmup_bars=needed, settled=settled, markers=markers
+        )
+
+    if entry.output == "levels":
+        assert entry.compute_cluster_levels is not None, entry.id
+        levels = [
+            IndicatorLevelOut(
+                from_=times_all[cluster.bar],
+                price=cluster.price,
+                label=cluster.label,
+                count=cluster.count,
+            )
+            for cluster in entry.compute_cluster_levels(series, params)
+            if cluster.bar >= first_requested
+        ]
+        return IndicatorResultOut(
+            id=entry.id, params=params, warmup_bars=needed, settled=settled, levels=levels
+        )
+
     values = entry.compute(series, params)
     lines = {
         key: [None if math.isnan(v) else float(v) for v in arr[first_requested:]]
@@ -225,6 +334,6 @@ def _result_out(
         id=entry.id,
         params=params,
         warmup_bars=needed,
-        settled=available_warmup_bars >= needed,
+        settled=settled,
         lines=lines,
     )

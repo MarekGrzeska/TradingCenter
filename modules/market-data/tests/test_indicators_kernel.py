@@ -138,6 +138,21 @@ class TestShiftDiff:
         assert result[1] == pytest.approx(10.0)
         assert result[2] == pytest.approx(15.0)
 
+    def test_lead_reads_n_bars_ahead(self):
+        result = kernel.lead([10.0, 20.0, 30.0, 40.0], 2)
+        assert result[0] == 30.0
+        assert result[1] == 40.0
+        assert math.isnan(result[2])
+        assert math.isnan(result[3])
+
+    def test_lead_reads_ahead_by_the_same_offset_shift_reads_back(self):
+        # `lead(values, n)[i] == values[i + n] == shift(values, n)[i + 2n]`.
+        values = [10.0, 20.0, 30.0, 40.0, 50.0, 60.0, 70.0]
+        led = kernel.lead(values, 2)
+        shifted = kernel.shift(values, 2)
+        for i in range(len(values) - 4):
+            assert led[i] == shifted[i + 4]
+
 
 class TestAlma:
     def test_flat_series_returns_the_flat_value(self):

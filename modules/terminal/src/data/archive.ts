@@ -264,6 +264,7 @@ function mapIndicatorResult(raw: RawIndicatorResult): IndicatorResult {
               from: parseIsoToEpochSeconds(level.from),
               price: level.price,
               label: level.label,
+              count: level.count,
             }),
           ),
   };

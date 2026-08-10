@@ -234,6 +234,19 @@ def shift(values: FloatArray, n: int) -> np.ndarray:
     return out
 
 
+def lead(values: FloatArray, n: int) -> np.ndarray:
+    """`values`, `n` bars ahead — `shift`'s mirror image. `np.nan` for the last `n`
+    bars, which have no such future bar yet. Swing-point confirmation (a bar higher
+    than `n` bars on *both* sides) is what this is for — every other primitive here
+    only ever looks backward."""
+    arr = _as_float64(values)
+    out = np.full(arr.shape, np.nan, dtype=np.float64)
+    if n < 1 or len(arr) <= n:
+        return out
+    out[:-n] = arr[n:]
+    return out
+
+
 def diff(values: FloatArray, n: int = 1) -> np.ndarray:
     """`values[i] - values[i - n]` — the change over `n` bars."""
     arr = _as_float64(values)
