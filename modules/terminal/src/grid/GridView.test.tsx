@@ -224,6 +224,31 @@ describe("GridView slot — archived-only symbols (terminal-grid spec)", () => {
     });
   });
 
+  it("offers every archived symbol and nothing else", async () => {
+    renderGrid();
+
+    const picker = await within(screen.getByTestId("slot-s1")).findByRole("combobox", {
+      name: "Symbol for slot s1",
+    });
+    await waitFor(() =>
+      expect([...(picker as HTMLSelectElement).options].map((option) => option.value)).toEqual([
+        "",
+        "BTCUSD",
+        "EURUSD",
+        "GOLD",
+        "SILVER",
+        "TSLA",
+        "US100",
+      ]),
+    );
+
+    // Archived at two resolutions, offered once: the picker is about the
+    // instrument, and the resolution selector beside it is about the rest.
+    expect(
+      [...(picker as HTMLSelectElement).options].filter((option) => option.value === "US100"),
+    ).toHaveLength(1);
+  });
+
   it("says nothing is archived, and points to Instruments, instead of an empty list", async () => {
     fakeArchive.pairs = [];
     const user = userEvent.setup();

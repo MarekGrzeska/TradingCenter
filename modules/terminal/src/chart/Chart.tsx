@@ -285,11 +285,13 @@ export function Chart({
     } else {
       // Older than what is drawn — a reconnect's gap fill. `update()` rejects
       // going backwards, so the merged series is redrawn wholesale. Rare by
-      // construction: only after a dropped stream.
-      seriesRef.current?.setData(barsRef.current.map(toCandlestick));
+      // construction: only after a dropped stream. Through `redraw`, because
+      // such a bar can land in front of the series and shift every logical
+      // index by one, which without the correction nudges the frame.
+      redraw(barsRef.current, previous[0]?.time);
     }
     publishLatestBar();
-  }, [publishLatestBar]);
+  }, [publishLatestBar, redraw]);
 
   const sink: BarSink = useMemo(
     () => ({ onHistory: applyHistory, onBar: applyBar }),
