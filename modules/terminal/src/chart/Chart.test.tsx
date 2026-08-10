@@ -765,6 +765,70 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(stub.latest().panesList).toHaveLength(1);
   });
 
+  it("deselecting one of two own-pane wskaźniki leaves the other's pane intact (regression)", async () => {
+    // Reported: select atr_pct, select atr, deselect atr — the chart's own
+    // default is to remove a pane the instant its last series does, which
+    // raced `Chart.tsx`'s own explicit `removePane` and threw ("This view
+    // hit an error"). Fixed by `addPane(true)` (`preserveEmptyPane`) plus a
+    // guard that never hands `removePane` a pane already gone.
+    const indicators = new FakeIndicatorSource();
+    const ownPaneLine = (id: string) =>
+      indicatorEntry({
+        id,
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: id, label: id, style: null }],
+        render: { pane: "own", style: "line", scale: "own", autoscale: true, range: null, levels: [] },
+      });
+    indicators.catalogueEntries = [ownPaneLine("atr_pct"), ownPaneLine("atr")];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ id: "atr_pct", params: { period: 14 }, lines: { atr_pct: [1] } })],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({ id: "atr_pct", params: { period: 14 }, lines: { atr_pct: [1] } }),
+          indicatorResult({ id: "atr", params: { period: 14 }, lines: { atr: [2] } }),
+        ],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ id: "atr_pct", params: { period: 14 }, lines: { atr_pct: [1] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr_pct$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(2));
+    expect(stub.latest().panesList).toHaveLength(3); // price + atr_pct + atr
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr$/i }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    expect(lineSeries()[0].options.color).toBeDefined(); // still a live, readable series
+    expect(stub.latest().panesList).toHaveLength(2); // price + atr_pct — atr's pane is gone, only once
+  });
+
   it("draws the catalogue's reference levels (RSI's 30/70) once, and removes them when deselected", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [

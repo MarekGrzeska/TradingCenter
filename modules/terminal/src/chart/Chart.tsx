@@ -545,7 +545,13 @@ export function Chart({
         activeOwnPanes.add(ownPaneKey);
         let pane = ownPanesRef.current.get(ownPaneKey);
         if (!pane) {
-          pane = chart.addPane();
+          // `preserveEmptyPane: true` — without it, the chart removes a pane
+          // on its own the moment its last series does (`IPaneApi.
+          // preserveEmptyPane` docs), racing the explicit `chart.removePane`
+          // below: deselecting one of two own-pane wskaźniki left the other's
+          // pane index stale and threw. This keeps removal singly-owned, by
+          // the cleanup loop, which already knows to look up a live index.
+          pane = chart.addPane(true);
           pane.setStretchFactor(OWN_PANE_STRETCH);
           ownPanesRef.current.set(ownPaneKey, pane);
         }
@@ -640,7 +646,10 @@ export function Chart({
 
     for (const [ownPaneKey, pane] of ownPanesRef.current) {
       if (activeOwnPanes.has(ownPaneKey)) continue;
-      chart.removePane(pane.paneIndex());
+      // Belt and braces alongside `preserveEmptyPane: true` above: a pane
+      // already gone (by whatever path) must not be handed to `removePane`
+      // again — that is what actually threw.
+      if (chart.panes().includes(pane)) chart.removePane(pane.paneIndex());
       ownPanesRef.current.delete(ownPaneKey);
     }
 

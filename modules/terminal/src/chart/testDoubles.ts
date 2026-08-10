@@ -55,6 +55,12 @@ export interface FakePane {
    *  after the one it removes, and a cached index would go stale exactly the way
    *  `Chart.tsx` must not let its own `paneIndex()` calls go stale. */
   paneIndex(): number;
+  /** What `chart.addPane()`'s own argument set — mirrors the real
+   *  `IPaneApi.preserveEmptyPane()`. `false` (the real library's own default)
+   *  is what makes `removeSeries` below delete a pane whose last series just
+   *  left, the exact behaviour that raced `Chart.tsx`'s own explicit
+   *  `removePane` and threw until `addPane(true)` opted out of it. */
+  preserveEmptyPane: boolean;
 }
 
 export interface Candle {
@@ -88,9 +94,13 @@ export interface FakeSeries {
   type: string;
   /** The options the chart created this series with. */
   options: Record<string, unknown>;
-  /** Which pane `addSeries`'s third argument put this series in — 0 (the price
-   *  pane) unless the call named another one. */
-  paneIndex: number;
+  /** The pane `addSeries`'s third argument put this series in, resolved once
+   *  at creation — never restored to a bare number, so a later pane removal
+   *  (this series' own or another's) is reflected the same live way the real
+   *  `series.getPane().paneIndex()` would be. */
+  pane: FakePane;
+  /** Read live off `pane`, for a test that only cares about the number. */
+  readonly paneIndex: number;
   setDataCalls: SeriesPoint[][];
   updateCalls: SeriesPoint[];
   /** Whatever setData/update has left on screen. */
@@ -115,13 +125,14 @@ export function createChartStub(): ChartStub {
   };
 }
 
-function makeFakePane(panesList: FakePane[]): FakePane {
+function makeFakePane(panesList: FakePane[], preserveEmptyPane = false): FakePane {
   const pane: FakePane = {
     stretchFactor: 1,
     setStretchFactor(factor) {
       this.stretchFactor = factor;
     },
     paneIndex: () => panesList.indexOf(pane),
+    preserveEmptyPane,
   };
   return pane;
 }
@@ -157,16 +168,30 @@ export function fakeChartApi(chart: FakeChart) {
       // place of the real series-definition objects — the same shape `Chart.tsx`
       // passes through unmodified, so reading it back here needs no separate map.
       const kind = (type as { type?: string } | undefined)?.type ?? "unknown";
-      const series = makeFakeSeries(kind, options, paneIndex);
+      const pane = chart.panesList[paneIndex] ?? chart.panesList[0];
+      const series = makeFakeSeries(kind, options, pane);
       chart.series.push(series);
       return series;
     },
     removeSeries: (series: FakeSeries) => {
       chart.series = chart.series.filter((existing) => existing !== series);
       chart.removedSeries.push(series);
+      // The real chart's own default: a pane with no series left in it goes
+      // too, unless it was created with `preserveEmptyPane: true`. Pane 0
+      // (the price pane) is exempt in practice — the candlestick series
+      // always occupies it — and exempt here explicitly, so a test can never
+      // end up asserting against a chart with no price pane at all.
+      const vacated = series.pane;
+      if (vacated !== chart.panesList[0] && !vacated.preserveEmptyPane) {
+        const stillOccupied = chart.series.some((s) => s.pane === vacated);
+        if (!stillOccupied) {
+          const index = chart.panesList.indexOf(vacated);
+          if (index !== -1) chart.panesList.splice(index, 1);
+        }
+      }
     },
-    addPane: () => {
-      const pane = makeFakePane(chart.panesList);
+    addPane: (preserveEmptyPane = false) => {
+      const pane = makeFakePane(chart.panesList, preserveEmptyPane);
       chart.panesList.push(pane);
       return pane;
     },
@@ -206,13 +231,16 @@ export function fakeChartApi(chart: FakeChart) {
 export function makeFakeSeries(
   type: string = "Candlestick",
   options: Record<string, unknown> = {},
-  paneIndex: number = 0,
+  pane: FakePane = makeFakePane([]),
 ): FakeSeries {
   let current: SeriesPoint[] = [];
   return {
     type,
     options,
-    paneIndex,
+    pane,
+    get paneIndex() {
+      return this.pane.paneIndex();
+    },
     setDataCalls: [],
     updateCalls: [],
     data: () => current,
