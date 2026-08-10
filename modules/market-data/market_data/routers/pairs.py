@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime
 
 from fastapi import (
@@ -21,6 +22,7 @@ from ..contract import (
     TrackPairRequest,
     TrackPairsResult,
 )
+from ..coverage import clear_history_boundary, earliest_reachable
 from ..deletion import close_for_deletion, delete_pair_data, read_deletions
 from ..ingest import Ingest
 from ..jobs import (
@@ -38,6 +40,8 @@ from ..tracking import (
     read_status,
 )
 from .deps import pool
+
+log = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -146,6 +150,22 @@ async def track_pairs(body: TrackPairRequest, request: Request) -> TrackPairsRes
     async with state.pool.acquire() as conn:
         plans = []
         for pair in accepted:
+            # A request reaching deeper than the boundary the archive holds *is* the
+            # instruction to measure it again, so the boundary goes first and the range is
+            # planned whole. Only here: pricing a job writes nothing, and reading coverage
+            # must not change what it reports (`market-data-store` spec, "Odczyt stanu
+            # pokrycia nie zmienia granicy").
+            reachable = await earliest_reachable(conn, pair.symbol, pair.resolution)
+            if reachable is not None and pair.collect_from < reachable:
+                await clear_history_boundary(conn, pair.symbol, pair.resolution)
+                log.info(
+                    "%s %s: asked for %s, below the recorded boundary %s — dropping it and "
+                    "measuring again",
+                    pair.symbol,
+                    pair.resolution.value,
+                    pair.collect_from.isoformat(),
+                    reachable.isoformat(),
+                )
             pair_plans, _ = await plan_chunks(
                 conn, pair.symbol, pair.resolution, pair.collect_from, now
             )

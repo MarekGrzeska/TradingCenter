@@ -65,26 +65,26 @@
 
 ## 5. market-data: granica powstaje z pomiaru i daje się unieważnić
 
-- [ ] 5.1 W `coverage.py` dodać zdejmowanie granicy dla pary — zdjęcie flagi `history_ended`
+- [x] 5.1 W `coverage.py` dodać zdejmowanie granicy dla pary — zdjęcie flagi `history_ended`
   bez ruszania zakresów pokrycia i bez ruszania świec.
-- [ ] 5.2 W `jobs/runner.py` zapisywać granicę z najstarszej odebranej świecy, a nie
+- [x] 5.2 W `jobs/runner.py` zapisywać granicę z najstarszej odebranej świecy, a nie
   z `chunk.chunk_start`; kawałek bez ani jednej świecy nie zapisuje granicy wcale.
-- [ ] 5.3 W `jobs/plan.py` przestać czytać `earliest_reachable` i przestać przycinać —
+- [x] 5.3 W `jobs/plan.py` przestać czytać `earliest_reachable` i przestać przycinać —
   `effective_from` równe `requested_from`.
-- [ ] 5.4 W `routers/pairs.py` zdejmować granicę przed planowaniem, gdy żądana data początku
+- [x] 5.4 W `routers/pairs.py` zdejmować granicę przed planowaniem, gdy żądana data początku
   jest wcześniejsza niż zapisana granica. Wyłącznie ta ścieżka zapisuje; `/jobs/estimate`
   nie rusza niczego.
-- [ ] 5.5 Test: para z zapisaną granicą i prośbą starszą od niej planuje pełny zakres,
+- [x] 5.5 Test: para z zapisaną granicą i prośbą starszą od niej planuje pełny zakres,
   a granica znika.
-- [ ] 5.6 Test: wycena tej samej prośby daje ten sam zakres i **nie** zdejmuje granicy.
-- [ ] 5.7 Test: kawałek z `history_ended` zapisuje granicę na najstarszej odebranej świecy,
+- [x] 5.6 Test: wycena tej samej prośby daje ten sam zakres i **nie** zdejmuje granicy.
+- [x] 5.7 Test: kawałek z `history_ended` zapisuje granicę na najstarszej odebranej świecy,
   nie na krawędzi okna.
-- [ ] 5.8 Test: kawałek pusty z `history_ended` nie zapisuje granicy.
-- [ ] 5.9 Test: hurtowe pomijanie starszych kawałków w obrębie zlecenia działa dalej —
+- [x] 5.8 Test: kawałek pusty z `history_ended` nie zapisuje granicy.
+- [x] 5.9 Test: hurtowe pomijanie starszych kawałków w obrębie zlecenia działa dalej —
   regresja na `skip_chunks_beyond_history`.
-- [ ] 5.10 Przejrzeć testy opierające się na starym przycinaniu (`tests/test_jobs_plan.py`,
+- [x] 5.10 Przejrzeć testy opierające się na starym przycinaniu (`tests/test_jobs_plan.py`,
   `tests/test_coverage.py`) i przepisać je na nową regułę zamiast rozluźniać.
-- [ ] 5.11 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright`.
+- [x] 5.11 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright`.
 
 ## 6. market-data: archiwum przestaje utrwalać okres, który trwa
 

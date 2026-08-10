@@ -202,17 +202,33 @@ async def test_a_pair_has_at_most_one_end_of_provider_history(db: asyncpg.Connec
     # Two of them would be two answers to "how far back is there anything left to
     # fetch", and backfill would believe whichever row it read first.
     await db.execute(
-        "INSERT INTO coverage_ranges (symbol, resolution, range_start, range_end, history_ended)"
-        " VALUES ('US100', 'MINUTE', $1, $1, true)",
+        "INSERT INTO coverage_ranges"
+        " (symbol, resolution, range_start, range_end, history_ended, history_ends_at)"
+        " VALUES ('US100', 'MINUTE', $1, $1, true, $1)",
         MOMENT,
     )
     with pytest.raises(UniqueViolationError):
         await db.execute(
             "INSERT INTO coverage_ranges"
-            " (symbol, resolution, range_start, range_end, history_ended)"
-            " VALUES ('US100', 'MINUTE', $1, $1, true)",
+            " (symbol, resolution, range_start, range_end, history_ended, history_ends_at)"
+            " VALUES ('US100', 'MINUTE', $1, $1, true, $1)",
             MOMENT.replace(hour=9),
         )
+
+
+async def test_a_boundary_and_its_point_are_one_fact(db: asyncpg.Connection) -> None:
+    """Claiming an end without saying where, or naming a point without claiming an end,
+    are both half a fact — and "how deep does this pair go" would then have two answers."""
+    for history_ended, point in ((True, None), (False, MOMENT)):
+        with pytest.raises(CheckViolationError):
+            await db.execute(
+                "INSERT INTO coverage_ranges"
+                " (symbol, resolution, range_start, range_end, history_ended, history_ends_at)"
+                " VALUES ('US100', 'MINUTE', $1, $1, $2, $3)",
+                MOMENT,
+                history_ended,
+                point,
+            )
 
 
 async def test_ranges_without_a_provider_boundary_may_be_many(db: asyncpg.Connection) -> None:
