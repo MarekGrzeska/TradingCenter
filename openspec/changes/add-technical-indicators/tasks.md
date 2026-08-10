@@ -64,31 +64,31 @@ grupa 7.
 
 ## 4. Strefy (E3)
 
-- [ ] 4.1 `range_gap` — kierunek, granice, `touched_at`, `filled_at` względem żądanego zakresu
-- [ ] 4.2 `body_gap`
-- [ ] 4.3 Klasyfikacja przerwy sesyjnej z pokrycia archiwum; `skip_session_gaps` domyślnie włączony
-- [ ] 4.4 `session_range(od, do, strefa)` — granice wyznaczane w kalendarzu strefy
-- [ ] 4.5 `opening_range(okno, n)`
-- [ ] 4.6 Kształt `zones` w odpowiedzi; strefa niedomknięta ma koniec nieustalony
-- [ ] 4.7 Terminal: `ZonePrimitive` — prostokąty, strefa otwarta do prawej krawędzi, selekcja po widocznym zakresie
-- [ ] 4.8 Test: przerwa piątek–niedziela nie jest zgłaszana jako luka cenowa
-- [ ] 4.9 Test: okno sesji obejmuje te same godziny lokalne przed i po zmianie czasu
-- [ ] 4.10 Pomiar płynności przewijania przy ~300 strefach w widocznym zakresie
+- [x] 4.1 `range_gap` — kierunek, granice, `touched_at`, `filled_at` względem żądanego zakresu
+- [x] 4.2 `body_gap`
+- [x] 4.3 Klasyfikacja przerwy sesyjnej z pokrycia archiwum; `skip_session_gaps` domyślnie włączony
+- [x] 4.4 `session_range(od, do, strefa)` — granice wyznaczane w kalendarzu strefy
+- [x] 4.5 `opening_range(okno, n)`
+- [x] 4.6 Kształt `zones` w odpowiedzi; strefa niedomknięta ma koniec nieustalony
+- [x] 4.7 Terminal: `ZonePrimitive` — prostokąty, strefa otwarta do prawej krawędzi, selekcja po widocznym zakresie
+- [x] 4.8 Test: przerwa piątek–niedziela nie jest zgłaszana jako luka cenowa
+- [x] 4.9 Test: okno sesji obejmuje te same godziny lokalne przed i po zmianie czasu
+- [x] 4.10 Pomiar płynności przewijania przy ~300 strefach w widocznym zakresie
 
 ## 5. Profil czasowy (E4)
 
-- [ ] 5.1 `time_profile` — odczyt serii minutowej niezależnie od zamówionej rozdzielczości
-- [ ] 5.2 Rozkład, poziom o największym udziale, przedział obejmujący zadany udział
-- [ ] 5.3 Odmowa przy braku serii minutowej dla pary
-- [ ] 5.4 Terminal: prymityw panelu — poziomy histogram przy prawej krawędzi
-- [ ] 5.5 Test: poziom o największym udziale zgodny z ręcznym przeliczeniem na próbce
+- [x] 5.1 `time_profile` — odczyt serii minutowej niezależnie od zamówionej rozdzielczości
+- [x] 5.2 Rozkład, poziom o największym udziale, przedział obejmujący zadany udział
+- [x] 5.3 Odmowa przy braku serii minutowej dla pary
+- [x] 5.4 Terminal: prymityw panelu — poziomy histogram przy prawej krawędzi
+- [x] 5.5 Test: poziom o największym udziale zgodny z ręcznym przeliczeniem na próbce
 
 ## 6. Na żywo (E5)
 
-- [ ] 6.1 Terminal: dopytanie o ogon serii po zamknięciu świecy, tym samym żądaniem
-- [ ] 6.2 Terminal: wskaźnik nie zmienia się w trakcie świecy w budowie
-- [ ] 6.3 Terminal: zmiana symbolu, rozdzielczości albo źródła kasuje serie wskaźników razem ze świecami
-- [ ] 6.4 Test: żadna wartość policzona dla poprzedniej serii nie zostaje na ekranie w trakcie ładowania nowej
+- [x] 6.1 Terminal: dopytanie o ogon serii po zamknięciu świecy, tym samym żądaniem
+- [x] 6.2 Terminal: wskaźnik nie zmienia się w trakcie świecy w budowie
+- [x] 6.3 Terminal: zmiana symbolu, rozdzielczości albo źródła kasuje serie wskaźników razem ze świecami
+- [x] 6.4 Test: żadna wartość policzona dla poprzedniej serii nie zostaje na ekranie w trakcie ładowania nowej
 
 ## 7. Domknięcie
 

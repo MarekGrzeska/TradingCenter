@@ -171,8 +171,39 @@ każdej zmianie `contract.py`, więc pominięcie kroku środkowego zatrzyma się
 
 - Konkretna wartość sufitu żądania. Ustalona po pomiarze w etapie zerowym; kształt odmowy jest już
   określony w spec, więc zmiana samej liczby nie rusza ani kontraktu, ani zadań.
-- Domyślna szerokość kubełka w profilu czasowym — ułamek ATR czy wielokrotność kroku instrumentu.
-  Rozstrzygalna przy etapie profilu, na danych.
-- Czy dopytywanie o ogon po zamknięciu świecy wystarczy, czy potrzebna będzie subskrypcja
-  wskaźników. Odpowiedź po zmierzeniu opóźnienia na działającym stosie; obie drogi mieszczą się
-  w tym samym kontrakcie.
+
+## Decisions rozstrzygnięte w etapie strefy/profilu/na żywo
+
+### Szerokość kubełka w profilu czasowym: ułamek ATR
+
+Rozważone przy etapie profilu, na danych: ułamek ATR kontra wielokrotność kroku instrumentu.
+
+Wybrany ułamek ATR (`bucket_atr`, domyślnie `0.25`, liczony z `atr_period` na tej samej serii
+minutowej co profil) — ta sama jednostka, jaką `level_clusters`' `tol` już używa do tolerancji
+poziomu (etap 2). Krok instrumentu odrzucony: moduł nie ma tabeli kroków per instrument (`Candle`
+nie niesie tego pola), a wprowadzenie jej byłoby osobną, nieuzasadnioną tu zmianą kontraktu.
+
+Sam algorytm — który dotąd nie był rozstrzygnięty, tylko szerokość kubełka — poszedł najprostszą
+drogą, jaką da się ręcznie przeliczyć (task 5.5): każda świeca minutowa zasila dokładnie jeden
+kubełek, wybrany po swojej cenie typowej `(H+L+C)/3`, a nie po rozbiciu własnego zakresu H-L na
+wiele kubełków. TPO/Volume Profile zwykle rozbijają zakres świecy; ta wersja tego nie robi —
+prostszy, deterministyczny wybór, łatwiejszy do zweryfikowania niż do przypadku brzegowego przy
+rozbijaniu, i wystarczający, skoro moduł liczy udział czasu, a nie wolumenu (task 1.16 nie zostawia
+tu miejsca na inny sygnał wagi).
+
+### Dopytywanie wystarcza — bez pomiaru opóźnienia na działającym stosie
+
+Rozważone: dopytanie tym samym żądaniem po zamknięciu świecy kontra osobna subskrypcja wskaźników.
+
+Wybrane dopytywanie — `tasks.md`'s 6.1 nazywa to wprost, więc decyzja została podjęta na poziomie
+zadania, a nie tej notatki. Zaimplementowane w `Chart.tsx`'s `applyBar`: gdy otwiera się nowy okres
+(`bar.time > last.time`), `barsRange.to` przesuwa się na świecę, która właśnie się domknęła, i
+`useIndicators`' istniejący efekt dopytuje tym samym kształtem żądania — nigdy przy samym tyknięciu
+świecy w budowie (`bar.time === last.time`), co utrzymuje 6.2 prawdziwym.
+
+Zastrzeżenie: to, co design.md pierwotnie obiecywał — "odpowiedź po zmierzeniu opóźnienia na
+działającym stosie" — nie zostało zmierzone; nie było działającego stosu do pomiaru w trakcie tej
+zmiany. Wybór dopytywania trzyma się mocno na słowach samego zadania 6.1 i na tym, że jest to
+prostsza z dwóch dróg zmieszczonych w tym samym kontrakcie, ale pomiar opóźnienia na żywym stosie
+zostaje uczciwie otwarty — gdyby dopytywanie okazało się zbyt wolne na wolnych połączeniach,
+przejście na subskrypcję nie rusza kontraktu, tylko sposób, w jaki terminal go odpytuje.

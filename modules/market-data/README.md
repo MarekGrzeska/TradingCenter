@@ -25,13 +25,17 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
   candles and quotes over its WebSocket. Paging is the gateway's job, so a fill is one request
   however deep — and genuinely long (20 000 five-minute candles: 30 provider calls, 26 s), which
   is why the read timeout is minutes while the connect timeout stays at five seconds.
+- `indicators/` — `kernel.py` (the math, ~20 primitives, no FastAPI or asyncpg import in
+  sight), `warmup.py` (how far back a recursive one needs reading before its answer can be
+  trusted), `catalogue.py` (every wskaźnik this module offers, as data — id, params, output
+  shape, how to draw it — not as a type per entry). See "Indicators" below.
 - `hub.py` — fan-out to subscribers, and the hold that makes a snapshot airtight.
 - `app.py` — assembly only: the lifespan, the error handling every route shares, and the
   routers mounted onto it. Nothing that decides anything.
 - `routers/` — the routes, split by the area they serve rather than by verb: `meta`,
-  `candles`, `pairs`, `jobs`, `stream`. That is how the specs are organised and how changes
-  arrive — a change to jobs touches four routes that are all in one file and none of the
-  others. `routers/deps.py` holds the two things a route reaches for, so a router never
+  `candles`, `pairs`, `jobs`, `stream`, `indicators`. That is how the specs are organised and
+  how changes arrive — a change to jobs touches four routes that are all in one file and none
+  of the others. `routers/deps.py` holds the two things a route reaches for, so a router never
   imports the module that mounts it.
 - `tickets.py` — one-time tickets, which are how a browser opens the stream. See below.
 - `contract.py`, `errors.py` — the shapes the module answers with, and refusals that name
@@ -179,6 +183,8 @@ deliberately needs no running stack: a check that needs one is a check nobody ru
 | GET | `/instruments?max_nodes=&asset_class=` | the catalogue, proxied from the gateway unread |
 | GET | `/instruments/search?q=` | a search, proxied from the gateway unread |
 | GET | `/asset-classes` | the classes the gateway describes instruments with |
+| GET | `/indicators` | every wskaźnik this module can compute, and how to draw it |
+| POST | `/indicators/{symbol}` | one or more wskaźniki, computed over a range, on one shared time axis |
 
 **The last three are a proxy, not a second catalogue.** `capital-gateway` is not public — the
 terminal cannot reach it directly — so these forward the gateway's own routes and its own JSON,
@@ -303,6 +309,59 @@ terminal no longer needs its "on resume, close the gap" rule.
 
 Subscribing to a pair nobody chose to collect is refused **before** the handshake, and does not
 start collecting it either — that is the decision the ceiling exists to keep deliberate.
+
+### Indicators
+
+One implementation of the math, on the server, for every future consumer — the terminal, a
+backtest, the strategy module someday — rather than each reimplementing it and quietly
+disagreeing. `GET /indicators` is the whole catalogue: id, parameters with their bounds, and
+how to draw the answer. A consumer never needs to know a wskaźnik by name beforehand — it reads
+the catalogue and offers whatever it already knows how to draw. `POST /indicators/{symbol}`
+computes one or more of them over a range, reading further back than `from` on its own by
+however much warmup each one needs, and says in `settled` whether the archive actually held
+enough history for the answer to be trusted yet — an unsettled value is still returned, never
+withheld, because a caller silently missing a value is worse than one that knows to distrust it.
+
+Every answer takes one of four shapes, declared per entry and unrelated to which trading school
+named the wskaźnik: **lines** (a moving average, an oscillator), **markers** (a swing point),
+**zones** (a gap, a session window — open on one end while unresolved, closed once it is),
+**levels** (a pivot, a cluster of equal highs, a previous day's OHLC, a time-profile bucket).
+`algorithm_version` bumps whenever a formula changes and never when an entry is only added —
+`test_indicators_catalogue.py`'s golden file turns a silent formula change into a diff in the
+same commit that made it.
+
+**Determinism is a product, not an accident.** The kernel is its own implementation, on `numpy`
+— not TA-Lib in the runtime, not `pandas-ta` — because every third-party library seeds its
+recursive filters (EMA, RMA, and everything built on them) its own way, and that seed cannot be
+overridden per call. Instead, warmup here is a decay threshold: read enough bars that the
+seed's influence falls below `1e-9`, and the value no longer depends on where a caller happened
+to start reading — the property `test_indicators_catalogue.py`'s `TestStartIndependence` checks
+for every decaying entry at once. TA-Lib is still in the box, as a `dev` dependency compared
+against with an explicit tolerance and a written list of known differences — a seeding
+difference is not a bug on either side.
+
+**What this module does not compute**, on purpose, not yet by omission:
+
+- **No signal, no boolean.** A wskaźnik measures; it never decides. Every threshold a formula
+  needs (`skip_session_gaps`, a value-area percentage, a pivot type) is a parameter the caller
+  chose, echoed back in the response — never a constant this module picked for them. `range_gap`
+  carries "Fair Value Gap" as an alias, never as its identifier, so one school's vocabulary
+  never becomes the wire's.
+- **No volume.** Nothing here reads it and nothing here will — this archive's `volume` field is
+  not reliably populated for a CFD provider, and a family built on it would be quietly wrong for
+  some instruments and not others. `time_profile` counts one-minute bars per price bucket
+  instead of traded size for the same reason: a TPO reading, not a volume profile.
+- **No state, no repaint.** Parabolic SAR, SuperTrend, ZigZag, and rebuilt series (Renko, Kagi)
+  do not decay with warmup, they *change* with it — deepening the history read changes today's
+  value, which is a different contract than everything else here promises. Left out deliberately,
+  not forgotten.
+- **No session calendar.** `market_status.py` knows whether an instrument's market is open now,
+  not its calendar — so `session_range`/`opening_range` take a **fixed clock window** as
+  parameters (`from_hour`/`to_hour`, or a UTC calendar day for the opening range) rather than
+  looking up real trading hours, and Ichimoku/Alligator's future-shifted lines stay out entirely
+  until a session calendar exists to place them against without drawing one into a weekend.
+- **No second instrument.** Every wskaźnik computes from one symbol's own series — a spread or a
+  correlation would need a second one as an input or a parameter, and nothing here accepts that.
 
 ## The rules, and what was measured
 
