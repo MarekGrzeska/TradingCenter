@@ -50,17 +50,17 @@ grupa 7.
 
 ## 3. Punkty i poziomy (E2)
 
-- [ ] 3.1 `swing_points(n)` — zgłaszany po potwierdzeniu, z opóźnieniem podanym w odpowiedzi
-- [ ] 3.2 `last_swing_high` / `last_swing_low` jako linie schodkowe
-- [ ] 3.3 `rolling_extreme(n)`
-- [ ] 3.4 `htf_levels(okres)` — odczyt międzyrozdzielczościowy z zamkniętego okresu; odmowa przy braku serii
-- [ ] 3.5 `pivots(typ, okres)` — classic, fibonacci, camarilla, woodie, demark
-- [ ] 3.6 `level_clusters(n, tol)` — tolerancja w jednostkach ATR, wynik z licznością
-- [ ] 3.7 Wypełnienie kształtów `markers` i `levels` w odpowiedzi
-- [ ] 3.8 Terminal: markery przez `createSeriesMarkers`
-- [ ] 3.9 Terminal: prymityw promienia — odcinek od zadanego momentu, nie przez całą szerokość
-- [ ] 3.10 Test: punkt zwrotny nie znika ani nie przesuwa się przy powtórnym odczycie dłuższego zakresu
-- [ ] 3.11 Test: poziomy dnia poprzedniego na serii piętnastominutowej obowiązują od zamknięcia tamtego dnia
+- [x] 3.1 `swing_points(n)` — zgłaszany po potwierdzeniu, z opóźnieniem podanym w odpowiedzi
+- [x] 3.2 `last_swing_high` / `last_swing_low` jako linie schodkowe
+- [x] 3.3 `rolling_extreme(n)`
+- [x] 3.4 `htf_levels(okres)` — odczyt międzyrozdzielczościowy z zamkniętego okresu; odmowa przy braku serii
+- [x] 3.5 `pivots(typ, okres)` — classic, fibonacci, camarilla, woodie, demark
+- [x] 3.6 `level_clusters(n, tol)` — tolerancja w jednostkach ATR, wynik z licznością
+- [x] 3.7 Wypełnienie kształtów `markers` i `levels` w odpowiedzi
+- [x] 3.8 Terminal: markery przez `createSeriesMarkers`
+- [x] 3.9 Terminal: prymityw promienia — odcinek od zadanego momentu, nie przez całą szerokość
+- [x] 3.10 Test: punkt zwrotny nie znika ani nie przesuwa się przy powtórnym odczycie dłuższego zakresu
+- [x] 3.11 Test: poziomy dnia poprzedniego na serii piętnastominutowej obowiązują od zamknięcia tamtego dnia
 
 ## 4. Strefy (E3)
 
