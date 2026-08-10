@@ -1,4 +1,4 @@
-import { RESOLUTIONS, type Resolution } from "../data/types";
+import { RESOLUTIONS, type IndicatorSelection, type Resolution } from "../data/types";
 
 /**
  * Six slots exist at all times, with fixed identities; the layout only decides
@@ -29,6 +29,12 @@ export interface SlotConfig {
    *  than rendering an empty chart. */
   symbol: string | null;
   resolution: Resolution;
+  /** The wskaźniki chosen for this slot, the same way it remembers its
+   *  instrument and interval (terminal-grid spec, "Slot pamięta własny zestaw
+   *  wskaźników"). An entry whose `id` the catalogue no longer offers is
+   *  `Chart`'s problem to notice and skip, not this shape's to validate — this
+   *  file only checks that a saved value has the shape a selection ever had. */
+  indicators: IndicatorSelection[];
 }
 
 export interface GridConfig {
@@ -51,17 +57,25 @@ export function defaultGridConfig(): GridConfig {
     layout: "2x2",
     activeSlot: "s1",
     slots: {
-      s1: { symbol: "US100", resolution: "MINUTE_5" },
-      s2: { symbol: "GOLD", resolution: "MINUTE_5" },
-      s3: { symbol: "BTCUSD", resolution: "HOUR" },
-      s4: { symbol: "EURUSD", resolution: "MINUTE_15" },
-      s5: { symbol: null, resolution: "MINUTE_5" },
-      s6: { symbol: null, resolution: "MINUTE_5" },
+      s1: { symbol: "US100", resolution: "MINUTE_5", indicators: [] },
+      s2: { symbol: "GOLD", resolution: "MINUTE_5", indicators: [] },
+      s3: { symbol: "BTCUSD", resolution: "HOUR", indicators: [] },
+      s4: { symbol: "EURUSD", resolution: "MINUTE_15", indicators: [] },
+      s5: { symbol: null, resolution: "MINUTE_5", indicators: [] },
+      s6: { symbol: null, resolution: "MINUTE_5", indicators: [] },
     },
   };
 }
 
 const RESOLUTION_SET = new Set<string>(RESOLUTIONS);
+
+function isIndicatorSelection(value: unknown): value is IndicatorSelection {
+  if (typeof value !== "object" || value === null) return false;
+  const selection = value as Record<string, unknown>;
+  if (typeof selection.id !== "string") return false;
+  if (typeof selection.params !== "object" || selection.params === null) return false;
+  return Object.values(selection.params).every((v) => typeof v === "number");
+}
 
 function isSlotConfig(value: unknown): value is SlotConfig {
   if (typeof value !== "object" || value === null) return false;
@@ -69,7 +83,8 @@ function isSlotConfig(value: unknown): value is SlotConfig {
   const symbolOk = slot.symbol === null || typeof slot.symbol === "string";
   const resolutionOk =
     typeof slot.resolution === "string" && RESOLUTION_SET.has(slot.resolution);
-  return symbolOk && resolutionOk;
+  const indicatorsOk = Array.isArray(slot.indicators) && slot.indicators.every(isIndicatorSelection);
+  return symbolOk && resolutionOk && indicatorsOk;
 }
 
 /**
@@ -93,7 +108,7 @@ export function parseGridConfig(value: unknown): GridConfig | null {
   for (const id of SLOT_IDS) {
     const slot = rawSlots[id];
     if (!isSlotConfig(slot)) return null;
-    slots[id] = { symbol: slot.symbol, resolution: slot.resolution };
+    slots[id] = { symbol: slot.symbol, resolution: slot.resolution, indicators: slot.indicators };
   }
 
   return {

@@ -338,6 +338,9 @@ export interface IndicatorParam {
 export interface IndicatorLineSpec {
   key: string;
   label: string;
+  /** Overrides the entry's own `render.style` for this one line — MACD's histogram
+   *  line inside an otherwise line-style entry. `null` means: use `render.style`. */
+  style: IndicatorStyle | null;
 }
 
 export type IndicatorPane = "price" | "own";

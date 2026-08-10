@@ -649,6 +649,11 @@ export interface components {
              * @description e.g. 'EMA {period}' — a template, not a rendered string
              */
             label: string;
+            /**
+             * Style
+             * @description Overrides the entry's own render.style for this one line — MACD's histogram line inside an otherwise line-style entry, and the only reason this field exists. Null means: use render.style.
+             */
+            style: ("line" | "dots" | "histogram") | null;
         };
         /** IndicatorMarkerOut */
         IndicatorMarkerOut: {

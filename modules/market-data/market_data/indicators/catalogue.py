@@ -13,6 +13,7 @@ translates onto the wire.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Literal
@@ -69,6 +70,10 @@ class ParamOutOfRange(ValueError):
 class LineSpec:
     key: str
     label: str
+    # Overrides the entry's own `render.style` for this one line — MACD's
+    # histogram line inside an otherwise line-style entry, and the only reason
+    # this field exists. `None` means: use the entry's `render.style`.
+    style: Literal["line", "dots", "histogram"] | None = None
 
 
 @dataclass(frozen=True)
@@ -164,9 +169,967 @@ _ATR = IndicatorSpec(
     },
 )
 
+def _safe_divide(numerator: np.ndarray, denominator: np.ndarray) -> np.ndarray:
+    """`numerator / denominator`, `np.nan` where undefined instead of a runtime
+    warning — division by a zero high-low range or a flat window is a property of
+    the data (a single-tick candle, an illiquid pair), not a bug in the formula."""
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return numerator / denominator
+
+
+_LN2 = float(np.log(2.0))
+
+
+_ATR_PCT = IndicatorSpec(
+    id="atr_pct",
+    name="Average True Range %",
+    group="volatility",
+    inputs=("high", "low", "close"),
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="atr_pct", label="ATR% {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["period"]))),
+    compute=lambda s, p: {
+        "atr_pct": 100
+        * _safe_divide(
+            kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["period"])), s.close
+        )
+    },
+)
+
+# --- geometria świecy: six numbers every candlestick pattern and every "reaction
+# at a level" is built from, normalised so they compare across candles and
+# instruments (docs/wskazniki-plan-wdrozenia.html, "Geometria świecy"). ---
+
+_BAR_RANGE_ATR = IndicatorSpec(
+    id="bar_range_atr",
+    name="Bar Range in ATR",
+    group="geometry",
+    aliases=("Bar Range / ATR",),
+    inputs=("high", "low", "close"),
+    params=(Param(name="atr_period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="bar_range_atr", label="Bar Range/ATR {atr_period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["atr_period"]))),
+    compute=lambda s, p: {
+        "bar_range_atr": _safe_divide(
+            s.high - s.low,
+            kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["atr_period"])),
+        )
+    },
+)
+
+_BODY_RATIO = IndicatorSpec(
+    id="body_ratio",
+    name="Body Ratio",
+    group="geometry",
+    inputs=("open", "high", "low", "close"),
+    lines=(LineSpec(key="body_ratio", label="Body Ratio"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute=lambda s, p: {"body_ratio": _safe_divide(np.abs(s.close - s.open), s.high - s.low)},
+)
+
+_WICK_UP_RATIO = IndicatorSpec(
+    id="wick_up_ratio",
+    name="Upper Wick Ratio",
+    group="geometry",
+    inputs=("open", "high", "low", "close"),
+    lines=(LineSpec(key="wick_up_ratio", label="Upper Wick Ratio"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute=lambda s, p: {
+        "wick_up_ratio": _safe_divide(s.high - np.maximum(s.open, s.close), s.high - s.low)
+    },
+)
+
+_WICK_DOWN_RATIO = IndicatorSpec(
+    id="wick_down_ratio",
+    name="Lower Wick Ratio",
+    group="geometry",
+    inputs=("open", "high", "low", "close"),
+    lines=(LineSpec(key="wick_down_ratio", label="Lower Wick Ratio"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute=lambda s, p: {
+        "wick_down_ratio": _safe_divide(np.minimum(s.open, s.close) - s.low, s.high - s.low)
+    },
+)
+
+_CLOSE_POSITION = IndicatorSpec(
+    id="close_position",
+    name="Close Position",
+    group="geometry",
+    aliases=("Close Location Value",),
+    inputs=("high", "low", "close"),
+    lines=(LineSpec(key="close_position", label="Close Position"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute=lambda s, p: {"close_position": _safe_divide(s.close - s.low, s.high - s.low)},
+)
+
+_GAP_PREV_CLOSE_ATR = IndicatorSpec(
+    id="gap_prev_close_atr",
+    name="Opening Gap in ATR",
+    group="geometry",
+    inputs=("open", "high", "low", "close"),
+    params=(Param(name="atr_period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="gap_prev_close_atr", label="Gap/ATR {atr_period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["atr_period"]))),
+    compute=lambda s, p: {
+        "gap_prev_close_atr": _safe_divide(
+            s.open - kernel.shift(s.close, 1),
+            kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["atr_period"])),
+        )
+    },
+)
+
+# --- położenie w zakresie: where the close sits against its own recent history,
+# without naming the halves "premium" or "discount" — that split is a threshold,
+# a strategy's job, not a measure's (spec "Katalog mierzy, a nie orzeka"). ---
+
+_RANGE_POSITION = IndicatorSpec(
+    id="range_position",
+    name="Range Position",
+    group="range_position",
+    inputs=("high", "low", "close"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="range_position", label="Range Position {period}"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {
+        "range_position": _safe_divide(
+            s.close - kernel.rolling_min(s.low, int(p["period"])),
+            kernel.rolling_max(s.high, int(p["period"])) - kernel.rolling_min(s.low, int(p["period"])),
+        )
+    },
+)
+
+_ZSCORE = IndicatorSpec(
+    id="zscore",
+    name="Z-Score",
+    group="range_position",
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="zscore", label="Z-Score {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {
+        "zscore": _safe_divide(
+            s.close - kernel.sma(s.close, int(p["period"])),
+            kernel.stdev(s.close, int(p["period"])),
+        )
+    },
+)
+
+# --- zmienność z OHLC: a family with no volume in it at all, built for exactly
+# the data this archive has (docs/wskazniki-plan-wdrozenia.html, "Zmienność z
+# OHLC"). None of these annualise — the module has no trading calendar to
+# annualise against (design.md, Ichimoku/Alligator decision) — so every one reads
+# in the same per-bar log-return units as the others. ---
+
+_STDEV = IndicatorSpec(
+    id="stdev",
+    name="Standard Deviation",
+    group="volatility_estimators",
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="stdev", label="StDev {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {"stdev": kernel.stdev(s.close, int(p["period"]))},
+)
+
+
+def _compute_parkinson(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    log_hl_sq = np.log(s.high / s.low) ** 2
+    variance = kernel.sma(log_hl_sq, period) / (4 * _LN2)
+    return {"parkinson": np.sqrt(np.clip(variance, 0, None))}
+
+
+_PARKINSON = IndicatorSpec(
+    id="parkinson",
+    name="Parkinson Volatility",
+    group="volatility_estimators",
+    inputs=("high", "low"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="parkinson", label="Parkinson {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_parkinson,
+)
+
+
+def _compute_garman_klass(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    per_bar = 0.5 * np.log(s.high / s.low) ** 2 - (2 * _LN2 - 1) * np.log(s.close / s.open) ** 2
+    variance = kernel.sma(per_bar, period)
+    return {"garman_klass": np.sqrt(np.clip(variance, 0, None))}
+
+
+_GARMAN_KLASS = IndicatorSpec(
+    id="garman_klass",
+    name="Garman-Klass Volatility",
+    group="volatility_estimators",
+    inputs=("open", "high", "low", "close"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="garman_klass", label="Garman-Klass {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_garman_klass,
+)
+
+
+def _compute_rogers_satchell(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    per_bar = np.log(s.high / s.close) * np.log(s.high / s.open) + np.log(s.low / s.close) * np.log(
+        s.low / s.open
+    )
+    variance = kernel.sma(per_bar, period)
+    return {"rogers_satchell": np.sqrt(np.clip(variance, 0, None))}
+
+
+_ROGERS_SATCHELL = IndicatorSpec(
+    id="rogers_satchell",
+    name="Rogers-Satchell Volatility",
+    group="volatility_estimators",
+    inputs=("open", "high", "low", "close"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="rogers_satchell", label="Rogers-Satchell {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_rogers_satchell,
+)
+
+
+def _compute_yang_zhang(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    prev_close = kernel.shift(s.close, 1)
+    overnight = np.log(_safe_divide(s.open, prev_close))
+    open_to_close = np.log(s.close / s.open)
+    rs_per_bar = np.log(s.high / s.close) * np.log(s.high / s.open) + np.log(s.low / s.close) * np.log(
+        s.low / s.open
+    )
+
+    k = 0.34 / (1.34 + (period + 1) / (period - 1))
+    overnight_var = kernel.stdev(overnight, period, ddof=1) ** 2
+    open_close_var = kernel.stdev(open_to_close, period, ddof=1) ** 2
+    rs_var = kernel.sma(rs_per_bar, period)
+
+    variance = overnight_var + k * open_close_var + (1 - k) * rs_var
+    return {"yang_zhang": np.sqrt(np.clip(variance, 0, None))}
+
+
+_YANG_ZHANG = IndicatorSpec(
+    id="yang_zhang",
+    name="Yang-Zhang Volatility",
+    group="volatility_estimators",
+    inputs=("open", "high", "low", "close"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="yang_zhang", label="Yang-Zhang {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"]) + 1),
+    compute=_compute_yang_zhang,
+)
+
+
+def _compute_ulcer(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    highest_close = kernel.rolling_max(s.close, period)
+    drawdown_pct = 100 * _safe_divide(s.close - highest_close, highest_close)
+    return {"ulcer": np.sqrt(kernel.sma(drawdown_pct**2, period))}
+
+
+_ULCER = IndicatorSpec(
+    id="ulcer",
+    name="Ulcer Index",
+    group="volatility_estimators",
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="ulcer", label="Ulcer {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    # Doubly rolling — the highest-close window, then the mean-square-drawdown
+    # window on top of it — so it needs two window's worth of history, the same
+    # "sum of consecutive windows" rule `stoch` and `hma` use below.
+    warmup=Warmup(kind="fixed", bars=lambda p: 2 * int(p["period"])),
+    compute=_compute_ulcer,
+)
+
+# --- reżim: whether there is a trend at all, the question none of the geometry
+# above answers, and the one a "break of structure" needs an honest answer to
+# before it means anything (docs/wskazniki-plan-wdrozenia.html, "Reżim"). ---
+
+
+def _compute_adx(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    up_move = np.diff(s.high, prepend=s.high[0])
+    down_move = -np.diff(s.low, prepend=s.low[0])
+    plus_dm = np.where((up_move > down_move) & (up_move > 0), up_move, 0.0)
+    minus_dm = np.where((down_move > up_move) & (down_move > 0), down_move, 0.0)
+
+    tr_smoothed = kernel.rma(kernel.true_range(s.high, s.low, s.close), period)
+    plus_di = 100 * _safe_divide(kernel.rma(plus_dm, period), tr_smoothed)
+    minus_di = 100 * _safe_divide(kernel.rma(minus_dm, period), tr_smoothed)
+    # `+DI` and `-DI` both land on exactly 0 at bar 0 — there is no earlier bar to
+    # measure directional movement against — which makes their sum 0 too. Read as
+    # "no directional dominance either way" (0), not "undefined" (NaN): `rma` seeds
+    # recursively from bar 0, and a NaN seed would poison every bar after it,
+    # forever, rather than merely decaying the way a seed is meant to.
+    di_sum = plus_di + minus_di
+    dx = np.where(di_sum == 0, 0.0, 100 * np.abs(plus_di - minus_di) / np.where(di_sum == 0, 1.0, di_sum))
+    return {"adx": kernel.rma(dx, period), "plus_di": plus_di, "minus_di": minus_di}
+
+
+_ADX = IndicatorSpec(
+    id="adx",
+    name="Average Directional Index",
+    group="regime",
+    aliases=("Directional Movement Index",),
+    inputs=("high", "low", "close"),
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(
+        LineSpec(key="adx", label="ADX {period}"),
+        LineSpec(key="plus_di", label="+DI {period}"),
+        LineSpec(key="minus_di", label="-DI {period}"),
+    ),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False),
+    # Doubly smoothed — DX is already an `rma` of the directional movement, and ADX
+    # is an `rma` of DX on top — so the seed's influence takes roughly twice as long
+    # to decay below epsilon as one `rma` alone (design.md, "Głębokość archiwum":
+    # ADX(14) needs ~580 bars, close to 2 × rma_warmup_bars(14) ≈ 560).
+    warmup=Warmup(kind="decay", bars=lambda p: 2 * warmup.rma_warmup_bars(int(p["period"]))),
+    compute=_compute_adx,
+)
+
+
+def _compute_choppiness(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    tr_sum = kernel.sma(kernel.true_range(s.high, s.low, s.close), period) * period
+    range_hl = kernel.rolling_max(s.high, period) - kernel.rolling_min(s.low, period)
+    ratio = _safe_divide(tr_sum, range_hl)
+    return {"choppiness": 100 * np.log10(ratio) / np.log10(period)}
+
+
+_CHOPPINESS = IndicatorSpec(
+    id="choppiness",
+    name="Choppiness Index",
+    group="regime",
+    inputs=("high", "low", "close"),
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="choppiness", label="Choppiness {period}"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_choppiness,
+)
+
+
+def _compute_aroon(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    # A `period + 1`-bar window, not `period` — "days since the extreme" counts
+    # today as day zero and looks back `period` days from it, which is
+    # `period + 1` candles end to end (Chande's original definition, and
+    # TA-Lib's; a plain `period`-bar window can never report "the extreme is
+    # today", the one case this caught when checked against TA-Lib in 2.11).
+    bars_since_high = kernel.rolling_argmax(s.high, period + 1)
+    bars_since_low = kernel.rolling_argmin(s.low, period + 1)
+    return {
+        "aroon_up": 100 * (period - bars_since_high) / period,
+        "aroon_down": 100 * (period - bars_since_low) / period,
+    }
+
+
+_AROON = IndicatorSpec(
+    id="aroon",
+    name="Aroon",
+    group="regime",
+    inputs=("high", "low"),
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(
+        LineSpec(key="aroon_up", label="Aroon Up {period}"),
+        LineSpec(key="aroon_down", label="Aroon Down {period}"),
+    ),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"]) + 1),
+    compute=_compute_aroon,
+)
+
+
+def _compute_vortex(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    prev_low = kernel.shift(s.low, 1)
+    prev_high = kernel.shift(s.high, 1)
+    vm_plus_sum = kernel.sma(np.abs(s.high - prev_low), period) * period
+    vm_minus_sum = kernel.sma(np.abs(s.low - prev_high), period) * period
+    tr_sum = kernel.sma(kernel.true_range(s.high, s.low, s.close), period) * period
+    return {
+        "vi_plus": _safe_divide(vm_plus_sum, tr_sum),
+        "vi_minus": _safe_divide(vm_minus_sum, tr_sum),
+    }
+
+
+_VORTEX = IndicatorSpec(
+    id="vortex",
+    name="Vortex Indicator",
+    group="regime",
+    inputs=("high", "low", "close"),
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(
+        LineSpec(key="vi_plus", label="VI+ {period}"),
+        LineSpec(key="vi_minus", label="VI- {period}"),
+    ),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"]) + 1),
+    compute=_compute_vortex,
+)
+
+_LINREG_SLOPE = IndicatorSpec(
+    id="linreg_slope",
+    name="Linear Regression Slope",
+    group="regime",
+    # Below 3, every window fits a line perfectly by construction — a slope
+    # without a fit to speak of, and `r_squared` a constant 1.
+    params=(Param(name="period", type="int", default=14, min=3, max=5000),),
+    lines=(LineSpec(key="linreg_slope", label="LinReg Slope {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {"linreg_slope": kernel.linreg_slope(s.close, int(p["period"]))},
+)
+
+_R_SQUARED = IndicatorSpec(
+    id="r_squared",
+    name="R-Squared",
+    group="regime",
+    params=(Param(name="period", type="int", default=14, min=3, max=5000),),
+    lines=(LineSpec(key="r_squared", label="R² {period}"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {"r_squared": kernel.r_squared(s.close, int(p["period"]))},
+)
+
+# --- średnie: bias and reference point, cheap because every one of them comes
+# from the same primitives (docs/wskazniki-plan-wdrozenia.html, "Średnie"). `sma`
+# and `ema` are already in the catalogue from etap zero. ---
+
+_WMA = IndicatorSpec(
+    id="wma",
+    name="Weighted Moving Average",
+    group="averages",
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="wma", label="WMA {period}"),),
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {"wma": kernel.wma(s.close, int(p["period"]))},
+)
+
+_RMA = IndicatorSpec(
+    id="rma",
+    name="Wilder's Smoothing",
+    group="averages",
+    aliases=("Smoothed Moving Average",),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="rma", label="RMA {period}"),),
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["period"]))),
+    compute=lambda s, p: {"rma": kernel.rma(s.close, int(p["period"]))},
+)
+
+
+def _compute_hma(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    half_period = round(period / 2)
+    sqrt_period = round(math.sqrt(period))
+    raw = 2 * kernel.wma(s.close, half_period) - kernel.wma(s.close, period)
+    return {"hma": kernel.wma(raw, sqrt_period)}
+
+
+_HMA = IndicatorSpec(
+    id="hma",
+    name="Hull Moving Average",
+    group="averages",
+    params=(Param(name="period", type="int", default=20, min=4, max=5000),),
+    lines=(LineSpec(key="hma", label="HMA {period}"),),
+    render=Render(pane="price", style="line"),
+    # `raw` needs `period` bars from the larger `wma` call inside it; the final
+    # `wma` needs `sqrt_period` more valid `raw` values on top of that — the same
+    # "sum of consecutive windows" rule `ulcer` and `stoch` use.
+    warmup=Warmup(
+        kind="fixed", bars=lambda p: int(p["period"]) + round(math.sqrt(int(p["period"])))
+    ),
+    compute=_compute_hma,
+)
+
+_KAMA = IndicatorSpec(
+    id="kama",
+    name="Kaufman's Adaptive Moving Average",
+    group="averages",
+    params=(
+        Param(name="period", type="int", default=10, min=2, max=5000),
+        Param(name="fast", type="int", default=2, min=1, max=100),
+        Param(name="slow", type="int", default=30, min=2, max=500),
+    ),
+    lines=(LineSpec(key="kama", label="KAMA {period}"),),
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(
+        kind="decay",
+        bars=lambda p: warmup.kama_warmup_bars(int(p["period"]), int(p["slow"])),
+    ),
+    compute=lambda s, p: {
+        "kama": kernel.kama(s.close, int(p["period"]), int(p["fast"]), int(p["slow"]))
+    },
+)
+
+_ALMA = IndicatorSpec(
+    id="alma",
+    name="Arnaud Legoux Moving Average",
+    group="averages",
+    params=(
+        Param(name="period", type="int", default=20, min=2, max=5000),
+        Param(name="offset", type="float", default=0.85, min=0.0, max=1.0),
+        Param(name="sigma", type="float", default=6.0, min=0.1, max=50.0),
+    ),
+    lines=(LineSpec(key="alma", label="ALMA {period}"),),
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {
+        "alma": kernel.alma(s.close, int(p["period"]), float(p["offset"]), float(p["sigma"]))
+    },
+)
+
+_LSMA = IndicatorSpec(
+    id="lsma",
+    name="Least Squares Moving Average",
+    group="averages",
+    aliases=("Linear Regression Moving Average",),
+    params=(Param(name="period", type="int", default=20, min=3, max=5000),),
+    lines=(LineSpec(key="lsma", label="LSMA {period}"),),
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {"lsma": kernel.linreg(s.close, int(p["period"]))},
+)
+
+# --- oscylatory: mostly for divergence-hunting and for the non-SMC strategies,
+# cheap because they are all built from finished primitives
+# (docs/wskazniki-plan-wdrozenia.html, "Oscylatory"). ---
+
+
+def _rsi_values(close: np.ndarray, period: int) -> np.ndarray:
+    change = kernel.diff(close, 1)
+    # Bar 0 has no earlier bar to change from — read as "0 change", not "unknown
+    # change", the same reasoning `_compute_adx` documents: `rma` seeds
+    # recursively from index 0, and a NaN seed poisons every bar after it.
+    no_prior_bar = np.isnan(change)
+    gains = np.where(no_prior_bar, 0.0, np.maximum(change, 0.0))
+    losses = np.where(no_prior_bar, 0.0, np.maximum(-change, 0.0))
+    rs = _safe_divide(kernel.rma(gains, period), kernel.rma(losses, period))
+    return 100 - 100 / (1 + rs)
+
+
+_RSI = IndicatorSpec(
+    id="rsi",
+    name="Relative Strength Index",
+    group="oscillators",
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="rsi", label="RSI {period}"),),
+    render=Render(
+        pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False, levels=(30.0, 70.0)
+    ),
+    warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["period"]))),
+    compute=lambda s, p: {"rsi": _rsi_values(s.close, int(p["period"]))},
+)
+
+
+def _compute_macd(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    macd_line = kernel.ema(s.close, int(p["fast_period"])) - kernel.ema(s.close, int(p["slow_period"]))
+    signal_line = kernel.ema(macd_line, int(p["signal_period"]))
+    return {"macd": macd_line, "signal": signal_line, "histogram": macd_line - signal_line}
+
+
+_MACD = IndicatorSpec(
+    id="macd",
+    name="Moving Average Convergence Divergence",
+    group="oscillators",
+    params=(
+        Param(name="fast_period", type="int", default=12, min=2, max=5000),
+        Param(name="slow_period", type="int", default=26, min=2, max=5000),
+        Param(name="signal_period", type="int", default=9, min=2, max=5000),
+    ),
+    lines=(
+        LineSpec(key="macd", label="MACD {fast_period},{slow_period}"),
+        LineSpec(key="signal", label="Signal {signal_period}"),
+        LineSpec(key="histogram", label="Histogram", style="histogram"),
+    ),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    # The slow EMA's own decay, plus the signal EMA's decay stacked on top of it —
+    # the same two-stage-recursion reasoning as `adx`'s warmup, since `signal` is
+    # an `ema` of a series that already contains an unstabilised `ema`.
+    warmup=Warmup(
+        kind="decay",
+        bars=lambda p: warmup.ema_warmup_bars(int(p["slow_period"]))
+        + warmup.ema_warmup_bars(int(p["signal_period"])),
+    ),
+    compute=_compute_macd,
+)
+
+
+def _compute_stoch(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    k_period = int(p["k_period"])
+    lowest = kernel.rolling_min(s.low, k_period)
+    highest = kernel.rolling_max(s.high, k_period)
+    raw_k = 100 * _safe_divide(s.close - lowest, highest - lowest)
+    k = kernel.sma(raw_k, int(p["k_smooth"]))
+    d = kernel.sma(k, int(p["d_period"]))
+    return {"k": k, "d": d}
+
+
+_STOCH = IndicatorSpec(
+    id="stoch",
+    name="Stochastic Oscillator",
+    group="oscillators",
+    inputs=("high", "low", "close"),
+    params=(
+        Param(name="k_period", type="int", default=14, min=2, max=5000),
+        Param(name="k_smooth", type="int", default=3, min=1, max=500),
+        Param(name="d_period", type="int", default=3, min=1, max=500),
+    ),
+    lines=(
+        LineSpec(key="k", label="%K {k_period}"),
+        LineSpec(key="d", label="%D {d_period}"),
+    ),
+    render=Render(
+        pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False, levels=(20.0, 80.0)
+    ),
+    warmup=Warmup(
+        kind="fixed",
+        bars=lambda p: int(p["k_period"]) + int(p["k_smooth"]) + int(p["d_period"]),
+    ),
+    compute=_compute_stoch,
+)
+
+
+def _compute_stoch_rsi(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    rsi = _rsi_values(s.close, int(p["rsi_period"]))
+    stoch_period = int(p["stoch_period"])
+    lowest = kernel.rolling_min(rsi, stoch_period)
+    highest = kernel.rolling_max(rsi, stoch_period)
+    raw_k = 100 * _safe_divide(rsi - lowest, highest - lowest)
+    k = kernel.sma(raw_k, int(p["k_smooth"]))
+    d = kernel.sma(k, int(p["d_period"]))
+    return {"k": k, "d": d}
+
+
+_STOCH_RSI = IndicatorSpec(
+    id="stoch_rsi",
+    name="Stochastic RSI",
+    group="oscillators",
+    params=(
+        Param(name="rsi_period", type="int", default=14, min=2, max=5000),
+        Param(name="stoch_period", type="int", default=14, min=2, max=5000),
+        Param(name="k_smooth", type="int", default=3, min=1, max=500),
+        Param(name="d_period", type="int", default=3, min=1, max=500),
+    ),
+    lines=(
+        LineSpec(key="k", label="StochRSI %K {rsi_period},{stoch_period}"),
+        LineSpec(key="d", label="StochRSI %D {d_period}"),
+    ),
+    render=Render(
+        pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False, levels=(20.0, 80.0)
+    ),
+    warmup=Warmup(
+        kind="decay",
+        bars=lambda p: warmup.rma_warmup_bars(int(p["rsi_period"]))
+        + int(p["stoch_period"])
+        + int(p["k_smooth"])
+        + int(p["d_period"]),
+    ),
+    compute=_compute_stoch_rsi,
+)
+
+
+def _compute_cci(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    typical = (s.high + s.low + s.close) / 3
+    deviation = 0.015 * kernel.mean_abs_dev(typical, period)
+    return {"cci": _safe_divide(typical - kernel.sma(typical, period), deviation)}
+
+
+_CCI = IndicatorSpec(
+    id="cci",
+    name="Commodity Channel Index",
+    group="oscillators",
+    inputs=("high", "low", "close"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="cci", label="CCI {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_cci,
+)
+
+_ROC = IndicatorSpec(
+    id="roc",
+    name="Rate of Change",
+    group="oscillators",
+    params=(Param(name="period", type="int", default=9, min=1, max=5000),),
+    lines=(LineSpec(key="roc", label="ROC {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {
+        "roc": 100
+        * _safe_divide(
+            s.close - kernel.shift(s.close, int(p["period"])), kernel.shift(s.close, int(p["period"]))
+        )
+    },
+)
+
+_WILLIAMS_R = IndicatorSpec(
+    id="williams_r",
+    name="Williams %R",
+    group="oscillators",
+    inputs=("high", "low", "close"),
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="williams_r", label="Williams %R {period}"),),
+    render=Render(
+        pane="own",
+        style="line",
+        scale="fixed",
+        range=(-100.0, 0.0),
+        autoscale=False,
+        levels=(-20.0, -80.0),
+    ),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {
+        "williams_r": -100
+        * _safe_divide(
+            kernel.rolling_max(s.high, int(p["period"])) - s.close,
+            kernel.rolling_max(s.high, int(p["period"])) - kernel.rolling_min(s.low, int(p["period"])),
+        )
+    },
+)
+
+
+def _compute_cmo(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    change = kernel.diff(s.close, 1)
+    no_prior_bar = np.isnan(change)
+    gains = np.where(no_prior_bar, 0.0, np.maximum(change, 0.0))
+    losses = np.where(no_prior_bar, 0.0, np.maximum(-change, 0.0))
+    sum_gain = kernel.sma(gains, period) * period
+    sum_loss = kernel.sma(losses, period) * period
+    return {"cmo": 100 * _safe_divide(sum_gain - sum_loss, sum_gain + sum_loss)}
+
+
+_CMO = IndicatorSpec(
+    id="cmo",
+    name="Chande Momentum Oscillator",
+    group="oscillators",
+    params=(Param(name="period", type="int", default=9, min=2, max=5000),),
+    lines=(LineSpec(key="cmo", label="CMO {period}"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(-100.0, 100.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_cmo,
+)
+
+# --- wstęgi i kanały: donchian is also "where the last n bars' extremes sit" —
+# the same number serving two very different purposes
+# (docs/wskazniki-plan-wdrozenia.html, "Wstęgi i kanały"). ---
+
+
+def _bbands_edges(s: Series, p: Mapping[str, float]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    period = int(p["period"])
+    mult = float(p["mult"])
+    basis = kernel.sma(s.close, period)
+    dev = mult * kernel.stdev(s.close, period)
+    return basis + dev, basis, basis - dev
+
+
+_BBANDS = IndicatorSpec(
+    id="bbands",
+    name="Bollinger Bands",
+    group="bands",
+    params=(
+        Param(name="period", type="int", default=20, min=2, max=5000),
+        Param(name="mult", type="float", default=2.0, min=0.1, max=10.0),
+    ),
+    lines=(
+        LineSpec(key="upper", label="BB Upper {period}"),
+        LineSpec(key="basis", label="BB Basis {period}"),
+        LineSpec(key="lower", label="BB Lower {period}"),
+    ),
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: dict(zip(("upper", "basis", "lower"), _bbands_edges(s, p), strict=True)),
+)
+
+def _compute_bbands_percent_b(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    upper, _basis, lower = _bbands_edges(s, p)
+    return {"percent_b": _safe_divide(s.close - lower, upper - lower)}
+
+
+_BBANDS_PERCENT_B = IndicatorSpec(
+    id="bbands_percent_b",
+    name="Bollinger %B",
+    group="bands",
+    params=(
+        Param(name="period", type="int", default=20, min=2, max=5000),
+        Param(name="mult", type="float", default=2.0, min=0.1, max=10.0),
+    ),
+    lines=(LineSpec(key="percent_b", label="%B {period}"),),
+    # Not pinned to [0, 1] like the ratios in "geometria świecy" — a price outside
+    # its own bands is exactly what this line exists to show, and a fixed scale
+    # would clip that off screen.
+    render=Render(pane="own", style="line", scale="own", autoscale=True, levels=(0.0, 1.0)),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_bbands_percent_b,
+)
+
+
+def _compute_bbands_bandwidth(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    upper, basis, lower = _bbands_edges(s, p)
+    return {"bandwidth": _safe_divide(upper - lower, basis)}
+
+
+_BBANDS_BANDWIDTH = IndicatorSpec(
+    id="bbands_bandwidth",
+    name="Bollinger Bandwidth",
+    group="bands",
+    params=(
+        Param(name="period", type="int", default=20, min=2, max=5000),
+        Param(name="mult", type="float", default=2.0, min=0.1, max=10.0),
+    ),
+    lines=(LineSpec(key="bandwidth", label="Bandwidth {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_bbands_bandwidth,
+)
+
+
+def _compute_keltner(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    basis = kernel.ema(s.close, int(p["period"]))
+    band = float(p["mult"]) * kernel.rma(
+        kernel.true_range(s.high, s.low, s.close), int(p["atr_period"])
+    )
+    return {"upper": basis + band, "basis": basis, "lower": basis - band}
+
+
+_KELTNER = IndicatorSpec(
+    id="keltner",
+    name="Keltner Channel",
+    group="bands",
+    inputs=("high", "low", "close"),
+    params=(
+        Param(name="period", type="int", default=20, min=2, max=5000),
+        Param(name="atr_period", type="int", default=10, min=2, max=5000),
+        Param(name="mult", type="float", default=2.0, min=0.1, max=10.0),
+    ),
+    lines=(
+        LineSpec(key="upper", label="KC Upper {period}"),
+        LineSpec(key="basis", label="KC Basis {period}"),
+        LineSpec(key="lower", label="KC Lower {period}"),
+    ),
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(
+        kind="decay",
+        bars=lambda p: max(
+            warmup.ema_warmup_bars(int(p["period"])), warmup.rma_warmup_bars(int(p["atr_period"]))
+        ),
+    ),
+    compute=_compute_keltner,
+)
+
+def _compute_donchian(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    period = int(p["period"])
+    upper = kernel.rolling_max(s.high, period)
+    lower = kernel.rolling_min(s.low, period)
+    return {"upper": upper, "basis": (upper + lower) / 2, "lower": lower}
+
+
+_DONCHIAN = IndicatorSpec(
+    id="donchian",
+    name="Donchian Channel",
+    group="bands",
+    inputs=("high", "low"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(
+        LineSpec(key="upper", label="DC Upper {period}"),
+        LineSpec(key="basis", label="DC Basis {period}"),
+        LineSpec(key="lower", label="DC Lower {period}"),
+    ),
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_donchian,
+)
+
+
+def _compute_envelope(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
+    basis = kernel.sma(s.close, int(p["period"]))
+    band = basis * float(p["percent"]) / 100
+    return {"upper": basis + band, "basis": basis, "lower": basis - band}
+
+
+_ENVELOPE = IndicatorSpec(
+    id="envelope",
+    name="Moving Average Envelope",
+    group="bands",
+    params=(
+        Param(name="period", type="int", default=20, min=2, max=5000),
+        Param(name="percent", type="float", default=2.5, min=0.1, max=50.0),
+    ),
+    lines=(
+        LineSpec(key="upper", label="Envelope Upper {period}"),
+        LineSpec(key="basis", label="Envelope Basis {period}"),
+        LineSpec(key="lower", label="Envelope Lower {period}"),
+    ),
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=_compute_envelope,
+)
+
 # Ordered as it is meant to be offered — averages first, since `sma` and `ema` are the
 # entries every future wskaźnik in this group will sit beside.
-CATALOGUE: tuple[IndicatorSpec, ...] = (_SMA, _EMA, _ATR)
+CATALOGUE: tuple[IndicatorSpec, ...] = (
+    _SMA,
+    _EMA,
+    _WMA,
+    _RMA,
+    _HMA,
+    _KAMA,
+    _ALMA,
+    _LSMA,
+    _ATR,
+    _ATR_PCT,
+    _BAR_RANGE_ATR,
+    _BODY_RATIO,
+    _WICK_UP_RATIO,
+    _WICK_DOWN_RATIO,
+    _CLOSE_POSITION,
+    _GAP_PREV_CLOSE_ATR,
+    _RANGE_POSITION,
+    _ZSCORE,
+    _STDEV,
+    _PARKINSON,
+    _GARMAN_KLASS,
+    _ROGERS_SATCHELL,
+    _YANG_ZHANG,
+    _ULCER,
+    _ADX,
+    _CHOPPINESS,
+    _AROON,
+    _VORTEX,
+    _LINREG_SLOPE,
+    _R_SQUARED,
+    _RSI,
+    _MACD,
+    _STOCH,
+    _STOCH_RSI,
+    _CCI,
+    _ROC,
+    _WILLIAMS_R,
+    _CMO,
+    _BBANDS,
+    _BBANDS_PERCENT_B,
+    _BBANDS_BANDWIDTH,
+    _KELTNER,
+    _DONCHIAN,
+    _ENVELOPE,
+)
 
 _BY_ID: dict[str, IndicatorSpec] = {entry.id: entry for entry in CATALOGUE}
 

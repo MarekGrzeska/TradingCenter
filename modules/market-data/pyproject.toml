@@ -81,6 +81,10 @@ dev = [
     # but with a floor it is the linter's publisher who decides when a commit that was
     # green turns red. Raised deliberately, in a commit that says which rules arrived.
     "ruff==0.16.2",
+    # An independent oracle for `test_indicators_talib_comparison.py`, dev-only —
+    # `market_data/indicators` imports nothing from it (design.md, "Własne jądro
+    # na numpy, TA-Lib wyłącznie jako wyrocznia testowa").
+    "ta-lib>=0.7.1",
     # Brings up a throwaway PostgreSQL per test session. A container rather than a
     # shared database, because the schema is the thing under test and a leftover
     # table from a previous run is indistinguishable from a migration that works.

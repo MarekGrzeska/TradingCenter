@@ -35,6 +35,20 @@ describe("parseGridConfig (terminal-grid spec, persistence guard)", () => {
       },
     ],
     [
+      "a slot with a non-numeric indicator param",
+      {
+        ...defaultGridConfig(),
+        slots: {
+          ...defaultGridConfig().slots,
+          s1: {
+            symbol: "US100",
+            resolution: "MINUTE_5",
+            indicators: [{ id: "ema", params: { period: "20" } }],
+          },
+        },
+      },
+    ],
+    [
       "a slot missing entirely",
       (() => {
         const config = defaultGridConfig() as unknown as { slots: Record<string, unknown> };
@@ -88,6 +102,17 @@ describe("createGridStore", () => {
     expect(store.getSnapshot()).toEqual(defaultGridConfig());
     expect(() => store.setLayout("1x1")).not.toThrow();
     expect(store.getSnapshot().layout).toBe("1x1");
+  });
+
+  it("restores a saved slot's indicators the same way it restores symbol and resolution", () => {
+    const storage = memoryStorage();
+    const first = createGridStore(storage);
+    first.setSlotIndicators("s2", [{ id: "ema", params: { period: 20 } }]);
+
+    const second = createGridStore(storage);
+    expect(second.getSnapshot().slots.s2.indicators).toEqual([
+      { id: "ema", params: { period: 20 } },
+    ]);
   });
 
   it("keeps hidden slots' configuration when shrinking the layout", () => {

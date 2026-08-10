@@ -59,7 +59,7 @@ async def test_catalogue_lists_entries_with_everything_a_picker_needs(catalogue_
     assert ema_entry["params"] == [
         {"name": "period", "type": "int", "default": 20, "min": 2, "max": 5000}
     ]
-    assert ema_entry["lines"] == [{"key": "ema", "label": "EMA {period}"}]
+    assert ema_entry["lines"] == [{"key": "ema", "label": "EMA {period}", "style": None}]
     assert ema_entry["render"]["pane"] == "price"
     assert ema_entry["output"] == "lines"
 

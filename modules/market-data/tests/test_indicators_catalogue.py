@@ -12,7 +12,9 @@ market-data's wire" and `design.md`'s risk list:
 
 from __future__ import annotations
 
+import json
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -20,6 +22,7 @@ import pytest
 from market_data.indicators.catalogue import CATALOGUE, IndicatorSpec, Series
 
 N = 4000
+GOLDEN = Path(__file__).parent / "golden" / "indicators_golden.json"
 
 
 def _synthetic_series(n: int) -> Series:
@@ -127,3 +130,44 @@ class TestStartIndependence:
             for a, b in zip(long_tail, short_tail, strict=True):
                 assert not math.isnan(a) and not math.isnan(b), (entry.id, key)
                 assert a == pytest.approx(b, rel=1e-9, abs=1e-9), (entry.id, key)
+
+
+def _load_golden() -> dict:
+    return json.loads(GOLDEN.read_text())
+
+
+def _golden_series(golden: dict) -> Series:
+    return Series(
+        open=np.array(golden["open"], dtype=np.float64),
+        high=np.array(golden["high"], dtype=np.float64),
+        low=np.array(golden["low"], dtype=np.float64),
+        close=np.array(golden["close"], dtype=np.float64),
+    )
+
+
+class TestCatalogueGoldenFile:
+    """Task 2.10's "pliki wzorcowe dla całego zestawu" — every entry, at its
+    default parameters, on the same committed series `test_indicators_kernel.py`
+    already golden-tests `sma`/`ema`/`atr` against (with an added `open` column,
+    absent from that file until now because nothing in etap zero read it). A
+    formula change shows up here as a diff, not as a chart that quietly draws
+    something else (design.md, "Zmiana wzoru bez podniesienia wersji")."""
+
+    @pytest.mark.parametrize("entry", CATALOGUE, ids=lambda e: e.id)
+    def test_default_params_match_the_committed_snapshot(self, entry: IndicatorSpec):
+        golden = _load_golden()
+        series = _golden_series(golden)
+        params = _default_params(entry)
+        result = entry.compute(series, params)
+
+        for line in entry.lines:
+            key = f"{entry.id}_{line.key}"
+            assert key in golden, f"golden file has no {key!r} — regenerate it for this entry"
+            expected = golden[key]
+            actual = result[line.key]
+            assert len(actual) == len(expected)
+            for value, want in zip(actual, expected, strict=True):
+                if want is None:
+                    assert math.isnan(value), (entry.id, line.key)
+                else:
+                    assert value == pytest.approx(want, rel=1e-7, abs=1e-7), (entry.id, line.key)

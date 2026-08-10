@@ -41,6 +41,26 @@ export interface FakeChart {
   visibleRange: LogicalRange | null;
   rangesSet: LogicalRange[];
   pan(range: LogicalRange): void;
+  /** Index 0 always exists — the price pane `createChart` makes implicitly, the
+   *  same one the real library never asks anyone to create by hand. Every later
+   *  entry is one `chart.addPane()` call; a removed pane is spliced out, same as
+   *  the real chart re-indexing the ones after it. */
+  panesList: FakePane[];
+}
+
+export interface FakePane {
+  stretchFactor: number;
+  setStretchFactor(factor: number): void;
+  /** A live lookup, never a stored number — `removePane` re-indexes every pane
+   *  after the one it removes, and a cached index would go stale exactly the way
+   *  `Chart.tsx` must not let its own `paneIndex()` calls go stale. */
+  paneIndex(): number;
+  /** What `chart.addPane()`'s own argument set — mirrors the real
+   *  `IPaneApi.preserveEmptyPane()`. `false` (the real library's own default)
+   *  is what makes `removeSeries` below delete a pane whose last series just
+   *  left, the exact behaviour that raced `Chart.tsx`'s own explicit
+   *  `removePane` and threw until `addPane(true)` opted out of it. */
+  preserveEmptyPane: boolean;
 }
 
 export interface Candle {
@@ -68,12 +88,19 @@ export interface FakePriceLine {
 }
 
 export interface FakeSeries {
-  /** `"Candlestick"` or `"Line"` — read off the series-definition object the
-   *  mocked `lightweight-charts` module exports, the same way the real
-   *  `chart.addSeries(LineSeries, …)` call identifies its own kind. */
+  /** `"Candlestick"`, `"Line"` or `"Histogram"` — read off the series-definition
+   *  object the mocked `lightweight-charts` module exports, the same way the
+   *  real `chart.addSeries(LineSeries, …)` call identifies its own kind. */
   type: string;
   /** The options the chart created this series with. */
   options: Record<string, unknown>;
+  /** The pane `addSeries`'s third argument put this series in, resolved once
+   *  at creation — never restored to a bare number, so a later pane removal
+   *  (this series' own or another's) is reflected the same live way the real
+   *  `series.getPane().paneIndex()` would be. */
+  pane: FakePane;
+  /** Read live off `pane`, for a test that only cares about the number. */
+  readonly paneIndex: number;
   setDataCalls: SeriesPoint[][];
   updateCalls: SeriesPoint[];
   /** Whatever setData/update has left on screen. */
@@ -98,8 +125,21 @@ export function createChartStub(): ChartStub {
   };
 }
 
+function makeFakePane(panesList: FakePane[], preserveEmptyPane = false): FakePane {
+  const pane: FakePane = {
+    stretchFactor: 1,
+    setStretchFactor(factor) {
+      this.stretchFactor = factor;
+    },
+    paneIndex: () => panesList.indexOf(pane),
+    preserveEmptyPane,
+  };
+  return pane;
+}
+
 export function makeFakeChart(): FakeChart {
-  return {
+  const panesList: FakePane[] = [];
+  const chart: FakeChart = {
     removed: false,
     resized: [],
     crosshairHandlers: [],
@@ -113,26 +153,52 @@ export function makeFakeChart(): FakeChart {
       this.visibleRange = range;
       for (const handler of [...this.rangeHandlers]) handler(range);
     },
+    panesList,
   };
+  panesList.push(makeFakePane(panesList)); // the implicit price pane, index 0
+  return chart;
 }
 
 /** The slice of lightweight-charts' API that `Chart` actually calls, over a
  *  `FakeChart` the test can then read and drive. */
 export function fakeChartApi(chart: FakeChart) {
   return {
-    addSeries: (type: unknown, options: Record<string, unknown> = {}) => {
+    addSeries: (type: unknown, options: Record<string, unknown> = {}, paneIndex = 0) => {
       // The mocked module exports `{ type: "Candlestick" }` / `{ type: "Line" }` in
       // place of the real series-definition objects — the same shape `Chart.tsx`
       // passes through unmodified, so reading it back here needs no separate map.
       const kind = (type as { type?: string } | undefined)?.type ?? "unknown";
-      const series = makeFakeSeries(kind, options);
+      const pane = chart.panesList[paneIndex] ?? chart.panesList[0];
+      const series = makeFakeSeries(kind, options, pane);
       chart.series.push(series);
       return series;
     },
     removeSeries: (series: FakeSeries) => {
       chart.series = chart.series.filter((existing) => existing !== series);
       chart.removedSeries.push(series);
+      // The real chart's own default: a pane with no series left in it goes
+      // too, unless it was created with `preserveEmptyPane: true`. Pane 0
+      // (the price pane) is exempt in practice — the candlestick series
+      // always occupies it — and exempt here explicitly, so a test can never
+      // end up asserting against a chart with no price pane at all.
+      const vacated = series.pane;
+      if (vacated !== chart.panesList[0] && !vacated.preserveEmptyPane) {
+        const stillOccupied = chart.series.some((s) => s.pane === vacated);
+        if (!stillOccupied) {
+          const index = chart.panesList.indexOf(vacated);
+          if (index !== -1) chart.panesList.splice(index, 1);
+        }
+      }
     },
+    addPane: (preserveEmptyPane = false) => {
+      const pane = makeFakePane(chart.panesList, preserveEmptyPane);
+      chart.panesList.push(pane);
+      return pane;
+    },
+    removePane: (index: number) => {
+      chart.panesList.splice(index, 1);
+    },
+    panes: () => chart.panesList,
     remove: () => {
       chart.removed = true;
     },
@@ -165,11 +231,16 @@ export function fakeChartApi(chart: FakeChart) {
 export function makeFakeSeries(
   type: string = "Candlestick",
   options: Record<string, unknown> = {},
+  pane: FakePane = makeFakePane([]),
 ): FakeSeries {
   let current: SeriesPoint[] = [];
   return {
     type,
     options,
+    pane,
+    get paneIndex() {
+      return this.pane.paneIndex();
+    },
     setDataCalls: [],
     updateCalls: [],
     data: () => current,
@@ -323,7 +394,7 @@ export function indicatorEntry(
     group: "averages",
     output: "lines",
     params: [{ name: "period", type: "int", default: 20, min: 2, max: 5000 }],
-    lines: [{ key: "ema", label: "EMA {period}" }],
+    lines: [{ key: "ema", label: "EMA {period}", style: null }],
     render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
     warmupKind: "decay",
     ...overrides,

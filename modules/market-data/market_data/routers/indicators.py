@@ -45,9 +45,11 @@ from ..store import read_candles
 from .deps import indicator_limiter, pool
 
 # candles × requested wskaźniki, above which the module refuses rather than compute.
-# Measured on this catalogue (`indicators/kernel.py`'s performance test): 5000 candles ×
-# 10 wskaźniki costs ~16.5ms p95. This leaves a wide margin while the catalogue is small
-# — the number to revisit once both the catalogue and the measurement have grown
+# Set in etap zero at 5000 candles × 10 wskaźniki, ~16.5ms p95 on a 3-entry catalogue.
+# Re-measured in 2.17 against the full 44-entry catalogue E1 grew it to: every entry at
+# once, at however many candles this ceiling allows that many entries (~4500), costs
+# ~63ms p95 (`test_indicators_performance.py`) — cells scale roughly linearly with
+# either factor, so the number held rather than needing to move
 # (design.md, "Obliczenia dzielą pętlę zdarzeń ze strumieniem świec").
 REQUEST_CEILING = 200_000
 
@@ -82,7 +84,10 @@ def _entry_out(entry: IndicatorSpec) -> IndicatorCatalogueEntryOut:
             IndicatorParamOut(name=p.name, type=p.type, default=p.default, min=p.min, max=p.max)
             for p in entry.params
         ],
-        lines=[IndicatorLineSpecOut(key=line.key, label=line.label) for line in entry.lines],
+        lines=[
+            IndicatorLineSpecOut(key=line.key, label=line.label, style=line.style)
+            for line in entry.lines
+        ],
         render=_render_out(entry),
         warmup_kind=entry.warmup.kind,
     )

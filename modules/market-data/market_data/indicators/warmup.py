@@ -36,3 +36,10 @@ def ema_warmup_bars(period: int) -> int:
 
 def rma_warmup_bars(period: int) -> int:
     return decay_warmup_bars(1.0 / period)
+
+
+def kama_warmup_bars(period: int, slow: int) -> int:
+    """`period` bars for the efficiency ratio's own window, plus the decay warmup
+    of `kama`'s slowest possible smoothing constant — see `kernel.kama` for why
+    that constant is always a safe upper bound on the seed's influence."""
+    return period + decay_warmup_bars(2.0 / (slow + 1))

@@ -5,7 +5,7 @@ import {
   type LayoutId,
   type SlotId,
 } from "./model";
-import type { Resolution } from "../data/types";
+import type { IndicatorSelection, Resolution } from "../data/types";
 
 /** Versioned so a future shape change is a clean miss (defaults) rather than a
  *  half-understood read — terminal-grid spec, "Zapisany stan jest nieczytelny". */
@@ -22,6 +22,7 @@ export interface GridStore {
    *  practice. */
   clearSlotSymbol(slot: SlotId): void;
   setSlotResolution(slot: SlotId, resolution: Resolution): void;
+  setSlotIndicators(slot: SlotId, indicators: IndicatorSelection[]): void;
 }
 
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
@@ -83,6 +84,9 @@ export function createGridStore(storage: Storage | null = safeLocalStorage()): G
     },
     setSlotResolution(slot, resolution) {
       updateSlot(slot, { resolution });
+    },
+    setSlotIndicators(slot, indicators) {
+      updateSlot(slot, { indicators });
     },
   };
 }

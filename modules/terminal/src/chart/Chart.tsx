@@ -5,10 +5,13 @@ import {
   CrosshairMode,
   createChart,
   type CandlestickData,
+  type HistogramData,
+  HistogramSeries,
   type LineData,
   LineSeries,
   LineStyle,
   type IChartApi,
+  type IPaneApi,
   type IPriceLine,
   type ISeriesApi,
   type LogicalRange,
@@ -55,16 +58,31 @@ export interface ChartProps {
    *  behind it. Omitted, the chart draws candles exactly as before — a caller
    *  with nowhere to compute wskaźniki simply does not offer them. */
   indicatorSource?: IndicatorSource;
+  /** What the operator had selected when this chart last mounted — omitted, it
+   *  starts with none. Read once, not kept in sync afterward: a caller that
+   *  persists selections (the grid slot) restores from here and is notified of
+   *  every change via `onIndicatorSelectionsChange`, the same way it owns
+   *  `resolution` — but as an initial value rather than a controlled one, since
+   *  nothing here needs the reverse (an external reset mid-session). */
+  initialIndicatorSelections?: IndicatorSelection[];
+  onIndicatorSelectionsChange?(selections: IndicatorSelection[]): void;
 }
 
-/** Only a price-pane overlay draws today — an own-pane oscillator (ATR, RSI, …)
- *  is etap E1 (`docs/wskazniki-plan-wdrozenia.html`, `chart.addPane()`). Kept
- *  as a predicate rather than a filter on the catalogue itself: the picker still
- *  lists every wskaźnik the archive offers, this only decides which of them the
- *  operator may currently pick. */
+/** Price-pane overlays and own-pane oscillators both draw today — only the
+ *  three later output shapes (markers, zones, levels) do not yet have a
+ *  primitive to draw with (E2-E4). Kept as a predicate rather than a filter on
+ *  the catalogue itself: the picker still lists every wskaźnik the archive
+ *  offers, this only decides which of them the operator may currently pick. */
 function canDrawIndicator(entry: IndicatorCatalogueEntry): boolean {
-  return entry.render.pane === "price" && entry.output === "lines";
+  return (entry.render.pane === "price" || entry.render.pane === "own") && entry.output === "lines";
 }
+
+/** The price pane's own stretch factor, set once at chart creation so an
+ *  own-pane oscillator added later does not grow to the price chart's own
+ *  height — `lightweight-charts`' default (equal stretch for every pane) reads
+ *  as "RSI is as important as the candles" the moment a second pane exists. */
+const PRICE_PANE_STRETCH = 4;
+const OWN_PANE_STRETCH = 1;
 
 function toCandlestick(bar: Bar): CandlestickData<Time> {
   return {
@@ -105,6 +123,8 @@ export function Chart({
   headerLeft,
   resolutions = RESOLUTIONS,
   indicatorSource,
+  initialIndicatorSelections,
+  onIndicatorSelectionsChange,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -117,8 +137,22 @@ export function Chart({
   // `syncPriceLine` for why the series' built-in one does not do.
   const priceLineRef = useRef<IPriceLine | null>(null);
   const colorsRef = useRef<ChartColors | null>(null);
-  // One line series per (wskaźnik, params, line key) — see the sync effect below.
-  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  // One series per (wskaźnik, params, line key) — Line unless the line asks for
+  // a histogram (MACD's, so far) — see the sync effect below.
+  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(
+    new Map(),
+  );
+  // One pane per (wskaźnik, params) whose `render.pane` is "own" — RSI and MACD
+  // each get their own row, the way every other charting platform draws them,
+  // rather than sharing one oscillator pane between wskaźniki that disagree
+  // about scale.
+  const ownPanesRef = useRef<Map<string, IPaneApi<Time>>>(new Map());
+  // The catalogue's reference-level hint (RSI's 30/70, …) drawn once per
+  // (wskaźnik, params) rather than recomputed every render — the levels never
+  // change while the selection is active, only the lines they sit behind do.
+  const levelLinesRef = useRef<
+    Map<string, { series: ISeriesApi<"Line"> | ISeriesApi<"Histogram">; lines: IPriceLine[] }>
+  >(new Map());
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -130,23 +164,54 @@ export function Chart({
   const latestFrameRef = useRef(0);
 
   // --- wskaźniki: chosen by the operator, computed over whatever the chart draws ---
-  const [indicatorSelections, setIndicatorSelections] = useState<IndicatorSelection[]>([]);
+  const [indicatorSelections, setIndicatorSelectionsState] = useState<IndicatorSelection[]>(
+    () => initialIndicatorSelections ?? [],
+  );
+  // A ref, not a dependency: notifying the caller must not itself be a reason
+  // to redo anything below, only a side effect of the operator's own action.
+  const onIndicatorSelectionsChangeRef = useRef(onIndicatorSelectionsChange);
+  onIndicatorSelectionsChangeRef.current = onIndicatorSelectionsChange;
+  const setIndicatorSelections = useCallback((next: IndicatorSelection[]) => {
+    setIndicatorSelectionsState(next);
+    onIndicatorSelectionsChangeRef.current?.(next);
+  }, []);
   // The range wskaźniki are computed over — set from what `redraw` actually drew, not
   // from every live tick, so a wskaźnik does not refetch on each forming-candle update
   // (design.md's "na żywo" is a later etap; see `useIndicators`).
   const [barsRange, setBarsRange] = useState<BarsRange | null>(null);
 
   const catalogue = useIndicatorCatalogue(indicatorSource);
+  const catalogueById = useMemo(
+    () => new Map(catalogue.entries.map((entry) => [entry.id, entry] as const)),
+    [catalogue.entries],
+  );
+  // A selection restored from a saved slot may name a wskaźnik the catalogue no
+  // longer offers (a removed entry, or storage from a build that had a
+  // different one). Dropped from what actually computes and draws — surfaced
+  // in the header instead — but never rewritten in the caller's storage on its
+  // own: only an explicit change through the picker does that (terminal-grid
+  // spec, "wpis nieznany katalogowi pomijany z komunikatem"). Skipped entirely
+  // while the catalogue is still loading or failed to load, so a slow or
+  // flaky read never reads as "the archive removed everything".
+  const { knownIndicatorSelections, unknownIndicatorIds } = useMemo(() => {
+    if (catalogue.status !== "ready") {
+      return { knownIndicatorSelections: indicatorSelections, unknownIndicatorIds: [] as string[] };
+    }
+    const known: IndicatorSelection[] = [];
+    const unknown: string[] = [];
+    for (const selection of indicatorSelections) {
+      if (catalogueById.has(selection.id)) known.push(selection);
+      else unknown.push(selection.id);
+    }
+    return { knownIndicatorSelections: known, unknownIndicatorIds: unknown };
+  }, [indicatorSelections, catalogue.status, catalogueById]);
+
   const indicatorsState = useIndicators(
     indicatorSource,
     symbol,
     resolution,
-    indicatorSelections,
+    knownIndicatorSelections,
     barsRange,
-  );
-  const catalogueById = useMemo(
-    () => new Map(catalogue.entries.map((entry) => [entry.id, entry] as const)),
-    [catalogue.entries],
   );
 
   // --- the chart instance itself: created once, never on data change ---
@@ -200,6 +265,7 @@ export function Chart({
     chartRef.current = chart;
     seriesRef.current = series;
     colorsRef.current = colors;
+    chart.panes()[0]?.setStretchFactor(PRICE_PANE_STRETCH);
 
     // Whatever the feed already delivered before this effect re-ran (a
     // StrictMode remount, most often) is redrawn rather than lost.
@@ -227,6 +293,8 @@ export function Chart({
     observer.observe(container);
 
     const indicatorSeries = indicatorSeriesRef.current;
+    const ownPanes = ownPanesRef.current;
+    const levelLines = levelLinesRef.current;
     return () => {
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
@@ -235,10 +303,12 @@ export function Chart({
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
       priceLineRef.current = null;
-      // Every wskaźnik series belonged to it too — `chart.remove()` already freed
-      // them, this only stops the sync effect below from reaching for one that is
-      // gone.
+      // Every wskaźnik series, pane and reference level belonged to it too —
+      // `chart.remove()` already freed them, this only stops the sync effect
+      // below from reaching for one that is gone.
       indicatorSeries.clear();
+      ownPanes.clear();
+      levelLines.clear();
     };
   }, []);
 
@@ -449,14 +519,17 @@ export function Chart({
   }, [source, symbol, resolution]);
 
   // --- wskaźniki: one Line series per (id, params, line key), synced to what the
-  // archive last answered. Only a price-pane line draws in this etap — see
-  // `canDrawIndicator` on why an own-pane wskaźnik is pickable but not drawn yet.
+  // archive last answered. A price-pane entry draws on the candles' own pane; an
+  // own-pane entry (RSI, ATR, MACD, …) gets a pane of its own, one per (id,
+  // params) rather than one shared by every oscillator — see `canDrawIndicator`.
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
     const colors = colorsRef.current ?? readChartColors();
 
     const active = new Set<string>();
+    const activeOwnPanes = new Set<string>();
+    const activeResults = new Set<string>();
     let colorIndex = 0;
 
     for (const result of indicatorsState.results) {
@@ -464,32 +537,104 @@ export function Chart({
       if (!entry || !result.lines || !canDrawIndicator(entry)) continue;
 
       const paramsKey = entry.params.map((p) => result.params[p.name]).join(",");
+      const ownPaneKey = `${result.id}|${paramsKey}`;
+      activeResults.add(ownPaneKey);
+
+      let paneIndex: number | undefined;
+      if (entry.render.pane === "own") {
+        activeOwnPanes.add(ownPaneKey);
+        let pane = ownPanesRef.current.get(ownPaneKey);
+        if (!pane) {
+          // `preserveEmptyPane: true` — without it, the chart removes a pane
+          // on its own the moment its last series does (`IPaneApi.
+          // preserveEmptyPane` docs), racing the explicit `chart.removePane`
+          // below: deselecting one of two own-pane wskaźniki left the other's
+          // pane index stale and threw. This keeps removal singly-owned, by
+          // the cleanup loop, which already knows to look up a live index.
+          pane = chart.addPane(true);
+          pane.setStretchFactor(OWN_PANE_STRETCH);
+          ownPanesRef.current.set(ownPaneKey, pane);
+        }
+        paneIndex = pane.paneIndex();
+      }
+
+      let firstLine: ISeriesApi<"Line"> | ISeriesApi<"Histogram"> | undefined;
+
       for (const lineSpec of entry.lines) {
         const key = `${result.id}|${paramsKey}|${lineSpec.key}`;
         active.add(key);
         const values = result.lines[lineSpec.key] ?? [];
-        const points: (LineData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
-          (time, i) => {
-            const value = values[i];
-            return value === null || value === undefined
-              ? { time: time as UTCTimestamp }
-              : { time: time as UTCTimestamp, value };
-          },
-        );
+        // A line overrides the entry's own style for itself alone — MACD's
+        // histogram sitting beside two ordinary lines in the same entry.
+        const style = lineSpec.style ?? entry.render.style;
 
-        let line = indicatorSeriesRef.current.get(key);
-        if (!line) {
-          line = chart.addSeries(LineSeries, {
-            color: indicatorLineColor(colors, colorIndex),
-            lineWidth: 1,
-            lastValueVisible: false,
-            priceLineVisible: false,
-            ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
-          });
-          indicatorSeriesRef.current.set(key, line);
+        let series = indicatorSeriesRef.current.get(key);
+        if (style === "histogram") {
+          const points: (HistogramData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
+            (time, i) => {
+              const value = values[i];
+              return value === null || value === undefined
+                ? { time: time as UTCTimestamp }
+                : { time: time as UTCTimestamp, value, color: value >= 0 ? colors.up : colors.down };
+            },
+          );
+          if (!series) {
+            series = chart.addSeries(
+              HistogramSeries,
+              {
+                lastValueVisible: false,
+                priceLineVisible: false,
+                ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
+              },
+              paneIndex,
+            );
+            indicatorSeriesRef.current.set(key, series);
+          }
+          series.setData(points);
+        } else {
+          const points: (LineData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
+            (time, i) => {
+              const value = values[i];
+              return value === null || value === undefined
+                ? { time: time as UTCTimestamp }
+                : { time: time as UTCTimestamp, value };
+            },
+          );
+          if (!series) {
+            series = chart.addSeries(
+              LineSeries,
+              {
+                color: indicatorLineColor(colors, colorIndex),
+                lineWidth: 1,
+                lastValueVisible: false,
+                priceLineVisible: false,
+                ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
+              },
+              paneIndex,
+            );
+            indicatorSeriesRef.current.set(key, series);
+          }
+          series.setData(points);
         }
-        line.setData(points);
+        firstLine ??= series;
         colorIndex++;
+      }
+
+      // Reference levels (RSI's 30/70, …) — drawn once per (id, params) on
+      // whichever line happens to be first, since every line an entry declares
+      // shares that pane's one price scale.
+      if (entry.render.levels.length > 0 && firstLine && !levelLinesRef.current.has(ownPaneKey)) {
+        const priceLines = entry.render.levels.map((level) =>
+          firstLine.createPriceLine({
+            price: level,
+            color: colors.inkMuted,
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            axisLabelVisible: true,
+            title: "",
+          }),
+        );
+        levelLinesRef.current.set(ownPaneKey, { series: firstLine, lines: priceLines });
       }
     }
 
@@ -497,6 +642,21 @@ export function Chart({
       if (active.has(key)) continue;
       chart.removeSeries(line);
       indicatorSeriesRef.current.delete(key);
+    }
+
+    for (const [ownPaneKey, pane] of ownPanesRef.current) {
+      if (activeOwnPanes.has(ownPaneKey)) continue;
+      // Belt and braces alongside `preserveEmptyPane: true` above: a pane
+      // already gone (by whatever path) must not be handed to `removePane`
+      // again — that is what actually threw.
+      if (chart.panes().includes(pane)) chart.removePane(pane.paneIndex());
+      ownPanesRef.current.delete(ownPaneKey);
+    }
+
+    for (const [key, { series, lines }] of levelLinesRef.current) {
+      if (activeResults.has(key)) continue;
+      for (const priceLine of lines) series.removePriceLine(priceLine);
+      levelLinesRef.current.delete(key);
     }
   }, [indicatorsState.results, indicatorsState.times, catalogueById]);
 
@@ -534,10 +694,26 @@ export function Chart({
           {indicatorSource && (
             <IndicatorPicker
               entries={catalogue.entries}
-              selections={indicatorSelections}
-              onChange={setIndicatorSelections}
+              selections={knownIndicatorSelections}
+              onChange={(next) => {
+                // An unknown selection is never touched by an edit to a known
+                // one — only a change that names it (impossible: it has no
+                // checkbox) or a later catalogue read that recognizes it again
+                // moves it out of this list.
+                const stillUnknown = indicatorSelections.filter((s) => !catalogueById.has(s.id));
+                setIndicatorSelections([...stillUnknown, ...next]);
+              }}
               canDraw={canDrawIndicator}
             />
+          )}
+          {unknownIndicatorIds.length > 0 && (
+            <span
+              title={`No longer offered by the indicator catalogue: ${unknownIndicatorIds.join(", ")}`}
+              className="rounded border border-warning/40 px-1.5 py-0.5 text-[10px] tracking-wide text-warning uppercase"
+            >
+              {unknownIndicatorIds.length} saved {unknownIndicatorIds.length === 1 ? "indicator" : "indicators"}{" "}
+              unavailable
+            </span>
           )}
           {unsettledIndicators.length > 0 && (
             <span
