@@ -10,6 +10,7 @@ parts of what it asked for were never collected.
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -486,6 +487,160 @@ class StreamTicketOut(BaseModel):
     expires_in_seconds: int = Field(
         description="How long from now the ticket stays valid if it goes unused."
     )
+
+
+class IndicatorParamOut(BaseModel):
+    name: str
+    type: Literal["int", "float"]
+    default: float
+    min: float
+    max: float
+
+
+class IndicatorLineSpecOut(BaseModel):
+    key: str
+    label: str = Field(description="e.g. 'EMA {period}' — a template, not a rendered string")
+
+
+class IndicatorRenderOut(BaseModel):
+    pane: Literal["price", "own"]
+    style: Literal["line", "dots", "histogram"]
+    scale: Literal["price", "own", "fixed"] = "price"
+    autoscale: bool = Field(
+        default=True,
+        description="whether this line may widen the price axis it shares — off for a "
+        "wskaźnik whose own values are not comparable to price",
+    )
+    range: tuple[float, float] | None = None
+    levels: list[float] = Field(
+        default_factory=list, description="reference lines to draw, e.g. 30/70 for RSI"
+    )
+
+
+class IndicatorCatalogueEntryOut(BaseModel):
+    """One row of `GET /indicators` — everything a consumer needs to offer this
+    wskaźnik and draw it, without knowing anything about it beforehand
+    (`market-data-indicators` spec, "Katalog wystarcza do zbudowania wybieraka")."""
+
+    id: str
+    name: str
+    aliases: list[str] = Field(
+        default_factory=list,
+        description="names a wskaźnik is also known by; never the vocabulary of one "
+        "trading school baked into `id` itself",
+    )
+    group: str
+    output: Literal["lines", "markers", "zones", "levels"]
+    params: list[IndicatorParamOut]
+    lines: list[IndicatorLineSpecOut] = Field(default_factory=list)
+    render: IndicatorRenderOut
+    warmup_kind: Literal["fixed", "decay", "anchored"]
+
+
+class IndicatorsCatalogueOut(BaseModel):
+    algorithm_version: int
+    indicators: list[IndicatorCatalogueEntryOut]
+
+
+class IndicatorSpecIn(BaseModel):
+    id: str = Field(examples=["ema"])
+    params: dict[str, float] = Field(default_factory=dict)
+
+
+class IndicatorsRequest(BaseModel):
+    resolution: Resolution = Field(default=Resolution.MINUTE, examples=[Resolution.MINUTE])
+    # Two one-way aliases for one wire name — see `Uncovered.from_`.
+    from_: datetime = Field(validation_alias="from", serialization_alias="from", description="inclusive, UTC")
+    to: datetime = Field(description="exclusive, UTC")
+    specs: list[IndicatorSpecIn] = Field(min_length=1)
+
+    model_config = {"populate_by_name": True}
+
+
+class IndicatorMarkerOut(BaseModel):
+    time: datetime
+    label: str
+    price: float | None = None
+
+
+class IndicatorZoneOut(BaseModel):
+    from_: datetime = Field(validation_alias="from", serialization_alias="from")
+    to: datetime | None = Field(
+        default=None, description="null while the zone has not closed within the read range"
+    )
+    top: float
+    bottom: float
+    direction: Literal["bullish", "bearish"] | None = None
+    touched_at: datetime | None = None
+    filled_at: datetime | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class IndicatorLevelOut(BaseModel):
+    from_: datetime = Field(validation_alias="from", serialization_alias="from")
+    price: float
+    label: str | None = None
+
+    model_config = {"populate_by_name": True}
+
+
+class IndicatorResultOut(BaseModel):
+    """One requested wskaźnik's answer. Exactly one of `lines`, `markers`, `zones`,
+    `levels` is set — the one its catalogue entry's `output` names
+    (`market-data-indicators` spec, "Wynik ma jeden z czterech kształtów")."""
+
+    id: str
+    params: dict[str, float] = Field(description="resolved params — defaults filled in")
+    warmup_bars: int | None = Field(
+        default=None,
+        description="how many bars before the requested range were read for warmup; "
+        "null for a kotwica-anchored wskaźnik, which carries anchored_at instead",
+    )
+    anchored_at: datetime | None = Field(
+        default=None,
+        description="set instead of warmup_bars for a wskaźnik with state rather than decay",
+    )
+    settled: bool = Field(
+        description="false when the archive did not hold enough history before the "
+        "requested range for this value to be trusted yet"
+    )
+    lines: dict[str, list[float | None]] | None = None
+    markers: list[IndicatorMarkerOut] | None = None
+    zones: list[IndicatorZoneOut] | None = None
+    levels: list[IndicatorLevelOut] | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_shape(self) -> IndicatorResultOut:
+        shapes = (self.lines, self.markers, self.zones, self.levels)
+        if sum(shape is not None for shape in shapes) != 1:
+            raise ValueError("exactly one of lines, markers, zones, levels must be set")
+        return self
+
+
+class IndicatorsOut(BaseModel):
+    """`POST /indicators/{symbol}` — one or more wskaźniki, on one shared time axis."""
+
+    symbol: str
+    resolution: Resolution
+    price_side: PriceSide = Field(
+        description="which side of the spread these were computed from; the archive holds bid"
+    )
+    derived: bool = Field(
+        description="true when computed from a resolution derived from the minute series"
+    )
+    algorithm_version: int
+    times: list[datetime] = Field(description="shared by every result below")
+    warmup_from: datetime | None = Field(
+        default=None,
+        description="oldest period actually read to satisfy warmup; null when no "
+        "requested wskaźnik needed any",
+    )
+    uncovered: list[Uncovered] = Field(
+        default_factory=list,
+        description="stretches of the requested range the archive never verified",
+    )
+    results: list[IndicatorResultOut]
 
 
 class Problem(BaseModel):

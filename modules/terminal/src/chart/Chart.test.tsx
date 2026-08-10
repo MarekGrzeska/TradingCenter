@@ -3,9 +3,12 @@ import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {
   ControllableSource,
+  FakeIndicatorSource,
   bar,
   createChartStub,
   fakeChartApi,
+  indicatorEntry,
+  indicatorResult,
   makeFakeChart,
 } from "./testDoubles";
 import type { Bar } from "../data/types";
@@ -16,6 +19,7 @@ const stub = createChartStub();
 // Everything below tests what the component *asks the chart to do*.
 vi.mock("lightweight-charts", () => ({
   CandlestickSeries: { type: "Candlestick" },
+  LineSeries: { type: "Line" },
   ColorType: { Solid: "solid" },
   CrosshairMode: { Normal: 0 },
   LineStyle: { Dashed: 2 },
@@ -28,11 +32,19 @@ vi.mock("lightweight-charts", () => ({
 
 const { Chart } = await import("./Chart");
 
-function renderChart(source: ControllableSource, props?: Partial<{ symbol: string; resolution: "MINUTE_5" | "HOUR" }>) {
+function renderChart(
+  source: ControllableSource,
+  props?: Partial<{
+    symbol: string;
+    resolution: "MINUTE_5" | "HOUR";
+    indicatorSource: FakeIndicatorSource;
+  }>,
+) {
   const onResolutionChange = vi.fn();
   const view = render(
     <Chart
       source={source}
+      indicatorSource={props?.indicatorSource}
       symbol={props?.symbol ?? "US100"}
       resolution={props?.resolution ?? "MINUTE_5"}
       onResolutionChange={onResolutionChange}
@@ -579,5 +591,247 @@ describe("Chart — the price on the right-hand scale", () => {
     );
 
     await waitFor(() => expect(line?.removed).toBe(true));
+  });
+});
+
+describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", () => {
+  function lineSeries() {
+    return stub.latest().series.filter((s) => s.type === "Line");
+  }
+
+  it("offers no picker at all without an indicator source", () => {
+    renderChart(source);
+    expect(screen.queryByRole("button", { name: /indicators/i })).not.toBeInTheDocument();
+  });
+
+  it("builds the picker from the catalogue, not from a hand-kept list", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry({ id: "ema", name: "Exponential Moving Average" })];
+    renderChart(source, { indicatorSource: indicators });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+
+    expect(await screen.findByText("Exponential Moving Average")).toBeInTheDocument();
+  });
+
+  it("computes the chosen wskaźnik over the range the chart actually drew, and draws a line", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [indicatorResult({ lines: { ema: [10, 20] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    expect(indicators.computeCalls[0]).toMatchObject({
+      symbol: "US100",
+      resolution: "MINUTE_5",
+      from: 100,
+      to: 200,
+      specs: [{ id: "ema", params: { period: 20 } }],
+    });
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    expect(lineSeries()[0].data()).toEqual([
+      { time: 100, value: 10 },
+      { time: 200, value: 20 },
+    ]);
+  });
+
+  it("draws a missing value as a whitespace point, never as zero", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [indicatorResult({ lines: { ema: [null, 20] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    const [first] = lineSeries()[0].data();
+    expect(first).toEqual({ time: 100 });
+    expect(first).not.toHaveProperty("value");
+  });
+
+  it("says when a value is not settled yet, without hiding it", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ settled: false, lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+
+    expect(await screen.findByText(/warming up/i)).toBeInTheDocument();
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+  });
+
+  it("a failed compute leaves the candles alone and offers a retry", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeFailure = new Error("the archive refused: unknown indicator");
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+
+    expect(await screen.findByText(/indicators unavailable/i)).toBeInTheDocument();
+    // The candlestick series is untouched — still whatever the snapshot drew.
+    expect(stub.latest().series[0].data()).toHaveLength(2);
+
+    const callsBefore = indicators.computeCalls.length;
+    await userEvent.click(screen.getByRole("button", { name: /retry/i }));
+    await waitFor(() => expect(indicators.computeCalls.length).toBeGreaterThan(callsBefore));
+  });
+
+  it("removes the line when the operator deselects the wskaźnik", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    const checkbox = await screen.findByRole("checkbox", { name: /exponential moving average/i });
+    await userEvent.click(checkbox);
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    const line = lineSeries()[0];
+
+    await userEvent.click(checkbox);
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(0));
+    expect(stub.latest().removedSeries).toContain(line);
+  });
+
+  it("clears every wskaźnik line when the symbol changes, before the new series loads", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    const { rerender, onResolutionChange } = renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+
+    rerender(
+      <Chart
+        source={source}
+        indicatorSource={indicators}
+        symbol="GOLD"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+      />,
+    );
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(0));
+  });
+
+  it("refuses a parameter outside the range the catalogue declares, and says what range does apply", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /exponential moving average/i }));
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+
+    const periodInput = screen.getByLabelText("period");
+    await userEvent.clear(periodInput);
+    await userEvent.type(periodInput, "99999");
+    await userEvent.tab(); // blur
+
+    expect(await screen.findByText(/must be between 2 and 5000/i)).toBeInTheDocument();
+    // The out-of-range value never reached a request — still the one call from selecting it.
+    expect(indicators.computeCalls).toHaveLength(1);
+  });
+
+  it("keeps a wskaźnik whose render style this chart cannot draw yet unselectable", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "atr",
+        name: "Average True Range",
+        render: { pane: "own", style: "line", scale: "own", autoscale: true, range: null, levels: [] },
+      }),
+    ];
+    renderChart(source, { indicatorSource: indicators });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+
+    expect(await screen.findByRole("checkbox", { name: /average true range/i })).toBeDisabled();
   });
 });

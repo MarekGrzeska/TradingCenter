@@ -1,6 +1,15 @@
 import { vi } from "vitest";
-import type { MarketDataSource } from "../data/source";
-import type { Bar, Resolution, StreamEvent } from "../data/types";
+import type { IndicatorSource, MarketDataSource } from "../data/source";
+import type {
+  Bar,
+  IndicatorCatalogue,
+  IndicatorCatalogueEntry,
+  IndicatorResult,
+  IndicatorSelection,
+  IndicatorsResult,
+  Resolution,
+  StreamEvent,
+} from "../data/types";
 
 /** A chart's canvas cannot be asserted on, so every chart test runs against
  *  this stub instead of the real library — see design.md, "Testy tam, gdzie da
@@ -21,6 +30,10 @@ export interface FakeChart {
   resized: Array<{ width: number; height: number }>;
   crosshairHandlers: Array<(param: unknown) => void>;
   series: FakeSeries[];
+  /** Series removed with `chart.removeSeries()` — kept out of `series` above (which
+   *  mirrors what is actually drawn) but not discarded, so a test can assert one
+   *  was removed rather than only that it is gone. */
+  removedSeries: FakeSeries[];
   fitContentCalls: number;
   /** Handlers the chart attached to the time scale, and the range they read.
    *  `pan()` is what a test uses to move the frame the way a drag would. */
@@ -38,6 +51,16 @@ export interface Candle {
   close: number;
 }
 
+/** A wskaźnik line's own point shape — `value` absent (rather than `null`) is how
+ *  `lightweight-charts` spells a whitespace gap, which is what `Chart.tsx` sends for
+ *  an index with no computed value. */
+export interface LinePoint {
+  time: number;
+  value?: number;
+}
+
+export type SeriesPoint = Candle | LinePoint;
+
 export interface FakePriceLine {
   options: Record<string, unknown>;
   removed: boolean;
@@ -45,14 +68,18 @@ export interface FakePriceLine {
 }
 
 export interface FakeSeries {
+  /** `"Candlestick"` or `"Line"` — read off the series-definition object the
+   *  mocked `lightweight-charts` module exports, the same way the real
+   *  `chart.addSeries(LineSeries, …)` call identifies its own kind. */
+  type: string;
   /** The options the chart created this series with. */
   options: Record<string, unknown>;
-  setDataCalls: Candle[][];
-  updateCalls: Candle[];
+  setDataCalls: SeriesPoint[][];
+  updateCalls: SeriesPoint[];
   /** Whatever setData/update has left on screen. */
-  data(): Candle[];
-  setData(data: Candle[]): void;
-  update(candle: Candle): void;
+  data(): SeriesPoint[];
+  setData(data: SeriesPoint[]): void;
+  update(point: SeriesPoint): void;
   priceLines: FakePriceLine[];
   createPriceLine(options: Record<string, unknown>): FakePriceLine;
   removePriceLine(line: FakePriceLine): void;
@@ -77,6 +104,7 @@ export function makeFakeChart(): FakeChart {
     resized: [],
     crosshairHandlers: [],
     series: [],
+    removedSeries: [],
     fitContentCalls: 0,
     rangeHandlers: [],
     visibleRange: null,
@@ -92,10 +120,18 @@ export function makeFakeChart(): FakeChart {
  *  `FakeChart` the test can then read and drive. */
 export function fakeChartApi(chart: FakeChart) {
   return {
-    addSeries: (_type: unknown, options: Record<string, unknown> = {}) => {
-      const series = makeFakeSeries(options);
+    addSeries: (type: unknown, options: Record<string, unknown> = {}) => {
+      // The mocked module exports `{ type: "Candlestick" }` / `{ type: "Line" }` in
+      // place of the real series-definition objects — the same shape `Chart.tsx`
+      // passes through unmodified, so reading it back here needs no separate map.
+      const kind = (type as { type?: string } | undefined)?.type ?? "unknown";
+      const series = makeFakeSeries(kind, options);
       chart.series.push(series);
       return series;
+    },
+    removeSeries: (series: FakeSeries) => {
+      chart.series = chart.series.filter((existing) => existing !== series);
+      chart.removedSeries.push(series);
     },
     remove: () => {
       chart.removed = true;
@@ -126,9 +162,13 @@ export function fakeChartApi(chart: FakeChart) {
   };
 }
 
-export function makeFakeSeries(options: Record<string, unknown> = {}): FakeSeries {
-  let current: Candle[] = [];
+export function makeFakeSeries(
+  type: string = "Candlestick",
+  options: Record<string, unknown> = {},
+): FakeSeries {
+  let current: SeriesPoint[] = [];
   return {
+    type,
     options,
     setDataCalls: [],
     updateCalls: [],
@@ -137,11 +177,11 @@ export function makeFakeSeries(options: Record<string, unknown> = {}): FakeSerie
       this.setDataCalls.push(data);
       current = [...data];
     },
-    update(candle) {
-      this.updateCalls.push(candle);
-      const index = current.findIndex((c) => c.time === candle.time);
-      if (index >= 0) current[index] = candle;
-      else current.push(candle);
+    update(point) {
+      this.updateCalls.push(point);
+      const index = current.findIndex((c) => c.time === point.time);
+      if (index >= 0) current[index] = point;
+      else current.push(point);
     },
     priceLines: [],
     createPriceLine(options) {
@@ -269,4 +309,85 @@ export class ControllableSource implements MarketDataSource {
 
 export function bar(time: number, close: number, forming = false, volume: number | null = null): Bar {
   return { time, open: close, high: close + 1, low: close - 1, close, volume, forming };
+}
+
+/** A catalogue entry with sane price-pane-line defaults — override only what a test
+ *  actually cares about. */
+export function indicatorEntry(
+  overrides: Partial<IndicatorCatalogueEntry> = {},
+): IndicatorCatalogueEntry {
+  return {
+    id: "ema",
+    name: "Exponential Moving Average",
+    aliases: [],
+    group: "averages",
+    output: "lines",
+    params: [{ name: "period", type: "int", default: 20, min: 2, max: 5000 }],
+    lines: [{ key: "ema", label: "EMA {period}" }],
+    render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
+    warmupKind: "decay",
+    ...overrides,
+  };
+}
+
+export function indicatorResult(overrides: Partial<IndicatorResult> = {}): IndicatorResult {
+  return {
+    id: "ema",
+    params: { period: 20 },
+    warmupBars: 210,
+    anchoredAt: null,
+    settled: true,
+    lines: { ema: [] },
+    markers: null,
+    zones: null,
+    levels: null,
+    ...overrides,
+  };
+}
+
+/**
+ * A wskaźnik source the test drives directly — no HTTP, no fake server. `computeQueue`
+ * answers successive `computeIndicators` calls in order; an exhausted queue answers with
+ * an empty result, which is how "nothing computed yet" looks without a test having to
+ * seed one for every call it does not care about.
+ */
+export class FakeIndicatorSource implements IndicatorSource {
+  catalogueEntries: IndicatorCatalogueEntry[] = [];
+  catalogueFailure: Error | null = null;
+
+  computeCalls: Array<{
+    symbol: string;
+    resolution: Resolution;
+    from: number;
+    to: number;
+    specs: IndicatorSelection[];
+  }> = [];
+  computeQueue: IndicatorsResult[] = [];
+  computeFailure: Error | null = null;
+
+  async indicatorCatalogue(): Promise<IndicatorCatalogue> {
+    if (this.catalogueFailure) throw this.catalogueFailure;
+    return { algorithmVersion: 1, indicators: this.catalogueEntries };
+  }
+
+  async computeIndicators(
+    symbol: string,
+    resolution: Resolution,
+    from: number,
+    to: number,
+    specs: IndicatorSelection[],
+  ): Promise<IndicatorsResult> {
+    this.computeCalls.push({ symbol, resolution, from, to, specs });
+    if (this.computeFailure) throw this.computeFailure;
+    return (
+      this.computeQueue.shift() ?? {
+        symbol,
+        resolution,
+        derived: false,
+        algorithmVersion: 1,
+        times: [],
+        results: [],
+      }
+    );
+  }
 }

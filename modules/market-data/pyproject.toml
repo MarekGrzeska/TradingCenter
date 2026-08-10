@@ -24,6 +24,9 @@ dependencies = [
     # transitive one left to chance.
     "azure-identity>=1.19",
     "aiohttp>=3.10",
+    # `market_data/indicators/kernel.py`'s only dependency, and deliberately its only one
+    # — see that module's docstring for why it imports nothing else.
+    "numpy>=2.0",
     # The candle-age metric the most important alert stands on (design.md, group 10) —
     # auto-configures the OpenTelemetry SDK to export to Application Insights from
     # APPLICATIONINSIGHTS_CONNECTION_STRING. Unset (every local run), it is a no-op:

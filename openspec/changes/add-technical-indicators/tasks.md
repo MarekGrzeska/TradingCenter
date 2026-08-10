@@ -5,28 +5,28 @@ grupa 7.
 
 ## 1. Szkielet na wylot (E0)
 
-- [ ] 1.1 Prototyp jądra na 5 prymitywach; zmierzyć p95 dla 5000 świec × 10 wskaźników i zapisać wynik
-- [ ] 1.2 Ustalić sufit żądania na podstawie 1.1
-- [ ] 1.3 `numpy` w `pyproject.toml`
-- [ ] 1.4 `market_data/indicators/kernel.py`: `sma`, `ema`, `rma`, `wma`, `stdev`, `true_range`, `rolling_max`, `rolling_min`
-- [ ] 1.5 `market_data/indicators/warmup.py`: `m = ceil(ln(1e-9) / ln(1 − α))` per rodzina wskaźników
-- [ ] 1.6 `market_data/indicators/catalogue.py`: kształt wpisu (id, name, aliases, group, params, output, render, warmup) + wpisy `sma`, `ema`, `atr`
-- [ ] 1.7 Modele w `market_data/contract.py`: katalog, żądanie, odpowiedź, cztery kształty wyjścia (`lines`, `markers`, `zones`, `levels`)
-- [ ] 1.8 `market_data/routers/indicators.py`: `GET /indicators`, `POST /indicators/{symbol}`
-- [ ] 1.9 Rozszerzanie okna odczytu o rozgrzewkę; `warmup_from` i `settled` w odpowiedzi
-- [ ] 1.10 Przeniesienie `uncovered`, `price_side` i `derived` z odczytu świec do odpowiedzi wskaźnikowej
-- [ ] 1.11 Odmowa ponad sufit i przy odwróconym zakresie, z nazwaną granicą
-- [ ] 1.12 Semafor ograniczający równoległe obliczenia
-- [ ] 1.13 Pliki wzorcowe dla `sma`, `ema`, `atr` na ustalonej serii syntetycznej
-- [ ] 1.14 Test niezależności od punktu startu, parametryzowany po wszystkich wskaźnikach z tłumieniem
-- [ ] 1.15 Test spójności katalogu z jądrem: każdy wpis policzony, klucze wyjścia równe deklarowanym
-- [ ] 1.16 Test granicy: żaden wpis nie czyta wolumenu, nie wymaga drugiego instrumentu i nie zwraca wartości logicznej
-- [ ] 1.17 `pnpm contract:generate` w terminalu
-- [ ] 1.18 Terminal: adapter `src/data/indicators.ts` — katalog i wyniki na typy terminala
-- [ ] 1.19 Terminal: wybierak wskaźników budowany z katalogu, z walidacją parametrów wobec zakresów
-- [ ] 1.20 Terminal: rysowanie nakładek liniowych na panelu ceny, z `autoscaleInfoProvider` wg podpowiedzi katalogu
-- [ ] 1.21 Terminal: przerwa w linii dla wartości nieznanych; sygnalizacja `settled: false`
-- [ ] 1.22 Terminal: nieudany odczyt wskaźników nie zasłania świec, z możliwością ponowienia
+- [x] 1.1 Prototyp jądra na 5 prymitywach; zmierzyć p95 dla 5000 świec × 10 wskaźników i zapisać wynik
+- [x] 1.2 Ustalić sufit żądania na podstawie 1.1
+- [x] 1.3 `numpy` w `pyproject.toml`
+- [x] 1.4 `market_data/indicators/kernel.py`: `sma`, `ema`, `rma`, `wma`, `stdev`, `true_range`, `rolling_max`, `rolling_min`
+- [x] 1.5 `market_data/indicators/warmup.py`: `m = ceil(ln(1e-9) / ln(1 − α))` per rodzina wskaźników
+- [x] 1.6 `market_data/indicators/catalogue.py`: kształt wpisu (id, name, aliases, group, params, output, render, warmup) + wpisy `sma`, `ema`, `atr`
+- [x] 1.7 Modele w `market_data/contract.py`: katalog, żądanie, odpowiedź, cztery kształty wyjścia (`lines`, `markers`, `zones`, `levels`)
+- [x] 1.8 `market_data/routers/indicators.py`: `GET /indicators`, `POST /indicators/{symbol}`
+- [x] 1.9 Rozszerzanie okna odczytu o rozgrzewkę; `warmup_from` i `settled` w odpowiedzi
+- [x] 1.10 Przeniesienie `uncovered`, `price_side` i `derived` z odczytu świec do odpowiedzi wskaźnikowej
+- [x] 1.11 Odmowa ponad sufit i przy odwróconym zakresie, z nazwaną granicą
+- [x] 1.12 Semafor ograniczający równoległe obliczenia
+- [x] 1.13 Pliki wzorcowe dla `sma`, `ema`, `atr` na ustalonej serii syntetycznej
+- [x] 1.14 Test niezależności od punktu startu, parametryzowany po wszystkich wskaźnikach z tłumieniem
+- [x] 1.15 Test spójności katalogu z jądrem: każdy wpis policzony, klucze wyjścia równe deklarowanym
+- [x] 1.16 Test granicy: żaden wpis nie czyta wolumenu, nie wymaga drugiego instrumentu i nie zwraca wartości logicznej
+- [x] 1.17 `pnpm contract:generate` w terminalu
+- [x] 1.18 Terminal: adapter w `src/data/archive.ts` (`indicatorCatalogue`, `computeIndicators`) — katalog i wyniki na typy terminala; `IndicatorSource` w `src/data/source.ts`
+- [x] 1.19 Terminal: wybierak wskaźników budowany z katalogu, z walidacją parametrów wobec zakresów (`IndicatorPicker.tsx`)
+- [x] 1.20 Terminal: rysowanie nakładek liniowych na panelu ceny, z `autoscaleInfoProvider` wg podpowiedzi katalogu — plus odczyt wartości pod kursorem, obok OHLC (spec `terminal-chart`, poza pierwotnym podziałem zadań)
+- [x] 1.21 Terminal: przerwa w linii dla wartości nieznanych; sygnalizacja `settled: false`
+- [x] 1.22 Terminal: nieudany odczyt wskaźników nie zasłania świec, z możliwością ponowienia
 
 ## 2. Miary ciągłe (E1)
 
