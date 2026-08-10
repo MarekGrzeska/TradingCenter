@@ -229,12 +229,24 @@ po grupach zadań.
 
 ## Migration Plan
 
-**Jest migracja bazy i jest ona krokiem osobnym.** `0007` dokłada `history_ends_at`, a od
-niej zależy każdy odczyt pokrycia — czyli `/candles`, `/coverage`, `/jobs/estimate`
-i `POST /pairs`. Kod wdrożony przed nią nie degraduje się łagodnie: odpytuje kolumnę,
-której nie ma, i cały ten zestaw odpowiada pięćsetką. Ani `Dockerfile`, ani
-`deploy-market-data.yml` nie robią `alembic upgrade head` — to świadoma decyzja z 8.6
-(restart nie ma ścigać się o migrację) i znaczy, że robi to operator.
+**Są dwie migracje i stoją po przeciwnych stronach wdrożenia `market-data`.** To nie jest
+ceremonia — to jedyna kolejność, w której żadne okno nie jest zepsute. Ani `Dockerfile`,
+ani `deploy-market-data.yml` nie robią `alembic upgrade head` (świadoma decyzja z 8.6:
+restart nie ma ścigać się o migrację), więc obie odpala operator.
+
+- `0007` dokłada kolumnę `history_ends_at`. **Przed** wdrożeniem, bo nowy kod jej używa
+  w każdym odczycie pokrycia — `/candles`, `/coverage`, `/jobs/estimate`, `POST /pairs` —
+  i uruchomiony przed nią odpowiada na to wszystko pięćsetką. Sama kolumna jest
+  `NULL`-owalna, więc staremu kodowi nie przeszkadza.
+- `0008` dokłada check-constraint wiążący flagę z punktem. **Po** wdrożeniu, bo stary
+  writer wstawia pięć kolumn: wiersz, który zapisałby, trafiwszy na koniec historii,
+  niósłby flagę bez punktu i zostałby odrzucony. Constraint dołożony razem z kolumną
+  wywracałby więc kawałki przez całe okno wdrożenia.
+
+Między nimi stary kod może zapisać flagę bez punktu. Czyta się to jako „granica nieznana",
+nie jako granica w złym miejscu, a `0008` takie wiersze zeruje przed założeniem reguły —
+odzyskanie kosztuje jedno żądanie. Dlatego tę szparę wolno zostawić otwartą na czas
+jednego wdrożenia, a odwrotnej nie wolno wcale.
 
 Kolejność:
 
@@ -242,20 +254,21 @@ Kolejność:
    w budowie i zasiew strumienia razem. Osobno nie wolno: bez warunku `market-data` skasuje
    granicę i natychmiast zapisze ją ponownie z tego samego błędu, a bez zasiewu odjęcie
    świecy bieżącej z archiwum zabrałoby ją z wykresu, nie dając nic w zamian.
-2. **`uv run alembic upgrade head`, zanim ruszy nowy `market-data`.** Migracja jest
-   addytywna i bezpieczna dla kodu w wersji sprzed niej: kolumna jest `NULL`-owalna,
-   a wiersze bez granicy check-constraint przepuszcza. Czyli okno między migracją
-   a wdrożeniem jest nieszkodliwe, a okno odwrotne — nie.
+2. `uv run alembic upgrade 0007`.
 3. Wdrożyć `market-data`. Nowe pole w DTO gatewaya było do tej chwili po prostu ignorowane
    — `market-data` czyta odpowiedź gatewaya przez własny model, więc kolejność 1 → 3 jest
    bezpieczna w tę stronę i tylko w tę.
-4. Operator prosi o US100 od 2024-01-01 dla wszystkich siedmiu rozdzielczości. Granica
+4. `uv run alembic upgrade head` (`0008`). Pominięcie tego kroku niczego nie psuje: reguła
+   jest zabezpieczeniem, a nie warunkiem działania — `record_coverage` odmawia zapisu
+   połowy faktu samodzielnie.
+5. Operator prosi o US100 od 2024-01-01 dla wszystkich siedmiu rozdzielczości. Granica
    zostaje zdjęta, zlecenie planuje pełny zakres i zbiera to, co provider ma.
-5. Sprawdzić `GET /coverage/US100?resolution=DAY`: `earliest_reachable` jest albo puste,
+6. Sprawdzić `GET /coverage/US100?resolution=DAY`: `earliest_reachable` jest albo puste,
    albo wskazuje moment, w którym faktycznie skończyły się dane.
 
-Wycofanie: rewert obu modułów, migracji **nie** cofać. Kolumna zostawiona na miejscu nie
-przeszkadza kodowi sprzed zmiany, a `downgrade -1` na działającej produkcji zabrałby
-kolumnę spod zapytań, które właśnie ją czytają — czyli powtórzyłby tę samą awarię
-z drugiej strony. Flagi zdjęte do czasu wycofania zostają zdjęte, co jest bezpieczne:
-najgorsze, co robi brak granicy, to jedno dodatkowe żądanie przy kolejnym zleceniu.
+Wycofanie: `alembic downgrade 0007` (zdejmuje samą regułę), rewert obu modułów, kolumny
+**nie** cofać. Kolumna zostawiona na miejscu nie przeszkadza kodowi sprzed zmiany,
+a `downgrade 0006` na działającej produkcji zabrałby ją spod zapytań, które właśnie ją
+czytają — czyli powtórzyłby tę samą awarię z drugiej strony. Flagi zdjęte do czasu
+wycofania zostają zdjęte, co jest bezpieczne: najgorsze, co robi brak granicy, to jedno
+dodatkowe żądanie przy kolejnym zleceniu.
