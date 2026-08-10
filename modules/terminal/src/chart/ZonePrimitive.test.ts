@@ -158,6 +158,30 @@ describe("ZonePrimitive — visible-range selection (task 4.7, task 4.10)", () =
 
     expect(primitive.renderItems()).toHaveLength(1);
   });
+
+  it("keeps per-frame cost bounded by the visible window, not the total zone count (task 4.10)", () => {
+    // ~300 zones spread across a wide daily-chart-sized read, mirroring the
+    // task's own number — only a narrow band of them is ever inside the
+    // scrolled-to window, the situation panning repeats every frame.
+    const primitive = new ZonePrimitive(COLORS);
+    const timeToCoordinate = vi.fn((t: Time) => t as number);
+    attach(primitive, { visibleRange: { from: 10_000, to: 10_500 }, timeToCoordinate });
+    const zones = Array.from({ length: 300 }, (_, i) =>
+      zone({ from: (i * 100) as Time, to: (i * 100 + 50) as Time }),
+    );
+    primitive.setZones(zones);
+
+    const startedAt = performance.now();
+    const items = primitive.renderItems();
+    const elapsedMs = performance.now() - startedAt;
+
+    // Only zones overlapping [10000, 10500) survive the filter — a handful,
+    // not 300 — and every `timeToCoordinate` call spent is one of those, not
+    // one per zone this primitive holds.
+    expect(items.length).toBeLessThan(10);
+    expect(timeToCoordinate).toHaveBeenCalledTimes(items.length * 2);
+    expect(elapsedMs).toBeLessThan(5);
+  });
 });
 
 describe("ZonePrimitive — drawing", () => {
