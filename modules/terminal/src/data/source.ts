@@ -157,4 +157,11 @@ export interface ArchiveAdmin {
    *  same job. Rejects with a `MarketDataError` of kind `"refused"` when
    *  there is nothing to retry. */
   retryJob(jobId: number, signal: AbortSignal): Promise<Job>;
+
+  /** Removes a job from the collection history, with every chunk it covers.
+   *  Deletes no candle — the data the job collected stays archived, which is
+   *  what separates this from `deletePair`. Rejects with a `MarketDataError`
+   *  of kind `"refused"` while any of its chunks is still pending or
+   *  running. */
+  deleteJob(jobId: number, signal: AbortSignal): Promise<void>;
 }

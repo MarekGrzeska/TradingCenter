@@ -14,6 +14,7 @@ import asyncpg
 from ..db import fetch_one
 from ..models import Resolution
 from .models import (
+    OPEN_CHUNK_STATES,
     RETRYABLE_CHUNK_STATES,
     Chunk,
     ChunkPlan,
@@ -30,6 +31,10 @@ class NothingToRetry(Exception):
 
 class UnknownJob(Exception):
     """A job id nobody has ever created."""
+
+
+class JobStillRunning(Exception):
+    """A delete was asked of a job a runner may still take work from."""
 
 
 _INSERT_JOB = """
@@ -134,6 +139,29 @@ _INTERRUPT_OPEN_CHUNKS = """
 
 _BUMP_JOB_ATTEMPT = """
     UPDATE collection_jobs SET attempt = attempt + 1 WHERE id = $1 RETURNING attempt
+"""
+
+# `FOR UPDATE` on both, and that is the whole race. `_CLAIM_PENDING_CHUNK` claims with
+# `FOR UPDATE SKIP LOCKED`, so a chunk this transaction holds is one the runner skips
+# rather than claims — without the lock, "nothing is open here" can be true when it is
+# read and false by the time the delete lands, leaving a running chunk whose job is gone.
+_LOCK_JOB = """
+    SELECT id FROM collection_jobs WHERE id = $1 FOR UPDATE
+"""
+
+_LOCK_CHUNK_STATES = """
+    SELECT state FROM collection_job_chunks WHERE job_id = $1 FOR UPDATE
+"""
+
+# No `ON DELETE CASCADE` on the chunks' foreign key (`0005_collection_jobs`), on purpose:
+# this is the only place allowed to remove a chunk, and a cascade would put that fact in
+# a migration nobody reads instead of here, beside the rest of these two tables' SQL.
+_DELETE_CHUNKS_FOR_JOB = """
+    DELETE FROM collection_job_chunks WHERE job_id = $1
+"""
+
+_DELETE_JOB = """
+    DELETE FROM collection_jobs WHERE id = $1
 """
 
 _RESET_RETRYABLE_CHUNKS = """
@@ -306,6 +334,35 @@ async def skip_chunks_beyond_history(
     """
     rows = await conn.fetch(_SKIP_BEYOND_HISTORY, job_id, symbol, resolution.value, boundary)
     return len(rows)
+
+
+async def delete_job(conn: asyncpg.Connection, job_id: int) -> None:
+    """Remove a job and its chunks from the history, leaving every candle alone.
+
+    Deleting the record of work does not undo the work: the candles this job wrote, and
+    the coverage that follows from them, stay exactly as they are (`market-data-jobs`
+    spec, "Wpis historii zlecenia da się usunąć"). Removing data is
+    `deletion.delete_pair_data`, which is a different operation and the one that leaves
+    a trace of itself.
+
+    Raises `UnknownJob` for an id nobody created and `JobStillRunning` while any chunk is
+    `pending` or `running`. `pending` counts the same as `running` — it is a chunk the
+    runner will claim in a moment, and its result would be written against a job that no
+    longer exists.
+    """
+    async with conn.transaction():
+        if await conn.fetchrow(_LOCK_JOB, job_id) is None:
+            raise UnknownJob(f"no collection job with id {job_id}")
+
+        states = [ChunkState(row["state"]) for row in await conn.fetch(_LOCK_CHUNK_STATES, job_id)]
+        if any(state in OPEN_CHUNK_STATES for state in states):
+            raise JobStillRunning(
+                f"job {job_id} still has chunks pending or running — it cannot be removed "
+                "from the history while a runner may work them"
+            )
+
+        await conn.execute(_DELETE_CHUNKS_FOR_JOB, job_id)
+        await conn.execute(_DELETE_JOB, job_id)
 
 
 async def retry_job(conn: asyncpg.Connection, job_id: int) -> Job:

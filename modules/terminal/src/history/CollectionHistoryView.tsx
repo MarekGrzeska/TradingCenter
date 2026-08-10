@@ -362,7 +362,9 @@ function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: num
  *
  * Retry lives here because this is where its scope is visible — it re-runs every failed
  * chunk of every pair the job touched, which is what the per-row button used to do while
- * looking like it did less.
+ * looking like it did less. Removing the job from the history is here for the same
+ * reason, and the two share nothing else: one re-runs work, the other forgets it ever
+ * happened without touching a candle.
  */
 function JobDialog({
   jobId,
@@ -375,6 +377,11 @@ function JobDialog({
   onChanged(): void;
   onClose(): void;
 }) {
+  // The second question is a second dialog, not a second button beside "Retry job".
+  // `ConfirmDialog` asks one thing and answers it once; two irreversible buttons on one
+  // panel is how the wrong one gets pressed (`terminal-dialogs` spec, "Pytanie o zgodę
+  // jest dialogiem").
+  const [removing, setRemoving] = useState(false);
   const chunks = rows.flatMap((row) => row.chunks);
   const retryable = chunks.filter(
     (chunk) => chunk.state === "failed" || chunk.state === "interrupted",
@@ -385,11 +392,20 @@ function JobDialog({
   const reasons = failureReasons(chunks);
   const running = rows.some((row) => row.status === "running");
   const lastActivity = Math.max(...rows.map((row) => row.lastActivityAt));
+  const candlesCollected = rows.reduce((total, row) => total + row.candlesWritten, 0);
 
   const retry = useCallback(async () => {
     await archive.retryJob(jobId, new AbortController().signal);
     onChanged();
   }, [jobId, onChanged]);
+
+  const remove = useCallback(async () => {
+    await archive.deleteJob(jobId, new AbortController().signal);
+    onChanged();
+    // Closed from here rather than by `closeOnSuccess`, whose `onClose` is the way back
+    // to the job dialog — and the job it shows no longer exists.
+    onClose();
+  }, [jobId, onChanged, onClose]);
 
   const body = (
     <>
@@ -448,8 +464,51 @@ function JobDialog({
           collected are left alone.
         </p>
       )}
+
+      {running ? (
+        // The archive refuses this outright, so offering it and reporting the refusal
+        // afterwards would be asking a question whose answer is already known.
+        <p className="mt-3 text-ink-muted">
+          This job cannot be removed from the history while its chunks are still running.
+        </p>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setRemoving(true)}
+          className="mt-3 rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
+        >
+          Remove from history
+        </button>
+      )}
     </>
   );
+
+  if (removing) {
+    return (
+      <ConfirmDialog
+        title={`Remove job #${jobId} from the history`}
+        confirmLabel="Remove"
+        busyLabel="Removing…"
+        tone="danger"
+        fallbackError="could not remove the job from the history"
+        closeOnSuccess={false}
+        onConfirm={remove}
+        onClose={() => setRemoving(false)}
+      >
+        <p className="mt-3 text-ink">
+          Removes this pull from the history — {rows.length} pair{rows.length === 1 ? "" : "s"} and{" "}
+          {chunks.length} chunk{chunks.length === 1 ? "" : "s"}.
+        </p>
+        {/* The one sentence that separates this from deleting a pair's data, which is
+            the other irreversible thing in this terminal with a similar name
+            (terminal-collection-history spec, "Wpis dociągnięcia da się usunąć"). */}
+        <p className="mt-2 text-ink-secondary">
+          The {candlesCollected.toLocaleString()} candles it collected stay in the archive. This
+          removes the record of the pull, not the data.
+        </p>
+      </ConfirmDialog>
+    );
+  }
 
   if (retryable.length === 0) {
     return (
