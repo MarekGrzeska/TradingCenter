@@ -9,6 +9,14 @@ import type {
   Chunk,
   ChunkState,
   CollectionState,
+  IndicatorCatalogue,
+  IndicatorCatalogueEntry,
+  IndicatorLevel,
+  IndicatorMarker,
+  IndicatorResult,
+  IndicatorSelection,
+  IndicatorsResult,
+  IndicatorZone,
   Job,
   JobEstimate,
   JobPairView,
@@ -23,7 +31,7 @@ import type {
   TrackedPairResult,
   TrackPairsResult,
 } from "./types";
-import type { ArchiveAdmin, CandleSource, HistoryRequest } from "./source";
+import type { ArchiveAdmin, CandleSource, HistoryRequest, IndicatorSource } from "./source";
 
 /**
  * The candle side of the terminal's source: `market-data`, over its HTTP contract and
@@ -67,6 +75,10 @@ type RawJobEstimate = Wire["JobEstimateOut"];
 type RawTrackPairsResult = Wire["TrackPairsResult"];
 type RawPairDeletion = Wire["PairDeletionOut"];
 type RawStreamTicket = Wire["StreamTicketOut"];
+type RawIndicatorCatalogueEntry = Wire["IndicatorCatalogueEntryOut"];
+type RawIndicatorsCatalogue = Wire["IndicatorsCatalogueOut"];
+type RawIndicatorResult = Wire["IndicatorResultOut"];
+type RawIndicatorsOut = Wire["IndicatorsOut"];
 
 /** A candle missing any OHLC field (the provider reports this for a period with
  *  no trade) can't become a `Bar` — `Bar`'s fields are non-nullable by design,
@@ -184,6 +196,90 @@ function mapPairDeletion(raw: RawPairDeletion): PairDeletion {
   };
 }
 
+function mapIndicatorCatalogueEntry(raw: RawIndicatorCatalogueEntry): IndicatorCatalogueEntry {
+  return {
+    id: raw.id,
+    name: raw.name,
+    aliases: raw.aliases,
+    group: raw.group,
+    output: raw.output,
+    params: raw.params,
+    lines: raw.lines,
+    render: {
+      pane: raw.render.pane,
+      style: raw.render.style,
+      scale: raw.render.scale,
+      autoscale: raw.render.autoscale,
+      range: raw.render.range,
+      levels: raw.render.levels,
+    },
+    warmupKind: raw.warmup_kind,
+  };
+}
+
+function mapIndicatorCatalogue(raw: RawIndicatorsCatalogue): IndicatorCatalogue {
+  return {
+    algorithmVersion: raw.algorithm_version,
+    indicators: raw.indicators.map(mapIndicatorCatalogueEntry),
+  };
+}
+
+function mapIndicatorResult(raw: RawIndicatorResult): IndicatorResult {
+  return {
+    id: raw.id,
+    params: raw.params,
+    warmupBars: raw.warmup_bars,
+    anchoredAt: raw.anchored_at === null ? null : parseIsoToEpochSeconds(raw.anchored_at),
+    settled: raw.settled,
+    lines: raw.lines,
+    markers:
+      raw.markers === null
+        ? null
+        : raw.markers.map(
+            (marker): IndicatorMarker => ({
+              time: parseIsoToEpochSeconds(marker.time),
+              label: marker.label,
+              price: marker.price,
+            }),
+          ),
+    zones:
+      raw.zones === null
+        ? null
+        : raw.zones.map(
+            (zone): IndicatorZone => ({
+              from: parseIsoToEpochSeconds(zone.from),
+              to: zone.to === null ? null : parseIsoToEpochSeconds(zone.to),
+              top: zone.top,
+              bottom: zone.bottom,
+              direction: zone.direction,
+              touchedAt: zone.touched_at === null ? null : parseIsoToEpochSeconds(zone.touched_at),
+              filledAt: zone.filled_at === null ? null : parseIsoToEpochSeconds(zone.filled_at),
+            }),
+          ),
+    levels:
+      raw.levels === null
+        ? null
+        : raw.levels.map(
+            (level): IndicatorLevel => ({
+              from: parseIsoToEpochSeconds(level.from),
+              price: level.price,
+              label: level.label,
+            }),
+          ),
+  };
+}
+
+function mapIndicatorsResult(raw: RawIndicatorsOut): IndicatorsResult {
+  return {
+    symbol: raw.symbol,
+    resolution: raw.resolution as Resolution,
+    derived: raw.derived,
+    algorithmVersion: raw.algorithm_version,
+    times: raw.times.map(parseIsoToEpochSeconds),
+    results: raw.results.map(mapIndicatorResult),
+  };
+}
+
 function mapTrackPairsResult(raw: RawTrackPairsResult): TrackPairsResult {
   return {
     results: raw.results.map(
@@ -255,7 +351,7 @@ export function translateMessage(raw: string): StreamEvent[] {
   return [];
 }
 
-export type ArchiveSource = CandleSource & ArchiveAdmin;
+export type ArchiveSource = CandleSource & ArchiveAdmin & IndicatorSource;
 
 /** How long the "why did that socket not open" question may take before the
  *  answer stops being worth waiting for. Short, because a chart is sitting on
@@ -480,6 +576,35 @@ export function createArchiveSource(
       // 204, so `send` rather than `json` — there is no body, and asking for one
       // would fail on the success path.
       await http.send(`${httpBase}/jobs/${jobId}`, { signal, method: "DELETE" });
+    },
+
+    async indicatorCatalogue(signal): Promise<IndicatorCatalogue> {
+      const raw = await http.json<RawIndicatorsCatalogue>(`${httpBase}/indicators`, { signal });
+      return mapIndicatorCatalogue(raw);
+    },
+
+    async computeIndicators(
+      symbol: string,
+      resolution: Resolution,
+      from: number,
+      to: number,
+      specs: IndicatorSelection[],
+      signal: AbortSignal,
+    ): Promise<IndicatorsResult> {
+      const raw = await http.json<RawIndicatorsOut>(
+        `${httpBase}/indicators/${encodeURIComponent(symbol)}`,
+        {
+          signal,
+          method: "POST",
+          body: {
+            resolution,
+            from: toIso(from),
+            to: toIso(to),
+            specs: specs.map((spec) => ({ id: spec.id, params: spec.params })),
+          },
+        },
+      );
+      return mapIndicatorsResult(raw);
     },
   };
 }

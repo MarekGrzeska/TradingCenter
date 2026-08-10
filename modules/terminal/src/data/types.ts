@@ -314,3 +314,132 @@ export interface PairDeletion {
   removedFrom: number | null;
   removedTo: number | null;
 }
+
+// --- indicators: wskaźniki liczone on the archive's own series ---
+//
+// Only the chart and its picker speak these. The catalogue is data, not a hand-kept
+// list — a wskaźnik the archive starts offering shows up here without a terminal
+// release, as long as its output shape and render style are ones the chart already
+// knows how to draw (`market-data-indicators` spec, "Katalog wystarcza do zbudowania
+// wybieraka").
+
+export type IndicatorParamType = "int" | "float";
+
+export interface IndicatorParam {
+  name: string;
+  type: IndicatorParamType;
+  default: number;
+  min: number;
+  max: number;
+}
+
+/** `label` is a template like `"EMA {period}"` — a caller fills in `{period}` from the
+ *  chosen params itself; the archive never renders a string for it. */
+export interface IndicatorLineSpec {
+  key: string;
+  label: string;
+}
+
+export type IndicatorPane = "price" | "own";
+export type IndicatorStyle = "line" | "dots" | "histogram";
+export type IndicatorScale = "price" | "own" | "fixed";
+
+export interface IndicatorRender {
+  pane: IndicatorPane;
+  style: IndicatorStyle;
+  scale: IndicatorScale;
+  /** Whether this wskaźnik's own values may widen the price axis it shares — off for
+   *  one whose values are not comparable to price, so a long average sitting far from
+   *  the current price cannot flatten the candles it is drawn over. */
+  autoscale: boolean;
+  range: [number, number] | null;
+  /** Reference lines to draw for this wskaźnik, e.g. 30/70 for RSI. */
+  levels: number[];
+}
+
+export type IndicatorOutputShape = "lines" | "markers" | "zones" | "levels";
+export type IndicatorWarmupKind = "fixed" | "decay" | "anchored";
+
+/** One row of the catalogue — everything the picker needs to offer this wskaźnik and
+ *  everything the chart needs to draw it, without either knowing it by name. */
+export interface IndicatorCatalogueEntry {
+  id: string;
+  name: string;
+  /** Names an operator might search by that are not `id` — never the vocabulary of
+   *  one trading school baked into the identifier itself. */
+  aliases: string[];
+  group: string;
+  output: IndicatorOutputShape;
+  params: IndicatorParam[];
+  lines: IndicatorLineSpec[];
+  render: IndicatorRender;
+  warmupKind: IndicatorWarmupKind;
+}
+
+export interface IndicatorCatalogue {
+  algorithmVersion: number;
+  indicators: IndicatorCatalogueEntry[];
+}
+
+/** One wskaźnik as the operator chose it — never the resolved defaults, so a catalogue
+ *  update that changes a default does not silently change what a saved slot draws.
+ *  What `terminal-grid` spec's slot state actually stores. */
+export interface IndicatorSelection {
+  id: string;
+  params: Record<string, number>;
+}
+
+export interface IndicatorMarker {
+  time: number;
+  label: string;
+  price: number | null;
+}
+
+/** `to` and the two "did price arrive here" instants are null for a zone the
+ *  requested range never resolved — `terminal-chart` spec, "Strefy i poziomy
+ *  rysują się jako obszary, nie jako linie serii". */
+export interface IndicatorZone {
+  from: number;
+  to: number | null;
+  top: number;
+  bottom: number;
+  direction: "bullish" | "bearish" | null;
+  touchedAt: number | null;
+  filledAt: number | null;
+}
+
+export interface IndicatorLevel {
+  from: number;
+  price: number;
+  label: string | null;
+}
+
+/** One requested wskaźnik's answer. Exactly one of `lines`/`markers`/`zones`/`levels`
+ *  is set — the one its catalogue entry's `output` names. */
+export interface IndicatorResult {
+  id: string;
+  /** Resolved params — defaults filled in, so a chart reading this back never has to
+   *  consult the catalogue to know what it is drawing. */
+  params: Record<string, number>;
+  /** Null for a kotwica-anchored wskaźnik, which carries `anchoredAt` instead. */
+  warmupBars: number | null;
+  anchoredAt: number | null;
+  /** False when the archive did not hold enough history before the requested range
+   *  for this result to be trusted yet. */
+  settled: boolean;
+  lines: Record<string, (number | null)[]> | null;
+  markers: IndicatorMarker[] | null;
+  zones: IndicatorZone[] | null;
+  levels: IndicatorLevel[] | null;
+}
+
+/** `POST /indicators/{symbol}` — one or more wskaźniki, on one shared time axis. */
+export interface IndicatorsResult {
+  symbol: string;
+  resolution: Resolution;
+  derived: boolean;
+  algorithmVersion: number;
+  /** Epoch seconds, shared by every result's `lines`/`markers`/`zones`/`levels`. */
+  times: number[];
+  results: IndicatorResult[];
+}

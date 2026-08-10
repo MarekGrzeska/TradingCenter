@@ -8,6 +8,7 @@ import type { Resolution, TrackedPair } from "../data/types";
 // Same stub rationale as Chart.test.tsx: the canvas is not assertable.
 vi.mock("lightweight-charts", () => ({
   CandlestickSeries: { type: "Candlestick" },
+  LineSeries: { type: "Line" },
   ColorType: { Solid: "solid" },
   CrosshairMode: { Normal: 0 },
   LineStyle: { Dashed: 2 },
@@ -57,6 +58,9 @@ vi.mock("../data/marketData", () => ({
   get archive() {
     return fakeArchive;
   },
+  // Undefined, same as a caller passing no `indicatorSource` at all: the grid's
+  // own tests are about layout and slot wiring, not the indicator picker.
+  indicators: undefined,
 }));
 
 const { GridView } = await import("./GridView");

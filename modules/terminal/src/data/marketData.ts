@@ -3,7 +3,7 @@ import { noIdentity, type Identity } from "../auth/identity";
 import { createArchiveSource } from "./archive";
 import { resolveEndpoints, resolveEntra } from "./config";
 import { createGatewaySource } from "./gatewaySource";
-import type { ArchiveAdmin, MarketDataSource } from "./source";
+import type { ArchiveAdmin, IndicatorSource, MarketDataSource } from "./source";
 
 /**
  * The one market-data source the app runs on, and the two back ends behind it.
@@ -63,3 +63,7 @@ export const instruments = gateway;
  * interface every view is supposed to use.
  */
 export const archive: ArchiveAdmin = archiveSource;
+
+/** The same archive again, narrowed to the wskaźniki it can compute — only the chart
+ *  and its picker have any business with this. */
+export const indicators: IndicatorSource = archiveSource;

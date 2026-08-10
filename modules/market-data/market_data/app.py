@@ -36,7 +36,7 @@ from .jobs import FutureRequest, JobRunner, interrupt_orphaned_chunks
 from .market_status import MarketStatus
 from .models import Candle
 from .openapi import add_stream_messages, require_response_fields
-from .routers import candles, instruments, jobs, meta, pairs, stream
+from .routers import candles, indicators, instruments, jobs, meta, pairs, stream
 from .tickets import TicketStore
 from .tracking import LimitReached, TrackingRefused
 
@@ -125,6 +125,10 @@ async def lifespan(app: FastAPI):
         # Memory only: the gateway it asks is resolved per request from the line
         # above, so a caller swapping that out is answered by the new one.
         app.state.market_status = MarketStatus()
+        # A recursive filter's loop holds the GIL, so this is a plain gate on how many
+        # `POST /indicators/*` requests compute at once — not a pool, since a thread would
+        # not free the event loop the way it does for I/O (routers/indicators.py).
+        app.state.indicator_limiter = asyncio.Semaphore(settings.indicator_concurrency)
 
         candle_age = telemetry.CandleAgeGauge()
         telemetry.register(candle_age)
@@ -234,7 +238,7 @@ async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
 
 
 # Order matches the single module these came out of, so the published document lists its
-# paths exactly where it always did. `instruments` is new — see its module docstring —
-# and goes last, after everything this module owned before it.
-for area in (meta, candles, pairs, jobs, stream, instruments):
+# paths exactly where it always did. `instruments` and `indicators` are newer than the
+# rest and go last, after everything this module owned before them.
+for area in (meta, candles, pairs, jobs, stream, instruments, indicators):
     app.include_router(area.router)

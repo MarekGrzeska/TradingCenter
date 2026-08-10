@@ -5,6 +5,8 @@ import {
   CrosshairMode,
   createChart,
   type CandlestickData,
+  type LineData,
+  LineSeries,
   LineStyle,
   type IChartApi,
   type IPriceLine,
@@ -14,13 +16,24 @@ import {
   type Time,
   type TickMarkType,
   type UTCTimestamp,
+  type WhitespaceData,
 } from "lightweight-charts";
 import { findBar, mergeBar, mergeSeries } from "../data/merge";
-import { RESOLUTIONS, type Bar, type Resolution } from "../data/types";
+import type { IndicatorSource } from "../data/source";
+import {
+  RESOLUTIONS,
+  type Bar,
+  type IndicatorCatalogueEntry,
+  type IndicatorSelection,
+  type Resolution,
+} from "../data/types";
 import type { MarketDataSource } from "../data/source";
 import { formatCrosshairTime, formatInstant, formatTickMark } from "../ui/formatTime";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
-import { candlestickColors, readChartColors, type ChartColors } from "./theme";
+import { candlestickColors, indicatorLineColor, readChartColors, type ChartColors } from "./theme";
+import { IndicatorPicker } from "./indicators/IndicatorPicker";
+import { type BarsRange, type IndicatorsState, useIndicators } from "./indicators/useIndicators";
+import { useIndicatorCatalogue } from "./indicators/useIndicatorCatalogue";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
 
@@ -38,6 +51,19 @@ export interface ChartProps {
    *  resolution that can only end in a refusal (terminal-grid spec, "Slot ma
    *  własny instrument i własny interwał"). */
   resolutions?: readonly Resolution[];
+  /** Wskaźniki: the catalogue to build the picker from and the computation
+   *  behind it. Omitted, the chart draws candles exactly as before — a caller
+   *  with nowhere to compute wskaźniki simply does not offer them. */
+  indicatorSource?: IndicatorSource;
+}
+
+/** Only a price-pane overlay draws today — an own-pane oscillator (ATR, RSI, …)
+ *  is etap E1 (`docs/wskazniki-plan-wdrozenia.html`, `chart.addPane()`). Kept
+ *  as a predicate rather than a filter on the catalogue itself: the picker still
+ *  lists every wskaźnik the archive offers, this only decides which of them the
+ *  operator may currently pick. */
+function canDrawIndicator(entry: IndicatorCatalogueEntry): boolean {
+  return entry.render.pane === "price" && entry.output === "lines";
 }
 
 function toCandlestick(bar: Bar): CandlestickData<Time> {
@@ -78,6 +104,7 @@ export function Chart({
   onResolutionChange,
   headerLeft,
   resolutions = RESOLUTIONS,
+  indicatorSource,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -90,6 +117,8 @@ export function Chart({
   // `syncPriceLine` for why the series' built-in one does not do.
   const priceLineRef = useRef<IPriceLine | null>(null);
   const colorsRef = useRef<ChartColors | null>(null);
+  // One line series per (wskaźnik, params, line key) — see the sync effect below.
+  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -99,6 +128,26 @@ export function Chart({
   // one write per frame, the same way the crosshair readout is.
   const [latestBar, setLatestBar] = useState<Bar | null>(null);
   const latestFrameRef = useRef(0);
+
+  // --- wskaźniki: chosen by the operator, computed over whatever the chart draws ---
+  const [indicatorSelections, setIndicatorSelections] = useState<IndicatorSelection[]>([]);
+  // The range wskaźniki are computed over — set from what `redraw` actually drew, not
+  // from every live tick, so a wskaźnik does not refetch on each forming-candle update
+  // (design.md's "na żywo" is a later etap; see `useIndicators`).
+  const [barsRange, setBarsRange] = useState<BarsRange | null>(null);
+
+  const catalogue = useIndicatorCatalogue(indicatorSource);
+  const indicatorsState = useIndicators(
+    indicatorSource,
+    symbol,
+    resolution,
+    indicatorSelections,
+    barsRange,
+  );
+  const catalogueById = useMemo(
+    () => new Map(catalogue.entries.map((entry) => [entry.id, entry] as const)),
+    [catalogue.entries],
+  );
 
   // --- the chart instance itself: created once, never on data change ---
   useLayoutEffect(() => {
@@ -177,6 +226,7 @@ export function Chart({
     });
     observer.observe(container);
 
+    const indicatorSeries = indicatorSeriesRef.current;
     return () => {
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
@@ -185,6 +235,10 @@ export function Chart({
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
       priceLineRef.current = null;
+      // Every wskaźnik series belonged to it too — `chart.remove()` already freed
+      // them, this only stops the sync effect below from reaching for one that is
+      // gone.
+      indicatorSeries.clear();
     };
   }, []);
 
@@ -289,6 +343,9 @@ export function Chart({
     const range = timeScale?.getVisibleLogicalRange() ?? null;
 
     seriesRef.current?.setData(merged.map(toCandlestick));
+    // Structural change to what is drawn — recompute wskaźniki over the new span.
+    // Not on every live tick: `applyBar`'s hot path never calls `redraw`.
+    setBarsRange(merged.length > 0 ? { from: merged[0].time, to: merged.at(-1)!.time } : null);
 
     if (previousFirstTime === undefined) {
       timeScale?.fitContent();
@@ -385,7 +442,63 @@ export function Chart({
     seriesRef.current?.setData([]);
     setReadout(null);
     setLatestBar(null);
+    // A wskaźnik computed for the previous series has no business staying on screen
+    // while the new one loads — `barsRange` going null empties `indicatorsState.results`
+    // (`useIndicators`), which the sync effect below reads as "remove every line".
+    setBarsRange(null);
   }, [source, symbol, resolution]);
+
+  // --- wskaźniki: one Line series per (id, params, line key), synced to what the
+  // archive last answered. Only a price-pane line draws in this etap — see
+  // `canDrawIndicator` on why an own-pane wskaźnik is pickable but not drawn yet.
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const colors = colorsRef.current ?? readChartColors();
+
+    const active = new Set<string>();
+    let colorIndex = 0;
+
+    for (const result of indicatorsState.results) {
+      const entry = catalogueById.get(result.id);
+      if (!entry || !result.lines || !canDrawIndicator(entry)) continue;
+
+      const paramsKey = entry.params.map((p) => result.params[p.name]).join(",");
+      for (const lineSpec of entry.lines) {
+        const key = `${result.id}|${paramsKey}|${lineSpec.key}`;
+        active.add(key);
+        const values = result.lines[lineSpec.key] ?? [];
+        const points: (LineData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
+          (time, i) => {
+            const value = values[i];
+            return value === null || value === undefined
+              ? { time: time as UTCTimestamp }
+              : { time: time as UTCTimestamp, value };
+          },
+        );
+
+        let line = indicatorSeriesRef.current.get(key);
+        if (!line) {
+          line = chart.addSeries(LineSeries, {
+            color: indicatorLineColor(colors, colorIndex),
+            lineWidth: 1,
+            lastValueVisible: false,
+            priceLineVisible: false,
+            ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
+          });
+          indicatorSeriesRef.current.set(key, line);
+        }
+        line.setData(points);
+        colorIndex++;
+      }
+    }
+
+    for (const [key, line] of indicatorSeriesRef.current) {
+      if (active.has(key)) continue;
+      chart.removeSeries(line);
+      indicatorSeriesRef.current.delete(key);
+    }
+  }, [indicatorsState.results, indicatorsState.times, catalogueById]);
 
   const feed = useBarFeed(source, symbol, resolution, sink);
   const older = useOlderBars(source, symbol, resolution, olderReader);
@@ -395,6 +508,7 @@ export function Chart({
     readout ?? (latestBar ? { bar: latestBar, hovered: false } : null);
 
   const staleStream = feed.streamState === "reconnecting" || feed.streamState === "closed";
+  const unsettledIndicators = indicatorsState.results.filter((r) => !r.settled);
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-panel">
@@ -414,9 +528,42 @@ export function Chart({
           ))}
         </select>
 
-        {shown && <OhlcReadout bar={shown.bar} />}
+        {shown && <OhlcReadout bar={shown.bar} indicators={activeIndicatorReadout(shown, indicatorsState, catalogueById)} />}
 
         <div className="ml-auto flex items-center gap-2">
+          {indicatorSource && (
+            <IndicatorPicker
+              entries={catalogue.entries}
+              selections={indicatorSelections}
+              onChange={setIndicatorSelections}
+              canDraw={canDrawIndicator}
+            />
+          )}
+          {unsettledIndicators.length > 0 && (
+            <span
+              title="The archive did not hold enough history before this range for every value to be trusted yet."
+              className="rounded border border-warning/40 px-1.5 py-0.5 text-[10px] tracking-wide text-warning uppercase"
+            >
+              warming up
+            </span>
+          )}
+          {indicatorsState.status === "error" && (
+            <span className="flex items-center gap-1">
+              <span
+                title={indicatorsState.error ?? undefined}
+                className="rounded border border-critical/40 px-1.5 py-0.5 text-[10px] tracking-wide text-critical uppercase"
+              >
+                indicators unavailable
+              </span>
+              <button
+                type="button"
+                onClick={indicatorsState.retry}
+                className="rounded border border-border px-1.5 py-0.5 text-[10px] text-ink hover:bg-panel-strong"
+              >
+                Retry
+              </button>
+            </span>
+          )}
           <OlderHistoryState older={older} />
           {staleStream && (
             <span className="rounded border border-down/40 px-1.5 py-0.5 text-[10px] tracking-wide text-down uppercase">
@@ -483,14 +630,60 @@ function OlderHistoryState({ older }: { older: ReturnType<typeof useOlderBars> }
   return null;
 }
 
-function OhlcReadout({ bar }: { bar: Bar }) {
+interface IndicatorReadoutEntry {
+  key: string;
+  label: string;
+  value: number | null;
+}
+
+/**
+ * The wskaźnik values for whichever bar `OhlcReadout` is already showing — the same
+ * bar the OHLC fields answer for, found by matching time rather than index, since a
+ * wskaźnik's own axis can start later than the candle series (`warmup_from`).
+ */
+function activeIndicatorReadout(
+  shown: Readout,
+  indicatorsState: IndicatorsState,
+  catalogueById: Map<string, IndicatorCatalogueEntry>,
+): IndicatorReadoutEntry[] {
+  const index = indicatorsState.times.indexOf(shown.bar.time);
+  if (index === -1) return [];
+
+  const entries: IndicatorReadoutEntry[] = [];
+  for (const result of indicatorsState.results) {
+    const entry = catalogueById.get(result.id);
+    if (!entry || !result.lines) continue;
+    for (const lineSpec of entry.lines) {
+      entries.push({
+        key: `${result.id}|${lineSpec.key}`,
+        label: fillLabelTemplate(lineSpec.label, result.params),
+        value: result.lines[lineSpec.key]?.[index] ?? null,
+      });
+    }
+  }
+  return entries;
+}
+
+function fillLabelTemplate(template: string, params: Record<string, number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
+    name in params ? String(params[name]) : match,
+  );
+}
+
+function OhlcReadout({ bar, indicators }: { bar: Bar; indicators: IndicatorReadoutEntry[] }) {
   return (
-    <span className="flex items-center gap-2 text-xs text-ink-secondary">
+    <span className="flex flex-wrap items-center gap-2 text-xs text-ink-secondary">
       <Field label="O" value={bar.open} />
       <Field label="H" value={bar.high} />
       <Field label="L" value={bar.low} />
       <Field label="C" value={bar.close} />
       <time className="text-ink-muted">{formatInstant(bar.time)}</time>
+      {indicators.map((entry) => (
+        <span key={entry.key} className="text-ink-muted">
+          {entry.label}{" "}
+          <span className="text-ink">{entry.value === null ? "…" : entry.value}</span>
+        </span>
+      ))}
     </span>
   );
 }
