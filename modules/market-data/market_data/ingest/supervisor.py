@@ -28,6 +28,12 @@ log = logging.getLogger(__name__)
 Pair = tuple[str, Resolution]
 
 
+# How long a pair waits before being started again after its task died. Longer than a
+# feed reconnect on purpose: this path is for a failure that got past `run()`'s own
+# guard, which is rarer and less likely to have cleared a second later.
+REVIVE_DELAY_SECONDS = 30.0
+
+
 class Ingest:
     """Runs one subscription per tracked pair, under one shared fill budget."""
 
@@ -60,6 +66,9 @@ class Ingest:
         self._backoff = backoff
         self._pair_options = pair_options
         self._tasks: dict[Pair, asyncio.Task] = {}
+        # Held so a revival in flight is not garbage-collected mid-sleep, and so
+        # `stop()` can cancel one rather than leave it starting a pair after shutdown.
+        self._revivals: set[asyncio.Task] = set()
         self._fills: dict[Pair, FillOutcome] = {}
         self.started_at: datetime | None = None
 
@@ -114,6 +123,9 @@ class Ingest:
     async def stop(self) -> None:
         """Stop everything and wait for it, so nothing writes after the process says it
         has shut down."""
+        for revival in list(self._revivals):
+            revival.cancel()
+        self._revivals.clear()
         for pair in list(self._tasks):
             await self._stop_pair(pair)
 
@@ -136,9 +148,74 @@ class Ingest:
             **self._pair_options,
         )
         log.info("ingest starting for %s %s", symbol, resolution.value)
-        self._tasks[(symbol, resolution)] = asyncio.create_task(
-            ingest.run(), name=f"ingest {symbol} {resolution.value}"
+        task = asyncio.create_task(ingest.run(), name=f"ingest {symbol} {resolution.value}")
+        task.add_done_callback(lambda ended: self._pair_ended(symbol, resolution, ended))
+        self._tasks[(symbol, resolution)] = task
+
+    def _pair_ended(self, symbol: str, resolution: Resolution, task: asyncio.Task) -> None:
+        """Say that a pair stopped collecting, and start it again.
+
+        Without this the end is the quietest thing that happens here. `run()` returning
+        or raising leaves the task in `_tasks` looking exactly like one that is working:
+        `/pairs` still lists the pair, `running` still counts it, and the only symptom is
+        an archive that quietly stops gaining candles. `sync()` clears the corpse, but
+        `sync()` runs at start and when the operator edits the list — so on 10 August a
+        process kept its pairs "collecting" for forty minutes after every one of them had
+        died, and it took reading the database to notice.
+
+        The same reasoning as `JobRunner._report_worker_death`, and the same conclusion:
+        an end nobody planned for must not be silent. This one goes further and revives
+        the pair, because unlike a job's worker there is nothing else to pick the work up.
+        """
+        if task.cancelled() or self._tasks.get((symbol, resolution)) is not task:
+            return  # `_stop_pair`, or already replaced — the ordinary way this ends.
+
+        error = task.exception()
+        if error is not None:
+            log.error(
+                "ingest for %s %s died; restarting in %ss",
+                symbol,
+                resolution.value,
+                REVIVE_DELAY_SECONDS,
+                exc_info=error,
+            )
+        else:
+            # `run()` returns when the pair stops being tracked, which `_stop_pair` would
+            # have cancelled — so reaching here means it read "untracked" itself. Nothing
+            # to revive, and nothing wrong.
+            log.info("ingest for %s %s stopped: no longer tracked", symbol, resolution.value)
+            self._tasks.pop((symbol, resolution), None)
+            return
+
+        self._tasks.pop((symbol, resolution), None)
+        self._revivals.add(
+            asyncio.create_task(
+                self._revive(symbol, resolution), name=f"revive {symbol} {resolution.value}"
+            )
         )
+
+    async def _revive(self, symbol: str, resolution: Resolution) -> None:
+        """Start a died pair again, after a pause.
+
+        The pause is what keeps a failure that recurs immediately — a database that is
+        down, a bug on the first line — from becoming a spin that fills the log and the
+        rate budget. It is deliberately longer than a feed reconnect: this path is for
+        something that got past `run()`'s own guard, which is rarer and less likely to
+        clear in a second.
+        """
+        try:
+            await asyncio.sleep(REVIVE_DELAY_SECONDS)
+            async with self._pool.acquire() as conn:
+                if not await is_tracked(conn, symbol, resolution):
+                    return
+            if (symbol, resolution) not in self._tasks:
+                self._start_pair(symbol, resolution)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("could not restart ingest for %s %s", symbol, resolution.value)
+        finally:
+            self._revivals.discard(asyncio.current_task())  # type: ignore[arg-type]
 
     async def _stop_pair(self, pair: Pair) -> None:
         task = self._tasks.pop(pair, None)

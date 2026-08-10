@@ -83,13 +83,23 @@ class PairIngest:
     backoff: Backoff = field(default_factory=Backoff)
 
     async def run(self) -> None:
-        """Collect this pair until it stops being tracked."""
-        while await self.still_tracked():
-            outcome = await self._close_gap()
-            if self.on_fill is not None:
-                self.on_fill(outcome)
+        """Collect this pair until it stops being tracked.
 
+        Closing the gap is inside the guard, not before it. It reaches the database and
+        the gateway, so it fails for all the reasons the feed does — and it used to fail
+        *outside* any handler, which ended the loop, ended the task, and ended collection
+        for this pair until somebody restarted the process. Measured on 10 August: a
+        schema migration applied half an hour after the code that needed it, and every
+        pair's ingest died on its first fill against the column that was not there yet.
+        The archive then sat silent for forty minutes with nothing to show it, because a
+        chart that has stopped and a market that has stopped look identical.
+        """
+        while await self.still_tracked():
             try:
+                outcome = await self._close_gap()
+                if self.on_fill is not None:
+                    self.on_fill(outcome)
+
                 await self._listen()
             except GatewayError as err:
                 log.warning("%s %s: feed failed — %s", self.symbol, self.resolution.value, err)

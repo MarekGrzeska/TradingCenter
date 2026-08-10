@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import logging
+import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
@@ -1005,8 +1008,15 @@ async def test_the_supervisor_reports_what_each_fill_did(pool) -> None:
     )
     await ingest.start()
     try:
-        await asyncio.sleep(0.1)
-        outcome = ingest.last_fill("US100", Resolution.MINUTE)
+        # Waited for rather than slept past: the fill crosses a real database, and a
+        # fixed 100ms raced it often enough to fail about one run in four once the file
+        # grew.
+        outcome = None
+        for _ in range(200):
+            outcome = ingest.last_fill("US100", Resolution.MINUTE)
+            if outcome is not None:
+                break
+            await asyncio.sleep(0.02)
     finally:
         await ingest.stop()
 
@@ -1058,3 +1068,123 @@ async def _never_ending_feed(url, symbol, resolution, api_key):
             yield  # pragma: no cover
 
     yield messages()
+
+
+# --- a pair that dies must say so, and come back ---
+
+
+@pytest.mark.db
+async def test_a_failing_fill_costs_one_pass_not_the_pair(pool) -> None:
+    """Closing the gap reaches the database and the gateway, so it fails for the same
+    reasons the feed does. It used to fail outside every handler, which ended the loop,
+    ended the task, and ended collection for that pair until someone restarted the
+    process — measured on 10 August against a column a migration had not added yet.
+    """
+    await _tracked(pool)
+    calls = 0
+
+    class ExplodingHistory(FakeHistory):
+        async def history(self, *args, **kwargs):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise RuntimeError("the archive answered with a column that is not there")
+            return await super().history(*args, **kwargs)
+
+    feed = fake_feed([])
+    await PairIngest(
+        pool=pool,
+        history=ExplodingHistory([]),
+        stream_url="ws://gateway.test/ws/stream",
+        symbol="US100",
+        resolution=Resolution.MINUTE,
+        default_bars=100,
+        still_tracked=_tracked_then_not([True, True, True, False]),
+        gateway_api_key="test-gateway-key",
+        subscribe_to=feed,
+        sleep=_no_sleep,
+    ).run()
+
+    # It came back for a second pass rather than taking the pair down with it.
+    assert calls == 2
+
+
+async def test_a_pair_whose_task_dies_is_reported_and_started_again(caplog) -> None:
+    started: list[tuple[str, Resolution]] = []
+    ingest = Ingest(
+        pool=None,
+        history=FakeHistory([]),
+        stream_url="ws://gateway.test/ws/stream",
+        default_bars=100,
+    )
+
+    async def dies() -> None:
+        raise RuntimeError("something got past run()'s own guard")
+
+    def start_pair(symbol: str, resolution: Resolution) -> None:
+        started.append((symbol, resolution))
+        task = asyncio.create_task(dies())
+        task.add_done_callback(lambda t: ingest._pair_ended(symbol, resolution, t))
+        ingest._tasks[(symbol, resolution)] = task
+
+    ingest._start_pair = start_pair  # type: ignore[method-assign]
+    supervisor_module = sys.modules[Ingest.__module__]
+    monkeypatched = supervisor_module.REVIVE_DELAY_SECONDS
+    supervisor_module.REVIVE_DELAY_SECONDS = 0
+    ingest._pool = _PoolSayingTracked()
+    try:
+        with caplog.at_level(logging.ERROR):
+            start_pair("US100", Resolution.MINUTE)
+            await asyncio.sleep(0)
+            await asyncio.sleep(0)
+            for _ in range(20):
+                if len(started) > 1:
+                    break
+                await asyncio.sleep(0)
+    finally:
+        supervisor_module.REVIVE_DELAY_SECONDS = monkeypatched
+        await ingest.stop()
+
+    # The failure is named rather than being the quietest thing that ever happened.
+    assert any("died" in r.message or "died" in r.getMessage() for r in caplog.records)
+    assert len(started) == 2, "the pair must be started again, not merely mourned"
+
+
+async def test_a_cancelled_pair_is_not_revived() -> None:
+    """`_stop_pair` is the ordinary way this ends — an operator removing a pair must not
+    have it started again three seconds later."""
+    ingest = Ingest(
+        pool=None,
+        history=FakeHistory([]),
+        stream_url="ws://gateway.test/ws/stream",
+        default_bars=100,
+    )
+
+    async def forever() -> None:
+        await asyncio.sleep(3600)
+
+    task = asyncio.create_task(forever())
+    task.add_done_callback(lambda t: ingest._pair_ended("US100", Resolution.MINUTE, t))
+    ingest._tasks[("US100", Resolution.MINUTE)] = task
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+    await asyncio.sleep(0)
+
+    assert ingest._revivals == set()
+
+
+class _PoolSayingTracked:
+    """A pool whose only job is to answer `is_tracked` with yes."""
+
+    def acquire(self):
+        return self
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *exc):
+        return False
+
+    async def fetchval(self, *args, **kwargs):
+        return 1
