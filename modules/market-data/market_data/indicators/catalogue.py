@@ -164,9 +164,172 @@ _ATR = IndicatorSpec(
     },
 )
 
+def _safe_divide(numerator: np.ndarray, denominator: np.ndarray) -> np.ndarray:
+    """`numerator / denominator`, `np.nan` where undefined instead of a runtime
+    warning — division by a zero high-low range or a flat window is a property of
+    the data (a single-tick candle, an illiquid pair), not a bug in the formula."""
+    with np.errstate(invalid="ignore", divide="ignore"):
+        return numerator / denominator
+
+
+_ATR_PCT = IndicatorSpec(
+    id="atr_pct",
+    name="Average True Range %",
+    group="volatility",
+    inputs=("high", "low", "close"),
+    params=(Param(name="period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="atr_pct", label="ATR% {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["period"]))),
+    compute=lambda s, p: {
+        "atr_pct": 100
+        * _safe_divide(
+            kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["period"])), s.close
+        )
+    },
+)
+
+# --- geometria świecy: six numbers every candlestick pattern and every "reaction
+# at a level" is built from, normalised so they compare across candles and
+# instruments (docs/wskazniki-plan-wdrozenia.html, "Geometria świecy"). ---
+
+_BAR_RANGE_ATR = IndicatorSpec(
+    id="bar_range_atr",
+    name="Bar Range in ATR",
+    group="geometry",
+    aliases=("Bar Range / ATR",),
+    inputs=("high", "low", "close"),
+    params=(Param(name="atr_period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="bar_range_atr", label="Bar Range/ATR {atr_period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["atr_period"]))),
+    compute=lambda s, p: {
+        "bar_range_atr": _safe_divide(
+            s.high - s.low,
+            kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["atr_period"])),
+        )
+    },
+)
+
+_BODY_RATIO = IndicatorSpec(
+    id="body_ratio",
+    name="Body Ratio",
+    group="geometry",
+    inputs=("open", "high", "low", "close"),
+    lines=(LineSpec(key="body_ratio", label="Body Ratio"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute=lambda s, p: {"body_ratio": _safe_divide(np.abs(s.close - s.open), s.high - s.low)},
+)
+
+_WICK_UP_RATIO = IndicatorSpec(
+    id="wick_up_ratio",
+    name="Upper Wick Ratio",
+    group="geometry",
+    inputs=("open", "high", "low", "close"),
+    lines=(LineSpec(key="wick_up_ratio", label="Upper Wick Ratio"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute=lambda s, p: {
+        "wick_up_ratio": _safe_divide(s.high - np.maximum(s.open, s.close), s.high - s.low)
+    },
+)
+
+_WICK_DOWN_RATIO = IndicatorSpec(
+    id="wick_down_ratio",
+    name="Lower Wick Ratio",
+    group="geometry",
+    inputs=("open", "high", "low", "close"),
+    lines=(LineSpec(key="wick_down_ratio", label="Lower Wick Ratio"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute=lambda s, p: {
+        "wick_down_ratio": _safe_divide(np.minimum(s.open, s.close) - s.low, s.high - s.low)
+    },
+)
+
+_CLOSE_POSITION = IndicatorSpec(
+    id="close_position",
+    name="Close Position",
+    group="geometry",
+    aliases=("Close Location Value",),
+    inputs=("high", "low", "close"),
+    lines=(LineSpec(key="close_position", label="Close Position"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute=lambda s, p: {"close_position": _safe_divide(s.close - s.low, s.high - s.low)},
+)
+
+_GAP_PREV_CLOSE_ATR = IndicatorSpec(
+    id="gap_prev_close_atr",
+    name="Opening Gap in ATR",
+    group="geometry",
+    inputs=("open", "high", "low", "close"),
+    params=(Param(name="atr_period", type="int", default=14, min=2, max=5000),),
+    lines=(LineSpec(key="gap_prev_close_atr", label="Gap/ATR {atr_period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["atr_period"]))),
+    compute=lambda s, p: {
+        "gap_prev_close_atr": _safe_divide(
+            s.open - kernel.shift(s.close, 1),
+            kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["atr_period"])),
+        )
+    },
+)
+
+# --- położenie w zakresie: where the close sits against its own recent history,
+# without naming the halves "premium" or "discount" — that split is a threshold,
+# a strategy's job, not a measure's (spec "Katalog mierzy, a nie orzeka"). ---
+
+_RANGE_POSITION = IndicatorSpec(
+    id="range_position",
+    name="Range Position",
+    group="range_position",
+    inputs=("high", "low", "close"),
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="range_position", label="Range Position {period}"),),
+    render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {
+        "range_position": _safe_divide(
+            s.close - kernel.rolling_min(s.low, int(p["period"])),
+            kernel.rolling_max(s.high, int(p["period"])) - kernel.rolling_min(s.low, int(p["period"])),
+        )
+    },
+)
+
+_ZSCORE = IndicatorSpec(
+    id="zscore",
+    name="Z-Score",
+    group="range_position",
+    params=(Param(name="period", type="int", default=20, min=2, max=5000),),
+    lines=(LineSpec(key="zscore", label="Z-Score {period}"),),
+    render=Render(pane="own", style="line", scale="own", autoscale=True),
+    warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
+    compute=lambda s, p: {
+        "zscore": _safe_divide(
+            s.close - kernel.sma(s.close, int(p["period"])),
+            kernel.stdev(s.close, int(p["period"])),
+        )
+    },
+)
+
 # Ordered as it is meant to be offered — averages first, since `sma` and `ema` are the
 # entries every future wskaźnik in this group will sit beside.
-CATALOGUE: tuple[IndicatorSpec, ...] = (_SMA, _EMA, _ATR)
+CATALOGUE: tuple[IndicatorSpec, ...] = (
+    _SMA,
+    _EMA,
+    _ATR,
+    _ATR_PCT,
+    _BAR_RANGE_ATR,
+    _BODY_RATIO,
+    _WICK_UP_RATIO,
+    _WICK_DOWN_RATIO,
+    _CLOSE_POSITION,
+    _GAP_PREV_CLOSE_ATR,
+    _RANGE_POSITION,
+    _ZSCORE,
+)
 
 _BY_ID: dict[str, IndicatorSpec] = {entry.id: entry for entry in CATALOGUE}
 
