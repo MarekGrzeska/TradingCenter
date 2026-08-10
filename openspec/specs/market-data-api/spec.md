@@ -75,6 +75,11 @@ pokryta, i MUST odpowiadać wynikiem osobno dla każdej pary — odmowa dla jedn
 pozostałych. Żądanie bez podanego momentu początku MUST pozostać ważne i MUST znaczyć domyślną
 głębokość z konfiguracji, żeby konsument sprzed tej zmiany działał dalej.
 
+Odczyt listy MUST nieść dla każdej pary liczbę zebranych świec oraz szacowaną objętość, jaką
+zajmują. Konsument MUST NOT musieć wyliczać żadnej z tych liczb sam: liczby świec nie da się
+wyprowadzić z zakresu dat, a mnożnik objętości należy do modułu, który dane przechowuje, a nie do
+tego, który je pokazuje.
+
 Skasowanie pary przez kontrakt MUST zatrzymać zbieranie i usunąć zebrane dane tej pary. Odpowiedź
 MUST nieść liczbę usuniętych świec, bo to jedyny moment, w którym konsument może się dowiedzieć, ile
 danych właśnie zniknęło.
@@ -83,6 +88,12 @@ danych właśnie zniknęło.
 
 - **WHEN** konsument dodaje parę przez kontrakt
 - **THEN** para zostaje zapisana jako śledzona, a odpowiedź to potwierdza
+
+#### Scenario: Odczyt listy z objętością danych
+
+- **WHEN** konsument odczytuje listę śledzonych par
+- **THEN** każda para niesie liczbę zebranych świec i szacowaną objętość w bajtach
+- **AND** obie liczby dotyczą wyłącznie tej pary, a nie całego archiwum
 
 #### Scenario: Dodanie wielu par jednym żądaniem
 

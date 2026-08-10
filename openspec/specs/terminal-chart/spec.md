@@ -55,21 +55,6 @@ zawierać dwóch świec o tym samym znaczniku czasu.
 - **WHEN** przychodzi świeca dla okresu późniejszego niż ostatnia narysowana
 - **THEN** wykres dokłada ją na końcu serii
 
-### Requirement: Świeca w budowie jest oznaczona na ekranie
-
-Świeca w budowie repaintuje i po restarcie źródła zaniża swój zakres. Wykres MUST oznaczać na
-ekranie, że ostatnia świeca jest w budowie, żeby nikt nie wziął jej za rozstrzygniętą.
-
-#### Scenario: Ostatnia świeca jeszcze się nie zamknęła
-
-- **WHEN** ostatnia świeca serii jest w budowie
-- **THEN** wykres to widocznie stwierdza
-
-#### Scenario: Świeca się zamyka
-
-- **WHEN** ta świeca zostaje zamknięta
-- **THEN** oznaczenie znika, a wartości świecy są tymi od źródła
-
 ### Requirement: Wykres mówi, w jakim jest stanie
 
 Wykres MUST rozróżniać na ekranie: trwa ładowanie historii, seria jest pusta, odczyt się nie
@@ -98,17 +83,20 @@ powiódł, strumień jest zerwany. Pusty prostokąt MUST NOT być odpowiedzią n
 ### Requirement: Wykres podaje wartości spod kursora
 
 Wykres MUST pokazywać otwarcie, maksimum, minimum, zamknięcie i czas świecy wskazywanej kursorem.
-Wolumen MUST być pokazany tam, gdzie źródło go niesie, a jego brak MUST być odróżnialny od zera.
+
+Wolumen MUST NOT być pokazywany. Provider podaje dla kontraktów CFD wolumen własnego instrumentu,
+a nie rynku bazowego, więc jest to liczba, której nie da się uczciwie przeczytać: pokazana obok
+ceny wygląda na wolumen rynkowy i tym nie jest.
 
 #### Scenario: Kursor nad świecą
 
 - **WHEN** operator najeżdża na świecę
 - **THEN** wykres pokazuje jej otwarcie, maksimum, minimum, zamknięcie i czas
 
-#### Scenario: Świeca bez wolumenu
+#### Scenario: Świeca z wolumenem od źródła
 
-- **WHEN** świeca pochodzi ze strumienia, który wolumenu nie niesie
-- **THEN** wykres pokazuje brak wolumenu jako brak danej, a nie jako wartość zero
+- **WHEN** świeca pochodzi ze źródła, które wolumen niesie
+- **THEN** wykres i tak go nie pokazuje
 
 ### Requirement: Wykres sprząta po sobie
 
