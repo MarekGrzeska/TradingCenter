@@ -27,6 +27,7 @@ from ..contract import (
     IndicatorsCatalogueOut,
     IndicatorsOut,
     IndicatorsRequest,
+    IndicatorZoneOut,
     Problem,
     Uncovered,
 )
@@ -38,6 +39,7 @@ from ..indicators.catalogue import (
     ParamOutOfRange,
     Series,
     UnknownIndicator,
+    Zone,
 )
 from ..indicators.catalogue import get as get_indicator
 from ..models import Candle, PriceSide, Resolution
@@ -169,6 +171,23 @@ async def compute(
         for entry, _params in resolved
         if entry.higher_resolution is not None
     }
+    needs_minute_series = any(entry.needs_minute_series for entry, _params in resolved)
+    # A DAY-resolution chart asking for `time_profile` can otherwise hide a
+    # minute-series read many orders of magnitude bigger than what
+    # `requested_candles` above ever saw — the module's one performance
+    # promise (design.md, "Obliczenia dzielą pętlę zdarzeń ze strumieniem
+    # świec") would not survive that read silently bypassing the ceiling.
+    if needs_minute_series and body.resolution != Resolution.MINUTE:
+        minute_candles = periods_between(Resolution.MINUTE, start, end)
+        if minute_candles > REQUEST_CEILING:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"the minute series time_profile/session_range/opening_range need "
+                    f"exceeds the indicator ceiling of {REQUEST_CEILING} candles "
+                    f"(~{minute_candles} asked for)"
+                ),
+            )
 
     async with limiter, db.acquire() as conn:
         rows: Sequence[Candle | DerivedCandle] = await read_candles(
@@ -179,6 +198,10 @@ async def compute(
             rows = await read_derived(conn, symbol, body.resolution, extended_start, end)
             derived = True
         gaps = await uncovered_within(conn, symbol, body.resolution, start, end)
+
+        first_requested = 0
+        while first_requested < len(rows) and rows[first_requested].period_start < start:
+            first_requested += 1
 
         htf_periods: dict[Resolution, list[tuple[datetime, Candle]]] = {}
         for htf_resolution in needed_htf_resolutions:
@@ -194,17 +217,49 @@ async def compute(
                 )
             htf_periods[htf_resolution] = _htf_effective_periods(htf_candles, start, end)
 
-    first_requested = 0
-    while first_requested < len(rows) and rows[first_requested].period_start < start:
-        first_requested += 1
-    available_warmup_bars = first_requested
+        minute_rows: Sequence[Candle | DerivedCandle] = []
+        if needs_minute_series:
+            # Trimmed to exactly `[start, end)` even when the requested
+            # resolution already *is* MINUTE and `rows` is sitting right there
+            # — `rows` may reach back past `start` for a different entry's
+            # warmup in the same request, which `time_profile`/`session_range`/
+            # `opening_range` must not see: none of them warm up, each reads
+            # exactly the window the operator asked for.
+            minute_rows = (
+                rows[first_requested:]
+                if body.resolution == Resolution.MINUTE
+                else await read_candles(conn, symbol, Resolution.MINUTE, start, end)
+            )
+            if not minute_rows:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        f"no MINUTE series collected for {symbol!r}; time_profile/"
+                        "session_range/opening_range need it read at that resolution directly"
+                    ),
+                )
 
+    available_warmup_bars = first_requested
     series = _build_series(rows)
     times_all = [row.period_start for row in rows]
+    session_close_before = _session_close_before(times_all, body.resolution, gaps)
+
+    minute_series = _build_series(minute_rows) if minute_rows else None
+    minute_times = [row.period_start for row in minute_rows] if minute_rows else None
 
     results = [
         _result_out(
-            entry, params, series, times_all, available_warmup_bars, first_requested, htf_periods
+            entry,
+            params,
+            series,
+            times_all,
+            available_warmup_bars,
+            first_requested,
+            htf_periods,
+            session_close_before,
+            minute_series,
+            minute_times,
+            start,
         )
         for entry, params in resolved
     ]
@@ -230,6 +285,47 @@ def _build_series(rows: Sequence[Candle | DerivedCandle]) -> Series:
         )
 
     return Series(open=column("open"), high=column("high"), low=column("low"), close=column("close"))
+
+
+def _session_close_before(
+    times: Sequence[datetime],
+    resolution: Resolution,
+    gaps: Sequence[tuple[datetime, datetime]],
+) -> np.ndarray:
+    """`out[i]` is true when the stretch between bar `i - 1` and bar `i` is
+    wider than one nominal period *and* the archive has verified it, meaning
+    the candle that would have filled it never existed because the market was
+    shut (`coverage.Absence.MARKET_CLOSED`) — as opposed to a stretch nobody
+    has verified yet, `uncovered_within`'s `gaps`, which might just as well be
+    a hole ingest left behind. Only the first is a session boundary; task 4.3
+    is the difference, and it is the reason this reads `gaps` rather than the
+    elapsed time alone.
+    """
+    n = len(times)
+    out = np.zeros(n, dtype=bool)
+    if n < 2:
+        return out
+    step = period_length(resolution)
+    for i in range(1, n):
+        if times[i] - times[i - 1] <= step:
+            continue
+        overlaps_uncovered = any(
+            gap_start < times[i] and gap_end > times[i - 1] for gap_start, gap_end in gaps
+        )
+        out[i] = not overlaps_uncovered
+    return out
+
+
+def _zone_out(zone: Zone, times: Sequence[datetime]) -> IndicatorZoneOut:
+    return IndicatorZoneOut(
+        from_=times[zone.start_bar],
+        to=times[zone.end_bar] if zone.end_bar is not None else None,
+        top=zone.top,
+        bottom=zone.bottom,
+        direction=zone.direction,
+        touched_at=times[zone.touched_at_bar] if zone.touched_at_bar is not None else None,
+        filled_at=times[zone.filled_at_bar] if zone.filled_at_bar is not None else None,
+    )
 
 
 def _htf_effective_periods(
@@ -274,9 +370,45 @@ def _result_out(
     available_warmup_bars: int,
     first_requested: int,
     htf_periods: dict[Resolution, list[tuple[datetime, Candle]]],
+    session_close_before: np.ndarray,
+    minute_series: Series | None,
+    minute_times: list[datetime] | None,
+    requested_start: datetime,
 ) -> IndicatorResultOut:
     needed = entry.warmup_bars(params)
     settled = available_warmup_bars >= needed
+
+    if entry.compute_zones is not None:
+        zones = [
+            _zone_out(zone, times_all)
+            for zone in entry.compute_zones(series, params, session_close_before)
+            if zone.start_bar >= first_requested
+        ]
+        return IndicatorResultOut(
+            id=entry.id, params=params, warmup_bars=needed, settled=settled, zones=zones
+        )
+
+    if entry.compute_minute_zones is not None:
+        assert minute_series is not None and minute_times is not None, entry.id
+        zones = [
+            _zone_out(zone, minute_times)
+            for zone in entry.compute_minute_zones(minute_series, minute_times, params)
+        ]
+        return IndicatorResultOut(
+            id=entry.id, params=params, warmup_bars=0, settled=True, zones=zones
+        )
+
+    if entry.compute_time_profile is not None:
+        assert minute_series is not None and minute_times is not None, entry.id
+        profile_levels = [
+            IndicatorLevelOut(
+                from_=requested_start, price=level.price, label=level.label, count=level.count
+            )
+            for level in entry.compute_time_profile(minute_series, minute_times, params)
+        ]
+        return IndicatorResultOut(
+            id=entry.id, params=params, warmup_bars=0, settled=True, levels=profile_levels
+        )
 
     if entry.higher_resolution is not None:
         assert entry.compute_htf_levels is not None, entry.id
