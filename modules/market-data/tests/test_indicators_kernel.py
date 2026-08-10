@@ -81,6 +81,81 @@ class TestWarmupNaN:
         assert not any(math.isnan(v) for v in result)
 
 
+class TestRollingArgExtreme:
+    def test_argmax_current_bar_is_zero(self):
+        result = kernel.rolling_argmax([1.0, 2.0, 5.0, 3.0], 3)
+        assert math.isnan(result[0])
+        assert math.isnan(result[1])
+        assert result[2] == 0  # window [1,2,5]: max is the current bar
+        assert result[3] == 1  # window [2,5,3]: max is one bar back
+
+    def test_argmin_oldest_bar_in_window(self):
+        result = kernel.rolling_argmin([5.0, 1.0, 4.0, 3.0], 3)
+        assert math.isnan(result[1])
+        assert result[2] == 1  # window [5,1,4]: min one bar back
+        assert result[3] == 2  # window [1,4,3]: min two bars back (oldest in window)
+
+    def test_tie_favours_the_older_bar(self):
+        result = kernel.rolling_argmax([3.0, 3.0], 2)
+        assert result[1] == 1  # both bars tie; the older one wins
+
+
+class TestLinreg:
+    def test_exact_fit_on_a_straight_line(self):
+        # y = 2x + 1 fits perfectly: slope 2, r_squared 1, endpoint = 2*(n-1)+1.
+        values = [1.0, 3.0, 5.0, 7.0, 9.0]
+        assert kernel.linreg_slope(values, 5)[-1] == pytest.approx(2.0)
+        assert kernel.r_squared(values, 5)[-1] == pytest.approx(1.0)
+        assert kernel.linreg(values, 5)[-1] == pytest.approx(9.0)
+
+    def test_flat_window_has_undefined_r_squared(self):
+        result = kernel.r_squared([5.0, 5.0, 5.0], 3)
+        assert math.isnan(result[-1])
+
+    def test_nan_before_period(self):
+        result = kernel.linreg([1.0, 2.0, 3.0], 5)
+        assert all(math.isnan(v) for v in result)
+
+
+class TestMeanAbsDev:
+    def test_matches_hand_computed_value(self):
+        # Window [1,2,3,4,5]: mean 3, absolute deviations [2,1,0,1,2], mean 1.2.
+        result = kernel.mean_abs_dev([1.0, 2.0, 3.0, 4.0, 5.0], 5)
+        assert result[-1] == pytest.approx(1.2)
+
+
+class TestShiftDiff:
+    def test_shift_reads_n_bars_back(self):
+        result = kernel.shift([10.0, 20.0, 30.0, 40.0], 2)
+        assert math.isnan(result[0])
+        assert math.isnan(result[1])
+        assert result[2] == 10.0
+        assert result[3] == 20.0
+
+    def test_diff_is_the_change_over_n_bars(self):
+        result = kernel.diff([10.0, 20.0, 35.0], 1)
+        assert math.isnan(result[0])
+        assert result[1] == pytest.approx(10.0)
+        assert result[2] == pytest.approx(15.0)
+
+
+class TestCross:
+    def test_detects_upward_and_downward_crossings(self):
+        a = [1.0, 2.0, 4.0, 3.0, 1.0]
+        b = [2.0, 2.0, 2.0, 2.0, 2.0]
+        result = kernel.cross(a, b)
+        assert math.isnan(result[0])
+        assert result[1] == 0.0
+        assert result[2] == 1.0  # a crosses above b
+        assert result[3] == 0.0
+        assert result[4] == -1.0  # a crosses below b
+
+    def test_no_crossing_when_never_on_the_other_side(self):
+        result = kernel.cross([5.0, 6.0, 7.0], [1.0, 1.0, 1.0])
+        assert result[1] == 0.0
+        assert result[2] == 0.0
+
+
 class TestTrueRange:
     def test_first_bar_falls_back_to_own_range(self):
         result = kernel.true_range([110.0], [100.0], [105.0])

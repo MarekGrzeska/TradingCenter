@@ -124,6 +124,144 @@ def rma(values: FloatArray, period: int) -> np.ndarray:
     return _recursive_smoothing(values, alpha=1.0 / period)
 
 
+def rolling_argmax(values: FloatArray, period: int) -> np.ndarray:
+    """Bars ago the trailing window's maximum sits — 0 for "the current bar is the
+    high", `period - 1` for "the oldest bar in the window is". A tie favours the
+    older bar (`np.argmax` keeps the first occurrence), so the count only grows on a
+    tie, never shrinks."""
+    arr = _as_float64(values)
+    out = np.full(arr.shape, np.nan, dtype=np.float64)
+    if period < 1 or len(arr) < period:
+        return out
+    windows = np.lib.stride_tricks.sliding_window_view(arr, period)
+    out[period - 1 :] = (period - 1) - windows.argmax(axis=1)
+    return out
+
+
+def rolling_argmin(values: FloatArray, period: int) -> np.ndarray:
+    """`rolling_argmax`'s sibling for the trailing window's minimum."""
+    arr = _as_float64(values)
+    out = np.full(arr.shape, np.nan, dtype=np.float64)
+    if period < 1 or len(arr) < period:
+        return out
+    windows = np.lib.stride_tricks.sliding_window_view(arr, period)
+    out[period - 1 :] = (period - 1) - windows.argmin(axis=1)
+    return out
+
+
+def _rolling_ols(values: FloatArray, period: int) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Ordinary least squares of each trailing window against `x = 0 .. period - 1`
+    (`0` the oldest bar in the window, `period - 1` the current one). Shared by
+    `linreg`, `linreg_slope` and `r_squared` so the three never disagree about what
+    window they fit.
+
+    Returns `(slope, intercept, r_squared)`, each `np.nan` for the first
+    `period - 1` bars and wherever the window has zero variance (`r_squared` is
+    undefined for a flat window, not `0`).
+    """
+    arr = _as_float64(values)
+    n = len(arr)
+    slope = np.full(n, np.nan, dtype=np.float64)
+    intercept = np.full(n, np.nan, dtype=np.float64)
+    r_sq = np.full(n, np.nan, dtype=np.float64)
+    if period < 2 or n < period:
+        return slope, intercept, r_sq
+
+    x = np.arange(period, dtype=np.float64)
+    sum_x = x.sum()
+    sum_x2 = (x * x).sum()
+    denom = period * sum_x2 - sum_x * sum_x
+
+    windows = np.lib.stride_tricks.sliding_window_view(arr, period)
+    sum_y = windows.sum(axis=1)
+    sum_y2 = (windows * windows).sum(axis=1)
+    sum_xy = windows @ x
+
+    b = (period * sum_xy - sum_x * sum_y) / denom
+    a = (sum_y - b * sum_x) / period
+    ss_tot = sum_y2 - (sum_y * sum_y) / period
+    ss_res = sum_y2 - a * sum_y - b * sum_xy
+    with np.errstate(invalid="ignore", divide="ignore"):
+        r_squared_values = 1 - ss_res / ss_tot
+
+    slope[period - 1 :] = b
+    intercept[period - 1 :] = a
+    r_sq[period - 1 :] = r_squared_values
+    return slope, intercept, r_sq
+
+
+def linreg(values: FloatArray, period: int) -> np.ndarray:
+    """The trailing window's fitted regression line, read at its last point — what
+    the catalogue offers as `lsma`, the least-squares moving average."""
+    slope, intercept, _ = _rolling_ols(values, period)
+    return intercept + slope * (period - 1)
+
+
+def linreg_slope(values: FloatArray, period: int) -> np.ndarray:
+    """The trailing window's fitted slope, in units per bar."""
+    slope, _, _ = _rolling_ols(values, period)
+    return slope
+
+
+def r_squared(values: FloatArray, period: int) -> np.ndarray:
+    """How well a straight line fits the trailing window — `1` for a perfect fit,
+    `0` for none, `np.nan` for a window with no variance to fit at all."""
+    _, _, r_sq = _rolling_ols(values, period)
+    return r_sq
+
+
+def mean_abs_dev(values: FloatArray, period: int) -> np.ndarray:
+    """Rolling mean absolute deviation from the window's own mean — `cci`'s
+    denominator."""
+    arr = _as_float64(values)
+    out = np.full(arr.shape, np.nan, dtype=np.float64)
+    if period < 1 or len(arr) < period:
+        return out
+    windows = np.lib.stride_tricks.sliding_window_view(arr, period)
+    means = windows.mean(axis=1, keepdims=True)
+    out[period - 1 :] = np.abs(windows - means).mean(axis=1)
+    return out
+
+
+def shift(values: FloatArray, n: int) -> np.ndarray:
+    """`values`, `n` bars back — `np.nan` for the first `n` bars, which have no
+    such bar to read."""
+    arr = _as_float64(values)
+    out = np.full(arr.shape, np.nan, dtype=np.float64)
+    if n < 1 or len(arr) <= n:
+        return out
+    out[n:] = arr[:-n]
+    return out
+
+
+def diff(values: FloatArray, n: int = 1) -> np.ndarray:
+    """`values[i] - values[i - n]` — the change over `n` bars."""
+    arr = _as_float64(values)
+    return arr - shift(arr, n)
+
+
+def cross(a: FloatArray, b: FloatArray) -> np.ndarray:
+    """`1.0` where `a` crosses above `b` this bar, `-1.0` where it crosses below,
+    `0.0` otherwise, `np.nan` for the first bar (no previous bar to cross from).
+
+    Not read by any catalogue entry yet — a foundation primitive for the marker-
+    shaped wskaźniki later etapy add (design.md's ~20-primitive list), added now so
+    later stages spend their budget on the wskaźnik, not the primitive.
+    """
+    arr_a, arr_b = _as_float64(a), _as_float64(b)
+    n = len(arr_a)
+    out = np.full(n, np.nan, dtype=np.float64)
+    if n < 2:
+        return out
+    prev_a, prev_b = arr_a[:-1], arr_b[:-1]
+    cur_a, cur_b = arr_a[1:], arr_b[1:]
+    result = np.zeros(n - 1, dtype=np.float64)
+    result[(prev_a <= prev_b) & (cur_a > cur_b)] = 1.0
+    result[(prev_a >= prev_b) & (cur_a < cur_b)] = -1.0
+    out[1:] = result
+    return out
+
+
 def true_range(high: FloatArray, low: FloatArray, close: FloatArray) -> np.ndarray:
     """The greatest of today's range and today's move from yesterday's close.
 
