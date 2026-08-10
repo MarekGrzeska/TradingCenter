@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from . import telemetry
 from .adapter import CapitalAdapter
 from .client import CapitalClient
 from .config import API_KEY_HEADER, Settings, is_production
@@ -71,6 +72,11 @@ async def stream_tokens_for(client: CapitalClient) -> tuple[str, str]:
 async def lifespan(app: FastAPI):
     # Settings first, and outside a try: a live URL or a missing credential must stop
     # the process here rather than surface later as a failing request.
+    # Before anything else that might have something to say. A failure in `Settings()`
+    # below is exactly the kind of thing that has to be readable, and it is unreadable if
+    # logging is configured after it.
+    telemetry.configure()
+
     settings = Settings()  # type: ignore[call-arg]
     client = CapitalClient(settings)
 
