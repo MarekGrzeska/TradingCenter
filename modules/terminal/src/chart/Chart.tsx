@@ -7,6 +7,7 @@ import {
   type CandlestickData,
   type IChartApi,
   type ISeriesApi,
+  type LogicalRange,
   type MouseEventParams,
   type Time,
   type UTCTimestamp,
@@ -16,6 +17,7 @@ import { RESOLUTIONS, type Bar, type Resolution } from "../data/types";
 import type { MarketDataSource } from "../data/source";
 import { candlestickColors, readChartColors } from "./theme";
 import { useBarFeed, type BarSink } from "./useBarFeed";
+import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
 
 export interface ChartProps {
   source: MarketDataSource;
@@ -49,6 +51,12 @@ interface Readout {
   hovered: boolean;
 }
 
+/** How close to the left edge of the drawn series a pan has to come before the
+ *  next page is asked for, counted in bars. Far enough that the page usually
+ *  arrives before the operator reaches the edge, near enough that opening a
+ *  chart and leaving it alone asks for nothing. */
+const OLDER_TRIGGER_BARS = 20;
+
 /**
  * One candlestick chart, defined entirely by `symbol` + `resolution` — the same
  * component standalone and inside a grid slot (terminal-chart spec, "Wykres
@@ -70,6 +78,16 @@ export function Chart({
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const barsRef = useRef<Bar[]>([]);
+  // The pan handler is attached once, with the chart; the pager it calls is
+  // recreated whenever symbol, resolution or source change.
+  const requestOlderRef = useRef<() => void>(() => {});
+  // How far left the frame had reached when the last page was asked for.
+  // Prepending candles moves every logical index to the right and the chart
+  // corrects the frame by exactly that much — which the time scale reports as
+  // another range change. Without this, that correction would ask for the next
+  // page, and that one for the one after it, all the way back through the
+  // archive on a single drag.
+  const requestedFromRef = useRef(Number.POSITIVE_INFINITY);
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -115,6 +133,17 @@ export function Chart({
       chart.timeScale().fitContent();
     }
 
+    // Panning past the left edge of what is drawn is the whole trigger for
+    // loading older candles (terminal-chart spec, "Wykres dociąga starszą
+    // historię przy przewijaniu w lewo").
+    const onRangeChange = (range: LogicalRange | null) => {
+      if (!range || range.from >= OLDER_TRIGGER_BARS) return;
+      if (range.from >= requestedFromRef.current) return;
+      requestedFromRef.current = range.from;
+      requestOlderRef.current();
+    };
+    chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange);
+
     const observer = new ResizeObserver(([entry]) => {
       const { width, height } = entry.contentRect;
       if (width > 0 && height > 0) {
@@ -125,6 +154,7 @@ export function Chart({
 
     return () => {
       observer.disconnect();
+      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -180,20 +210,69 @@ export function Chart({
     };
   }, []);
 
-  // --- the feed writes straight into the series ---
-  const applyHistory = useCallback((bars: Bar[]) => {
-    // The subscription opens before the history read finishes, so live bars
-    // routinely land first — the gateway sends a forming candle within a
-    // second, while a deep read takes far longer. Merging (rather than
-    // replacing) keeps those bars instead of blanking them until the next
-    // tick, which at DAY resolution could be hours away.
-    const merged = mergeSeries(bars, barsRef.current);
-    barsRef.current = merged;
+  /**
+   * Redraw the whole series, keeping the operator looking at the same candles.
+   *
+   * `setData` keeps the visible *logical* range, and logical indices count from the
+   * start of the data — so every bar merged in at the front slides the frame that many
+   * candles to the right. Shifting the range back by exactly that many puts it back.
+   * `previousFirstTime` undefined means nothing was drawn yet, and that is the one case
+   * where the frame should move: fit the new series.
+   */
+  const redraw = useCallback((merged: Bar[], previousFirstTime: number | undefined) => {
+    const timeScale = chartRef.current?.timeScale();
+    const range = timeScale?.getVisibleLogicalRange() ?? null;
+
     seriesRef.current?.setData(merged.map(toCandlestick));
-    chartRef.current?.timeScale().fitContent();
-    setLatestBar(merged.at(-1) ?? null);
-    setReadout(null);
+
+    if (previousFirstTime === undefined) {
+      timeScale?.fitContent();
+      return;
+    }
+    const prepended = merged.findIndex((candidate) => candidate.time === previousFirstTime);
+    if (range && prepended > 0) {
+      timeScale?.setVisibleLogicalRange({
+        from: range.from + prepended,
+        to: range.to + prepended,
+      });
+    }
   }, []);
+
+  // --- the feed writes straight into the series ---
+  const applyHistory = useCallback(
+    (bars: Bar[]) => {
+      // The subscription opens before the history read finishes, so live bars
+      // routinely land first — the gateway sends a forming candle within a
+      // second, while a deep read takes far longer. Merging (rather than
+      // replacing) keeps those bars instead of blanking them until the next
+      // tick, which at DAY resolution could be hours away.
+      //
+      // A reconnect's snapshot comes through here too, which is why the frame
+      // is only fitted on the first draw: a chart panned back three thousand
+      // candles must not be thrown to the right-hand edge because the socket
+      // blinked.
+      const previousFirstTime = barsRef.current[0]?.time;
+      const merged = mergeSeries(bars, barsRef.current);
+      barsRef.current = merged;
+      redraw(merged, previousFirstTime);
+      setLatestBar(merged.at(-1) ?? null);
+      setReadout(null);
+    },
+    [redraw],
+  );
+
+  /** A page of candles older than everything drawn. Merged rather than
+   *  concatenated: the archive answers a range, and a range that happens to
+   *  end on a bar already drawn must not produce it twice. */
+  const applyOlder = useCallback(
+    (bars: Bar[]) => {
+      const previousFirstTime = barsRef.current[0]?.time;
+      const merged = mergeSeries(barsRef.current, bars);
+      barsRef.current = merged;
+      redraw(merged, previousFirstTime);
+    },
+    [redraw],
+  );
 
   const applyBar = useCallback((bar: Bar) => {
     const previous = barsRef.current;
@@ -217,6 +296,11 @@ export function Chart({
     [applyHistory, applyBar],
   );
 
+  const olderReader: OlderBarsReader = useMemo(
+    () => ({ readSeries: () => barsRef.current, deliver: applyOlder }),
+    [applyOlder],
+  );
+
   // Changing symbol, resolution *or source* must not leave the previous
   // series on screen while the new history loads. Source matters as much as
   // the other two: switching mock → gateway was observed showing mock prices
@@ -225,11 +309,14 @@ export function Chart({
   useEffect(() => {
     barsRef.current = [];
     seriesRef.current?.setData([]);
+    requestedFromRef.current = Number.POSITIVE_INFINITY;
     setReadout(null);
     setLatestBar(null);
   }, [source, symbol, resolution]);
 
   const feed = useBarFeed(source, symbol, resolution, sink);
+  const older = useOlderBars(source, symbol, resolution, olderReader);
+  requestOlderRef.current = older.requestOlder;
 
   const shown: Readout | null =
     readout ?? (latestBar ? { bar: latestBar, hovered: false } : null);
@@ -258,6 +345,7 @@ export function Chart({
         {shown && <OhlcReadout bar={shown.bar} />}
 
         <div className="ml-auto flex items-center gap-2">
+          <OlderHistoryState older={older} />
           {lastIsForming && !shown?.hovered && (
             <span
               title="This candle is still being built from quotes and will change."
@@ -280,6 +368,55 @@ export function Chart({
       </div>
     </section>
   );
+}
+
+/**
+ * What paging back through the archive is doing, said in the header rather than over the
+ * candles: a chart that is dragging in older history is still a chart worth reading, and
+ * a failed page must not hide the series that did arrive (terminal-chart spec, "Wykres
+ * mówi, co się dzieje ze starszą historią").
+ */
+function OlderHistoryState({ older }: { older: ReturnType<typeof useOlderBars> }) {
+  if (older.status === "loading") {
+    return (
+      <span className="rounded border border-border px-1.5 py-0.5 text-[10px] tracking-wide text-ink-muted uppercase">
+        loading older…
+      </span>
+    );
+  }
+
+  if (older.status === "exhausted") {
+    return (
+      <span
+        title="The archive has nothing older for this pair and resolution."
+        className="rounded border border-border px-1.5 py-0.5 text-[10px] tracking-wide text-ink-muted uppercase"
+      >
+        start of history
+      </span>
+    );
+  }
+
+  if (older.status === "error") {
+    return (
+      <span className="flex items-center gap-1">
+        <span
+          title={older.error ?? undefined}
+          className="rounded border border-critical/40 px-1.5 py-0.5 text-[10px] tracking-wide text-critical uppercase"
+        >
+          older history failed
+        </span>
+        <button
+          type="button"
+          onClick={older.retry}
+          className="rounded border border-border px-1.5 py-0.5 text-[10px] text-ink hover:bg-panel-strong"
+        >
+          Retry
+        </button>
+      </span>
+    );
+  }
+
+  return null;
 }
 
 function OhlcReadout({ bar }: { bar: Bar }) {

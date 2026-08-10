@@ -1,11 +1,12 @@
-import type { ArchiveAdmin, InstrumentSource } from "../data/source";
-import type { AssetClass, Instrument, Resolution } from "../data/types";
+import type { InstrumentSource } from "../data/source";
+import type { AssetClass, Instrument } from "../data/types";
 import type { OptionsFetcher, OptionsPage } from "./useAsyncOptions";
 
-/** The three `Autocomplete` sources the terminal actually uses (design.md,
- *  "Terminal: jeden `Autocomplete`, trzy źródła"). Each is just an
- *  `OptionsFetcher` closing over the source object it reads from — the
- *  component itself never knows which one it was given. */
+/** The `Autocomplete` sources the terminal actually uses, both of them in the
+ *  instrument wizard. Each is just an `OptionsFetcher` closing over the source
+ *  object it reads from — the component itself never knows which one it was
+ *  given. (The grid's slot picker used to be a third; it is now a plain select
+ *  over the archived pairs the grid already reads.) */
 
 /**
  * Asset classes: a fixed, small set the gateway publishes, filtered locally
@@ -41,37 +42,5 @@ export function instrumentInClassSource(
     }
     const found = await instruments.searchInstruments(trimmed, signal, assetClass);
     return { options: found };
-  };
-}
-
-/** One symbol as the archive is collecting it, in every resolution being
- *  collected — the grouping `/pairs` does not do itself (design.md,
- *  "Grupowanie `/pairs` po symbolu robi terminal"). */
-export interface ArchivedInstrument {
-  symbol: string;
-  resolutions: Resolution[];
-}
-
-/**
- * Instruments already archived, grouped from `/pairs` by symbol and filtered
- * locally by symbol — the archive has no search of its own and does not need
- * one at the sizes `MAX_TRACKED_PAIRS` allows (terminal-grid spec, "Slot
- * przyjmuje wyłącznie instrument archiwizowany").
- */
-export function archivedInstrumentSource(archive: ArchiveAdmin): OptionsFetcher<ArchivedInstrument> {
-  return async (query, signal) => {
-    const pairs = await archive.listPairs(signal);
-    const bySymbol = new Map<string, Resolution[]>();
-    for (const pair of pairs) {
-      const resolutions = bySymbol.get(pair.symbol) ?? [];
-      resolutions.push(pair.resolution);
-      bySymbol.set(pair.symbol, resolutions);
-    }
-    const needle = query.trim().toUpperCase();
-    const options: ArchivedInstrument[] = [...bySymbol.entries()]
-      .filter(([symbol]) => !needle || symbol.includes(needle))
-      .map(([symbol, resolutions]) => ({ symbol, resolutions }))
-      .sort((a, b) => a.symbol.localeCompare(b.symbol));
-    return { options };
   };
 }
