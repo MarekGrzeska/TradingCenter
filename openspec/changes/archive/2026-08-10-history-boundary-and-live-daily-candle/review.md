@@ -3,9 +3,9 @@
 Trzy błędy produkcyjne naprawione i potwierdzone na produkcji przez operatora: granica
 historii powstaje teraz z pomiaru i daje się unieważnić głębszą prośbą, `DAY` i `WEEK` mają
 świecę w budowie od pierwszego kwotowania, a archiwum przestało utrwalać okres, który
-jeszcze trwa. Świadomie niedokończone: **pomiar `live` z grupy 1 nigdy nie został
-uruchomiony** — kod jest poprawny w obie strony jego wyniku, ale nikt nie potwierdził, którą
-gałęzią faktycznie chodzi produkcja. Czego nie brać za przeoczenie: `PairEstimate.clipped`
+jeszcze trwa. Pomiar `live` z grupy 1 został uruchomiony i wypadł po stronie, którą projekt zakładał:
+provider oddaje bieżący, niedomknięty okres, więc zasiew i oznaczanie świecy w budowie
+chodzą główną gałęzią. Czego nie brać za przeoczenie: `PairEstimate.clipped`
 nie jest już przez nic ustawiane i to jest zamierzone (patrz Gaps), a wdrożenie odbyło się
 w złej kolejności i położyło produkcję — opis niżej, bo to jest lekcja tej zmiany, nie
 przypis do niej.
@@ -26,9 +26,17 @@ Uruchomione lokalnie na końcowym stanie kodu:
 | `openspec validate … --strict` | valid |
 | migracja | round-trip `0006 → 0007 → 0006` na bazie deweloperskiej |
 
-**Nie uruchomione:** `uv run pytest -m live --run-live` (grupa 1). Wymaga sesji demo
-capital.com, a każde logowanie unieważnia poprzednią — odpalenie zerwałoby sesję
-produkcyjnego gatewaya. Testy są napisane i zbierają się poprawnie; brakuje tylko przebiegu.
+`uv run pytest -m live --run-live` → **8 passed, 196 deselected**, uruchomione 10 sierpnia
+przeciwko koncie demo. Potwierdziło trzy rzeczy, na których stoi ta zmiana, a których nikt
+wcześniej nie zmierzył: najnowsza świeca odczytu `MINUTE_5` sięgającego teraźniejszości
+pokrywa się z bieżącym kubełkiem (czyli błąd 3 był realny), odczyt `DAY` przy otwartym
+rynku zawiera dzisiejszą świecę (czyli zasiew ma z czego wystartować), a `marketStatus`
+zgadza się z tym, czy płyną kwotowania (czyli jest użytecznym źródłem prawdy dla `DAY`
+i `WEEK`).
+
+Uruchomienie zerwało sesję produkcyjnego gatewaya, jak zapowiadano. Wrócił sam, dzięki
+osobnej poprawce wdrożonej w tym celu wcześniej (PR #49) — sprawdzone w bazie: zapisy
+świec szły dalej pięć minut po pomiarze.
 
 Na produkcji: po ręcznej migracji operator potwierdził, że kreator wycenia, wykres na `DAY`
 i `WEEK` pokazuje ruchomą świecę bieżącą, a dociąganie starszej historii działa.
@@ -129,14 +137,6 @@ Poza scenariuszami, jako regresje po przeglądzie: `test_hub.py::test_a_reconnec
 | Odczyt stanu pokrycia nie zmienia granicy | `test_app.py::test_pricing_the_same_request_leaves_the_boundary_alone`, `::test_re_adding_a_pair_without_a_date_leaves_the_boundary_alone` |
 
 ## Gaps
-
-**Pomiar `live` (zadania 1.1–1.4) nieuruchomiony.** Potwierdza, czy capital.com oddaje
-w REST okres, który jeszcze trwa, i czy tuż po zamknięciu dnia zwraca już nową świecę.
-Zasiew w `hub.py` jest poprawny w obie strony: przy odpowiedzi „nic nowszego" pokój milczy
-i ponawia z odstępem zamiast zgadywać granicę. Ale to znaczy, że nie wiemy, którą gałęzią
-produkcja faktycznie chodzi — a jeśli tą drugą, na `DAY` bywa krótkie okno bez świecy
-w budowie zaraz po przetoczeniu doby. Uruchomienie zrywa sesję produkcyjnego gatewaya, więc
-wymaga okna serwisowego.
 
 **Scenariusz „Data sprzed historii providera" nie ma testu na własnym poziomie.** Wymaganie
 mówi, że zakres zostaje przycięty do najstarszego osiągalnego momentu i że zlecenie to

@@ -148,6 +148,16 @@ najnowsza świeca odczytu należy do okresu, który jeszcze trwa. Tam jednak wyn
 warunkiem — decyzja niżej jest poprawna w obie strony i nic nie traci, jeśli okaże się, że
 provider bieżącego okresu nie oddaje.
 
+**Zmierzone 10 sierpnia 2026, `uv run pytest -m live --run-live`, 8/8 zielonych.** Provider
+**oddaje** bieżący, niedomknięty okres: najnowsza świeca `MINUTE_5` odczytu sięgającego
+teraźniejszości pokrywa się z kubełkiem, w którym jesteśmy, a odczyt `DAY` przy otwartym
+rynku zawiera dzisiejszą świecę. `marketStatus` zgadza się z tym, czy płyną kwotowania.
+
+Czyli obie decyzje niżej chodzą **główną** gałęzią, nie degradacyjną: zasiew dostaje od
+providera okres, który faktycznie trwa, a oznaczanie świecy w budowie ma co oznaczać.
+Gałąź „provider nie otworzył jeszcze nowego okresu" zostaje jako zabezpieczenie i jest
+pokryta testem, ale w normalnym biegu się nie uruchamia.
+
 ### Świeca w budowie jest oznaczana przez gateway, a rozstrzyga o tym stan rynku
 
 `capital_gateway/dtos.py` — DTO `Candle` zyskuje pole mówiące, czy okres się domknął. To
