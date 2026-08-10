@@ -112,6 +112,65 @@ async def test_running_past_the_bottom_keeps_what_was_collected() -> None:
     assert result.requested == 100
 
 
+async def test_an_empty_first_window_is_not_the_end_of_history() -> None:
+    """`not-found` before a single candle has been collected says nothing about the
+    bottom of the instrument.
+
+    The window is where the caller's anchor put it, not where data put it, and the
+    provider answers `not-found` to more questions than "there is nothing older". Read as
+    an ending it cost US100 its whole history below January 2026: a permanent boundary
+    was recorded there, and every later request to reach 2024 planned nothing and
+    reported success.
+    """
+
+    async def fetch(date_from, date_to, limit):
+        return None  # error.prices.not-found, on the very first window
+
+    result = await history.collect("GOLD", Resolution.MINUTE_5, 100, fetch)
+
+    assert result.count == 0
+    assert result.history_ended is False
+    assert result.requests == 1
+
+
+async def test_an_empty_first_window_with_an_anchor_is_not_an_ending_either() -> None:
+    """The same read as above with a past anchor — the shape a job chunk uses, and the
+    one that produced the failure in production."""
+
+    async def fetch(date_from, date_to, limit):
+        return None
+
+    result = await history.collect(
+        "GOLD",
+        Resolution.MINUTE_5,
+        100,
+        fetch,
+        anchor=datetime(2026, 1, 1, tzinfo=UTC),
+        after=datetime(2024, 1, 1, tzinfo=UTC),
+    )
+
+    assert result.count == 0
+    assert result.history_ended is False
+
+
+async def test_an_empty_window_after_a_full_one_still_ends_history() -> None:
+    """The behaviour the change must not weaken: once a page has anchored the read, a
+    window running out is the provider's own bottom."""
+    calls = 0
+
+    async def fetch(date_from, date_to, limit):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return candles(datetime(2026, 7, 23, 14, 0, tzinfo=UTC), 3)
+        return None
+
+    result = await history.collect("GOLD", Resolution.MINUTE_5, 100, fetch)
+
+    assert result.count == 3
+    assert result.history_ended is True
+
+
 async def test_an_anchor_shapes_only_the_first_page() -> None:
     anchor = datetime(2024, 1, 15, 0, 0, tzinfo=UTC)
     first_page = candles(anchor, 2)

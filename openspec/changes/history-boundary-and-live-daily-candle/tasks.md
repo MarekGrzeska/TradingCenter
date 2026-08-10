@@ -14,16 +14,16 @@
 
 ## 2. capital-gateway: koniec historii wymaga zebranej świecy
 
-- [ ] 2.1 W `capital_gateway/history.py` powiązać ustawienie `history_ended` z tym, czy
+- [x] 2.1 W `capital_gateway/history.py` powiązać ustawienie `history_ended` z tym, czy
   odczyt zebrał już jakąkolwiek świecę — pusta odpowiedź na okno przed pierwszą zebraną
   świecą kończy odczyt bez stwierdzania końca historii.
-- [ ] 2.2 Test: pierwsze okno wraca `None`, odczyt zwraca pustą serię i `history_ended`
+- [x] 2.2 Test: pierwsze okno wraca `None`, odczyt zwraca pustą serię i `history_ended`
   fałszywe.
-- [ ] 2.3 Test: pierwsze okno wraca świece, drugie `None` poza podłogą — `history_ended`
+- [x] 2.3 Test: pierwsze okno wraca świece, drugie `None` poza podłogą — `history_ended`
   prawdziwe, czyli zachowanie sprzed zmiany zostaje.
-- [ ] 2.4 Test: podłoga konsumenta nadal nie ustawia `history_ended` (regresja na
+- [x] 2.4 Test: podłoga konsumenta nadal nie ustawia `history_ended` (regresja na
   `on_the_floor`).
-- [ ] 2.5 `uv run pytest`, `uv run ruff check .`, `uv run pyright`.
+- [x] 2.5 `uv run pytest`, `uv run ruff check .`, `uv run pyright`.
 
 ## 3. capital-gateway: zasiew granicy okresu dla `DAY` i `WEEK`
 

@@ -119,6 +119,13 @@ async def collect(
     over half a minute; without it, a client that gave up ten seconds in keeps spending
     the rate budget on an answer nobody will read.
 
+    An ending is only ever read off a window that data placed. A first window coming back
+    empty ends the read without ``history_ended``: nothing has anchored it yet, so the
+    window sits where the caller's anchor put it, and ``not-found`` answers more questions
+    than "there is nothing older". Measured in production — US100 collected from January
+    2026 recorded a permanent boundary from exactly that, and every later request to reach
+    2024 planned nothing and reported success.
+
     ``after`` is a floor on how far back to reach, and it is a different thing from
     ``bars``. ``bars`` counts *candles*; an instrument that is shut half the week hands
     back ``bars`` candles spanning far more calendar time than ``bars`` periods, so a
@@ -192,9 +199,18 @@ async def collect(
         # the provider answered with that same 07:05 candle, which is no progress. Read
         # as an ending either way it set `history_ended`, which the archive stores as a
         # permanent boundary and uses to bulk-skip every older chunk still queued.
+        #
+        # And a third way of running out, which is not an ending at all: the *first*
+        # window came back with nothing. `collected` empty means no candle has anchored
+        # this read yet, so the window was placed by the caller's anchor rather than by
+        # data, and `not-found` is the provider's answer to more questions than "there is
+        # nothing older" — a window over hours it does not recognise, an instrument
+        # momentarily without prices. Read as an ending it cost a whole pair: US100
+        # collected from January 2026 recorded a permanent boundary there, and every
+        # later request to reach 2024 planned nothing and reported success.
         if on_the_floor:
             reached_floor = True
-        else:
+        elif collected:
             history_ended = True
         break
 
