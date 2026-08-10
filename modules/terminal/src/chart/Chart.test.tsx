@@ -742,6 +742,52 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(rsiLine.priceLines.every((l) => l.removed)).toBe(true);
   });
 
+  it("shows an own-pane wskaźnik's value under the cursor beside OHLC, same as a price-pane one", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "rsi",
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: "rsi", label: "RSI {period}", style: null }],
+        render: {
+          pane: "own",
+          style: "line",
+          scale: "fixed",
+          autoscale: false,
+          range: [0, 100],
+          levels: [30, 70],
+        },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ id: "rsi", params: { period: 14 }, lines: { rsi: [40, 63.5] } }),
+        ],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^rsi$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+
+    await act(async () => {
+      for (const handler of stub.latest().crosshairHandlers) handler({ time: 200 });
+    });
+
+    expect(await screen.findByText("RSI 14")).toBeInTheDocument();
+    expect(await screen.findByText("63.5")).toBeInTheDocument();
+  });
+
   it("draws MACD's histogram line as a two-color Histogram series beside its two Line series", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
