@@ -118,11 +118,11 @@
 ## 8. Domknięcie
 
 - [x] 8.1 `openspec validate history-boundary-and-live-daily-candle --strict`.
-- [ ] 8.2 Wdrożyć w kolejności z `design.md`: `capital-gateway` w całości → `alembic
-  upgrade 0007` → `market-data` → `alembic upgrade head` (`0008`). Migracje nie jadą ani
-  z obrazem, ani z workflow, i stoją po przeciwnych stronach wdrożenia celowo: kolumna
-  przed (bez niej nowy kod odpowiada pięćsetką na każdy odczyt pokrycia), reguła po (przed
-  wdrożeniem odrzucałaby zapisy starego writera).
+- [x] 8.2 Wdrożyć w kolejności z `design.md`: `capital-gateway` w całości → **`alembic
+  upgrade head`** → `market-data`. Migracja nie jedzie ani z obrazem, ani z workflow,
+  a bez niej nowy `market-data` odpowiada pięćsetką na każdy odczyt pokrycia
+  (`/candles`, `/coverage`, `/jobs/estimate`, `POST /pairs`). **Zrobione w złej
+  kolejności** — migracja poszła po wdrożeniu, ręcznie, po awarii; opis w `review.md`.
 - [ ] 8.3 Odzyskać US100: poprosić o dane od 2024-01-01 dla siedmiu rozdzielczości
   i sprawdzić `GET /coverage/US100?resolution=DAY`.
 - [ ] 8.4 Sprawdzić na wykresie, że `DAY` i `WEEK` pokazują bieżącą świecę zaraz po
