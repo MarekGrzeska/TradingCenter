@@ -3,14 +3,9 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Autocomplete } from "./Autocomplete";
-import {
-  archivedInstrumentSource,
-  assetClassSource,
-  instrumentInClassSource,
-} from "./autocompleteSources";
-import type { ArchiveAdmin, InstrumentSource } from "../data/source";
-import type { AssetClass, Instrument, TrackedPair } from "../data/types";
-import type { ArchivedInstrument } from "./autocompleteSources";
+import { assetClassSource, instrumentInClassSource } from "./autocompleteSources";
+import type { InstrumentSource } from "../data/source";
+import type { AssetClass, Instrument } from "../data/types";
 
 function fakeInstrumentSource(overrides: Partial<InstrumentSource> = {}): InstrumentSource {
   return {
@@ -22,45 +17,6 @@ function fakeInstrumentSource(overrides: Partial<InstrumentSource> = {}): Instru
     listInstruments: vi.fn(async () => ({ instruments: [], count: 0, truncated: false })),
     listAssetClasses: vi.fn(async () => []),
     ...overrides,
-  };
-}
-
-function fakeArchiveAdmin(overrides: Partial<ArchiveAdmin> = {}): ArchiveAdmin {
-  return {
-    listPairs: vi.fn(async () => []),
-    trackPairs: vi.fn(async () => ({ results: [], jobId: null })),
-    deletePair: vi.fn(async () => ({
-      symbol: "",
-      resolution: "MINUTE" as const,
-      deletedAt: 0,
-      candlesRemoved: 0,
-      removedFrom: null,
-      removedTo: null,
-    })),
-    coverage: vi.fn(async () => ({
-      symbol: "",
-      resolution: "MINUTE" as const,
-      ranges: [],
-      earliestReachable: null,
-    })),
-    listDeletions: vi.fn(async () => []),
-    estimateJob: vi.fn(async () => ({ pairs: [], totalEstimatedCandles: 0, totalEstimatedBytes: 0 })),
-    listJobs: vi.fn(async () => []),
-    readJob: vi.fn(),
-    retryJob: vi.fn(),
-    ...overrides,
-  };
-}
-
-function trackedPair(symbol: string, resolution: TrackedPair["resolution"]): TrackedPair {
-  return {
-    symbol,
-    resolution,
-    addedAt: 0,
-    collectFrom: 0,
-    earliestCandle: null,
-    latestCandle: null,
-    collection: "collecting",
   };
 }
 
@@ -326,29 +282,5 @@ describe("Autocomplete: identical keyboard behavior across all three real source
     await user.keyboard("{ArrowDown}{Enter}");
 
     expect(onChange).toHaveBeenCalledWith(eth);
-  });
-
-  it("archived instruments", async () => {
-    const archive = fakeArchiveAdmin({
-      listPairs: vi.fn(async () => [trackedPair("US100", "MINUTE")]),
-    });
-    const onChange = vi.fn();
-    const user = userEvent.setup();
-    render(
-      <Autocomplete<ArchivedInstrument>
-        value={null}
-        onChange={onChange}
-        source={archivedInstrumentSource(archive)}
-        getOptionId={(a) => a.symbol}
-        getOptionLabel={(a) => a.symbol}
-        ariaLabel="Archived instrument"
-      />,
-    );
-
-    await user.click(screen.getByRole("combobox"));
-    await waitFor(() => expect(screen.getByRole("option", { name: "US100" })).toBeInTheDocument());
-    await user.keyboard("{ArrowDown}{Enter}");
-
-    expect(onChange).toHaveBeenCalledWith({ symbol: "US100", resolutions: ["MINUTE"] });
   });
 });

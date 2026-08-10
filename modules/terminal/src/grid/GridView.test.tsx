@@ -14,7 +14,13 @@ vi.mock("lightweight-charts", () => ({
     addSeries: () => ({ setData: () => {}, update: () => {} }),
     remove: () => {},
     resize: () => {},
-    timeScale: () => ({ fitContent: () => {} }),
+    timeScale: () => ({
+      fitContent: () => {},
+      getVisibleLogicalRange: () => null,
+      setVisibleLogicalRange: () => {},
+      subscribeVisibleLogicalRangeChange: () => {},
+      unsubscribeVisibleLogicalRangeChange: () => {},
+    }),
     subscribeCrosshairMove: () => {},
     unsubscribeCrosshairMove: () => {},
   }),
@@ -124,8 +130,10 @@ describe("GridView layout (terminal-grid spec)", () => {
 
     await user.click(screen.getByRole("button", { name: "3x2" }));
     const slot6 = within(screen.getByTestId("slot-s6"));
-    await user.click(slot6.getByRole("combobox", { name: "Symbol for slot s6" }));
-    await user.click(await screen.findByRole("option", { name: /^SILVER/ }));
+    await user.selectOptions(
+      await slot6.findByRole("combobox", { name: "Symbol for slot s6" }),
+      "SILVER",
+    );
     await waitFor(() => expect(gridStore.getSnapshot().slots.s6.symbol).toBe("SILVER"));
 
     await user.click(screen.getByRole("button", { name: "2x2" }));
@@ -160,9 +168,10 @@ describe("GridView layout (terminal-grid spec)", () => {
     const before = gridStore.getSnapshot().slots.s2.symbol;
 
     const slot1 = within(screen.getByTestId("slot-s1"));
-    await user.click(slot1.getByRole("button", { name: "Clear Symbol for slot s1" }));
-    await user.click(slot1.getByRole("combobox", { name: "Symbol for slot s1" }));
-    await user.click(await screen.findByRole("option", { name: /^TSLA/ }));
+    await user.selectOptions(
+      await slot1.findByRole("combobox", { name: "Symbol for slot s1" }),
+      "TSLA",
+    );
 
     await waitFor(() => expect(gridStore.getSnapshot().slots.s1.symbol).toBe("TSLA"));
     expect(gridStore.getSnapshot().slots.s2.symbol).toBe(before);
@@ -215,34 +224,56 @@ describe("GridView slot — archived-only symbols (terminal-grid spec)", () => {
     });
   });
 
-  it("says nothing archived matches, and points to Instruments, when the picker is empty", async () => {
+  it("offers every archived symbol and nothing else", async () => {
+    renderGrid();
+
+    const picker = await within(screen.getByTestId("slot-s1")).findByRole("combobox", {
+      name: "Symbol for slot s1",
+    });
+    await waitFor(() =>
+      expect([...(picker as HTMLSelectElement).options].map((option) => option.value)).toEqual([
+        "",
+        "BTCUSD",
+        "EURUSD",
+        "GOLD",
+        "SILVER",
+        "TSLA",
+        "US100",
+      ]),
+    );
+
+    // Archived at two resolutions, offered once: the picker is about the
+    // instrument, and the resolution selector beside it is about the rest.
+    expect(
+      [...(picker as HTMLSelectElement).options].filter((option) => option.value === "US100"),
+    ).toHaveLength(1);
+  });
+
+  it("says nothing is archived, and points to Instruments, instead of an empty list", async () => {
     fakeArchive.pairs = [];
     const user = userEvent.setup();
     renderGrid();
     await user.click(screen.getByRole("button", { name: "3x2" }));
 
-    await user.click(
-      within(screen.getByTestId("slot-s6")).getByRole("combobox", {
-        name: "Symbol for slot s6",
-      }),
+    const slot6 = within(screen.getByTestId("slot-s6"));
+    expect(await slot6.findByText(/nothing is archived yet/i)).toBeInTheDocument();
+    expect(slot6.getByRole("link", { name: "Instruments" })).toHaveAttribute(
+      "href",
+      "/instruments",
     );
-
-    expect(await screen.findByText(/add instruments in the instruments tab/i)).toBeInTheDocument();
+    expect(slot6.queryByRole("combobox", { name: "Symbol for slot s6" })).not.toBeInTheDocument();
   });
 
   it("keeps a slot's instrument when the archived list can't be read, and lets the picker say so", async () => {
     fakeArchive.listFailure = new Error("archive unreachable");
-    const user = userEvent.setup();
     renderGrid();
 
     const slot1 = within(screen.getByTestId("slot-s1"));
     expect(slot1.queryByText(/no longer archived/i)).not.toBeInTheDocument();
     expect(slot1.getByText("US100")).toBeInTheDocument();
 
-    await user.click(slot1.getByRole("button", { name: "Clear Symbol for slot s1" }));
-    await user.click(screen.getByRole("combobox", { name: "Symbol for slot s1" }));
-
-    expect(await screen.findByText(/archive unreachable/i)).toBeInTheDocument();
+    expect(await slot1.findByText(/archive unreachable/i)).toBeInTheDocument();
+    expect(slot1.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
   it("recognizes a remembered instrument that stopped being archived, leaving other slots alone", async () => {

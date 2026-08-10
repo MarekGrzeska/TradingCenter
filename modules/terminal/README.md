@@ -43,16 +43,19 @@ before it is asked anything else.
   addresses).
 - `app/` — the shell: tab registry, routing, theme, connection indicator, per-view error
   boundary.
-- `ui/` — `Autocomplete`, the one position picker the whole terminal uses, plus the three
-  sources it is given (asset classes, instruments in a class, archived instruments) and the
+- `ui/` — `Autocomplete`, the one search-as-you-type picker the terminal uses, plus the two
+  sources it is given (asset classes, instruments in a class) and the
   debounce-and-stale-guard hook underneath it; and `ConfirmDialog`, the one way the terminal
   asks for consent. Every question that precedes something irreversible goes through it —
   never a row glued under a table — and it owns the work in flight, the second click, the
   failure that has to stay with its decision, `Escape` and the focus trap.
-- `chart/` — the reusable candlestick chart, identical standalone and in a grid slot.
+- `chart/` — the reusable candlestick chart, identical standalone and in a grid slot. The
+  live edge comes from the subscription's snapshot; panning left pages older candles in from
+  the archive's range endpoint (`useOlderBars.ts`), which never reads anything newer than the
+  oldest candle already drawn.
 - `grid/` — six slots with fixed identities, layout presets, and persistence. A slot's
-  symbol comes from the archived-instruments picker and its resolutions from what that
-  instrument is archived in.
+  symbol is picked from a plain list of what the archive collects — the grid reads `/pairs`
+  once for all six — and its resolutions from what that instrument is archived in.
 - `instruments/` — the `Instruments` tab: what is archived, per instrument, and the wizard
   and acceptance dialog that add to it; Delete, which removes a pair's data with it.
 - `history/` — the `Data History` tab: collection jobs per instrument and resolution, their

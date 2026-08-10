@@ -28,6 +28,12 @@ export function GridView() {
     [archived.pairs],
   );
 
+  // Everything the pickers offer, sorted once for all of them.
+  const symbols = useMemo(
+    () => [...resolutionsBySymbol.keys()].sort((a, b) => a.localeCompare(b)),
+    [resolutionsBySymbol],
+  );
+
   const visible = visibleSlotIds(config.layout);
   const { cols, rows } = LAYOUTS[config.layout];
 
@@ -68,6 +74,12 @@ export function GridView() {
             active={config.activeSlot === slotId}
             archivedStatus={archived.status}
             resolutionsBySymbol={resolutionsBySymbol}
+            picker={{
+              symbols,
+              status: archived.status,
+              error: archived.error,
+              onRetry: archived.reload,
+            }}
           />
         ))}
       </div>
@@ -75,16 +87,26 @@ export function GridView() {
   );
 }
 
+/** What every picker in the grid draws from — one read of `/pairs`, shared. */
+interface PickerSource {
+  symbols: string[];
+  status: ReturnType<typeof useTrackedPairs>["status"];
+  error: string | null;
+  onRetry(): void;
+}
+
 function Slot({
   slotId,
   active,
   archivedStatus,
   resolutionsBySymbol,
+  picker,
 }: {
   slotId: SlotId;
   active: boolean;
   archivedStatus: ReturnType<typeof useTrackedPairs>["status"];
   resolutionsBySymbol: Map<string, Resolution[]>;
+  picker: PickerSource;
 }) {
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
   const slot = config.slots[slotId];
@@ -120,13 +142,14 @@ function Slot({
       }`}
     >
       {slot.symbol === null ? (
-        <EmptySlot slotId={slotId} />
+        <EmptySlot slotId={slotId} picker={picker} />
       ) : stale ? (
         <StaleSlot
           slotId={slotId}
           symbol={slot.symbol}
           resolution={staleResolution ? slot.resolution : null}
           stillArchivedAt={staleResolution ? (allowedResolutions ?? []) : []}
+          picker={picker}
         />
       ) : (
         <Chart
@@ -138,9 +161,13 @@ function Slot({
           headerLeft={
             <SymbolField
               label={`Symbol for slot ${slotId}`}
-              value={{ symbol: slot.symbol, resolutions: allowedResolutions ?? [] }}
-              onChange={(instrument) => {
-                if (instrument) gridStore.setSlotSymbol(slotId, instrument.symbol);
+              value={slot.symbol}
+              symbols={picker.symbols}
+              status={picker.status}
+              error={picker.error}
+              onRetry={picker.onRetry}
+              onChange={(symbol) => {
+                if (symbol) gridStore.setSlotSymbol(slotId, symbol);
                 else gridStore.clearSlotSymbol(slotId);
               }}
             />
@@ -151,18 +178,30 @@ function Slot({
   );
 }
 
-function EmptySlot({ slotId }: { slotId: SlotId }) {
+function EmptySlot({ slotId, picker }: { slotId: SlotId; picker: PickerSource }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 bg-panel">
       <p className="text-sm text-ink-muted">Pick an instrument for this slot.</p>
-      <SymbolField
-        label={`Symbol for slot ${slotId}`}
-        value={null}
-        onChange={(instrument) => {
-          if (instrument) gridStore.setSlotSymbol(slotId, instrument.symbol);
-        }}
-      />
+      <SlotPicker slotId={slotId} picker={picker} />
     </div>
+  );
+}
+
+/** The picker as every place but the chart header uses it: nothing selected
+ *  yet, and choosing sets the slot. */
+function SlotPicker({ slotId, picker }: { slotId: SlotId; picker: PickerSource }) {
+  return (
+    <SymbolField
+      label={`Symbol for slot ${slotId}`}
+      value={null}
+      symbols={picker.symbols}
+      status={picker.status}
+      error={picker.error}
+      onRetry={picker.onRetry}
+      onChange={(symbol) => {
+        if (symbol) gridStore.setSlotSymbol(slotId, symbol);
+      }}
+    />
   );
 }
 
@@ -179,11 +218,13 @@ function StaleSlot({
   symbol,
   resolution,
   stillArchivedAt,
+  picker,
 }: {
   slotId: SlotId;
   symbol: string;
   resolution: Resolution | null;
   stillArchivedAt: readonly Resolution[];
+  picker: PickerSource;
 }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 bg-panel px-4 text-center">
@@ -226,13 +267,7 @@ function StaleSlot({
         </p>
       )}
 
-      <SymbolField
-        label={`Symbol for slot ${slotId}`}
-        value={null}
-        onChange={(instrument) => {
-          if (instrument) gridStore.setSlotSymbol(slotId, instrument.symbol);
-        }}
-      />
+      <SlotPicker slotId={slotId} picker={picker} />
     </div>
   );
 }
