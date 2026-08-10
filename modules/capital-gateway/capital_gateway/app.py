@@ -49,9 +49,14 @@ async def stream_tokens_for(client: CapitalClient) -> tuple[str, str]:
 
     The stream borrows the REST session and has no way of noticing that it stopped
     working: a websocket never receives a 401. `client.authenticated` says the tokens
-    exist, not that the provider still honours them — and capital.com invalidates the
-    previous session on every new login anywhere on the account, so one `-m live` run, or
-    a second gateway process, leaves this one holding a pair of dead strings.
+    exist, not that the provider still honours them.
+
+    This used to name a second gateway process as what kills them, which measurement on
+    10 August 2026 ruled out — sessions coexist, and two streams on one account both keep
+    receiving. What is left is enough on its own: a session is good for about ten idle
+    minutes, and a stream makes no REST calls at all. A gateway whose only traffic is the
+    subscription therefore holds tokens that expire from disuse, on a schedule nobody
+    watches.
 
     Trusting them is a reconnect loop that never recovers. Every attempt subscribes with
     the same dead tokens, the provider refuses, the socket drops, and three seconds later

@@ -67,9 +67,30 @@ schema `market-data` derives from its own models. After changing anything in
 `contract:check` fails on a stale file, and it runs before the terminal's tests on purpose.
 The whole route a new field travels is below, under "A new field on market-data's wire".
 
-**One Capital demo session exists.** capital.com invalidates the previous session on every
-new login (`capital_gateway/client.py`), so two gateway processes on the same account
-deauthenticate each other. Symptom: random 401s in both. Do not run two stacks at once.
+**Capital sessions coexist — the old warning here was never measured, and it was wrong.**
+This file used to say that capital.com invalidates the previous session on every new login,
+so two gateway processes deauthenticate each other. Measured against the demo API on
+10 August 2026, all of it with `GET /accounts` proving each session usable, not merely
+present:
+
+- four sessions opened with **one** API key: all four still answered after the fourth
+  login, and still answered a minute later. No eviction, no cap at four, no delay;
+- two sessions from **two** API keys under one login: both answered, in either order;
+- two streaming connections on one account subscribed to the same epic: both kept
+  receiving quotes, whether the sessions came from one key or two.
+
+An API key carries **its own password**, set when the key is created — not the account's
+login password. A second key with the first key's password answers
+`401 {"errorCode":"error.invalid.details"}`, which reads exactly like an invalidated
+session and is not one.
+
+What still constrains parallel work is the rate budget, not the session: capital.com counts
+its 10 requests/second against the **account**, so two stacks share one allowance and starve
+each other. Together with the fixed ports and the single dev database container, that is
+still a reason to run one stack at a time — a different reason, with a different symptom
+(slowness, not 401s). Not measured: live accounts, and whether this behaviour is stable
+over time. A 401 storm was really observed on 9–10 August; `stream_tokens_for` in
+`capital_gateway/app.py` names what does explain it, which is a session going idle.
 
 **Env files are per-module and gitignored.** Copy from `.env.example`. The gateway needs
 `CAPITAL_*` demo credentials plus its own `GATEWAY_API_KEY`; market-data needs the same

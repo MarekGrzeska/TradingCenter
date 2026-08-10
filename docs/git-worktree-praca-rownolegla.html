@@ -292,8 +292,8 @@ cd ../../modules/terminal &amp;&amp; pnpm install</code></pre>
   <text class="svg-m" x="446" y="98">porty 8010 · 8020 · 5173</text>
   <text class="svg-m" x="446" y="128">kontener Postgres</text>
   <text class="svg-s" x="446" y="148">compose.yaml — jeden wolumen</text>
-  <text class="svg-m" x="446" y="180">sesja demo capital.com</text>
-  <text class="svg-s" x="446" y="200">nowe logowanie unieważnia stare</text>
+  <text class="svg-m" x="446" y="180">budżet capital.com</text>
+  <text class="svg-s" x="446" y="200">10 żądań/s liczone na konto</text>
 </svg>
 <figcaption>Lewa strona zwielokrotnia się dowolnie, prawa nie zwielokrotnia się wcale. Stąd zasada: równolegle pisze wielu, ale <strong>stack uruchamia jeden</strong>.</figcaption>
 </figure>
@@ -303,7 +303,7 @@ cd ../../modules/terminal &amp;&amp; pnpm install</code></pre>
   <ul>
     <li><strong>Porty są stałe</strong> — 8010 gateway, 8020 market-data, 5173 terminal. Drugi <code>./scripts/dev.sh</code> nie wystartuje albo, gorzej, podepnie się pod cudzy proces.</li>
     <li><strong>Baza to jeden kontener</strong> z <code>compose.yaml</code>, jeden projekt Dockera i jeden wolumen. Migracja puszczona w jednym worktree zmienia schemat, który widzą wszystkie pozostałe.</li>
-    <li><strong>Sesja demo capital.com jest jedna</strong> — każde nowe logowanie unieważnia poprzednie (<code>capital_gateway/client.py</code>). Dwa gateway’e na tym samym koncie wzajemnie się wylogowują, a objaw to losowe 401 w obu.</li>
+    <li><strong>Budżet ruchu capital.com jest jeden</strong> — 10 żądań na sekundę liczone na konto, nie na proces, więc dwa gateway’e dzielą tę samą pulę i głodzą się nawzajem. Objawem jest wolność, nie błąd. <em>Ten punkt mówił wcześniej, że nowe logowanie unieważnia poprzednią sesję; pomiar z 10 sierpnia 2026 tego nie potwierdził — cztery sesje na jednym kluczu współistniały, dwa strumienie na jednym koncie też. Zob. <code>CLAUDE.md</code>.</em></li>
   </ul>
   <p style="margin-bottom:0"><strong>Wniosek:</strong> równolegle można pisać kod, czytać, planować i uruchamiać testy jednostkowe. Testy <code>-m db</code> są bezpieczne, bo testcontainers podnosi własny kontener na losowym porcie. Ale pełny stack i migracje — jeden agent naraz.</p>
 </div>

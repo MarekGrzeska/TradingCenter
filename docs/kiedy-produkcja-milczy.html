@@ -388,6 +388,24 @@
       <p><strong>Osobna rejestracja — inny adres e-mail, własny login, własny klucz API — daje.</strong> To jest ta droga, o której mówi rekomendacja, i to jest jej koszt: drugie konto od zera, drugi zestaw <code>CAPITAL_*</code> w sekretach CI.</p>
       <p><strong>Jedno jest niesprawdzone i tańsze, jeśli działa:</strong> dwa klucze API pod tym samym loginem. Nigdzie nie zmierzono, czy logowanie kluczem B unieważnia sesję klucza A — repo wie tylko tyle, że robi to logowanie tymi samymi poświadczeniami. Test jest na pięć minut: zalogować się kluczem B przy żywej sesji klucza A i zapytać <code>GET /session</code> kluczem A. Odpowiedź inna niż <code>401</code> oznacza, że osobna rejestracja nie jest potrzebna.</p>
     </div>
+    <div class="status">
+      <strong>Zmierzone tego samego wieczora — cała ta pozycja stoi na nieprawdzie</strong>
+      <p>Test na pięć minut został zrobiony i wyszedł inaczej, niż zakładały obie wersje powyżej. Zdanie „capital.com unieważnia poprzednią sesję przy każdym logowaniu" jest <strong>nieprawdziwe</strong> — dla REST-u i dla strumienia. Nikt go nigdy nie zmierzył; było przepisywane z pliku do pliku.</p>
+      <p>Demo API, 10 sierpnia 2026, każda sesja sprawdzana przez <code>GET /accounts</code>, nie samą obecnością tokenów:</p>
+      <div class="evidence">
+        <span class="ev-label">cztery sesje na jednym kluczu</span>
+        after login 1:  s1:200<br>
+        after login 2:  s1:200  s2:200<br>
+        after login 3:  s1:200  s2:200  s3:200<br>
+        after login 4:  s1:200  s2:200  s3:200  s4:200<br>
+        after 60s:      s1:200  s2:200  s3:200  s4:200
+      </div>
+      <p>Żadnej eksmisji, żadnego sufitu przy czterech, żadnego opóźnionego unieważnienia. Dwa klucze pod jednym loginem: obie sesje żyją, w obu kolejnościach. Dwa połączenia strumieniowe na jednym koncie, subskrybujące ten sam epic: oba dostają kwotowania dalej — <code>first=54</code> i <code>second=50</code> w 25 sekund przy jednym kluczu, <code>60</code> i <code>55</code> przy dwóch.</p>
+      <p><strong>Wniosek dla tej pozycji: drugie konto nie jest potrzebne. Drugi klucz też nie.</strong> Testy <code>live</code> i CI mogą chodzić na tym koncie, nie zrywając produkcji — bo nie ma czego zrywać.</p>
+      <p>Przy okazji wyszła rzecz, której repo nie wiedziało: <strong>klucz API ma własne hasło</strong>, ustawiane przy jego tworzeniu, i to ono idzie w <code>POST /session</code>, a nie hasło konta. Klucz B z hasłem klucza A odpowiada <code>401 {"errorCode":"error.invalid.details"}</code> — co wygląda dokładnie jak unieważniona sesja i nią nie jest. Prawdopodobne źródło całego nieporozumienia.</p>
+      <p><strong>Czego to nie unieważnia.</strong> Burza 401 z 9–10 sierpnia była prawdziwa. Wyjaśnia ją co innego i jest już opisane w <code>capital_gateway/app.py</code>: strumień nie robi żadnych żądań REST, a sesja żyje jakieś dziesięć minut bezczynności — więc gateway, którego jedynym ruchem jest subskrypcja, trzyma tokeny wygasające z niekorzystania. Nie potrzeba do tego drugiego procesu. Zostaje też budżet 10 żądań/s liczony na konto, przez co dwa stacki dalej sobie przeszkadzają — wolnością, nie błędem.</p>
+      <p>Niesprawdzone: konta live i to, czy zachowanie jest stałe w czasie.</p>
+    </div>
   </div>
 </div>
 
