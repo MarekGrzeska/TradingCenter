@@ -157,3 +157,24 @@ def test_an_out_of_order_quote_does_not_rewind_the_candle() -> None:
 
     assert bar.time == BASE_S + 300
     assert bar.low == 100.0
+
+
+@pytest.mark.parametrize("resolution", [Resolution.DAY, Resolution.WEEK])
+def test_a_break_and_a_seal_are_told_apart(resolution: Resolution) -> None:
+    """Both leave the module needing a boundary, and they need different answers to the
+    same question — whether the provider handing back the *same* period is any use.
+
+    After a seal it is not: that period is finished. After a break it is exactly the
+    confirmation being asked for, and reading it as no progress silenced the room until
+    the next period.
+    """
+    f = FormingCandle(resolution)
+    f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
+
+    f.invalidate()
+    assert f.needs_boundary is True
+    assert f.period_is_over is False
+
+    f.on_sealed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
+    assert f.needs_boundary is True
+    assert f.period_is_over is True

@@ -443,6 +443,31 @@ async def test_asking_deeper_than_the_boundary_drops_it_and_plans_the_whole_rang
     assert _at(min(c["chunk_start"] for c in chunks)) == NOW - timedelta(days=90)
 
 
+async def test_re_adding_a_pair_without_a_date_leaves_the_boundary_alone(api, pool) -> None:
+    """A pair's `collect_from` is the deepest moment it was *ever* asked to reach, kept by
+    `LEAST` so re-tracking cannot abandon history already promised. Read as this request's
+    intent it makes every re-add look like a deeper one — dropping a boundary nobody
+    questioned, and replanning the whole span below it."""
+    boundary = NOW - timedelta(days=30)
+    async with pool.acquire() as conn:
+        await track(conn, "US100", Resolution.MINUTE, LIMIT, collect_from=NOW - timedelta(days=90))
+        await record_coverage(
+            conn,
+            "US100",
+            Resolution.MINUTE,
+            boundary,
+            NOW,
+            history_ended=True,
+            history_ends_at=boundary,
+        )
+
+    response = await api.post("/pairs", json={"symbol": "US100", "resolution": "MINUTE"})
+
+    assert response.status_code == 201
+    async with pool.acquire() as conn:
+        assert await earliest_reachable(conn, "US100", Resolution.MINUTE) == boundary
+
+
 async def test_pricing_the_same_request_leaves_the_boundary_alone(api, pool) -> None:
     """An estimate is a question. It has to price what the job would do — and it does,
     because planning does not read the boundary either — without ordering anything."""

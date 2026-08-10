@@ -247,6 +247,43 @@ describe("CollectionHistoryView — rows (terminal-collection-history spec)", ()
     expect(within(r).queryByText(/nothing in this range/)).not.toBeInTheDocument();
   });
 
+  it("does not turn a failed job into a claim about the provider's history", async () => {
+    // A chunk that failed says nothing about what is down there. Counting its absence as
+    // "collected nothing" reads an outage as the instrument having no history.
+    fakeArchive.rows = [
+      row({
+        status: "failed",
+        candlesWritten: 0,
+        chunksDone: 0,
+        chunksTotal: 1,
+        chunks: [chunk({ state: "failed", failure: "gateway did not answer" })],
+      }),
+    ];
+    renderView();
+
+    const r = await screen.findByTestId("history-1-US100-MINUTE");
+    expect(within(r).queryByText(/nothing in this range to collect/)).not.toBeInTheDocument();
+  });
+
+  it("does not call a partially failed job shallow", async () => {
+    fakeArchive.rows = [
+      row({
+        status: "partial",
+        candlesWritten: 500,
+        chunksDone: 1,
+        chunksTotal: 2,
+        chunks: [
+          chunk({ id: 1, state: "done", chunkStart: 1785542400, chunkEnd: 1785600000 }),
+          chunk({ id: 2, state: "failed", chunkStart: 1700000000, chunkEnd: 1785542400 }),
+        ],
+      }),
+    ];
+    renderView();
+
+    const r = await screen.findByTestId("history-1-US100-MINUTE");
+    expect(within(r).queryByText(/collected from/)).not.toBeInTheDocument();
+  });
+
   it("does not call a job shallow while its older chunks are still queued", async () => {
     fakeArchive.rows = [
       row({

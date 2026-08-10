@@ -410,3 +410,49 @@ async def test_a_reconnect_re_reads_the_boundary_it_may_have_missed() -> None:
     assert len(asked) == 2
     candles = [m for m in received if isinstance(m, CandleMessage)]
     assert candles[-1].time == BASE_S + 86_400
+
+
+async def test_a_reconnect_inside_the_same_period_keeps_publishing() -> None:
+    """The ordinary drop, and the one that must not cost a day of chart.
+
+    A feed blip inside a daily period leaves the boundary unconfirmed but not moved, so
+    the provider hands the same period back. Read as "no progress" — the right reading
+    after a seal — the room fell silent for the rest of the period.
+    """
+    held = Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0)
+    hub, asked = make_seeded_hub([held, held])
+    subscriber, received = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    upstream = FakeUpstream.instances[0]
+    await upstream.emit({"kind": "status", "state": "reconnecting"})
+    await upstream.emit({"kind": "status", "state": "connected"})
+    for n in range(3):
+        await upstream.emit(
+            {"kind": "quote", "t": BASE_MS + n * 1_000, "bid": 120.0 + n, "ask": 121.0}
+        )
+
+    assert len(asked) == 2
+    candles = [m for m in received if isinstance(m, CandleMessage)]
+    assert candles, "a blip must not stop the chart until the next period"
+    assert candles[-1].forming is True
+    assert candles[-1].time == BASE_S
+    assert candles[-1].high == 122.0
+
+
+async def test_a_late_joiner_is_not_handed_a_finished_period_as_forming() -> None:
+    """Between a seal and the next boundary read the room holds a bar whose period is
+    over. Handing it to a joiner as forming charts a closed period as still moving."""
+    hub, _ = make_seeded_hub([Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0), None])
+    first, _ = collector()
+    await hub.subscribe("US100", Resolution.DAY, first)
+    await FakeUpstream.instances[0].emit(
+        {"kind": "sealed", "t": BASE_S * 1000, "o": 100.0, "h": 105.0, "l": 99.0, "c": 104.0}
+    )
+
+    joiner, got = collector()
+    await hub.subscribe("US100", Resolution.DAY, joiner)
+
+    [candle] = [m for m in got if isinstance(m, CandleMessage)]
+    assert candle.forming is False
+    assert candle.time == BASE_S

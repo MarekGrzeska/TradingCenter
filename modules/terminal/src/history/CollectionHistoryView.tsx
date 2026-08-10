@@ -262,11 +262,14 @@ function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: num
   const reasons = failureReasons(row.chunks);
   const range = chunkRange(row.chunks);
   const collected = collectedRange(row.chunks);
-  // Only once the job has stopped: a range that is still filling in is not a shortfall,
-  // and saying so while chunks are queued would call every running job shallow.
-  const settled = row.status !== "running" && range !== null;
-  const shallow = settled && collected !== null && collected.start > range.start;
-  const nothingReached = settled && collected === null;
+  // Only for a job that finished cleanly. A range still filling in is not a shortfall,
+  // and a chunk that *failed* says nothing about what the provider holds — reading its
+  // absence as "the history stops here" turns an outage into a claim about the
+  // instrument. `succeeded` is exactly the case where every unfinished chunk was
+  // skipped, which is the provider having answered.
+  const whole = row.status === "succeeded" && range !== null;
+  const shallow = whole && collected !== null && collected.start > range.start;
+  const nothingReached = whole && collected === null;
   const pct = row.chunksTotal > 0 ? Math.round((row.chunksDone / row.chunksTotal) * 100) : 0;
   const explainsItself = row.status !== "running" && row.status !== "succeeded";
 

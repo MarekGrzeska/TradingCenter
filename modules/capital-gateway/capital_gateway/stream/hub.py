@@ -46,6 +46,19 @@ CurrentPeriod = Callable[[str, Resolution], Awaitable[Bar | None]]
 BOUNDARY_RETRY_SECONDS = 30.0
 
 
+def _no_progress(offered: Bar, held: Bar, forming: FormingCandle) -> bool:
+    """Whether the provider's answer leaves the room no better off than before.
+
+    Which answer counts as progress depends on why the boundary was asked for, and
+    conflating the two cost a whole period's worth of chart. After a seal the held bar's
+    period is finished, so only a later one is any use. After a break in the feed nothing
+    says the period ended — the same period handed back *is* the confirmation being asked
+    for, and rejecting it left the room silent until the next day over a drop that lasted
+    seconds.
+    """
+    return offered.time <= held.time if forming.period_is_over else offered.time < held.time
+
+
 class Room:
     def __init__(
         self,
@@ -92,13 +105,13 @@ class Room:
             return
 
         held = self.forming.current
-        if bar is None or (held is not None and bar.time <= held.time):
-            # Nothing newer than the period already known to be over. Saying so is worth
-            # a line: it is the difference between "the provider is slow to open the next
-            # candle" and "this room is broken".
+        if bar is None or (held is not None and _no_progress(bar, held, self.forming)):
+            # Nothing to seed from. Saying so is worth a line: it is the difference
+            # between "the provider is slow to open the next candle" and "this room is
+            # broken".
             self._retry_boundary_after = now + BOUNDARY_RETRY_SECONDS
             log.info(
-                "%s %s: no period newer than the one that closed; waiting",
+                "%s %s: no period to build on yet; waiting",
                 self.epic,
                 self.resolution.value,
             )
@@ -213,8 +226,12 @@ class Hub:
             return
         if room.forming.current is not None:
             # Whatever the room has built so far, so a late joiner sees a bar rather than
-            # an empty chart until the next quote.
-            await room.deliver(subscriber, room.candle_message(room.forming.current, True))
+            # an empty chart until the next quote — labelled with what it actually is. A
+            # bar whose period the provider has sealed is finished, and handing it over as
+            # forming would have a joiner chart a closed period as still moving. The
+            # window is small and real: between a daily seal and the next boundary read.
+            settled = room.forming.period_is_over
+            await room.deliver(subscriber, room.candle_message(room.forming.current, not settled))
 
     async def unsubscribe(self, epic: str, resolution: Resolution, subscriber: Subscriber) -> None:
         key = (epic, resolution)

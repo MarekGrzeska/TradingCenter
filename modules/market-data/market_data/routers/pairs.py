@@ -155,17 +155,24 @@ async def track_pairs(body: TrackPairRequest, request: Request) -> TrackPairsRes
             # planned whole. Only here: pricing a job writes nothing, and reading coverage
             # must not change what it reports (`market-data-store` spec, "Odczyt stanu
             # pokrycia nie zmienia granicy").
-            reachable = await earliest_reachable(conn, pair.symbol, pair.resolution)
-            if reachable is not None and pair.collect_from < reachable:
-                await clear_history_boundary(conn, pair.symbol, pair.resolution)
-                log.info(
-                    "%s %s: asked for %s, below the recorded boundary %s — dropping it and "
-                    "measuring again",
-                    pair.symbol,
-                    pair.resolution.value,
-                    pair.collect_from.isoformat(),
-                    reachable.isoformat(),
-                )
+            #
+            # Read from what this caller asked for, not from `pair.collect_from`. That one
+            # is `LEAST(existing, new)` — the deepest moment this pair was *ever* asked to
+            # reach — so re-adding a pair with no date at all, which asks for nothing new,
+            # would look like a deeper request and drop a boundary nobody questioned.
+            requested_from = body.collect_from
+            if requested_from is not None:
+                reachable = await earliest_reachable(conn, pair.symbol, pair.resolution)
+                if reachable is not None and requested_from < reachable:
+                    await clear_history_boundary(conn, pair.symbol, pair.resolution)
+                    log.info(
+                        "%s %s: asked for %s, below the recorded boundary %s — dropping it "
+                        "and measuring again",
+                        pair.symbol,
+                        pair.resolution.value,
+                        requested_from.isoformat(),
+                        reachable.isoformat(),
+                    )
             pair_plans, _ = await plan_chunks(
                 conn, pair.symbol, pair.resolution, pair.collect_from, now
             )
