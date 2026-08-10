@@ -96,6 +96,8 @@ function mapTrackedPair(raw: RawTrackedPair): TrackedPair {
       raw.earliest_candle === null ? null : parseIsoToEpochSeconds(raw.earliest_candle),
     latestCandle: raw.latest_candle === null ? null : parseIsoToEpochSeconds(raw.latest_candle),
     collection: raw.collection as CollectionState,
+    candleCount: raw.candle_count,
+    estimatedBytes: raw.estimated_bytes,
   };
 }
 

@@ -126,7 +126,7 @@ describe("CollectionHistoryView — rows (terminal-collection-history spec)", ()
 
     const r = await screen.findByTestId("history-1-US100-MINUTE");
     expect(within(r).getByText("US100")).toBeInTheDocument();
-    expect(within(r).getByText("MINUTE")).toBeInTheDocument();
+    expect(within(r).getByText("m1")).toBeInTheDocument();
     expect(within(r).getByText("done")).toBeInTheDocument();
     expect(within(r).getByText("1,000 candles")).toBeInTheDocument();
   });
@@ -345,7 +345,7 @@ describe("CollectionHistoryView — deletions (delete-archived-pair-data)", () =
 
     const r = await screen.findByTestId("deletion-US100-MINUTE-1786200000");
     expect(within(r).getByText("US100")).toBeInTheDocument();
-    expect(within(r).getByText("MINUTE")).toBeInTheDocument();
+    expect(within(r).getByText("m1")).toBeInTheDocument();
     expect(within(r).getByText(/−42 candles/)).toBeInTheDocument();
     expect(within(r).getByText(/→/)).toBeInTheDocument();
   });

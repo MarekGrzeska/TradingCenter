@@ -75,7 +75,7 @@ export function SymbolField({
       aria-label={label}
       value={value ?? ""}
       onChange={(event) => onChange(event.target.value === "" ? null : event.target.value)}
-      className="rounded border border-border bg-panel-strong px-1.5 py-0.5 text-sm font-semibold text-ink"
+      className="rounded border border-border bg-panel-strong px-1.5 py-0.5 text-xs text-ink"
     >
       <option value="">{status === "loading" ? "Loading…" : "Symbol…"}</option>
       {options.map((symbol) => (

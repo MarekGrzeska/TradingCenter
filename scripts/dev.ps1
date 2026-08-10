@@ -31,6 +31,7 @@
     ./scripts/dev.ps1 -NoTerminal
 #>
 
+[CmdletBinding()]
 param(
     [switch]$NoTerminal,
     [int]$WaitSeconds = 120
@@ -65,7 +66,16 @@ if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
     $problems += "docker is not on PATH (runs the database, compose.yaml) - https://docs.docker.com/get-docker/"
 } else {
+    # `*> $null` alone would still abort under $ErrorActionPreference = "Stop": redirecting
+    # a native command's stderr wraps each line as a NativeCommandError, which -Stop then
+    # promotes to terminating regardless of the redirect target — so a harmless line like
+    # Docker's own "WARNING: No blkio throttle.read_bps_device support" would kill the
+    # script before it ever got to say the daemon was fine. Scoped down to SilentlyContinue
+    # for just this call, the same way dev.sh silences both streams unconditionally.
+    $previousEap = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
     docker info *> $null
+    $ErrorActionPreference = $previousEap
     if ($LASTEXITCODE -ne 0) {
         $problems += "docker is installed but the daemon is not answering - start Docker Desktop"
     }
@@ -81,11 +91,22 @@ if (-not (Test-Path $archiveEnv)) {
 }
 
 if (-not $NoTerminal) {
-    if (-not (Get-Command pnpm -ErrorAction SilentlyContinue)) {
-        $problems += "pnpm is not on PATH (runs the terminal) - https://pnpm.io/installation"
+    if (Get-Command pnpm -ErrorAction SilentlyContinue) {
+        $usePnpm = $true
+        $terminalInstall = "pnpm install"
+    } elseif (Get-Command npm -ErrorAction SilentlyContinue) {
+        # pnpm is what the module documents, but a machine with only npm can still
+        # run a dev server, and refusing over the choice of package manager helps
+        # nobody.
+        $usePnpm = $false
+        $terminalInstall = "npm install"
+    } else {
+        $problems += "neither pnpm nor npm is on PATH (runs the terminal) - https://pnpm.io/installation"
+        $usePnpm = $true
+        $terminalInstall = "pnpm install"
     }
     if (-not (Test-Path (Join-Path $terminalDir "node_modules"))) {
-        $problems += "$terminalDir\node_modules is missing - run 'pnpm install' in modules\terminal"
+        $problems += "$terminalDir\node_modules is missing - run '$terminalInstall' in modules\terminal"
     }
 }
 
@@ -247,17 +268,21 @@ try {
     if (-not $NoTerminal) {
         Write-Host "Starting the terminal on port $terminalPort..." -ForegroundColor Cyan
         $terminalJob = Start-Job -Name "terminal" -ScriptBlock {
-            param($dir, $port)
+            param($dir, $port, $usePnpm)
             Set-Location $dir
-            pnpm exec vite --port $port --strictPort 2>&1
-        } -ArgumentList $terminalDir, $terminalPort
+            if ($usePnpm) {
+                pnpm exec vite --port $port --strictPort 2>&1
+            } else {
+                npx vite --port $port --strictPort 2>&1
+            }
+        } -ArgumentList $terminalDir, $terminalPort, $usePnpm
     }
 
     Write-Host ""
     Write-Host "Ready:" -ForegroundColor Green
     if (-not $NoTerminal) {
         Write-Host "  Terminal            $terminalUrl"
-        Write-Host "  Archive panel       $terminalUrl/archive"
+        Write-Host "  Instruments panel   $terminalUrl/instruments"
     }
     Write-Host "  market-data docs    $archiveUrl/docs"
     Write-Host "  Gateway docs        $gatewayUrl/docs"

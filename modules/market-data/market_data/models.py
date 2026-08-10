@@ -117,6 +117,14 @@ class CoverageRange(BaseModel):
         return value.astimezone(UTC)
 
 
+# A rough, deliberately round figure for one stored candle: eight numeric columns plus
+# per-row overhead. Never exact — session calendars are not consulted here — and the
+# estimate says so; see `terminal-data-manager` spec, "Zatwierdzenie kreatora otwiera
+# dialog akceptacji". Lives here, not next to a single reader, because both a job's price
+# and a tracked pair's stored size are read off it and must agree.
+ESTIMATED_BYTES_PER_CANDLE = 96
+
+
 class TrackedPairState(str, Enum):
     """Whether the operator currently wants this pair collected.
 

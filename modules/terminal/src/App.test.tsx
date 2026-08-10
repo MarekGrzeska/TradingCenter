@@ -125,18 +125,17 @@ describe("App routing (terminal-shell spec)", () => {
     expect(screen.getByText(/no tab lives at this address/i)).toBeInTheDocument();
   });
 
-  it("shows an explicit placeholder for a not-yet-implemented tab, other tabs unaffected", async () => {
-    const user = userEvent.setup();
+  // Positions, Orders and Account never shipped a view, so the registry never carried
+  // them past that (`terminal-shell` spec, "Rejestr zakładek jest otwarty") — their
+  // addresses behave like any other unknown one, not like a placeholder tab.
+  it("sends the old placeholder addresses to the unknown-tab page, not a tab", async () => {
+    window.history.pushState({}, "", "/account");
     await renderApp();
 
-    // Graph is implemented; Account is one of the registry entries reserved
-    // for a later change.
-    await user.click(screen.getByRole("link", { name: "Account" }));
-    expect(screen.getByText(/isn't built yet/i)).toBeInTheDocument();
-
-    await user.click(screen.getByRole("link", { name: "Graph" }));
-    expect(window.location.pathname).toBe("/graph");
-    expect(screen.queryByText(/isn't built yet/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/no tab lives at this address/i)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Account" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Positions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Orders" })).not.toBeInTheDocument();
   });
 
   it("shows a way back to the default tab for an unknown address", async () => {

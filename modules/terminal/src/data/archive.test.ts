@@ -245,6 +245,8 @@ describe("archive pair management", () => {
             earliest_candle: "2026-07-26T00:00:00Z",
             latest_candle: "2026-08-07T14:40:00Z",
             collection: "collecting",
+            candle_count: 12431,
+            estimated_bytes: 1193376,
           },
           {
             symbol: "GOLD",
@@ -254,6 +256,8 @@ describe("archive pair management", () => {
             earliest_candle: null,
             latest_candle: null,
             collection: "never_collected",
+            candle_count: 0,
+            estimated_bytes: 0,
           },
         ]),
       ),
@@ -269,6 +273,8 @@ describe("archive pair management", () => {
         earliestCandle: 1785024000,
         latestCandle: 1786113600,
         collection: "collecting",
+        candleCount: 12431,
+        estimatedBytes: 1193376,
       },
       {
         symbol: "GOLD",
@@ -278,6 +284,8 @@ describe("archive pair management", () => {
         earliestCandle: null,
         latestCandle: null,
         collection: "never_collected",
+        candleCount: 0,
+        estimatedBytes: 0,
       },
     ]);
   });
@@ -519,6 +527,8 @@ describe("archive: reading a subscription's refusal off the tracked list", () =>
     earliestCandle: null,
     latestCandle: null,
     collection: "never_collected",
+    candleCount: 0,
+    estimatedBytes: 0,
   });
 
   // The archive refuses before the handshake, so the browser never learns why:

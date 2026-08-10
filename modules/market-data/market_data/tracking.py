@@ -117,6 +117,12 @@ class TrackedPairStatus(BaseModel):
     earliest_candle: datetime | None
     latest_candle: datetime | None
     collection: CollectionState
+    # How many candles are actually collected — the date range alone cannot say, since a
+    # pair with a wide range and a thin scatter of candles inside it looks the same as one
+    # collected densely. Defaulted rather than required: most call sites build this from
+    # `_SELECT_STATUS`, which always has the real count, but a handful construct one to
+    # describe a pair's timing alone.
+    candle_count: int = 0
 
 
 def default_collect_from(resolution: Resolution, default_bars: int, now: datetime) -> datetime:
@@ -177,10 +183,15 @@ _SELECT_COLLECT_FROM = """
 # One query for every tracked pair's oldest and newest candle rather than one query per
 # pair. The left join keeps a pair that has never collected anything, which is a state an
 # operator needs to see rather than a row that quietly goes missing.
+#
+# `count(c.period_start)`, not `count(*)`: with a LEFT JOIN, `count(*)` counts the joined
+# row even when every one of its columns is NULL, so a pair with nothing collected would
+# report one candle instead of zero.
 _SELECT_STATUS = """
     SELECT t.symbol, t.resolution, t.added_at, t.collect_from,
            min(c.period_start) AS earliest_candle,
-           max(c.period_start) AS latest_candle
+           max(c.period_start) AS latest_candle,
+           count(c.period_start) AS candle_count
       FROM tracked_pairs t
       LEFT JOIN candles c
         ON c.symbol = t.symbol AND c.resolution = t.resolution
@@ -341,6 +352,7 @@ async def read_status(
                 collection=collection_state(
                     resolution, latest, moment, lookup.get((row["symbol"], resolution))
                 ),
+                candle_count=row["candle_count"],
             )
         )
     return statuses

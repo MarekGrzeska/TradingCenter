@@ -1,7 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
+import { todayInWarsaw, warsawMidnightEpochSeconds } from "../ui/formatTime";
 import type {
   AssetClass,
   Instrument,
@@ -124,9 +125,11 @@ describe("AddInstrumentWizard — steps (terminal-data-manager spec)", () => {
 
     const field = screen.getByLabelText("History from") as HTMLInputElement;
 
-    expect(field.value).toBe(`${new Date().getUTCFullYear()}-01-01`);
+    // Warsaw's own year, not UTC's — the two disagree for an hour or two around
+    // every New Year, which is exactly the gap a UTC-based expectation here would miss.
+    expect(field.value).toBe(`${todayInWarsaw().slice(0, 4)}-01-01`);
     // And never a date the archive would refuse outright.
-    expect(field.value <= new Date().toISOString().slice(0, 10)).toBe(true);
+    expect(field.value <= todayInWarsaw()).toBe(true);
   });
 
   it("blocks review until an instrument and at least one resolution are chosen", async () => {
@@ -142,7 +145,7 @@ describe("AddInstrumentWizard — steps (terminal-data-manager spec)", () => {
     expect(submit).toBeDisabled();
     expect(screen.getByText(/choose at least one resolution/i)).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "1m" }));
+    await user.click(screen.getByRole("button", { name: "m1" }));
     expect(submit).toBeEnabled();
   });
 
@@ -215,8 +218,8 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
   async function reachDialog(user: ReturnType<typeof userEvent.setup>) {
     await pickAssetClass(user, "CRYPTO");
     await pickInstrument(user, "BTCUSD");
-    await user.click(screen.getByRole("button", { name: "1m" }));
-    await user.click(screen.getByRole("button", { name: "1h" }));
+    await user.click(screen.getByRole("button", { name: "m1" }));
+    await user.click(screen.getByRole("button", { name: "h1" }));
     await user.click(screen.getByRole("button", { name: /review and add/i }));
   }
 
@@ -232,14 +235,40 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
     await reachDialog(user);
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("MINUTE")).toBeInTheDocument();
-    expect(within(dialog).getByText("HOUR")).toBeInTheDocument();
+    expect(within(dialog).getByText("m1")).toBeInTheDocument();
+    expect(within(dialog).getByText("h1")).toBeInTheDocument();
     expect(within(dialog).getByText(/total: 2,000 candles/i)).toBeInTheDocument();
     expect(fakeArchive.estimateCalls).toHaveLength(1);
     expect(fakeArchive.estimateCalls[0].pairs).toEqual([
       { symbol: "BTCUSD", resolution: "MINUTE" },
       { symbol: "BTCUSD", resolution: "HOUR" },
     ]);
+  });
+
+  // The date field is the operator's own calendar, not UTC's — picking "2026-08-01" MUST
+  // mean the start of that day in Warsaw (`terminal-shell` spec, "Czas jest pokazywany w
+  // polskiej strefie czasowej", scenario "Data podana przez operatora").
+  it("reads the picked date as the start of that day in Warsaw, not in UTC", async () => {
+    const user = userEvent.setup();
+    fakeArchive.estimateAnswer = {
+      pairs: [pairEstimate("BTCUSD", "MINUTE")],
+      totalEstimatedCandles: 1000,
+      totalEstimatedBytes: 64000,
+    };
+    renderWizard();
+
+    fireEvent.change(screen.getByLabelText("History from"), {
+      target: { value: "2026-08-01" },
+    });
+    await pickAssetClass(user, "CRYPTO");
+    await pickInstrument(user, "BTCUSD");
+    await user.click(screen.getByRole("button", { name: "m1" }));
+    await user.click(screen.getByRole("button", { name: /review and add/i }));
+
+    await screen.findByRole("dialog");
+    expect(fakeArchive.estimateCalls[0].collectFrom).toBe(
+      warsawMidnightEpochSeconds("2026-08-01"),
+    );
   });
 
   // The operator decides on cost from these numbers, so their being calendar-period
@@ -277,6 +306,8 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
         earliestCandle: null,
         latestCandle: null,
         collection: "collecting",
+        candleCount: 0,
+        estimatedBytes: 0,
       },
     ]);
 
@@ -310,7 +341,7 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
 
     await pickAssetClass(user, "CRYPTO");
     await pickInstrument(user, "BTCUSD");
-    await user.click(screen.getByRole("button", { name: "1m" }));
+    await user.click(screen.getByRole("button", { name: "m1" }));
     await user.click(screen.getByRole("button", { name: /review and add/i }));
 
     await screen.findByRole("dialog");
@@ -320,7 +351,7 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     // The wizard's own choices survived the round trip.
     expect(screen.getByText("BTCUSD")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "1m", pressed: true })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "m1", pressed: true })).toBeInTheDocument();
   });
 
   it("starts collection, lists what is now archiving, points to Data History, and resets the wizard", async () => {
@@ -343,6 +374,8 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
             earliestCandle: null,
             latestCandle: null,
             collection: "never_collected",
+            candleCount: 0,
+            estimatedBytes: 0,
           },
           refused: null,
         },
@@ -353,13 +386,13 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
 
     await pickAssetClass(user, "CRYPTO");
     await pickInstrument(user, "BTCUSD");
-    await user.click(screen.getByRole("button", { name: "1m" }));
+    await user.click(screen.getByRole("button", { name: "m1" }));
     await user.click(screen.getByRole("button", { name: /review and add/i }));
     await screen.findByRole("dialog");
     await user.click(screen.getByRole("button", { name: /start collecting/i }));
 
     expect(await screen.findByText(/collecting started/i)).toBeInTheDocument();
-    expect(screen.getByText("BTCUSD MINUTE")).toBeInTheDocument();
+    expect(screen.getByText("BTCUSD m1")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /data history/i })).toHaveAttribute(
       "href",
       "/data-history",
@@ -394,6 +427,8 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
             earliestCandle: null,
             latestCandle: null,
             collection: "never_collected",
+            candleCount: 0,
+            estimatedBytes: 0,
           },
           refused: null,
         },
@@ -410,13 +445,13 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
 
     await pickAssetClass(user, "CRYPTO");
     await pickInstrument(user, "BTCUSD");
-    await user.click(screen.getByRole("button", { name: "1m" }));
-    await user.click(screen.getByRole("button", { name: "1h" }));
+    await user.click(screen.getByRole("button", { name: "m1" }));
+    await user.click(screen.getByRole("button", { name: "h1" }));
     await user.click(screen.getByRole("button", { name: /review and add/i }));
     await screen.findByRole("dialog");
     await user.click(screen.getByRole("button", { name: /start collecting/i }));
 
-    expect(await screen.findByText("BTCUSD MINUTE")).toBeInTheDocument();
+    expect(await screen.findByText("BTCUSD m1")).toBeInTheDocument();
     expect(screen.getByText(/raise MAX_TRACKED_PAIRS/i)).toBeInTheDocument();
   });
 });

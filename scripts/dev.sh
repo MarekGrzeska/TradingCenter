@@ -246,7 +246,7 @@ echo
 ok "Ready:"
 if (( START_TERMINAL )); then
   echo "  Terminal            http://localhost:$TERMINAL_PORT"
-  echo "  Archive panel       http://localhost:$TERMINAL_PORT/archive"
+  echo "  Instruments panel   http://localhost:$TERMINAL_PORT/instruments"
 fi
 echo "  market-data docs    $ARCHIVE_URL/docs"
 echo "  Gateway docs        $GATEWAY_URL/docs"

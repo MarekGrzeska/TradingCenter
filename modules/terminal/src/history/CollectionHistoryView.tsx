@@ -3,8 +3,9 @@ import { Link } from "react-router";
 import { archive } from "../data/marketData";
 import { RESOLUTIONS } from "../data/types";
 import type { Chunk, JobPairView, JobStatus, PairDeletion, Resolution } from "../data/types";
-import { formatInstant } from "../instruments/format";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
+import { formatInstant } from "../ui/formatTime";
+import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { useJobHistory } from "./useJobHistory";
 import type { JobHistoryState } from "./useJobHistory";
 
@@ -289,7 +290,7 @@ function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: num
         }`}
       >
         <td className="px-4 py-1.5 font-semibold text-ink">{row.symbol}</td>
-        <td className="px-4 py-1.5 text-ink-secondary">{row.resolution}</td>
+        <td className="px-4 py-1.5 text-ink-secondary">{RESOLUTION_LABEL[row.resolution]}</td>
         <td className="px-4 py-1.5 text-ink-muted">{formatInstant(row.createdAt)}</td>
         <td className="px-4 py-1.5">
           <span className={STATUS_CLASS[row.status]}>{STATUS_LABEL[row.status]}</span>
@@ -429,7 +430,7 @@ function JobDialog({
           {rows.map((row) => (
             <tr key={`${row.symbol}|${row.resolution}`} className="border-t border-border">
               <td className="px-2 py-1.5 font-semibold text-ink">{row.symbol}</td>
-              <td className="px-2 py-1.5 text-ink-secondary">{row.resolution}</td>
+              <td className="px-2 py-1.5 text-ink-secondary">{RESOLUTION_LABEL[row.resolution]}</td>
               <td className="px-2 py-1.5">
                 <span className={STATUS_CLASS[row.status]}>{STATUS_LABEL[row.status]}</span>
               </td>
@@ -554,7 +555,7 @@ function DeletionRow({ deletion }: { deletion: PairDeletion }) {
       className="border-t border-border"
     >
       <td className="px-4 py-1.5 font-semibold text-ink">{deletion.symbol}</td>
-      <td className="px-4 py-1.5 text-ink-secondary">{deletion.resolution}</td>
+      <td className="px-4 py-1.5 text-ink-secondary">{RESOLUTION_LABEL[deletion.resolution]}</td>
       <td className="px-4 py-1.5 text-ink-muted">{formatInstant(deletion.deletedAt)}</td>
       <td className="px-4 py-1.5">
         <span className="font-semibold text-ink-secondary">deleted</span>

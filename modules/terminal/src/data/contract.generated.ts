@@ -860,6 +860,11 @@ export interface components {
              */
             added_at: string;
             /**
+             * Candle Count
+             * @description how many candles are collected for this pair
+             */
+            candle_count: number;
+            /**
              * Collect From
              * Format: date-time
              * @description the moment history for this pair is meant to reach back to
@@ -872,6 +877,11 @@ export interface components {
              * @description the oldest period collected — how far back the data actually reaches, which is not `collect_from` (where it was asked to reach) — or null if none yet
              */
             earliest_candle: string | null;
+            /**
+             * Estimated Bytes
+             * @description a rough estimate of how much storage those candles take, derived from `candle_count` the same way a job's price is
+             */
+            estimated_bytes: number;
             /** @description the pair's most recent backfill, or null if none has run since the module started — fills live in memory and do not survive a restart */
             last_fill: components["schemas"]["FillOut"] | null;
             /**
