@@ -229,19 +229,49 @@ po grupach zadań.
 
 ## Migration Plan
 
-Bez migracji bazy i bez ręcznego zapisu do niej. Kolejność:
+**Jest migracja `0007` i MUSI zostać zastosowana zanim ruszy nowy `market-data`.** Nowy kod
+czyta `history_ends_at` w każdym odczycie pokrycia — `/candles`, `/coverage`,
+`/jobs/estimate`, `POST /pairs` — więc uruchomiony przed migracją odpowiada na to wszystko
+pięćsetką. To nie jest degradacja, to cztery endpointy naraz.
+
+Migracja nie jedzie ani z obrazem, ani z workflow. `Dockerfile` mówi wprost dlaczego
+(8.6: restart nie ma ścigać się o migrację), a `deploy-market-data.yml` nie robi jej
+w ogóle — więc robi ją operator, i jest to krok, o którym trzeba pamiętać, bo nic o nim
+nie przypomni.
+
+Kolejność:
 
 1. Wdrożyć `capital-gateway` w całości — warunek na `history_ended`, oznaczanie świecy
    w budowie i zasiew strumienia razem. Osobno nie wolno: bez warunku `market-data` skasuje
    granicę i natychmiast zapisze ją ponownie z tego samego błędu, a bez zasiewu odjęcie
    świecy bieżącej z archiwum zabrałoby ją z wykresu, nie dając nic w zamian.
-2. Wdrożyć `market-data`. Do tej chwili nowe pole w DTO jest po prostu ignorowane —
-   `market-data` czyta odpowiedź gatewaya przez własny model, więc kolejność jest
+2. **`uv run alembic upgrade head`** z tożsamością produkcyjną (`DATABASE_USER` ustawione —
+   `migrations/env.py` używa tego samego mechanizmu co moduł).
+3. Wdrożyć `market-data`. Nowe pole w DTO gatewaya było do tej chwili po prostu ignorowane
+   — `market-data` czyta odpowiedź gatewaya przez własny model, więc kolejność 1 → 3 jest
    bezpieczna w tę stronę i tylko w tę.
-3. Operator prosi o US100 od 2024-01-01 dla wszystkich siedmiu rozdzielczości. Granica
+4. Operator prosi o US100 od 2024-01-01 dla wszystkich siedmiu rozdzielczości. Granica
    zostaje zdjęta, zlecenie planuje pełny zakres i zbiera to, co provider ma.
-4. Sprawdzić `GET /coverage/US100?resolution=DAY`: `earliest_reachable` jest albo puste,
+5. Sprawdzić `GET /coverage/US100?resolution=DAY`: `earliest_reachable` jest albo puste,
    albo wskazuje moment, w którym faktycznie skończyły się dane.
 
-Wycofanie: rewert obu modułów. Flagi zdjęte do tego czasu zostają zdjęte, co jest bezpieczne
-— najgorsze, co robi brak granicy, to jedno dodatkowe żądanie przy kolejnym zleceniu.
+Krok 2 zostawia wąskie okno, w którym stary jeszcze writer może trafić na koniec historii
+i spróbować zapisać flagę bez punktu — check-constraint go wtedy odrzuci i kawałek padnie,
+raz, retryowalnie. To jest cena rzędu jednego kawałka, a cena odwrotnej kolejności to
+cztery endpointy leżące do czasu ręcznej interwencji. Rozważano rozbicie na dwie migracje
+po przeciwnych stronach kroku 3; odrzucone, bo dokłada operatorowi krok, o którym też nikt
+nie przypomni, żeby uniknąć czegoś, co jest jedną nieudaną próbą.
+
+Wycofanie: rewert obu modułów, migracji **nie** cofać. Kolumna zostawiona na miejscu nie
+przeszkadza kodowi sprzed zmiany, a `downgrade -1` na działającej produkcji zabrałby ją
+spod zapytań, które właśnie ją czytają — czyli powtórzyłby tę samą awarię z drugiej strony.
+Flagi zdjęte do czasu wycofania zostają zdjęte, co jest bezpieczne: najgorsze, co robi brak
+granicy, to jedno dodatkowe żądanie przy kolejnym zleceniu.
+
+**Co się faktycznie wydarzyło.** Ten plan przy wdrożeniu nie istniał w tej postaci — sekcja
+otwierała się zdaniem „bez migracji bazy", napisanym zanim `0007` powstała i nigdy potem
+nieprzejrzanym. PR zmergowano, trzy deploye przeszły, i produkcyjny `market-data` stanął na
+nowym kodzie przy bazie na `0006`. Kreator odpowiedział „the archive failed to answer this
+request", bo tak wygląda `UndefinedColumnError` po przejściu przez catch-all w `app.py`.
+Naprawione ręcznym `alembic upgrade 0007` na produkcji. Szczegóły w `review.md` — to jest
+ten rodzaj rzeczy, dla którego ten plik istnieje.
