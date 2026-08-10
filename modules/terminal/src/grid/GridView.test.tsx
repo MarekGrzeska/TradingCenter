@@ -14,6 +14,9 @@ vi.mock("lightweight-charts", () => ({
   LineStyle: { Dashed: 2 },
   createChart: () => ({
     addSeries: () => ({ setData: () => {}, update: () => {} }),
+    addPane: () => ({ setStretchFactor: () => {}, paneIndex: () => 1 }),
+    removePane: () => {},
+    panes: () => [{ setStretchFactor: () => {} }],
     remove: () => {},
     resize: () => {},
     timeScale: () => ({

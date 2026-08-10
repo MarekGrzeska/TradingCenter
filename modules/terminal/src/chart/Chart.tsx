@@ -9,6 +9,7 @@ import {
   LineSeries,
   LineStyle,
   type IChartApi,
+  type IPaneApi,
   type IPriceLine,
   type ISeriesApi,
   type LogicalRange,
@@ -57,14 +58,21 @@ export interface ChartProps {
   indicatorSource?: IndicatorSource;
 }
 
-/** Only a price-pane overlay draws today — an own-pane oscillator (ATR, RSI, …)
- *  is etap E1 (`docs/wskazniki-plan-wdrozenia.html`, `chart.addPane()`). Kept
- *  as a predicate rather than a filter on the catalogue itself: the picker still
- *  lists every wskaźnik the archive offers, this only decides which of them the
- *  operator may currently pick. */
+/** Price-pane overlays and own-pane oscillators both draw today — only the
+ *  three later output shapes (markers, zones, levels) do not yet have a
+ *  primitive to draw with (E2-E4). Kept as a predicate rather than a filter on
+ *  the catalogue itself: the picker still lists every wskaźnik the archive
+ *  offers, this only decides which of them the operator may currently pick. */
 function canDrawIndicator(entry: IndicatorCatalogueEntry): boolean {
-  return entry.render.pane === "price" && entry.output === "lines";
+  return (entry.render.pane === "price" || entry.render.pane === "own") && entry.output === "lines";
 }
+
+/** The price pane's own stretch factor, set once at chart creation so an
+ *  own-pane oscillator added later does not grow to the price chart's own
+ *  height — `lightweight-charts`' default (equal stretch for every pane) reads
+ *  as "RSI is as important as the candles" the moment a second pane exists. */
+const PRICE_PANE_STRETCH = 4;
+const OWN_PANE_STRETCH = 1;
 
 function toCandlestick(bar: Bar): CandlestickData<Time> {
   return {
@@ -119,6 +127,11 @@ export function Chart({
   const colorsRef = useRef<ChartColors | null>(null);
   // One line series per (wskaźnik, params, line key) — see the sync effect below.
   const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line">>>(new Map());
+  // One pane per (wskaźnik, params) whose `render.pane` is "own" — RSI and MACD
+  // each get their own row, the way every other charting platform draws them,
+  // rather than sharing one oscillator pane between wskaźniki that disagree
+  // about scale.
+  const ownPanesRef = useRef<Map<string, IPaneApi<Time>>>(new Map());
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -200,6 +213,7 @@ export function Chart({
     chartRef.current = chart;
     seriesRef.current = series;
     colorsRef.current = colors;
+    chart.panes()[0]?.setStretchFactor(PRICE_PANE_STRETCH);
 
     // Whatever the feed already delivered before this effect re-ran (a
     // StrictMode remount, most often) is redrawn rather than lost.
@@ -227,6 +241,7 @@ export function Chart({
     observer.observe(container);
 
     const indicatorSeries = indicatorSeriesRef.current;
+    const ownPanes = ownPanesRef.current;
     return () => {
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
@@ -235,10 +250,11 @@ export function Chart({
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
       priceLineRef.current = null;
-      // Every wskaźnik series belonged to it too — `chart.remove()` already freed
-      // them, this only stops the sync effect below from reaching for one that is
-      // gone.
+      // Every wskaźnik series and pane belonged to it too — `chart.remove()`
+      // already freed them, this only stops the sync effect below from reaching
+      // for one that is gone.
       indicatorSeries.clear();
+      ownPanes.clear();
     };
   }, []);
 
@@ -449,14 +465,16 @@ export function Chart({
   }, [source, symbol, resolution]);
 
   // --- wskaźniki: one Line series per (id, params, line key), synced to what the
-  // archive last answered. Only a price-pane line draws in this etap — see
-  // `canDrawIndicator` on why an own-pane wskaźnik is pickable but not drawn yet.
+  // archive last answered. A price-pane entry draws on the candles' own pane; an
+  // own-pane entry (RSI, ATR, MACD, …) gets a pane of its own, one per (id,
+  // params) rather than one shared by every oscillator — see `canDrawIndicator`.
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
     const colors = colorsRef.current ?? readChartColors();
 
     const active = new Set<string>();
+    const activeOwnPanes = new Set<string>();
     let colorIndex = 0;
 
     for (const result of indicatorsState.results) {
@@ -464,6 +482,20 @@ export function Chart({
       if (!entry || !result.lines || !canDrawIndicator(entry)) continue;
 
       const paramsKey = entry.params.map((p) => result.params[p.name]).join(",");
+      const ownPaneKey = `${result.id}|${paramsKey}`;
+
+      let paneIndex: number | undefined;
+      if (entry.render.pane === "own") {
+        activeOwnPanes.add(ownPaneKey);
+        let pane = ownPanesRef.current.get(ownPaneKey);
+        if (!pane) {
+          pane = chart.addPane();
+          pane.setStretchFactor(OWN_PANE_STRETCH);
+          ownPanesRef.current.set(ownPaneKey, pane);
+        }
+        paneIndex = pane.paneIndex();
+      }
+
       for (const lineSpec of entry.lines) {
         const key = `${result.id}|${paramsKey}|${lineSpec.key}`;
         active.add(key);
@@ -479,13 +511,17 @@ export function Chart({
 
         let line = indicatorSeriesRef.current.get(key);
         if (!line) {
-          line = chart.addSeries(LineSeries, {
-            color: indicatorLineColor(colors, colorIndex),
-            lineWidth: 1,
-            lastValueVisible: false,
-            priceLineVisible: false,
-            ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
-          });
+          line = chart.addSeries(
+            LineSeries,
+            {
+              color: indicatorLineColor(colors, colorIndex),
+              lineWidth: 1,
+              lastValueVisible: false,
+              priceLineVisible: false,
+              ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
+            },
+            paneIndex,
+          );
           indicatorSeriesRef.current.set(key, line);
         }
         line.setData(points);
@@ -497,6 +533,12 @@ export function Chart({
       if (active.has(key)) continue;
       chart.removeSeries(line);
       indicatorSeriesRef.current.delete(key);
+    }
+
+    for (const [ownPaneKey, pane] of ownPanesRef.current) {
+      if (activeOwnPanes.has(ownPaneKey)) continue;
+      chart.removePane(pane.paneIndex());
+      ownPanesRef.current.delete(ownPaneKey);
     }
   }, [indicatorsState.results, indicatorsState.times, catalogueById]);
 

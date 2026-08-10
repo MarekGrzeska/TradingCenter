@@ -651,6 +651,47 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     ]);
   });
 
+  it("draws an own-pane wskaźnik in a pane of its own, not the price pane", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "atr",
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: "atr", label: "ATR {period}", style: null }],
+        render: { pane: "own", style: "line", scale: "own", autoscale: true, range: null, levels: [] },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ id: "atr", params: { period: 14 }, lines: { atr: [1.5, 1.6] } }),
+        ],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr$/i }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    // Pane 0 is the price pane the candles live on — an own-pane wskaźnik must
+    // land anywhere else, in a pane `Chart` created for it.
+    expect(lineSeries()[0].paneIndex).not.toBe(0);
+    expect(stub.latest().panesList).toHaveLength(2);
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(0));
+    expect(stub.latest().panesList).toHaveLength(1);
+  });
+
   it("draws a missing value as a whitespace point, never as zero", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [indicatorEntry()];
@@ -819,12 +860,32 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(indicators.computeCalls).toHaveLength(1);
   });
 
-  it("keeps a wskaźnik whose render style this chart cannot draw yet unselectable", async () => {
+  it("keeps a wskaźnik whose output shape this chart cannot draw yet unselectable", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "swing_points",
+        name: "Swing Points",
+        // markers/zones/levels have no drawing primitive until E2-E4 — a
+        // price- or own-pane "lines" entry (atr, rsi, …) is drawable from E1.
+        output: "markers",
+      }),
+    ];
+    renderChart(source, { indicatorSource: indicators });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+
+    expect(await screen.findByRole("checkbox", { name: /^swing_points$/i })).toBeDisabled();
+  });
+
+  it("makes an own-pane wskaźnik (RSI, ATR, …) selectable and drawable, not just price-pane overlays", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
       indicatorEntry({
         id: "atr",
         name: "Average True Range",
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: "atr", label: "ATR {period}", style: null }],
         render: { pane: "own", style: "line", scale: "own", autoscale: true, range: null, levels: [] },
       }),
     ];
@@ -832,6 +893,6 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
 
-    expect(await screen.findByRole("checkbox", { name: /^atr$/i })).toBeDisabled();
+    expect(await screen.findByRole("checkbox", { name: /^atr$/i })).not.toBeDisabled();
   });
 });
