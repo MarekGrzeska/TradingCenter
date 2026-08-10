@@ -1,0 +1,419 @@
+<title>Co dalej — wnioski z 10 sierpnia</title>
+<style>
+  :root {
+    --ground: #EDF0F2;
+    --panel: #F7F9FA;
+    --ink: #17212A;
+    --ink-soft: #5A6773;
+    --ink-faint: #8794A0;
+    --rule: #D2DAE0;
+    --accent: #A8620A;
+    --accent-soft: #F0E2CE;
+    --critical: #9E2530;
+    --warn: #A8620A;
+    --ok: #2C6650;
+    --code-bg: #E4E9EC;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #12181D;
+      --panel: #1A2128;
+      --ink: #DFE6EB;
+      --ink-soft: #9DAAB5;
+      --ink-faint: #6E7C88;
+      --rule: #2C363E;
+      --accent: #E0A343;
+      --accent-soft: #3A2E1C;
+      --critical: #E0737E;
+      --warn: #E0A343;
+      --ok: #6FBB99;
+      --code-bg: #222B33;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #12181D;
+    --panel: #1A2128;
+    --ink: #DFE6EB;
+    --ink-soft: #9DAAB5;
+    --ink-faint: #6E7C88;
+    --rule: #2C363E;
+    --accent: #E0A343;
+    --accent-soft: #3A2E1C;
+    --critical: #E0737E;
+    --warn: #E0A343;
+    --ok: #6FBB99;
+    --code-bg: #222B33;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, Georgia, serif;
+    font-size: 17px;
+    line-height: 1.62;
+    margin: 0;
+    padding: 0 1.5rem 6rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 46rem; margin: 0 auto; }
+
+  h1, h2, h3, .label, .chip, .rank {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  }
+
+  header {
+    padding: 4.5rem 0 2.5rem;
+    border-bottom: 2px solid var(--ink);
+    margin-bottom: 3rem;
+  }
+  .eyebrow {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin: 0 0 1.25rem;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    line-height: 1.08;
+    letter-spacing: -0.022em;
+    font-weight: 650;
+    margin: 0 0 1.1rem;
+    text-wrap: balance;
+  }
+  .thesis {
+    font-size: 1.16rem;
+    color: var(--ink-soft);
+    margin: 0;
+    max-width: 38rem;
+  }
+
+  h2 {
+    font-size: 0.78rem;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    font-weight: 650;
+    color: var(--ink-faint);
+    margin: 4rem 0 1.5rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  p { margin: 0 0 1.1rem; }
+  a { color: var(--accent); }
+
+  code, .mono {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.86em;
+  }
+  code {
+    background: var(--code-bg);
+    padding: 0.1em 0.36em;
+    border-radius: 3px;
+  }
+
+  /* --- timeline: order carries information, so it is typed as a sequence --- */
+  .timeline { display: flex; flex-direction: column; gap: 0; margin: 0 0 1rem; }
+  .tl-row {
+    display: grid;
+    grid-template-columns: 5.5rem 1fr;
+    gap: 1.25rem;
+    padding: 0.7rem 0;
+    border-top: 1px solid var(--rule);
+    align-items: baseline;
+  }
+  .tl-row:last-child { border-bottom: 1px solid var(--rule); }
+  .tl-time {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink-faint);
+  }
+  .tl-what { font-size: 0.97rem; }
+  .tl-row.bad .tl-time { color: var(--critical); font-weight: 600; }
+
+  /* --- recommendations --- */
+  .rec {
+    display: grid;
+    grid-template-columns: 2.6rem 1fr;
+    gap: 0 1.1rem;
+    margin: 0 0 3.2rem;
+  }
+  .rank {
+    font-size: 1.5rem;
+    font-weight: 650;
+    line-height: 1.15;
+    color: var(--ink-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .rec-body { min-width: 0; }
+  .rec h3 {
+    font-size: 1.24rem;
+    line-height: 1.25;
+    font-weight: 650;
+    letter-spacing: -0.012em;
+    margin: 0 0 0.5rem;
+    text-wrap: balance;
+  }
+  .chips { display: flex; flex-wrap: wrap; gap: 0.45rem; margin: 0 0 0.9rem; }
+  .chip {
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border: 1px solid var(--rule);
+    border-radius: 2px;
+    color: var(--ink-soft);
+  }
+  .chip.sev-1 { color: var(--critical); border-color: var(--critical); }
+  .chip.sev-2 { color: var(--warn); border-color: var(--warn); }
+
+  /* evidence breaks the reading column */
+  .evidence {
+    background: var(--panel);
+    border-left: 3px solid var(--warn);
+    padding: 0.95rem 1.1rem;
+    margin: 1.1rem 0;
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.79rem;
+    line-height: 1.55;
+    color: var(--ink-soft);
+    overflow-x: auto;
+  }
+  .evidence .ev-label {
+    display: block;
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    margin-bottom: 0.5rem;
+  }
+  .evidence.crit { border-left-color: var(--critical); }
+
+  .move {
+    border-top: 1px solid var(--rule);
+    padding-top: 0.85rem;
+    margin-top: 1.1rem;
+    font-size: 0.95rem;
+  }
+  .move strong {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.72rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--ink-faint);
+    display: block;
+    margin-bottom: 0.3rem;
+    font-weight: 650;
+  }
+
+  ul { margin: 0 0 1.1rem; padding-left: 1.2rem; }
+  li { margin-bottom: 0.4rem; }
+
+  .done-list { display: flex; flex-direction: column; gap: 0; }
+  .done-row {
+    display: grid;
+    grid-template-columns: 4.5rem 1fr;
+    gap: 1.1rem;
+    padding: 0.65rem 0;
+    border-top: 1px solid var(--rule);
+    align-items: baseline;
+    font-size: 0.95rem;
+  }
+  .done-row:last-child { border-bottom: 1px solid var(--rule); }
+  .pr {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 0.78rem;
+    color: var(--ok);
+    font-variant-numeric: tabular-nums;
+  }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    font-size: 0.9rem;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 34rem) {
+    .rec { grid-template-columns: 1fr; gap: 0; }
+    .rank { margin-bottom: 0.3rem; }
+    .tl-row, .done-row { grid-template-columns: 1fr; gap: 0.15rem; }
+  }
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">TradingCenter · 10 sierpnia 2026</p>
+  <h1>Co dalej, i dlaczego akurat to</h1>
+  <p class="thesis">Trzy błędy naprawione, jedno wdrożenie położyło produkcję, a alarm, który miał to złapać, świecił się na czerwono od poprzedniego wieczora. Poniżej pięć rzeczy w kolejności tego, co dziś faktycznie zabolało — nie tego, co najciekawsze.</p>
+</header>
+
+<h2>Przebieg dnia</h2>
+
+<div class="timeline">
+  <div class="tl-row">
+    <span class="tl-time">09:15</span>
+    <span class="tl-what">PR #47 zmergowany. Trzy deploye zgłaszają sukces.</span>
+  </div>
+  <div class="tl-row bad">
+    <span class="tl-time">09:15–09:50</span>
+    <span class="tl-what">market-data chodzi na nowym kodzie przy bazie sprzed migracji. <code>/candles</code>, <code>/coverage</code>, <code>/jobs/estimate</code> i <code>POST /pairs</code> odpowiadają pięćsetką. Ingest każdej pary umiera na pierwszym fillu.</span>
+  </div>
+  <div class="tl-row">
+    <span class="tl-time">09:50</span>
+    <span class="tl-what">Migracja <code>0007</code> zastosowana ręcznie. Baza naprawiona, zadania ingestu zostają martwe.</span>
+  </div>
+  <div class="tl-row">
+    <span class="tl-time">09:55</span>
+    <span class="tl-what">Zlecenie dociąga głęboką historię — 87 tysięcy świec. Naprawa granicy działa.</span>
+  </div>
+  <div class="tl-row bad">
+    <span class="tl-time">09:57–10:27</span>
+    <span class="tl-what">Archiwum nie zapisuje nic, na żadnej rozdzielczości. Jedyny objaw: nieruchomy wykres.</span>
+  </div>
+  <div class="tl-row">
+    <span class="tl-time">10:27</span>
+    <span class="tl-what">Restart market-data. Zbieranie wraca w ciągu trzech minut.</span>
+  </div>
+</div>
+
+<p>Diagnoza szła przez czytanie produkcyjnej bazy. Nie musiała — dowód leżał w Application Insights od 09:50, a pierwsze zapytanie, którym go szukałem, po cichu padło i wyciągnąłem z tego wniosek, że telemetrii nie ma. Miała ją market-data. Nie miał jej gateway.</p>
+
+<h2>Pięć rzeczy, w kolejności ważności</h2>
+
+<div class="rec">
+  <div class="rank">01</div>
+  <div class="rec-body">
+    <h3>Alarm o zatrzymanym zbieraniu nie może zgasnąć, więc nikt go nie czyta</h3>
+    <div class="chips">
+      <span class="chip sev-1">bezpieczeństwo produkcji</span>
+      <span class="chip">infra/monitoring.tf</span>
+      <span class="chip">pół dnia</span>
+    </div>
+    <p><code>alert-candle-age-stale</code> jest w stanie <em>Fired</em> nieprzerwanie od 9 sierpnia 19:22 — piętnaście godzin, przez całą dzisiejszą awarię. Nie mógł jej zasygnalizować, bo już się palił.</p>
+    <div class="evidence crit">
+      <span class="ev-label">Azure Alerts, zapytane 10.08</span>
+      alert-candle-age-stale &nbsp; Fired &nbsp; 2026-08-09T19:22:56Z
+    </div>
+    <p>Powód jest w definicji, nie w danych. Reguła bierze <code>Maximum</code> z metryki po <strong>wszystkich</strong> parach i porównuje z jednym progiem 600 sekund. Świeca <code>DAY</code> ma z definicji do 86 400 sekund, <code>HOUR_4</code> do 14 400. Odkąd śledzona jest choć jedna taka para przy otwartym rynku, maksimum jest trwale ponad progiem. Komentarz w Terraformie mówi, że jeden próg ma działać „across every tracked resolution" — to było prawdą, dopóki każda śledzona rozdzielczość była krótsza niż dziesięć minut.</p>
+    <p>Obok tego siedzi <code>skip_metric_validation = true</code> z komentarzem „revisit once market-data is deployed". Wdrożone jest od dawna; nikt nie wrócił.</p>
+    <div class="move">
+      <strong>Ruch</strong>
+      Zmienić to, co metryka raportuje, a nie próg. <code>CandleAgeGauge</code> zna rozdzielczość każdej pary, więc może podawać <em>o ile okresów</em> świeca jest spóźniona zamiast o ile sekund. Wtedy jeden próg — powiedzmy trzy okresy — znaczy to samo dla <code>MINUTE</code> i dla <code>WEEK</code>, a komentarz w Terraformie staje się prawdziwy. Przy okazji zdjąć <code>skip_metric_validation</code>.
+    </div>
+  </div>
+</div>
+
+<div class="rec">
+  <div class="rank">02</div>
+  <div class="rec-body">
+    <h3>Deploy melduje sukces przy leżącej aplikacji</h3>
+    <div class="chips">
+      <span class="chip sev-1">bezpieczeństwo produkcji</span>
+      <span class="chip">.github/workflows</span>
+      <span class="chip">pół dnia</span>
+    </div>
+    <p>O 09:15 <code>deploy-market-data.yml</code> zakończył się na zielono, a aplikacja odpowiadała pięćsetką na cztery endpointy. Smoke check na końcu uderza w ścieżkę, która nie czyta pokrycia, więc nie miał jak tego zobaczyć.</p>
+    <p>Migracja nie jedzie ani z obrazem, ani z workflow. To świadoma decyzja — restart nie ma ścigać się o migrację — ale jej konsekwencją jest krok, o którym nie przypomina nic poza pamięcią operatora. Dziś zawiodła pamięć i plan wdrożenia, który wciąż mówił „bez migracji bazy", napisany zanim ta zmiana migrację dostała.</p>
+    <div class="move">
+      <strong>Ruch</strong>
+      Najtańsze i najskuteczniejsze: smoke check ma uderzać w endpoint czytający pokrycie. Wtedy schemat niezgodny z kodem wywraca deploy zamiast go przepuszczać. Mocniejszy wariant: krok, który porównuje <code>alembic current</code> z <code>head</code> i zatrzymuje wdrożenie przy rozjeździe — bez uruchamiania migracji, więc decyzja z Dockerfile'a zostaje nienaruszona.
+    </div>
+  </div>
+</div>
+
+<div class="rec">
+  <div class="rank">03</div>
+  <div class="rec-body">
+    <h3>Jedno konto demo obsługuje produkcję, testy i każdy deploy naraz</h3>
+    <div class="chips">
+      <span class="chip sev-2">ryzyko powtarzalne</span>
+      <span class="chip">capital-gateway</span>
+      <span class="chip">dzień</span>
+    </div>
+    <p>capital.com unieważnia poprzednią sesję przy każdym logowaniu na koncie. Skutki są trzy i wszystkie wystąpiły dziś: każdy deploy przez chwilę trzyma dwa procesy gatewaya, które wzajemnie się wylogowują; testy <code>live</code> nie dają się uruchomić bez zerwania produkcji; a przed dzisiejszą poprawką strumień po takim zerwaniu nie wracał wcale.</p>
+    <p>PR #49 sprawił, że wraca — sesja jest teraz sprawdzana przed każdym połączeniem, a nie zakładana. To usuwa objaw. Kolizja została.</p>
+    <div class="move">
+      <strong>Ruch</strong>
+      Drugie konto demo dla testów <code>live</code> i dla CI. Odcina dwie z trzech konsekwencji i sprawia, że pomiar taki jak dzisiejszy przestaje wymagać okna serwisowego. Trzecia — nakładanie się kontenerów przy deployu — zostaje i jest do przyjęcia, skoro sesja sama wraca.
+    </div>
+  </div>
+</div>
+
+<div class="rec">
+  <div class="rank">04</div>
+  <div class="rec-body">
+    <h3>Operator patrzący na wykres nie ma jak odróżnić ciszy od zatrzymania</h3>
+    <div class="chips">
+      <span class="chip sev-2">obserwowalność</span>
+      <span class="chip">terminal</span>
+      <span class="chip">dzień</span>
+    </div>
+    <p>Przez czterdzieści minut jedynym objawem był nieruchomy wykres — nie do odróżnienia od zamkniętego rynku ani od spokojnej sesji. Rozróżnienie <em>istnieje</em> w danych: <code>/pairs</code> niesie stan <code>COLLECTING</code> / <code>STALLED</code> / <code>MARKET_CLOSED</code>, a <code>tracking.py</code> liczy go per rozdzielczość. Tyle że widać go w menedżerze danych, a nie tam, gdzie operator faktycznie patrzy.</p>
+    <div class="move">
+      <strong>Ruch</strong>
+      Wykres pokazuje już swój stan połączenia. Dołożyć do tego stan <em>zbierania</em> tej pary — jedno dyskretne oznaczenie, które zapala się przy <code>STALLED</code>. Kontrakt już to niesie, więc jest to praca wyłącznie w terminalu.
+    </div>
+  </div>
+</div>
+
+<div class="rec">
+  <div class="rank">05</div>
+  <div class="rec-body">
+    <h3>Dwa długi zostawione świadomie w dzisiejszej zmianie</h3>
+    <div class="chips">
+      <span class="chip">porządki</span>
+      <span class="chip">market-data · testy</span>
+      <span class="chip">pół dnia</span>
+    </div>
+    <p><strong><code>PairEstimate.clipped</code> nie jest już przez nic ustawiane.</strong> Jego jedynym źródłem było przycięcie do zapamiętanej granicy, które usunęliśmy: w chwili wyceny nikt nie wie, jak głęboko sięga provider. Pole zostało w kontrakcie, bo terminal je renderuje. Do decyzji: usunąć je z <code>contract.py</code> wraz ze ścieżką w terminalu, albo przedefiniować na fakt znany po przebiegu zlecenia.</p>
+    <p><strong>Scenariusz „Data sprzed historii providera" nie ma testu end-to-end.</strong> Łańcuch jest pokryty w kawałkach — odkrycie granicy, hurtowe pominięcie, wyliczenie w terminalu — ale żaden test nie przechodzi go w całości dla pary faktycznie płytszej niż prośba. Odnotowane w <code>review.md</code> zarchiwizowanej zmiany.</p>
+  </div>
+</div>
+
+<h2>Zamknięte dzisiaj</h2>
+
+<div class="done-list">
+  <div class="done-row">
+    <span class="pr">#47</span>
+    <span>Granica historii powstaje z pomiaru i daje się unieważnić głębszą prośbą. Świeca w budowie na <code>DAY</code>/<code>WEEK</code>. Archiwum przestaje utrwalać okres, który trwa.</span>
+  </div>
+  <div class="done-row">
+    <span class="pr">#48</span>
+    <span>Plan wdrożenia mówi wreszcie o migracji, którą ta zmiana dostała w połowie drogi.</span>
+  </div>
+  <div class="done-row">
+    <span class="pr">#49</span>
+    <span>Sesja, którą pożycza strumień, jest sprawdzana zamiast zakładana. Bez tego zerwanie było pętlą bez wyjścia.</span>
+  </div>
+  <div class="done-row">
+    <span class="pr">#50</span>
+    <span>Nieudany fill kosztuje jeden przebieg, nie parę. Śmierć zadania ingestu jest głośna i wznawiana.</span>
+  </div>
+  <div class="done-row">
+    <span class="pr">#51</span>
+    <span>Gateway ma gdzie mówić. Miał connection string od początku i nie wołał linijki, która go używa.</span>
+  </div>
+</div>
+
+<p style="margin-top:1.6rem">Pomiar <code>live</code>, na który czekała grupa 1, przeszedł 8/8 i rozstrzygnął otwartą gałąź projektu: capital.com <em>oddaje</em> w REST bieżący, niedomknięty okres. Zmiana <code>history-boundary-and-live-daily-candle</code> jest zarchiwizowana, delty wtopione w <code>openspec/specs/</code>.</p>
+
+<h2>Czego nie proponuję</h2>
+
+<p><strong>Automatycznego uruchamiania migracji w workflow deploya.</strong> Kusi, bo usuwa krok, o którym się zapomina. Ale decyzja z <code>Dockerfile</code>a — że restart nie ma ścigać się o migrację — jest słuszna, a workflow, który migruje przed wdrożeniem, wprowadza własne okno: stary kod działa przez chwilę przy nowym schemacie. Dziś to okno byłoby nieszkodliwe, jutro przy migracji zmieniającej kolumnę już nie. Bramka, która <em>zatrzymuje</em> rozjazd, jest tańsza od automatu, który go tworzy w drugą stronę.</p>
+
+<p><strong>Rozbijania telemetrii na wspólną bibliotekę.</strong> Dwadzieścia linii konfiguracji logowania stoi teraz w dwóch modułach. To jest cena reguły „no shared library" i jest mniejsza niż sprzężenie, które usunęłaby.</p>
+
+<footer>
+  Wszystkie liczby i znaczniki czasu w tym dokumencie pochodzą z odpytania produkcji 10 sierpnia 2026: bazy <code>market_data</code>, Application Insights <code>appi-tradingcenter</code> i Azure Alerts. Czasy w UTC.
+</footer>
+
+</div>
