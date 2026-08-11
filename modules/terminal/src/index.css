@@ -40,6 +40,19 @@
    * `theme.ts`'s `indicatorLineColors` assembles all eight back into the documented
    * order; picking any other subset or order failed the palette validator's
    * adjacent-pair check (orange next to yellow, ΔE 4.8 — below the CVD floor). */
+  /* The agent panel is chrome of a different kind — something that speaks, sitting beside
+   * every view of market data rather than being one. Its own violet-tinted surface is what
+   * says so at a glance: `--color-panel` would make it read as one more pane of the
+   * terminal. Violet and not another hue because every other one here already means
+   * something (teal up, red down, amber degraded, blue interactive), and a surface tint is
+   * not a data colour — the palette validator's separation rules govern the eight
+   * indicator hues, which nothing below is used for. It is close to `--color-indicator-7`
+   * and stays distinguishable by context: chrome under the chart's edge, never inside it.
+   */
+  --color-agent-surface: #16151d;
+  --color-agent-surface-strong: #201e2b;
+  --color-agent-edge: #8a7ff0;
+
   --color-indicator-2: #d95926;
   --color-indicator-4: #c98500;
   --color-indicator-5: #d55181;

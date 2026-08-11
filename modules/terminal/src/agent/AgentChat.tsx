@@ -17,25 +17,27 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
 
   if (!state.expanded) {
     return (
-      <div className="flex w-11 shrink-0 flex-col items-center border-l border-border bg-panel py-2">
-        <button
-          type="button"
-          onClick={() => store.setExpanded(true)}
-          aria-label="Open agent chat"
-          aria-expanded={false}
-          aria-controls="agent-chat-panel"
-          title="Agent chat"
-          className="flex flex-col items-center gap-2 rounded px-1 py-2 text-ink-muted transition-colors hover:bg-panel-strong hover:text-ink"
+      // The whole rail is the button, not a control sitting on one: a full-height strip is
+      // a target that cannot be missed at any window size, and there is nothing else in the
+      // rail to aim at instead. The handle is centred rather than at the top so it reads as
+      // the edge of a drawer — the shape says "pulls out", which the rotated word did not.
+      <button
+        type="button"
+        onClick={() => store.setExpanded(true)}
+        aria-label="Open agent chat"
+        aria-expanded={false}
+        aria-controls="agent-chat-panel"
+        title="Agent chat"
+        className="group flex w-9 shrink-0 cursor-pointer flex-col items-center justify-center border-l border-agent-edge/40 bg-agent-surface transition-colors hover:bg-agent-surface-strong"
+      >
+        <span
+          aria-hidden
+          className="flex flex-col items-center gap-1.5 rounded-l-md border border-r-0 border-agent-edge/40 bg-agent-edge/15 px-1.5 py-3 text-agent-edge transition-colors group-hover:bg-agent-edge/25"
         >
-          <span aria-hidden className="text-base leading-none">
-            ✦
-          </span>
-          {/* Vertical, so the rail can stay narrow enough to cost the charts nothing. */}
-          <span aria-hidden className="text-[11px] tracking-wide [writing-mode:vertical-rl]">
-            Agent
-          </span>
-        </button>
-      </div>
+          <span className="text-sm leading-none">✦</span>
+          <span className="text-xs leading-none">‹</span>
+        </span>
+      </button>
     );
   }
 
@@ -43,14 +45,14 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
     <aside
       id="agent-chat-panel"
       aria-label="Agent chat"
-      className="flex w-96 shrink-0 flex-col border-l border-border bg-panel"
+      className="flex w-96 shrink-0 flex-col border-l border-agent-edge/40 bg-agent-surface"
     >
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-3">
-        <span aria-hidden className="text-ink-muted">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-agent-edge/25 bg-agent-surface-strong px-3">
+        <span aria-hidden className="text-agent-edge">
           ✦
         </span>
         <span className="text-sm font-semibold">Agent</span>
-        <span className="rounded border border-border px-1.5 py-0.5 text-[10px] text-ink-muted">
+        <span className="rounded border border-agent-edge/40 px-1.5 py-0.5 text-[10px] text-agent-edge">
           mockup
         </span>
         <button
@@ -59,7 +61,7 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
           aria-label="Collapse agent chat"
           aria-expanded
           aria-controls="agent-chat-panel"
-          className="ml-auto rounded px-2 py-1 text-sm text-ink-muted transition-colors hover:bg-panel-strong hover:text-ink"
+          className="ml-auto cursor-pointer rounded px-2 py-1 text-sm text-ink-muted transition-colors hover:bg-agent-edge/20 hover:text-ink"
         >
           ›
         </button>
@@ -101,10 +103,12 @@ function Bubble({ message }: { message: ChatMessage }) {
   return (
     <div className={`flex ${operator ? "justify-end" : "justify-start"}`}>
       <div
+        // Whose turn it is carries on shape and side as well as tint: the two bubbles differ
+        // by alignment and by border, so they stay apart where the tint does not survive.
         className={`max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed wrap-break-word ${
           operator
-            ? "bg-accent/20 text-ink"
-            : "border border-border bg-panel-strong text-ink-secondary"
+            ? "rounded-br-sm bg-agent-edge/20 text-ink"
+            : "rounded-bl-sm border border-agent-edge/20 bg-agent-surface-strong text-ink-secondary"
         }`}
       >
         {message.text}
@@ -131,7 +135,7 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
   }
 
   return (
-    <div className="shrink-0 border-t border-border p-3">
+    <div className="shrink-0 border-t border-agent-edge/25 bg-agent-surface-strong p-3">
       <textarea
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
@@ -139,7 +143,7 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
         rows={2}
         aria-label="Message the agent"
         placeholder="Ask the agent…"
-        className="w-full resize-none rounded border border-border bg-canvas px-2 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:border-accent focus:outline-none"
+        className="w-full resize-none rounded border border-agent-edge/30 bg-canvas px-2 py-1.5 text-xs text-ink placeholder:text-ink-muted focus:border-agent-edge focus:outline-none"
       />
       <div className="mt-2 flex items-center gap-2">
         <span className="text-[10px] text-ink-muted">Enter sends · Shift+Enter new line</span>
@@ -147,7 +151,7 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
           type="button"
           onClick={submit}
           disabled={draft.trim() === ""}
-          className="ml-auto rounded border border-border px-2 py-1 text-xs text-ink transition-colors hover:bg-panel-strong disabled:cursor-not-allowed disabled:text-ink-muted disabled:hover:bg-transparent"
+          className="ml-auto cursor-pointer rounded border border-agent-edge/40 bg-agent-edge/15 px-2 py-1 text-xs text-ink transition-colors hover:bg-agent-edge/30 disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-ink-muted"
         >
           Send
         </button>
