@@ -1,17 +1,17 @@
 ## 1. Szkielet modułu
 
-- [ ] 1.1 Utworzyć `modules/agent/` — `agent/`, `tests/`, `pyproject.toml` (uv, fastapi,
+- [x] 1.1 Utworzyć `modules/agent/` — `agent/`, `tests/`, `pyproject.toml` (uv, fastapi,
       langgraph, langchain-openai, sqlalchemy, alembic, azure-identity, pydantic-settings),
       `README.md`, `.env.example`, `Dockerfile` na wzór `market-data`
-- [ ] 1.2 `agent/app.py` — aplikacja FastAPI na porcie 8030 z trasą zdrowia i konfiguracją
+- [x] 1.2 `agent/app.py` — aplikacja FastAPI na porcie 8030 z trasą zdrowia i konfiguracją
       logowania roota (bez niej moduł pisze w próżnię, jak `market-data` przed poprawką)
-- [ ] 1.3 `agent/config.py` — ustawienia z walidacją: tryb bazy (`DATABASE_USER`
+- [x] 1.3 `agent/config.py` — ustawienia z walidacją: tryb bazy (`DATABASE_USER`
       ustawiony/nieustawiony), tryb dostawcy modeli (tożsamość albo klucz, dokładnie jedno),
       `REQUIRE_AUTHENTICATED_PRINCIPAL`, `LOG_LEVEL`
-- [ ] 1.4 Testy `config.py`: host zdalny bez tożsamości odmawia startu, poświadczenie w
+- [x] 1.4 Testy `config.py`: host zdalny bez tożsamości odmawia startu, poświadczenie w
       `DATABASE_URL` obok tożsamości odmawia startu, brak szyfrowania przy hoście zdalnym
       odmawia startu, dwa tryby dostawcy naraz odmawiają startu
-- [ ] 1.5 `uv run ruff check .` i `uv run pyright` przechodzą na pustym module
+- [x] 1.5 `uv run ruff check .` i `uv run pyright` przechodzą na pustym module
 
 ## 2. Baza i migracje
 
