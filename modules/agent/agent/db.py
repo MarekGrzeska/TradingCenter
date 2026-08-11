@@ -14,9 +14,16 @@ from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 import asyncpg
+import asyncpg.pool
 from azure.identity.aio import ClientSecretCredential, DefaultAzureCredential
 
 log = logging.getLogger(__name__)
+
+# What a `store.py` function actually receives: `pool.acquire()` yields a
+# `PoolConnectionProxy`, not a `Connection` — it forwards every method at runtime
+# (`__getattr__`) but does not subclass `Connection`, so a bare `asyncpg.Connection`
+# annotation on a store function rejects the one thing every route actually passes it.
+Conn = asyncpg.Connection | asyncpg.pool.PoolConnectionProxy
 
 _SCHEME_SEPARATOR = "://"
 
@@ -144,7 +151,7 @@ async def pool(
             await created.close()
 
 
-async def fetch_one(conn: asyncpg.Connection, query: str, *args: object) -> asyncpg.Record:
+async def fetch_one(conn: Conn, query: str, *args: object) -> asyncpg.Record:
     """`fetchrow` for a statement that cannot answer with nothing — see
     `market_data/db.py`'s twin for the full rationale."""
     row = await conn.fetchrow(query, *args)

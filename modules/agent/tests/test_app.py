@@ -5,10 +5,13 @@ from fastapi.testclient import TestClient
 
 from agent.app import app
 
-# The lifespan builds a real Settings() from the environment — these are the minimum a
-# started process needs, mirroring tests/test_config.py's REQUIRED.
+# The lifespan now opens a real pool — it did not, back when this file's tests were
+# first written, and their env carried a DATABASE_URL nothing was listening on. A `db`
+# test since group 4 (`app.state.pool`, `POST /sessions` etc.), pointed at the
+# throwaway container `migrated_url` gives.
+pytestmark = pytest.mark.db
+
 _ENV = {
-    "DATABASE_URL": "postgresql://agent:change-me@127.0.0.1:55432/agent",
     "AZURE_OPENAI_ENDPOINT": "https://example.openai.azure.com",
     "AZURE_OPENAI_API_VERSION": "2026-01-01",
     "AZURE_OPENAI_API_KEY": "key",
@@ -23,7 +26,8 @@ _ENV = {
 
 
 @pytest.fixture(autouse=True)
-def _env(monkeypatch: pytest.MonkeyPatch) -> None:
+def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_url)
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 

@@ -6,8 +6,11 @@ sides rather than wired into `pnpm contract:generate`, which is market-data's al
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel
 
+from .models import Message, Session
 from .models_catalogue import ModelCatalogueEntry
 
 
@@ -30,3 +33,58 @@ class ModelOut(BaseModel):
             input_rate_per_1k=str(entry.input_rate_per_1k),
             output_rate_per_1k=str(entry.output_rate_per_1k),
         )
+
+
+class SessionOut(BaseModel):
+    id: int
+    title: str | None
+    current_model_id: str
+    created_at: datetime
+    last_active_at: datetime
+
+    @classmethod
+    def from_session(cls, session: Session) -> SessionOut:
+        return cls(
+            id=session.id,
+            title=session.title,
+            current_model_id=session.current_model_id,
+            created_at=session.created_at,
+            last_active_at=session.last_active_at,
+        )
+
+
+class MessageOut(BaseModel):
+    id: int
+    role: str
+    content: str
+    model_id: str | None
+    prompt_version: str | None
+    incomplete: bool
+    created_at: datetime
+
+    @classmethod
+    def from_message(cls, message: Message) -> MessageOut:
+        return cls(
+            id=message.id,
+            role=message.role.value,
+            content=message.content,
+            model_id=message.model_id,
+            prompt_version=message.prompt_version,
+            incomplete=message.incomplete,
+            created_at=message.created_at,
+        )
+
+
+class CreateSessionIn(BaseModel):
+    # Absent or null both mean "no preference" — the route resolves it to the module's
+    # default, the same as specs/agent-models requires when a session is created with
+    # no model named at all.
+    model_id: str | None = None
+
+
+class PatchSessionIn(BaseModel):
+    model_id: str
+
+
+class SendMessageIn(BaseModel):
+    content: str

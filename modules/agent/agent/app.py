@@ -22,8 +22,10 @@ logging.basicConfig(
 from fastapi import FastAPI
 
 from .config import Settings
+from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
-from .routers import models
+from .provider import AzureOpenAIProvider
+from .routers import models, sessions
 
 log = logging.getLogger(__name__)
 
@@ -31,9 +33,22 @@ log = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
-    app.state.settings = settings
-    app.state.catalogue = ModelCatalogue.from_settings(settings)
-    yield
+    async with make_pool(
+        settings.database_url,
+        user=settings.database_user,
+        client_id=settings.azure_client_id,
+        client_secret=settings.azure_client_secret,
+        tenant_id=settings.azure_tenant_id,
+    ) as pool:
+        app.state.settings = settings
+        app.state.pool = pool
+        app.state.catalogue = ModelCatalogue.from_settings(settings)
+        app.state.provider = AzureOpenAIProvider(settings)
+        # Holds a turn's background task for as long as it runs, so nothing collects
+        # it mid-generation just because the request that started it ended
+        # (design.md, "Tura modelu przeżywa rozłączenie wołającego").
+        app.state.background_tasks = set()
+        yield
 
 
 app = FastAPI(
@@ -60,3 +75,4 @@ async def health() -> dict[str, str]:
 
 
 app.include_router(models.router)
+app.include_router(sessions.router)
