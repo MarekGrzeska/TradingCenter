@@ -5,12 +5,13 @@ the runtime path.
 
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 import asyncpg
 
 from .db import Conn, fetch_one
-from .models import Message, Role, Session, Usage
+from .models import Message, Role, Session, Usage, UsageAggregate
 
 # How much of the first message becomes the session's title (specs/agent-chat, "Tytuł
 # powstaje z pierwszego pytania"). Long enough to be recognisable in a narrow list,
@@ -206,3 +207,86 @@ async def record_usage(
         cost,
     )
     return _usage_from_row(row)
+
+
+# --- zbiorczy odczyt zużycia (specs/agent-usage, "Zużycie da się odczytać zbiorczo") ---
+#
+# Every aggregate is scoped to the caller's own sessions (the `JOIN sessions` filters on
+# `owner_principal`) — usage belongs to whoever the session belongs to, same as the
+# transcript does. `SUM` ignores NULL rows on its own; `unknown_count` is what a caller
+# would otherwise never learn it silently dropped.
+
+_AGGREGATE_COLUMNS = """
+    COALESCE(SUM(u.input_tokens), 0)::bigint AS input_tokens,
+    COALESCE(SUM(u.output_tokens), 0)::bigint AS output_tokens,
+    COALESCE(SUM(u.cost), 0) AS cost,
+    COUNT(*) FILTER (WHERE u.cost IS NULL)::bigint AS unknown_count
+"""
+
+_AGGREGATE_WHERE = """
+    WHERE s.owner_principal = $1
+      AND ($2::timestamptz IS NULL OR u.created_at >= $2)
+      AND ($3::timestamptz IS NULL OR u.created_at < $3)
+"""
+
+_USAGE_BY_MODEL = f"""
+    SELECT u.model_id AS key, {_AGGREGATE_COLUMNS}
+      FROM usage u JOIN sessions s ON s.id = u.session_id
+    {_AGGREGATE_WHERE}
+     GROUP BY u.model_id
+     ORDER BY u.model_id
+"""
+
+_USAGE_BY_SESSION = f"""
+    SELECT u.session_id::text AS key, {_AGGREGATE_COLUMNS}
+      FROM usage u JOIN sessions s ON s.id = u.session_id
+    {_AGGREGATE_WHERE}
+     GROUP BY u.session_id
+     ORDER BY u.session_id
+"""
+
+_USAGE_BY_DAY = f"""
+    SELECT to_char(date_trunc('day', u.created_at), 'YYYY-MM-DD') AS key, {_AGGREGATE_COLUMNS}
+      FROM usage u JOIN sessions s ON s.id = u.session_id
+    {_AGGREGATE_WHERE}
+     GROUP BY 1
+     ORDER BY 1
+"""
+
+_USAGE_TOTAL_COST = f"""
+    SELECT COALESCE(SUM(u.cost), 0) AS total_cost
+      FROM usage u JOIN sessions s ON s.id = u.session_id
+    {_AGGREGATE_WHERE}
+"""
+
+
+def _aggregate_from_row(row: asyncpg.Record) -> UsageAggregate:
+    return UsageAggregate(**dict(row))
+
+
+async def usage_by_model(
+    conn: Conn, *, owner_principal: str, since: datetime | None, until: datetime | None
+) -> list[UsageAggregate]:
+    rows = await conn.fetch(_USAGE_BY_MODEL, owner_principal, since, until)
+    return [_aggregate_from_row(row) for row in rows]
+
+
+async def usage_by_session(
+    conn: Conn, *, owner_principal: str, since: datetime | None, until: datetime | None
+) -> list[UsageAggregate]:
+    rows = await conn.fetch(_USAGE_BY_SESSION, owner_principal, since, until)
+    return [_aggregate_from_row(row) for row in rows]
+
+
+async def usage_by_day(
+    conn: Conn, *, owner_principal: str, since: datetime | None, until: datetime | None
+) -> list[UsageAggregate]:
+    rows = await conn.fetch(_USAGE_BY_DAY, owner_principal, since, until)
+    return [_aggregate_from_row(row) for row in rows]
+
+
+async def usage_total_cost(
+    conn: Conn, *, owner_principal: str, since: datetime | None, until: datetime | None
+) -> Decimal:
+    row = await fetch_one(conn, _USAGE_TOTAL_COST, owner_principal, since, until)
+    return row["total_cost"]

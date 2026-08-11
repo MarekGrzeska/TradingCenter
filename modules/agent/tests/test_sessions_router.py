@@ -27,7 +27,9 @@ _ENV = {
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def _env(migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
+    # `db` requested for its TRUNCATE side effect — see test_usage_router.py's twin.
+    del db
     monkeypatch.setenv("DATABASE_URL", migrated_url)
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
@@ -127,6 +129,27 @@ def test_changing_to_an_unknown_model_is_refused() -> None:
         session_id = client.post("/sessions", json={}).json()["id"]
         response = client.patch(f"/sessions/{session_id}", json={"model_id": "not-a-real-model"})
     assert response.status_code == 422
+
+
+def test_required_authentication_refuses_before_touching_the_model(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # specs/agent-browser-access, "Moduł nie bierze na wiarę warstwy przed sobą" — the
+    # refusal must land before the model is ever called, not merely before the reply
+    # finishes.
+    with TestClient(app) as client:
+        session_id = client.post("/sessions", json={}).json()["id"]
+
+    class _ProviderThatMustNotBeCalled:
+        async def stream(self, *, deployment: str, system_prompt: str, history: list):
+            raise AssertionError("the model must never be called")
+            yield  # pragma: no cover - makes this an async generator
+
+    monkeypatch.setenv("REQUIRE_AUTHENTICATED_PRINCIPAL", "true")
+    with TestClient(app) as client:
+        app.state.provider = _ProviderThatMustNotBeCalled()
+        response = client.post(f"/sessions/{session_id}/messages", json={"content": "hello"})
+    assert response.status_code == 401
 
 
 def test_a_broken_stream_reports_error_and_saves_the_partial_reply() -> None:

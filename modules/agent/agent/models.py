@@ -54,3 +54,16 @@ class Usage(BaseModel):
     output_rate_per_1k: Decimal
     cost: Decimal | None
     created_at: datetime
+
+
+class UsageAggregate(BaseModel):
+    """One row of a `GROUP BY` over `usage` — by model, by session, or by day,
+    depending which query built it. Sums ignore the rows they cannot price;
+    `unknown_count` is how many of those a caller silently dropping them would hide
+    (specs/agent-usage, "Zużycie da się odczytać zbiorczo")."""
+
+    key: str
+    input_tokens: int
+    output_tokens: int
+    cost: Decimal
+    unknown_count: int

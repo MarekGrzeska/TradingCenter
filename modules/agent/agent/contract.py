@@ -10,7 +10,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from .models import Message, Session
+from .models import Message, Session, UsageAggregate
 from .models_catalogue import ModelCatalogueEntry
 
 
@@ -88,3 +88,29 @@ class PatchSessionIn(BaseModel):
 
 class SendMessageIn(BaseModel):
     content: str
+
+
+class UsageAggregateOut(BaseModel):
+    key: str
+    input_tokens: int
+    output_tokens: int
+    # A string, like every other cost/rate on this contract — see ModelOut.
+    cost: str
+    unknown_count: int
+
+    @classmethod
+    def from_aggregate(cls, aggregate: UsageAggregate) -> UsageAggregateOut:
+        return cls(
+            key=aggregate.key,
+            input_tokens=aggregate.input_tokens,
+            output_tokens=aggregate.output_tokens,
+            cost=str(aggregate.cost),
+            unknown_count=aggregate.unknown_count,
+        )
+
+
+class UsageSummaryOut(BaseModel):
+    total_cost: str
+    by_model: list[UsageAggregateOut]
+    by_session: list[UsageAggregateOut]
+    by_day: list[UsageAggregateOut]
