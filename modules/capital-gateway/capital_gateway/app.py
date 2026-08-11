@@ -13,12 +13,24 @@ import hmac
 from contextlib import asynccontextmanager
 from datetime import datetime
 
+from . import telemetry
+
+# Must run before `from fastapi import FastAPI` below, not merely before `FastAPI(...)` is
+# called — and before anything else that might have something to say, since a failure in
+# `Settings()` (read inside `lifespan`) has to be readable, and it is unreadable if logging
+# is configured after it. `configure_azure_monitor()`'s FastAPI auto-instrumentation patches
+# the `fastapi.FastAPI` *class attribute*, but `from fastapi import FastAPI` binds this
+# module's own `FastAPI` name to whatever the attribute holds at the moment that statement
+# runs — called from `lifespan`, long after every import here has resolved, the patch lands
+# on an attribute this module never looks at again, and `AppRequests` never receives a point
+# regardless of where `FastAPI(...)` itself is called.
+telemetry.configure()
+
 from fastapi import Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from . import telemetry
 from .adapter import CapitalAdapter
 from .client import CapitalClient
 from .config import API_KEY_HEADER, Settings, is_production
@@ -49,9 +61,14 @@ async def stream_tokens_for(client: CapitalClient) -> tuple[str, str]:
 
     The stream borrows the REST session and has no way of noticing that it stopped
     working: a websocket never receives a 401. `client.authenticated` says the tokens
-    exist, not that the provider still honours them — and capital.com invalidates the
-    previous session on every new login anywhere on the account, so one `-m live` run, or
-    a second gateway process, leaves this one holding a pair of dead strings.
+    exist, not that the provider still honours them.
+
+    This used to name a second gateway process as what kills them, which measurement on
+    10 August 2026 ruled out — sessions coexist, and two streams on one account both keep
+    receiving. What is left is enough on its own: a session is good for about ten idle
+    minutes, and a stream makes no REST calls at all. A gateway whose only traffic is the
+    subscription therefore holds tokens that expire from disuse, on a schedule nobody
+    watches.
 
     Trusting them is a reconnect loop that never recovers. Every attempt subscribes with
     the same dead tokens, the provider refuses, the socket drops, and three seconds later
@@ -72,11 +89,6 @@ async def stream_tokens_for(client: CapitalClient) -> tuple[str, str]:
 async def lifespan(app: FastAPI):
     # Settings first, and outside a try: a live URL or a missing credential must stop
     # the process here rather than surface later as a failing request.
-    # Before anything else that might have something to say. A failure in `Settings()`
-    # below is exactly the kind of thing that has to be readable, and it is unreadable if
-    # logging is configured after it.
-    telemetry.configure()
-
     settings = Settings()  # type: ignore[call-arg]
     client = CapitalClient(settings)
 

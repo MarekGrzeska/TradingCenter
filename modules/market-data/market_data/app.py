@@ -21,10 +21,21 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
+from . import schema_version, telemetry
+
+# Must run before `from fastapi import FastAPI` below, not merely before `FastAPI(...)` is
+# called. OpenTelemetry's FastAPI auto-instrumentation (enabled by `configure_azure_monitor`
+# inside `configure()`) patches the `fastapi.FastAPI` *class attribute* — but `from fastapi
+# import FastAPI` binds this module's own `FastAPI` name to whatever the attribute holds at
+# the moment that statement runs. Called after the import (as it was inside `lifespan`,
+# which only runs at ASGI startup — long after every import in this file has resolved), the
+# patch lands on an attribute this module never looks at again, and `AppRequests` never
+# receives a point regardless of where `FastAPI(...)` itself is called.
+telemetry.configure()
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from . import schema_version, telemetry
 from .config import Settings
 from .db import pool as make_pool
 from .errors import GatewayError, GatewayUnreachable
@@ -72,7 +83,6 @@ def candle_sink(pool, hub: Hub):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
-    telemetry.configure()
 
     async with (
         make_pool(
@@ -131,7 +141,8 @@ async def lifespan(app: FastAPI):
         app.state.indicator_limiter = asyncio.Semaphore(settings.indicator_concurrency)
 
         candle_age = telemetry.CandleAgeGauge()
-        telemetry.register(candle_age)
+        candle_age_periods = telemetry.CandlePeriodsLateGauge()
+        telemetry.register(candle_age, candle_age_periods)
 
         # Before anything else touches the job tables: no runner survives a restart, so
         # any chunk left `pending` or `running` from before this start was orphaned, not
@@ -145,7 +156,11 @@ async def lifespan(app: FastAPI):
         await job_runner.start()
         candle_age_task = asyncio.create_task(
             telemetry.refresh_loop(
-                pool, app.state.instruments, app.state.market_status, candle_age
+                pool,
+                app.state.instruments,
+                app.state.market_status,
+                candle_age,
+                candle_age_periods,
             )
         )
         try:

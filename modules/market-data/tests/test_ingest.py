@@ -993,14 +993,13 @@ async def test_an_untracked_pair_stops_being_collected(pool) -> None:
 @pytest.mark.db
 async def test_the_supervisor_reports_what_each_fill_did(pool) -> None:
     """7.7."""
-    async with pool.acquire() as conn:
-        # `collect_from` pinned to the fixture's clock, not left to `track`'s default.
-        # That default is `now - 5000 minutes` off the *real* clock, while every candle
-        # here is placed relative to `NOW`, a fixed moment — so the fill's floor walked
-        # past the fixtures and the batch was filtered down to nothing on the day the
-        # wall clock passed `NOW + 5000 minutes`. A test that expires is worse than one
-        # that fails.
-        await track(conn, "US100", Resolution.MINUTE, LIMIT, collect_from=NOW - timedelta(hours=1))
+    # `_tracked` (not a bare `track`) deliberately: `collect_from` left to its own
+    # default is computed from the real wall clock, and drifts a little further past
+    # `NOW` every day this suite is run — it caught up with `minute_candle`'s fixed
+    # offsets from `NOW` and started filtering out all four candles, `within` came back
+    # empty, and `written` read 0. `DEEP` decouples the pair's clamp from today's date,
+    # same as everywhere else in this file that fills against fixed candles.
+    await _tracked(pool)
     history = FakeHistory([minute_candle(m) for m in range(1, 5)])
 
     ingest = Ingest(

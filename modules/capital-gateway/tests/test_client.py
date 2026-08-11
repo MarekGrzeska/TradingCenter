@@ -90,8 +90,9 @@ async def test_concurrent_callers_trigger_exactly_one_login(client: CapitalClien
 
     await asyncio.gather(*(client.accounts() for _ in range(8)))
 
-    # capital.com invalidates the previous session on every new login, so eight logins
-    # would leave seven callers holding tokens that were already killed.
+    # Eight logins would be seven wasted requests against the account's shared 10/second
+    # budget, and eight sessions expiring on eight schedules. (Not seven dead sessions:
+    # measurement on 10 August 2026 found that capital.com sessions coexist.)
     assert session.call_count == 1
     await client.aclose()
 
@@ -163,9 +164,13 @@ async def test_stream_tokens_prove_the_session_still_answers(client: CapitalClie
 async def test_a_session_invalidated_elsewhere_is_replaced_before_the_stream_uses_it(
     client: CapitalClient,
 ) -> None:
-    """capital.com invalidates the previous session on every new login anywhere on the
-    account. The tokens are then still present and still wrong — which is the state that
-    left a production stream reconnecting into nothing until some REST call happened by.
+    """A session can stop being honoured while the tokens are still sitting there — a
+    stream makes no REST calls, so its borrowed session expires from disuse. The tokens
+    are then still present and still wrong, which is the state that left a production
+    stream reconnecting into nothing until some REST call happened by.
+
+    The name says "invalidated elsewhere" for the shape, not for a particular cause: what
+    this covers is a 401 arriving from a session the client believed in, whatever ended it.
     """
     login = respx.post(SESSION)
     login.side_effect = [login_response(), login_response("cst-2", "tok-2")]

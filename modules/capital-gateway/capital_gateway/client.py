@@ -53,10 +53,13 @@ class CapitalClient:
     async def login(self) -> httpx.Response:
         """Log in, or join the login already running.
 
-        Without this, a burst of calls arriving with no session each starts its own
-        login: capital.com invalidates the previous session on every new one, so the
-        winners of that race hold tokens the last login already killed. One shared
-        attempt turns a stampede into one request everybody waits on.
+        Without this, a burst of calls arriving with no session each starts its own login.
+        That used to be described here as fatal — every login killing the session before
+        it — which measurement on 10 August 2026 did not support: four sessions opened
+        with one key all kept working. What it costs is still real and still worth
+        avoiding: every login is a request against the account's 10/second budget, and the
+        callers end up spread across sessions that each expire on their own schedule. One
+        shared attempt turns a stampede into one request everybody waits on.
 
         Deliberately a Task rather than a lock: awaiting the same Task hands every
         waiter the same result, whereas a lock would let each waiter proceed to log in

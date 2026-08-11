@@ -316,6 +316,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/ping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ping
+         * @description Proves only that the process is up and serving — nothing about its dependencies.
+         *
+         *     Reads nothing: `/health` above already answers whether the database is reachable, and
+         *     an external prober checking that would read a healthy process as dead the moment a
+         *     query ran slow. This is what Easy Auth's `excluded_paths` (infra/app-service.tf) can
+         *     exempt without exposing anything — the response never varies with the archive's state.
+         */
+        get: operations["ping_ping_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/stream-tickets": {
         parameters: {
             query?: never;
@@ -1840,6 +1865,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ping_ping_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

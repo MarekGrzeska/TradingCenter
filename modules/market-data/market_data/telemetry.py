@@ -30,7 +30,15 @@ from opentelemetry.metrics import CallbackOptions, Observation
 
 from .gateway import GatewayInstruments
 from .market_status import MarketStatus
-from .tracking import CollectionState, decide_late_pairs, read_status
+from .models import Resolution
+from .periods import period_length
+from .tracking import (
+    DELIVERY_GRACE,
+    STALE_AFTER_PERIODS,
+    CollectionState,
+    decide_late_pairs,
+    read_status,
+)
 
 log = logging.getLogger(__name__)
 
@@ -72,9 +80,44 @@ class CandleAgeGauge:
         ]
 
 
+class CandlePeriodsLateGauge:
+    """The same staleness as `CandleAgeGauge`, in periods of each pair's own resolution
+    instead of seconds — the unit `alert-candle-age-stale` actually alerts on, since a
+    single second threshold cannot mean the same thing for `MINUTE` and for `WEEK`.
+    """
+
+    def __init__(self) -> None:
+        self._periods: dict[tuple[str, str], float] = {}
+
+    def set(self, periods: dict[tuple[str, str], float]) -> None:
+        self._periods = periods
+
+    def observe(self, options: CallbackOptions) -> list[Observation]:
+        return [
+            Observation(value, {"symbol": symbol, "resolution": resolution})
+            for (symbol, resolution), value in self._periods.items()
+        ]
+
+
+def periods_late(age_seconds: float, resolution: Resolution) -> float:
+    """How far behind a pair's newest candle sits, in periods of its own resolution, past
+    the delivery grace `tracking.py` already measured (`DELIVERY_GRACE`). Floored to zero
+    so a candle that just arrived does not read negative — the raw ratio without the grace
+    subtracted first would put every healthy `MINUTE` pair near four "periods" late.
+    """
+    behind = age_seconds - DELIVERY_GRACE.total_seconds()
+    return max(0.0, behind / period_length(resolution).total_seconds())
+
+
 def configure() -> None:
-    """Wires up logging, and Application Insights when there is one to wire to. Called
-    once, from `lifespan`, before anything registers a metric.
+    """Wires up logging, and Application Insights when there is one to wire to.
+
+    Called once, at import time in `app.py`, before `from fastapi import FastAPI` — not
+    merely before `FastAPI(...)` is called, and not from `lifespan`.
+    `configure_azure_monitor()`'s FastAPI auto-instrumentation patches the `fastapi.FastAPI`
+    class *attribute*; a `from fastapi import FastAPI` that already ran binds a name to
+    whatever the attribute held at that moment; regardless of where `FastAPI(...)` is later
+    called, that name never repoints itself.
     """
     configure_logging()
     if not os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):
@@ -110,7 +153,7 @@ def configure_logging() -> None:
         logging.getLogger(name).setLevel(logging.WARNING)
 
 
-def register(gauge: CandleAgeGauge) -> None:
+def register(gauge: CandleAgeGauge, periods_gauge: CandlePeriodsLateGauge) -> None:
     meter = metrics.get_meter("market_data")
     meter.create_observable_gauge(
         "market_data.candle_age_seconds",
@@ -120,6 +163,15 @@ def register(gauge: CandleAgeGauge) -> None:
             "isn't known to be closed"
         ),
         unit="s",
+    )
+    meter.create_observable_gauge(
+        "market_data.candle_age_periods",
+        callbacks=[periods_gauge.observe],
+        description=(
+            "Periods behind each tracked pair's newest candle sits, past its delivery "
+            f"grace — the module's own STALLED state fires after {STALE_AFTER_PERIODS} "
+            "periods; alert-candle-age-stale fires at 3."
+        ),
     )
 
 
@@ -161,16 +213,24 @@ async def refresh_loop(
     instruments: GatewayInstruments,
     market_status: MarketStatus,
     gauge: CandleAgeGauge,
+    periods_gauge: CandlePeriodsLateGauge,
     interval: float = REFRESH_INTERVAL_SECONDS,
 ) -> None:
-    """Runs for the life of the application, updating `gauge` every `interval` seconds.
+    """Runs for the life of the application, updating both gauges every `interval` seconds.
 
     A failed read is logged and skipped rather than raised — one bad refresh should not
     take down the loop that is, itself, half of the monitoring for everything else.
     """
     while True:
         try:
-            gauge.set(await compute_ages(pool, instruments, market_status))
+            ages = await compute_ages(pool, instruments, market_status)
+            gauge.set(ages)
+            periods_gauge.set(
+                {
+                    (symbol, resolution): periods_late(age, Resolution(resolution))
+                    for (symbol, resolution), age in ages.items()
+                }
+            )
         except Exception:
             log.exception("candle age refresh failed")
         await asyncio.sleep(interval)

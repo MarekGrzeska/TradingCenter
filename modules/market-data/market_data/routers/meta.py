@@ -28,3 +28,15 @@ async def health(request: Request) -> dict:
         "collecting": len(ingest.running),
         "started_at": ingest.started_at.isoformat() if ingest.started_at else None,
     }
+
+
+@router.get("/ping", tags=["meta"])
+async def ping() -> dict:
+    """Proves only that the process is up and serving — nothing about its dependencies.
+
+    Reads nothing: `/health` above already answers whether the database is reachable, and
+    an external prober checking that would read a healthy process as dead the moment a
+    query ran slow. This is what Easy Auth's `excluded_paths` (infra/app-service.tf) can
+    exempt without exposing anything — the response never varies with the archive's state.
+    """
+    return {"status": "ok"}

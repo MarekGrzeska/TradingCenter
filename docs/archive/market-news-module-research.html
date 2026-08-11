@@ -1,0 +1,571 @@
+<title>Moduł newsów rynkowych — research dostawców i modelu deterministycznego</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.7; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 62rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.4rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.2rem, 2.6vw, 1.5rem); letter-spacing: -0.01em; margin: 3.5rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.02rem; margin: 2rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.92rem; margin: 1.4rem 0 0.35rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.06rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 36rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dim { color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.55; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+
+  .worry { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.2rem 1.35rem; margin: 1.3rem 0; }
+  .worry .q { font-weight: 620; font-size: 1.02rem; margin: 0 0 0.1rem; }
+  .worry .verdict { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.6rem; }
+  .worry.solved .verdict { color: var(--good); }
+  .worry.real .verdict { color: var(--bad); }
+  .worry > :last-child { margin-bottom: 0; }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; }
+  .steps > li { counter-increment: step; position: relative; padding: 0 0 0 3rem; margin: 0 0 1.3rem; }
+  .steps > li::before {
+    content: counter(step); position: absolute; left: 0; top: 0.05rem;
+    width: 2rem; height: 2rem; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 0.85rem; font-weight: 600;
+  }
+  .steps > li > b { display: block; margin-bottom: 0.15rem; }
+  .steps > li p { margin: 0.3rem 0; }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>Moduł newsów rynkowych</h1>
+<p class="lede">Research dostawców wiadomości i projekt deterministycznego filtra istotności — worker, który słucha wiadomości rynkowych i geopolitycznych, odrzuca szum i zapisuje resztę do bazy.</p>
+<p class="meta">Stan na 2026-08-10 · gałąź <code>research-market-news</code> · dokument przed decyzją, nie opis stanu</p>
+
+<div class="callout good">
+  <span class="tag">Wniosek na wstępie</span>
+  <p><strong>Za 0 zł/mies. da się zbudować feed, który jest lepszy dla tego portfela instrumentów niż większość płatnych API po 20–50 USD.</strong> Powód jest prosty: handlujesz CFD na indeksy, złoto, forex i krypto — a płatne API newsowe sprzedają głównie <em>tagowanie po tickerach spółek</em>, czyli dokładnie to, czego nie potrzebujesz. Wartość dla ciebie jest w bankach centralnych, makro i geopolityce, a te źródła są pierwotne i darmowe.</p>
+  <p>Rekomendowany zestaw fazy 1: <strong>RSS źródeł pierwotnych</strong> (Fed, EBC, BoE, BoJ, EIA, OPEC, SEC) + <strong>GDELT DOC 2.0</strong> (geopolityka, licencja bez ograniczeń, aktualizacja co 15 min) + <strong>Marketaux free</strong> (tagowanie encji) + <strong>kalendarz ForexFactory</strong> (JSON, darmowy, z poziomem <em>impact</em>). Ścieżka wyjścia w górę, gdy okaże się że warto: EODHD 19,99 USD/mies. albo Marketaux płatny; Benzinga przez Massive dopiero gdy będzie budżet rzędu enterprise.</p>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Ostrzeżenie metodologiczne</span>
+  <p>Duża część rankingów „best news API 2026" w wynikach wyszukiwania to <strong>content marketing samych dostawców</strong> (APITube, EODHD, NewsData publikują porównania, w których wygrywają). Liczby poniżej pochodzą — tam gdzie się dało — ze stron cennikowych i dokumentacji. Pozycje, których nie udało się potwierdzić u źródła, są oznaczone <span class="pill warn">do weryfikacji</span> i <strong>trzeba je sprawdzić przed decyzją zakupową</strong>.</p>
+</div>
+
+<h2>1. Co właściwie jest tu istotne</h2>
+
+<p>Archiwum zbiera świece dla instrumentów capital.com — indeksy (<code>US500</code>), forex (<code>EURUSD</code>), surowce (<code>GOLD</code>), krypto (<code>BTCUSD</code>). To przesuwa cały punkt ciężkości researchu:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Klasa newsa</th><th>Wpływ na te instrumenty</th><th>Kto to dobrze dostarcza</th></tr></thead>
+  <tbody>
+    <tr><td>Decyzje i komunikacja banków centralnych</td><td><span class="pill good">krytyczny</span> FX, indeksy, złoto</td><td>źródła pierwotne (RSS), za darmo</td></tr>
+    <tr><td>Odczyty makro (CPI, NFP, PMI, PKB)</td><td><span class="pill good">krytyczny</span> wszystko</td><td>kalendarz + źródła urzędowe</td></tr>
+    <tr><td>Geopolityka: konflikty, sankcje, cła, wybory</td><td><span class="pill good">wysoki</span> złoto, ropa, FX</td><td>GDELT, agencje, agregatory</td></tr>
+    <tr><td>Podaż surowców (OPEC, zapasy EIA, zakłócenia)</td><td><span class="pill good">wysoki</span> ropa, złoto</td><td>EIA/OPEC bezpośrednio</td></tr>
+    <tr><td>Regulacje krypto, ETF-y, hacki giełd</td><td><span class="pill warn">średni</span> BTC</td><td>agregatory, SEC</td></tr>
+    <tr><td>Wyniki i rekomendacje pojedynczych spółek</td><td><span class="pill">niski</span> pośrednio przez indeks</td><td>Benzinga/Alpaca — <em>to sprzedają wszyscy</em></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Wniosek jest niewygodny dla rynku dostawców: <strong>najdroższa część oferty (tagowanie po tickerach, ~25 ms latencja na wire Benzingi) jest dla tego portfela najmniej użyteczna</strong>, a najbardziej użyteczna część (Fed, EBC, EIA, geopolityka) jest darmowa i publiczna.</p>
+
+<h2>2. Krajobraz dostawców</h2>
+
+<h3>A. Wire zawodowy / squawk — poza budżetem, ale warto znać sufit</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Dostawca</th><th class="num">Koszt</th><th>Transport</th><th>Werdykt</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Benzinga API</strong> (dystrybucja gł. przez Massive, dawne Polygon.io)</td><td class="num">enterprise, cennik na kontakt</td><td>REST + WebSocket, deklarowana mediana ~25 ms</td><td><span class="pill bad">odpada</span> darmowego progu praktycznie nie ma; treść pod akcje US</td></tr>
+    <tr><td><strong>Benzinga Pro</strong> (produkt konsumencki, nie API)</td><td class="num">37–197 USD/mies.</td><td>aplikacja / squawk</td><td><span class="pill bad">odpada</span> nie da się z tego karmić bazy</td></tr>
+    <tr><td><strong>Newsquawk</strong></td><td class="num">£174–£349/mies.</td><td>squawk audio + terminal</td><td><span class="pill bad">odpada</span> człowiek czyta, nie API</td></tr>
+    <tr><td><strong>LiveSquawk</strong></td><td class="num">£275 / 350 USD mies.</td><td>squawk</td><td><span class="pill bad">odpada</span> jw.</td></tr>
+    <tr><td><strong>Reuters / Dow Jones Newswires / LSEG</strong></td><td class="num">tysiące USD/mies.</td><td>feed enterprise</td><td><span class="pill bad">odpada</span> inny rząd wielkości</td></tr>
+    <tr><td><strong>FinancialJuice</strong></td><td class="num">darmowe konto; plany od ~207 USD/kwartał</td><td>squawk audio + RSS; darmowy tier z ~10 s opóźnieniem</td><td><span class="pill warn">obserwować</span> brak publicznego API; RSS możliwy, ale niedokumentowany</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p class="dim">Konkluzja tej kategorii: różnica między squawkiem a naszym pollerem to sekundy do minut. Dla systemu, który <em>zapisuje i przegląda</em> newsy — a nie wchodzi w rynek w 300 ms po nagłówku — ta różnica nie jest warta trzycyfrowej kwoty miesięcznie.</p>
+
+<h3>B. API agregatorów z tagowaniem finansowym — realny środek stawki</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Dostawca</th><th class="num">Darmowy tier</th><th class="num">Wejście płatne</th><th>Co daje</th><th>Haczyk</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>Marketaux</strong></td>
+      <td class="num">100 req/dobę, bez karty</td>
+      <td class="num">tanio; 20% przy rocznej <span class="pill warn">do weryfikacji</span></td>
+      <td>200 tys. encji, ~5 tys. źródeł, 30+ języków, sentyment per encja, highlighty fragmentów</td>
+      <td>tylko REST — polling, brak streamu</td>
+    </tr>
+    <tr>
+      <td><strong>Finnhub</strong></td>
+      <td class="num">60 req/min</td>
+      <td class="num">11,99–99,99 USD/mies. + dodatki rynkowe od 50 USD</td>
+      <td><code>market-news</code> i <code>company-news</code> w REST, rok historii, kalendarz makro</td>
+      <td>darmowy tier <strong>tylko do użytku niekomercyjnego</strong>; są raporty, że WebSocket newsowy podaje pozycje historyczne zamiast świeżych <span class="pill warn">do weryfikacji</span></td>
+    </tr>
+    <tr>
+      <td><strong>Alpaca News API</strong></td>
+      <td class="num">z kontem Alpaca (także paper)</td>
+      <td class="num">wraz z planem danych, 99 USD/mies. za pełny SIP</td>
+      <td><strong>prawdziwy WebSocket</strong> <code>wss://stream.data.alpaca.markets/v1beta1/news</code>, treść Benzingi, pole <code>symbols[]</code>, pełny <code>content</code></td>
+      <td>wyłącznie akcje US i krypto — <strong>zero makro i geopolityki</strong>; cennik po becie zastrzeżony do zmiany</td>
+    </tr>
+    <tr>
+      <td><strong>EODHD</strong></td>
+      <td class="num">20 req/dobę (symbolicznie)</td>
+      <td class="num">od 19,99 USD/mies.</td>
+      <td>news + sentyment leksykalny, tagi akcje / krypto / <strong>forex</strong></td>
+      <td>sentyment słownikowy, nie modelowy — co akurat nam pasuje (deterministyczny)</td>
+    </tr>
+    <tr>
+      <td><strong>Tiingo</strong></td>
+      <td class="num">brak realnego</td>
+      <td class="num">30 USD/mies. (niekomercyjnie), 50 USD komercyjnie</td>
+      <td>news jako dodatek do planu Power, 3 mies. historii + wszystko od momentu wykupienia</td>
+      <td>licencja rozdzielona na komercyjną/niekomercyjną — czysto, ale drożej</td>
+    </tr>
+    <tr>
+      <td><strong>Alpha Vantage</strong> <code>NEWS_SENTIMENT</code></td>
+      <td class="num">25 req/dobę</td>
+      <td class="num">od ~50 USD/mies.</td>
+      <td>tematy m.in. <code>economy_macro</code>, <code>financial_markets</code>; gotowy sentyment</td>
+      <td>25 zapytań na dobę to nie jest feed, to demo</td>
+    </tr>
+    <tr>
+      <td><strong>StockNewsAPI</strong></td>
+      <td class="num">brak (5 dni trialu)</td>
+      <td class="num">~20 USD/mies.</td>
+      <td>news US equities</td>
+      <td>sentyment po słowach kluczowych z tytułu; zakres tylko akcje US</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h3>C. Ogólne API newsowe — szeroko, ale bez rozumienia rynku</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Dostawca</th><th class="num">Darmowy tier</th><th class="num">Płatne</th><th>Werdykt</th></tr></thead>
+  <tbody>
+    <tr><td><strong>NewsAPI.org</strong></td><td class="num">100 req/dobę, <strong>24 h opóźnienia</strong>, tylko dev/localhost</td><td class="num">449 USD/mies. (Business) / 1 749 USD (Advanced)</td><td><span class="pill bad">odpada</span> darmowy jest bezużyteczny dla realtime, płatny absurdalnie drogi jak na to, co daje</td></tr>
+    <tr><td><strong>NewsData.io</strong></td><td class="num">200 kredytów/dobę, opóźnienie kilkunastu godzin <span class="pill warn">do weryfikacji</span></td><td class="num">od 25 USD/mies.</td><td><span class="pill warn">rezerwa</span> szeroki zasięg, brak tagowania finansowego, skrócone treści</td></tr>
+    <tr><td><strong>APITube</strong></td><td class="num">deklarowane 1 000 req/dobę bez opóźnienia</td><td class="num">wg wolumenu</td><td><span class="pill warn">rezerwa</span> najgłośniej reklamowany przez samego siebie — zweryfikować empirycznie, nie z bloga</td></tr>
+    <tr><td><strong>NewsAPI.ai</strong> (dawne Event Registry)</td><td class="num">tokenowy</td><td class="num">rozliczanie tokenowe, rośnie szybko</td><td><span class="pill warn">ciekawe</span> jako jedyny robi <strong>klastrowanie w zdarzenia</strong> po stronie dostawcy — to jest dokładnie problem, który inaczej rozwiązujemy sami SimHashem</td></tr>
+    <tr><td><strong>Webz.io</strong></td><td class="num">brak</td><td class="num">enterprise</td><td><span class="pill bad">odpada</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>D. Źródła pierwotne — darmowy kręgosłup systemu</h3>
+
+<p>To jest najważniejsza sekcja tego dokumentu. Komunikat prasowy Fedu w RSS-ie pojawia się <strong>w tej samej sekundzie co na wire</strong> — agregatory dopiero go potem przepisują. Poller z warunkowym GET-em i interwałem 10–15 s ma tu przewagę nad płatnym agregatorem, nie stratę.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Źródło</th><th>Adres</th><th>Wagi / uwagi</th></tr></thead>
+  <tbody>
+    <tr><td>Fed — wszystkie komunikaty</td><td><code>federalreserve.gov/feeds/press_all.xml</code></td><td rowspan="3">waga maksymalna; <code>press_monetary</code> to FOMC — najwyższy priorytet w całym systemie</td></tr>
+    <tr><td>Fed — polityka pieniężna</td><td><code>/feeds/press_monetary.xml</code></td></tr>
+    <tr><td>Fed — wystąpienia i zeznania</td><td><code>/feeds/speeches_and_testimony.xml</code></td></tr>
+    <tr><td>EBC — komunikaty, wystąpienia, konferencje</td><td><code>ecb.europa.eu/rss/press.html</code></td><td>waga maksymalna dla EURUSD</td></tr>
+    <tr><td>EBC — operacje otwartego rynku</td><td><code>/rss/operations.html</code></td><td>waga średnia</td></tr>
+    <tr><td>EBC — kursy referencyjne EUR</td><td><code>/rss/fxref-usd.html</code> itd. (29 par)</td><td>to nie news, to dane — raczej pominąć</td></tr>
+    <tr><td>SEC EDGAR — zgłoszone dokumenty</td><td><code>sec.gov/structureddata/rss-feeds-submitted-filings</code></td><td>odświeżane <strong>co 10 min</strong>, pn–pt 6:00–22:00 ET; wolumen ogromny — wpuszczać tylko wybrane typy (8-K, 13D)</td></tr>
+    <tr><td>Bank of England, BoJ, SNB, RBA, NBP</td><td>własne RSS <span class="pill warn">do weryfikacji</span></td><td>waga wysoka dla odpowiednich par</td></tr>
+    <tr><td>EIA — tygodniowy raport zapasów ropy</td><td>eia.gov, śr. 10:30 ET</td><td>zdarzenie cykliczne — kandydat na wpis w kalendarzu, nie w feedzie</td></tr>
+    <tr><td>OPEC — komunikaty prasowe</td><td>opec.org</td><td>waga wysoka dla ropy</td></tr>
+    <tr><td>US Treasury, BLS, BEA</td><td>harmonogramy publikacji</td><td>źródło prawdy dla CPI/NFP</td></tr>
+    <tr><td>Yahoo Finance / CNBC / MarketWatch / Investing RSS</td><td>publiczne</td><td>waga niska — użyteczne wyłącznie jako <strong>drugie źródło do potwierdzenia</strong> (patrz: velocity w §4)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>E. Geopolityka — GDELT</h3>
+
+<div class="callout good">
+  <span class="tag">Znalezisko</span>
+  <p><strong>GDELT DOC 2.0 API</strong> — <code>https://api.gdeltproject.org/api/v2/doc/doc</code>. Monitoruje media w ponad 100 językach na całym świecie, <strong>odświeża się co 15 minut</strong>, zwraca JSON/RSS/CSV, do 250 rekordów na zapytanie, ruchome okno 3 miesięcy.</p>
+  <p>Licencja: <em>„unlimited and unrestricted use for any academic, commercial, or governmental use of any kind without fee"</em> — jedyny warunek to cytowanie projektu i link. To jest lepsza licencja niż na czymkolwiek płatnym w tym zestawieniu.</p>
+  <p>Zapytanie potrafi filtrować po <code>theme:</code> (np. <code>TERROR</code>, kategorie ekonomiczne), <code>tone&lt;-5</code>, <code>sourcecountry:</code>, <code>sourcelang:</code>, <code>near20:"..."</code> — czyli filtr deterministyczny dostajemy częściowo <strong>po stronie dostawcy</strong>, za darmo.</p>
+</div>
+
+<p>Ograniczenia, o których trzeba wiedzieć: GDELT indeksuje <em>artykuły o zdarzeniach</em>, nie sam wire — opóźnienie to do 15 minut plus czas publikacji mediów. Do handlu w minutę po nagłówku nie nadaje się. Do „co się dzieje na świecie i czy to dotyka złota" — nadaje się bardzo dobrze i nic innego w tej cenie tego nie robi.</p>
+
+<h3>F. Kalendarz makro</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Źródło</th><th class="num">Koszt</th><th>Uwagi</th></tr></thead>
+  <tbody>
+    <tr><td><strong>ForexFactory</strong> — <code>nfs.faireconomy.media/ff_calendar_thisweek.json</code></td><td class="num">0</td><td>JSON/XML/CSV/ICS, gotowy poziom <em>impact</em> (high/medium/low). <strong>Limit: 2 pobrania na 5 minut</strong> — pobierać raz na godzinę, to plik tygodniowy</td></tr>
+    <tr><td><strong>Trading Economics</strong></td><td class="num">płatne, cennik na kontakt</td><td>~1 600 zdarzeń/mies. dla 150+ krajów, wartości ze <strong>źródeł urzędowych</strong>, nie od pośredników — najlepsza jakość <em>actual</em></td></tr>
+    <tr><td><strong>Finnhub</strong> <code>/calendar/economic</code></td><td class="num">w planie</td><td>wygodne, gdy i tak bierzemy Finnhuba</td></tr>
+    <tr><td><strong>FMP</strong> economics calendar</td><td class="num">od ~19 USD/mies.</td><td>szeroki zakres fundamentów w cenie</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>3. Rekomendowany zestaw</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Faza</th><th>Źródła</th><th class="num">Koszt/mies.</th><th>Co odblokowuje</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>1 — start</strong></td>
+      <td>RSS źródeł pierwotnych (~15–25 feedów) + GDELT DOC 2.0 + kalendarz ForexFactory</td>
+      <td class="num"><strong>0 USD</strong></td>
+      <td>banki centralne, makro, geopolityka, harmonogram zdarzeń. Pełny pipeline i model danych działają na tym komplecie</td>
+    </tr>
+    <tr>
+      <td><strong>1b — dołożenie tagowania</strong></td>
+      <td>+ Marketaux free (100 req/dobę ≈ jedno odpytanie co 14 min)</td>
+      <td class="num"><strong>0 USD</strong></td>
+      <td>gotowe encje i sentyment jako <em>dodatkowy sygnał</em> obok naszych reguł — dobre do kalibracji własnych wag</td>
+    </tr>
+    <tr>
+      <td><strong>2 — gdy feed się sprawdzi</strong></td>
+      <td>EODHD (19,99 USD) <em>albo</em> Marketaux płatny</td>
+      <td class="num">~20 USD</td>
+      <td>gęstsze odpytywanie, tagi forex/krypto, historia do backtestu reguł</td>
+    </tr>
+    <tr>
+      <td><strong>3 — tylko jeśli dojdą akcje US</strong></td>
+      <td>Alpaca News WebSocket (konto paper wystarczy)</td>
+      <td class="num">0–99 USD</td>
+      <td>prawdziwy stream sub-sekundowy, treść Benzingi</td>
+    </tr>
+    <tr>
+      <td><strong>4 — profesjonalizacja</strong></td>
+      <td>Benzinga przez Massive / Trading Economics</td>
+      <td class="num">enterprise</td>
+      <td>latencja ~25 ms i urzędowe <em>actual</em> — decyzja na później, nie teraz</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout">
+  <span class="tag">Dlaczego nie zacząć od płatnego</span>
+  <p>Bo <strong>nie wiadomo jeszcze, czego szukamy.</strong> Reguły istotności trzeba wykalibrować na prawdziwym ruchu, a do kalibracji wystarczy darmowy strumień. Płatny plan kupuje się wtedy, gdy da się powiedzieć konkretnie: „mam zbyt rzadki polling przy tych regułach" albo „brakuje mi tagów forex". Dziś żadnego z tych zdań nie da się uczciwie napisać.</p>
+</div>
+
+<h2>4. Deterministyczny silnik istotności</h2>
+
+<p>Wymaganie brzmi: <strong>odrzucać newsy bez wpływu na rynek, zapisywać całą resztę</strong>, bez AI. To znaczy, że domyślną odpowiedzią jest „zapisz", a odrzucenie musi być <em>uzasadnione konkretną regułą</em> — nigdy „nie osiągnął progu".</p>
+
+<h3>Potok</h3>
+
+<ol class="steps">
+  <li><b>Pobranie</b>
+    <p>Adapter per typ źródła (<code>rss</code>, <code>gdelt</code>, <code>marketaux</code>, <code>calendar</code>). Warunkowy GET (<code>ETag</code> / <code>If-Modified-Since</code>) — feed Fedu odpytywany co 10 s kosztuje wtedy 304 bez treści. Własny interwał i twardy limit na źródło (ForexFactory: 2/5 min). Wyłącznik obwodu po serii błędów, jitter żeby nie strzelać wszystkim naraz.</p>
+  </li>
+  <li><b>Normalizacja</b>
+    <p>Wspólny kształt: <code>source_id</code>, <code>external_id</code>, URL kanoniczny (usunięte <code>utm_*</code>, fragmenty, końcowe ukośniki), nagłówek, lead, <code>published_at</code> w UTC, język. Nagłówek normalizowany osobno: małe litery, bez interpunkcji, bez prefiksów typu „BREAKING:", „UPDATE 2-".</p>
+  </li>
+  <li><b>Deduplikacja</b>
+    <p>Trzy poziomy, od najtańszego: <span class="pill">1</span> SHA-256 URL-a kanonicznego → ten sam artykuł pobrany dwa razy. <span class="pill">2</span> SHA-256 znormalizowanego nagłówka → ten sam tekst z dwóch feedów. <span class="pill">3</span> <strong>SimHash 64-bit</strong> na shingles z nagłówka i leadu, dystans Hamminga ≤ 3 w oknie 24 h → przepisany news z innej redakcji.</p>
+    <p class="dim">SimHash, nie MinHash: przechowuje <em>jedną</em> 64-bitową wartość na dokument, podczas gdy MinHash-LSH trzyma hash dla każdego shingla. Przy krótkich nagłówkach różnica jakości jest nieistotna, a różnica kosztu w Postgresie — duża. Reprezentantem klastra zostaje pierwszy w kolejności czasu, reszta dostaje <code>duplicate_of</code>, nic nie jest kasowane.</p>
+  </li>
+  <li><b>Tagowanie</b>
+    <p>Słowniki wersjonowane w bazie, edytowalne z terminala — nie stałe w kodzie. Trzy rodzaje tagów: <strong>instrument</strong> (<code>GOLD</code> ← „gold", „XAU", „bullion", „kruszec"), <strong>temat</strong> (<code>MONETARY_POLICY</code>, <code>INFLATION</code>, <code>LABOUR</code>, <code>ENERGY</code>, <code>CONFLICT</code>, <code>SANCTIONS</code>, <code>TARIFFS</code>, <code>CRYPTO_REGULATION</code>), <strong>encja</strong> (banki centralne, nazwiska decydentów, kraje, surowce).</p>
+  </li>
+  <li><b>Punktacja</b>
+    <p>Suma addytywna, z zapisanym rozbiciem. Wzór poniżej.</p>
+  </li>
+  <li><b>Decyzja</b>
+    <p><code>reject</code> tylko z reguły odrzucającej. Poza tym <code>keep</code>, a powyżej progu dodatkowo <code>alert</code>. Odrzucone <strong>też trafiają do bazy</strong> — bez treści, z powodem odrzucenia — po to, żeby dało się zobaczyć, co filtr wyrzucił, i cofnąć złą regułę. Czyszczone po 7 dniach.</p>
+  </li>
+  <li><b>Publikacja</b>
+    <p>REST do przeglądania + zdarzenie na WebSockecie dla terminala, tym samym mechanizmem, którym leci strumień świec.</p>
+  </li>
+</ol>
+
+<h3>Wzór punktacji</h3>
+
+<pre><code>score = w_source          # ranga źródła: Fed/EBC 40 · agencja 25 · agregator 10 · blog 0
+      + w_topic           # temat: MONETARY_POLICY 30 · CONFLICT 25 · INFLATION 25 · EARNINGS 5
+      + w_entity          # encja: Powell/Lagarde 15 · nazwa kraju G7 5
+      + w_instrument      # trafienie w śledzony instrument: +20 (tylko raz, nie za tag)
+      + w_verb            # czasownik ruchu: cuts|raises|halts|bans|invades|defaults|strike  +15
+      + w_velocity        # N≥3 różnych źródeł w tym samym klastrze SimHash w 15 min:      +25
+      + w_event_window    # ±30 min od zdarzenia kalendarza o impact=high:                 +15
+      - p_stale           # published_at starsze niż 6 h w chwili pobrania:                -20
+      - p_noise           # miękki szum (patrz niżej):                                     -30</code></pre>
+
+<div class="callout good">
+  <span class="tag">Najmocniejszy darmowy sygnał</span>
+  <p><strong><code>w_velocity</code></strong> — liczba <em>różnych</em> źródeł, które w ciągu 15 minut opublikowały wiadomość lądującą w tym samym klastrze SimHash. To jest deterministyczny zamiennik oceny ważności: rynek sam głosuje przedrukiem. Nie wymaga AI, nie wymaga płatnego API i działa tym lepiej, im więcej tanich feedów niskiej wagi dorzucimy — bo one przestają być szumem, a stają się <em>elektoratem</em>.</p>
+</div>
+
+<h4>Reguły odrzucające — twarde</h4>
+<pre><code>reject if  source.kind == 'rss' and category in {'sponsored', 'press release wire promo'}
+reject if  headline matches ^\d+\s+(stocks|coins|ETFs)\s+to\s+(buy|watch|sell)
+reject if  headline matches (how to|beginner's guide|explained:|opinion:|horoscope)
+reject if  domain in blocklist              # farmy treści, agregatory-śmieciarki
+reject if  language not in {en, pl}         # dopóki nie ma tłumaczenia
+reject if  tags ∩ {SPORT, CELEBRITY, WEATHER_LOCAL} and tags ∩ market_topics == ∅</code></pre>
+
+<h4>Szum miękki — kara, nie odrzucenie</h4>
+<pre><code>p_noise += 30  if headline matches (analyst|price target|upgrades|downgrades) and instrument tags == ∅
+p_noise += 30  if body_length &lt; 200 and source.weight &lt; 20
+p_noise += 30  if source in {znane wire'y PR-owe} and w_verb == 0</code></pre>
+
+<div class="callout warn">
+  <span class="tag">Zasada, której nie wolno złamać</span>
+  <p><strong>Niski wynik to nie jest powód do odrzucenia.</strong> News z wynikiem 5 ląduje w bazie z wynikiem 5 i można go zobaczyć, przesuwając suwak progu w terminalu. Odrzucamy tylko to, co pasuje do jawnej reguły odrzucającej — i zapisujemy <em>która</em>. Inaczej pierwszy błąd w wagach kasuje na cicho klasę wiadomości, o której nikt się nie dowie.</p>
+</div>
+
+<h3>Powtarzalność</h3>
+
+<p>Każdy wiersz trzyma <code>ruleset_version</code> i <code>score_breakdown</code> (JSONB: które reguły zadziałały i za ile). Z tego wynikają trzy rzeczy, wszystkie potrzebne:</p>
+<ul>
+  <li><strong>Ten sam wejściowy artykuł przy tej samej wersji reguł zawsze daje ten sam wynik</strong> — da się to sprawdzić testem golden, dokładnie jak wskaźniki w <code>market-data</code>.</li>
+  <li><strong>Przeliczenie wstecz</strong> po zmianie reguł nie wymaga ponownego pobierania — nowy <code>ruleset_version</code> przechodzi po archiwum.</li>
+  <li><strong>„Dlaczego to dostało 85?"</strong> ma odpowiedź w interfejsie, a nie w logu workera. To jest też dane treningowe dla warstwy AI, gdy przyjdzie.</li>
+</ul>
+
+<h2>5. Model danych</h2>
+
+<pre><code>news_source
+  id · kind (rss|gdelt|marketaux|calendar) · url · poll_interval_s
+  weight · enabled · etag · last_modified · last_polled_at · last_ok_at
+  consecutive_failures · rate_limit_per_hour
+
+news_article
+  id · source_id → news_source · external_id · url_canonical · url_hash (bytea, unique)
+  headline · headline_hash · summary · body (NULL dla odrzuconych)
+  published_at · fetched_at · language
+  simhash (bigint) · cluster_id → news_cluster · duplicate_of → news_article
+  score (int) · decision (reject|keep|alert) · reject_rule_id
+  ruleset_version · score_breakdown (jsonb)
+
+news_article_tag
+  article_id · kind (topic|entity|instrument) · value · weight · rule_id
+  PK (article_id, kind, value)
+
+news_rule
+  id · ruleset_version · kind (tag|score|reject) · target · pattern · is_regex
+  weight · enabled · created_at
+
+news_cluster
+  id · first_seen_at · representative_article_id · source_count · peak_velocity
+
+news_event                       -- kalendarz makro
+  id · event_key · country · impact (high|medium|low)
+  scheduled_at · actual · forecast · previous · revised_from</code></pre>
+
+<h4>Indeksy, które będą potrzebne</h4>
+<ul>
+  <li><code>(decision, score DESC, published_at DESC)</code> — główny widok feedu.</li>
+  <li><code>(published_at DESC)</code> — przewijanie w czasie i sprzątanie.</li>
+  <li>GIN na <code>to_tsvector('simple', headline || ' ' || summary)</code> — wyszukiwanie.</li>
+  <li>SimHash w pasmach: cztery kolumny <code>smallint</code> z 16-bitowych wycinków, indeks na każdej — kandydatów na duplikat szuka się przez zgodność choć jednego pasma, dopiero potem liczy dystans Hamminga.</li>
+</ul>
+
+<h4>Ile tego będzie</h4>
+<p>Szacunek dla 20–25 feedów RSS plus GDELT co 15 min: <strong>2–5 tys. artykułów na dobę</strong> przed dedup, <strong>1–2 tys.</strong> po. Nagłówek plus lead to ~1 KB na wiersz → poniżej 1 GB rocznie. Treść pełna (jeśli w ogóle, patrz §8) to 2–5 KB — do 3,5 GB/rok, dlatego trzymana tylko dla <code>keep</code> i tylko tam, gdzie licencja pozwala. <strong>PostgreSQL nie zauważy tego obciążenia</strong> — to ułamek tego, co robi archiwum świec.</p>
+
+<h2>6. Gdzie to mieszka</h2>
+
+<div class="callout warn">
+  <span class="tag">Decyzja do podjęcia</span>
+  <p>To jest jedyna architektoniczna rozwidlenie w tym dokumencie i <strong>trzeba je rozstrzygnąć przed pisaniem kodu</strong>, bo przesunięcie później jest kosztowne.</p>
+</div>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wariant</th><th>Za</th><th>Przeciw</th></tr></thead>
+  <tbody>
+    <tr>
+      <td><strong>A. Nowy moduł</strong> <code>modules/news-radar</code>, port 8030, własna baza</td>
+      <td>Zgodne z regułą modułów niezależnych. Inny rytm pobierania, inne tryby awarii, inne licencje na dane niż świece. Awaria pollera nie dotyka archiwum. Osobny deploy, osobny job w CI</td>
+      <td>Nowy moduł to nowy port, nowy workflow deployu, nowy zasób w Terraformie, nowy alembic. Realny koszt, nie kosmetyczny</td>
+    </tr>
+    <tr>
+      <td><strong>B. Wewnątrz</strong> <code>market-data</code></td>
+      <td>Zero nowej infrastruktury. Jest już runner zadań (<code>jobs/</code>), hub WebSocket, kontrakt i wzorzec migracji</td>
+      <td><code>market-data</code> jest opisany jako <em>archiwum świec</em> — od modeli po README. News to inna dziedzina i innym psuje się w produkcji. Ten moduł już niesie <code>jobs</code>, <code>tracking</code>, <code>rollups</code>, <code>indicators</code></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p><strong>Rekomendacja: wariant A.</strong> Rozstrzyga to zdanie z <code>CLAUDE.md</code> — <em>„market-data · the candle archive. Owns the PostgreSQL"</em>. News nie jest świecą i nie powinien dzielić właściciela bazy. Osobna baza (ten sam serwer Postgresa w dev, osobna baza logiczna) trzyma granicę widoczną i tanią w utrzymaniu.</p>
+
+<p>Konsekwencje wariantu A, wszystkie do zaplanowania w propozycji OpenSpec:</p>
+<ul>
+  <li>Port <strong>8030</strong>, dopisany do <code>scripts/dev.sh</code> w kolejności zależności (news-radar nie zależy od gateway ani od market-data — może startować równolegle).</li>
+  <li>Własny <code>contract.py</code> i własny wpis w generatorze kontraktu terminala. <strong>To jest zmiana OpenSpec</strong> — kontrakt między modułami.</li>
+  <li>Własny job w <code>checks.yml</code> i własny <code>deploy-news-radar.yml</code>.</li>
+  <li>Terminal konsumuje trzy backendy zamiast dwóch — bez zmiany zasady, że nic od terminala nie zależy.</li>
+</ul>
+
+<h2>7. Terminal — zakładki</h2>
+
+<h3>Zakładka „Wiadomości"</h3>
+<ul>
+  <li>Strumień na żywo, najnowsze u góry, wpis po WebSockecie bez przeładowania.</li>
+  <li><strong>Suwak progu istotności</strong> — nie przełącznik „pokaż/ukryj", tylko ciągły próg. Domyślnie ustawiony wysoko, ale zjechanie do zera pokazuje wszystko, co jest w bazie.</li>
+  <li>Filtry: instrument, temat, źródło, zakres czasu, „tylko klastry ≥ N źródeł".</li>
+  <li><strong>Zwijanie klastrów</strong> — jeden nagłówek reprezentanta z licznikiem „+7 źródeł", rozwijany.</li>
+  <li>Popover <strong>„dlaczego ten wynik"</strong> — rozbicie ze <code>score_breakdown</code>, reguła po regule.</li>
+  <li>Kliknięcie nagłówka <strong>przestawia wykres na moment publikacji</strong> — to jest właściwy powód, dla którego ten moduł ma sens w tym terminalu, a nie w czytniku RSS.</li>
+</ul>
+
+<h3>Zakładka „Reguły i źródła"</h3>
+<ul>
+  <li>Lista źródeł: stan (ostatnie pobranie, ostatni sukces, licznik błędów), interwał, waga, włącz/wyłącz, dodaj RSS.</li>
+  <li>Edytor reguł: słowniki tagów, wagi, progi, reguły odrzucające — z wersjonowaniem.</li>
+  <li><strong>Podgląd na sucho</strong>: „ta reguła na ostatnich 24 h zatrzymałaby 312 z 1 840, w tym te 12 nagłówków" — <em>zanim</em> reguła wejdzie w życie. Bez tego strojenie wag jest zgadywaniem.</li>
+  <li>Przycisk przeliczenia archiwum na nową wersję reguł, z paskiem postępu.</li>
+</ul>
+
+<h3>Zakładka „Kalendarz" <span class="pill">opcjonalna</span></h3>
+<p>Nadchodzące zdarzenia o wysokim <em>impact</em>, z odliczaniem, plus nakładka na wykres. Może też być paskiem w zakładce wiadomości zamiast osobną zakładką — do rozstrzygnięcia przy projektowaniu UI, nie teraz.</p>
+
+<h2>8. Ryzyka i kwestie prawne</h2>
+
+<div class="worry real">
+  <p class="verdict">⚠ realne</p>
+  <p class="q">Darmowe tiery bywają niekomercyjne</p>
+  <p>Finnhub deklaruje darmowy plan <strong>do użytku osobistego, niekomercyjnego</strong>; Tiingo rozdziela cennik na 30 USD niekomercyjnie i 50 USD komercyjnie. Dla prywatnego terminala operatora to nie jest problem. Staje się problemem w dniu, w którym cokolwiek z tego zostanie komukolwiek udostępnione — i wtedy jest to zmiana kosztu, nie zmiana kodu. Warto to zapisać w propozycji, żeby decyzja nie zapadła przypadkiem.</p>
+</div>
+
+<div class="worry real">
+  <p class="verdict">⚠ realne</p>
+  <p class="q">Przechowywanie pełnych treści z RSS-a</p>
+  <p>Nagłówek, lead i link to praktyka standardowa i bezpieczna. Zapisywanie <strong>pełnej treści artykułu</strong> z cudzego feedu do własnej bazy to już inna sprawa i zależy od źródła. <strong>Rekomendacja: domyślnie nie przechowywać body</strong>, poza źródłami pierwotnymi (komunikat Fedu to dokument publiczny) i tymi, gdzie licencja mówi wprost że wolno (GDELT nie dystrybuuje treści, tylko metadane i linki — i to jest dobry wzorzec).</p>
+</div>
+
+<div class="worry solved">
+  <p class="verdict">✓ rozwiązane</p>
+  <p class="q">„Poller po RSS to hałas dla źródła"</p>
+  <p>Warunkowy GET po <code>ETag</code>/<code>If-Modified-Since</code> sprawia, że odpytanie bez zmian kosztuje 304 i kilkaset bajtów. Fed przy interwale 10 s to ~8,6 tys. żądań na dobę, prawie wszystkie 304 — to mniej niż jeden użytkownik z otwartą kartą przeglądarki. Twarde limity per źródło w konfiguracji i tak są potrzebne (ForexFactory: 2/5 min).</p>
+</div>
+
+<div class="worry real">
+  <p class="verdict">⚠ realne</p>
+  <p class="q">Strojenie wag zamieni się w zajęcie na pełen etat</p>
+  <p>To jest najprawdopodobniejszy sposób, w jaki ten moduł zawiedzie: reguły będą wiecznie „prawie dobre". Zabezpieczenie jest jedno i musi być w wersji pierwszej, nie dołożone później — <strong>podgląd na sucho i licznik odrzuconych</strong>. Dopóki widać, ile i czego filtr wyrzuca, strojenie jest pracą skończoną. Bez tego jest pętlą.</p>
+</div>
+
+<div class="worry solved">
+  <p class="verdict">✓ rozwiązane</p>
+  <p class="q">Warstwa AI dołożona później zburzy ten projekt</p>
+  <p>Nie zburzy, jeśli AI dostanie <strong>osobne kolumny</strong> (<code>ai_score</code>, <code>ai_sentiment</code>, <code>ai_model_version</code>) obok deterministycznych, a nie zastąpi ich. Wtedy jedno i drugie da się porównać na tym samym archiwum, a <code>score_breakdown</code> z reguł jest gotowym zbiorem etykiet do oceny modelu. Deterministyczna warstwa zostaje jako zabezpieczenie: gdy model padnie albo skończy się budżet, feed dalej działa.</p>
+</div>
+
+<h2>9. Co trzeba rozstrzygnąć przed propozycją</h2>
+
+<ol>
+  <li><strong>Osobny moduł czy w market-data</strong> — rekomendacja: osobny (§6).</li>
+  <li><strong>Czy przechowujemy pełne treści</strong> — rekomendacja: nie, poza źródłami pierwotnymi (§8).</li>
+  <li><strong>Retencja</strong> — propozycja: odrzucone 7 dni, zachowane bezterminowo (są małe).</li>
+  <li><strong>Języki</strong> — tylko angielski na start, czy też polskie źródła (PAP, Bankier, Stooq)? Polskie źródła dokładają pracy przy słownikach, a duplikują treść światową.</li>
+  <li><strong>Alerty</strong> — czy <code>decision = alert</code> ma cokolwiek robić poza podświetleniem w terminalu (dźwięk, powiadomienie systemowe, webhook)?</li>
+  <li><strong>Czy dokładamy Marketaux już w fazie 1</strong>, czy najpierw same RSS + GDELT, żeby zobaczyć, czy tagowanie jest w ogóle potrzebne.</li>
+</ol>
+
+<div class="callout">
+  <span class="tag">Następny krok</span>
+  <p>To jest research, nie propozycja. Kontrakt między modułami i nowy moduł to <strong>zmiana OpenSpec</strong> — po rozstrzygnięciu punktów z §9 idzie <code>/opsx:propose</code>, a ten dokument zostaje w <code>docs/archive/</code> jako droga, którą do niej doszliśmy.</p>
+</div>
+
+<h2>Źródła</h2>
+<ul>
+  <li><a href="https://www.gdeltproject.org/">GDELT Project</a> · <a href="https://blog.gdeltproject.org/gdelt-doc-2-0-api-debuts/">DOC 2.0 API</a> · <a href="https://www.gdeltproject.org/about.html">licencja</a></li>
+  <li><a href="https://www.federalreserve.gov/feeds/feeds.htm">Federal Reserve — RSS Feeds</a></li>
+  <li><a href="https://www.ecb.europa.eu/home/html/rss.en.html">European Central Bank — RSS news feeds</a></li>
+  <li><a href="https://www.sec.gov/structureddata/rss-feeds-submitted-filings">SEC EDGAR — Structured Disclosure RSS Feeds</a></li>
+  <li><a href="https://docs.alpaca.markets/us/docs/streaming-real-time-news">Alpaca — Real-time News (WebSocket)</a> · <a href="https://alpaca.markets/blog/introducing-news-api-for-real-time-fiancial-news/">ogłoszenie News API</a></li>
+  <li><a href="https://newsapi.org/pricing">NewsAPI.org — cennik</a></li>
+  <li><a href="https://www.marketaux.com/pricing">Marketaux — cennik</a> · <a href="https://www.marketaux.com/documentation">dokumentacja</a> · <a href="https://www.marketaux.com/faq">FAQ</a></li>
+  <li><a href="https://finnhub.io/pricing">Finnhub — cennik</a> · <a href="https://finnhub.io/docs/api/economic-calendar">kalendarz makro</a></li>
+  <li><a href="https://eodhd.com/financial-apis/stock-market-financial-news-api">EODHD — Financial News API</a></li>
+  <li><a href="https://www.tiingo.com/about/pricing">Tiingo — cennik</a></li>
+  <li><a href="https://www.alphavantage.co/documentation/">Alpha Vantage — dokumentacja</a></li>
+  <li><a href="https://docs.tradingeconomics.com/">Trading Economics — dokumentacja API</a> · <a href="https://tradingeconomics.com/calendar/api">kalendarz</a></li>
+  <li><a href="https://site.financialmodelingprep.com/developer/docs/stable/economics-calendar">FMP — Economic Calendar API</a></li>
+  <li><a href="https://nfs.faireconomy.media/ff_calendar_thisweek.json">ForexFactory — kalendarz tygodniowy JSON</a></li>
+  <li><a href="https://docs.benzinga.com/ws-reference/data-websocket/get-news-stream">Benzinga — News Stream (WebSocket)</a> · <a href="https://massive.com/blog/polygon-is-now-massive">Polygon.io → Massive</a></li>
+  <li><a href="https://www.newsquawk.com/">Newsquawk</a> · <a href="https://www.livesquawk.com/">LiveSquawk</a> · <a href="https://github.com/FinancialJuice">FinancialJuice</a></li>
+  <li><a href="https://aclanthology.org/2025.naacl-industry.73.pdf">Improved Near-Duplicate Detection for Aggregated News (NAACL 2025)</a> · <a href="https://mbrenndoerfer.com/writing/minhash-algorithm-jaccard-similarity-lsh-deduplication">MinHash / LSH — omówienie</a></li>
+</ul>
+
+<footer>
+  <p>Dokument przygotowany na gałęzi <code>research-market-news</code> (osobny worktree). Ceny i limity zebrane 10 sierpnia 2026 — sprawdzić u źródła przed decyzją zakupową. Pozycje oznaczone <span class="pill warn">do weryfikacji</span> pochodzą z materiałów wtórnych, w tym z porównań publikowanych przez samych dostawców.</p>
+</footer>
+
+</main>
