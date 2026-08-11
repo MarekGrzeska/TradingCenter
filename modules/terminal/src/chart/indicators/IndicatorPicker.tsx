@@ -17,7 +17,7 @@ function defaultParams(entry: IndicatorCatalogueEntry): Record<string, number> {
 
 /**
  * Built entirely from the catalogue it is given — no indicator is named in this file.
- * Adding one to `market_data/indicators/catalogue.py` makes it appear here without a
+ * Adding one to `market_data/indicators/catalogue/` makes it appear here without a
  * change on this side, as long as its output shape and render style are ones `canDraw`
  * already accepts (`market-data-indicators` spec, "Katalog wystarcza do zbudowania
  * wybieraka"; `terminal-chart` spec, "Operator wybiera wskaźniki z tego, co oferuje

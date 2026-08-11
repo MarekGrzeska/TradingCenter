@@ -116,14 +116,17 @@ hand, because a WebSocket has no route for FastAPI to describe. Stops 3 to 5 are
 ## A new indicator
 
 Not the change above, and the two are easy to conflate. Adding one — another moving average,
-another oscillator, another zone — touches exactly one file, `market_data/indicators/
-catalogue.py`, as long as its output shape (`lines`, `markers`, `zones`, `levels`) and render
-style are ones the catalogue and the terminal already know. The catalogue is data, not a
-generated type per entry: `GET /indicators` publishes a new entry the moment it lands there,
-and the terminal's picker offers it with **zero terminal changes and no
-`pnpm contract:generate`** — that is the whole point of `market-data-indicators` spec's
-"Katalog wystarcza do zbudowania wybieraka" (`openspec/changes/add-technical-indicators/
-design.md`, "Katalog jako dane, nie jako typy").
+another oscillator, another zone — touches exactly one file: the group's own module under
+`market_data/indicators/catalogue/` (`averages.py`, `volatility.py`, `regime.py`,
+`oscillators.py`, `bands.py`, `structure.py`, `zones.py`, `profile.py`), where it is
+appended to that module's tuple. Not `spec.py`, which is the entry *shape*, and not
+`__init__.py`, which only orders the groups — as long as the new entry's output shape
+(`lines`, `markers`, `zones`, `levels`) and render style are ones the catalogue and the
+terminal already know. The catalogue is data, not a generated type per entry: `GET
+/indicators` publishes a new entry the moment it lands there, and the terminal's picker
+offers it with **zero terminal changes and no `pnpm contract:generate`** — that is the whole
+point of `market-data-indicators` spec's "Katalog wystarcza do zbudowania wybieraka"
+(`openspec/changes/add-technical-indicators/design.md`, "Katalog jako dane, nie jako typy").
 
 The five-stop path above is for the rarer case this one is not: a genuinely **new output
 shape**, or a **render style** (`Chart.tsx`'s `canDrawIndicator` and its sync effect, a new

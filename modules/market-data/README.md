@@ -27,8 +27,9 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
   is why the read timeout is minutes while the connect timeout stays at five seconds.
 - `indicators/` — `kernel.py` (the math, ~20 primitives, no FastAPI or asyncpg import in
   sight), `warmup.py` (how far back a recursive one needs reading before its answer can be
-  trusted), `catalogue.py` (every indicator this module offers, as data — id, params, output
-  shape, how to draw it — not as a type per entry). See "Indicators" below.
+  trusted), `catalogue/` (every indicator this module offers, as data — id, params, output
+  shape, how to draw it — not as a type per entry; `spec.py` holds the entry shape, one
+  module per group holds the entries). See "Indicators" below.
 - `hub.py` — fan-out to subscribers, and the hold that makes a snapshot airtight.
 - `app.py` — assembly only: the lifespan, the error handling every route shares, and the
   routers mounted onto it. Nothing that decides anything.

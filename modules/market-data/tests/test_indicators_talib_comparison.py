@@ -39,7 +39,7 @@ comparison test the *formula* instead of re-measuring the seed.
 **One real bug this file found**: `aroon` originally read a `period`-bar
 window, which can never report "the extreme is today" (`bars_since == 0` is
 unreachable). TA-Lib — and Chande's original definition — read `period + 1`
-bars, counting today as day zero. Fixed in `catalogue.py`; the two now agree
+bars, counting today as day zero. Fixed in `catalogue/regime.py`; the two now agree
 to float precision. Left in this file's history as the reason task 2.11 is
 worth doing even when most of it is "no equivalent exists".
 """
