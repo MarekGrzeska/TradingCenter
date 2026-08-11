@@ -41,7 +41,7 @@ export function GridView() {
   return (
     <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-2">
-        <span className="text-xs text-ink-muted">Layout</span>
+        <span className="text-[11px] uppercase tracking-wide text-secondary">Layout</span>
         <div className="flex gap-1" role="group" aria-label="Layout">
           {LAYOUT_IDS.map((id) => (
             <button
@@ -51,7 +51,7 @@ export function GridView() {
               onClick={() => gridStore.setLayout(id)}
               className={`rounded border px-2 py-0.5 text-xs transition-colors ${
                 config.layout === id
-                  ? "border-accent text-ink"
+                  ? "border-primary text-ink"
                   : "border-border text-ink-muted hover:text-ink"
               }`}
             >
@@ -139,7 +139,7 @@ function Slot({
       data-testid={`slot-${slotId}`}
       data-active={active}
       className={`relative min-h-0 min-w-0 -outline-offset-2 ${
-        active ? "outline-2 outline-accent" : ""
+        active ? "outline-2 outline-primary" : ""
       }`}
     >
       {slot.symbol === null ? (

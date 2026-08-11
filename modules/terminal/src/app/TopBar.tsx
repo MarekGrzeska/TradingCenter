@@ -40,7 +40,10 @@ export function TopBar() {
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-4 border-b border-border bg-panel px-4">
-      <span className="text-sm font-semibold text-ink">TradingCenter · Terminal</span>
+      <span className="flex items-baseline gap-1.5 text-sm font-semibold">
+        <span className="text-ink">TradingCenter</span>
+        <span className="text-secondary">Terminal</span>
+      </span>
 
       {/* One indicator per back end rather than one for "the source". They go
           down separately and the consequences differ: no archive means no
@@ -78,7 +81,7 @@ function SignInState({ signedIn }: { signedIn: boolean }) {
       <button
         type="button"
         onClick={() => identity.signIn()}
-        className="cursor-pointer rounded border border-accent-line bg-accent-soft px-2 py-0.5 text-ink hover:bg-accent-strong hover:text-ink-on-accent"
+        className="cursor-pointer rounded border border-primary-line bg-primary-soft px-2 py-0.5 text-ink hover:bg-primary-strong hover:text-ink-inverse"
       >
         Sign in
       </button>

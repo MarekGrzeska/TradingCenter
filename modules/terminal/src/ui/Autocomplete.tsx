@@ -190,7 +190,7 @@ export function Autocomplete<T>({
                 }}
                 onMouseEnter={() => setHighlighted(index)}
                 className={`cursor-pointer px-2 py-1.5 ${
-                  index === highlighted ? "bg-accent-soft text-ink" : "text-ink-secondary"
+                  index === highlighted ? "bg-primary-soft text-ink" : "text-ink-secondary"
                 }`}
               >
                 {renderOption ? renderOption(option) : getOptionLabel(option)}

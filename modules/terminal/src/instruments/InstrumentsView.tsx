@@ -212,7 +212,7 @@ function InstrumentList({
         </p>
       ) : (
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-canvas text-left text-xs text-ink-muted">
+          <thead className="sticky top-0 border-b border-secondary-line bg-canvas text-left text-[11px] uppercase tracking-wide text-secondary">
             <tr>
               <th className="px-4 py-2 font-normal">Symbol</th>
               <th className="px-4 py-2 font-normal">Resolutions</th>
@@ -301,7 +301,7 @@ function InstrumentRow({
               <span
                 title={COLLECTION_HINT[pair.collection]}
                 className={
-                  pair.collection === "stalled" ? "font-semibold text-down" : "text-ink-secondary"
+                  pair.collection === "stalled" ? "font-semibold text-critical" : "text-ink-secondary"
                 }
               >
                 {RESOLUTION_LABEL[pair.resolution]}

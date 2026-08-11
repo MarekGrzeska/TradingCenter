@@ -122,7 +122,7 @@ export function ConfirmDialog({
   const confirmClass =
     tone === "danger"
       ? "rounded border border-critical bg-critical-soft px-3 py-1 text-critical hover:bg-critical hover:text-ink disabled:opacity-40"
-      : "rounded border border-accent bg-accent-soft px-3 py-1 text-ink hover:bg-accent-strong hover:text-ink-on-accent disabled:opacity-40";
+      : "rounded border border-primary bg-primary-soft px-3 py-1 text-ink hover:bg-primary-strong hover:text-ink-inverse disabled:opacity-40";
 
   return (
     <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">

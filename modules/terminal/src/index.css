@@ -13,64 +13,47 @@
  * secondary encoding — the chart renders up candles hollow and down candles
  * filled, so the distinction survives on shape even where hue does not.
  */
-/*
- * The chrome is one cool grey scale, all of it at the accent's hue (~222°) and only the
- * lightness moving between steps. It replaced a warm neutral scale (#1a1a19 and its
- * relatives, at 60°): with the agent panel next to it, the two greys read as two
- * different products rather than as one screen, and tinting the panel to fix that only
- * moved the seam. Cooling every surface instead puts the seam nowhere.
- *
- * Only the chrome moved. The data colours below — up, down, and the eight indicator hues
- * — are the palette the dataviz validator passed and are unchanged; the background they
- * sit on shifted hue but barely shifted lightness (#0d0d0d → #0b0e14), so their contrast
- * against it is what it was. Not re-run through the validator: worth doing before this
- * settles, and the pairwise separations it checks are between the data colours, none of
- * which this touched.
- */
+/* Chrome triad (testing): primary violet = interactive, secondary cyan = structure,
+   tertiary sand = quiet meta. Blue stays with the data palette — it is the chart's
+   first series. */
 @theme {
-  /* Five steps of depth, not three: `sunken` is what a control is cut into (an input, a
-   * well), `raised` is what floats over the screen (a toast, a popover). With only
-   * canvas/panel/panel-strong every one of those borrowed a surface that meant something
-   * else, and the screen flattened into one grey. */
-  --color-sunken: #06090f;
-  --color-canvas: #0b0e14;
-  --color-panel: #121620;
+  --color-sunken: #04060a;
+  --color-canvas: #090c13;
+  --color-panel: #10141d;
   --color-panel-strong: #1a2130;
-  --color-raised: #242e40;
-  --color-border: rgba(148, 171, 214, 0.16);
-  /* For a divider that has to be seen rather than felt — a panel's own edge, a focused
-   * control. The soft one disappears against `raised`. */
-  --color-border-strong: rgba(148, 171, 214, 0.3);
+  --color-raised: #27314a;
+  --color-border: rgba(148, 171, 214, 0.14);
+  --color-border-strong: rgba(148, 171, 214, 0.32);
 
-  --color-ink: #ffffff;
+  --color-ink: #f4f7fb;
   --color-ink-secondary: #c4cbd9;
   --color-ink-muted: #8794a8;
-  /* Placeholders and disabled text, which `ink-muted` was doing at the cost of meaning the
-   * same thing as a live secondary label. */
-  --color-ink-faint: #5b6879;
-  /* Text on an accent fill: white on #3987e5 is 3.1:1 and fails. */
-  --color-ink-on-accent: #06121f;
+  --color-ink-faint: #5b6779;
+  --color-ink-inverse: #080a12;
 
-  --color-grid: #1c2331;
+  --color-primary: #7c6cf5;
+  --color-primary-strong: #9c8fff;
+  --color-primary-line: rgba(124, 108, 245, 0.42);
+  --color-primary-soft: rgba(124, 108, 245, 0.16);
+
+  --color-secondary: #3bb8d4;
+  --color-secondary-strong: #5fd0e8;
+  --color-secondary-line: rgba(59, 184, 212, 0.38);
+  --color-secondary-soft: rgba(59, 184, 212, 0.14);
+
+  --color-tertiary: #c2a878;
+  --color-tertiary-line: rgba(194, 168, 120, 0.34);
+  --color-tertiary-soft: rgba(194, 168, 120, 0.12);
+
+  --color-grid: #1a2130;
   --color-axis: #2b3446;
 
-  /* The accent as a family rather than a single value: a hover that only changed opacity
-   * read as the control fading, not lighting up, and every tinted fill in the terminal was
-   * spelled `accent/15` or `accent/20` at whatever number the last file guessed. */
   --color-accent: #3987e5;
-  --color-accent-strong: #5aa0f0;
-  --color-accent-line: rgba(57, 135, 229, 0.38);
-  --color-accent-soft: rgba(57, 135, 229, 0.16);
 
   --color-up: #199e70;
   --color-down: #e66767;
 
-  /* Chrome status, kept apart from `up`/`down`: those two are the market's direction and
-   * mean nothing about whether a back end is answering. A reachable service used to be
-   * painted with the same teal as a rising candle, which is what made a screen of dots and
-   * a screen of candles look like the same three colours. The two degraded states carry a
-   * soft fill so a status needing attention can be a chip and not only a dot; `good` has
-   * none on purpose — a healthy terminal says so quietly. */
+  /* Status, kept off the data hues: `up`/`down` mean price, not health. */
   --color-good: #0ca30c;
   --color-warning: #fab219;
   --color-warning-soft: rgba(250, 178, 25, 0.16);

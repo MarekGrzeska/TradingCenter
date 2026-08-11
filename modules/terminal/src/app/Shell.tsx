@@ -13,6 +13,8 @@ export function Shell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
         <TabBar />
+        {/* Testing: the triad stated once, at the seam between chrome and content. */}
+        <div className="h-px shrink-0 bg-gradient-to-r from-primary via-secondary to-transparent" />
         <main className="min-h-0 flex-1 overflow-auto">
           <Outlet />
         </main>

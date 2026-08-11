@@ -364,7 +364,7 @@ describe("CollectionHistoryView — deletions (delete-archived-pair-data)", () =
 
     const r = await screen.findByTestId("deletion-US100-MINUTE-1786200000");
     const label = within(r).getByText("deleted");
-    expect(label).not.toHaveClass("text-up");
+    expect(label).not.toHaveClass("text-good");
     expect(label).not.toHaveClass("text-critical");
     expect(label).not.toHaveClass("text-warning");
   });
@@ -402,7 +402,7 @@ describe("CollectionHistoryView — success vs partial coverage", () => {
     renderView();
 
     const r = await screen.findByTestId("history-1-US100-MINUTE");
-    expect(within(r).getByText("done")).toHaveClass("text-up");
+    expect(within(r).getByText("done")).toHaveClass("text-good");
     expect(within(r).getByText(/→/)).toBeInTheDocument();
   });
 

@@ -152,7 +152,7 @@ export function AddInstrumentWizard({
                 onClick={() => toggleResolution(r)}
                 className={`rounded border px-2 py-1 text-xs ${
                   resolutions.has(r)
-                    ? "border-accent bg-panel-strong text-ink"
+                    ? "border-primary bg-panel-strong text-ink"
                     : "border-border text-ink-muted hover:text-ink"
                 }`}
               >

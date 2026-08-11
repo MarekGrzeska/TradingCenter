@@ -52,7 +52,7 @@ const STATUS_LABEL: Record<JobStatus, string> = {
 
 const STATUS_CLASS: Record<JobStatus, string> = {
   running: "text-ink-secondary",
-  succeeded: "font-semibold text-up",
+  succeeded: "font-semibold text-good",
   partial: "font-semibold text-warning",
   failed: "font-semibold text-critical",
   interrupted: "font-semibold text-critical",
@@ -226,7 +226,7 @@ function HistoryList({
         </p>
       ) : (
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-canvas text-left text-xs text-ink-muted">
+          <thead className="sticky top-0 border-b border-secondary-line bg-canvas text-left text-[11px] uppercase tracking-wide text-secondary">
             <tr>
               <th className="px-4 py-2 font-normal">Symbol</th>
               <th className="px-4 py-2 font-normal">Resolution</th>
@@ -543,7 +543,7 @@ function JobDialog({
 /**
  * A skasowanie, in the same table a pull's row lives in — deliberately not
  * styled like one. It is neither a success nor a failure, so it MUST NOT
- * borrow `text-up` (reserved for a job that succeeded) or `text-critical`
+ * borrow `text-good` (reserved for a job that succeeded) or `text-critical`
  * (a job that failed): reading it at a glance has to say "something was
  * removed", not "something went wrong" or "something finished".
  */
