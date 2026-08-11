@@ -22,12 +22,12 @@
 
 ## 4. Wdrożenie, w tej kolejności
 
-- [ ] 4.1 Wdrożyć `market-data` — operator, wymaga realnego Azure; poza zasięgiem agenta
-- [ ] 4.2 Potwierdzić w Application Insights, że `market_data.candle_age_periods` ma punkty
-- [ ] 4.3 `terraform apply` (operator, nie CI)
-- [ ] 4.4 Sprawdzić, że `alert-candle-age-stale` zszedł ze stanu `Fired`
+- [x] 4.1 Wdrożyć `market-data` — operator
+- [x] 4.2 Potwierdzić w Application Insights, że `market_data.candle_age_periods` ma punkty — potwierdzone przez operatora
+- [x] 4.3 `terraform apply` (operator, nie CI)
+- [x] 4.4 Sprawdzić, że `alert-candle-age-stale` zszedł ze stanu `Fired` — potwierdzone przez operatora
 
 ## 5. Dokumentacja
 
 - [x] 5.1 Dopisać obie metryki i ich role do README `market-data`
-- [ ] 5.2 Odnotować w `docs/kiedy-produkcja-milczy.html`, że pozycja 01 jest zamknięta — dopisano stan 11.08 (kod gotowy, wdrożenie w toku); „zamknięta" zostaje dla punktu 4.4
+- [x] 5.2 Odnotować w `docs/kiedy-produkcja-milczy.html`, że pozycja 01 jest zamknięta

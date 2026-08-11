@@ -27,11 +27,11 @@
 
 ## 5. Wdrożenie, w tej kolejności — operator, nie agent ani CI
 
-- [ ] 5.1 Wdrożyć `market-data` i `capital-gateway` (trasa `/ping` musi istnieć, zanim test dostępności zacznie jej pytać)
-- [ ] 5.2 Potwierdzić w Application Insights, że `AppRequests` ma punkty dla obu modułów
-- [ ] 5.3 `terraform apply` (operator, lokalnie, nigdy CI)
-- [ ] 5.4 Potwierdzić w Azure Portal, że test dostępności odpytuje `/ping` i dostaje sukces
-- [ ] 5.5 Otworzyć PR — `terraform plan` w CI (`terraform.yml`) pokaże diff nowych zasobów
+- [x] 5.1 Wdrożyć `market-data` i `capital-gateway` (trasa `/ping` musi istnieć, zanim test dostępności zacznie jej pytać)
+- [x] 5.2 Potwierdzić w Application Insights, że `AppRequests` ma punkty dla obu modułów — potwierdzone przez operatora
+- [x] 5.3 `terraform apply` (operator, lokalnie, nigdy CI)
+- [x] 5.4 Potwierdzić w Azure Portal, że test dostępności odpytuje `/ping` i dostaje sukces — potwierdzone przez operatora
+- [x] 5.5 Otworzyć PR — `terraform plan` w CI (`terraform.yml`) pokaże diff nowych zasobów — #66, zmergowany
 
 ## 6. Dokumentacja
 
