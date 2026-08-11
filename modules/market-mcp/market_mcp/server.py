@@ -12,7 +12,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 
-from . import tools
+from . import resources, tools
 from .client import UpstreamClient
 from .config import Settings
 
@@ -36,5 +36,6 @@ def build_server(settings: Settings, upstream: UpstreamClient) -> FastMCP:
         return JSONResponse({"status": "ok"})
 
     tools.register(mcp, upstream)
+    resources.register(mcp, upstream)
 
     return mcp

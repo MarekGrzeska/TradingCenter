@@ -3,7 +3,7 @@ from __future__ import annotations
 import httpx
 import respx
 
-from market_mcp.tools import _pair_out
+from market_mcp.tools.pairs import _pair_out
 
 BASE = "http://127.0.0.1:8020"
 

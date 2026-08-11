@@ -52,3 +52,21 @@ def truncate(items: list, limit: int) -> tuple[list, int]:
     if len(items) <= limit:
         return items, 0
     return items[:limit], len(items) - limit
+
+
+def thin_series(values: list, target_count: int) -> tuple[list, int | None]:
+    """Every `stride`-th value, keeping the series' shape recognizable instead of its
+    every point — for a full-resolution series, not the OHLC series `aggregate_candles`
+    bucket-merges. `stride` is `None` when the series already fits.
+    """
+    n = len(values)
+    if n <= target_count or target_count <= 0:
+        return values, None
+    stride = math.ceil(n / target_count)
+    return values[::stride], stride
+
+
+def cap_by_freshness(items: list[dict], time_key: str, limit: int) -> tuple[list[dict], int]:
+    """The most recent `limit` items, and how many older ones were dropped."""
+    ordered = sorted(items, key=lambda item: item[time_key], reverse=True)
+    return truncate(ordered, limit)
