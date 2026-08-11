@@ -13,37 +13,36 @@
  * secondary encoding — the chart renders up candles hollow and down candles
  * filled, so the distinction survives on shape even where hue does not.
  */
-/* Chrome triad (testing): primary violet = interactive, secondary cyan = structure,
-   tertiary sand = quiet meta. Blue stays with the data palette — it is the chart's
-   first series. */
+/* Chrome (testing): one main colour and one side colour, each in a few shades. Two
+   candidates live here — amber+steel is the default, copper+ice hangs off
+   [data-palette="copper"] below, and the switch in the top bar flips between them.
+   Blue, teal, violet and the rest belong to the data palette. */
 @theme {
-  --color-sunken: #04060a;
-  --color-canvas: #090c13;
-  --color-panel: #10141d;
-  --color-panel-strong: #1a2130;
-  --color-raised: #27314a;
-  --color-border: rgba(148, 171, 214, 0.14);
-  --color-border-strong: rgba(148, 171, 214, 0.32);
+  --color-sunken: #06070a;
+  --color-canvas: #0a0c11;
+  --color-panel: #12151d;
+  --color-panel-strong: #1b1f2a;
+  --color-raised: #262b38;
+  --color-border: rgba(150, 160, 180, 0.12);
+  --color-border-strong: rgba(150, 160, 180, 0.26);
 
-  --color-ink: #f4f7fb;
-  --color-ink-secondary: #c4cbd9;
-  --color-ink-muted: #8794a8;
-  --color-ink-faint: #5b6779;
-  --color-ink-inverse: #080a12;
+  --color-ink: #f0f1f4;
+  --color-ink-secondary: #bcc2cd;
+  --color-ink-muted: #808896;
+  --color-ink-faint: #545c6a;
+  --color-ink-inverse: #0a0700;
 
-  --color-primary: #7c6cf5;
-  --color-primary-strong: #9c8fff;
-  --color-primary-line: rgba(124, 108, 245, 0.42);
-  --color-primary-soft: rgba(124, 108, 245, 0.16);
+  --color-primary-dim: #966820;
+  --color-primary: #e2a33f;
+  --color-primary-strong: #f2ba5e;
+  --color-primary-line: rgba(226, 163, 63, 0.38);
+  --color-primary-soft: rgba(226, 163, 63, 0.13);
 
-  --color-secondary: #3bb8d4;
-  --color-secondary-strong: #5fd0e8;
-  --color-secondary-line: rgba(59, 184, 212, 0.38);
-  --color-secondary-soft: rgba(59, 184, 212, 0.14);
-
-  --color-tertiary: #c2a878;
-  --color-tertiary-line: rgba(194, 168, 120, 0.34);
-  --color-tertiary-soft: rgba(194, 168, 120, 0.12);
+  --color-secondary-dim: #4a5666;
+  --color-secondary: #7d8ca3;
+  --color-secondary-strong: #9dabc0;
+  --color-secondary-line: rgba(125, 140, 163, 0.34);
+  --color-secondary-soft: rgba(125, 140, 163, 0.12);
 
   --color-grid: #1a2130;
   --color-axis: #2b3446;
@@ -55,8 +54,8 @@
 
   /* Status, kept off the data hues: `up`/`down` mean price, not health. */
   --color-good: #0ca30c;
-  --color-warning: #fab219;
-  --color-warning-soft: rgba(250, 178, 25, 0.16);
+  --color-warning: #f0803c;
+  --color-warning-soft: rgba(240, 128, 60, 0.16);
   --color-critical: #d03b3b;
   --color-critical-soft: rgba(208, 59, 59, 0.16);
 
@@ -73,6 +72,32 @@
 
   --font-sans:
     system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+/* Second candidate: copper main, ice-blue side. */
+:root[data-palette="copper"] {
+  --color-sunken: #07070a;
+  --color-canvas: #0b0c10;
+  --color-panel: #13151c;
+  --color-panel-strong: #1c1f28;
+  --color-raised: #262a35;
+
+  --color-ink-inverse: #0c0603;
+
+  --color-primary-dim: #7d431f;
+  --color-primary: #c9743d;
+  --color-primary-strong: #e08f57;
+  --color-primary-line: rgba(201, 116, 61, 0.4);
+  --color-primary-soft: rgba(201, 116, 61, 0.14);
+
+  --color-secondary-dim: #4b6f90;
+  --color-secondary: #8fb6d9;
+  --color-secondary-strong: #aecdea;
+  --color-secondary-line: rgba(143, 182, 217, 0.34);
+  --color-secondary-soft: rgba(143, 182, 217, 0.12);
+
+  --color-warning: #fab219;
+  --color-warning-soft: rgba(250, 178, 25, 0.16);
 }
 
 html {

@@ -1,6 +1,7 @@
 import { identity } from "../data/marketData";
 import { marketData } from "../data/marketData";
 import type { SourcePart } from "../data/source";
+import { PaletteSwitch } from "./PaletteSwitch";
 import { useIdentityState } from "./useIdentityState";
 import { useSourceHealth, type SourceHealth } from "./useSourceHealth";
 
@@ -50,6 +51,8 @@ export function TopBar() {
           candles anywhere, while no gateway means the instrument search stops
           and the charts carry on. An operator has to be able to tell which. */}
       <div className="ml-auto flex items-center gap-4 text-sm text-ink-muted">
+        {/* Testing only, alongside the two candidate palettes in `index.css`. */}
+        <PaletteSwitch />
         {/* Sign-in sits beside them and not among them, because it is not a
             back end — and it is the first thing to read when nothing is
             arriving. An expired session and an archive that is down empty the

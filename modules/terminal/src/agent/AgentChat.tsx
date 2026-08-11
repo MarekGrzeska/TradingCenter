@@ -50,7 +50,7 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-primary-line bg-panel-strong px-3">
         <AgentGlyph className="h-4 w-4 text-secondary" />
         <span className="text-sm font-semibold">Agent</span>
-        <span className="rounded border border-tertiary-line bg-tertiary-soft px-1.5 py-0.5 text-[10px] text-tertiary">
+        <span className="rounded border border-border bg-panel px-1.5 py-0.5 text-[10px] text-ink-muted">
           mockup
         </span>
         <button
@@ -180,7 +180,7 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
         className="w-full resize-none rounded border border-primary-line bg-sunken px-2 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-primary focus:outline-none"
       />
       <div className="mt-2 flex items-center gap-2">
-        <span className="text-[10px] text-tertiary">Enter sends · Shift+Enter new line</span>
+        <span className="text-[10px] text-ink-faint">Enter sends · Shift+Enter new line</span>
         <button
           type="button"
           onClick={submit}
