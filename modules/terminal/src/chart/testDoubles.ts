@@ -456,6 +456,7 @@ export function indicatorResult(overrides: Partial<IndicatorResult> = {}): Indic
     warmupBars: 210,
     anchoredAt: null,
     settled: true,
+    error: null,
     lines: { ema: [] },
     markers: null,
     zones: null,

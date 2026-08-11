@@ -200,6 +200,10 @@ async def compute(
                 ),
             )
 
+    # Keyed by the resolution that could not be read, not by entry: three session windows
+    # and the time profile all want the same fine series and all get the same reason.
+    missing_series: dict[Resolution, str] = {}
+
     async with limiter, db.acquire() as conn:
         rows: Sequence[Candle | DerivedCandle] = await read_candles(
             conn, symbol, body.resolution, extended_start, end
@@ -214,18 +218,22 @@ async def compute(
         while first_requested < len(rows) and rows[first_requested].period_start < start:
             first_requested += 1
 
+        # A series the archive does not hold is not the caller's mistake — it is a
+        # property of what someone chose to collect, and it differs entry by entry. The
+        # read still happens once per resolution rather than once per entry; what
+        # changes is that a miss is written down here and handed to whichever entries
+        # asked for that series, instead of taking the whole request down with it
+        # (design.md, "Granica biegnie po tym, czyj to jest problem").
         htf_periods: dict[Resolution, list[tuple[datetime, Candle]]] = {}
         for htf_resolution in needed_htf_resolutions:
             htf_window_start = start - period_length(htf_resolution)
             htf_candles = await read_candles(conn, symbol, htf_resolution, htf_window_start, end)
             if not htf_candles:
-                raise HTTPException(
-                    status_code=422,
-                    detail=(
-                        f"no {htf_resolution.value} series collected for {symbol!r}; "
-                        "htf_levels/pivots need it read at that resolution directly"
-                    ),
+                missing_series[htf_resolution] = (
+                    f"no {htf_resolution.value} series collected for {symbol!r}; "
+                    "htf_levels/pivots need it read at that resolution directly"
                 )
+                continue
             htf_periods[htf_resolution] = _htf_effective_periods(htf_candles, start, end)
 
         minute_rows: Sequence[Candle | DerivedCandle] = []
@@ -244,13 +252,10 @@ async def compute(
                 if not minute_rows and FINE_RESOLUTION in DERIVABLE:
                     minute_rows = await read_derived(conn, symbol, FINE_RESOLUTION, start, end)
             if not minute_rows:
-                raise HTTPException(
-                    status_code=422,
-                    detail=(
-                        f"no {FINE_RESOLUTION.value} series collected for {symbol!r}, and "
-                        "none could be derived from MINUTE either; time_profile/session_range/"
-                        "opening_range need one of those two read directly"
-                    ),
+                missing_series[FINE_RESOLUTION] = (
+                    f"no {FINE_RESOLUTION.value} series collected for {symbol!r}, and "
+                    "none could be derived from MINUTE either; time_profile/session_range/"
+                    "opening_range need one of those two read directly"
                 )
 
     available_warmup_bars = first_requested
@@ -274,6 +279,7 @@ async def compute(
             minute_series,
             minute_times,
             start,
+            missing_series,
         )
         for entry, params in resolved
     ]
@@ -388,9 +394,29 @@ def _result_out(
     minute_series: Series | None,
     minute_times: list[datetime] | None,
     requested_start: datetime,
+    missing_series: dict[Resolution, str],
 ) -> IndicatorResultOut:
     needed = entry.warmup_bars(params)
     settled = available_warmup_bars >= needed
+
+    # Asked for before anything is computed: an entry whose series is not there has no
+    # answer to give, and the reason belongs where its answer would have been.
+    # `warmup_bars` stays null — nothing was read to warm anything up.
+    #
+    # Both series are checked, not whichever one the entry mostly uses. No entry wants
+    # both today, and an `if/else` here would read as if that were guaranteed — the
+    # first one that does would have its missing coarse series ignored, compute against
+    # an empty `htf_periods` and answer with an empty `levels`: "computed, found none",
+    # which is the exact claim this whole change exists to stop being made.
+    wanted = (
+        FINE_RESOLUTION if entry.needs_minute_series else None,
+        entry.higher_resolution,
+    )
+    for resolution in wanted:
+        if resolution is not None and resolution in missing_series:
+            return IndicatorResultOut(
+                id=entry.id, params=params, settled=False, error=missing_series[resolution]
+            )
 
     if entry.compute_zones is not None:
         zones = [

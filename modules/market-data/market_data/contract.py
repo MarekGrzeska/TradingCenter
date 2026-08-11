@@ -600,15 +600,17 @@ class IndicatorLevelOut(BaseModel):
 
 class IndicatorResultOut(BaseModel):
     """One requested indicator's answer. Exactly one of `lines`, `markers`, `zones`,
-    `levels` is set — the one its catalogue entry's `output` names
-    (`market-data-indicators` spec, "Wynik ma jeden z czterech kształtów")."""
+    `levels` is set — the one its catalogue entry's `output` names — or none of them
+    and `error` instead (`market-data-indicators` spec, "Wynik ma jeden z czterech
+    kształtów")."""
 
     id: str
     params: dict[str, float] = Field(description="resolved params — defaults filled in")
     warmup_bars: int | None = Field(
         default=None,
         description="how many bars before the requested range were read for warmup; "
-        "null for an anchored indicator, which carries anchored_at instead",
+        "null for an anchored indicator, which carries anchored_at instead, and for "
+        "one that carries an error instead of an answer",
     )
     anchored_at: datetime | None = Field(
         default=None,
@@ -616,7 +618,18 @@ class IndicatorResultOut(BaseModel):
     )
     settled: bool = Field(
         description="false when the archive did not hold enough history before the "
-        "requested range for this value to be trusted yet"
+        "requested range for this value to be trusted yet. Says nothing about `error`: "
+        "an unsettled value is still a value, computed from a series that was shorter "
+        "than it wanted"
+    )
+    error: str | None = Field(
+        default=None,
+        description="why this one indicator could not be computed, when the reason is "
+        "something the archive does not hold — the series it needs at a resolution "
+        "nobody collects. Set instead of a shape, never beside one: an empty `zones` "
+        "means the range held none, which is not the same claim. A request the module "
+        "refuses outright (unknown indicator, parameter out of range, reversed range, "
+        "over the ceiling) is a 422 carrying Problem, not a result carrying this",
     )
     lines: dict[str, list[float | None]] | None = None
     markers: list[IndicatorMarkerOut] | None = None
@@ -624,10 +637,23 @@ class IndicatorResultOut(BaseModel):
     levels: list[IndicatorLevelOut] | None = None
 
     @model_validator(mode="after")
-    def _exactly_one_shape(self) -> IndicatorResultOut:
+    def _exactly_one_shape_or_an_error(self) -> IndicatorResultOut:
+        """Exactly one shape and no error, or no shape and an error.
+
+        The third combination — a shape *and* a reason — is the one worth refusing to
+        build: it reads to a consumer that only looks at the shape as "computed, and it
+        was empty", which is the opposite of what happened.
+        """
         shapes = (self.lines, self.markers, self.zones, self.levels)
-        if sum(shape is not None for shape in shapes) != 1:
-            raise ValueError("exactly one of lines, markers, zones, levels must be set")
+        set_shapes = sum(shape is not None for shape in shapes)
+        if self.error is not None:
+            if set_shapes != 0:
+                raise ValueError("a result carrying an error must carry no shape")
+            return self
+        if set_shapes != 1:
+            raise ValueError(
+                "exactly one of lines, markers, zones, levels must be set, or error instead"
+            )
         return self
 
 

@@ -726,8 +726,9 @@ export interface components {
         /**
          * IndicatorResultOut
          * @description One requested indicator's answer. Exactly one of `lines`, `markers`, `zones`,
-         *     `levels` is set — the one its catalogue entry's `output` names
-         *     (`market-data-indicators` spec, "Wynik ma jeden z czterech kształtów").
+         *     `levels` is set — the one its catalogue entry's `output` names — or none of them
+         *     and `error` instead (`market-data-indicators` spec, "Wynik ma jeden z czterech
+         *     kształtów").
          */
         IndicatorResultOut: {
             /**
@@ -735,6 +736,11 @@ export interface components {
              * @description set instead of warmup_bars for an indicator with state rather than decay
              */
             anchored_at: string | null;
+            /**
+             * Error
+             * @description why this one indicator could not be computed, when the reason is something the archive does not hold — the series it needs at a resolution nobody collects. Set instead of a shape, never beside one: an empty `zones` means the range held none, which is not the same claim. A request the module refuses outright (unknown indicator, parameter out of range, reversed range, over the ceiling) is a 422 carrying Problem, not a result carrying this
+             */
+            error: string | null;
             /** Id */
             id: string;
             /** Levels */
@@ -754,12 +760,12 @@ export interface components {
             };
             /**
              * Settled
-             * @description false when the archive did not hold enough history before the requested range for this value to be trusted yet
+             * @description false when the archive did not hold enough history before the requested range for this value to be trusted yet. Says nothing about `error`: an unsettled value is still a value, computed from a series that was shorter than it wanted
              */
             settled: boolean;
             /**
              * Warmup Bars
-             * @description how many bars before the requested range were read for warmup; null for an anchored indicator, which carries anchored_at instead
+             * @description how many bars before the requested range were read for warmup; null for an anchored indicator, which carries anchored_at instead, and for one that carries an error instead of an answer
              */
             warmup_bars: number | null;
             /** Zones */

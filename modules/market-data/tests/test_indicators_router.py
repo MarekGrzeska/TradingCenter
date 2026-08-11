@@ -8,8 +8,10 @@ from datetime import UTC, datetime, timedelta
 
 import httpx
 import pytest
+from pydantic import ValidationError
 
 from market_data.app import app
+from market_data.contract import IndicatorResultOut
 from market_data.models import Candle, CandleSource, Resolution
 from market_data.store import write_candles
 
@@ -36,6 +38,37 @@ def candle(offset: int, **overrides) -> Candle:
             **overrides,
         }
     )
+
+
+# --- the result model itself: the one combination that must not be buildable ---------
+
+
+class TestResultShapeOrError:
+    """`market-data-indicators` spec, "Wynik ma jeden z czterech kształtów" — enforced on
+    the model rather than left to whoever writes the next branch of `_result_out`."""
+
+    def test_a_shape_and_a_reason_together_are_refused(self):
+        # The combination that would read to a consumer looking only at the shape as
+        # "computed, and it was empty" — the opposite of what happened.
+        with pytest.raises(ValidationError, match="must carry no shape"):
+            IndicatorResultOut(
+                id="range_gap", params={}, settled=False, zones=[], error="no series"
+            )
+
+    def test_neither_a_shape_nor_a_reason_is_still_refused(self):
+        with pytest.raises(ValidationError, match="exactly one of"):
+            IndicatorResultOut(id="ema", params={}, settled=True)
+
+    def test_a_reason_alone_is_a_whole_result(self):
+        result = IndicatorResultOut(
+            id="time_profile", params={}, settled=False, error="no MINUTE_5 series collected"
+        )
+        assert result.error == "no MINUTE_5 series collected"
+        assert (result.lines, result.markers, result.zones, result.levels) == (None,) * 4
+
+    def test_two_shapes_at_once_are_refused_as_before(self):
+        with pytest.raises(ValidationError, match="exactly one of"):
+            IndicatorResultOut(id="ema", params={}, settled=True, lines={"ema": []}, zones=[])
 
 
 # --- catalogue: no database, no app.state — the route touches neither -----------------
@@ -388,9 +421,9 @@ async def test_htf_levels_day_reads_the_previous_closed_day(api, pool) -> None:
     assert pd_low["price"] == pytest.approx(95.0)
 
 
-async def test_htf_levels_refused_without_the_day_series(api, pool) -> None:
-    """Acceptance criterion: cross-resolution reads must not break on a pair
-    collected only at MINUTE — they refuse cleanly instead."""
+async def test_htf_levels_names_the_missing_day_series_in_its_own_result(api, pool) -> None:
+    """Acceptance criterion: cross-resolution reads must not break on a pair collected
+    only at MINUTE — the entry that needed the series says so, and says it alone."""
     async with pool.acquire() as conn:
         await write_candles(conn, [candle(m) for m in range(30, -1, -1)])
 
@@ -400,11 +433,17 @@ async def test_htf_levels_refused_without_the_day_series(api, pool) -> None:
             "resolution": "MINUTE",
             "from": (NOW - timedelta(minutes=10)).isoformat(),
             "to": NOW.isoformat(),
-            "specs": [{"id": "htf_levels_day"}],
+            "specs": [{"id": "ema"}, {"id": "htf_levels_day"}],
         },
     )
-    assert response.status_code == 422
-    assert "DAY" in response.json()["detail"]
+    assert response.status_code == 200
+
+    results = {r["id"]: r for r in response.json()["results"]}
+    assert results["ema"]["lines"]["ema"], "the indicator that could be computed was"
+    assert results["ema"]["error"] is None
+    assert "DAY" in results["htf_levels_day"]["error"]
+    # No shape at all — an empty `levels` would read as "computed, found none".
+    assert results["htf_levels_day"]["levels"] is None
 
 
 # --- E3, zones: zones on the wire, and task 4.3's coverage-driven session gap ---
@@ -552,7 +591,7 @@ async def test_session_range_reads_the_minute_series_regardless_of_requested_res
 # --- E4, time profile: task 5.3's refusal, and the minute-series ceiling ---
 
 
-async def test_time_profile_refused_without_a_minute_series(api, pool) -> None:
+async def test_time_profile_names_the_missing_minute_series_in_its_own_result(api, pool) -> None:
     async with pool.acquire() as conn:
         await write_candles(
             conn, [_day_candle(_TODAY - timedelta(days=d)) for d in range(5, -1, -1)]
@@ -567,8 +606,14 @@ async def test_time_profile_refused_without_a_minute_series(api, pool) -> None:
             "specs": [{"id": "time_profile"}],
         },
     )
-    assert response.status_code == 422
-    assert "MINUTE" in response.json()["detail"]
+    # Every requested indicator failing is still an answer, not a refusal: the caller
+    # asked a well-formed question and the archive answered what it had, which is
+    # nothing (spec, "Wszystkie zamówione wskaźniki bez serii").
+    assert response.status_code == 200
+
+    [result] = response.json()["results"]
+    assert "MINUTE" in result["error"]
+    assert result["levels"] is None
 
 
 async def test_time_profile_computes_from_the_minute_series_at_day_resolution(api, pool) -> None:
@@ -619,3 +664,149 @@ async def test_a_wide_request_hiding_a_bigger_minute_read_is_refused(api, pool) 
     )
     assert response.status_code == 422
     assert "ceiling" in response.json()["detail"]
+
+
+# --- partial answers: whose problem it is decides the granularity of the refusal ------
+
+
+class TestPartialAnswer:
+    """`market-data-indicators` spec, "Brakująca seria nie unieważnia policzonych
+    wskaźników" — the boundary runs along whose problem the failure is."""
+
+    async def test_a_missing_series_leaves_the_rest_computed(self, api, pool) -> None:
+        async with pool.acquire() as conn:
+            await write_candles(
+                conn, [_day_candle(_TODAY - timedelta(days=d)) for d in range(5, -1, -1)]
+            )
+
+        response = await api.post(
+            "/indicators/US100",
+            json={
+                "resolution": "DAY",
+                "from": (_TODAY - timedelta(days=5)).isoformat(),
+                "to": (_TODAY + timedelta(days=1)).isoformat(),
+                "specs": [{"id": "sma", "params": {"period": 2}}, {"id": "time_profile"}],
+            },
+        )
+        assert response.status_code == 200
+
+        results = {r["id"]: r for r in response.json()["results"]}
+        assert results["sma"]["error"] is None
+        assert results["sma"]["lines"]["sma"]
+        assert "MINUTE" in results["time_profile"]["error"]
+
+    async def test_every_indicator_failing_is_still_an_answer(self, api, pool) -> None:
+        async with pool.acquire() as conn:
+            await write_candles(
+                conn, [_day_candle(_TODAY - timedelta(days=d)) for d in range(5, -1, -1)]
+            )
+
+        response = await api.post(
+            "/indicators/US100",
+            json={
+                "resolution": "DAY",
+                "from": (_TODAY - timedelta(days=5)).isoformat(),
+                "to": (_TODAY + timedelta(days=1)).isoformat(),
+                "specs": [{"id": "time_profile"}, {"id": "session_range_london"}],
+            },
+        )
+        assert response.status_code == 200
+
+        results = response.json()["results"]
+        assert len(results) == 2
+        assert all(r["error"] for r in results)
+        # Every requested id is still present. A consumer that asked for two indicators
+        # and got one row back cannot tell which of the two it is holding.
+        assert {r["id"] for r in results} == {"time_profile", "session_range_london"}
+
+    async def test_an_unknown_id_still_refuses_the_whole_request(self, api, pool) -> None:
+        async with pool.acquire() as conn:
+            await write_candles(conn, [candle(m) for m in range(30, -1, -1)])
+
+        response = await api.post(
+            "/indicators/US100",
+            json={
+                "resolution": "MINUTE",
+                "from": (NOW - timedelta(minutes=10)).isoformat(),
+                "to": NOW.isoformat(),
+                "specs": [{"id": "ema"}, {"id": "nie_ma_takiego"}],
+            },
+        )
+        # A typo answered partially is one nobody notices; a 422 is not.
+        assert response.status_code == 422
+        assert "nie_ma_takiego" in response.json()["detail"]
+
+    async def test_a_parameter_out_of_range_still_refuses_the_whole_request(
+        self, api, pool
+    ) -> None:
+        async with pool.acquire() as conn:
+            await write_candles(conn, [candle(m) for m in range(30, -1, -1)])
+
+        response = await api.post(
+            "/indicators/US100",
+            json={
+                "resolution": "MINUTE",
+                "from": (NOW - timedelta(minutes=10)).isoformat(),
+                "to": NOW.isoformat(),
+                "specs": [{"id": "atr"}, {"id": "ema", "params": {"period": 999_999}}],
+            },
+        )
+        assert response.status_code == 422
+        assert "period" in response.json()["detail"]
+
+    async def test_the_same_request_twice_gives_the_same_reasons(self, api, pool) -> None:
+        async with pool.acquire() as conn:
+            await write_candles(
+                conn, [_day_candle(_TODAY - timedelta(days=d)) for d in range(5, -1, -1)]
+            )
+        body = {
+            "resolution": "DAY",
+            "from": (_TODAY - timedelta(days=5)).isoformat(),
+            "to": (_TODAY + timedelta(days=1)).isoformat(),
+            "specs": [{"id": "sma", "params": {"period": 2}}, {"id": "time_profile"}],
+        }
+
+        first = await api.post("/indicators/US100", json=body)
+        second = await api.post("/indicators/US100", json=body)
+
+        assert first.status_code == second.status_code == 200
+        assert first.json() == second.json()
+
+    async def test_one_read_serves_every_entry_wanting_the_same_series(self, api, pool) -> None:
+        """The reason a missing series is recorded per resolution rather than per entry:
+        four entries wanting the fine series must not read it four times."""
+        reads: list[Resolution] = []
+        import market_data.routers.indicators as router_module
+
+        real_read = router_module.read_candles
+
+        async def counting_read(conn, symbol, resolution, *args, **kwargs):
+            reads.append(resolution)
+            return await real_read(conn, symbol, resolution, *args, **kwargs)
+
+        async with pool.acquire() as conn:
+            await write_candles(
+                conn, [_day_candle(_TODAY - timedelta(days=d)) for d in range(5, -1, -1)]
+            )
+
+        router_module.read_candles = counting_read
+        try:
+            response = await api.post(
+                "/indicators/US100",
+                json={
+                    "resolution": "DAY",
+                    "from": (_TODAY - timedelta(days=5)).isoformat(),
+                    "to": (_TODAY + timedelta(days=1)).isoformat(),
+                    "specs": [
+                        {"id": "time_profile"},
+                        {"id": "session_range_london"},
+                        {"id": "session_range_new_york"},
+                        {"id": "session_range_tokyo"},
+                    ],
+                },
+            )
+        finally:
+            router_module.read_candles = real_read
+
+        assert response.status_code == 200
+        assert reads.count(Resolution.MINUTE_5) == 1, reads

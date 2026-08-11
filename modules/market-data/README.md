@@ -316,15 +316,27 @@ start collecting it either — that is the decision the ceiling exists to keep d
 One implementation of the math, on the server, for every future consumer — the terminal, a
 backtest, the strategy module someday — rather than each reimplementing it and quietly
 disagreeing. `GET /indicators` is the whole catalogue: id, parameters with their bounds, and
-how to draw the answer. A consumer never needs to know a wskaźnik by name beforehand — it reads
+how to draw the answer. A consumer never needs to know an indicator by name beforehand — it reads
 the catalogue and offers whatever it already knows how to draw. `POST /indicators/{symbol}`
 computes one or more of them over a range, reading further back than `from` on its own by
 however much warmup each one needs, and says in `settled` whether the archive actually held
 enough history for the answer to be trusted yet — an unsettled value is still returned, never
 withheld, because a caller silently missing a value is worse than one that knows to distrust it.
 
+**A refusal is per indicator when it is the archive's, per request when it is the caller's.**
+An entry reading a series other than the one being drawn — the session ranges, the opening
+range, the time profile, the previous-period levels — cannot be computed for a pair nobody
+collects that series for. That is not a bad request: it is a property of what someone chose to
+collect, it changes without the request changing, and it differs entry by entry. So it comes
+back as `error` on that one result, the rest of the request answers normally, and the status is
+`200`. A caller's own mistake stays a `422` carrying `Problem` — an unknown indicator id, a
+parameter outside the catalogue's range, a range ending before it starts, a request over the
+ceiling — because a quiet partial answer to a typo is one nobody notices. A result carrying
+`error` carries no shape: an empty `zones` list means the range held none, which is a different
+claim, and the model refuses to be built with both.
+
 Every answer takes one of four shapes, declared per entry and unrelated to which trading school
-named the wskaźnik: **lines** (a moving average, an oscillator), **markers** (a swing point),
+named the indicator: **lines** (a moving average, an oscillator), **markers** (a swing point),
 **zones** (a gap, a session window — open on one end while unresolved, closed once it is),
 **levels** (a pivot, a cluster of equal highs, a previous day's OHLC, a time-profile bucket).
 `algorithm_version` bumps whenever a formula changes and never when an entry is only added —
@@ -343,7 +355,7 @@ difference is not a bug on either side.
 
 **What this module does not compute**, on purpose, not yet by omission:
 
-- **No signal, no boolean.** A wskaźnik measures; it never decides. Every threshold a formula
+- **No signal, no boolean.** An indicator measures; it never decides. Every threshold a formula
   needs (`skip_session_gaps`, a value-area percentage, a pivot type) is a parameter the caller
   chose, echoed back in the response — never a constant this module picked for them. `range_gap`
   carries "Fair Value Gap" as an alias, never as its identifier, so one school's vocabulary
@@ -361,7 +373,7 @@ difference is not a bug on either side.
   parameters (`from_hour`/`to_hour`, or a UTC calendar day for the opening range) rather than
   looking up real trading hours, and Ichimoku/Alligator's future-shifted lines stay out entirely
   until a session calendar exists to place them against without drawing one into a weekend.
-- **No second instrument.** Every wskaźnik computes from one symbol's own series — a spread or a
+- **No second instrument.** Every indicator computes from one symbol's own series — a spread or a
   correlation would need a second one as an input or a parameter, and nothing here accepts that.
 
 ## The rules, and what was measured
