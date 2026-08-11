@@ -145,18 +145,18 @@
 
 ## 11. CI i wdrożenie
 
-- [ ] 11.1 `.github/workflows/checks.yml` — `agent` w filtrze `changes` i czwarty job
+- [x] 11.1 `.github/workflows/checks.yml` — `agent` w filtrze `changes` i czwarty job
       (ruff, pyright, pytest, pytest -m db)
-- [ ] 11.2 `.github/workflows/deploy-agent.yml` na wzór pozostałych trzech, zakończony
+- [x] 11.2 `.github/workflows/deploy-agent.yml` na wzór pozostałych trzech, zakończony
       sprawdzeniem wdrożonej aplikacji
-- [ ] 11.3 Filtr terminala obejmuje zmiany w `modules/agent` wyłącznie tam, gdzie dotyczą
+- [x] 11.3 Filtr terminala obejmuje zmiany w `modules/agent` wyłącznie tam, gdzie dotyczą
       kształtu wystawianego terminalowi
 
 ## 12. Dokumentacja i domknięcie
 
-- [ ] 12.1 `modules/agent/README.md` — co, jak uruchomić, jak przetestować, jaki kontrakt
-- [ ] 12.2 `CLAUDE.md` i `README.md` — czwarty moduł, port 8030, komendy, druga baza lokalna
-- [ ] 12.3 `docs/architecture.md` — agent na schemacie jako konsument, nie peer
+- [x] 12.1 `modules/agent/README.md` — co, jak uruchomić, jak przetestować, jaki kontrakt
+- [x] 12.2 `CLAUDE.md` i `README.md` — czwarty moduł, port 8030, komendy, druga baza lokalna
+- [x] 12.3 `docs/architecture.md` — agent na schemacie jako konsument, nie peer
 - [ ] 12.4 Uruchomić cały stos lokalnie i przeprowadzić rozmowę na każdym z trzech modeli;
       sprawdzić, że koszt pojawia się w zakładce
 - [ ] 12.5 Sprawdzić strumień na wdrożonej aplikacji, nie tylko lokalnie (buforowanie i

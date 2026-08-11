@@ -1,6 +1,9 @@
-# One Linux App Service Plan, two apps. design.md, "App Service, nie Container Apps":
-# both modules run non-stop, so a shared B1 plan is cheaper than two Container Apps
-# billed by CPU-second, and B1 fits the free-tier grant this subscription is on.
+# One Linux App Service Plan, three apps (capital-gateway, market-data, agent — design.md,
+# "App Service, nie Container Apps"): all three run non-stop, so a shared B1 plan is
+# cheaper than as many Container Apps billed by CPU-second, and B1 fits the free-tier grant
+# this subscription is on. `add-agent-chat`'s own design.md prices the fourth app onto this
+# same plan explicitly rather than a second one — see its Risk, "Czwarta aplikacja na B1 z
+# jednym workerem".
 resource "azurerm_service_plan" "main" {
   name                = "asp-tradingcenter"
   resource_group_name = azurerm_resource_group.main.name

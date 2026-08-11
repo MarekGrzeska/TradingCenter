@@ -17,7 +17,8 @@ modules move here one at a time.
 |---|---|---|
 | [capital-gateway](modules/capital-gateway/) | capital.com — trading, deep history, a live stream. Demo only. | HTTP + WebSocket |
 | [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. | HTTP + WebSocket |
-| [terminal](modules/terminal/) | The operator's screen — charts in a grid, and what the archive collects. | consumes both |
+| [agent](modules/agent/) | The operator's conversation with a model — its own database, its own Azure OpenAI account. No tools yet. | HTTP, streamed |
+| [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, and the agent panel. | consumes all three |
 
 ## Layout
 
@@ -51,12 +52,13 @@ convenience wrappers; no module depends on one.
 Both bring the same things up in the same order:
 
 ```
-migrations  ->  capital-gateway  ->  market-data  ->  terminal
+migrations  ->  capital-gateway  ->  market-data  ->  agent  ->  terminal
 ```
 
 The order is not tidiness. `market-data` subscribes to the gateway as it starts, and the
 terminal's charts read `market-data`, so starting anything early only fills the console with
-retries. Each step waits for the one before it to actually answer. Ctrl+C stops the services.
+retries; `agent` has nothing that depends on it, so it goes last among the back ends. Each
+step waits for the one before it to actually answer. Ctrl+C stops the services.
 
 **The database is local again.** `market-data` writes to the PostgreSQL container in
 [compose.yaml](compose.yaml), which the scripts start first — so Docker is a requirement for
@@ -65,10 +67,14 @@ running the stack, not only for testing it. The archive survives Ctrl+C and
 on the Azure server, for production fidelity; the standing tax — latency, an IP allowlist, a
 yearly secret rotation — cost more than the fidelity bought, and
 `openspec/changes/local-dev-database-in-docker` reversed it. Production stays in Azure.)
-The scripts refuse to start if `modules/market-data/.env` points `DATABASE_URL` at any host
-that is not loopback, and the module itself refuses the same at startup: without an identity
-configured it does not reach beyond the machine, so pointing a local run at production is a
-named error, not a quiet write.
+The scripts refuse to start if `modules/market-data/.env` or `modules/agent/.env` points
+`DATABASE_URL` at any host that is not loopback, and each module refuses the same at
+startup: without an identity configured it does not reach beyond the machine, so pointing a
+local run at production is a named error, not a quiet write.
+
+`agent` writes to a second logical database (`agent`) in the same container — one Postgres
+server, two schemas, mirroring how production shares one server between them. The scripts
+create the role and the database themselves the first time they are missing.
 
 Useful variants:
 
@@ -103,20 +109,23 @@ When it is a change:
 ### Checks
 
 Every pull request to `main`, and every push to it, runs
-[`.github/workflows/checks.yml`](.github/workflows/checks.yml): three jobs in parallel, one
+[`.github/workflows/checks.yml`](.github/workflows/checks.yml): four jobs in parallel, one
 per module, running the same commands a developer runs — and only for the modules the
 change can have broken. A first job works out which those are from the diff; a change under
 `docs/` or `infra/` runs no module suite at all.
 
-One exception is worth knowing: the terminal's job also runs when
-`market_data/contract.py` changes, even if no terminal file did. `contract:check` exists to
-catch exactly that pairing, and filtering it out by directory would retire the check in the
-one case it was written for.
+One exception is worth knowing: the terminal's job also runs when `market_data/contract.py`
+or `agent/contract.py` changes, even if no terminal file did. `contract:check` exists to
+catch exactly the first pairing; the second has no generator to fail, so the terminal's own
+tests against its hand-written DTOs are what catch it instead — and neither runs at all if
+the terminal's job never fires. Filtering either out by directory would retire the check in
+the one case it was written for.
 
 | Job | Runs |
 |---|---|
 | `capital-gateway` | `ruff check`, `pyright`, `pytest` |
 | `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
+| `agent` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's; its `live` tests need a real Azure OpenAI deployment and stay behind `--run-live` |
 | `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
 
 `contract:check` runs before the terminal's tests on purpose: it compares
@@ -135,8 +144,9 @@ actually answers, not merely that Azure accepted the request: `market-data` is p
 `/ws/candles`, the one path Easy Auth lets through to the container; the terminal is
 checked on both `/` and a tab address, because deep links have broken here before while the
 root kept working. `capital-gateway` admits only market-data's addresses, so a runner
-cannot reach it at all — there the deploy confirms through the Azure control plane that the
-site is running the image this commit built.
+cannot reach it at all — there, and for `agent`, which carves out no path of its own from
+Easy Auth, the deploy confirms through the Azure control plane instead that the site is
+running the image this commit built.
 
 Infrastructure is applied by hand, from
 [`terraform-apply.yml`](.github/workflows/terraform-apply.yml) — Actions → terraform-apply →

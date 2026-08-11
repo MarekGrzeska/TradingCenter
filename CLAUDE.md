@@ -16,7 +16,8 @@ need one, the change is wrong, not the rule.
 ```
 modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
 modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway.
-modules/terminal          React+TS · the operator's screen. Consumes both. Publishes nothing.
+modules/agent             Python · the operator's conversation with a model. Own database, own Azure OpenAI account. No tools yet.
+modules/terminal          React+TS · the operator's screen. Consumes all three. Publishes nothing.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
 docs/                     architecture and reference — only what is true today
@@ -34,6 +35,7 @@ Run these from the module directory. Nothing at the repo root builds or tests ev
 |---|---|
 | `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `market-data` | `uv run alembic upgrade head` then `uv run uvicorn market_data.app:app --reload --port 8020`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
+| `agent` | `uv run alembic upgrade head` then `uv run uvicorn agent.app:app --reload --port 8030`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `terminal` | `pnpm dev` · `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm contract:check` |
 
 Test flags that matter:
@@ -47,8 +49,9 @@ Test flags that matter:
 
 The whole stack: `./scripts/dev.sh` on macOS and Linux, `./scripts/dev.ps1` on Windows —
 the same script twice (`--no-terminal` / `-NoTerminal` for back end only). It starts things
-in dependency order — migrations → gateway → market-data → terminal — waiting for each to
-actually answer. Ports are fixed: **8010** gateway, **8020** market-data, **5173** terminal.
+in dependency order — migrations → gateway → market-data → agent → terminal — waiting for
+each to actually answer. Ports are fixed: **8010** gateway, **8020** market-data, **8030**
+agent, **5173** terminal.
 
 ## Things that will bite you
 
@@ -61,6 +64,13 @@ Production connects with an Entra identity instead — `DATABASE_USER` set in
 `infra/app-service.tf` — and that path is not for local use. (Do not "restore" the brief
 arrangement where dev ran on the Azure server; it was reversed the same day it was made —
 `openspec/changes/local-dev-database-in-docker`.)
+
+`agent` writes to a second logical database (`agent`) in the same container, on the same
+port — one Postgres server, two schemas, the same shape as production's own `psql-
+tradingcenter` (`infra/database.tf`). The dev scripts create the role and the database
+themselves if either is missing, since `docker-entrypoint-initdb.d` only ever runs against
+an empty volume and would never fire for a `tradingcenter-db-data` from before `agent`
+existed.
 
 **The terminal's contract is generated.** `src/data/contract.generated.ts` is built from the
 schema `market-data` derives from its own models. After changing anything in
@@ -96,6 +106,9 @@ over time. A 401 storm was really observed on 9–10 August; `stream_tokens_for`
 **Env files are per-module and gitignored.** Copy from `.env.example`. The gateway needs
 `CAPITAL_*` demo credentials plus its own `GATEWAY_API_KEY`; market-data needs the same
 `GATEWAY_API_KEY`, a `DATABASE_URL` and the `AZURE_*` identity it connects to Postgres with.
+`agent` needs a `DATABASE_URL` of its own and `AZURE_OPENAI_*` — a demo API key locally,
+managed identity in production, exactly one of the two (`config.py` refuses both or
+neither).
 
 **Terraform `apply` is the operator's job, never CI's.** CI plans only, deliberately —
 applying would hand the CI principal Entra directory write access. `infra/bootstrap/` keeps
@@ -215,15 +228,21 @@ comment exists is usually clearest to whoever is already reading the code around
 `.github/workflows/checks.yml` runs on every PR to `main` and every push to it: one job per
 module, running the same commands listed above, and **only for the modules the diff can
 have broken** — a `changes` job works that out first. `live` tests stay out. If you touch
-`market_data/contract.py`, expect the terminal's job to run too; that is deliberate, since
-`contract:check` is the check for exactly that pairing.
+`market_data/contract.py` or `agent/contract.py`, expect the terminal's job to run too;
+that is deliberate, since `contract:check` and the terminal's own hand-written DTOs are the
+checks for exactly those pairings — `agent`'s contract is not wired into
+`pnpm contract:generate`, so its half of that pairing is the terminal's tests passing, not
+a regenerated file.
 
 There is no branch protection on this repository — a private repo on the free plan cannot
 have it — so a skipped job blocks nothing. If that changes, the filter needs stand-in jobs
 or a required check will sit pending forever.
 
-Three `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
-the matching module, each ending in a smoke check of the deployed thing.
+Four `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
+the matching module, each ending in a smoke check of the deployed thing — market-data's and
+agent's differ here: market-data has one path excluded from Easy Auth to probe directly,
+agent has none, so its deploy confirms through the Azure control plane instead, the same way
+capital-gateway's already did.
 `terraform.yml` plans on infra PRs; `terraform-apply.yml` is a manual `workflow_dispatch`
 that applies — and refuses any plan touching `azuread_*`, because CI holds
 `Application.Read.All` and not write. Entra changes are applied locally by the operator.
