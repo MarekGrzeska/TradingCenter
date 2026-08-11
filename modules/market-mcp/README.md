@@ -34,6 +34,10 @@ built from the same `market_mcp/server.py`.
   the same words wherever it applies.
 - `errors.py` — `ToolRefusal`, the one exception a tool raises to refuse a request; the
   MCP server turns it into `isError=True` with the message as content.
+- `scripts/contract.py` — `generate`/`check` against market-data's own OpenAPI document,
+  the same mechanism the terminal's `contract.mjs` uses.
+- `contract/market-data.openapi.json` — the committed snapshot `tests/test_contract.py`
+  checks every field this module reads against.
 - `server.py` — builds the `FastMCP` instance and mounts `/health` on the same ASGI app
   the streamable-http transport serves, so the platform can probe it without an MCP
   session.
@@ -78,6 +82,22 @@ uv run ruff check . && uv run ruff format --check .
 uv run pyright             # types, over market_mcp/
 ```
 
+One file, `test_transport_parity.py`, spawns a real `python -m market_mcp stdio`
+subprocess and binds a real port for the streamable-http transport — needs no running
+market-data, but takes seconds rather than milliseconds. It runs in the default suite,
+same as everything else; there is no flag for it.
+
+Regenerating the contract snapshot after a `market-data` change:
+
+```bash
+uv run python scripts/contract.py generate   # rewrite contract/market-data.openapi.json
+uv run python scripts/contract.py check      # fail if it is stale — what CI runs
+```
+
+Needs `market-data`'s own dependencies resolvable (`uv run --python 3.12` in that
+module's directory) but no database, no gateway and no running server: the OpenAPI
+document is a property of `market_data/contract.py`'s Pydantic models.
+
 ## Tools
 
 | Tool | Answers | Reads |
@@ -109,8 +129,21 @@ indicators, then naming what is still not known.
 
 This module does not import `market_data` — no shared library between modules, same rule
 every module in this repository follows. What it reads is checked against a committed
-OpenAPI snapshot (`contract/market-data.openapi.json`, added alongside the tools that need
-it), the same mechanism the terminal uses for its generated types.
+OpenAPI snapshot (`contract/market-data.openapi.json`), the same mechanism the terminal
+uses for its generated types. `tests/test_contract.py` asserts every field a tool or
+resource reads is still published; regenerate the snapshot with `scripts/contract.py`.
+
+## Reliability
+
+- One retry on a 5xx from market-data — every request through `client.py` is a read, so
+  retrying duplicates nothing.
+- A timeout or an unreachable archive is a `ToolRefusal` naming the failure ("this is a
+  problem on this module's side, not missing data"), never a raw exception a caller has
+  to guess the meaning of.
+- At most 8 requests to market-data in flight at once — a burst of concurrent tool calls
+  is a burst of concurrent load on the archive, bounded here rather than left open.
+- Every tool is marked `readOnlyHint=True` — a structural claim an MCP client can act on,
+  not just a convention this module follows.
 
 ## MCP protocol version
 

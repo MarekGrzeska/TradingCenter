@@ -10,13 +10,20 @@ a write — its method is POST only because the request body does not fit in a U
 
 from __future__ import annotations
 
+import asyncio
 import re
 
 import httpx
 
 from .config import Settings
+from .errors import ToolRefusal
 
 _INDICATOR_COMPUTE_PATH = re.compile(r"^/indicators/[^/]+$")
+
+# A burst of concurrent tool calls is a burst of concurrent requests to market-data —
+# bounded here rather than left open, the same reasoning market-data's own
+# `indicator_concurrency` gate uses on its side of this same seam.
+MAX_CONCURRENT_UPSTREAM_REQUESTS = 8
 
 
 class UpstreamWriteRejected(Exception):
@@ -30,6 +37,8 @@ class UpstreamClient:
             base_url=settings.market_data_url,
             timeout=settings.market_data_request_timeout_seconds,
         )
+        self._timeout_seconds = settings.market_data_request_timeout_seconds
+        self._gate = asyncio.Semaphore(MAX_CONCURRENT_UPSTREAM_REQUESTS)
 
     async def aclose(self) -> None:
         await self._http.aclose()
@@ -49,4 +58,23 @@ class UpstreamClient:
                 'specs/market-mcp-upstream-access, "Do archiwum idą wyłącznie żądania '
                 'czytające".'
             )
-        return await self._http.request(method, path, **kwargs)
+        async with self._gate:
+            response = await self._send(method, path, **kwargs)
+            # One retry: a 5xx is market-data's own trouble, not a malformed
+            # request, and every request through this client is a read — retrying
+            # duplicates nothing (specs/market-mcp-upstream-access, "Wołanie archiwum
+            # ma skończony czas i jedno ponowienie").
+            if response.status_code >= 500:
+                response = await self._send(method, path, **kwargs)
+        return response
+
+    async def _send(self, method: str, path: str, **kwargs) -> httpx.Response:
+        try:
+            return await self._http.request(method, path, **kwargs)
+        except httpx.TimeoutException as err:
+            raise ToolRefusal(
+                f"market-data did not respond within {self._timeout_seconds}s. This "
+                "is a failure on this module's side, not missing data."
+            ) from err
+        except httpx.RequestError as err:
+            raise ToolRefusal(f"market-data is unreachable: {err}") from err
