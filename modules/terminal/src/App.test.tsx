@@ -150,6 +150,28 @@ describe("App routing (terminal-shell spec)", () => {
   });
 });
 
+describe("App agent chat", () => {
+  // It belongs to the terminal, not to a tab: the rail is in the same pixels on every one
+  // of them, and expansion is the only thing that decides whether the panel is open.
+  it("keeps the agent chat reachable from every tab", async () => {
+    const user = userEvent.setup();
+    await renderApp();
+
+    expect(screen.getByRole("button", { name: /open agent chat/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "Instruments" }));
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+
+    expect(screen.getByRole("complementary", { name: /agent chat/i })).toBeInTheDocument();
+
+    // A tab switch re-renders the outlet; the panel is a sibling of it and stays open.
+    await user.click(screen.getByRole("link", { name: "Data History" }));
+
+    expect(screen.getByText("data history stub")).toBeInTheDocument();
+    expect(screen.getByRole("complementary", { name: /agent chat/i })).toBeInTheDocument();
+  });
+});
+
 describe("App top bar (terminal-shell spec, source status)", () => {
   // Two back ends, two indicators: the archive keeps the candles and the
   // gateway keeps the catalogue, and they go down separately. One combined

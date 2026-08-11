@@ -907,7 +907,7 @@ export function Chart({
           // own intrinsic sizing on top of padding, which made it taller than a `<button>`
           // given the identical classes — pinning the height is what actually matches
           // them, not the padding.
-          className="h-6 rounded border border-border bg-panel-strong px-1.5 text-xs text-ink"
+          className="h-6 rounded border border-border bg-sunken px-1.5 text-xs text-ink"
         >
           {resolutions.map((r) => (
             <option key={r} value={r}>

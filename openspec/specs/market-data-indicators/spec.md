@@ -1,10 +1,12 @@
+# market-data-indicators Specification
+
 ## Purpose
 
 Wskaźniki techniczne liczone na serii, której archiwum jest właścicielem: ta sama para,
 rozdzielczość i zakres dają zawsze tę samą wartość. Moduł podaje miary i geometrię, a nie
 werdykty — próg stawia ten, kto podejmuje decyzję.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Wskaźnik jest czystą funkcją świec
 

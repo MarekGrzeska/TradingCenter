@@ -180,6 +180,24 @@ describe("GridView layout (terminal-grid spec)", () => {
     expect(screen.getByTestId("slot-s1")).toHaveAttribute("data-active", "false");
   });
 
+  // The mark used to be an `outline` on the slot, which paints with the slot's own
+  // background: a chart's opaque section covered it, so only an empty slot ever showed
+  // which one was active.
+  it("marks the active slot whether it holds a chart or is empty", async () => {
+    const user = userEvent.setup();
+    renderGrid();
+
+    expect(gridStore.getSnapshot().slots.s1.symbol).not.toBeNull();
+    expect(screen.getByTestId("active-mark-s1")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "3x2" }));
+    await user.click(screen.getByTestId("slot-s6"));
+
+    expect(within(screen.getByTestId("slot-s6")).getByText(/pick an instrument/i)).toBeInTheDocument();
+    expect(screen.getByTestId("active-mark-s6")).toBeInTheDocument();
+    expect(screen.queryByTestId("active-mark-s1")).not.toBeInTheDocument();
+  });
+
   it("changes one slot's instrument without disturbing the others", async () => {
     const user = userEvent.setup();
     renderGrid();

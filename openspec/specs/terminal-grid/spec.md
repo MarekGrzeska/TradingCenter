@@ -24,10 +24,14 @@ do nowego rozmiaru po zmianie układu.
 
 ### Requirement: Slot ma własny instrument i własny interwał
 
-Każdy slot MUST nieść własny symbol i własną rozdzielczość, ustawiane niezależnie od pozostałych
-slotów. Zmiana w jednym slocie MUST NOT ruszać żadnego innego. Rozdzielczości dostępne w slocie
-MUST być ograniczone do tych, w których wybrany instrument jest archiwizowany, bo pozostałe
-prowadziłyby do wykresu bez danych.
+Każdy slot MUST nieść własny symbol, własną rozdzielczość i własny zestaw wskaźników, ustawiane
+niezależnie od pozostałych slotów. Zmiana w jednym slocie MUST NOT ruszać żadnego innego.
+Rozdzielczości dostępne w slocie MUST być ograniczone do tych, w których wybrany instrument jest
+archiwizowany, bo pozostałe prowadziłyby do wykresu bez danych.
+
+Zestaw wskaźników slotu MUST być zapamiętywany razem z resztą jego zawartości. Wskaźnik zapamiętany,
+którego bieżące źródło już nie oferuje, MUST zostać pominięty przy odtwarzaniu slotu, a pozostałe
+wskaźniki tego slotu MUST zostać narysowane.
 
 #### Scenario: Ten sam instrument w kilku interwałach
 
@@ -45,6 +49,22 @@ prowadziłyby do wykresu bez danych.
 
 - **WHEN** slot nie ma jeszcze przypisanego instrumentu
 - **THEN** pokazuje zaproszenie do wybrania instrumentu, a nie pusty wykres ani błąd
+
+#### Scenario: Różne wskaźniki w dwóch slotach
+
+- **WHEN** operator włącza inny zestaw wskaźników w dwóch slotach
+- **THEN** każdy slot rysuje własny zestaw
+- **AND** włączenie wskaźnika w jednym z nich nie zmienia drugiego
+
+#### Scenario: Powrót do terminala z zapisanymi wskaźnikami
+
+- **WHEN** operator zamyka terminal i otwiera go ponownie
+- **THEN** każdy slot ma z powrotem swój zestaw wskaźników z tymi samymi parametrami
+
+#### Scenario: Zapamiętany wskaźnik zniknął z katalogu
+
+- **WHEN** odtwarzany slot wskazuje wskaźnik, którego bieżące źródło nie oferuje
+- **THEN** slot rysuje pozostałe swoje wskaźniki i mówi, którego nie dało się przywrócić
 
 ### Requirement: Konfiguracja siatki przeżywa sesję
 

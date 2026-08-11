@@ -13,27 +13,51 @@
  * secondary encoding — the chart renders up candles hollow and down candles
  * filled, so the distinction survives on shape even where hue does not.
  */
+/* Chrome is amber (anything you can act on) and steel (structure that only names
+   things), each in a few shades. The data palette below keeps blue, teal, violet and
+   the rest — `--color-warning` sits at orange rather than its old amber so a degraded
+   state cannot be read as a control. */
 @theme {
-  --color-canvas: #0d0d0d;
-  --color-panel: #1a1a19;
-  --color-panel-strong: #232322;
-  --color-border: rgba(255, 255, 255, 0.1);
+  --color-sunken: #06070a;
+  --color-canvas: #0a0c11;
+  --color-panel: #12151d;
+  --color-panel-strong: #1b1f2a;
+  --color-raised: #262b38;
+  --color-border: rgba(150, 160, 180, 0.12);
+  --color-border-strong: rgba(150, 160, 180, 0.26);
 
-  --color-ink: #ffffff;
-  --color-ink-secondary: #c3c2b7;
-  --color-ink-muted: #898781;
+  --color-ink: #f0f1f4;
+  --color-ink-secondary: #bcc2cd;
+  --color-ink-muted: #808896;
+  --color-ink-faint: #545c6a;
+  --color-ink-inverse: #0a0700;
 
-  --color-grid: #2c2c2a;
-  --color-axis: #383835;
+  --color-primary-dim: #966820;
+  --color-primary: #e2a33f;
+  --color-primary-strong: #f2ba5e;
+  --color-primary-line: rgba(226, 163, 63, 0.38);
+  --color-primary-soft: rgba(226, 163, 63, 0.13);
+
+  --color-secondary-dim: #4a5666;
+  --color-secondary: #7d8ca3;
+  --color-secondary-strong: #9dabc0;
+  --color-secondary-line: rgba(125, 140, 163, 0.34);
+  --color-secondary-soft: rgba(125, 140, 163, 0.12);
+
+  --color-grid: #1a2130;
+  --color-axis: #2b3446;
 
   --color-accent: #3987e5;
 
   --color-up: #199e70;
   --color-down: #e66767;
 
+  /* Status, kept off the data hues: `up`/`down` mean price, not health. */
   --color-good: #0ca30c;
-  --color-warning: #fab219;
+  --color-warning: #f0803c;
+  --color-warning-soft: rgba(240, 128, 60, 0.16);
   --color-critical: #d03b3b;
+  --color-critical-soft: rgba(208, 59, 59, 0.16);
 
   /* Slots 2/4/5/6/7 of the dataviz skill's validated eight-hue palette (dark
    * column) — slots 1/3/8 are `--color-accent`/`--color-up`/`--color-down` above.

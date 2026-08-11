@@ -6,7 +6,7 @@ export function NotFound() {
     <div className="flex h-full items-center justify-center p-8">
       <div className="text-center">
         <p className="text-lg text-ink">No tab lives at this address.</p>
-        <Link to={`/${DEFAULT_TAB_PATH}`} className="mt-3 inline-block text-accent hover:underline">
+        <Link to={`/${DEFAULT_TAB_PATH}`} className="mt-3 inline-block text-primary hover:underline">
           Back to {DEFAULT_TAB_PATH}
         </Link>
       </div>
