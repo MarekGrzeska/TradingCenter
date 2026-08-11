@@ -18,6 +18,14 @@ const SRC = join(process.cwd(), "src");
 /** The component allowed to render toasts, relative to `src/`. */
 const THE_ONE = join("ui", "Toaster.tsx");
 
+/**
+ * A live region that is not a toast stack, named here so it is a decision rather than a
+ * loophole. The agent chat's transcript announces a reply arriving in the panel the
+ * operator opened and is reading; it stacks nothing, times nothing out and covers no
+ * chart, which is the whole of what this guard exists to stop.
+ */
+const NOT_A_TOAST_STACK = [join("agent", "AgentChat.tsx")];
+
 function sourceFiles(dir: string, prefix = ""): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const relative = join(prefix, entry.name);
@@ -41,7 +49,10 @@ describe("every toast in the terminal comes from Toaster", () => {
 
   it("has no second component announcing a live region of its own", () => {
     const offenders = sourceFiles(SRC).filter(
-      (file) => file !== THE_ONE && contents(file).includes("aria-live"),
+      (file) =>
+        file !== THE_ONE &&
+        !NOT_A_TOAST_STACK.includes(file) &&
+        contents(file).includes("aria-live"),
     );
 
     expect(offenders).toEqual([]);
