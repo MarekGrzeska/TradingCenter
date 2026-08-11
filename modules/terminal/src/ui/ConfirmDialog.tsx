@@ -121,8 +121,8 @@ export function ConfirmDialog({
 
   const confirmClass =
     tone === "danger"
-      ? "rounded border border-down px-3 py-1 text-down hover:bg-panel disabled:opacity-40"
-      : "rounded border border-accent px-3 py-1 text-ink hover:bg-panel disabled:opacity-40";
+      ? "rounded border border-critical bg-critical-soft px-3 py-1 text-critical hover:bg-critical hover:text-ink disabled:opacity-40"
+      : "rounded border border-accent bg-accent-soft px-3 py-1 text-ink hover:bg-accent-strong hover:text-ink-on-accent disabled:opacity-40";
 
   return (
     <div className="fixed inset-0 z-20 flex items-center justify-center bg-black/50 p-4">
@@ -133,7 +133,7 @@ export function ConfirmDialog({
         aria-label={title}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded border border-border bg-panel-strong p-4 text-sm text-ink outline-none"
+        className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded border border-border-strong bg-raised p-4 text-sm text-ink outline-none"
       >
         <h2 className="text-base font-semibold text-ink">{title}</h2>
 

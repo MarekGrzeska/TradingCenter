@@ -148,14 +148,14 @@ export function Autocomplete<T>({
         }}
         autoComplete="off"
         spellCheck={false}
-        className="w-full rounded border border-border bg-panel px-2 py-1 text-sm text-ink placeholder:text-ink-muted disabled:opacity-50"
+        className="w-full rounded border border-border bg-sunken px-2 py-1 text-sm text-ink placeholder:text-ink-faint disabled:opacity-50"
       />
       {open && (
         <ul
           id={`${ariaLabel}-listbox`}
           role="listbox"
           aria-label={ariaLabel}
-          className="absolute z-10 mt-1 max-h-64 w-full min-w-max overflow-auto rounded border border-border bg-panel-strong text-sm shadow-lg"
+          className="absolute z-10 mt-1 max-h-64 w-full min-w-max overflow-auto rounded border border-border-strong bg-raised text-sm shadow-lg"
         >
           {state.status === "loading" && (
             <li className="px-2 py-1.5 text-ink-muted">Loading…</li>
@@ -167,7 +167,7 @@ export function Autocomplete<T>({
                 type="button"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => state.retry()}
-                className="shrink-0 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel"
+                className="shrink-0 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
               >
                 Retry
               </button>
@@ -190,7 +190,7 @@ export function Autocomplete<T>({
                 }}
                 onMouseEnter={() => setHighlighted(index)}
                 className={`cursor-pointer px-2 py-1.5 ${
-                  index === highlighted ? "bg-panel text-ink" : "text-ink-secondary"
+                  index === highlighted ? "bg-accent-soft text-ink" : "text-ink-secondary"
                 }`}
               >
                 {renderOption ? renderOption(option) : getOptionLabel(option)}

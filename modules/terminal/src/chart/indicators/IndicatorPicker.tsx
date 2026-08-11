@@ -118,7 +118,7 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
         // Left-anchored: the button sits near the left edge of the header, beside the
         // symbol and resolution controls. A right-anchored panel would pin its right
         // edge to the button's and grow leftward, running off the header entirely.
-        <div className="absolute left-0 top-full z-20 mt-1 flex max-h-80 w-64 flex-col rounded border border-border bg-panel shadow-lg">
+        <div className="absolute left-0 top-full z-20 mt-1 flex max-h-80 w-64 flex-col rounded border border-border-strong bg-raised shadow-lg">
           {/* Outside the listbox, not inside it: a text field is not one of the options,
               and the catalogue is long enough that this is the first thing an operator
               reaches for. */}
@@ -132,7 +132,7 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
             }}
             placeholder="Filter…"
             aria-label="Filter indicators"
-            className="m-2 mb-0 shrink-0 rounded border border-border bg-panel-strong px-1.5 py-1 text-xs text-ink placeholder:text-ink-muted"
+            className="m-2 mb-0 shrink-0 rounded border border-border bg-sunken px-1.5 py-1 text-xs text-ink placeholder:text-ink-faint"
           />
 
           <div
@@ -195,7 +195,7 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
                             min={param.min}
                             max={param.max}
                             step={param.type === "int" ? 1 : "any"}
-                            className="w-16 rounded border border-border bg-panel-strong px-1 py-0.5 text-xs text-ink"
+                            className="w-16 rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink"
                             onBlur={(e) => setParam(entry, param.name, e.target.value)}
                           />
                           {paramErrors[errorKey] && (

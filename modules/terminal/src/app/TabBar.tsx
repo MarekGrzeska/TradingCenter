@@ -11,8 +11,8 @@ export function TabBar() {
           className={({ isActive }) =>
             `rounded-t px-3 py-1.5 text-sm transition-colors ${
               isActive
-                ? "border-b-2 border-accent text-ink"
-                : "text-ink-muted hover:text-ink"
+                ? "border-b-2 border-accent bg-accent-soft text-ink"
+                : "text-ink-muted hover:bg-panel-strong hover:text-ink"
             }`
           }
         >

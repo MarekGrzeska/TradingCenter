@@ -28,26 +28,54 @@
  * which this touched.
  */
 @theme {
+  /* Five steps of depth, not three: `sunken` is what a control is cut into (an input, a
+   * well), `raised` is what floats over the screen (a toast, a popover). With only
+   * canvas/panel/panel-strong every one of those borrowed a surface that meant something
+   * else, and the screen flattened into one grey. */
+  --color-sunken: #06090f;
   --color-canvas: #0b0e14;
   --color-panel: #121620;
   --color-panel-strong: #1a2130;
+  --color-raised: #242e40;
   --color-border: rgba(148, 171, 214, 0.16);
+  /* For a divider that has to be seen rather than felt — a panel's own edge, a focused
+   * control. The soft one disappears against `raised`. */
+  --color-border-strong: rgba(148, 171, 214, 0.3);
 
   --color-ink: #ffffff;
   --color-ink-secondary: #c4cbd9;
   --color-ink-muted: #8794a8;
+  /* Placeholders and disabled text, which `ink-muted` was doing at the cost of meaning the
+   * same thing as a live secondary label. */
+  --color-ink-faint: #5b6879;
+  /* Text on an accent fill: white on #3987e5 is 3.1:1 and fails. */
+  --color-ink-on-accent: #06121f;
 
   --color-grid: #1c2331;
   --color-axis: #2b3446;
 
+  /* The accent as a family rather than a single value: a hover that only changed opacity
+   * read as the control fading, not lighting up, and every tinted fill in the terminal was
+   * spelled `accent/15` or `accent/20` at whatever number the last file guessed. */
   --color-accent: #3987e5;
+  --color-accent-strong: #5aa0f0;
+  --color-accent-line: rgba(57, 135, 229, 0.38);
+  --color-accent-soft: rgba(57, 135, 229, 0.16);
 
   --color-up: #199e70;
   --color-down: #e66767;
 
+  /* Chrome status, kept apart from `up`/`down`: those two are the market's direction and
+   * mean nothing about whether a back end is answering. A reachable service used to be
+   * painted with the same teal as a rising candle, which is what made a screen of dots and
+   * a screen of candles look like the same three colours. The two degraded states carry a
+   * soft fill so a status needing attention can be a chip and not only a dot; `good` has
+   * none on purpose — a healthy terminal says so quietly. */
   --color-good: #0ca30c;
   --color-warning: #fab219;
+  --color-warning-soft: rgba(250, 178, 25, 0.16);
   --color-critical: #d03b3b;
+  --color-critical-soft: rgba(208, 59, 59, 0.16);
 
   /* Slots 2/4/5/6/7 of the dataviz skill's validated eight-hue palette (dark
    * column) — slots 1/3/8 are `--color-accent`/`--color-up`/`--color-down` above.

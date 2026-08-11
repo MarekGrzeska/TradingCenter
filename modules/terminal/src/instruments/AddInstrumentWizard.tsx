@@ -169,7 +169,7 @@ export function AddInstrumentWizard({
             value={collectFromInput}
             max={todayInWarsaw()}
             onChange={(e) => setCollectFromInput(e.target.value)}
-            className="rounded border border-border bg-panel-strong px-2 py-1 text-xs text-ink"
+            className="rounded border border-border bg-sunken px-2 py-1 text-xs text-ink"
           />
         </Field>
 

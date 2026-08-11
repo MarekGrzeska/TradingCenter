@@ -11,14 +11,27 @@ const HEALTH_LABEL: Record<SourceHealth, string> = {
   "signed-out": "needs sign-in",
 };
 
+// Chrome status, not market direction: these used to borrow `up` and `down`, which made a
+// reachable back end the same teal as a rising candle and left the screen looking like it
+// owned three colours. `good`/`critical` say nothing about a price.
 const HEALTH_DOT: Record<SourceHealth, string> = {
   checking: "bg-ink-muted",
-  reachable: "bg-up",
-  unreachable: "bg-down",
+  reachable: "bg-good",
+  unreachable: "bg-critical",
   // Amber, not red: nothing here is broken. The back end is fine and simply
   // does not know who is asking, and a red dot on it is a claim about Azure
   // that the terminal has no evidence for.
   "signed-out": "bg-warning",
+};
+
+/** The chip a status sits in. Only a degraded one is filled — a healthy terminal is
+ *  quiet, and three green chips in a row would draw the eye to the thing that needs no
+ *  attention. */
+const HEALTH_CHIP: Record<SourceHealth, string> = {
+  checking: "border-transparent",
+  reachable: "border-transparent",
+  unreachable: "border-critical/40 bg-critical-soft text-ink-secondary",
+  "signed-out": "border-warning/40 bg-warning-soft text-ink-secondary",
 };
 
 export function TopBar() {
@@ -52,20 +65,20 @@ export function TopBar() {
 function SignInState({ signedIn }: { signedIn: boolean }) {
   if (signedIn) {
     return (
-      <span className="flex items-center gap-2">
-        <span className="h-2 w-2 rounded-full bg-up" aria-hidden />
+      <span className="flex items-center gap-2 rounded-full px-2 py-0.5">
+        <span className="h-2 w-2 rounded-full bg-good" aria-hidden />
         <span>signed in</span>
       </span>
     );
   }
   return (
-    <span className="flex items-center gap-2">
-      <span className="h-2 w-2 rounded-full bg-down" aria-hidden />
-      <span className="text-down">signed out</span>
+    <span className="flex items-center gap-2 rounded-full border border-critical/40 bg-critical-soft px-2 py-0.5">
+      <span className="h-2 w-2 rounded-full bg-critical" aria-hidden />
+      <span className="text-critical">signed out</span>
       <button
         type="button"
         onClick={() => identity.signIn()}
-        className="rounded border border-border px-2 py-0.5 text-ink hover:bg-panel-strong"
+        className="cursor-pointer rounded border border-accent-line bg-accent-soft px-2 py-0.5 text-ink hover:bg-accent-strong hover:text-ink-on-accent"
       >
         Sign in
       </button>
@@ -75,7 +88,9 @@ function SignInState({ signedIn }: { signedIn: boolean }) {
 
 function PartHealth({ part, health }: { part: SourcePart; health: SourceHealth }) {
   return (
-    <span className="flex items-center gap-2">
+    <span
+      className={`flex items-center gap-2 rounded-full border px-2 py-0.5 ${HEALTH_CHIP[health]}`}
+    >
       <span className={`h-2 w-2 rounded-full ${HEALTH_DOT[health]}`} aria-hidden />
       <span>
         {part.label} {HEALTH_LABEL[health]}
@@ -84,7 +99,7 @@ function PartHealth({ part, health }: { part: SourcePart; health: SourceHealth }
         // Silence on the feed has to look different from a flat market, and an
         // operator needs to know what has stopped — naming the casualty rather
         // than declaring the whole terminal offline.
-        <span className="text-down">— {part.whenUnreachable}</span>
+        <span className="text-critical">— {part.whenUnreachable}</span>
       )}
     </span>
   );

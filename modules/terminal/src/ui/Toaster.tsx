@@ -38,8 +38,10 @@ function ToastLine({ toast }: { toast: Toast }) {
   return (
     <div
       role={error ? "alert" : "status"}
-      className={`pointer-events-auto rounded border bg-panel p-2 shadow-lg ${
-        error ? "border-critical/50" : "border-border"
+      // `raised`, not `panel`: this floats over whatever raised it, and a toast the same
+      // colour as the pane beneath it looked like part of that pane.
+      className={`pointer-events-auto rounded border bg-raised p-2 shadow-lg ${
+        error ? "border-critical/50" : "border-border-strong"
       }`}
     >
       <div className="flex items-start gap-2">
