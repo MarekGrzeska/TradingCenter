@@ -8,7 +8,7 @@ from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
 from ..client import UpstreamClient
-from ._shared import raise_for_status
+from ._shared import READ_ONLY, raise_for_status
 
 
 class TrackedPairOut(BaseModel):
@@ -40,7 +40,7 @@ def _pair_out(row: dict) -> TrackedPairOut:
 
 
 def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def list_tracked_pairs() -> list[TrackedPairOut]:
         """Which pairs market-data is collecting right now, and whether collection is
         actually happening — the first thing to check before asking about a symbol,

@@ -7,11 +7,17 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 import httpx
+from mcp.types import ToolAnnotations
 
 from ..client import UpstreamClient
 from ..errors import ToolRefusal
 
 DEFAULT_WINDOW = timedelta(days=1)
+
+# Applied to every `@mcp.tool()` in this package — a structural claim an MCP client
+# can act on, not just a convention this module follows
+# (specs/market-mcp-tools, "Zestaw narzędzi wyłącznie czyta").
+READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True)
 
 
 def resolve_window(from_iso: str | None, to_iso: str | None) -> tuple[datetime, datetime]:

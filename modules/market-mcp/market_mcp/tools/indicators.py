@@ -15,7 +15,7 @@ from .. import reduce, uncertainty
 from ..client import UpstreamClient
 from ..errors import ToolRefusal
 from ..upstream import UpstreamCandles
-from ._shared import is_tracked, raise_for_status, resolve_window
+from ._shared import READ_ONLY, is_tracked, raise_for_status, resolve_window
 
 INDICATOR_HARD_LIMIT = 10
 SERIES_POINT_LIMIT = 200
@@ -487,7 +487,7 @@ def _near_price_item(
 def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
     catalogue = _CatalogueCache()
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def list_indicators(group: str | None = None) -> ListIndicatorsOut:
         """Every indicator this archive can compute, its parameters and their
         defaults — enough to build a request without knowing any indicator by name
@@ -505,7 +505,7 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
             indicators=[_summary_out(e) for e in entries],
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def describe_indicator(id: str) -> IndicatorDetailOut:
         """The full catalogue entry for one indicator: parameter ranges, aliases,
         output shape and how it likes to be drawn. Read this before calling
@@ -515,7 +515,7 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         _validate_spec_ids([id], cache)
         return _detail_out(cache.entries[id])
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def compute_indicators(
         symbol: str,
         specs: list[IndicatorSpecIn],
@@ -525,7 +525,9 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         to_iso: str | None = None,
     ) -> ComputeIndicatorsOut:
         """Compute one or more named indicators on one shared time axis. Most
-        questions need 1-3; refuses above 10 in one call.
+        questions need 1-3; refuses above 10 in one call. `from_iso`/`to_iso`
+        (mode="series" only) are UTC, ISO-8601. Distances are measured against the
+        last **bid** close, the only side the archive holds.
 
         mode="latest" (default): each line's current value, its slope over the
         trailing bars, its distance from the last close, and how many bars since it
@@ -598,13 +600,15 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
             notes=notes,
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def levels_near_price(
         symbol: str, resolution: str = "MINUTE", group: str | None = None
     ) -> LevelsNearPriceOut:
-        """Every level, zone and marker the catalogue can compute for this pair,
-        merged into one list sorted by distance from the last price. Narrow to one
-        group to avoid surveying the whole catalogue; omit it to check everything.
+        """Every level, zone and marker the catalogue can compute for this pair over
+        the last 30 days, merged into one list sorted by distance from the last
+        **bid** close (UTC) — the closest 20, further ones counted in `omitted`.
+        Narrow to one group to avoid surveying the whole catalogue; omit it to check
+        everything.
         """
         cache = await _ensure_catalogue(upstream, catalogue)
         candidates = [

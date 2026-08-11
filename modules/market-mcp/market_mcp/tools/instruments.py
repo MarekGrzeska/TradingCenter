@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 from .. import reduce
 from ..client import UpstreamClient
 from ..upstream import UpstreamInstrument
-from ._shared import raise_for_status
+from ._shared import READ_ONLY, raise_for_status
 
 SEARCH_LIMIT = 10
 
@@ -27,10 +27,11 @@ class SearchInstrumentsOut(BaseModel):
 
 
 def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def search_instruments(query: str) -> SearchInstrumentsOut:
         """Find the symbol market-data and the other tools here expect, from a name a
-        person would actually type — "Nasdaq" rather than "US100".
+        person would actually type — "Nasdaq" rather than "US100". Up to 10 matches;
+        further ones are counted in `omitted`, not dropped silently.
         """
         response = await upstream.get("/instruments/search", params={"q": query})
         await raise_for_status(response)

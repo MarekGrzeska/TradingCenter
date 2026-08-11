@@ -11,7 +11,7 @@ from .. import reduce, uncertainty
 from ..client import UpstreamClient
 from ..errors import ToolRefusal
 from ..upstream import UpstreamCandles, UpstreamCoverage
-from ._shared import is_tracked, raise_for_status, resolve_window
+from ._shared import READ_ONLY, is_tracked, raise_for_status, resolve_window
 
 # design.md, "Sufity są liczbami w kodzie, nie wartościami w konfiguracji" — a ceiling
 # that lived in .env would drift from the description a caller was given for it.
@@ -103,17 +103,19 @@ class DescribeCoverageOut(BaseModel):
 
 
 def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def get_candles(
         symbol: str,
         resolution: str = "MINUTE",
         from_iso: str | None = None,
         to_iso: str | None = None,
     ) -> GetCandlesOut:
-        """OHLC candles for one pair over a UTC time range, ISO-8601. Omit both bounds
-        for the last day. A series larger than the ceiling comes back bucketed to
-        roughly 200 candles rather than in full — each bucket then covers more than
-        one original period, which `aggregated` and `original_candle_count` say.
+        """OHLC candles for one pair over a UTC time range, `from_iso`/`to_iso` in
+        ISO-8601. Omit both bounds for the last day. Prices are the **bid** side —
+        the only side the archive holds. A series larger than the ceiling comes back
+        bucketed to roughly 200 candles rather than in full — each bucket then
+        covers more than one original period, which `aggregated` and
+        `original_candle_count` say.
 
         Refuses rather than aggregate a series so large the result would no longer
         answer what was asked (~2000 candles) — ask for a coarser resolution or a
@@ -165,11 +167,12 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
             notes=notes,
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def get_last_price(symbol: str, resolution: str = "MINUTE") -> LastPriceOut:
-        """The most recent candle for a pair, with its moment and its age — a price
-        with no age attached could be from now or from Friday's close, and there is
-        no way to tell which from the number alone.
+        """The most recent candle for a pair, with its moment (UTC) and its age in
+        seconds — a price with no age attached could be from now or from Friday's
+        close, and there is no way to tell which from the number alone. The price is
+        the **bid** side, the only side the archive holds.
         """
         start, end = resolve_window(None, None)
         response = await upstream.get(
@@ -200,7 +203,7 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
             notes=notes,
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def summarize_range(
         symbol: str,
         resolution: str = "MINUTE",
@@ -208,8 +211,10 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         to_iso: str | None = None,
     ) -> SummarizeRangeOut:
         """A window's shape in a dozen numbers instead of its candles: total change,
-        how choppy it was, its single biggest move and when. For "what happened here"
-        rather than "draw me the chart" — read `get_candles` for the series itself.
+        how choppy it was, its single biggest move and when. `from_iso`/`to_iso` are
+        UTC, ISO-8601; omit both for the last day. Prices are the **bid** side. For
+        "what happened here" rather than "draw me the chart" — read `get_candles` for
+        the series itself.
         """
         start, end = resolve_window(from_iso, to_iso)
         response = await upstream.get(
@@ -276,11 +281,13 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
             notes=notes,
         )
 
-    @mcp.tool()
+    @mcp.tool(annotations=READ_ONLY)
     async def describe_coverage(symbol: str, resolution: str = "MINUTE") -> DescribeCoverageOut:
         """What the archive has actually verified for one pair: the ranges it looked
-        at — even ones with no candle in them — and how far back it has confirmed the
-        provider's own history reaches.
+        at (UTC instants) — even ones with no candle in them — and how far back it
+        has confirmed the provider's own history reaches. Up to 20 ranges, most
+        recent first; older ones are counted in `omitted_ranges`, not dropped
+        silently.
         """
         response = await upstream.get(f"/coverage/{symbol}", params={"resolution": resolution})
         await raise_for_status(response)

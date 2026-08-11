@@ -36,14 +36,14 @@ Przy okazji: `market_mcp/tools.py` rozbite na pakiet `market_mcp/tools/` (`pairs
 
 ## 4. Rzetelność i kontrakt
 
-- [ ] 4.1 Jednolity kształt odmowy: oznaczenie błędu wywołania plus parametr do zmiany; wszystkie narzędzia przez jedną drogę
-- [ ] 4.2 Rozróżnienie trzech rodzajów „nie wiem" — para niezbierana, przedział niezweryfikowany, archiwum nie odpowiada — i test na każdy z nich
-- [ ] 4.3 Jedno ponowienie na błąd serwera archiwum; przekroczenie czasu jako odmowa nazywająca awarię
-- [ ] 4.4 `scripts/contract.py generate|check` i commitowany `contract/market-data.openapi.json` — proces uruchamiany w katalogu siostrzanym, bez działającego archiwum
-- [ ] 4.5 `tests/test_contract.py` — asercja każdego pola, po które sięga klient
-- [ ] 4.6 `tests/test_tool_surface.py` — opis, typowane parametry, wpisany sufit, nazwane jednostki i strefa dla każdego narzędzia; brak narzędzia zapisującego
-- [ ] 4.7 Test: stdio i transport sieciowy publikują ten sam zestaw narzędzi
-- [ ] 4.8 Limit współbieżnych wywołań archiwum
+- [x] 4.1 Jednolity kształt odmowy: `ToolRefusal` przez `raise_for_status` na każdym z 13 miejsc wołania klienta (audyt: liczba wywołań `upstream.get`/`compute_indicators` równa liczbie `raise_for_status` w każdym pliku); test na 7 narzędziach naraz
+- [x] 4.2 Rozróżnienie trzech rodzajów „nie wiem" — para niezbierana, przedział niezweryfikowany, archiwum nie odpowiada — test na poziomie narzędzia (nie tylko klienta) na każdy z nich, plus test że trzy zdania różnią się treścią
+- [x] 4.3 Jedno ponowienie na błąd serwera archiwum (nie na 4xx); `httpx.TimeoutException`/`RequestError` jako `ToolRefusal` nazywająca awarię, nie surowy wyjątek
+- [x] 4.4 `scripts/contract.py generate|check` i commitowany `contract/market-data.openapi.json` — proces uruchamiany w katalogu siostrzanym, bez działającego archiwum. Po drodze złapane: Windows koduje stdout w kodowaniu ANSI, więc em-dash w docstringach `market_data.contract` wywalał dekodowanie UTF-8 — ten sam problem, przed którym ostrzegał `contract.mjs`, naprawiony tym samym sposobem (`PYTHONIOENCODING`/`PYTHONUTF8`)
+- [x] 4.5 `tests/test_contract.py` — asercja każdego pola i każdej ścieżki, po które sięga klient (16 modeli, 6 ścieżek); `/instruments/search` świadomie pominięte — market-data przekazuje tam JSON gatewaya nieodczytany, bez `response_model`, więc nie ma kontraktu do sprawdzenia
+- [x] 4.6 `tests/test_tool_surface.py` — opis, typowane parametry, wpisany sufit (tam gdzie istnieje), nazwana strefa czasowa i strona ceny (bid) dla narzędzi, które ich dotyczą; `readOnlyHint=True` na każdym narzędziu jako strukturalny, nie tylko nazewniczy, dowód braku zapisu. Po drodze uzupełnione braki w opisach (UTC, bid, sufity), które ten test faktycznie wyłapał
+- [x] 4.7 Test: prawdziwy subproces stdio i prawdziwy serwer HTTP (realny port, `uvicorn.Server` w wątku) publikują ten sam zestaw 10 narzędzi — nie asercja przez czytanie kodu, tylko przez oba transporty naraz
+- [x] 4.8 Limit 8 współbieżnych wywołań archiwum (`asyncio.Semaphore` w `client.py`), test mierzący szczyt współbieżności
 
 ## 5. Dostęp, wdrożenie, uruchomienie
 
