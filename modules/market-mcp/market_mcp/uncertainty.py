@@ -28,6 +28,25 @@ def derived_sentence(derived: bool, resolution: str) -> str | None:
     )
 
 
+def unsettled_sentence(warmup_bars: int | None) -> str:
+    """An indicator result whose `settled` is false is still a value — market-data
+    computed it from a series shorter than the formula wanted. `warmup_bars` is what
+    the formula *needs*, not what was missing: the archive does not publish how many
+    bars fell short, only how many the formula asked for
+    (specs/market-mcp-answers, "Wskaźnik bez pełnej rozgrzewki").
+    """
+    if warmup_bars is None:
+        return (
+            "This value has not fully settled — the archive did not hold enough "
+            "history before the requested range yet; treat it as provisional."
+        )
+    return (
+        f"This value has not fully settled — it needs {warmup_bars} bars of warmup "
+        "and the archive did not hold that many before the requested range; treat it "
+        "as provisional."
+    )
+
+
 def empty_series_sentence(symbol: str, tracked: bool) -> str:
     """Distinguishes "nobody is collecting this pair" from "it is tracked, but this
     window has no candle" — the same empty list means two different things

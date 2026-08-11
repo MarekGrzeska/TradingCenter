@@ -37,7 +37,12 @@ built from the same `market_mcp/server.py`.
 - `server.py` — builds the `FastMCP` instance and mounts `/health` on the same ASGI app
   the streamable-http transport serves, so the platform can probe it without an MCP
   session.
-- `tools.py` — the tool surface. One function per tool, registered with `@mcp.tool()`.
+- `resources.py` — the resources (`market://pairs`, `market://indicators/catalogue`,
+  `market://coverage/{symbol}/{resolution}`) and the `analyze-symbol` prompt.
+- `tools/` — the tool surface, one file per concern (mirrors `market_data/routers/`):
+  `pairs.py`, `candles.py`, `instruments.py`, `indicators.py`, plus `_shared.py` for
+  what more than one of them needs (the window default, the read-only-empty-series
+  distinction).
 - `__main__.py` — `python -m market_mcp [stdio|http]`, defaulting to `stdio`.
 
 ## Run
@@ -83,15 +88,22 @@ uv run pyright             # types, over market_mcp/
 | `summarize_range` | A window's shape in a dozen numbers: change, choppiness, biggest move — instead of its candles. | `GET /candles/{symbol}` |
 | `describe_coverage` | What the archive has actually verified for a pair, and how far back its history reaches. | `GET /coverage/{symbol}` |
 | `search_instruments` | The symbol other tools expect, from a name a person would type. | `GET /instruments/search` |
+| `list_indicators` | Every indicator the archive can compute, its parameters and their defaults — filterable by group. | `GET /indicators` (cached once per process) |
+| `describe_indicator` | The full catalogue entry for one indicator — ranges, aliases, output shape, render hint. | `GET /indicators` (cached) |
+| `compute_indicators` | Up to 10 named indicators on one shared axis. `mode="latest"`: value, slope, distance from price, bars since it crossed price. `mode="series"`: the window, thinned to ≤200 points. | `POST /indicators/{symbol}` |
+| `levels_near_price` | Every level, zone and marker the catalogue can compute, merged and sorted by distance from the last price. | `POST /indicators/{symbol}` (batched, ≤10 per call) |
 
 Every candle/coverage tool distinguishes three reasons for an empty answer — nobody
 tracks the pair, the window is unverified, or the archive did not respond — instead of
 letting a caller read silence as "the market was quiet"
-(`specs/market-mcp-answers`).
+(`specs/market-mcp-answers`). An indicator result carries the archive's own `error` text
+verbatim, and an unsettled value says why — the warmup its formula needs, not
+necessarily how much was missing (the archive does not publish that second number).
 
-Growing incrementally — see `openspec/changes/add-market-data-mcp/tasks.md` for the rest
-of the surface (indicators) and the reduction each remaining tool applies before
-answering.
+Also published: three resources (`market://pairs`, `market://indicators/catalogue`,
+`market://coverage/{symbol}/{resolution}`) for a client that wants to read rather than
+call, and one prompt, `analyze-symbol` — coverage, then a window summary, then
+indicators, then naming what is still not known.
 
 ## Contract with market-data
 

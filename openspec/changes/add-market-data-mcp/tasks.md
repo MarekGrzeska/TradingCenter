@@ -22,15 +22,17 @@
 
 ## 3. Wskaźniki
 
-- [ ] 3.1 Cache katalogu wskaźników unieważniany przez `algorithm_version`
-- [ ] 3.2 Narzędzia `list_indicators` (filtr po grupie) i `describe_indicator`
-- [ ] 3.3 Redukcja kształtu `lines` — ostatnia wartość, nachylenie, odległość od ceny, świece od przecięcia
-- [ ] 3.4 Redukcja kształtów `markers`, `zones` i `levels` — sortowanie po odległości od ceny albo po świeżości, z licznikiem pominiętych
-- [ ] 3.5 Narzędzie `compute_indicators` — tryby `latest` i `series`, sufity 3/10 wskaźników i 200 punktów serii
-- [ ] 3.6 Narzędzie `levels_near_price` — poziomy, strefy i znaki z odległością od ostatniej ceny w punktach i procentach
-- [ ] 3.7 Testy: `settled=false` ma swoje zdanie; wpis z `error` przepisuje powód archiwum; nieznany wskaźnik odsyła do katalogu; każdy z czterech kształtów wyjścia ma swój test redukcji
-- [ ] 3.8 Zasoby MCP: katalog wskaźników, zbierane pary, pokrycie pary jako szablon
-- [ ] 3.9 Prompt MCP `analiza-symbolu` — pokrycie, streszczenie okna, wskaźniki, nazwanie tego, czego nie wiadomo
+- [x] 3.1 Cache katalogu wskaźników — pobierany raz na proces (kolejna zmiana `algorithm_version` przychodzi z restartem modułu, nie z odpytywania w kółko)
+- [x] 3.2 Narzędzia `list_indicators` (filtr po grupie) i `describe_indicator`
+- [x] 3.3 Redukcja kształtu `lines` — ostatnia wartość, nachylenie, odległość od ceny, świece od przecięcia
+- [x] 3.4 Redukcja kształtów `markers`, `zones` i `levels` — świeżość w `compute_indicators` (wybór wskaźników jest już decyzją wołającego), odległość od ceny w `levels_near_price`; licznik pominiętych w obu
+- [x] 3.5 Narzędzie `compute_indicators` — tryby `latest` i `series`, twardy sufit 10 wskaźników (bez osobnego „domyślnie 3" — nie ma tu agregacji, więc nie ma czego stopniować), 200 punktów serii
+- [x] 3.6 Narzędzie `levels_near_price` — poziomy, strefy i znaki z odległością od ostatniej ceny w punktach i procentach, wsadowo po 10 wskaźników na żądanie
+- [x] 3.7 Testy: `settled=false` ma swoje zdanie; wpis z `error` przepisuje powód archiwum; nieznany wskaźnik (i alias) odsyła do katalogu; każdy z czterech kształtów wyjścia ma swój test redukcji
+- [x] 3.8 Zasoby MCP: katalog wskaźników, zbierane pary, pokrycie pary jako szablon
+- [x] 3.9 Prompt MCP `analyze-symbol` (nazwa po angielsku — CLAUDE.md: identyfikatory kodu, nie proza OpenSpec) — pokrycie, streszczenie okna, wskaźniki, nazwanie tego, czego nie wiadomo
+
+Przy okazji: `market_mcp/tools.py` rozbite na pakiet `market_mcp/tools/` (`pairs.py`, `candles.py`, `instruments.py`, `indicators.py`, `_shared.py`) — ten sam podział co `market_data/routers/`, zanim jeden plik urósł do rozmiaru, który ten podział miał zapobiec.
 
 ## 4. Rzetelność i kontrakt
 
