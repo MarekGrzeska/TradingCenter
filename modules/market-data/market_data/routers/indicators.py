@@ -57,6 +57,15 @@ from .deps import indicator_limiter, pool
 # (design.md, "Obliczenia dzielą pętlę zdarzeń ze strumieniem świec").
 REQUEST_CEILING = 200_000
 
+# The resolution `time_profile`/`session_range_*`/`opening_range` read regardless of what
+# was requested (`IndicatorSpec.needs_minute_series`). Raw MINUTE is the finer choice on
+# paper, but nothing in this deployment actually tracks it — pairs are collected starting
+# at MINUTE_5, with MINUTE itself existing only as the source `rollups.py` derives it from
+# when asked for directly. Targeting MINUTE_5 here, with the same DERIVABLE fallback the
+# primary series read already gets, is what makes these entries usable against real
+# tracked pairs instead of refusing on every request for want of a series nobody collects.
+FINE_RESOLUTION = Resolution.MINUTE_5
+
 router = APIRouter()
 
 
@@ -173,19 +182,21 @@ async def compute(
     }
     needs_minute_series = any(entry.needs_minute_series for entry, _params in resolved)
     # A DAY-resolution chart asking for `time_profile` can otherwise hide a
-    # minute-series read many orders of magnitude bigger than what
+    # fine-resolution read many orders of magnitude bigger than what
     # `requested_candles` above ever saw — the module's one performance
     # promise (design.md, "Obliczenia dzielą pętlę zdarzeń ze strumieniem
     # świec") would not survive that read silently bypassing the ceiling.
-    if needs_minute_series and body.resolution != Resolution.MINUTE:
-        minute_candles = periods_between(Resolution.MINUTE, start, end)
-        if minute_candles > REQUEST_CEILING:
+    # Already covered when the chart itself reads at `FINE_RESOLUTION` or
+    # finer (raw MINUTE): the top-level `cells` check above priced that read.
+    if needs_minute_series and body.resolution not in (Resolution.MINUTE, FINE_RESOLUTION):
+        fine_candles = periods_between(FINE_RESOLUTION, start, end)
+        if fine_candles > REQUEST_CEILING:
             raise HTTPException(
                 status_code=422,
                 detail=(
-                    f"the minute series time_profile/session_range/opening_range need "
-                    f"exceeds the indicator ceiling of {REQUEST_CEILING} candles "
-                    f"(~{minute_candles} asked for)"
+                    f"the {FINE_RESOLUTION.value} series time_profile/session_range/"
+                    f"opening_range need exceeds the indicator ceiling of "
+                    f"{REQUEST_CEILING} candles (~{fine_candles} asked for)"
                 ),
             )
 
@@ -220,22 +231,25 @@ async def compute(
         minute_rows: Sequence[Candle | DerivedCandle] = []
         if needs_minute_series:
             # Trimmed to exactly `[start, end)` even when the requested
-            # resolution already *is* MINUTE and `rows` is sitting right there
-            # — `rows` may reach back past `start` for a different entry's
-            # warmup in the same request, which `time_profile`/`session_range`/
-            # `opening_range` must not see: none of them warm up, each reads
-            # exactly the window the operator asked for.
-            minute_rows = (
-                rows[first_requested:]
-                if body.resolution == Resolution.MINUTE
-                else await read_candles(conn, symbol, Resolution.MINUTE, start, end)
-            )
+            # resolution already *is* `FINE_RESOLUTION` (or finer, raw MINUTE)
+            # and `rows` is sitting right there — `rows` may reach back past
+            # `start` for a different entry's warmup in the same request,
+            # which `time_profile`/`session_range`/`opening_range` must not
+            # see: none of them warm up, each reads exactly the window the
+            # operator asked for.
+            if body.resolution in (Resolution.MINUTE, FINE_RESOLUTION):
+                minute_rows = rows[first_requested:]
+            else:
+                minute_rows = await read_candles(conn, symbol, FINE_RESOLUTION, start, end)
+                if not minute_rows and FINE_RESOLUTION in DERIVABLE:
+                    minute_rows = await read_derived(conn, symbol, FINE_RESOLUTION, start, end)
             if not minute_rows:
                 raise HTTPException(
                     status_code=422,
                     detail=(
-                        f"no MINUTE series collected for {symbol!r}; time_profile/"
-                        "session_range/opening_range need it read at that resolution directly"
+                        f"no {FINE_RESOLUTION.value} series collected for {symbol!r}, and "
+                        "none could be derived from MINUTE either; time_profile/session_range/"
+                        "opening_range need one of those two read directly"
                     ),
                 )
 

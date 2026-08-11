@@ -519,7 +519,9 @@ async def test_session_range_reads_the_minute_series_regardless_of_requested_res
             [
                 candle(
                     0,
-                    resolution=Resolution.MINUTE,
+                    # `FINE_RESOLUTION` (`routers/indicators.py`) — nothing in
+                    # a real deployment tracks raw MINUTE, only this and up.
+                    resolution=Resolution.MINUTE_5,
                     # 07:30 UTC — London runs BST (UTC+1) in August, so this
                     # is local 08:30, inside the 08:00-09:00 window below.
                     period_start=_TODAY.replace(hour=7, minute=30),
@@ -575,8 +577,8 @@ async def test_time_profile_computes_from_the_minute_series_at_day_resolution(ap
         await write_candles(
             conn,
             [
-                candle(m, resolution=Resolution.MINUTE, period_start=NOW - timedelta(minutes=m))
-                for m in range(60, -1, -1)
+                candle(m, resolution=Resolution.MINUTE_5, period_start=NOW - timedelta(minutes=m))
+                for m in range(60, -1, -5)
             ],
         )
 
@@ -598,12 +600,14 @@ async def test_time_profile_computes_from_the_minute_series_at_day_resolution(ap
 
 
 async def test_a_wide_request_hiding_a_bigger_minute_read_is_refused(api, pool) -> None:
-    """The minute series `time_profile` needs behind a DAY-resolution request
-    is invisible to the ceiling's own `candles×indicators` count — this is
-    the check that keeps it from silently bypassing that ceiling."""
+    """The fine-resolution series `time_profile` needs behind a DAY-resolution
+    request is invisible to the ceiling's own `candles×indicators` count —
+    this is the check that keeps it from silently bypassing that ceiling."""
     from market_data.routers.indicators import REQUEST_CEILING
 
-    days = REQUEST_CEILING // 1440 + 10  # comfortably past the ceiling in minutes
+    # `FINE_RESOLUTION` is MINUTE_5 (288/day), not MINUTE (1440/day) — the
+    # width that clears the ceiling is almost five times as many days.
+    days = REQUEST_CEILING // 288 + 10
     response = await api.post(
         "/indicators/US100",
         json={
