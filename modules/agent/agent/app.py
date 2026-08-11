@@ -22,6 +22,8 @@ logging.basicConfig(
 from fastapi import FastAPI
 
 from .config import Settings
+from .models_catalogue import ModelCatalogue
+from .routers import models
 
 log = logging.getLogger(__name__)
 
@@ -30,6 +32,7 @@ log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
     app.state.settings = settings
+    app.state.catalogue = ModelCatalogue.from_settings(settings)
     yield
 
 
@@ -54,3 +57,6 @@ app = FastAPI(
 @app.get("/health")
 async def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+app.include_router(models.router)

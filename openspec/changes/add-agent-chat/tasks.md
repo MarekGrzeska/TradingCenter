@@ -30,14 +30,14 @@
 
 ## 3. Katalog modeli i prompt systemowy
 
-- [ ] 3.1 `agent/models_catalogue.py` — katalog z konfiguracji: identyfikator, nazwa
+- [x] 3.1 `agent/models_catalogue.py` — katalog z konfiguracji: identyfikator, nazwa
       deploymentu, nazwa do pokazania, porządek kosztu, stawki wejścia i wyjścia
-- [ ] 3.2 Start modułu odmawia, gdy model w katalogu nie ma stawki
-- [ ] 3.3 `agent/prompt.py` — prompt systemowy agenta terminala tradingowego z
+- [x] 3.2 Start modułu odmawia, gdy model w katalogu nie ma stawki
+- [x] 3.3 `agent/prompt.py` — prompt systemowy agenta terminala tradingowego z
       identyfikatorem wersji; prompt nazywa brak narzędzi i brak rekomendacji
-- [ ] 3.4 `GET /models` — katalog na wyjściu; test, że odpowiedź wystarcza do zbudowania
+- [x] 3.4 `GET /models` — katalog na wyjściu; test, że odpowiedź wystarcza do zbudowania
       wybieraka (identyfikator, nazwa, porządek, stawki)
-- [ ] 3.5 Testy: model spoza katalogu jest odmową z nazwą modelu w przyczynie; sesja bez
+- [x] 3.5 Testy: model spoza katalogu jest odmową z nazwą modelu w przyczynie; sesja bez
       wskazanego modelu dostaje domyślny
 
 ## 4. Rozmowa i strumień
