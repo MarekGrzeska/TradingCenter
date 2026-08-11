@@ -10,6 +10,8 @@ import type {
   Time,
 } from "lightweight-charts";
 
+import { timeToX } from "./timeCoordinates";
+
 /**
  * One `levels`-shaped price ray: a segment from the moment it took effect to the
  * right edge — never the whole width, unlike `createPriceLine` (`terminal-chart`
@@ -132,10 +134,11 @@ export class RayPrimitive implements ISeriesPrimitive<Time> {
     if (!chart || !series) return [];
     const timeScale = chart.timeScale();
     return this.levels.map((level) => ({
-      // `null` when `level.time` names no point the time scale currently knows —
-      // a ray whose moment falls outside the loaded series draws nothing rather
-      // than guessing a coordinate for it.
-      x: timeScale.timeToCoordinate(level.time),
+      // `null` only when the chart holds no bars at all. A moment inside the
+      // loaded range that is not itself a bar — a previous-day close at a
+      // midnight the venue was shut through — snaps to the nearest one rather
+      // than dropping the ray (`timeCoordinates.ts`).
+      x: timeToX(timeScale, level.time),
       y: series.priceToCoordinate(level.price),
       color: this.color,
       label: level.label,

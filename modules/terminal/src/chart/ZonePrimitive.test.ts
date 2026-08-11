@@ -39,16 +39,22 @@ function attach(
     visibleRange?: { from: number; to: number } | null;
     timeToCoordinate?: (time: Time) => number | null;
     priceToCoordinate?: (price: number) => number | null;
+    /** What the time scale answers for a moment that is not itself a bar — see
+     *  `timeCoordinates.ts`. `null` is a chart with no bars to be near. */
+    nearestBar?: (time: Time) => number | null;
   } = {},
 ) {
   const visibleRange = options.visibleRange === undefined ? { from: 0, to: 1000 } : options.visibleRange;
   const timeToCoordinate = options.timeToCoordinate ?? ((t: Time) => t as number);
   const priceToCoordinate = options.priceToCoordinate ?? ((p: number) => p);
 
+  const nearestBar = options.nearestBar ?? (() => null);
   const chart = {
     timeScale: () => ({
       getVisibleRange: () => visibleRange,
       timeToCoordinate,
+      timeToIndex: (t: Time) => nearestBar(t),
+      logicalToCoordinate: (x: number | null) => x,
     }),
   } as unknown as IChartApi;
   const series = { priceToCoordinate } as unknown as ISeriesApi<SeriesType, Time>;
@@ -88,17 +94,54 @@ describe("ZonePrimitive — coordinate resolution", () => {
     primitive.setZones([zone({ from: 100 as Time, to: 200 as Time, top: 110, bottom: 90 })]);
 
     expect(primitive.renderItems()).toEqual([
-      { xStart: 100, xEnd: 200, yTop: 110, yBottom: 90, color: COLORS.bullish },
+      { open: false, xStart: 100, xEnd: 200, yTop: 110, yBottom: 90, color: COLORS.bullish },
     ]);
   });
 
-  it("carries an open zone's null `to` through as a null xEnd, not a guessed edge", () => {
+  it("carries an open zone's null `to` through as open, not as a guessed edge", () => {
     const primitive = new ZonePrimitive(COLORS);
     attach(primitive);
     primitive.setZones([zone({ to: null })]);
 
     const [item] = primitive.renderItems();
+    expect(item?.open).toBe(true);
     expect(item?.xEnd).toBeNull();
+  });
+
+  // A `session_range`/`opening_range` zone is computed on the archive's fine series, so its
+  // boundaries are minute instants that an hourly or daily chart has no bar for. The time
+  // scale answers null for those, and both halves of that used to be silent bugs.
+  describe("a zone whose boundaries are not bars on this chart", () => {
+    it("snaps its start to the nearest bar instead of vanishing", () => {
+      const primitive = new ZonePrimitive(COLORS);
+      attach(primitive, {
+        timeToCoordinate: (time) => ((time as number) === 830 ? null : (time as number)),
+        nearestBar: () => 800,
+      });
+      primitive.setZones([zone({ from: 830 as Time, to: 900 as Time })]);
+
+      const [item] = primitive.renderItems();
+      expect(item?.xStart).toBe(800);
+      expect(item?.xEnd).toBe(900);
+    });
+
+    it("does not turn an end it cannot place into an open zone running off the screen", () => {
+      const primitive = new ZonePrimitive(COLORS);
+      attach(primitive, {
+        timeToCoordinate: (time) => ((time as number) === 1630 ? null : (time as number)),
+        nearestBar: () => null,
+      });
+      primitive.setZones([zone({ from: 800 as Time, to: 1630 as Time })]);
+
+      const [item] = primitive.renderItems();
+      expect(item?.open).toBe(false);
+
+      const { ctx, target } = fakeTarget(500);
+      primitive.paneViews()[0]?.renderer()?.draw(target);
+      // An unplaceable end draws nothing at all — it is not the same claim as "this zone
+      // has not closed yet", which is what filling to the right edge says.
+      expect(ctx.fillRect).not.toHaveBeenCalled();
+    });
   });
 
   it("colors bearish and direction-less zones from their own slot", () => {

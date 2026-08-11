@@ -10,6 +10,8 @@ import type {
   Time,
 } from "lightweight-charts";
 
+import { timeToX } from "./timeCoordinates";
+
 /**
  * One `zones`-shaped region: a rectangle from the moment it took effect to
  * the moment it closed, open to the right edge while `to` is null — the same
@@ -32,9 +34,12 @@ export interface ZoneColors {
 
 interface ZoneRenderItem {
   xStart: number | null;
-  /** `null` means open — the rectangle reaches the pane's own right edge,
-   *  never the whole chart width, the same distinction `RayPrimitive` draws
-   *  for a ray's right end. */
+  /** Open to the right: the rectangle reaches the pane's own right edge, never
+   *  the whole chart width. Kept apart from a null `xEnd`, which means the end
+   *  moment resolved to no coordinate at all — the two used to be the same
+   *  `null` here, so a zone whose end the time scale could not place silently
+   *  became an open one running off the screen. */
+  open: boolean;
   xEnd: number | null;
   yTop: number | null;
   yBottom: number | null;
@@ -55,9 +60,12 @@ class ZonePaneRenderer implements IPrimitivePaneRenderer {
       const ctx = scope.context;
       for (const item of this.items) {
         if (item.xStart === null || item.yTop === null || item.yBottom === null) continue;
+        if (!item.open && item.xEnd === null) continue;
         const xStart = Math.max(0, item.xStart) * scope.horizontalPixelRatio;
         const xEnd =
-          item.xEnd === null ? scope.bitmapSize.width : item.xEnd * scope.horizontalPixelRatio;
+          item.open || item.xEnd === null
+            ? scope.bitmapSize.width
+            : item.xEnd * scope.horizontalPixelRatio;
         const yTop = Math.min(item.yTop, item.yBottom) * scope.verticalPixelRatio;
         const yBottom = Math.max(item.yTop, item.yBottom) * scope.verticalPixelRatio;
 
@@ -152,8 +160,9 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
       if ((zone.from as number) > (visible.to as number)) continue;
 
       items.push({
-        xStart: timeScale.timeToCoordinate(zone.from),
-        xEnd: zone.to === null ? null : timeScale.timeToCoordinate(zone.to),
+        open: zone.to === null,
+        xStart: timeToX(timeScale, zone.from),
+        xEnd: zone.to === null ? null : timeToX(timeScale, zone.to),
         yTop: series.priceToCoordinate(zone.top),
         yBottom: series.priceToCoordinate(zone.bottom),
         color: colorFor(zone.direction, this.colors),

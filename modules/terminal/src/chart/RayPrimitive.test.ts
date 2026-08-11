@@ -40,12 +40,46 @@ function fakeTarget(bitmapWidth: number) {
   return { ctx, target };
 }
 
-function attach(ray: RayPrimitive, timeCoordinate: number | null, priceCoordinate: number | null) {
-  const chart = { timeScale: () => ({ timeToCoordinate: () => timeCoordinate }) } as unknown as IChartApi;
+/** `nearestBar` stands for what the real time scale answers when the moment asked for is
+ *  not itself a bar: `null`/`null` is a chart with no bars to be near, a pair of numbers is
+ *  the bar it would snap to. */
+function attach(
+  ray: RayPrimitive,
+  timeCoordinate: number | null,
+  priceCoordinate: number | null,
+  nearestBar: { index: number | null; x: number | null } = { index: null, x: null },
+) {
+  const chart = {
+    timeScale: () => ({
+      timeToCoordinate: () => timeCoordinate,
+      timeToIndex: () => nearestBar.index,
+      logicalToCoordinate: () => nearestBar.x,
+    }),
+  } as unknown as IChartApi;
   const series = { priceToCoordinate: () => priceCoordinate } as unknown as ISeriesApi<SeriesType, Time>;
   const param = { chart, series, requestUpdate: () => {} } as unknown as SeriesAttachedParameter<Time>;
   ray.attached(param);
 }
+
+describe("RayPrimitive — a moment that is not a bar on this chart", () => {
+  // A previous-day pivot's close moment is a midnight the venue may have been shut
+  // through: inside the loaded range, and still not a bar of its own.
+  it("snaps to the nearest bar instead of dropping the ray", () => {
+    const ray = new RayPrimitive("#fff");
+    attach(ray, null, 50, { index: 7, x: 240 });
+    ray.setLevels([{ time: 100 as Time, price: 10, label: "PDH" }]);
+
+    expect(ray.renderItems()[0]?.x).toBe(240);
+  });
+
+  it("still draws nothing when the chart holds no bars to be near", () => {
+    const ray = new RayPrimitive("#fff");
+    attach(ray, null, 50, { index: null, x: null });
+    ray.setLevels([{ time: 100 as Time, price: 10, label: "PDH" }]);
+
+    expect(ray.renderItems()[0]?.x).toBeNull();
+  });
+});
 
 describe("RayPrimitive — coordinate resolution", () => {
   it("has nothing to draw before it is attached", () => {
