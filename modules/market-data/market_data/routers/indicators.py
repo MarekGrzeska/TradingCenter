@@ -1,7 +1,7 @@
-"""Wskaźniki: a catalogue anyone can build a picker from, and a computation over the
+"""Indicators: a catalogue anyone can build a picker from, and a computation over the
 series this module already owns.
 
-The one rule every line here answers to: a wskaźnik measures, it never orzeka
+The one rule every line here answers to: an indicator measures, it never decides
 (`market-data-indicators` spec, "Katalog mierzy, a nie orzeka"). Nothing in this router
 returns a boolean, and every threshold a formula needs is a parameter the caller sent
 back to it in the response — never a constant this file decided on its own.
@@ -48,8 +48,8 @@ from ..rollups import DERIVABLE, DerivedCandle, read_derived
 from ..store import read_candles
 from .deps import indicator_limiter, pool
 
-# candles × requested wskaźniki, above which the module refuses rather than compute.
-# Set in etap zero at 5000 candles × 10 wskaźniki, ~16.5ms p95 on a 3-entry catalogue.
+# candles × requested indicators, above which the module refuses rather than compute.
+# Set in the first stage at 5000 candles × 10 indicators, ~16.5ms p95 on a 3-entry catalogue.
 # Re-measured in 2.17 against the full 44-entry catalogue E1 grew it to: every entry at
 # once, at however many candles this ceiling allows that many entries (~4500), costs
 # ~63ms p95 (`test_indicators_performance.py`) — cells scale roughly linearly with
@@ -110,10 +110,10 @@ def _entry_out(entry: IndicatorSpec) -> IndicatorCatalogueEntryOut:
     "/indicators",
     tags=["indicators"],
     response_model=IndicatorsCatalogueOut,
-    summary="Every wskaźnik this module can compute, and how to draw it",
+    summary="Every indicator this module can compute, and how to draw it",
     description=(
         "A consumer builds its whole picker from this — parameters, defaults, output "
-        "shape, render hint — and never needs to know a wskaźnik by name beforehand."
+        "shape, render hint — and never needs to know an indicator by name beforehand."
     ),
 )
 async def catalogue() -> IndicatorsCatalogueOut:
@@ -128,10 +128,10 @@ async def catalogue() -> IndicatorsCatalogueOut:
     tags=["indicators"],
     response_model=IndicatorsOut,
     responses={422: {"model": Problem}},
-    summary="Compute one or more wskaźniki over a range, on one shared time axis",
+    summary="Compute one or more indicators over a range, on one shared time axis",
     description=(
         "Reads further back than `from` on its own, by however much each requested "
-        "wskaźnik's warmup needs, and says in `warmup_from`/`settled` whether the "
+        "indicator's warmup needs, and says in `warmup_from`/`settled` whether the "
         "archive actually held enough history for the answer to be trusted."
     ),
 )

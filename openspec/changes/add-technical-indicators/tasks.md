@@ -92,9 +92,10 @@ grupa 7.
 
 ## 7. Domknięcie
 
-- [ ] 7.1 `modules/market-data/README.md` — sekcja o wskaźnikach i o tym, czego moduł nie liczy
-- [ ] 7.2 `CLAUDE.md` — poprawić opis modułu; dopisać ścieżkę dodania nowego wskaźnika
-- [ ] 7.3 `openspec validate add-technical-indicators --strict`
-- [ ] 7.4 Test lokalny całego stosu przez `./scripts/dev.sh`
-- [ ] 7.5 `review.md`
+- [x] 7.1 `modules/market-data/README.md` — sekcja o wskaźnikach i o tym, czego moduł nie liczy
+- [x] 7.2 `CLAUDE.md` — poprawić opis modułu; dopisać ścieżkę dodania nowego wskaźnika
+- [x] 7.3 `openspec validate add-technical-indicators --strict`
+- [ ] 7.4 Test lokalny całego stosu przez `./scripts/dev.sh` (`./scripts/dev.ps1` na Windows) —
+      scenariusze w `docs/wskazniki-testy-lokalne.html`
+- [x] 7.5 `review.md`
 - [ ] 7.6 Pull request gałęzi `add-technical-indicators` do `main`

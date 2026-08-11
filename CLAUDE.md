@@ -45,7 +45,8 @@ Test flags that matter:
   CI**, and see the session warning below.
 - `--run-live-trading` (gateway only) **writes**: it opens, amends and closes demo positions.
 
-The whole stack: `./scripts/dev.sh` (`--no-terminal` for back end only). It starts things
+The whole stack: `./scripts/dev.sh` on macOS and Linux, `./scripts/dev.ps1` on Windows —
+the same script twice (`--no-terminal` / `-NoTerminal` for back end only). It starts things
 in dependency order — migrations → gateway → market-data → terminal — waiting for each to
 actually answer. Ports are fixed: **8010** gateway, **8020** market-data, **5173** terminal.
 

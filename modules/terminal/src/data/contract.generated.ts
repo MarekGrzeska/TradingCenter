@@ -131,8 +131,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Every wskaźnik this module can compute, and how to draw it
-         * @description A consumer builds its whole picker from this — parameters, defaults, output shape, render hint — and never needs to know a wskaźnik by name beforehand.
+         * Every indicator this module can compute, and how to draw it
+         * @description A consumer builds its whole picker from this — parameters, defaults, output shape, render hint — and never needs to know an indicator by name beforehand.
          */
         get: operations["catalogue_indicators_get"];
         put?: never;
@@ -153,8 +153,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Compute one or more wskaźniki over a range, on one shared time axis
-         * @description Reads further back than `from` on its own, by however much each requested wskaźnik's warmup needs, and says in `warmup_from`/`settled` whether the archive actually held enough history for the answer to be trusted.
+         * Compute one or more indicators over a range, on one shared time axis
+         * @description Reads further back than `from` on its own, by however much each requested indicator's warmup needs, and says in `warmup_from`/`settled` whether the archive actually held enough history for the answer to be trusted.
          */
         post: operations["compute_indicators__symbol__post"];
         delete?: never;
@@ -597,13 +597,13 @@ export interface components {
         /**
          * IndicatorCatalogueEntryOut
          * @description One row of `GET /indicators` — everything a consumer needs to offer this
-         *     wskaźnik and draw it, without knowing anything about it beforehand
+         *     indicator and draw it, without knowing anything about it beforehand
          *     (`market-data-indicators` spec, "Katalog wystarcza do zbudowania wybieraka").
          */
         IndicatorCatalogueEntryOut: {
             /**
              * Aliases
-             * @description names a wskaźnik is also known by; never the vocabulary of one trading school baked into `id` itself
+             * @description names an indicator is also known by; never the vocabulary of one trading school baked into `id` itself
              */
             aliases: string[];
             /** Group */
@@ -692,7 +692,7 @@ export interface components {
         IndicatorRenderOut: {
             /**
              * Autoscale
-             * @description whether this line may widen the price axis it shares — off for a wskaźnik whose own values are not comparable to price
+             * @description whether this line may widen the price axis it shares — off for an indicator whose own values are not comparable to price
              * @default true
              */
             autoscale: boolean;
@@ -725,14 +725,14 @@ export interface components {
         };
         /**
          * IndicatorResultOut
-         * @description One requested wskaźnik's answer. Exactly one of `lines`, `markers`, `zones`,
+         * @description One requested indicator's answer. Exactly one of `lines`, `markers`, `zones`,
          *     `levels` is set — the one its catalogue entry's `output` names
          *     (`market-data-indicators` spec, "Wynik ma jeden z czterech kształtów").
          */
         IndicatorResultOut: {
             /**
              * Anchored At
-             * @description set instead of warmup_bars for a wskaźnik with state rather than decay
+             * @description set instead of warmup_bars for an indicator with state rather than decay
              */
             anchored_at: string | null;
             /** Id */
@@ -759,7 +759,7 @@ export interface components {
             settled: boolean;
             /**
              * Warmup Bars
-             * @description how many bars before the requested range were read for warmup; null for a kotwica-anchored wskaźnik, which carries anchored_at instead
+             * @description how many bars before the requested range were read for warmup; null for an anchored indicator, which carries anchored_at instead
              */
             warmup_bars: number | null;
             /** Zones */
@@ -809,7 +809,7 @@ export interface components {
         };
         /**
          * IndicatorsOut
-         * @description `POST /indicators/{symbol}` — one or more wskaźniki, on one shared time axis.
+         * @description `POST /indicators/{symbol}` — one or more indicators, on one shared time axis.
          */
         IndicatorsOut: {
             /** Algorithm Version */
@@ -838,7 +838,7 @@ export interface components {
             uncovered: components["schemas"]["Uncovered"][];
             /**
              * Warmup From
-             * @description oldest period actually read to satisfy warmup; null when no requested wskaźnik needed any
+             * @description oldest period actually read to satisfy warmup; null when no requested indicator needed any
              */
             warmup_from: string | null;
         };

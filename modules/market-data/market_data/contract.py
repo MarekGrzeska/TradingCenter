@@ -516,8 +516,8 @@ class IndicatorRenderOut(BaseModel):
     scale: Literal["price", "own", "fixed"] = "price"
     autoscale: bool = Field(
         default=True,
-        description="whether this line may widen the price axis it shares — off for a "
-        "wskaźnik whose own values are not comparable to price",
+        description="whether this line may widen the price axis it shares — off for an "
+        "indicator whose own values are not comparable to price",
     )
     range: tuple[float, float] | None = None
     levels: list[float] = Field(
@@ -527,14 +527,14 @@ class IndicatorRenderOut(BaseModel):
 
 class IndicatorCatalogueEntryOut(BaseModel):
     """One row of `GET /indicators` — everything a consumer needs to offer this
-    wskaźnik and draw it, without knowing anything about it beforehand
+    indicator and draw it, without knowing anything about it beforehand
     (`market-data-indicators` spec, "Katalog wystarcza do zbudowania wybieraka")."""
 
     id: str
     name: str
     aliases: list[str] = Field(
         default_factory=list,
-        description="names a wskaźnik is also known by; never the vocabulary of one "
+        description="names an indicator is also known by; never the vocabulary of one "
         "trading school baked into `id` itself",
     )
     group: str
@@ -599,7 +599,7 @@ class IndicatorLevelOut(BaseModel):
 
 
 class IndicatorResultOut(BaseModel):
-    """One requested wskaźnik's answer. Exactly one of `lines`, `markers`, `zones`,
+    """One requested indicator's answer. Exactly one of `lines`, `markers`, `zones`,
     `levels` is set — the one its catalogue entry's `output` names
     (`market-data-indicators` spec, "Wynik ma jeden z czterech kształtów")."""
 
@@ -608,11 +608,11 @@ class IndicatorResultOut(BaseModel):
     warmup_bars: int | None = Field(
         default=None,
         description="how many bars before the requested range were read for warmup; "
-        "null for a kotwica-anchored wskaźnik, which carries anchored_at instead",
+        "null for an anchored indicator, which carries anchored_at instead",
     )
     anchored_at: datetime | None = Field(
         default=None,
-        description="set instead of warmup_bars for a wskaźnik with state rather than decay",
+        description="set instead of warmup_bars for an indicator with state rather than decay",
     )
     settled: bool = Field(
         description="false when the archive did not hold enough history before the "
@@ -632,7 +632,7 @@ class IndicatorResultOut(BaseModel):
 
 
 class IndicatorsOut(BaseModel):
-    """`POST /indicators/{symbol}` — one or more wskaźniki, on one shared time axis."""
+    """`POST /indicators/{symbol}` — one or more indicators, on one shared time axis."""
 
     symbol: str
     resolution: Resolution
@@ -647,7 +647,7 @@ class IndicatorsOut(BaseModel):
     warmup_from: datetime | None = Field(
         default=None,
         description="oldest period actually read to satisfy warmup; null when no "
-        "requested wskaźnik needed any",
+        "requested indicator needed any",
     )
     uncovered: list[Uncovered] = Field(
         default_factory=list,

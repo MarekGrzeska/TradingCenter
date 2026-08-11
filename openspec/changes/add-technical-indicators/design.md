@@ -139,41 +139,6 @@ z własnymi testami; do `main` trafia całość, po lokalnym przetestowaniu i re
 i katalog ustalają się w etapie zerowym i przez kolejne etapy jeszcze się układają — wypuszczanie
 ich do `main` po kawałku znaczyłoby publikowanie kontraktu, o którym wiadomo, że się zmieni.
 
-## Risks / Trade-offs
-
-- **Obliczenia dzielą pętlę zdarzeń ze strumieniem świec** → sufit żądania i semafor od pierwszego
-  etapu; pomiar p95 przed rozrostem katalogu; `scipy` albo osobny moduł jako droga odwrotu, dla
-  której jądro jest już przygotowane.
-- **Katalog rozjeżdża się z jądrem** — wpis deklaruje linię, której obliczenie nie zwraca, i nic
-  tego nie wykrywa → jeden test liczący *każdy* wpis katalogu na krótkiej serii i porównujący klucze
-  wyjścia z deklaracją. Wchodzi w etapie zerowym, nie później.
-- **Zmiana wzoru bez podniesienia wersji** → pliki wzorcowe pokazują diff przy każdej zmianie
-  wartości, więc podniesienie wersji jest widoczne w tym samym commicie.
-- **Rozmiar odpowiedzi** — 20 linii po 5000 punktów to około megabajta JSON-a → zmierzyć po
-  kompresji przed jakąkolwiek optymalizacją; kompresja jest po stronie App Service.
-- **Terminal wąskim gardłem** — Python gotowy, ale nie ma czym narysować → prymityw rysowania jest
-  częścią zakresu etapu, w którym pojawia się jego kształt, a nie osobną „integracją po".
-- **Rozlanie zakresu katalogu** → lista pozycji jest zamknięta w `tasks.md`; kolejne wskaźniki są
-  osobnymi, tanimi zmianami, i właśnie po to katalog jest danymi.
-- **Głębokość archiwum** — ADX(14) potrzebuje ~580 świec rozgrzewki, czyli ponad dwóch lat na
-  serii dziennej → moduł mówi o tym wprost (`settled`), zamiast podawać wartość jako pewną.
-
-## Migration Plan
-
-Brak migracji bazy i brak zmian w `infra/`. Wdrożenie to nowy obraz `market-data` i nowy build
-terminala; wycofanie to `revert` — nie ma stanu, który zostałby po zmianie.
-
-Kolejność w każdym etapie dotykającym kontraktu: modele w `market_data/contract.py`, potem
-`pnpm contract:generate` w terminalu, dopiero potem kod terminala. CI uruchamia job terminala przy
-każdej zmianie `contract.py`, więc pominięcie kroku środkowego zatrzyma się na `contract:check`.
-
-## Open Questions
-
-- Konkretna wartość sufitu żądania. Ustalona po pomiarze w etapie zerowym; kształt odmowy jest już
-  określony w spec, więc zmiana samej liczby nie rusza ani kontraktu, ani zadań.
-
-## Decisions rozstrzygnięte w etapie strefy/profilu/na żywo
-
 ### Szerokość kubełka w profilu czasowym: ułamek ATR
 
 Rozważone przy etapie profilu, na danych: ułamek ATR kontra wielokrotność kroku instrumentu.
@@ -207,3 +172,36 @@ zmiany. Wybór dopytywania trzyma się mocno na słowach samego zadania 6.1 i na
 prostsza z dwóch dróg zmieszczonych w tym samym kontrakcie, ale pomiar opóźnienia na żywym stosie
 zostaje uczciwie otwarty — gdyby dopytywanie okazało się zbyt wolne na wolnych połączeniach,
 przejście na subskrypcję nie rusza kontraktu, tylko sposób, w jaki terminal go odpytuje.
+
+## Risks / Trade-offs
+
+- **Obliczenia dzielą pętlę zdarzeń ze strumieniem świec** → sufit żądania i semafor od pierwszego
+  etapu; pomiar p95 przed rozrostem katalogu; `scipy` albo osobny moduł jako droga odwrotu, dla
+  której jądro jest już przygotowane.
+- **Katalog rozjeżdża się z jądrem** — wpis deklaruje linię, której obliczenie nie zwraca, i nic
+  tego nie wykrywa → jeden test liczący *każdy* wpis katalogu na krótkiej serii i porównujący klucze
+  wyjścia z deklaracją. Wchodzi w etapie zerowym, nie później.
+- **Zmiana wzoru bez podniesienia wersji** → pliki wzorcowe pokazują diff przy każdej zmianie
+  wartości, więc podniesienie wersji jest widoczne w tym samym commicie.
+- **Rozmiar odpowiedzi** — 20 linii po 5000 punktów to około megabajta JSON-a → zmierzyć po
+  kompresji przed jakąkolwiek optymalizacją; kompresja jest po stronie App Service.
+- **Terminal wąskim gardłem** — Python gotowy, ale nie ma czym narysować → prymityw rysowania jest
+  częścią zakresu etapu, w którym pojawia się jego kształt, a nie osobną „integracją po".
+- **Rozlanie zakresu katalogu** → lista pozycji jest zamknięta w `tasks.md`; kolejne wskaźniki są
+  osobnymi, tanimi zmianami, i właśnie po to katalog jest danymi.
+- **Głębokość archiwum** — ADX(14) potrzebuje ~580 świec rozgrzewki, czyli ponad dwóch lat na
+  serii dziennej → moduł mówi o tym wprost (`settled`), zamiast podawać wartość jako pewną.
+
+## Migration Plan
+
+Brak migracji bazy i brak zmian w `infra/`. Wdrożenie to nowy obraz `market-data` i nowy build
+terminala; wycofanie to `revert` — nie ma stanu, który zostałby po zmianie.
+
+Kolejność w każdym etapie dotykającym kontraktu: modele w `market_data/contract.py`, potem
+`pnpm contract:generate` w terminalu, dopiero potem kod terminala. CI uruchamia job terminala przy
+każdej zmianie `contract.py`, więc pominięcie kroku środkowego zatrzyma się na `contract:check`.
+
+## Open Questions
+
+- Konkretna wartość sufitu żądania. Ustalona po pomiarze w etapie zerowym; kształt odmowy jest już
+  określony w spec, więc zmiana samej liczby nie rusza ani kontraktu, ani zadań.

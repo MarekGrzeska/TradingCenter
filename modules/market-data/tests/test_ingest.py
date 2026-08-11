@@ -994,7 +994,13 @@ async def test_an_untracked_pair_stops_being_collected(pool) -> None:
 async def test_the_supervisor_reports_what_each_fill_did(pool) -> None:
     """7.7."""
     async with pool.acquire() as conn:
-        await track(conn, "US100", Resolution.MINUTE, LIMIT)
+        # `collect_from` pinned to the fixture's clock, not left to `track`'s default.
+        # That default is `now - 5000 minutes` off the *real* clock, while every candle
+        # here is placed relative to `NOW`, a fixed moment — so the fill's floor walked
+        # past the fixtures and the batch was filtered down to nothing on the day the
+        # wall clock passed `NOW + 5000 minutes`. A test that expires is worse than one
+        # that fails.
+        await track(conn, "US100", Resolution.MINUTE, LIMIT, collect_from=NOW - timedelta(hours=1))
     history = FakeHistory([minute_candle(m) for m in range(1, 5)])
 
     ingest = Ingest(

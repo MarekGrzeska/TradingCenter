@@ -8,6 +8,7 @@ subscription's messages, which FastAPI by itself does not.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -109,10 +110,19 @@ def test_the_document_prints_with_no_environment_at_all() -> None:
     """
     root = Path(__file__).resolve().parents[1]
 
+    # `SystemRoot` is carried on Windows and is not one of the variables under test:
+    # winsock resolves its provider catalogue through the registry, so `_overlapped`
+    # — which importing the app pulls in with asyncio's proactor loop — dies with
+    # WinError 10106 without it. What the test asserts is that no CAPITAL_*,
+    # DATABASE_* or AZURE_* setting is needed, and none is carried.
+    env = {"PATH": "/usr/bin:/bin"}
+    if sys.platform == "win32":
+        env["SystemRoot"] = os.environ["SystemRoot"]
+
     finished = subprocess.run(
         [sys.executable, "-m", "market_data.openapi"],
         cwd=root,
-        env={"PATH": "/usr/bin:/bin"},
+        env=env,
         capture_output=True,
         text=True,
         check=False,

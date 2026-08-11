@@ -27,7 +27,7 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
   is why the read timeout is minutes while the connect timeout stays at five seconds.
 - `indicators/` — `kernel.py` (the math, ~20 primitives, no FastAPI or asyncpg import in
   sight), `warmup.py` (how far back a recursive one needs reading before its answer can be
-  trusted), `catalogue.py` (every wskaźnik this module offers, as data — id, params, output
+  trusted), `catalogue.py` (every indicator this module offers, as data — id, params, output
   shape, how to draw it — not as a type per entry). See "Indicators" below.
 - `hub.py` — fan-out to subscribers, and the hold that makes a snapshot airtight.
 - `app.py` — assembly only: the lifespan, the error handling every route shares, and the
@@ -183,8 +183,8 @@ deliberately needs no running stack: a check that needs one is a check nobody ru
 | GET | `/instruments?max_nodes=&asset_class=` | the catalogue, proxied from the gateway unread |
 | GET | `/instruments/search?q=` | a search, proxied from the gateway unread |
 | GET | `/asset-classes` | the classes the gateway describes instruments with |
-| GET | `/indicators` | every wskaźnik this module can compute, and how to draw it |
-| POST | `/indicators/{symbol}` | one or more wskaźniki, computed over a range, on one shared time axis |
+| GET | `/indicators` | every indicator this module can compute, and how to draw it |
+| POST | `/indicators/{symbol}` | one or more of them, computed over a range, on one shared time axis |
 
 **The last three are a proxy, not a second catalogue.** `capital-gateway` is not public — the
 terminal cannot reach it directly — so these forward the gateway's own routes and its own JSON,

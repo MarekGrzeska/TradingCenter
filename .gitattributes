@@ -1,0 +1,6 @@
+# `modules/terminal/scripts/contract.mjs` writes this file with LF, and `pnpm
+# contract:check` compares it byte for byte against a fresh generation. Git's Windows
+# default (`core.autocrlf=true`) hands the checkout CRLF instead, so the check reports a
+# stale contract on a clean clone — on a machine where nothing is stale. Pinned to LF so
+# the working copy matches what the generator writes.
+modules/terminal/src/data/contract.generated.ts text eol=lf
