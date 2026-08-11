@@ -41,17 +41,18 @@
    * order; picking any other subset or order failed the palette validator's
    * adjacent-pair check (orange next to yellow, ΔE 4.8 — below the CVD floor). */
   /* The agent panel is chrome of a different kind — something that speaks, sitting beside
-   * every view of market data rather than being one. Its own violet-tinted surface is what
-   * says so at a glance: `--color-panel` would make it read as one more pane of the
-   * terminal. Violet and not another hue because every other one here already means
-   * something (teal up, red down, amber degraded, blue interactive), and a surface tint is
-   * not a data colour — the palette validator's separation rules govern the eight
-   * indicator hues, which nothing below is used for. It is close to `--color-indicator-7`
-   * and stays distinguishable by context: chrome under the chart's edge, never inside it.
+   * every view of market data rather than being one. It is set apart by temperature rather
+   * than by a hue of its own: the terminal's surfaces are warm neutrals (`--color-panel` is
+   * #1a1a19, green-yellow at 60°), so cooling the panel's two surfaces toward the accent's
+   * blue reads as a different kind of surface without adding a ninth colour to a palette
+   * that has a meaning for every one it has. A violet tint was tried first and did the
+   * separating too loudly — it belonged to no other part of the screen.
+   *
+   * Its edges and controls take `--color-accent` itself, unchanged: everything in the
+   * panel is something to talk to, which is what that colour already means here.
    */
-  --color-agent-surface: #16151d;
-  --color-agent-surface-strong: #201e2b;
-  --color-agent-edge: #8a7ff0;
+  --color-agent-surface: #121620;
+  --color-agent-surface-strong: #1a2130;
 
   --color-indicator-2: #d95926;
   --color-indicator-4: #c98500;
