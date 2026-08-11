@@ -1,7 +1,19 @@
 import { useEffect, useState } from "react";
 import type { SourcePart } from "../data/source";
+import { MarketDataError } from "../data/types";
 
-export type SourceHealth = "checking" | "reachable" | "unreachable";
+export type SourceHealth = "checking" | "reachable" | "unreachable" | "signed-out";
+
+/** A source that will not answer without a credential is not a source that is
+ *  down. `types.ts` keeps `unauthenticated` apart from `unreachable` so that
+ *  this indicator can too — and flattening the two here is what sent an
+ *  operator through a night of Azure dashboards for an expired session, with
+ *  both back ends healthy and answering the whole time. */
+function healthFromFailure(cause: unknown): SourceHealth {
+  return cause instanceof MarketDataError && cause.kind === "unauthenticated"
+    ? "signed-out"
+    : "unreachable";
+}
 
 const POLL_MS = 15_000;
 
@@ -34,9 +46,9 @@ export function useSourceHealth(parts: readonly SourcePart[]): Record<string, So
           .then(() => {
             if (!cancelled) setHealth((prev) => ({ ...prev, [part.id]: "reachable" }));
           })
-          .catch(() => {
+          .catch((cause: unknown) => {
             if (!cancelled && !controller.signal.aborted) {
-              setHealth((prev) => ({ ...prev, [part.id]: "unreachable" }));
+              setHealth((prev) => ({ ...prev, [part.id]: healthFromFailure(cause) }));
             }
           });
       }

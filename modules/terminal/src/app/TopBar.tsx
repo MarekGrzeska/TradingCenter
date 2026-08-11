@@ -8,12 +8,17 @@ const HEALTH_LABEL: Record<SourceHealth, string> = {
   checking: "checking…",
   reachable: "connected",
   unreachable: "unreachable",
+  "signed-out": "needs sign-in",
 };
 
 const HEALTH_DOT: Record<SourceHealth, string> = {
   checking: "bg-ink-muted",
   reachable: "bg-up",
   unreachable: "bg-down",
+  // Amber, not red: nothing here is broken. The back end is fine and simply
+  // does not know who is asking, and a red dot on it is a claim about Azure
+  // that the terminal has no evidence for.
+  "signed-out": "bg-warning",
 };
 
 export function TopBar() {
