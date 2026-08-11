@@ -112,7 +112,10 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-1 flex max-h-80 w-64 flex-col rounded border border-border bg-panel shadow-lg">
+        // Left-anchored: the button sits near the left edge of the header, beside the
+        // symbol and resolution controls. A right-anchored panel would pin its right
+        // edge to the button's and grow leftward, running off the header entirely.
+        <div className="absolute left-0 top-full z-20 mt-1 flex max-h-80 w-64 flex-col rounded border border-border bg-panel shadow-lg">
           {/* Outside the listbox, not inside it: a text field is not one of the options,
               and the catalogue is long enough that this is the first thing an operator
               reaches for. */}

@@ -912,24 +912,30 @@ export function Chart({
           ))}
         </select>
 
+        {/* Grouped with the instrument and interval, not pushed to the far right with
+            the status badges below: this is a control the operator reaches for, the
+            same as the two selectors beside it — and the right side of the header sits
+            directly above the right edge of the price pane, where the current price and
+            its axis label live. Nothing that competes for attention belongs there. */}
+        {indicatorSource && (
+          <IndicatorPicker
+            entries={catalogue.entries}
+            selections={knownIndicatorSelections}
+            onChange={(next) => {
+              // An unknown selection is never touched by an edit to a known
+              // one — only a change that names it (impossible: it has no
+              // checkbox) or a later catalogue read that recognizes it again
+              // moves it out of this list.
+              const stillUnknown = indicatorSelections.filter((s) => !catalogueById.has(s.id));
+              setIndicatorSelections([...stillUnknown, ...next]);
+            }}
+            canDraw={canDrawIndicator}
+          />
+        )}
+
         {shown && <OhlcReadout bar={shown.bar} indicators={activeIndicatorReadout(shown, indicatorsState, catalogueById)} />}
 
         <div className="ml-auto flex items-center gap-2">
-          {indicatorSource && (
-            <IndicatorPicker
-              entries={catalogue.entries}
-              selections={knownIndicatorSelections}
-              onChange={(next) => {
-                // An unknown selection is never touched by an edit to a known
-                // one — only a change that names it (impossible: it has no
-                // checkbox) or a later catalogue read that recognizes it again
-                // moves it out of this list.
-                const stillUnknown = indicatorSelections.filter((s) => !catalogueById.has(s.id));
-                setIndicatorSelections([...stillUnknown, ...next]);
-              }}
-              canDraw={canDrawIndicator}
-            />
-          )}
           {unknownIndicatorIds.length > 0 && (
             <span
               title={`No longer offered by the indicator catalogue: ${unknownIndicatorIds.join(", ")}`}
