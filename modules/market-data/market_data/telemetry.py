@@ -110,8 +110,14 @@ def periods_late(age_seconds: float, resolution: Resolution) -> float:
 
 
 def configure() -> None:
-    """Wires up logging, and Application Insights when there is one to wire to. Called
-    once, from `lifespan`, before anything registers a metric.
+    """Wires up logging, and Application Insights when there is one to wire to.
+
+    Called once, at import time in `app.py`, before `from fastapi import FastAPI` — not
+    merely before `FastAPI(...)` is called, and not from `lifespan`.
+    `configure_azure_monitor()`'s FastAPI auto-instrumentation patches the `fastapi.FastAPI`
+    class *attribute*; a `from fastapi import FastAPI` that already ran binds a name to
+    whatever the attribute held at that moment; regardless of where `FastAPI(...)` is later
+    called, that name never repoints itself.
     """
     configure_logging()
     if not os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):

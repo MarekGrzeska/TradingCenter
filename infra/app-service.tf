@@ -260,7 +260,14 @@ resource "azurerm_linux_web_app" "market_data" {
     # (`market_data/tickets.py`). Deploy order follows from that and is not
     # interchangeable: the module learned to check tickets before this line existed,
     # because the reverse leaves an open WebSocket on the internet in between.
-    excluded_paths = ["/ws/candles"]
+    #
+    # `/ping` is the other exemption, and it needs no guard of its own: Easy Auth returns
+    # 401 for every non-excluded path whether the container behind it is alive or dead, so
+    # an external availability probe (`azurerm_application_insights_standard_web_test`
+    # below, monitoring.tf) can never tell the two apart without a path that answers before
+    # Easy Auth would. `/ping` (market_data/routers/meta.py) reads nothing and returns a
+    # fixed body for exactly that reason — nothing here needs protecting.
+    excluded_paths = ["/ws/candles", "/ping"]
 
     active_directory_v2 {
       client_id                  = azuread_application.market_data_easy_auth.client_id

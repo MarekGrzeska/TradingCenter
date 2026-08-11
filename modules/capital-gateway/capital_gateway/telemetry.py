@@ -33,10 +33,14 @@ NOISY_LOGGERS = ("httpx", "httpcore", "websockets", "azure.core.pipeline.policie
 def configure() -> None:
     """Wire up logging, and Application Insights when there is one to wire to.
 
-    Called once, from `lifespan`. Ordering matters: the root logger needs its level before
-    Azure Monitor attaches a handler to it, because that handler is gated by the same
-    level — configured after, an `INFO` line reaches stdout and still never reaches
-    Application Insights.
+    Called once, at import time in `app.py`, before `from fastapi import FastAPI` — not
+    merely before `FastAPI(...)` is called, and not from `lifespan`.
+    `configure_azure_monitor()`'s FastAPI auto-instrumentation patches the `fastapi.FastAPI`
+    class *attribute*; a `from fastapi import FastAPI` that already ran binds a name to
+    whatever the attribute held at that moment, and no later call repoints it. Ordering
+    matters for logging too: the root logger needs its level before Azure Monitor attaches a
+    handler to it, because that handler is gated by the same level — configured after, an
+    `INFO` line reaches stdout and still never reaches Application Insights.
     """
     configure_logging()
     if not os.environ.get("APPLICATIONINSIGHTS_CONNECTION_STRING"):

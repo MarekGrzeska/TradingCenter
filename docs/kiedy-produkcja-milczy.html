@@ -428,6 +428,7 @@
       <strong>Stan — otwarte, i nic z dzisiejszego wieczora tego nie dotyka</strong>
       <p>Warto powiedzieć wprost, bo pozycje 01 i 02 mogą sprawiać wrażenie, że sprawa jest załatwiona: <strong>żadna z nich nie złapałaby ciszy z 09:57–10:27</strong>. Kontener był wtedy zdrowy, schemat zgodny, deploy dawno za sobą — archiwum po prostu nie zapisywało. Bramka przy wdrożeniu pilnuje momentu wdrożenia, a alarm z pozycji 01 wołałby po trzech okresach i mailem. Operator patrzący w tej chwili na wykres nadal nie ma czego przeczytać.</p>
       <p>Stan jest w <code>/pairs</code> i w terminalu — <code>CollectionState</code> w <code>src/data/types.ts</code>, etykiety w <code>InstrumentsView.tsx</code>. Widać go w menedżerze danych i nigdzie indziej. To dalej praca wyłącznie w terminalu, bez zmiany kontraktu.</p>
+      <p><strong>Dopisane 11 sierpnia.</strong> Zmiana <code>alert-on-dead-backend</code> (alerty na ciszę, 5xx market-data, wyjątki, plus <code>/ping</code> jako sonda z zewnątrz) dokłada sposób, żeby operator <em>dowiedział się</em> szybciej — nie sposób, żeby zobaczył to na wykresie, gdy już patrzy. Ta pozycja zostaje otwarta, z tego samego powodu co wieczorem: to praca w terminalu, i nic z dzisiejszej zmiany go nie dotyka.</p>
     </div>
   </div>
 </div>
