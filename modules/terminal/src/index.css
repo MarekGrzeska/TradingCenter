@@ -13,18 +13,32 @@
  * secondary encoding — the chart renders up candles hollow and down candles
  * filled, so the distinction survives on shape even where hue does not.
  */
+/*
+ * The chrome is one cool grey scale, all of it at the accent's hue (~222°) and only the
+ * lightness moving between steps. It replaced a warm neutral scale (#1a1a19 and its
+ * relatives, at 60°): with the agent panel next to it, the two greys read as two
+ * different products rather than as one screen, and tinting the panel to fix that only
+ * moved the seam. Cooling every surface instead puts the seam nowhere.
+ *
+ * Only the chrome moved. The data colours below — up, down, and the eight indicator hues
+ * — are the palette the dataviz validator passed and are unchanged; the background they
+ * sit on shifted hue but barely shifted lightness (#0d0d0d → #0b0e14), so their contrast
+ * against it is what it was. Not re-run through the validator: worth doing before this
+ * settles, and the pairwise separations it checks are between the data colours, none of
+ * which this touched.
+ */
 @theme {
-  --color-canvas: #0d0d0d;
-  --color-panel: #1a1a19;
-  --color-panel-strong: #232322;
-  --color-border: rgba(255, 255, 255, 0.1);
+  --color-canvas: #0b0e14;
+  --color-panel: #121620;
+  --color-panel-strong: #1a2130;
+  --color-border: rgba(148, 171, 214, 0.16);
 
   --color-ink: #ffffff;
-  --color-ink-secondary: #c3c2b7;
-  --color-ink-muted: #898781;
+  --color-ink-secondary: #c4cbd9;
+  --color-ink-muted: #8794a8;
 
-  --color-grid: #2c2c2a;
-  --color-axis: #383835;
+  --color-grid: #1c2331;
+  --color-axis: #2b3446;
 
   --color-accent: #3987e5;
 
@@ -40,20 +54,6 @@
    * `theme.ts`'s `indicatorLineColors` assembles all eight back into the documented
    * order; picking any other subset or order failed the palette validator's
    * adjacent-pair check (orange next to yellow, ΔE 4.8 — below the CVD floor). */
-  /* The agent panel is chrome of a different kind — something that speaks, sitting beside
-   * every view of market data rather than being one. It is set apart by temperature rather
-   * than by a hue of its own: the terminal's surfaces are warm neutrals (`--color-panel` is
-   * #1a1a19, green-yellow at 60°), so cooling the panel's two surfaces toward the accent's
-   * blue reads as a different kind of surface without adding a ninth colour to a palette
-   * that has a meaning for every one it has. A violet tint was tried first and did the
-   * separating too loudly — it belonged to no other part of the screen.
-   *
-   * Its edges and controls take `--color-accent` itself, unchanged: everything in the
-   * panel is something to talk to, which is what that colour already means here.
-   */
-  --color-agent-surface: #121620;
-  --color-agent-surface-strong: #1a2130;
-
   --color-indicator-2: #d95926;
   --color-indicator-4: #c98500;
   --color-indicator-5: #d55181;

@@ -10,11 +10,11 @@
  */
 
 const FALLBACKS: Record<string, string> = {
-  "--color-panel": "#1a1a19",
+  "--color-panel": "#121620",
   "--color-ink": "#ffffff",
-  "--color-ink-muted": "#898781",
-  "--color-grid": "#2c2c2a",
-  "--color-axis": "#383835",
+  "--color-ink-muted": "#8794a8",
+  "--color-grid": "#1c2331",
+  "--color-axis": "#2b3446",
   "--color-up": "#199e70",
   "--color-down": "#e66767",
   "--color-accent": "#3987e5",

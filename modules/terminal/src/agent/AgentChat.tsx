@@ -28,7 +28,7 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
         aria-expanded={false}
         aria-controls="agent-chat-panel"
         title="Agent chat"
-        className="group flex w-9 shrink-0 cursor-pointer flex-col items-center justify-center border-l border-accent/40 bg-agent-surface transition-colors hover:bg-agent-surface-strong"
+        className="group flex w-9 shrink-0 cursor-pointer flex-col items-center justify-center border-l border-accent/40 bg-panel transition-colors hover:bg-panel-strong"
       >
         <span
           aria-hidden
@@ -45,9 +45,9 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
     <aside
       id="agent-chat-panel"
       aria-label="Agent chat"
-      className="flex w-96 shrink-0 flex-col border-l border-accent/40 bg-agent-surface"
+      className="flex w-96 shrink-0 flex-col border-l border-accent/40 bg-panel"
     >
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-accent/25 bg-agent-surface-strong px-3">
+      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-accent/25 bg-panel-strong px-3">
         <AgentGlyph className="h-4 w-4 text-accent" />
         <span className="text-sm font-semibold">Agent</span>
         <span className="rounded border border-accent/40 px-1.5 py-0.5 text-[10px] text-accent">
@@ -142,7 +142,7 @@ function Bubble({ message }: { message: ChatMessage }) {
         className={`max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed wrap-break-word ${
           operator
             ? "rounded-br-sm bg-accent/20 text-ink"
-            : "rounded-bl-sm border border-accent/20 bg-agent-surface-strong text-ink-secondary"
+            : "rounded-bl-sm border border-accent/20 bg-panel-strong text-ink-secondary"
         }`}
       >
         {message.text}
@@ -169,7 +169,7 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
   }
 
   return (
-    <div className="shrink-0 border-t border-accent/25 bg-agent-surface-strong p-3">
+    <div className="shrink-0 border-t border-accent/25 bg-panel-strong p-3">
       <textarea
         value={draft}
         onChange={(event) => setDraft(event.target.value)}
