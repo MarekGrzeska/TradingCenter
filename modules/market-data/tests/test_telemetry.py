@@ -12,8 +12,8 @@ from market_data.errors import GatewayUnreachable
 from market_data.market_status import MarketStatus
 from market_data.models import Candle, CandleSource, Resolution
 from market_data.store import write_candles
-from market_data.telemetry import CandleAgeGauge, compute_ages
-from market_data.tracking import track
+from market_data.telemetry import CandleAgeGauge, compute_ages, periods_late
+from market_data.tracking import DELIVERY_GRACE, track
 
 NOW = datetime(2026, 8, 9, 12, 0, tzinfo=UTC)
 
@@ -51,6 +51,34 @@ def test_a_later_set_replaces_the_earlier_one() -> None:
     symbols = {o.attributes["symbol"] for o in gauge.observe(options=None)}
 
     assert symbols == {"GOLD"}
+
+
+# --- periods_late, no I/O ---
+
+
+def test_a_healthy_minute_pair_reports_less_than_one_period_late() -> None:
+    age = DELIVERY_GRACE.total_seconds() + 20  # well inside the measured arrival window
+    assert periods_late(age, Resolution.MINUTE) < 1.0
+
+
+def test_a_healthy_week_pair_reports_less_than_one_period_late() -> None:
+    age = 3600.0  # an hour old, nowhere near a week's period
+    assert periods_late(age, Resolution.WEEK) < 1.0
+
+
+def test_a_pair_skipped_the_same_number_of_periods_reports_the_same_value() -> None:
+    # Three periods behind, past the grace, whether the period is a minute or a day —
+    # the whole point of the metric being in periods rather than seconds.
+    minute_age = DELIVERY_GRACE.total_seconds() + 3 * 60
+    day_age = DELIVERY_GRACE.total_seconds() + 3 * 86_400
+
+    assert periods_late(minute_age, Resolution.MINUTE) == pytest.approx(3.0)
+    assert periods_late(day_age, Resolution.DAY) == pytest.approx(3.0)
+
+
+def test_a_candle_that_just_arrived_reports_zero_not_negative() -> None:
+    assert periods_late(0.0, Resolution.MINUTE) == 0.0
+    assert periods_late(DELIVERY_GRACE.total_seconds(), Resolution.HOUR_4) == 0.0
 
 
 # --- compute_ages, against a real database ---
@@ -113,6 +141,10 @@ async def test_a_pair_whose_market_is_shut_is_excluded(db) -> None:
     ages = await compute_ages(_FakePool(db), FakeInstruments(market_open=False), MarketStatus(), now=NOW)
 
     assert ages == {}
+    # The periods gauge is derived from the same `ages` dict `refresh_loop` computes —
+    # nothing to derive from means nothing reported, same as the seconds gauge.
+    periods = {(s, r): periods_late(a, Resolution(r)) for (s, r), a in ages.items()}
+    assert periods == {}
 
 
 @pytest.mark.db

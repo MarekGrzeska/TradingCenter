@@ -166,6 +166,7 @@ deliberately needs no running stack: a check that needs one is a check nobody ru
 | Method | Path | Returns |
 |--------|------|---------|
 | GET | `/health` | whether the database answers, and what is being collected |
+| GET | `/ping` | whether the process is up — nothing else, no authentication required |
 | GET | `/candles/{symbol}?resolution=&from=&to=` | the series, **plus what was never collected** |
 | GET | `/coverage/{symbol}?resolution=` | verified ranges and the end of provider history |
 | GET | `/pairs` | what is collected, how collection is going, and where each pair's history starts |
@@ -179,6 +180,15 @@ deliberately needs no running stack: a check that needs one is a check nobody ru
 | GET | `/instruments?max_nodes=&asset_class=` | the catalogue, proxied from the gateway unread |
 | GET | `/instruments/search?q=` | a search, proxied from the gateway unread |
 | GET | `/asset-classes` | the classes the gateway describes instruments with |
+
+**`/ping` proves the process is up, not that it is healthy.** It is the one route Easy Auth
+excludes from authentication alongside `/ws/candles` (`infra/app-service.tf`), because an
+external availability probe needs to reach the container itself — Easy Auth answers 401 for
+everything else whether the container is alive or dead, so a probe stopped there could never
+tell the two apart. It reads nothing (no database, no gateway, no tracked-pair state) and
+returns a fixed body for exactly that reason: `/health` above already answers whether the
+database is reachable, and a route meant to catch a dead container has to answer while every
+one of its dependencies is down.
 
 **The last three are a proxy, not a second catalogue.** `capital-gateway` is not public — the
 terminal cannot reach it directly — so these forward the gateway's own routes and its own JSON,
@@ -405,3 +415,22 @@ nothing between 04:59 and at least 06:04 UTC, quote included — an hour-plus pr
 instrument that `marketStatus` would have called `TRADEABLE` throughout. It was read at the time as
 the weekend. Ask the gateway what the market's status is before concluding anything from a series
 that stopped moving; that is the same distinction `collection_state` refuses to guess at.
+
+## Telemetry
+
+Two observable OpenTelemetry gauges (`telemetry.py`), both derived from the same per-pair age read
+(`compute_ages`) every 60s and read by whichever exporter is configured — Application Insights in
+production, nothing locally:
+
+- `market_data.candle_age_seconds` — seconds since each tracked pair's newest candle, for pairs
+  whose market isn't known to be closed. Human-readable, and not what `alert-candle-age-stale`
+  alerts on: a healthy `DAY` pair sits near 86,400 seconds old and a healthy `WEEK` pair near
+  604,800, so no single second threshold means the same thing across every tracked resolution.
+- `market_data.candle_age_periods` — the same staleness in periods of each pair's own resolution,
+  with `DELIVERY_GRACE` (`tracking.py`) subtracted first so a healthy pair reads near zero rather
+  than near one. One threshold (3, in `infra/monitoring.tf`) then means the same thing whether the
+  resolution is `MINUTE` or `WEEK` — one more period than the module's own `STALE_AFTER_PERIODS`,
+  so the production alert stays a blunter safety net than the per-pair `STALLED` indicator, not a
+  second copy of it.
+
+A pair whose market the gateway reports closed appears in neither gauge.
