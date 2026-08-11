@@ -9,7 +9,7 @@ from decimal import Decimal
 
 import asyncpg
 
-from .db import fetch_one
+from .db import Conn, fetch_one
 from .models import Message, Role, Session, Usage
 
 # How much of the first message becomes the session's title (specs/agent-chat, "Tytuł
@@ -98,14 +98,14 @@ def _usage_from_row(row: asyncpg.Record) -> Usage:
 
 
 async def create_session(
-    conn: asyncpg.Connection, *, owner_principal: str, model_id: str
+    conn: Conn, *, owner_principal: str, model_id: str
 ) -> Session:
     row = await fetch_one(conn, _INSERT_SESSION, owner_principal, model_id)
     return _session_from_row(row)
 
 
 async def get_session(
-    conn: asyncpg.Connection, *, session_id: int, owner_principal: str
+    conn: Conn, *, session_id: int, owner_principal: str
 ) -> Session | None:
     """`None` for a session that does not exist *and* for one owned by someone else —
     the two are indistinguishable to a caller on purpose (specs/agent-browser-access,
@@ -115,25 +115,25 @@ async def get_session(
     return _session_from_row(row) if row else None
 
 
-async def list_sessions(conn: asyncpg.Connection, *, owner_principal: str) -> list[Session]:
+async def list_sessions(conn: Conn, *, owner_principal: str) -> list[Session]:
     rows = await conn.fetch(_SELECT_SESSIONS_FOR_OWNER, owner_principal)
     return [_session_from_row(row) for row in rows]
 
 
 async def set_session_model(
-    conn: asyncpg.Connection, *, session_id: int, owner_principal: str, model_id: str
+    conn: Conn, *, session_id: int, owner_principal: str, model_id: str
 ) -> Session | None:
     row = await conn.fetchrow(_UPDATE_SESSION_MODEL, session_id, model_id, owner_principal)
     return _session_from_row(row) if row else None
 
 
-async def get_messages(conn: asyncpg.Connection, *, session_id: int) -> list[Message]:
+async def get_messages(conn: Conn, *, session_id: int) -> list[Message]:
     rows = await conn.fetch(_SELECT_MESSAGES, session_id)
     return [_message_from_row(row) for row in rows]
 
 
 async def append_operator_message(
-    conn: asyncpg.Connection, *, session_id: int, content: str
+    conn: Conn, *, session_id: int, content: str
 ) -> Message:
     """Written before the model is ever called (specs/agent-chat, "Wypowiedź operatora
     MUST być zapisana zanim moduł zawoła model") — what the operator typed survives a
@@ -148,7 +148,7 @@ async def append_operator_message(
 
 
 async def append_agent_message(
-    conn: asyncpg.Connection,
+    conn: Conn,
     *,
     session_id: int,
     content: str,
@@ -172,7 +172,7 @@ async def append_agent_message(
 
 
 async def record_usage(
-    conn: asyncpg.Connection,
+    conn: Conn,
     *,
     session_id: int,
     message_id: int,

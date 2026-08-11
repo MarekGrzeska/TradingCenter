@@ -112,3 +112,14 @@ async def db(migrated_url: str) -> AsyncIterator[asyncpg.Connection]:
         yield conn
     finally:
         await conn.close()
+
+
+@pytest.fixture
+async def pool(db: asyncpg.Connection, migrated_url: str) -> AsyncIterator[asyncpg.Pool]:
+    """A pool over the same emptied database `db` connects to — `turn.py` takes a pool,
+    not a bare connection, because a turn acquires twice (history, then the reply)."""
+    created = await asyncpg.create_pool(asyncpg_dsn(migrated_url))
+    try:
+        yield created
+    finally:
+        await created.close()

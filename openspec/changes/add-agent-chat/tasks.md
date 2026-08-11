@@ -30,33 +30,33 @@
 
 ## 3. Katalog modeli i prompt systemowy
 
-- [ ] 3.1 `agent/models_catalogue.py` — katalog z konfiguracji: identyfikator, nazwa
+- [x] 3.1 `agent/models_catalogue.py` — katalog z konfiguracji: identyfikator, nazwa
       deploymentu, nazwa do pokazania, porządek kosztu, stawki wejścia i wyjścia
-- [ ] 3.2 Start modułu odmawia, gdy model w katalogu nie ma stawki
-- [ ] 3.3 `agent/prompt.py` — prompt systemowy agenta terminala tradingowego z
+- [x] 3.2 Start modułu odmawia, gdy model w katalogu nie ma stawki
+- [x] 3.3 `agent/prompt.py` — prompt systemowy agenta terminala tradingowego z
       identyfikatorem wersji; prompt nazywa brak narzędzi i brak rekomendacji
-- [ ] 3.4 `GET /models` — katalog na wyjściu; test, że odpowiedź wystarcza do zbudowania
+- [x] 3.4 `GET /models` — katalog na wyjściu; test, że odpowiedź wystarcza do zbudowania
       wybieraka (identyfikator, nazwa, porządek, stawki)
-- [ ] 3.5 Testy: model spoza katalogu jest odmową z nazwą modelu w przyczynie; sesja bez
+- [x] 3.5 Testy: model spoza katalogu jest odmową z nazwą modelu w przyczynie; sesja bez
       wskazanego modelu dostaje domyślny
 
 ## 4. Rozmowa i strumień
 
-- [ ] 4.1 `agent/graph.py` — graf LangGraph z jednym węzłem modelu, historia budowana z
+- [x] 4.1 `agent/graph.py` — graf LangGraph z jednym węzłem modelu, historia budowana z
       tabel; miejsce na węzeł narzędzi zostawione, ale puste
-- [ ] 4.2 `agent/provider.py` — klient Azure OpenAI: tożsamość zarządzana albo klucz,
+- [x] 4.2 `agent/provider.py` — klient Azure OpenAI: tożsamość zarządzana albo klucz,
       wybór deploymentu po katalogu
-- [ ] 4.3 Trasy sesji: `POST /sessions`, `GET /sessions`, `GET /sessions/{id}`,
+- [x] 4.3 Trasy sesji: `POST /sessions`, `GET /sessions`, `GET /sessions/{id}`,
       `GET /sessions/{id}/messages`, `PATCH /sessions/{id}` (zmiana modelu)
-- [ ] 4.4 `POST /sessions/{id}/messages` — zapis wypowiedzi operatora **przed** wywołaniem
+- [x] 4.4 `POST /sessions/{id}/messages` — zapis wypowiedzi operatora **przed** wywołaniem
       modelu, odpowiedź `text/event-stream`
-- [ ] 4.5 Tura modelu w zadaniu niezwiązanym z cyklem życia żądania; rozłączenie wołającego
+- [x] 4.5 Tura modelu w zadaniu niezwiązanym z cyklem życia żądania; rozłączenie wołającego
       zamyka kolejkę, nie turę
-- [ ] 4.6 Komentarz utrzymujący w strumieniu co kilkanaście sekund (bezczynne połączenie
+- [x] 4.6 Komentarz utrzymujący w strumieniu co kilkanaście sekund (bezczynne połączenie
       App Service jest zrywane po 230 s)
-- [ ] 4.7 Zdarzenia strumienia: fragment, domknięcie, błąd — trzy odróżnialne
-- [ ] 4.8 Tytuł sesji nadawany z pierwszej wypowiedzi operatora, stabilny przy kolejnych
-- [ ] 4.9 Testy na fałszywym modelu: fragmenty przed końcem, rozłączenie w połowie zapisuje
+- [x] 4.7 Zdarzenia strumienia: fragment, domknięcie, błąd — trzy odróżnialne
+- [x] 4.8 Tytuł sesji nadawany z pierwszej wypowiedzi operatora, stabilny przy kolejnych
+- [x] 4.9 Testy na fałszywym modelu: fragmenty przed końcem, rozłączenie w połowie zapisuje
       całość, błąd w połowie zapisuje część z oznaczeniem niepełnej, wypowiedź operatora
       zostaje po nieudanym wywołaniu
 
