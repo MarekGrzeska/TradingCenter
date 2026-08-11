@@ -40,7 +40,11 @@ built from the same `market_mcp/server.py`.
   checks every field this module reads against.
 - `server.py` — builds the `FastMCP` instance and mounts `/health` on the same ASGI app
   the streamable-http transport serves, so the platform can probe it without an MCP
-  session.
+  session. `build_http_app` wraps that app with `network_identity.py`'s check — the
+  streamable-http transport only; stdio has no network caller to check.
+- `network_identity.py` — the caller-identity requirement for the network transport: raw
+  ASGI, not Starlette's `BaseHTTPMiddleware`, which would buffer the streaming response
+  this wraps.
 - `resources.py` — the resources (`market://pairs`, `market://indicators/catalogue`,
   `market://coverage/{symbol}/{resolution}`) and the `analyze-symbol` prompt.
 - `tools/` — the tool surface, one file per concern (mirrors `market_data/routers/`):
@@ -144,6 +148,14 @@ resource reads is still published; regenerate the snapshot with `scripts/contrac
   is a burst of concurrent load on the archive, bounded here rather than left open.
 - Every tool is marked `readOnlyHint=True` — a structural claim an MCP client can act on,
   not just a convention this module follows.
+- Outbound: `MARKET_DATA_SCOPE` set means every request to market-data carries a bearer
+  token from this process's own managed identity (`azure-identity`'s
+  `DefaultAzureCredential`, cached internally — not one token fetch per request).
+- Inbound: `REQUIRE_AUTHENTICATED_PRINCIPAL=true` refuses a network request carrying no
+  `X-MS-CLIENT-PRINCIPAL-ID` — the header a platform authenticator populates after
+  validating a token, and the module does not take on trust that it is configured
+  correctly. Off by default locally; on in Azure (`infra/app-service.tf`). `/health` is
+  exempt either way, since the platform's own probe carries no identity.
 
 ## MCP protocol version
 

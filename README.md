@@ -17,7 +17,8 @@ modules move here one at a time.
 |---|---|---|
 | [capital-gateway](modules/capital-gateway/) | capital.com — trading, deep history, a live stream. Demo only. | HTTP + WebSocket |
 | [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. | HTTP + WebSocket |
-| [terminal](modules/terminal/) | The operator's screen — charts in a grid, and what the archive collects. | consumes both |
+| [market-mcp](modules/market-mcp/) | MCP tools over market-data's archive, reduced for a model rather than proxied for a chart. Read-only — no tool writes. | MCP (stdio + streamable HTTP) |
+| [terminal](modules/terminal/) | The operator's screen — charts in a grid, and what the archive collects. | consumes market-data + capital-gateway |
 
 ## Layout
 
@@ -51,12 +52,13 @@ convenience wrappers; no module depends on one.
 Both bring the same things up in the same order:
 
 ```
-migrations  ->  capital-gateway  ->  market-data  ->  terminal
+migrations  ->  capital-gateway  ->  market-data  ->  market-mcp  ->  terminal
 ```
 
-The order is not tidiness. `market-data` subscribes to the gateway as it starts, and the
-terminal's charts read `market-data`, so starting anything early only fills the console with
-retries. Each step waits for the one before it to actually answer. Ctrl+C stops the services.
+The order is not tidiness. `market-data` subscribes to the gateway as it starts, `market-mcp`
+reads `market-data`'s own contract, and the terminal's charts read `market-data` too, so
+starting anything early only fills the console with retries. Each step waits for the one
+before it to actually answer. Ctrl+C stops the services.
 
 **The database is local again.** `market-data` writes to the PostgreSQL container in
 [compose.yaml](compose.yaml), which the scripts start first — so Docker is a requirement for
@@ -103,27 +105,30 @@ When it is a change:
 ### Checks
 
 Every pull request to `main`, and every push to it, runs
-[`.github/workflows/checks.yml`](.github/workflows/checks.yml): three jobs in parallel, one
+[`.github/workflows/checks.yml`](.github/workflows/checks.yml): four jobs in parallel, one
 per module, running the same commands a developer runs — and only for the modules the
 change can have broken. A first job works out which those are from the diff; a change under
 `docs/` or `infra/` runs no module suite at all.
 
-One exception is worth knowing: the terminal's job also runs when
-`market_data/contract.py` changes, even if no terminal file did. `contract:check` exists to
-catch exactly that pairing, and filtering it out by directory would retire the check in the
-one case it was written for.
+One exception is worth knowing: the terminal's job, and market-mcp's, also run when
+`market_data/contract.py` changes, even if no file of theirs did. `contract:check` and
+`scripts/contract.py check` exist to catch exactly that pairing, and filtering either out
+by directory would retire the check in the one case it was written for.
 
 | Job | Runs |
 |---|---|
 | `capital-gateway` | `ruff check`, `pyright`, `pytest` |
 | `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
+| `market-mcp` | `scripts/contract.py check`, `ruff check`, `pyright`, `pytest` |
 | `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
 
-`contract:check` runs before the terminal's tests on purpose: it compares
-`src/data/contract.generated.ts` against the schema `market-data` builds from its own models,
-and a stale contract makes every conclusion the suite reaches about the wire rest on an
-out-of-date premise. Regenerate with `pnpm contract:generate` after changing a model in
-`market_data/contract.py`.
+`contract:check` runs before the terminal's tests on purpose, and `scripts/contract.py
+check` before market-mcp's for the same reason: both compare their own copy of the wire —
+generated TypeScript for the terminal, a committed OpenAPI snapshot for market-mcp —
+against the schema `market-data` builds from its own models, and a stale copy makes every
+conclusion either suite reaches about the wire rest on an out-of-date premise. Regenerate
+with `pnpm contract:generate` (terminal) or `uv run python scripts/contract.py generate`
+(market-mcp) after changing a model in `market_data/contract.py`.
 
 The `live` tests are not run — they need a real Capital demo session, and putting provider
 credentials in CI to earn a green tick is a bad trade. They stay behind `--run-live`.
@@ -132,11 +137,12 @@ credentials in CI to earn a green tick is a bad trade. They stay behind `--run-l
 
 Pushing to `main` deploys the module that changed. Each deploy ends by checking the thing
 actually answers, not merely that Azure accepted the request: `market-data` is probed on
-`/ws/candles`, the one path Easy Auth lets through to the container; the terminal is
-checked on both `/` and a tab address, because deep links have broken here before while the
-root kept working. `capital-gateway` admits only market-data's addresses, so a runner
-cannot reach it at all — there the deploy confirms through the Azure control plane that the
-site is running the image this commit built.
+`/ws/candles`, the one path Easy Auth lets through to the container; `market-mcp` is probed
+on `/health`, excluded from Easy Auth the same way and answering a plain 200 with no trick
+needed; the terminal is checked on both `/` and a tab address, because deep links have
+broken here before while the root kept working. `capital-gateway` admits only
+market-data's addresses, so a runner cannot reach it at all — there the deploy confirms
+through the Azure control plane that the site is running the image this commit built.
 
 Infrastructure is applied by hand, from
 [`terraform-apply.yml`](.github/workflows/terraform-apply.yml) — Actions → terraform-apply →

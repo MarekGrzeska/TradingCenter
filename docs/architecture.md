@@ -22,9 +22,16 @@ that runs on its own and publishes a contract. Nothing imports across that bound
         └──────┬───────────────┬───────┘          │
                │               │                  │
                ▼               ▼                  │
-      agents / backtests    terminal ◀────────────┘
-                       charts · grid · search
-                          archive panel
+        ┌─────────────┐   terminal ◀───────────────┘
+        │ market-mcp  │   charts · grid · search
+        │ MCP tools,  │      archive panel
+        │ read-only   │
+        └──────┬──────┘
+               │ MCP (stdio / streamable HTTP)
+               ▼
+         an agent (planned — a model reading the
+         archive through market-mcp's tools, not
+         built yet)
 ```
 
 `terminal` is a consumer, not a peer: it publishes no contract of its own and nothing
@@ -38,6 +45,12 @@ of having had the interface first.
 account rather than the process, so a second client anywhere spends the same allowance twice:
 the gateway owns the only door to the provider, and the archive refuses to start if its
 upstream URLs point anywhere else.
+
+`market-mcp` is a consumer of `market-data`, the same shape as `terminal`: it reads the
+published contract and imports nothing. Where it differs is the shape of what it hands
+onward — a chart wants every candle, a model wants a summary, so the same archive read
+comes out reduced rather than proxied. It has no consumer of its own yet; the agent that
+will call it is a later, separate module.
 
 ## Why no shared library
 

@@ -11,10 +11,12 @@ from __future__ import annotations
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
+from starlette.types import ASGIApp
 
 from . import resources, tools
 from .client import UpstreamClient
 from .config import Settings
+from .network_identity import RequireCallerIdentity
 
 INSTRUCTIONS = (
     "Read-only tools over market-data's candle archive and indicator catalogue. No "
@@ -39,3 +41,15 @@ def build_server(settings: Settings, upstream: UpstreamClient) -> FastMCP:
     resources.register(mcp, upstream)
 
     return mcp
+
+
+def build_http_app(settings: Settings, upstream: UpstreamClient) -> ASGIApp:
+    """The streamable-http transport, wrapped with the caller-identity check —
+    stdio has no network caller to check, so `build_server` alone is what it runs
+    (specs/market-mcp-transport, "Żądanie z sieci niesie tożsamość wołającego" is
+    scoped to "gdy moduł jest wystawiony w sieci").
+    """
+    mcp = build_server(settings, upstream)
+    return RequireCallerIdentity(
+        mcp.streamable_http_app(), settings.require_authenticated_principal
+    )
