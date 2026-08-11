@@ -47,11 +47,11 @@ Przy okazji: `market_mcp/tools.py` rozbite na pakiet `market_mcp/tools/` (`pairs
 
 ## 5. Dostęp, wdrożenie, uruchomienie
 
-- [ ] 5.1 Tożsamość zarządzana wobec archiwum; dziennik zapisuje fakt i tożsamość, nigdy treści ani poświadczenia
-- [ ] 5.2 Wymóg tożsamości wołającego przy transporcie sieciowym, wyłączalny wyłącznie dla pracy lokalnej; test odmowy bez tożsamości
-- [ ] 5.3 Test sondy zdrowia: odpowiada bez sesji MCP i przy niedostępnym archiwum
-- [ ] 5.4 `infra/` — piąta aplikacja na planie App Service, jej tożsamość i uprawnienie do wołania archiwum; `plan` w CI, `apply` u operatora
-- [ ] 5.5 `.github/workflows/checks.yml` — job modułu, wchodzący do filtra także na zmianie `market_data/contract.py`
-- [ ] 5.6 `.github/workflows/deploy-market-mcp.yml` zakończony sprawdzeniem wdrożonej sondy zdrowia
-- [ ] 5.7 `scripts/dev.sh` i `scripts/dev.ps1` — start po `market-data`, przed agentem, z czekaniem na odpowiedź
-- [ ] 5.8 `CLAUDE.md`, `README.md`, `docs/architecture.md` — moduł, jego port i jego granica
+- [x] 5.1 Tożsamość zarządzana wobec archiwum (`client.py`, `DefaultAzureCredential`, token dołączany tylko gdy `MARKET_DATA_SCOPE` ustawione); jeden log przy starcie nazywający fakt i scope, nigdy token
+- [x] 5.2 Wymóg tożsamości wołającego przy transporcie sieciowym (`network_identity.py`, surowe ASGI, nie `BaseHTTPMiddleware` — ten buforowałby strumień), wyłączalny wyłącznie dla pracy lokalnej; dziennik odnotowuje fakt i tożsamość (albo `anonymous`), nigdy treści; testy odmowy bez tożsamości i przepuszczenia z nią
+- [x] 5.3 Testy sondy zdrowia: odpowiada bez sesji MCP (grupa 1) i przy niedostępnym archiwum (dopisane tu)
+- [x] 5.4 `infra/app-service.tf` — piąta aplikacja (`market-mcp`), jej tożsamość zarządzana i wpis w `allowed_applications` archiwum (`data.azuread_service_principal` po `principal_id` — `identity[0]` samo nie eksportuje `client_id`, złapane przez `terraform validate`); Easy Auth na module własnym z placeholderem zamiast pustej listy — prawdziwy wołający (agent) nie istnieje jeszcze
+- [x] 5.5 `.github/workflows/checks.yml` — job modułu, `scripts/contract.py check` przed testami, wchodzący do filtra także na zmianie `market_data/contract.py`
+- [x] 5.6 `.github/workflows/deploy-market-mcp.yml` zakończony sprawdzeniem `/health` — prostszy niż market-data's `/ws/candles`, bo `/health` odpowiada wprost 200 bez triku
+- [x] 5.7 `scripts/dev.sh` i `scripts/dev.ps1` — start po `market-data`, przed terminalem (agent jeszcze nie jest tu wpięty — to `add-agent-chat`), z czekaniem na `/health`. Bez `--reload`: moduł nie startuje przez CLI uvicorna wprost (owijka tożsamości z 5.2 potrzebuje zbudowanej aplikacji ASGI najpierw), więc restart po zmianie kodu jest ręczny
+- [x] 5.8 `CLAUDE.md`, `README.md`, `docs/architecture.md` — moduł, jego port, jego granica (diagram: `market-mcp` jako konsument `market-data`, agent jako planowany odbiorca)

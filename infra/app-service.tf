@@ -21,18 +21,26 @@ resource "azurerm_service_plan" "main" {
 locals {
   capital_gateway_app_name = "app-tradingcenter-gateway"
   market_data_app_name     = "app-tradingcenter-market-data"
+  market_mcp_app_name      = "app-tradingcenter-market-mcp"
 
   # Deterministic App Service hostnames — used ahead of `terraform apply` (e.g. in the
   # Easy Auth redirect URI below) instead of waiting on the computed `default_hostname`,
   # since Azure names of this form are `<name>.azurewebsites.net` with no surprises.
   capital_gateway_hostname = "${local.capital_gateway_app_name}.azurewebsites.net"
   market_data_hostname     = "${local.market_data_app_name}.azurewebsites.net"
+  market_mcp_hostname      = "${local.market_mcp_app_name}.azurewebsites.net"
 
   # What `market-data` is called when it is the *resource* a token is asked for, rather
   # than the app serving a request. The terminal asks Entra for `<uri>/<scope>`; Easy
   # Auth accepts a token whose audience is this.
   market_data_api_uri   = "api://tradingcenter-market-data"
   market_data_api_scope = "access_as_user"
+
+  # Same idea, one level down: what market-mcp is called when *it* is the resource a
+  # token is asked for — this time by a service's managed identity (client-credentials),
+  # never a signed-in user, so there is no delegated scope to pair it with (contrast
+  # `market_data_api_scope` above).
+  market_mcp_api_uri = "api://tradingcenter-market-mcp"
 
   # Where the terminal is served from. One string, used in three places that MUST agree:
   # the SPA registration's redirect URI, the origin market-data allows a browser to call
@@ -283,10 +291,14 @@ resource "azurerm_linux_web_app" "market_data" {
         azuread_application.market_data_easy_auth.client_id,
       ]
 
-      # Which clients may present a token at all. Today that is the terminal and nothing
-      # else; a future service reaching this API adds itself here, deliberately, rather
-      # than inheriting access by having a token from the same tenant.
-      allowed_applications = [azuread_application.terminal.client_id]
+      # Which clients may present a token at all. The terminal (a user's own delegated
+      # token) and market-mcp (its managed identity, client-credentials) — a future
+      # service reaching this API adds itself here, deliberately, rather than
+      # inheriting access by having a token from the same tenant.
+      allowed_applications = [
+        azuread_application.terminal.client_id,
+        data.azuread_service_principal.market_mcp_managed_identity.client_id,
+      ]
     }
 
     login {
@@ -352,4 +364,143 @@ output "market_data_hostname" {
 output "market_data_managed_identity_principal_id" {
   description = "Postgres role creation (5.7 / old 4.7) needs this object id."
   value       = azurerm_linux_web_app.market_data.identity[0].principal_id
+}
+
+# market-mcp: not public in the sense the terminal ever reaches it — its only intended
+# caller is a backend service (the agent module, `add-agent-chat`'s own change, not this
+# one), authenticating with a managed identity rather than a signed-in user. That is why
+# this registration carries no `api { oauth2_permission_scope {...} }` block the way
+# market-data's does: there is no delegated consent flow here, only client-credentials.
+resource "azuread_application" "market_mcp_easy_auth" {
+  display_name    = "app-tradingcenter-market-mcp-easyauth"
+  identifier_uris = [local.market_mcp_api_uri]
+
+  web {
+    redirect_uris = ["https://${local.market_mcp_hostname}/.auth/login/aad/callback"]
+  }
+}
+
+resource "azuread_service_principal" "market_mcp_easy_auth" {
+  client_id = azuread_application.market_mcp_easy_auth.client_id
+}
+
+resource "azuread_application_password" "market_mcp_easy_auth" {
+  application_id = azuread_application.market_mcp_easy_auth.id
+  display_name   = "easy-auth"
+  end_date       = timeadd(timestamp(), "8760h")
+
+  lifecycle {
+    ignore_changes = [end_date]
+  }
+}
+
+resource "azurerm_linux_web_app" "market_mcp" {
+  name                = local.market_mcp_app_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  service_plan_id     = azurerm_service_plan.main.id
+  https_only          = true
+
+  # This is the outbound half of task 5.1 — the identity market-mcp presents *to*
+  # market-data. `MARKET_DATA_SCOPE` below asks Entra for a token naming this identity;
+  # `allowed_applications` on market-data's own auth_settings_v2 (above) is what has to
+  # name it back for that token to be worth anything.
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    always_on = true
+    # No `cors` block and no `ip_restriction`: this app is never called from a browser
+    # (contrast market-data), so there is no preflight to answer and no plan-mate
+    # address list to allow — Easy Auth below is the one gate, the same choice
+    # market-data itself makes.
+
+    application_stack {
+      # Placeholder — the deploy workflow pushes the real GHCR image after the first
+      # build. Terraform must not fight that: see the lifecycle block below.
+      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
+    }
+  }
+
+  # The inbound half of task 5.2 — who may call *this* app. Return401, matching
+  # market-data: nothing here is a browser navigation to redirect.
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = true
+    unauthenticated_action = "Return401"
+    default_provider       = "azureactivedirectory"
+
+    # The health probe, same exemption as market-data's `/ping` — the platform restarts
+    # the container off this response and does not speak Easy Auth's protocol
+    # (specs/market-mcp-transport, "Zdrowie modułu da się sprawdzić bez sesji MCP").
+    excluded_paths = ["/health"]
+
+    active_directory_v2 {
+      client_id                  = azuread_application.market_mcp_easy_auth.client_id
+      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
+      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      allowed_audiences = [
+        local.market_mcp_api_uri,
+        azuread_application.market_mcp_easy_auth.client_id,
+      ]
+
+      # No real caller exists yet: the client that will call this app is the agent
+      # module, and that module is a different, not-yet-written OpenSpec change
+      # (design.md, Non-Goals — "Klient MCP po stronie agenta ... to zmiana w
+      # modules/agent, po zamknięciu add-agent-chat"). This app's own client id is a
+      # safe placeholder rather than an empty list of uncertain meaning: an
+      # application's token never carries its own id as `appid` — an app does not
+      # call itself — so nothing real can pass this check until the agent's own infra
+      # change replaces this entry with its managed identity's client id.
+      allowed_applications = [azuread_application.market_mcp_easy_auth.client_id]
+    }
+
+    login {
+      token_store_enabled = true
+    }
+  }
+
+  app_settings = {
+    MARKET_DATA_URL   = "https://${local.market_data_hostname}"
+    MARKET_DATA_SCOPE = "${local.market_data_api_uri}/.default"
+
+    # Matches the port `Dockerfile`'s CMD binds to via `FastMCP(port=...)` reading this
+    # setting through `config.py`'s `mcp_http_port` — App Service's own default
+    # expectation for a Linux custom container (no WEBSITES_PORT override, same as the
+    # other two apps).
+    MCP_HTTP_PORT = "80"
+
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.market_mcp_easy_auth.value
+
+    # Same reasoning as market-data's own setting of the same name: the module does not
+    # take on trust that Easy Auth above is actually configured correctly, and checks
+    # for the principal header itself (specs/market-mcp-transport, "Żądanie z sieci
+    # niesie tożsamość wołającego").
+    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+  }
+
+  lifecycle {
+    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
+  }
+}
+
+# The managed identity's own client id — what market-data's `allowed_applications`
+# (above) actually has to name, and what `identity[0]` on the web app resource itself
+# does NOT export. `azurerm_linux_web_app.identity` publishes `principal_id` (the
+# Entra object id) and `tenant_id` only; the identity's own service principal, looked
+# up by that object id, is where its `client_id` lives.
+data "azuread_service_principal" "market_mcp_managed_identity" {
+  object_id = azurerm_linux_web_app.market_mcp.identity[0].principal_id
+}
+
+output "market_mcp_hostname" {
+  value = azurerm_linux_web_app.market_mcp.default_hostname
 }

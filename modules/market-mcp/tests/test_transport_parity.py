@@ -22,7 +22,7 @@ from mcp.client.streamable_http import streamable_http_client
 
 from market_mcp.client import UpstreamClient
 from market_mcp.config import Settings
-from market_mcp.server import build_server
+from market_mcp.server import build_http_app
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent
 
@@ -50,10 +50,10 @@ async def _stdio_tool_names() -> set[str]:
 async def _http_tool_names(port: int) -> set[str]:
     settings = Settings(market_data_url="http://127.0.0.1:8020", mcp_http_port=port, _env_file=None)  # type: ignore[call-arg]
     upstream = UpstreamClient(settings)
-    mcp = build_server(settings, upstream)
-    config = uvicorn.Config(
-        mcp.streamable_http_app(), host="127.0.0.1", port=port, log_level="error"
-    )
+    # The real shape `__main__.py` serves — wrapped with the caller-identity check,
+    # not the bare `streamable_http_app()` — so this test proves what actually runs.
+    app = build_http_app(settings, upstream)
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
     server = uvicorn.Server(config)
 
     thread = threading.Thread(target=server.run, daemon=True)

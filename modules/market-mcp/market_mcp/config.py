@@ -37,6 +37,16 @@ class Settings(BaseSettings):
     # --- this module's own HTTP surface, for the streamable-http transport ---
     mcp_http_port: int = 8040
 
+    # Whether a platform authenticator (Easy Auth) stands in front of this module.
+    # Where it does, only a caller it has already identified may reach a tool — a
+    # request arriving over the network with no principal header is refused rather
+    # than served (specs/market-mcp-transport, "Żądanie z sieci niesie tożsamość
+    # wołającego"). Off locally, where nothing stands in front and there is no
+    # identity to have; on in Azure (`infra/app-service.tf`). Mirrors market-data's
+    # own field of the same name and the same reasoning: the module does not take on
+    # trust that the layer in front is configured correctly.
+    require_authenticated_principal: bool = False
+
     @field_validator("market_data_url")
     @classmethod
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:

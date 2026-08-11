@@ -10,20 +10,27 @@ from __future__ import annotations
 import argparse
 import asyncio
 
+import uvicorn
+
 from .client import UpstreamClient
 from .config import Settings
-from .server import build_server
+from .server import build_http_app, build_server
 
 
 async def _serve(transport: str) -> None:
     settings = Settings()
     upstream = UpstreamClient(settings)
-    mcp = build_server(settings, upstream)
     try:
         if transport == "stdio":
+            mcp = build_server(settings, upstream)
             await mcp.run_stdio_async()
         else:
-            await mcp.run_streamable_http_async()
+            # Not `mcp.run_streamable_http_async()`: that builds the transport's own
+            # ASGI app internally, with no seam to wrap it in the caller-identity
+            # check `build_http_app` adds (task 5.2).
+            app = build_http_app(settings, upstream)
+            config = uvicorn.Config(app, host="0.0.0.0", port=settings.mcp_http_port)
+            await uvicorn.Server(config).serve()
     finally:
         await upstream.aclose()
 

@@ -16,6 +16,7 @@ need one, the change is wrong, not the rule.
 ```
 modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
 modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway.
+modules/market-mcp        Python · MCP tools over market-data, reduced for a model. Read-only — no tool writes. Depends on market-data.
 modules/terminal          React+TS · the operator's screen. Consumes both. Publishes nothing.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
@@ -34,6 +35,7 @@ Run these from the module directory. Nothing at the repo root builds or tests ev
 |---|---|
 | `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `market-data` | `uv run alembic upgrade head` then `uv run uvicorn market_data.app:app --reload --port 8020`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
+| `market-mcp` | `uv run python -m market_mcp stdio` (desktop client) or `... http` (port 8040)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
 | `terminal` | `pnpm dev` · `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm contract:check` |
 
 Test flags that matter:
@@ -47,8 +49,9 @@ Test flags that matter:
 
 The whole stack: `./scripts/dev.sh` on macOS and Linux, `./scripts/dev.ps1` on Windows —
 the same script twice (`--no-terminal` / `-NoTerminal` for back end only). It starts things
-in dependency order — migrations → gateway → market-data → terminal — waiting for each to
-actually answer. Ports are fixed: **8010** gateway, **8020** market-data, **5173** terminal.
+in dependency order — migrations → gateway → market-data → market-mcp → terminal — waiting
+for each to actually answer. Ports are fixed: **8010** gateway, **8020** market-data,
+**8040** market-mcp, **5173** terminal.
 
 ## Things that will bite you
 
@@ -96,6 +99,9 @@ over time. A 401 storm was really observed on 9–10 August; `stream_tokens_for`
 **Env files are per-module and gitignored.** Copy from `.env.example`. The gateway needs
 `CAPITAL_*` demo credentials plus its own `GATEWAY_API_KEY`; market-data needs the same
 `GATEWAY_API_KEY`, a `DATABASE_URL` and the `AZURE_*` identity it connects to Postgres with.
+market-mcp needs no `.env` at all locally — every setting has a working loopback default;
+`MARKET_DATA_SCOPE` only exists for the deployed instance, whose managed identity calls
+market-data with it.
 
 **Terraform `apply` is the operator's job, never CI's.** CI plans only, deliberately —
 applying would hand the CI principal Entra directory write access. `infra/bootstrap/` keeps
