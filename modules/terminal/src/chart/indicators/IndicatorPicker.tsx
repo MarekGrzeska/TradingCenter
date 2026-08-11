@@ -106,7 +106,10 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
         onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
         aria-label="Indicators"
-        className="rounded border border-border px-1.5 py-0.5 text-xs text-ink hover:bg-panel-strong"
+        // `h-6`, matching the resolution select beside it in `Chart.tsx` — a native
+        // `<select>`'s own sizing runs taller than a `<button>`'s given the same
+        // padding, so the height is pinned explicitly rather than left to it.
+        className="h-6 rounded border border-border px-1.5 text-xs text-ink hover:bg-panel-strong"
       >
         Indicators{selections.length > 0 ? ` (${selections.length})` : ""}
       </button>

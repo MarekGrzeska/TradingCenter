@@ -903,7 +903,11 @@ export function Chart({
           aria-label="Resolution"
           value={resolution}
           onChange={(e) => onResolutionChange(e.target.value as Resolution)}
-          className="rounded border border-border bg-panel-strong px-1.5 py-0.5 text-xs text-ink"
+          // `h-6` rather than the vertical padding alone: a native `<select>` carries its
+          // own intrinsic sizing on top of padding, which made it taller than a `<button>`
+          // given the identical classes — pinning the height is what actually matches
+          // them, not the padding.
+          className="h-6 rounded border border-border bg-panel-strong px-1.5 text-xs text-ink"
         >
           {resolutions.map((r) => (
             <option key={r} value={r}>
