@@ -13,10 +13,10 @@
  * secondary encoding — the chart renders up candles hollow and down candles
  * filled, so the distinction survives on shape even where hue does not.
  */
-/* Chrome (testing): one main colour and one side colour, each in a few shades. Two
-   candidates live here — amber+steel is the default, copper+ice hangs off
-   [data-palette="copper"] below, and the switch in the top bar flips between them.
-   Blue, teal, violet and the rest belong to the data palette. */
+/* Chrome is amber (anything you can act on) and steel (structure that only names
+   things), each in a few shades. The data palette below keeps blue, teal, violet and
+   the rest — `--color-warning` sits at orange rather than its old amber so a degraded
+   state cannot be read as a control. */
 @theme {
   --color-sunken: #06070a;
   --color-canvas: #0a0c11;
@@ -72,32 +72,6 @@
 
   --font-sans:
     system-ui, -apple-system, "Segoe UI", sans-serif;
-}
-
-/* Second candidate: copper main, ice-blue side. */
-:root[data-palette="copper"] {
-  --color-sunken: #07070a;
-  --color-canvas: #0b0c10;
-  --color-panel: #13151c;
-  --color-panel-strong: #1c1f28;
-  --color-raised: #262a35;
-
-  --color-ink-inverse: #0c0603;
-
-  --color-primary-dim: #7d431f;
-  --color-primary: #c9743d;
-  --color-primary-strong: #e08f57;
-  --color-primary-line: rgba(201, 116, 61, 0.4);
-  --color-primary-soft: rgba(201, 116, 61, 0.14);
-
-  --color-secondary-dim: #4b6f90;
-  --color-secondary: #8fb6d9;
-  --color-secondary-strong: #aecdea;
-  --color-secondary-line: rgba(143, 182, 217, 0.34);
-  --color-secondary-soft: rgba(143, 182, 217, 0.12);
-
-  --color-warning: #fab219;
-  --color-warning-soft: rgba(250, 178, 25, 0.16);
 }
 
 html {

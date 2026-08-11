@@ -138,9 +138,7 @@ function Slot({
       onFocusCapture={() => gridStore.setActiveSlot(slotId)}
       data-testid={`slot-${slotId}`}
       data-active={active}
-      className={`relative min-h-0 min-w-0 -outline-offset-2 ${
-        active ? "outline-2 outline-primary" : ""
-      }`}
+      className="relative min-h-0 min-w-0"
     >
       {slot.symbol === null ? (
         <EmptySlot slotId={slotId} picker={picker} />
@@ -176,6 +174,20 @@ function Slot({
               }}
             />
           }
+        />
+      )}
+
+      {/* An overlay rather than an `outline` on the slot: an outline paints with the box's
+          own background, so the chart's opaque `<section>` covered it and only an empty
+          slot ever showed the mark. Last child and `z-10` puts it over the chart and its
+          loading veil, still under the indicator popover at `z-20`. */}
+      {active && (
+        <span
+          aria-hidden
+          // `active-mark-`, not `slot-`: the layout tests count slots with
+          // getAllByTestId(/^slot-/), which a second id per slot would inflate.
+          data-testid={`active-mark-${slotId}`}
+          className="pointer-events-none absolute inset-0 z-10 border-2 border-primary"
         />
       )}
     </div>
