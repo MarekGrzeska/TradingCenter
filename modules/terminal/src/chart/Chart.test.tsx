@@ -15,6 +15,8 @@ import {
 } from "./testDoubles";
 import type { Bar, IndicatorSelection } from "../data/types";
 import { readChartColors } from "./theme";
+import { Toaster } from "../ui/Toaster";
+import { toastStore } from "../ui/toastStore";
 
 const stub = createChartStub();
 
@@ -37,6 +39,10 @@ vi.mock("lightweight-charts", () => ({
 }));
 
 const { Chart } = await import("./Chart");
+
+// The store is a module singleton; a toast left behind would show up in the next test's
+// document as if that test had raised it.
+afterEach(() => act(() => toastStore.clear()));
 
 function renderChart(
   source: ControllableSource,
@@ -1058,6 +1064,29 @@ describe("Chart — indicators (terminal-chart spec, market-data-indicators)", (
     const callsBefore = indicators.computeCalls.length;
     await userEvent.click(screen.getByRole("button", { name: /retry/i }));
     await waitFor(() => expect(indicators.computeCalls.length).toBeGreaterThan(callsBefore));
+  });
+
+  it("raises the reason as a toast, where the badge has nowhere to put it", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeFailure = new Error(
+      "no MINUTE_5 series collected for 'US100', and none could be derived from MINUTE either",
+    );
+    renderChart(source, { indicatorSource: indicators });
+    // Mounted the way `Shell` mounts it: once, beside the view, not inside it.
+    render(<Toaster />);
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+
+    // The badge says *that*; the toast is the only place that says *why*, and the why is
+    // the actionable half — a series nobody collected is a thing the operator can go fix.
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("US100");
+    expect(toast).toHaveTextContent(/no MINUTE_5 series collected/);
   });
 
   it("removes the line when the operator deselects the indicator", async () => {

@@ -36,6 +36,7 @@ import {
 import type { MarketDataSource } from "../data/source";
 import { formatCrosshairTime, formatInstant, formatTickMark } from "../ui/formatTime";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
+import { showToast } from "../ui/toastStore";
 import { candlestickColors, indicatorLineColor, readChartColors, type ChartColors } from "./theme";
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
 import { type BarsRange, type IndicatorsState, useIndicators } from "./indicators/useIndicators";
@@ -246,6 +247,23 @@ export function Chart({
     knownIndicatorSelections,
     barsRange,
   );
+
+  // The header badge says *that* indicators are unavailable; it has nowhere to put *why*
+  // except a `title` nobody hovers. The reason is the useful part and is often actionable
+  // on the spot — "no MINUTE_5 series collected" is a thing the operator can go and fix —
+  // so it is raised where it will be read. Keyed per slot, so a chart requerying on every
+  // candle close refreshes one toast instead of stacking one per close, and two slots
+  // failing for different reasons still say so separately.
+  const indicatorError = indicatorsState.status === "error" ? indicatorsState.error : null;
+  useEffect(() => {
+    if (indicatorError === null) return;
+    showToast({
+      key: `indicators:${symbol}:${resolution}`,
+      severity: "error",
+      title: `${symbol} · indicators unavailable`,
+      detail: indicatorError,
+    });
+  }, [indicatorError, symbol, resolution]);
 
   // --- the chart instance itself: created once, never on data change ---
   useLayoutEffect(() => {
