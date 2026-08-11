@@ -26,7 +26,9 @@ _ENV = {
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+def _env(migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
+    # `db` requested for its TRUNCATE side effect — see test_usage_router.py's twin.
+    del db
     monkeypatch.setenv("DATABASE_URL", migrated_url)
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)

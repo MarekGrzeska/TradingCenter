@@ -62,26 +62,26 @@
 
 ## 5. Zużycie i koszt
 
-- [ ] 5.1 Zapis wiersza zużycia przy każdym wywołaniu modelu, ze stawkami i kosztem
+- [x] 5.1 Zapis wiersza zużycia przy każdym wywołaniu modelu, ze stawkami i kosztem
       policzonym w chwili zapisu
-- [ ] 5.2 Zużycie nieraportowane przez dostawcę zapisywane jako nieznane, odróżnialne od
+- [x] 5.2 Zużycie nieraportowane przez dostawcę zapisywane jako nieznane, odróżnialne od
       zerowego
-- [ ] 5.3 Zużycie z wywołania przerwanego błędem zapisywane w tym, co dostawca podał
-- [ ] 5.4 `GET /usage` — agregaty w podziale na model, sesję i czas, w zakresie dat; sumy
+- [x] 5.3 Zużycie z wywołania przerwanego błędem zapisywane w tym, co dostawca podał
+- [x] 5.4 `GET /usage` — agregaty w podziale na model, sesję i czas, w zakresie dat; sumy
       liczone z zapisanych kosztów
-- [ ] 5.5 Testy: zmiana cennika nie rusza kosztu dawnych wierszy; pusty zakres to puste
+- [x] 5.5 Testy: zmiana cennika nie rusza kosztu dawnych wierszy; pusty zakres to puste
       zestawienie, nie błąd; nieznane zużycie nie wpada do sumy jako zero
 
 ## 6. Dostęp z przeglądarki
 
-- [ ] 6.1 Tożsamość wołającego z nagłówków Easy Auth; tryb lokalny bez warstwy przed
+- [x] 6.1 Tożsamość wołającego z nagłówków Easy Auth; tryb lokalny bez warstwy przed
       modułem przypisuje tożsamość lokalną
-- [ ] 6.2 Sesja przypisana do tożsamości; cudza sesja odpowiada tak samo jak nieistniejąca
-- [ ] 6.3 `REQUIRE_AUTHENTICATED_PRINCIPAL` włączony odmawia wywołania bez tożsamości przed
+- [x] 6.2 Sesja przypisana do tożsamości; cudza sesja odpowiada tak samo jak nieistniejąca
+- [x] 6.3 `REQUIRE_AUTHENTICATED_PRINCIPAL` włączony odmawia wywołania bez tożsamości przed
       dotknięciem modelu
-- [ ] 6.4 Testy: lista rozmów zwraca tylko własne, cudza sesja jest nieodróżnialna od
+- [x] 6.4 Testy: lista rozmów zwraca tylko własne, cudza sesja jest nieodróżnialna od
       nieistniejącej, brak tożsamości to odmowa
-- [ ] 6.5 `agent` nie dokłada własnego CORS — nagłówki są zadaniem App Service; test
+- [x] 6.5 `agent` nie dokłada własnego CORS — nagłówki są zadaniem App Service; test
       pilnujący, że middleware CORS nie ma
 
 ## 7. Terminal — panel agenta

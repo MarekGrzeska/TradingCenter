@@ -25,7 +25,7 @@ from .config import Settings
 from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
 from .provider import AzureOpenAIProvider
-from .routers import models, sessions
+from .routers import models, sessions, usage
 
 log = logging.getLogger(__name__)
 
@@ -76,3 +76,4 @@ async def health() -> dict[str, str]:
 
 app.include_router(models.router)
 app.include_router(sessions.router)
+app.include_router(usage.router)
