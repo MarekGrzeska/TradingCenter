@@ -17,3 +17,8 @@ operator_object_id = "00000000-0000-0000-0000-000000000000"
 
 # Where the alerts in infra/monitoring.tf go.
 operator_email = "you@example.com"
+
+# Azure OpenAI's own REST API version — check the current value in Azure OpenAI's REST
+# reference before setting this; a guessed date answers 400 for a reason nothing here
+# explains (variables.tf).
+azure_openai_api_version = "2024-10-21"

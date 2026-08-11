@@ -114,30 +114,33 @@
 
 ## 9. Środowisko lokalne
 
-- [ ] 9.1 `scripts/dev.sh` i `scripts/dev.ps1` — zakładanie bazy `agent`, jeśli jej nie ma,
+- [x] 9.1 `scripts/dev.sh` i `scripts/dev.ps1` — zakładanie bazy `agent`, jeśli jej nie ma,
       i uruchamianie modułu w kolejności migracje → gateway → market-data → agent → terminal
       (`--no-terminal` / `-NoTerminal` bez zmian)
-- [ ] 9.2 Odmowa skryptu, gdy `.env` agenta wskazuje hosta spoza pętli zwrotnej
-- [ ] 9.3 `modules/agent/.env.example` uzupełniony o katalog modeli i stawki, gotowy do
+- [x] 9.2 Odmowa skryptu, gdy `.env` agenta wskazuje hosta spoza pętli zwrotnej
+- [x] 9.3 `modules/agent/.env.example` uzupełniony o katalog modeli i stawki, gotowy do
       skopiowania bez edycji poza poświadczeniem
 
 ## 10. Infrastruktura
 
 - [ ] 10.0 Sprawdzić typ subskrypcji i quotę na modele Azure OpenAI; oferta próbna ma
       quotę 0 i wymaga przejścia na Pay-As-You-Go (kredyt i darmowe usługi zostają)
-- [ ] 10.1 `infra/openai.tf` — `azurerm_cognitive_account` (kind OpenAI) i trzy
+- [x] 10.1 `infra/openai.tf` — `azurerm_cognitive_account` (kind OpenAI) i trzy
       `azurerm_cognitive_deployment` (luna/terra/sol), Global Standard
-- [ ] 10.2 `infra/variables.tf` — nazwy i wersje modeli jako zmienne z komentarzem, że
+- [x] 10.2 `infra/variables.tf` — nazwy i wersje modeli jako zmienne z komentarzem, że
       operator weryfikuje je `az cognitiveservices account list-models` przed apply
-- [ ] 10.3 `infra/app-service.tf` — czwarta aplikacja na istniejącym planie: tożsamość
+- [x] 10.3 `infra/app-service.tf` — czwarta aplikacja na istniejącym planie: tożsamość
       zarządzana, Easy Auth, CORS na adres terminala, ustawienia aplikacji, `lifecycle`
       na obraz kontenera
-- [ ] 10.4 Rola **Cognitive Services OpenAI User** dla tożsamości aplikacji agenta
-- [ ] 10.5 `infra/database.tf` — baza logiczna `agent` i reguły firewalla na adresy
+- [x] 10.4 Rola **Cognitive Services OpenAI User** dla tożsamości aplikacji agenta
+- [x] 10.5 `infra/database.tf` — baza logiczna `agent` i reguły firewalla na adresy
       wychodzące aplikacji agenta (`for_each` po jej `possible_outbound_ip_address_list`)
-- [ ] 10.6 `infra/entra.tf` — rejestracja API agenta i uprawnienie terminala do jego zakresu
-- [ ] 10.7 `infra/outputs.tf` — adres agenta i nazwa konta Azure OpenAI
-- [ ] 10.8 `terraform fmt` i `terraform validate` przechodzą; plan przejrzany przez
+- [x] 10.6 `infra/entra.tf` — rejestracja API agenta i uprawnienie terminala do jego zakresu
+- [x] 10.7 Adres agenta (`app-service.tf`) i nazwa konta Azure OpenAI (`openai.tf`) —
+      obok analogicznych wyjść market-data/gateway, nie w `outputs.tf` (te trzymają tylko
+      wyjścia bez naturalnego pliku-właściciela, wzorem istniejących `market_data_hostname`
+      itp.)
+- [x] 10.8 `terraform fmt` i `terraform validate` przechodzą; plan przejrzany przez
       operatora (apply jest jego, nie CI)
 
 ## 11. CI i wdrożenie

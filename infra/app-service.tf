@@ -21,18 +21,26 @@ resource "azurerm_service_plan" "main" {
 locals {
   capital_gateway_app_name = "app-tradingcenter-gateway"
   market_data_app_name     = "app-tradingcenter-market-data"
+  agent_app_name           = "app-tradingcenter-agent"
 
   # Deterministic App Service hostnames — used ahead of `terraform apply` (e.g. in the
   # Easy Auth redirect URI below) instead of waiting on the computed `default_hostname`,
   # since Azure names of this form are `<name>.azurewebsites.net` with no surprises.
   capital_gateway_hostname = "${local.capital_gateway_app_name}.azurewebsites.net"
   market_data_hostname     = "${local.market_data_app_name}.azurewebsites.net"
+  agent_hostname           = "${local.agent_app_name}.azurewebsites.net"
 
   # What `market-data` is called when it is the *resource* a token is asked for, rather
   # than the app serving a request. The terminal asks Entra for `<uri>/<scope>`; Easy
   # Auth accepts a token whose audience is this.
   market_data_api_uri   = "api://tradingcenter-market-data"
   market_data_api_scope = "access_as_user"
+
+  # The same shape for the agent's own registration (entra.tf) — see the comment there
+  # for why its scope is granted to the terminal today but not yet the one the
+  # terminal's token actually carries.
+  agent_api_uri   = "api://tradingcenter-agent"
+  agent_api_scope = "access_as_user"
 
   # Where the terminal is served from. One string, used in three places that MUST agree:
   # the SPA registration's redirect URI, the origin market-data allows a browser to call
@@ -324,6 +332,125 @@ resource "azurerm_linux_web_app" "market_data" {
   }
 }
 
+# agent: public, Easy Auth-gated, same shape as market-data — design.md, "agent
+# dostanie własny adres, a nie ścieżkę pod adresem terminala": Static Web Apps cannot
+# proxy its stream any more than it can market-data's WebSocket, so the terminal calls
+# this app's own hostname directly, same as it does market-data's.
+resource "azurerm_linux_web_app" "agent" {
+  name                = local.agent_app_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  service_plan_id     = azurerm_service_plan.main.id
+  https_only          = true
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    always_on = true
+    # No `websockets_enabled`: the turn streams over plain HTTP (`fetch` +
+    # `ReadableStream`), never a WebSocket upgrade — design.md, "Odpowiedź
+    # strumieniem: fetch + ReadableStream, nie EventSource".
+
+    # Same reasoning as market-data's own CORS block above: the preflight for a
+    # cross-origin request carrying `Authorization` has no credential on it at all,
+    # and Easy Auth would refuse it before the container ever saw it. agent MUST NOT
+    # add a CORS middleware of its own for the same reason market-data's own comment
+    # gives — two layers would double the header and a browser rejects that.
+    cors {
+      allowed_origins     = [local.terminal_origin]
+      support_credentials = false
+    }
+
+    application_stack {
+      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
+    }
+  }
+
+  # Return401, not RedirectToLoginPage — same reasoning as market-data's own block:
+  # the terminal reaches this app through `fetch()`, and a redirect resolves to an
+  # HTML login page masquerading as a JSON body.
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = true
+    unauthenticated_action = "Return401"
+    default_provider       = "azureactivedirectory"
+
+    active_directory_v2 {
+      client_id                  = azuread_application.agent_easy_auth.client_id
+      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
+      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      # Both audiences, deliberately — see the long comment on `agent_easy_auth` in
+      # entra.tf. The terminal's existing token (asked for by market-data's scope)
+      # carries market-data's audience; a future terminal asking for the agent's own
+      # scope by name carries this application's instead. Either is accepted.
+      allowed_audiences = [
+        local.agent_api_uri,
+        azuread_application.agent_easy_auth.client_id,
+        local.market_data_api_uri,
+        azuread_application.market_data_easy_auth.client_id,
+      ]
+
+      allowed_applications = [azuread_application.terminal.client_id]
+    }
+
+    login {
+      token_store_enabled = true
+    }
+  }
+
+  app_settings = {
+    # No credential in the URL and no AZURE_CLIENT_* triple — same as market-data:
+    # config.py refuses a DATABASE_URL carrying one, and the system-assigned identity
+    # is ambient. DATABASE_USER is the role the operator creates by hand in the
+    # `agent` database (tasks.md's Migration Plan step 3, design.md's Risk "Baza
+    # `agent` w produkcji zakładana ręcznie") — named after this app so the two never
+    # drift apart.
+    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.agent.name}?sslmode=require"
+    DATABASE_USER = local.agent_app_name
+
+    AZURE_OPENAI_ENDPOINT             = azurerm_cognitive_account.openai.endpoint
+    AZURE_OPENAI_API_VERSION          = var.azure_openai_api_version
+    AZURE_OPENAI_USE_MANAGED_IDENTITY = "true"
+    # AZURE_OPENAI_API_KEY absent on purpose — exactly one of key/managed identity may
+    # be set (config.py refuses both or neither), and production is the managed-
+    # identity side of that switch.
+
+    # The module's own catalogue, built from the one place its Azure OpenAI
+    # deployments are also declared (openai.tf) — see `var.agent_models`'s own
+    # description for why the two cannot drift apart.
+    MODELS = jsonencode([
+      for id, m in var.agent_models : {
+        id                 = id
+        deployment         = id
+        display_name       = m.display_name
+        cost_rank          = m.cost_rank
+        input_rate_per_1k  = m.input_rate_per_1k
+        output_rate_per_1k = m.output_rate_per_1k
+      }
+    ])
+    # The cheapest entry — same choice `.env.example` documents, and design.md's own
+    # Risk: "Domyślny model to najtańszy (Luna); najdroższy wybiera się świadomie."
+    DEFAULT_MODEL_ID = "gpt-5.6-luna"
+
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.agent_easy_auth.value
+
+    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+  }
+
+  lifecycle {
+    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
+  }
+}
+
 # Secret-read access only — Set/Delete/Purge stays with the operator (key-vault.tf).
 resource "azurerm_key_vault_access_policy" "capital_gateway" {
   key_vault_id = azurerm_key_vault.main.id
@@ -341,6 +468,17 @@ resource "azurerm_key_vault_access_policy" "market_data" {
   secret_permissions = ["Get", "List"]
 }
 
+# Read-only for the same one reason as the other two: resolving the
+# `@Microsoft.KeyVault(...)` reference on its own `docker_registry_password` — agent
+# stores no other secret in the vault, unlike capital-gateway and market-data.
+resource "azurerm_key_vault_access_policy" "agent" {
+  key_vault_id = azurerm_key_vault.main.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.agent.identity[0].principal_id
+
+  secret_permissions = ["Get", "List"]
+}
+
 output "capital_gateway_hostname" {
   value = azurerm_linux_web_app.capital_gateway.default_hostname
 }
@@ -349,7 +487,16 @@ output "market_data_hostname" {
   value = azurerm_linux_web_app.market_data.default_hostname
 }
 
+output "agent_hostname" {
+  value = azurerm_linux_web_app.agent.default_hostname
+}
+
 output "market_data_managed_identity_principal_id" {
   description = "Postgres role creation (5.7 / old 4.7) needs this object id."
   value       = azurerm_linux_web_app.market_data.identity[0].principal_id
+}
+
+output "agent_managed_identity_principal_id" {
+  description = "The operator's manual Postgres role creation for `agent` needs this object id (design.md's Risk, \"Baza `agent` w produkcji zakładana ręcznie\")."
+  value       = azurerm_linux_web_app.agent.identity[0].principal_id
 }
