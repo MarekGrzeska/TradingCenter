@@ -127,7 +127,8 @@ async def lifespan(app: FastAPI):
         app.state.market_status = MarketStatus()
 
         candle_age = telemetry.CandleAgeGauge()
-        telemetry.register(candle_age)
+        candle_age_periods = telemetry.CandlePeriodsLateGauge()
+        telemetry.register(candle_age, candle_age_periods)
 
         # Before anything else touches the job tables: no runner survives a restart, so
         # any chunk left `pending` or `running` from before this start was orphaned, not
@@ -141,7 +142,11 @@ async def lifespan(app: FastAPI):
         await job_runner.start()
         candle_age_task = asyncio.create_task(
             telemetry.refresh_loop(
-                pool, app.state.instruments, app.state.market_status, candle_age
+                pool,
+                app.state.instruments,
+                app.state.market_status,
+                candle_age,
+                candle_age_periods,
             )
         )
         try:

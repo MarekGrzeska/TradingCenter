@@ -40,30 +40,33 @@ resource "azurerm_monitor_action_group" "operator" {
 
 # The candle-age metric (market_data/telemetry.py) already excludes any pair whose
 # market the gateway says is closed — so "w godzinach handlu" (design.md, group 10) is
-# encoded in what the metric reports, not in when this alert is allowed to fire. 600s is
-# coarser than the in-app STALLED threshold (two periods plus delivery grace, per
-# resolution — see tracking.py) on purpose: this is the production safety net, not a
-# restatement of that per-resolution logic, and it alerts on the same signal across
-# every tracked resolution with one number.
+# encoded in what the metric reports, not in when this alert is allowed to fire.
+#
+# Stands on `market_data.candle_age_periods`, not `..._seconds`: a healthy `DAY` pair
+# sits near 86,400 raw seconds old and a healthy `WEEK` pair near 604,800 — one second
+# threshold could not be both blind to slow resolutions and quiet on fast ones, and
+# `..._seconds` spent nine hours firing continuously as a result (openspec/changes/
+# candle-age-alert-in-periods). The periods metric is `(age − DELIVERY_GRACE) / period`
+# per pair, so one threshold means the same thing at every resolution. Three periods:
+# one more than the module's own STALLED threshold (`STALE_AFTER_PERIODS` in
+# tracking.py), so the production safety net is deliberately blunter than the per-pair
+# indicator, not a second copy of it. `..._seconds` stays published for the portal —
+# periods are what to alert on, seconds are what a human reads once alerted.
 resource "azurerm_monitor_metric_alert" "candle_age" {
   name                = "alert-candle-age-stale"
   resource_group_name = azurerm_resource_group.main.name
   scopes              = [azurerm_application_insights.main.id]
-  description         = "A tracked pair's newest candle is more than 10 minutes old while its market is open."
+  description         = "A tracked pair's newest candle is more than 3 periods late (past its delivery grace) while its market is open."
   severity            = 1
   frequency           = "PT5M"
   window_size         = "PT5M"
 
   criteria {
     metric_namespace = "azure.applicationinsights"
-    metric_name      = "market_data.candle_age_seconds"
+    metric_name      = "market_data.candle_age_periods"
     aggregation      = "Maximum"
     operator         = "GreaterThan"
-    threshold        = 600
-    # market-data isn't deployed yet (task 7.4) — the metric has never actually reached
-    # this Application Insights resource, so Azure Monitor's own metric-definition
-    # validation would refuse the rule outright. Revisit once it has.
-    skip_metric_validation = true
+    threshold        = 3
   }
 
   action {

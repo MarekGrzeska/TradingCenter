@@ -338,6 +338,7 @@
       <p>Projekt dołożył jedną rzecz, której rekomendacja nie widziała: surowy iloraz wieku przez okres wraca prosto do problemu, który <code>DELIVERY_GRACE</code> już raz rozwiązało. Zdrowa para <code>MINUTE</code> ma wiek do 229 sekund, czyli 3,8 „okresu" — powyżej każdego progu, jaki chciałoby się ustawić. Spóźnienie liczy się więc dopiero po odjęciu tych zmierzonych trzech minut, a wynik podłoguje do zera.</p>
       <p>Metryka sekundowa zostaje obok nowej. Z „4,2 okresu" nie odczyta się godziny, o której zbieranie stanęło, a to jest pierwsze pytanie po awarii.</p>
       <p>Kolejność wdrożenia jest częścią zmiany, nie przypisem: najpierw moduł, potem <code>terraform apply</code>. Azure waliduje istnienie metryki w chwili zakładania reguły, więc odwrotnie — bez <code>skip_metric_validation</code>, które ta zmiana zdejmuje — reguła zostaje odrzucona.</p>
+      <p><strong>Dopisane 11 sierpnia.</strong> Kod (<code>telemetry.py</code>, druga metryka i gauge) i Terraform (nowa metryka, próg 3, <code>skip_metric_validation</code> zdjęte) gotowe w drzewie roboczym — <code>uv run pytest</code>, <code>ruff check</code>, <code>pyright</code> zielone, <code>terraform fmt</code> bez zmian. Jeszcze nie zamknięte: <code>terraform apply</code> jest operatora, nie CI, więc wdrożenie modułu, potwierdzenie punktów <code>market_data.candle_age_periods</code> w Application Insights i sam <code>apply</code> zostają do zrobienia ręcznie, w tej kolejności.</p>
     </div>
   </div>
 </div>
@@ -489,7 +490,7 @@
   </div>
   <div class="done-row">
     <span class="pr">opsx</span>
-    <span>Pozycja 01. Zmiana <code>candle-age-alert-in-periods</code> — artefakty gotowe, implementacji nie ma. Rusza <code>infra/**</code>, więc pełna ścieżka.</span>
+    <span>Pozycja 01. Zmiana <code>candle-age-alert-in-periods</code> — kod i Terraform zaimplementowane 11.08, czekają na wdrożenie modułu i <code>terraform apply</code> operatora.</span>
   </div>
 </div>
 
