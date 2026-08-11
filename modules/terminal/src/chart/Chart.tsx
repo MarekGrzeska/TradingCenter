@@ -254,16 +254,31 @@ export function Chart({
   // so it is raised where it will be read. Keyed per slot, so a chart requerying on every
   // candle close refreshes one toast instead of stacking one per close, and two slots
   // failing for different reasons still say so separately.
+  //
+  // Two ways this goes wrong and they read differently. The whole read can fail — the
+  // archive is unreachable, or refused the request — and then nothing was computed. Or
+  // the archive answered and some indicators came back carrying a reason instead of an
+  // answer, which is the archive not holding a series they need; the rest drew fine and
+  // the toast has to say which ones did not.
   const indicatorError = indicatorsState.status === "error" ? indicatorsState.error : null;
+  const failedIndicators = indicatorsState.results.filter((result) => result.error !== null);
+  // A string, not the array: the array is rebuilt every render and would refire the
+  // effect on every one of them.
+  const failureDigest = failedIndicators.map((r) => `${r.id}: ${r.error}`).join("\n");
+
   useEffect(() => {
-    if (indicatorError === null) return;
+    if (indicatorError === null && failureDigest === "") return;
+    const failedCount = failureDigest === "" ? 0 : failureDigest.split("\n").length;
     showToast({
       key: `indicators:${symbol}:${resolution}`,
       severity: "error",
-      title: `${symbol} · indicators unavailable`,
-      detail: indicatorError,
+      title:
+        indicatorError !== null
+          ? `${symbol} · indicators unavailable`
+          : `${symbol} · ${failedCount} of the chosen indicators unavailable`,
+      detail: indicatorError ?? failureDigest,
     });
-  }, [indicatorError, symbol, resolution]);
+  }, [indicatorError, failureDigest, symbol, resolution]);
 
   // --- the chart instance itself: created once, never on data change ---
   useLayoutEffect(() => {
@@ -604,6 +619,11 @@ export function Chart({
     for (const result of indicatorsState.results) {
       const entry = catalogueById.get(result.id);
       if (!entry || !canDrawIndicator(entry)) continue;
+      // A result carrying a reason carries no shape, so every branch below would skip
+      // it anyway — said here instead of relied on, because "drew nothing" and "had
+      // nothing to draw" reaching the same place by accident is how the next shape
+      // added below quietly draws an empty one.
+      if (result.error !== null) continue;
 
       const paramsKey = entry.params.map((p) => result.params[p.name]).join(",");
       const ownPaneKey = `${result.id}|${paramsKey}`;
@@ -925,6 +945,17 @@ export function Chart({
               className="rounded border border-warning/40 px-1.5 py-0.5 text-[10px] tracking-wide text-warning uppercase"
             >
               warming up
+            </span>
+          )}
+          {failedIndicators.length > 0 && (
+            // Named by id rather than counted: with several chosen, "one is unavailable"
+            // sends the operator looking for which. The reason is in the toast; the id
+            // is what makes the toast findable.
+            <span
+              title={failureDigest}
+              className="rounded border border-critical/40 px-1.5 py-0.5 text-[10px] tracking-wide text-critical uppercase"
+            >
+              {failedIndicators.map((result) => result.id).join(", ")} unavailable
             </span>
           )}
           {indicatorsState.status === "error" && (

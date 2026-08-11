@@ -1066,6 +1066,134 @@ describe("Chart — indicators (terminal-chart spec, market-data-indicators)", (
     await waitFor(() => expect(indicators.computeCalls.length).toBeGreaterThan(callsBefore));
   });
 
+  // `indicator-result-names-its-own-failure`: the archive answers, and one of the chosen
+  // indicators carries a reason where its values would have been.
+  describe("one indicator carries a reason, the rest carry answers", () => {
+    function partialCompute() {
+      return {
+        symbol: "US100",
+        resolution: "MINUTE_5" as const,
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ id: "ema", lines: { ema: [10, 20] } }),
+          indicatorResult({
+            id: "range_gap",
+            settled: false,
+            error: "no MINUTE_5 series collected for 'US100'",
+            lines: null,
+          }),
+        ],
+      };
+    }
+
+    async function pickBoth(indicators: FakeIndicatorSource) {
+      await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: /^range_gap$/i }));
+      return indicators;
+    }
+
+    function twoEntries() {
+      const indicators = new FakeIndicatorSource();
+      indicators.catalogueEntries = [
+        indicatorEntry(),
+        indicatorEntry({ id: "range_gap", name: "Range Gap", output: "zones", group: "zones" }),
+      ];
+      return indicators;
+    }
+
+    it("draws the ones that computed and names the one that did not", async () => {
+      const indicators = twoEntries();
+      indicators.computeQueue = [partialCompute(), partialCompute()];
+      renderChart(source, { indicatorSource: indicators });
+      await act(async () => {
+        source.snapshot([bar(100, 1), bar(200, 2)]);
+      });
+      await pickBoth(indicators);
+
+      await waitFor(() => expect(lineSeries()).toHaveLength(1));
+      // Named by id: with several chosen, a count sends the operator looking for which.
+      expect(await screen.findByText(/range_gap unavailable/i)).toBeInTheDocument();
+    });
+
+    it("leaves no empty primitive behind for the one that could not be computed", async () => {
+      const indicators = twoEntries();
+      indicators.computeQueue = [partialCompute(), partialCompute()];
+      renderChart(source, { indicatorSource: indicators });
+      await act(async () => {
+        source.snapshot([bar(100, 1), bar(200, 2)]);
+      });
+      await pickBoth(indicators);
+
+      await waitFor(() => expect(lineSeries()).toHaveLength(1));
+      // An empty zone primitive would be the terminal drawing "computed, found none"
+      // over a result that says the opposite.
+      expect(stub.latest().series[0].primitives).toHaveLength(0);
+    });
+
+    it("keeps it selected — the operator chose it and the archive may yet hold the series", async () => {
+      const indicators = twoEntries();
+      indicators.computeQueue = [partialCompute(), partialCompute(), partialCompute()];
+      const onIndicatorSelectionsChange = vi.fn();
+      renderChart(source, { indicatorSource: indicators, onIndicatorSelectionsChange });
+      await act(async () => {
+        source.snapshot([bar(100, 1), bar(200, 2)]);
+      });
+      await pickBoth(indicators);
+
+      await waitFor(() => expect(lineSeries()).toHaveLength(1));
+      expect(screen.getByRole("checkbox", { name: /^range_gap$/i })).toBeChecked();
+      // What the grid slot saves is what was last reported, and it still has both.
+      const saved = onIndicatorSelectionsChange.mock.lastCall?.[0] ?? [];
+      expect(saved.map((s: { id: string }) => s.id).sort()).toEqual(["ema", "range_gap"]);
+    });
+
+    it("draws it on the next read that succeeds, without being picked again", async () => {
+      const indicators = twoEntries();
+      const computed = {
+        ...partialCompute(),
+        results: [
+          indicatorResult({ id: "ema", lines: { ema: [10, 20] } }),
+          indicatorResult({
+            id: "range_gap",
+            lines: null,
+            zones: [
+              {
+                from: 100,
+                to: 200,
+                top: 12,
+                bottom: 10,
+                direction: "bullish",
+                touchedAt: null,
+                filledAt: null,
+              },
+            ],
+          }),
+        ],
+      };
+      indicators.computeQueue = [partialCompute(), partialCompute(), computed, computed];
+      renderChart(source, { indicatorSource: indicators });
+      await act(async () => {
+        source.snapshot([bar(100, 1), bar(200, 2)]);
+      });
+      await pickBoth(indicators);
+      await waitFor(() => expect(screen.queryByText(/range_gap unavailable/i)).toBeInTheDocument());
+
+      // A new candle closes, the chart requeries with the same request shape, and this
+      // time the archive has what it needed.
+      await act(async () => {
+        source.emit({ kind: "bar", bar: bar(300, 3, true) }); // 200 just closed
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByText(/range_gap unavailable/i)).not.toBeInTheDocument(),
+      );
+      expect(stub.latest().series[0].primitives.length).toBeGreaterThan(0);
+    });
+  });
+
   it("raises the reason as a toast, where the badge has nowhere to put it", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [indicatorEntry()];

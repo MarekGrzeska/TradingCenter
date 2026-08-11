@@ -231,6 +231,7 @@ function mapIndicatorResult(raw: RawIndicatorResult): IndicatorResult {
     warmupBars: raw.warmup_bars,
     anchoredAt: raw.anchored_at === null ? null : parseIsoToEpochSeconds(raw.anchored_at),
     settled: raw.settled,
+    error: raw.error,
     lines: raw.lines,
     markers:
       raw.markers === null

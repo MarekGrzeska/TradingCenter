@@ -431,8 +431,14 @@ export interface IndicatorResult {
   warmupBars: number | null;
   anchoredAt: number | null;
   /** False when the archive did not hold enough history before the requested range
-   *  for this result to be trusted yet. */
+   *  for this result to be trusted yet. Says nothing about `error` — an unsettled
+   *  value is still a value. */
   settled: boolean;
+  /** Why this one indicator could not be computed, when the archive does not hold the
+   *  series it needs. Set instead of a shape, never beside one: an empty `zones` means
+   *  the range held none, which is a different claim and must not be drawn the same.
+   *  A request the archive refuses outright fails the whole read instead. */
+  error: string | null;
   lines: Record<string, (number | null)[]> | null;
   markers: IndicatorMarker[] | null;
   zones: IndicatorZone[] | null;
