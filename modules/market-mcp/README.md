@@ -25,6 +25,15 @@ built from the same `market_mcp/server.py`.
 - `client.py` — the one seam every request to `market-data` passes through. A method
   other than `GET` is rejected before a socket opens; the one named exception is
   `POST /indicators/{symbol}`, a computation, not a write.
+- `upstream.py` — narrow pydantic models for the shapes this module actually reads off
+  market-data's wire. Not `market_data.contract` — no shared library between modules.
+- `reduce.py` — the one place aggregation and truncation happen: bucket a candle series
+  down to a target count, or take the first N of a list, always saying what was cut.
+- `uncertainty.py` — the sentences every candle/coverage tool builds from `uncovered`,
+  `derived`, and an empty series, so the archive's own uncertainty reaches the model in
+  the same words wherever it applies.
+- `errors.py` — `ToolRefusal`, the one exception a tool raises to refuse a request; the
+  MCP server turns it into `isError=True` with the message as content.
 - `server.py` — builds the `FastMCP` instance and mounts `/health` on the same ASGI app
   the streamable-http transport serves, so the platform can probe it without an MCP
   session.
@@ -69,9 +78,19 @@ uv run pyright             # types, over market_mcp/
 | Tool | Answers | Reads |
 |------|---------|-------|
 | `list_tracked_pairs` | Which pairs the archive is collecting, and whether collection is happening — the first thing to check before asking about a symbol. | `GET /pairs` |
+| `get_candles` | OHLC candles over a time range, aggregated to ~200 buckets above the ceiling, refused above ~2000. | `GET /candles/{symbol}` |
+| `get_last_price` | The most recent candle, with its age — a price is not trustworthy without knowing how old it is. | `GET /candles/{symbol}` |
+| `summarize_range` | A window's shape in a dozen numbers: change, choppiness, biggest move — instead of its candles. | `GET /candles/{symbol}` |
+| `describe_coverage` | What the archive has actually verified for a pair, and how far back its history reaches. | `GET /coverage/{symbol}` |
+| `search_instruments` | The symbol other tools expect, from a name a person would type. | `GET /instruments/search` |
+
+Every candle/coverage tool distinguishes three reasons for an empty answer — nobody
+tracks the pair, the window is unverified, or the archive did not respond — instead of
+letting a caller read silence as "the market was quiet"
+(`specs/market-mcp-answers`).
 
 Growing incrementally — see `openspec/changes/add-market-data-mcp/tasks.md` for the rest
-of the surface (candles, coverage, indicators) and the reduction each one applies before
+of the surface (indicators) and the reduction each remaining tool applies before
 answering.
 
 ## Contract with market-data

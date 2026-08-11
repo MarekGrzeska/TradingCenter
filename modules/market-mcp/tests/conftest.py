@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import pytest
 
+from market_mcp.client import UpstreamClient
 from market_mcp.config import Settings
+from market_mcp.server import build_server
+
+BASE = "http://127.0.0.1:8020"
 
 
 def pytest_addoption(parser: pytest.Parser) -> None:
@@ -39,4 +43,12 @@ def _no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.fixture
 def settings() -> Settings:
-    return Settings(market_data_url="http://127.0.0.1:8020", _env_file=None)  # type: ignore[call-arg]
+    return Settings(market_data_url=BASE, _env_file=None)  # type: ignore[call-arg]
+
+
+@pytest.fixture
+def server(settings: Settings):
+    """The server and the client it was built with, so a test can close the client
+    and mock the exact base URL it will call."""
+    upstream = UpstreamClient(settings)
+    return build_server(settings, upstream), upstream
