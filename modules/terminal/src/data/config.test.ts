@@ -47,38 +47,43 @@ describe("resolveWsBase", () => {
 describe("resolveEndpoints", () => {
   const devLoc = { protocol: "http:", host: "localhost:5173" };
 
-  it("resolves both addresses independently from env", () => {
+  it("resolves every address independently from env", () => {
     const endpoints = resolveEndpoints(
       {
         VITE_ARCHIVE_HTTP: "/archive-api",
         VITE_ARCHIVE_WS: "/archive-api/ws",
+        VITE_AGENT_HTTP: "/agent-api",
       },
       devLoc,
     );
     expect(endpoints).toEqual({
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
+      agentHttp: "/agent-api",
     });
   });
 
-  it("resolves a fully split topology — static site and archive on two hosts", () => {
+  it("resolves a fully split topology — static site, archive and agent on three hosts", () => {
     const endpoints = resolveEndpoints(
       {
         VITE_ARCHIVE_HTTP: "https://archive.example.com",
         VITE_ARCHIVE_WS: "wss://archive.example.com/ws",
+        VITE_AGENT_HTTP: "https://agent.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
     expect(endpoints).toEqual({
       archiveHttp: "https://archive.example.com",
       archiveWs: "wss://archive.example.com/ws",
+      agentHttp: "https://agent.example.com",
     });
   });
 
-  it("falls back to the dev-proxy prefix when the env vars are unset, instead of throwing", () => {
+  it("falls back to the dev-proxy prefixes when the env vars are unset, instead of throwing", () => {
     expect(resolveEndpoints({}, devLoc)).toEqual({
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
+      agentHttp: "/agent-api",
     });
   });
 
@@ -88,12 +93,13 @@ describe("resolveEndpoints", () => {
   // server — which is why nothing in this suite noticed.
   //
   // The relative prefix is only safe if no tab claims it, so it is compared
-  // against the route list rather than eyeballed.
-  it("gives the archive no relative prefix that a tab route already claims", () => {
-    const { archiveHttp, archiveWs } = resolveEndpoints({}, devLoc);
+  // against the route list rather than eyeballed. Covers the agent's prefix too,
+  // since it is a relative default of the same shape.
+  it("gives the archive and agent no relative prefix that a tab route already claims", () => {
+    const { archiveHttp, archiveWs, agentHttp } = resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
-    const prefixes = [archiveHttp, new URL(archiveWs).pathname]
+    const prefixes = [archiveHttp, new URL(archiveWs).pathname, agentHttp]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);
 

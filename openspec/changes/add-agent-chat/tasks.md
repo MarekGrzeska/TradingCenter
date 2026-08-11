@@ -86,31 +86,31 @@
 
 ## 7. Terminal — panel agenta
 
-- [ ] 7.1 `src/data/config.ts` — `VITE_AGENT_HTTP` i domyślny prefiks `/agent-api`; proxy w
+- [x] 7.1 `src/data/config.ts` — `VITE_AGENT_HTTP` i domyślny prefiks `/agent-api`; proxy w
       `vite.config.ts`; test porównujący prefiksy z listą zakładek
-- [ ] 7.2 `src/agent/agentApi.ts` — DTO agenta pisane ręcznie, wywołania sesji i katalogu,
+- [x] 7.2 `src/agent/agentApi.ts` — DTO agenta pisane ręcznie, wywołania sesji i katalogu,
       token z `Identity`
-- [ ] 7.3 `src/agent/stream.ts` — parser ramek SSE nad `fetch` + `ReadableStream`, z testami
+- [x] 7.3 `src/agent/stream.ts` — parser ramek SSE nad `fetch` + `ReadableStream`, z testami
       na ramkę rozciętą między porcjami
-- [ ] 7.4 `agentChatStore.ts` — stan na sesjach z modułu zamiast zaszytych odpowiedzi;
+- [x] 7.4 `agentChatStore.ts` — stan na sesjach z modułu zamiast zaszytych odpowiedzi;
       zapamiętana ostatnio otwarta rozmowa, zachowany zapis stanu zwinięcia
-- [ ] 7.5 Lista rozmów w panelu: wybór rozmowy, nowa rozmowa, porządek od ostatnio używanej
-- [ ] 7.6 Wybierak modelu zbudowany z katalogu, z widoczną różnicą stawki; katalog
+- [x] 7.5 Lista rozmów w panelu: wybór rozmowy, nowa rozmowa, porządek od ostatnio używanej
+- [x] 7.6 Wybierak modelu zbudowany z katalogu, z widoczną różnicą stawki; katalog
       niedostępny mówi to wprost i nie podstawia listy z kodu
-- [ ] 7.7 Strumień w dymku: oczekiwanie przed pierwszym fragmentem, dopisywanie kolejnych,
+- [x] 7.7 Strumień w dymku: oczekiwanie przed pierwszym fragmentem, dopisywanie kolejnych,
       oznaczenie odpowiedzi niepełnej, komunikat o nieosiągalnym module
-- [ ] 7.8 Usunąć plakietkę „mockup" i zaszyte `CANNED_REPLY`/`seedMessages`
-- [ ] 7.9 Testy panelu: zmiana zakładki nie przerywa strumienia, powrót do rozmowy wczytuje
+- [x] 7.8 Usunąć plakietkę „mockup" i zaszyte `CANNED_REPLY`/`seedMessages`
+- [x] 7.9 Testy panelu: zmiana zakładki nie przerywa strumienia, powrót do rozmowy wczytuje
       transkrypt z modułu, przeładowanie wraca do tej samej rozmowy
 
 ## 8. Terminal — zakładka Agents cost
 
-- [ ] 8.1 Wpis w `src/app/tabs.ts` i widok `src/agent/cost/AgentCostView.tsx`
-- [ ] 8.2 Wybór zakresu dat; przekroje: model, rozmowa, czas; suma kosztu w jednym miejscu
-- [ ] 8.3 Przejście z rozmowy do jej wywołań
-- [ ] 8.4 Zużycie nieznane pokazane jako nieznane; pusty zakres mówi, że nic nie zużyto;
+- [x] 8.1 Wpis w `src/app/tabs.ts` i widok `src/agent/cost/AgentCostView.tsx`
+- [x] 8.2 Wybór zakresu dat; przekroje: model, rozmowa, czas; suma kosztu w jednym miejscu
+- [x] 8.3 Przejście z rozmowy do jej wywołań
+- [x] 8.4 Zużycie nieznane pokazane jako nieznane; pusty zakres mówi, że nic nie zużyto;
       moduł nieosiągalny mówi to wprost
-- [ ] 8.5 Testy: liczby biorą się z modułu, terminal niczego nie przelicza
+- [x] 8.5 Testy: liczby biorą się z modułu, terminal niczego nie przelicza
 
 ## 9. Środowisko lokalne
 

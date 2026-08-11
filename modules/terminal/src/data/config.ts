@@ -49,6 +49,12 @@ export interface Endpoints {
    *  own any more. */
   archiveHttp: string;
   archiveWs: string;
+  /** `agent`, for the conversation and its cost. Its own address rather than a path
+   *  under the archive's: Static Web Apps cannot proxy a stream any more than it can a
+   *  WebSocket, so the agent gets the same split treatment as the archive — see
+   *  design.md, "Static Web Apps nie przeprowadzi strumienia". No WS counterpart: the
+   *  agent's stream rides plain HTTP (`fetch` + `ReadableStream`), not a socket. */
+  agentHttp: string;
 }
 
 // Same defaults as .env.example: a checkout without one falls back to the dev proxy
@@ -58,10 +64,12 @@ export interface Endpoints {
 // the mistake. See the note in vite.config.ts.
 const DEFAULT_ARCHIVE_HTTP = "/archive-api";
 const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
+const DEFAULT_AGENT_HTTP = "/agent-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
   VITE_ARCHIVE_WS?: string;
+  VITE_AGENT_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
@@ -108,5 +116,6 @@ export function resolveEndpoints(
   return {
     archiveHttp: resolveHttpBase(env.VITE_ARCHIVE_HTTP || DEFAULT_ARCHIVE_HTTP),
     archiveWs: resolveWsBase(env.VITE_ARCHIVE_WS || DEFAULT_ARCHIVE_WS, loc),
+    agentHttp: resolveHttpBase(env.VITE_AGENT_HTTP || DEFAULT_AGENT_HTTP),
   };
 }

@@ -23,6 +23,7 @@ function handler(method: string) {
 export const http = {
   get: handler("GET"),
   post: handler("POST"),
+  patch: handler("PATCH"),
   delete: handler("DELETE"),
   put: handler("PUT"),
 };
