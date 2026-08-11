@@ -82,7 +82,7 @@ class RayPaneView implements IPrimitivePaneView {
 }
 
 /**
- * A series primitive drawing every `IndicatorLevel` a `levels`-output wskaźnik
+ * A series primitive drawing every `IndicatorLevel` a `levels`-output indicator
  * answered with — one instance per (id, params) result, its `levels` replaced
  * wholesale on every recompute rather than diffed, the same way a Line series'
  * `setData` replaces its points (task 3.9).

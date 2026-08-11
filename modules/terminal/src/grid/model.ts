@@ -29,7 +29,7 @@ export interface SlotConfig {
    *  than rendering an empty chart. */
   symbol: string | null;
   resolution: Resolution;
-  /** The wskaźniki chosen for this slot, the same way it remembers its
+  /** The indicators chosen for this slot, the same way it remembers its
    *  instrument and interval (terminal-grid spec, "Slot pamięta własny zestaw
    *  wskaźników"). An entry whose `id` the catalogue no longer offers is
    *  `Chart`'s problem to notice and skip, not this shape's to validate — this

@@ -20,7 +20,7 @@ from market_data.routers.indicators import REQUEST_CEILING
 
 # Measured on the machine that set this: the full catalogue at exactly
 # REQUEST_CEILING candles×entries costs ~63ms p95 (was ~16.5ms for 10 entries
-# at 5000 candles in etap zero — the ceiling itself, not the per-entry cost,
+# at 5000 candles in the first stage — the ceiling itself, not the per-entry cost,
 # is what grew, and cells scale roughly linearly with either factor). Ten
 # times that, so only a real regression trips it.
 GENEROUS_BOUND_SECONDS = 0.63

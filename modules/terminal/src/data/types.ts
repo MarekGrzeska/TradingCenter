@@ -176,7 +176,7 @@ export interface PairCoverage {
   earliestReachable: number | null;
 }
 
-// --- collection jobs: dociąganie historii, jako coś operator zleca i śledzi ---
+// --- collection jobs: backfilling history, as something the operator orders and follows ---
 //
 // Only the Instruments tab's wizard and the Data History tab speak these — the
 // chart never sees one. `market-data-jobs` spec: a job is the decision, a
@@ -315,10 +315,10 @@ export interface PairDeletion {
   removedTo: number | null;
 }
 
-// --- indicators: wskaźniki liczone on the archive's own series ---
+// --- indicators: computed on the archive's own series ---
 //
 // Only the chart and its picker speak these. The catalogue is data, not a hand-kept
-// list — a wskaźnik the archive starts offering shows up here without a terminal
+// list — an indicator the archive starts offering shows up here without a terminal
 // release, as long as its output shape and render style are ones the chart already
 // knows how to draw (`market-data-indicators` spec, "Katalog wystarcza do zbudowania
 // wybieraka").
@@ -351,19 +351,19 @@ export interface IndicatorRender {
   pane: IndicatorPane;
   style: IndicatorStyle;
   scale: IndicatorScale;
-  /** Whether this wskaźnik's own values may widen the price axis it shares — off for
+  /** Whether this indicator's own values may widen the price axis it shares — off for
    *  one whose values are not comparable to price, so a long average sitting far from
    *  the current price cannot flatten the candles it is drawn over. */
   autoscale: boolean;
   range: [number, number] | null;
-  /** Reference lines to draw for this wskaźnik, e.g. 30/70 for RSI. */
+  /** Reference lines to draw for this indicator, e.g. 30/70 for RSI. */
   levels: number[];
 }
 
 export type IndicatorOutputShape = "lines" | "markers" | "zones" | "levels";
 export type IndicatorWarmupKind = "fixed" | "decay" | "anchored";
 
-/** One row of the catalogue — everything the picker needs to offer this wskaźnik and
+/** One row of the catalogue — everything the picker needs to offer this indicator and
  *  everything the chart needs to draw it, without either knowing it by name. */
 export interface IndicatorCatalogueEntry {
   id: string;
@@ -384,7 +384,7 @@ export interface IndicatorCatalogue {
   indicators: IndicatorCatalogueEntry[];
 }
 
-/** One wskaźnik as the operator chose it — never the resolved defaults, so a catalogue
+/** One indicator as the operator chose it — never the resolved defaults, so a catalogue
  *  update that changes a default does not silently change what a saved slot draws.
  *  What `terminal-grid` spec's slot state actually stores. */
 export interface IndicatorSelection {
@@ -420,14 +420,14 @@ export interface IndicatorLevel {
   count: number | null;
 }
 
-/** One requested wskaźnik's answer. Exactly one of `lines`/`markers`/`zones`/`levels`
+/** One requested indicator's answer. Exactly one of `lines`/`markers`/`zones`/`levels`
  *  is set — the one its catalogue entry's `output` names. */
 export interface IndicatorResult {
   id: string;
   /** Resolved params — defaults filled in, so a chart reading this back never has to
    *  consult the catalogue to know what it is drawing. */
   params: Record<string, number>;
-  /** Null for a kotwica-anchored wskaźnik, which carries `anchoredAt` instead. */
+  /** Null for an anchored indicator, which carries `anchoredAt` instead. */
   warmupBars: number | null;
   anchoredAt: number | null;
   /** False when the archive did not hold enough history before the requested range
@@ -439,7 +439,7 @@ export interface IndicatorResult {
   levels: IndicatorLevel[] | null;
 }
 
-/** `POST /indicators/{symbol}` — one or more wskaźniki, on one shared time axis. */
+/** `POST /indicators/{symbol}` — one or more indicators, on one shared time axis. */
 export interface IndicatorsResult {
   symbol: string;
   resolution: Resolution;

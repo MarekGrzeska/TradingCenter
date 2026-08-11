@@ -5,7 +5,7 @@ market-data's wire" and `design.md`'s risk list:
 
 - An entry declares a line its `compute` never produces (or produces one it never
   declared) — nothing about Python or FastAPI catches that on its own.
-- An entry crosses into orzekanie: a boolean output, a volume input, a second
+- An entry crosses into deciding: a boolean output, a volume input, a second
   instrument. `market-data-indicators` spec, "Katalog mierzy, a nie orzeka" and "Wskaźnik
   liczy się z jednej serii świec".
 """
@@ -79,7 +79,7 @@ class TestCatalogueBoundary:
             assert "volume" not in entry.inputs, entry.id
 
     def test_no_entry_takes_a_second_instrument(self):
-        # A relational wskaźnik would need a second symbol as an input or a param;
+        # A relational indicator would need a second symbol as an input or a param;
         # neither exists anywhere in this catalogue's shape today.
         for entry in CATALOGUE:
             assert not any("symbol" in p.name for p in entry.params), entry.id
@@ -149,7 +149,7 @@ class TestCatalogueGoldenFile:
     """Task 2.10's "pliki wzorcowe dla całego zestawu" — every entry, at its
     default parameters, on the same committed series `test_indicators_kernel.py`
     already golden-tests `sma`/`ema`/`atr` against (with an added `open` column,
-    absent from that file until now because nothing in etap zero read it). A
+    absent from that file until now because nothing in the first stage read it). A
     formula change shows up here as a diff, not as a chart that quietly draws
     something else (design.md, "Zmiana wzoru bez podniesienia wersji")."""
 

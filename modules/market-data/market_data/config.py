@@ -87,10 +87,10 @@ class Settings(BaseSettings):
     # number below is 20 instruments' worth of them.
     max_tracked_pairs: int = 160
 
-    # A wskaźnik computation is a Python loop for every recursive filter it touches, and
+    # An indicator computation is a Python loop for every recursive filter it touches, and
     # that loop holds the GIL — a thread would not free the event loop the way it does for
     # I/O, so the limit here is a plain gate, not a pool. Bounds how many `POST
-    # /indicators/*` requests compute at once, so one asking for many wskaźniki over a
+    # /indicators/*` requests compute at once, so one asking for many indicators over a
     # long range cannot stall the candle stream every other request depends on.
     indicator_concurrency: int = 4
 

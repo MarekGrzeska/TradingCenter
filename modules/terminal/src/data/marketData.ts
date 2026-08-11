@@ -64,6 +64,6 @@ export const instruments = gateway;
  */
 export const archive: ArchiveAdmin = archiveSource;
 
-/** The same archive again, narrowed to the wskaźniki it can compute — only the chart
+/** The same archive again, narrowed to the indicators it can compute — only the chart
  *  and its picker have any business with this. */
 export const indicators: IndicatorSource = archiveSource;

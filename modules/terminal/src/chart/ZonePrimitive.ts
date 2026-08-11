@@ -90,7 +90,7 @@ function colorFor(direction: DrawnZone["direction"], colors: ZoneColors): string
 }
 
 /**
- * A series primitive drawing every `Zone` a `zones`-output wskaźnik answered
+ * A series primitive drawing every `Zone` a `zones`-output indicator answered
  * with — `range_gap`, `body_gap`, `session_range_*`, `opening_range` (task
  * 4.7). Its zones are replaced wholesale on every recompute, the same
  * convention `RayPrimitive.setLevels` already uses for `levels`.

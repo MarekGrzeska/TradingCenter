@@ -60,9 +60,9 @@ export interface ChartProps {
    *  resolution that can only end in a refusal (terminal-grid spec, "Slot ma
    *  własny instrument i własny interwał"). */
   resolutions?: readonly Resolution[];
-  /** Wskaźniki: the catalogue to build the picker from and the computation
+  /** Indicators: the catalogue to build the picker from and the computation
    *  behind it. Omitted, the chart draws candles exactly as before — a caller
-   *  with nowhere to compute wskaźniki simply does not offer them. */
+   *  with nowhere to compute indicators simply does not offer them. */
   indicatorSource?: IndicatorSource;
   /** What the operator had selected when this chart last mounted — omitted, it
    *  starts with none. Read once, not kept in sync afterward: a caller that
@@ -82,7 +82,7 @@ export interface ChartProps {
  *  `TimeProfilePrimitive` rather than `RayPrimitive` further down, but it is
  *  a *drawing* choice, not a *drawable* one, so it does not belong here.
  *  Kept as a predicate rather than a filter on the catalogue itself: the
- *  picker still lists every wskaźnik the archive offers, this only decides
+ *  picker still lists every indicator the archive offers, this only decides
  *  which of them the operator may currently pick. */
 function canDrawIndicator(entry: IndicatorCatalogueEntry): boolean {
   if (entry.output === "lines") {
@@ -154,35 +154,35 @@ export function Chart({
   // `syncPriceLine` for why the series' built-in one does not do.
   const priceLineRef = useRef<IPriceLine | null>(null);
   const colorsRef = useRef<ChartColors | null>(null);
-  // One series per (wskaźnik, params, line key) — Line unless the line asks for
+  // One series per (indicator, params, line key) — Line unless the line asks for
   // a histogram (MACD's, so far) — see the sync effect below.
   const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(
     new Map(),
   );
-  // One pane per (wskaźnik, params) whose `render.pane` is "own" — RSI and MACD
+  // One pane per (indicator, params) whose `render.pane` is "own" — RSI and MACD
   // each get their own row, the way every other charting platform draws them,
-  // rather than sharing one oscillator pane between wskaźniki that disagree
+  // rather than sharing one oscillator pane between indicators that disagree
   // about scale.
   const ownPanesRef = useRef<Map<string, IPaneApi<Time>>>(new Map());
   // The catalogue's reference-level hint (RSI's 30/70, …) drawn once per
-  // (wskaźnik, params) rather than recomputed every render — the levels never
+  // (indicator, params) rather than recomputed every render — the levels never
   // change while the selection is active, only the lines they sit behind do.
   const levelLinesRef = useRef<
     Map<string, { series: ISeriesApi<"Line"> | ISeriesApi<"Histogram">; lines: IPriceLine[] }>
   >(new Map());
-  // One `createSeriesMarkers` plugin per (wskaźnik, params) whose output is
+  // One `createSeriesMarkers` plugin per (indicator, params) whose output is
   // `markers` — `swing_points`, so far — attached to the price series, since
   // `canDrawIndicator` only offers markers/levels entries drawn on it.
   const markerPluginsRef = useRef<Map<string, ISeriesMarkersPluginApi<Time>>>(new Map());
-  // One `RayPrimitive` per (wskaźnik, params) whose output is `levels` and
+  // One `RayPrimitive` per (indicator, params) whose output is `levels` and
   // whose `render.style` is not `"histogram"` — `htf_levels_*`, `pivots_*`,
   // `level_clusters` — replacing its levels wholesale on every recompute
   // rather than being torn down and rebuilt.
   const rayPrimitivesRef = useRef<Map<string, RayPrimitive>>(new Map());
-  // One `ZonePrimitive` per (wskaźnik, params) whose output is `zones` —
+  // One `ZonePrimitive` per (indicator, params) whose output is `zones` —
   // `range_gap`, `body_gap`, `session_range_*`, `opening_range` (task 4.7).
   const zonePrimitivesRef = useRef<Map<string, ZonePrimitive>>(new Map());
-  // One `TimeProfilePrimitive` per (wskaźnik, params) whose output is
+  // One `TimeProfilePrimitive` per (indicator, params) whose output is
   // `levels` with `render.style === "histogram"` — `time_profile`, the one
   // entry that draws a histogram rather than reference rays (task 5.4).
   const timeProfilePrimitivesRef = useRef<Map<string, TimeProfilePrimitive>>(new Map());
@@ -196,7 +196,7 @@ export function Chart({
   const [latestBar, setLatestBar] = useState<Bar | null>(null);
   const latestFrameRef = useRef(0);
 
-  // --- wskaźniki: chosen by the operator, computed over whatever the chart draws ---
+  // --- indicators: chosen by the operator, computed over whatever the chart draws ---
   const [indicatorSelections, setIndicatorSelectionsState] = useState<IndicatorSelection[]>(
     () => initialIndicatorSelections ?? [],
   );
@@ -208,9 +208,9 @@ export function Chart({
     setIndicatorSelectionsState(next);
     onIndicatorSelectionsChangeRef.current?.(next);
   }, []);
-  // The range wskaźniki are computed over — set from what `redraw` actually drew, not
-  // from every live tick, so a wskaźnik does not refetch on each forming-candle update
-  // (design.md's "na żywo" is a later etap; see `useIndicators`).
+  // The range indicators are computed over — set from what `redraw` actually drew, not
+  // from every live tick, so an indicator does not refetch on each forming-candle update
+  // (design.md's "na żywo" is a later stage; see `useIndicators`).
   const [barsRange, setBarsRange] = useState<BarsRange | null>(null);
 
   const catalogue = useIndicatorCatalogue(indicatorSource);
@@ -218,7 +218,7 @@ export function Chart({
     () => new Map(catalogue.entries.map((entry) => [entry.id, entry] as const)),
     [catalogue.entries],
   );
-  // A selection restored from a saved slot may name a wskaźnik the catalogue no
+  // A selection restored from a saved slot may name an indicator the catalogue no
   // longer offers (a removed entry, or storage from a build that had a
   // different one). Dropped from what actually computes and draws — surfaced
   // in the header instead — but never rewritten in the caller's storage on its
@@ -340,7 +340,7 @@ export function Chart({
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
       priceLineRef.current = null;
-      // Every wskaźnik series, pane, reference level, marker plugin and
+      // Every indicator series, pane, reference level, marker plugin and
       // primitive belonged to it too — `chart.remove()` already freed them,
       // this only stops the sync effect below from reaching for one that is
       // gone.
@@ -455,7 +455,7 @@ export function Chart({
     const range = timeScale?.getVisibleLogicalRange() ?? null;
 
     seriesRef.current?.setData(merged.map(toCandlestick));
-    // Structural change to what is drawn — recompute wskaźniki over the new span.
+    // Structural change to what is drawn — recompute indicators over the new span.
     // Not on every live tick: `applyBar`'s hot path never calls `redraw`.
     setBarsRange(merged.length > 0 ? { from: merged[0].time, to: merged.at(-1)!.time } : null);
 
@@ -563,13 +563,13 @@ export function Chart({
     seriesRef.current?.setData([]);
     setReadout(null);
     setLatestBar(null);
-    // A wskaźnik computed for the previous series has no business staying on screen
+    // An indicator computed for the previous series has no business staying on screen
     // while the new one loads — `barsRange` going null empties `indicatorsState.results`
     // (`useIndicators`), which the sync effect below reads as "remove every line".
     setBarsRange(null);
   }, [source, symbol, resolution]);
 
-  // --- wskaźniki: one Line series per (id, params, line key), synced to what the
+  // --- indicators: one Line series per (id, params, line key), synced to what the
   // archive last answered. A price-pane entry draws on the candles' own pane; an
   // own-pane entry (RSI, ATR, MACD, …) gets a pane of its own, one per (id,
   // params) rather than one shared by every oscillator — see `canDrawIndicator`.
@@ -710,7 +710,7 @@ export function Chart({
           // `preserveEmptyPane: true` — without it, the chart removes a pane
           // on its own the moment its last series does (`IPaneApi.
           // preserveEmptyPane` docs), racing the explicit `chart.removePane`
-          // below: deselecting one of two own-pane wskaźniki left the other's
+          // below: deselecting one of two own-pane indicators left the other's
           // pane index stale and threw. This keeps removal singly-owned, by
           // the cleanup loop, which already knows to look up a live index.
           pane = chart.addPane(true);
@@ -999,9 +999,9 @@ interface IndicatorReadoutEntry {
 }
 
 /**
- * The wskaźnik values for whichever bar `OhlcReadout` is already showing — the same
+ * The indicator values for whichever bar `OhlcReadout` is already showing — the same
  * bar the OHLC fields answer for, found by matching time rather than index, since a
- * wskaźnik's own axis can start later than the candle series (`warmup_from`).
+ * indicator's own axis can start later than the candle series (`warmup_from`).
  */
 function activeIndicatorReadout(
   shown: Readout,

@@ -12,7 +12,7 @@ export interface IndicatorCatalogueState {
 }
 
 /**
- * The picker's whole vocabulary, read once and shared by every chart. A wskaźnik the
+ * The picker's whole vocabulary, read once and shared by every chart. An indicator the
  * archive starts offering appears here without a terminal release — this hook is the
  * one place that turns the catalogue into something a picker can render
  * (`market-data-indicators` spec, "Katalog wystarcza do zbudowania wybieraka").

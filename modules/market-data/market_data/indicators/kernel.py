@@ -16,7 +16,7 @@ module exists to rule out.
 
 Every operation runs at `float64` and every reduction has one fixed order — never a
 parallel or tree reduction — because two orderings of the same sum can differ in the
-last bit, and a wskaźnik that isn't the same twice isn't the product this module sells.
+last bit, and an indicator that isn't the same twice isn't the product this module sells.
 """
 
 from __future__ import annotations
@@ -258,8 +258,8 @@ def cross(a: FloatArray, b: FloatArray) -> np.ndarray:
     `0.0` otherwise, `np.nan` for the first bar (no previous bar to cross from).
 
     Not read by any catalogue entry yet — a foundation primitive for the marker-
-    shaped wskaźniki later etapy add (design.md's ~20-primitive list), added now so
-    later stages spend their budget on the wskaźnik, not the primitive.
+    shaped indicators later stages add (design.md's ~20-primitive list), added now so
+    later stages spend their budget on the indicator, not the primitive.
     """
     arr_a, arr_b = _as_float64(a), _as_float64(b)
     n = len(arr_a)

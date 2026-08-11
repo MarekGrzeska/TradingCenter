@@ -228,7 +228,7 @@ describe("GridView layout (terminal-grid spec)", () => {
     });
   });
 
-  it("restores a slot's chosen wskaźniki across a remount, the same as its instrument", async () => {
+  it("restores a slot's chosen indicators across a remount, the same as its instrument", async () => {
     fakeIndicators = new FakeIndicatorSource();
     fakeIndicators.catalogueEntries = [indicatorEntry({ id: "ema" })];
     const user = userEvent.setup();

@@ -56,7 +56,7 @@ export interface ChartColors {
   axis: string;
   up: string;
   down: string;
-  /** Fixed order, indexed by how many wskaźnik lines are already drawn — never by
+  /** Fixed order, indexed by how many indicator lines are already drawn — never by
    *  which one a line is, so adding or removing one never repaints another
    *  (dataviz skill, "Color follows the entity, never its rank"; here the order of
    *  appearance is the entity, since a line has no identity a legend names). Cycles

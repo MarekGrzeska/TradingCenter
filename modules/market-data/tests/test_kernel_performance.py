@@ -2,7 +2,7 @@
 
 The number that actually decided `routers/indicators.py`'s `REQUEST_CEILING` came from
 running this same batch by hand and reading `time.perf_counter` across 200 repetitions
-(design.md, "Sufit żądania zamiast odciążania wątkiem") — 5000 candles × 10 wskaźniki
+(design.md, "Sufit żądania zamiast odciążania wątkiem") — 5000 candles × 10 indicators
 cost 16.5ms at p95 on the machine that measured it. This test is not that measurement: CI
 hardware varies too much for a tight bound to mean anything. It exists to catch the
 mistake that would invalidate the ceiling entirely — a vectorised primitive turning back

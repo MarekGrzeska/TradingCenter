@@ -112,7 +112,7 @@ def _candles_written(chunks: list[Chunk]) -> int:
 
 
 def _progress(chunks: list[Chunk]) -> tuple[int, int]:
-    """(kawałki ukończone, kawałki wszystkie) — done and skipped both count as settled,
+    """(chunks settled, chunks total) — done and skipped both count as settled,
     the way a fill that found nothing further back is not a failure."""
     done = sum(1 for chunk in chunks if chunk.state in SETTLED_CHUNK_STATES)
     return done, len(chunks)

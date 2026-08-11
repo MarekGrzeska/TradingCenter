@@ -71,7 +71,7 @@ export interface Candle {
   close: number;
 }
 
-/** A wskaźnik line's own point shape — `value` absent (rather than `null`) is how
+/** An indicator line's own point shape — `value` absent (rather than `null`) is how
  *  `lightweight-charts` spells a whitespace gap, which is what `Chart.tsx` sends for
  *  an index with no computed value. */
 export interface LinePoint {
@@ -88,7 +88,7 @@ export interface FakePriceLine {
 }
 
 /** What `createSeriesMarkers(series, …)` hands back — task 3.8. One per series;
- *  `Chart.tsx` keeps its own map from (wskaźnik, params) to the plugin instead
+ *  `Chart.tsx` keeps its own map from (indicator, params) to the plugin instead
  *  of asking the series for it, so this only needs to record the last call. */
 export interface FakeMarkerPlugin {
   series: FakeSeries;
@@ -129,7 +129,7 @@ export interface FakeSeries {
   attachPrimitive(primitive: unknown): void;
   detachPrimitive(primitive: unknown): void;
   /** Every `createSeriesMarkers(series, …)` call made against this series —
-   *  `Chart.tsx` keeps at most one live per (wskaźnik, params), so a test
+   *  `Chart.tsx` keeps at most one live per (indicator, params), so a test
    *  reads the last one to see what is actually still on screen. */
   markerPlugins: FakeMarkerPlugin[];
 }
@@ -465,7 +465,7 @@ export function indicatorResult(overrides: Partial<IndicatorResult> = {}): Indic
 }
 
 /**
- * A wskaźnik source the test drives directly — no HTTP, no fake server. `computeQueue`
+ * An indicator source the test drives directly — no HTTP, no fake server. `computeQueue`
  * answers successive `computeIndicators` calls in order; an exhausted queue answers with
  * an empty result, which is how "nothing computed yet" looks without a test having to
  * seed one for every call it does not care about.

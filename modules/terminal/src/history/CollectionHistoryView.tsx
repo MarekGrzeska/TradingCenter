@@ -12,7 +12,7 @@ import type { JobHistoryState } from "./useJobHistory";
 /**
  * Every pull the archive has run, per instrument and per interval — the
  * question `market-data-jobs` exists to answer without a log: what got
- * dociągnięte, how far a running one has got, and where to retry what
+ * backfilled, how far a running one has got, and where to retry what
  * failed without touching the pair's archived status at all.
  */
 

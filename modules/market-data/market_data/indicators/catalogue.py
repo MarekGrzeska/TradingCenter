@@ -1,8 +1,8 @@
-"""What can be asked for, and how to compute it — one entry per wskaźnik.
+"""What can be asked for, and how to compute it — one entry per indicator.
 
 An entry is the whole contract between this module and everyone reading `GET
 /indicators`: id, parameters, the shape it answers in, how to draw it, and the function
-that produces it. A consumer never needs to know a wskaźnik by name to offer it — it reads
+that produces it. A consumer never needs to know an indicator by name to offer it — it reads
 this list (`market-data-indicators` spec, "Katalog wystarcza do zbudowania wybieraka").
 
 Kept separate from `kernel.py` on purpose: this file knows about parameters, defaults and
@@ -84,7 +84,7 @@ class Render:
     pane: Literal["price", "own"]
     style: Literal["line", "dots", "histogram"]
     scale: Literal["price", "own", "fixed"] = "price"
-    # Whether this wskaźnik's own values may widen the price axis it shares. A long
+    # Whether this indicator's own values may widen the price axis it shares. A long
     # average sitting far from the current price would otherwise flatten the candles it
     # is drawn over (docs/wskazniki-plan-wdrozenia.html, pułapka 1).
     autoscale: bool = True
@@ -308,7 +308,7 @@ _ATR_PCT = IndicatorSpec(
     },
 )
 
-# --- geometria świecy: six numbers every candlestick pattern and every "reaction
+# --- candle geometry: six numbers every candlestick pattern and every "reaction
 # at a level" is built from, normalised so they compare across candles and
 # instruments (docs/wskazniki-plan-wdrozenia.html, "Geometria świecy"). ---
 
@@ -396,7 +396,7 @@ _GAP_PREV_CLOSE_ATR = IndicatorSpec(
     },
 )
 
-# --- położenie w zakresie: where the close sits against its own recent history,
+# --- position in the range: where the close sits against its own recent history,
 # without naming the halves "premium" or "discount" — that split is a threshold,
 # a strategy's job, not a measure's (spec "Katalog mierzy, a nie orzeka"). ---
 
@@ -433,7 +433,7 @@ _ZSCORE = IndicatorSpec(
     },
 )
 
-# --- zmienność z OHLC: a family with no volume in it at all, built for exactly
+# --- volatility from OHLC: a family with no volume in it at all, built for exactly
 # the data this archive has (docs/wskazniki-plan-wdrozenia.html, "Zmienność z
 # OHLC"). None of these annualise — the module has no trading calendar to
 # annualise against (design.md, Ichimoku/Alligator decision) — so every one reads
@@ -565,7 +565,7 @@ _ULCER = IndicatorSpec(
     compute=_compute_ulcer,
 )
 
-# --- reżim: whether there is a trend at all, the question none of the geometry
+# --- regime: whether there is a trend at all, the question none of the geometry
 # above answers, and the one a "break of structure" needs an honest answer to
 # before it means anything (docs/wskazniki-plan-wdrozenia.html, "Reżim"). ---
 
@@ -716,9 +716,9 @@ _R_SQUARED = IndicatorSpec(
     compute=lambda s, p: {"r_squared": kernel.r_squared(s.close, int(p["period"]))},
 )
 
-# --- średnie: bias and reference point, cheap because every one of them comes
+# --- averages: bias and reference point, cheap because every one of them comes
 # from the same primitives (docs/wskazniki-plan-wdrozenia.html, "Średnie"). `sma`
-# and `ema` are already in the catalogue from etap zero. ---
+# and `ema` are already in the catalogue from the first stage. ---
 
 _WMA = IndicatorSpec(
     id="wma",
@@ -1038,7 +1038,7 @@ _CMO = IndicatorSpec(
     compute=_compute_cmo,
 )
 
-# --- wstęgi i kanały: donchian is also "where the last n bars' extremes sit" —
+# --- bands and channels: donchian is also "where the last n bars' extremes sit" —
 # the same number serving two very different purposes
 # (docs/wskazniki-plan-wdrozenia.html, "Wstęgi i kanały"). ---
 
@@ -1083,7 +1083,7 @@ _BBANDS_PERCENT_B = IndicatorSpec(
         Param(name="mult", type="float", default=2.0, min=0.1, max=10.0),
     ),
     lines=(LineSpec(key="percent_b", label="%B {period}"),),
-    # Not pinned to [0, 1] like the ratios in "geometria świecy" — a price outside
+    # Not pinned to [0, 1] like the ratios in "candle geometry" — a price outside
     # its own bands is exactly what this line exists to show, and a fixed scale
     # would clip that off screen.
     render=Render(pane="own", style="line", scale="own", autoscale=True, levels=(0.0, 1.0)),
@@ -1193,17 +1193,17 @@ _ENVELOPE = IndicatorSpec(
     compute=_compute_envelope,
 )
 
-# --- punkty i poziomy: rzadkie zdarzenia i linie odniesienia, wciąż bez
-# interpretacji (docs/wskazniki-plan-wdrozenia.html, "W1 — punkty i poziomy").
+# --- points and levels: rare events and reference lines, still with no
+# interpretation on top (docs/wskazniki-plan-wdrozenia.html, "W1 — punkty i poziomy").
 # `n` here is the one decision the whole group shares — how many bars on each
-# side make a fraktal — and every entry below takes it as its own parameter
+# side make a fractal — and every entry below takes it as its own parameter
 # rather than assuming a shared default, so a caller composing e.g. `swing_points`
 # with `level_clusters` is the one who decides they agree. ---
 
 
 def _swing_extremes(high: np.ndarray, low: np.ndarray, n: int) -> tuple[np.ndarray, np.ndarray]:
     """Bar `i` is a swing high when `high[i]` is strictly greater than each of the
-    `n` bars on both sides — a fraktal Williamsa. `True` only once those `n` bars
+    `n` bars on both sides — a Williams fractal. `True` only once those `n` bars
     *after* `i` exist in the array; turning "not yet confirmed" into a gap rather
     than a repainted answer is the caller's job (`_compute_swing_points`,
     `_last_swing_series`), not this function's.
@@ -1389,14 +1389,14 @@ _LEVEL_CLUSTERS = IndicatorSpec(
     compute_cluster_levels=_compute_level_clusters,
 )
 
-# --- poziomy z wyższego interwału: odczyt międzyrozdzielczościowy z zamkniętego
-# okresu — jedna świeca DAY/WEEK, cztery lub siedem promieni z niej wyprowadzonych
-# (docs/wskazniki-plan-wdrozenia.html, "htf_levels(okres)" i "pivots(typ, okres)").
-# `okres` jest tu wyborem identyfikatora katalogowego, nie parametrem liczbowym —
-# ten sam wybór, jaki `bbands_percent_b` już robi dla „kształtu wyjścia" zamiast
-# przyjmować go jako `mode`. Router (`routers/indicators.py`) czyta serię nazwaną
-# w `higher_resolution` osobno i podaje tu gotową krotkę OHLC jednej zamkniętej
-# świecy — żadna z funkcji poniżej nie widzi bazy danych. ---
+# --- levels from a higher interval: a cross-resolution read of one closed period
+# — a single DAY/WEEK candle, four or seven rays drawn out of it
+# (docs/wskazniki-plan-wdrozenia.html, "htf_levels(okres)" and "pivots(typ, okres)").
+# The period is a choice of catalogue id here, not a numeric parameter — the same
+# choice `bbands_percent_b` already makes for its output shape instead of taking it
+# as a `mode`. The router (`routers/indicators.py`) reads the series named in
+# `higher_resolution` separately and hands the OHLC tuple of one closed candle down
+# ready — none of the functions below ever sees the database. ---
 
 
 def _htf_ohlc_levels(ohlc: tuple[float, float, float, float], prefix: str) -> list[HtfLevel]:
@@ -1873,7 +1873,7 @@ _TIME_PROFILE = IndicatorSpec(
 )
 
 # Ordered as it is meant to be offered — averages first, since `sma` and `ema` are the
-# entries every future wskaźnik in this group will sit beside.
+# entries every future indicator in this group will sit beside.
 CATALOGUE: tuple[IndicatorSpec, ...] = (
     _SMA,
     _EMA,

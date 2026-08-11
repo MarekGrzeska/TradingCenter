@@ -26,10 +26,10 @@ const IDLE: IndicatorsState = {
 };
 
 /**
- * Computes the operator's chosen wskaźniki over whatever range the chart currently has
+ * Computes the operator's chosen indicators over whatever range the chart currently has
  * candles for — recomputed when that range changes structurally (a new symbol, a new
  * resolution, older history paged in), not on every live tick. Chasing the forming
- * candle is `docs/wskazniki-plan-wdrozenia.html`'s etap 5 (na żywo), not this one: an
+ * candle is `docs/wskazniki-plan-wdrozenia.html`'s stage 5 ("na żywo"), not this one: an
  * indicator here holds its last computed value until the next structural change.
  *
  * A failed compute never touches what candles are on screen — `market-data-indicators`

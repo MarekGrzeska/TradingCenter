@@ -604,7 +604,7 @@ describe("Chart — the price on the right-hand scale", () => {
   });
 });
 
-describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", () => {
+describe("Chart — indicators (terminal-chart spec, market-data-indicators)", () => {
   function lineSeries() {
     return stub.latest().series.filter((s) => s.type === "Line");
   }
@@ -624,7 +624,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(await screen.findByText("EMA")).toBeInTheDocument();
   });
 
-  it("computes the chosen wskaźnik over the range the chart actually drew, and draws a line", async () => {
+  it("computes the chosen indicator over the range the chart actually drew, and draws a line", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [indicatorEntry()];
     indicators.computeQueue = [
@@ -712,7 +712,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
       source.snapshot([bar(100, 1)]);
     });
 
-    // Only the wskaźnik the catalogue still recognizes is ever asked for.
+    // Only the indicator the catalogue still recognizes is ever asked for.
     await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
     expect(indicators.computeCalls[0].specs).toEqual([{ id: "ema", params: { period: 20 } }]);
 
@@ -728,7 +728,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     ]);
   });
 
-  it("draws an own-pane wskaźnik in a pane of its own, not the price pane", async () => {
+  it("draws an own-pane indicator in a pane of its own, not the price pane", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
       indicatorEntry({
@@ -759,7 +759,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     await userEvent.click(await screen.findByRole("checkbox", { name: /^atr$/i }));
 
     await waitFor(() => expect(lineSeries()).toHaveLength(1));
-    // Pane 0 is the price pane the candles live on — an own-pane wskaźnik must
+    // Pane 0 is the price pane the candles live on — an own-pane indicator must
     // land anywhere else, in a pane `Chart` created for it.
     expect(lineSeries()[0].paneIndex).not.toBe(0);
     expect(stub.latest().panesList).toHaveLength(2);
@@ -769,7 +769,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(stub.latest().panesList).toHaveLength(1);
   });
 
-  it("deselecting one of two own-pane wskaźniki leaves the other's pane intact (regression)", async () => {
+  it("deselecting one of two own-pane indicators leaves the other's pane intact (regression)", async () => {
     // Reported: select atr_pct, select atr, deselect atr — the chart's own
     // default is to remove a pane the instant its last series does, which
     // raced `Chart.tsx`'s own explicit `removePane` and threw ("This view
@@ -881,7 +881,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(rsiLine.priceLines.every((l) => l.removed)).toBe(true);
   });
 
-  it("shows an own-pane wskaźnik's value under the cursor beside OHLC, same as a price-pane one", async () => {
+  it("shows an own-pane indicator's value under the cursor beside OHLC, same as a price-pane one", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
       indicatorEntry({
@@ -1060,7 +1060,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     await waitFor(() => expect(indicators.computeCalls.length).toBeGreaterThan(callsBefore));
   });
 
-  it("removes the line when the operator deselects the wskaźnik", async () => {
+  it("removes the line when the operator deselects the indicator", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [indicatorEntry()];
     indicators.computeQueue = [
@@ -1090,7 +1090,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(stub.latest().removedSeries).toContain(line);
   });
 
-  it("clears every wskaźnik line when the symbol changes, before the new series loads", async () => {
+  it("clears every indicator line when the symbol changes, before the new series loads", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [indicatorEntry()];
     indicators.computeQueue = [
@@ -1155,7 +1155,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(indicators.computeCalls).toHaveLength(1);
   });
 
-  it("keeps an own-pane markers/levels/zones wskaźnik unselectable — no primitive draws one off the price pane", async () => {
+  it("keeps an own-pane markers/levels/zones indicator unselectable — no primitive draws one off the price pane", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
       indicatorEntry({
@@ -1172,7 +1172,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(await screen.findByRole("checkbox", { name: /^own_pane_zones$/i })).toBeDisabled();
   });
 
-  it("makes a price-pane zones wskaźnik (range_gap, session ranges, …) selectable — E3's primitive draws it", async () => {
+  it("makes a price-pane zones indicator (range_gap, session ranges, …) selectable — E3's primitive draws it", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
       indicatorEntry({ id: "range_gap", name: "Range Gap", output: "zones" }),
@@ -1184,7 +1184,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(await screen.findByRole("checkbox", { name: /^range_gap$/i })).not.toBeDisabled();
   });
 
-  it("makes an own-pane wskaźnik (RSI, ATR, …) selectable and drawable, not just price-pane overlays", async () => {
+  it("makes an own-pane indicator (RSI, ATR, …) selectable and drawable, not just price-pane overlays", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
       indicatorEntry({
@@ -1203,7 +1203,7 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
   });
 });
 
-describe("Chart — wskaźniki markers (terminal-chart spec, task 3.8)", () => {
+describe("Chart — indicators markers (terminal-chart spec, task 3.8)", () => {
   function priceSeries() {
     return stub.latest().series.find((s) => s.type === "Candlestick")!;
   }
@@ -1217,7 +1217,7 @@ describe("Chart — wskaźniki markers (terminal-chart spec, task 3.8)", () => {
     render: { pane: "price", style: "dots", scale: "price", autoscale: true, range: null, levels: [] },
   });
 
-  it("draws a markers-output wskaźnik through createSeriesMarkers on the price series", async () => {
+  it("draws a markers-output indicator through createSeriesMarkers on the price series", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [swingPointsEntry];
     indicators.computeQueue = [
@@ -1255,7 +1255,7 @@ describe("Chart — wskaźniki markers (terminal-chart spec, task 3.8)", () => {
     expect(plugin.detached).toBe(false);
   });
 
-  it("stops drawing the markers once the wskaźnik is deselected", async () => {
+  it("stops drawing the markers once the indicator is deselected", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [swingPointsEntry];
     indicators.computeQueue = [
@@ -1292,7 +1292,7 @@ describe("Chart — wskaźniki markers (terminal-chart spec, task 3.8)", () => {
   });
 });
 
-describe("Chart — wskaźniki levels / ray primitive (terminal-chart spec, task 3.9)", () => {
+describe("Chart — indicators levels / ray primitive (terminal-chart spec, task 3.9)", () => {
   function priceSeries() {
     return stub.latest().series.find((s) => s.type === "Candlestick")!;
   }
@@ -1306,7 +1306,7 @@ describe("Chart — wskaźniki levels / ray primitive (terminal-chart spec, task
     render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
   });
 
-  it("attaches one ray primitive per (wskaźnik, params), not one per level", async () => {
+  it("attaches one ray primitive per (indicator, params), not one per level", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [htfLevelsEntry];
     indicators.computeQueue = [
@@ -1395,7 +1395,7 @@ describe("Chart — wskaźniki levels / ray primitive (terminal-chart spec, task
     expect(priceSeries().primitives).toHaveLength(1);
   });
 
-  it("detaches the ray primitive once the wskaźnik is deselected", async () => {
+  it("detaches the ray primitive once the indicator is deselected", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [htfLevelsEntry];
     indicators.computeQueue = [
@@ -1431,7 +1431,7 @@ describe("Chart — wskaźniki levels / ray primitive (terminal-chart spec, task
   });
 });
 
-describe("Chart — wskaźniki zones / zone primitive (terminal-chart spec, task 4.7)", () => {
+describe("Chart — indicators zones / zone primitive (terminal-chart spec, task 4.7)", () => {
   function priceSeries() {
     return stub.latest().series.find((s) => s.type === "Candlestick")!;
   }
@@ -1445,7 +1445,7 @@ describe("Chart — wskaźniki zones / zone primitive (terminal-chart spec, task
     render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
   });
 
-  it("attaches one zone primitive per (wskaźnik, params), not one per zone", async () => {
+  it("attaches one zone primitive per (indicator, params), not one per zone", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [rangeGapEntry];
     indicators.computeQueue = [
@@ -1536,7 +1536,7 @@ describe("Chart — wskaźniki zones / zone primitive (terminal-chart spec, task
     expect(priceSeries().primitives).toHaveLength(1);
   });
 
-  it("detaches the zone primitive once the wskaźnik is deselected", async () => {
+  it("detaches the zone primitive once the indicator is deselected", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [rangeGapEntry];
     indicators.computeQueue = [
@@ -1574,7 +1574,7 @@ describe("Chart — wskaźniki zones / zone primitive (terminal-chart spec, task
   });
 });
 
-describe("Chart — wskaźniki time profile / histogram primitive (terminal-chart spec, task 5.4)", () => {
+describe("Chart — indicators time profile / histogram primitive (terminal-chart spec, task 5.4)", () => {
   function priceSeries() {
     return stub.latest().series.find((s) => s.type === "Candlestick")!;
   }
@@ -1627,7 +1627,7 @@ describe("Chart — wskaźniki time profile / histogram primitive (terminal-char
     await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
   });
 
-  it("detaches the profile primitive once the wskaźnik is deselected", async () => {
+  it("detaches the profile primitive once the indicator is deselected", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [timeProfileEntry];
     indicators.computeQueue = [
@@ -1663,7 +1663,7 @@ describe("Chart — wskaźniki time profile / histogram primitive (terminal-char
   });
 });
 
-describe("Chart — wskaźniki na żywo (terminal-chart spec, task 6.1/6.2/6.4)", () => {
+describe("Chart — live indicators (terminal-chart spec, task 6.1/6.2/6.4)", () => {
   function priceSeries() {
     return stub.latest().series.find((s) => s.type === "Candlestick")!;
   }
@@ -1753,7 +1753,7 @@ describe("Chart — wskaźniki na żywo (terminal-chart spec, task 6.1/6.2/6.4)"
     expect(indicators.computeCalls).toHaveLength(2); // unchanged from the one close above
   });
 
-  it("clears a non-lines primitive (a zone) on a symbol change too, not just wskaźnik lines (task 6.3/6.4)", async () => {
+  it("clears a non-lines primitive (a zone) on a symbol change too, not just indicator lines (task 6.3/6.4)", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
       indicatorEntry({
