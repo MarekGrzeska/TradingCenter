@@ -251,7 +251,7 @@ async def test_the_response_names_its_side_and_algorithm_version(api) -> None:
     assert body["algorithm_version"] >= 1
 
 
-# --- W1, punkty i poziomy: markers, cluster levels, cross-resolution levels ----------
+# --- W1, points and levels: markers, cluster levels, cross-resolution levels ----------
 
 
 async def test_swing_points_are_returned_as_markers(api, pool) -> None:
@@ -407,7 +407,7 @@ async def test_htf_levels_refused_without_the_day_series(api, pool) -> None:
     assert "DAY" in response.json()["detail"]
 
 
-# --- E3, strefy: zones on the wire, and task 4.3's coverage-driven session gap ---
+# --- E3, zones: zones on the wire, and task 4.3's coverage-driven session gap ---
 
 
 _TODAY = NOW.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -549,7 +549,7 @@ async def test_session_range_reads_the_minute_series_regardless_of_requested_res
     assert zone["bottom"] == pytest.approx(104.0)
 
 
-# --- E4, profil czasowy: task 5.3's refusal, and the minute-series ceiling ---
+# --- E4, time profile: task 5.3's refusal, and the minute-series ceiling ---
 
 
 async def test_time_profile_refused_without_a_minute_series(api, pool) -> None:

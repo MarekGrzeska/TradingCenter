@@ -817,7 +817,7 @@ _LSMA = IndicatorSpec(
     compute=lambda s, p: {"lsma": kernel.linreg(s.close, int(p["period"]))},
 )
 
-# --- oscylatory: mostly for divergence-hunting and for the non-SMC strategies,
+# --- oscillators: mostly for divergence-hunting and for the non-SMC strategies,
 # cheap because they are all built from finished primitives
 # (docs/wskazniki-plan-wdrozenia.html, "Oscylatory"). ---
 
@@ -1532,7 +1532,7 @@ _PIVOTS: tuple[IndicatorSpec, ...] = tuple(
     for id_, name, fn in _PIVOT_TYPES
 )
 
-# --- strefy: three-bar imbalances and fixed clock windows, all sharing the same
+# --- zones: three-bar imbalances and fixed clock windows, all sharing the same
 # `zones` shape — a region with a top, a bottom and a moment it took effect,
 # open on the right until something closes it (docs/wskazniki-plan-wdrozenia.html,
 # "W2 — strefy"). No market calendar backs any of this: `session_range` and
@@ -1695,7 +1695,7 @@ def _fixed_window_zones(
 def _session_window_zones(zone_info: ZoneInfo) -> MinuteZoneFn:
     """One zone per local calendar day in `zone_info`, spanning the bars whose
     local clock time falls in `[from_hour, to_hour)` — a fixed window, not a
-    market-hours lookup (see the "strefy" section banner above). `zoneinfo`
+    market-hours lookup (see the "zones" section banner above). `zoneinfo`
     resolves the UTC offset per calendar day rather than once for the whole
     read, so the same local hours line up across a DST change instead of
     sliding by the transition's hour (task 4.9)."""
@@ -1777,7 +1777,7 @@ _OPENING_RANGE = IndicatorSpec(
     compute_minute_zones=_opening_range_zones,
 )
 
-# --- profil czasowy: how much of the read range's own time each price bucket
+# --- time profile: how much of the read range's own time each price bucket
 # held, from the MINUTE series regardless of what resolution is charted
 # (docs/wskazniki-plan-wdrozenia.html, "W3 — profil czasowy"). No volume backs
 # this archive (task 1.16's boundary), so "how much" is a count of one-minute
