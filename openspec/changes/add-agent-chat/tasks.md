@@ -15,18 +15,18 @@
 
 ## 2. Baza i migracje
 
-- [ ] 2.1 `agent/db.py` — silnik i sesje, pobieranie poświadczenia Entra przy nawiązywaniu
+- [x] 2.1 `agent/db.py` — silnik i sesje, pobieranie poświadczenia Entra przy nawiązywaniu
       połączenia i jego odnawianie (wzorzec z `market_data/db.py`, przepisany, nie
       zaimportowany)
-- [ ] 2.2 `agent/models.py` — sesje (tytuł, właściciel, model, wersja promptu, utworzenie,
+- [x] 2.2 `agent/models.py` — sesje (tytuł, właściciel, model, wersja promptu, utworzenie,
       ostatnia aktywność), wiadomości (sesja, rola, treść, porządek, model, moment,
       oznaczenie niepełnej), zużycie (sesja, wiadomość, model, tokeny wejścia/wyjścia/
       cache/rozumowania, stawki, koszt `NUMERIC`, moment)
-- [ ] 2.3 `migrations/` — alembic z `0001_sessions_messages_usage.py`; `alembic.ini` i
+- [x] 2.3 `migrations/` — alembic z `0001_sessions_messages_usage.py`; `alembic.ini` i
       `env.py` na wzór `market-data`
-- [ ] 2.4 Testy `-m db` (testcontainers): migracje wchodzą na czystej bazie, porządek
+- [x] 2.4 Testy `-m db` (testcontainers): migracje wchodzą na czystej bazie, porządek
       wiadomości jest powtarzalny, sesja bez wiadomości nie wchodzi na listę rozmów
-- [ ] 2.5 Test: poświadczenie nie pojawia się w logu błędu połączenia
+- [x] 2.5 Test: poświadczenie nie pojawia się w logu błędu połączenia
 
 ## 3. Katalog modeli i prompt systemowy
 
