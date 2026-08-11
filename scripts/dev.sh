@@ -3,17 +3,24 @@
 # Everything the terminal needs, in the order it needs it — the macOS and Linux
 # counterpart of dev.ps1.
 #
-#   migrations  ->  capital-gateway  ->  market-data  ->  terminal
+#   migrations  ->  capital-gateway  ->  market-data  ->  agent  ->  terminal
 #
 # The order is not tidiness. market-data opens a subscription per tracked pair the
 # moment it starts, so a gateway that is not listening yet costs it a round of
-# backoff; and the terminal's charts read the archive, so starting it first fills
-# the console with proxy errors that mean nothing. Each step waits for the one
-# before it to actually answer, not merely to have been launched.
+# backoff; the terminal's charts read the archive, so starting it first fills the
+# console with proxy errors that mean nothing; and the agent has nothing that depends
+# on it, so it goes last among the back ends. Each step waits for the one before it to
+# actually answer, not merely to have been launched.
 #
 # The database is the container in ../compose.yaml — started here, before migrations
 # (openspec/changes/local-dev-database-in-docker; the spell in Azure is over, production
 # stays there and development does not). `docker compose down` keeps the data.
+#
+# `agent`'s own database is a second logical database in that same container, created
+# here if missing rather than through docker-entrypoint-initdb.d — that only runs on a
+# volume's first boot, so it would never fire for anyone who already has
+# tradingcenter-db-data from before this module existed (design.md, "Baza: druga baza
+# logiczna, jeden serwer").
 #
 #   ./scripts/dev.sh              # everything
 #   ./scripts/dev.sh --no-terminal    # back end only, e.g. to run the live tests
@@ -26,16 +33,19 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GATEWAY_DIR="$REPO_ROOT/modules/capital-gateway"
 ARCHIVE_DIR="$REPO_ROOT/modules/market-data"
+AGENT_DIR="$REPO_ROOT/modules/agent"
 TERMINAL_DIR="$REPO_ROOT/modules/terminal"
 
 GATEWAY_PORT=8010
 ARCHIVE_PORT=8020
+AGENT_PORT=8030
 TERMINAL_PORT=5173
 
 # 127.0.0.1 rather than "localhost": uvicorn binds IPv4 loopback, and on a machine
 # where "localhost" resolves to ::1 first the wait below would never succeed.
 GATEWAY_URL="http://127.0.0.1:$GATEWAY_PORT"
 ARCHIVE_URL="http://127.0.0.1:$ARCHIVE_PORT"
+AGENT_URL="http://127.0.0.1:$AGENT_PORT"
 
 START_TERMINAL=1
 WAIT_SECONDS=120
@@ -43,12 +53,12 @@ WAIT_SECONDS=120
 for arg in "$@"; do
   case "$arg" in
     --no-terminal) START_TERMINAL=0 ;;
-    -h|--help) sed -n '2,22p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,29p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
   esac
 done
 
-BLUE=$'\033[34m'; MAGENTA=$'\033[35m'; CYAN=$'\033[36m'
+BLUE=$'\033[34m'; MAGENTA=$'\033[35m'; CYAN=$'\033[36m'; YELLOW=$'\033[33m'
 GREEN=$'\033[32m'; RED=$'\033[31m'; DIM=$'\033[2m'; RESET=$'\033[0m'
 
 say()  { printf '%s%s%s\n' "$CYAN" "$1" "$RESET"; }
@@ -75,6 +85,7 @@ fi
 
 [[ -f "$GATEWAY_DIR/.env" ]] || problems+=("$GATEWAY_DIR/.env is missing — copy .env.example and fill in demo credentials")
 [[ -f "$ARCHIVE_DIR/.env" ]] || problems+=("$ARCHIVE_DIR/.env is missing — copy .env.example; the defaults match compose.yaml")
+[[ -f "$AGENT_DIR/.env" ]] || problems+=("$AGENT_DIR/.env is missing — copy .env.example and fill in AZURE_OPENAI_*")
 
 if (( START_TERMINAL )); then
   if command -v pnpm >/dev/null 2>&1; then
@@ -110,7 +121,7 @@ port_owner() {
   printf ' by %s (pid %s)' "$(ps -p "$pid" -o comm= 2>/dev/null || echo process)" "$pid"
 }
 
-ports=("$GATEWAY_PORT" "$ARCHIVE_PORT")
+ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$AGENT_PORT")
 (( START_TERMINAL )) && ports+=("$TERMINAL_PORT")
 for port in "${ports[@]}"; do
   port_in_use "$port" || continue
@@ -127,6 +138,12 @@ archive_db_host="$(sed -n 's|^DATABASE_URL=[a-z+]*://\([^@/]*@\)\{0,1\}\([^:/?]*
 case "$archive_db_host" in
   ""|localhost|127.*|::1) ;;
   *) problems+=("modules/market-data/.env's DATABASE_URL points at '$archive_db_host' — local runs use the compose.yaml container (localhost), never a remote database") ;;
+esac
+
+agent_db_host="$(sed -n 's|^DATABASE_URL=[a-z+]*://\([^@/]*@\)\{0,1\}\([^:/?]*\).*|\2|p' "$AGENT_DIR/.env" 2>/dev/null | head -1)"
+case "$agent_db_host" in
+  ""|localhost|127.*|::1) ;;
+  *) problems+=("modules/agent/.env's DATABASE_URL points at '$agent_db_host' — local runs use the compose.yaml container (localhost), never a remote database") ;;
 esac
 
 if (( ${#problems[@]} )); then
@@ -204,6 +221,24 @@ if ! ( cd "$REPO_ROOT" && docker compose up -d --wait db ); then
 fi
 ok "Database is up."
 
+# --- the agent's own database ----------------------------------------------------
+#
+# A second logical database in the same container, not a second container — the free
+# grant is one Postgres server and this mirrors it (design.md, "Baza: druga baza
+# logiczna, jeden serwer"). Checked and created here rather than through
+# docker-entrypoint-initdb.d, which only ever runs against an empty volume: anyone with
+# a tradingcenter-db-data from before this module existed would never see it fire.
+psql_super() { ( cd "$REPO_ROOT" && docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 "$@" ); }
+
+say "Ensuring the agent database exists..."
+if ! psql_super -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'agent'" | grep -q 1; then
+  psql_super -c "CREATE ROLE agent LOGIN PASSWORD 'change-me';" || { fail "could not create the 'agent' role"; exit 1; }
+fi
+if ! psql_super -tAc "SELECT 1 FROM pg_database WHERE datname = 'agent'" | grep -q 1; then
+  psql_super -c "CREATE DATABASE agent OWNER agent;" || { fail "could not create the 'agent' database"; exit 1; }
+fi
+ok "agent database is ready."
+
 # --- migrations -----------------------------------------------------------------
 
 # Applied every run, not only on a fresh one: a checkout that has just pulled a
@@ -212,6 +247,10 @@ ok "Database is up."
 say "Applying migrations..."
 if ! ( cd "$ARCHIVE_DIR" && uv run alembic upgrade head ); then
   fail "migrations failed — the archive would fail on its first query, so stopping here."
+  exit 1
+fi
+if ! ( cd "$AGENT_DIR" && uv run alembic upgrade head ); then
+  fail "agent's migrations failed — it would fail on its first query, so stopping here."
   exit 1
 fi
 ok "Schema is up to date."
@@ -235,6 +274,16 @@ run_service "archive " "$MAGENTA" "$ARCHIVE_DIR" uv run uvicorn market_data.app:
 wait_for_http "$ARCHIVE_URL/health" "market-data" || exit 1
 ok "market-data is answering."
 
+# --- agent ----------------------------------------------------------------------
+#
+# Last among the back ends: nothing else calls it, so nothing else waits on it —
+# unlike the gateway, which market-data subscribes to as it starts.
+
+say "Starting agent on port $AGENT_PORT..."
+run_service "agent   " "$YELLOW" "$AGENT_DIR" uv run uvicorn agent.app:app --reload --port "$AGENT_PORT"
+wait_for_http "$AGENT_URL/health" "agent" || exit 1
+ok "agent is answering."
+
 # --- the terminal -------------------------------------------------------------
 
 if (( START_TERMINAL )); then
@@ -250,6 +299,7 @@ if (( START_TERMINAL )); then
 fi
 echo "  market-data docs    $ARCHIVE_URL/docs"
 echo "  Gateway docs        $GATEWAY_URL/docs"
+echo "  agent docs          $AGENT_URL/docs"
 echo "  Database            market_data @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
 echo
 note "Nothing is archived until a pair is added in the Archive panel — that is deliberate."

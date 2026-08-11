@@ -34,6 +34,19 @@ resource "azuread_application" "terminal" {
       type = "Scope"
     }
   }
+
+  # Ready for whenever the terminal is changed to ask for a token scoped to the agent
+  # by name, rather than reusing its market-data token against it (see the comment on
+  # `agent_easy_auth` below) — `required_resource_access` takes one block per resource,
+  # so this sits alongside the one above rather than replacing it.
+  required_resource_access {
+    resource_app_id = azuread_application.agent_easy_auth.client_id
+
+    resource_access {
+      id   = random_uuid.agent_scope.result
+      type = "Scope"
+    }
+  }
 }
 
 resource "azuread_service_principal" "terminal" {
@@ -48,6 +61,71 @@ resource "azuread_application_pre_authorized" "terminal" {
   application_id       = azuread_application.market_data_easy_auth.id
   authorized_client_id = azuread_application.terminal.client_id
   permission_ids       = [random_uuid.market_data_scope.result]
+}
+
+# --- agent, as a caller of the terminal (its own API registration) ------------------
+#
+# Its own registration rather than reuse of `market_data_easy_auth` — each backend
+# module is its own API here the same way each is its own deployable (design.md,
+# "Osobny moduł `modules/agent`"), and tasks.md 10.6 asks for exactly this: a
+# registration and a scope of the agent's own.
+#
+# The terminal's identity layer (`src/auth/`) acquires one token today, scoped to
+# market-data — `add-agent-chat`'s Migration Plan lists only `VITE_AGENT_HTTP` as the
+# terminal-side step to go live, no second scope. So `allowed_audiences` on the
+# agent's App Service (app-service.tf) accepts *both* this new audience and
+# market-data's: the terminal's existing token works against agent unmodified today,
+# and the scope below stands ready, pre-authorized, for whenever the terminal is
+# changed to ask for it by name instead.
+resource "azuread_application" "agent_easy_auth" {
+  display_name = "app-tradingcenter-agent-easyauth"
+
+  identifier_uris = [local.agent_api_uri]
+
+  api {
+    requested_access_token_version = 2
+
+    oauth2_permission_scope {
+      id                         = random_uuid.agent_scope.result
+      value                      = local.agent_api_scope
+      type                       = "User"
+      enabled                    = true
+      admin_consent_display_name = "Talk to the agent"
+      admin_consent_description  = "Allows the app to reach the agent as the signed-in operator."
+      user_consent_display_name  = "Talk to the agent on your behalf"
+      user_consent_description   = "Allows the app to reach the agent as you."
+    }
+  }
+
+  web {
+    redirect_uris = ["https://${local.agent_hostname}/.auth/login/aad/callback"]
+
+    implicit_grant {
+      id_token_issuance_enabled = true
+    }
+  }
+}
+
+resource "random_uuid" "agent_scope" {}
+
+resource "azuread_service_principal" "agent_easy_auth" {
+  client_id = azuread_application.agent_easy_auth.client_id
+}
+
+resource "azuread_application_password" "agent_easy_auth" {
+  application_id = azuread_application.agent_easy_auth.id
+  display_name   = "easy-auth"
+  end_date       = timeadd(timestamp(), "8760h")
+
+  lifecycle {
+    ignore_changes = [end_date]
+  }
+}
+
+resource "azuread_application_pre_authorized" "agent_terminal" {
+  application_id       = azuread_application.agent_easy_auth.id
+  authorized_client_id = azuread_application.terminal.client_id
+  permission_ids       = [random_uuid.agent_scope.result]
 }
 
 # The three values the terminal's build needs (deploy-terminal.yml). All three are public

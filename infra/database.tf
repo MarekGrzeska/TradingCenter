@@ -67,6 +67,19 @@ resource "azurerm_postgresql_flexible_server_database" "prod" {
   charset   = "UTF8"
 }
 
+# A second logical database on the same server, not a second server — design.md,
+# "Baza: druga baza logiczna, jeden serwer": the free grant is 750 hours of *one*
+# B1ms. The Entra role this database's data actually needs is not created here —
+# same as `market_data`'s own role, it is a manual `psql` step against the server's AD
+# Administrator (tasks.md's Migration Plan step 3; `agent_managed_identity_principal_id`
+# in app-service.tf is the object id that step grants).
+resource "azurerm_postgresql_flexible_server_database" "agent" {
+  name      = "agent"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  collation = "en_US.utf8"
+  charset   = "UTF8"
+}
+
 # `market_data_dev` used to sit beside it — the database local development wrote to for
 # the one morning that arrangement lasted (openspec/changes/local-dev-database-in-docker).
 # Applying its removal DROPS it, data and all; dev data is disposable by definition, but
@@ -97,6 +110,17 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "market_data_outboun
   for_each = toset(azurerm_linux_web_app.market_data.possible_outbound_ip_address_list)
 
   name             = "AllowMarketDataOutbound-${replace(each.value, ".", "-")}"
+  server_id        = azurerm_postgresql_flexible_server.main.id
+  start_ip_address = each.value
+  end_ip_address   = each.value
+}
+
+# Same two-apply shape as market-data's own rule above: `terraform apply
+# -target=azurerm_linux_web_app.agent` once, then the normal unrestricted apply.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "agent_outbound" {
+  for_each = toset(azurerm_linux_web_app.agent.possible_outbound_ip_address_list)
+
+  name             = "AllowAgentOutbound-${replace(each.value, ".", "-")}"
   server_id        = azurerm_postgresql_flexible_server.main.id
   start_ip_address = each.value
   end_ip_address   = each.value
