@@ -1,24 +1,24 @@
 ## 1. Szkielet modułu
 
-- [ ] 1.1 `modules/market-mcp/` z `pyproject.toml` (zależności: `mcp`, `httpx`, `pydantic`, `azure-identity`; grupa dev: `pytest`, `ruff`, `pyright`), `.env.example`, `README.md` z zapisaną wersją protokołu MCP i datą sprawdzenia
-- [ ] 1.2 `market_mcp/config.py` — przełącznik trybu dostępu do archiwum; konfiguracja niejednoznaczna albo adres zdalny bez tożsamości odmawiana przy starcie
-- [ ] 1.3 Testy `config.py`: adres zdalny bez tożsamości, pętla zwrotna bez tożsamości, oba tryby naraz
-- [ ] 1.4 `market_mcp/client.py` — klient HTTP archiwum z limitem czasu; metody inne niż czytające odrzucane, jedyny wyjątek `POST /indicators/{symbol}`
-- [ ] 1.5 Test klienta: próba żądania zmieniającego wywraca się; obliczenie wskaźników przechodzi
-- [ ] 1.6 `market_mcp/server.py` — serwer MCP z transportem stdio i aplikacją ASGI, trasa zdrowia obok, `market_mcp/__main__.py` dla obu transportów
-- [ ] 1.7 Narzędzie `list_tracked_pairs` i test przeciw podstawionemu archiwum
-- [ ] 1.8 `Dockerfile`, wpis w `README.md` repozytorium
+- [x] 1.1 `modules/market-mcp/` z `pyproject.toml` (zależności: `mcp`, `httpx`, `pydantic`, `azure-identity`; grupa dev: `pytest`, `ruff`, `pyright`), `.env.example`, `README.md` z zapisaną wersją protokołu MCP i datą sprawdzenia
+- [x] 1.2 `market_mcp/config.py` — przełącznik trybu dostępu do archiwum; konfiguracja niejednoznaczna albo adres zdalny bez tożsamości odmawiana przy starcie
+- [x] 1.3 Testy `config.py`: adres zdalny bez tożsamości, pętla zwrotna bez tożsamości, oba tryby naraz
+- [x] 1.4 `market_mcp/client.py` — klient HTTP archiwum z limitem czasu; metody inne niż czytające odrzucane, jedyny wyjątek `POST /indicators/{symbol}`
+- [x] 1.5 Test klienta: próba żądania zmieniającego wywraca się; obliczenie wskaźników przechodzi
+- [x] 1.6 `market_mcp/server.py` — serwer MCP z transportem stdio i aplikacją ASGI, trasa zdrowia obok, `market_mcp/__main__.py` dla obu transportów
+- [x] 1.7 Narzędzie `list_tracked_pairs` i test przeciw podstawionemu archiwum
+- [x] 1.8 `Dockerfile`, wpis w `README.md` repozytorium
 
 ## 2. Świece, pokrycie, instrumenty
 
-- [ ] 2.1 `market_mcp/reduce.py` — agregacja świec do grubszych okresów i obcinanie list, z nazwaniem faktu odcięcia w wyniku
-- [ ] 2.2 `market_mcp/uncertainty.py` — zdania budowane z `uncovered`, `derived`, `settled` oraz z pustej serii dla pary niezbieranej
-- [ ] 2.3 Narzędzie `get_candles` — sufity 200/500, agregacja powyżej, `uncovered` w treści
-- [ ] 2.4 Narzędzie `get_last_price` — ostatnia świeca z jej momentem i wiekiem
-- [ ] 2.5 Narzędzie `summarize_range` — OHLC okna, zmiana bezwzględna i procentowa, średni i maksymalny zakres świecy, największy ruch z momentem, liczba świec i luk
-- [ ] 2.6 Narzędzie `describe_coverage` — przedziały zweryfikowane, najstarsza osiągalna świeca, dziury w oknie
-- [ ] 2.7 Narzędzie `search_instruments` — 10 trafień
-- [ ] 2.8 Testy: pusta seria dla pary niezbieranej nie czyta się jak cisza rynku; zakres ponad sufit wraca zagregowany i nazwany; okno roczne mieści się w budżecie znaków
+- [x] 2.1 `market_mcp/reduce.py` — agregacja świec do grubszych okresów i obcinanie list, z nazwaniem faktu odcięcia w wyniku
+- [x] 2.2 `market_mcp/uncertainty.py` — zdania budowane z `uncovered`, `derived` oraz z pustej serii dla pary niezbieranej (`settled` dołącza w grupie 3 — dotyczy tylko wyniku wskaźnika, którego tu jeszcze nie ma)
+- [x] 2.3 Narzędzie `get_candles` — domyślny cel agregacji 200 świec, odmowa powyżej 2000 (10×, reguła „powyżej ~10× sufitu — odmowa”), `uncovered` w treści
+- [x] 2.4 Narzędzie `get_last_price` — ostatnia świeca z jej momentem i wiekiem
+- [x] 2.5 Narzędzie `summarize_range` — OHLC okna, zmiana bezwzględna i procentowa, średni i maksymalny zakres świecy, największy ruch z momentem, liczba świec i luk
+- [x] 2.6 Narzędzie `describe_coverage` — przedziały zweryfikowane (limit 20, najnowsze pierwsze), najstarsza osiągalna świeca, dziury w oknie
+- [x] 2.7 Narzędzie `search_instruments` — 10 trafień
+- [x] 2.8 Testy: pusta seria dla pary niezbieranej nie czyta się jak cisza rynku; zakres ponad sufit wraca zagregowany i nazwany; okno roczne mieści się w budżecie znaków
 
 ## 3. Wskaźniki
 

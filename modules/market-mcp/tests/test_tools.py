@@ -1,21 +1,11 @@
 from __future__ import annotations
 
 import httpx
-import pytest
 import respx
 
-from market_mcp.client import UpstreamClient
-from market_mcp.config import Settings
-from market_mcp.server import build_server
 from market_mcp.tools import _pair_out
 
 BASE = "http://127.0.0.1:8020"
-
-
-@pytest.fixture
-def server(settings: Settings):
-    upstream = UpstreamClient(settings)
-    return build_server(settings, upstream), upstream
 
 
 def test_pair_out_computes_age_from_latest_candle() -> None:
