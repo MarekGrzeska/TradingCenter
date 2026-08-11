@@ -949,3 +949,184 @@ describe("archive.subscribe (the ticket the handshake costs)", () => {
     expect(spy.urls[1]).toContain("ticket=ticket-2");
   });
 });
+
+describe("archive.indicatorCatalogue", () => {
+  it("maps every field a picker needs, snake_case to camelCase", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/indicators`, () =>
+        HttpResponse.json({
+          algorithm_version: 1,
+          indicators: [
+            {
+              id: "ema",
+              name: "Exponential Moving Average",
+              aliases: [],
+              group: "averages",
+              output: "lines",
+              params: [{ name: "period", type: "int", default: 20, min: 2, max: 5000 }],
+              lines: [{ key: "ema", label: "EMA {period}" }],
+              render: {
+                pane: "price",
+                style: "line",
+                scale: "price",
+                autoscale: true,
+                range: null,
+                levels: [],
+              },
+              warmup_kind: "decay",
+            },
+          ],
+        }),
+      ),
+    );
+
+    const catalogue = await source().indicatorCatalogue(signal());
+
+    expect(catalogue.algorithmVersion).toBe(1);
+    const [entry] = catalogue.indicators;
+    expect(entry).toMatchObject({
+      id: "ema",
+      warmupKind: "decay",
+      render: { pane: "price", autoscale: true },
+    });
+  });
+});
+
+describe("archive.computeIndicators", () => {
+  it("sends the range in ISO and the resolved id/params, answers in epoch seconds", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/indicators/US100`, async ({ request }) => {
+        const body = (await request.json()) as {
+          resolution: string;
+          from: string;
+          to: string;
+          specs: Array<{ id: string; params: Record<string, number> }>;
+        };
+        expect(body.resolution).toBe("MINUTE_5");
+        expect(body.from).toBe("2026-08-07T14:00:00.000Z");
+        expect(body.to).toBe("2026-08-07T15:00:00.000Z");
+        expect(body.specs).toEqual([{ id: "ema", params: { period: 20 } }]);
+
+        return HttpResponse.json({
+          symbol: "US100",
+          resolution: "MINUTE_5",
+          price_side: "bid",
+          derived: false,
+          algorithm_version: 1,
+          times: ["2026-08-07T14:35:00Z"],
+          warmup_from: "2026-08-07T10:00:00Z",
+          uncovered: [],
+          results: [
+            {
+              id: "ema",
+              params: { period: 20 },
+              warmup_bars: 210,
+              anchored_at: null,
+              settled: true,
+              lines: { ema: [21042.5] },
+              markers: null,
+              zones: null,
+              levels: null,
+            },
+          ],
+        });
+      }),
+    );
+
+    const result = await source().computeIndicators(
+      "US100",
+      "MINUTE_5" as Resolution,
+      Date.parse("2026-08-07T14:00:00Z") / 1000,
+      Date.parse("2026-08-07T15:00:00Z") / 1000,
+      [{ id: "ema", params: { period: 20 } }],
+      signal(),
+    );
+
+    expect(result.times).toEqual([Date.parse("2026-08-07T14:35:00Z") / 1000]);
+    const [emaResult] = result.results;
+    expect(emaResult.settled).toBe(true);
+    expect(emaResult.warmupBars).toBe(210);
+    expect(emaResult.lines).toEqual({ ema: [21042.5] });
+  });
+
+  it("maps zones and markers to epoch seconds, null to null", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/indicators/US100`, () =>
+        HttpResponse.json({
+          symbol: "US100",
+          resolution: "MINUTE",
+          price_side: "bid",
+          derived: false,
+          algorithm_version: 1,
+          times: [],
+          warmup_from: null,
+          uncovered: [],
+          results: [
+            {
+              id: "range_gap",
+              params: {},
+              warmup_bars: null,
+              anchored_at: null,
+              settled: true,
+              lines: null,
+              markers: null,
+              zones: [
+                {
+                  from: "2026-08-07T14:00:00Z",
+                  to: null,
+                  top: 21100,
+                  bottom: 21080,
+                  direction: "bullish",
+                  touched_at: null,
+                  filled_at: null,
+                },
+              ],
+              levels: null,
+            },
+          ],
+        }),
+      ),
+    );
+
+    const result = await source().computeIndicators(
+      "US100",
+      "MINUTE" as Resolution,
+      0,
+      1,
+      [{ id: "range_gap", params: {} }],
+      signal(),
+    );
+
+    const [gapResult] = result.results;
+    expect(gapResult.zones).toEqual([
+      {
+        from: Date.parse("2026-08-07T14:00:00Z") / 1000,
+        to: null,
+        top: 21100,
+        bottom: 21080,
+        direction: "bullish",
+        touchedAt: null,
+        filledAt: null,
+      },
+    ]);
+  });
+
+  it("refuses by name when the archive names a refusal", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/indicators/US100`, () =>
+        HttpResponse.json({ detail: "unknown indicator: 'not-real'" }, { status: 422 }),
+      ),
+    );
+
+    await expect(
+      source().computeIndicators(
+        "US100",
+        "MINUTE" as Resolution,
+        0,
+        1,
+        [{ id: "not-real", params: {} }],
+        signal(),
+      ),
+    ).rejects.toMatchObject({ kind: "refused" });
+  });
+});

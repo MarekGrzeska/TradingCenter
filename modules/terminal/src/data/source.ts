@@ -1,6 +1,9 @@
 import type {
   AssetClass,
   Bar,
+  IndicatorCatalogue,
+  IndicatorSelection,
+  IndicatorsResult,
   Instrument,
   InstrumentPage,
   Job,
@@ -164,4 +167,28 @@ export interface ArchiveAdmin {
    *  of kind `"refused"` while any of its chunks is still pending or
    *  running. */
   deleteJob(jobId: number, signal: AbortSignal): Promise<void>;
+}
+
+/** Indicators: the catalogue every picker builds from, and the computation behind it.
+ *  Not part of `MarketDataSource` — only the chart and its picker have any business
+ *  with this, the same way `ArchiveAdmin` is narrowed away from the views that only
+ *  read candles. */
+export interface IndicatorSource {
+  /** Every indicator this source can compute, and how to draw each one. A consumer
+   *  builds its whole picker from this and never needs to know an indicator by name
+   *  beforehand (`market-data-indicators` spec, "Katalog wystarcza do zbudowania
+   *  wybieraka"). */
+  indicatorCatalogue(signal: AbortSignal): Promise<IndicatorCatalogue>;
+
+  /** One or more indicators over a range, on one shared time axis. Rejects with a
+   *  `MarketDataError` of kind `"refused"` for an unknown id, an out-of-range param,
+   *  or a request past the source's ceiling — each named in the message. */
+  computeIndicators(
+    symbol: string,
+    resolution: Resolution,
+    from: number,
+    to: number,
+    specs: IndicatorSelection[],
+    signal: AbortSignal,
+  ): Promise<IndicatorsResult>;
 }

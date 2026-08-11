@@ -1,5 +1,19 @@
 import "@testing-library/jest-dom/vitest";
 
+// Node takes Intl's default locale from the operating system and, on Windows, from
+// nothing else — LANG and LC_ALL are both ignored there. So `12431.toLocaleString()`
+// is "12,431" on CI's C locale and "12 431" (a non-breaking space) on a Polish
+// machine, and every assertion counting candles or megabytes fails locally while
+// passing in CI. The views follow the operator's locale on purpose, so the default is
+// pinned here rather than in the components.
+const formatNumber = Number.prototype.toLocaleString;
+Number.prototype.toLocaleString = function (
+  locales?: string | string[],
+  options?: Intl.NumberFormatOptions,
+): string {
+  return formatNumber.call(this, locales ?? "en-US", options);
+};
+
 // jsdom implements neither of these, and the chart uses both: ResizeObserver
 // for sizing, requestAnimationFrame to coalesce crosshair updates.
 if (!("ResizeObserver" in globalThis)) {

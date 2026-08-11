@@ -87,6 +87,13 @@ class Settings(BaseSettings):
     # number below is 20 instruments' worth of them.
     max_tracked_pairs: int = 160
 
+    # An indicator computation is a Python loop for every recursive filter it touches, and
+    # that loop holds the GIL — a thread would not free the event loop the way it does for
+    # I/O, so the limit here is a plain gate, not a pool. Bounds how many `POST
+    # /indicators/*` requests compute at once, so one asking for many indicators over a
+    # long range cannot stall the candle stream every other request depends on.
+    indicator_concurrency: int = 4
+
     # --- how a browser gets in ---
     #
     # A ticket is minted for one handshake and dies on use (`tickets.py`). This is the
@@ -188,6 +195,7 @@ class Settings(BaseSettings):
         "default_backfill_bars",
         "max_tracked_pairs",
         "stream_ticket_ttl_seconds",
+        "indicator_concurrency",
     )
     @classmethod
     def _positive(cls, value: int, info: ValidationInfo) -> int:

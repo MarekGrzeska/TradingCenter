@@ -123,6 +123,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/indicators": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every indicator this module can compute, and how to draw it
+         * @description A consumer builds its whole picker from this — parameters, defaults, output shape, render hint — and never needs to know an indicator by name beforehand.
+         */
+        get: operations["catalogue_indicators_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/indicators/{symbol}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compute one or more indicators over a range, on one shared time axis
+         * @description Reads further back than `from` on its own, by however much each requested indicator's warmup needs, and says in `warmup_from`/`settled` whether the archive actually held enough history for the answer to be trusted.
+         */
+        post: operations["compute_indicators__symbol__post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/instruments": {
         parameters: {
             query?: never;
@@ -271,6 +311,31 @@ export interface paths {
          * @description Stops collection, releases the provider connection, and removes every candle and coverage range this pair holds — irreversibly. A symbol whose minute series is deleted also loses the rollups computed from it. 404 for a pair not currently tracked, which deletes nothing.
          */
         delete: operations["delete_pair_pairs__symbol__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/ping": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Ping
+         * @description Proves only that the process is up and serving — nothing about its dependencies.
+         *
+         *     Reads nothing: `/health` above already answers whether the database is reachable, and
+         *     an external prober checking that would read a healthy process as dead the moment a
+         *     query ran slow. This is what Easy Auth's `excluded_paths` (infra/app-service.tf) can
+         *     exempt without exposing anything — the response never varies with the archive's state.
+         */
+        get: operations["ping_ping_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -553,6 +618,282 @@ export interface components {
         HTTPValidationError: {
             /** Detail */
             detail: components["schemas"]["ValidationError"][];
+        };
+        /**
+         * IndicatorCatalogueEntryOut
+         * @description One row of `GET /indicators` — everything a consumer needs to offer this
+         *     indicator and draw it, without knowing anything about it beforehand
+         *     (`market-data-indicators` spec, "Katalog wystarcza do zbudowania wybieraka").
+         */
+        IndicatorCatalogueEntryOut: {
+            /**
+             * Aliases
+             * @description names an indicator is also known by; never the vocabulary of one trading school baked into `id` itself
+             */
+            aliases: string[];
+            /** Group */
+            group: string;
+            /** Id */
+            id: string;
+            /** Lines */
+            lines: components["schemas"]["IndicatorLineSpecOut"][];
+            /** Name */
+            name: string;
+            /**
+             * Output
+             * @enum {string}
+             */
+            output: "lines" | "markers" | "zones" | "levels";
+            /** Params */
+            params: components["schemas"]["IndicatorParamOut"][];
+            render: components["schemas"]["IndicatorRenderOut"];
+            /**
+             * Warmup Kind
+             * @enum {string}
+             */
+            warmup_kind: "fixed" | "decay" | "anchored";
+        };
+        /** IndicatorLevelOut */
+        IndicatorLevelOut: {
+            /**
+             * Count
+             * @description how many extrema support this level; null for a level that carries no weight, e.g. a pivot or a previous-period edge
+             */
+            count: number | null;
+            /**
+             * From
+             * Format: date-time
+             */
+            from: string;
+            /** Label */
+            label: string | null;
+            /** Price */
+            price: number;
+        };
+        /** IndicatorLineSpecOut */
+        IndicatorLineSpecOut: {
+            /** Key */
+            key: string;
+            /**
+             * Label
+             * @description e.g. 'EMA {period}' — a template, not a rendered string
+             */
+            label: string;
+            /**
+             * Style
+             * @description Overrides the entry's own render.style for this one line — MACD's histogram line inside an otherwise line-style entry, and the only reason this field exists. Null means: use render.style.
+             */
+            style: ("line" | "dots" | "histogram") | null;
+        };
+        /** IndicatorMarkerOut */
+        IndicatorMarkerOut: {
+            /** Label */
+            label: string;
+            /** Price */
+            price: number | null;
+            /**
+             * Time
+             * Format: date-time
+             */
+            time: string;
+        };
+        /** IndicatorParamOut */
+        IndicatorParamOut: {
+            /** Default */
+            default: number;
+            /** Max */
+            max: number;
+            /** Min */
+            min: number;
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "int" | "float";
+        };
+        /** IndicatorRenderOut */
+        IndicatorRenderOut: {
+            /**
+             * Autoscale
+             * @description whether this line may widen the price axis it shares — off for an indicator whose own values are not comparable to price
+             * @default true
+             */
+            autoscale: boolean;
+            /**
+             * Levels
+             * @description reference lines to draw, e.g. 30/70 for RSI
+             */
+            levels: number[];
+            /**
+             * Pane
+             * @enum {string}
+             */
+            pane: "price" | "own";
+            /** Range */
+            range: [
+                number,
+                number
+            ] | null;
+            /**
+             * Scale
+             * @default price
+             * @enum {string}
+             */
+            scale: "price" | "own" | "fixed";
+            /**
+             * Style
+             * @enum {string}
+             */
+            style: "line" | "dots" | "histogram";
+        };
+        /**
+         * IndicatorResultOut
+         * @description One requested indicator's answer. Exactly one of `lines`, `markers`, `zones`,
+         *     `levels` is set — the one its catalogue entry's `output` names — or none of them
+         *     and `error` instead (`market-data-indicators` spec, "Wynik ma jeden z czterech
+         *     kształtów").
+         */
+        IndicatorResultOut: {
+            /**
+             * Anchored At
+             * @description set instead of warmup_bars for an indicator with state rather than decay
+             */
+            anchored_at: string | null;
+            /**
+             * Error
+             * @description why this one indicator could not be computed, when the reason is something the archive does not hold — the series it needs at a resolution nobody collects. Set instead of a shape, never beside one: an empty `zones` means the range held none, which is not the same claim. A request the module refuses outright (unknown indicator, parameter out of range, reversed range, over the ceiling) is a 422 carrying Problem, not a result carrying this
+             */
+            error: string | null;
+            /** Id */
+            id: string;
+            /** Levels */
+            levels: components["schemas"]["IndicatorLevelOut"][] | null;
+            /** Lines */
+            lines: {
+                [key: string]: (number | null)[];
+            } | null;
+            /** Markers */
+            markers: components["schemas"]["IndicatorMarkerOut"][] | null;
+            /**
+             * Params
+             * @description resolved params — defaults filled in
+             */
+            params: {
+                [key: string]: number;
+            };
+            /**
+             * Settled
+             * @description false when the archive did not hold enough history before the requested range for this value to be trusted yet. Says nothing about `error`: an unsettled value is still a value, computed from a series that was shorter than it wanted
+             */
+            settled: boolean;
+            /**
+             * Warmup Bars
+             * @description how many bars before the requested range were read for warmup; null for an anchored indicator, which carries anchored_at instead, and for one that carries an error instead of an answer
+             */
+            warmup_bars: number | null;
+            /** Zones */
+            zones: components["schemas"]["IndicatorZoneOut"][] | null;
+        };
+        /** IndicatorSpecIn */
+        IndicatorSpecIn: {
+            /**
+             * Id
+             * @example ema
+             */
+            id: string;
+            /** Params */
+            params?: {
+                [key: string]: number;
+            };
+        };
+        /** IndicatorZoneOut */
+        IndicatorZoneOut: {
+            /** Bottom */
+            bottom: number;
+            /** Direction */
+            direction: ("bullish" | "bearish") | null;
+            /** Filled At */
+            filled_at: string | null;
+            /**
+             * From
+             * Format: date-time
+             */
+            from: string;
+            /**
+             * To
+             * @description null while the zone has not closed within the read range
+             */
+            to: string | null;
+            /** Top */
+            top: number;
+            /** Touched At */
+            touched_at: string | null;
+        };
+        /** IndicatorsCatalogueOut */
+        IndicatorsCatalogueOut: {
+            /** Algorithm Version */
+            algorithm_version: number;
+            /** Indicators */
+            indicators: components["schemas"]["IndicatorCatalogueEntryOut"][];
+        };
+        /**
+         * IndicatorsOut
+         * @description `POST /indicators/{symbol}` — one or more indicators, on one shared time axis.
+         */
+        IndicatorsOut: {
+            /** Algorithm Version */
+            algorithm_version: number;
+            /**
+             * Derived
+             * @description true when computed from a resolution derived from the minute series
+             */
+            derived: boolean;
+            /** @description which side of the spread these were computed from; the archive holds bid */
+            price_side: components["schemas"]["PriceSide"];
+            resolution: components["schemas"]["Resolution"];
+            /** Results */
+            results: components["schemas"]["IndicatorResultOut"][];
+            /** Symbol */
+            symbol: string;
+            /**
+             * Times
+             * @description shared by every result below
+             */
+            times: string[];
+            /**
+             * Uncovered
+             * @description stretches of the requested range the archive never verified
+             */
+            uncovered: components["schemas"]["Uncovered"][];
+            /**
+             * Warmup From
+             * @description oldest period actually read to satisfy warmup; null when no requested indicator needed any
+             */
+            warmup_from: string | null;
+        };
+        /** IndicatorsRequest */
+        IndicatorsRequest: {
+            /**
+             * From
+             * Format: date-time
+             * @description inclusive, UTC
+             */
+            from: string;
+            /**
+             * @default MINUTE
+             * @example MINUTE
+             */
+            resolution: components["schemas"]["Resolution"];
+            /** Specs */
+            specs: components["schemas"]["IndicatorSpecIn"][];
+            /**
+             * To
+             * Format: date-time
+             * @description exclusive, UTC
+             */
+            to: string;
         };
         /** JobEstimateOut */
         JobEstimateOut: {
@@ -1114,6 +1455,61 @@ export interface operations {
             };
         };
     };
+    catalogue_indicators_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorsCatalogueOut"];
+                };
+            };
+        };
+    };
+    compute_indicators__symbol__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["IndicatorsRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IndicatorsOut"];
+                };
+            };
+            /** @description Unprocessable Entity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
     catalogue_instruments_get: {
         parameters: {
             query?: {
@@ -1469,6 +1865,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    ping_ping_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
         };

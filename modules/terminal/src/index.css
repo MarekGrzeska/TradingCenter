@@ -35,6 +35,17 @@
   --color-warning: #fab219;
   --color-critical: #d03b3b;
 
+  /* Slots 2/4/5/6/7 of the dataviz skill's validated eight-hue palette (dark
+   * column) — slots 1/3/8 are `--color-accent`/`--color-up`/`--color-down` above.
+   * `theme.ts`'s `indicatorLineColors` assembles all eight back into the documented
+   * order; picking any other subset or order failed the palette validator's
+   * adjacent-pair check (orange next to yellow, ΔE 4.8 — below the CVD floor). */
+  --color-indicator-2: #d95926;
+  --color-indicator-4: #c98500;
+  --color-indicator-5: #d55181;
+  --color-indicator-6: #008300;
+  --color-indicator-7: #9085e9;
+
   --font-sans:
     system-ui, -apple-system, "Segoe UI", sans-serif;
 }

@@ -1,7 +1,7 @@
 import { useMemo, useSyncExternalStore } from "react";
 import { Link } from "react-router";
 import { Chart } from "../chart/Chart";
-import { archive, marketData } from "../data/marketData";
+import { archive, indicators, marketData } from "../data/marketData";
 import type { Resolution, TrackedPair } from "../data/types";
 import { useTrackedPairs } from "../instruments/useTrackedPairs";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
@@ -155,10 +155,13 @@ function Slot({
       ) : (
         <Chart
           source={marketData}
+          indicatorSource={indicators}
           symbol={slot.symbol}
           resolution={slot.resolution}
           resolutions={allowedResolutions}
           onResolutionChange={(resolution) => gridStore.setSlotResolution(slotId, resolution)}
+          initialIndicatorSelections={slot.indicators}
+          onIndicatorSelectionsChange={(next) => gridStore.setSlotIndicators(slotId, next)}
           headerLeft={
             <SymbolField
               label={`Symbol for slot ${slotId}`}

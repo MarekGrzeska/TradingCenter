@@ -1,0 +1,393 @@
+<title>Wskaźniki — testy lokalne</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 56rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.9rem; margin: 1.5rem 0 0.4rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.82rem; }
+  td.num { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.79rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  .stage { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.2rem 0; }
+  .stage > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .stage .no { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.05em 0.45em; }
+  .stage dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.8rem 0 0; font-size: 0.92rem; }
+  .stage dt { font-family: var(--mono); font-size: 0.73rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); padding-top: 0.22rem; }
+  .stage dd { margin: 0; }
+  @media (max-width: 34rem) { .stage dl { grid-template-columns: 1fr; gap: 0.15rem; } .stage dd { margin-bottom: 0.6rem; } }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>Wskaźniki — testy lokalne</h1>
+<p class="lede">Scenariusze do przejścia ręką na działającym stosie, zanim gałąź <code>add-technical-indicators</code> pójdzie do <code>main</code>. Zadanie 7.4 zmiany OpenSpec — to, czego żaden test automatyczny nie sprawdza, bo dotyczy tego, co widać na ekranie.</p>
+<p class="meta">
+  Dotyczy: <code>modules/market-data</code>, <code>modules/terminal</code><br>
+  Zmiana: <code>openspec/changes/add-technical-indicators</code>, zadanie 7.4<br>
+  Katalog w chwili pisania: <strong>63 wpisy</strong>, sufit żądania <strong>200 000</strong> świec×wskaźników
+</p>
+
+<h2>Zanim zaczniesz</h2>
+
+<div class="callout warn">
+  <span class="tag">Trzy rzeczy, które psują przebieg, zanim się zacznie</span>
+  <ul>
+    <li><strong>Docker musi być wstały.</strong> Baza deweloperska to kontener z <code>compose.yaml</code>, <code>127.0.0.1:55432</code>. Skrypt startowy podnosi go pierwszy — bez Dockera nie ruszy nic, nie tylko testy.</li>
+    <li><strong>Jedna sesja demo Capital na całe konto.</strong> Drugi proces bramy wylogowuje pierwszy. Objaw: losowe 401 w obu. Nie uruchamiaj dwóch stosów naraz — także w drugim <code>git worktree</code>.</li>
+    <li><strong>Pliki <code>.env</code> są per moduł i nie są w gicie.</strong> Skopiuj z <code>.env.example</code>. Brama potrzebuje <code>CAPITAL_*</code> i własnego <code>GATEWAY_API_KEY</code>; archiwum tego samego <code>GATEWAY_API_KEY</code> i <code>DATABASE_URL</code>. <code>DATABASE_USER</code> zostaje pusty — to on wybiera tryb lokalny.</li>
+  </ul>
+</div>
+
+<h3>Testy automatyczne — najpierw one</h3>
+
+<p>Ręczny przebieg ma sens dopiero, gdy to jest zielone. Komendy z katalogu modułu; w repozytorium nie ma niczego, co zbuduje albo przetestuje wszystko naraz.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Gdzie</th><th>Komenda</th><th>Oczekiwane</th></tr></thead>
+  <tbody>
+    <tr><td class="field">market-data</td><td class="field">uv run pytest</td><td>993 passed, 7 skipped <span class="dim">— testy <code>db</code> wchodzą same, gdy Docker działa</span></td></tr>
+    <tr><td class="field">market-data</td><td class="field">uv run ruff check .</td><td>All checks passed!</td></tr>
+    <tr><td class="field">market-data</td><td class="field">uv run pyright</td><td>0 errors, 0 warnings</td></tr>
+    <tr><td class="field">terminal</td><td class="field">pnpm test</td><td>373 passed (25 plików)</td></tr>
+    <tr><td class="field">terminal</td><td class="field">pnpm lint</td><td>bez wyjścia</td></tr>
+    <tr><td class="field">terminal</td><td class="field">pnpm typecheck</td><td>bez wyjścia</td></tr>
+    <tr><td class="field">terminal</td><td class="field">pnpm contract:check</td><td>Contract is up to date.</td></tr>
+    <tr><td class="field">repozytorium</td><td class="field">openspec validate add-technical-indicators --strict</td><td>Change 'add-technical-indicators' is valid</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Podniesienie stosu</h3>
+
+<pre><code>./scripts/dev.ps1            # Windows
+./scripts/dev.sh             # macOS, Linux
+./scripts/dev.ps1 -NoTerminal   # sam back end (to, czego potrzebują testy live)</code></pre>
+
+<p>Kolejność jest wymuszona i każdy krok czeka, aż poprzedni <em>odpowie</em>, a nie aż zostanie uruchomiony: migracje → <code>capital-gateway</code> (<strong>8010</strong>) → <code>market-data</code> (<strong>8020</strong>) → terminal (<strong>5173</strong>). Porty są stałe.</p>
+
+<p>Przed pierwszym scenariuszem potrzebna jest para z historią. W terminalu: <em>Instruments</em> → dodaj instrument (np. <code>US100</code>) i zbierz co najmniej kilka tysięcy świec na <code>MINUTE</code> — wskaźniki liczą się z serii, której nie ma, tak samo skutecznie jak z pustej.</p>
+
+<div class="callout">
+  <span class="tag">Dlaczego akurat seria minutowa</span>
+  <p><code>time_profile</code>, <code>session_range_*</code> i <code>opening_range</code> czytają serię drobną (<code>MINUTE_5</code>) niezależnie od tego, jaką rozdzielczość ma wykres. Bez niej odmawiają — i to jest poprawne zachowanie, nie awaria (scenariusz <strong>15</strong>).</p>
+</div>
+
+<h2>Scenariusze — E0, szkielet i linie</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-01</span> Katalog jest jedynym źródłem wybieraka</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Wykres → przycisk <strong>Indicators</strong> w prawym górnym rogu panelu.</dd>
+    <dt>Oczekiwane</dt><dd>Lista zawiera wszystkie 63 pozycje z <code>GET /indicators</code>, po <code>id</code> wielkimi literami, z nazwą w tooltipie. Pozycje, których ten wykres nie umie narysować, są wyszarzone i nieklikalne, z podpowiedzią „This chart cannot draw this indicator's render style yet".</dd>
+    <dt>Podstawa</dt><dd>spec <code>market-data-indicators</code>, „Katalog wystarcza do zbudowania wybieraka"</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-02</span> Parametr poza zakresem nie idzie na serwer</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>EMA</code>, w polu <code>period</code> wpisz wartość powyżej maksimum z katalogu (np. 100000) i wyjdź z pola (blur).</dd>
+    <dt>Oczekiwane</dt><dd>Pod polem czerwony komunikat <code>period must be between &lt;min&gt; and &lt;max&gt;</code>. Wykres się nie zmienia, żadne żądanie nie wychodzi — sprawdź w zakładce Network.</dd>
+    <dt>Podstawa</dt><dd>zadanie 1.19</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-03</span> Nakładka liniowa i skala ceny</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>EMA</code> i <code>SMA</code>. Zmień <code>period</code> jednej z nich.</dd>
+    <dt>Oczekiwane</dt><dd>Obie linie na panelu ceny, każda swoim kolorem. Zmiana parametru przerysowuje tylko tę jedną. Oś ceny nie skacze — <code>autoscale</code> z katalogu decyduje, czy wskaźnik może ją poszerzyć.</dd>
+    <dt>Podstawa</dt><dd>zadanie 1.20</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-04</span> Rozgrzewka: „warming up" zamiast cichej nieprawdy</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Na parze o płytkim archiwum zaznacz <code>ADX</code> (potrzebuje ~580 świec rozgrzewki) i przewiń na sam początek zebranej historii.</dd>
+    <dt>Oczekiwane</dt><dd>W nagłówku panelu żółta plakietka <strong>warming up</strong> z tooltipem o niewystarczającej historii. Wartości <em>są</em> narysowane — nieustalona wartość jest zwracana, nigdy ukrywana. Tam, gdzie wartości nie ma w ogóle, linia ma przerwę, a nie zero.</dd>
+    <dt>Podstawa</dt><dd>zadania 1.9, 1.21</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-05</span> Padnięte wskaźniki nie zasłaniają świec</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Przy narysowanych wskaźnikach zatrzymaj <code>market-data</code> (Ctrl+C w jego oknie). Poczekaj na odświeżenie. Podnieś moduł z powrotem i kliknij <strong>Retry</strong>.</dd>
+    <dt>Oczekiwane</dt><dd>Świece zostają na ekranie. Pojawia się czerwona plakietka <strong>indicators unavailable</strong> z przyczyną w tooltipie i przyciskiem <strong>Retry</strong>. Po ponowieniu wskaźniki wracają bez przeładowania strony.</dd>
+    <dt>Podstawa</dt><dd>zadanie 1.22</dd>
+  </dl>
+</div>
+
+<h2>Scenariusze — E1, miary ciągłe</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-06</span> Oscylator dostaje własny panel</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>RSI</code>. Potem dołóż <code>STOCH</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Każdy oscylator w osobnym panelu pod ceną, nie we wspólnym. Panel ceny zostaje wyraźnie wyższy (stretch 4:1) — dołożenie drugiego oscylatora nie zmniejsza świec do połowy ekranu. Poziomy odniesienia (30/70 dla RSI) rysowane z podpowiedzi katalogu, nie zaszyte w terminalu.</dd>
+    <dt>Podstawa</dt><dd>zadania 2.12, 2.13</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-07</span> Histogram MACD ma kolor na słupek</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>MACD</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Trzy przebiegi we własnym panelu: linia, sygnał i histogram, w którym każdy słupek ma kolor swojego znaku — nie jeden kolor na całą serię.</dd>
+    <dt>Podstawa</dt><dd>zadanie 2.14</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-08</span> Odczyt pod kursorem obok OHLC</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Przy zaznaczonych <code>EMA</code> i <code>RSI</code> przesuwaj kursor po wykresie. Zjedź kursorem poza wykres.</dd>
+    <dt>Oczekiwane</dt><dd>W nagłówku obok OHLC wartości obu wskaźników, z nazwą i parametrami. Po zjechaniu kursorem czytnik wraca do ostatniej świecy, a nie znika.</dd>
+    <dt>Podstawa</dt><dd>zadanie 2.15</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-09</span> Zestaw przeżywa przeładowanie, nieznany wpis nie znika po cichu</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Ustaw różne zestawy wskaźników w dwóch slotach siatki. Przeładuj stronę (F5).<br>Potem, przy zatrzymanym terminalu, w konsoli przeglądarki dopisz do <code>localStorage["terminal.grid.v1"]</code> wybór o zmyślonym <code>id</code> i przeładuj.</dd>
+    <dt>Oczekiwane</dt><dd>Każdy slot odtwarza swój własny zestaw z parametrami. Zmyślony wpis nie jest rysowany ani nie wywraca panelu — zamiast tego plakietka <strong>1 saved indicator unavailable</strong> z listą w tooltipie. Edycja znanego wskaźnika go nie kasuje.</dd>
+    <dt>Podstawa</dt><dd>zadanie 2.16</dd>
+  </dl>
+</div>
+
+<h2>Scenariusze — E2, punkty i poziomy</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-10</span> Markery punktów zwrotnych i ich opóźnienie</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>SWING_POINTS</code>. Popatrz na prawą krawędź wykresu.</dd>
+    <dt>Oczekiwane</dt><dd>Markery nad/pod świecami. Przy prawej krawędzi ostatnie <code>n</code> świec nie ma markerów — punkt zgłaszany jest dopiero po potwierdzeniu, a odpowiedź podaje to opóźnienie. Zmiana zakresu widoku nie przesuwa raz postawionego markera.</dd>
+    <dt>Podstawa</dt><dd>zadania 3.1, 3.8, 3.10</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-11</span> Poziom to promień, nie linia przez cały ekran</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>PIVOTS_CLASSIC</code>, potem <code>HTF_LEVELS_DAY</code> na wykresie <code>MINUTE_15</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Poziomy zaczynają się w momencie, od którego obowiązują, i biegną w prawo — nie przecinają całej szerokości wykresu. Poziomy dnia poprzedniego zaczynają się od zamknięcia tamtego dnia, nie od jego początku.</dd>
+    <dt>Podstawa</dt><dd>zadania 3.4, 3.9, 3.11</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-12</span> Skupiska poziomów niosą liczność</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>LEVEL_CLUSTERS</code>, pokręć parametrem <code>tol</code> (w jednostkach ATR).</dd>
+    <dt>Oczekiwane</dt><dd>Liczba narysowanych skupisk zmienia się z tolerancją; przy odczycie pod kursorem widać liczność każdego. Próg jest parametrem, który podałeś — moduł nie wybrał go za ciebie.</dd>
+    <dt>Podstawa</dt><dd>zadanie 3.6</dd>
+  </dl>
+</div>
+
+<h2>Scenariusze — E3, strefy</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-13</span> Luka cenowa i strefa niedomknięta</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>RANGE_GAP</code> na <code>MINUTE_15</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Prostokąty w miejscach niepokrytych przedziałów, kolorem kierunku. Strefa jeszcze niewypełniona ciągnie się do prawej krawędzi i przesuwa się razem z nią; wypełniona kończy się na świecy, która ją domknęła.</dd>
+    <dt>Podstawa</dt><dd>zadania 4.1, 4.6, 4.7</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-14</span> Weekend to nie luka</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Przy zaznaczonym <code>RANGE_GAP</code> przewiń wykres na przełom piątku i niedzieli.</dd>
+    <dt>Oczekiwane</dt><dd>Przerwa sesyjna nie jest zgłoszona jako luka cenowa — <code>skip_session_gaps</code> jest domyślnie włączone, a klasyfikacja bierze się z pokrycia archiwum, nie z kalendarza sesji, którego moduł nie zna. Wyłącz parametr: luka się pojawia.</dd>
+    <dt>Podstawa</dt><dd>zadania 4.3, 4.8</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-15</span> Okno sesji trzyma godziny lokalne przez zmianę czasu</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>SESSION_RANGE_LONDON</code>. Przewiń na ostatni weekend października (koniec czasu letniego w Europie).</dd>
+    <dt>Oczekiwane</dt><dd>Prostokąt sesji obejmuje te same godziny <em>lokalne</em> po obu stronach zmiany czasu, choć w UTC przesuwa się o godzinę. To samo dla <code>SESSION_RANGE_NEW_YORK</code> na przełomie marca — daty zmiany czasu w USA i Europie nie są te same.</dd>
+    <dt>Podstawa</dt><dd>zadania 4.4, 4.9</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-16</span> Płynność przy wielu strefach</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz naraz <code>RANGE_GAP</code>, <code>BODY_GAP</code> i <code>OPENING_RANGE</code> na długim zakresie, tak by w widocznym oknie było ~300 stref. Przewijaj i zoomuj.</dd>
+    <dt>Oczekiwane</dt><dd>Przewijanie zostaje płynne — koszt klatki jest ograniczony widocznym zakresem, nie liczbą wszystkich stref w odpowiedzi.</dd>
+    <dt>Podstawa</dt><dd>zadanie 4.10</dd>
+  </dl>
+</div>
+
+<h2>Scenariusze — E4, profil czasowy</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-17</span> Histogram profilu przy prawej krawędzi</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zaznacz <code>TIME_PROFILE</code> na wykresie <code>HOUR</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Poziomy histogram przy prawej krawędzi panelu ceny, wyróżniony poziom o największym udziale i przedział obejmujący zadany udział. Liczy udział <em>czasu</em>, nie wolumenu — to odczyt TPO, nie volume profile.</dd>
+    <dt>Podstawa</dt><dd>zadania 5.1, 5.2, 5.4</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-18</span> Brak serii drobnej to odmowa, nie zero</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Dodaj parę zbieraną wyłącznie na <code>DAY</code> (bez serii minutowej) i zaznacz na niej <code>TIME_PROFILE</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Plakietka <strong>indicators unavailable</strong> z nazwaną przyczyną w tooltipie. Świece zostają. Żadnego pustego histogramu udającego dane.</dd>
+    <dt>Podstawa</dt><dd>zadanie 5.3</dd>
+  </dl>
+</div>
+
+<h2>Scenariusze — E5, na żywo</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-19</span> Wskaźnik nie drga w trakcie świecy w budowie</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Na otwartym rynku, <code>MINUTE</code>, z zaznaczoną <code>EMA</code>: obserwuj ostatnią wartość przez pełną minutę, a potem przez moment zamknięcia świecy.</dd>
+    <dt>Oczekiwane</dt><dd>W trakcie świecy wartość stoi — mimo że świeca się rusza. W momencie zamknięcia okresu terminal dopytuje o ogon serii <em>tym samym</em> żądaniem i wartość przeskakuje raz. W Network widać jedno żądanie na zamknięcie świecy, nie na tyknięcie.</dd>
+    <dt>Podstawa</dt><dd>zadania 6.1, 6.2</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-20</span> Zmiana symbolu kasuje stare wartości razem ze świecami</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Przy narysowanych wskaźnikach zmień symbol, potem rozdzielczość w selektorze <em>Resolution</em>. Obserwuj moment ładowania.</dd>
+    <dt>Oczekiwane</dt><dd>Żadna wartość policzona dla poprzedniej serii nie zostaje na ekranie ani na chwilę — wskaźniki znikają razem ze świecami, nie po nich.</dd>
+    <dt>Podstawa</dt><dd>zadania 6.3, 6.4</dd>
+  </dl>
+</div>
+
+<h2>Bez terminala — odmowy i kształt odpowiedzi</h2>
+
+<p>Cztery rzeczy łatwiej sprawdzić na samym module. Poniżej PowerShell; <code>market-data</code> nie wymaga lokalnie żadnego klucza — to Easy Auth przed wdrożonym kontenerem, nie moduł.</p>
+
+<h4>TC-21 — katalog</h4>
+<pre><code>$c = Invoke-RestMethod http://127.0.0.1:8020/indicators
+$c.indicators.Count            # 63
+$c.algorithm_version           # rośnie tylko przy zmianie wzoru, nie przy dodaniu wpisu
+$c.indicators | Group-Object group | Select-Object Name, Count</code></pre>
+
+<h4>TC-22 — policzenie i rozgrzewka</h4>
+<pre><code>$body = @{
+  resolution = "MINUTE_15"
+  from = "2026-08-01T00:00:00Z"
+  to   = "2026-08-05T00:00:00Z"
+  specs = @(@{ id = "ema"; params = @{ period = 21 } }, @{ id = "atr" })
+} | ConvertTo-Json -Depth 5
+
+$r = Invoke-RestMethod -Method Post -ContentType application/json `
+     -Uri http://127.0.0.1:8020/indicators/US100 -Body $body
+
+$r.warmup_from                 # wcześniej niż `from` — moduł sam sięgnął wstecz
+$r.results | Select-Object id, settled, warmup_bars
+$r.times.Count                 # wspólna oś czasu dla wszystkich wyników
+$r.uncovered                   # przedziały, których archiwum nigdy nie zweryfikowało</code></pre>
+
+<h4>TC-23 — sufit żądania</h4>
+<pre><code># 10 wskaźników × zakres na tyle długi, żeby iloczyn przekroczył 200 000
+$body = @{ resolution = "MINUTE"; from = "2020-01-01T00:00:00Z"; to = "2026-01-01T00:00:00Z"
+           specs = @(@{ id = "ema" }) } | ConvertTo-Json -Depth 5
+Invoke-RestMethod -Method Post -ContentType application/json `
+  -Uri http://127.0.0.1:8020/indicators/US100 -Body $body</code></pre>
+<p>Oczekiwane: <span class="pill bad">422</span> z <code>detail</code> nazywającym granicę — <code>request exceeds the indicator ceiling of 200000 candles×indicators (~N asked for)</code>. Granica jest w odpowiedzi liczbą, nie ogólnikiem.</p>
+
+<h4>TC-24 — zakres odwrócony i nieznany wskaźnik</h4>
+<pre><code>@{ resolution="MINUTE"; from="2026-08-05T00:00:00Z"; to="2026-08-01T00:00:00Z"; specs=@(@{id="ema"}) }
+@{ resolution="MINUTE"; from="2026-08-01T00:00:00Z"; to="2026-08-02T00:00:00Z"; specs=@(@{id="nie_ma_takiego"}) }</code></pre>
+<p>Oczekiwane: oba <span class="pill bad">422</span>, drugie z <code>unknown indicator: 'nie_ma_takiego'</code>. Wskaźnik z parametrem poza zakresem też — komunikat nazywa parametr i jego granice.</p>
+
+<div class="callout good">
+  <span class="tag">Co ten zestaw ma udowodnić</span>
+  <p>Że granica wobec strategii trzyma się kontraktu, a nie dyscypliny: <strong>żaden</strong> wynik nie jest wartością logiczną, <strong>każdy</strong> próg jest parametrem żądania powtórzonym w odpowiedzi, a nazwy jednej szkoły siedzą w <code>aliases</code>, nigdy w <code>id</code>. Sprawdź to na <code>range_gap</code> — niesie „Fair Value Gap" jako alias, nie jako identyfikator.</p>
+</div>
+
+<h2>Co zostaje otwarte po tym przebiegu</h2>
+
+<div class="callout warn">
+  <span class="tag">Uczciwie, żeby nie było potem niespodzianki</span>
+  <p><strong>Opóźnienie dopytywania nie zostało zmierzone na żywym stosie.</strong> <code>design.md</code> obiecywał pomiar przed wyborem między dopytaniem po zamknięciu świecy a osobną subskrypcją wskaźników; wybrano dopytanie na podstawie brzmienia zadania 6.1, bo w trakcie zmiany nie było działającego stosu do pomiaru. Scenariusz <strong>TC-19</strong> pokazuje, że to <em>działa</em> — nie pokazuje, że jest dostatecznie szybkie na wolnym łączu. Przejście na subskrypcję nie rusza kontraktu, tylko sposób odpytywania.</p>
+  <p><strong>Testy <code>live</code> zostają poza tym przebiegiem.</strong> <code>uv run pytest -m live --run-live</code> potrzebuje sesji demo, a <code>--run-live-trading</code> w bramie <em>pisze</em> — otwiera, zmienia i zamyka pozycje demo. Nigdy w CI, i nie przy okazji testu wskaźników.</p>
+</div>
+
+<footer>
+  Dokument roboczy do zadania 7.4. Po przejściu scenariuszy i wpisaniu wyniku do <code>review.md</code> traci rację bytu jako plan — zostaje jako zapis, co i jak było sprawdzone ręcznie. Prawdą o systemie są specyfikacje <code>market-data-indicators</code>, <code>terminal-chart</code> i <code>terminal-grid</code>.
+</footer>
+
+</main>

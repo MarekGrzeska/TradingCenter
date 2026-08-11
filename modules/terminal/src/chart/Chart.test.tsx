@@ -1,14 +1,22 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { FakeSeries } from "./testDoubles";
 import {
   ControllableSource,
+  FakeIndicatorSource,
   bar,
   createChartStub,
   fakeChartApi,
+  fakeCreateSeriesMarkers,
+  indicatorEntry,
+  indicatorResult,
   makeFakeChart,
 } from "./testDoubles";
-import type { Bar } from "../data/types";
+import type { Bar, IndicatorSelection } from "../data/types";
+import { readChartColors } from "./theme";
+import { Toaster } from "../ui/Toaster";
+import { toastStore } from "../ui/toastStore";
 
 const stub = createChartStub();
 
@@ -16,6 +24,8 @@ const stub = createChartStub();
 // Everything below tests what the component *asks the chart to do*.
 vi.mock("lightweight-charts", () => ({
   CandlestickSeries: { type: "Candlestick" },
+  LineSeries: { type: "Line" },
+  HistogramSeries: { type: "Histogram" },
   ColorType: { Solid: "solid" },
   CrosshairMode: { Normal: 0 },
   LineStyle: { Dashed: 2 },
@@ -24,18 +34,36 @@ vi.mock("lightweight-charts", () => ({
     stub.charts.push(chart);
     return fakeChartApi(chart);
   },
+  createSeriesMarkers: (series: FakeSeries, markers: unknown[] = []) =>
+    fakeCreateSeriesMarkers(series, markers),
 }));
 
 const { Chart } = await import("./Chart");
 
-function renderChart(source: ControllableSource, props?: Partial<{ symbol: string; resolution: "MINUTE_5" | "HOUR" }>) {
+// The store is a module singleton; a toast left behind would show up in the next test's
+// document as if that test had raised it.
+afterEach(() => act(() => toastStore.clear()));
+
+function renderChart(
+  source: ControllableSource,
+  props?: Partial<{
+    symbol: string;
+    resolution: "MINUTE_5" | "HOUR";
+    indicatorSource: FakeIndicatorSource;
+    initialIndicatorSelections: IndicatorSelection[];
+    onIndicatorSelectionsChange: (selections: IndicatorSelection[]) => void;
+  }>,
+) {
   const onResolutionChange = vi.fn();
   const view = render(
     <Chart
       source={source}
+      indicatorSource={props?.indicatorSource}
       symbol={props?.symbol ?? "US100"}
       resolution={props?.resolution ?? "MINUTE_5"}
       onResolutionChange={onResolutionChange}
+      initialIndicatorSelections={props?.initialIndicatorSelections}
+      onIndicatorSelectionsChange={props?.onIndicatorSelectionsChange}
     />,
   );
   return { ...view, onResolutionChange };
@@ -579,5 +607,1362 @@ describe("Chart — the price on the right-hand scale", () => {
     );
 
     await waitFor(() => expect(line?.removed).toBe(true));
+  });
+});
+
+describe("Chart — indicators (terminal-chart spec, market-data-indicators)", () => {
+  function lineSeries() {
+    return stub.latest().series.filter((s) => s.type === "Line");
+  }
+
+  it("offers no picker at all without an indicator source", () => {
+    renderChart(source);
+    expect(screen.queryByRole("button", { name: /indicators/i })).not.toBeInTheDocument();
+  });
+
+  it("builds the picker from the catalogue, not from a hand-kept list", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry({ id: "ema", name: "Exponential Moving Average" })];
+    renderChart(source, { indicatorSource: indicators });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+
+    expect(await screen.findByText("EMA")).toBeInTheDocument();
+  });
+
+  it("computes the chosen indicator over the range the chart actually drew, and draws a line", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [indicatorResult({ lines: { ema: [10, 20] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    expect(indicators.computeCalls[0]).toMatchObject({
+      symbol: "US100",
+      resolution: "MINUTE_5",
+      from: 100,
+      to: 200,
+      specs: [{ id: "ema", params: { period: 20 } }],
+    });
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    expect(lineSeries()[0].data()).toEqual([
+      { time: 100, value: 10 },
+      { time: 200, value: 20 },
+    ]);
+  });
+
+  it("restores a saved selection on mount, computes it without a click, and notifies every later change", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    const onIndicatorSelectionsChange = vi.fn();
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "ema", params: { period: 20 } }],
+      onIndicatorSelectionsChange,
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    expect(indicators.computeCalls[0]).toMatchObject({ specs: [{ id: "ema" }] });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    expect(await screen.findByRole("checkbox", { name: /^ema$/i })).toBeChecked();
+
+    // Toggling it off is a real change — the caller (the grid slot) hears
+    // about it so it can save the new, now-empty selection.
+    await userEvent.click(screen.getByRole("checkbox", { name: /^ema$/i }));
+    expect(onIndicatorSelectionsChange).toHaveBeenCalledWith([]);
+  });
+
+  it("skips a saved selection the catalogue no longer offers, and says so, without discarding it from the next save", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry({ id: "ema" })];
+    const onIndicatorSelectionsChange = vi.fn();
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { id: "retired_indicator", params: {} },
+        { id: "ema", params: { period: 20 } },
+      ],
+      onIndicatorSelectionsChange,
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    // Only the indicator the catalogue still recognizes is ever asked for.
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    expect(indicators.computeCalls[0].specs).toEqual([{ id: "ema", params: { period: 20 } }]);
+
+    expect(await screen.findByText(/1 saved indicator unavailable/i)).toBeInTheDocument();
+
+    // An unrelated edit (toggling EMA off) must not silently drop the entry
+    // the catalogue does not recognize — nothing here decided it is gone for
+    // good, only that it cannot be drawn right now.
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+    expect(onIndicatorSelectionsChange).toHaveBeenLastCalledWith([
+      { id: "retired_indicator", params: {} },
+    ]);
+  });
+
+  it("draws an own-pane indicator in a pane of its own, not the price pane", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "atr",
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: "atr", label: "ATR {period}", style: null }],
+        render: { pane: "own", style: "line", scale: "own", autoscale: true, range: null, levels: [] },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ id: "atr", params: { period: 14 }, lines: { atr: [1.5, 1.6] } }),
+        ],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr$/i }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    // Pane 0 is the price pane the candles live on — an own-pane indicator must
+    // land anywhere else, in a pane `Chart` created for it.
+    expect(lineSeries()[0].paneIndex).not.toBe(0);
+    expect(stub.latest().panesList).toHaveLength(2);
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(0));
+    expect(stub.latest().panesList).toHaveLength(1);
+  });
+
+  it("deselecting one of two own-pane indicators leaves the other's pane intact (regression)", async () => {
+    // Reported: select atr_pct, select atr, deselect atr — the chart's own
+    // default is to remove a pane the instant its last series does, which
+    // raced `Chart.tsx`'s own explicit `removePane` and threw ("This view
+    // hit an error"). Fixed by `addPane(true)` (`preserveEmptyPane`) plus a
+    // guard that never hands `removePane` a pane already gone.
+    const indicators = new FakeIndicatorSource();
+    const ownPaneLine = (id: string) =>
+      indicatorEntry({
+        id,
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: id, label: id, style: null }],
+        render: { pane: "own", style: "line", scale: "own", autoscale: true, range: null, levels: [] },
+      });
+    indicators.catalogueEntries = [ownPaneLine("atr_pct"), ownPaneLine("atr")];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ id: "atr_pct", params: { period: 14 }, lines: { atr_pct: [1] } })],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({ id: "atr_pct", params: { period: 14 }, lines: { atr_pct: [1] } }),
+          indicatorResult({ id: "atr", params: { period: 14 }, lines: { atr: [2] } }),
+        ],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ id: "atr_pct", params: { period: 14 }, lines: { atr_pct: [1] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr_pct$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(2));
+    expect(stub.latest().panesList).toHaveLength(3); // price + atr_pct + atr
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^atr$/i }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    expect(lineSeries()[0].options.color).toBeDefined(); // still a live, readable series
+    expect(stub.latest().panesList).toHaveLength(2); // price + atr_pct — atr's pane is gone, only once
+  });
+
+  it("draws the catalogue's reference levels (RSI's 30/70) once, and removes them when deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "rsi",
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: "rsi", label: "RSI {period}", style: null }],
+        render: {
+          pane: "own",
+          style: "line",
+          scale: "fixed",
+          autoscale: false,
+          range: [0, 100],
+          levels: [30, 70],
+        },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ id: "rsi", params: { period: 14 }, lines: { rsi: [40, 60] } }),
+        ],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^rsi$/i }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    const rsiLine = lineSeries()[0];
+    const levelPrices = rsiLine.priceLines.filter((l) => !l.removed).map((l) => l.options.price);
+    expect(levelPrices).toEqual([30, 70]);
+
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^rsi$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(0));
+    // Explicitly removed, not just orphaned along with the series it sat on.
+    expect(rsiLine.priceLines.every((l) => l.removed)).toBe(true);
+  });
+
+  it("shows an own-pane indicator's value under the cursor beside OHLC, same as a price-pane one", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "rsi",
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: "rsi", label: "RSI {period}", style: null }],
+        render: {
+          pane: "own",
+          style: "line",
+          scale: "fixed",
+          autoscale: false,
+          range: [0, 100],
+          levels: [30, 70],
+        },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ id: "rsi", params: { period: 14 }, lines: { rsi: [40, 63.5] } }),
+        ],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^rsi$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+
+    await act(async () => {
+      for (const handler of stub.latest().crosshairHandlers) handler({ time: 200 });
+    });
+
+    expect(await screen.findByText("RSI 14")).toBeInTheDocument();
+    expect(await screen.findByText("63.5")).toBeInTheDocument();
+  });
+
+  it("draws MACD's histogram line as a two-color Histogram series beside its two Line series", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "macd",
+        params: [
+          { name: "fast_period", type: "int", default: 12, min: 2, max: 5000 },
+          { name: "slow_period", type: "int", default: 26, min: 2, max: 5000 },
+          { name: "signal_period", type: "int", default: 9, min: 2, max: 5000 },
+        ],
+        lines: [
+          { key: "macd", label: "MACD {fast_period},{slow_period}", style: null },
+          { key: "signal", label: "Signal {signal_period}", style: null },
+          { key: "histogram", label: "Histogram", style: "histogram" },
+        ],
+        render: { pane: "own", style: "line", scale: "own", autoscale: true, range: null, levels: [] },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200, 300],
+        results: [
+          indicatorResult({
+            id: "macd",
+            params: { fast_period: 12, slow_period: 26, signal_period: 9 },
+            lines: {
+              macd: [1, 2, 3],
+              signal: [0.5, 0.5, 0.5],
+              histogram: [0.5, -1.5, 2.5],
+            },
+          }),
+        ],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2), bar(300, 3)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^macd$/i }));
+
+    await waitFor(() =>
+      expect(stub.latest().series.filter((s) => s.type === "Histogram")).toHaveLength(1),
+    );
+    expect(lineSeries()).toHaveLength(2); // macd, signal — the histogram line is not among them
+
+    const histogram = stub.latest().series.find((s) => s.type === "Histogram")!;
+    const colors = readChartColors();
+    expect(histogram.data()).toEqual([
+      { time: 100, value: 0.5, color: colors.up },
+      { time: 200, value: -1.5, color: colors.down },
+      { time: 300, value: 2.5, color: colors.up },
+    ]);
+  });
+
+  it("draws a missing value as a whitespace point, never as zero", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [indicatorResult({ lines: { ema: [null, 20] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    const [first] = lineSeries()[0].data();
+    expect(first).toEqual({ time: 100 });
+    expect(first).not.toHaveProperty("value");
+  });
+
+  it("says when a value is not settled yet, without hiding it", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ settled: false, lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+
+    expect(await screen.findByText(/warming up/i)).toBeInTheDocument();
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+  });
+
+  it("a failed compute leaves the candles alone and offers a retry", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeFailure = new Error("the archive refused: unknown indicator");
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+
+    expect(await screen.findByText(/indicators unavailable/i)).toBeInTheDocument();
+    // The candlestick series is untouched — still whatever the snapshot drew.
+    expect(stub.latest().series[0].data()).toHaveLength(2);
+
+    const callsBefore = indicators.computeCalls.length;
+    await userEvent.click(screen.getByRole("button", { name: /retry/i }));
+    await waitFor(() => expect(indicators.computeCalls.length).toBeGreaterThan(callsBefore));
+  });
+
+  // `indicator-result-names-its-own-failure`: the archive answers, and one of the chosen
+  // indicators carries a reason where its values would have been.
+  describe("one indicator carries a reason, the rest carry answers", () => {
+    function partialCompute() {
+      return {
+        symbol: "US100",
+        resolution: "MINUTE_5" as const,
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ id: "ema", lines: { ema: [10, 20] } }),
+          indicatorResult({
+            id: "range_gap",
+            settled: false,
+            error: "no MINUTE_5 series collected for 'US100'",
+            lines: null,
+          }),
+        ],
+      };
+    }
+
+    async function pickBoth(indicators: FakeIndicatorSource) {
+      await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+      await userEvent.click(await screen.findByRole("checkbox", { name: /^range_gap$/i }));
+      return indicators;
+    }
+
+    function twoEntries() {
+      const indicators = new FakeIndicatorSource();
+      indicators.catalogueEntries = [
+        indicatorEntry(),
+        indicatorEntry({ id: "range_gap", name: "Range Gap", output: "zones", group: "zones" }),
+      ];
+      return indicators;
+    }
+
+    it("draws the ones that computed and names the one that did not", async () => {
+      const indicators = twoEntries();
+      indicators.computeQueue = [partialCompute(), partialCompute()];
+      renderChart(source, { indicatorSource: indicators });
+      await act(async () => {
+        source.snapshot([bar(100, 1), bar(200, 2)]);
+      });
+      await pickBoth(indicators);
+
+      await waitFor(() => expect(lineSeries()).toHaveLength(1));
+      // Named by id: with several chosen, a count sends the operator looking for which.
+      expect(await screen.findByText(/range_gap unavailable/i)).toBeInTheDocument();
+    });
+
+    it("leaves no empty primitive behind for the one that could not be computed", async () => {
+      const indicators = twoEntries();
+      indicators.computeQueue = [partialCompute(), partialCompute()];
+      renderChart(source, { indicatorSource: indicators });
+      await act(async () => {
+        source.snapshot([bar(100, 1), bar(200, 2)]);
+      });
+      await pickBoth(indicators);
+
+      await waitFor(() => expect(lineSeries()).toHaveLength(1));
+      // An empty zone primitive would be the terminal drawing "computed, found none"
+      // over a result that says the opposite.
+      expect(stub.latest().series[0].primitives).toHaveLength(0);
+    });
+
+    it("keeps it selected — the operator chose it and the archive may yet hold the series", async () => {
+      const indicators = twoEntries();
+      indicators.computeQueue = [partialCompute(), partialCompute(), partialCompute()];
+      const onIndicatorSelectionsChange = vi.fn();
+      renderChart(source, { indicatorSource: indicators, onIndicatorSelectionsChange });
+      await act(async () => {
+        source.snapshot([bar(100, 1), bar(200, 2)]);
+      });
+      await pickBoth(indicators);
+
+      await waitFor(() => expect(lineSeries()).toHaveLength(1));
+      expect(screen.getByRole("checkbox", { name: /^range_gap$/i })).toBeChecked();
+      // What the grid slot saves is what was last reported, and it still has both.
+      const saved = onIndicatorSelectionsChange.mock.lastCall?.[0] ?? [];
+      expect(saved.map((s: { id: string }) => s.id).sort()).toEqual(["ema", "range_gap"]);
+    });
+
+    it("draws it on the next read that succeeds, without being picked again", async () => {
+      const indicators = twoEntries();
+      const computed = {
+        ...partialCompute(),
+        results: [
+          indicatorResult({ id: "ema", lines: { ema: [10, 20] } }),
+          indicatorResult({
+            id: "range_gap",
+            lines: null,
+            zones: [
+              {
+                from: 100,
+                to: 200,
+                top: 12,
+                bottom: 10,
+                direction: "bullish",
+                touchedAt: null,
+                filledAt: null,
+              },
+            ],
+          }),
+        ],
+      };
+      indicators.computeQueue = [partialCompute(), partialCompute(), computed, computed];
+      renderChart(source, { indicatorSource: indicators });
+      await act(async () => {
+        source.snapshot([bar(100, 1), bar(200, 2)]);
+      });
+      await pickBoth(indicators);
+      await waitFor(() => expect(screen.queryByText(/range_gap unavailable/i)).toBeInTheDocument());
+
+      // A new candle closes, the chart requeries with the same request shape, and this
+      // time the archive has what it needed.
+      await act(async () => {
+        source.emit({ kind: "bar", bar: bar(300, 3, true) }); // 200 just closed
+      });
+
+      await waitFor(() =>
+        expect(screen.queryByText(/range_gap unavailable/i)).not.toBeInTheDocument(),
+      );
+      expect(stub.latest().series[0].primitives.length).toBeGreaterThan(0);
+    });
+  });
+
+  it("raises the reason as a toast, where the badge has nowhere to put it", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeFailure = new Error(
+      "no MINUTE_5 series collected for 'US100', and none could be derived from MINUTE either",
+    );
+    renderChart(source, { indicatorSource: indicators });
+    // Mounted the way `Shell` mounts it: once, beside the view, not inside it.
+    render(<Toaster />);
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+
+    // The badge says *that*; the toast is the only place that says *why*, and the why is
+    // the actionable half — a series nobody collected is a thing the operator can go fix.
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("US100");
+    expect(toast).toHaveTextContent(/no MINUTE_5 series collected/);
+  });
+
+  it("removes the line when the operator deselects the indicator", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    const checkbox = await screen.findByRole("checkbox", { name: /^ema$/i });
+    await userEvent.click(checkbox);
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    const line = lineSeries()[0];
+
+    await userEvent.click(checkbox);
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(0));
+    expect(stub.latest().removedSeries).toContain(line);
+  });
+
+  it("clears every indicator line when the symbol changes, before the new series loads", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    const { rerender, onResolutionChange } = renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+
+    rerender(
+      <Chart
+        source={source}
+        indicatorSource={indicators}
+        symbol="GOLD"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+      />,
+    );
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(0));
+  });
+
+  it("refuses a parameter outside the range the catalogue declares, and says what range does apply", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+
+    const periodInput = screen.getByLabelText("period");
+    await userEvent.clear(periodInput);
+    await userEvent.type(periodInput, "99999");
+    await userEvent.tab(); // blur
+
+    expect(await screen.findByText(/must be between 2 and 5000/i)).toBeInTheDocument();
+    // The out-of-range value never reached a request — still the one call from selecting it.
+    expect(indicators.computeCalls).toHaveLength(1);
+  });
+
+  it("keeps an own-pane markers/levels/zones indicator unselectable — no primitive draws one off the price pane", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "own_pane_zones",
+        name: "Own-Pane Zones (hypothetical)",
+        output: "zones",
+        render: { pane: "own", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
+      }),
+    ];
+    renderChart(source, { indicatorSource: indicators });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+
+    expect(await screen.findByRole("checkbox", { name: /^own_pane_zones$/i })).toBeDisabled();
+  });
+
+  it("makes a price-pane zones indicator (range_gap, session ranges, …) selectable — E3's primitive draws it", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({ id: "range_gap", name: "Range Gap", output: "zones" }),
+    ];
+    renderChart(source, { indicatorSource: indicators });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+
+    expect(await screen.findByRole("checkbox", { name: /^range_gap$/i })).not.toBeDisabled();
+  });
+
+  it("makes an own-pane indicator (RSI, ATR, …) selectable and drawable, not just price-pane overlays", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "atr",
+        name: "Average True Range",
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: "atr", label: "ATR {period}", style: null }],
+        render: { pane: "own", style: "line", scale: "own", autoscale: true, range: null, levels: [] },
+      }),
+    ];
+    renderChart(source, { indicatorSource: indicators });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+
+    expect(await screen.findByRole("checkbox", { name: /^atr$/i })).not.toBeDisabled();
+  });
+});
+
+describe("Chart — indicators markers (terminal-chart spec, task 3.8)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const swingPointsEntry = indicatorEntry({
+    id: "swing_points",
+    name: "Swing Points",
+    output: "markers",
+    params: [{ name: "n", type: "int", default: 2, min: 1, max: 50 }],
+    lines: [],
+    render: { pane: "price", style: "dots", scale: "price", autoscale: true, range: null, levels: [] },
+  });
+
+  it("draws a markers-output indicator through createSeriesMarkers on the price series", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [swingPointsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({
+            id: "swing_points",
+            params: { n: 2 },
+            lines: null,
+            markers: [{ time: 100, label: "Swing High", price: 105 }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "swing_points", params: { n: 2 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    await waitFor(() => expect(priceSeries().markerPlugins).toHaveLength(1));
+
+    const [plugin] = priceSeries().markerPlugins;
+    expect(plugin.markers).toEqual([
+      expect.objectContaining({ time: 100, price: 105, text: "Swing High" }),
+    ]);
+    expect(plugin.detached).toBe(false);
+  });
+
+  it("stops drawing the markers once the indicator is deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [swingPointsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "swing_points",
+            params: { n: 2 },
+            lines: null,
+            markers: [{ time: 100, label: "Swing High", price: 105 }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "swing_points", params: { n: 2 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().markerPlugins).toHaveLength(1));
+    const [plugin] = priceSeries().markerPlugins;
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^swing_points$/i }));
+
+    await waitFor(() => expect(plugin.detached).toBe(true));
+  });
+});
+
+describe("Chart — indicators levels / ray primitive (terminal-chart spec, task 3.9)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const htfLevelsEntry = indicatorEntry({
+    id: "htf_levels_day",
+    name: "Previous Day Levels",
+    output: "levels",
+    params: [],
+    lines: [],
+    render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
+  });
+
+  it("attaches one ray primitive per (indicator, params), not one per level", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [htfLevelsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "htf_levels_day",
+            params: {},
+            lines: null,
+            levels: [
+              { from: 100, price: 110, label: "PD High", count: null },
+              { from: 100, price: 95, label: "PD Low", count: null },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "htf_levels_day", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("updates the same primitive's levels on recompute instead of attaching a new one", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [htfLevelsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "htf_levels_day",
+            params: {},
+            lines: null,
+            levels: [{ from: 100, price: 110, label: "PD High", count: null }],
+          }),
+        ],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({
+            id: "htf_levels_day",
+            params: {},
+            lines: null,
+            levels: [{ from: 200, price: 130, label: "PD High", count: null }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "htf_levels_day", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(2));
+
+    // Still exactly one primitive on the series — the second recompute updated
+    // it in place rather than attaching a second one alongside the first.
+    expect(priceSeries().primitives).toHaveLength(1);
+  });
+
+  it("detaches the ray primitive once the indicator is deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [htfLevelsEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "htf_levels_day",
+            params: {},
+            lines: null,
+            levels: [{ from: 100, price: 110, label: "PD High", count: null }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "htf_levels_day", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^htf_levels_day$/i }));
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
+  });
+});
+
+describe("Chart — indicators zones / zone primitive (terminal-chart spec, task 4.7)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const rangeGapEntry = indicatorEntry({
+    id: "range_gap",
+    name: "Range Gap",
+    output: "zones",
+    params: [{ name: "skip_session_gaps", type: "int", default: 1, min: 0, max: 1 }],
+    lines: [],
+    render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
+  });
+
+  it("attaches one zone primitive per (indicator, params), not one per zone", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [rangeGapEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: { skip_session_gaps: 1 },
+            lines: null,
+            zones: [
+              { from: 100, to: null, top: 21, bottom: 20, direction: "bullish", touchedAt: null, filledAt: null },
+              { from: 200, to: 300, top: 15, bottom: 10, direction: "bearish", touchedAt: 250, filledAt: 300 },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "range_gap", params: { skip_session_gaps: 1 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("updates the same primitive's zones on recompute instead of attaching a new one", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [rangeGapEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: { skip_session_gaps: 1 },
+            lines: null,
+            zones: [
+              { from: 100, to: null, top: 21, bottom: 20, direction: "bullish", touchedAt: null, filledAt: null },
+            ],
+          }),
+        ],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: { skip_session_gaps: 1 },
+            lines: null,
+            zones: [
+              { from: 100, to: 200, top: 21, bottom: 20, direction: "bullish", touchedAt: 200, filledAt: 200 },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "range_gap", params: { skip_session_gaps: 1 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(2));
+
+    expect(priceSeries().primitives).toHaveLength(1);
+  });
+
+  it("detaches the zone primitive once the indicator is deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [rangeGapEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: { skip_session_gaps: 1 },
+            lines: null,
+            zones: [
+              { from: 100, to: null, top: 21, bottom: 20, direction: "bullish", touchedAt: null, filledAt: null },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "range_gap", params: { skip_session_gaps: 1 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^range_gap$/i }));
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
+  });
+});
+
+describe("Chart — indicators time profile / histogram primitive (terminal-chart spec, task 5.4)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const timeProfileEntry = indicatorEntry({
+    id: "time_profile",
+    name: "Time Profile",
+    output: "levels",
+    params: [],
+    lines: [],
+    // `render.style: "histogram"` on a `levels` entry is what routes this to
+    // `TimeProfilePrimitive` instead of `RayPrimitive` — see `canDrawIndicator`.
+    render: { pane: "price", style: "histogram", scale: "price", autoscale: true, range: null, levels: [] },
+  });
+
+  it("routes a histogram-style levels entry to the profile primitive, not the ray primitive", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [timeProfileEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "time_profile",
+            params: {},
+            lines: null,
+            levels: [
+              { from: 100, price: 20, label: "POC", count: 8 },
+              { from: 100, price: 21, label: null, count: 3 },
+              { from: 100, price: 22, label: "VAH", count: null },
+              { from: 100, price: 19, label: "VAL", count: null },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "time_profile", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("detaches the profile primitive once the indicator is deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [timeProfileEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "time_profile",
+            params: {},
+            lines: null,
+            levels: [{ from: 100, price: 20, label: "POC", count: 8 }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "time_profile", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^time_profile$/i }));
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
+  });
+});
+
+describe("Chart — live indicators (terminal-chart spec, task 6.1/6.2/6.4)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  it("requeries once a candle closes — same request shape, `to` slid to the bar that just settled", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [indicatorResult({ lines: { ema: [10, 11] } })],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "ema", params: { period: 20 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    expect(indicators.computeCalls[0]).toMatchObject({ from: 100, to: 100 });
+
+    await act(async () => {
+      source.emit({ kind: "bar", bar: bar(200, 2, true) }); // 100 just closed, 200 now forming
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(2));
+    // Same window as before — `applyBar` slides `to` to the bar that closed
+    // (100), not to the new forming one (200), which `useIndicators` never sees.
+    expect(indicators.computeCalls[1]).toMatchObject({ from: 100, to: 100 });
+  });
+
+  it("never requeries while the same candle keeps forming, even right after a close (task 6.2)", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [indicatorResult({ lines: { ema: [10, 11] } })],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "ema", params: { period: 20 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+
+    await act(async () => {
+      source.emit({ kind: "bar", bar: bar(200, 2, true) }); // closes 100, opens 200 forming
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(2));
+
+    await act(async () => {
+      source.emit({ kind: "bar", bar: bar(200, 2.5, true) }); // 200 still forming, just ticked
+      source.emit({ kind: "bar", bar: bar(200, 2.8, true) });
+    });
+    await act(async () => {}); // let any wrongly-triggered requery's microtasks land
+
+    expect(indicators.computeCalls).toHaveLength(2); // unchanged from the one close above
+  });
+
+  it("clears a non-lines primitive (a zone) on a symbol change too, not just indicator lines (task 6.3/6.4)", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "range_gap",
+        name: "Range Gap",
+        output: "zones",
+        params: [],
+        lines: [],
+        render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: {},
+            lines: null,
+            zones: [
+              { from: 100, to: null, top: 21, bottom: 20, direction: "bullish", touchedAt: null, filledAt: null },
+            ],
+          }),
+        ],
+      },
+    ];
+    const { rerender, onResolutionChange } = renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "range_gap", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    rerender(
+      <Chart
+        source={source}
+        indicatorSource={indicators}
+        symbol="GOLD"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+      />,
+    );
+
+    // `barsRange` going null the instant the symbol changes empties
+    // `indicatorsState.results` before the new series has even loaded — the
+    // previous symbol's zone primitive must not linger through that gap.
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
   });
 });

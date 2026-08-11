@@ -57,6 +57,9 @@ importers:
       eslint-plugin-react-refresh:
         specifier: ^0.4.20
         version: 0.4.26(eslint@9.39.5(jiti@2.7.0)(supports-color@10.2.2))
+      fancy-canvas:
+        specifier: 2.1.0
+        version: 2.1.0
       jsdom:
         specifier: ^25.0.1
         version: 25.0.1(supports-color@10.2.2)

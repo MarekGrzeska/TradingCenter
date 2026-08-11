@@ -24,6 +24,16 @@ dependencies = [
     # transitive one left to chance.
     "azure-identity>=1.19",
     "aiohttp>=3.10",
+    # `market_data/indicators/kernel.py`'s only dependency, and deliberately its only one
+    # — see that module's docstring for why it imports nothing else.
+    "numpy>=2.0",
+    # `zoneinfo` reads the operating system's tz database and falls back to this package
+    # when there is none. Two of the platforms this module runs on have none: Windows
+    # never ships one, and `python:3.12-slim-bookworm` (the Dockerfile's runtime stage)
+    # drops `/usr/share/zoneinfo` with the rest of what "slim" removes. `catalogue.py`
+    # builds its session entries at import time, so a missing database is not a failed
+    # request — it is a module that will not import at all.
+    "tzdata>=2024.1",
     # The candle-age metric the most important alert stands on (design.md, group 10) —
     # auto-configures the OpenTelemetry SDK to export to Application Insights from
     # APPLICATIONINSIGHTS_CONNECTION_STRING. Unset (every local run), it is a no-op:
@@ -78,6 +88,10 @@ dev = [
     # but with a floor it is the linter's publisher who decides when a commit that was
     # green turns red. Raised deliberately, in a commit that says which rules arrived.
     "ruff==0.16.2",
+    # An independent oracle for `test_indicators_talib_comparison.py`, dev-only —
+    # `market_data/indicators` imports nothing from it (design.md, "Własne jądro
+    # na numpy, TA-Lib wyłącznie jako wyrocznia testowa").
+    "ta-lib>=0.7.1",
     # Brings up a throwaway PostgreSQL per test session. A container rather than a
     # shared database, because the schema is the thing under test and a leftover
     # table from a previous run is indistinguishable from a migration that works.
