@@ -405,3 +405,217 @@ async def test_htf_levels_refused_without_the_day_series(api, pool) -> None:
     )
     assert response.status_code == 422
     assert "DAY" in response.json()["detail"]
+
+
+# --- E3, strefy: zones on the wire, and task 4.3's coverage-driven session gap ---
+
+
+_TODAY = NOW.replace(hour=0, minute=0, second=0, microsecond=0)
+
+
+def _day_candle(period_start: datetime, **overrides) -> Candle:
+    return Candle(
+        **{
+            "symbol": "US100",
+            "resolution": Resolution.DAY,
+            "period_start": period_start,
+            "open": 100.0,
+            "high": 100.6,
+            "low": 99.4,
+            "close": 100.2,
+            "source": CandleSource.HISTORY,
+            **overrides,
+        }
+    )
+
+
+async def test_range_gap_is_returned_with_direction_and_bounds(api, pool) -> None:
+    async with pool.acquire() as conn:
+        await write_candles(
+            conn,
+            [
+                candle(2, high=101.0, low=100.0),
+                candle(1, high=102.0, low=101.0),  # the impulse candle
+                candle(0, high=103.0, low=102.0),
+            ],
+        )
+
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "MINUTE",
+            "from": (NOW - timedelta(minutes=2)).isoformat(),
+            "to": (NOW + timedelta(minutes=1)).isoformat(),
+            "specs": [{"id": "range_gap", "params": {"skip_session_gaps": 0}}],
+        },
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    [result] = body["results"]
+    assert result["lines"] is None
+    [zone] = result["zones"]
+    assert zone["direction"] == "bullish"
+    assert zone["top"] == pytest.approx(102.0)
+    assert zone["bottom"] == pytest.approx(101.0)
+    assert datetime.fromisoformat(zone["from"]) == NOW - timedelta(minutes=2)
+    assert zone["to"] is None  # never touched within the read range
+
+
+async def test_friday_to_sunday_gap_is_not_reported_as_a_price_gap(api, pool) -> None:
+    """Task 4.8: a weekend close is a session boundary the archive has
+    verified, not an imbalance — `skip_session_gaps` (on by default) must
+    suppress it, and the same data must show the module *would* have
+    reported it otherwise, proving the suppression is doing something."""
+    from market_data.coverage import record_coverage
+
+    thursday = datetime(2026, 8, 6, tzinfo=UTC)  # real calendar dates —
+    friday = datetime(2026, 8, 7, tzinfo=UTC)  # the point is the actual
+    monday = datetime(2026, 8, 10, tzinfo=UTC)  # Friday-to-Monday market close
+
+    async with pool.acquire() as conn:
+        await write_candles(
+            conn,
+            [
+                _day_candle(thursday, high=101.0, low=100.0),
+                _day_candle(friday, high=102.0, low=101.0),  # the impulse candle
+                _day_candle(monday, high=104.0, low=103.0),
+            ],
+        )
+        # The whole window verified, weekend included — the archive looked
+        # and found nothing there, `Absence.MARKET_CLOSED`, not a hole ingest
+        # left behind.
+        await record_coverage(conn, "US100", Resolution.DAY, thursday, monday + timedelta(days=1))
+
+    request_body = {
+        "resolution": "DAY",
+        "from": thursday.isoformat(),
+        "to": (monday + timedelta(days=1)).isoformat(),
+    }
+
+    default_response = await api.post(
+        "/indicators/US100",
+        json={**request_body, "specs": [{"id": "range_gap"}]},  # skip_session_gaps defaults on
+    )
+    assert default_response.json()["results"][0]["zones"] == []
+
+    unsuppressed_response = await api.post(
+        "/indicators/US100",
+        json={
+            **request_body,
+            "specs": [{"id": "range_gap", "params": {"skip_session_gaps": 0}}],
+        },
+    )
+    assert len(unsuppressed_response.json()["results"][0]["zones"]) == 1
+
+
+async def test_session_range_reads_the_minute_series_regardless_of_requested_resolution(
+    api, pool
+) -> None:
+    async with pool.acquire() as conn:
+        await write_candles(conn, [_day_candle(_TODAY)])
+        await write_candles(
+            conn,
+            [
+                candle(
+                    0,
+                    # `FINE_RESOLUTION` (`routers/indicators.py`) — nothing in
+                    # a real deployment tracks raw MINUTE, only this and up.
+                    resolution=Resolution.MINUTE_5,
+                    # 07:30 UTC — London runs BST (UTC+1) in August, so this
+                    # is local 08:30, inside the 08:00-09:00 window below.
+                    period_start=_TODAY.replace(hour=7, minute=30),
+                    high=105.0,
+                    low=104.0,
+                )
+            ],
+        )
+
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "DAY",
+            "from": _TODAY.isoformat(),
+            "to": (_TODAY + timedelta(days=1)).isoformat(),
+            "specs": [{"id": "session_range_london", "params": {"from_hour": 8.0, "to_hour": 9.0}}],
+        },
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    [result] = body["results"]
+    [zone] = result["zones"]
+    assert zone["top"] == pytest.approx(105.0)
+    assert zone["bottom"] == pytest.approx(104.0)
+
+
+# --- E4, profil czasowy: task 5.3's refusal, and the minute-series ceiling ---
+
+
+async def test_time_profile_refused_without_a_minute_series(api, pool) -> None:
+    async with pool.acquire() as conn:
+        await write_candles(
+            conn, [_day_candle(_TODAY - timedelta(days=d)) for d in range(5, -1, -1)]
+        )
+
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "DAY",
+            "from": (NOW - timedelta(days=5)).isoformat(),
+            "to": NOW.isoformat(),
+            "specs": [{"id": "time_profile"}],
+        },
+    )
+    assert response.status_code == 422
+    assert "MINUTE" in response.json()["detail"]
+
+
+async def test_time_profile_computes_from_the_minute_series_at_day_resolution(api, pool) -> None:
+    async with pool.acquire() as conn:
+        await write_candles(conn, [_day_candle(_TODAY)])
+        await write_candles(
+            conn,
+            [
+                candle(m, resolution=Resolution.MINUTE_5, period_start=NOW - timedelta(minutes=m))
+                for m in range(60, -1, -5)
+            ],
+        )
+
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "DAY",
+            "from": _TODAY.isoformat(),
+            "to": (_TODAY + timedelta(days=1)).isoformat(),
+            "specs": [{"id": "time_profile"}],
+        },
+    )
+    body = response.json()
+
+    assert response.status_code == 200
+    [result] = body["results"]
+    assert result["lines"] is None
+    assert any(lvl["label"] == "POC" for lvl in result["levels"])
+
+
+async def test_a_wide_request_hiding_a_bigger_minute_read_is_refused(api, pool) -> None:
+    """The fine-resolution series `time_profile` needs behind a DAY-resolution
+    request is invisible to the ceiling's own `candles×indicators` count —
+    this is the check that keeps it from silently bypassing that ceiling."""
+    from market_data.routers.indicators import REQUEST_CEILING
+
+    # `FINE_RESOLUTION` is MINUTE_5 (288/day), not MINUTE (1440/day) — the
+    # width that clears the ceiling is almost five times as many days.
+    days = REQUEST_CEILING // 288 + 10
+    response = await api.post(
+        "/indicators/US100",
+        json={
+            "resolution": "DAY",
+            "from": (NOW - timedelta(days=days)).isoformat(),
+            "to": NOW.isoformat(),
+            "specs": [{"id": "time_profile"}],
+        },
+    )
+    assert response.status_code == 422
+    assert "ceiling" in response.json()["detail"]

@@ -16,7 +16,9 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 import numpy as np
 
@@ -144,6 +146,54 @@ HtfLevelsFn = Callable[[tuple[float, float, float, float]], list[HtfLevel]]
 
 
 @dataclass(frozen=True)
+class Zone:
+    """One `zones`-shaped region, indexed the same way `compute`'s arrays are —
+    a gap between three consecutive bars, a session window, an opening range.
+    `end_bar` is `None` while the zone has not closed within the read range,
+    `IndicatorZoneOut.to`'s own null meaning carried one level down."""
+
+    start_bar: int
+    end_bar: int | None
+    top: float
+    bottom: float
+    direction: Literal["bullish", "bearish"] | None = None
+    touched_at_bar: int | None = None
+    filled_at_bar: int | None = None
+
+
+# `session_close_before[i]` is true when the archive has *verified* there is no
+# candle between bar `i - 1` and bar `i` — a confirmed market closure, not merely
+# an unverified stretch (`coverage.py`'s `Absence.MARKET_CLOSED` vs
+# `NOT_COLLECTED`). Computed once per request in the router from data it already
+# reads for the top-level `uncovered` field, and handed to whichever zone
+# entries read it — the kernel still never touches asyncpg itself (task 4.3).
+ZoneComputeFn = Callable[[Series, Mapping[str, float], np.ndarray], list[Zone]]
+
+# A second `zones` pipeline, for entries that read the archive's own MINUTE
+# series regardless of what resolution was requested (`session_range`,
+# `opening_range`) — the same "read a different series than the one being drawn
+# over" shape `HtfLevelsFn` already uses for pivots, just finer instead of
+# coarser. `times` are that minute series' own instants — a bucket has no price
+# to derive a calendar day or a local hour from, unlike every `ComputeFn` above.
+MinuteZoneFn = Callable[[Series, Sequence[datetime], Mapping[str, float]], list[Zone]]
+
+
+@dataclass(frozen=True)
+class ProfileLevel:
+    """One price-bucket row of a `levels`-shaped time-profile entry. No `bar`:
+    a bucket is not indexed against any bar axis, the same reason `HtfLevel`
+    has none — the router places every row at one shared moment, the start of
+    the requested range."""
+
+    price: float
+    label: str | None
+    count: int | None
+
+
+TimeProfileFn = Callable[[Series, Sequence[datetime], Mapping[str, float]], list[ProfileLevel]]
+
+
+@dataclass(frozen=True)
 class IndicatorSpec:
     id: str
     name: str
@@ -167,6 +217,15 @@ class IndicatorSpec:
     # from one closed candle of a *different* resolution, e.g. `pivots_classic`.
     higher_resolution: Resolution | None = None
     compute_htf_levels: HtfLevelsFn | None = None
+    # Set instead of `compute` for an `output="zones"` entry computed from this
+    # entry's own series — `range_gap`, `body_gap`.
+    compute_zones: ZoneComputeFn | None = None
+    # `compute_minute_zones` and `compute_time_profile` both read the archive's
+    # MINUTE series instead of whatever resolution was requested — set together
+    # with `needs_minute_series`, which tells the router to fetch it.
+    needs_minute_series: bool = False
+    compute_minute_zones: MinuteZoneFn | None = None
+    compute_time_profile: TimeProfileFn | None = None
 
     def resolve_params(self, requested: Mapping[str, float]) -> dict[str, float]:
         """Requested values over defaults, each checked against its declared range.
@@ -1473,6 +1532,346 @@ _PIVOTS: tuple[IndicatorSpec, ...] = tuple(
     for id_, name, fn in _PIVOT_TYPES
 )
 
+# --- strefy: three-bar imbalances and fixed clock windows, all sharing the same
+# `zones` shape — a region with a top, a bottom and a moment it took effect,
+# open on the right until something closes it (docs/wskazniki-plan-wdrozenia.html,
+# "W2 — strefy"). No market calendar backs any of this: `session_range` and
+# `opening_range` take their window as parameters rather than looking one up,
+# the same non-goal design.md's Ichimoku/Alligator decision already recorded
+# ("market_status wie tylko, czy rynek jest otwarty teraz"). ---
+
+
+def _three_bar_gaps(
+    hi: np.ndarray,
+    lo: np.ndarray,
+    session_close_before: np.ndarray,
+    skip_session_gaps: bool,
+) -> list[Zone]:
+    """A void between bar `i - 1` and bar `i + 1` that bar `i` itself never
+    reaches into, in whichever direction `i`'s impulse moved — the "fair value
+    gap" a three-bar pattern is, on whichever pair of edges the caller hands in
+    (`hi`/`lo` are the full wick range for `range_gap`, the body's own edges for
+    `body_gap`; the pattern itself does not care which).
+
+    Touched and filled are different claims: touched is price merely reaching
+    the near edge again, filled is a later bar crossing all the way to the far
+    one. Only the second means the imbalance is gone, so only the second closes
+    the zone (`end_bar`) — `IndicatorZoneOut.to` stays null on a merely-touched
+    gap, same as one nothing has come back to at all.
+
+    A candidate spanning a confirmed market closure (`session_close_before`) is
+    skipped when `skip_session_gaps` is set — a weekend is not an imbalance,
+    task 4.3's whole point.
+    """
+    n = len(hi)
+    zones: list[Zone] = []
+    for i in range(1, n - 1):
+        if skip_session_gaps and (session_close_before[i] or session_close_before[i + 1]):
+            continue
+        direction: Literal["bullish", "bearish"]
+        if lo[i + 1] > hi[i - 1]:
+            top, bottom, direction = float(lo[i + 1]), float(hi[i - 1]), "bullish"
+        elif hi[i + 1] < lo[i - 1]:
+            top, bottom, direction = float(lo[i - 1]), float(hi[i + 1]), "bearish"
+        else:
+            continue
+
+        touched_at: int | None = None
+        filled_at: int | None = None
+        # `i + 2`, not `i + 1`: bar `i + 1` is one of the three bars that forms
+        # the gap in the first place (its own edge *is* `top`, by construction
+        # above), so starting the scan there would count the gap as touching
+        # itself the instant it exists.
+        for j in range(i + 2, n):
+            if direction == "bullish":
+                if touched_at is None and lo[j] <= top:
+                    touched_at = j
+                if lo[j] <= bottom:
+                    filled_at = j
+                    break
+            else:
+                if touched_at is None and hi[j] >= bottom:
+                    touched_at = j
+                if hi[j] >= top:
+                    filled_at = j
+                    break
+
+        zones.append(
+            Zone(
+                start_bar=i - 1,
+                end_bar=filled_at,
+                top=top,
+                bottom=bottom,
+                direction=direction,
+                touched_at_bar=touched_at,
+                filled_at_bar=filled_at,
+            )
+        )
+    return zones
+
+
+def _body_edges(s: Series) -> tuple[np.ndarray, np.ndarray]:
+    return np.maximum(s.open, s.close), np.minimum(s.open, s.close)
+
+
+_SKIP_SESSION_GAPS_PARAM = Param(name="skip_session_gaps", type="int", default=1, min=0, max=1)
+
+_RANGE_GAP = IndicatorSpec(
+    id="range_gap",
+    name="Range Gap",
+    group="zones",
+    aliases=("Fair Value Gap", "FVG", "Imbalance"),
+    inputs=("high", "low"),
+    params=(_SKIP_SESSION_GAPS_PARAM,),
+    output="zones",
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute_zones=lambda s, p, session_close_before: _three_bar_gaps(
+        s.high, s.low, session_close_before, bool(p["skip_session_gaps"])
+    ),
+)
+
+_BODY_GAP = IndicatorSpec(
+    id="body_gap",
+    name="Body Gap",
+    group="zones",
+    inputs=("open", "close"),
+    params=(_SKIP_SESSION_GAPS_PARAM,),
+    output="zones",
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    compute_zones=lambda s, p, session_close_before: _three_bar_gaps(
+        *_body_edges(s), session_close_before, bool(p["skip_session_gaps"])
+    ),
+)
+
+
+def _fixed_window_zones(
+    s: Series, days: Sequence[object], in_window: Callable[[int], bool]
+) -> list[Zone]:
+    """Groups consecutive in-window minute bars into one zone apiece — shared
+    by `_session_window_zones` (a window per local calendar day) and
+    `_opening_range_zones` (a window per UTC calendar day), which differ only
+    in how `in_window` decides a bar belongs to today's window, and in which
+    calendar `days` names.
+
+    A day boundary always closes whatever window was open first, even if
+    `in_window` would call the new day's own first bar "inside" too — a
+    window defined in its own zone's local hours never legitimately reaches
+    midnight, so two different days' windows must never merge into one zone
+    just because nothing out-of-window separated them.
+    """
+    zones: list[Zone] = []
+    window_bars: list[int] = []
+
+    def flush(closed: bool) -> None:
+        if not window_bars:
+            return
+        highs = [float(s.high[b]) for b in window_bars]
+        lows = [float(s.low[b]) for b in window_bars]
+        zones.append(
+            Zone(
+                start_bar=window_bars[0],
+                end_bar=window_bars[-1] if closed else None,
+                top=max(highs),
+                bottom=min(lows),
+            )
+        )
+        window_bars.clear()
+
+    for i in range(len(days)):
+        if i > 0 and days[i] != days[i - 1]:
+            flush(closed=True)
+        if in_window(i):
+            window_bars.append(i)
+        else:
+            flush(closed=True)
+    # Whatever is still open when the read range ends has not closed within it
+    # — `end_bar=None`, `IndicatorZoneOut.to`'s null, same as an unfilled gap.
+    flush(closed=False)
+    return zones
+
+
+def _session_window_zones(zone_info: ZoneInfo) -> MinuteZoneFn:
+    """One zone per local calendar day in `zone_info`, spanning the bars whose
+    local clock time falls in `[from_hour, to_hour)` — a fixed window, not a
+    market-hours lookup (see the "strefy" section banner above). `zoneinfo`
+    resolves the UTC offset per calendar day rather than once for the whole
+    read, so the same local hours line up across a DST change instead of
+    sliding by the transition's hour (task 4.9)."""
+
+    def compute(s: Series, times: Sequence[datetime], p: Mapping[str, float]) -> list[Zone]:
+        from_hour = float(p["from_hour"])
+        to_hour = float(p["to_hour"])
+        local_times = [t.astimezone(zone_info) for t in times]
+        days = [t.date() for t in local_times]
+
+        def in_window(i: int) -> bool:
+            local = local_times[i]
+            hour = local.hour + local.minute / 60 + local.second / 3600
+            return from_hour <= hour < to_hour
+
+        return _fixed_window_zones(s, days, in_window)
+
+    return compute
+
+
+def _opening_range_zones(s: Series, times: Sequence[datetime], p: Mapping[str, float]) -> list[Zone]:
+    """The high-low range of the first `window_minutes` of each UTC calendar
+    day — `htf_levels_day` anchors to the same boundary for the same reason:
+    it is the only "day" this module can name without a session calendar
+    (design.md, Ichimoku/Alligator decision). Kept to the most recent `n` —
+    unlike a gap or a session window, nothing bounds how many opening ranges a
+    wide daily-chart request would otherwise produce."""
+    window = timedelta(minutes=int(p["window_minutes"]))
+    n = int(p["n"])
+    days = [t.date() for t in times]
+    day_starts = [t.replace(hour=0, minute=0, second=0, microsecond=0) for t in times]
+
+    def in_window(i: int) -> bool:
+        return times[i] < day_starts[i] + window
+
+    zones = _fixed_window_zones(s, days, in_window)
+    return zones[-n:] if n > 0 else []
+
+
+_SESSION_TYPES: tuple[tuple[str, str, str, float, float], ...] = (
+    ("session_range_london", "London Session Range", "Europe/London", 8.0, 16.5),
+    ("session_range_new_york", "New York Session Range", "America/New_York", 9.5, 16.0),
+    ("session_range_tokyo", "Tokyo Session Range", "Asia/Tokyo", 9.0, 15.0),
+)
+
+_SESSIONS: tuple[IndicatorSpec, ...] = tuple(
+    IndicatorSpec(
+        id=id_,
+        name=name,
+        group="zones",
+        inputs=("high", "low"),
+        params=(
+            Param(name="from_hour", type="float", default=default_from, min=0.0, max=24.0),
+            Param(name="to_hour", type="float", default=default_to, min=0.0, max=24.0),
+        ),
+        output="zones",
+        render=Render(pane="price", style="line"),
+        warmup=Warmup(kind="fixed", bars=lambda p: 0),
+        needs_minute_series=True,
+        compute_minute_zones=_session_window_zones(ZoneInfo(tz_name)),
+    )
+    for id_, name, tz_name, default_from, default_to in _SESSION_TYPES
+)
+
+_OPENING_RANGE = IndicatorSpec(
+    id="opening_range",
+    name="Opening Range",
+    group="zones",
+    aliases=("ORB", "Opening Range Breakout"),
+    inputs=("high", "low"),
+    params=(
+        Param(name="window_minutes", type="int", default=30, min=1, max=240),
+        Param(name="n", type="int", default=5, min=1, max=50),
+    ),
+    output="zones",
+    render=Render(pane="price", style="line"),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    needs_minute_series=True,
+    compute_minute_zones=_opening_range_zones,
+)
+
+# --- profil czasowy: how much of the read range's own time each price bucket
+# held, from the MINUTE series regardless of what resolution is charted
+# (docs/wskazniki-plan-wdrozenia.html, "W3 — profil czasowy"). No volume backs
+# this archive (task 1.16's boundary), so "how much" is a count of one-minute
+# bars, not traded size — a TPO profile's own convention, not a volume
+# profile's. ---
+
+
+def _time_profile_levels(
+    s: Series, times: Sequence[datetime], p: Mapping[str, float]
+) -> list[ProfileLevel]:
+    """Buckets each minute bar by its typical price `(H+L+C)/3` into a bucket
+    `bucket_atr` fractions of ATR wide — resolving design.md's open question in
+    favour of an ATR fraction, the same unit `level_clusters`' tolerance
+    already uses, over a fixed multiple of the instrument's own tick step this
+    module has no per-instrument table for. One bar, one bucket: splitting a
+    bar's own high-low range across every bucket it touches is a legitimate
+    reading too, but this one is the one a hand recount of a small sample can
+    actually check (task 5.5), which a fractional split cannot promise.
+
+    The point of control is the single busiest bucket; the value area expands
+    outward from it, always into whichever open neighbour currently holds
+    more, until it covers `value_area_pct` of the bars read — the standard
+    TPO rule, weighed by bar count in place of traded size.
+    """
+    n = len(s)
+    if n == 0:
+        return []
+
+    atr_period = int(p["atr_period"])
+    bucket_atr = float(p["bucket_atr"])
+    value_area_pct = float(p["value_area_pct"])
+
+    atr = kernel.rma(kernel.true_range(s.high, s.low, s.close), atr_period)
+    reference_atr = float(atr[-1])
+    bucket_width = bucket_atr * reference_atr
+    if not bucket_width > 0:
+        return []
+
+    typical = (s.high + s.low + s.close) / 3
+    lowest = float(np.min(s.low))
+    bucket_of = np.floor((typical - lowest) / bucket_width).astype(np.int64)
+
+    counts: dict[int, int] = {}
+    for bucket in bucket_of:
+        counts[int(bucket)] = counts.get(int(bucket), 0) + 1
+
+    total = sum(counts.values())
+    poc_bucket = max(counts, key=lambda b: (counts[b], -b))
+
+    included_low = included_high = poc_bucket
+    accumulated = counts[poc_bucket]
+    target = total * value_area_pct / 100
+    while accumulated < target:
+        below, above = included_low - 1, included_high + 1
+        gain_below, gain_above = counts.get(below, 0), counts.get(above, 0)
+        if gain_below == 0 and gain_above == 0:
+            break
+        if gain_below >= gain_above:
+            included_low, accumulated = below, accumulated + gain_below
+        else:
+            included_high, accumulated = above, accumulated + gain_above
+
+    def price_of(bucket: int) -> float:
+        return lowest + (bucket + 0.5) * bucket_width
+
+    levels = [
+        ProfileLevel(price=price_of(bucket), label="POC" if bucket == poc_bucket else None, count=count)
+        for bucket, count in sorted(counts.items())
+    ]
+    levels.append(
+        ProfileLevel(price=lowest + (included_high + 1) * bucket_width, label="VAH", count=None)
+    )
+    levels.append(ProfileLevel(price=lowest + included_low * bucket_width, label="VAL", count=None))
+    return levels
+
+
+_TIME_PROFILE = IndicatorSpec(
+    id="time_profile",
+    name="Time Profile",
+    group="profile",
+    aliases=("TPO Profile", "Market Profile"),
+    inputs=("high", "low", "close"),
+    params=(
+        Param(name="atr_period", type="int", default=14, min=2, max=5000),
+        Param(name="bucket_atr", type="float", default=0.25, min=0.01, max=5.0),
+        Param(name="value_area_pct", type="float", default=70.0, min=1.0, max=99.9),
+    ),
+    output="levels",
+    render=Render(pane="price", style="histogram"),
+    warmup=Warmup(kind="fixed", bars=lambda p: 0),
+    needs_minute_series=True,
+    compute_time_profile=_time_profile_levels,
+)
+
 # Ordered as it is meant to be offered — averages first, since `sma` and `ema` are the
 # entries every future wskaźnik in this group will sit beside.
 CATALOGUE: tuple[IndicatorSpec, ...] = (
@@ -1528,6 +1927,11 @@ CATALOGUE: tuple[IndicatorSpec, ...] = (
     _HTF_LEVELS_DAY,
     _HTF_LEVELS_WEEK,
     *_PIVOTS,
+    _RANGE_GAP,
+    _BODY_GAP,
+    *_SESSIONS,
+    _OPENING_RANGE,
+    _TIME_PROFILE,
 )
 
 _BY_ID: dict[str, IndicatorSpec] = {entry.id: entry for entry in CATALOGUE}

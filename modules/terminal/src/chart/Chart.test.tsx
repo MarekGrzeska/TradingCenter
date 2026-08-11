@@ -1155,22 +1155,33 @@ describe("Chart — wskaźniki (terminal-chart spec, market-data-indicators)", (
     expect(indicators.computeCalls).toHaveLength(1);
   });
 
-  it("keeps a wskaźnik whose output shape this chart cannot draw yet unselectable", async () => {
+  it("keeps an own-pane markers/levels/zones wskaźnik unselectable — no primitive draws one off the price pane", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [
       indicatorEntry({
-        id: "range_gap",
-        name: "Range Gap",
-        // `zones` has no drawing primitive until E3 — markers and levels
-        // (price-pane) became drawable in E2, alongside price/own "lines".
+        id: "own_pane_zones",
+        name: "Own-Pane Zones (hypothetical)",
         output: "zones",
+        render: { pane: "own", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
       }),
     ];
     renderChart(source, { indicatorSource: indicators });
 
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
 
-    expect(await screen.findByRole("checkbox", { name: /^range_gap$/i })).toBeDisabled();
+    expect(await screen.findByRole("checkbox", { name: /^own_pane_zones$/i })).toBeDisabled();
+  });
+
+  it("makes a price-pane zones wskaźnik (range_gap, session ranges, …) selectable — E3's primitive draws it", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({ id: "range_gap", name: "Range Gap", output: "zones" }),
+    ];
+    renderChart(source, { indicatorSource: indicators });
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+
+    expect(await screen.findByRole("checkbox", { name: /^range_gap$/i })).not.toBeDisabled();
   });
 
   it("makes an own-pane wskaźnik (RSI, ATR, …) selectable and drawable, not just price-pane overlays", async () => {
@@ -1416,6 +1427,385 @@ describe("Chart — wskaźniki levels / ray primitive (terminal-chart spec, task
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
     await userEvent.click(await screen.findByRole("checkbox", { name: /^htf_levels_day$/i }));
 
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
+  });
+});
+
+describe("Chart — wskaźniki zones / zone primitive (terminal-chart spec, task 4.7)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const rangeGapEntry = indicatorEntry({
+    id: "range_gap",
+    name: "Range Gap",
+    output: "zones",
+    params: [{ name: "skip_session_gaps", type: "int", default: 1, min: 0, max: 1 }],
+    lines: [],
+    render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
+  });
+
+  it("attaches one zone primitive per (wskaźnik, params), not one per zone", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [rangeGapEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: { skip_session_gaps: 1 },
+            lines: null,
+            zones: [
+              { from: 100, to: null, top: 21, bottom: 20, direction: "bullish", touchedAt: null, filledAt: null },
+              { from: 200, to: 300, top: 15, bottom: 10, direction: "bearish", touchedAt: 250, filledAt: 300 },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "range_gap", params: { skip_session_gaps: 1 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("updates the same primitive's zones on recompute instead of attaching a new one", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [rangeGapEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: { skip_session_gaps: 1 },
+            lines: null,
+            zones: [
+              { from: 100, to: null, top: 21, bottom: 20, direction: "bullish", touchedAt: null, filledAt: null },
+            ],
+          }),
+        ],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: { skip_session_gaps: 1 },
+            lines: null,
+            zones: [
+              { from: 100, to: 200, top: 21, bottom: 20, direction: "bullish", touchedAt: 200, filledAt: 200 },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "range_gap", params: { skip_session_gaps: 1 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(2));
+
+    expect(priceSeries().primitives).toHaveLength(1);
+  });
+
+  it("detaches the zone primitive once the wskaźnik is deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [rangeGapEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: { skip_session_gaps: 1 },
+            lines: null,
+            zones: [
+              { from: 100, to: null, top: 21, bottom: 20, direction: "bullish", touchedAt: null, filledAt: null },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "range_gap", params: { skip_session_gaps: 1 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^range_gap$/i }));
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
+  });
+});
+
+describe("Chart — wskaźniki time profile / histogram primitive (terminal-chart spec, task 5.4)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const timeProfileEntry = indicatorEntry({
+    id: "time_profile",
+    name: "Time Profile",
+    output: "levels",
+    params: [],
+    lines: [],
+    // `render.style: "histogram"` on a `levels` entry is what routes this to
+    // `TimeProfilePrimitive` instead of `RayPrimitive` — see `canDrawIndicator`.
+    render: { pane: "price", style: "histogram", scale: "price", autoscale: true, range: null, levels: [] },
+  });
+
+  it("routes a histogram-style levels entry to the profile primitive, not the ray primitive", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [timeProfileEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "time_profile",
+            params: {},
+            lines: null,
+            levels: [
+              { from: 100, price: 20, label: "POC", count: 8 },
+              { from: 100, price: 21, label: null, count: 3 },
+              { from: 100, price: 22, label: "VAH", count: null },
+              { from: 100, price: 19, label: "VAL", count: null },
+            ],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "time_profile", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("detaches the profile primitive once the wskaźnik is deselected", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [timeProfileEntry];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "time_profile",
+            params: {},
+            lines: null,
+            levels: [{ from: 100, price: 20, label: "POC", count: 8 }],
+          }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "time_profile", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("checkbox", { name: /^time_profile$/i }));
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
+  });
+});
+
+describe("Chart — wskaźniki na żywo (terminal-chart spec, task 6.1/6.2/6.4)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  it("requeries once a candle closes — same request shape, `to` slid to the bar that just settled", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [indicatorResult({ lines: { ema: [10, 11] } })],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "ema", params: { period: 20 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+    expect(indicators.computeCalls[0]).toMatchObject({ from: 100, to: 100 });
+
+    await act(async () => {
+      source.emit({ kind: "bar", bar: bar(200, 2, true) }); // 100 just closed, 200 now forming
+    });
+
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(2));
+    // Same window as before — `applyBar` slides `to` to the bar that closed
+    // (100), not to the new forming one (200), which `useIndicators` never sees.
+    expect(indicators.computeCalls[1]).toMatchObject({ from: 100, to: 100 });
+  });
+
+  it("never requeries while the same candle keeps forming, even right after a close (task 6.2)", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [indicatorResult({ lines: { ema: [10, 11] } })],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "ema", params: { period: 20 } }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+
+    await act(async () => {
+      source.emit({ kind: "bar", bar: bar(200, 2, true) }); // closes 100, opens 200 forming
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(2));
+
+    await act(async () => {
+      source.emit({ kind: "bar", bar: bar(200, 2.5, true) }); // 200 still forming, just ticked
+      source.emit({ kind: "bar", bar: bar(200, 2.8, true) });
+    });
+    await act(async () => {}); // let any wrongly-triggered requery's microtasks land
+
+    expect(indicators.computeCalls).toHaveLength(2); // unchanged from the one close above
+  });
+
+  it("clears a non-lines primitive (a zone) on a symbol change too, not just wskaźnik lines (task 6.3/6.4)", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry({
+        id: "range_gap",
+        name: "Range Gap",
+        output: "zones",
+        params: [],
+        lines: [],
+        render: { pane: "price", style: "line", scale: "price", autoscale: true, range: null, levels: [] },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({
+            id: "range_gap",
+            params: {},
+            lines: null,
+            zones: [
+              { from: 100, to: null, top: 21, bottom: 20, direction: "bullish", touchedAt: null, filledAt: null },
+            ],
+          }),
+        ],
+      },
+    ];
+    const { rerender, onResolutionChange } = renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ id: "range_gap", params: {} }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+
+    rerender(
+      <Chart
+        source={source}
+        indicatorSource={indicators}
+        symbol="GOLD"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+      />,
+    );
+
+    // `barsRange` going null the instant the symbol changes empties
+    // `indicatorsState.results` before the new series has even loaded — the
+    // previous symbol's zone primitive must not linger through that gap.
     await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
   });
 });

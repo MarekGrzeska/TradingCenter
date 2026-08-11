@@ -15,7 +15,7 @@ need one, the change is wrong, not the rule.
 
 ```
 modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
-modules/market-data       Python · the candle archive. Owns the PostgreSQL. Depends on the gateway.
+modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway.
 modules/terminal          React+TS · the operator's screen. Consumes both. Publishes nothing.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
@@ -111,6 +111,23 @@ What catches a missed step, and what does not:
 A field on a **WebSocket** message travels a shorter route with the same rule: the models
 live in `market_data/hub.py`, and `openapi.py` hangs them into the published document by
 hand, because a WebSocket has no route for FastAPI to describe. Stops 3 to 5 are unchanged.
+
+## A new indicator
+
+Not the change above, and the two are easy to conflate. Adding one — another moving average,
+another oscillator, another zone — touches exactly one file, `market_data/indicators/
+catalogue.py`, as long as its output shape (`lines`, `markers`, `zones`, `levels`) and render
+style are ones the catalogue and the terminal already know. The catalogue is data, not a
+generated type per entry: `GET /indicators` publishes a new entry the moment it lands there,
+and the terminal's picker offers it with **zero terminal changes and no
+`pnpm contract:generate`** — that is the whole point of `market-data-indicators` spec's
+"Katalog wystarcza do zbudowania wybieraka" (`openspec/changes/add-technical-indicators/
+design.md`, "Katalog jako dane, nie jako typy").
+
+The five-stop path above is for the rarer case this one is not: a genuinely **new output
+shape**, or a **render style** (`Chart.tsx`'s `canDrawIndicator` and its sync effect, a new
+`*Primitive.ts`) the terminal has no drawing code for yet. Only that touches
+`market_data/contract.py`, and only then does the full route apply.
 
 ## Workflow
 
