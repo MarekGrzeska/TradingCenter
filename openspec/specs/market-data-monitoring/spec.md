@@ -1,3 +1,5 @@
+# market-data-monitoring Specification
+
 ## Purpose
 
 Co moduł mówi o własnym zbieraniu na zewnątrz procesu — do systemu monitoringu, nie do API.
@@ -5,7 +7,7 @@ Chodzi o jedną rzecz: żeby operator dowiedział się, że para przestała być
 zauważy to po nieruchomym wykresie, i żeby próg tego powiadomienia dało się ustawić raz dla
 wszystkich rozdzielczości.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Spóźnienie zbierania jest raportowane w jednostce niezależnej od rozdzielczości
 

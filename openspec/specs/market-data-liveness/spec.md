@@ -1,10 +1,12 @@
+# market-data-liveness Specification
+
 ## Purpose
 
 Daje sondzie z zewnątrz sposób odróżnienia martwego kontenera market-data od zdrowego, po
 prostu chwilowo bezczynnego — bez przechodzenia przez uwierzytelnianie, które przed
 kontenerem odpowiada identycznie w obu przypadkach.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Sonda dostępności odpowiada bez uwierzytelnienia
 
