@@ -49,4 +49,4 @@ Wchodzi po `add-technical-indicators`. Każdy etap kończy się zielonym `uv run
 - [x] 6.2 `openspec validate indicator-result-names-its-own-failure --strict`
 - [x] 6.3 Test lokalny: para bez serii minutowej, wskaźniki mieszane, na działającym stosie
 - [x] 6.4 `review.md`
-- [ ] 6.5 Pull request do `main` — po `add-technical-indicators`
+- [x] 6.5 Pull request do `main` — po `add-technical-indicators`
