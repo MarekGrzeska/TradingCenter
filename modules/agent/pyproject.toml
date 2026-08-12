@@ -19,10 +19,17 @@ dependencies = [
     # i tylko klucz").
     "azure-identity>=1.19",
     "aiohttp>=3.10",
-    # The conversation graph. One node today — the model call — with room left for tools
-    # (design.md, Non-Goals: no tools yet, the shape is not to be filled in advance).
+    # The conversation graph: a model node and a tool node, with a conditional edge
+    # between them (connect-agent-to-market-mcp/design.md, "Pętla jako drugi węzeł
+    # grafu").
     "langgraph>=0.2",
     "langchain-openai>=0.2",
+    # The MCP client half of the same SDK market-mcp serves with, and pinned exactly for
+    # the same reason it pins it: `mcp` shipped a 2.0.0 that moved public names during
+    # that module's first draft. Both modules move off this version together or not at
+    # all — they speak to each other, and this is the one contract in the repository
+    # with no committed snapshot to catch a drift.
+    "mcp==1.27.0",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.

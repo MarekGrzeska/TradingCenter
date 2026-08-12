@@ -10,28 +10,28 @@ implementacja tego nie potrzebuje.
 
 ## 1. Dostęp do serwera narzędzi
 
-- [ ] 1.1 `agent/config.py` — `market_mcp_url` (domyślnie puste: brak narzędzi) i
+- [x] 1.1 `agent/config.py` — `market_mcp_url` (domyślnie puste: brak narzędzi) i
   `market_mcp_scope`, z przełącznikiem trybu w kształcie, jaki ma `market-mcp/config.py`
   wobec archiwum: adres zdalny bez scope'u odmawia startu, scope przy pętli zwrotnej
   odmawia startu
-- [ ] 1.2 Testy `config.py`: adres zdalny bez tożsamości, pętla zwrotna bez tożsamości,
+- [x] 1.2 Testy `config.py`: adres zdalny bez tożsamości, pętla zwrotna bez tożsamości,
   oba naraz, adres nieustawiony jako poprawny stan „bez narzędzi"
-- [ ] 1.3 Zależność `mcp` w `pyproject.toml` (klient; ta sama biblioteka, której
+- [x] 1.3 Zależność `mcp` w `pyproject.toml` (klient; ta sama biblioteka, której
   `market-mcp` używa po stronie serwera), `uv lock`
-- [ ] 1.4 `agent/tools/client.py` — sesja streamable http z serwerem narzędzi: nawiązanie,
+- [x] 1.4 `agent/tools/client.py` — sesja streamable http z serwerem narzędzi: nawiązanie,
   `tools/list`, wywołanie narzędzia, zamknięcie. Token z `DefaultAzureCredential` dla
   `market_mcp_scope`, gdy ustawiony; jeden log przy starcie nazywający fakt i scope, nigdy
   token
-- [ ] 1.5 Górna granica czasu wywołania, odróżnialna w wyniku od odmowy narzędzia
+- [x] 1.5 Górna granica czasu wywołania, odróżnialna w wyniku od odmowy narzędzia
   (`agent-tool-access`, „Wołanie serwera narzędzi ma skończony czas")
-- [ ] 1.6 Katalog narzędzi pobierany raz na sesję z serwerem i trzymany w procesie, nie
+- [x] 1.6 Katalog narzędzi pobierany raz na sesję z serwerem i trzymany w procesie, nie
   per tura — ten sam wybór, jaki `market-mcp` zrobił dla katalogu wskaźników
-- [ ] 1.7 Testy klienta przeciw podstawionemu serwerowi MCP: lista narzędzi, udane
+- [x] 1.7 Testy klienta przeciw podstawionemu serwerowi MCP: lista narzędzi, udane
   wywołanie, odmowa narzędzia, przekroczenie czasu, serwer nieosiągalny
-- [ ] 1.8 Test: moduł startuje i odpowiada, gdy adres serwera nie jest ustawiony i gdy
+- [x] 1.8 Test: moduł startuje i odpowiada, gdy adres serwera nie jest ustawiony i gdy
   serwer nie odpowiada (`agent-tool-access`, „Brak serwera narzędzi nie odbiera agentowi
   mowy")
-- [ ] 1.9 `.env.example` i `README.md` modułu — oba ustawienia i to, co znaczy ich brak
+- [x] 1.9 `.env.example` i `README.md` modułu — oba ustawienia i to, co znaczy ich brak
 
 ## 2. Pętla narzędzi w grafie
 

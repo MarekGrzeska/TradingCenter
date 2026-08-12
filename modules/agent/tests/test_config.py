@@ -145,3 +145,52 @@ def test_a_missing_database_url_names_itself() -> None:
     with pytest.raises(ValidationError) as err:
         Settings(_env_file=None)
     assert "database_url" in str(err.value)
+
+
+# --- the tool server's own mode switch (specs/agent-tool-access) ---
+
+
+def test_no_tool_server_configured_is_a_valid_state() -> None:
+    # Not a misconfiguration: it is what this module was before it had tools, and what
+    # it falls back to when market-mcp is down.
+    assert settings().market_mcp_url is None
+
+
+def test_remote_tool_server_without_a_scope_is_refused() -> None:
+    with pytest.raises(ValidationError) as err:
+        settings(market_mcp_url="https://market-mcp.example.com")
+    assert "MARKET_MCP_SCOPE" in str(err.value)
+
+
+def test_scope_with_a_loopback_tool_server_is_refused() -> None:
+    with pytest.raises(ValidationError) as err:
+        settings(
+            market_mcp_url="http://127.0.0.1:8040",
+            market_mcp_scope="api://some-app/.default",
+        )
+    assert "loopback" in str(err.value)
+
+
+def test_a_scope_with_no_url_at_all_is_refused() -> None:
+    with pytest.raises(ValidationError) as err:
+        settings(market_mcp_scope="api://some-app/.default")
+    assert "MARKET_MCP_URL" in str(err.value)
+
+
+def test_loopback_tool_server_without_a_scope_is_accepted() -> None:
+    assert settings(market_mcp_url="http://127.0.0.1:8040").market_mcp_url == (
+        "http://127.0.0.1:8040"
+    )
+
+
+def test_remote_tool_server_with_a_scope_is_accepted() -> None:
+    resolved = settings(
+        market_mcp_url="https://market-mcp.example.com/",
+        market_mcp_scope="api://some-app/.default",
+    )
+    # The trailing slash is dropped here so nothing downstream builds `//mcp`.
+    assert resolved.market_mcp_url == "https://market-mcp.example.com"
+
+
+def test_a_blank_tool_server_url_means_unset() -> None:
+    assert settings(market_mcp_url="   ").market_mcp_url is None

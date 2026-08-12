@@ -12,6 +12,14 @@ OpenAI is not in Entra, so a managed identity has nobody to present a token to a
 klucz, i tylko klucz"). Local and production differ only in where the value comes from —
 `.env` there, a Key Vault reference here (infra/key-vault.tf).
 
+The tool server has the database's shape rather than the provider's: `market_mcp_scope`
+set → the server is off this machine and a token for that scope is what proves this
+module to it; unset → `market_mcp_url` MUST point at loopback. It differs from the
+database in one way that matters — the whole setting is optional. An unset
+`market_mcp_url` is not a misconfiguration but a module with no tools, which is what
+this module was until this change and what it falls back to when the server is down
+(specs/agent-tool-access, "Brak serwera narzędzi nie odbiera agentowi mowy").
+
 Refusing to build the settings leaves nothing running to misuse.
 """
 
@@ -95,6 +103,21 @@ class Settings(BaseSettings):
     models: list[ModelCatalogueEntry] = Field(default_factory=list)
     default_model_id: str
 
+    # --- market-mcp, this module's only tool server ---
+    #
+    # Unset means no tools, deliberately: the module answers from the model alone, the
+    # way it did before this setting existed. That is also the state a failed connection
+    # degrades to, so it is a path the tests exercise rather than a corner nobody has
+    # been down.
+    market_mcp_url: str | None = None
+    # api://<market-mcp-app-id>/.default — the scope this module's managed identity
+    # requests a token for. Set only when `market_mcp_url` is not loopback.
+    market_mcp_scope: str | None = None
+    # Per tool call. The operator is watching a panel while this runs, and market-mcp's
+    # own ceiling on reaching the archive is 10s — a little more than that here leaves
+    # room for its own work without turning one slow call into a turn that never ends.
+    market_mcp_request_timeout_seconds: float = 15.0
+
     # --- who may call this module from a browser ---
     #
     # Mirrors market-data's own field and its own reasoning: a request without an
@@ -111,9 +134,12 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_user")
+    @field_validator("database_user", "market_mcp_url", "market_mcp_scope")
     @classmethod
-    def _blank_database_user_means_unset(cls, value: str | None) -> str | None:
+    def _blank_means_unset(cls, value: str | None) -> str | None:
+        # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent,
+        # and the same reading the database's own user field has had since it was
+        # written: an empty string is not a value, it is a line someone stopped filling.
         if value is None or not value.strip():
             return None
         return value.strip()
@@ -148,6 +174,44 @@ class Settings(BaseSettings):
                 f"DATABASE_URL points at {host!r} with no DATABASE_USER set. Without an "
                 "identity this module only connects to a database on this machine's "
                 "loopback — a remote database needs DATABASE_USER and an Entra identity."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _tool_server_mode_is_coherent(self) -> Settings:
+        """The third copy of the rule market-data set for its database and market-mcp
+        set for its archive: name one mode, or none, never both
+        (specs/agent-tool-access, "Tryb połączenia z serwerem narzędzi jest wybrany
+        jednoznacznie")."""
+        if self.market_mcp_url is None:
+            if self.market_mcp_scope is not None:
+                raise ValueError(
+                    "MARKET_MCP_SCOPE is set but MARKET_MCP_URL is not — a scope names "
+                    "the audience of a token for a server this module has no address "
+                    "for. Set the URL, or unset the scope to run without tools."
+                )
+            return self
+
+        self.market_mcp_url = self.market_mcp_url.rstrip("/")
+        host = (urlparse(self.market_mcp_url).hostname or "").lower()
+        is_loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+
+        if self.market_mcp_scope is not None:
+            if is_loopback:
+                raise ValueError(
+                    f"MARKET_MCP_SCOPE is set but MARKET_MCP_URL points at loopback "
+                    f"({self.market_mcp_url!r}) — a scope belongs to a remote tool "
+                    "server; unset MARKET_MCP_SCOPE for local development, or point "
+                    "the URL at the remote instance it names a token for."
+                )
+            return self
+
+        if not is_loopback:
+            raise ValueError(
+                f"MARKET_MCP_URL points at {host!r} with no MARKET_MCP_SCOPE set. "
+                "Without a scope this module only reaches a tool server on this "
+                "machine's loopback — a remote one needs MARKET_MCP_SCOPE and the "
+                "managed identity it is requested for."
             )
         return self
 
