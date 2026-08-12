@@ -176,5 +176,5 @@
       tą samą drogą przez terminal (5173)
 - [ ] 12.5 Sprawdzić strumień na wdrożonej aplikacji, nie tylko lokalnie (buforowanie i
       zerwanie po 230 s widać dopiero tam)
-- [ ] 12.6 `openspec validate add-agent-chat --strict`
+- [x] 12.6 `openspec validate add-agent-chat --strict`
 - [ ] 12.7 `review.md` przed archiwizacją
