@@ -56,17 +56,17 @@ implementacja tego nie potrzebuje.
 
 ## 3. Zapis wywołań i zużycia
 
-- [ ] 3.1 Migracja: tabela wywołań narzędzi — sesja, wiadomość agenta, numer obrotu,
+- [x] 3.1 Migracja: tabela wywołań narzędzi — sesja, wiadomość agenta, numer obrotu,
   nazwa, argumenty, powodzenie, wynik albo powód odmowy, czas trwania, moment
-- [ ] 3.2 `store.py` — zapis wywołań po `append_agent_message`, w tym samym miejscu co
+- [x] 3.2 `store.py` — zapis wywołań po `append_agent_message`, w tym samym miejscu co
   wiersze zużycia i z tego samego powodu: identyfikator wiadomości powstaje na końcu tury
-- [ ] 3.3 `turn.py` — wiersz zużycia na każde wywołanie modelu w turze, wszystkie
+- [x] 3.3 `turn.py` — wiersz zużycia na każde wywołanie modelu w turze, wszystkie
   wskazujące tę samą wypowiedź agenta (`agent-usage`, „Tura z wywołaniem narzędzia")
-- [ ] 3.4 Testy `db`: trzy wywołania w turze dają trzy zapisy o odtwarzalnej kolejności;
+- [x] 3.4 Testy `db`: trzy wywołania w turze dają trzy zapisy o odtwarzalnej kolejności;
   wywołanie zakończone odmową też zostawia zapis; tura niepełna zapisuje to, co zdążyła
-- [ ] 3.5 Test `db`: dwa wywołania modelu w turze dają dwa wiersze zużycia i sumę kosztu
+- [x] 3.5 Test `db`: dwa wywołania modelu w turze dają dwa wiersze zużycia i sumę kosztu
   równą ich sumie — sprawdzone przez istniejące agregaty, nie przez nowy odczyt
-- [ ] 3.6 Sprawdzić i zapisać w teście, że `agent/contract.py` nie zmienia się ani o pole:
+- [x] 3.6 Sprawdzić i zapisać w teście, że `agent/contract.py` nie zmienia się ani o pole:
   transkrypt czytany przez terminal jest ten sam co przed zmianą
 
 ## 4. Prompt

@@ -21,7 +21,8 @@ MODULE_ROOT = Path(__file__).resolve().parent.parent
 # for macOS, and the container fixture already stops cleanly on its own.
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
-TABLES = ("usage", "messages", "sessions")
+# Children before parents: `tool_calls` and `usage` both reference `messages`.
+TABLES = ("tool_calls", "usage", "messages", "sessions")
 
 DOCKER_PING_TIMEOUT = 15
 

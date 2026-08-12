@@ -20,11 +20,11 @@ file exists to avoid:
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable, Sequence
-from dataclasses import dataclass
-from typing import Any, TypedDict
+from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
 
+from .models import RecordedCall
 from .provider import (
     ModelProvider,
     TextDelta,
@@ -41,19 +41,6 @@ from .tools import ToolDescriptor, ToolOutcomeKind, ToolServer
 # coverage, candles, indicators and levels — four or five calls — and eight leaves room
 # while still bounding a runaway loop to a known multiple of one turn's cost.
 TOOL_CALL_CEILING = 8
-
-
-@dataclass(frozen=True)
-class RecordedCall:
-    """What group 3 writes to the database. Built here because this is the only place
-    that knows the round number and what the call actually cost in time."""
-
-    round_index: int
-    name: str
-    arguments: dict[str, Any]
-    outcome: str
-    text: str
-    duration_ms: int
 
 
 class ConversationState(TypedDict):

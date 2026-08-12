@@ -126,8 +126,9 @@ async def run_turn(
                 input_rate_per_1m=model_entry.input_rate_per_1m,
                 output_rate_per_1m=model_entry.output_rate_per_1m,
             )
-    # `calls` is built and, for now, dropped: the table it belongs in is task group 3.
-    log.info("turn on session %s made %d tool call(s)", session_id, len(calls))
+        await store.record_tool_calls(
+            conn, session_id=session_id, message_id=reply.id, calls=calls
+        )
 
     if failed:
         queue.put_nowait(Failed("the model call failed"))
