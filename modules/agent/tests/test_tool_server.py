@@ -223,3 +223,27 @@ def test_describe_unwraps_nested_task_groups() -> None:
     assert described == "All connection attempts failed"
     assert "TaskGroup" not in described
     assert "ExceptionGroup" not in described
+
+
+async def test_one_session_serves_turns_that_are_separate_tasks(tool_server: ToolServer) -> None:
+    """The router runs every turn as its own `asyncio.create_task`, so the session is
+    opened inside one task and then used and closed from others.
+
+    Worth an explicit test rather than an assumption: the transport runs its halves in
+    an anyio task group, and a task group whose scope is exited by a different task than
+    entered it is a documented way to get `RuntimeError`. It holds here — this is the
+    test that says so, and the one that would fail if a future SDK version stopped
+    tolerating it.
+    """
+    first = await asyncio.create_task(tool_server.call("get_last_price", {"symbol": "US100"}))
+    second = await asyncio.create_task(tool_server.call("list_tracked_pairs", {}))
+
+    concurrent = await asyncio.gather(
+        asyncio.create_task(tool_server.call("list_tracked_pairs", {})),
+        asyncio.create_task(tool_server.call("get_last_price", {"symbol": "US100"})),
+    )
+
+    assert first.ok and second.ok
+    assert [outcome.kind for outcome in concurrent] == [ToolOutcomeKind.OK, ToolOutcomeKind.OK]
+    # Closing from a third task is the lifespan's shutdown path.
+    await asyncio.create_task(tool_server.aclose())

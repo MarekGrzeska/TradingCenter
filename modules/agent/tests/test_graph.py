@@ -41,7 +41,12 @@ class FakeProvider:
     ):
         index = len(self.calls)
         self.calls.append(
-            {"tools": list(tools), "rounds": list(rounds), "history": list(history)}
+            {
+                "tools": list(tools),
+                "rounds": list(rounds),
+                "history": list(history),
+                "system_prompt": system_prompt,
+            }
         )
         for chunk in self._script[index]:
             yield chunk

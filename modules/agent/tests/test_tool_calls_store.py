@@ -16,6 +16,7 @@ import pytest
 from agent import store
 from agent.config import ModelCatalogueEntry
 from agent.models import RecordedCall
+from agent.prompt import SYSTEM_PROMPT_WITH_TOOLS, SYSTEM_PROMPT_WITHOUT_TOOLS
 from agent.provider import TextDelta, ToolCallRequest, UsageReport
 from agent.tools import ToolOutcome, ToolOutcomeKind
 from agent.turn import run_turn
@@ -243,3 +244,50 @@ async def test_record_tool_calls_numbers_positions_within_each_round(pool, db) -
     )
 
     assert [(call.round_index, call.position) for call in written] == [(0, 0), (0, 1), (1, 0)]
+
+
+class ServerWithNoTools(FakeToolServer):
+    """market-mcp unconfigured or unreachable — `list_tools` answers with nothing rather
+    than raising, which is the whole of `agent-tool-access`'s "Brak serwera narzędzi nie
+    odbiera agentowi mowy"."""
+
+    async def list_tools(self):
+        return []
+
+
+async def test_a_turn_without_tools_runs_the_prompt_that_says_so(pool, db) -> None:
+    # The prompt is picked from what the turn actually has, not from configuration: a
+    # market-mcp that was configured and then went down must not leave the model being
+    # told it has tools it cannot call (specs/agent-chat, "Agent bez narzędzi mówi, że
+    # ich nie ma").
+    session_id = await _new_session(db)
+    provider = FakeProvider([[TextDelta("no archive today"), UsageReport(1, 1, None, None)]])
+
+    await run_turn(
+        pool,
+        session_id=session_id,
+        model_entry=LUNA,
+        provider=provider,
+        queue=RecordingQueue(),
+        tool_server=ServerWithNoTools(),  # pyright: ignore[reportArgumentType]
+    )
+
+    assert provider.calls[0]["tools"] == []
+    assert provider.calls[0]["system_prompt"] == SYSTEM_PROMPT_WITHOUT_TOOLS
+
+
+async def test_a_turn_with_tools_runs_the_prompt_that_says_that(pool, db) -> None:
+    session_id = await _new_session(db)
+    provider = FakeProvider([[TextDelta("checking"), UsageReport(1, 1, None, None)]])
+
+    await run_turn(
+        pool,
+        session_id=session_id,
+        model_entry=LUNA,
+        provider=provider,
+        queue=RecordingQueue(),
+        tool_server=ServerWithTools(),  # pyright: ignore[reportArgumentType]
+    )
+
+    assert [tool.name for tool in provider.calls[0]["tools"]] == ["get_last_price"]
+    assert provider.calls[0]["system_prompt"] == SYSTEM_PROMPT_WITH_TOOLS

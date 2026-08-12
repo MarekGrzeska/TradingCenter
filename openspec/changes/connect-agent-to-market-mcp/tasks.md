@@ -105,8 +105,8 @@ implementacja tego nie potrzebuje.
 
 ## 6. Domknięcie
 
-- [ ] 6.1 `uv run ruff check .`, `uv run pyright`, `uv run pytest` w `modules/agent`
-- [ ] 6.2 `review.md` — werdykt, uruchomione komendy, pokrycie wymagań, luki
-- [ ] 6.3 `openspec validate connect-agent-to-market-mcp --strict`
+- [x] 6.1 `uv run ruff check .`, `uv run pyright`, `uv run pytest` w `modules/agent`
+- [x] 6.2 `review.md` — werdykt, uruchomione komendy, pokrycie wymagań, luki
+- [x] 6.3 `openspec validate connect-agent-to-market-mcp --strict`
 - [ ] 6.4 Pull request; archiwizacja dopiero po zarchiwizowaniu `add-agent-chat` (patrz
   nota na górze tego pliku)

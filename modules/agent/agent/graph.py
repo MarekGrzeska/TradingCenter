@@ -40,6 +40,11 @@ from .tools import ToolDescriptor, ToolOutcomeKind, ToolServer
 # to raise it at the moment it is inconvenient. Eight, because a real analytical turn is
 # coverage, candles, indicators and levels — four or five calls — and eight leaves room
 # while still bounding a runaway loop to a known multiple of one turn's cost.
+#
+# Raising it past about ten needs a second edit, in a place nothing points at from here:
+# a turn of N rounds costs 2N+1 supersteps and LangGraph's default `recursion_limit` is
+# 25, so the graph would stop with its own error before this ceiling ever spoke. At
+# eight that is 17, with room to spare.
 TOOL_CALL_CEILING = 8
 
 
