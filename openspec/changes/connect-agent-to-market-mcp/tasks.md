@@ -35,22 +35,22 @@ implementacja tego nie potrzebuje.
 
 ## 2. Pętla narzędzi w grafie
 
-- [ ] 2.1 `provider.py` — własne kształty żądania wywołania i jego wyniku, obok
+- [x] 2.1 `provider.py` — własne kształty żądania wywołania i jego wyniku, obok
   `TextDelta` i `UsageReport`; klasy langchaina zostają tam, gdzie były, i nie wychodzą
   poza ten plik
-- [ ] 2.2 `provider.py` — narzędzia przekazane modelowi przy wywołaniu (`bind_tools` ze
+- [x] 2.2 `provider.py` — narzędzia przekazane modelowi przy wywołaniu (`bind_tools` ze
   schematów z `tools/list`, nie z listy wpisanej tutaj) i rozpoznanie prośby o wywołanie
   w strumieniu
-- [ ] 2.3 `graph.py` — węzeł `tools`, krawędź warunkowa z `model` (`tools` albo `END`) i
+- [x] 2.3 `graph.py` — węzeł `tools`, krawędź warunkowa z `model` (`tools` albo `END`) i
   krawędź powrotna `tools → model`
-- [ ] 2.4 Sufit ośmiu wywołań na turę, liczbą w kodzie; po jego osiągnięciu model dostaje
+- [x] 2.4 Sufit ośmiu wywołań na turę, liczbą w kodzie; po jego osiągnięciu model dostaje
   to jako wynik i ma jeszcze obrót na odpowiedź (`agent-tools`, „Tura ma sufit wywołań
   narzędzi")
-- [ ] 2.5 Odmowa narzędzia wraca do modelu jako wynik ze zdaniem serwera; awaria dostępu
+- [x] 2.5 Odmowa narzędzia wraca do modelu jako wynik ze zdaniem serwera; awaria dostępu
   wraca jako wynik nazywający awarię; ani jedna, ani druga nie kończy tury błędem
-- [ ] 2.6 Wynik narzędzia żyje w stanie grafu przez turę i nie wchodzi do historii tury
+- [x] 2.6 Wynik narzędzia żyje w stanie grafu przez turę i nie wchodzi do historii tury
   następnej (design.md, „Wynik narzędzia żyje jedną turę")
-- [ ] 2.7 Testy grafu przeciw podstawionemu dostawcy i podstawionemu klientowi: tura bez
+- [x] 2.7 Testy grafu przeciw podstawionemu dostawcy i podstawionemu klientowi: tura bez
   narzędzia, tura z jednym, tura z trzema, tura wchodząca w sufit, tura z odmową i
   poprawionym żądaniem, tura z niedostępnym serwerem
 

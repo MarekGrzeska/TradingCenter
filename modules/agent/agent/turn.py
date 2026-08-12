@@ -17,10 +17,11 @@ from typing import Protocol
 import asyncpg
 
 from . import store
-from .graph import build_graph
+from .graph import build_graph, initial_state
 from .models_catalogue import ModelCatalogueEntry
 from .prompt import PROMPT_VERSION, SYSTEM_PROMPT
 from .provider import ModelProvider
+from .tools import ToolServer
 
 log = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ async def run_turn(
     model_entry: ModelCatalogueEntry,
     provider: ModelProvider,
     queue: Queue,
+    tool_server: ToolServer | None = None,
 ) -> None:
     async with pool.acquire() as conn:
         messages = await store.get_messages(conn, session_id=session_id)
@@ -70,28 +72,33 @@ async def run_turn(
     async def on_delta(text: str) -> None:
         queue.put_nowait(Fragment(text))
 
-    graph = build_graph(provider)
+    # Asked here rather than inside the graph so a turn's tool set is fixed before the
+    # first model call: a list that changed between rounds would leave the provider
+    # holding a call for a tool that had just gone away. An empty list is the whole
+    # answer to a tool server that is down (specs/agent-tool-access).
+    tools = await tool_server.list_tools() if tool_server is not None else []
+
+    graph = build_graph(provider, tool_server)
     try:
         result = await graph.ainvoke(
-            {
-                "system_prompt": SYSTEM_PROMPT,
-                "history": history,
-                "model": model_entry.model,
-                "on_delta": on_delta,
-                "text": "",
-                "usage": None,
-                "failed": False,
-            }
+            initial_state(
+                system_prompt=SYSTEM_PROMPT,
+                history=history,
+                model=model_entry.model,
+                on_delta=on_delta,
+                tools=tools,
+            )
         )
         text: str = result["text"]
-        usage = result["usage"]
+        usages = result["usages"]
+        calls = result["calls"]
         failed: bool = result["failed"]
     except Exception:
         # A last-resort backstop, not the primary path: `graph.py`'s own node already
         # catches a broken provider call so partial text survives it. Reaching here
         # means the graph wiring itself failed, and nothing was ever generated.
         log.exception("the conversation graph failed for session %s", session_id)
-        text, usage, failed = "", None, True
+        text, usages, calls, failed = "", [None], [], True
 
     async with pool.acquire() as conn:
         reply = await store.append_agent_message(
@@ -102,18 +109,25 @@ async def run_turn(
             prompt_version=PROMPT_VERSION,
             incomplete=failed,
         )
-        await store.record_usage(
-            conn,
-            session_id=session_id,
-            message_id=reply.id,
-            model_id=model_entry.id,
-            input_tokens=usage.input_tokens if usage else None,
-            output_tokens=usage.output_tokens if usage else None,
-            cached_tokens=usage.cached_tokens if usage else None,
-            reasoning_tokens=usage.reasoning_tokens if usage else None,
-            input_rate_per_1m=model_entry.input_rate_per_1m,
-            output_rate_per_1m=model_entry.output_rate_per_1m,
-        )
+        # One row per model call, all pointing at this one reply. A turn that asked for
+        # a tool was billed at least twice, and the tool's own answer went into the
+        # prompt of the call after it (specs/agent-usage, "Tura z wywołaniem
+        # narzędzia").
+        for usage in usages:
+            await store.record_usage(
+                conn,
+                session_id=session_id,
+                message_id=reply.id,
+                model_id=model_entry.id,
+                input_tokens=usage.input_tokens if usage else None,
+                output_tokens=usage.output_tokens if usage else None,
+                cached_tokens=usage.cached_tokens if usage else None,
+                reasoning_tokens=usage.reasoning_tokens if usage else None,
+                input_rate_per_1m=model_entry.input_rate_per_1m,
+                output_rate_per_1m=model_entry.output_rate_per_1m,
+            )
+    # `calls` is built and, for now, dropped: the table it belongs in is task group 3.
+    log.info("turn on session %s made %d tool call(s)", session_id, len(calls))
 
     if failed:
         queue.put_nowait(Failed("the model call failed"))

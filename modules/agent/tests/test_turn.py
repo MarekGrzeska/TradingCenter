@@ -38,7 +38,9 @@ class FakeProvider:
         self._chunks = chunks
         self._then_raise = then_raise
 
-    async def stream(self, *, model: str, system_prompt: str, history: list):
+    async def stream(
+        self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+    ):
         for chunk in self._chunks:
             yield chunk
         if self._then_raise:

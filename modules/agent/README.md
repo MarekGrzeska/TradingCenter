@@ -5,11 +5,12 @@ sessions and their transcripts, in this module's own database, with every model 
 priced at the moment it happens rather than recomputed later against whatever the
 cennik says today.
 
-**Tools are being wired in.** `tools/` holds the session with `market-mcp` and can list
-and call what that server publishes; the graph does not use it yet, so today the model
-still answers alone. The loop is the next step of
-`openspec/changes/connect-agent-to-market-mcp`. Nothing here reaches `capital-gateway`,
-and nothing writes anywhere: `market-mcp` publishes reads only.
+**Tools, all of them reads.** The model can ask `market-mcp` for candles, coverage,
+indicators and levels mid-answer and carry on with what comes back — at most eight calls
+per turn, a number in the code rather than a setting. Nothing here reaches
+`capital-gateway`, and nothing writes anywhere: `market-mcp` publishes no tool that
+changes state, and this module adds none of its own. With `MARKET_MCP_URL` unset, or the
+server down, the agent answers from the model alone and says so.
 
 ## What
 
@@ -25,7 +26,10 @@ and nothing writes anywhere: `market-mcp` publishes reads only.
 - `models.py` — sessions, messages, usage rows.
 - `models_catalogue.py` — the queryable catalogue built from `Settings.models`.
 - `prompt.py` — the one system prompt this module runs, versioned.
-- `graph.py` — the LangGraph conversation graph.
+- `graph.py` — the LangGraph conversation graph: a model node, a tool node, and the
+  conditional edge between them. Also where the three failures a turn can hit are kept
+  apart — the tool refusing, the tool server being unreachable, and the provider
+  breaking are three different answers.
 - `provider.py` — the OpenAI client, chosen model by catalogue entry.
 - `tools/` — the session with `market-mcp` and the shapes a turn sees. The only place
   the `mcp` package is imported, the way `provider.py` is the only place langchain's

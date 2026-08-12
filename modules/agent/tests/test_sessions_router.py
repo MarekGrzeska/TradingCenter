@@ -39,7 +39,9 @@ class _FakeProvider:
     def __init__(self, chunks: list) -> None:
         self._chunks = chunks
 
-    async def stream(self, *, model: str, system_prompt: str, history: list):
+    async def stream(
+        self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+    ):
         for chunk in self._chunks:
             yield chunk
 
@@ -247,7 +249,9 @@ def test_required_authentication_refuses_before_touching_the_model(
         session_id = client.post("/sessions", json={}).json()["id"]
 
     class _ProviderThatMustNotBeCalled:
-        async def stream(self, *, model: str, system_prompt: str, history: list):
+        async def stream(
+            self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+        ):
             raise AssertionError("the model must never be called")
             yield  # pragma: no cover - makes this an async generator
 
@@ -260,7 +264,9 @@ def test_required_authentication_refuses_before_touching_the_model(
 
 def test_a_broken_stream_reports_error_and_saves_the_partial_reply() -> None:
     class _BreakingProvider:
-        async def stream(self, *, model: str, system_prompt: str, history: list):
+        async def stream(
+            self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+        ):
             yield TextDelta("cut ")
             yield TextDelta("off")
             raise RuntimeError("provider broke")

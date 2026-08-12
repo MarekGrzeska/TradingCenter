@@ -142,6 +142,7 @@ async def send_message(
             model_entry=model_entry,
             provider=request.app.state.provider,
             queue=queue,
+            tool_server=request.app.state.tool_server,
         )
     )
     # A task with nothing referencing it is eligible for collection mid-run — kept here
