@@ -52,7 +52,7 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
     <aside
       id="agent-chat-panel"
       aria-label="Agent chat"
-      className="flex w-96 shrink-0 flex-col border-l border-primary-line bg-panel"
+      className="flex w-115 shrink-0 flex-col border-l border-primary-line bg-panel"
     >
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-primary-line bg-panel-strong px-3">
         <AgentGlyph className="h-4 w-4 text-secondary" />
