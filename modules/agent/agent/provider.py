@@ -99,6 +99,18 @@ class OpenAIProvider:
             # Without this the provider's usage arrives on no chunk at all when
             # streaming — the one field specs/agent-usage exists to record.
             stream_usage=True,
+            # `/v1/responses`, not `/v1/chat/completions`. Measured, not chosen: a
+            # reasoning model asked for function tools on chat/completions answers
+            #
+            #   400 Function tools with reasoning_effort are not supported for
+            #   <model> in /v1/chat/completions. To use function tools, use
+            #   /v1/responses or set reasoning_effort to 'none'.
+            #
+            # The other way out of that error is `reasoning_effort="none"`, which buys
+            # tools by throwing away the reasoning this module picked the model for.
+            # Set for every call, tools or not, so one code path serves both — the
+            # alternative is two content shapes in this file depending on the turn.
+            use_responses_api=True,
         )
         if not tools:
             return client
@@ -158,8 +170,13 @@ class OpenAIProvider:
             if not isinstance(chunk, AIMessageChunk):  # pragma: no cover - defensive
                 continue
             accumulated = chunk if accumulated is None else accumulated + chunk
-            if chunk.content:
-                yield TextDelta(text=str(chunk.content))
+            # `.text`, not `str(.content)`. On the responses API `content` is a list of
+            # blocks — a tool call arrives as one — and stringifying it would stream
+            # `[{'type': 'function_call', ...}]` into the operator's panel as prose.
+            # `.text` pulls out the text blocks and nothing else, and returns the plain
+            # string unchanged on the older shape.
+            if chunk.text:
+                yield TextDelta(text=chunk.text)
             reported = getattr(chunk, "usage_metadata", None)
             if reported:
                 usage = reported

@@ -14,15 +14,22 @@ Terminala nie dotknięto ani jedną linijką — świadomie, na decyzję operato
 (`tests/test_transcript_contract.py`). Podgląd wywołań w panelu jest następną zmianą, i
 tabela, którą ta zmiana zapisuje, jest tym, co tamta odczyta.
 
-Przegląd znalazł jedną rzecz i był to prawdziwy błąd, złapany dopiero przez przebieg
-przeciw działającemu stosowi — nie przez 143 testy, które przechodziły obok niego.
-Naprawiony, szczegóły w Findings.
+Przegląd znalazł cztery rzeczy i wszystkie cztery były prawdziwymi błędami; żadnego z
+nich nie złapał zestaw testów. Trzy z nich wyszły dopiero, gdy operator włączył
+`MARKET_MCP_URL` u siebie i dostał trzy tury pod rząd oznaczone „incomplete — broke off":
+modele rozumujące nie przyjmują narzędzi na `/v1/chat/completions`, węzeł modelu połykał
+wyjątek bez wpisu w dzienniku, a treść z Responses API to bloki, nie string. Wszystkie
+naprawione, szczegóły w Findings.
+
+To jest dokładnie ta luka, którą ten przegląd zdążył zapisać, zanim się zmaterializowała
+(„Pętla nie przeszła ani razu z prawdziwym modelem"). Zapisanie jej nie kosztowało nic i
+nie uchroniło przed niczym — jedyne, co pomogło, to uruchomienie.
 
 ## Verified
 
 Wszystko na Windows 11, z Dockerem — testy `db` weszły same, nie zostały pominięte.
 
-- `cd modules/agent && uv run pytest -q` → `143 passed, 2 warnings`
+- `cd modules/agent && uv run pytest -q` → `146 passed, 2 warnings`
 - `cd modules/agent && uv run ruff check .` → `All checks passed!`
 - `cd modules/agent && uv run pyright` → `0 errors, 0 warnings, 0 informations`
 - `cd infra && terraform validate` → `Success! The configuration is valid.`
@@ -37,16 +44,20 @@ archiwum za nim. Odkrył 10 narzędzi z ich własnymi opisami, wyciągnął zbie
 because the market was quiet", odczytał katalog wskaźników i na złym porcie odpowiedział
 `unavailable`.
 
-**Czego nie uruchomiono: pętli z prawdziwym modelem.** Wywołanie OpenAI kosztuje i jest
-decyzją operatora, nie przeglądu. Wszystko po stronie tego modułu — kształt żądania z
-narzędziami, składanie kawałków wywołania ze strumienia, `bind_tools` — jest sprawdzone
-przeciw podstawionemu dostawcy, ale to, jak model naprawdę korzysta z tych opisów, jest
-do zobaczenia dopiero na żywo. Patrz Gaps.
+**Pełna pętla z prawdziwym modelem** (`gpt-5.6-luna`, prawdziwy `market-mcp`, prawdziwe
+archiwum). Pytanie: „które pary archiwum zbiera i jaka jest ostatnia cena jednej z nich".
+Wynik: dwa obroty, `list_tracked_pairs` (72 ms) i `get_last_price` z rozdzielczością,
+którą model wybrał sam (32 ms), trzy wywołania modelu, `failed=False`, odpowiedź niosąca
+cenę bid, moment w UTC i wiek świecy. Ten przebieg jest tym, co wywróciło trzy błędy z
+tabeli niżej; przed nimi nie działała ani jedna tura z narzędziami.
 
 ## Findings
 
 | Severity | Where | Finding | Status |
 |---|---|---|---|
+| **High** | `modules/agent/agent/provider.py` | Każda tura z narzędziami wywracała się na `400` od OpenAI: „Function tools with reasoning_effort are not supported for gpt-5.6-luna in /v1/chat/completions. To use function tools, use /v1/responses or set reasoning_effort to 'none'." Modele rozumujące nie łączą narzędzi z `reasoning_effort` na starym endpoincie. Operator zobaczył trzy tury pod rząd jako „incomplete — broke off". Nie złapał tego żaden test, bo 146 testów wywołuje podstawionego dostawcę, a `ChatOpenAI` konstruuje się bez błędu — 400 przychodzi dopiero z sieci; luka nazwana w Gaps tego przeglądu („Pętla nie przeszła ani razu z prawdziwym modelem") zmaterializowała się w tej samej godzinie, w której ją zapisano. Naprawione: `use_responses_api=True`, dla każdego wywołania, nie tylko z narzędziami — druga droga (`reasoning_effort="none"`) kupuje narzędzia, oddając rozumowanie, po które ten model został wybrany. Test na kształt klienta, w tym po `bind_tools`. | fixed |
+| **High** | `modules/agent/agent/graph.py` | Wyjątek dostawcy był łapany i zamieniany na `failed=True` **bez jednego wiersza dziennika**. `turn.py` ma własny backstop z `log.exception`, ale on nigdy nie działa, bo z węzła nic nie propaguje. Skutkiem było „incomplete — broke off" w panelu i cisza wszędzie indziej: nie dało się dowiedzieć, co pękło, bez podstawienia własnego skryptu — i tak właśnie znaleziono błąd powyżej. Naprawione: `log.exception` z liczbą dotychczasowych wywołań i liczbą oferowanych narzędzi, przed zamianą wyjątku na flagę. | fixed |
+| **Medium** | `modules/agent/agent/provider.py` | Na Responses API `content` to lista bloków, a wywołanie narzędzia jest jednym z nich — `str(chunk.content)` wysłałby operatorowi do panelu `[{'type': 'function_call', 'name': 'list_tracked_pairs', ...}]` jako prozę. Ukryte za błędem powyżej: dopóki każda tura z narzędziami kończyła się 400, ten kod nigdy nie doszedł do bloku wywołania. Naprawione: `chunk.text`, który bierze bloki tekstowe i nic więcej, a na starym kształcie zwraca ten sam string. Test na obu kształtach. | fixed |
 | **Medium** | `modules/agent/agent/tools/client.py` | Awaria dostępu do serwera narzędzi docierała do modelu jako `the tool server could not be reached: unhandled errors in a TaskGroup (1 sub-exception)`. Obie połówki transportu streamable-http chodzą w grupie zadań anyio, więc odmowa połączenia wychodzi opakowana w `BaseExceptionGroup`, którego `str()` nie nazywa niczego. Model dostawał zdanie bez treści dokładnie w sytuacji, w której ma powiedzieć operatorowi, co się stało — a operator dostawał to samo w dzienniku. Nie złapały tego testy: asercje sprawdzały rodzaj wyniku (`UNAVAILABLE`) i stałą część zdania, nie zmienną. Złapał przebieg z zadania 5.5, bo tam ten tekst po prostu widać. Naprawione: `_describe` rozwija grupę rekurencyjnie i deduplikuje liście — komunikat brzmi teraz `All connection attempts failed`. Test na zagnieżdżonych grupach plus asercja `"TaskGroup" not in outcome.text` w teście nieosiągalnego serwera. | fixed |
 
 Sprawdzone i **niebędące** błędami — obie rzeczy wyglądały na problem i obie zostały
@@ -133,11 +144,14 @@ rozstrzygnięte pomiarem, nie rozumowaniem:
 
 ## Gaps
 
-- **Pętla nie przeszła ani razu z prawdziwym modelem.** Wszystko po stronie modułu jest
-  sprawdzone, ale `bind_tools` przeciw prawdziwemu OpenAI, składanie argumentów z
-  częściowego JSON-a w strumieniu i to, czy model w ogóle sięga po te narzędzia mając
-  opisy `market-mcp`, są do zobaczenia dopiero na żywo. To jest pierwsza rzecz do
-  zrobienia po wdrożeniu i nie da się jej odbyć taniej.
+- ~~**Pętla nie przeszła ani razu z prawdziwym modelem.**~~ Przeszła, i kosztowała trzy
+  błędy z tabeli wyżej. Zmierzone na `gpt-5.6-luna` z działającym `market-mcp`: pytanie
+  „które pary archiwum zbiera i jaka jest ostatnia cena jednej z nich" dało dwa
+  wywołania narzędzi w dwóch obrotach (`list_tracked_pairs`, potem `get_last_price` z
+  rozdzielczością wybraną przez model), trzy wywołania modelu i odpowiedź niosącą cenę
+  bid, moment w UTC i wiek świecy — czyli dokładnie to, czego prompt `v3` wymaga.
+  Zostaje niezmierzone, jak pętla zachowuje się na droższych modelach z katalogu i przy
+  pytaniach wymagających wskaźników.
 - **Sufit ośmiu nie jest zmierzony, tylko oszacowany.** Wybrany z tego, jak wygląda
   hipotetyczna tura analityczna. Ile wywołań realnie robi model, wiadomo będzie z
   `tool_calls` po tygodniu — i wtedy dopiero ta liczba ma podstawę.

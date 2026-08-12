@@ -19,6 +19,7 @@ file exists to avoid:
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Awaitable, Callable, Sequence
 from typing import TypedDict
 
@@ -34,6 +35,8 @@ from .provider import (
     UsageReport,
 )
 from .tools import ToolDescriptor, ToolOutcomeKind, ToolServer
+
+log = logging.getLogger(__name__)
 
 # A number in the code, not a setting — the same choice market-mcp made for its own
 # ceilings, and for the same reason: a safety ceiling in configuration is an invitation
@@ -94,10 +97,20 @@ def build_graph(provider: ModelProvider, tool_server: ToolServer | None = None):
                     requests.append(chunk)
                 else:
                     usage = chunk
-        except Exception:  # noqa: BLE001 - any provider failure must still return partial text
+        except Exception:
             # Caught here, not by the caller: whatever text arrived before the
             # provider broke must still be returned, not lost along with the
             # exception (specs/agent-chat, "Model przerywa w połowie").
+            #
+            # Logged with the traceback before it is turned into a flag. Without this
+            # line the operator sees "incomplete — broke off" in the panel and there is
+            # no record anywhere of what broke: the exception dies here, and `turn.py`'s
+            # own backstop never runs because nothing propagates. Measured the hard way.
+            log.exception(
+                "the model call failed after %d tool call(s), %d tool(s) offered",
+                state["tool_calls_made"],
+                len(offered),
+            )
             return {
                 "text": state["text"] + "".join(parts),
                 "usages": [*state["usages"], usage],
