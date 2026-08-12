@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { agentApi, type AgentApi, type AgentUsageAggregate } from "../agentApi";
 import { agentChatStore, type AgentChatStore } from "../agentChatStore";
 import { defaultDateRangeInputs, toUsageRange, type DateRangeInputs } from "./dateRange";
+import { pageOf, type Page } from "./pagination";
 import { useUsage, type UsageState } from "./useUsage";
 import { todayInWarsaw } from "../../ui/formatTime";
 
@@ -147,6 +148,10 @@ function UsageBody({
   );
 }
 
+/** Rows per page. Enough that a normal week of days or conversations needs no paging at
+ *  all, small enough that a busy month does not push the third table off the screen. */
+const PAGE_SIZE = 10;
+
 function AggregateTable({
   title,
   keyLabel,
@@ -162,25 +167,40 @@ function AggregateTable({
   onRowOpen?: (row: AgentUsageAggregate) => void;
   openLabel?: string;
 }) {
+  const [requestedPage, setRequestedPage] = useState(0);
+  const page = pageOf(rows, requestedPage, PAGE_SIZE);
+
   if (rows.length === 0) return null;
 
   return (
     <section>
       <h2 className="mb-1 text-xs font-semibold uppercase tracking-wide text-secondary">{title}</h2>
-      <table className="w-full text-sm">
+      {/* `table-fixed` with the same colgroup in all three tables, and every table
+          carrying the action column whether or not it has an action. Three separate
+          `table-auto` tables each size their own columns from their own content, so the
+          numbers in one do not land under the numbers in the next — which is what the
+          missing fifth column made obvious rather than caused. */}
+      <table className="w-full table-fixed text-sm">
+        <colgroup>
+          <col />
+          <col className="w-28" />
+          <col className="w-28" />
+          <col className="w-40" />
+          <col className="w-20" />
+        </colgroup>
         <thead className="border-b border-secondary-line text-left text-[11px] uppercase tracking-wide text-secondary">
           <tr>
             <th className="px-2 py-1.5 font-normal">{keyLabel}</th>
             <th className="px-2 py-1.5 text-right font-normal">Input tokens</th>
             <th className="px-2 py-1.5 text-right font-normal">Output tokens</th>
             <th className="px-2 py-1.5 text-right font-normal">Cost</th>
-            {onRowOpen && <th className="px-2 py-1.5" />}
+            <th className="px-2 py-1.5" />
           </tr>
         </thead>
         <tbody>
-          {rows.map((row) => (
+          {page.rows.map((row) => (
             <tr key={row.key} className="border-t border-border">
-              <td className="px-2 py-1.5 font-semibold text-ink">
+              <td className="truncate px-2 py-1.5 font-semibold text-ink">
                 {renderKey ? renderKey(row.key) : row.key}
               </td>
               <td className="px-2 py-1.5 text-right text-ink-secondary">
@@ -200,8 +220,8 @@ function AggregateTable({
                   </span>
                 )}
               </td>
-              {onRowOpen && (
-                <td className="px-2 py-1.5 text-right">
+              <td className="px-2 py-1.5 text-right">
+                {onRowOpen && (
                   <button
                     type="button"
                     onClick={() => onRowOpen(row)}
@@ -209,12 +229,60 @@ function AggregateTable({
                   >
                     {openLabel}
                   </button>
-                </td>
-              )}
+                )}
+              </td>
             </tr>
           ))}
         </tbody>
       </table>
+      <Pagination label={title} page={page} onPage={setRequestedPage} />
     </section>
+  );
+}
+
+/**
+ * Absent entirely below one page — a table of three models does not need to say it is
+ * showing three of three.
+ */
+function Pagination({
+  label,
+  page,
+  onPage,
+}: {
+  label: string;
+  page: Page<AgentUsageAggregate>;
+  onPage: (index: number) => void;
+}) {
+  if (page.count <= 1) return null;
+
+  return (
+    <div className="mt-1 flex items-center gap-2 px-2 text-[11px] text-ink-muted">
+      <span>
+        {page.firstRow}–{page.lastRow} of {page.total}
+      </span>
+      <div className="ml-auto flex items-center gap-1">
+        <button
+          type="button"
+          onClick={() => onPage(page.index - 1)}
+          disabled={page.index === 0}
+          aria-label={`${label}: previous page`}
+          className="cursor-pointer rounded border border-border px-1.5 py-0.5 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Prev
+        </button>
+        <span aria-current="page">
+          {page.index + 1} / {page.count}
+        </span>
+        <button
+          type="button"
+          onClick={() => onPage(page.index + 1)}
+          disabled={page.index === page.count - 1}
+          aria-label={`${label}: next page`}
+          className="cursor-pointer rounded border border-border px-1.5 py-0.5 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Next
+        </button>
+      </div>
+    </div>
   );
 }

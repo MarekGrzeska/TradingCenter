@@ -156,4 +156,94 @@ describe("AgentCostView", () => {
     const last = seen[seen.length - 1];
     expect(last.from).not.toBe(first.from);
   });
+
+  it("gives all three tables the same columns, so their numbers line up", async () => {
+    const api = fakeApi({
+      usage: async () =>
+        summaryFixture({
+          byModel: [{ key: "luna", inputTokens: 1, outputTokens: 1, cost: "0.1", unknownCount: 0 }],
+          bySession: [{ key: "7", inputTokens: 2, outputTokens: 2, cost: "0.2", unknownCount: 0 }],
+          byDay: [{ key: "2026-08-12", inputTokens: 3, outputTokens: 3, cost: "0.3", unknownCount: 0 }],
+        }),
+    });
+    const { container } = render(<AgentCostView api={api} chatStore={createAgentChatStore(null, api)} />);
+    await screen.findByText("luna");
+
+    // Only the by-conversation table has a row action, but every table carries the column
+    // — otherwise the three size their columns independently and nothing aligns.
+    const tables = [...container.querySelectorAll("table")];
+    expect(tables).toHaveLength(3);
+    for (const table of tables) {
+      expect(table.querySelectorAll("thead th")).toHaveLength(5);
+      expect(table.querySelectorAll("tbody tr:first-child td")).toHaveLength(5);
+      expect(table.querySelectorAll("colgroup col")).toHaveLength(5);
+    }
+  });
+
+  it("pages a long table and leaves a short one alone", async () => {
+    const many = Array.from({ length: 23 }, (_, i) => ({
+      key: `2026-07-${String(i + 1).padStart(2, "0")}`,
+      inputTokens: i,
+      outputTokens: i,
+      cost: `0.${i}`,
+      unknownCount: 0,
+    }));
+    const api = fakeApi({
+      usage: async () =>
+        summaryFixture({
+          byModel: [{ key: "luna", inputTokens: 1, outputTokens: 1, cost: "0.1", unknownCount: 0 }],
+          byDay: many,
+        }),
+    });
+    const user = userEvent.setup();
+    render(<AgentCostView api={api} />);
+    await screen.findByText("2026-07-01");
+
+    expect(screen.getByText("1–10 of 23")).toBeInTheDocument();
+    expect(screen.queryByText("2026-07-11")).not.toBeInTheDocument();
+    // One model, one page — a table that fits says nothing about paging.
+    expect(screen.queryByLabelText(/by model: next page/i)).not.toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/by day: next page/i));
+    expect(await screen.findByText("2026-07-11")).toBeInTheDocument();
+    expect(screen.queryByText("2026-07-01")).not.toBeInTheDocument();
+    expect(screen.getByText("11–20 of 23")).toBeInTheDocument();
+
+    await user.click(screen.getByLabelText(/by day: next page/i));
+    expect(await screen.findByText("21–23 of 23")).toBeInTheDocument();
+    expect(screen.getByLabelText(/by day: next page/i)).toBeDisabled();
+  });
+
+  it("does not strand the operator on a page the new range no longer has", async () => {
+    let long = true;
+    const api = fakeApi({
+      usage: async () =>
+        summaryFixture({
+          byDay: long
+            ? Array.from({ length: 23 }, (_, i) => ({
+                key: `2026-07-${String(i + 1).padStart(2, "0")}`,
+                inputTokens: i,
+                outputTokens: i,
+                cost: `0.${i}`,
+                unknownCount: 0,
+              }))
+            : [{ key: "2026-08-12", inputTokens: 1, outputTokens: 1, cost: "0.1", unknownCount: 0 }],
+        }),
+    });
+    const user = userEvent.setup();
+    render(<AgentCostView api={api} />);
+    await screen.findByText("2026-07-01");
+
+    await user.click(screen.getByLabelText(/by day: next page/i));
+    await user.click(screen.getByLabelText(/by day: next page/i));
+    expect(screen.getByText("21–23 of 23")).toBeInTheDocument();
+
+    // Narrowing the range to a single day while parked on page 3: the row must appear,
+    // not an empty table waiting for an effect to notice.
+    long = false;
+    fireEvent.change(screen.getByLabelText("From"), { target: { value: "2026-08-12" } });
+
+    expect(await screen.findByText("2026-08-12")).toBeInTheDocument();
+    expect(screen.queryByText(/of 23/)).not.toBeInTheDocument();
+  });
 });
