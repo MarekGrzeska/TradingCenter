@@ -60,7 +60,7 @@ jobs:
           images: ${{ steps.image.outputs.name }}:${{ github.sha }}
 
       # "Deployed" has meant "the request was accepted" up to here — same gap the other
-      # two deploy workflows close with their own smoke check.
+      # deploy workflows close with their own smoke check.
       #
       # `/health` is the probe, and it needs none of market-data's `/ws/candles` trick:
       # this route is excluded from Easy Auth (infra/app-service.tf, `excluded_paths`)

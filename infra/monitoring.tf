@@ -251,11 +251,17 @@ resource "azurerm_application_insights_standard_web_test" "market_data_ping" {
 resource "azurerm_monitor_metric_alert" "market_data_availability" {
   name                = "alert-market-data-availability"
   resource_group_name = azurerm_resource_group.main.name
-  scopes              = [azurerm_application_insights.main.id]
-  description         = "market-data's /ping availability test is failing from outside."
-  severity            = 1
-  frequency           = "PT5M"
-  window_size         = "PT15M"
+  # Both ids, not just the component's — this alert type refuses with a bare "Alert
+  # scope is invalid" 400 unless the web test itself is also in scopes, alongside the
+  # Application Insights resource the criteria block below also names as component_id.
+  scopes = [
+    azurerm_application_insights_standard_web_test.market_data_ping.id,
+    azurerm_application_insights.main.id,
+  ]
+  description = "market-data's /ping availability test is failing from outside."
+  severity    = 1
+  frequency   = "PT5M"
+  window_size = "PT15M"
 
   application_insights_web_test_location_availability_criteria {
     web_test_id           = azurerm_application_insights_standard_web_test.market_data_ping.id

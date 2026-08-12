@@ -6,32 +6,32 @@ One repository, many modules, no shared runtime. A module is a directory under `
 that runs on its own and publishes a contract. Nothing imports across that boundary.
 
 ```
-                  capital.com
-                  (REST + WS)
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │  capital-gateway             │──────────┐
-        │  trade · history · stream    │          │
-        └──────────────┬───────────────┘          │
-                       │ HTTP + WebSocket         │ instruments
-                       ▼                          │
-        ┌──────────────────────────────┐          │
-        │  market-data                 │          │
-        │  archive · coverage · rollups│          │
-        └──────┬───────────────┬───────┘          │
-               │               │                  │
-               ▼               ▼                  │
-        ┌─────────────┐   terminal ◀───────────────┘
-        │ market-mcp  │   charts · grid · search
-        │ MCP tools,  │      archive panel
-        │ read-only   │
-        └──────┬──────┘
-               │ MCP (stdio / streamable HTTP)
-               ▼
-         an agent (planned — a model reading the
-         archive through market-mcp's tools, not
-         built yet)
+                  capital.com                             OpenAI
+                  (REST + WS)                                │
+                       │                                     ▼
+                       ▼                        ┌──────────────────────────────┐
+        ┌──────────────────────────────┐        │  agent                       │
+        │  capital-gateway             │───┐    │  conversation · cost         │
+        │  trade · history · stream    │   │    └──────────────┬───────────────┘
+        └──────────────┬───────────────┘   │                   │ HTTP, streamed
+                       │ HTTP + WebSocket  │ instruments       │
+                       ▼                   │                   │
+        ┌──────────────────────────────┐   │                   │
+        │  market-data                 │   │                   │
+        │  archive · coverage · rollups│   │                   │
+        └──────┬───────────────┬───────┘   │                   │
+               │               │           │                   │
+               ▼               ▼           ▼                   ▼
+    ┌─────────────────┐   terminal ◀────────┴───────────────────┘
+    │  market-mcp     │   charts · grid · search · archive panel · agent panel
+    │  MCP tools,     │
+    │  read-only      │
+    └────────┬────────┘
+             │ MCP (stdio / streamable HTTP)
+             ▼
+      whatever holds a model: the operator's desktop client today.
+      `agent` is not that caller — it has no tool loop, and giving
+      it one is its own change.
 ```
 
 `terminal` is a consumer, not a peer: it publishes no contract of its own and nothing
@@ -39,7 +39,8 @@ depends on it. It reads market data through one interface, and that interface no
 implementations behind it — candles and the live stream from `market-data`, the instrument
 catalogue from `capital-gateway`, composed into a single instance the views never see
 through. The charts were not rewritten when the archive arrived, which is the whole point
-of having had the interface first.
+of having had the interface first. `agent` is a third, unrelated source behind its own
+interface — a conversation and its cost, nothing that shares a shape with a candle.
 
 `market-data` sits between the two on purpose. capital.com counts its rate limit against the
 account rather than the process, so a second client anywhere spends the same allowance twice:
@@ -49,8 +50,20 @@ upstream URLs point anywhere else.
 `market-mcp` is a consumer of `market-data`, the same shape as `terminal`: it reads the
 published contract and imports nothing. Where it differs is the shape of what it hands
 onward — a chart wants every candle, a model wants a summary, so the same archive read
-comes out reduced rather than proxied. It has no consumer of its own yet; the agent that
-will call it is a later, separate module.
+comes out reduced rather than proxied.
+
+`agent` is a peer of `capital-gateway` and `market-data`, not a consumer of either — it
+reaches nothing in this diagram but OpenAI. The box market-data used to point at here
+(`agents / backtests`) was a placeholder for something that did not exist yet; now that one
+does, drawing it as downstream of the archive would say `agent` reads candles and calls
+tools, which it deliberately does not (`openspec/changes/add-agent-chat/design.md`,
+Non-Goals — no tools, nothing that reaches `market-data` or `capital-gateway`).
+
+The two of them look adjacent on the page and are not yet connected. `market-mcp` publishes
+the tools; `agent` holds the model; the edge between them is a tool loop neither module has,
+and it is its own OpenSpec change rather than a quiet addition to a graph
+(`openspec/changes/add-market-data-mcp/proposal.md` puts it out of scope in as many words).
+Until it lands, market-mcp's caller is whatever MCP client the operator runs on the desktop.
 
 ## Why no shared library
 

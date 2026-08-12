@@ -42,7 +42,7 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
         if (!res.headersSent) {
           res.writeHead(502, { "Content-Type": "application/json" });
         }
-        res.end(JSON.stringify({ detail: "capital-gateway is not reachable" }));
+        res.end(JSON.stringify({ detail: `${label} is not reachable` }));
       } else {
         res.destroy();
       }
@@ -61,6 +61,7 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
+  const agent = env.AGENT_PROXY_TARGET || "http://localhost:8030";
 
   return {
     plugins: [react(), tailwindcss()],
@@ -83,6 +84,18 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/archive-api/, ""),
           configure: quietProxyErrors("market-data", archive),
+        },
+
+        // The agent's own address, not a path under the archive's — it is a fourth,
+        // independent module (design.md, "Osobny moduł `modules/agent`, port 8030").
+        // No `ws: true`: its stream rides `fetch` + `ReadableStream` over plain HTTP,
+        // never a WebSocket upgrade (design.md, "Odpowiedź strumieniem: fetch +
+        // ReadableStream, nie EventSource").
+        "/agent-api": {
+          target: agent,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/agent-api/, ""),
+          configure: quietProxyErrors("agent", agent),
         },
       },
     },

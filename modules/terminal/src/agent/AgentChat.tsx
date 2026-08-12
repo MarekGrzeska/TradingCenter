@@ -1,19 +1,34 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
-import { agentChatStore, type AgentChatStore, type ChatMessage } from "./agentChatStore";
+import { agentChatStore, type AgentChatState, type AgentChatStore, type ChatMessage } from "./agentChatStore";
+import { MessageBody } from "./MessageBody";
 
 /**
  * Mounted once in `Shell`, as a sibling of the router outlet rather than inside it: the
  * panel belongs to the terminal, not to a tab, so switching tabs neither hides it nor
- * remounts the conversation.
+ * remounts the conversation (`terminal-agent-chat` spec, "Panel należy do terminala, nie
+ * do zakładki").
  *
  * Collapsed it is a rail on the right edge — a place, not a floating button, so the way in
  * is always in the same pixels whatever tab is on screen. Expanded it is a column in the
  * shell's flex row, which is what pushes the tab content aside instead of covering it; the
  * chart's ResizeObserver picks the new width up on its own.
+ *
+ * Whether the list of conversations or the transcript is on screen is this component's
+ * own, unpersisted state — the store only remembers which conversation was open, not
+ * which panel the operator was looking at when they last left.
  */
 export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore } = {}) {
   const state = useSyncExternalStore(store.subscribe, store.getSnapshot);
+  const [view, setView] = useState<"chat" | "conversations">("chat");
+  const turnInFlight = state.turn?.status === "waiting" || state.turn?.status === "streaming";
 
   if (!state.expanded) {
     return (
@@ -45,14 +60,31 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
     <aside
       id="agent-chat-panel"
       aria-label="Agent chat"
-      className="flex w-96 shrink-0 flex-col border-l border-primary-line bg-panel"
+      className="flex w-115 shrink-0 flex-col border-l border-primary-line bg-panel"
     >
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-primary-line bg-panel-strong px-3">
         <AgentGlyph className="h-4 w-4 text-secondary" />
         <span className="text-sm font-semibold">Agent</span>
-        <span className="rounded border border-border bg-panel px-1.5 py-0.5 text-[10px] text-ink-muted">
-          mockup
-        </span>
+        <button
+          type="button"
+          onClick={() => setView(view === "chat" ? "conversations" : "chat")}
+          aria-pressed={view === "conversations"}
+          className="ml-2 rounded border border-border px-1.5 py-0.5 text-[11px] text-ink-muted hover:bg-panel hover:text-ink"
+        >
+          {view === "chat" ? "Conversations" : "Back to chat"}
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            store.newSession();
+            setView("chat");
+          }}
+          disabled={turnInFlight}
+          title="New conversation"
+          className="rounded border border-border px-1.5 py-0.5 text-[11px] text-ink-muted hover:bg-panel hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          New
+        </button>
         <button
           type="button"
           onClick={() => store.setExpanded(false)}
@@ -65,8 +97,29 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
         </button>
       </header>
 
-      <Transcript messages={state.messages} />
-      <Composer onSend={(text) => store.send(text)} />
+      {view === "conversations" ? (
+        <ConversationList
+          state={state}
+          onOpen={(id) => {
+            store.openSession(id);
+            setView("chat");
+          }}
+          onRename={(id, title) => store.renameSession(id, title)}
+          onDelete={(id) => store.deleteSession(id)}
+        />
+      ) : (
+        <>
+          <Transcript messages={state.messages} turn={state.turn} />
+          {/* The picker sits under the box it applies to, not in the header: which model
+              answers is a decision made while writing the question, so it belongs beside
+              the writing rather than at the far end of the panel. It rides inside the
+              composer for that reason and is out of sight in the conversations view,
+              where there is nothing to send. */}
+          <Composer onSend={(text) => store.send(text)} disabled={turnInFlight}>
+            <ModelPicker state={state} onChange={(modelId) => store.setModel(modelId)} />
+          </Composer>
+        </>
+      )}
     </aside>
   );
 }
@@ -107,7 +160,209 @@ function Chevron({ className, direction }: { className?: string; direction: "lef
   );
 }
 
-function Transcript({ messages }: { messages: readonly ChatMessage[] }) {
+/**
+ * Built entirely from `state.models` — `terminal-agent-chat` spec, "terminal MUST NOT
+ * nieść listy modeli we własnym kodzie". A catalogue that failed to load says so in
+ * words rather than falling back to anything baked in here, which is the one way this
+ * component could quietly start lying about what a session will actually run on.
+ */
+function ModelPicker({
+  state,
+  onChange,
+}: {
+  state: AgentChatState;
+  onChange: (modelId: string) => void;
+}) {
+  if (state.modelsStatus === "unreachable") {
+    return (
+      <p className="mt-2 text-xs text-critical">
+        model picker unavailable — the catalogue could not be read
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex items-center gap-2">
+      <label htmlFor="agent-model" className="text-[11px] text-ink-muted">
+        Model
+      </label>
+      <select
+        id="agent-model"
+        value={state.selectedModelId ?? ""}
+        onChange={(event) => onChange(event.target.value)}
+        disabled={state.modelsStatus === "loading" || state.models.length === 0}
+        className="flex-1 rounded border border-border bg-sunken px-1.5 py-1 text-xs text-ink disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {state.modelsStatus === "loading" && <option value="">Loading models…</option>}
+        {state.models.map((model) => (
+          <option key={model.id} value={model.id}>
+            {model.displayName} — ${model.inputRatePer1M} in / ${model.outputRatePer1M} out per 1M
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
+/**
+ * Newest-first, exactly as the module already orders `GET /sessions` — nothing here
+ * re-sorts it. A conversation joins this list only once it has a title, which the
+ * module only assigns after the first exchange (`terminal-agent-chat` spec, "rozmowa
+ * pojawia się na liście dopiero po pierwszej wymianie zdań"): an empty, unsent new
+ * conversation is never a row here.
+ */
+function ConversationList({
+  state,
+  onOpen,
+  onRename,
+  onDelete,
+}: {
+  state: AgentChatState;
+  onOpen: (id: number) => void;
+  onRename: (id: number, title: string) => void;
+  onDelete: (id: number) => void;
+}) {
+  if (state.sessionsStatus === "unreachable") {
+    return (
+      <p className="px-3 py-4 text-xs text-critical">the conversation list could not be read</p>
+    );
+  }
+  if (state.sessionsStatus === "loading") {
+    return <p className="px-3 py-4 text-xs text-ink-muted">Reading conversations…</p>;
+  }
+  if (state.sessions.length === 0) {
+    return <p className="px-3 py-4 text-xs text-ink-muted">No conversations yet.</p>;
+  }
+
+  return (
+    <ul className="min-h-0 flex-1 overflow-y-auto">
+      {state.sessions.map((session) => (
+        <ConversationRow
+          key={session.id}
+          session={session}
+          active={session.id === state.activeSessionId}
+          onOpen={onOpen}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
+      ))}
+    </ul>
+  );
+}
+
+function ConversationRow({
+  session,
+  active,
+  onOpen,
+  onRename,
+  onDelete,
+}: {
+  session: AgentChatState["sessions"][number];
+  active: boolean;
+  onOpen: (id: number) => void;
+  onRename: (id: number, title: string) => void;
+  onDelete: (id: number) => void;
+}) {
+  // Three states, not two: renaming and confirming a delete are both modes this one row
+  // enters, and neither may be reachable from the other — a stray Enter must not both
+  // rename and remove.
+  const [mode, setMode] = useState<"idle" | "renaming" | "confirming">("idle");
+  const [draft, setDraft] = useState(session.title ?? "");
+
+  function commitRename(): void {
+    onRename(session.id, draft);
+    setMode("idle");
+  }
+
+  if (mode === "renaming") {
+    return (
+      <li className="flex items-center gap-1 px-2 py-1.5">
+        <input
+          // The row became a field on the operator's own click, so the caret has exactly
+          // one sensible place to be.
+          autoFocus
+          value={draft}
+          maxLength={120}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commitRename();
+            if (event.key === "Escape") setMode("idle");
+          }}
+          onBlur={commitRename}
+          aria-label={`Rename ${session.title ?? "conversation"}`}
+          className="min-w-0 flex-1 rounded border border-primary bg-sunken px-1.5 py-1 text-xs text-ink focus:outline-none"
+        />
+      </li>
+    );
+  }
+
+  if (mode === "confirming") {
+    return (
+      <li className="flex items-center gap-2 bg-critical/10 px-3 py-2 text-xs">
+        <span className="min-w-0 flex-1 truncate text-ink-secondary">Delete this conversation?</span>
+        <button
+          type="button"
+          onClick={() => onDelete(session.id)}
+          className="cursor-pointer rounded border border-critical/50 px-1.5 py-0.5 text-[11px] text-critical hover:bg-critical/20"
+        >
+          Delete
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("idle")}
+          className="cursor-pointer rounded border border-border px-1.5 py-0.5 text-[11px] text-ink-muted hover:text-ink"
+        >
+          Keep
+        </button>
+      </li>
+    );
+  }
+
+  return (
+    // `group` rather than always-on controls: a list read far more often than edited
+    // stays a list of names, and the two buttons appear on the row under the pointer.
+    // They are still in the tab order, so a keyboard reaches them without hovering.
+    <li className="group flex items-center">
+      <button
+        type="button"
+        onClick={() => onOpen(session.id)}
+        aria-current={active}
+        className={`min-w-0 flex-1 truncate px-3 py-2 text-left text-xs hover:bg-panel-strong ${
+          active ? "bg-panel-strong text-ink" : "text-ink-secondary"
+        }`}
+      >
+        {session.title}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(session.title ?? "");
+          setMode("renaming");
+        }}
+        aria-label={`Rename ${session.title ?? "conversation"}`}
+        className="cursor-pointer px-1 py-2 text-[11px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:text-ink"
+      >
+        Rename
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode("confirming")}
+        aria-label={`Delete ${session.title ?? "conversation"}`}
+        className="cursor-pointer px-2 py-2 text-[11px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:text-critical"
+      >
+        Delete
+      </button>
+    </li>
+  );
+}
+
+function Transcript({
+  messages,
+  turn,
+}: {
+  messages: readonly ChatMessage[];
+  turn: AgentChatState["turn"];
+}) {
   const listRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -115,7 +370,7 @@ function Transcript({ messages }: { messages: readonly ChatMessage[] }) {
     // container is the thing that scrolls anyway.
     const list = listRef.current;
     if (list) list.scrollTop = list.scrollHeight;
-  }, [messages.length]);
+  }, [messages.length, turn]);
 
   return (
     <div
@@ -125,14 +380,46 @@ function Transcript({ messages }: { messages: readonly ChatMessage[] }) {
       aria-live="polite"
       className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto p-3"
     >
+      {messages.length === 0 && turn === null && (
+        <p className="text-xs text-ink-faint">Ask the agent about the market on screen.</p>
+      )}
       {messages.map((message) => (
         <Bubble key={message.id} message={message} />
       ))}
+      {/* Before the first fragment the panel already says something happened — a
+          message that vanished into a silent, unchanged screen is indistinguishable
+          from one that was never sent (`terminal-agent-chat` spec, "Widać, że
+          odpowiedź powstaje"). */}
+      {turn?.status === "waiting" && <ThinkingBubble />}
+      {turn?.status === "streaming" && (
+        <Bubble
+          message={{ id: "turn", role: "agent", text: turn.text, incomplete: false }}
+          streaming
+        />
+      )}
+      {turn?.status === "unreachable" && (
+        // Not a bubble: no agent reply happened, so nothing here impersonates one
+        // (`terminal-agent-chat` spec, "MUST NOT pokazywać wypowiedzi agenta, która nie
+        // powstała").
+        <p className="rounded border border-critical/40 bg-critical/10 px-3 py-2 text-xs text-critical">
+          the agent module is not reachable — {turn.message}
+        </p>
+      )}
     </div>
   );
 }
 
-function Bubble({ message }: { message: ChatMessage }) {
+function ThinkingBubble() {
+  return (
+    <div className="flex justify-start">
+      <div className="rounded-lg rounded-bl-sm border border-border bg-panel-strong px-3 py-2 text-xs text-ink-faint">
+        thinking…
+      </div>
+    </div>
+  );
+}
+
+function Bubble({ message, streaming = false }: { message: ChatMessage; streaming?: boolean }) {
   const operator = message.role === "operator";
   return (
     <div className={`flex ${operator ? "justify-end" : "justify-start"}`}>
@@ -142,19 +429,40 @@ function Bubble({ message }: { message: ChatMessage }) {
         className={`max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed wrap-break-word ${
           operator
             ? "rounded-br-sm bg-primary-soft text-ink"
-            : "rounded-bl-sm border border-border bg-panel-strong text-ink-secondary"
+            : message.incomplete
+              ? "rounded-bl-sm border border-critical/50 bg-panel-strong text-ink-secondary"
+              : "rounded-bl-sm border border-border bg-panel-strong text-ink-secondary"
         }`}
       >
-        {message.text}
+        {/* The operator's own words stay literal — they typed them, so reinterpreting
+            `*` as emphasis would be this panel putting words in their mouth. Only the
+            model's side is Markdown, because only the model writes it. */}
+        {operator ? message.text : <MessageBody text={message.text} streaming={streaming} />}
+        {/* Never shown as a whole reply — the module's own `incomplete` flag, carried
+            straight through (`terminal-agent-chat` spec, "Odpowiedź niepełna MUST być
+            oznaczona jako niepełna, a nie pokazana jako całość"). */}
+        {!operator && message.incomplete && (
+          <div className="mt-1 text-[10px] font-semibold text-critical">⚠ incomplete — broke off</div>
+        )}
       </div>
     </div>
   );
 }
 
-function Composer({ onSend }: { onSend: (text: string) => void }) {
+function Composer({
+  onSend,
+  disabled,
+  children,
+}: {
+  onSend: (text: string) => void;
+  disabled: boolean;
+  /** Rendered between the box and the send row — the model picker, today. */
+  children?: ReactNode;
+}) {
   const [draft, setDraft] = useState("");
 
   function submit(): void {
+    if (disabled) return;
     onSend(draft);
     setDraft("");
   }
@@ -175,16 +483,18 @@ function Composer({ onSend }: { onSend: (text: string) => void }) {
         onChange={(event) => setDraft(event.target.value)}
         onKeyDown={onKeyDown}
         rows={2}
+        disabled={disabled}
         aria-label="Message the agent"
-        placeholder="Ask the agent…"
-        className="w-full resize-none rounded border border-primary-line bg-sunken px-2 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-primary focus:outline-none"
+        placeholder={disabled ? "Waiting for the reply…" : "Ask the agent…"}
+        className="w-full resize-none rounded border border-primary-line bg-sunken px-2 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
       />
+      {children}
       <div className="mt-2 flex items-center gap-2">
         <span className="text-[10px] text-ink-faint">Enter sends · Shift+Enter new line</span>
         <button
           type="button"
           onClick={submit}
-          disabled={draft.trim() === ""}
+          disabled={disabled || draft.trim() === ""}
           className="ml-auto cursor-pointer rounded border border-primary-line bg-primary-soft px-2 py-1 text-xs text-ink transition-colors hover:bg-primary-strong hover:text-ink-inverse disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-ink-faint"
         >
           Send

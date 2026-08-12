@@ -3,14 +3,16 @@
     Everything the terminal needs, in the order it needs it.
 
 .DESCRIPTION
-    migrations -> capital-gateway -> market-data -> market-mcp -> terminal
+    migrations -> capital-gateway -> market-data -> market-mcp -> agent -> terminal
 
     The order is not tidiness. market-data opens a subscription per tracked pair
     as it starts, so a gateway that is not listening yet costs it a round of
     backoff; market-mcp is a consumer of market-data's own contract, same as the
-    terminal, so it starts after; and the terminal's charts read the archive, so
-    starting it first fills the console with proxy errors that mean nothing. Each
-    step waits for the one before it to answer, not merely to have been launched.
+    terminal, so it starts after; the terminal's charts read the archive, so
+    starting it first fills the console with proxy errors that mean nothing; and
+    the agent has nothing that depends on it, so it goes last among the back ends.
+    Each step waits for the one before it to answer, not merely to have been
+    launched.
 
     market-mcp needs no .env of its own here: every setting it reads has a
     working default for loopback (config.py), unlike the gateway and the archive,
@@ -20,6 +22,12 @@
     migrations (openspec/changes/local-dev-database-in-docker). The services run
     here on the host, where they reload on save and can be attached to;
     `docker compose down` stops the database and keeps the data.
+
+    `agent`'s own database is a second logical database in that same container,
+    created here if missing rather than through docker-entrypoint-initdb.d — that
+    only runs on a volume's first boot, so it would never fire for anyone who
+    already has tradingcenter-db-data from before this module existed
+    (design.md, "Baza: druga baza logiczna, jeden serwer").
 
     Neither module depends on this script: each still starts on its own with the
     command in its README. `scripts/dev.sh` is the macOS and Linux counterpart.
@@ -48,16 +56,19 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $gatewayDir = Join-Path $repoRoot "modules\capital-gateway"
 $archiveDir = Join-Path $repoRoot "modules\market-data"
 $mcpDir = Join-Path $repoRoot "modules\market-mcp"
+$agentDir = Join-Path $repoRoot "modules\agent"
 $terminalDir = Join-Path $repoRoot "modules\terminal"
 
 $gatewayPort = 8010
 $archivePort = 8020
+$agentPort = 8030
 $mcpPort = 8040
 $terminalPort = 5173
 # 127.0.0.1, not "localhost": uvicorn binds IPv4 loopback, while "localhost" can
 # resolve to ::1 first on Windows.
 $gatewayUrl = "http://127.0.0.1:$gatewayPort"
 $archiveUrl = "http://127.0.0.1:$archivePort"
+$agentUrl = "http://127.0.0.1:$agentPort"
 $mcpUrl = "http://127.0.0.1:$mcpPort"
 $terminalUrl = "http://localhost:$terminalPort"
 
@@ -97,6 +108,10 @@ $archiveEnv = Join-Path $archiveDir ".env"
 if (-not (Test-Path $archiveEnv)) {
     $problems += "$archiveEnv is missing - copy .env.example; the defaults match compose.yaml"
 }
+$agentEnv = Join-Path $agentDir ".env"
+if (-not (Test-Path $agentEnv)) {
+    $problems += "$agentEnv is missing - copy .env.example and fill in OPENAI_API_KEY"
+}
 
 if (-not $NoTerminal) {
     if (Get-Command pnpm -ErrorAction SilentlyContinue) {
@@ -130,7 +145,7 @@ function Get-PortOwner {
     return "$($proc.ProcessName) (pid $($proc.Id))"
 }
 
-$ports = @($gatewayPort, $archivePort, $mcpPort)
+$ports = @($gatewayPort, $archivePort, $mcpPort, $agentPort)
 if (-not $NoTerminal) { $ports += $terminalPort }
 foreach ($port in $ports) {
     $owner = Get-PortOwner -Port $port
@@ -143,15 +158,19 @@ foreach ($port in $ports) {
 # refuses the same thing at startup (no DATABASE_USER means loopback only); repeating
 # the check here just refuses earlier, before anything has been launched, with the
 # file to fix named. Reads the host between the optional `user:pass@` and the port.
-if (Test-Path $archiveEnv) {
-    $urlLine = Select-String -Path $archiveEnv -Pattern '^DATABASE_URL=' | Select-Object -First 1
+function Test-LocalDatabaseHost {
+    param([string]$EnvPath, [string]$Label)
+    if (-not (Test-Path $EnvPath)) { return }
+    $urlLine = Select-String -Path $EnvPath -Pattern '^DATABASE_URL=' | Select-Object -First 1
     if ($null -ne $urlLine -and $urlLine.Line -match '^DATABASE_URL=[a-z+]+://(?:[^@/]+@)?(?<dbhost>[^:/?]+)') {
         $dbHost = $Matches['dbhost']
         if ($dbHost -ne "localhost" -and $dbHost -notlike "127.*" -and $dbHost -ne "::1") {
-            $problems += "modules\market-data\.env's DATABASE_URL points at '$dbHost' - local runs use the compose.yaml container (localhost), never a remote database"
+            $script:problems += "$Label's DATABASE_URL points at '$dbHost' - local runs use the compose.yaml container (localhost), never a remote database"
         }
     }
 }
+Test-LocalDatabaseHost -EnvPath $archiveEnv -Label "modules\market-data\.env"
+Test-LocalDatabaseHost -EnvPath $agentEnv -Label "modules\agent\.env"
 
 if ($problems.Count -gt 0) {
     Write-Host "Cannot start:" -ForegroundColor Red
@@ -162,6 +181,7 @@ if ($problems.Count -gt 0) {
 $gatewayJob = $null
 $archiveJob = $null
 $mcpJob = $null
+$agentJob = $null
 $terminalJob = $null
 
 function Write-Prefixed {
@@ -217,6 +237,42 @@ try {
     }
     Write-Host "Database is up." -ForegroundColor Green
 
+    # --- the agent's own database ---
+    #
+    # A second logical database in the same container, not a second container - the
+    # free grant is one Postgres server and this mirrors it (design.md, "Baza: druga
+    # baza logiczna, jeden serwer"). Checked and created here rather than through
+    # docker-entrypoint-initdb.d, which only ever runs against an empty volume: anyone
+    # with a tradingcenter-db-data from before this module existed would never see it
+    # fire.
+    Write-Host "Ensuring the agent database exists..." -ForegroundColor Cyan
+    Push-Location $repoRoot
+    try {
+        # "$(...)" and not (...).Trim(): psql -tAc prints nothing at all when the row is
+        # absent, PowerShell binds that to $null, and $null.Trim() throws "You cannot
+        # call a method on a null-valued expression" - in exactly the case this block
+        # exists to handle. The subexpression makes an absent row an empty string.
+        $roleExists = "$(docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'agent'")".Trim()
+        if ($roleExists -ne "1") {
+            docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 -c "CREATE ROLE agent LOGIN PASSWORD 'change-me';"
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "could not create the 'agent' role." -ForegroundColor Red
+                exit 1
+            }
+        }
+        $dbExists = "$(docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_database WHERE datname = 'agent'")".Trim()
+        if ($dbExists -ne "1") {
+            docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 -c "CREATE DATABASE agent OWNER agent;"
+            if ($LASTEXITCODE -ne 0) {
+                Write-Host "could not create the 'agent' database." -ForegroundColor Red
+                exit 1
+            }
+        }
+    } finally {
+        Pop-Location
+    }
+    Write-Host "agent database is ready." -ForegroundColor Green
+
     # --- migrations ---
 
     # Applied every run, not only on a fresh one: a checkout that has just pulled
@@ -228,6 +284,16 @@ try {
         uv run alembic upgrade head
         if ($LASTEXITCODE -ne 0) {
             Write-Host "migrations failed - the archive would fail on its first query, so stopping here." -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+    Push-Location $agentDir
+    try {
+        uv run alembic upgrade head
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "agent's migrations failed - it would fail on its first query, so stopping here." -ForegroundColor Red
             exit 1
         }
     } finally {
@@ -274,12 +340,10 @@ try {
 
     # --- market-mcp ---
     #
-    # After market-data, whose contract it reads; before the terminal, which does
-    # not call it directly but starts last regardless so its proxy has everything
-    # behind it up already. No `--reload`: unlike the other two services this one
-    # is not started through uvicorn's own CLI (server.py's caller-identity
-    # wrapper needs the ASGI app built in Python first), so a code change here
-    # needs a manual restart for now.
+    # After market-data, whose contract it reads. No `--reload`: unlike the other
+    # services this one is not started through uvicorn's own CLI (server.py's
+    # caller-identity wrapper needs the ASGI app built in Python first), so a code
+    # change here needs a manual restart for now.
 
     Write-Host "Starting market-mcp on port $mcpPort..." -ForegroundColor Cyan
     $mcpJob = Start-Job -Name "mcp" -ScriptBlock {
@@ -289,11 +353,31 @@ try {
     } -ArgumentList $mcpDir
 
     if (-not (Wait-ForHttp -Url "$mcpUrl/health" -Label "market-mcp" `
-                -Job $mcpJob -Prefix "mcp     " -Color Yellow)) {
+                -Job $mcpJob -Prefix "mcp     " -Color Green)) {
         Write-Prefixed -Prefix "mcp     " -Color Yellow -Lines (Receive-Job $mcpJob)
         exit 1
     }
     Write-Host "market-mcp is answering." -ForegroundColor Green
+
+    # --- agent ---
+    #
+    # Last among the back ends: nothing else calls it, so nothing else waits on it -
+    # unlike the gateway, which market-data subscribes to as it starts. It does not
+    # call market-mcp either; that edge does not exist yet.
+
+    Write-Host "Starting agent on port $agentPort..." -ForegroundColor Cyan
+    $agentJob = Start-Job -Name "agent" -ScriptBlock {
+        param($dir, $port)
+        Set-Location $dir
+        uv run uvicorn agent.app:app --reload --port $port 2>&1
+    } -ArgumentList $agentDir, $agentPort
+
+    if (-not (Wait-ForHttp -Url "$agentUrl/health" -Label "agent" `
+                -Job $agentJob -Prefix "agent   " -Color Yellow)) {
+        Write-Prefixed -Prefix "agent   " -Color Yellow -Lines (Receive-Job $agentJob)
+        exit 1
+    }
+    Write-Host "agent is answering." -ForegroundColor Green
 
     # --- the terminal ---
 
@@ -319,6 +403,7 @@ try {
     Write-Host "  market-data docs    $archiveUrl/docs"
     Write-Host "  Gateway docs        $gatewayUrl/docs"
     Write-Host "  market-mcp health   $mcpUrl/health"
+    Write-Host "  agent docs          $agentUrl/docs"
     Write-Host "  Database            market_data @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
     Write-Host ""
     Write-Host "Nothing is archived until a pair is added in the Archive panel - that is deliberate." -ForegroundColor DarkGray
@@ -328,7 +413,8 @@ try {
     $watched = @(
         @{ Job = $gatewayJob; Label = "capital-gateway"; Prefix = "gateway "; Color = "Blue" },
         @{ Job = $archiveJob; Label = "market-data"; Prefix = "archive "; Color = "Magenta" },
-        @{ Job = $mcpJob; Label = "market-mcp"; Prefix = "mcp     "; Color = "Yellow" }
+        @{ Job = $mcpJob; Label = "market-mcp"; Prefix = "mcp     "; Color = "Green" },
+        @{ Job = $agentJob; Label = "agent"; Prefix = "agent   "; Color = "Yellow" }
     )
     if (-not $NoTerminal) {
         $watched += @{ Job = $terminalJob; Label = "terminal"; Prefix = "terminal"; Color = "Cyan" }
@@ -350,7 +436,7 @@ try {
 finally {
     Write-Host ""
     Write-Host "Stopping..." -ForegroundColor Cyan
-    foreach ($job in @($gatewayJob, $archiveJob, $mcpJob, $terminalJob)) {
+    foreach ($job in @($gatewayJob, $archiveJob, $mcpJob, $agentJob, $terminalJob)) {
         if ($null -ne $job) {
             Stop-Job $job -ErrorAction SilentlyContinue | Out-Null
             Remove-Job $job -Force -ErrorAction SilentlyContinue | Out-Null
@@ -359,7 +445,7 @@ finally {
     # Start-Job's child process tree (uv -> uvicorn, pnpm -> vite) can outlive the
     # job object itself, which is what actually leaves a process squatting on the
     # port - so processes bound to the ports we used are swept explicitly too.
-    $sweep = @($gatewayPort, $archivePort, $mcpPort)
+    $sweep = @($gatewayPort, $archivePort, $mcpPort, $agentPort)
     if (-not $NoTerminal) { $sweep += $terminalPort }
     foreach ($port in $sweep) {
         Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
