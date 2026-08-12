@@ -433,8 +433,8 @@ resource "azurerm_linux_web_app" "agent" {
         model              = m.model
         display_name       = m.display_name
         cost_rank          = m.cost_rank
-        input_rate_per_1k  = m.input_rate_per_1k
-        output_rate_per_1k = m.output_rate_per_1k
+        input_rate_per_1m  = m.input_rate_per_1m
+        output_rate_per_1m = m.output_rate_per_1m
       }
     ])
     # The cheapest entry — same choice `.env.example` documents, and design.md's own

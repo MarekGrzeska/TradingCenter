@@ -132,8 +132,8 @@ async def test_usage_cost_is_computed_from_the_rates_given(db) -> None:
         output_tokens=500,
         cached_tokens=None,
         reasoning_tokens=None,
-        input_rate_per_1k=Decimal("0.001"),
-        output_rate_per_1k=Decimal("0.006"),
+        input_rate_per_1m=Decimal(1),
+        output_rate_per_1m=Decimal(6),
     )
     assert usage.cost == Decimal("0.001") + Decimal("0.003")
 
@@ -159,8 +159,8 @@ async def test_usage_with_unknown_tokens_has_no_cost(db) -> None:
         output_tokens=None,
         cached_tokens=None,
         reasoning_tokens=None,
-        input_rate_per_1k=Decimal("0.001"),
-        output_rate_per_1k=Decimal("0.006"),
+        input_rate_per_1m=Decimal(1),
+        output_rate_per_1m=Decimal(6),
     )
     assert usage.cost is None
     assert usage.input_tokens is None

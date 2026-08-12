@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, useSyncExternalStore, type KeyboardEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type KeyboardEvent,
+  type ReactNode,
+} from "react";
 
 import { agentChatStore, type AgentChatState, type AgentChatStore, type ChatMessage } from "./agentChatStore";
 
@@ -89,8 +96,6 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
         </button>
       </header>
 
-      <ModelPicker state={state} onChange={(modelId) => store.setModel(modelId)} />
-
       {view === "conversations" ? (
         <ConversationList
           state={state}
@@ -102,7 +107,14 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
       ) : (
         <>
           <Transcript messages={state.messages} turn={state.turn} />
-          <Composer onSend={(text) => store.send(text)} disabled={turnInFlight} />
+          {/* The picker sits under the box it applies to, not in the header: which model
+              answers is a decision made while writing the question, so it belongs beside
+              the writing rather than at the far end of the panel. It rides inside the
+              composer for that reason and is out of sight in the conversations view,
+              where there is nothing to send. */}
+          <Composer onSend={(text) => store.send(text)} disabled={turnInFlight}>
+            <ModelPicker state={state} onChange={(modelId) => store.setModel(modelId)} />
+          </Composer>
         </>
       )}
     </aside>
@@ -160,14 +172,14 @@ function ModelPicker({
 }) {
   if (state.modelsStatus === "unreachable") {
     return (
-      <p className="border-b border-primary-line bg-panel px-3 py-2 text-xs text-critical">
+      <p className="mt-2 text-xs text-critical">
         model picker unavailable — the catalogue could not be read
       </p>
     );
   }
 
   return (
-    <div className="flex items-center gap-2 border-b border-primary-line bg-panel px-3 py-2">
+    <div className="mt-2 flex items-center gap-2">
       <label htmlFor="agent-model" className="text-[11px] text-ink-muted">
         Model
       </label>
@@ -181,7 +193,7 @@ function ModelPicker({
         {state.modelsStatus === "loading" && <option value="">Loading models…</option>}
         {state.models.map((model) => (
           <option key={model.id} value={model.id}>
-            {model.displayName} — ${model.inputRatePer1k} in / ${model.outputRatePer1k} out per 1K
+            {model.displayName} — ${model.inputRatePer1M} in / ${model.outputRatePer1M} out per 1M
           </option>
         ))}
       </select>
@@ -325,9 +337,12 @@ function Bubble({ message }: { message: ChatMessage }) {
 function Composer({
   onSend,
   disabled,
+  children,
 }: {
   onSend: (text: string) => void;
   disabled: boolean;
+  /** Rendered between the box and the send row — the model picker, today. */
+  children?: ReactNode;
 }) {
   const [draft, setDraft] = useState("");
 
@@ -358,6 +373,7 @@ function Composer({
         placeholder={disabled ? "Waiting for the reply…" : "Ask the agent…"}
         className="w-full resize-none rounded border border-primary-line bg-sunken px-2 py-1.5 text-xs text-ink placeholder:text-ink-faint focus:border-primary focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
       />
+      {children}
       <div className="mt-2 flex items-center gap-2">
         <span className="text-[10px] text-ink-faint">Enter sends · Shift+Enter new line</span>
         <button

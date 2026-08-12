@@ -24,8 +24,8 @@ export interface AgentModel {
   id: string;
   displayName: string;
   costRank: number;
-  inputRatePer1k: string;
-  outputRatePer1k: string;
+  inputRatePer1M: string;
+  outputRatePer1M: string;
 }
 
 export type ChatRole = "operator" | "agent";
@@ -91,8 +91,8 @@ interface RawModel {
   id: string;
   display_name: string;
   cost_rank: number;
-  input_rate_per_1k: string;
-  output_rate_per_1k: string;
+  input_rate_per_1m: string;
+  output_rate_per_1m: string;
 }
 
 interface RawSession {
@@ -133,8 +133,8 @@ function mapModel(raw: RawModel): AgentModel {
     id: raw.id,
     displayName: raw.display_name,
     costRank: raw.cost_rank,
-    inputRatePer1k: raw.input_rate_per_1k,
-    outputRatePer1k: raw.output_rate_per_1k,
+    inputRatePer1M: raw.input_rate_per_1m,
+    outputRatePer1M: raw.output_rate_per_1m,
   };
 }
 

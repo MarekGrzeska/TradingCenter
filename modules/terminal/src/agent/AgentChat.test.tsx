@@ -8,8 +8,8 @@ import type { AgentApi, AgentMessage, AgentModel, AgentSession } from "./agentAp
 import type { AgentStreamEvent } from "./stream";
 
 const MODELS: AgentModel[] = [
-  { id: "luna", displayName: "Luna", costRank: 1, inputRatePer1k: "0.0002", outputRatePer1k: "0.0012" },
-  { id: "sol", displayName: "Sol", costRank: 3, inputRatePer1k: "0.005", outputRatePer1k: "0.03" },
+  { id: "luna", displayName: "Luna", costRank: 1, inputRatePer1M: "0.2", outputRatePer1M: "1.2" },
+  { id: "sol", displayName: "Sol", costRank: 3, inputRatePer1M: "5", outputRatePer1M: "30" },
 ];
 
 async function* fromArray(events: AgentStreamEvent[]): AsyncGenerator<AgentStreamEvent> {
@@ -195,8 +195,10 @@ describe("AgentChat", () => {
     await user.click(screen.getByRole("button", { name: /open agent chat/i }));
 
     const select = await screen.findByLabelText("Model");
-    expect(screen.getByRole("option", { name: /luna.*0\.0002.*0\.0012/i })).toBeInTheDocument();
-    expect(screen.getByRole("option", { name: /sol.*0\.005.*0\.03/i })).toBeInTheDocument();
+    // The rates the module published, rendered as they arrived: per million, which is
+    // what `agent/contract.py` now sends, and never rescaled here.
+    expect(screen.getByRole("option", { name: /luna.*0\.2.*1\.2.*per 1M/i })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /sol.*5.*30.*per 1M/i })).toBeInTheDocument();
 
     await user.selectOptions(select, "sol");
     expect(select).toHaveValue("sol");

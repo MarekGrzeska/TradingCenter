@@ -126,10 +126,11 @@ def upgrade() -> None:
         sa.Column("reasoning_tokens", sa.Integer(), nullable=True),
         # The rate this row was priced at, snapshotted from the catalogue at write time —
         # never re-read from current configuration (specs/agent-usage, "Koszt jest
-        # przypisany do wiersza w chwili zapisu"). Precise enough for Luna's
-        # fractions-of-a-cent-per-1k rate without float's rounding.
-        sa.Column("input_rate_per_1k", sa.Numeric(18, 8), nullable=False),
-        sa.Column("output_rate_per_1k", sa.Numeric(18, 8), nullable=False),
+        # przypisany do wiersza w chwili zapisu"). Per 1,000,000 tokens, the unit the
+        # catalogue is configured in — 8 decimal places is far more than any per-million
+        # rate needs, and keeps the cost column below exact without float's rounding.
+        sa.Column("input_rate_per_1m", sa.Numeric(18, 8), nullable=False),
+        sa.Column("output_rate_per_1m", sa.Numeric(18, 8), nullable=False),
         # NULL exactly when the tokens it would be computed from are — a cost cannot be
         # invented for usage the provider never reported.
         sa.Column("cost", sa.Numeric(18, 8), nullable=True),
@@ -149,8 +150,8 @@ def upgrade() -> None:
         sa.CheckConstraint(
             "reasoning_tokens IS NULL OR reasoning_tokens >= 0", name="usage_reasoning_tokens_nonneg"
         ),
-        sa.CheckConstraint("input_rate_per_1k > 0", name="usage_input_rate_positive"),
-        sa.CheckConstraint("output_rate_per_1k > 0", name="usage_output_rate_positive"),
+        sa.CheckConstraint("input_rate_per_1m > 0", name="usage_input_rate_positive"),
+        sa.CheckConstraint("output_rate_per_1m > 0", name="usage_output_rate_positive"),
         sa.CheckConstraint("cost IS NULL OR cost >= 0", name="usage_cost_nonneg"),
         # Cost is derived from tokens; a row cannot carry one without the other, or a
         # later reader cannot tell whether a cost came from real usage or was guessed.

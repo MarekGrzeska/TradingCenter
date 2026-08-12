@@ -11,8 +11,8 @@ ONE_MODEL = [
         "model": "luna-prod",
         "display_name": "Luna",
         "cost_rank": 1,
-        "input_rate_per_1k": "0.001",
-        "output_rate_per_1k": "0.006",
+        "input_rate_per_1m": "1",
+        "output_rate_per_1m": "6",
     }
 ]
 
@@ -128,12 +128,12 @@ def test_default_model_outside_the_catalogue_refuses_to_start() -> None:
 def test_a_model_without_a_rate_fails_to_parse() -> None:
     # specs/agent-models, "Model spoza katalogu jest odmową, nie podmianą" — a rate
     # missing entirely must not read as free.
-    broken = [{k: v for k, v in ONE_MODEL[0].items() if k != "input_rate_per_1k"}]
+    broken = [{k: v for k, v in ONE_MODEL[0].items() if k != "input_rate_per_1m"}]
     with pytest.raises(ValidationError):
         settings(models=broken)
 
 
-@pytest.mark.parametrize("field", ["input_rate_per_1k", "output_rate_per_1k"])
+@pytest.mark.parametrize("field", ["input_rate_per_1m", "output_rate_per_1m"])
 def test_a_non_positive_rate_refuses_to_start(field: str) -> None:
     broken = [{**ONE_MODEL[0], field: "0"}]
     with pytest.raises(ValidationError) as err:

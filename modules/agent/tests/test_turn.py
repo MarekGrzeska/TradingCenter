@@ -16,8 +16,8 @@ LUNA = ModelCatalogueEntry(
     model="luna-prod",
     display_name="Luna",
     cost_rank=1,
-    input_rate_per_1k=Decimal("0.001"),
-    output_rate_per_1k=Decimal("0.006"),
+    input_rate_per_1m=Decimal(1),
+    output_rate_per_1m=Decimal(6),
 )
 
 

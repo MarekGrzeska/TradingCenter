@@ -14,7 +14,7 @@ _ENV = {
     "OPENAI_API_KEY": "key",
     "MODELS": (
         '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
-        '"cost_rank":1,"input_rate_per_1k":"0.001","output_rate_per_1k":"0.006"}]'
+        '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
     "DEFAULT_MODEL_ID": "gpt-5.6-luna",
 }

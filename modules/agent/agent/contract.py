@@ -18,11 +18,13 @@ class ModelOut(BaseModel):
     id: str
     display_name: str
     cost_rank: int
-    # Strings, not numbers: a rate like 0.0002 round-trips exactly as text, and nothing
+    # Per 1,000,000 tokens, the unit providers quote — published in the same unit it is
+    # configured in, so the terminal renders the string as it arrives and never rescales
+    # it. Strings, not numbers: a rate like 0.2 round-trips exactly as text, and nothing
     # here ever sums these on the wire — the terminal reads them to render, never to
     # compute (design.md, "terminal niczego nie przelicza").
-    input_rate_per_1k: str
-    output_rate_per_1k: str
+    input_rate_per_1m: str
+    output_rate_per_1m: str
 
     @classmethod
     def from_entry(cls, entry: ModelCatalogueEntry) -> ModelOut:
@@ -30,8 +32,8 @@ class ModelOut(BaseModel):
             id=entry.id,
             display_name=entry.display_name,
             cost_rank=entry.cost_rank,
-            input_rate_per_1k=str(entry.input_rate_per_1k),
-            output_rate_per_1k=str(entry.output_rate_per_1k),
+            input_rate_per_1m=str(entry.input_rate_per_1m),
+            output_rate_per_1m=str(entry.output_rate_per_1m),
         )
 
 

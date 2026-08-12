@@ -24,8 +24,8 @@ describe("agentApi.listModels", () => {
             id: "gpt-5.6-luna",
             display_name: "Luna",
             cost_rank: 1,
-            input_rate_per_1k: "0.0002",
-            output_rate_per_1k: "0.0012",
+            input_rate_per_1m: "0.2",
+            output_rate_per_1m: "1.2",
           },
         ]),
       ),
@@ -37,8 +37,8 @@ describe("agentApi.listModels", () => {
         id: "gpt-5.6-luna",
         displayName: "Luna",
         costRank: 1,
-        inputRatePer1k: "0.0002",
-        outputRatePer1k: "0.0012",
+        inputRatePer1M: "0.2",
+        outputRatePer1M: "1.2",
       },
     ]);
   });

@@ -12,16 +12,16 @@ LUNA = ModelCatalogueEntry(
     model="luna-prod",
     display_name="Luna",
     cost_rank=1,
-    input_rate_per_1k=Decimal("0.0002"),
-    output_rate_per_1k=Decimal("0.0012"),
+    input_rate_per_1m=Decimal("0.2"),
+    output_rate_per_1m=Decimal("1.2"),
 )
 SOL = ModelCatalogueEntry(
     id="gpt-5.6-sol",
     model="sol-prod",
     display_name="Sol",
     cost_rank=3,
-    input_rate_per_1k=Decimal("0.005"),
-    output_rate_per_1k=Decimal("0.03"),
+    input_rate_per_1m=Decimal(5),
+    output_rate_per_1m=Decimal(30),
 )
 
 

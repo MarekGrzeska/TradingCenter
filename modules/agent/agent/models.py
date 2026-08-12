@@ -50,8 +50,8 @@ class Usage(BaseModel):
     output_tokens: int | None
     cached_tokens: int | None
     reasoning_tokens: int | None
-    input_rate_per_1k: Decimal
-    output_rate_per_1k: Decimal
+    input_rate_per_1m: Decimal
+    output_rate_per_1m: Decimal
     cost: Decimal | None
     created_at: datetime
 

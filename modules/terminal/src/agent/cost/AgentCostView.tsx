@@ -10,7 +10,7 @@ import { todayInWarsaw } from "../../ui/formatTime";
  * Azure invoice does (`terminal-agent-cost` spec's Purpose). Every number here is the
  * module's own — `GET /usage`'s aggregates, read and shown, never summed or converted
  * on this side (spec, "Terminal MUST NOT liczyć kosztu z tokenów i cennika po swojej
- * stronie"): `cost`/`*RatePer1k` stay strings the whole way from `agent/contract.py`
+ * stronie"): `cost`/`*RatePer1M` stay strings the whole way from `agent/contract.py`
  * to the `$` prefix below, so there is no arithmetic here to get wrong.
  */
 export function AgentCostView({

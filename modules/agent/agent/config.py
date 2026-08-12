@@ -32,10 +32,11 @@ _TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 class ModelCatalogueEntry(BaseModel):
     """One model this module can hand a turn to.
 
-    Rates are per 1000 tokens, `Decimal` rather than `float`: a turn costs a fraction of
-    a cent, and summing thousands of `float`s loses the pennies the usage ledger exists
-    to get right (design.md, "Cennik jest konfiguracją, stawka jest przepisywana na
-    wiersz").
+    Rates are per 1,000,000 tokens — the unit every provider advertises, so a rate copied
+    from a pricing page needs no arithmetic on the way in and none on the way out to the
+    operator. `Decimal` rather than `float`: a turn costs a fraction of a cent, and
+    summing thousands of `float`s loses the pennies the usage ledger exists to get right
+    (design.md, "Cennik jest konfiguracją, stawka jest przepisywana na wiersz").
 
     Required, not defaulted — a model entry without a rate must fail to *parse*, which
     is what keeps the module from starting rather than starting and pricing a turn as
@@ -52,8 +53,8 @@ class ModelCatalogueEntry(BaseModel):
     # an env-supplied JSON string is easy to get wrong silently; a wybierak sorts by
     # this and a config typo in the order shows up as a wrong number, not a swapped row.
     cost_rank: int
-    input_rate_per_1k: Decimal
-    output_rate_per_1k: Decimal
+    input_rate_per_1m: Decimal
+    output_rate_per_1m: Decimal
 
     @field_validator("id", "model", "display_name")
     @classmethod
@@ -62,7 +63,7 @@ class ModelCatalogueEntry(BaseModel):
             raise ValueError(f"model catalogue entry {info.field_name!s} must not be blank")
         return value.strip()
 
-    @field_validator("input_rate_per_1k", "output_rate_per_1k")
+    @field_validator("input_rate_per_1m", "output_rate_per_1m")
     @classmethod
     def _rate_is_positive(cls, value: Decimal, info: ValidationInfo) -> Decimal:
         if value <= 0:

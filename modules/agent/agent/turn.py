@@ -111,8 +111,8 @@ async def run_turn(
             output_tokens=usage.output_tokens if usage else None,
             cached_tokens=usage.cached_tokens if usage else None,
             reasoning_tokens=usage.reasoning_tokens if usage else None,
-            input_rate_per_1k=model_entry.input_rate_per_1k,
-            output_rate_per_1k=model_entry.output_rate_per_1k,
+            input_rate_per_1m=model_entry.input_rate_per_1m,
+            output_rate_per_1m=model_entry.output_rate_per_1m,
         )
 
     if failed:

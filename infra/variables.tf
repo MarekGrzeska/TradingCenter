@@ -55,7 +55,9 @@ variable "agent_models" {
     and a name from memory fails at the first turn, not at `apply`. Operator confirms
     against `GET https://api.openai.com/v1/models` before deploying.
 
-    Rates move faster than this module does (design.md, "Cennik jest konfiguracją") —
+    Rates are per 1,000,000 tokens, the unit OpenAI's pricing page quotes — copied across
+    without arithmetic in either direction, and published to the terminal in that same
+    unit. They move faster than this module does (design.md, "Cennik jest konfiguracją"):
     the defaults below are illustrative, read from public pricing in August 2026; check
     OpenAI's own pricing page before trusting them at deploy time, the same caution
     `modules/agent/.env.example` carries.
@@ -64,30 +66,30 @@ variable "agent_models" {
     model              = string
     display_name       = string
     cost_rank          = number
-    input_rate_per_1k  = string
-    output_rate_per_1k = string
+    input_rate_per_1m  = string
+    output_rate_per_1m = string
   }))
   default = {
     "gpt-5.6-luna" = {
       model              = "gpt-5.6-luna"
       display_name       = "Luna"
       cost_rank          = 1
-      input_rate_per_1k  = "0.0002"
-      output_rate_per_1k = "0.0012"
+      input_rate_per_1m  = "0.2"
+      output_rate_per_1m = "1.2"
     }
     "gpt-5.6-terra" = {
       model              = "gpt-5.6-terra"
       display_name       = "Terra"
       cost_rank          = 2
-      input_rate_per_1k  = "0.002"
-      output_rate_per_1k = "0.012"
+      input_rate_per_1m  = "2"
+      output_rate_per_1m = "12"
     }
     "gpt-5.6-sol" = {
       model              = "gpt-5.6-sol"
       display_name       = "Sol"
       cost_rank          = 3
-      input_rate_per_1k  = "0.005"
-      output_rate_per_1k = "0.03"
+      input_rate_per_1m  = "5"
+      output_rate_per_1m = "30"
     }
   }
 }

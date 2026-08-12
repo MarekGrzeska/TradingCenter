@@ -10,8 +10,8 @@ import type {
 import type { AgentStreamEvent } from "./stream";
 
 const MODELS: AgentModel[] = [
-  { id: "luna", displayName: "Luna", costRank: 1, inputRatePer1k: "0.0002", outputRatePer1k: "0.0012" },
-  { id: "sol", displayName: "Sol", costRank: 3, inputRatePer1k: "0.005", outputRatePer1k: "0.03" },
+  { id: "luna", displayName: "Luna", costRank: 1, inputRatePer1M: "0.2", outputRatePer1M: "1.2" },
+  { id: "sol", displayName: "Sol", costRank: 3, inputRatePer1M: "5", outputRatePer1M: "30" },
 ];
 
 async function* fromArray(events: AgentStreamEvent[]): AsyncGenerator<AgentStreamEvent> {

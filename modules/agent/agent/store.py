@@ -75,12 +75,12 @@ _INSERT_USAGE = """
     INSERT INTO usage (
         session_id, message_id, model_id,
         input_tokens, output_tokens, cached_tokens, reasoning_tokens,
-        input_rate_per_1k, output_rate_per_1k, cost
+        input_rate_per_1m, output_rate_per_1m, cost
     )
     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
     RETURNING id, session_id, message_id, model_id,
               input_tokens, output_tokens, cached_tokens, reasoning_tokens,
-              input_rate_per_1k, output_rate_per_1k, cost, created_at
+              input_rate_per_1m, output_rate_per_1m, cost, created_at
 """
 
 
@@ -182,15 +182,15 @@ async def record_usage(
     output_tokens: int | None,
     cached_tokens: int | None,
     reasoning_tokens: int | None,
-    input_rate_per_1k: Decimal,
-    output_rate_per_1k: Decimal,
+    input_rate_per_1m: Decimal,
+    output_rate_per_1m: Decimal,
 ) -> Usage:
     """The one place a cost is computed, and the only moment it ever is — never again at
     read time (specs/agent-usage, "Koszt jest przypisany do wiersza w chwili zapisu")."""
     cost = None
     if input_tokens is not None and output_tokens is not None:
-        cost = (Decimal(input_tokens) / 1000 * input_rate_per_1k) + (
-            Decimal(output_tokens) / 1000 * output_rate_per_1k
+        cost = (Decimal(input_tokens) / 1_000_000 * input_rate_per_1m) + (
+            Decimal(output_tokens) / 1_000_000 * output_rate_per_1m
         )
     row = await fetch_one(
         conn,
@@ -202,8 +202,8 @@ async def record_usage(
         output_tokens,
         cached_tokens,
         reasoning_tokens,
-        input_rate_per_1k,
-        output_rate_per_1k,
+        input_rate_per_1m,
+        output_rate_per_1m,
         cost,
     )
     return _usage_from_row(row)

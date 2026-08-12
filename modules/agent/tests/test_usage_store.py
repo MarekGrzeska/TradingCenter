@@ -17,8 +17,8 @@ async def _reply_with_usage(
     model_id: str = "gpt-5.6-luna",
     input_tokens: int | None,
     output_tokens: int | None,
-    input_rate: Decimal = Decimal("0.001"),
-    output_rate: Decimal = Decimal("0.006"),
+    input_rate: Decimal = Decimal(1),
+    output_rate: Decimal = Decimal(6),
 ):
     session = await store.create_session(conn, owner_principal=owner, model_id=model_id)
     await store.append_operator_message(conn, session_id=session.id, content="hi")
@@ -39,8 +39,8 @@ async def _reply_with_usage(
         output_tokens=output_tokens,
         cached_tokens=None,
         reasoning_tokens=None,
-        input_rate_per_1k=input_rate,
-        output_rate_per_1k=output_rate,
+        input_rate_per_1m=input_rate,
+        output_rate_per_1m=output_rate,
     )
     return session, usage
 
@@ -84,8 +84,8 @@ async def test_total_cost_matches_the_sum_of_known_rows(db) -> None:
         db,
         input_tokens=1000,
         output_tokens=500,
-        input_rate=Decimal("0.001"),
-        output_rate=Decimal("0.006"),
+        input_rate=Decimal(1),
+        output_rate=Decimal(6),
     )
     total = await store.usage_total_cost(db, owner_principal="op-1", since=None, until=None)
     assert total == Decimal("0.001") + Decimal("0.003")
@@ -126,10 +126,10 @@ async def test_a_later_rate_does_not_change_an_earlier_rows_cost(db) -> None:
     # mechanism itself: recording a second row on a different rate must not touch the
     # first.
     _, first = await _reply_with_usage(
-        db, input_tokens=1000, output_tokens=0, input_rate=Decimal("0.001"), output_rate=Decimal("0.006")
+        db, input_tokens=1000, output_tokens=0, input_rate=Decimal(1), output_rate=Decimal(6)
     )
     await _reply_with_usage(
-        db, input_tokens=1000, output_tokens=0, input_rate=Decimal("0.002"), output_rate=Decimal("0.012")
+        db, input_tokens=1000, output_tokens=0, input_rate=Decimal(2), output_rate=Decimal(12)
     )
     total = await store.usage_total_cost(db, owner_principal="op-1", since=None, until=None)
     assert first.cost == Decimal("0.001")
