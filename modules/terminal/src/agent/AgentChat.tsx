@@ -8,6 +8,7 @@ import {
 } from "react";
 
 import { agentChatStore, type AgentChatState, type AgentChatStore, type ChatMessage } from "./agentChatStore";
+import { MessageBody } from "./MessageBody";
 
 /**
  * Mounted once in `Shell`, as a sibling of the router outlet rather than inside it: the
@@ -391,7 +392,10 @@ function Transcript({
           odpowiedź powstaje"). */}
       {turn?.status === "waiting" && <ThinkingBubble />}
       {turn?.status === "streaming" && (
-        <Bubble message={{ id: "turn", role: "agent", text: turn.text, incomplete: false }} />
+        <Bubble
+          message={{ id: "turn", role: "agent", text: turn.text, incomplete: false }}
+          streaming
+        />
       )}
       {turn?.status === "unreachable" && (
         // Not a bubble: no agent reply happened, so nothing here impersonates one
@@ -415,7 +419,7 @@ function ThinkingBubble() {
   );
 }
 
-function Bubble({ message }: { message: ChatMessage }) {
+function Bubble({ message, streaming = false }: { message: ChatMessage; streaming?: boolean }) {
   const operator = message.role === "operator";
   return (
     <div className={`flex ${operator ? "justify-end" : "justify-start"}`}>
@@ -430,7 +434,10 @@ function Bubble({ message }: { message: ChatMessage }) {
               : "rounded-bl-sm border border-border bg-panel-strong text-ink-secondary"
         }`}
       >
-        {message.text}
+        {/* The operator's own words stay literal — they typed them, so reinterpreting
+            `*` as emphasis would be this panel putting words in their mouth. Only the
+            model's side is Markdown, because only the model writes it. */}
+        {operator ? message.text : <MessageBody text={message.text} streaming={streaming} />}
         {/* Never shown as a whole reply — the module's own `incomplete` flag, carried
             straight through (`terminal-agent-chat` spec, "Odpowiedź niepełna MUST być
             oznaczona jako niepełna, a nie pokazana jako całość"). */}

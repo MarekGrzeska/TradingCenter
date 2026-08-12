@@ -1,0 +1,235 @@
+<title>Markdown w odpowiedziach agenta — czym renderować strumień</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.7; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 62rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.7rem, 4.5vw, 2.4rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.2rem, 2.6vw, 1.5rem); letter-spacing: -0.01em; margin: 3.5rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.02rem; margin: 2rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.92rem; margin: 1.4rem 0 0.35rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.06rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 36rem; }
+  th, td { text-align: left; padding: 0.62rem 0.85rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.75rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .dim { color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.8rem; line-height: 1.55; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.72rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+
+  .worry { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.2rem 1.35rem; margin: 1.3rem 0; }
+  .worry .q { font-weight: 620; font-size: 1.02rem; margin: 0 0 0.1rem; }
+  .worry .verdict { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 0.6rem; }
+  .worry.solved .verdict { color: var(--good); }
+  .worry.real .verdict { color: var(--bad); }
+  .worry > :last-child { margin-bottom: 0; }
+
+  footer { margin-top: 4rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>Markdown w odpowiedziach agenta</h1>
+<p class="lede">Panel pokazywał gołe <code>**</code>, bo nic ich nie renderowało. Pytanie brzmiało: czym renderować, skoro odpowiedź przychodzi strumieniem i w połowie zdania nie jest poprawnym Markdownem.</p>
+<p class="meta">Stan na 2026-08-12 · dokument sprzed decyzji · decyzja zapadła i weszła tego samego dnia</p>
+
+<div class="callout good">
+  <span class="tag">Wynik</span>
+  <p><strong><code>react-markdown</code> + <code>remark-gfm</code> + <code>remend</code></strong>, parsowanie w trakcie strumienia. Bez <code>rehype-raw</code>, bez <code>streamdown</code>, bez <code>DOMPurify</code>.</p>
+  <p>Kluczem okazało się <code>remend</code> — wydzielona z <code>streamdown</code> logika domykania niedomkniętego Markdownu, dostępna jako osobny pakiet. Daje to, po co sięgało się po <code>streamdown</code>, bez jego ceny.</p>
+</div>
+
+<h2>1. Dwie niezależne przyczyny</h2>
+
+<p>Gwiazdki na ekranie miały dwa źródła, i warto było ruszyć oba.</p>
+
+<p>Pierwsze oczywiste: <code>modules/terminal</code> nie miał <em>żadnej</em> biblioteki Markdown, a dymek wypisywał <code>message.text</code> jako zwykły tekst.</p>
+
+<p>Drugie mniej: <code>agent/prompt.py</code> nie mówił modelowi <strong>ani słowa o formacie</strong>. Model pisze Markdownem, bo tak został wytrenowany — nie dlatego, że ktoś go o to poprosił. Sama biblioteka bez promptu daje tabele i LaTeX, których kolumna 460&nbsp;px nie narysuje sensownie, a ich obsługa to kolejne wtyczki.</p>
+
+<h2>2. Co naprawdę jest trudne przy strumieniu</h2>
+
+<p>Wpięcie renderera nie jest trudne — to jedna linia. Trudne są trzy rzeczy pod spodem, i tylko pierwsza z nich jest realnym problemem.</p>
+
+<div class="worry real">
+  <p class="q">Przejściowo zły wynik</p>
+  <p class="verdict">Realne — to jest cały problem</p>
+  <p>W połowie tokena tekst brzmi <code>Spread to **różnic</code>. CommonMark widzi niedomknięte <code>**</code> i renderuje je <strong>jako literalne gwiazdki</strong>, a token później całość przeskakuje w pogrubienie. To samo z <code>[tekst](htt</code>, z połową wiersza tabeli, z <code>~~</code>.</p>
+</div>
+
+<div class="worry solved">
+  <p class="q">Koszt re-parsowania</p>
+  <p class="verdict">Teoretyczne przy tej długości odpowiedzi</p>
+  <p>Pełny re-parse rosnącego napisu na każdy token to O(n²) znaków przez całą turę. Przy turze rzędu 700 tokenów wyjścia to kilkadziesiąt kilobajtów pracy rozłożone na kilkanaście sekund. Wzorzec memoizacji z cookbooka Vercela istnieje dla długich dokumentów, nie dla wypowiedzi w czacie. <strong>Nie optymalizowane z góry</strong> — do zmierzenia, jeśli kiedykolwiek zacznie zacinać.</p>
+</div>
+
+<div class="worry solved">
+  <p class="q">Churn DOM-u</p>
+  <p class="verdict">Drobne</p>
+  <p>Całe drzewo wiadomości rekonsyliuje się co token, więc zaznaczenie tekstu w trakcie strumienia potrafi się gubić. Zauważalne, ale nie na tyle, żeby zmieniać architekturę.</p>
+</div>
+
+<h2>3. Rozważane opcje</h2>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>Opcja</th><th>Jak działa</th><th>Za</th><th>Przeciw</th><th>Wynik</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Sam prompt</strong></td>
+      <td>„odpowiadaj zwykłym tekstem"</td>
+      <td>zero zależności</td>
+      <td>modele dryfują z powrotem do <code>**</code>; tracisz listy i bloki kodu, które akurat są czytelne</td>
+      <td><span class="pill bad">odrzucone</span></td>
+    </tr>
+    <tr>
+      <td><strong><code>react-markdown</code></strong></td>
+      <td>Markdown → elementy Reacta</td>
+      <td>brak drogi do XSS bez <code>rehype-raw</code>; każdy element dostaje własne klasy, więc wpina się w tokeny terminala</td>
+      <td>przy strumieniu migotanie niedomkniętych znaczników</td>
+      <td><span class="pill good">wybrane</span></td>
+    </tr>
+    <tr>
+      <td><strong><code>streamdown</code></strong></td>
+      <td>fork <code>react-markdown</code> pod strumień</td>
+      <td>domyka niedomknięte bloki, hartowanie <code>rehype-harden</code>, gotowe Shiki/KaTeX/Mermaid</td>
+      <td>wymaga zmiennych CSS shadcn/ui, których ten terminal nie ma — ma własne tokeny; plus dyrektywy <code>@source</code> w Tailwindzie; wnosi swój wygląd</td>
+      <td><span class="pill bad">odrzucone</span></td>
+    </tr>
+    <tr>
+      <td><strong><code>marked</code>/<code>markdown-it</code> + <code>DOMPurify</code></strong></td>
+      <td>Markdown → napis HTML</td>
+      <td>najmniejsze i najszybsze</td>
+      <td><code>dangerouslySetInnerHTML</code>; sanityzacja staje się odpowiedzialnością autora zamiast być własnością architektury</td>
+      <td><span class="pill bad">odrzucone</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>4. <code>remend</code> zmienił rekomendację</h2>
+
+<p>Pierwsza wersja tej rekomendacji brzmiała: <em>rysuj strumień gołym tekstem, parsuj dopiero po domknięciu wiadomości</em>. Panel ma już strukturę, która to umożliwia — <code>finishTurn()</code> przeładowuje kanoniczny transkrypt z modułu — a kosztem był jeden widoczny przeskok formatowania w chwili zakończenia odpowiedzi.</p>
+
+<p>Ta propozycja była dobra tak długo, jak alternatywą był <code>streamdown</code> z całą jego integracją. Przestała być, gdy okazało się, że Vercel <strong>wydzielił samą logikę domykania jako osobny pakiet <code>remend</code></strong>. To zwykła funkcja napis → napis:</p>
+
+<pre><code>"To jest **pogrubiony tekst"  →  "To jest **pogrubiony tekst**"</code></pre>
+
+<p>Domyka <code>**</code>, <code>*</code>, <code>`</code>, <code>~~</code>, linki, obrazki i bloki math. Jest świadoma kontekstu — nie tknie zawartości bloku kodu. Bez regexów.</p>
+
+<p>Czyli: <code>react-markdown</code> zostaje przy swoim mapowaniu na tokeny terminala, a domykanie dochodzi jako jedno wywołanie przed parserem. Nie ma przeskoku i nie ma cudzego wyglądu w panelu.</p>
+
+<h2>5. Trzy decyzje konfiguracyjne, każda z powodem</h2>
+
+<h3>Bez <code>rehype-raw</code></h3>
+
+<p>To jest cały argument bezpieczeństwa tego rozwiązania, i dlatego nie ma tu <code>rehype-sanitize</code>. Bez <code>rehype-raw</code> <code>react-markdown</code> buduje elementy Reacta i nigdy nie dotyka <code>dangerouslySetInnerHTML</code> — surowy HTML w odpowiedzi modelu <strong>nie jest sanityzowany, tylko w ogóle nie powstaje</strong>. Dociera jako zescapowany tekst: czytelny, bezwładny.</p>
+
+<div class="callout warn">
+  <span class="tag">Nie „naprawiać"</span>
+  <p>Dodanie <code>rehype-raw</code> „żeby wspierać HTML" unieważnia to rozumowanie w całości. Test <code>MessageBody.test.tsx</code> → <em>„does not render raw HTML from a model, at all"</em> istnieje po to, żeby taka zmiana miała czerwone światło, a nie żeby ją odkryć później.</p>
+</div>
+
+<h3><code>linkMode: "text-only"</code></h3>
+
+<p>Domyślnie <code>remend</code> parkuje niedomknięty link na zastępczym adresie <code>streamdown:incomplete-link</code>. Mignąłby klikalny nie-link. Sam tekst mówi to samo i nie prowadzi donikąd.</p>
+
+<h3><code>katex: false</code></h3>
+
+<p>W tym panelu nie ma matematyki, a <code>$</code> nie jest tu znakiem bez znaczenia — stawki i koszty pisze się <code>$0.2</code> w całym słowniku agenta. (<code>inlineKatex</code> jest wyłączone domyślnie z dokładnie tego powodu; to wyłącza też blok <code>$$</code>.)</p>
+
+<h2>6. Co zostało trudne mimo wszystko</h2>
+
+<ul>
+  <li><strong><code>remend</code> domyka na ślepo.</strong> Jeśli model napisze literalną gwiazdkę i na niej skończy token, dostaniesz chwilowe pogrubienie zamiast chwilowej gwiazdki. Zamiana jednego artefaktu na łagodniejszy — nie usunięcie problemu.</li>
+  <li><strong>Tabele w budowie</strong> to najgorszy przypadek i żaden domykacz tego nie rozwiąże: wiersz nagłówka bez wiersza separatora to nie tabela, tylko akapit z kreskami. Stąd zakaz tabel w prompcie, a nie tylko <code>overflow-x-auto</code> w rendererze.</li>
+  <li><strong>Bloki kodu</strong> akurat są w porządku bez pomocy: CommonMark domyka niedomknięty ogranicznik na końcu wejścia, więc <code>```</code> renderuje się jako blok od razu.</li>
+</ul>
+
+<h2>7. Co weszło</h2>
+
+<ul>
+  <li><code>modules/terminal/src/agent/MessageBody.tsx</code> — renderer, mapowanie na tokeny terminala, <code>SafeLink</code> odrzucający schematy inne niż <code>http(s)</code>, nagłówki spłaszczone do pogrubienia (dymek 460&nbsp;px nie niesie konspektu dokumentu), tabela we własnym scrollerze.</li>
+  <li>Wiadomości <strong>operatora zostają literalne</strong>. Napisał, co napisał; reinterpretowanie jego <code>*</code> jako emfazy byłoby wkładaniem mu słów w usta. Markdown dotyczy tylko strony modelu.</li>
+  <li><code>agent/prompt.py</code> — <code>PROMPT_VERSION</code> na <code>v2</code>, akapit nazywający wspierany podzbiór. Wiadomości sprzed zmiany zachowują <code>v1</code>, zgodnie z tym, po co ta wersja w ogóle istnieje.</li>
+</ul>
+
+<p>To <strong>nie była zmiana OpenSpec</strong>. Test z <code>CLAUDE.md</code> jest mechaniczny: wymień pliki, które praca ruszy. Ani <code>src/agent/*</code>, ani <code>prompt.py</code> nie należą do trzech kategorii (<code>openspec/specs/**</code>, kontrakt między modułami, <code>infra/**</code>). Zmieniłoby to dopiero zapisanie „odpowiedź MUST być pokazana z formatowaniem" jako wymagania w <code>terminal-agent-chat</code> — a to jest wygląd, nie zobowiązanie wobec konsumenta.</p>
+
+<h2>8. Źródła</h2>
+
+<ul>
+  <li><a href="https://www.npmjs.com/package/remend">remend — npm</a></li>
+  <li><a href="https://vercel.com/changelog/new-npm-package-for-automatic-recovery-of-broken-streaming-markdown">New npm package for automatic recovery of broken streaming markdown — Vercel changelog</a></li>
+  <li><a href="https://streamdown.ai/docs/termination">Streamdown — Unterminated Block Parsing</a></li>
+  <li><a href="https://github.com/vercel/streamdown">vercel/streamdown — GitHub</a></li>
+  <li><a href="https://strapi.io/blog/react-markdown-complete-guide-security-styling">Secure Markdown Rendering in React with React-Markdown — Strapi</a></li>
+  <li><a href="https://www.hackerone.com/blog/secure-markdown-rendering-react-balancing-flexibility-and-safety">Secure Markdown Rendering in React — HackerOne</a></li>
+  <li><a href="https://ai-sdk.dev/cookbook/next/markdown-chatbot-with-memoization">Markdown chatbot with memoization — Vercel AI SDK cookbook</a></li>
+</ul>
+
+<footer>
+  Dokument sprzed decyzji, zachowany w <code>docs/archive/</code> jako droga, nie stan. Stan opisuje kod:
+  <code>modules/terminal/src/agent/MessageBody.tsx</code> i jego testy.
+</footer>
+
+</main>
