@@ -82,19 +82,26 @@ implementacja tego nie potrzebuje.
 
 ## 5. Wdrożenie i uruchomienie
 
-- [ ] 5.1 `infra/app-service.tf` — client id tożsamości agenta w `allowed_applications`
+- [x] 5.1 `infra/app-service.tf` — client id tożsamości agenta w `allowed_applications`
   Easy Auth `market-mcp`, w miejsce zaślepki (`data.azuread_service_principal` po
   `principal_id`, ten sam wzór, którym market-mcp wchodzi do market-daty)
-- [ ] 5.2 `infra/app-service.tf` — `MARKET_MCP_URL` i `MARKET_MCP_SCOPE` w
+- [x] 5.2 `infra/app-service.tf` — `MARKET_MCP_URL` i `MARKET_MCP_SCOPE` w
   `app_settings` aplikacji agenta; `terraform validate` i `fmt`
-- [ ] 5.3 `scripts/dev.sh` i `dev.ps1` — agent dostaje `MARKET_MCP_URL` wskazujący na
+- [x] 5.3 `scripts/dev.sh` i `dev.ps1` — agent dostaje `MARKET_MCP_URL` wskazujący na
   lokalny serwer; kolejność startu bez zmian, ale czekanie na `/health` market-mcp
   przestaje być formalnością
-- [ ] 5.4 `CLAUDE.md`, `README.md`, `docs/architecture.md` — krawędź `agent → market-mcp`
+- [x] 5.4 `CLAUDE.md`, `README.md`, `docs/architecture.md` — krawędź `agent → market-mcp`
   na diagramie, „No tools yet" usunięte z trzech miejsc, kolejność apply u operatora
   zapisana tam, gdzie ktoś jej poszuka
-- [ ] 5.5 Przebieg całego stosu lokalnie: pytanie o cenę pary zbieranej, pytanie o parę
-  niezbieraną, pytanie wymagające wskaźnika, pytanie przy zatrzymanym market-mcp
+- [x] 5.5 Przebieg przeciw działającemu stosowi operatora (8010/8020/8030/8040): klient
+  agenta odkrył 10 narzędzi z prawdziwego `market-mcp`, wyciągnął zbierane pary
+  (SILVER i dalej), dostał notatkę „nobody is collecting it, not because the market was
+  quiet" dla symbolu spoza archiwum, odczytał katalog wskaźników i zwrócił
+  `unavailable` przy złym porcie. Bez wywołania modelu — pętla end-to-end z OpenAI
+  zostaje operatorowi, bo kosztuje. Po drodze złapany realny błąd: komunikat awarii
+  brzmiał „unhandled errors in a TaskGroup (1 sub-exception)", bo obie połówki
+  transportu chodzą w grupie zadań anyio — `_describe` rozwija grupę i model dostaje
+  „All connection attempts failed"
 
 ## 6. Domknięcie
 

@@ -150,6 +150,11 @@ async def test_an_unreachable_server_is_unavailable_not_a_refusal() -> None:
 
     assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
     assert "says nothing about the archive" in outcome.text
+    # Both halves of the transport run in an anyio task group, so the raw exception is
+    # "unhandled errors in a TaskGroup (1 sub-exception)" — a sentence naming nothing,
+    # which a live run handed to the model before `_describe` existed.
+    assert "TaskGroup" not in outcome.text
+    assert "connection" in outcome.text.lower()
 
 
 async def test_an_unreachable_server_publishes_no_tools_rather_than_failing() -> None:
@@ -205,3 +210,16 @@ async def test_no_configured_server_means_no_tools_and_no_calls() -> None:
 
     assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
     assert "no tool server is configured" in outcome.text
+
+
+def test_describe_unwraps_nested_task_groups() -> None:
+    from agent.tools.client import _describe
+
+    refused = ConnectionRefusedError("All connection attempts failed")
+    nested = BaseExceptionGroup("outer", [BaseExceptionGroup("inner", [refused, refused])])
+
+    described = _describe(nested)
+
+    assert described == "All connection attempts failed"
+    assert "TaskGroup" not in described
+    assert "ExceptionGroup" not in described

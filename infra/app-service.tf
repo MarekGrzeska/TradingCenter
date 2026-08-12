@@ -454,6 +454,14 @@ resource "azurerm_linux_web_app" "agent" {
     # Risk: "Domyślny model to najtańszy (Luna); najdroższy wybiera się świadomie."
     DEFAULT_MODEL_ID = "gpt-5.6-luna"
 
+    # The tool server, and the scope this app's managed identity asks Entra for a token
+    # to reach it with. Both or neither: `agent/config.py` refuses a remote URL with no
+    # scope at startup. Removing MARKET_MCP_URL is also the rollback for the whole tool
+    # loop — the module falls back to answering without tools, which is a path its own
+    # tests walk.
+    MARKET_MCP_URL   = "https://${local.market_mcp_hostname}"
+    MARKET_MCP_SCOPE = "${local.market_mcp_api_uri}/.default"
+
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.agent_easy_auth.value
 
     REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
@@ -514,6 +522,14 @@ output "market_data_managed_identity_principal_id" {
 output "agent_managed_identity_principal_id" {
   description = "The operator's manual Postgres role creation for `agent` needs this object id (design.md's Risk, \"Baza `agent` w produkcji zakładana ręcznie\")."
   value       = azurerm_linux_web_app.agent.identity[0].principal_id
+}
+
+# The agent's own client id — what market-mcp's `allowed_applications` (below) has to
+# name. Same reason market-mcp needs one of these to appear in market-data's list:
+# `azurerm_linux_web_app.identity` publishes `principal_id` and `tenant_id` only, and
+# the identity's `client_id` lives on the service principal found by that object id.
+data "azuread_service_principal" "agent_managed_identity" {
+  object_id = azurerm_linux_web_app.agent.identity[0].principal_id
 }
 
 # market-mcp: not public in the sense the terminal ever reaches it — its only intended
@@ -600,16 +616,15 @@ resource "azurerm_linux_web_app" "market_mcp" {
         azuread_application.market_mcp_easy_auth.client_id,
       ]
 
-      # No real caller exists yet: the client that will call this app is the agent
-      # module's MCP client, and that client is a different, not-yet-written OpenSpec
-      # change — the module itself landed with `add-agent-chat` and holds no tool loop
-      # (design.md, Non-Goals — "Klient MCP po stronie agenta ... to zmiana w
-      # modules/agent, po zamknięciu add-agent-chat"). This app's own client id is a
-      # safe placeholder rather than an empty list of uncertain meaning: an
-      # application's token never carries its own id as `appid` — an app does not
-      # call itself — so nothing real can pass this check until the agent's own infra
-      # change replaces this entry with its managed identity's client id.
-      allowed_applications = [azuread_application.market_mcp_easy_auth.client_id]
+      # The real caller, replacing the placeholder this app was created with: the
+      # agent's managed identity, presenting a client-credentials token for
+      # `market_mcp_api_uri`. Same lookup pattern market-mcp itself needs to appear in
+      # market-data's list — `identity[0]` exports the Entra object id, and the client
+      # id lives on the service principal behind it.
+      #
+      # There is deliberately no second entry. The terminal never reaches this app; a
+      # browser talks to the agent, and the agent talks here.
+      allowed_applications = [data.azuread_service_principal.agent_managed_identity.client_id]
     }
 
     login {

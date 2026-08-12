@@ -66,7 +66,8 @@ app = FastAPI(
         "The operator's conversation with a model. Sessions and their transcripts "
         "persist in this module's own database; each model call prices itself at the "
         "moment it is written, against the module's own rate configuration, never "
-        "recomputed later. No tools yet — a vertical slice the next changes build on."
+        "recomputed later. Read-only tools over the candle archive, reached through "
+        "market-mcp — nothing here writes anywhere."
     ),
     version="0.1.0",
     lifespan=lifespan,

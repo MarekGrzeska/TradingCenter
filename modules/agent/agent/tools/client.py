@@ -139,7 +139,7 @@ class ToolServer:
             session = await self._connected_session()
             result = await asyncio.wait_for(session.list_tools(), timeout=self._timeout)
         except Exception as err:  # noqa: BLE001 - every failure here means "no tools"
-            log.warning("could not read the tool list from %s: %s", self._url, err)
+            log.warning("could not read the tool list from %s: %s", self._url, _describe(err))
             await self._disconnect()
             return []
         self._tools = [
@@ -179,12 +179,12 @@ class ToolServer:
                 elapsed(),
             )
         except Exception as err:  # noqa: BLE001 - a broken session is not a broken turn
-            log.warning("tool call %s failed against %s: %s", name, self._url, err)
+            log.warning("tool call %s failed against %s: %s", name, self._url, _describe(err))
             await self._disconnect()
             return ToolOutcome(
                 ToolOutcomeKind.UNAVAILABLE,
-                f"the tool server could not be reached: {err}. The call was not made — "
-                "this says nothing about the archive's own data.",
+                f"the tool server could not be reached: {_describe(err)}. The call was not "
+                "made — this says nothing about the archive's own data.",
                 elapsed(),
             )
 
@@ -246,6 +246,25 @@ class ToolServer:
             await stack.aclose()
         except Exception as err:  # noqa: BLE001 - closing a broken stream often raises
             log.debug("closing the tool session raised on the way out: %s", err)
+
+
+def _describe(err: BaseException) -> str:
+    """The cause, not the wrapper.
+
+    Both the streamable-http transport and the MCP session run their halves in an anyio
+    task group, so a refused connection surfaces as `unhandled errors in a TaskGroup
+    (1 sub-exception)` — a sentence that names nothing. It reached a live run before it
+    reached this function, and the model would have been handed it verbatim. Groups
+    nest, so this recurses.
+    """
+    if isinstance(err, BaseExceptionGroup):
+        inner = [_describe(sub) for sub in err.exceptions]
+        # Deduplicated: a group of five identical connection refusals is one fact.
+        unique = list(dict.fromkeys(part for part in inner if part))
+        if unique:
+            return "; ".join(unique)
+    text = str(err).strip()
+    return text or type(err).__name__
 
 
 def _text_of(content: list[Any]) -> str:

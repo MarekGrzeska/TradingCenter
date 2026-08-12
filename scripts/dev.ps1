@@ -5,14 +5,15 @@
 .DESCRIPTION
     migrations -> capital-gateway -> market-data -> market-mcp -> agent -> terminal
 
-    The order is not tidiness. market-data opens a subscription per tracked pair
-    as it starts, so a gateway that is not listening yet costs it a round of
-    backoff; market-mcp is a consumer of market-data's own contract, same as the
-    terminal, so it starts after; the terminal's charts read the archive, so
-    starting it first fills the console with proxy errors that mean nothing; and
-    the agent has nothing that depends on it, so it goes last among the back ends.
-    Each step waits for the one before it to answer, not merely to have been
-    launched.
+    The order is not tidiness, and every arrow in it is now a real dependency.
+    market-data opens a subscription per tracked pair as it starts, so a gateway
+    that is not listening yet costs it a round of backoff; market-mcp reads
+    market-data's own contract; the agent asks market-mcp for its tool list on the
+    first turn, and a market-mcp that was not up yet means an agent answering
+    without tools rather than an error anyone would notice; the terminal's charts
+    read the archive, so starting it first fills the console with proxy errors that
+    mean nothing. Each step waits for the one before it to answer, not merely to
+    have been launched.
 
     market-mcp needs no .env of its own here: every setting it reads has a
     working default for loopback (config.py), unlike the gateway and the archive,
@@ -176,6 +177,16 @@ if ($problems.Count -gt 0) {
     Write-Host "Cannot start:" -ForegroundColor Red
     foreach ($p in $problems) { Write-Host "  - $p" -ForegroundColor Red }
     exit 1
+}
+
+# Not a problem - an agent without tools is a supported state, and the one it degrades
+# to when market-mcp is down. Worth saying out loud, though: an `.env` written before
+# the tools existed leaves the agent answering from the model alone, which looks from
+# the panel exactly like tools that are broken.
+if ((Test-Path $agentEnv) -and
+    -not (Select-String -Path $agentEnv -Pattern '^MARKET_MCP_URL=.+' -Quiet)) {
+    Write-Host "modules\agent\.env has no MARKET_MCP_URL - the agent will run without tools." -ForegroundColor DarkGray
+    Write-Host "  Add MARKET_MCP_URL=$mcpUrl to give it market-mcp's, as .env.example does." -ForegroundColor DarkGray
 }
 
 $gatewayJob = $null
@@ -362,8 +373,9 @@ try {
     # --- agent ---
     #
     # Last among the back ends: nothing else calls it, so nothing else waits on it -
-    # unlike the gateway, which market-data subscribes to as it starts. It does not
-    # call market-mcp either; that edge does not exist yet.
+    # unlike the gateway, which market-data subscribes to as it starts. It does call
+    # market-mcp, which is why it starts after it: the tool list is read on the first
+    # turn, and a market-mcp still coming up would mean a turn answered without tools.
 
     Write-Host "Starting agent on port $agentPort..." -ForegroundColor Cyan
     $agentJob = Start-Job -Name "agent" -ScriptBlock {
