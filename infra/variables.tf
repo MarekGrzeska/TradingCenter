@@ -37,6 +37,63 @@ variable "operator_email" {
   type        = string
 }
 
+variable "agent_models" {
+  description = <<-EOT
+    The agent's model catalogue, one entry per model — the Terraform half of design.md's
+    "Katalog modeli jest konfiguracją, nie kodem". This root does not *create* anything
+    from it: the models belong to OpenAI's own account, reached with an API key
+    (design.md, "Wobec OpenAI: klucz, i tylko klucz"), so there is no deployment
+    resource to declare and no capacity to reserve. All this variable does is build the
+    agent's MODELS app setting (app-service.tf) — a fourth model is one more entry here
+    and a restart, exactly as `modules/agent/.env.example` describes for local runs.
+
+    Map key is this module's own stable id (`agent/models_catalogue.py`), carried in
+    every session and usage row. `model` is what OpenAI is actually asked for, kept
+    separate because the two need not match — an id outlives a model renamed upstream.
+
+    `model` MUST name something OpenAI serves to this key — nothing here verifies it,
+    and a name from memory fails at the first turn, not at `apply`. Operator confirms
+    against `GET https://api.openai.com/v1/models` before deploying.
+
+    Rates are per 1,000,000 tokens, the unit OpenAI's pricing page quotes — copied across
+    without arithmetic in either direction, and published to the terminal in that same
+    unit. They move faster than this module does (design.md, "Cennik jest konfiguracją"):
+    the defaults below are illustrative, read from public pricing in August 2026; check
+    OpenAI's own pricing page before trusting them at deploy time, the same caution
+    `modules/agent/.env.example` carries.
+  EOT
+  type = map(object({
+    model              = string
+    display_name       = string
+    cost_rank          = number
+    input_rate_per_1m  = string
+    output_rate_per_1m = string
+  }))
+  default = {
+    "gpt-5.6-luna" = {
+      model              = "gpt-5.6-luna"
+      display_name       = "Luna"
+      cost_rank          = 1
+      input_rate_per_1m  = "0.2"
+      output_rate_per_1m = "1.2"
+    }
+    "gpt-5.6-terra" = {
+      model              = "gpt-5.6-terra"
+      display_name       = "Terra"
+      cost_rank          = 2
+      input_rate_per_1m  = "2"
+      output_rate_per_1m = "12"
+    }
+    "gpt-5.6-sol" = {
+      model              = "gpt-5.6-sol"
+      display_name       = "Sol"
+      cost_rank          = 3
+      input_rate_per_1m  = "5"
+      output_rate_per_1m = "30"
+    }
+  }
+}
+
 variable "operator_object_id" {
   description = <<-EOT
     Entra object id of the human operator — the one who writes Key Vault secret values

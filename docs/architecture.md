@@ -6,25 +6,24 @@ One repository, many modules, no shared runtime. A module is a directory under `
 that runs on its own and publishes a contract. Nothing imports across that boundary.
 
 ```
-                  capital.com
-                  (REST + WS)
-                       │
-                       ▼
-        ┌──────────────────────────────┐
-        │  capital-gateway             │──────────┐
-        │  trade · history · stream    │          │
-        └──────────────┬───────────────┘          │
-                       │ HTTP + WebSocket         │ instruments
-                       ▼                          │
-        ┌──────────────────────────────┐          │
-        │  market-data                 │          │
-        │  archive · coverage · rollups│          │
-        └──────┬───────────────┬───────┘          │
-               │               │                  │
-               ▼               ▼                  │
-      agents / backtests    terminal ◀────────────┘
-                       charts · grid · search
-                          archive panel
+                  capital.com                             OpenAI
+                  (REST + WS)                                │
+                       │                                     ▼
+                       ▼                        ┌──────────────────────────────┐
+        ┌──────────────────────────────┐        │  agent                       │
+        │  capital-gateway             │───┐    │  conversation · cost         │
+        │  trade · history · stream    │   │    └──────────────┬───────────────┘
+        └──────────────┬───────────────┘   │                   │ HTTP, streamed
+                       │ HTTP + WebSocket  │ instruments       │
+                       ▼                   │                   │
+        ┌──────────────────────────────┐   │                   │
+        │  market-data                 │   │                   │
+        │  archive · coverage · rollups│   │                   │
+        └──────────────┬───────────────┘   │                   │
+                       │                   │                   │
+                       ▼                   ▼                   ▼
+                              terminal ◀────┴───────────────────┘
+                    charts · grid · search · archive panel · agent panel
 ```
 
 `terminal` is a consumer, not a peer: it publishes no contract of its own and nothing
@@ -32,12 +31,22 @@ depends on it. It reads market data through one interface, and that interface no
 implementations behind it — candles and the live stream from `market-data`, the instrument
 catalogue from `capital-gateway`, composed into a single instance the views never see
 through. The charts were not rewritten when the archive arrived, which is the whole point
-of having had the interface first.
+of having had the interface first. `agent` is a third, unrelated source behind its own
+interface — a conversation and its cost, nothing that shares a shape with a candle.
 
 `market-data` sits between the two on purpose. capital.com counts its rate limit against the
 account rather than the process, so a second client anywhere spends the same allowance twice:
 the gateway owns the only door to the provider, and the archive refuses to start if its
 upstream URLs point anywhere else.
+
+`agent` is a peer of `capital-gateway` and `market-data`, not a consumer of either — it
+reaches nothing in this diagram but OpenAI. The box market-data used to point at here
+(`agents / backtests`) was a placeholder for something that did not exist yet; now that one
+does, drawing it as downstream of the archive would say `agent` reads candles and calls
+tools, which it deliberately does not (`openspec/changes/add-agent-chat/design.md`,
+Non-Goals — no tools, nothing that reaches `market-data` or `capital-gateway`). Whether it
+ever earns that edge is a later, separate decision, made the same way this module itself
+was: an OpenSpec change, not a quiet addition to a graph.
 
 ## Why no shared library
 

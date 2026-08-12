@@ -17,3 +17,10 @@ operator_object_id = "00000000-0000-0000-0000-000000000000"
 
 # Where the alerts in infra/monitoring.tf go.
 operator_email = "you@example.com"
+
+# The agent's model catalogue has a working default in variables.tf and is left out
+# here on purpose. Override it only to change which models the agent offers — and then
+# confirm each `model` against OpenAI's own list first, because nothing in this root
+# checks it. The OpenAI key itself is not a Terraform variable at all: it goes into Key
+# Vault by hand (`az keyvault secret set ... --name openai-api-key`), so it never
+# reaches state.

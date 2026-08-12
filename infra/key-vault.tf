@@ -50,6 +50,7 @@ resource "azurerm_key_vault_access_policy" "operator" {
 #   az keyvault secret set --vault-name <output.key_vault_name> --name capital-identifier   --value ...
 #   az keyvault secret set --vault-name <output.key_vault_name> --name capital-password     --value ...
 #   az keyvault secret set --vault-name <output.key_vault_name> --name gateway-api-key      --value ...
+#   az keyvault secret set --vault-name <output.key_vault_name> --name openai-api-key       --value ...
 # (the same gateway-api-key value both apps read — capital-gateway checks it, market-data
 # presents it, exactly like GATEWAY_API_KEY in both .env.example files today)
 locals {
@@ -58,6 +59,13 @@ locals {
     capital_identifier = "capital-identifier"
     capital_password   = "capital-password"
     gateway_api_key    = "gateway-api-key"
+
+    # The agent's OpenAI key — the same value `modules/agent/.env` carries locally.
+    # Unlike the database, which the app reaches with its managed identity, OpenAI has
+    # no Entra to present one to: an API key is the only credential it accepts, so this
+    # is the one place it can live without ending up in Terraform state or a deploy log
+    # (design.md, "Wobec OpenAI: klucz, i tylko klucz").
+    openai_api_key = "openai-api-key"
 
     # A GitHub personal access token with `read:packages`, and nothing else — the only
     # way App Service can pull from GHCR, which is private because the repository is.
