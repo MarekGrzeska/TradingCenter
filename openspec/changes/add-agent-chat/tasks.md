@@ -161,8 +161,11 @@
 - [x] 12.1 `modules/agent/README.md` — co, jak uruchomić, jak przetestować, jaki kontrakt
 - [x] 12.2 `CLAUDE.md` i `README.md` — czwarty moduł, port 8030, komendy, druga baza lokalna
 - [x] 12.3 `docs/architecture.md` — agent na schemacie jako konsument, nie peer
-- [ ] 12.4 Uruchomić cały stos lokalnie i przeprowadzić rozmowę na każdym z trzech modeli;
-      sprawdzić, że koszt pojawia się w zakładce
+- [x] 12.4 Uruchomić cały stos lokalnie i przeprowadzić rozmowę na każdym z trzech modeli;
+      sprawdzić, że koszt pojawia się w zakładce. Zrobione po stronie modułu: trzy tury
+      strumieniem, każda zakończona `complete`, transkrypt z `model_id` i `prompt_version`,
+      `/usage` liczy trzy różne stawki i `unknown_count` = 0 wszędzie. Zostaje przejście
+      tą samą drogą przez terminal (5173)
 - [ ] 12.5 Sprawdzić strumień na wdrożonej aplikacji, nie tylko lokalnie (buforowanie i
       zerwanie po 230 s widać dopiero tam)
 - [ ] 12.6 `openspec validate add-agent-chat --strict`

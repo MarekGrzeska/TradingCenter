@@ -238,7 +238,11 @@ try {
     Write-Host "Ensuring the agent database exists..." -ForegroundColor Cyan
     Push-Location $repoRoot
     try {
-        $roleExists = (docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'agent'").Trim()
+        # "$(...)" and not (...).Trim(): psql -tAc prints nothing at all when the row is
+        # absent, PowerShell binds that to $null, and $null.Trim() throws "You cannot
+        # call a method on a null-valued expression" - in exactly the case this block
+        # exists to handle. The subexpression makes an absent row an empty string.
+        $roleExists = "$(docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'agent'")".Trim()
         if ($roleExists -ne "1") {
             docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 -c "CREATE ROLE agent LOGIN PASSWORD 'change-me';"
             if ($LASTEXITCODE -ne 0) {
@@ -246,7 +250,7 @@ try {
                 exit 1
             }
         }
-        $dbExists = (docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_database WHERE datname = 'agent'").Trim()
+        $dbExists = "$(docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_database WHERE datname = 'agent'")".Trim()
         if ($dbExists -ne "1") {
             docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 -c "CREATE DATABASE agent OWNER agent;"
             if ($LASTEXITCODE -ne 0) {
