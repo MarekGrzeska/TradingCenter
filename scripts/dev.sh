@@ -3,14 +3,19 @@
 # Everything the terminal needs, in the order it needs it — the macOS and Linux
 # counterpart of dev.ps1.
 #
-#   migrations  ->  capital-gateway  ->  market-data  ->  agent  ->  terminal
+#   migrations -> capital-gateway -> market-data -> market-mcp -> agent -> terminal
 #
 # The order is not tidiness. market-data opens a subscription per tracked pair the
 # moment it starts, so a gateway that is not listening yet costs it a round of
-# backoff; the terminal's charts read the archive, so starting it first fills the
-# console with proxy errors that mean nothing; and the agent has nothing that depends
-# on it, so it goes last among the back ends. Each step waits for the one before it to
-# actually answer, not merely to have been launched.
+# backoff; market-mcp is a consumer of market-data's own contract, same as the
+# terminal, so it starts after; the terminal's charts read the archive, so starting
+# it first fills the console with proxy errors that mean nothing; and the agent has
+# nothing that depends on it, so it goes last among the back ends. Each step waits
+# for the one before it to actually answer, not merely to have been launched.
+#
+# market-mcp needs no .env of its own to run here: every setting it reads has a
+# working default for loopback (`config.py`), unlike the gateway and the archive,
+# which hold real credentials with no safe default to fall back to.
 #
 # The database is the container in ../compose.yaml — started here, before migrations
 # (openspec/changes/local-dev-database-in-docker; the spell in Azure is over, production
@@ -33,12 +38,14 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GATEWAY_DIR="$REPO_ROOT/modules/capital-gateway"
 ARCHIVE_DIR="$REPO_ROOT/modules/market-data"
+MCP_DIR="$REPO_ROOT/modules/market-mcp"
 AGENT_DIR="$REPO_ROOT/modules/agent"
 TERMINAL_DIR="$REPO_ROOT/modules/terminal"
 
 GATEWAY_PORT=8010
 ARCHIVE_PORT=8020
 AGENT_PORT=8030
+MCP_PORT=8040
 TERMINAL_PORT=5173
 
 # 127.0.0.1 rather than "localhost": uvicorn binds IPv4 loopback, and on a machine
@@ -46,6 +53,7 @@ TERMINAL_PORT=5173
 GATEWAY_URL="http://127.0.0.1:$GATEWAY_PORT"
 ARCHIVE_URL="http://127.0.0.1:$ARCHIVE_PORT"
 AGENT_URL="http://127.0.0.1:$AGENT_PORT"
+MCP_URL="http://127.0.0.1:$MCP_PORT"
 
 START_TERMINAL=1
 WAIT_SECONDS=120
@@ -53,7 +61,7 @@ WAIT_SECONDS=120
 for arg in "$@"; do
   case "$arg" in
     --no-terminal) START_TERMINAL=0 ;;
-    -h|--help) sed -n '2,29p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,34p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
   esac
 done
@@ -73,7 +81,7 @@ note() { printf '%s%s%s\n' "$DIM" "$1" "$RESET"; }
 
 problems=()
 
-command -v uv >/dev/null 2>&1 || problems+=("uv is not on PATH (runs both Python services) — https://docs.astral.sh/uv/")
+command -v uv >/dev/null 2>&1 || problems+=("uv is not on PATH (runs all three Python services) — https://docs.astral.sh/uv/")
 
 # The database lives in a container again, so Docker is back to being a requirement for
 # running the stack, not only for testing market-data.
@@ -121,7 +129,7 @@ port_owner() {
   printf ' by %s (pid %s)' "$(ps -p "$pid" -o comm= 2>/dev/null || echo process)" "$pid"
 }
 
-ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$AGENT_PORT")
+ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$MCP_PORT" "$AGENT_PORT")
 (( START_TERMINAL )) && ports+=("$TERMINAL_PORT")
 for port in "${ports[@]}"; do
   port_in_use "$port" || continue
@@ -274,10 +282,23 @@ run_service "archive " "$MAGENTA" "$ARCHIVE_DIR" uv run uvicorn market_data.app:
 wait_for_http "$ARCHIVE_URL/health" "market-data" || exit 1
 ok "market-data is answering."
 
+# --- market-mcp -----------------------------------------------------------------
+#
+# After market-data, whose contract it reads. No `--reload`: unlike the other
+# services this one is not started through uvicorn's own CLI (`server.py`'s
+# caller-identity wrapper needs the ASGI app built in Python first), so a code
+# change here needs a manual restart for now.
+
+say "Starting market-mcp on port $MCP_PORT..."
+run_service "mcp     " "$GREEN" "$MCP_DIR" uv run python -m market_mcp http
+wait_for_http "$MCP_URL/health" "market-mcp" || exit 1
+ok "market-mcp is answering."
+
 # --- agent ----------------------------------------------------------------------
 #
 # Last among the back ends: nothing else calls it, so nothing else waits on it —
-# unlike the gateway, which market-data subscribes to as it starts.
+# unlike the gateway, which market-data subscribes to as it starts. It does not
+# call market-mcp either; that edge does not exist yet.
 
 say "Starting agent on port $AGENT_PORT..."
 run_service "agent   " "$YELLOW" "$AGENT_DIR" uv run uvicorn agent.app:app --reload --port "$AGENT_PORT"
@@ -299,6 +320,7 @@ if (( START_TERMINAL )); then
 fi
 echo "  market-data docs    $ARCHIVE_URL/docs"
 echo "  Gateway docs        $GATEWAY_URL/docs"
+echo "  market-mcp health   $MCP_URL/health"
 echo "  agent docs          $AGENT_URL/docs"
 echo "  Database            market_data @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
 echo

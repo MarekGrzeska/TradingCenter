@@ -17,8 +17,9 @@ modules move here one at a time.
 |---|---|---|
 | [capital-gateway](modules/capital-gateway/) | capital.com — trading, deep history, a live stream. Demo only. | HTTP + WebSocket |
 | [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. | HTTP + WebSocket |
+| [market-mcp](modules/market-mcp/) | MCP tools over market-data's archive, reduced for a model rather than proxied for a chart. Read-only — no tool writes. | MCP (stdio + streamable HTTP) |
 | [agent](modules/agent/) | The operator's conversation with a model — its own database, its own OpenAI key. No tools yet. | HTTP, streamed |
-| [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, and the agent panel. | consumes all three |
+| [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, and the agent panel. | consumes capital-gateway, market-data and agent |
 
 ## Layout
 
@@ -52,13 +53,14 @@ convenience wrappers; no module depends on one.
 Both bring the same things up in the same order:
 
 ```
-migrations  ->  capital-gateway  ->  market-data  ->  agent  ->  terminal
+migrations  ->  capital-gateway  ->  market-data  ->  market-mcp  ->  agent  ->  terminal
 ```
 
-The order is not tidiness. `market-data` subscribes to the gateway as it starts, and the
-terminal's charts read `market-data`, so starting anything early only fills the console with
-retries; `agent` has nothing that depends on it, so it goes last among the back ends. Each
-step waits for the one before it to actually answer. Ctrl+C stops the services.
+The order is not tidiness. `market-data` subscribes to the gateway as it starts, `market-mcp`
+reads `market-data`, and the terminal's charts read `market-data` too, so starting anything
+early only fills the console with retries; `agent` has nothing that depends on it, so it goes
+last among the back ends. Each step waits for the one before it to actually answer. Ctrl+C
+stops the services.
 
 **The database is local again.** `market-data` writes to the PostgreSQL container in
 [compose.yaml](compose.yaml), which the scripts start first — so Docker is a requirement for
@@ -109,30 +111,34 @@ When it is a change:
 ### Checks
 
 Every pull request to `main`, and every push to it, runs
-[`.github/workflows/checks.yml`](.github/workflows/checks.yml): four jobs in parallel, one
+[`.github/workflows/checks.yml`](.github/workflows/checks.yml): five jobs in parallel, one
 per module, running the same commands a developer runs — and only for the modules the
 change can have broken. A first job works out which those are from the diff; a change under
 `docs/` or `infra/` runs no module suite at all.
 
 One exception is worth knowing: the terminal's job also runs when `market_data/contract.py`
-or `agent/contract.py` changes, even if no terminal file did. `contract:check` exists to
-catch exactly the first pairing; the second has no generator to fail, so the terminal's own
-tests against its hand-written DTOs are what catch it instead — and neither runs at all if
-the terminal's job never fires. Filtering either out by directory would retire the check in
-the one case it was written for.
+or `agent/contract.py` changes, even if no terminal file did, and market-mcp's runs on the
+first of those two for the same reason. `contract:check` and `scripts/contract.py check`
+exist to catch exactly that pairing with `market_data/contract.py`; `agent/contract.py` has
+no generator to fail, so the terminal's own tests against its hand-written DTOs are what
+catch it instead — and none of them run at all if the job never fires. Filtering any of
+them out by directory would retire the check in the one case it was written for.
 
 | Job | Runs |
 |---|---|
 | `capital-gateway` | `ruff check`, `pyright`, `pytest` |
 | `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
+| `market-mcp` | `scripts/contract.py check`, `ruff check`, `pyright`, `pytest` |
 | `agent` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's; its `live` tests need a real OpenAI key and stay behind `--run-live` |
 | `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
 
-`contract:check` runs before the terminal's tests on purpose: it compares
-`src/data/contract.generated.ts` against the schema `market-data` builds from its own models,
-and a stale contract makes every conclusion the suite reaches about the wire rest on an
-out-of-date premise. Regenerate with `pnpm contract:generate` after changing a model in
-`market_data/contract.py`.
+`contract:check` runs before the terminal's tests on purpose, and `scripts/contract.py
+check` before market-mcp's for the same reason: both compare their own copy of the wire —
+generated TypeScript for the terminal, a committed OpenAPI snapshot for market-mcp —
+against the schema `market-data` builds from its own models, and a stale copy makes every
+conclusion either suite reaches about the wire rest on an out-of-date premise. Regenerate
+with `pnpm contract:generate` (terminal) or `uv run python scripts/contract.py generate`
+(market-mcp) after changing a model in `market_data/contract.py`.
 
 The `live` tests are not run — they need a real Capital demo session, and putting provider
 credentials in CI to earn a green tick is a bad trade. They stay behind `--run-live`.
@@ -141,12 +147,13 @@ credentials in CI to earn a green tick is a bad trade. They stay behind `--run-l
 
 Pushing to `main` deploys the module that changed. Each deploy ends by checking the thing
 actually answers, not merely that Azure accepted the request: `market-data` is probed on
-`/ws/candles`, the one path Easy Auth lets through to the container; the terminal is
-checked on both `/` and a tab address, because deep links have broken here before while the
-root kept working. `capital-gateway` admits only market-data's addresses, so a runner
-cannot reach it at all — there, and for `agent`, which carves out no path of its own from
-Easy Auth, the deploy confirms through the Azure control plane instead that the site is
-running the image this commit built.
+`/ws/candles`, the one path Easy Auth lets through to the container; `market-mcp` is probed
+on `/health`, excluded from Easy Auth the same way and answering a plain 200 with no trick
+needed; the terminal is checked on both `/` and a tab address, because deep links have
+broken here before while the root kept working. `capital-gateway` admits only
+market-data's addresses, so a runner cannot reach it at all — there, and for `agent`, which
+carves out no path of its own from Easy Auth, the deploy confirms through the Azure control
+plane instead that the site is running the image this commit built.
 
 Infrastructure is applied by hand, from
 [`terraform-apply.yml`](.github/workflows/terraform-apply.yml) — Actions → terraform-apply →

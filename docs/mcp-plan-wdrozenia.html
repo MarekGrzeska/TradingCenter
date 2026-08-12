@@ -1,0 +1,558 @@
+<title>MCP nad archiwum — plan wdrożenia</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 56rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.9rem; margin: 1.5rem 0 0.4rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.82rem; }
+  td.num { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.79rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  .stage { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.2rem 0; }
+  .stage > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .stage .no { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.05em 0.45em; }
+  .stage dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.8rem 0 0; font-size: 0.92rem; }
+  .stage dt { font-family: var(--mono); font-size: 0.73rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); padding-top: 0.22rem; }
+  .stage dd { margin: 0; }
+  @media (max-width: 34rem) { .stage dl { grid-template-columns: 1fr; gap: 0.15rem; } .stage dd { margin-bottom: 0.6rem; } }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>MCP nad archiwum — plan wdrożenia</h1>
+<p class="lede">Narzędzia, którymi model sięga po świece i wskaźniki. Osobny moduł, własny kontrakt, zero importów z <code>market-data</code> — i jedna zasada, z której wynika cała reszta: to nie jest proxy, to jest redukcja.</p>
+<p class="meta">
+  Plan, nie research. Status: przed <code>/opsx:propose</code><br>
+  Dotyczy: <code>modules/market-mcp</code> (nowy) · czyta <code>modules/market-data</code> · konsument: <code>modules/agent</code><br>
+  Gałąź techniczna: <code>add-market-data-mcp</code> · worktree <code>../TradingCenter-mcp</code><br>
+  Sąsiednia praca: <code>add-agent-chat</code> — moduł agenta, świadomie bez narzędzi
+</p>
+
+<h2>Zasada, która wyznacza granicę</h2>
+
+<div class="callout good">
+  <span class="tag">Jedno zdanie, z którego wynika reszta</span>
+  <p><strong>Wykres chce każdego punktu. Model chce zdania.</strong></p>
+  <p>Kontrakt <code>market-data</code> jest zbudowany dla wykresu: <code>GET /candles</code> oddaje wszystko, co mieści się w zakresie, bo <em>lightweight-charts</em> potrzebuje każdego punktu, żeby narysować świecę. Ten sam zakres podany modelowi to kilkaset kilobajtów JSON-a — sto tysięcy tokenów za odpowiedź, która brzmi „w ostatniej godzinie rynek stoi w miejscu”. Narzędzie MCP nie przekazuje tej odpowiedzi dalej. Ono ją streszcza.</p>
+</div>
+
+<p>To nie jest optymalizacja do dopisania później. To jest kształt kontraktu: narzędzie, które raz odda 5000 świec, będzie tak wołane zawsze, bo model nie ma jak wiedzieć, że to drogo. Sufit i redukcja muszą siedzieć po stronie narzędzia — tak samo, jak sufit żądania wskaźników siedzi w <code>market-data</code>, a nie w umowie z terminalem.</p>
+
+<h3>Jak to wygląda w praktyce</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Zamiast oddać</th><th>Oddajemy</th><th>Dlaczego tak</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">candles[] <span class="dim">— 5000 obiektów OHLC</span></td>
+      <td class="field">open/high/low/close okna, zmiana %, zakres w ATR, największy ruch, liczba luk</td>
+      <td>Model i tak policzyłby te liczby z tablicy — wolniej, drożej i czasem źle. Arytmetyka jest po naszej stronie, bo tu jest deterministyczna.</td>
+    </tr>
+    <tr>
+      <td class="field">lines: {ema: [4000 liczb]}</td>
+      <td class="field">ostatnia wartość, nachylenie na N świec, ile świec temu przecięcie z ceną</td>
+      <td>Pytanie brzmi „gdzie jesteśmy względem tej średniej”, nie „narysuj mi ją”. Rysowanie to zadanie terminala i on ma do tego własną trasę.</td>
+    </tr>
+    <tr>
+      <td class="field">candles: [] <span class="dim">— pusta lista</span></td>
+      <td class="field">„archiwum nie zweryfikowało 03:00–07:00 tego zakresu” <span class="dim">(<code>uncovered</code>)</span></td>
+      <td>Pusta lista czyta się jak „rynek stał”. To jest ta jedna pewna zła odpowiedź, przed którą <code>market-data</code> broni się całą swoją strukturą — MCP nie ma prawa jej z powrotem wyprodukować.</td>
+    </tr>
+    <tr>
+      <td class="field">indicators[] <span class="dim">— 57 wpisów z <code>render</code></span></td>
+      <td class="field">id, nazwa, grupa, kształt wyjścia, parametry z domyślnymi</td>
+      <td><code>pane</code>, <code>autoscale</code> i <code>style</code> to instrukcja rysowania. Model nie rysuje, a każde pole w odpowiedzi kosztuje.</td>
+    </tr>
+    <tr>
+      <td class="field">HTTP 422 z <code>detail</code></td>
+      <td class="field">zdanie mówiące, co zmniejszyć: zakres, rozdzielczość albo liczbę wskaźników</td>
+      <td>Model ma poprawić żądanie sam, bez rundy do operatora. Odmowa, która nie mówi, co zrobić inaczej, kosztuje trzy próby zamiast jednej.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Kształt</h2>
+
+<pre><code>  przeglądarka                     Azure                              provider
+  ────────────                     ─────                              ────────
+
+  terminal ───HTTP/WS──────────► market-data :8020 ──HTTP──► capital-gateway :8010 ──► capital.com
+     │                                 ▲
+     │                                 │ HTTP · kontrakt OpenAPI · zero importów
+     │                                 │
+  panel agenta ───SSE───► agent :8030 ─┴─MCP (streamable http)──► market-mcp :8040
+                                                                   bezstanowy
+
+  lokalnie, poza Azure:
+  Claude Desktop / claude code ───MCP (stdio)───► market-mcp ──HTTP──► market-data :8020
+</code></pre>
+
+<p><code>market-mcp</code> jest konsumentem <code>market-data</code> dokładnie tak, jak terminal: czyta opublikowany kontrakt i nie sięga po nic poza nim. Nie ma bazy, nie ma stanu i kasuje się przez skasowanie katalogu. Jeśli to coś zepsuje, to coś sięgało poza kontrakt.</p>
+
+<div class="callout">
+  <span class="tag">Dlaczego to nie może zamieszkać w module agenta</span>
+  <p>Bo wtedy narzędzia nie da się wdrożyć, przetestować ani usunąć bez agenta — a przede wszystkim nie da się ich użyć <em>bez agenta</em>. Ten sam serwer MCP podpięty pod Claude Desktop przez stdio jest najtańszym sposobem na sprawdzenie, czy narzędzie w ogóle odpowiada na pytanie, które ma odpowiadać. Moduł agenta zostaje przy swoim zakresie: rozmowa, transkrypt, koszt.</p>
+</div>
+
+<h2>Decyzje</h2>
+
+<h3>1. Osobny moduł <code>modules/market-mcp</code>, port 8040</h3>
+
+<p>Piąty moduł, z własnym <code>pyproject.toml</code>, testami, Dockerfile i README. Odrzucone dwie alternatywy:</p>
+
+<ul>
+  <li><strong>Narzędzia wewnątrz <code>modules/agent</code></strong> — tańsze o cały moduł, ale wiąże zestaw narzędzi z cyklem życia rozmowy i zamyka drogę każdemu innemu klientowi MCP. Agent ma wtedy dwa profile awarii w jednym procesie: model, który nie odpowiada, i archiwum, które nie odpowiada.</li>
+  <li><strong>Trasy MCP w <code>market-data</code></strong> — nie ma nowego wdrożenia, bazy ani auth do postawienia, ale <code>market-data</code> zaczyna obsługiwać dwie publiczności o sprzecznych wymaganiach: wykres chce kompletu, model chce streszczenia. Jej odmowy musiałyby zacząć mówić do modelu. To jest drugi kontrakt w module, który ma jeden.</li>
+</ul>
+
+<p>Nazwa: <code>market-mcp</code>, nie <code>mcp-gateway</code>. „Gateway” w tym repozytorium znaczy okno na dostawcę (<code>capital-gateway</code>) i mieszanie tego z powierzchnią narzędziową zmyliłoby czytelnika przy pierwszym katalogu. Gdy kiedyś dojdą narzędzia do pozycji, będą czytać <code>capital-gateway</code> i to jest osobna decyzja, nie rozszerzenie tej.</p>
+
+<h3>2. Transport: streamable HTTP dla agenta, stdio dla biurka</h3>
+
+<p>Serwer stoi na SDK <code>mcp</code> (FastMCP) i wystawia obie drogi z jednego zestawu narzędzi:</p>
+
+<ul>
+  <li><strong>streamable http</strong> — bo agent stoi w innym kontenerze niż MCP i rozmawia z nim po sieci. Aplikacja ASGI serwera jest zamontowana obok własnego <code>/health</code>, żeby App Service miał co odpytywać.</li>
+  <li><strong>stdio</strong> — bo lokalnie ten sam moduł jest podpinany pod Claude Desktop i <code>claude code</code> jedną linijką w konfiguracji, i to jest najtańszy sposób oceny, czy opis narzędzia jest zrozumiały dla modelu.</li>
+</ul>
+
+<p>Odrzucone: stary transport HTTP+SSE (dwie trasy, sesja po stronie serwera — wycofany na rzecz streamable http) oraz WebSocket, który wciągnąłby tu całą maszynerię biletów z <code>market-data/tickets.py</code>. Bilety istnieją tam dlatego, że uchwyt WebSocketu nie uniesie nagłówka; klient MCP uniesie, więc kopiowanie tamtego rozwiązania byłoby tabelą i trasą kupionymi za nic.</p>
+
+<h3>3. Bezstanowy, bez bazy danych</h3>
+
+<p>Żadnych migracji, żadnego wolumenu, żadnego backupu. W pamięci procesu mieszka wyłącznie krótkotrwały cache dwóch rzeczy, które zmieniają się rzadko: katalogu wskaźników (unieważniany po <code>algorithm_version</code>, które <code>market-data</code> podaje w każdej odpowiedzi) i katalogu instrumentów.</p>
+
+<p>Odrzucone: własny cache świec w Postgresie. Byłby drugim archiwum tych samych świec, a <code>docs/architecture.md</code> mówi wprost, że danie jednej świecy dwóch pochodzeń jest gorsze niż niezapisanie jej wcale. Powód jest praktyczny, nie estetyczny: przy rozjeździe nikt nie wie, które z dwóch źródeł skłamało.</p>
+
+<h3>4. Klient rozmawia kontraktem, nie importem</h3>
+
+<p><code>market-mcp</code> nie importuje <code>market_data.contract</code> — to jest reguła nośna tego repozytorium. Kształty, których używa, są przepisane u siebie, jako wąskie modele pydantic obejmujące tylko te pola, które faktycznie czyta.</p>
+
+<p>Przed rozjazdem broni ten sam mechanizm, którym broni się terminal, przeniesiony jeden do jednego:</p>
+
+<ol>
+  <li><code>contract/market-data.openapi.json</code> — commitowany snapshot, wytwarzany przez <code>scripts/contract.py generate</code>, który uruchamia <code>uv run --python 3.12 python -m market_data.openapi</code> w katalogu siostrzanym. Wywołanie procesu obok, nie import: schemat powstaje bez działającego serwera, bo <em>sprawdzenie wymagające uruchomionej usługi to sprawdzenie, którego nikt nie robi</em>.</li>
+  <li><code>tests/test_contract.py</code> — dla każdej ścieżki i każdego pola, po które sięga klient, asercja, że są w snapshocie. Pole usunięte albo przemianowane w <code>market-data</code> wywraca test tutaj, a nie żądanie modelu w produkcji.</li>
+  <li><code>scripts/contract.py check</code> — nieświeży snapshot wywraca CI, tak jak <code>pnpm contract:check</code> w terminalu. Job modułu wchodzi do filtra <code>changes</code> na zmianie <code>market_data/contract.py</code>, dokładnie tak, jak dziś wchodzi job terminala.</li>
+</ol>
+
+<div class="callout warn">
+  <span class="tag">Ta sama pułapka co w terminalu</span>
+  <p>Pole dołożone w <code>market_data/models.py</code> i nie dołożone do <code>*Out</code> nie wywraca <em>niczego</em> — po prostu nie jest publikowane. Snapshot go nie zobaczy, bo w schemacie go nie ma. To jest przystanek do sprawdzenia okiem i on się przez MCP nie zmienia.</p>
+</div>
+
+<h3>5. Sufit i redukcja są własnością narzędzia</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wielkość</th><th>Domyślnie</th><th>Twardy sufit</th><th>Co się dzieje powyżej</th></tr></thead>
+  <tbody>
+    <tr><td>świece w jednej odpowiedzi</td><td class="num">200</td><td class="num">500</td><td>agregacja do kubełków OHLC + zdanie, że odpowiedź jest zagregowana; powyżej ~10× sufitu — odmowa z propozycją grubszej rozdzielczości</td></tr>
+    <tr><td>wskaźniki w jednym wywołaniu</td><td class="num">3</td><td class="num">10</td><td>odmowa mówiąca, ile ich było</td></tr>
+    <tr><td>punkty serii wskaźnika</td><td class="num">— <span class="dim">(tryb <code>latest</code>)</span></td><td class="num">200</td><td>tryb <code>series</code> trzeba poprosić jawnie i on też jest agregowany</td></tr>
+    <tr><td>poziomy i strefy</td><td class="num">20 najbliższych cenie</td><td class="num">50</td><td>reszta odcięta, z licznikiem w odpowiedzi („pominięto 31 dalszych”)</td></tr>
+    <tr><td>znaki (markers)</td><td class="num">20 najnowszych</td><td class="num">50</td><td>jak wyżej</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Reguła nad tą tabelą: <strong>nic nie znika po cichu</strong>. Odcięcie zawsze zostawia w odpowiedzi zdanie o tym, że odcięło — inaczej model streszcza operatorowi wycinek, o którym myśli, że jest całością.</p>
+
+<h3>6. Niepewność jedzie razem z odpowiedzią</h3>
+
+<p>Cztery pola z kontraktu <code>market-data</code> nie mogą zginąć w redukcji, bo każde z nich zmienia to, na ile odpowiedź wolno traktować poważnie. Każde ma swoje zdanie w tekście dla modelu:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pole</th><th>Znaczy</th><th>Co widzi model</th></tr></thead>
+  <tbody>
+    <tr><td class="field">uncovered[]</td><td>archiwum nigdy nie zweryfikowało tego przedziału</td><td>„Nie zweryfikowano 2026-08-09 03:00–07:00 UTC — brak świec tam nie znaczy, że rynek stał.”</td></tr>
+    <tr><td class="field">derived</td><td>seria policzona z minutowej, nie zebrana od dostawcy</td><td>„Świece HOUR policzone ze zbioru minutowego.”</td></tr>
+    <tr><td class="field">settled</td><td>rozgrzewka wskaźnika nie zmieściła się w historii</td><td>„EMA(200): archiwum miało 140 świec rozgrzewki z potrzebnych 200 — wartość jest wstępna.”</td></tr>
+    <tr><td class="field">error <span class="dim">(w wyniku wskaźnika)</span></td><td>brak serii, której ten wpis potrzebuje</td><td>przepisane dosłownie; <code>market-data</code> pisze te zdania dla człowieka i są dobre</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>7. Moduł tylko czyta — i to jest wymaganie, nie ustawienie</h3>
+
+<p>Zestaw narzędzi nie zawiera ani jednego, które zmienia stan czegokolwiek. Nie ma przełącznika włączającego zapis, bo przełącznik jest obietnicą, że kiedyś się go przestawi, a wtedy różnica między konfiguracją a wymaganiem znika w jednym <code>.env</code>.</p>
+
+<ul>
+  <li><strong>Żadnych żądań <code>POST</code>, <code>PUT</code> ani <code>DELETE</code> do <code>market-data</code>.</strong> Wyjątek jest jeden i pozorny: <code>POST /indicators/{symbol}</code>, które jest obliczeniem, nie zapisem — metoda jest <code>POST</code>, bo specyfikacja żądania nie mieści się w URL-u. Test asercji na kliencie pilnuje, że innych <code>POST</code>-ów nie ma.</li>
+  <li><strong><code>track_pair</code> poza zakresem.</strong> Rozpoczęcie zbierania pary to godziny wołań do dostawcy i zjadanie budżetu 10 żądań/s dzielonego z terminalem. To jest decyzja operatora podejmowana w terminalu, gdzie widać jej koszt przed kliknięciem.</li>
+  <li><strong><code>DELETE /pairs/{symbol}</code> nie ma opakowania i mieć nie będzie.</strong> Kasuje świece nieodwracalnie, a odbudowa trzech lat historii to około 27 godzin wołań do dostawcy. To nie jest ryzyko do wyważenia, to jest narzędzie, którego się nie pisze.</li>
+  <li>Dostęp do <code>market-data</code>: tożsamość zarządzana w Azure, pętla zwrotna lokalnie — ten sam przełącznik trybu co w <code>market-data/config.py</code> i <code>agent/config.py</code>. Konfiguracja wskazująca zdalny adres bez tożsamości jest odmawiana przy starcie, nie zgadywana.</li>
+  <li>Przed samym MCP stoi Easy Auth; agent przedstawia się swoją tożsamością zarządzaną. Sam moduł nie zna żadnego hasła i nie ma czego rotować.</li>
+</ul>
+
+<div class="callout good">
+  <span class="tag">Co to kupuje</span>
+  <p>Najgorsze, co może zrobić zepsute narzędzie albo model, który je źle zawołał, to zmarnowany czas i zjedzone tokeny. Nie ma ścieżki, na której halucynacja modelu kasuje trzy lata świec albo zaczyna zbieranie, którego nikt nie zamawiał. Zestaw, którego zakres da się opisać jednym zdaniem — <em>„czyta archiwum i liczy z niego"</em> — jest też zestawem, którego review nie musi szukać drugiego dna.</p>
+</div>
+
+<h3>8. Opis narzędzia jest promptem, więc jest kodem</h3>
+
+<p>Docstring narzędzia i opisy jego parametrów to jedyne, co model o nim wie. Idą więc przez review jak kod i mają własny test: każde narzędzie MUSI mieć opis, typowane parametry, wpisany sufit oraz jawnie nazwane jednostki i strefę (UTC, ISO-8601, ceny po stronie <code>BID</code>). Narzędzie bez tego nie przechodzi <code>tests/test_tool_surface.py</code>.</p>
+
+<p>Wyjścia są modelami pydantic, więc SDK publikuje dla nich <code>outputSchema</code> i wypełnia <code>structuredContent</code>; obok jedzie zwięzły tekst dla modeli, które czytają treść, a nie schemat. Dwa kształty jednej odpowiedzi, jeden kod je produkujący.</p>
+
+<h2>Narzędzia</h2>
+
+<h3>Dziesięć narzędzi, wszystkie czytające</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Narzędzie</th><th>Odpowiada na pytanie</th><th>Skąd</th><th>Sufit odpowiedzi</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">list_tracked_pairs</td>
+      <td>Co archiwum w ogóle zbiera i czy zbieranie się dzieje? Symbol, rozdzielczość, wiek najnowszej świecy, stan kolekcji.</td>
+      <td class="field">GET /pairs</td>
+      <td>całość <span class="dim">(rzędu dziesiątek wierszy)</span></td>
+    </tr>
+    <tr>
+      <td class="field">search_instruments</td>
+      <td>Jak nazywa się symbol, o którym operator mówi „Nasdaq”? Nazwa → epic.</td>
+      <td class="field">GET /instruments/search</td>
+      <td>10 trafień</td>
+    </tr>
+    <tr>
+      <td class="field">describe_coverage</td>
+      <td>Czy da się zaufać odpowiedzi za ten zakres? Przedziały zweryfikowane, najstarsza osiągalna świeca, dziury.</td>
+      <td class="field">GET /coverage/{symbol}</td>
+      <td>20 przedziałów</td>
+    </tr>
+    <tr>
+      <td class="field">get_last_price</td>
+      <td>Ile jest teraz i sprzed ilu sekund to jest? Ostatnia świeca + jej wiek.</td>
+      <td class="field">GET /candles <span class="dim">(wąskie okno)</span></td>
+      <td>jedna świeca</td>
+    </tr>
+    <tr>
+      <td class="field">get_candles</td>
+      <td>Jak wyglądał przebieg? Zwarta tabela OHLC, zagregowana, gdy zakres jest większy niż sufit.</td>
+      <td class="field">GET /candles/{symbol}</td>
+      <td>200 domyślnie / 500 twardo</td>
+    </tr>
+    <tr>
+      <td class="field">summarize_range</td>
+      <td>Co się stało w tym oknie? OHLC okna, zmiana bezwzględna i procentowa, średni i maksymalny zakres świecy, największy ruch i kiedy, liczba świec, luki.</td>
+      <td class="field">GET /candles <span class="dim">+ arytmetyka u nas</span></td>
+      <td>~15 liczb</td>
+    </tr>
+    <tr>
+      <td class="field">list_indicators</td>
+      <td>Co da się policzyć? 57 wpisów w 11 grupach — filtrowane po grupie, zwarte: id, nazwa, kształt wyjścia, parametry z domyślnymi.</td>
+      <td class="field">GET /indicators</td>
+      <td>grupa naraz</td>
+    </tr>
+    <tr>
+      <td class="field">describe_indicator</td>
+      <td>Jak się tego używa? Pełny wpis: zakresy parametrów, aliasy, kształt wyjścia, rodzaj rozgrzewki.</td>
+      <td class="field">GET /indicators <span class="dim">(z cache)</span></td>
+      <td>jeden wpis</td>
+    </tr>
+    <tr>
+      <td class="field">compute_indicators</td>
+      <td>Gdzie jesteśmy względem tych miar? Tryb <code>latest</code>: ostatnia wartość każdej linii, nachylenie, ile świec od przecięcia z ceną. Tryb <code>series</code>: przerzedzona seria.</td>
+      <td class="field">POST /indicators/{symbol}</td>
+      <td>3 wskaźniki domyślnie / 10 twardo</td>
+    </tr>
+    <tr>
+      <td class="field">levels_near_price</td>
+      <td>Co leży blisko ceny? Poziomy, strefy i znaki z wpisów o wyjściu <code>levels</code>/<code>zones</code>/<code>markers</code>, posortowane po odległości od ostatniej ceny, z tą odległością w punktach i procentach.</td>
+      <td class="field">POST /indicators/{symbol}</td>
+      <td>20 najbliższych</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout">
+  <span class="tag">Dlaczego <code>levels_near_price</code> jest osobnym narzędziem, a nie trybem <code>compute_indicators</code></span>
+  <p>Bo to jest inne pytanie i inna redukcja. „Policz mi RSI” zwraca liczbę na osi czasu; „co leży blisko ceny” zwraca listę posortowaną po odległości od <em>teraz</em> — i sensownie odcina się ją po odległości, nie po czasie. Jedno narzędzie z dwoma trybami redukcji ma dwa opisy w jednym docstringu, a docstring jest tu promptem.</p>
+</div>
+
+<h3>Czego nie ma i dlaczego</h3>
+
+<ul>
+  <li><strong>Cokolwiek zapisującego</strong> — <code>track_pair</code>, kasowanie pary, kasowanie zlecenia. Patrz decyzja 7: to jest wymaganie modułu, nie ustawienie do przestawienia.</li>
+  <li><strong>Podgląd zleceń zbierania</strong> (<code>GET /jobs</code>) — bez <code>track_pair</code> model nie ma o co pytać, a operator ma na to własną zakładkę w terminalu. Dołożenie tego, gdy okaże się potrzebne, kosztuje jedno narzędzie i żadnej decyzji.</li>
+  <li><strong>Subskrypcja strumienia</strong> — model nie utrzymuje połączenia między turami. Zamiast tego pyta ponownie; <code>get_last_price</code> jest tanie i mówi wiek świecy, więc odpowiada na to samo pytanie bez sesji.</li>
+  <li><strong><code>POST /stream-tickets</code></strong> — bilet ma sens tylko dla uchwytu, który nie uniesie nagłówka. Tutaj nie ma takiego uchwytu.</li>
+  <li><strong>Stan sesji rynku</strong> (otwarte/zamknięte) — <code>market-data</code> ma <code>market_status.py</code>, ale <em>nie publikuje</em> go żadną trasą; używa go wewnętrznie przy ocenie spóźnionych par. Wystawienie tego to zmiana kontraktu <code>market-data</code>, czyli osobna zmiana OpenSpec w tamtym module. Do tego czasu narzędzia mówią „ostatnia świeca sprzed 14 minut”, co jest faktem, zamiast „rynek zamknięty”, co byłoby domysłem.</li>
+  <li><strong>Pozycje i zlecenia</strong> — mieszkają w <code>capital-gateway</code> i są osobnym modułem MCP albo osobną decyzją. Świadomie poza zakresem: narzędzie, które czyta, i narzędzie, które handluje, mają inny profil ryzyka i nie powinny wjeżdżać jednym pull requestem.</li>
+</ul>
+
+<h2>Zasoby i prompty</h2>
+
+<p>MCP zna trzy rodzaje rzeczy, nie jeden. Narzędzie się <em>woła</em>, zasób się <em>czyta</em>, prompt <em>podpowiada procedurę</em> — i mieszanie ich kosztuje tokeny.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Rodzaj</th><th>Identyfikator</th><th>Po co</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill">resource</span></td><td class="field">market://indicators/catalogue</td><td>Katalog jako materiał do przeczytania raz, nie wywołanie do powtarzania. Zmienia się rzadko i mówi o tym przez <code>algorithm_version</code>.</td></tr>
+    <tr><td><span class="pill">resource</span></td><td class="field">market://pairs</td><td>Co jest zbierane — druga rzecz, którą klient chce znać, zanim zacznie pytać o cokolwiek.</td></tr>
+    <tr><td><span class="pill">resource</span></td><td class="field">market://coverage/{symbol}/{resolution}</td><td>Szablon zasobu: pokrycie konkretnej pary bez wywołania narzędzia.</td></tr>
+    <tr><td><span class="pill">prompt</span></td><td class="field">analiza-symbolu</td><td>Kolejność, która działa: pokrycie → streszczenie okna → wskaźniki → <em>nazwij, czego nie wiadomo</em>. Ostatni krok jest tym, po co ten prompt istnieje.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Kształt odmowy</h2>
+
+<p>Odmowa jest odpowiedzią, nie awarią: <code>isError</code> plus zdanie mówiące, co zrobić inaczej. Model ma poprawić żądanie w tej samej turze.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Sytuacja</th><th>Skąd wiadomo</th><th>Co widzi model</th></tr></thead>
+  <tbody>
+    <tr><td>zakres ponad sufit</td><td>policzone u nas przed wołaniem</td><td>„4 dni po MINUTE to ~5760 świec przy suficie 500 — poproś o HOUR albo o krótszy zakres.”</td></tr>
+    <tr><td>sufit wskaźników w <code>market-data</code></td><td>HTTP 422 z <code>detail</code></td><td>przepisane zdanie modułu plus podpowiedź, którą oś skrócić</td></tr>
+    <tr><td>nieznany wskaźnik</td><td>HTTP 422</td><td>„Nie ma wpisu <code>macd_hist</code>. Najbliższe po aliasach: <code>macd</code>. Katalog: <code>list_indicators</code>.”</td></tr>
+    <tr><td>para niezbierana</td><td>pusta seria + <code>uncovered</code> na cały zakres</td><td>„<code>EURUSD MINUTE</code> nie jest zbierane — to nie jest cisza rynku. Zbierane pary: <code>list_tracked_pairs</code>.”</td></tr>
+    <tr><td><code>market-data</code> nie odpowiada</td><td>timeout / 5xx</td><td>„Archiwum nie odpowiedziało w 10 s. To awaria po naszej stronie, nie brak danych.”</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Rozróżnienie w ostatnich dwóch wierszach jest tym, po co ta tabela istnieje. „Nie wiem, bo nikt tego nie zbiera”, „nie wiem, bo rynek był zamknięty” i „nie wiem, bo archiwum leży” to trzy różne zdania i model nie ma jak ich rozróżnić, jeśli mu ich nie napiszemy.</p>
+
+<h2>Etapy</h2>
+
+<p>Każdy etap to jeden pull request do gałęzi technicznej <code>add-market-data-mcp</code>. Gałąź idzie do <code>main</code> dopiero po E4; E5 może wejść osobno, bo dotyka innego modułu.</p>
+
+<div class="stage">
+  <h3><span class="no">E0</span> Szkielet, który da się uruchomić</h3>
+  <dl>
+    <dt>Zakres</dt><dd><code>pyproject.toml</code>, <code>market_mcp/</code>, konfiguracja z przełącznikiem trybu (adres <code>market-data</code> + tożsamość albo pętla zwrotna), serwer FastMCP zamontowany obok <code>/health</code>, jedno narzędzie <code>list_tracked_pairs</code>, klient HTTP z timeoutem, <code>tests/</code> z podstawionym <code>market-data</code>, <code>README.md</code>, <code>.env.example</code>, <code>Dockerfile</code>.</dd>
+    <dt>Kończy się na</dt><dd>Claude Desktop przez stdio wypisuje listę zbieranych par z lokalnego <code>market-data</code>. To jest cała definicja gotowości tego etapu.</dd>
+    <dt>Zależy od</dt><dd>niczego — <code>market-data</code> stoi</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E1</span> Świece i pokrycie</h3>
+  <dl>
+    <dt>Zakres</dt><dd><code>get_candles</code>, <code>get_last_price</code>, <code>summarize_range</code>, <code>describe_coverage</code>, <code>search_instruments</code>. Do tego cała maszyneria redukcji: kubełkowanie OHLC, sufity, zdania o <code>uncovered</code> i <code>derived</code>.</dd>
+    <dt>Kończy się na</dt><dd>test mierzący rozmiar odpowiedzi: żadne narzędzie na zakresie roku nie oddaje więcej niż ustalony sufit znaków.</dd>
+    <dt>Zależy od</dt><dd>E0</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E2</span> Wskaźniki</h3>
+  <dl>
+    <dt>Zakres</dt><dd><code>list_indicators</code>, <code>describe_indicator</code>, <code>compute_indicators</code> (tryby <code>latest</code>/<code>series</code>), <code>levels_near_price</code>, katalog jako zasób z cache po <code>algorithm_version</code>.</dd>
+    <dt>Kończy się na</dt><dd>cztery kształty wyjścia (<code>lines</code>, <code>markers</code>, <code>zones</code>, <code>levels</code>) mają każdy swoją redukcję i swój test; <code>settled=false</code> ma swoje zdanie.</dd>
+    <dt>Zależy od</dt><dd>E1 <span class="dim">(ta sama ścieżka do świec i ten sam kształt okna)</span></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E3</span> Rzetelność</h3>
+  <dl>
+    <dt>Zakres</dt><dd>Snapshot OpenAPI i <code>scripts/contract.py</code>, <code>test_contract.py</code>, <code>test_tool_surface.py</code>, jednolity kształt odmowy, limit współbieżnych wywołań do <code>market-data</code>, timeouty i jedna próba ponowienia na 5xx.</dd>
+    <dt>Kończy się na</dt><dd>przemianowanie pola w <code>market_data/contract.py</code> wywraca test tutaj.</dd>
+    <dt>Zależy od</dt><dd>E2</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E4</span> Dostęp i wdrożenie</h3>
+  <dl>
+    <dt>Zakres</dt><dd>Tożsamość zarządzana do <code>market-data</code>, Easy Auth przed modułem, test asercji „klient nie wykonuje żadnego zapisu”. Infrastruktura, piąty job w CI, <code>deploy-market-mcp.yml</code>, <code>scripts/dev.sh</code> i <code>dev.ps1</code>.</dd>
+    <dt>Kończy się na</dt><dd>agent w Azure woła narzędzie i dostaje odpowiedź; nigdzie po drodze nie ma hasła.</dd>
+    <dt>Zależy od</dt><dd>E3</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">E5</span> Podpięcie po stronie agenta <span class="pill warn">osobna zmiana</span></h3>
+  <dl>
+    <dt>Zakres</dt><dd>Klient MCP jako węzeł w grafie LangGraph, pętla narzędziowa, zapis wywołań narzędzi w transkrypcie, koszt tokenów wywołań w tabeli zużycia.</dd>
+    <dt>Kończy się na</dt><dd>operator pyta „co robi US100 dziś” i dostaje odpowiedź opartą o archiwum, z nazwanym marginesem niepewności.</dd>
+    <dt>Zależy od</dt><dd>E4 <strong>oraz</strong> zamkniętego <code>add-agent-chat</code>. To jest zmiana w <code>modules/agent</code>, nie tutaj — inna gałąź, inny pull request, inny spec.</dd>
+  </dl>
+</div>
+
+<h2>Testy</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Rodzaj</th><th>Czego dotyka</th><th>W CI</th></tr></thead>
+  <tbody>
+    <tr><td class="field">uv run pytest</td><td>redukcja, sufity, kształt odmowy, powierzchnia narzędzi — wszystko przeciw podstawionemu <code>market-data</code></td><td><span class="pill good">tak</span></td></tr>
+    <tr><td class="field">-m contract</td><td>snapshot OpenAPI kontra pola, po które sięga klient</td><td><span class="pill good">tak</span> <span class="dim">— snapshot jest w repo, serwer niepotrzebny</span></td></tr>
+    <tr><td class="field">-m live --run-live</td><td>prawdziwe <code>market-data</code> na 8020 z prawdziwą bazą</td><td><span class="pill bad">nie</span></td></tr>
+    <tr><td class="field">budżet odpowiedzi</td><td>rozmiar odpowiedzi każdego narzędzia na zakresie rocznym</td><td><span class="pill good">tak</span> <span class="dim">— to jest regresja kosztowa, nie stylistyczna</span></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Bazy nie ma, więc nie ma <code>-m db</code> i nie ma testcontainers. Jedyna zależność zewnętrzna to HTTP do <code>market-data</code>, a to się podstawia.</p>
+
+<h2>Środowisko</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Port</th><th>Moduł</th><th>Kolejność w <code>dev.sh</code> / <code>dev.ps1</code></th></tr></thead>
+  <tbody>
+    <tr><td class="num">8010</td><td>capital-gateway</td><td class="num">1</td></tr>
+    <tr><td class="num">8020</td><td>market-data <span class="dim">(po migracjach)</span></td><td class="num">2</td></tr>
+    <tr><td class="num">8040</td><td><strong>market-mcp</strong></td><td class="num">3</td></tr>
+    <tr><td class="num">8030</td><td>agent</td><td class="num">4 <span class="dim">— zależy od MCP, więc po nim</span></td></tr>
+    <tr><td class="num">5173</td><td>terminal</td><td class="num">5</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Numer portu jest wyższy niż agenta, a moduł startuje przed nim. To nie jest niekonsekwencja — porty są przydzielane w kolejności powstawania modułów, a kolejność startu wynika z zależności. Skrypt czeka, aż każdy z nich naprawdę odpowie, więc pomyłka tutaj kosztuje wiszący start, nie ciche pominięcie.</p>
+
+<h4>Konfiguracja</h4>
+
+<pre><code>MARKET_DATA_URL=http://127.0.0.1:8020   # zdalny adres wymaga tożsamości — inaczej odmowa przy starcie
+MARKET_DATA_SCOPE=                       # api://&lt;app-id&gt;/.default — tylko w Azure
+MCP_HTTP_PORT=8040
+MCP_REQUEST_TIMEOUT_SECONDS=10
+</code></pre>
+
+<h2>Ryzyka i pytania otwarte</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Rzecz</th><th>Stan</th><th>Co z tym robimy</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>Plan App Service B1, <strong>jeden worker</strong>, a to piąta aplikacja na nim</td>
+      <td><span class="pill warn">ryzyko</span></td>
+      <td>Moduł jest bezstanowy i lekki, ale to jest realny nacisk na jeden worker dzielony już z agentem. Do zmierzenia po E4 — i to pomiar, nie przewidywanie. Awaryjne wyjście: MCP jako proces obok agenta w jednym kontenerze, kosztem osobnego wdrożenia.</td>
+    </tr>
+    <tr>
+      <td>Budżet 10 żądań/s liczony przez capital.com <strong>na konto</strong></td>
+      <td><span class="pill good">rozwiązane</span></td>
+      <td>Odczyt świec z archiwum nie dotyka dostawcy w ogóle. Jedyne, co potrafiło go dotknąć, to <code>track_pair</code> — a tego narzędzia nie ma. Wyszło z zakresu przy decyzji o module wyłącznie czytającym.</td>
+    </tr>
+    <tr>
+      <td>Stan sesji rynku niepublikowany przez <code>market-data</code></td>
+      <td><span class="pill">luka</span></td>
+      <td>Osobna zmiana OpenSpec w <code>market-data</code>, jeśli okaże się potrzebna. Do tego czasu wiek świecy zamiast domysłu.</td>
+    </tr>
+    <tr>
+      <td>Wersja protokołu MCP i tempo zmian SDK</td>
+      <td><span class="pill">do sprawdzenia</span></td>
+      <td>Wersja protokołu zapisana w README modułu przy pierwszym commicie, razem z datą sprawdzenia. Transport streamable http wyparł stary HTTP+SSE i tamtego nie implementujemy.</td>
+    </tr>
+    <tr>
+      <td>Koszt tokenów opisów narzędzi</td>
+      <td><span class="pill">do zmierzenia</span></td>
+      <td>Dziesięć narzędzi z opisami to stały narzut w każdej turze modelu. Do zmierzenia po E2 i zestawienia z tabelą kosztów agenta — jeśli boli, zestaw dzieli się na profile, a nie skraca opisy do nieczytelnych.</td>
+    </tr>
+    <tr>
+      <td>Halucynacja symbolu</td>
+      <td><span class="pill good">rozwiązane</span></td>
+      <td>Model poprosi o <code>NASDAQ</code>, którego nie ma. Odpowiedź nazywa to wprost i odsyła do <code>list_tracked_pairs</code>, zamiast oddać pustą serię — patrz kształt odmowy.</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Pierwszy krok</h2>
+
+<p>Jedna zmiana OpenSpec, <code>add-market-data-mcp</code>, obejmująca E0–E3. Infrastruktura (E4) może być w niej albo osobno — dotyka <code>infra/</code>, więc i tak jest zmianą.</p>
+
+<p>Zdolności do opisania — cztery, nie siedem. Każda kolejna to około 790 linii papieru, które ktoś potem czyta (<code>docs/dlaczego-robi-sie-wolniej.html</code>):</p>
+
+<ul>
+  <li><code>market-mcp-tools</code> — jakie narzędzia moduł publikuje, co każde obiecuje i czego nie publikuje nigdy, łącznie z tym, że żadne nie zapisuje.</li>
+  <li><code>market-mcp-answers</code> — jak wygląda odpowiedź: sufity, agregacja, „nic nie znika po cichu”, niepewność w tekście i jeden kształt odmowy.</li>
+  <li><code>market-mcp-upstream-access</code> — na jakich warunkach moduł łączy się z archiwum: tryb tożsamości, pętla zwrotna, snapshot kontraktu, wyłącznie metody czytające.</li>
+  <li><code>market-mcp-transport</code> — dwa transporty, kto może wołać, i co moduł robi z żądaniem bez tożsamości.</li>
+</ul>
+
+<p>Do rozstrzygnięcia w tej zmianie i tylko to — reszta jest tania do zmiany później:</p>
+
+<ol>
+  <li><strong>Sufity i sposób agregacji.</strong> Liczby z tabeli w decyzji 5 są propozycją, nie pomiarem. Zmiana sufitu po fakcie zmienia to, co model widzi, więc zmienia jego odpowiedzi.</li>
+  <li><strong>Kształt odmowy.</strong> Jeden dla wszystkich narzędzi, bo model uczy się go raz.</li>
+  <li><strong>To, że moduł nie zapisuje, jest wymaganiem.</strong> Nie ustawieniem, nie domyślną wartością — zdaniem w specyfikacji, którego przestawienie kosztuje zmianę OpenSpec.</li>
+</ol>
+
+<footer>
+  Dokument planistyczny, pisany przed <code>/opsx:propose</code>. Gdy zmiana <code>add-market-data-mcp</code> zostanie zarchiwizowana, prawdą o systemie stają się specyfikacje i README modułu, a ten plik zostaje tym, czym jest — zapisem, jak zamierzaliśmy to zrobić. Wtedy do <code>docs/archive/</code>.
+</footer>
+
+</main>

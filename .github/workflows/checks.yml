@@ -38,6 +38,7 @@ jobs:
     outputs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
       market-data: ${{ steps.filter.outputs.market-data }}
+      market-mcp: ${{ steps.filter.outputs.market-mcp }}
       agent: ${{ steps.filter.outputs.agent }}
       terminal: ${{ steps.filter.outputs.terminal }}
       openspec: ${{ steps.filter.outputs.openspec }}
@@ -85,13 +86,18 @@ jobs:
           # generatora") — the terminal's hand-written DTOs in `agentApi.ts` are the
           # check for *that* contract, and they only run if this job does.
           terminal='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/agent/agent/contract\.py$'
+          # Same reasoning as the terminal's own filter, one line up: market-mcp keeps a
+          # committed snapshot of the same contract (`contract/market-data.openapi.json`),
+          # and `test_contract.py` is the check that catches it going stale.
+          mcp='^modules/market-mcp/|^modules/market-data/market_data/contract\.py$'
           # The archive-shape check, plus the script that is the shape.
           specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
 
-          for name in capital-gateway market-data agent terminal openspec; do
+          for name in capital-gateway market-data market-mcp agent terminal openspec; do
             case "$name" in
               capital-gateway) pattern="$gateway" ;;
               market-data)     pattern="$archive" ;;
+              market-mcp)      pattern="$mcp" ;;
               agent)           pattern="$agent" ;;
               terminal)        pattern="$terminal" ;;
               openspec)        pattern="$specs" ;;
@@ -147,6 +153,28 @@ jobs:
       # it, so testcontainers starts a real PostgreSQL and they run. That is the intent:
       # they cover the coverage and rollup logic, which has been wrong twice. The 7 that
       # skip are the `live` ones, which need a Capital session and stay behind --run-live.
+      - run: uv run pytest -q
+
+  market-mcp:
+    name: market-mcp
+    needs: changes
+    if: needs.changes.outputs.market-mcp == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/market-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # Before the tests, not after — same reasoning as the terminal's own
+      # `contract:check` below. `scripts/contract.py` reaches into `../market-data`
+      # itself (a sibling checkout in this same runner) and needs no database, no
+      # gateway and no running server to do it.
+      - run: uv run python scripts/contract.py check
+      - run: uv run ruff check .
+      - run: uv run pyright
       - run: uv run pytest -q
 
   agent:

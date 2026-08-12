@@ -16,8 +16,9 @@ need one, the change is wrong, not the rule.
 ```
 modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
 modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway.
+modules/market-mcp        Python · MCP tools over market-data, reduced for a model. Read-only — no tool writes. Depends on market-data.
 modules/agent             Python · the operator's conversation with a model. Own database, own OpenAI key. No tools yet.
-modules/terminal          React+TS · the operator's screen. Consumes all three. Publishes nothing.
+modules/terminal          React+TS · the operator's screen. Consumes the gateway, market-data and agent. Publishes nothing.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
 docs/                     architecture and reference — only what is true today
@@ -35,6 +36,7 @@ Run these from the module directory. Nothing at the repo root builds or tests ev
 |---|---|
 | `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `market-data` | `uv run alembic upgrade head` then `uv run uvicorn market_data.app:app --reload --port 8020`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
+| `market-mcp` | `uv run python -m market_mcp stdio` (desktop client) or `... http` (port 8040)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
 | `agent` | `uv run alembic upgrade head` then `uv run uvicorn agent.app:app --reload --port 8030`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `terminal` | `pnpm dev` · `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm contract:check` |
 
@@ -49,9 +51,9 @@ Test flags that matter:
 
 The whole stack: `./scripts/dev.sh` on macOS and Linux, `./scripts/dev.ps1` on Windows —
 the same script twice (`--no-terminal` / `-NoTerminal` for back end only). It starts things
-in dependency order — migrations → gateway → market-data → agent → terminal — waiting for
-each to actually answer. Ports are fixed: **8010** gateway, **8020** market-data, **8030**
-agent, **5173** terminal.
+in dependency order — migrations → gateway → market-data → market-mcp → agent → terminal —
+waiting for each to actually answer. Ports are fixed: **8010** gateway, **8020**
+market-data, **8030** agent, **8040** market-mcp, **5173** terminal.
 
 ## Things that will bite you
 
@@ -106,10 +108,12 @@ over time. A 401 storm was really observed on 9–10 August; `stream_tokens_for`
 **Env files are per-module and gitignored.** Copy from `.env.example`. The gateway needs
 `CAPITAL_*` demo credentials plus its own `GATEWAY_API_KEY`; market-data needs the same
 `GATEWAY_API_KEY`, a `DATABASE_URL` and the `AZURE_*` identity it connects to Postgres with.
-`agent` needs a `DATABASE_URL` of its own and an `OPENAI_API_KEY`. That key has no
-managed-identity alternative the way the database does — OpenAI is not in Entra — so
-production reads the same value from Key Vault (`openai-api-key`) and `config.py`
-refuses to start without it.
+market-mcp needs no `.env` at all locally — every setting has a working loopback default;
+`MARKET_DATA_SCOPE` only exists for the deployed instance, whose managed identity calls
+market-data with it. `agent` needs a `DATABASE_URL` of its own and an `OPENAI_API_KEY`.
+That key has no managed-identity alternative the way the database does — OpenAI is not in
+Entra — so production reads the same value from Key Vault (`openai-api-key`) and
+`config.py` refuses to start without it.
 
 **Terraform `apply` is the operator's job, never CI's.** CI plans only, deliberately —
 applying would hand the CI principal Entra directory write access. `infra/bootstrap/` keeps
@@ -233,17 +237,20 @@ have broken** — a `changes` job works that out first. `live` tests stay out. I
 that is deliberate, since `contract:check` and the terminal's own hand-written DTOs are the
 checks for exactly those pairings — `agent`'s contract is not wired into
 `pnpm contract:generate`, so its half of that pairing is the terminal's tests passing, not
-a regenerated file.
+a regenerated file. `market_data/contract.py` pulls in `market-mcp`'s job for the same
+reason: that module keeps its own committed snapshot of the same schema
+(`contract/market-data.openapi.json`), and `scripts/contract.py check` is what catches it
+going stale.
 
 There is no branch protection on this repository — a private repo on the free plan cannot
 have it — so a skipped job blocks nothing. If that changes, the filter needs stand-in jobs
 or a required check will sit pending forever.
 
-Four `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
-the matching module, each ending in a smoke check of the deployed thing — market-data's and
-agent's differ here: market-data has one path excluded from Easy Auth to probe directly,
-agent has none, so its deploy confirms through the Azure control plane instead, the same way
-capital-gateway's already did.
+Five `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
+the matching module, each ending in a smoke check of the deployed thing — they differ in
+how they can reach it: market-data has one path excluded from Easy Auth and market-mcp
+answers `/health` outright, so both probe directly, while capital-gateway and agent have
+no such path and confirm through the Azure control plane instead.
 `terraform.yml` plans on infra PRs; `terraform-apply.yml` is a manual `workflow_dispatch`
 that applies — and refuses any plan touching `azuread_*`, because CI holds
 `Application.Read.All` and not write. Entra changes are applied locally by the operator.

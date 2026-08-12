@@ -1,0 +1,86 @@
+name: deploy-market-mcp
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/market-mcp/**"
+      - ".github/workflows/deploy-market-mcp.yml"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  id-token: write # azure/login's OIDC exchange
+  packages: write # docker push to GHCR
+
+concurrency:
+  group: deploy-market-mcp
+  cancel-in-progress: false # never cancel a deploy mid-flight
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+
+      # Lowercased for the same reason as the other deploy workflows — a Docker
+      # reference cannot carry the capitals in `github.repository`.
+      - id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/market-mcp" >> "$GITHUB_OUTPUT"
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Same reasoning as the other deploy workflows: buildx starts cold otherwise.
+      - uses: docker/setup-buildx-action@v3
+
+      # Tagged with the commit, never `latest` — same reasoning as the other deploy
+      # workflows.
+      - uses: docker/build-push-action@v6
+        with:
+          context: modules/market-mcp
+          push: true
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=market-mcp
+          cache-to: type=gha,scope=market-mcp,mode=max
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: app-tradingcenter-market-mcp
+          images: ${{ steps.image.outputs.name }}:${{ github.sha }}
+
+      # "Deployed" has meant "the request was accepted" up to here — same gap the other
+      # deploy workflows close with their own smoke check.
+      #
+      # `/health` is the probe, and it needs none of market-data's `/ws/candles` trick:
+      # this route is excluded from Easy Auth (infra/app-service.tf, `excluded_paths`)
+      # *and* answers a plain 200 with a JSON body on success
+      # (specs/market-mcp-transport, "Sonda bez sesji" / "Sonda przy niedostępnym
+      # archiwum") — there is no case where a live container answers anything else, so
+      # the check is a direct status-code match, not a workaround.
+      - name: Smoke-check the deployed module
+        run: |
+          set -euo pipefail
+          url="https://app-tradingcenter-market-mcp.azurewebsites.net/health"
+          for attempt in $(seq 1 12); do
+            code=$(curl -s -o /tmp/probe -w '%{http_code}' --max-time 20 "$url" || echo 000)
+            body=$(head -c 200 /tmp/probe 2>/dev/null || true)
+            echo "attempt $attempt: HTTP $code ${body}"
+            if [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"status"'; then
+              echo "market-mcp is answering"
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::market-mcp did not answer from its container after ~3 minutes (last HTTP $code)"
+          exit 1

@@ -19,11 +19,19 @@ that runs on its own and publishes a contract. Nothing imports across that bound
         ┌──────────────────────────────┐   │                   │
         │  market-data                 │   │                   │
         │  archive · coverage · rollups│   │                   │
-        └──────────────┬───────────────┘   │                   │
-                       │                   │                   │
-                       ▼                   ▼                   ▼
-                              terminal ◀────┴───────────────────┘
-                    charts · grid · search · archive panel · agent panel
+        └──────┬───────────────┬───────┘   │                   │
+               │               │           │                   │
+               ▼               ▼           ▼                   ▼
+    ┌─────────────────┐   terminal ◀────────┴───────────────────┘
+    │  market-mcp     │   charts · grid · search · archive panel · agent panel
+    │  MCP tools,     │
+    │  read-only      │
+    └────────┬────────┘
+             │ MCP (stdio / streamable HTTP)
+             ▼
+      whatever holds a model: the operator's desktop client today.
+      `agent` is not that caller — it has no tool loop, and giving
+      it one is its own change.
 ```
 
 `terminal` is a consumer, not a peer: it publishes no contract of its own and nothing
@@ -39,14 +47,23 @@ account rather than the process, so a second client anywhere spends the same all
 the gateway owns the only door to the provider, and the archive refuses to start if its
 upstream URLs point anywhere else.
 
+`market-mcp` is a consumer of `market-data`, the same shape as `terminal`: it reads the
+published contract and imports nothing. Where it differs is the shape of what it hands
+onward — a chart wants every candle, a model wants a summary, so the same archive read
+comes out reduced rather than proxied.
+
 `agent` is a peer of `capital-gateway` and `market-data`, not a consumer of either — it
 reaches nothing in this diagram but OpenAI. The box market-data used to point at here
 (`agents / backtests`) was a placeholder for something that did not exist yet; now that one
 does, drawing it as downstream of the archive would say `agent` reads candles and calls
 tools, which it deliberately does not (`openspec/changes/add-agent-chat/design.md`,
-Non-Goals — no tools, nothing that reaches `market-data` or `capital-gateway`). Whether it
-ever earns that edge is a later, separate decision, made the same way this module itself
-was: an OpenSpec change, not a quiet addition to a graph.
+Non-Goals — no tools, nothing that reaches `market-data` or `capital-gateway`).
+
+The two of them look adjacent on the page and are not yet connected. `market-mcp` publishes
+the tools; `agent` holds the model; the edge between them is a tool loop neither module has,
+and it is its own OpenSpec change rather than a quiet addition to a graph
+(`openspec/changes/add-market-data-mcp/proposal.md` puts it out of scope in as many words).
+Until it lands, market-mcp's caller is whatever MCP client the operator runs on the desktop.
 
 ## Why no shared library
 

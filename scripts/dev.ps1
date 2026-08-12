@@ -3,14 +3,20 @@
     Everything the terminal needs, in the order it needs it.
 
 .DESCRIPTION
-    migrations -> capital-gateway -> market-data -> agent -> terminal
+    migrations -> capital-gateway -> market-data -> market-mcp -> agent -> terminal
 
     The order is not tidiness. market-data opens a subscription per tracked pair
     as it starts, so a gateway that is not listening yet costs it a round of
-    backoff; the terminal's charts read the archive, so starting it first fills
-    the console with proxy errors that mean nothing; and the agent has nothing
-    that depends on it, so it goes last among the back ends. Each step waits for
-    the one before it to answer, not merely to have been launched.
+    backoff; market-mcp is a consumer of market-data's own contract, same as the
+    terminal, so it starts after; the terminal's charts read the archive, so
+    starting it first fills the console with proxy errors that mean nothing; and
+    the agent has nothing that depends on it, so it goes last among the back ends.
+    Each step waits for the one before it to answer, not merely to have been
+    launched.
+
+    market-mcp needs no .env of its own here: every setting it reads has a
+    working default for loopback (config.py), unlike the gateway and the archive,
+    which hold real credentials with no safe default to fall back to.
 
     The database is the container in ..\compose.yaml — started here, before
     migrations (openspec/changes/local-dev-database-in-docker). The services run
@@ -49,18 +55,21 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $gatewayDir = Join-Path $repoRoot "modules\capital-gateway"
 $archiveDir = Join-Path $repoRoot "modules\market-data"
+$mcpDir = Join-Path $repoRoot "modules\market-mcp"
 $agentDir = Join-Path $repoRoot "modules\agent"
 $terminalDir = Join-Path $repoRoot "modules\terminal"
 
 $gatewayPort = 8010
 $archivePort = 8020
 $agentPort = 8030
+$mcpPort = 8040
 $terminalPort = 5173
 # 127.0.0.1, not "localhost": uvicorn binds IPv4 loopback, while "localhost" can
 # resolve to ::1 first on Windows.
 $gatewayUrl = "http://127.0.0.1:$gatewayPort"
 $archiveUrl = "http://127.0.0.1:$archivePort"
 $agentUrl = "http://127.0.0.1:$agentPort"
+$mcpUrl = "http://127.0.0.1:$mcpPort"
 $terminalUrl = "http://localhost:$terminalPort"
 
 Write-Host "Checking prerequisites..." -ForegroundColor Cyan
@@ -68,7 +77,7 @@ Write-Host "Checking prerequisites..." -ForegroundColor Cyan
 $problems = @()
 
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) {
-    $problems += "uv is not on PATH (runs both Python services) - https://docs.astral.sh/uv/"
+    $problems += "uv is not on PATH (runs all three Python services) - https://docs.astral.sh/uv/"
 }
 
 # The database lives in a container again, so Docker is back to being a requirement
@@ -136,7 +145,7 @@ function Get-PortOwner {
     return "$($proc.ProcessName) (pid $($proc.Id))"
 }
 
-$ports = @($gatewayPort, $archivePort, $agentPort)
+$ports = @($gatewayPort, $archivePort, $mcpPort, $agentPort)
 if (-not $NoTerminal) { $ports += $terminalPort }
 foreach ($port in $ports) {
     $owner = Get-PortOwner -Port $port
@@ -171,6 +180,7 @@ if ($problems.Count -gt 0) {
 
 $gatewayJob = $null
 $archiveJob = $null
+$mcpJob = $null
 $agentJob = $null
 $terminalJob = $null
 
@@ -328,10 +338,32 @@ try {
     }
     Write-Host "market-data is answering." -ForegroundColor Green
 
+    # --- market-mcp ---
+    #
+    # After market-data, whose contract it reads. No `--reload`: unlike the other
+    # services this one is not started through uvicorn's own CLI (server.py's
+    # caller-identity wrapper needs the ASGI app built in Python first), so a code
+    # change here needs a manual restart for now.
+
+    Write-Host "Starting market-mcp on port $mcpPort..." -ForegroundColor Cyan
+    $mcpJob = Start-Job -Name "mcp" -ScriptBlock {
+        param($dir)
+        Set-Location $dir
+        uv run python -m market_mcp http 2>&1
+    } -ArgumentList $mcpDir
+
+    if (-not (Wait-ForHttp -Url "$mcpUrl/health" -Label "market-mcp" `
+                -Job $mcpJob -Prefix "mcp     " -Color Green)) {
+        Write-Prefixed -Prefix "mcp     " -Color Yellow -Lines (Receive-Job $mcpJob)
+        exit 1
+    }
+    Write-Host "market-mcp is answering." -ForegroundColor Green
+
     # --- agent ---
     #
     # Last among the back ends: nothing else calls it, so nothing else waits on it -
-    # unlike the gateway, which market-data subscribes to as it starts.
+    # unlike the gateway, which market-data subscribes to as it starts. It does not
+    # call market-mcp either; that edge does not exist yet.
 
     Write-Host "Starting agent on port $agentPort..." -ForegroundColor Cyan
     $agentJob = Start-Job -Name "agent" -ScriptBlock {
@@ -370,6 +402,7 @@ try {
     }
     Write-Host "  market-data docs    $archiveUrl/docs"
     Write-Host "  Gateway docs        $gatewayUrl/docs"
+    Write-Host "  market-mcp health   $mcpUrl/health"
     Write-Host "  agent docs          $agentUrl/docs"
     Write-Host "  Database            market_data @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
     Write-Host ""
@@ -380,6 +413,7 @@ try {
     $watched = @(
         @{ Job = $gatewayJob; Label = "capital-gateway"; Prefix = "gateway "; Color = "Blue" },
         @{ Job = $archiveJob; Label = "market-data"; Prefix = "archive "; Color = "Magenta" },
+        @{ Job = $mcpJob; Label = "market-mcp"; Prefix = "mcp     "; Color = "Green" },
         @{ Job = $agentJob; Label = "agent"; Prefix = "agent   "; Color = "Yellow" }
     )
     if (-not $NoTerminal) {
@@ -402,7 +436,7 @@ try {
 finally {
     Write-Host ""
     Write-Host "Stopping..." -ForegroundColor Cyan
-    foreach ($job in @($gatewayJob, $archiveJob, $agentJob, $terminalJob)) {
+    foreach ($job in @($gatewayJob, $archiveJob, $mcpJob, $agentJob, $terminalJob)) {
         if ($null -ne $job) {
             Stop-Job $job -ErrorAction SilentlyContinue | Out-Null
             Remove-Job $job -Force -ErrorAction SilentlyContinue | Out-Null
@@ -411,7 +445,7 @@ finally {
     # Start-Job's child process tree (uv -> uvicorn, pnpm -> vite) can outlive the
     # job object itself, which is what actually leaves a process squatting on the
     # port - so processes bound to the ports we used are swept explicitly too.
-    $sweep = @($gatewayPort, $archivePort, $agentPort)
+    $sweep = @($gatewayPort, $archivePort, $mcpPort, $agentPort)
     if (-not $NoTerminal) { $sweep += $terminalPort }
     foreach ($port in $sweep) {
         Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
