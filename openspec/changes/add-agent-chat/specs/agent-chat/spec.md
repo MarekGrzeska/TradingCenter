@@ -112,3 +112,39 @@ po powrocie do sesji.
 - **THEN** strumień niesie zdarzenie błędu, odróżnialne od domknięcia odpowiedzi
 - **AND** to, co model zdążył wypowiedzieć, MUST być zapisane wraz z oznaczeniem, że
   odpowiedź jest niepełna
+
+### Requirement: Operator nazywa i usuwa rozmowy
+
+Operator MUST móc nadać rozmowie własną nazwę w miejsce tytułu wyprowadzonego z pierwszego
+pytania. Tytuł automatyczny wystarcza, dopóki rozmów jest kilka; przy kilkudziesięciu
+pierwsze zdanie mówi, od czego rozmowa się zaczęła, a nie czego dotyczyła. Nazwa nadana
+ręcznie MUST przetrwać kolejne wypowiedzi — moduł MUST NOT nadpisać jej tytułem
+wyprowadzonym.
+
+Operator MUST móc usunąć rozmowę z historii. Rozmowa usunięta MUST zniknąć z listy i MUST
+przestać być czytelna, nieodróżnialnie od sesji, która nigdy nie istniała — tak samo jak
+sesja cudza (`agent-browser-access`). Dalsza wypowiedź w usuniętej rozmowie MUST być
+odmówiona.
+
+Usunięcie MUST NOT usunąć śladu zużycia, który ta rozmowa zostawiła — patrz `agent-usage`,
+„Skasowanie rozmowy nie zmniejsza rachunku".
+
+#### Scenario: Rozmowa dostaje nazwę od operatora
+
+- **WHEN** operator zmienia nazwę rozmowy, która miała tytuł wyprowadzony z pierwszego
+  pytania
+- **THEN** lista rozmów pokazuje nazwę nadaną przez operatora
+- **AND** kolejna wypowiedź w tej rozmowie nie przywraca tytułu wyprowadzonego
+
+#### Scenario: Nazwa pusta jest odmową
+
+- **WHEN** przychodzi żądanie nadania rozmowie nazwy pustej albo złożonej z samych spacji
+- **THEN** moduł odmawia
+- **AND** rozmowa zachowuje nazwę, którą miała
+
+#### Scenario: Usunięta rozmowa jest nie do odróżnienia od nieistniejącej
+
+- **WHEN** operator usuwa rozmowę, a potem próbuje ją odczytać, przemianować albo dopisać
+  do niej wypowiedź
+- **THEN** moduł odpowiada tak, jakby ta sesja nie istniała
+- **AND** rozmowa nie pojawia się na liście

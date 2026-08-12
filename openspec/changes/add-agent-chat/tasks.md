@@ -47,7 +47,13 @@
 - [x] 4.2 `agent/provider.py` — klient OpenAI na kluczu (tożsamości zarządzanej nie ma do
       czego użyć), wybór modelu po katalogu
 - [x] 4.3 Trasy sesji: `POST /sessions`, `GET /sessions`, `GET /sessions/{id}`,
-      `GET /sessions/{id}/messages`, `PATCH /sessions/{id}` (zmiana modelu)
+      `GET /sessions/{id}/messages`, `PATCH /sessions/{id}` (model i/albo nazwa),
+      `DELETE /sessions/{id}`
+- [x] 4.3a Nazwa nadana ręcznie nie jest nadpisywana tytułem wyprowadzonym; nazwa pusta,
+      sama ze spacji albo dłuższa niż 120 znaków jest odmową
+- [x] 4.3b Usunięcie znaczy `deleted_at`, nie `DELETE` — wiersze `usage` zostają, a każde
+      czytanie sesji filtruje po `deleted_at IS NULL`, więc usunięta rozmowa odpowiada tak
+      jak nieistniejąca na wszystkich trasach naraz
 - [x] 4.4 `POST /sessions/{id}/messages` — zapis wypowiedzi operatora **przed** wywołaniem
       modelu, odpowiedź `text/event-stream`
 - [x] 4.5 Tura modelu w zadaniu niezwiązanym z cyklem życia żądania; rozłączenie wołającego
@@ -95,6 +101,8 @@
 - [x] 7.4 `agentChatStore.ts` — stan na sesjach z modułu zamiast zaszytych odpowiedzi;
       zapamiętana ostatnio otwarta rozmowa, zachowany zapis stanu zwinięcia
 - [x] 7.5 Lista rozmów w panelu: wybór rozmowy, nowa rozmowa, porządek od ostatnio używanej
+- [x] 7.5a Zmiana nazwy i usunięcie wprost z wiersza listy; usunięcie za potwierdzeniem,
+      nazwa brana z odpowiedzi modułu, a usunięcie rozmowy otwartej zamyka jej transkrypt
 - [x] 7.6 Wybierak modelu zbudowany z katalogu, z widoczną różnicą stawki; katalog
       niedostępny mówi to wprost i nie podstawia listy z kodu
 - [x] 7.7 Strumień w dymku: oczekiwanie przed pierwszym fragmentem, dopisywanie kolejnych,

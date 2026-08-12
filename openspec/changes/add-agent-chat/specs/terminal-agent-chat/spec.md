@@ -101,3 +101,39 @@ Odpowiedź niepełna MUST być oznaczona jako niepełna, a nie pokazana jako ca�
 - **WHEN** moduł agenta nie odpowiada
 - **THEN** panel mówi to wprost
 - **AND** MUST NOT pokazywać wypowiedzi agenta, która nie powstała
+
+### Requirement: Lista rozmów pozwala je nazwać i usunąć
+
+Terminal MUST pozwalać operatorowi zmienić nazwę rozmowy i usunąć rozmowę wprost z listy —
+tam, gdzie operator ją widzi i tam, gdzie odróżnia ją od pozostałych.
+
+Usunięcie MUST wymagać potwierdzenia. Lista rozmów jest czytana znacznie częściej, niż
+zmieniana, a jedno chybione kliknięcie MUST NOT kosztować rozmowy.
+
+Terminal MUST pokazać nazwę, którą moduł potwierdził, a nie tę, którą operator wpisał:
+nazwa odrzucona albo nieprzyjęta z powodu awarii MUST NOT zostać na ekranie jako obowiązująca.
+
+Usunięcie rozmowy otwartej w panelu MUST zamknąć jej transkrypt — panel MUST NOT pokazywać
+rozmowy, której moduł już nie wydaje.
+
+#### Scenario: Zmiana nazwy z listy
+
+- **WHEN** operator zmienia nazwę rozmowy na liście i zatwierdza ją
+- **THEN** lista pokazuje nową nazwę
+- **AND** nazwa pochodzi z odpowiedzi modułu, nie z pola, które operator wypełnił
+
+#### Scenario: Nazwa, której moduł nie przyjął
+
+- **WHEN** operator zmienia nazwę rozmowy, a moduł odmawia albo jest nieosiągalny
+- **THEN** lista pokazuje nazwę sprzed próby
+
+#### Scenario: Usunięcie wymaga potwierdzenia
+
+- **WHEN** operator wybiera usunięcie rozmowy
+- **THEN** terminal pyta o potwierdzenie, zanim cokolwiek usunie
+- **AND** rezygnacja zostawia rozmowę na liście
+
+#### Scenario: Usunięcie rozmowy otwartej w panelu
+
+- **WHEN** operator usuwa rozmowę, której transkrypt jest właśnie na ekranie
+- **THEN** panel przestaje pokazywać ten transkrypt

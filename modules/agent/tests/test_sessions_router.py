@@ -6,6 +6,8 @@ built a real pool against the throwaway database — nothing here calls OpenAI.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 import pytest
 from fastapi.testclient import TestClient
 
@@ -127,6 +129,112 @@ def test_changing_to_an_unknown_model_is_refused() -> None:
         session_id = client.post("/sessions", json={}).json()["id"]
         response = client.patch(f"/sessions/{session_id}", json={"model_id": "not-a-real-model"})
     assert response.status_code == 422
+
+
+# --- renaming ---
+
+
+def test_renaming_a_session_replaces_the_derived_title() -> None:
+    with TestClient(app) as client:
+        app.state.provider = _FakeProvider([TextDelta("hi"), UsageReport(1, 1, None, None)])
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(f"/sessions/{session_id}/messages", json={"content": "hello there"})
+        response = client.patch(f"/sessions/{session_id}", json={"title": "  EURUSD  plan  "})
+        listed = client.get("/sessions").json()
+
+    assert response.status_code == 200
+    # Collapsed, not stored as typed — a name padded with spaces reads as a different
+    # name in a list that trims nothing.
+    assert response.json()["title"] == "EURUSD plan"
+    assert any(s["id"] == session_id and s["title"] == "EURUSD plan" for s in listed)
+
+
+def test_a_later_turn_does_not_overwrite_the_operators_name() -> None:
+    with TestClient(app) as client:
+        app.state.provider = _FakeProvider([TextDelta("hi"), UsageReport(1, 1, None, None)])
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(f"/sessions/{session_id}/messages", json={"content": "hello there"})
+        client.patch(f"/sessions/{session_id}", json={"title": "EURUSD plan"})
+        app.state.provider = _FakeProvider([TextDelta("hi"), UsageReport(1, 1, None, None)])
+        client.post(f"/sessions/{session_id}/messages", json={"content": "and another"})
+        session = client.get(f"/sessions/{session_id}").json()
+
+    assert session["title"] == "EURUSD plan"
+
+
+@pytest.mark.parametrize("title", ["", "   ", "x" * 121])
+def test_a_blank_or_overlong_title_is_refused(title: str) -> None:
+    with TestClient(app) as client:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        response = client.patch(f"/sessions/{session_id}", json={"title": title})
+    assert response.status_code == 422
+
+
+def test_a_patch_that_asks_for_nothing_is_refused() -> None:
+    with TestClient(app) as client:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        response = client.patch(f"/sessions/{session_id}", json={})
+    assert response.status_code == 422
+
+
+def test_model_and_title_can_change_in_one_request() -> None:
+    with TestClient(app) as client:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        response = client.patch(
+            f"/sessions/{session_id}", json={"model_id": "gpt-5.6-luna", "title": "both"}
+        )
+    assert response.status_code == 200
+    assert response.json()["current_model_id"] == "gpt-5.6-luna"
+    assert response.json()["title"] == "both"
+
+
+# --- deleting ---
+
+
+def test_a_deleted_session_leaves_the_list_and_reads_as_missing() -> None:
+    with TestClient(app) as client:
+        app.state.provider = _FakeProvider([TextDelta("hi"), UsageReport(1, 1, None, None)])
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(f"/sessions/{session_id}/messages", json={"content": "hello there"})
+
+        deleted = client.delete(f"/sessions/{session_id}")
+        listed = client.get("/sessions").json()
+        read = client.get(f"/sessions/{session_id}")
+        transcript = client.get(f"/sessions/{session_id}/messages")
+        renamed = client.patch(f"/sessions/{session_id}", json={"title": "too late"})
+        continued = client.post(f"/sessions/{session_id}/messages", json={"content": "hello?"})
+
+    assert deleted.status_code == 204
+    assert all(s["id"] != session_id for s in listed)
+    # Indistinguishable from a session that never existed, exactly like a foreign one
+    # (specs/agent-browser-access) — and nothing can be done to it afterwards.
+    assert read.status_code == 404
+    assert transcript.status_code == 404
+    assert renamed.status_code == 404
+    assert continued.status_code == 404
+
+
+def test_deleting_twice_is_a_404_not_a_second_success() -> None:
+    with TestClient(app) as client:
+        session_id = client.post("/sessions", json={}).json()["id"]
+        assert client.delete(f"/sessions/{session_id}").status_code == 204
+        assert client.delete(f"/sessions/{session_id}").status_code == 404
+
+
+def test_deleting_a_session_does_not_reduce_the_bill() -> None:
+    """specs/agent-usage, "Skasowanie rozmowy nie zmniejsza rachunku" — the money was
+    spent whether or not the rozmowa it paid for is still on the list."""
+    with TestClient(app) as client:
+        app.state.provider = _FakeProvider([TextDelta("hi"), UsageReport(1000, 500, None, None)])
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(f"/sessions/{session_id}/messages", json={"content": "hello there"})
+        before = client.get("/usage").json()["total_cost"]
+
+        client.delete(f"/sessions/{session_id}")
+        after = client.get("/usage").json()["total_cost"]
+
+    assert Decimal(after) == Decimal(before)
+    assert Decimal(after) > 0
 
 
 def test_required_authentication_refuses_before_touching_the_model(

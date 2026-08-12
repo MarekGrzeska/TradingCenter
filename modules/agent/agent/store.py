@@ -32,10 +32,14 @@ _INSERT_SESSION = """
     RETURNING id, owner_principal, title, current_model_id, created_at, last_active_at
 """
 
+# `deleted_at IS NULL` rides on every read of a session, here and below. One condition in
+# one place is what makes a removed rozmowa answer like a missing one everywhere at once
+# — GET, PATCH, the transcript and a new turn all reach the session through this — rather
+# than each route remembering to check.
 _SELECT_SESSION = """
     SELECT id, owner_principal, title, current_model_id, created_at, last_active_at
       FROM sessions
-     WHERE id = $1 AND owner_principal = $2
+     WHERE id = $1 AND owner_principal = $2 AND deleted_at IS NULL
 """
 
 # `title IS NOT NULL` is the whole enforcement of "Pusta sesja nie zaśmieca historii" —
@@ -43,14 +47,31 @@ _SELECT_SESSION = """
 _SELECT_SESSIONS_FOR_OWNER = """
     SELECT id, owner_principal, title, current_model_id, created_at, last_active_at
       FROM sessions
-     WHERE owner_principal = $1 AND title IS NOT NULL
+     WHERE owner_principal = $1 AND title IS NOT NULL AND deleted_at IS NULL
      ORDER BY last_active_at DESC
 """
 
 _UPDATE_SESSION_MODEL = """
     UPDATE sessions SET current_model_id = $2
-     WHERE id = $1 AND owner_principal = $3
+     WHERE id = $1 AND owner_principal = $3 AND deleted_at IS NULL
     RETURNING id, owner_principal, title, current_model_id, created_at, last_active_at
+"""
+
+# The operator's own name for a rozmowa. It overwrites whatever `derive_title` put there
+# and is never overwritten back: `_TOUCH_SESSION` below only fills a title that is still
+# NULL, so a renamed session keeps its name for every turn after.
+_UPDATE_SESSION_TITLE = """
+    UPDATE sessions SET title = $2
+     WHERE id = $1 AND owner_principal = $3 AND deleted_at IS NULL
+    RETURNING id, owner_principal, title, current_model_id, created_at, last_active_at
+"""
+
+# `deleted_at IS NULL` in the WHERE, not just the stamp: deleting twice returns no row,
+# so the route answers 404 the second time instead of silently moving the timestamp.
+_SOFT_DELETE_SESSION = """
+    UPDATE sessions SET deleted_at = now()
+     WHERE id = $1 AND owner_principal = $2 AND deleted_at IS NULL
+    RETURNING id
 """
 
 _SELECT_MESSAGES = """
@@ -108,10 +129,10 @@ async def create_session(
 async def get_session(
     conn: Conn, *, session_id: int, owner_principal: str
 ) -> Session | None:
-    """`None` for a session that does not exist *and* for one owned by someone else —
-    the two are indistinguishable to a caller on purpose (specs/agent-browser-access,
-    "Odmowa dostępu do cudzej sesji MUST być nieodróżnialna od odpowiedzi o sesji
-    nieistniejącej")."""
+    """`None` for a session that does not exist, for one owned by someone else, and for
+    one the operator removed — all three are indistinguishable to a caller on purpose
+    (specs/agent-browser-access, "Odmowa dostępu do cudzej sesji MUST być nieodróżnialna
+    od odpowiedzi o sesji nieistniejącej")."""
     row = await conn.fetchrow(_SELECT_SESSION, session_id, owner_principal)
     return _session_from_row(row) if row else None
 
@@ -126,6 +147,26 @@ async def set_session_model(
 ) -> Session | None:
     row = await conn.fetchrow(_UPDATE_SESSION_MODEL, session_id, model_id, owner_principal)
     return _session_from_row(row) if row else None
+
+
+async def set_session_title(
+    conn: Conn, *, session_id: int, owner_principal: str, title: str
+) -> Session | None:
+    row = await conn.fetchrow(_UPDATE_SESSION_TITLE, session_id, title, owner_principal)
+    return _session_from_row(row) if row else None
+
+
+async def delete_session(conn: Conn, *, session_id: int, owner_principal: str) -> bool:
+    """False for a session that does not exist, belongs to someone else, or was already
+    removed — the caller cannot tell which, same as `get_session`.
+
+    The row is stamped, not deleted: `usage` references it, and a rozmowa removed from the
+    list must not remove what it cost from the ledger (specs/agent-usage, "Skasowanie
+    rozmowy nie zmniejsza rachunku"). The transcript stays in `messages` too, unreachable
+    through this module's API — actually erasing text is a different operation from
+    tidying a list, and nothing here claims to do it."""
+    row = await conn.fetchrow(_SOFT_DELETE_SESSION, session_id, owner_principal)
+    return row is not None
 
 
 async def get_messages(conn: Conn, *, session_id: int) -> list[Message]:

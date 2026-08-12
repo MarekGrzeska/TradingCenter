@@ -91,6 +91,13 @@ export interface AgentChatStore {
   /** Clears the panel back to an empty, unsaved conversation — `terminal-agent-chat`
    *  spec, "rozmowa pojawia się na liście dopiero po pierwszej wymianie zdań". */
   newSession(): void;
+  /** Gives a conversation the operator's own name, so a list of first questions becomes a
+   *  list of subjects. Blank is ignored; the module trims and refuses the rest. */
+  renameSession(id: number, title: string): void;
+  /** Removes a conversation from the history. What it cost stays in the cost tab — the
+   *  module keeps the usage rows (`agent-usage` spec, "Skasowanie rozmowy nie zmniejsza
+   *  rachunku"). A no-op while a turn is in flight. */
+  deleteSession(id: number): void;
   /** Picks the model for the active conversation, or for the one `send` will create if
    *  none is open yet. */
   setModel(modelId: string): void;
@@ -302,6 +309,65 @@ export function createAgentChatStore(
     persistActiveSessionId(null);
   }
 
+  /**
+   * Optimistic on neither count: the row changes only once the module has agreed. A list
+   * that renames itself and then silently reverts on a failed request is worse than one
+   * that pauses — the operator would go on believing the name they can see.
+   */
+  function renameSession(id: number, title: string): void {
+    const trimmed = title.trim();
+    if (trimmed === "") return;
+    const current = state.sessions.find((s) => s.id === id);
+    if (current && current.title === trimmed) return;
+
+    void (async () => {
+      try {
+        const session = await api.renameSession(id, trimmed, new AbortController().signal);
+        commit({
+          ...state,
+          sessions: state.sessions.map((s) => (s.id === session.id ? session : s)),
+        });
+      } catch {
+        // Refused or unreachable. The list still shows the old name, which is the one the
+        // module still holds — nothing to undo, and nothing to claim.
+        console.warn(`[agent] could not rename conversation ${id}`);
+      }
+    })();
+  }
+
+  /**
+   * Removing the conversation currently on screen leaves the panel on a new, empty one —
+   * the transcript it was showing is gone, and keeping it visible would be showing a
+   * rozmowa the module now answers 404 for.
+   */
+  function deleteSession(id: number): void {
+    if (turnInFlight()) return;
+
+    void (async () => {
+      try {
+        await api.deleteSession(id, new AbortController().signal);
+      } catch {
+        console.warn(`[agent] could not delete conversation ${id}`);
+        return;
+      }
+      const wasActive = state.activeSessionId === id;
+      if (wasActive) ++transcriptSeq; // orphans any in-flight loadMessages for it
+      commit({
+        ...state,
+        sessions: state.sessions.filter((s) => s.id !== id),
+        ...(wasActive
+          ? {
+              activeSessionId: null,
+              messages: [],
+              transcriptStatus: "ready" as const,
+              turn: null,
+            }
+          : {}),
+      });
+      if (wasActive) persistActiveSessionId(null);
+    })();
+  }
+
   function setModel(modelId: string): void {
     if (modelId === state.selectedModelId) return;
     const previous = state.selectedModelId;
@@ -404,6 +470,8 @@ export function createAgentChatStore(
     },
     openSession,
     newSession,
+    renameSession,
+    deleteSession,
     setModel,
     send(text) {
       void send(text);

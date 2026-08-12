@@ -83,3 +83,19 @@ Sumy MUST być liczone z zapisanych kosztów wierszy, bez sięgania po bieżący
 
 - **WHEN** zadany zakres dat nie obejmuje żadnego wywołania
 - **THEN** odpowiedź jest pustym zestawieniem, a nie błędem
+
+### Requirement: Skasowanie rozmowy nie zmniejsza rachunku
+
+Usunięcie rozmowy (`agent-chat`, „Operator nazywa i usuwa rozmowy") MUST NOT usunąć ani
+zmienić wierszy zużycia, które ta rozmowa zostawiła. Tokeny zostały wydane, a dostawca
+policzył je niezależnie od tego, czy rozmowa jest jeszcze na liście — zakładka kosztów,
+która maleje przy porządkowaniu historii, przestaje się dać porównać z fakturą, i to
+właśnie porównanie jest jedynym powodem, dla którego moduł liczy koszt sam.
+
+Zbiorcze zużycie MUST nadal obejmować wiersze usuniętych rozmów.
+
+#### Scenario: Rachunek po usunięciu rozmowy
+
+- **WHEN** operator usuwa rozmowę, która kosztowała
+- **THEN** suma kosztu przed usunięciem i po nim jest ta sama
+- **AND** wiersze zużycia tej rozmowy nadal wchodzą do zestawień

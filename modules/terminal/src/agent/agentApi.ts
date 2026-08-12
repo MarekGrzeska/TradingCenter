@@ -76,6 +76,10 @@ export interface AgentApi {
   getSession(id: number, signal: AbortSignal): Promise<AgentSession>;
   createSession(modelId: string | null, signal: AbortSignal): Promise<AgentSession>;
   setSessionModel(id: number, modelId: string, signal: AbortSignal): Promise<AgentSession>;
+  renameSession(id: number, title: string, signal: AbortSignal): Promise<AgentSession>;
+  /** Resolves on 204 and rejects on anything else — there is no body to map. A session
+   *  already gone answers 404, indistinguishable from one that never existed. */
+  deleteSession(id: number, signal: AbortSignal): Promise<void>;
   getMessages(id: number, signal: AbortSignal): Promise<AgentMessage[]>;
   /** Posts the operator's turn and hands back its reply as typed events — the raw
    *  `fetch`/`ReadableStream` plumbing lives entirely in `stream.ts` and in the one
@@ -223,6 +227,19 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
         signal,
       });
       return mapSession(raw);
+    },
+
+    async renameSession(id, title, signal) {
+      const raw = await http.json<RawSession>(`${httpBase}/sessions/${id}`, {
+        method: "PATCH",
+        body: { title },
+        signal,
+      });
+      return mapSession(raw);
+    },
+
+    async deleteSession(id, signal) {
+      await http.send(`${httpBase}/sessions/${id}`, { method: "DELETE", signal });
     },
 
     async getMessages(id, signal) {

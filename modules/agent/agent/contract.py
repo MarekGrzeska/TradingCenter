@@ -8,10 +8,15 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator, model_validator
 
 from .models import Message, Session, UsageAggregate
 from .models_catalogue import ModelCatalogueEntry
+
+# A name the operator types, not one derived from the first question — so it may be longer
+# than `store.derive_title`'s 60, but not unbounded: the conversation list is a narrow
+# column that truncates, and a title past this is one nothing can show.
+TITLE_MAX_CHARS = 120
 
 
 class ModelOut(BaseModel):
@@ -85,7 +90,33 @@ class CreateSessionIn(BaseModel):
 
 
 class PatchSessionIn(BaseModel):
-    model_id: str
+    """Both fields optional, at least one required — one route for two edits that an
+    operator makes at different moments and never together: the model changes mid-thought,
+    the name once the rozmowa turned out to be about something worth finding again."""
+
+    model_id: str | None = None
+    title: str | None = None
+
+    @field_validator("title")
+    @classmethod
+    def _title_is_a_name(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        collapsed = " ".join(value.split())
+        if not collapsed:
+            raise ValueError(
+                "title is blank — a session with no name would drop off the list "
+                "entirely, which is not what renaming asks for. Delete it instead."
+            )
+        if len(collapsed) > TITLE_MAX_CHARS:
+            raise ValueError(f"title is longer than {TITLE_MAX_CHARS} characters")
+        return collapsed
+
+    @model_validator(mode="after")
+    def _asks_for_something(self) -> PatchSessionIn:
+        if self.model_id is None and self.title is None:
+            raise ValueError("neither model_id nor title given — this request changes nothing")
+        return self
 
 
 class SendMessageIn(BaseModel):

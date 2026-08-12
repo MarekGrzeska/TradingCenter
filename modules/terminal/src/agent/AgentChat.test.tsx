@@ -105,6 +105,18 @@ function createFakeApi(): FakeApi {
       found.currentModelId = modelId;
       return found;
     },
+    async renameSession(id, title) {
+      const found = api.sessions.find((s) => s.id === id);
+      if (!found) throw new Error("no such session");
+      found.title = title;
+      return found;
+    },
+    async deleteSession(id) {
+      const index = api.sessions.findIndex((s) => s.id === id);
+      if (index === -1) throw new Error("no such session");
+      api.sessions.splice(index, 1);
+      api.transcripts.delete(id);
+    },
     async getMessages(id) {
       return api.transcripts.get(id) ?? [];
     },
@@ -307,7 +319,7 @@ describe("AgentChat", () => {
     await screen.findByLabelText("Model");
 
     await user.click(screen.getByRole("button", { name: /^conversations$/i }));
-    await user.click(await screen.findByRole("button", { name: /older chat/i }));
+    await user.click(await screen.findByRole("button", { name: /^older chat$/i }));
 
     await screen.findByText("hello from before");
     expect(screen.getByRole("textbox", { name: /message the agent/i })).toBeInTheDocument();
@@ -322,14 +334,14 @@ describe("AgentChat", () => {
     await screen.findByLabelText("Model");
 
     await user.click(screen.getByRole("button", { name: /^conversations$/i }));
-    await screen.findByRole("button", { name: /older chat/i });
+    await screen.findByRole("button", { name: /^older chat$/i });
     await user.click(screen.getByRole("button", { name: /^back to chat$/i }));
 
     await user.click(screen.getByRole("button", { name: /^new$/i }));
     expect(screen.queryByText("older chat")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /^conversations$/i }));
-    expect(screen.queryByRole("button", { name: /brand new topic/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^brand new topic$/i })).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /^back to chat$/i }));
 
     const box = screen.getByRole("textbox", { name: /message the agent/i });
@@ -337,7 +349,7 @@ describe("AgentChat", () => {
     await screen.findByText("you asked: brand new topic");
 
     await user.click(screen.getByRole("button", { name: /^conversations$/i }));
-    await screen.findByRole("button", { name: /brand new topic/i });
+    await screen.findByRole("button", { name: /^brand new topic$/i });
   });
 
   // The panel is mounted once, beside the router outlet and not inside it (`Shell.tsx`),
@@ -391,7 +403,7 @@ describe("AgentChat", () => {
     await user.click(screen.getByRole("button", { name: /open agent chat/i }));
     await screen.findByLabelText("Model");
     await user.click(screen.getByRole("button", { name: /^conversations$/i }));
-    await user.click(await screen.findByRole("button", { name: /older chat/i }));
+    await user.click(await screen.findByRole("button", { name: /^older chat$/i }));
     await screen.findByText("hello from before");
     unmount();
 
@@ -425,5 +437,77 @@ describe("AgentChat", () => {
     await user.type(box, "   {Enter}");
 
     expect(screen.getByRole("button", { name: "Send" })).toBeDisabled();
+  });
+
+  it("renames a conversation to whatever the operator types", async () => {
+    const api = createFakeApi();
+    api.seed("older chat", "luna");
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+
+    await user.click(await screen.findByRole("button", { name: /rename older chat/i }));
+    const field = screen.getByRole("textbox", { name: /rename older chat/i });
+    await user.clear(field);
+    await user.type(field, "EURUSD plan{Enter}");
+
+    expect(await screen.findByRole("button", { name: /^EURUSD plan$/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^older chat$/i })).not.toBeInTheDocument();
+  });
+
+  it("abandons a rename on Escape, leaving the name the module still holds", async () => {
+    const api = createFakeApi();
+    api.seed("older chat", "luna");
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+
+    await user.click(await screen.findByRole("button", { name: /rename older chat/i }));
+    const field = screen.getByRole("textbox", { name: /rename older chat/i });
+    await user.clear(field);
+    await user.type(field, "never mind{Escape}");
+
+    expect(await screen.findByRole("button", { name: /^older chat$/i })).toBeInTheDocument();
+  });
+
+  it("asks before deleting, and keeps the conversation when told to", async () => {
+    const api = createFakeApi();
+    api.seed("older chat", "luna");
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+
+    await user.click(await screen.findByRole("button", { name: /delete older chat/i }));
+    // The row asks rather than acting — a single mis-click on a list read far more often
+    // than edited must not lose a rozmowa.
+    expect(screen.getByText(/delete this conversation\?/i)).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /^keep$/i }));
+    expect(await screen.findByRole("button", { name: /^older chat$/i })).toBeInTheDocument();
+  });
+
+  it("removes a confirmed conversation from the list", async () => {
+    const api = createFakeApi();
+    api.seed("older chat", "luna");
+    api.seed("another chat", "luna");
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+
+    await user.click(await screen.findByRole("button", { name: /delete older chat/i }));
+    await user.click(screen.getByRole("button", { name: /^delete$/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /^older chat$/i })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByRole("button", { name: /^another chat$/i })).toBeInTheDocument();
   });
 });

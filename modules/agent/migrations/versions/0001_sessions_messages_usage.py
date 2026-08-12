@@ -55,6 +55,14 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("now()"),
         ),
+        # Set when the operator removes a rozmowa. A stamp rather than a `DELETE`, and the
+        # reason is the ledger: `usage` rows below reference this session, and money that
+        # was spent MUST NOT stop being counted because the conversation it paid for was
+        # tidied away (specs/agent-usage, "Skasowanie rozmowy nie zmniejsza rachunku").
+        # Every read filters on `deleted_at IS NULL`, so a removed session answers exactly
+        # like a missing one — the same indistinguishability specs/agent-browser-access
+        # already requires of somebody else's session.
+        sa.Column("deleted_at", sa.TIMESTAMP(timezone=True), nullable=True),
     )
     op.create_index(
         "ix_sessions_owner_last_active",

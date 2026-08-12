@@ -58,6 +58,8 @@ interface FakeApi extends AgentApi {
   failGetMessages: boolean;
   failCreateSession: boolean;
   failSendMessage: boolean;
+  failRenameSession: boolean;
+  failDeleteSession: boolean;
   /** What `sendMessage` hands back, set per test — a plain event list by default. */
   script: AgentStreamEvent[];
   /** Seeds a titled, already-exchanged conversation, the way one would exist in the
@@ -76,6 +78,8 @@ function createFakeApi(): FakeApi {
     failGetMessages: false,
     failCreateSession: false,
     failSendMessage: false,
+    failRenameSession: false,
+    failDeleteSession: false,
     script: [{ kind: "complete", incomplete: false }],
 
     seed(title, modelId) {
@@ -123,6 +127,22 @@ function createFakeApi(): FakeApi {
       if (!found) throw new Error("no such session");
       found.currentModelId = modelId;
       return found;
+    },
+    async renameSession(id, title) {
+      if (api.failRenameSession) throw new Error("agent is not reachable");
+      const found = api.sessions.find((s) => s.id === id);
+      if (!found) throw new Error("no such session");
+      found.title = title;
+      return found;
+    },
+    async deleteSession(id) {
+      if (api.failDeleteSession) throw new Error("agent is not reachable");
+      const index = api.sessions.findIndex((s) => s.id === id);
+      if (index === -1) throw new Error("no such session");
+      // The module soft-deletes and the transcript stays in its database; from this side
+      // the row and its messages are simply gone, which is all the terminal can observe.
+      api.sessions.splice(index, 1);
+      api.transcripts.delete(id);
     },
     async getMessages(id) {
       if (api.failGetMessages) throw new Error("agent is not reachable");
@@ -467,5 +487,66 @@ describe("createAgentChatStore", () => {
     expect(second.getSnapshot().messages).toEqual([
       { id: 1, role: "operator", text: "hello", incomplete: false },
     ]);
+  });
+
+  it("renames a conversation only once the module has agreed", async () => {
+    const api = createFakeApi();
+    const older = api.seed("older chat", "luna");
+    const store = createAgentChatStore(null, api);
+    store.setExpanded(true);
+    await waitFor(() => expect(store.getSnapshot().sessionsStatus).toBe("ready"));
+
+    store.renameSession(older.id, "  EURUSD plan  ");
+    await waitFor(() =>
+      expect(store.getSnapshot().sessions[0].title).toBe("EURUSD plan"),
+    );
+  });
+
+  it("keeps the old name when the rename is refused, rather than showing one nothing holds", async () => {
+    const api = createFakeApi();
+    const older = api.seed("older chat", "luna");
+    api.failRenameSession = true;
+    const store = createAgentChatStore(null, api);
+    store.setExpanded(true);
+    await waitFor(() => expect(store.getSnapshot().sessionsStatus).toBe("ready"));
+
+    store.renameSession(older.id, "EURUSD plan");
+    await waitFor(() => expect(api.failRenameSession).toBe(true));
+    expect(store.getSnapshot().sessions[0].title).toBe("older chat");
+  });
+
+  it("clears the panel when the conversation it is showing is deleted", async () => {
+    const api = createFakeApi();
+    const older = api.seed("older chat", "luna");
+    const store = createAgentChatStore(null, api);
+    store.setExpanded(true);
+    await waitFor(() => expect(store.getSnapshot().sessionsStatus).toBe("ready"));
+
+    store.openSession(older.id);
+    await waitFor(() => expect(store.getSnapshot().activeSessionId).toBe(older.id));
+
+    store.deleteSession(older.id);
+    // Not left on screen: the module answers 404 for it now, so a transcript still
+    // showing would be one nothing can be added to.
+    await waitFor(() => expect(store.getSnapshot().activeSessionId).toBeNull());
+    expect(store.getSnapshot().messages).toEqual([]);
+    expect(store.getSnapshot().sessions).toEqual([]);
+  });
+
+  it("leaves the open conversation alone when a different one is deleted", async () => {
+    const api = createFakeApi();
+    const keep = api.seed("keep me", "luna");
+    const drop = api.seed("drop me", "luna");
+    const store = createAgentChatStore(null, api);
+    store.setExpanded(true);
+    await waitFor(() => expect(store.getSnapshot().sessionsStatus).toBe("ready"));
+
+    store.openSession(keep.id);
+    await waitFor(() => expect(store.getSnapshot().activeSessionId).toBe(keep.id));
+
+    store.deleteSession(drop.id);
+    await waitFor(() => expect(store.getSnapshot().sessions).toHaveLength(1));
+    expect(store.getSnapshot().activeSessionId).toBe(keep.id);
+    expect(store.getSnapshot().sessions[0].id).toBe(keep.id);
   });
 });

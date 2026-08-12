@@ -72,20 +72,46 @@ async def get_messages(
 
 
 @router.patch("/sessions/{session_id}")
-async def set_session_model(
+async def patch_session(
     session_id: int, body: PatchSessionIn, request: Request, owner: str = Depends(current_principal)
 ) -> SessionOut:
-    try:
-        request.app.state.catalogue.get(body.model_id)
-    except ModelNotInCatalogue as err:
-        raise HTTPException(422, detail=str(err)) from err
+    if body.model_id is not None:
+        try:
+            request.app.state.catalogue.get(body.model_id)
+        except ModelNotInCatalogue as err:
+            raise HTTPException(422, detail=str(err)) from err
+
     async with request.app.state.pool.acquire() as conn:
-        session = await store.set_session_model(
-            conn, session_id=session_id, owner_principal=owner, model_id=body.model_id
-        )
+        session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
+        if session is None:
+            raise HTTPException(404, detail="no such session")
+        # Both edits go through their own statement rather than one built by hand from
+        # whichever fields arrived — two small UPDATEs on a single-operator table cost
+        # nothing, and a query assembled from a request body is the shape SQL injection
+        # arrives in.
+        if body.model_id is not None:
+            session = await store.set_session_model(
+                conn, session_id=session_id, owner_principal=owner, model_id=body.model_id
+            )
+        if body.title is not None:
+            session = await store.set_session_title(
+                conn, session_id=session_id, owner_principal=owner, title=body.title
+            )
     if session is None:
         raise HTTPException(404, detail="no such session")
     return SessionOut.from_session(session)
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+async def delete_session(
+    session_id: int, request: Request, owner: str = Depends(current_principal)
+) -> None:
+    """Removes the rozmowa from the operator's history. What it cost stays in the ledger —
+    see `store.delete_session` for why that is not a compromise but the point."""
+    async with request.app.state.pool.acquire() as conn:
+        removed = await store.delete_session(conn, session_id=session_id, owner_principal=owner)
+    if not removed:
+        raise HTTPException(404, detail="no such session")
 
 
 def _sse(event: str, data: dict) -> str:

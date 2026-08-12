@@ -103,6 +103,8 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
             store.openSession(id);
             setView("chat");
           }}
+          onRename={(id, title) => store.renameSession(id, title)}
+          onDelete={(id) => store.deleteSession(id)}
         />
       ) : (
         <>
@@ -211,9 +213,13 @@ function ModelPicker({
 function ConversationList({
   state,
   onOpen,
+  onRename,
+  onDelete,
 }: {
   state: AgentChatState;
   onOpen: (id: number) => void;
+  onRename: (id: number, title: string) => void;
+  onDelete: (id: number) => void;
 }) {
   if (state.sessionsStatus === "unreachable") {
     return (
@@ -230,20 +236,122 @@ function ConversationList({
   return (
     <ul className="min-h-0 flex-1 overflow-y-auto">
       {state.sessions.map((session) => (
-        <li key={session.id}>
-          <button
-            type="button"
-            onClick={() => onOpen(session.id)}
-            aria-current={session.id === state.activeSessionId}
-            className={`w-full truncate px-3 py-2 text-left text-xs hover:bg-panel-strong ${
-              session.id === state.activeSessionId ? "bg-panel-strong text-ink" : "text-ink-secondary"
-            }`}
-          >
-            {session.title}
-          </button>
-        </li>
+        <ConversationRow
+          key={session.id}
+          session={session}
+          active={session.id === state.activeSessionId}
+          onOpen={onOpen}
+          onRename={onRename}
+          onDelete={onDelete}
+        />
       ))}
     </ul>
+  );
+}
+
+function ConversationRow({
+  session,
+  active,
+  onOpen,
+  onRename,
+  onDelete,
+}: {
+  session: AgentChatState["sessions"][number];
+  active: boolean;
+  onOpen: (id: number) => void;
+  onRename: (id: number, title: string) => void;
+  onDelete: (id: number) => void;
+}) {
+  // Three states, not two: renaming and confirming a delete are both modes this one row
+  // enters, and neither may be reachable from the other — a stray Enter must not both
+  // rename and remove.
+  const [mode, setMode] = useState<"idle" | "renaming" | "confirming">("idle");
+  const [draft, setDraft] = useState(session.title ?? "");
+
+  function commitRename(): void {
+    onRename(session.id, draft);
+    setMode("idle");
+  }
+
+  if (mode === "renaming") {
+    return (
+      <li className="flex items-center gap-1 px-2 py-1.5">
+        <input
+          // The row became a field on the operator's own click, so the caret has exactly
+          // one sensible place to be.
+          autoFocus
+          value={draft}
+          maxLength={120}
+          onChange={(event) => setDraft(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter") commitRename();
+            if (event.key === "Escape") setMode("idle");
+          }}
+          onBlur={commitRename}
+          aria-label={`Rename ${session.title ?? "conversation"}`}
+          className="min-w-0 flex-1 rounded border border-primary bg-sunken px-1.5 py-1 text-xs text-ink focus:outline-none"
+        />
+      </li>
+    );
+  }
+
+  if (mode === "confirming") {
+    return (
+      <li className="flex items-center gap-2 bg-critical/10 px-3 py-2 text-xs">
+        <span className="min-w-0 flex-1 truncate text-ink-secondary">Delete this conversation?</span>
+        <button
+          type="button"
+          onClick={() => onDelete(session.id)}
+          className="cursor-pointer rounded border border-critical/50 px-1.5 py-0.5 text-[11px] text-critical hover:bg-critical/20"
+        >
+          Delete
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("idle")}
+          className="cursor-pointer rounded border border-border px-1.5 py-0.5 text-[11px] text-ink-muted hover:text-ink"
+        >
+          Keep
+        </button>
+      </li>
+    );
+  }
+
+  return (
+    // `group` rather than always-on controls: a list read far more often than edited
+    // stays a list of names, and the two buttons appear on the row under the pointer.
+    // They are still in the tab order, so a keyboard reaches them without hovering.
+    <li className="group flex items-center">
+      <button
+        type="button"
+        onClick={() => onOpen(session.id)}
+        aria-current={active}
+        className={`min-w-0 flex-1 truncate px-3 py-2 text-left text-xs hover:bg-panel-strong ${
+          active ? "bg-panel-strong text-ink" : "text-ink-secondary"
+        }`}
+      >
+        {session.title}
+      </button>
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(session.title ?? "");
+          setMode("renaming");
+        }}
+        aria-label={`Rename ${session.title ?? "conversation"}`}
+        className="cursor-pointer px-1 py-2 text-[11px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:text-ink"
+      >
+        Rename
+      </button>
+      <button
+        type="button"
+        onClick={() => setMode("confirming")}
+        aria-label={`Delete ${session.title ?? "conversation"}`}
+        className="cursor-pointer px-2 py-2 text-[11px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 focus:opacity-100 hover:text-critical"
+      >
+        Delete
+      </button>
+    </li>
   );
 }
 

@@ -29,6 +29,12 @@ function fakeApi(overrides: Partial<AgentApi> = {}): AgentApi {
     setSessionModel: async () => {
       throw new Error("not used");
     },
+    renameSession: async () => {
+      throw new Error("not used");
+    },
+    deleteSession: async () => {
+      throw new Error("not used");
+    },
     getMessages: async () => [],
     sendMessage: async () => {
       throw new Error("not used");
