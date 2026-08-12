@@ -34,6 +34,14 @@ def test_remote_url_with_scope_is_accepted() -> None:
     assert settings.market_data_scope == "api://some-app/.default"
 
 
+def test_the_http_transport_binds_loopback_unless_told_otherwise() -> None:
+    """A desk runs this with the identity requirement off, so the default bind is the
+    difference between tools reachable by this machine and tools reachable by whatever
+    network it is on. The container overrides it (Dockerfile, MCP_HTTP_HOST)."""
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+    assert settings.mcp_http_host == "127.0.0.1"
+
+
 def test_blank_scope_means_unset() -> None:
     settings = Settings(
         market_data_url="http://127.0.0.1:8020",

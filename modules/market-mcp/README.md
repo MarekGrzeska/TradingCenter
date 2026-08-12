@@ -64,6 +64,11 @@ uv run python -m market_mcp http   # for the agent module, or for manual testing
 Pointing `MARKET_DATA_URL` anywhere off loopback needs `MARKET_DATA_SCOPE` set too — see
 `config.py`'s docstring.
 
+`http` binds `127.0.0.1:8040`. The container binds every interface instead
+(`Dockerfile`, `MCP_HTTP_HOST=0.0.0.0`), because the platform reaches it from outside;
+a desk has no reason to publish read-only market tools to its network, least of all
+with `REQUIRE_AUTHENTICATED_PRINCIPAL` off, which is what local means.
+
 ### Trying it from Claude Desktop
 
 ```json

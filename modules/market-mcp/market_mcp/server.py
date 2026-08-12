@@ -29,7 +29,7 @@ def build_server(settings: Settings, upstream: UpstreamClient) -> FastMCP:
     mcp = FastMCP(
         "market-mcp",
         instructions=INSTRUCTIONS,
-        host="0.0.0.0",
+        host=settings.mcp_http_host,
         port=settings.mcp_http_port,
     )
 

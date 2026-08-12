@@ -36,6 +36,14 @@ class Settings(BaseSettings):
 
     # --- this module's own HTTP surface, for the streamable-http transport ---
     mcp_http_port: int = 8040
+    # Loopback by default, and the container overrides it (`Dockerfile`, ENV) — the
+    # other three modules get this for free from uvicorn's CLI, whose own default is
+    # 127.0.0.1 and whose `--host 0.0.0.0` is written into their CMD. This module runs
+    # uvicorn from Python (`__main__.py`, so the caller-identity wrapper can be built
+    # first), so the default is spelled out here instead of inherited. It matters
+    # locally: `require_authenticated_principal` is off on a desk, so binding every
+    # interface would publish the tools to whatever network the machine is on.
+    mcp_http_host: str = "127.0.0.1"
 
     # Whether a platform authenticator (Easy Auth) stands in front of this module.
     # Where it does, only a caller it has already identified may reach a tool — a

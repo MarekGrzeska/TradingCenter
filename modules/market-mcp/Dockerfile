@@ -23,6 +23,11 @@ ENV PATH="/app/.venv/bin:$PATH"
 # alongside it so the server binds where the platform is listening.
 EXPOSE 80
 
+# Every interface, because the platform reaches the container from outside it. This is
+# the container's override of `config.py`'s loopback default, and it is the same line
+# the other three modules write as `--host 0.0.0.0` in their uvicorn CMD.
+ENV MCP_HTTP_HOST=0.0.0.0
+
 # The `http` transport, not `stdio` — App Service speaks HTTP to the container, and
 # `/health` lives on the same ASGI app `server.py` builds around the MCP route.
 CMD ["python", "-m", "market_mcp", "http"]

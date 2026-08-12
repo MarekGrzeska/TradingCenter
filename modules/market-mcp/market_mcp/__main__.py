@@ -29,7 +29,7 @@ async def _serve(transport: str) -> None:
             # ASGI app internally, with no seam to wrap it in the caller-identity
             # check `build_http_app` adds (task 5.2).
             app = build_http_app(settings, upstream)
-            config = uvicorn.Config(app, host="0.0.0.0", port=settings.mcp_http_port)
+            config = uvicorn.Config(app, host=settings.mcp_http_host, port=settings.mcp_http_port)
             await uvicorn.Server(config).serve()
     finally:
         await upstream.aclose()
