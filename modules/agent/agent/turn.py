@@ -19,7 +19,7 @@ import asyncpg
 from . import store
 from .graph import build_graph, initial_state
 from .models_catalogue import ModelCatalogueEntry
-from .prompt import PROMPT_VERSION, SYSTEM_PROMPT
+from .prompt import PROMPT_VERSION, system_prompt
 from .provider import ModelProvider
 from .tools import ToolServer
 
@@ -82,7 +82,11 @@ async def run_turn(
     try:
         result = await graph.ainvoke(
             initial_state(
-                system_prompt=SYSTEM_PROMPT,
+                # Which prompt this turn runs is a fact about the turn, not a change to
+                # the prompt: both texts are `v3`, and the one without tools is what an
+                # unreachable market-mcp degrades to (specs/agent-chat, "Agent bez
+                # narzędzi mówi, że ich nie ma").
+                system_prompt=system_prompt(has_tools=bool(tools)),
                 history=history,
                 model=model_entry.model,
                 on_delta=on_delta,

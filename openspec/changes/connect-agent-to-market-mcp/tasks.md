@@ -71,13 +71,13 @@ implementacja tego nie potrzebuje.
 
 ## 4. Prompt
 
-- [ ] 4.1 `prompt.py` — `v3`: agent ma narzędzia, dane pochodzą z archiwum zbierającego
+- [x] 4.1 `prompt.py` — `v3`: agent ma narzędzia, dane pochodzą z archiwum zbierającego
   wybrane pary, brak świec nie jest ciszą rynku, cena bez momentu nic nie znaczy
-- [ ] 4.2 Zakaz rekomendacji i zakaz podawania liczby, której agent nie dostał, przepisane
+- [x] 4.2 Zakaz rekomendacji i zakaz podawania liczby, której agent nie dostał, przepisane
   wprost pod nowy stan rzeczy — ten drugi jest teraz sprawdzalny, bo agent liczby dostaje
-- [ ] 4.3 Wariant promptu na turę bez narzędzi (serwer niedostępny), mówiący to, co prompt
+- [x] 4.3 Wariant promptu na turę bez narzędzi (serwer niedostępny), mówiący to, co prompt
   mówił zawsze (`agent-chat`, „Agent bez narzędzi mówi, że ich nie ma")
-- [ ] 4.4 Test: `PROMPT_VERSION` podbite, a wiadomości sprzed zmiany dalej niosą swoją
+- [x] 4.4 Test: `PROMPT_VERSION` podbite, a wiadomości sprzed zmiany dalej niosą swoją
   wersję
 
 ## 5. Wdrożenie i uruchomienie
