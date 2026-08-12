@@ -1,10 +1,9 @@
-## Purpose
+# market-mcp-transport Specification
 
+## Purpose
 Jak klient sięga po moduł — dwiema drogami, jednym zestawem narzędzi — i kto ma prawo go
 zawołać, gdy stoi w sieci, a nie na biurku operatora.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Dwa transporty, jeden zestaw narzędzi
 
 Moduł MUST być osiągalny dwiema drogami: po sieci, dla klienta stojącego w innym procesie

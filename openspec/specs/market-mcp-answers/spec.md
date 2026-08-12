@@ -1,11 +1,10 @@
-## Purpose
+# market-mcp-answers Specification
 
+## Purpose
 Kształt odpowiedzi każdego narzędzia: ile jej maksymalnie jest, co się dzieje, gdy jest
 jej za dużo, jak niesie niepewność archiwum i jak wygląda odmowa, której model ma
 posłuchać.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Odpowiedź ma sufit, a odcięcie nie jest ciche
 
 Każde narzędzie MUST mieć górną granicę wielkości swojej odpowiedzi, wpisaną w jego opis.

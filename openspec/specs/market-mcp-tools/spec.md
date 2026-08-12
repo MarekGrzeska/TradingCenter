@@ -1,10 +1,9 @@
-## Purpose
+# market-mcp-tools Specification
 
+## Purpose
 Zestaw narzędzi, które moduł publikuje klientowi MCP: na jakie pytanie o archiwum
 odpowiada każde z nich, co obiecuje ich opis, i czego w zestawie nie ma — nigdy.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Zestaw narzędzi wyłącznie czyta
 
 Moduł MUST publikować wyłącznie narzędzia, których wykonanie nie zmienia stanu żadnego

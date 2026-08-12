@@ -1,10 +1,9 @@
-## Purpose
+# market-mcp-upstream-access Specification
 
+## Purpose
 Warunki, na jakich moduł łączy się z archiwum: czym się przed nim przedstawia, jakich
 żądań nie wykonuje nigdy i skąd wie, że kontrakt, który czyta, jest wciąż tym samym.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Tryb połączenia jest wybrany jednoznacznie, nie zgadnięty
 
 Konfiguracja MUST wskazywać dokładnie jeden tryb dostępu do archiwum: tożsamość wobec
