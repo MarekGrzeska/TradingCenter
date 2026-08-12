@@ -11,11 +11,9 @@ from agent.provider import TextDelta, UsageReport
 pytestmark = pytest.mark.db
 
 _ENV = {
-    "AZURE_OPENAI_ENDPOINT": "https://example.openai.azure.com",
-    "AZURE_OPENAI_API_VERSION": "2026-01-01",
-    "AZURE_OPENAI_API_KEY": "key",
+    "OPENAI_API_KEY": "key",
     "MODELS": (
-        '[{"id":"gpt-5.6-luna","deployment":"luna-prod","display_name":"Luna",'
+        '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1k":"0.001","output_rate_per_1k":"0.006"}]'
     ),
     "DEFAULT_MODEL_ID": "gpt-5.6-luna",
@@ -39,7 +37,7 @@ class _FakeProvider:
     def __init__(self, chunks: list) -> None:
         self._chunks = chunks
 
-    async def stream(self, *, deployment: str, system_prompt: str, history: list):
+    async def stream(self, *, model: str, system_prompt: str, history: list):
         for chunk in self._chunks:
             yield chunk
 

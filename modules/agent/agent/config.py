@@ -1,19 +1,16 @@
-"""Settings, and the two mode switches this module refuses to leave ambiguous.
+"""Settings, and the one mode switch this module refuses to leave ambiguous.
 
-Two things here pick between a local shape and a remote one, and both follow the same
-rule market-data's `config.py` set for its database: **exactly one** of a pair of
-settings selects the mode, and a configuration naming neither or both is rejected at
-startup rather than guessed at.
+The database follows the rule market-data's `config.py` set for its own: `database_user`
+set → identity, off-machine; unset → password, loopback only. A configuration naming
+neither or both is rejected at startup rather than guessed at (design.md, "Moduł nie
+dzieli bazy z innym modułem" — the two modules duplicate this check rather than share
+it).
 
-  database         `database_user` set → identity, off-machine. Unset → password,
-                    loopback only. Mirrors market-data's own switch (design.md, "Moduł
-                    nie dzieli bazy z innym modułem" — the two modules duplicate this
-                    check rather than share it).
-
-  model provider   `azure_openai_api_key` set → key, local. `azure_openai_use_managed_
-                    identity` true → managed identity, production. A key *and* the flag
-                    together do not say which of them actually pays (design.md, "Wobec
-                    Azure OpenAI: tożsamość zarządzana, lokalnie klucz").
+The model provider has no such switch, because there is nothing to switch between:
+OpenAI is not in Entra, so a managed identity has nobody to present a token to and
+`openai_api_key` is the only credential either shape can use (design.md, "Wobec OpenAI:
+klucz, i tylko klucz"). Local and production differ only in where the value comes from —
+`.env` there, a Key Vault reference here (infra/key-vault.tf).
 
 Refusing to build the settings leaves nothing running to misuse.
 """
@@ -46,11 +43,10 @@ class ModelCatalogueEntry(BaseModel):
     """
 
     id: str
-    # The name this deployment is known by in Azure OpenAI — what a call actually
-    # addresses. Kept separate from `id` because the two need not match: `id` is this
-    # module's own stable identifier, carried in every session and usage row, and
-    # outliving a deployment renamed or moved to a different region.
-    deployment: str
+    # What OpenAI is actually asked for. Kept separate from `id` because the two need
+    # not match: `id` is this module's own stable identifier, carried in every session
+    # and usage row, and outliving a model renamed or retired upstream.
+    model: str
     display_name: str
     # Lower is cheaper. An explicit field rather than list order, because list order in
     # an env-supplied JSON string is easy to get wrong silently; a wybierak sorts by
@@ -59,7 +55,7 @@ class ModelCatalogueEntry(BaseModel):
     input_rate_per_1k: Decimal
     output_rate_per_1k: Decimal
 
-    @field_validator("id", "deployment", "display_name")
+    @field_validator("id", "model", "display_name")
     @classmethod
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:
         if not value.strip():
@@ -86,14 +82,13 @@ class Settings(BaseSettings):
     azure_client_secret: str | None = None
     azure_tenant_id: str | None = None
 
-    # --- Azure OpenAI, this module's only model provider ---
-    azure_openai_endpoint: str
-    # No default: Azure OpenAI's REST surface is versioned by a query parameter that
-    # moves independently of this module's releases, and a guessed date here is a
-    # deployment that answers 400 for a reason nothing in this file explains.
-    azure_openai_api_version: str
-    azure_openai_api_key: str | None = None
-    azure_openai_use_managed_identity: bool = False
+    # --- OpenAI, this module's only model provider ---
+    #
+    # Required, with no fallback to an ambient credential: unlike the database, OpenAI
+    # has no Entra identity to fall back *to*. A module that started without this would
+    # accept a turn and fail on the call, after the operator's message was already
+    # stored.
+    openai_api_key: str
 
     # --- the models this module offers, and which one a session gets by default ---
     models: list[ModelCatalogueEntry] = Field(default_factory=list)
@@ -108,7 +103,7 @@ class Settings(BaseSettings):
     # have.
     require_authenticated_principal: bool = False
 
-    @field_validator("database_url", "azure_openai_endpoint", "azure_openai_api_version")
+    @field_validator("database_url", "openai_api_key")
     @classmethod
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:
         if not value.strip():
@@ -118,13 +113,6 @@ class Settings(BaseSettings):
     @field_validator("database_user")
     @classmethod
     def _blank_database_user_means_unset(cls, value: str | None) -> str | None:
-        if value is None or not value.strip():
-            return None
-        return value.strip()
-
-    @field_validator("azure_openai_api_key")
-    @classmethod
-    def _blank_api_key_means_unset(cls, value: str | None) -> str | None:
         if value is None or not value.strip():
             return None
         return value.strip()
@@ -159,23 +147,6 @@ class Settings(BaseSettings):
                 f"DATABASE_URL points at {host!r} with no DATABASE_USER set. Without an "
                 "identity this module only connects to a database on this machine's "
                 "loopback — a remote database needs DATABASE_USER and an Entra identity."
-            )
-        return self
-
-    @model_validator(mode="after")
-    def _provider_mode_is_coherent(self) -> Settings:
-        has_key = self.azure_openai_api_key is not None
-        if has_key == self.azure_openai_use_managed_identity:
-            if has_key:
-                raise ValueError(
-                    "AZURE_OPENAI_API_KEY is set and AZURE_OPENAI_USE_MANAGED_IDENTITY is "
-                    "true — set exactly one, so which of them actually authenticates a "
-                    "call is never a guess."
-                )
-            raise ValueError(
-                "Neither AZURE_OPENAI_API_KEY nor AZURE_OPENAI_USE_MANAGED_IDENTITY is "
-                "set. Local development sets the key; a deployed instance sets the flag "
-                "and authenticates with its managed identity."
             )
         return self
 

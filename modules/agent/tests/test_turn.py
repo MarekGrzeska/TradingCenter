@@ -13,7 +13,7 @@ pytestmark = pytest.mark.db
 
 LUNA = ModelCatalogueEntry(
     id="gpt-5.6-luna",
-    deployment="luna-prod",
+    model="luna-prod",
     display_name="Luna",
     cost_rank=1,
     input_rate_per_1k=Decimal("0.001"),
@@ -38,7 +38,7 @@ class FakeProvider:
         self._chunks = chunks
         self._then_raise = then_raise
 
-    async def stream(self, *, deployment: str, system_prompt: str, history: list):
+    async def stream(self, *, model: str, system_prompt: str, history: list):
         for chunk in self._chunks:
             yield chunk
         if self._then_raise:

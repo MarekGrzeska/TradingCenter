@@ -418,20 +418,19 @@ resource "azurerm_linux_web_app" "agent" {
     DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.agent.name}?sslmode=require"
     DATABASE_USER = local.agent_app_name
 
-    AZURE_OPENAI_ENDPOINT             = azurerm_cognitive_account.openai.endpoint
-    AZURE_OPENAI_API_VERSION          = var.azure_openai_api_version
-    AZURE_OPENAI_USE_MANAGED_IDENTITY = "true"
-    # AZURE_OPENAI_API_KEY absent on purpose — exactly one of key/managed identity may
-    # be set (config.py refuses both or neither), and production is the managed-
-    # identity side of that switch.
+    # The one credential this module cannot replace with an identity: OpenAI is not in
+    # Entra, so there is nothing to present a managed-identity token to. Key Vault
+    # reference rather than a literal — the value never enters Terraform state or a
+    # deploy log (key-vault.tf, design.md "Wobec OpenAI: klucz, i tylko klucz").
+    OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.openai_api_key})"
 
-    # The module's own catalogue, built from the one place its Azure OpenAI
-    # deployments are also declared (openai.tf) — see `var.agent_models`'s own
-    # description for why the two cannot drift apart.
+    # The module's own catalogue — see `var.agent_models`'s own description. Nothing in
+    # this root creates these models; the variable exists so a fourth entry is one line
+    # here rather than a hand-edited app setting.
     MODELS = jsonencode([
       for id, m in var.agent_models : {
         id                 = id
-        deployment         = id
+        model              = m.model
         display_name       = m.display_name
         cost_rank          = m.cost_rank
         input_rate_per_1k  = m.input_rate_per_1k
@@ -471,9 +470,9 @@ resource "azurerm_key_vault_access_policy" "market_data" {
   secret_permissions = ["Get", "List"]
 }
 
-# Read-only for the same one reason as the other two: resolving the
-# `@Microsoft.KeyVault(...)` reference on its own `docker_registry_password` — agent
-# stores no other secret in the vault, unlike capital-gateway and market-data.
+# Secret-read only, same as the other two: this app resolves the
+# `@Microsoft.KeyVault(...)` references on its `docker_registry_password` and its
+# `OPENAI_API_KEY`. Writing those values stays with the operator (key-vault.tf).
 resource "azurerm_key_vault_access_policy" "agent" {
   key_vault_id = azurerm_key_vault.main.id
   tenant_id    = data.azurerm_client_config.current.tenant_id

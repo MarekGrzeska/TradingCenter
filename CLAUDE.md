@@ -16,7 +16,7 @@ need one, the change is wrong, not the rule.
 ```
 modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
 modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway.
-modules/agent             Python · the operator's conversation with a model. Own database, own Azure OpenAI account. No tools yet.
+modules/agent             Python · the operator's conversation with a model. Own database, own OpenAI key. No tools yet.
 modules/terminal          React+TS · the operator's screen. Consumes all three. Publishes nothing.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
@@ -106,9 +106,10 @@ over time. A 401 storm was really observed on 9–10 August; `stream_tokens_for`
 **Env files are per-module and gitignored.** Copy from `.env.example`. The gateway needs
 `CAPITAL_*` demo credentials plus its own `GATEWAY_API_KEY`; market-data needs the same
 `GATEWAY_API_KEY`, a `DATABASE_URL` and the `AZURE_*` identity it connects to Postgres with.
-`agent` needs a `DATABASE_URL` of its own and `AZURE_OPENAI_*` — a demo API key locally,
-managed identity in production, exactly one of the two (`config.py` refuses both or
-neither).
+`agent` needs a `DATABASE_URL` of its own and an `OPENAI_API_KEY`. That key has no
+managed-identity alternative the way the database does — OpenAI is not in Entra — so
+production reads the same value from Key Vault (`openai-api-key`) and `config.py`
+refuses to start without it.
 
 **Terraform `apply` is the operator's job, never CI's.** CI plans only, deliberately —
 applying would hand the CI principal Entra directory write access. `infra/bootstrap/` keeps

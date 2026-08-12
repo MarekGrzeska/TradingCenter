@@ -7,7 +7,7 @@ Co zastane kształtuje ten projekt:
 - Platforma Azure jest już postawiona i mieści się w darmowym grancie: jeden plan App
   Service **B1 z jednym workerem**, jeden serwer PostgreSQL **B1ms**, Static Web Apps na
   terminal, Key Vault, Application Insights. Agent jest pierwszą rzeczą, która wyjdzie
-  poza ten grant — Azure OpenAI płaci się za token.
+  poza ten grant — model płaci się za token, i to poza fakturą Azure.
 - Terminal stoi pod innym adresem niż moduły i woła je międzydomenowo z tokenem Entra.
   CORS odpowiada **App Service, nie aplikacja** (`infra/app-service.tf`: dwie warstwy
   dokładające `Access-Control-Allow-Origin` dają nagłówek podwójny, a preflight bez
@@ -126,7 +126,7 @@ rozbić, dawne wiersze zostają czytelne i poprawne bez migracji danych.
 ### Katalog modeli jest konfiguracją, nie kodem
 
 Trzy modele — `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol` — wchodzą jako konfiguracja:
-nazwa deploymentu, nazwa do pokazania, porządek kosztu, stawki. Moduł publikuje z tego
+nazwa u dostawcy, nazwa do pokazania, porządek kosztu, stawki. Moduł publikuje z tego
 katalog, a terminal buduje z katalogu wybierak i nie zna żadnej z tych nazw.
 
 To ten sam chwyt, co `market-data-indicators` („Katalog wystarcza do zbudowania
@@ -136,17 +136,34 @@ modułach i regeneracją kontraktu.
 Model bez stawki zatrzymuje start modułu. Alternatywa — koszt zerowy albo pominięty wiersz
 — daje zakładkę kosztów, która kłamie, i nikt się o tym nie dowie.
 
-### Wobec Azure OpenAI: tożsamość zarządzana, lokalnie klucz
+### Wobec OpenAI: klucz, i tylko klucz
 
-Na produkcji aplikacja przedstawia się tożsamością zarządzaną z rolą **Cognitive Services
-OpenAI User**. Nie ma wtedy klucza do rotacji, do wycieku ani do trzymania w Key Vault.
+Modele bierze się wprost z OpenAI, nie przez Azure OpenAI. Powód jest zmierzony, nie
+preferencyjny: 12 sierpnia 2026 `gpt-5.6-luna/terra/sol` miały quotę **0 we wszystkich 28
+regionach**, które ta subskrypcja widzi — Poland Central i Sweden Central tak samo — a
+`az cognitiveservices usage list` pokazuje niezerowy przydział tylko na warianty „mini".
+Azure nie odmawia tych modeli, po prostu ich jeszcze nie przydziela; odblokowuje je wniosek
+o quotę i cudzy kalendarz. Konto OpenAI daje je od ręki, a moduł nie ma powodu wiedzieć,
+przez którą bramę mówi.
 
-Lokalnie tożsamości nie ma, więc `.env` niesie klucz. Wybór trybu działa jak przy bazie:
-**dokładnie jedno** z dwojga MUST być skonfigurowane, a nie żadne i nie oba — konfiguracja
-z kluczem *i* tożsamością nie mówi, które z nich naprawdę płaci.
+Ceną jest jedyne poświadczenie na tej platformie, którego nie da się zastąpić tożsamością:
+**OpenAI nie ma odpowiednika w Entra**, więc nie ma komu przedstawić tokenu tożsamości
+zarządzanej. Zostaje klucz. Lokalnie niesie go `.env`, na produkcji ten sam klucz siedzi w
+Key Vault (`openai-api-key`) i aplikacja czyta go referencją `@Microsoft.KeyVault(...)` —
+wartość nie przechodzi przez stan Terraforma ani przez log wdrożenia, tak samo jak
+poświadczenia capital.com.
 
-Testy nie dotykają ani jednego, ani drugiego: podstawiają fałszywy model. Sprawdzian z
-prawdziwym modelem stoi za markerem `live`, jak w pozostałych modułach, i nie chodzi w CI.
+Nie ma więc wyboru trybu, jaki jest przy bazie: klucz MUST być ustawiony, bo nie ma czego
+użyć zamiast niego. Moduł bez niego nie wstaje — inaczej przyjąłby turę i przewrócił się
+na wywołaniu, już po zapisaniu wypowiedzi operatora.
+
+Co to kosztuje w stosunku do poprzedniego wariantu, zapisane wprost: klucz do rotacji i
+do wycieku, rachunek poza fakturą Azure, i ruch wychodzący poza subskrypcję. Wraca to
+w chwili, w której quota na te modele w Azure przestanie być zerowa — wtedy zmiana dotyczy
+`provider.py` i `infra/`, a nie kontraktu ani terminala.
+
+Testy nie dotykają klucza: podstawiają fałszywy model. Sprawdzian z prawdziwym modelem stoi
+za markerem `live`, jak w pozostałych modułach, i nie chodzi w CI.
 
 ### Baza: druga baza logiczna, jeden serwer
 
@@ -186,23 +203,30 @@ model to najtańszy (Luna); najdroższy wybiera się świadomie, z widoczną ró
 Twardy limit — dzienny albo miesięczny — jest odłożony do osobnej zmiany i zapisany tutaj
 jako świadomy dług, nie przeoczenie.
 
-**Subskrypcja Free Trial ma zerową quotę na modele** → Kredyt i quota to dwa różne
-mechanizmy: oferty próbne mają 0 quoty na modele Azure OpenAI niezależnie od tego, ile
-kredytu zostało, więc `azurerm_cognitive_deployment` nie ma z czego powstać. Odblokowuje to
-przejście na Pay-As-You-Go, przy którym niewykorzystany kredyt i darmowe usługi
-dwunastomiesięczne zostają. Krok należy do listy przed pierwszym `apply`, bo objawia się
-jako błąd Terraforma o quocie, nie jako komunikat o rodzaju subskrypcji.
+**Rachunek za model jest poza fakturą Azure** → Kredyt Azure i konto OpenAI to dwa
+oddzielne rachunki, więc startowe 200 USD nie płaci ani jednej tury. Zakładka kosztów
+liczy z własnych stawek w konfiguracji, a nie z niczyjej faktury — przy turze rzędu
+3 tys. tokenów wejścia i 700 wyjścia stawki z sierpnia dają około 25 tys. tur na Lunie i
+5 tys. na Solu za 100 USD. Trzeba pilnować dwóch miejsc zamiast jednego; alert kosztowy po
+stronie OpenAI należy do operatora i nie da się go postawić Terraformem z tego roota.
 
-Startowe 200 USD wygasa **30 dni po założeniu konta** i nie da się go przedłużyć.
-Platforma stanęła 9 sierpnia 2026, więc rozmowy deweloperskie mieszczą się w kredycie —
-przy stawkach z sierpnia i turze rzędu 3 tys. tokenów wejścia i 700 wyjścia to około
-25 tys. tur na Lunie, 5 tys. na Solu. Po tym oknie płaci karta, i wtedy domyślny model
-przestaje być szczegółem.
+*(Poprzednie brzmienie tego ryzyka — „Subskrypcja Free Trial ma zerową quotę" — okazało
+się trafne co do skutku i chybione co do przyczyny. Subskrypcja jest Pay-As-You-Go, a
+quota i tak wynosiła 0: nie z powodu rodzaju subskrypcji, tylko dlatego, że te modele
+dopiero wchodzą. Zmierzone, zapisane wyżej.)*
 
-**Wersja modelu w Terraformie nie jest potwierdzona** → `model { name, version }` wchodzi
-jako zmienna z komentarzem; operator sprawdza `az cognitiveservices account list-models`
-przed `apply`. Data wersji wpisana z pamięci to plan, który przechodzi i deployment, który
-nie odpowiada.
+**Klucz OpenAI to poświadczenie bez tożsamości za plecami** → Jedyne miejsce na tej
+platformie, gdzie nie da się użyć tożsamości zarządzanej, więc jedyne, które trzeba
+rotować ręcznie i które może wyciec. Mitygacja jest ta sama, co przy capital.com: wartość
+tylko w Key Vault, w ustawieniu aplikacji sama referencja, nigdy w stanie Terraforma ani w
+logu wdrożenia. Rotacja dopisuje się do `docs/rotacja-poswiadczen.html` obok tokenu GHCR —
+drugi wpis w tej samej tabeli, nie nowy mechanizm.
+
+**Nazwa modelu nie jest przez nic sprawdzana** → Katalog to konfiguracja, a `model` jest w
+niej zwykłym napisem: ani Terraform, ani moduł nie potwierdzą, że OpenAI taki model
+serwuje. Objawia się dopiero na pierwszej turze, nie przy starcie — bo katalogu nie da się
+zweryfikować bez wywołania, które kosztuje. Operator sprawdza `GET /v1/models` przed
+wdrożeniem; to samo, co poprzednio robił `az cognitiveservices account list-models`.
 
 **Czwarta aplikacja na B1 z jednym workerem** → 1 rdzeń i 1,75 GB dzielone teraz przez
 cztery kontenery. Moduł agenta jest w większości czekaniem na sieć, więc rdzeń boli mniej
@@ -239,21 +263,22 @@ zwinięcia panelu.
 
 Kolejność wdrożenia, wymuszona zależnościami:
 
-0. Sprawdzenie typu subskrypcji i quoty na modele — oferta próbna ma quotę 0 i nie
-   pozwoli utworzyć deploymentu.
-1. `terraform apply` na konto Azure OpenAI i trzy deploymenty — po sprawdzeniu wersji
-   modeli. Nadanie roli **Cognitive Services OpenAI User** tożsamości aplikacji agenta.
-2. `terraform apply -target=azurerm_linux_web_app.agent`, potem apply bez `-target` —
+0. Konto OpenAI i klucz — sprawdzenie, że katalog naprawdę serwuje trzy modele z
+   `var.agent_models` (`GET /v1/models`). Napis, którego nie ma po tamtej stronie,
+   przechodzi przez `apply` bez słowa i przewraca się na pierwszej turze.
+1. `terraform apply -target=azurerm_linux_web_app.agent`, potem apply bez `-target` —
    ta sama dwufazowość co przy `market-data`: adresy wychodzące aplikacji nie są znane
    przed jej powstaniem, a reguła firewalla bazy ich potrzebuje.
+2. `az keyvault secret set --name openai-api-key` — przed pierwszym startem kontenera.
+   Aplikacja czyta go referencją i bez wartości nie wstaje.
 3. Operator zakłada rolę Entra w bazie `agent` i nadaje jej uprawnienia (sesja `psql`).
 4. Wdrożenie obrazu (`deploy-agent.yml`), migracje, sprawdzenie zdrowia.
 5. Terminal z ustawionym `VITE_AGENT_HTTP`.
 
 Wycofanie: usunięcie zakładki i panelu z terminala jest zmianą w terminalu i nic poza nim
 nie psuje. Moduł zatrzymuje się bez skutków dla `market-data` i `capital-gateway` — nic go
-nie woła. Deploymenty Azure OpenAI usuwa się osobno; dopóki stoją, nie kosztują nic bez
-ruchu.
+nie woła. Po stronie modelu nie ma nic do rozbierania: klucz się kasuje, a nieużywany nie
+kosztuje.
 
 ## Open Questions
 

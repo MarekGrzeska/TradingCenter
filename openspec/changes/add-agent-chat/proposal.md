@@ -15,7 +15,7 @@ zapisem).
 ## What Changes
 
 - Nowy moduł `modules/agent` — Python, FastAPI, port 8030, własne zależności, testy,
-  migracje i baza. Graf rozmowy prowadzi LangGraph, model liczy Azure OpenAI.
+  migracje i baza. Graf rozmowy prowadzi LangGraph, model liczy OpenAI.
 - Trzy modele do wyboru w oknie agenta: `gpt-5.6-luna`, `gpt-5.6-terra`, `gpt-5.6-sol` —
   trzy różne modele jednej generacji, rosnące kosztem i możliwościami. Moduł publikuje je
   jako katalog; terminal buduje z niego wybierak i nie zna ich z nazwy.
@@ -28,9 +28,10 @@ zapisem).
   czas.
 - Jeden standardowy prompt systemowy agenta terminala tradingowego, wersjonowany w kodzie
   i oznaczany przy sesji — o transkrypcie da się powiedzieć, którym promptem odpowiadał.
-- Infrastruktura: `azurerm_cognitive_account` (kind OpenAI) z trzema deploymentami, czwarta
-  aplikacja na istniejącym planie App Service, druga baza logiczna na istniejącym serwerze
-  PostgreSQL, dostęp do modeli przez tożsamość zarządzaną — bez klucza do rotacji.
+- Infrastruktura: czwarta aplikacja na istniejącym planie App Service, druga baza logiczna
+  na istniejącym serwerze PostgreSQL. Modele stoją poza Azure — dostęp kluczem OpenAI z
+  Key Vault, bo OpenAI nie ma tożsamości w Entra (design.md, „Wobec OpenAI: klucz, i tylko
+  klucz"; Azure OpenAI odpadło na zerowej quocie zmierzonej 12 sierpnia 2026).
 - CI dostaje czwarty job i czwarty workflow wdrożeniowy; skrypty `dev.sh`/`dev.ps1`
   uruchamiają moduł w kolejności zależności.
 
@@ -72,10 +73,11 @@ outletu, nie w nim, i to jest wymaganie nowej zdolności, nie zmiana starej.
 `src/data/config.ts` (`VITE_AGENT_HTTP`), `vite.config.ts` (proxy `/agent-api`),
 `src/app/tabs.ts`.
 
-**Infrastruktura**: `infra/` — nowy plik na Azure OpenAI, zmiany w `app-service.tf`,
-`database.tf`, `entra.tf`, `variables.tf`, `outputs.tf`. Wersje modeli nie są potwierdzone
-i wchodzą jako zmienne — operator sprawdza je `az cognitiveservices account list-models`
-przed `apply`. Apply robi operator, nie CI.
+**Infrastruktura**: `infra/` — zmiany w `app-service.tf`, `database.tf`, `entra.tf`,
+`key-vault.tf`, `variables.tf`, `outputs.tf`. Żaden zasób modelu nie powstaje w tym roocie:
+katalog jest zmienną, z której buduje się ustawienie aplikacji, a nazw modeli nie sprawdza
+nic — operator potwierdza je `GET /v1/models` przed `apply`. Klucz wchodzi do Key Vault
+ręcznie, żeby nie trafił do stanu. Apply robi operator, nie CI.
 
 **Wspólne**: `compose.yaml` (druga baza lokalna), `scripts/dev.sh`, `scripts/dev.ps1`,
 `.github/workflows/checks.yml`, nowy `.github/workflows/deploy-agent.yml`, `CLAUDE.md`,
@@ -84,6 +86,7 @@ przed `apply`. Apply robi operator, nie CI.
 **Czego nie ruszamy**: `market-data` i `capital-gateway` — ani linijki. Agent nie importuje
 z nich nic i na razie nawet ich nie woła.
 
-**Koszt bieżący**: pierwszy element platformy poza darmowym grantem. Azure OpenAI płaci się
-za token; plan B1 i serwer PostgreSQL są już opłacone i czwarta aplikacja ich nie zmienia,
+**Koszt bieżący**: pierwszy element platformy poza darmowym grantem, i jedyny poza fakturą
+Azure — model płaci się za token na osobnym rachunku OpenAI, więc kredyt Azure go nie
+pokrywa. Plan B1 i serwer PostgreSQL są już opłacone i czwarta aplikacja ich nie zmienia,
 ale jeden worker obsługuje teraz o jedną aplikację więcej.

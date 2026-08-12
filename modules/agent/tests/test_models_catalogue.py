@@ -9,7 +9,7 @@ from agent.models_catalogue import ModelCatalogue, ModelNotInCatalogue
 
 LUNA = ModelCatalogueEntry(
     id="gpt-5.6-luna",
-    deployment="luna-prod",
+    model="luna-prod",
     display_name="Luna",
     cost_rank=1,
     input_rate_per_1k=Decimal("0.0002"),
@@ -17,7 +17,7 @@ LUNA = ModelCatalogueEntry(
 )
 SOL = ModelCatalogueEntry(
     id="gpt-5.6-sol",
-    deployment="sol-prod",
+    model="sol-prod",
     display_name="Sol",
     cost_rank=3,
     input_rate_per_1k=Decimal("0.005"),

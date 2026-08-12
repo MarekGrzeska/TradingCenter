@@ -1,7 +1,7 @@
 """HTTP-level wiring for the session routes and their SSE stream.
 
 The provider is swapped for a scripted fake after the app's own lifespan has already
-built a real pool against the throwaway database — nothing here calls Azure OpenAI.
+built a real pool against the throwaway database — nothing here calls OpenAI.
 """
 
 from __future__ import annotations
@@ -15,11 +15,9 @@ from agent.provider import TextDelta, UsageReport
 pytestmark = pytest.mark.db
 
 _ENV = {
-    "AZURE_OPENAI_ENDPOINT": "https://example.openai.azure.com",
-    "AZURE_OPENAI_API_VERSION": "2026-01-01",
-    "AZURE_OPENAI_API_KEY": "key",
+    "OPENAI_API_KEY": "key",
     "MODELS": (
-        '[{"id":"gpt-5.6-luna","deployment":"luna-prod","display_name":"Luna",'
+        '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1k":"0.001","output_rate_per_1k":"0.006"}]'
     ),
     "DEFAULT_MODEL_ID": "gpt-5.6-luna",
@@ -39,7 +37,7 @@ class _FakeProvider:
     def __init__(self, chunks: list) -> None:
         self._chunks = chunks
 
-    async def stream(self, *, deployment: str, system_prompt: str, history: list):
+    async def stream(self, *, model: str, system_prompt: str, history: list):
         for chunk in self._chunks:
             yield chunk
 
@@ -141,7 +139,7 @@ def test_required_authentication_refuses_before_touching_the_model(
         session_id = client.post("/sessions", json={}).json()["id"]
 
     class _ProviderThatMustNotBeCalled:
-        async def stream(self, *, deployment: str, system_prompt: str, history: list):
+        async def stream(self, *, model: str, system_prompt: str, history: list):
             raise AssertionError("the model must never be called")
             yield  # pragma: no cover - makes this an async generator
 
@@ -154,7 +152,7 @@ def test_required_authentication_refuses_before_touching_the_model(
 
 def test_a_broken_stream_reports_error_and_saves_the_partial_reply() -> None:
     class _BreakingProvider:
-        async def stream(self, *, deployment: str, system_prompt: str, history: list):
+        async def stream(self, *, model: str, system_prompt: str, history: list):
             yield TextDelta("cut ")
             yield TextDelta("off")
             raise RuntimeError("provider broke")

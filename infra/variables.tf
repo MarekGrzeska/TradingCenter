@@ -37,41 +37,31 @@ variable "operator_email" {
   type        = string
 }
 
-variable "azure_openai_api_version" {
-  description = <<-EOT
-    Azure OpenAI's own REST API version, e.g. "2024-10-21" — not a model version.
-    No default on purpose, same reasoning as `modules/agent/.env.example`: check the
-    current value in Azure OpenAI's REST reference before setting this in
-    terraform.tfvars. A guessed date answers 400 for a reason nothing here explains.
-  EOT
-  type        = string
-}
-
 variable "agent_models" {
   description = <<-EOT
-    The agent's model catalogue and its Azure OpenAI deployments, one entry per model
-    — the Terraform half of design.md's "Katalog modeli jest konfiguracją, nie kodem".
-    Map key is this module's own stable id (`agent/models_catalogue.py`), reused
-    verbatim as the Azure OpenAI deployment name and as MODELS' `id`/`deployment`
-    (app-service.tf) — a fourth model is one more entry here, not a change in two
-    places.
+    The agent's model catalogue, one entry per model — the Terraform half of design.md's
+    "Katalog modeli jest konfiguracją, nie kodem". This root does not *create* anything
+    from it: the models belong to OpenAI's own account, reached with an API key
+    (design.md, "Wobec OpenAI: klucz, i tylko klucz"), so there is no deployment
+    resource to declare and no capacity to reserve. All this variable does is build the
+    agent's MODELS app setting (app-service.tf) — a fourth model is one more entry here
+    and a restart, exactly as `modules/agent/.env.example` describes for local runs.
 
-    `model_name`/`model_version` MUST name a real entry in the Cognitive Services
-    model catalog — Terraform does not verify this. Operator checks
-    `az cognitiveservices account list-models --location <var.location>` before
-    `apply`; a version pinned from memory plans clean and the deployment then answers
-    400 with nothing about why (design.md's Risk, "Wersja modelu w Terraformie nie
-    jest potwierdzona").
+    Map key is this module's own stable id (`agent/models_catalogue.py`), carried in
+    every session and usage row. `model` is what OpenAI is actually asked for, kept
+    separate because the two need not match — an id outlives a model renamed upstream.
+
+    `model` MUST name something OpenAI serves to this key — nothing here verifies it,
+    and a name from memory fails at the first turn, not at `apply`. Operator confirms
+    against `GET https://api.openai.com/v1/models` before deploying.
 
     Rates move faster than this module does (design.md, "Cennik jest konfiguracją") —
-    the defaults below are illustrative, read from public pricing in August 2026;
-    check the Azure OpenAI resource's own pricing page before trusting them at deploy
-    time, the same caution `modules/agent/.env.example` carries.
+    the defaults below are illustrative, read from public pricing in August 2026; check
+    OpenAI's own pricing page before trusting them at deploy time, the same caution
+    `modules/agent/.env.example` carries.
   EOT
   type = map(object({
-    model_name         = string
-    model_version      = string
-    capacity           = number
+    model              = string
     display_name       = string
     cost_rank          = number
     input_rate_per_1k  = string
@@ -79,27 +69,21 @@ variable "agent_models" {
   }))
   default = {
     "gpt-5.6-luna" = {
-      model_name         = "gpt-5.6-luna"
-      model_version      = "1"
-      capacity           = 10
+      model              = "gpt-5.6-luna"
       display_name       = "Luna"
       cost_rank          = 1
       input_rate_per_1k  = "0.0002"
       output_rate_per_1k = "0.0012"
     }
     "gpt-5.6-terra" = {
-      model_name         = "gpt-5.6-terra"
-      model_version      = "1"
-      capacity           = 10
+      model              = "gpt-5.6-terra"
       display_name       = "Terra"
       cost_rank          = 2
       input_rate_per_1k  = "0.002"
       output_rate_per_1k = "0.012"
     }
     "gpt-5.6-sol" = {
-      model_name         = "gpt-5.6-sol"
-      model_version      = "1"
-      capacity           = 10
+      model              = "gpt-5.6-sol"
       display_name       = "Sol"
       cost_rank          = 3
       input_rate_per_1k  = "0.005"

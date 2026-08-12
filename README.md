@@ -17,7 +17,7 @@ modules move here one at a time.
 |---|---|---|
 | [capital-gateway](modules/capital-gateway/) | capital.com — trading, deep history, a live stream. Demo only. | HTTP + WebSocket |
 | [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. | HTTP + WebSocket |
-| [agent](modules/agent/) | The operator's conversation with a model — its own database, its own Azure OpenAI account. No tools yet. | HTTP, streamed |
+| [agent](modules/agent/) | The operator's conversation with a model — its own database, its own OpenAI key. No tools yet. | HTTP, streamed |
 | [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, and the agent panel. | consumes all three |
 
 ## Layout
@@ -125,7 +125,7 @@ the one case it was written for.
 |---|---|
 | `capital-gateway` | `ruff check`, `pyright`, `pytest` |
 | `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
-| `agent` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's; its `live` tests need a real Azure OpenAI deployment and stay behind `--run-live` |
+| `agent` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's; its `live` tests need a real OpenAI key and stay behind `--run-live` |
 | `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
 
 `contract:check` runs before the terminal's tests on purpose: it compares

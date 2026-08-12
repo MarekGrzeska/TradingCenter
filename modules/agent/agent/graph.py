@@ -19,7 +19,7 @@ class ConversationState(TypedDict):
     # (role, content) pairs, oldest first, this module's own vocabulary
     # ("operator"/"agent") — never langchain's message classes.
     history: list[tuple[str, str]]
-    deployment: str
+    model: str
     # Called with each fragment of text as it arrives. Not persisted or checkpointed —
     # there is none (design.md) — so a plain closure is safe to carry in state.
     on_delta: Callable[[str], Awaitable[None]]
@@ -34,7 +34,7 @@ def build_graph(provider: ModelProvider):
         usage: UsageReport | None = None
         try:
             async for chunk in provider.stream(
-                deployment=state["deployment"],
+                model=state["model"],
                 system_prompt=state["system_prompt"],
                 history=state["history"],
             ):

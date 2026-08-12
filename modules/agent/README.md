@@ -23,7 +23,7 @@ later change says otherwise (`openspec/changes/add-agent-chat/design.md`, Non-Go
 - `models_catalogue.py` — the queryable catalogue built from `Settings.models`.
 - `prompt.py` — the one system prompt this module runs, versioned.
 - `graph.py` — the LangGraph conversation graph.
-- `provider.py` — the Azure OpenAI client, chosen deployment by catalogue entry.
+- `provider.py` — the OpenAI client, chosen model by catalogue entry.
 - `routers/` — the HTTP surface, split by area.
 - `app.py` — assembly only: lifespan and routers. Nothing that decides anything.
 - `migrations/` — the schema, as the statements a deployment actually runs.
@@ -31,7 +31,7 @@ later change says otherwise (`openspec/changes/add-agent-chat/design.md`, Non-Go
 ## Run
 
 ```bash
-cp .env.example .env   # then fill in AZURE_OPENAI_* and MODELS
+cp .env.example .env   # then fill in OPENAI_API_KEY and MODELS
 uv run alembic upgrade head
 uv run uvicorn agent.app:app --reload --port 8030
 ```

@@ -6,7 +6,7 @@ One repository, many modules, no shared runtime. A module is a directory under `
 that runs on its own and publishes a contract. Nothing imports across that boundary.
 
 ```
-                  capital.com                          Azure OpenAI
+                  capital.com                             OpenAI
                   (REST + WS)                                │
                        │                                     ▼
                        ▼                        ┌──────────────────────────────┐
@@ -40,7 +40,7 @@ the gateway owns the only door to the provider, and the archive refuses to start
 upstream URLs point anywhere else.
 
 `agent` is a peer of `capital-gateway` and `market-data`, not a consumer of either — it
-reaches nothing in this diagram but Azure OpenAI. The box market-data used to point at here
+reaches nothing in this diagram but OpenAI. The box market-data used to point at here
 (`agents / backtests`) was a placeholder for something that did not exist yet; now that one
 does, drawing it as downstream of the archive would say `agent` reads candles and calls
 tools, which it deliberately does not (`openspec/changes/add-agent-chat/design.md`,

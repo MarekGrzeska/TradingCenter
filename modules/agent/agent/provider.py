@@ -1,4 +1,4 @@
-"""The Azure OpenAI client — one call per turn, streamed, no tools.
+"""The OpenAI client — one call per turn, streamed, no tools.
 
 This module is the one place `langchain_openai`'s message classes exist; everywhere
 else in this module a turn's history is `(role, content)` pairs in this module's own
@@ -9,17 +9,12 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from typing import Any, Protocol
+from typing import Protocol
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
-from langchain_openai import AzureChatOpenAI
+from langchain_openai import ChatOpenAI
 
 from .config import Settings
-
-# Azure Cognitive Services' own resource id — the audience a managed-identity token must
-# be issued for to call Azure OpenAI (design.md, "Wobec Azure OpenAI: tożsamość
-# zarządzana, lokalnie klucz").
-_COGNITIVE_SERVICES_SCOPE = "https://cognitiveservices.azure.com/.default"
 
 
 @dataclass(frozen=True)
@@ -44,46 +39,33 @@ ProviderChunk = TextDelta | UsageReport
 
 class ModelProvider(Protocol):
     def stream(
-        self, *, deployment: str, system_prompt: str, history: list[tuple[str, str]]
+        self, *, model: str, system_prompt: str, history: list[tuple[str, str]]
     ) -> AsyncIterator[ProviderChunk]: ...
 
 
-class AzureOpenAIProvider:
+class OpenAIProvider:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
 
-    def _client(self, deployment: str) -> AzureChatOpenAI:
-        kwargs: dict[str, Any] = {
-            "azure_endpoint": self._settings.azure_openai_endpoint,
-            "api_version": self._settings.azure_openai_api_version,
-            "azure_deployment": deployment,
-            "streaming": True,
+    def _client(self, model: str) -> ChatOpenAI:
+        return ChatOpenAI(
+            model=model,
+            api_key=self._settings.openai_api_key,  # pyright: ignore[reportArgumentType]
+            streaming=True,
             # Without this the provider's usage arrives on no chunk at all when
             # streaming — the one field specs/agent-usage exists to record.
-            "stream_usage": True,
-        }
-        if self._settings.azure_openai_api_key is not None:
-            kwargs["api_key"] = self._settings.azure_openai_api_key
-        else:
-            # Imported lazily: this branch runs only in the managed-identity mode
-            # config.py already validated, and the sync `azure.identity` (not `.aio`)
-            # is what `azure_ad_token_provider` — a plain sync callable — expects.
-            from azure.identity import DefaultAzureCredential, get_bearer_token_provider
-
-            kwargs["azure_ad_token_provider"] = get_bearer_token_provider(
-                DefaultAzureCredential(), _COGNITIVE_SERVICES_SCOPE
-            )
-        return AzureChatOpenAI(**kwargs)
+            stream_usage=True,
+        )
 
     async def stream(
-        self, *, deployment: str, system_prompt: str, history: list[tuple[str, str]]
+        self, *, model: str, system_prompt: str, history: list[tuple[str, str]]
     ) -> AsyncIterator[ProviderChunk]:
         messages: list[BaseMessage] = [SystemMessage(content=system_prompt)]
         for role, content in history:
             messages.append(
                 HumanMessage(content=content) if role == "operator" else AIMessage(content=content)
             )
-        client = self._client(deployment)
+        client = self._client(model)
         usage: dict | None = None
         async for chunk in client.astream(messages):
             if chunk.content:

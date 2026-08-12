@@ -76,7 +76,7 @@ async def run_turn(
             {
                 "system_prompt": SYSTEM_PROMPT,
                 "history": history,
-                "deployment": model_entry.deployment,
+                "model": model_entry.model,
                 "on_delta": on_delta,
                 "text": "",
                 "usage": None,

@@ -38,13 +38,13 @@ def pytest_addoption(parser: pytest.Parser) -> None:
         "--run-live",
         action="store_true",
         default=False,
-        help="run tests that call a real Azure OpenAI deployment",
+        help="run tests that call a real OpenAI model",
     )
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
     if not config.getoption("--run-live"):
-        skip_live = pytest.mark.skip(reason="needs --run-live and a configured Azure OpenAI key")
+        skip_live = pytest.mark.skip(reason="needs --run-live and a configured OpenAI key")
         for item in items:
             if "live" in item.keywords:
                 item.add_marker(skip_live)

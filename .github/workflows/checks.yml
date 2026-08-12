@@ -168,8 +168,8 @@ jobs:
       - run: uv run pyright
       # Same as market-data's own step: the `db` tests are gated on Docker inside
       # conftest.py, not on a flag, and this runner has it — so one `pytest -q` also
-      # runs them, real PostgreSQL and all. `live` tests need a real Azure OpenAI
-      # deployment and stay behind --run-live, never here.
+      # runs them, real PostgreSQL and all. `live` tests need a real OpenAI key and
+      # stay behind --run-live, never here.
       - run: uv run pytest -q
 
   terminal:

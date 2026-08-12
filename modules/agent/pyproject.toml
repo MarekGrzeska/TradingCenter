@@ -13,10 +13,10 @@ dependencies = [
     # straight through asyncpg, so no ORM is pulled into the runtime path — same split
     # as market-data.
     "sqlalchemy[asyncio]>=2.0",
-    # The database credential and, in production, the credential this module presents to
-    # Azure OpenAI: a managed identity in Azure, a service principal (client secret)
-    # locally for the database — never a stored password (design.md, "Wobec Azure OpenAI:
-    # tożsamość zarządzana, lokalnie klucz").
+    # The database credential, and only that: a managed identity in Azure, a service
+    # principal (client secret) locally — never a stored password. The model provider
+    # does not use it, because OpenAI is not in Entra (design.md, "Wobec OpenAI: klucz,
+    # i tylko klucz").
     "azure-identity>=1.19",
     "aiohttp>=3.10",
     # The conversation graph. One node today — the model call — with room left for tools
@@ -46,7 +46,7 @@ pythonpath = ["."]
 testpaths = ["tests"]
 markers = [
     "db: needs a real PostgreSQL (a throwaway container, started on demand — see conftest)",
-    "live: calls a real Azure OpenAI deployment (needs --run-live and a configured key)",
+    "live: calls a real OpenAI model (needs --run-live and a configured key)",
 ]
 
 [dependency-groups]

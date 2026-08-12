@@ -85,7 +85,7 @@ fi
 
 [[ -f "$GATEWAY_DIR/.env" ]] || problems+=("$GATEWAY_DIR/.env is missing — copy .env.example and fill in demo credentials")
 [[ -f "$ARCHIVE_DIR/.env" ]] || problems+=("$ARCHIVE_DIR/.env is missing — copy .env.example; the defaults match compose.yaml")
-[[ -f "$AGENT_DIR/.env" ]] || problems+=("$AGENT_DIR/.env is missing — copy .env.example and fill in AZURE_OPENAI_*")
+[[ -f "$AGENT_DIR/.env" ]] || problems+=("$AGENT_DIR/.env is missing — copy .env.example and fill in OPENAI_API_KEY")
 
 if (( START_TERMINAL )); then
   if command -v pnpm >/dev/null 2>&1; then

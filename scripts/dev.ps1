@@ -101,7 +101,7 @@ if (-not (Test-Path $archiveEnv)) {
 }
 $agentEnv = Join-Path $agentDir ".env"
 if (-not (Test-Path $agentEnv)) {
-    $problems += "$agentEnv is missing - copy .env.example and fill in AZURE_OPENAI_*"
+    $problems += "$agentEnv is missing - copy .env.example and fill in OPENAI_API_KEY"
 }
 
 if (-not $NoTerminal) {

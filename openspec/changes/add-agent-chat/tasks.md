@@ -31,7 +31,7 @@
 ## 3. Katalog modeli i prompt systemowy
 
 - [x] 3.1 `agent/models_catalogue.py` — katalog z konfiguracji: identyfikator, nazwa
-      deploymentu, nazwa do pokazania, porządek kosztu, stawki wejścia i wyjścia
+      modelu u dostawcy, nazwa do pokazania, porządek kosztu, stawki wejścia i wyjścia
 - [x] 3.2 Start modułu odmawia, gdy model w katalogu nie ma stawki
 - [x] 3.3 `agent/prompt.py` — prompt systemowy agenta terminala tradingowego z
       identyfikatorem wersji; prompt nazywa brak narzędzi i brak rekomendacji
@@ -44,8 +44,8 @@
 
 - [x] 4.1 `agent/graph.py` — graf LangGraph z jednym węzłem modelu, historia budowana z
       tabel; miejsce na węzeł narzędzi zostawione, ale puste
-- [x] 4.2 `agent/provider.py` — klient Azure OpenAI: tożsamość zarządzana albo klucz,
-      wybór deploymentu po katalogu
+- [x] 4.2 `agent/provider.py` — klient OpenAI na kluczu (tożsamości zarządzanej nie ma do
+      czego użyć), wybór modelu po katalogu
 - [x] 4.3 Trasy sesji: `POST /sessions`, `GET /sessions`, `GET /sessions/{id}`,
       `GET /sessions/{id}/messages`, `PATCH /sessions/{id}` (zmiana modelu)
 - [x] 4.4 `POST /sessions/{id}/messages` — zapis wypowiedzi operatora **przed** wywołaniem
@@ -123,23 +123,27 @@
 
 ## 10. Infrastruktura
 
-- [ ] 10.0 Sprawdzić typ subskrypcji i quotę na modele Azure OpenAI; oferta próbna ma
-      quotę 0 i wymaga przejścia na Pay-As-You-Go (kredyt i darmowe usługi zostają)
-- [x] 10.1 `infra/openai.tf` — `azurerm_cognitive_account` (kind OpenAI) i trzy
-      `azurerm_cognitive_deployment` (luna/terra/sol), Global Standard
-- [x] 10.2 `infra/variables.tf` — nazwy i wersje modeli jako zmienne z komentarzem, że
-      operator weryfikuje je `az cognitiveservices account list-models` przed apply
+- [x] 10.0 Sprawdzić, czy dostawca modeli w ogóle je wyda. Zmierzone 12 sierpnia 2026:
+      subskrypcja jest Pay-As-You-Go (więc ryzyko „Free Trial ma quotę 0" nie dotyczy), ale
+      `gpt-5.6-*` mają w Azure quotę 0 we wszystkich 28 regionach — stąd przejście na
+      OpenAI wprost. Odpowiednik tego kroku teraz: `GET /v1/models` na koncie OpenAI
+- [x] 10.1 Modele bierze się wprost z OpenAI — w tym roocie nie powstaje **żaden** zasób
+      modelu (`infra/openai.tf` usunięty wraz z kontem, deploymentami i rolą)
+- [x] 10.2 `infra/variables.tf` — katalog modeli jako `var.agent_models` (nazwa u dostawcy,
+      nazwa do pokazania, porządek kosztu, stawki), z komentarzem, że nazw nie sprawdza nic
+      i potwierdza je operator przed apply
 - [x] 10.3 `infra/app-service.tf` — czwarta aplikacja na istniejącym planie: tożsamość
       zarządzana, Easy Auth, CORS na adres terminala, ustawienia aplikacji, `lifecycle`
       na obraz kontenera
-- [x] 10.4 Rola **Cognitive Services OpenAI User** dla tożsamości aplikacji agenta
+- [x] 10.4 `infra/key-vault.tf` — sekret `openai-api-key` i referencja
+      `@Microsoft.KeyVault(...)` w ustawieniach agenta; wartość wpisuje operator po apply,
+      nie przechodzi przez stan Terraforma
 - [x] 10.5 `infra/database.tf` — baza logiczna `agent` i reguły firewalla na adresy
       wychodzące aplikacji agenta (`for_each` po jej `possible_outbound_ip_address_list`)
 - [x] 10.6 `infra/entra.tf` — rejestracja API agenta i uprawnienie terminala do jego zakresu
-- [x] 10.7 Adres agenta (`app-service.tf`) i nazwa konta Azure OpenAI (`openai.tf`) —
-      obok analogicznych wyjść market-data/gateway, nie w `outputs.tf` (te trzymają tylko
-      wyjścia bez naturalnego pliku-właściciela, wzorem istniejących `market_data_hostname`
-      itp.)
+- [x] 10.7 Adres agenta (`app-service.tf`) — obok analogicznych wyjść market-data/gateway,
+      nie w `outputs.tf` (te trzymają tylko wyjścia bez naturalnego pliku-właściciela,
+      wzorem istniejących `market_data_hostname` itp.)
 - [x] 10.8 `terraform fmt` i `terraform validate` przechodzą; plan przejrzany przez
       operatora (apply jest jego, nie CI)
 

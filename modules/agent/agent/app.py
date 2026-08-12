@@ -24,7 +24,7 @@ from fastapi import FastAPI
 from .config import Settings
 from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
-from .provider import AzureOpenAIProvider
+from .provider import OpenAIProvider
 from .routers import models, sessions, usage
 
 log = logging.getLogger(__name__)
@@ -43,7 +43,7 @@ async def lifespan(app: FastAPI):
         app.state.settings = settings
         app.state.pool = pool
         app.state.catalogue = ModelCatalogue.from_settings(settings)
-        app.state.provider = AzureOpenAIProvider(settings)
+        app.state.provider = OpenAIProvider(settings)
         # Holds a turn's background task for as long as it runs, so nothing collects
         # it mid-generation just because the request that started it ended
         # (design.md, "Tura modelu przeżywa rozłączenie wołającego").

@@ -8,7 +8,7 @@ from agent.config import Settings
 ONE_MODEL = [
     {
         "id": "gpt-5.6-luna",
-        "deployment": "luna-prod",
+        "model": "luna-prod",
         "display_name": "Luna",
         "cost_rank": 1,
         "input_rate_per_1k": "0.001",
@@ -19,9 +19,7 @@ ONE_MODEL = [
 REQUIRED = {
     "database_url": "postgresql://localhost:5432/agent?sslmode=require",
     "database_user": "agent",
-    "azure_openai_endpoint": "https://example.openai.azure.com",
-    "azure_openai_api_version": "2026-01-01",
-    "azure_openai_api_key": "key",
+    "openai_api_key": "key",
     "models": ONE_MODEL,
     "default_model_id": "gpt-5.6-luna",
 }
@@ -84,31 +82,26 @@ def test_local_mode_does_not_require_tls() -> None:
     assert settings(database_user=None, database_url=url).database_url == url
 
 
-# --- provider mode: exactly one of key / managed identity ---
+# --- provider credential: the key, and nothing to fall back to ---
 
 
-def test_key_and_managed_identity_together_refuses_to_start() -> None:
+def test_a_missing_api_key_refuses_to_start() -> None:
+    """Not optional, unlike the database's: OpenAI is not in Entra, so there is no
+    ambient identity to fall back to when this is absent."""
+    incomplete = {k: v for k, v in REQUIRED.items() if k != "openai_api_key"}
     with pytest.raises(ValidationError) as err:
-        settings(azure_openai_api_key="key", azure_openai_use_managed_identity=True)
-    assert "exactly one" in str(err.value)
+        Settings(**incomplete, _env_file=None)  # pyright: ignore[reportCallIssue]
+    assert "openai_api_key" in str(err.value)
 
 
-def test_neither_key_nor_managed_identity_refuses_to_start() -> None:
+def test_a_blank_api_key_is_a_missing_one_not_a_key_named_blank() -> None:
     with pytest.raises(ValidationError) as err:
-        settings(azure_openai_api_key=None, azure_openai_use_managed_identity=False)
-    assert "AZURE_OPENAI_API_KEY" in str(err.value)
+        settings(openai_api_key="   ")
+    assert "OPENAI_API_KEY" in str(err.value)
 
 
-def test_managed_identity_alone_is_a_valid_mode() -> None:
-    s = settings(azure_openai_api_key=None, azure_openai_use_managed_identity=True)
-    assert s.azure_openai_api_key is None
-    assert s.azure_openai_use_managed_identity is True
-
-
-def test_a_blank_api_key_means_unset_not_a_key_named_blank() -> None:
-    with pytest.raises(ValidationError) as err:
-        settings(azure_openai_api_key="   ", azure_openai_use_managed_identity=False)
-    assert "AZURE_OPENAI_API_KEY" in str(err.value)
+def test_the_api_key_is_stripped() -> None:
+    assert settings(openai_api_key="  sk-abc  ").openai_api_key == "sk-abc"
 
 
 # --- model catalogue ---
