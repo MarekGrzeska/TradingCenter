@@ -32,6 +32,13 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
   const [view, setView] = useState<"chat" | "conversations">("chat");
   const turnInFlight = state.turn?.status === "waiting" || state.turn?.status === "streaming";
 
+  // The panel mounts after `main.tsx` has awaited `identity.initialize()`; the store is
+  // constructed during `import`, which is before it. Asking here is what makes the first
+  // request carry a token — see `ensureLoaded`.
+  useEffect(() => {
+    store.ensureLoaded();
+  }, [store]);
+
   if (!state.expanded) {
     return (
       // The whole rail is the button, not a control sitting on one: a full-height strip is

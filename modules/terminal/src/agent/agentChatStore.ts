@@ -91,6 +91,9 @@ export interface AgentChatStore {
   subscribe(listener: () => void): () => void;
   getSnapshot(): AgentChatState;
   setExpanded(expanded: boolean): void;
+  /** Loads what an open panel needs and has not got. Called by the panel on mount —
+   *  after sign-in has resolved, which construction is not. Safe to call repeatedly. */
+  ensureLoaded(): void;
   toggle(): void;
   /** Opens a conversation from the list and loads its transcript from the module.
    *  A no-op while a turn is in flight — nothing here tracks more than one active
@@ -170,7 +173,15 @@ export function createAgentChatStore(
   };
   let nextLocalId = 1;
   let transcriptSeq = 0;
-  let initialized = false;
+  // Not "has the panel been opened before" — that was the old gate, and a load which
+  // failed under it never got a second chance. These say only "a request is already out",
+  // so `ensureLoaded` can be called as often as anything likes without doubling it.
+  let modelsInFlight = false;
+  let sessionsInFlight = false;
+  // Which conversation's transcript is actually on screen. `transcriptStatus` cannot say:
+  // it starts "ready", because an empty panel is not a panel that is loading, so it reads
+  // the same before the first read as after a successful one.
+  let transcriptFor: number | null = null;
   const listeners = new Set<() => void>();
 
   function commit(next: AgentChatState): void {
@@ -192,6 +203,8 @@ export function createAgentChatStore(
   }
 
   async function loadModels(): Promise<void> {
+    if (modelsInFlight) return;
+    modelsInFlight = true;
     commit({ ...state, modelsStatus: "loading" });
     try {
       const models = await api.listModels(new AbortController().signal);
@@ -206,26 +219,34 @@ export function createAgentChatStore(
       });
     } catch {
       commit({ ...state, modelsStatus: "unreachable" });
+    } finally {
+      modelsInFlight = false;
     }
   }
 
   async function loadSessions(): Promise<void> {
+    if (sessionsInFlight) return;
+    sessionsInFlight = true;
     try {
       const sessions = await api.listSessions(new AbortController().signal);
       commit({ ...state, sessions, sessionsStatus: "ready" });
     } catch {
       commit({ ...state, sessionsStatus: "unreachable" });
+    } finally {
+      sessionsInFlight = false;
     }
   }
 
   async function loadMessages(id: number): Promise<void> {
     const seq = ++transcriptSeq;
+    transcriptFor = id;
     commit({ ...state, messages: [], transcriptStatus: "loading" });
     try {
       const raw = await api.getMessages(id, new AbortController().signal);
       if (seq !== transcriptSeq || id !== state.activeSessionId) return;
       commit({ ...state, messages: raw.map(toChatMessage), transcriptStatus: "ready" });
     } catch {
+      transcriptFor = null; // so a retry is possible — this one showed nothing
       if (seq !== transcriptSeq || id !== state.activeSessionId) return;
       commit({ ...state, transcriptStatus: "unreachable" });
     }
@@ -287,11 +308,31 @@ export function createAgentChatStore(
       }
       commit({ ...state, expanded });
     }
-    if (expanded && !initialized) {
-      initialized = true;
-      void loadModels();
-      void loadSessions();
-      if (state.activeSessionId !== null) void loadMessages(state.activeSessionId);
+    if (expanded) ensureLoaded();
+  }
+
+  /**
+   * Loads whatever an open panel needs and has not got, and is safe to call repeatedly.
+   *
+   * Called from the panel's own mount rather than from this module's construction, and
+   * that difference is the whole point. The store is a module-level const, so
+   * constructing it ran during `import` — before `main.tsx` had awaited
+   * `identity.initialize()`. Every request made there asked for a token from an MSAL that
+   * had not resolved the session yet, got `SignedOut`, and never reached the network:
+   * `jsonClient` awaits the token *before* it calls `fetch`, so nothing was even sent.
+   *
+   * The session list recovered on its own — `finishTurn` reloads it after every turn — so
+   * the symptom was one panel that worked with a permanently empty model picker saying
+   * the catalogue could not be read, while the module's log showed no request for it at
+   * all. Observed in production on 13 August 2026; a reload reproduced it exactly,
+   * because the race is deterministic rather than a race at all.
+   */
+  function ensureLoaded(): void {
+    if (!state.expanded) return;
+    if (state.modelsStatus !== "ready") void loadModels();
+    if (state.sessionsStatus !== "ready") void loadSessions();
+    if (state.activeSessionId !== null && transcriptFor !== state.activeSessionId) {
+      void loadMessages(state.activeSessionId);
     }
   }
 
@@ -487,8 +528,9 @@ export function createAgentChatStore(
 
   // A checkout that reloads with the panel already expanded (`STORAGE_KEY` read as
   // "expanded" above) gets no click on the rail button to trigger the load that click
-  // would otherwise cause — this is that trigger, run once at construction instead.
-  if (state.expanded) setExpanded(true);
+  // would otherwise cause. That trigger used to run here, at construction — which is
+  // during `import`, before the sign-in state exists. `AgentChat` calls `ensureLoaded`
+  // on mount instead, which is after it.
 
   return {
     subscribe(listener) {
@@ -497,6 +539,7 @@ export function createAgentChatStore(
     },
     getSnapshot: () => state,
     setExpanded,
+    ensureLoaded,
     toggle() {
       setExpanded(!state.expanded);
     },
