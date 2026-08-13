@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
@@ -11,7 +11,14 @@ from .. import reduce, uncertainty
 from ..client import UpstreamClient
 from ..errors import ToolRefusal
 from ..upstream import UpstreamCandles, UpstreamCoverage
-from ._shared import READ_ONLY, is_tracked, raise_for_status, resolve_window
+from ._shared import (
+    READ_ONLY,
+    WindowedOut,
+    is_tracked,
+    raise_for_status,
+    resolve_window,
+    tracked_pair,
+)
 
 # design.md, "Sufity są liczbami w kodzie, nie wartościami w konfiguracji" — a ceiling
 # that lived in .env would drift from the description a caller was given for it.
@@ -30,11 +37,9 @@ class CandleOut(BaseModel):
     volume: float | None = None
 
 
-class GetCandlesOut(BaseModel):
+class GetCandlesOut(WindowedOut):
     symbol: str
     resolution: str
-    from_: datetime = Field(serialization_alias="from")
-    to: datetime
     aggregated: bool = Field(
         description="true when each candle below covers more than one original period"
     )
@@ -60,11 +65,9 @@ class LastPriceOut(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
-class SummarizeRangeOut(BaseModel):
+class SummarizeRangeOut(WindowedOut):
     symbol: str
     resolution: str
-    from_: datetime = Field(serialization_alias="from")
-    to: datetime
     candle_count: int
     open: float | None = None
     high: float | None = None
@@ -84,9 +87,7 @@ class SummarizeRangeOut(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
-class CoverageRangeOut(BaseModel):
-    from_: datetime = Field(serialization_alias="from")
-    to: datetime
+class CoverageRangeOut(WindowedOut):
     history_ended: bool
 
 
@@ -100,6 +101,40 @@ class DescribeCoverageOut(BaseModel):
         description="verified ranges older than the ones shown, dropped to keep the reply short",
     )
     notes: list[str] = Field(default_factory=list)
+
+
+async def _newest_candle(
+    upstream: UpstreamClient, symbol: str, resolution: str, notes: list[str]
+) -> UpstreamCandles:
+    """The archive's newest candle for a pair, read at the instant `/pairs` reports for
+    it rather than found by widening a window. Appends the sentence that says which kind
+    of empty this is when there is nothing to read.
+    """
+    row = await tracked_pair(upstream, symbol, resolution)
+    newest = row.get("latest_candle") if row else None
+    empty = UpstreamCandles(
+        symbol=symbol, resolution=resolution, derived=False, candles=[], uncovered=[]
+    )
+    if newest is None:
+        notes.append(uncertainty.empty_series_sentence(symbol, row is not None))
+        return empty
+
+    moment = datetime.fromisoformat(newest)
+    response = await upstream.get(
+        f"/candles/{symbol}",
+        params={
+            "resolution": resolution,
+            "from": moment.isoformat(),
+            # `to` is exclusive on market-data's side, so a second past the candle's own
+            # instant is the narrowest range that contains it.
+            "to": (moment + timedelta(seconds=1)).isoformat(),
+        },
+    )
+    await raise_for_status(response)
+    parsed = UpstreamCandles.model_validate(response.json())
+    if not parsed.candles:
+        notes.append(uncertainty.empty_series_sentence(symbol, True))
+    return parsed
 
 
 def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
@@ -183,13 +218,20 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         parsed = UpstreamCandles.model_validate(response.json())
 
         notes: list[str] = []
+        if not parsed.candles:
+            # The default window is one day, which is shorter than the gap between two
+            # candles at DAY or WEEK and shorter than a weekend at any resolution — so
+            # this tool answered "no candle" for the pairs it was most useful on, while
+            # the archive held the price all along. Widening the window by some guessed
+            # multiple only moves the boundary; `/pairs` publishes where the newest
+            # candle actually is, so ask for that instant instead.
+            parsed = await _newest_candle(upstream, symbol, resolution, notes)
+
         derived_note = uncertainty.derived_sentence(parsed.derived, resolution)
         if derived_note:
             notes.append(derived_note)
 
         if not parsed.candles:
-            tracked = await is_tracked(upstream, symbol, resolution)
-            notes.append(uncertainty.empty_series_sentence(symbol, tracked))
             return LastPriceOut(symbol=symbol, resolution=resolution, notes=notes)
 
         latest = parsed.candles[-1]
