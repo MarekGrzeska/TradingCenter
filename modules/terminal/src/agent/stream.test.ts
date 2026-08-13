@@ -66,6 +66,53 @@ describe("parseSseFrame", () => {
     });
   });
 
+  it("reads a tool call into the same shape the transcript hands back", () => {
+    const frame =
+      "event: tool_call\ndata: " +
+      JSON.stringify({
+        round_index: 1,
+        position: 0,
+        tool_name: "get_candles",
+        arguments: { symbol: "US100", resolution: "DAY" },
+        outcome: "ok",
+        result_text: '{"candles": 78}',
+        duration_ms: 240,
+      });
+
+    expect(parseSseFrame(frame)).toEqual({
+      kind: "toolCall",
+      call: {
+        roundIndex: 1,
+        position: 0,
+        name: "get_candles",
+        arguments: { symbol: "US100", resolution: "DAY" },
+        outcome: "ok",
+        resultText: '{"candles": 78}',
+        durationMs: 240,
+      },
+    });
+  });
+
+  it("keeps an outcome it has no name for out of the three it does", () => {
+    // A fourth kind rendered as one of the three would say something the module did not:
+    // an unreachable server shown as a refusal reads as "the archive says no".
+    const frame =
+      "event: tool_call\ndata: " +
+      JSON.stringify({
+        round_index: 0,
+        position: 0,
+        tool_name: "get_candles",
+        arguments: {},
+        outcome: "throttled",
+        result_text: "slow down",
+        duration_ms: 1,
+      });
+
+    const event = parseSseFrame(frame);
+
+    expect(event).toMatchObject({ kind: "toolCall", call: { outcome: "unknown" } });
+  });
+
   it("ignores the keepalive comment", () => {
     expect(parseSseFrame(": ping")).toBeNull();
   });

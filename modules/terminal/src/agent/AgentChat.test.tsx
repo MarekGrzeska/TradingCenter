@@ -4,8 +4,21 @@ import userEvent from "@testing-library/user-event";
 
 import { AgentChat } from "./AgentChat";
 import { createAgentChatStore, STORAGE_KEY } from "./agentChatStore";
-import type { AgentApi, AgentMessage, AgentModel, AgentSession } from "./agentApi";
+import type { AgentApi, AgentMessage, AgentModel, AgentSession, AgentToolCall } from "./agentApi";
 import type { AgentStreamEvent } from "./stream";
+
+function toolCall(overrides: Partial<AgentToolCall> = {}): AgentToolCall {
+  return {
+    roundIndex: 0,
+    position: 0,
+    name: "get_candles",
+    arguments: { symbol: "US100", resolution: "DAY" },
+    outcome: "ok",
+    resultText: '{"candles": 78}',
+    durationMs: 240,
+    ...overrides,
+  };
+}
 
 const MODELS: AgentModel[] = [
   { id: "luna", displayName: "Luna", costRank: 1, inputRatePer1M: "0.2", outputRatePer1M: "1.2" },
@@ -54,7 +67,13 @@ interface FakeApi extends AgentApi {
    *  `sendMessage` does by default, exposed so a test overriding `sendMessage` for
    *  control over event *timing* does not also have to reinvent what ends up on
    *  reload, which is what a `finishTurn` reload always reflects. */
-  recordExchange(id: number, content: string, replyText: string, incomplete: boolean): void;
+  recordExchange(
+    id: number,
+    content: string,
+    replyText: string,
+    incomplete: boolean,
+    toolCalls?: AgentToolCall[],
+  ): void;
 }
 
 function createFakeApi(): FakeApi {
@@ -120,7 +139,7 @@ function createFakeApi(): FakeApi {
     async getMessages(id) {
       return api.transcripts.get(id) ?? [];
     },
-    recordExchange(id, content, replyText, incomplete) {
+    recordExchange(id, content, replyText, incomplete, toolCalls = []) {
       const transcript = api.transcripts.get(id) ?? [];
       transcript.push({
         id: transcript.length + 1,
@@ -130,6 +149,7 @@ function createFakeApi(): FakeApi {
         promptVersion: null,
         incomplete: false,
         createdAt: 0,
+        toolCalls: [],
       });
       const session = api.sessions.find((s) => s.id === id);
       if (session && session.title === null) session.title = content.slice(0, 40);
@@ -141,6 +161,7 @@ function createFakeApi(): FakeApi {
         promptVersion: "v1",
         incomplete,
         createdAt: 0,
+        toolCalls,
       });
       api.transcripts.set(id, transcript);
     },
@@ -261,6 +282,100 @@ describe("AgentChat", () => {
     await screen.findByText("consolidating");
   });
 
+  it("shows a tool call as it happens, before the reply has said anything", async () => {
+    const api = createFakeApi();
+    const controllable = controllableEvents();
+    api.sendMessage = async (id, content) => {
+      api.recordExchange(id, content, "it rose 0.6%", false, [toolCall()]);
+      return controllable.events;
+    };
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+
+    const box = screen.getByRole("textbox", { name: /message the agent/i });
+    await user.type(box, "summarise US100{Enter}");
+    await screen.findByText("thinking…");
+
+    controllable.push({ kind: "toolCall", call: toolCall() });
+
+    await screen.findByText("get_candles");
+    expect(screen.getByText("240 ms")).toBeInTheDocument();
+    // The panel is still waiting on the model — a call resolving is not the reply
+    // starting.
+    expect(screen.getByText("thinking…")).toBeInTheDocument();
+
+    controllable.push({ kind: "fragment", text: "it rose 0.6%" });
+    controllable.push({ kind: "complete", incomplete: false });
+    // Still there after the reload, now from the transcript rather than the stream.
+    await screen.findByText("it rose 0.6%");
+    expect(screen.getByText("get_candles")).toBeInTheDocument();
+  });
+
+  it("keeps a call's arguments and result behind one click", async () => {
+    const api = createFakeApi();
+    const session = api.seed("older chat", "luna");
+    api.recordExchange(session.id, "summarise US100", "it rose 0.6%", false, [toolCall()]);
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+    await user.click(await screen.findByRole("button", { name: /^older chat$/i }));
+
+    await screen.findByText("get_candles");
+    // Collapsed by default: a turn is allowed eight calls, and eight open results would
+    // bury the rozmowa they were made for.
+    expect(screen.queryByText(/"symbol":"US100"/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /expand get_candles/i }));
+
+    expect(screen.getByText(/"symbol":"US100"/)).toBeInTheDocument();
+    expect(screen.getByText('{"candles": 78}')).toBeInTheDocument();
+  });
+
+  it("tells a refusal, an unreachable server and a successful call apart", async () => {
+    const api = createFakeApi();
+    const session = api.seed("older chat", "luna");
+    api.recordExchange(session.id, "summarise US100", "I could not check all of it", false, [
+      toolCall(),
+      toolCall({ position: 1, name: "summarize_range", outcome: "refused", durationMs: 18 }),
+      toolCall({ position: 2, name: "describe_coverage", outcome: "unavailable", durationMs: 3 }),
+    ]);
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+    await user.click(await screen.findByRole("button", { name: /^older chat$/i }));
+
+    await screen.findByText("get_candles");
+    expect(screen.getByText("ok")).toHaveClass("text-ink-muted");
+    // A refusal is the archive answering "not like that"; an unreachable server means
+    // nothing was asked and nothing is known. Reading the second as the first is how
+    // "the archive has no data" gets said about data the archive has.
+    expect(screen.getByText("refused")).toHaveClass("text-warning");
+    expect(screen.getByText("no answer")).toHaveClass("text-critical");
+    // And none of it makes the reply itself incomplete.
+    expect(screen.queryByText(/incomplete/i)).not.toBeInTheDocument();
+  });
+
+  it("shows no entries for a turn that asked for nothing", async () => {
+    const api = createFakeApi();
+    const session = api.seed("older chat", "luna");
+    api.recordExchange(session.id, "hello", "hello back", false);
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+    await user.click(await screen.findByRole("button", { name: /^older chat$/i }));
+
+    await screen.findByText("hello back");
+    expect(screen.queryByRole("button", { name: /expand /i })).not.toBeInTheDocument();
+  });
+
   it("marks a broken reply as incomplete on the bubble itself, and keeps what arrived", async () => {
     const api = createFakeApi();
     api.sendMessage = async (id, content) => {
@@ -311,6 +426,7 @@ describe("AgentChat", () => {
         promptVersion: null,
         incomplete: false,
         createdAt: 0,
+        toolCalls: [],
       },
     ]);
     const user = userEvent.setup();
@@ -395,6 +511,7 @@ describe("AgentChat", () => {
         promptVersion: null,
         incomplete: false,
         createdAt: 0,
+        toolCalls: [],
       },
     ]);
     const user = userEvent.setup();

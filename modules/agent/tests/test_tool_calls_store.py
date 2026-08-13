@@ -2,9 +2,10 @@
 row per model call.
 
 Both hang off the same agent message, and neither is a message. That is the whole point
-of the split — `agent/contract.py` does not change, so the terminal reads exactly the
-transcript it read before this change (specs/agent-tools, "Wywołanie narzędzia zostawia
-ślad").
+of the split: the transcript stays the conversation, and this is how the agent got to its
+half of it (specs/agent-tools, "Wywołanie narzędzia zostawia ślad"). The calls do reach
+the wire — `MessageOut.tool_calls`, since `show-tool-calls-in-chat` — but they reach it
+beside a message rather than as one.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from agent.models import RecordedCall
 from agent.prompt import SYSTEM_PROMPT_WITH_TOOLS, SYSTEM_PROMPT_WITHOUT_TOOLS
 from agent.provider import TextDelta, ToolCallRequest, UsageReport
 from agent.tools import ToolOutcome, ToolOutcomeKind
-from agent.turn import run_turn
+from agent.turn import ToolCalled, run_turn
 
 from .test_graph import PRICE_TOOL, FakeProvider, FakeToolServer
 
@@ -98,6 +99,85 @@ async def test_three_calls_leave_three_rows_in_a_recoverable_order(pool, db) -> 
     assert calls[1].arguments == {"symbol": "US100"}
     assert all(call.outcome == "ok" for call in calls)
     assert all(call.duration_ms >= 0 for call in calls)
+
+
+async def test_a_whole_session_reads_in_one_query_grouped_by_message(pool, db) -> None:
+    """What the transcript route reads. One query for a rozmowa of many turns, rather
+    than one per message — and each message's calls still in the order they were made."""
+    session_id = await _new_session(db)
+    for symbol in ("US100", "SILVER"):
+        provider = FakeProvider(
+            [
+                [
+                    ToolCallRequest("a", "get_last_price", {"symbol": symbol}),
+                    ToolCallRequest("b", "describe_coverage", {"symbol": symbol}),
+                    UsageReport(10, 5, None, None),
+                ],
+                [TextDelta("here it is"), UsageReport(20, 5, None, None)],
+            ]
+        )
+        await run_turn(
+            pool,
+            session_id=session_id,
+            model_entry=LUNA,
+            provider=provider,
+            queue=RecordingQueue(),
+            tool_server=ServerWithTools(),  # pyright: ignore[reportArgumentType]
+        )
+
+    messages = await store.get_messages(db, session_id=session_id)
+    grouped = await store.get_session_tool_calls(db, session_id=session_id)
+
+    replies = [m for m in messages if m.role.value == "agent"]
+    assert len(replies) == 2
+    for reply in replies:
+        assert [call.tool_name for call in grouped[reply.id]] == [
+            "get_last_price",
+            "describe_coverage",
+        ]
+        assert [call.position for call in grouped[reply.id]] == [0, 1]
+    # A message that asked nothing is simply absent — the caller reads with a default.
+    assert all(m.id not in grouped for m in messages if m.role.value == "operator")
+
+
+async def test_the_announced_position_is_the_one_that_was_stored(pool, db) -> None:
+    """The graph announces a position mid-turn and the store writes one afterwards. Two
+    numbers derived in two places, and a panel would order a round by the first while a
+    reload orders it by the second."""
+    session_id = await _new_session(db)
+    provider = FakeProvider(
+        [
+            [
+                ToolCallRequest("a", "list_tracked_pairs", {}),
+                ToolCallRequest("b", "get_last_price", {"symbol": "US100"}),
+                UsageReport(10, 5, None, None),
+            ],
+            [
+                ToolCallRequest("c", "describe_coverage", {"symbol": "US100"}),
+                UsageReport(20, 5, None, None),
+            ],
+            [TextDelta("21000.5"), UsageReport(40, 8, None, None)],
+        ]
+    )
+    queue = RecordingQueue()
+
+    await run_turn(
+        pool,
+        session_id=session_id,
+        model_entry=LUNA,
+        provider=provider,
+        queue=queue,
+        tool_server=ServerWithTools(),  # pyright: ignore[reportArgumentType]
+    )
+
+    messages = await store.get_messages(db, session_id=session_id)
+    stored = await store.get_tool_calls(db, message_id=messages[-1].id)
+    announced = [event for event in queue.events if isinstance(event, ToolCalled)]
+
+    assert [(e.call.round_index, e.position) for e in announced] == [
+        (call.round_index, call.position) for call in stored
+    ]
+    assert [e.call.name for e in announced] == [call.tool_name for call in stored]
 
 
 async def test_a_refused_call_is_recorded_with_its_reason(pool, db) -> None:

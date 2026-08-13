@@ -6,6 +6,7 @@ import type {
   AgentMessage,
   AgentModel,
   AgentSession,
+  AgentToolCall,
 } from "./agentApi";
 import type { AgentStreamEvent } from "./stream";
 
@@ -17,6 +18,26 @@ const MODELS: AgentModel[] = [
 async function* fromArray(events: AgentStreamEvent[]): AsyncGenerator<AgentStreamEvent> {
   yield* events;
 }
+
+const CANDLES_CALL: AgentToolCall = {
+  roundIndex: 0,
+  position: 0,
+  name: "get_candles",
+  arguments: { symbol: "US100", resolution: "DAY" },
+  outcome: "ok",
+  resultText: '{"candles": 78}',
+  durationMs: 240,
+};
+
+const REFUSED_CALL: AgentToolCall = {
+  roundIndex: 0,
+  position: 1,
+  name: "summarize_range",
+  arguments: { symbol: "US100" },
+  outcome: "refused",
+  resultText: "market-data refused: no such pair",
+  durationMs: 18,
+};
 
 /** A stream that only advances when the test tells it to — the fixed-array fake below
  *  resolves purely through microtasks, which can finish a whole turn before a
@@ -159,6 +180,7 @@ function createFakeApi(): FakeApi {
         promptVersion: null,
         incomplete: false,
         createdAt: 0,
+        toolCalls: [],
       });
       const session = api.sessions.find((s) => s.id === id);
       // The module's own behaviour: a title appears once there has been an exchange.
@@ -168,6 +190,11 @@ function createFakeApi(): FakeApi {
         .filter((e): e is Extract<AgentStreamEvent, { kind: "fragment" }> => e.kind === "fragment")
         .map((e) => e.text)
         .join("");
+      // Also the module's own behaviour: whatever the stream announced ends up on the
+      // reply in the transcript, in the same shape (`agent/contract.py`, `ToolCallOut`).
+      const calls = api.script
+        .filter((e): e is Extract<AgentStreamEvent, { kind: "toolCall" }> => e.kind === "toolCall")
+        .map((e) => e.call);
       const broke = api.script.some((e) => e.kind === "error");
       if (text || !broke) {
         transcript.push({
@@ -178,6 +205,7 @@ function createFakeApi(): FakeApi {
           promptVersion: "v1",
           incomplete: broke,
           createdAt: 0,
+          toolCalls: calls,
         });
       }
       api.transcripts.set(id, transcript);
@@ -248,9 +276,13 @@ describe("createAgentChatStore", () => {
 
     await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
 
-    expect(seenTurns).toContainEqual({ status: "waiting" });
-    expect(seenTurns).toContainEqual({ status: "streaming", text: "why is " });
-    expect(seenTurns).toContainEqual({ status: "streaming", text: "why is BTC flat" });
+    expect(seenTurns).toContainEqual({ status: "waiting", toolCalls: [] });
+    expect(seenTurns).toContainEqual({ status: "streaming", text: "why is ", toolCalls: [] });
+    expect(seenTurns).toContainEqual({
+      status: "streaming",
+      text: "why is BTC flat",
+      toolCalls: [],
+    });
 
     const { messages, activeSessionId } = store.getSnapshot();
     expect(activeSessionId).not.toBeNull();
@@ -352,6 +384,7 @@ describe("createAgentChatStore", () => {
         promptVersion: null,
         incomplete: false,
         createdAt: 0,
+        toolCalls: [],
       },
     ]);
     const store = createAgentChatStore(null, api);
@@ -362,7 +395,7 @@ describe("createAgentChatStore", () => {
     await waitFor(() => expect(store.getSnapshot().transcriptStatus).toBe("ready"));
 
     expect(store.getSnapshot().messages).toEqual([
-      { id: 1, role: "operator", text: "hello", incomplete: false },
+      { id: 1, role: "operator", text: "hello", incomplete: false, toolCalls: [] },
     ]);
     expect(store.getSnapshot().selectedModelId).toBe("luna");
   });
@@ -399,7 +432,11 @@ describe("createAgentChatStore", () => {
     store.send("why is BTC flat");
     controllable.push({ kind: "fragment", text: "still going" });
     await waitFor(() =>
-      expect(store.getSnapshot().turn).toEqual({ status: "streaming", text: "still going" }),
+      expect(store.getSnapshot().turn).toEqual({
+        status: "streaming",
+        text: "still going",
+        toolCalls: [],
+      }),
     );
 
     const activeBefore = store.getSnapshot().activeSessionId;
@@ -470,6 +507,7 @@ describe("createAgentChatStore", () => {
         promptVersion: null,
         incomplete: false,
         createdAt: 0,
+        toolCalls: [],
       },
     ]);
     const storage = memoryStorage();
@@ -485,7 +523,7 @@ describe("createAgentChatStore", () => {
     expect(second.getSnapshot().activeSessionId).toBe(older.id);
     await waitFor(() => expect(second.getSnapshot().transcriptStatus).toBe("ready"));
     expect(second.getSnapshot().messages).toEqual([
-      { id: 1, role: "operator", text: "hello", incomplete: false },
+      { id: 1, role: "operator", text: "hello", incomplete: false, toolCalls: [] },
     ]);
   });
 
@@ -531,6 +569,79 @@ describe("createAgentChatStore", () => {
     await waitFor(() => expect(store.getSnapshot().activeSessionId).toBeNull());
     expect(store.getSnapshot().messages).toEqual([]);
     expect(store.getSnapshot().sessions).toEqual([]);
+  });
+
+  it("shows a tool call while the turn is still waiting for the first fragment", async () => {
+    const api = createFakeApi();
+    const store = createAgentChatStore(null, api);
+    store.setExpanded(true);
+    await waitFor(() => expect(store.getSnapshot().modelsStatus).toBe("ready"));
+    const controllable = controllableEvents();
+    api.sendMessage = async () => controllable.events;
+
+    store.send("summarise US100");
+    controllable.push({ kind: "toolCall", call: CANDLES_CALL });
+
+    // Still "waiting": no text has arrived, and claiming "streaming" would swap the
+    // panel's "thinking…" for an empty bubble.
+    await waitFor(() =>
+      expect(store.getSnapshot().turn).toEqual({ status: "waiting", toolCalls: [CANDLES_CALL] }),
+    );
+
+    controllable.push({ kind: "fragment", text: "it rose 0.6%" });
+    await waitFor(() =>
+      expect(store.getSnapshot().turn).toEqual({
+        status: "streaming",
+        text: "it rose 0.6%",
+        toolCalls: [CANDLES_CALL],
+      }),
+    );
+  });
+
+  it("keeps the turn's calls on the reply the transcript hands back", async () => {
+    const api = createFakeApi();
+    api.script = [
+      { kind: "toolCall", call: CANDLES_CALL },
+      { kind: "toolCall", call: REFUSED_CALL },
+      { kind: "fragment", text: "it rose 0.6%" },
+      { kind: "complete", incomplete: false },
+    ];
+    const store = createAgentChatStore(null, api);
+    store.setExpanded(true);
+    await waitFor(() => expect(store.getSnapshot().modelsStatus).toBe("ready"));
+
+    store.send("summarise US100");
+    await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
+
+    const { messages } = store.getSnapshot();
+    expect(messages.at(-1)?.toolCalls).toEqual([CANDLES_CALL, REFUSED_CALL]);
+    // A refusal is a result, not a broken reply.
+    expect(messages.at(-1)?.incomplete).toBe(false);
+    expect(messages[0].toolCalls).toEqual([]);
+  });
+
+  it("keeps the calls on screen when the stream breaks and the module cannot be reloaded", async () => {
+    const api = createFakeApi();
+    api.script = [
+      { kind: "toolCall", call: CANDLES_CALL },
+      { kind: "fragment", text: "cut o" },
+      { kind: "error", message: "the model call failed" },
+    ];
+    const store = createAgentChatStore(null, api);
+    store.setExpanded(true);
+    await waitFor(() => expect(store.getSnapshot().modelsStatus).toBe("ready"));
+
+    store.send("summarise US100");
+    await waitFor(() => expect(store.getSnapshot().messages).toHaveLength(1));
+    api.failGetMessages = true;
+
+    await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
+
+    const reply = store.getSnapshot().messages.at(-1);
+    // The locally reconstructed bubble — the one thing that explains a reply that broke
+    // off is what the agent had read by then.
+    expect(reply).toMatchObject({ text: "cut o", incomplete: true });
+    expect(reply?.toolCalls).toEqual([CANDLES_CALL]);
   });
 
   it("leaves the open conversation alone when a different one is deleted", async () => {

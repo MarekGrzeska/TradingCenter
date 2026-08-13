@@ -11,9 +11,16 @@ from fastapi.responses import StreamingResponse
 
 from .. import store
 from ..auth import current_principal
-from ..contract import CreateSessionIn, MessageOut, PatchSessionIn, SendMessageIn, SessionOut
+from ..contract import (
+    CreateSessionIn,
+    MessageOut,
+    PatchSessionIn,
+    SendMessageIn,
+    SessionOut,
+    ToolCallOut,
+)
 from ..models_catalogue import ModelNotInCatalogue
-from ..turn import Complete, Failed, Fragment, run_turn
+from ..turn import Complete, Failed, Fragment, ToolCalled, run_turn
 
 log = logging.getLogger(__name__)
 
@@ -68,7 +75,8 @@ async def get_messages(
         if session is None:
             raise HTTPException(404, detail="no such session")
         messages = await store.get_messages(conn, session_id=session_id)
-    return [MessageOut.from_message(m) for m in messages]
+        calls = await store.get_session_tool_calls(conn, session_id=session_id)
+    return [MessageOut.from_message(m, calls.get(m.id, ())) for m in messages]
 
 
 @router.patch("/sessions/{session_id}")
@@ -161,6 +169,14 @@ async def send_message(
                 continue
             if isinstance(event, Fragment):
                 yield _sse("fragment", {"text": event.text})
+            elif isinstance(event, ToolCalled):
+                # The same shape the transcript publishes for this call once it has a
+                # row, built from the same contract model — a caller that keeps what the
+                # stream gave it and a caller that reloads afterwards MUST end up holding
+                # the same thing (specs/agent-chat, "Wywołanie narzędzia dociera w
+                # trakcie tury").
+                published = ToolCallOut.from_recorded(event.call, event.position)
+                yield _sse("tool_call", published.model_dump(mode="json"))
             elif isinstance(event, Complete):
                 yield _sse("complete", {"incomplete": event.incomplete})
                 return

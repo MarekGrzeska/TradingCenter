@@ -6,11 +6,12 @@ sides rather than wired into `pnpm contract:generate`, which is market-data's al
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import datetime
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
-from .models import Message, Session, UsageAggregate
+from .models import Message, RecordedCall, Session, ToolCall, UsageAggregate
 from .models_catalogue import ModelCatalogueEntry
 
 # A name the operator types, not one derived from the first question — so it may be longer
@@ -60,6 +61,59 @@ class SessionOut(BaseModel):
         )
 
 
+class ToolCallOut(BaseModel):
+    """One tool call, published in exactly one shape whether it is leaving as a stream
+    event mid-turn or hanging off a message in a reloaded transcript. Both are built here
+    on purpose: two shapes for the same call is two chances for the panel and the
+    transcript to disagree about what the agent asked and what came back.
+
+    No `id` and no `created_at`: the live event has neither — the row does not exist yet
+    when the call resolves — and a field one of the two paths cannot fill is a field the
+    reader has to check the origin of before trusting.
+    """
+
+    # Which round of the turn, and where within it. The transcript arrives ordered
+    # already; these say whether three calls were one round of three or three rounds of
+    # one, which is the difference between a model surveying and a model iterating.
+    round_index: int
+    position: int
+    tool_name: str
+    arguments: dict
+    # ok, refused, or unavailable — `ToolOutcomeKind` in `tools/client.py`, and the three
+    # never collapse into two (specs/agent-tools, "Odmowa narzędzia jest wynikiem, nie
+    # awarią tury").
+    outcome: str
+    # The text the model itself received, not a summary of it. A caller shown a summary
+    # cannot tell that the model was handed something else, which is the whole reason
+    # this is published (design.md, "Wynik w całości, bez własnego sufitu").
+    result_text: str
+    duration_ms: int
+
+    @classmethod
+    def from_tool_call(cls, call: ToolCall) -> ToolCallOut:
+        return cls(
+            round_index=call.round_index,
+            position=call.position,
+            tool_name=call.tool_name,
+            arguments=call.arguments,
+            outcome=call.outcome,
+            result_text=call.result_text,
+            duration_ms=call.duration_ms,
+        )
+
+    @classmethod
+    def from_recorded(cls, call: RecordedCall, position: int) -> ToolCallOut:
+        return cls(
+            round_index=call.round_index,
+            position=position,
+            tool_name=call.name,
+            arguments=call.arguments,
+            outcome=call.outcome,
+            result_text=call.text,
+            duration_ms=call.duration_ms,
+        )
+
+
 class MessageOut(BaseModel):
     id: int
     role: str
@@ -68,9 +122,14 @@ class MessageOut(BaseModel):
     prompt_version: str | None
     incomplete: bool
     created_at: datetime
+    # Empty for an operator's message and for an agent message that asked nothing — never
+    # absent, and never null. "No calls" and "the calls were lost on the way" are two
+    # different facts, and a field that is sometimes missing collapses them
+    # (specs/agent-tools, "Wypowiedź bez narzędzi").
+    tool_calls: list[ToolCallOut] = Field(default_factory=list)
 
     @classmethod
-    def from_message(cls, message: Message) -> MessageOut:
+    def from_message(cls, message: Message, tool_calls: Sequence[ToolCall] = ()) -> MessageOut:
         return cls(
             id=message.id,
             role=message.role.value,
@@ -79,6 +138,7 @@ class MessageOut(BaseModel):
             prompt_version=message.prompt_version,
             incomplete=message.incomplete,
             created_at=message.created_at,
+            tool_calls=[ToolCallOut.from_tool_call(call) for call in tool_calls],
         )
 
 

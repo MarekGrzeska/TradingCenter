@@ -19,6 +19,7 @@ import {
   type AgentMessage,
   type AgentModel,
   type AgentSession,
+  type AgentToolCall,
   type ChatRole,
 } from "./agentApi";
 import type { AgentStreamEvent } from "./stream";
@@ -43,6 +44,9 @@ export interface ChatMessage {
   id: number | string;
   role: ChatRole;
   text: string;
+  /** What the agent read on the way to this reply, in the order it read it. Empty for an
+   *  operator's message and for a reply that asked nothing. */
+  toolCalls: AgentToolCall[];
   /** Mirrors the module's own `incomplete` — a reply cut short by a broken stream, or
    *  reconstructed locally because the module could not be reached to confirm it
    *  (`terminal-agent-chat` spec, "Odpowiedź niepełna MUST być oznaczona jako
@@ -54,8 +58,12 @@ export interface ChatMessage {
  *  Nothing here duplicates a finished reply — that lives in `messages`, reloaded from
  *  the module, the moment it is known. */
 export type TurnState =
-  | { status: "waiting" }
-  | { status: "streaming"; text: string }
+  /** Calls carried on every in-flight status, not only on `streaming`: a turn that opens
+   *  with a round of tools makes them before the model has written a word, and dropping
+   *  them on the way from `waiting` to `streaming` would blank the panel at exactly the
+   *  moment it started saying something. */
+  | { status: "waiting"; toolCalls: AgentToolCall[] }
+  | { status: "streaming"; text: string; toolCalls: AgentToolCall[] }
   /** The module never accepted this turn — no operator message, no reply, nothing
    *  reloadable. `terminal-agent-chat` spec, "MUST NOT pokazywać wypowiedzi agenta,
    *  która nie powstała": the panel says so in words, not with an empty bubble. */
@@ -140,6 +148,7 @@ function toChatMessage(message: AgentMessage): ChatMessage {
     role: message.role,
     text: message.content,
     incomplete: message.incomplete,
+    toolCalls: message.toolCalls,
   };
 }
 
@@ -230,6 +239,7 @@ export function createAgentChatStore(
   async function finishTurn(
     sessionId: number,
     accumulated: string,
+    calls: AgentToolCall[],
     errorMessage: string | null,
   ): Promise<void> {
     const seq = ++transcriptSeq;
@@ -251,6 +261,10 @@ export function createAgentChatStore(
           role: "agent",
           text: accumulated,
           incomplete: true,
+          // The module could not be asked what it holds, so the calls that arrived on the
+          // stream are the only record of them there is on screen — dropping them here
+          // would take away the one thing that explains a reply that broke off.
+          toolCalls: calls,
         },
       ];
     }
@@ -402,11 +416,17 @@ export function createAgentChatStore(
       role: "operator",
       text: trimmed,
       incomplete: false,
+      toolCalls: [],
     };
-    commit({ ...state, messages: [...state.messages, operatorMessage], turn: { status: "waiting" } });
+    commit({
+      ...state,
+      messages: [...state.messages, operatorMessage],
+      turn: { status: "waiting", toolCalls: [] },
+    });
 
     let sessionId = state.activeSessionId;
     let accumulated = "";
+    let calls: AgentToolCall[] = [];
 
     try {
       if (sessionId === null) {
@@ -430,12 +450,24 @@ export function createAgentChatStore(
           if (sessionId !== state.activeSessionId) return; // switched conversations mid-turn
           if (event.kind === "fragment") {
             accumulated += event.text;
-            commit({ ...state, turn: { status: "streaming", text: accumulated } });
+            commit({ ...state, turn: { status: "streaming", text: accumulated, toolCalls: calls } });
+          } else if (event.kind === "toolCall") {
+            calls = [...calls, event.call];
+            // Still `waiting` until the first fragment: a round of tools can resolve
+            // before the model has written a word, and claiming `streaming` with no text
+            // would swap the panel's "thinking…" for an empty bubble.
+            commit({
+              ...state,
+              turn:
+                accumulated === ""
+                  ? { status: "waiting", toolCalls: calls }
+                  : { status: "streaming", text: accumulated, toolCalls: calls },
+            });
           } else if (event.kind === "complete") {
-            await finishTurn(sessionId, accumulated, event.incomplete ? "reply marked incomplete" : null);
+            await finishTurn(sessionId, accumulated, calls, event.incomplete ? "reply marked incomplete" : null);
             return;
           } else if (event.kind === "error") {
-            await finishTurn(sessionId, accumulated, event.message);
+            await finishTurn(sessionId, accumulated, calls, event.message);
             return;
           }
         }
@@ -443,9 +475,9 @@ export function createAgentChatStore(
         // The turn was accepted (we have a session and got at least the response
         // headers), so this is the same recovery as a mid-stream error, not a "nothing
         // happened" refusal.
-        await finishTurn(sessionId, accumulated, "the connection ended before the reply finished");
+        await finishTurn(sessionId, accumulated, calls, "the connection ended before the reply finished");
       } catch (cause) {
-        await finishTurn(sessionId, accumulated, describeError(cause));
+        await finishTurn(sessionId, accumulated, calls, describeError(cause));
       }
     } catch (cause) {
       // Creating the session itself failed — nothing was accepted for this turn.

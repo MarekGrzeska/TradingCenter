@@ -1,4 +1,5 @@
 import {
+  Fragment,
   useEffect,
   useRef,
   useState,
@@ -9,6 +10,7 @@ import {
 
 import { agentChatStore, type AgentChatState, type AgentChatStore, type ChatMessage } from "./agentChatStore";
 import { MessageBody } from "./MessageBody";
+import { ToolCallEntry } from "./ToolCallEntry";
 
 /**
  * Mounted once in `Shell`, as a sibling of the router outlet rather than inside it: the
@@ -384,16 +386,31 @@ function Transcript({
         <p className="text-xs text-ink-faint">Ask the agent about the market on screen.</p>
       )}
       {messages.map((message) => (
-        <Bubble key={message.id} message={message} />
+        // The calls come before the reply they produced, which is the order they happened
+        // in — the agent read, then answered.
+        <Fragment key={message.id}>
+          {message.toolCalls.map((call) => (
+            <ToolCallEntry key={`${message.id}-${call.roundIndex}-${call.position}`} call={call} />
+          ))}
+          <Bubble message={message} />
+        </Fragment>
       ))}
       {/* Before the first fragment the panel already says something happened — a
           message that vanished into a silent, unchanged screen is indistinguishable
           from one that was never sent (`terminal-agent-chat` spec, "Widać, że
           odpowiedź powstaje"). */}
+      {/* The turn's own calls, shown as they arrive rather than at the end — a round of
+          tools produces no text, and without them the panel says "thinking…" through the
+          part of the turn that is doing the most (`terminal-agent-chat` spec, "Narzędzie
+          w trakcie tury"). */}
+      {(turn?.status === "waiting" || turn?.status === "streaming") &&
+        turn.toolCalls.map((call) => (
+          <ToolCallEntry key={`turn-${call.roundIndex}-${call.position}`} call={call} />
+        ))}
       {turn?.status === "waiting" && <ThinkingBubble />}
       {turn?.status === "streaming" && (
         <Bubble
-          message={{ id: "turn", role: "agent", text: turn.text, incomplete: false }}
+          message={{ id: "turn", role: "agent", text: turn.text, incomplete: false, toolCalls: [] }}
           streaming
         />
       )}
