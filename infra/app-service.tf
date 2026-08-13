@@ -541,6 +541,24 @@ resource "azuread_application" "market_mcp_easy_auth" {
   display_name    = "app-tradingcenter-market-mcp-easyauth"
   identifier_uris = [local.market_mcp_api_uri]
 
+  # No `oauth2_permission_scope` (see above) but the `api` block still has to be here, and
+  # leaving it out cost an interrupted `apply` on 13 August 2026. Two failures, one cause:
+  #
+  #   1. Entra refused the registration outright — "InvalidUniqueTenantIdentifierAsPerAppPolicy:
+  #      all newly added URIs must contain a tenant verified domain, tenant ID, or app ID".
+  #      The tenant policy exempts applications asking for v2 tokens, which is why
+  #      `api://tradingcenter-market-data` was accepted when it was created and
+  #      `api://tradingcenter-market-mcp` was not.
+  #   2. Had it been accepted, the agent's token would have been rejected on arrival: this
+  #      app's own Easy Auth is configured against the `/v2.0` tenant endpoint below, and a
+  #      v1 token there fails on its `iss` claim with an error naming no versions at all.
+  #
+  # The default is 1. Every other registration here sets 2 inside a block it needed for a
+  # scope; this one needs the block for nothing else, which is exactly how it went missing.
+  api {
+    requested_access_token_version = 2
+  }
+
   web {
     redirect_uris = ["https://${local.market_mcp_hostname}/.auth/login/aad/callback"]
   }
