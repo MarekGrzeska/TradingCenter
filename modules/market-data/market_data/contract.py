@@ -10,6 +10,7 @@ parts of what it asked for were never collected.
 from __future__ import annotations
 
 from datetime import datetime
+from enum import Enum
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
@@ -56,6 +57,58 @@ class Uncovered(BaseModel):
     to: datetime
 
     model_config = {"populate_by_name": True}
+
+
+class FormingState(str, Enum):
+    """Why a read of the current period does or does not carry a candle.
+
+    Four answers rather than a candle and a null, because the three empty ones send an
+    operator somewhere different: add the pair, come back on Monday, or go and look at why
+    collection stopped. Only the last is anybody's problem right now, and without a name it
+    reads exactly like the other two.
+    """
+
+    FORMING = "forming"
+    # Nothing is being collected for this symbol at any resolution.
+    NOT_TRACKED = "not_tracked"
+    # The venue is shut. There is no current price because there is no trading.
+    MARKET_CLOSED = "market_closed"
+    # Tracked, and the market is open or the gateway would not say — and still nothing is
+    # arriving. This is a collection failure wearing the same empty answer as a quiet
+    # weekend, which is the confusion the whole enum exists to prevent.
+    NO_QUOTES = "no_quotes"
+
+
+class FormingCandleOut(BaseModel):
+    """The period being built right now, read rather than subscribed to.
+
+    The candle is the same one a subscription's snapshot would carry this instant, and it
+    is not stored anywhere: it changes with every quote and understates its own range until
+    the period closes. A consumer treating `high`/`low` here as the period's range will be
+    wrong before the period ends — which is why `state` says `forming` in words rather than
+    leaving it to be inferred from a field being present.
+    """
+
+    symbol: str
+    resolution: Resolution | None = Field(
+        default=None,
+        description=(
+            "which resolution this candle came from; null when there is none to answer "
+            "with. May differ from the one asked for, because a caller that names none is "
+            "answered from the finest resolution that actually has quotes arriving"
+        ),
+    )
+    price_side: PriceSide = Field(
+        description="which side of the spread this is built from; the archive holds bid"
+    )
+    state: FormingState
+    candle: CandleOut | None = Field(
+        default=None, description="null unless `state` is `forming`"
+    )
+    market_open: bool | None = Field(
+        default=None,
+        description="null when the gateway could not be asked — not the same as closed",
+    )
 
 
 class CandlesOut(BaseModel):

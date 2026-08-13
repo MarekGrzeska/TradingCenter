@@ -21,7 +21,7 @@ BASE = "http://127.0.0.1:8020"
     "tool_name,arguments,path",
     [
         ("get_candles", {"symbol": "US100"}, f"{BASE}/candles/US100"),
-        ("get_last_price", {"symbol": "US100"}, f"{BASE}/candles/US100"),
+        ("get_last_price", {"symbol": "US100"}, f"{BASE}/candles/US100/forming"),
         ("summarize_range", {"symbol": "US100"}, f"{BASE}/candles/US100"),
         ("describe_coverage", {"symbol": "US100"}, f"{BASE}/coverage/US100"),
         ("search_instruments", {"query": "x"}, f"{BASE}/instruments/search"),

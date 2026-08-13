@@ -47,6 +47,54 @@ def unsettled_sentence(warmup_bars: int | None) -> str:
     )
 
 
+def forming_sentence(resolution: str) -> str:
+    """Said whenever a price comes from a period that has not closed. Without it a model
+    reports the period's high and low as its range, and both will still move
+    (specs/market-mcp-tools, "Zakres okresu w toku MUST NOT być podany jako zakres
+    zamknięty")."""
+    return (
+        f"This is the {resolution} period still being built — the price is current, but "
+        "its high, low and volume will still move before the period closes. Do not quote "
+        "them as the period's range."
+    )
+
+
+def no_live_price_sentence(symbol: str, state: str, market_open: bool | None = None) -> str:
+    """Why there is no current price, in the words the state means.
+
+    `market_closed` and `no_quotes` are the pair worth keeping apart: the first is the
+    venue being shut, which is nobody's problem, and the second is the archive not
+    receiving anything while it is open, which is somebody's problem right now
+    (specs/market-mcp-tools, "Rynek otwarty, a ceny bieżącej nie ma").
+
+    `no_quotes` covers one more case than its name suggests — the archive could not find
+    out whether the market is open at all — and saying "the market is open" there would
+    state as fact the one thing nobody established.
+    """
+    if state == "market_closed":
+        return (
+            f"{symbol}'s market is closed, so there is no price forming. The figure below "
+            "is the last candle that closed, and its age says how long ago that was."
+        )
+    if state == "no_quotes" and market_open is True:
+        return (
+            f"{symbol}'s market is open and the archive is receiving nothing for it — "
+            "collection has stopped, this is not a quiet market. The figure below is the "
+            "last candle that closed; treat it as stale, not as current."
+        )
+    if state == "no_quotes":
+        return (
+            f"The archive is receiving nothing for {symbol}, and could not find out "
+            "whether its market is open. Either the venue is shut or collection has "
+            "stopped — this is not a quiet market either way. The figure below is the "
+            "last candle that closed; treat it as stale, not as current."
+        )
+    return (
+        f"{symbol} has no price forming because nobody is collecting it. See "
+        "list_tracked_pairs for what is actually tracked."
+    )
+
+
 def empty_series_sentence(symbol: str, tracked: bool) -> str:
     """Distinguishes "nobody is collecting this pair" from "it is tracked, but this
     window has no candle" — the same empty list means two different things

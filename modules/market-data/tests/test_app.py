@@ -1441,6 +1441,140 @@ async def test_a_subscriber_stops_receiving_once_it_leaves(pool) -> None:
     assert not [m for m in received if isinstance(m, CandleChange)]
 
 
+# --- reading the period being built, without subscribing to it -------------------------
+#
+# specs/market-data-api, "Świeca w budowie jest oznaczona". The candle is the hub's, so
+# these tests put one there the way ingest does — `hub.publish` with `forming=True` — and
+# then read it over HTTP.
+
+
+async def _tracked(pool, *resolutions: Resolution) -> None:
+    async with pool.acquire() as conn:
+        for resolution in resolutions:
+            await track(conn, "US100", resolution, LIMIT)
+
+
+async def test_the_forming_candle_is_readable_without_a_subscription(api, pool) -> None:
+    await _tracked(pool, Resolution.MINUTE)
+    await app.state.hub.publish("US100", Resolution.MINUTE, candle(0, forming=True, close=101.25))
+
+    body = (await api.get("/candles/US100/forming")).json()
+
+    assert body["state"] == "forming"
+    assert body["resolution"] == "MINUTE"
+    assert body["candle"]["close"] == 101.25
+    assert body["price_side"] == "bid"
+
+
+async def test_without_a_resolution_the_archive_answers_from_the_finest_live_one(
+    api, pool
+) -> None:
+    await _tracked(pool, Resolution.MINUTE, Resolution.HOUR)
+    await app.state.hub.publish(
+        "US100", Resolution.HOUR, candle(0, resolution=Resolution.HOUR, forming=True, close=200.0)
+    )
+    await app.state.hub.publish("US100", Resolution.MINUTE, candle(0, forming=True, close=101.0))
+
+    body = (await api.get("/candles/US100/forming")).json()
+
+    assert body["resolution"] == "MINUTE"
+    assert body["candle"]["close"] == 101.0
+
+
+async def test_a_stalled_finer_feed_does_not_hide_a_coarser_price(api, pool) -> None:
+    """The reason the pick is "finest that has one" rather than "finest tracked". A pair
+    tracked at MINUTE and HOUR whose minute feed has stopped still has a price."""
+    await _tracked(pool, Resolution.MINUTE, Resolution.HOUR)
+    await app.state.hub.publish(
+        "US100", Resolution.HOUR, candle(0, resolution=Resolution.HOUR, forming=True, close=200.0)
+    )
+
+    body = (await api.get("/candles/US100/forming")).json()
+
+    assert body["resolution"] == "HOUR"
+    assert body["candle"]["close"] == 200.0
+
+
+async def test_a_named_resolution_is_honoured_over_the_finer_one(api, pool) -> None:
+    await _tracked(pool, Resolution.MINUTE, Resolution.HOUR)
+    await app.state.hub.publish("US100", Resolution.MINUTE, candle(0, forming=True, close=101.0))
+    await app.state.hub.publish(
+        "US100", Resolution.HOUR, candle(0, resolution=Resolution.HOUR, forming=True, close=200.0)
+    )
+
+    body = (await api.get("/candles/US100/forming", params={"resolution": "HOUR"})).json()
+
+    assert body["resolution"] == "HOUR"
+    assert body["candle"]["close"] == 200.0
+
+
+async def test_a_shut_market_says_so_rather_than_reading_as_missing_data(api, pool) -> None:
+    await _tracked(pool, Resolution.MINUTE)
+    app.state.instruments = FakeInstruments(market_open=False)
+
+    body = (await api.get("/candles/US100/forming")).json()
+
+    assert body["state"] == "market_closed"
+    assert body["market_open"] is False
+    assert body["candle"] is None
+
+
+async def test_an_open_market_with_nothing_arriving_is_a_collection_failure(api, pool) -> None:
+    # The one empty answer that needs somebody to go and look, and the one that would
+    # otherwise be indistinguishable from a quiet weekend.
+    await _tracked(pool, Resolution.MINUTE)
+    app.state.instruments = FakeInstruments(market_open=True)
+
+    body = (await api.get("/candles/US100/forming")).json()
+
+    assert body["state"] == "no_quotes"
+    assert body["market_open"] is True
+
+
+async def test_a_gateway_that_will_not_answer_is_not_a_shut_market(api, pool) -> None:
+    await _tracked(pool, Resolution.MINUTE)
+    app.state.instruments = FakeInstruments(market_open=None)
+
+    body = (await api.get("/candles/US100/forming")).json()
+
+    # Claiming a closed market on the strength of an unanswered question is the one wrong
+    # answer here that would read as certain.
+    assert body["state"] == "no_quotes"
+    assert body["market_open"] is None
+
+
+async def test_an_untracked_symbol_says_nobody_collects_it(api) -> None:
+    body = (await api.get("/candles/GOLD/forming")).json()
+
+    assert body["state"] == "not_tracked"
+    assert body["candle"] is None
+
+
+async def test_reading_the_forming_candle_stores_nothing(api, pool) -> None:
+    await _tracked(pool, Resolution.MINUTE)
+    await app.state.hub.publish("US100", Resolution.MINUTE, candle(0, forming=True))
+
+    await api.get("/candles/US100/forming")
+
+    async with pool.acquire() as conn:
+        stored = await read_candles(
+            conn, "US100", Resolution.MINUTE, NOW - timedelta(hours=1), NOW + timedelta(hours=1)
+        )
+    assert stored == []
+
+
+async def test_reading_does_not_leave_a_room_behind(api) -> None:
+    """A read that created rooms would leave one per symbol anybody ever asked about, and
+    `unsubscribe` only collects rooms it finds — one nobody subscribed to is never
+    reached."""
+    before = app.state.hub.room_count()
+
+    await api.get("/candles/GOLD/forming")
+    await api.get("/candles/SILVER/forming", params={"resolution": "MINUTE"})
+
+    assert app.state.hub.room_count() == before
+
+
 # --- 8.9: subscribing to something nobody chose to collect -----------------------------
 
 

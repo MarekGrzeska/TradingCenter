@@ -35,6 +35,21 @@ class UpstreamCandles(BaseModel):
     uncovered: list[UpstreamUncovered]
 
 
+class UpstreamForming(BaseModel):
+    """The period market-data is building right now, or the reason there is none.
+
+    `state` is the field this exists for: `forming`, `not_tracked`, `market_closed` or
+    `no_quotes`. A nullable candle would collapse the last three, and they are the whole
+    difference between "the market is shut" and "collection has stopped".
+    """
+
+    symbol: str
+    resolution: str | None = None
+    state: str
+    candle: UpstreamCandle | None = None
+    market_open: bool | None = None
+
+
 class UpstreamCoverageRange(BaseModel):
     from_: datetime = Field(alias="from")
     to: datetime
