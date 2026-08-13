@@ -60,6 +60,14 @@ class ConversationState(TypedDict):
     # Called with each fragment of text as it arrives. Not persisted or checkpointed —
     # there is none (design.md) — so a plain closure is safe to carry in state.
     on_delta: Callable[[str], Awaitable[None]]
+    # The same idea for a tool call, called once the call has resolved. A round of tools
+    # produces no text, so without this the caller sees nothing between the model's last
+    # fragment and its next one — and cannot tell a turn reading the archive from a turn
+    # that hung (specs/agent-chat, "Wywołanie narzędzia dociera w trakcie tury").
+    # Takes the call and its position within its round: `store.record_tool_calls` derives
+    # the same number from its own loop, and the two must agree or the panel and the
+    # reloaded transcript order a round differently.
+    on_tool_call: Callable[[RecordedCall, int], Awaitable[None]]
     tools: list[ToolDescriptor]
     rounds: list[ToolRound]
     calls: list[RecordedCall]
@@ -132,9 +140,10 @@ def build_graph(provider: ModelProvider, tool_server: ToolServer | None = None):
 
         for request in state["pending"]:
             if made >= TOOL_CALL_CEILING:
-                # Not executed, so not recorded as a call — nothing was asked of the
-                # server. The model still gets a result for its request, because a
-                # request left unanswered is a turn that never ends.
+                # Not executed, so neither recorded nor announced — nothing was asked of
+                # the server, and an event here would put a call in the operator's panel
+                # that never happened. The model still gets a result for its request,
+                # because a request left unanswered is a turn that never ends.
                 results.append(
                     ToolCallResult(
                         id=request.id,
@@ -156,16 +165,20 @@ def build_graph(provider: ModelProvider, tool_server: ToolServer | None = None):
             else:
                 text, kind, duration = outcome.text, outcome.kind, outcome.duration_ms
             results.append(ToolCallResult(id=request.id, name=request.name, text=text))
-            recorded.append(
-                RecordedCall(
-                    round_index=round_index,
-                    name=request.name,
-                    arguments=request.arguments,
-                    outcome=str(kind),
-                    text=text,
-                    duration_ms=duration,
-                )
+            call = RecordedCall(
+                round_index=round_index,
+                name=request.name,
+                arguments=request.arguments,
+                outcome=str(kind),
+                text=text,
+                duration_ms=duration,
             )
+            recorded.append(call)
+            # Announced before the loop moves on, so a round of three calls reaches the
+            # caller as three events in the order they resolved — not as three at once
+            # when the round ends. `recorded` holds this round alone, so its length is
+            # the position the store will write for the same call.
+            await state["on_tool_call"](call, len(recorded) - 1)
 
         return {
             "rounds": [*state["rounds"], ToolRound(tuple(state["pending"]), tuple(results))],
@@ -194,6 +207,7 @@ def initial_state(
     history: list[tuple[str, str]],
     model: str,
     on_delta: Callable[[str], Awaitable[None]],
+    on_tool_call: Callable[[RecordedCall, int], Awaitable[None]],
     tools: Sequence[ToolDescriptor] = (),
 ) -> ConversationState:
     return {
@@ -201,6 +215,7 @@ def initial_state(
         "history": history,
         "model": model,
         "on_delta": on_delta,
+        "on_tool_call": on_tool_call,
         "tools": list(tools),
         "rounds": [],
         "calls": [],

@@ -12,6 +12,7 @@ from collections.abc import Sequence
 from typing import Any
 
 from agent.graph import TOOL_CALL_CEILING, build_graph, initial_state
+from agent.models import RecordedCall
 from agent.provider import TextDelta, ToolCallRequest, ToolRound, UsageReport
 from agent.tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind
 
@@ -66,11 +67,19 @@ class FakeToolServer:
         )
 
 
-async def _run(provider, tool_server=None, *, tools=(PRICE_TOOL,)):
+async def _run(provider, tool_server=None, *, tools=(PRICE_TOOL,), announced=None):
+    """`announced` collects `(call, position)` for every tool call the graph announced —
+    the events a caller watching the turn sees, as opposed to `result["calls"]`, which is
+    what the turn hands back at the end. A test passing a list is asking about the first;
+    every other test is asking about the second."""
     seen: list[str] = []
+    announced_here: list[tuple[RecordedCall, int]] = announced if announced is not None else []
 
     async def on_delta(text: str) -> None:
         seen.append(text)
+
+    async def on_tool_call(call: RecordedCall, position: int) -> None:
+        announced_here.append((call, position))
 
     graph = build_graph(provider, tool_server)  # pyright: ignore[reportArgumentType]
     result = await graph.ainvoke(
@@ -79,6 +88,7 @@ async def _run(provider, tool_server=None, *, tools=(PRICE_TOOL,)):
             history=[("operator", "what is US100 at?")],
             model="luna-prod",
             on_delta=on_delta,
+            on_tool_call=on_tool_call,
             tools=tools,
         )
     )
@@ -161,6 +171,71 @@ async def test_three_calls_in_one_turn_are_recorded_in_order() -> None:
     # Two rounds, and the third call belongs to the second of them.
     assert [call.round_index for call in result["calls"]] == [0, 0, 1]
     assert len(result["usages"]) == 3
+
+
+async def test_every_call_is_announced_as_it_resolves() -> None:
+    """The graph's own half of "Wywołanie narzędzia dociera w trakcie tury": three calls
+    reach the listener as three announcements, in the order they resolved, each carrying
+    the position `store.record_tool_calls` will write for it."""
+    provider = FakeProvider(
+        [
+            [
+                ToolCallRequest("a", "list_tracked_pairs", {}),
+                ToolCallRequest("b", "get_last_price", {"symbol": "US100"}),
+                UsageReport(1, 1, None, None),
+            ],
+            [ToolCallRequest("c", "describe_coverage", {"symbol": "US100"}), UsageReport(1, 1, None, None)],
+            [TextDelta("here it is"), UsageReport(1, 1, None, None)],
+        ]
+    )
+    announced: list[tuple[RecordedCall, int]] = []
+
+    result, _ = await _run(provider, FakeToolServer(), announced=announced)
+
+    assert [call.name for call, _position in announced] == [
+        "list_tracked_pairs",
+        "get_last_price",
+        "describe_coverage",
+    ]
+    # Position restarts with the round, exactly as the store numbers it.
+    assert [(call.round_index, position) for call, position in announced] == [(0, 0), (0, 1), (1, 0)]
+    # What was announced is what the turn hands back — one is not a summary of the other.
+    assert [call for call, _position in announced] == result["calls"]
+
+
+async def test_a_refused_call_is_announced_like_any_other() -> None:
+    provider = FakeProvider(
+        [
+            [ToolCallRequest("c1", "get_last_price", {"symbol": "NOPE"}), UsageReport(1, 1, None, None)],
+            [TextDelta("that pair is not tracked"), UsageReport(1, 1, None, None)],
+        ]
+    )
+    server = FakeToolServer(
+        {"get_last_price": ToolOutcome(ToolOutcomeKind.REFUSED, "no such pair: NOPE", 3)}
+    )
+    announced: list[tuple[RecordedCall, int]] = []
+
+    await _run(provider, server, announced=announced)
+
+    assert len(announced) == 1
+    call, _position = announced[0]
+    assert call.outcome == str(ToolOutcomeKind.REFUSED)
+    assert call.text == "no such pair: NOPE"
+
+
+async def test_a_call_stopped_by_the_ceiling_is_never_announced() -> None:
+    """Nothing was asked of the server, so nothing happened to show. An event here would
+    put a call in the operator's panel that never left the module."""
+    asks = [
+        [ToolCallRequest(f"c{i}", "get_last_price", {"symbol": "US100"}), UsageReport(1, 1, None, None)]
+        for i in range(TOOL_CALL_CEILING + 2)
+    ]
+    provider = FakeProvider([*asks, [TextDelta("giving up"), UsageReport(1, 1, None, None)]])
+    announced: list[tuple[RecordedCall, int]] = []
+
+    await _run(provider, FakeToolServer(), announced=announced)
+
+    assert len(announced) == TOOL_CALL_CEILING
 
 
 async def test_a_refusal_reaches_the_model_and_the_turn_carries_on() -> None:

@@ -264,12 +264,25 @@ _INSERT_TOOL_CALL = """
               tool_name, arguments, outcome, result_text, duration_ms, created_at
 """
 
-_SELECT_TOOL_CALLS = """
-    SELECT id, session_id, message_id, round_index, position,
-           tool_name, arguments, outcome, result_text, duration_ms, created_at
+_TOOL_CALL_COLUMNS = """
+    id, session_id, message_id, round_index, position,
+    tool_name, arguments, outcome, result_text, duration_ms, created_at
+"""
+
+_SELECT_TOOL_CALLS = f"""
+    SELECT {_TOOL_CALL_COLUMNS}
       FROM tool_calls
      WHERE message_id = $1
      ORDER BY round_index, position, id
+"""
+
+# `message_id` leads the ordering so the grouping below builds each message's list in the
+# order the turn made the calls, in one pass and without sorting afterwards.
+_SELECT_SESSION_TOOL_CALLS = f"""
+    SELECT {_TOOL_CALL_COLUMNS}
+      FROM tool_calls
+     WHERE session_id = $1
+     ORDER BY message_id, round_index, position, id
 """
 
 
@@ -322,6 +335,22 @@ async def record_tool_calls(
 async def get_tool_calls(conn: Conn, *, message_id: int) -> list[ToolCall]:
     rows = await conn.fetch(_SELECT_TOOL_CALLS, message_id)
     return [_tool_call_from_row(row) for row in rows]
+
+
+async def get_session_tool_calls(conn: Conn, *, session_id: int) -> dict[int, list[ToolCall]]:
+    """Every call in a session, grouped by the message it belongs to.
+
+    One query, not one per message: the transcript route reads a whole session at once,
+    and a rozmowa of forty exchanges would otherwise cost forty round trips to answer a
+    single request. Messages with no calls are simply absent from the mapping — the
+    caller reads it with a default, so an empty list never has to be stored.
+    """
+    rows = await conn.fetch(_SELECT_SESSION_TOOL_CALLS, session_id)
+    grouped: dict[int, list[ToolCall]] = {}
+    for row in rows:
+        call = _tool_call_from_row(row)
+        grouped.setdefault(call.message_id, []).append(call)
+    return grouped
 
 
 # --- zbiorczy odczyt zużycia (specs/agent-usage, "Zużycie da się odczytać zbiorczo") ---

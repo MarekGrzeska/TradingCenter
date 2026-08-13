@@ -18,6 +18,7 @@ import asyncpg
 
 from . import store
 from .graph import build_graph, initial_state
+from .models import RecordedCall
 from .models_catalogue import ModelCatalogueEntry
 from .prompt import PROMPT_VERSION, system_prompt
 from .provider import ModelProvider
@@ -32,6 +33,16 @@ class Fragment:
 
 
 @dataclass(frozen=True)
+class ToolCalled:
+    """One resolved tool call, on its way to whoever is listening to this turn. Carries
+    the same call the database row is built from — the panel and the transcript must not
+    be able to disagree about what was asked and what came back."""
+
+    call: RecordedCall
+    position: int
+
+
+@dataclass(frozen=True)
 class Complete:
     incomplete: bool
 
@@ -41,7 +52,7 @@ class Failed:
     message: str
 
 
-StreamEvent = Fragment | Complete | Failed
+StreamEvent = Fragment | ToolCalled | Complete | Failed
 
 
 class Queue(Protocol):
@@ -72,6 +83,9 @@ async def run_turn(
     async def on_delta(text: str) -> None:
         queue.put_nowait(Fragment(text))
 
+    async def on_tool_call(call: RecordedCall, position: int) -> None:
+        queue.put_nowait(ToolCalled(call, position))
+
     # Asked here rather than inside the graph so a turn's tool set is fixed before the
     # first model call: a list that changed between rounds would leave the provider
     # holding a call for a tool that had just gone away. An empty list is the whole
@@ -90,6 +104,7 @@ async def run_turn(
                 history=history,
                 model=model_entry.model,
                 on_delta=on_delta,
+                on_tool_call=on_tool_call,
                 tools=tools,
             )
         )

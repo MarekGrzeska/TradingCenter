@@ -5,6 +5,9 @@ import { identity } from "../data/marketData";
 import { parseIsoToEpochSeconds } from "../data/time";
 import { MarketDataError } from "../data/types";
 import { readAgentStream, type AgentStreamEvent } from "./stream";
+import { mapToolCall, type AgentToolCall, type RawToolCall } from "./toolCall";
+
+export type { AgentToolCall, ToolOutcome } from "./toolCall";
 
 /**
  * The agent module's own DTOs, written by hand against its OpenAPI rather than
@@ -46,6 +49,11 @@ export interface AgentMessage {
   promptVersion: string | null;
   incomplete: boolean;
   createdAt: number;
+  /** How the agent got to this reply. Empty on an operator's message and on a reply that
+   *  asked nothing — and empty, too, against a module from before `tool_calls` existed on
+   *  the wire, which is the one case worth naming: the mapper defaults rather than reads
+   *  `undefined.map`. */
+  toolCalls: AgentToolCall[];
 }
 
 export interface AgentUsageAggregate {
@@ -115,6 +123,10 @@ interface RawMessage {
   prompt_version: string | null;
   incomplete: boolean;
   created_at: string;
+  /** Optional here and required on the module's own contract: a terminal deployed ahead
+   *  of the agent reads a transcript without it, and the panel must open rather than
+   *  throw (design.md, "Agent sprzed zmiany wobec terminala po zmianie"). */
+  tool_calls?: RawToolCall[];
 }
 
 interface RawUsageAggregate {
@@ -161,6 +173,7 @@ function mapMessage(raw: RawMessage): AgentMessage {
     promptVersion: raw.prompt_version,
     incomplete: raw.incomplete,
     createdAt: parseIsoToEpochSeconds(raw.created_at),
+    toolCalls: (raw.tool_calls ?? []).map(mapToolCall),
   };
 }
 
