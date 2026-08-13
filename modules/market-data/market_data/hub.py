@@ -28,6 +28,7 @@ from typing import Literal
 from pydantic import BaseModel
 
 from .models import Candle, Resolution
+from .periods import period_length
 
 log = logging.getLogger(__name__)
 
@@ -89,6 +90,36 @@ class Hub:
     def subscriber_count(self, symbol: str, resolution: Resolution) -> int:
         room = self._rooms.get((symbol, resolution))
         return len(room.subscribers) if room else 0
+
+    def forming(self, symbol: str, resolution: Resolution) -> Candle | None:
+        """The candle currently being built for one pair, or None.
+
+        `.get`, never `_room`: a read that created a room would leave one behind for every
+        symbol anybody ever asked about, and `unsubscribe` only ever collects rooms it
+        finds empty — a room nobody subscribed to would never be reached.
+
+        No lock. `publish` assigns `room.forming` between two awaits, so a reader can only
+        ever see the candle before or the candle after, never a half of either. Taking the
+        room's lock would instead make this read wait out a database write and a broadcast
+        to every subscriber, for a guarantee it already has.
+        """
+        room = self._rooms.get((symbol, resolution))
+        return room.forming if room else None
+
+    def forming_resolutions(self, symbol: str) -> list[Resolution]:
+        """Which resolutions this symbol has a forming candle for, finest first.
+
+        A room exists because something published into it, so this is "what is arriving
+        right now" rather than "what the operator asked to track" — and those differ in
+        exactly the case worth answering: a pair tracked at MINUTE and HOUR whose minute
+        feed has stalled still has a price, on HOUR.
+        """
+        live = [
+            resolution
+            for (candidate, resolution), room in self._rooms.items()
+            if candidate == symbol and room.forming is not None
+        ]
+        return sorted(live, key=period_length)
 
     def _room(self, symbol: str, resolution: Resolution) -> Room:
         return self._rooms.setdefault((symbol, resolution), Room())

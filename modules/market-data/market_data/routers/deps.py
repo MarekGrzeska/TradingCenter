@@ -24,5 +24,12 @@ def hub(websocket: WebSocket) -> Hub:
     return websocket.app.state.hub
 
 
+def hub_over_http(request: Request) -> Hub:
+    # The same hub, reached the other way. Two functions rather than a union parameter,
+    # because FastAPI resolves the dependency by its annotation: a `Request | WebSocket`
+    # is not something it knows how to hand over on either transport.
+    return request.app.state.hub
+
+
 def indicator_limiter(request: Request) -> asyncio.Semaphore:
     return request.app.state.indicator_limiter

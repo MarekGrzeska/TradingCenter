@@ -69,6 +69,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/candles/{symbol}/forming": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The period being built right now, for one pair
+         * @description The current price, as the candle the archive is building this instant — the same one a subscription's snapshot carries, without the handshake a subscription costs. Nothing here is stored: a forming candle changes with every quote and understates its own range until the period closes.
+         *
+         *     Omit `resolution` and the archive answers from the finest one that actually has quotes arriving, which is not the same as the finest one tracked — a stalled minute feed on a pair also tracked hourly still has a price. Name one and it is honoured.
+         *
+         *     An answer with no candle says which of three reasons it is: nobody collects this symbol, the market is shut, or it is open and nothing is arriving anyway. The last one is a collection failure, and it is the reason this is not simply a nullable candle.
+         */
+        get: operations["forming_candle_candles__symbol__forming_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/coverage/{symbol}": {
         parameters: {
             query?: never;
@@ -614,6 +638,43 @@ export interface components {
              */
             written: number;
         };
+        /**
+         * FormingCandleOut
+         * @description The period being built right now, read rather than subscribed to.
+         *
+         *     The candle is the same one a subscription's snapshot would carry this instant, and it
+         *     is not stored anywhere: it changes with every quote and understates its own range until
+         *     the period closes. A consumer treating `high`/`low` here as the period's range will be
+         *     wrong before the period ends — which is why `state` says `forming` in words rather than
+         *     leaving it to be inferred from a field being present.
+         */
+        FormingCandleOut: {
+            /** @description null unless `state` is `forming` */
+            candle: components["schemas"]["CandleOut"] | null;
+            /**
+             * Market Open
+             * @description null when the gateway could not be asked — not the same as closed
+             */
+            market_open: boolean | null;
+            /** @description which side of the spread this is built from; the archive holds bid */
+            price_side: components["schemas"]["PriceSide"];
+            /** @description which resolution this candle came from; null when there is none to answer with. May differ from the one asked for, because a caller that names none is answered from the finest resolution that actually has quotes arriving */
+            resolution: components["schemas"]["Resolution"] | null;
+            state: components["schemas"]["FormingState"];
+            /** Symbol */
+            symbol: string;
+        };
+        /**
+         * FormingState
+         * @description Why a read of the current period does or does not carry a candle.
+         *
+         *     Four answers rather than a candle and a null, because the three empty ones send an
+         *     operator somewhere different: add the pair, come back on Monday, or go and look at why
+         *     collection stopped. Only the last is anybody's problem right now, and without a name it
+         *     reads exactly like the other two.
+         * @enum {string}
+         */
+        FormingState: "forming" | "not_tracked" | "market_closed" | "no_quotes";
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
@@ -1364,6 +1425,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    forming_candle_candles__symbol__forming_get: {
+        parameters: {
+            query?: {
+                /** @description omit to let the archive pick the finest live one */
+                resolution?: components["schemas"]["Resolution"] | null;
+            };
+            header?: never;
+            path: {
+                symbol: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FormingCandleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

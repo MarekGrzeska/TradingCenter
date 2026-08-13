@@ -16,6 +16,20 @@ from ..errors import ToolRefusal
 
 DEFAULT_WINDOW = timedelta(days=1)
 
+# How long one candle of each resolution covers. Here rather than in one tool's module
+# because two now need it: `indicators.py` to turn a bar count into a window, and
+# `candles.py` to order a pair's resolutions from finest to coarsest.
+PERIOD_SECONDS = {
+    "MINUTE": 60,
+    "MINUTE_5": 300,
+    "MINUTE_15": 900,
+    "MINUTE_30": 1800,
+    "HOUR": 3600,
+    "HOUR_4": 14400,
+    "DAY": 86400,
+    "WEEK": 604800,
+}
+
 # Applied to every `@mcp.tool()` in this package — a structural claim an MCP client
 # can act on, not just a convention this module follows
 # (specs/market-mcp-tools, "Zestaw narzędzi wyłącznie czyta").
@@ -82,6 +96,19 @@ async def tracked_pair(
 
 async def is_tracked(upstream: UpstreamClient, symbol: str, resolution: str) -> bool:
     return await tracked_pair(upstream, symbol, resolution) is not None
+
+
+async def tracked_resolutions(upstream: UpstreamClient, symbol: str) -> list[str]:
+    """Every resolution the archive collects this symbol at, finest first.
+
+    For the caller that has no resolution of its own to offer: a pair tracked at HOUR and
+    DAY answers nothing at MINUTE, and guessing the default is how a question about a
+    tracked pair comes back empty.
+    """
+    response = await upstream.get("/pairs")
+    await raise_for_status(response)
+    found = [row["resolution"] for row in response.json() if row["symbol"] == symbol]
+    return sorted(found, key=lambda r: PERIOD_SECONDS.get(r, 0))
 
 
 async def raise_for_status(response: httpx.Response) -> None:
