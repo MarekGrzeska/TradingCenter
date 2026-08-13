@@ -15,7 +15,7 @@ from .. import reduce, uncertainty
 from ..client import UpstreamClient
 from ..errors import ToolRefusal
 from ..upstream import UpstreamCandles
-from ._shared import READ_ONLY, is_tracked, raise_for_status, resolve_window
+from ._shared import READ_ONLY, WindowedOut, is_tracked, raise_for_status, resolve_window
 
 INDICATOR_HARD_LIMIT = 10
 SERIES_POINT_LIMIT = 200
@@ -172,11 +172,9 @@ class ComputedIndicatorOut(BaseModel):
     omitted: int = 0
 
 
-class ComputeIndicatorsOut(BaseModel):
+class ComputeIndicatorsOut(WindowedOut):
     symbol: str
     resolution: str
-    from_: datetime = Field(serialization_alias="from")
-    to: datetime
     mode: str
     results: list[ComputedIndicatorOut]
     notes: list[str] = Field(default_factory=list)
