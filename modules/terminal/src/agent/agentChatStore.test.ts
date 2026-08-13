@@ -517,10 +517,13 @@ describe("createAgentChatStore", () => {
     first.openSession(older.id);
     await waitFor(() => expect(first.getSnapshot().transcriptStatus).toBe("ready"));
 
-    // A fresh store, as a reload would construct — reads back the same conversation
-    // and loads it without anybody clicking it again.
+    // A fresh store, as a reload would construct — reads back the same conversation and
+    // loads it without anybody clicking it again. The load is asked for by the panel's
+    // mount, not by construction: construction happens during `import`, before sign-in
+    // has been resolved, and a request made there never carries a token.
     const second = createAgentChatStore(storage, api);
     expect(second.getSnapshot().activeSessionId).toBe(older.id);
+    second.ensureLoaded();
     await waitFor(() => expect(second.getSnapshot().transcriptStatus).toBe("ready"));
     expect(second.getSnapshot().messages).toEqual([
       { id: 1, role: "operator", text: "hello", incomplete: false, toolCalls: [] },
@@ -569,6 +572,49 @@ describe("createAgentChatStore", () => {
     await waitFor(() => expect(store.getSnapshot().activeSessionId).toBeNull());
     expect(store.getSnapshot().messages).toEqual([]);
     expect(store.getSnapshot().sessions).toEqual([]);
+  });
+
+  it("asks for nothing at construction, and everything once the panel mounts", async () => {
+    /**
+     * The production bug of 13 August 2026. The store is a module-level const, so
+     * constructing it ran during `import` — before `main.tsx` had awaited
+     * `identity.initialize()`. Every request it made there asked an MSAL that had not
+     * resolved the session yet, was refused, and never reached the network. The session
+     * list recovered by itself, because `finishTurn` reloads it after every turn; the
+     * model catalogue had no second chance and the picker read "unavailable" for the life
+     * of the page, while the module's own log showed no request for it at all.
+     */
+    const api = createFakeApi();
+    api.seed("older chat", "luna");
+    let calls = 0;
+    const counted = { ...api, listModels: async () => (calls++, MODELS) };
+    const storage = memoryStorage({ [STORAGE_KEY]: "expanded" });
+
+    const store = createAgentChatStore(storage, counted);
+    expect(store.getSnapshot().expanded).toBe(true);
+    expect(calls).toBe(0);
+
+    store.ensureLoaded();
+
+    await waitFor(() => expect(store.getSnapshot().modelsStatus).toBe("ready"));
+    expect(calls).toBe(1);
+  });
+
+  it("retries a catalogue that failed, rather than staying unavailable for the page", async () => {
+    const api = createFakeApi();
+    api.failListModels = true;
+    const store = createAgentChatStore(null, api);
+    store.setExpanded(true);
+    await waitFor(() => expect(store.getSnapshot().modelsStatus).toBe("unreachable"));
+
+    // The old gate was "has the panel ever been opened", so this second ask did nothing
+    // and the picker stayed broken until the operator reloaded — which reproduced the
+    // failure rather than clearing it.
+    api.failListModels = false;
+    store.ensureLoaded();
+
+    await waitFor(() => expect(store.getSnapshot().modelsStatus).toBe("ready"));
+    expect(store.getSnapshot().models).toHaveLength(MODELS.length);
   });
 
   it("shows a tool call while the turn is still waiting for the first fragment", async () => {
