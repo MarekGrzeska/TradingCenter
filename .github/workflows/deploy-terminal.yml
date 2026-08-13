@@ -85,6 +85,16 @@ jobs:
         env:
           VITE_ARCHIVE_HTTP: https://app-tradingcenter-market-data.azurewebsites.net
           VITE_ARCHIVE_WS: wss://app-tradingcenter-market-data.azurewebsites.net/ws
+          # Left unset the panel does not fall back to "no agent" — it falls back to
+          # `/agent-api`, the dev proxy path, which in Static Web Apps is a 404 and reads
+          # as "the catalogue could not be read". No request ever left the browser, so
+          # the agent's own log stays empty and looks healthy while the panel says it is
+          # not. Deployed 13 August 2026 without it, and that is exactly what happened.
+          #
+          # No token setting beside it: the terminal asks for one scope, market-data's,
+          # and the agent's Easy Auth accepts that audience on purpose
+          # (infra/app-service.tf, "Both audiences, deliberately").
+          VITE_AGENT_HTTP: https://app-tradingcenter-agent.azurewebsites.net
           VITE_ENTRA_CLIENT_ID: ${{ vars.TERMINAL_ENTRA_CLIENT_ID }}
           VITE_ENTRA_TENANT_ID: ${{ vars.TERMINAL_ENTRA_TENANT_ID }}
           VITE_ENTRA_SCOPE: ${{ vars.TERMINAL_ENTRA_SCOPE }}
