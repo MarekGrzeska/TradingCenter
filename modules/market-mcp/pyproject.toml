@@ -16,6 +16,16 @@ dependencies = [
     # never a stored key (design.md, "Kontrakt sprawdzany snapshotem, nie generowanym
     # klientem" / specs/market-mcp-upstream-access).
     "azure-identity>=1.19",
+    # `azure.identity.aio` builds its own async transport and imports `aiohttp` to do it —
+    # `ImportError: aiohttp package is not installed`, raised from inside the credential's
+    # constructor rather than at import time. It is not an extra of `azure-identity`, so
+    # nothing pulls it in; `agent` lists it next to the same dependency for the same
+    # reason. Missing here it costs nothing locally and everything deployed: the
+    # credential is only constructed when `MARKET_DATA_SCOPE` is set, which is true of
+    # the Azure instance and of nothing else, so every test and every local run took the
+    # branch that never touches it. Found by a container that would not start, 13 August
+    # 2026.
+    "aiohttp>=3.10",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.

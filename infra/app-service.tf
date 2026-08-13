@@ -502,6 +502,27 @@ resource "azurerm_key_vault_access_policy" "agent" {
   secret_permissions = ["Get", "List"]
 }
 
+# The same read-only grant, and market-mcp went to production without it on 13 August
+# 2026. It holds no application secret of its own — market-data is reached with a managed
+# identity and there is no OpenAI key here — so the resource looked unnecessary and was
+# never written. It is not: `docker_registry_password` is a `@Microsoft.KeyVault(...)`
+# reference like everybody else's, and a reference the app cannot resolve does not fail
+# loudly. It resolves to nothing, and the pull that follows reports the only thing it can
+# see:
+#
+#   DockerApiException: Head "https://ghcr.io/v2/.../market-mcp/manifests/<sha>":
+#   unauthorized
+#
+# — which reads as a broken registry credential, and sent the first hour of diagnosis at
+# GHCR. The same token, read out of this vault by hand, pulls that exact manifest.
+resource "azurerm_key_vault_access_policy" "market_mcp" {
+  key_vault_id = azurerm_key_vault.main.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.market_mcp.identity[0].principal_id
+
+  secret_permissions = ["Get", "List"]
+}
+
 output "capital_gateway_hostname" {
   value = azurerm_linux_web_app.capital_gateway.default_hostname
 }

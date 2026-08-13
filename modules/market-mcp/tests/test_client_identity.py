@@ -63,6 +63,29 @@ async def test_local_requests_carry_no_authorization_header(settings: Settings) 
     await client.aclose()
 
 
+async def test_the_real_credential_builds_where_app_service_would_build_one(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The deployed path, and the one nothing else here walks.
+
+    Every other test with a scope swaps `DefaultAzureCredential` for a fake, so the real
+    one was never constructed — and the real one is where the deployment broke. Given the
+    two variables App Service sets and nothing else does, `azure.identity.aio` picks
+    `AppServiceCredential`, which builds an async transport out of `aiohttp` inside its
+    own constructor. Without that dependency the module imports, the tests pass, and the
+    container exits at startup with `ImportError: aiohttp package is not installed`.
+
+    Nothing is sent: the credential reaches the network in `get_token`, not here.
+    """
+    monkeypatch.setenv("IDENTITY_ENDPOINT", "http://169.254.169.254/metadata/identity/oauth2/token")
+    monkeypatch.setenv("IDENTITY_HEADER", "not-a-real-header")
+
+    client = UpstreamClient(_remote_settings())
+
+    assert client._credential is not None
+    await client.aclose()
+
+
 @respx.mock
 async def test_credential_failure_is_a_tool_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
     fake = _FakeCredential(fail=True)
