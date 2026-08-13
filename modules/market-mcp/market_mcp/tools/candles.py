@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
@@ -10,8 +10,16 @@ from pydantic import BaseModel, Field
 from .. import reduce, uncertainty
 from ..client import UpstreamClient
 from ..errors import ToolRefusal
-from ..upstream import UpstreamCandles, UpstreamCoverage
-from ._shared import READ_ONLY, is_tracked, raise_for_status, resolve_window
+from ..upstream import UpstreamCandles, UpstreamCoverage, UpstreamForming
+from ._shared import (
+    READ_ONLY,
+    WindowedOut,
+    is_tracked,
+    raise_for_status,
+    resolve_window,
+    tracked_pair,
+    tracked_resolutions,
+)
 
 # design.md, "Sufity są liczbami w kodzie, nie wartościami w konfiguracji" — a ceiling
 # that lived in .env would drift from the description a caller was given for it.
@@ -30,11 +38,9 @@ class CandleOut(BaseModel):
     volume: float | None = None
 
 
-class GetCandlesOut(BaseModel):
+class GetCandlesOut(WindowedOut):
     symbol: str
     resolution: str
-    from_: datetime = Field(serialization_alias="from")
-    to: datetime
     aggregated: bool = Field(
         description="true when each candle below covers more than one original period"
     )
@@ -49,7 +55,13 @@ class GetCandlesOut(BaseModel):
 
 class LastPriceOut(BaseModel):
     symbol: str
-    resolution: str
+    resolution: str | None = Field(
+        default=None,
+        description=(
+            "which resolution this price came from; may differ from the one asked for "
+            "when none was, and null when the archive had nothing to answer with"
+        ),
+    )
     time: datetime | None = Field(
         default=None, description="null when the archive has no candle to answer with"
     )
@@ -57,14 +69,22 @@ class LastPriceOut(BaseModel):
     age_seconds: float | None = Field(
         default=None, description="seconds since this candle's period started"
     )
+    forming: bool = Field(
+        default=False,
+        description=(
+            "true when this period has not closed: the price is current, and its high, "
+            "low and volume will still move"
+        ),
+    )
+    market_open: bool | None = Field(
+        default=None, description="null when the archive could not find out — not 'closed'"
+    )
     notes: list[str] = Field(default_factory=list)
 
 
-class SummarizeRangeOut(BaseModel):
+class SummarizeRangeOut(WindowedOut):
     symbol: str
     resolution: str
-    from_: datetime = Field(serialization_alias="from")
-    to: datetime
     candle_count: int
     open: float | None = None
     high: float | None = None
@@ -84,9 +104,7 @@ class SummarizeRangeOut(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
-class CoverageRangeOut(BaseModel):
-    from_: datetime = Field(serialization_alias="from")
-    to: datetime
+class CoverageRangeOut(WindowedOut):
     history_ended: bool
 
 
@@ -100,6 +118,40 @@ class DescribeCoverageOut(BaseModel):
         description="verified ranges older than the ones shown, dropped to keep the reply short",
     )
     notes: list[str] = Field(default_factory=list)
+
+
+async def _newest_candle(
+    upstream: UpstreamClient, symbol: str, resolution: str, notes: list[str]
+) -> UpstreamCandles:
+    """The archive's newest candle for a pair, read at the instant `/pairs` reports for
+    it rather than found by widening a window. Appends the sentence that says which kind
+    of empty this is when there is nothing to read.
+    """
+    row = await tracked_pair(upstream, symbol, resolution)
+    newest = row.get("latest_candle") if row else None
+    empty = UpstreamCandles(
+        symbol=symbol, resolution=resolution, derived=False, candles=[], uncovered=[]
+    )
+    if newest is None:
+        notes.append(uncertainty.empty_series_sentence(symbol, row is not None))
+        return empty
+
+    moment = datetime.fromisoformat(newest)
+    response = await upstream.get(
+        f"/candles/{symbol}",
+        params={
+            "resolution": resolution,
+            "from": moment.isoformat(),
+            # `to` is exclusive on market-data's side, so a second past the candle's own
+            # instant is the narrowest range that contains it.
+            "to": (moment + timedelta(seconds=1)).isoformat(),
+        },
+    )
+    await raise_for_status(response)
+    parsed = UpstreamCandles.model_validate(response.json())
+    if not parsed.candles:
+        notes.append(uncertainty.empty_series_sentence(symbol, True))
+    return parsed
 
 
 def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
@@ -168,38 +220,74 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         )
 
     @mcp.tool(annotations=READ_ONLY)
-    async def get_last_price(symbol: str, resolution: str = "MINUTE") -> LastPriceOut:
-        """The most recent candle for a pair, with its moment (UTC) and its age in
-        seconds — a price with no age attached could be from now or from Friday's
-        close, and there is no way to tell which from the number alone. The price is
-        the **bid** side, the only side the archive holds.
+    async def get_last_price(symbol: str, resolution: str | None = None) -> LastPriceOut:
+        """What a pair costs **now**: the period being built while the market trades, and
+        the last one that closed once it stops. `forming` says which of the two this is —
+        a forming period's high, low and volume are not its range yet and will still move.
+
+        Omit `resolution` and the archive answers from the finest one actually receiving
+        quotes, which is not always the finest one tracked; name one and it is honoured.
+        The reply says which it used.
+
+        Always carries the candle's moment (UTC) and its age in seconds: a price with no
+        age could be from this second or from Friday's close, and the number alone does
+        not say which. Prices are the **bid** side, the only side the archive holds.
         """
-        start, end = resolve_window(None, None)
         response = await upstream.get(
-            f"/candles/{symbol}",
-            params={"resolution": resolution, "from": start.isoformat(), "to": end.isoformat()},
+            f"/candles/{symbol}/forming",
+            params={"resolution": resolution} if resolution else {},
         )
         await raise_for_status(response)
-        parsed = UpstreamCandles.model_validate(response.json())
+        live = UpstreamForming.model_validate(response.json())
 
         notes: list[str] = []
-        derived_note = uncertainty.derived_sentence(parsed.derived, resolution)
+        if live.state == "forming" and live.candle is not None:
+            notes.append(uncertainty.forming_sentence(live.resolution or "current"))
+            return LastPriceOut(
+                symbol=symbol,
+                resolution=live.resolution,
+                time=live.candle.time,
+                close=live.candle.close,
+                age_seconds=(datetime.now(UTC) - live.candle.time).total_seconds(),
+                forming=True,
+                market_open=live.market_open,
+                notes=notes,
+            )
+
+        notes.append(uncertainty.no_live_price_sentence(symbol, live.state, live.market_open))
+        if live.state == "not_tracked":
+            # Nothing is collected for this symbol at any resolution, so there is no
+            # settled candle to fall back to either — and the sentence above already says
+            # what to do about it.
+            return LastPriceOut(symbol=symbol, resolution=resolution, notes=notes)
+
+        settled_resolution = resolution or next(
+            iter(await tracked_resolutions(upstream, symbol)), None
+        )
+        if settled_resolution is None:  # pragma: no cover - `not_tracked` covers this
+            return LastPriceOut(symbol=symbol, resolution=None, notes=notes)
+
+        parsed = await _newest_candle(upstream, symbol, settled_resolution, notes)
+        derived_note = uncertainty.derived_sentence(parsed.derived, settled_resolution)
         if derived_note:
             notes.append(derived_note)
 
         if not parsed.candles:
-            tracked = await is_tracked(upstream, symbol, resolution)
-            notes.append(uncertainty.empty_series_sentence(symbol, tracked))
-            return LastPriceOut(symbol=symbol, resolution=resolution, notes=notes)
+            return LastPriceOut(
+                symbol=symbol,
+                resolution=settled_resolution,
+                market_open=live.market_open,
+                notes=notes,
+            )
 
         latest = parsed.candles[-1]
-        age_seconds = (datetime.now(UTC) - latest.time).total_seconds()
         return LastPriceOut(
             symbol=symbol,
-            resolution=resolution,
+            resolution=settled_resolution,
             time=latest.time,
             close=latest.close,
-            age_seconds=age_seconds,
+            age_seconds=(datetime.now(UTC) - latest.time).total_seconds(),
+            market_open=live.market_open,
             notes=notes,
         )
 

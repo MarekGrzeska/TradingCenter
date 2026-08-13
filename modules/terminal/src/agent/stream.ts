@@ -2,7 +2,7 @@
  * The agent's turn, read as it arrives — `fetch` + `ReadableStream`, not `EventSource`:
  * the route is a `POST` and carries an `Authorization` header, neither of which
  * `EventSource` can do (design.md, "Odpowiedź strumieniem: fetch + ReadableStream, nie
- * EventSource"). Nothing here is agent-specific vocabulary beyond the three event kinds
+ * EventSource"). Nothing here is agent-specific vocabulary beyond the four event kinds
  * the module actually sends — `_sse` in `agent/routers/sessions.py`.
  *
  * Split in two on purpose. `splitSseFrames`/`parseSseFrame` are pure string functions —
@@ -11,8 +11,11 @@
  * carries nothing worth testing on its own beyond wiring the two together.
  */
 
+import { mapToolCall, type AgentToolCall, type RawToolCall } from "./toolCall";
+
 export type AgentStreamEvent =
   | { kind: "fragment"; text: string }
+  | { kind: "toolCall"; call: AgentToolCall }
   | { kind: "complete"; incomplete: boolean }
   | { kind: "error"; message: string };
 
@@ -48,6 +51,11 @@ export function parseSseFrame(frame: string): AgentStreamEvent | null {
   switch (event) {
     case "fragment":
       return { kind: "fragment", text: String(payload.text ?? "") };
+    case "tool_call":
+      // The module publishes one shape for a call whether it arrives here or on a
+      // reloaded transcript (`agent/contract.py`, `ToolCallOut`), so both paths land in
+      // the same mapper and the panel cannot be shown two different versions of one call.
+      return { kind: "toolCall", call: mapToolCall(payload as unknown as RawToolCall) };
     case "complete":
       return { kind: "complete", incomplete: Boolean(payload.incomplete) };
     case "error":

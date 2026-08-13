@@ -17,7 +17,7 @@ need one, the change is wrong, not the rule.
 modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
 modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway.
 modules/market-mcp        Python · MCP tools over market-data, reduced for a model. Read-only — no tool writes. Depends on market-data.
-modules/agent             Python · the operator's conversation with a model. Own database, own OpenAI key. No tools yet.
+modules/agent             Python · the operator's conversation with a model. Own database, own OpenAI key. Reads the archive through market-mcp's tools.
 modules/terminal          React+TS · the operator's screen. Consumes the gateway, market-data and agent. Publishes nothing.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
@@ -113,12 +113,25 @@ market-mcp needs no `.env` at all locally — every setting has a working loopba
 market-data with it. `agent` needs a `DATABASE_URL` of its own and an `OPENAI_API_KEY`.
 That key has no managed-identity alternative the way the database does — OpenAI is not in
 Entra — so production reads the same value from Key Vault (`openai-api-key`) and
-`config.py` refuses to start without it.
+`config.py` refuses to start without it. `MARKET_MCP_URL` is the one setting whose
+*absence* is a working configuration rather than a mistake: without it the agent has no
+tools, which is what it was before it had any. An `.env` copied before this change is the
+usual reason a local agent answers from memory while market-mcp sits there idle —
+`dev.sh`/`dev.ps1` say so at startup rather than leave it to be discovered.
 
 **Terraform `apply` is the operator's job, never CI's.** CI plans only, deliberately —
 applying would hand the CI principal Entra directory write access. `infra/bootstrap/` keeps
 local state that *is* committed; its storage-account keys are in that file and are inert by
 design (`shared_access_key_enabled = false`, verified live). Don't "fix" that by rotating.
+
+**The agent's tools arrive at `apply`, not at deploy.** Code and infrastructure land
+separately here, and this is the pairing where it shows: `agent` deployed with no
+`MARKET_MCP_URL` starts, runs and answers — without tools, which is a supported state and
+one its own tests walk, not a broken one. The tools appear only after the operator's
+`terraform apply` sets that setting and puts the agent's managed identity into
+`market-mcp`'s `allowed_applications`, and after the agent restarts. Rolling back is the
+same lever: clear `MARKET_MCP_URL`, restart, and the module is what it was, with the rows
+in `tool_calls` still recording what happened while it had them.
 
 ## A new field on market-data's wire
 

@@ -5,13 +5,15 @@ the runtime path.
 
 from __future__ import annotations
 
+import json
+from collections.abc import Sequence
 from datetime import datetime
 from decimal import Decimal
 
 import asyncpg
 
 from .db import Conn, fetch_one
-from .models import Message, Role, Session, Usage, UsageAggregate
+from .models import Message, RecordedCall, Role, Session, ToolCall, Usage, UsageAggregate
 
 # How much of the first message becomes the session's title (specs/agent-chat, "Tytuł
 # powstaje z pierwszego pytania"). Long enough to be recognisable in a narrow list,
@@ -248,6 +250,107 @@ async def record_usage(
         cost,
     )
     return _usage_from_row(row)
+
+
+# --- ślad wywołań narzędzi (specs/agent-tools, "Wywołanie narzędzia zostawia ślad") ---
+
+_INSERT_TOOL_CALL = """
+    INSERT INTO tool_calls (
+        session_id, message_id, round_index, position,
+        tool_name, arguments, outcome, result_text, duration_ms
+    )
+    VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9)
+    RETURNING id, session_id, message_id, round_index, position,
+              tool_name, arguments, outcome, result_text, duration_ms, created_at
+"""
+
+_TOOL_CALL_COLUMNS = """
+    id, session_id, message_id, round_index, position,
+    tool_name, arguments, outcome, result_text, duration_ms, created_at
+"""
+
+_SELECT_TOOL_CALLS = f"""
+    SELECT {_TOOL_CALL_COLUMNS}
+      FROM tool_calls
+     WHERE message_id = $1
+     ORDER BY round_index, position, id
+"""
+
+# `message_id` leads the ordering so the grouping below builds each message's list in the
+# order the turn made the calls, in one pass and without sorting afterwards.
+_SELECT_SESSION_TOOL_CALLS = f"""
+    SELECT {_TOOL_CALL_COLUMNS}
+      FROM tool_calls
+     WHERE session_id = $1
+     ORDER BY message_id, round_index, position, id
+"""
+
+
+def _tool_call_from_row(row: asyncpg.Record) -> ToolCall:
+    data = dict(row)
+    # asyncpg hands JSONB back as text unless a codec is registered; parsing here keeps
+    # that decision in the one place that reads the column.
+    data["arguments"] = json.loads(data["arguments"]) if isinstance(data["arguments"], str) else (
+        data["arguments"]
+    )
+    return ToolCall(**data)
+
+
+async def record_tool_calls(
+    conn: Conn,
+    *,
+    session_id: int,
+    message_id: int,
+    calls: Sequence[RecordedCall],
+) -> list[ToolCall]:
+    """Written after the agent message exists, like usage rows and for the same reason:
+    the id they hang off does not exist until the turn ends.
+
+    `position` comes from the loop rather than the caller — several calls in one round
+    are dispatched in the same millisecond, so a timestamp cannot order them and the
+    caller should not have to think about it.
+    """
+    written: list[ToolCall] = []
+    position_in_round: dict[int, int] = {}
+    for call in calls:
+        position = position_in_round.get(call.round_index, 0)
+        position_in_round[call.round_index] = position + 1
+        row = await fetch_one(
+            conn,
+            _INSERT_TOOL_CALL,
+            session_id,
+            message_id,
+            call.round_index,
+            position,
+            call.name,
+            json.dumps(call.arguments),
+            call.outcome,
+            call.text,
+            call.duration_ms,
+        )
+        written.append(_tool_call_from_row(row))
+    return written
+
+
+async def get_tool_calls(conn: Conn, *, message_id: int) -> list[ToolCall]:
+    rows = await conn.fetch(_SELECT_TOOL_CALLS, message_id)
+    return [_tool_call_from_row(row) for row in rows]
+
+
+async def get_session_tool_calls(conn: Conn, *, session_id: int) -> dict[int, list[ToolCall]]:
+    """Every call in a session, grouped by the message it belongs to.
+
+    One query, not one per message: the transcript route reads a whole session at once,
+    and a rozmowa of forty exchanges would otherwise cost forty round trips to answer a
+    single request. Messages with no calls are simply absent from the mapping — the
+    caller reads it with a default, so an empty list never has to be stored.
+    """
+    rows = await conn.fetch(_SELECT_SESSION_TOOL_CALLS, session_id)
+    grouped: dict[int, list[ToolCall]] = {}
+    for row in rows:
+        call = _tool_call_from_row(row)
+        grouped.setdefault(call.message_id, []).append(call)
+    return grouped
 
 
 # --- zbiorczy odczyt zużycia (specs/agent-usage, "Zużycie da się odczytać zbiorczo") ---

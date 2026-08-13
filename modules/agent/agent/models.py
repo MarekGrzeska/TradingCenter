@@ -56,6 +56,42 @@ class Usage(BaseModel):
     created_at: datetime
 
 
+class RecordedCall(BaseModel):
+    """A tool call that happened, before it has a row. Built by the graph — the only
+    place that knows which round it belonged to and what it cost in time — and handed to
+    `store.record_tool_calls` once the agent message it belongs to exists."""
+
+    round_index: int
+    name: str
+    arguments: dict
+    outcome: str
+    text: str
+    duration_ms: int
+
+
+class ToolCall(BaseModel):
+    """One call the agent made while producing an agent message.
+
+    Not a `Message`, on purpose: the transcript is the conversation, and this is how the
+    agent got to its half of it (specs/agent-tools, "Wywołanie narzędzia zostawia ślad").
+
+    `outcome` distinguishes three answers that must never be collapsed into two — see
+    `ToolOutcomeKind` in `tools/client.py`, which is where they are decided.
+    """
+
+    id: int
+    session_id: int
+    message_id: int
+    round_index: int
+    position: int
+    tool_name: str
+    arguments: dict
+    outcome: str
+    result_text: str
+    duration_ms: int
+    created_at: datetime
+
+
 class UsageAggregate(BaseModel):
     """One row of a `GROUP BY` over `usage` — by model, by session, or by day,
     depending which query built it. Sums ignore the rows they cannot price;

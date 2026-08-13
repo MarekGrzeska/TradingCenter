@@ -157,6 +157,9 @@ describe("agentApi.getMessages", () => {
         promptVersion: null,
         incomplete: false,
         createdAt: 1786442400,
+        // Neither message in this response carries `tool_calls` at all, which is a module
+        // from before it published them. Empty, not undefined — the panel maps over this.
+        toolCalls: [],
       },
       {
         id: 2,
@@ -166,6 +169,68 @@ describe("agentApi.getMessages", () => {
         promptVersion: "v1",
         incomplete: true,
         createdAt: 1786442405,
+        toolCalls: [],
+      },
+    ]);
+  });
+
+  it("maps the tool calls a reply was reached through", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/sessions/7/messages`, () =>
+        HttpResponse.json([
+          {
+            id: 2,
+            role: "agent",
+            content: "US100 is at 29698.2",
+            model_id: "gpt-5.6-luna",
+            prompt_version: "v3",
+            incomplete: false,
+            created_at: "2026-08-11T10:00:05Z",
+            tool_calls: [
+              {
+                round_index: 0,
+                position: 0,
+                tool_name: "get_last_price",
+                arguments: { symbol: "US100", resolution: "DAY" },
+                outcome: "ok",
+                result_text: '{"close": 29698.2}',
+                duration_ms: 63,
+              },
+              {
+                round_index: 0,
+                position: 1,
+                tool_name: "describe_coverage",
+                arguments: { symbol: "US100" },
+                outcome: "refused",
+                result_text: "market-data refused: no such pair",
+                duration_ms: 18,
+              },
+            ],
+          },
+        ]),
+      ),
+    );
+
+    const [message] = await api().getMessages(7, new AbortController().signal);
+
+    expect(message.toolCalls).toEqual([
+      {
+        roundIndex: 0,
+        position: 0,
+        name: "get_last_price",
+        arguments: { symbol: "US100", resolution: "DAY" },
+        outcome: "ok",
+        resultText: '{"close": 29698.2}',
+        durationMs: 63,
+      },
+      {
+        roundIndex: 0,
+        position: 1,
+        name: "describe_coverage",
+        arguments: { symbol: "US100" },
+        outcome: "refused",
+        resultText: "market-data refused: no such pair",
+        durationMs: 18,
       },
     ]);
   });

@@ -18,7 +18,7 @@ modules move here one at a time.
 | [capital-gateway](modules/capital-gateway/) | capital.com — trading, deep history, a live stream. Demo only. | HTTP + WebSocket |
 | [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. | HTTP + WebSocket |
 | [market-mcp](modules/market-mcp/) | MCP tools over market-data's archive, reduced for a model rather than proxied for a chart. Read-only — no tool writes. | MCP (stdio + streamable HTTP) |
-| [agent](modules/agent/) | The operator's conversation with a model — its own database, its own OpenAI key. No tools yet. | HTTP, streamed |
+| [agent](modules/agent/) | The operator's conversation with a model — its own database, its own OpenAI key, and read-only tools over the archive through market-mcp. | HTTP, streamed |
 | [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, and the agent panel. | consumes capital-gateway, market-data and agent |
 
 ## Layout
@@ -56,11 +56,16 @@ Both bring the same things up in the same order:
 migrations  ->  capital-gateway  ->  market-data  ->  market-mcp  ->  agent  ->  terminal
 ```
 
-The order is not tidiness. `market-data` subscribes to the gateway as it starts, `market-mcp`
-reads `market-data`, and the terminal's charts read `market-data` too, so starting anything
-early only fills the console with retries; `agent` has nothing that depends on it, so it goes
-last among the back ends. Each step waits for the one before it to actually answer. Ctrl+C
-stops the services.
+The order is not tidiness — every arrow in it is a real dependency. `market-data`
+subscribes to the gateway as it starts, `market-mcp` reads `market-data`, `agent` asks
+`market-mcp` for its tool list on the first turn, and the terminal's charts read
+`market-data` too. Starting anything early fills the console with retries, or — in the
+agent's case — quietly produces a turn answered without tools, which is worse because
+nothing reports it. Each step waits for the one before it to actually answer. Ctrl+C stops
+the services.
+
+The agent needs `MARKET_MCP_URL` in its own `.env` to use the tools at all; `.env.example`
+has it, and both scripts say so at startup if an older `.env` does not.
 
 **The database is local again.** `market-data` writes to the PostgreSQL container in
 [compose.yaml](compose.yaml), which the scripts start first — so Docker is a requirement for

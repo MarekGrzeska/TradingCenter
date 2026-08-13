@@ -15,7 +15,14 @@ from .. import reduce, uncertainty
 from ..client import UpstreamClient
 from ..errors import ToolRefusal
 from ..upstream import UpstreamCandles
-from ._shared import READ_ONLY, is_tracked, raise_for_status, resolve_window
+from ._shared import (
+    PERIOD_SECONDS,
+    READ_ONLY,
+    WindowedOut,
+    is_tracked,
+    raise_for_status,
+    resolve_window,
+)
 
 INDICATOR_HARD_LIMIT = 10
 SERIES_POINT_LIMIT = 200
@@ -29,18 +36,6 @@ SLOPE_LOOKBACK_BARS = 10
 # a moving average's does — a starting point, like every other ceiling here
 # (design.md, "Sufity są liczbami w kodzie... do zmierzenia po E2").
 LEVELS_LOOKBACK = timedelta(days=30)
-
-_PERIOD_SECONDS = {
-    "MINUTE": 60,
-    "MINUTE_5": 300,
-    "MINUTE_15": 900,
-    "MINUTE_30": 1800,
-    "HOUR": 3600,
-    "HOUR_4": 14400,
-    "DAY": 86400,
-    "WEEK": 604800,
-}
-
 
 # --- output shapes ---
 
@@ -172,11 +167,9 @@ class ComputedIndicatorOut(BaseModel):
     omitted: int = 0
 
 
-class ComputeIndicatorsOut(BaseModel):
+class ComputeIndicatorsOut(WindowedOut):
     symbol: str
     resolution: str
-    from_: datetime = Field(serialization_alias="from")
-    to: datetime
     mode: str
     results: list[ComputedIndicatorOut]
     notes: list[str] = Field(default_factory=list)
@@ -299,7 +292,7 @@ def _latest_window(to_iso: str | None, resolution: str) -> tuple[datetime, datet
     end = datetime.fromisoformat(to_iso) if to_iso else datetime.now(UTC)
     if end.tzinfo is None:
         end = end.replace(tzinfo=UTC)
-    seconds = _PERIOD_SECONDS.get(resolution, _PERIOD_SECONDS["MINUTE"])
+    seconds = PERIOD_SECONDS.get(resolution, PERIOD_SECONDS["MINUTE"])
     start = end - timedelta(seconds=seconds * LATEST_LOOKBACK_BARS)
     return start, end
 

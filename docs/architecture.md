@@ -6,32 +6,41 @@ One repository, many modules, no shared runtime. A module is a directory under `
 that runs on its own and publishes a contract. Nothing imports across that boundary.
 
 ```
-                  capital.com                             OpenAI
-                  (REST + WS)                                │
-                       │                                     ▼
-                       ▼                        ┌──────────────────────────────┐
-        ┌──────────────────────────────┐        │  agent                       │
-        │  capital-gateway             │───┐    │  conversation · cost         │
-        │  trade · history · stream    │   │    └──────────────┬───────────────┘
-        └──────────────┬───────────────┘   │                   │ HTTP, streamed
-                       │ HTTP + WebSocket  │ instruments       │
-                       ▼                   │                   │
-        ┌──────────────────────────────┐   │                   │
-        │  market-data                 │   │                   │
-        │  archive · coverage · rollups│   │                   │
-        └──────┬───────────────┬───────┘   │                   │
-               │               │           │                   │
-               ▼               ▼           ▼                   ▼
-    ┌─────────────────┐   terminal ◀────────┴───────────────────┘
-    │  market-mcp     │   charts · grid · search · archive panel · agent panel
-    │  MCP tools,     │
-    │  read-only      │
-    └────────┬────────┘
-             │ MCP (stdio / streamable HTTP)
-             ▼
-      whatever holds a model: the operator's desktop client today.
-      `agent` is not that caller — it has no tool loop, and giving
-      it one is its own change.
+                  capital.com
+                  (REST + WS)
+                       │
+                       ▼
+        ┌──────────────────────────────┐
+        │  capital-gateway             │──────────────────┐
+        │  trade · history · stream    │                  │
+        └──────────────┬───────────────┘                  │ instruments
+                       │ HTTP + WebSocket                 │
+                       ▼                                  │
+        ┌──────────────────────────────┐                  │
+        │  market-data                 │                  │
+        │  archive · coverage · rollups│                  │
+        └──────┬───────────────┬───────┘                  │
+     candles,  │               │  the same archive,       │
+     the live  │               │  reduced for a model     │
+     stream    │               ▼                          │
+               │      ┌──────────────────────┐            │
+               │      │  market-mcp          │            │
+               │      │  MCP tools,          │            │
+               │      │  read-only           │            │
+               │      └───┬──────────────┬───┘            │
+               │          │              │ MCP (stdio)    │
+               │   MCP    │              ▼                │
+               │  (streamable HTTP)  the operator's       │
+               │          │           desktop client      │
+               │          ▼                               │
+               │  ┌──────────────────────────────┐        │
+               │  │  agent                       │◀────── OpenAI
+               │  │  conversation · tools · cost │        │
+               │  └──────────────┬───────────────┘        │
+               │                 │ HTTP, streamed         │
+               ▼                 ▼                        ▼
+                            terminal ◀────────────────────┘
+        charts · grid · search · archive panel · agent panel
 ```
 
 `terminal` is a consumer, not a peer: it publishes no contract of its own and nothing
@@ -50,20 +59,25 @@ upstream URLs point anywhere else.
 `market-mcp` is a consumer of `market-data`, the same shape as `terminal`: it reads the
 published contract and imports nothing. Where it differs is the shape of what it hands
 onward — a chart wants every candle, a model wants a summary, so the same archive read
-comes out reduced rather than proxied.
+comes out reduced rather than proxied. It has two callers and they arrive by different
+doors: `agent`, over streamable HTTP from its own container, and whatever MCP client the
+operator runs on the desktop, over stdio. One tool set, registered once; the transport
+decides only how a request gets in.
 
-`agent` is a peer of `capital-gateway` and `market-data`, not a consumer of either — it
-reaches nothing in this diagram but OpenAI. The box market-data used to point at here
-(`agents / backtests`) was a placeholder for something that did not exist yet; now that one
-does, drawing it as downstream of the archive would say `agent` reads candles and calls
-tools, which it deliberately does not (`openspec/changes/add-agent-chat/design.md`,
-Non-Goals — no tools, nothing that reaches `market-data` or `capital-gateway`).
+`agent` reaches OpenAI and `market-mcp`, and nothing else in this diagram. That it is not
+drawn under `market-data` is the point: the archive is two hops away, and the module has
+no address for it, no credential for it and no code that would know what to do with a
+candle. What it has is a tool list it did not write, fetched from `market-mcp` at the
+start of a session and used as given.
 
-The two of them look adjacent on the page and are not yet connected. `market-mcp` publishes
-the tools; `agent` holds the model; the edge between them is a tool loop neither module has,
-and it is its own OpenSpec change rather than a quiet addition to a graph
-(`openspec/changes/add-market-data-mcp/proposal.md` puts it out of scope in as many words).
-Until it lands, market-mcp's caller is whatever MCP client the operator runs on the desktop.
+That edge is the one thing in this diagram with no committed copy of its contract
+anywhere. Every other arrow has one — the terminal's generated types, market-mcp's OpenAPI
+snapshot, the terminal's hand-written agent DTOs — because HTTP does not describe itself
+at call time. MCP does: the tool names, descriptions and argument schemas arrive in the
+same session that uses them, so there is no second copy to drift and nothing to
+regenerate. The trade is that a tool added on the `market-mcp` side reaches the model with
+no review on the `agent` side, which is safe exactly as long as that module's own
+specification keeps forbidding a tool that writes.
 
 ## Why no shared library
 

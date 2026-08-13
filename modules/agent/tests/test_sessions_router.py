@@ -6,13 +6,15 @@ built a real pool against the throwaway database — nothing here calls OpenAI.
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 
 import pytest
 from fastapi.testclient import TestClient
 
 from agent.app import app
-from agent.provider import TextDelta, UsageReport
+from agent.provider import TextDelta, ToolCallRequest, UsageReport
+from agent.tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind
 
 pytestmark = pytest.mark.db
 
@@ -39,7 +41,9 @@ class _FakeProvider:
     def __init__(self, chunks: list) -> None:
         self._chunks = chunks
 
-    async def stream(self, *, model: str, system_prompt: str, history: list):
+    async def stream(
+        self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+    ):
         for chunk in self._chunks:
             yield chunk
 
@@ -247,7 +251,9 @@ def test_required_authentication_refuses_before_touching_the_model(
         session_id = client.post("/sessions", json={}).json()["id"]
 
     class _ProviderThatMustNotBeCalled:
-        async def stream(self, *, model: str, system_prompt: str, history: list):
+        async def stream(
+            self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+        ):
             raise AssertionError("the model must never be called")
             yield  # pragma: no cover - makes this an async generator
 
@@ -258,9 +264,133 @@ def test_required_authentication_refuses_before_touching_the_model(
     assert response.status_code == 401
 
 
+class _ScriptedProvider:
+    """One entry per model call, unlike `_FakeProvider`'s single reusable script — a turn
+    that asks for a tool calls the model more than once, and a script that repeated itself
+    would ask for the same tool forever."""
+
+    def __init__(self, script: list[list]) -> None:
+        self._script = script
+        self.calls = 0
+
+    async def stream(self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()):
+        chunks = self._script[self.calls]
+        self.calls += 1
+        for chunk in chunks:
+            yield chunk
+
+
+class _FakeToolServer:
+    def __init__(self, outcomes: dict[str, ToolOutcome] | None = None) -> None:
+        self._outcomes = outcomes or {}
+
+    async def list_tools(self):
+        return [
+            ToolDescriptor(
+                name="get_last_price",
+                description="Last price for a symbol.",
+                input_schema={"type": "object", "properties": {"symbol": {"type": "string"}}},
+            )
+        ]
+
+    async def call(self, name: str, arguments: dict) -> ToolOutcome:
+        return self._outcomes.get(name, ToolOutcome(ToolOutcomeKind.OK, f"{name} says 29698.2", 63))
+
+
+def test_a_turn_streams_its_tool_calls_before_it_completes() -> None:
+    # specs/agent-chat, "Wywołanie narzędzia dociera w trakcie tury"
+    with TestClient(app) as client:
+        app.state.provider = _ScriptedProvider(
+            [
+                [
+                    ToolCallRequest("c1", "get_last_price", {"symbol": "US100"}),
+                    ToolCallRequest("c2", "get_last_price", {"symbol": "SILVER"}),
+                    UsageReport(1, 1, None, None),
+                ],
+                [TextDelta("both are up"), UsageReport(1, 1, None, None)],
+            ]
+        )
+        app.state.tool_server = _FakeToolServer()
+        session_id = client.post("/sessions", json={}).json()["id"]
+        response = client.post(f"/sessions/{session_id}/messages", json={"content": "how are they"})
+        events = _sse_events(response.text)
+
+    kinds = [kind for kind, _ in events]
+    assert kinds == ["tool_call", "tool_call", "fragment", "complete"]
+    first = json.loads(events[0][1])
+    assert first["tool_name"] == "get_last_price"
+    assert first["arguments"] == {"symbol": "US100"}
+    assert first["outcome"] == "ok"
+    assert first["result_text"] == "get_last_price says 29698.2"
+    assert first["duration_ms"] == 63
+    assert (first["round_index"], first["position"]) == (0, 0)
+    assert json.loads(events[1][1])["position"] == 1
+
+
+def test_a_refused_tool_call_streams_as_a_call_not_as_an_error() -> None:
+    # specs/agent-tools, "Odmowa narzędzia jest wynikiem, nie awarią tury"
+    with TestClient(app) as client:
+        app.state.provider = _ScriptedProvider(
+            [
+                [ToolCallRequest("c1", "get_last_price", {"symbol": "NOPE"}), UsageReport(1, 1, None, None)],
+                [TextDelta("that pair is not tracked"), UsageReport(1, 1, None, None)],
+            ]
+        )
+        app.state.tool_server = _FakeToolServer(
+            {"get_last_price": ToolOutcome(ToolOutcomeKind.REFUSED, "no such pair: NOPE", 8)}
+        )
+        session_id = client.post("/sessions", json={}).json()["id"]
+        response = client.post(f"/sessions/{session_id}/messages", json={"content": "and NOPE?"})
+        events = _sse_events(response.text)
+        messages = client.get(f"/sessions/{session_id}/messages").json()
+
+    assert [kind for kind, _ in events] == ["tool_call", "fragment", "complete"]
+    assert json.loads(events[0][1])["outcome"] == "refused"
+    assert messages[-1]["incomplete"] is False
+
+
+def test_the_transcript_hands_back_what_the_stream_sent() -> None:
+    """specs/agent-tools, "Transkrypt niesie wywołania" — and it is the same shape, so a
+    panel that kept the stream's events and one that reloaded cannot disagree."""
+    with TestClient(app) as client:
+        app.state.provider = _ScriptedProvider(
+            [
+                [ToolCallRequest("c1", "get_last_price", {"symbol": "US100"}), UsageReport(1, 1, None, None)],
+                [ToolCallRequest("c2", "get_last_price", {"symbol": "SILVER"}), UsageReport(1, 1, None, None)],
+                [TextDelta("both are up"), UsageReport(1, 1, None, None)],
+            ]
+        )
+        app.state.tool_server = _FakeToolServer()
+        session_id = client.post("/sessions", json={}).json()["id"]
+        response = client.post(f"/sessions/{session_id}/messages", json={"content": "how are they"})
+        streamed = [json.loads(data) for kind, data in _sse_events(response.text) if kind == "tool_call"]
+        messages = client.get(f"/sessions/{session_id}/messages").json()
+
+    assert messages[-1]["tool_calls"] == streamed
+    # Two rounds of one call each, which is what the model asked for.
+    assert [(c["round_index"], c["position"]) for c in messages[-1]["tool_calls"]] == [(0, 0), (1, 0)]
+    # specs/agent-tools, "Wypowiedź bez narzędzi" — the operator's own message says so
+    # with an empty list, not by omitting the field.
+    assert messages[0]["tool_calls"] == []
+
+
+def test_a_turn_without_tools_leaves_the_list_empty() -> None:
+    with TestClient(app) as client:
+        app.state.provider = _FakeProvider([TextDelta("no need to look"), UsageReport(1, 1, None, None)])
+        app.state.tool_server = _FakeToolServer()
+        session_id = client.post("/sessions", json={}).json()["id"]
+        response = client.post(f"/sessions/{session_id}/messages", json={"content": "hello"})
+        messages = client.get(f"/sessions/{session_id}/messages").json()
+
+    assert [kind for kind, _ in _sse_events(response.text)] == ["fragment", "complete"]
+    assert all(m["tool_calls"] == [] for m in messages)
+
+
 def test_a_broken_stream_reports_error_and_saves_the_partial_reply() -> None:
     class _BreakingProvider:
-        async def stream(self, *, model: str, system_prompt: str, history: list):
+        async def stream(
+            self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+        ):
             yield TextDelta("cut ")
             yield TextDelta("off")
             raise RuntimeError("provider broke")

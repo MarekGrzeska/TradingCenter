@@ -492,6 +492,77 @@
         "title": "FillOut",
         "type": "object"
       },
+      "FormingCandleOut": {
+        "description": "The period being built right now, read rather than subscribed to.\n\nThe candle is the same one a subscription's snapshot would carry this instant, and it\nis not stored anywhere: it changes with every quote and understates its own range until\nthe period closes. A consumer treating `high`/`low` here as the period's range will be\nwrong before the period ends — which is why `state` says `forming` in words rather than\nleaving it to be inferred from a field being present.",
+        "properties": {
+          "candle": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandleOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null unless `state` is `forming`"
+          },
+          "market_open": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null when the gateway could not be asked — not the same as closed",
+            "title": "Market Open"
+          },
+          "price_side": {
+            "$ref": "#/components/schemas/PriceSide",
+            "description": "which side of the spread this is built from; the archive holds bid"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Resolution"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "which resolution this candle came from; null when there is none to answer with. May differ from the one asked for, because a caller that names none is answered from the finest resolution that actually has quotes arriving"
+          },
+          "state": {
+            "$ref": "#/components/schemas/FormingState"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "candle",
+          "market_open",
+          "price_side",
+          "resolution",
+          "state",
+          "symbol"
+        ],
+        "title": "FormingCandleOut",
+        "type": "object"
+      },
+      "FormingState": {
+        "description": "Why a read of the current period does or does not carry a candle.\n\nFour answers rather than a candle and a null, because the three empty ones send an\noperator somewhere different: add the pair, come back on Monday, or go and look at why\ncollection stopped. Only the last is anybody's problem right now, and without a name it\nreads exactly like the other two.",
+        "enum": [
+          "forming",
+          "not_tracked",
+          "market_closed",
+          "no_quotes"
+        ],
+        "title": "FormingState",
+        "type": "string"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -2082,6 +2153,67 @@
           }
         },
         "summary": "Candles for one pair over a time range",
+        "tags": [
+          "candles"
+        ]
+      }
+    },
+    "/candles/{symbol}/forming": {
+      "get": {
+        "description": "The current price, as the candle the archive is building this instant — the same one a subscription's snapshot carries, without the handshake a subscription costs. Nothing here is stored: a forming candle changes with every quote and understates its own range until the period closes.\n\nOmit `resolution` and the archive answers from the finest one that actually has quotes arriving, which is not the same as the finest one tracked — a stalled minute feed on a pair also tracked hourly still has a price. Name one and it is honoured.\n\nAn answer with no candle says which of three reasons it is: nobody collects this symbol, the market is shut, or it is open and nothing is arriving anyway. The last one is a collection failure, and it is the reason this is not simply a nullable candle.",
+        "operationId": "forming_candle_candles__symbol__forming_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          },
+          {
+            "description": "omit to let the archive pick the finest live one",
+            "in": "query",
+            "name": "resolution",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/Resolution"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "omit to let the archive pick the finest live one",
+              "title": "Resolution"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormingCandleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "The period being built right now, for one pair",
         "tags": [
           "candles"
         ]

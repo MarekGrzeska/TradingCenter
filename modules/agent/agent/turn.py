@@ -17,10 +17,12 @@ from typing import Protocol
 import asyncpg
 
 from . import store
-from .graph import build_graph
+from .graph import build_graph, initial_state
+from .models import RecordedCall
 from .models_catalogue import ModelCatalogueEntry
-from .prompt import PROMPT_VERSION, SYSTEM_PROMPT
+from .prompt import PROMPT_VERSION, system_prompt
 from .provider import ModelProvider
+from .tools import ToolServer
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +30,16 @@ log = logging.getLogger(__name__)
 @dataclass(frozen=True)
 class Fragment:
     text: str
+
+
+@dataclass(frozen=True)
+class ToolCalled:
+    """One resolved tool call, on its way to whoever is listening to this turn. Carries
+    the same call the database row is built from — the panel and the transcript must not
+    be able to disagree about what was asked and what came back."""
+
+    call: RecordedCall
+    position: int
 
 
 @dataclass(frozen=True)
@@ -40,7 +52,7 @@ class Failed:
     message: str
 
 
-StreamEvent = Fragment | Complete | Failed
+StreamEvent = Fragment | ToolCalled | Complete | Failed
 
 
 class Queue(Protocol):
@@ -62,6 +74,7 @@ async def run_turn(
     model_entry: ModelCatalogueEntry,
     provider: ModelProvider,
     queue: Queue,
+    tool_server: ToolServer | None = None,
 ) -> None:
     async with pool.acquire() as conn:
         messages = await store.get_messages(conn, session_id=session_id)
@@ -70,28 +83,41 @@ async def run_turn(
     async def on_delta(text: str) -> None:
         queue.put_nowait(Fragment(text))
 
-    graph = build_graph(provider)
+    async def on_tool_call(call: RecordedCall, position: int) -> None:
+        queue.put_nowait(ToolCalled(call, position))
+
+    # Asked here rather than inside the graph so a turn's tool set is fixed before the
+    # first model call: a list that changed between rounds would leave the provider
+    # holding a call for a tool that had just gone away. An empty list is the whole
+    # answer to a tool server that is down (specs/agent-tool-access).
+    tools = await tool_server.list_tools() if tool_server is not None else []
+
+    graph = build_graph(provider, tool_server)
     try:
         result = await graph.ainvoke(
-            {
-                "system_prompt": SYSTEM_PROMPT,
-                "history": history,
-                "model": model_entry.model,
-                "on_delta": on_delta,
-                "text": "",
-                "usage": None,
-                "failed": False,
-            }
+            initial_state(
+                # Which prompt this turn runs is a fact about the turn, not a change to
+                # the prompt: both texts are `v3`, and the one without tools is what an
+                # unreachable market-mcp degrades to (specs/agent-chat, "Agent bez
+                # narzędzi mówi, że ich nie ma").
+                system_prompt=system_prompt(has_tools=bool(tools)),
+                history=history,
+                model=model_entry.model,
+                on_delta=on_delta,
+                on_tool_call=on_tool_call,
+                tools=tools,
+            )
         )
         text: str = result["text"]
-        usage = result["usage"]
+        usages = result["usages"]
+        calls = result["calls"]
         failed: bool = result["failed"]
     except Exception:
         # A last-resort backstop, not the primary path: `graph.py`'s own node already
         # catches a broken provider call so partial text survives it. Reaching here
         # means the graph wiring itself failed, and nothing was ever generated.
         log.exception("the conversation graph failed for session %s", session_id)
-        text, usage, failed = "", None, True
+        text, usages, calls, failed = "", [None], [], True
 
     async with pool.acquire() as conn:
         reply = await store.append_agent_message(
@@ -102,17 +128,25 @@ async def run_turn(
             prompt_version=PROMPT_VERSION,
             incomplete=failed,
         )
-        await store.record_usage(
-            conn,
-            session_id=session_id,
-            message_id=reply.id,
-            model_id=model_entry.id,
-            input_tokens=usage.input_tokens if usage else None,
-            output_tokens=usage.output_tokens if usage else None,
-            cached_tokens=usage.cached_tokens if usage else None,
-            reasoning_tokens=usage.reasoning_tokens if usage else None,
-            input_rate_per_1m=model_entry.input_rate_per_1m,
-            output_rate_per_1m=model_entry.output_rate_per_1m,
+        # One row per model call, all pointing at this one reply. A turn that asked for
+        # a tool was billed at least twice, and the tool's own answer went into the
+        # prompt of the call after it (specs/agent-usage, "Tura z wywołaniem
+        # narzędzia").
+        for usage in usages:
+            await store.record_usage(
+                conn,
+                session_id=session_id,
+                message_id=reply.id,
+                model_id=model_entry.id,
+                input_tokens=usage.input_tokens if usage else None,
+                output_tokens=usage.output_tokens if usage else None,
+                cached_tokens=usage.cached_tokens if usage else None,
+                reasoning_tokens=usage.reasoning_tokens if usage else None,
+                input_rate_per_1m=model_entry.input_rate_per_1m,
+                output_rate_per_1m=model_entry.output_rate_per_1m,
+            )
+        await store.record_tool_calls(
+            conn, session_id=session_id, message_id=reply.id, calls=calls
         )
 
     if failed:
