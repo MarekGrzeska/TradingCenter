@@ -17,7 +17,7 @@
       both apps share is over 92% memory" — cztery aplikacje i nie B1. Próg 92 zostaje
       bez zmian (`design.md`, „Próg alertu zostaje na 92”).
 - [x] 1.4 `terraform fmt` i `terraform validate` w `infra/`.
-- [ ] 1.5 Otworzyć PR — `terraform plan` w CI (`terraform.yml`) pokaże zmianę SKU i
+- [x] 1.5 Otworzyć PR — `terraform plan` w CI (`terraform.yml`) pokaże zmianę SKU i
       przebudowę reguł firewalla wyliczanych z adresów wyjściowych planu. Sprawdzić na
       planie, czy reguły `market_data_outbound` i `agent_outbound` faktycznie wchodzą do
       diffu; jeśli plan w CI się wywraca na `for_each` wobec wartości nieznanej, to jest
