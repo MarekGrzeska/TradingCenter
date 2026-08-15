@@ -1,10 +1,13 @@
 ## 0. Przed zmianą kodu
 
-- [ ] 0.1 Operator sprawdza w Cost Analysis, czy plan B1 jest dziś rozliczany, czy mieści
-      się w darmowym rocznym limicie — `az consumption usage list` oddaje na tej
-      subskrypcji `pretaxCost` jako `null`, więc z wiersza poleceń tego nie widać.
-      To jedyna niezmierzona rzecz w tej zmianie i jedyna, która może ją odwołać
-      (`design.md`, Risks).
+- [x] 0.1 Rozstrzygnięte 15 sierpnia przez Cost Management (`az rest` na
+      `Microsoft.CostManagement/query`; `az consumption usage list` oddaje tu same
+      `null`, `az costmanagement` nie jest zainstalowane). Koszt faktyczny 1–15 sierpnia:
+      **App Service 0,0105 €**, PostgreSQL 0,00 €, Key Vault 0,0014 €, Azure Monitor
+      0,27 € — czyli największą pozycją rachunku jest monitoring, a plan B1 jest
+      praktycznie darmowy. Komentarz w `app-service.tf` mówił prawdę. Decyzja nie brzmi
+      więc „płacić dwa razy tyle", tylko „zacząć płacić ~24 €/mies." — przedstawiona
+      operatorowi z tą liczbą i podjęta świadomie.
 
 ## 1. Terraform
 
@@ -27,25 +30,31 @@
 
 ## 2. Wdrożenie (operator, nie CI)
 
-- [ ] 2.1 Po scaleniu: `terraform apply -target=azurerm_service_plan.main`. Cztery
-      aplikacje restartują się w trakcie.
-- [ ] 2.2 `terraform apply` bez `-target` — reguły firewalla bazy i `ip_restriction`
-      gatewaya zbiegają się do nowych adresów wyjściowych planu.
-- [ ] 2.3 Potwierdzić SKU: `az appservice plan show --name asp-tradingcenter
-      --resource-group rg-tradingcenter --query "sku"` pokazuje `B2`.
+- [x] 2.1 `terraform apply -target=azurerm_service_plan.main` — 15 sierpnia 2026, ~16:30
+      UTC. **Aplikacje się nie zrestartowały**, wbrew temu, co zapowiadał `design.md`;
+      dowód niżej, w 3.4.
+- [x] 2.2 `terraform apply` bez `-target`. Po nim `terraform plan -detailed-exitcode`
+      oddaje `0` — „No changes. Your infrastructure matches the configuration".
+- [x] 2.3 SKU potwierdzone: `sku B2`, `tier Basic`, `capacity 1`. Opis alertu na Azure
+      zmieniony, próg dalej 92.
 
 ## 3. Sprawdzenie po wdrożeniu
 
-- [ ] 3.1 `market-data` widzi bazę: `GET /ws/candles` na wdrożonej aplikacji oddaje 404
-      z ciałem JSON modułu (ta sama sonda, której używa `deploy-market-data.yml`), a
-      `Data History` w terminalu pokazuje, że zbieranie ruszyło dalej.
-- [ ] 3.2 `agent` widzi bazę: rozmowa w terminalu odpowiada, a `Agents cost` pokazuje
-      wiersz zużycia z tej tury.
-- [ ] 3.3 `capital-gateway` ma sesję: terminal pokazuje żywe notowania, a nie ostatnią
-      świecę sprzed restartu.
-- [ ] 3.4 Sprawdzić, że w oknie między 2.1 a 2.2 przerwa w zbieraniu zapisała się jako
-      dziura w `coverage_ranges`, a nie jako cisza rynku — to jest test tego, że moduł nie
-      skłamał o tym, czego nie zebrał.
+- [x] 3.1 `market-data` widzi bazę: sonda `GET /ws/candles` oddaje `404 {"detail":"Not
+      Found"}` z kontenera za pierwszym razem. Mocniejszy dowód niż sonda: rola
+      `app-tradingcenter-market-data` ma 18 żywych połączeń w `pg_stat_activity`.
+- [x] 3.2 `agent` widzi bazę: rola `app-tradingcenter-agent` ma połączenie otwarte
+      16:36:10 UTC, czyli po skalowaniu. Rozmowa przez terminal zostaje do przejścia
+      przez operatora — przeglądarki nie da się sprawdzić stąd.
+- [ ] 3.3 `capital-gateway` ma sesję: terminal pokazuje żywe notowania. Do przejścia
+      przez operatora.
+- [x] 3.4 Przerwy nie było, więc nie ma dziury do sprawdzenia — i to jest samo w sobie
+      wynik. `pg_stat_activity` pokazuje połączenie `market-data` otwarte 15:55:51 UTC,
+      **przed** skalowaniem i wciąż żywe po nim: proces nie został zrestartowany, bo
+      restart zerwałby tę sesję. Zbieranie też się nie zatrzymało — `BTCUSD MINUTE_5`
+      ma 17 z 18 możliwych świec w oknie 90 minut obejmującym oba `apply`, najnowsza
+      16:35. Adresy wyjściowe się nie przestawiły: 32 adresy, 32 reguły
+      `AllowMarketDataOutbound`, 32 `AllowAgentOutbound`, plan czysty.
 
 ## 4. Obserwacja
 

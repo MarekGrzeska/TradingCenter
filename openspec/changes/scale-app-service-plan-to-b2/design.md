@@ -138,6 +138,11 @@ czytania diffu.
   → **Mitygacja**: żadna nie jest potrzebna. Sesje capital.com współistnieją — zmierzone
   10 sierpnia i zapisane w `CLAUDE.md` — więc ponowne logowanie nie unieważnia niczego,
   a `stream_tokens_for` odnawia strumień. Przerwa liczy się w minutach.
+  → **Zaobserwowane przy apply 15 sierpnia: restartu nie było.** `market-data` trzymało
+  przez oba `apply` połączenie do bazy otwarte 15:55:51 UTC, a restart procesu zerwałby
+  je; zbieranie świec nie ma w tym oknie luki. Azure przestawił warstwę planu w miejscu.
+  Ryzyko było prawdziwe i tanie do obsłużenia, ale nie zmaterializowało się — i nie jest
+  to obietnica na następny raz, bo to decyzja Azure, nie nasza.
 - **[Ryzyko]** Rachunek rośnie o tyle, o ile — a być może z zera. Komentarz w
   `app-service.tf` twierdzi, że B1 mieści się w darmowym rocznym limicie subskrypcji;
   `az consumption usage list` oddaje na niej `pretaxCost` jako `null`, więc twierdzenia nie
