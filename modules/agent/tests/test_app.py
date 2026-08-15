@@ -3,7 +3,9 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
+from agent import schema_version
 from agent.app import app
+from agent.schema_version import SchemaMismatch
 
 # The lifespan now opens a real pool — it did not, back when this file's tests were
 # first written, and their env carried a DATABASE_URL nothing was listening on. A `db`
@@ -37,6 +39,19 @@ def test_health() -> None:
         response = client.get("/health")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_a_schema_the_image_was_not_built_for_refuses_to_start(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The wiring, not the comparison — `test_schema_version.py` owns the comparison. What
+    # this proves is that a mismatch reaches the lifespan and stops it, which is the whole
+    # value: the check ran on 15 August's production database too, in the sense that
+    # nothing called it.
+    monkeypatch.setattr(schema_version, "expected_heads", lambda: {"9999_from_a_newer_image"})
+
+    with pytest.raises(SchemaMismatch), TestClient(app):
+        pass  # pragma: no cover - the lifespan raises before the body runs
 
 
 def test_get_models_is_enough_to_build_a_wybierak() -> None:
