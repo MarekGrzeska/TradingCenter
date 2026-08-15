@@ -1,16 +1,26 @@
 # One Linux App Service Plan, four apps (capital-gateway, market-data, market-mcp, agent —
-# design.md, "App Service, nie Container Apps"): all of them run non-stop, so a shared B1
-# plan is cheaper than as many Container Apps billed by CPU-second, and B1 fits the
-# free-tier grant this subscription is on. `add-agent-chat`'s own design.md prices its app
-# onto this same plan explicitly rather than a second one — see its Risk, "Czwarta
-# aplikacja na B1 z jednym workerem"; `add-market-data-mcp` does the same for the fifth,
-# and the real pressure is a thing to measure after both are deployed, not to predict.
+# design.md, "App Service, nie Container Apps"): all of them run non-stop, so one shared
+# plan is cheaper than as many Container Apps billed by CPU-second.
+#
+# B2 rather than the B1 this started on, and the measurement is the reason (openspec:
+# scale-app-service-plan-to-b2). The two changes that added the third and fourth app both
+# said the pressure was a thing to measure once they were deployed rather than predict;
+# measured on 15 August 2026, the nightly floor of the plan's MemoryPercentage had walked
+# from 73.5% (10 Aug, two apps) to 83.1% (13 Aug, four), with a 89.2% peak against an alert
+# at 92.
+#
+# What that is NOT is a leak: the two original apps came down over the same window
+# (gateway's peak working set 262 -> 193 MB, market-data's 327 -> 311 MB). The four apps'
+# peaks together are ~882 MB of the 1.75 GB B1 had, so roughly half of what the plan
+# reported. The rest is the platform — four containers, four Kestrels, Easy Auth, the OS —
+# and that overhead grows with the number of apps rather than with their work. Which is
+# why the answer is memory, not a rewrite.
 resource "azurerm_service_plan" "main" {
   name                = "asp-tradingcenter"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
-  sku_name            = "B1"
+  sku_name            = "B2"
 
   # Exactly one worker, on purpose — design.md, "Gateway ma dokładnie jedną instancję".
   # capital.com counts its 10 req/s limit per *account*, not per process; a second
@@ -18,7 +28,8 @@ resource "azurerm_service_plan" "main" {
   # and the overflow reaches a caller looking exactly like missing data, not like a
   # traffic problem. DO NOT add autoscaling or raise this number — if more capacity is
   # ever needed, it has to come from a change to the rate-limiting design first, not
-  # from turning a knob here.
+  # from turning a knob here. The move to B2 above deliberately left this alone: a bigger
+  # SKU buys memory and a second core for the one worker, never a second worker.
   worker_count = 1
 }
 
