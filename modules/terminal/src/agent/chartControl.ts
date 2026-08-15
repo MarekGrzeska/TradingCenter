@@ -1,4 +1,4 @@
-import type { AgentApi, AgentChartCommand, AgentChartSnapshot } from "./agentApi";
+import type { AgentApi, AgentChartCommand, AgentChartFocus, AgentChartSnapshot } from "./agentApi";
 import { agentApi } from "./agentApi";
 import { archive } from "../data/marketData";
 import type { ArchiveAdmin } from "../data/source";
@@ -69,6 +69,17 @@ function describeIndicators(command: AgentChartCommand): string {
       return params === "" ? indicator.id.toUpperCase() : `${indicator.id.toUpperCase()} ${params}`;
     })
     .join(", ");
+}
+
+function describeFocus(focus: AgentChartFocus): string {
+  if (focus.lastBars !== null) return `the newest ${focus.lastBars} candles`;
+  if (focus.around !== null && focus.bars !== null) {
+    return `${focus.bars} candles around ${new Date(focus.around * 1000).toISOString()}`;
+  }
+  if (focus.from !== null && focus.to !== null) {
+    return `${new Date(focus.from * 1000).toISOString()} to ${new Date(focus.to * 1000).toISOString()}`;
+  }
+  return "an unrecognised span"; // unreachable if the module wrote this focus
 }
 
 function toSelections(command: AgentChartCommand): IndicatorSelection[] {
@@ -172,6 +183,10 @@ export async function syncAgentChart(
   if (command.indicators !== null) {
     deps.grid.setSlotIndicators(slotId, toSelections(command));
     applied.push(describeIndicators(command));
+  }
+  if (command.focus !== null) {
+    deps.grid.setFocusRequest(slotId, command.focus);
+    applied.push(`focus ${describeFocus(command.focus)}`);
   }
 
   writeCursor(deps.storage, command.sequence);

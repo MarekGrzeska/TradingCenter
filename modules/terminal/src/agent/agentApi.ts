@@ -93,6 +93,18 @@ export interface AgentChartIndicator {
   color: string | null;
 }
 
+/** Which fragment of the time axis the chart should show — epoch seconds here, ISO 8601
+ *  UTC on the wire (`parseIsoToEpochSeconds`, the same conversion every other timestamp
+ *  from this module goes through). Exactly one of the three shapes is filled: a
+ *  `from`/`to` range, an `around`/`bars` point, or `lastBars` alone. */
+export interface AgentChartFocus {
+  from: number | null;
+  to: number | null;
+  around: number | null;
+  bars: number | null;
+  lastBars: number | null;
+}
+
 /** What the agent set the chart to, as of `sequence`. A null field means "leave it as it
  *  is": several commands arrive folded into one, and a field none of them touched is
  *  still untouched here. */
@@ -101,6 +113,7 @@ export interface AgentChartCommand {
   symbol: string | null;
   resolution: string | null;
   indicators: AgentChartIndicator[] | null;
+  focus: AgentChartFocus | null;
 }
 
 /** What the terminal is drawing as it asks — context for one turn, never a message. */
@@ -175,11 +188,30 @@ interface RawMessage {
   tool_calls?: RawToolCall[];
 }
 
+interface RawChartFocus {
+  from: string | null;
+  to: string | null;
+  around: string | null;
+  bars: number | null;
+  last_bars: number | null;
+}
+
 interface RawChartCommand {
   sequence: number;
   symbol: string | null;
   resolution: string | null;
   indicators: Array<{ id: string; params: Record<string, number>; color: string | null }> | null;
+  focus: RawChartFocus | null;
+}
+
+function mapChartFocus(raw: RawChartFocus): AgentChartFocus {
+  return {
+    from: raw.from === null ? null : parseIsoToEpochSeconds(raw.from),
+    to: raw.to === null ? null : parseIsoToEpochSeconds(raw.to),
+    around: raw.around === null ? null : parseIsoToEpochSeconds(raw.around),
+    bars: raw.bars,
+    lastBars: raw.last_bars,
+  };
 }
 
 function mapChartCommand(raw: RawChartCommand): AgentChartCommand {
@@ -195,6 +227,7 @@ function mapChartCommand(raw: RawChartCommand): AgentChartCommand {
             params: indicator.params,
             color: indicator.color,
           })),
+    focus: raw.focus === null ? null : mapChartFocus(raw.focus),
   };
 }
 

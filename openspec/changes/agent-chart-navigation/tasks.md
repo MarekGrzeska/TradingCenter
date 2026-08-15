@@ -29,11 +29,11 @@
 
 ## 5. Terminal: DTO i przekazanie kadru do slotu
 
-- [ ] 5.1 `src/agent/agentApi.ts`: `AgentChartFocus` na `AgentChartCommand`, mapper ISO → epoch-sekundy, `null` gdy polecenie nie niosło kadru
-- [ ] 5.2 `src/grid/gridStore.ts`: przejściowe, niezapisywane do `localStorage` pole „żądany kadr" per slot, z własnym `subscribe` i metodą czyszczącą po zastosowaniu
-- [ ] 5.3 `parseGridConfig` i zapis konfiguracji nietknięte — test, że kadr nie trafia do `localStorage` i że konfiguracja zapisana bez niego wczytuje się bez zmian
-- [ ] 5.4 `src/agent/chartControl.ts`: `syncAgentChart` przekazuje kadr do aktywnego slotu i dopisuje go do `applied`
-- [ ] 5.5 Testy `chartControl.test.ts`: polecenie z samym kadrem, polecenie z kadrem i symbolem, polecenie bez kadru nienaruszające widoku
+- [x] 5.1 `src/agent/agentApi.ts`: `AgentChartFocus` na `AgentChartCommand`, mapper ISO → epoch-sekundy, `null` gdy polecenie nie niosło kadru
+- [x] 5.2 `src/grid/gridStore.ts`: przejściowe, niezapisywane do `localStorage` pole „żądany kadr" per slot, z własnym `subscribe` i metodą czyszczącą po zastosowaniu
+- [x] 5.3 `parseGridConfig` i zapis konfiguracji nietknięte — test, że kadr nie trafia do `localStorage` i że konfiguracja zapisana bez niego wczytuje się bez zmian
+- [x] 5.4 `src/agent/chartControl.ts`: `syncAgentChart` przekazuje kadr do aktywnego slotu i dopisuje go do `applied`
+- [x] 5.5 Testy `chartControl.test.ts`: polecenie z samym kadrem, polecenie z kadrem i symbolem, polecenie bez kadru nienaruszające widoku
 
 ## 6. Terminal: wykres stosuje kadr
 

@@ -332,6 +332,77 @@ describe("agentApi.usage", () => {
   });
 });
 
+describe("agentApi.chartCommand", () => {
+  it("maps a null focus through untouched", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/chart`, () =>
+        HttpResponse.json({
+          sequence: 3,
+          symbol: "US100",
+          resolution: null,
+          indicators: null,
+          focus: null,
+        }),
+      ),
+    );
+
+    const command = await api().chartCommand(0, new AbortController().signal);
+    expect(command?.focus).toBeNull();
+  });
+
+  it("maps a range focus from ISO instants to epoch seconds", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/chart`, () =>
+        HttpResponse.json({
+          sequence: 3,
+          symbol: null,
+          resolution: null,
+          indicators: null,
+          focus: {
+            from: "2026-01-03T00:00:00Z",
+            to: "2026-01-04T00:00:00Z",
+            around: null,
+            bars: null,
+            last_bars: null,
+          },
+        }),
+      ),
+    );
+
+    const command = await api().chartCommand(0, new AbortController().signal);
+    expect(command?.focus).toEqual({
+      from: 1767398400,
+      to: 1767484800,
+      around: null,
+      bars: null,
+      lastBars: null,
+    });
+  });
+
+  it("maps a last-bars focus, its number kept as a number", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/chart`, () =>
+        HttpResponse.json({
+          sequence: 3,
+          symbol: null,
+          resolution: null,
+          indicators: null,
+          focus: { from: null, to: null, around: null, bars: null, last_bars: 100 },
+        }),
+      ),
+    );
+
+    const command = await api().chartCommand(0, new AbortController().signal);
+    expect(command?.focus).toEqual({
+      from: null,
+      to: null,
+      around: null,
+      bars: null,
+      lastBars: 100,
+    });
+  });
+});
+
 describe("agentApi.getPrompt", () => {
   it("maps the current revision, both variants and the version", async () => {
     server.use(

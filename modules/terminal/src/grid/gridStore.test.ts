@@ -211,3 +211,75 @@ describe("createGridStore", () => {
     expect(listener).not.toHaveBeenCalled();
   });
 });
+
+describe("createGridStore focus requests", () => {
+  const focus = { from: 1, to: 2, around: null, bars: null, lastBars: null };
+
+  it("has no request for a slot until one is set", () => {
+    const store = createGridStore(memoryStorage());
+    expect(store.getFocusRequest("s1")).toBeNull();
+  });
+
+  it("returns what was set for that slot", () => {
+    const store = createGridStore(memoryStorage());
+    store.setFocusRequest("s1", focus);
+    expect(store.getFocusRequest("s1")).toEqual(focus);
+  });
+
+  it("clears on request, and stays cleared", () => {
+    const store = createGridStore(memoryStorage());
+    store.setFocusRequest("s1", focus);
+    store.clearFocusRequest("s1");
+    expect(store.getFocusRequest("s1")).toBeNull();
+  });
+
+  it("notifies focus listeners on set and on clear, not the config listeners", () => {
+    const store = createGridStore(memoryStorage());
+    const focusListener = vi.fn();
+    const configListener = vi.fn();
+    store.subscribeFocusRequest(focusListener);
+    store.subscribe(configListener);
+
+    store.setFocusRequest("s1", focus);
+    store.clearFocusRequest("s1");
+
+    expect(focusListener).toHaveBeenCalledTimes(2);
+    expect(configListener).not.toHaveBeenCalled();
+  });
+
+  it("does not notify when clearing a slot with no request", () => {
+    const store = createGridStore(memoryStorage());
+    const listener = vi.fn();
+    store.subscribeFocusRequest(listener);
+    store.clearFocusRequest("s1");
+    expect(listener).not.toHaveBeenCalled();
+  });
+
+  it("keeps one slot's request independent of another's", () => {
+    const store = createGridStore(memoryStorage());
+    store.setFocusRequest("s1", focus);
+    store.setFocusRequest("s2", { ...focus, from: 99 });
+
+    expect(store.getFocusRequest("s1")).toEqual(focus);
+    expect(store.getFocusRequest("s2")?.from).toBe(99);
+  });
+
+  it("never reaches storage: setting the config afterwards saves no trace of it", () => {
+    const storage = memoryStorage();
+    const store = createGridStore(storage);
+    store.setFocusRequest("s1", focus);
+    store.setLayout("1x1"); // the only thing that writes to storage
+
+    expect(storage.raw.get(STORAGE_KEY)).not.toContain("from");
+  });
+
+  it("does not survive a reload — it is not part of the persisted config", () => {
+    const storage = memoryStorage();
+    const first = createGridStore(storage);
+    first.setFocusRequest("s1", focus);
+    first.setLayout("1x1"); // forces a write, so there is something to reload
+
+    const second = createGridStore(storage);
+    expect(second.getFocusRequest("s1")).toBeNull();
+  });
+});

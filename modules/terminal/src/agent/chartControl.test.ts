@@ -57,7 +57,7 @@ function fakePairs(pairs: TrackedPair[] = [pair("US100", "MINUTE_5"), pair("US10
 }
 
 function command(over: Partial<AgentChartCommand> = {}): AgentChartCommand {
-  return { sequence: 7, symbol: null, resolution: null, indicators: null, ...over };
+  return { sequence: 7, symbol: null, resolution: null, indicators: null, focus: null, ...over };
 }
 
 describe("syncAgentChart", () => {
@@ -225,6 +225,59 @@ describe("syncAgentChart", () => {
     expect(result).toBeNull();
     // The cursor stays put, so the command is applied once the archive answers again.
     expect(storage.raw.has(CHART_CURSOR_KEY)).toBe(false);
+  });
+
+  it("passes a range focus through to the active slot", async () => {
+    const active = grid.getSnapshot().activeSlot;
+
+    const result = await syncAgentChart({
+      api: fakeApi(
+        command({ focus: { from: 100, to: 200, around: null, bars: null, lastBars: null } }),
+      ),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    expect(grid.getFocusRequest(active)).toEqual({
+      from: 100,
+      to: 200,
+      around: null,
+      bars: null,
+      lastBars: null,
+    });
+    expect(result?.applied).toEqual([
+      "focus 1970-01-01T00:01:40.000Z to 1970-01-01T00:03:20.000Z",
+    ]);
+  });
+
+  it("passes a last-bars focus through, described by candle count", async () => {
+    const active = grid.getSnapshot().activeSlot;
+
+    const result = await syncAgentChart({
+      api: fakeApi(
+        command({ focus: { from: null, to: null, around: null, bars: null, lastBars: 100 } }),
+      ),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    expect(grid.getFocusRequest(active)?.lastBars).toBe(100);
+    expect(result?.applied).toEqual(["focus the newest 100 candles"]);
+  });
+
+  it("leaves the focus request alone when the command carries none", async () => {
+    const active = grid.getSnapshot().activeSlot;
+
+    await syncAgentChart({
+      api: fakeApi(command({ symbol: "US100" })),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    expect(grid.getFocusRequest(active)).toBeNull();
   });
 
   it("says nothing when the agent set nothing", async () => {
