@@ -46,6 +46,7 @@ function fakeApi(overrides: Partial<AgentApi> = {}): AgentApi {
     updatePrompt: async () => {
       throw new Error("not used");
     },
+    chartCommand: async () => null,
     ...overrides,
   };
 }

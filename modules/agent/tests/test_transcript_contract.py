@@ -36,6 +36,7 @@ TOOL_CALL_FIELDS = {
     "outcome",
     "result_text",
     "duration_ms",
+    "source",
 }
 
 

@@ -119,6 +119,18 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
       ) : (
         <>
           <Transcript messages={state.messages} turn={state.turn} />
+          {state.chartNotice !== null && (
+            // Above the composer rather than inside the transcript: the agent changed the
+            // chart, it did not say something — a bubble here would put words in its
+            // mouth. A chart that moves with no sentence anywhere reads as a fault
+            // (`terminal-agent-chat` spec, "Panel mówi, że wykres zmienił agent").
+            <p
+              role="status"
+              className="mx-3 mb-2 rounded border border-primary-line bg-primary-soft px-2 py-1 text-[11px] text-ink-secondary"
+            >
+              {state.chartNotice}
+            </p>
+          )}
           {/* The picker sits under the box it applies to, not in the header: which model
               answers is a decision made while writing the question, so it belongs beside
               the writing rather than at the far end of the panel. It rides inside the

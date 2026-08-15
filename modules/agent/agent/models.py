@@ -92,6 +92,82 @@ class ToolCall(BaseModel):
     created_at: datetime
 
 
+class ChartIndicator(BaseModel):
+    """One indicator instance as the agent asked for it — the terminal's own selection
+    shape minus the instance key, which the terminal hands out itself when it applies
+    this. `params` empty means "whatever the catalogue defaults to"."""
+
+    id: str
+    params: dict[str, float] = {}
+    color: str | None = None
+
+
+class ChartSnapshot(BaseModel):
+    """What the consumer says it is drawing at the moment it asks a question. Not stored
+    and not a message: it describes the instant the question was asked, not a state this
+    module keeps (specs/agent-chat, "Tura wie, co terminal właśnie rysuje")."""
+
+    symbol: str | None = None
+    resolution: str | None = None
+    indicators: list[ChartIndicator] = []
+
+    def as_context(self) -> str:
+        """One line for the system prompt. Written for a model to read, so it names the
+        parameters rather than listing ids the model would have to look up."""
+        drawn = ", ".join(
+            indicator.id
+            + (
+                "("
+                + ", ".join(f"{name}={value:g}" for name, value in sorted(indicator.params.items()))
+                + ")"
+                if indicator.params
+                else ""
+            )
+            for indicator in self.indicators
+        )
+        parts = [
+            f"symbol {self.symbol}" if self.symbol else "no symbol",
+            f"interval {self.resolution}" if self.resolution else "no interval",
+            f"indicators {drawn}" if drawn else "no indicators",
+        ]
+        return "The operator's chart currently shows: " + "; ".join(parts) + "."
+
+
+class ChartCommand(BaseModel):
+    """What the agent set the chart to, once. Declarative: `None` on a field means "leave
+    that as it is", never "clear it" — a model asked to add an average must not be able
+    to blank the symbol by omission (specs/agent-chart-control, "Narzędzie ustawia
+    zawartość aktywnego slotu"). An empty `indicators` list is the one way to say "draw
+    none", and it is a list, not a None.
+
+    `sequence` is the row's own id: rising across the whole module, not per session, so a
+    consumer holding one number knows what it has already applied.
+    """
+
+    sequence: int
+    session_id: int
+    symbol: str | None
+    resolution: str | None
+    indicators: list[ChartIndicator] | None
+    created_at: datetime
+
+    def merged_with(self, later: ChartCommand) -> ChartCommand:
+        """This command, then a newer one on top — the later value wins per field, and a
+        field the later one left alone keeps this one's.
+
+        What makes it safe for a consumer to skip the commands it missed while it was
+        away: one merged answer says what the chart should look like now, where replaying
+        only the newest would silently drop an earlier command's indicators."""
+        return ChartCommand(
+            sequence=later.sequence,
+            session_id=later.session_id,
+            symbol=later.symbol if later.symbol is not None else self.symbol,
+            resolution=later.resolution if later.resolution is not None else self.resolution,
+            indicators=later.indicators if later.indicators is not None else self.indicators,
+            created_at=later.created_at,
+        )
+
+
 class PromptRevision(BaseModel):
     """One saved system prompt, both variants together — "two texts, one version",
     the same shape `PROMPT_VERSION` always was, now a row instead of a constant

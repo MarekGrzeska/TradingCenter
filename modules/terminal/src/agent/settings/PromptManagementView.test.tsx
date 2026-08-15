@@ -44,6 +44,7 @@ function fakeApi(overrides: Partial<AgentApi> = {}): AgentApi {
     },
     getPrompt: async () => promptFixture(),
     updatePrompt: async () => promptFixture(),
+    chartCommand: async () => null,
     ...overrides,
   };
 }

@@ -19,9 +19,16 @@ import {
   type AgentMessage,
   type AgentModel,
   type AgentSession,
+  type AgentChartSnapshot,
   type AgentToolCall,
   type ChatRole,
 } from "./agentApi";
+import {
+  activeChartSnapshot,
+  describeChartControl,
+  syncAgentChart,
+  type ChartControlResult,
+} from "./chartControl";
 import type { AgentStreamEvent } from "./stream";
 
 export type { ChatRole };
@@ -85,6 +92,10 @@ export interface AgentChatState {
    *  session's own `currentModelId` once one is open, or the pick that will become the
    *  first session's model once one exists. `null` only until the catalogue loads. */
   selectedModelId: string | null;
+  /** What the agent last did to the chart, in one sentence, or null when it has not
+   *  touched it. A chart that changes on its own without a word reads as a fault
+   *  (`terminal-agent-chat` spec, "Panel mówi, że wykres zmienił agent"). */
+  chartNotice: string | null;
 }
 
 export interface AgentChatStore {
@@ -158,6 +169,12 @@ function toChatMessage(message: AgentMessage): ChatMessage {
 export function createAgentChatStore(
   storage: Storage | null = safeLocalStorage(),
   api: AgentApi = agentApi,
+  // Injected rather than imported at the call site so a test can watch it without a
+  // grid, an archive and a localStorage behind it.
+  syncChart: () => Promise<ChartControlResult | null> = () => syncAgentChart(),
+  // What the terminal is drawing as the question is asked. Read at send time, not at
+  // construction: the operator may have changed slots since the panel opened.
+  chartSnapshot: () => AgentChartSnapshot | null = activeChartSnapshot,
 ): AgentChatStore {
   let state: AgentChatState = {
     expanded: loadExpanded(storage),
@@ -170,6 +187,7 @@ export function createAgentChatStore(
     models: [],
     modelsStatus: "loading",
     selectedModelId: null,
+    chartNotice: null,
   };
   let nextLocalId = 1;
   let transcriptSeq = 0;
@@ -263,6 +281,11 @@ export function createAgentChatStore(
     calls: AgentToolCall[],
     errorMessage: string | null,
   ): Promise<void> {
+    // A turn is the one moment the chart is most likely to have been set, so the read
+    // happens here rather than on a timer. Not awaited by the transcript reload below:
+    // the two are independent, and neither should hold the other up.
+    void syncChartCommands();
+
     const seq = ++transcriptSeq;
     let messages: ChatMessage[] | null = null;
     try {
@@ -327,7 +350,18 @@ export function createAgentChatStore(
    * all. Observed in production on 13 August 2026; a reload reproduced it exactly,
    * because the race is deterministic rather than a race at all.
    */
+  /** Whatever the agent set while nobody was reading — on the way in, and after every
+   *  turn. Never awaited by anything the operator is waiting for: a chart that could not
+   *  be synced is not a reason to hold up a reply (`terminal-agent-chat` spec, "Nieudany
+   *  odczyt poleceń"). */
+  async function syncChartCommands(): Promise<void> {
+    const notice = describeChartControl(await syncChart());
+    if (notice === null) return;
+    commit({ ...state, chartNotice: notice });
+  }
+
   function ensureLoaded(): void {
+    void syncChartCommands();
     if (!state.expanded) return;
     if (state.modelsStatus !== "ready") void loadModels();
     if (state.sessionsStatus !== "ready") void loadSessions();
@@ -479,7 +513,12 @@ export function createAgentChatStore(
 
       let events: AsyncGenerator<AgentStreamEvent>;
       try {
-        events = await api.sendMessage(sessionId, trimmed, new AbortController().signal);
+        events = await api.sendMessage(
+          sessionId,
+          trimmed,
+          new AbortController().signal,
+          chartSnapshot(),
+        );
       } catch (cause) {
         // Nothing accepted yet — no operator message, no turn, nothing to reload.
         commit({ ...state, turn: { status: "unreachable", message: describeError(cause) } });

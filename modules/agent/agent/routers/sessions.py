@@ -151,6 +151,7 @@ async def send_message(
             provider=request.app.state.provider,
             queue=queue,
             tool_server=request.app.state.tool_server,
+            chart=body.chart.to_snapshot() if body.chart is not None else None,
         )
     )
     # A task with nothing referencing it is eligible for collection mid-run — kept here

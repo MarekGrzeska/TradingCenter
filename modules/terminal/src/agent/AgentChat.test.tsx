@@ -180,6 +180,9 @@ function createFakeApi(): FakeApi {
     async updatePrompt() {
       throw new Error("not used");
     },
+    async chartCommand() {
+      return null;
+    },
   };
   return api;
 }

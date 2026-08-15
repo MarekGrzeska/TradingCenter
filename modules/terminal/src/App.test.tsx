@@ -38,6 +38,12 @@ vi.mock("./data/marketData", () => ({
     history: async () => [],
     subscribe: () => () => {},
   },
+  // The agent panel reads what the agent set the chart to, and checks it against what
+  // the archive collects before applying any of it — stubbed empty here for the same
+  // reason the two back ends are: these tests assert routing.
+  archive: {
+    listPairs: async () => [],
+  },
   // The unconfigured identity, which is what a local run has: the top bar shows
   // no sign-in state at all, so these tests keep asserting on routing and the
   // two back ends without a third indicator appearing beside them.
