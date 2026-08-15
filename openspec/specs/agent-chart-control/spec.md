@@ -1,11 +1,10 @@
-## Purpose
+# agent-chart-control Specification
 
+## Purpose
 Narzędzie, którym agent ustawia to, co terminal rysuje, i trwały ślad tego ustawienia:
 kształt polecenia, jego numerację, sposób odczytu przez terminal oraz to, czego narzędzie
 odmawia i jak tę odmowę uzasadnia.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Narzędzie ustawia zawartość aktywnego slotu
 
 Moduł MUST publikować modelowi narzędzie, które ustawia zawartość aktywnego slotu
@@ -102,3 +101,4 @@ awarią tury"). Odmowa MUST NOT zapisać polecenia ani zmienić czegokolwiek na 
 
 - **WHEN** narzędzie odmawia polecenia niosącego trzy wskaźniki, z których jeden jest nieznany
 - **THEN** nie zostaje zastosowany żaden z nich, a numer ostatniego polecenia się nie zmienia
+

@@ -5,9 +5,7 @@
 Wskaźniki techniczne liczone na serii, której archiwum jest właścicielem: ta sama para,
 rozdzielczość i zakres dają zawsze tę samą wartość. Moduł podaje miary i geometrię, a nie
 werdykty — próg stawia ten, kto podejmuje decyzję.
-
 ## Requirements
-
 ### Requirement: Wskaźnik jest czystą funkcją świec
 
 Wartość wskaźnika MUST zależeć wyłącznie od świec i parametrów wskazanych w żądaniu. Obliczenie
@@ -126,6 +124,11 @@ Moduł MUST przyjmować w jednym żądaniu listę wskaźników z parametrami i M
 znaczników czasu wspólną dla wszystkich wyników. Odpowiedź MUST powtarzać parametry każdego
 wskaźnika, żeby dwa warianty tego samego wskaźnika dały się rozróżnić.
 
+Wyniki MUST wracać w kolejności zamówionych wskaźników — n-ty wynik odpowiada n-temu zamówieniu,
+także wtedy, gdy dwa zamówienia mają ten sam identyfikator i te same parametry, i także wtedy, gdy
+któreś z nich wraca z przyczyną zamiast wartości. Identyfikator i parametry same w sobie MUST NOT
+być jedynym sposobem powiązania wyniku z zamówieniem, bo nie odróżniają zamówień identycznych.
+
 #### Scenario: Kilka wskaźników naraz
 
 - **WHEN** konsument prosi o kilka różnych wskaźników dla jednego zakresu
@@ -135,6 +138,16 @@ wskaźnika, żeby dwa warianty tego samego wskaźnika dały się rozróżnić.
 
 - **WHEN** konsument prosi dwa razy o ten sam wskaźnik z różnymi parametrami
 - **THEN** dostaje dwa osobne wyniki, każdy z powtórzonymi parametrami
+
+#### Scenario: Kolejność wyników
+
+- **WHEN** konsument zamawia kilka wskaźników w wybranej przez siebie kolejności
+- **THEN** wyniki wracają w tej samej kolejności, po jednym na każde zamówienie
+
+#### Scenario: Dwa identyczne zamówienia
+
+- **WHEN** konsument zamawia dwa razy ten sam wskaźnik z tymi samymi parametrami
+- **THEN** dostaje dwa wyniki, na pierwszej i drugiej pozycji odpowiadających tym zamówieniom
 
 ### Requirement: Wynik ma jeden z czterech kształtów
 
@@ -360,3 +373,4 @@ samego żądania.
 
 - **WHEN** para jest archiwizowana wyłącznie w rozdzielczości godzinowej
 - **THEN** wynik profilu niesie nazwany brak zamiast rozkładu
+

@@ -5,9 +5,7 @@
 Opisuje rozmowę operatora z agentem: jak sesja powstaje i trwa, co dokładnie zostaje z
 niej zapisane, w jakiej kolejności, oraz jak odpowiedź modelu dociera do wołającego —
 strumieniem, który może pęknąć w połowie zdania.
-
 ## Requirements
-
 ### Requirement: Sesja rozmowy trwa poza przeglądarką
 
 Rozmowa MUST być zapisana po stronie modułu, a nie w przeglądarce: sesja i każda należąca
@@ -197,3 +195,31 @@ Usunięcie MUST NOT usunąć śladu zużycia, który ta rozmowa zostawiła — p
   do niej wypowiedź
 - **THEN** moduł odpowiada tak, jakby ta sesja nie istniała
 - **AND** rozmowa nie pojawia się na liście
+
+### Requirement: Tura wie, co terminal właśnie rysuje
+
+Żądanie tury MAY nieść migawkę tego, co konsument rysuje: symbol, interwał i włączone
+wskaźniki wraz z parametrami. Moduł MUST podać ją modelowi jako kontekst tury.
+
+Migawka MUST być opcjonalna: żądanie bez niej MUST działać tak jak dotąd, bo konsument bez
+wykresu — a taki jest każdy inny niż terminal — nie ma czego wysłać.
+
+Migawka MUST NOT być zapisywana jako wiadomość w transkrypcie ani MUST NOT zmieniać
+niczego po stronie modułu. Jest opisem chwili, w której padło pytanie, a nie stanem, który
+moduł miałby odtąd trzymać.
+
+#### Scenario: Pytanie o to, co widać
+
+- **WHEN** operator pyta „co widzisz na tym wykresie", mając włączone dwa wskaźniki
+- **THEN** model odpowiada z symbolu, interwału i tych dwóch wskaźników
+
+#### Scenario: Żądanie bez migawki
+
+- **WHEN** konsument wysyła turę bez migawki wykresu
+- **THEN** tura toczy się jak dotąd
+
+#### Scenario: Migawka nie trafia do transkryptu
+
+- **WHEN** tura niosła migawkę wykresu
+- **THEN** transkrypt niesie pytanie operatora i wypowiedź agenta, bez migawki
+
