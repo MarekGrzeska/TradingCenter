@@ -77,11 +77,10 @@
 
 ## 7. Weryfikacja end-to-end
 
-- [ ] 7.1 Lokalny stos: edycja promptu z terminala, nowa rozmowa odpowiada pod nową
+- [x] 7.1 Lokalny stos: edycja promptu z terminala, nowa rozmowa odpowiada pod nową
       wersją, stara rozmowa w `sessions`/`messages` zachowuje starą wersję na swoich
-      wcześniejszych wiadomościach — **nie zrobione**: wymaga uruchomienia dev stosu,
-      który jest operatora, nie mój (`CLAUDE.md`, "Terraform apply is the operator's
-      job" i analogicznie dev.ps1)
+      wcześniejszych wiadomościach — zweryfikowane przez operatora na jego własnym
+      dev stosie (2026-08-15)
 - [x] 7.2 `uv run pytest` (164 passed, real `-m db` tests ran — Docker był dostępny),
       `uv run ruff check .`, `uv run pyright` (agent) — zielone
 - [x] 7.3 `pnpm test` (528 passed), `pnpm lint`, `pnpm typecheck` (terminal) — zielone
