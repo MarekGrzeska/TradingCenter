@@ -29,13 +29,14 @@ REFUSE_ABOVE_CANDLES = DEFAULT_CANDLE_TARGET * 10  # 2000
 COVERAGE_RANGE_LIMIT = 20
 
 
+# No `volume`: this archive's provider is a CFD feed, so the figure is not reliable
+# enough to reason from and not worth its tokens in every candle.
 class CandleOut(BaseModel):
     time: datetime
     open: float | None = None
     high: float | None = None
     low: float | None = None
     close: float | None = None
-    volume: float | None = None
 
 
 class GetCandlesOut(WindowedOut):

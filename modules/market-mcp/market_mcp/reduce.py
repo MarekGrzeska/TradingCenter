@@ -43,7 +43,6 @@ def _merge_candles(chunk: list[dict]) -> dict:
         "high": field("high", max),
         "low": field("low", min),
         "close": field("close", lambda vs: vs[-1]),
-        "volume": field("volume", sum),
     }
 
 

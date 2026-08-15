@@ -24,7 +24,7 @@ SNAPSHOT = Path(__file__).resolve().parent.parent / "contract" / "market-data.op
 # actually reach if it went missing.
 READ_FIELDS = {
     "CandlesOut": {"symbol", "resolution", "derived", "candles", "uncovered"},
-    "CandleOut": {"time", "open", "high", "low", "close", "volume"},
+    "CandleOut": {"time", "open", "high", "low", "close"},
     "Uncovered": {"from", "to"},
     "PairCoverageOut": {"symbol", "resolution", "ranges", "earliest_reachable"},
     "CoverageOut": {"from", "to", "history_ended"},

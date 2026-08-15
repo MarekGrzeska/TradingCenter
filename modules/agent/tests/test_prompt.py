@@ -20,7 +20,7 @@ def test_the_version_moved_when_the_prompt_did() -> None:
     # v2 was the prompt that said "You have no tools" as a fact about the module rather
     # than about the turn. A transcript answered under it must stay distinguishable from
     # one answered now (specs/agent-chat, "Prompt zmienia się między rozmowami").
-    assert PROMPT_VERSION != "v2"
+    assert PROMPT_VERSION not in ("v2", "v3")
 
 
 def test_with_tools_the_prompt_does_not_claim_to_have_none() -> None:
@@ -28,14 +28,17 @@ def test_with_tools_the_prompt_does_not_claim_to_have_none() -> None:
     assert "read-only tools" in SYSTEM_PROMPT_WITH_TOOLS.lower()
 
 
-def test_with_tools_the_prompt_names_the_three_easy_over_readings() -> None:
+def test_with_tools_the_prompt_names_the_easy_over_readings() -> None:
     lowered = SYSTEM_PROMPT_WITH_TOOLS.lower()
-    # The archive collects chosen pairs, an empty window is not silence, and a price is
-    # only as current as its candle — each one a conclusion market-mcp's own answers are
-    # shaped to prevent, and each one a model would otherwise reach.
+    # The archive collects chosen pairs, an empty window is not silence, a price is only
+    # as current as its candle, and volume is not reliable enough to reason from — each
+    # one a conclusion market-mcp's own answers are shaped to prevent, and each one a
+    # model would otherwise reach.
     assert "not the whole market" in lowered
     assert "does not mean the market was quiet" in lowered
     assert "as current as the candle" in lowered
+    assert "volume" in lowered
+    assert "not reliable" in lowered
 
 
 def test_with_tools_the_prompt_says_the_tools_change_nothing() -> None:

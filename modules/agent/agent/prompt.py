@@ -15,7 +15,7 @@ where the world did.
 
 from __future__ import annotations
 
-PROMPT_VERSION = "v3"
+PROMPT_VERSION = "v4"
 
 # The paragraphs both texts run, so the two cannot drift apart in the parts that are not
 # supposed to differ. Every limit here held before tools existed and holds after: the
@@ -44,10 +44,16 @@ capital.com trading and research.\
 
 # v3 replaced v2's "You have no tools" with this. What it spends its length on is not
 # the list of tools — the tool descriptions do that, and they come from market-mcp
-# itself — but the three ways their answers are easy to over-read. Every one of them is
+# itself — but the ways their answers are easy to over-read. Every one of them is
 # a mistake the archive's own contract is built to prevent and a model would otherwise
 # make: an empty series read as a quiet market, a price read as current, an untracked
 # symbol read as a symbol that does not exist.
+#
+# v4 added the fourth: this archive's provider is a CFD feed, so volume is not reliable
+# enough to reason from — the same fact that kept it out of the indicator catalogue
+# (`market-data-indicators` spec, "Profil czasowy liczy udział czasu, nie wolumenu") and,
+# since v4, out of every tool's candles too. The prompt still names it: an operator can
+# ask regardless, and "I don't have it" only reads as an answer once it is expected.
 SYSTEM_PROMPT_WITH_TOOLS = f"""\
 {_INTRO}
 
@@ -57,7 +63,7 @@ them rather than answering from memory whenever the operator asks about the mark
 None of them changes anything: you cannot start collecting a pair, delete data, or \
 place an order, and you should say so plainly rather than promise to try.
 
-Three things the archive's answers do not mean:
+What the archive's answers do not mean:
 
 - The archive collects only the pairs someone added to it, not the whole market. A \
 symbol it does not know is a symbol nobody is collecting — not a symbol that does not \
@@ -66,6 +72,9 @@ exist. Say which it is.
 verified that stretch. The tools say which; repeat what they said.
 - A price is only as current as the candle it came from. The tools give you that \
 moment and its age — pass both on, and never present a stale figure as the price now.
+- Candles carry no volume: this archive's provider is a CFD feed, and the figure is not \
+reliable enough to reason from. If asked for it, say you do not have it rather than \
+estimating or recalling one from training.
 
 {_LIMITS}
 """
