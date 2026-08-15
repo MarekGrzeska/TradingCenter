@@ -388,8 +388,25 @@ export interface IndicatorCatalogue {
  *  update that changes a default does not silently change what a saved slot draws.
  *  What `terminal-grid` spec's slot state actually stores. */
 export interface IndicatorSelection {
+  /** This instance's identity, handed out when it is added and never derived from what
+   *  it holds. One catalogue entry may be chosen more than once, and a second instance
+   *  is born carrying the first one's default params — a key computed from `id` and
+   *  `params` would collide at that moment (design.md, "Instancja ma własny klucz"). */
+  key: string;
   id: string;
   params: Record<string, number>;
+  /** A palette token name (`--color-indicator-5`), never a hex string: the token is what
+   *  follows the theme, and a saved slot outlives whatever the token resolved to when it
+   *  was chosen. Null means the chart assigns one from its own cycle, as it always did. */
+  color: string | null;
+}
+
+let fallbackKeys = 0;
+
+/** A fresh instance identity. `randomUUID` where there is one; a counter where there is
+ *  not, since the key only has to be unique within one operator's selections. */
+export function newIndicatorSelectionKey(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `indicator-${(fallbackKeys += 1)}`;
 }
 
 export interface IndicatorMarker {

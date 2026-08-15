@@ -30,6 +30,7 @@ import {
   RESOLUTIONS,
   type Bar,
   type IndicatorCatalogueEntry,
+  type IndicatorResult,
   type IndicatorSelection,
   type Resolution,
 } from "../data/types";
@@ -37,7 +38,13 @@ import type { MarketDataSource } from "../data/source";
 import { formatCrosshairTime, formatInstant, formatTickMark } from "../ui/formatTime";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { showToast } from "../ui/toastStore";
-import { candlestickColors, indicatorLineColor, readChartColors, type ChartColors } from "./theme";
+import {
+  candlestickColors,
+  indicatorColorFromToken,
+  indicatorLineColor,
+  readChartColors,
+  type ChartColors,
+} from "./theme";
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
 import { type BarsRange, type IndicatorsState, useIndicators } from "./indicators/useIndicators";
 import { useIndicatorCatalogue } from "./indicators/useIndicatorCatalogue";
@@ -93,6 +100,86 @@ function canDrawIndicator(entry: IndicatorCatalogueEntry): boolean {
     return entry.render.pane === "price";
   }
   return false;
+}
+
+/** One chosen instance beside the answer it got. The pairing is positional — the archive
+ *  answers specs in the order they were asked for — because nothing on the wire tells two
+ *  instances of one entry apart when their params agree. */
+interface DrawnInstance {
+  selection: IndicatorSelection;
+  result: IndicatorResult;
+  entry: IndicatorCatalogueEntry;
+}
+
+/** The instances this chart can actually draw right now, zipped with their answers.
+ *  A result carrying a reason carries no shape and is dropped here rather than at each
+ *  branch below: "drew nothing" and "had nothing to draw" arriving at the same place by
+ *  accident is how the next shape added quietly draws an empty one. */
+function drawnInstances(
+  selections: IndicatorSelection[],
+  results: IndicatorResult[],
+  catalogueById: Map<string, IndicatorCatalogueEntry>,
+): DrawnInstance[] {
+  const drawn: DrawnInstance[] = [];
+  selections.forEach((selection, index) => {
+    const result = results[index];
+    if (!result || result.error !== null) return;
+    const entry = catalogueById.get(selection.id);
+    if (!entry || !canDrawIndicator(entry)) return;
+    drawn.push({ selection, result, entry });
+  });
+  return drawn;
+}
+
+/**
+ * A colour per line of every drawn instance, in one pass so that no two lines on screen
+ * collide by accident. An instance the operator gave a colour spends it on its first
+ * line; its remaining lines (MACD's signal and histogram) keep taking from the cycle,
+ * since three same-coloured lines in one pane say less than three different ones.
+ *
+ * The cycle skips every colour already claimed by hand, so choosing one for an average
+ * cannot leave a neighbouring line drawn in the same hue. Instances beyond the palette's
+ * eight repeat it, the way they always did — a legend, not the hue, is what names a line.
+ */
+function assignLineColors(
+  drawn: DrawnInstance[],
+  colors: ChartColors,
+  chosenByKey: Map<string, string | null>,
+): Map<string, string[]> {
+  const chosen = new Map<string, string | null>();
+  for (const { selection } of drawn) {
+    chosen.set(
+      selection.key,
+      indicatorColorFromToken(colors, chosenByKey.get(selection.key) ?? selection.color),
+    );
+  }
+  const claimed = new Set([...chosen.values()].filter((color): color is string => color !== null));
+
+  let cycle = 0;
+  function nextFromCycle(): string {
+    for (let step = 0; step < colors.indicatorLines.length; step += 1) {
+      const candidate = indicatorLineColor(colors, cycle);
+      cycle += 1;
+      if (!claimed.has(candidate)) return candidate;
+    }
+    // Every hue spoken for by hand. Repeating one beats inventing a ninth.
+    const candidate = indicatorLineColor(colors, cycle);
+    cycle += 1;
+    return candidate;
+  }
+
+  const byKey = new Map<string, string[]>();
+  for (const { selection, entry } of drawn) {
+    const own = chosen.get(selection.key) ?? null;
+    // A markers/levels/zones entry declares no lines and still needs one colour.
+    const lineCount = Math.max(entry.lines.length, 1);
+    const assigned: string[] = [];
+    for (let index = 0; index < lineCount; index += 1) {
+      assigned.push(index === 0 && own !== null ? own : nextFromCycle());
+    }
+    byKey.set(selection.key, assigned);
+  }
+  return byKey;
 }
 
 /** The price pane's own stretch factor, set once at chart creation so an
@@ -246,6 +333,15 @@ export function Chart({
     resolution,
     knownIndicatorSelections,
     barsRange,
+  );
+
+  // The colours as they stand *now*, not as they stood when the archive last answered.
+  // Picking a swatch must repaint the line it names immediately; waiting for the next
+  // recompute would make choosing a colour feel like a read of the archive, which it
+  // is not (design.md, "Kolor rozwiązywany przy rysowaniu z bieżących selekcji").
+  const instanceColors = useMemo(
+    () => new Map(indicatorSelections.map((selection) => [selection.key, selection.color])),
+    [indicatorSelections],
   );
 
   // The header badge says *that* indicators are unavailable; it has nowhere to put *why*
@@ -602,10 +698,12 @@ export function Chart({
     setBarsRange(null);
   }, [source, symbol, resolution]);
 
-  // --- indicators: one Line series per (id, params, line key), synced to what the
-  // archive last answered. A price-pane entry draws on the candles' own pane; an
-  // own-pane entry (RSI, ATR, MACD, …) gets a pane of its own, one per (id,
-  // params) rather than one shared by every oscillator — see `canDrawIndicator`.
+  // --- indicators: one Line series per (instance, line key), synced to what the archive
+  // last answered. A price-pane entry draws on the candles' own pane; an own-pane entry
+  // (RSI, ATR, MACD, …) gets a pane of its own, one per instance rather than one shared
+  // by every oscillator — see `canDrawIndicator`. Keyed by the instance, so the same
+  // entry chosen twice draws twice and changing one instance's period moves its own line
+  // rather than tearing a series down and building it again.
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
@@ -614,26 +712,27 @@ export function Chart({
     const active = new Set<string>();
     const activeOwnPanes = new Set<string>();
     const activeResults = new Set<string>();
-    let colorIndex = 0;
 
-    for (const result of indicatorsState.results) {
-      const entry = catalogueById.get(result.id);
-      if (!entry || !canDrawIndicator(entry)) continue;
-      // A result carrying a reason carries no shape, so every branch below would skip
-      // it anyway — said here instead of relied on, because "drew nothing" and "had
-      // nothing to draw" reaching the same place by accident is how the next shape
-      // added below quietly draws an empty one.
-      if (result.error !== null) continue;
+    // The snapshot's own pairing: `results[i]` answers `selections[i]`
+    // (`market-data-indicators` spec, "Kolejność wyników"). Nothing else binds the two —
+    // two instances of one entry with the same params are identical on the wire.
+    const drawable = drawnInstances(
+      indicatorsState.selections,
+      indicatorsState.results,
+      catalogueById,
+    );
+    const lineColors = assignLineColors(drawable, colors, instanceColors);
 
-      const paramsKey = entry.params.map((p) => result.params[p.name]).join(",");
-      const ownPaneKey = `${result.id}|${paramsKey}`;
+    for (const { selection, result, entry } of drawable) {
+      const ownPaneKey = selection.key;
+      const colorsForInstance = lineColors.get(selection.key) ?? colors.indicatorLines;
 
       if (entry.output === "markers") {
         if (!result.markers) continue;
         activeResults.add(ownPaneKey);
         const priceSeries = seriesRef.current;
         if (!priceSeries) continue;
-        const color = indicatorLineColor(colors, colorIndex++);
+        const color = colorsForInstance[0];
         const markers: SeriesMarker<Time>[] = result.markers.map((point) =>
           point.price === null
             ? { time: point.time as UTCTimestamp, position: "inBar", shape: "circle", color, text: point.label }
@@ -694,7 +793,7 @@ export function Chart({
         activeResults.add(ownPaneKey);
         const priceSeries = seriesRef.current;
         if (!priceSeries) continue;
-        const color = indicatorLineColor(colors, colorIndex++);
+        const color = colorsForInstance[0];
         let ray = rayPrimitivesRef.current.get(ownPaneKey);
         if (!ray) {
           ray = new RayPrimitive(color);
@@ -759,11 +858,12 @@ export function Chart({
       }
 
       let firstLine: ISeriesApi<"Line"> | ISeriesApi<"Histogram"> | undefined;
+      const lines = result.lines;
 
-      for (const lineSpec of entry.lines) {
-        const key = `${result.id}|${paramsKey}|${lineSpec.key}`;
+      entry.lines.forEach((lineSpec, lineIndex) => {
+        const key = `${selection.key}|${lineSpec.key}`;
         active.add(key);
-        const values = result.lines[lineSpec.key] ?? [];
+        const values = lines[lineSpec.key] ?? [];
         // A line overrides the entry's own style for itself alone — MACD's
         // histogram sitting beside two ordinary lines in the same entry.
         const style = lineSpec.style ?? entry.render.style;
@@ -804,7 +904,7 @@ export function Chart({
             series = chart.addSeries(
               LineSeries,
               {
-                color: indicatorLineColor(colors, colorIndex),
+                color: colorsForInstance[lineIndex],
                 lineWidth: 1,
                 lastValueVisible: false,
                 priceLineVisible: false,
@@ -813,19 +913,23 @@ export function Chart({
               paneIndex,
             );
             indicatorSeriesRef.current.set(key, series);
+          } else {
+            // Recolouring an instance is not a recompute: the operator picks a swatch and
+            // the line it stands for changes on the spot, without another read.
+            series.applyOptions({ color: colorsForInstance[lineIndex] });
           }
           series.setData(points);
         }
         firstLine ??= series;
-        colorIndex++;
-      }
+      });
 
-      // Reference levels (RSI's 30/70, …) — drawn once per (id, params) on
-      // whichever line happens to be first, since every line an entry declares
-      // shares that pane's one price scale.
-      if (entry.render.levels.length > 0 && firstLine && !levelLinesRef.current.has(ownPaneKey)) {
+      // Reference levels (RSI's 30/70, …) — drawn once per instance on whichever
+      // line happens to be first, since every line an entry declares shares that
+      // pane's one price scale.
+      const anchor = firstLine;
+      if (entry.render.levels.length > 0 && anchor && !levelLinesRef.current.has(ownPaneKey)) {
         const priceLines = entry.render.levels.map((level) =>
-          firstLine.createPriceLine({
+          anchor.createPriceLine({
             price: level,
             color: colors.inkMuted,
             lineWidth: 1,
@@ -834,7 +938,7 @@ export function Chart({
             title: "",
           }),
         );
-        levelLinesRef.current.set(ownPaneKey, { series: firstLine, lines: priceLines });
+        levelLinesRef.current.set(ownPaneKey, { series: anchor, lines: priceLines });
       }
     }
 
@@ -882,7 +986,13 @@ export function Chart({
       seriesRef.current?.detachPrimitive(profile);
       timeProfilePrimitivesRef.current.delete(key);
     }
-  }, [indicatorsState.results, indicatorsState.times, catalogueById]);
+  }, [
+    indicatorsState.results,
+    indicatorsState.times,
+    indicatorsState.selections,
+    instanceColors,
+    catalogueById,
+  ]);
 
   const feed = useBarFeed(source, symbol, resolution, sink);
   const older = useOlderBars(source, symbol, resolution, olderReader);
@@ -937,7 +1047,18 @@ export function Chart({
           />
         )}
 
-        {shown && <OhlcReadout bar={shown.bar} indicators={activeIndicatorReadout(shown, indicatorsState, catalogueById)} />}
+        {shown && (
+          <OhlcReadout
+            bar={shown.bar}
+            indicators={activeIndicatorReadout(
+              shown,
+              indicatorsState,
+              catalogueById,
+              instanceColors,
+              colorsRef.current ?? readChartColors(),
+            )}
+          />
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           {unknownIndicatorIds.length > 0 && (
@@ -1055,6 +1176,11 @@ interface IndicatorReadoutEntry {
   key: string;
   label: string;
   value: number | null;
+  /** The colour the line is drawn in. Two instances of one entry with the same params
+   *  carry the same label, and then the swatch is the only thing that says which line a
+   *  number came from (`terminal-chart` spec, "Wykres podaje wartości wskaźników spod
+   *  kursora"). */
+  color: string;
 }
 
 /**
@@ -1066,21 +1192,33 @@ function activeIndicatorReadout(
   shown: Readout,
   indicatorsState: IndicatorsState,
   catalogueById: Map<string, IndicatorCatalogueEntry>,
+  instanceColors: Map<string, string | null>,
+  colors: ChartColors,
 ): IndicatorReadoutEntry[] {
   const index = indicatorsState.times.indexOf(shown.bar.time);
   if (index === -1) return [];
 
+  const drawn = drawnInstances(
+    indicatorsState.selections,
+    indicatorsState.results,
+    catalogueById,
+  );
+  // The same assignment the sync effect makes, from the same input: a readout naming a
+  // colour the line is not drawn in would be worse than naming none.
+  const lineColors = assignLineColors(drawn, colors, instanceColors);
+
   const entries: IndicatorReadoutEntry[] = [];
-  for (const result of indicatorsState.results) {
-    const entry = catalogueById.get(result.id);
-    if (!entry || !result.lines) continue;
-    for (const lineSpec of entry.lines) {
+  for (const { selection, result, entry } of drawn) {
+    if (!result.lines) continue;
+    const assigned = lineColors.get(selection.key) ?? colors.indicatorLines;
+    entry.lines.forEach((lineSpec, lineIndex) => {
       entries.push({
-        key: `${result.id}|${lineSpec.key}`,
+        key: `${selection.key}|${lineSpec.key}`,
         label: fillLabelTemplate(lineSpec.label, result.params),
-        value: result.lines[lineSpec.key]?.[index] ?? null,
+        value: result.lines?.[lineSpec.key]?.[index] ?? null,
+        color: assigned[lineIndex],
       });
-    }
+    });
   }
   return entries;
 }
@@ -1100,7 +1238,12 @@ function OhlcReadout({ bar, indicators }: { bar: Bar; indicators: IndicatorReado
       <Field label="C" value={bar.close} />
       <time className="text-ink-muted">{formatInstant(bar.time)}</time>
       {indicators.map((entry) => (
-        <span key={entry.key} className="text-ink-muted">
+        <span key={entry.key} className="flex items-center gap-1 text-ink-muted">
+          <span
+            aria-hidden
+            style={{ backgroundColor: entry.color }}
+            className="inline-block h-2 w-2 rounded-sm"
+          />
           {entry.label}{" "}
           <span className="text-ink">{entry.value === null ? "…" : entry.value}</span>
         </span>
