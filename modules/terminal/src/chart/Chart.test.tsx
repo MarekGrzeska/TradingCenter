@@ -1892,6 +1892,26 @@ describe("Chart — several instances of one indicator, each with its own colour
     expect(colors.indicatorLines).toContain(lineSeries()[1].options.color);
   });
 
+  it("draws two instances of one entry in two colours the operator picked", async () => {
+    const indicators = new FakeIndicatorSource();
+    twoEmas(indicators);
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: "--color-indicator-2" },
+        { key: "slow", id: "ema", params: { period: 50 }, color: "--color-indicator-7" },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(2));
+    const colors = readChartColors();
+    expect(lineSeries()[0].options.color).toBe(indicatorColorFromToken(colors, "--color-indicator-2"));
+    expect(lineSeries()[1].options.color).toBe(indicatorColorFromToken(colors, "--color-indicator-7"));
+  });
+
   it("keeps a chosen colour when another instance is added afterwards", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [indicatorEntry()];
@@ -1967,6 +1987,39 @@ describe("Chart — several instances of one indicator, each with its own colour
     const chosen = indicatorColorFromToken(readChartColors(), "--color-indicator-5");
     await waitFor(() => expect(lineSeries()[0].options.color).toBe(chosen));
     expect(indicators.computeCalls).toHaveLength(readsBefore);
+  });
+
+  it("clears a restored colour back to the cycle when the operator picks Auto", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ params: { period: 20 }, lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: "--color-indicator-5" },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    const chosen = indicatorColorFromToken(readChartColors(), "--color-indicator-5");
+    await waitFor(() => expect(lineSeries()[0]?.options.color).toBe(chosen));
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("button", { name: "Auto" }));
+
+    // Picking Auto is a choice too, and it must land without waiting for a recompute.
+    await waitFor(() => expect(lineSeries()[0].options.color).not.toBe(chosen));
+    expect(indicators.computeCalls).toHaveLength(1);
   });
 
   it("gives the crosshair readout one entry per instance, each labelled with its own params", async () => {

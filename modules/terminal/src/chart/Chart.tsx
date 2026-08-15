@@ -148,10 +148,13 @@ function assignLineColors(
 ): Map<string, string[]> {
   const chosen = new Map<string, string | null>();
   for (const { selection } of drawn) {
-    chosen.set(
-      selection.key,
-      indicatorColorFromToken(colors, chosenByKey.get(selection.key) ?? selection.color),
-    );
+    // `has`, not `??`: null is the operator choosing *no* colour, and falling through to
+    // the snapshot's own on null would make "Auto" a no-op for an instance restored with
+    // a colour — it would keep painting the old one until the next recompute.
+    const token = chosenByKey.has(selection.key)
+      ? (chosenByKey.get(selection.key) ?? null)
+      : selection.color;
+    chosen.set(selection.key, indicatorColorFromToken(colors, token));
   }
   const claimed = new Set([...chosen.values()].filter((color): color is string => color !== null));
 
