@@ -16,6 +16,7 @@ function toolCall(overrides: Partial<AgentToolCall> = {}): AgentToolCall {
     outcome: "ok",
     resultText: '{"candles": 78}',
     durationMs: 240,
+    source: "server",
     ...overrides,
   };
 }

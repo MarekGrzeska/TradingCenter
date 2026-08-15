@@ -53,6 +53,18 @@ export function ToolCallEntry({ call }: { call: AgentToolCall }) {
             {expanded ? "▾" : "▸"}
           </span>
           <span className="truncate font-mono text-ink-secondary">{call.name}</span>
+          {call.source === "module" && (
+            // Server calls are the common case and say nothing extra; the one tool this
+            // module runs itself is the exception worth naming, the same way a badge
+            // elsewhere on this panel only appears for what stands out (`agent-tools`
+            // spec, "ślad wywołania mówi, które z nich zostało wykonane przez ten moduł").
+            <span
+              title="Run by this module, not the tool server"
+              className="shrink-0 rounded border border-primary-line px-1 text-[10px] tracking-wide text-primary uppercase"
+            >
+              module
+            </span>
+          )}
           <span className={`ml-auto shrink-0 font-semibold ${OUTCOME_STYLE[call.outcome]}`}>
             {OUTCOME_LABEL[call.outcome]}
           </span>

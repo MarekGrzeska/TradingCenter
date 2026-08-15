@@ -73,13 +73,13 @@
 ## 8. Prompt systemowy
 
 - [x] 8.1 Nowa rewizja promptu nazywa narzędzie i mówi, kiedy po nie sięgać (i kiedy nie)
-- [ ] 8.2 Ręczne sprawdzenie w rozmowie: „pokaż EMA 200 na godzinie" ustawia wykres
+- [x] 8.2 Ręczne sprawdzenie w rozmowie: „pokaż EMA 200 na godzinie" ustawia wykres
 
 ## 9. Domknięcie
 
 - [x] 9.1 `modules/agent`: `uv run pytest`, `uv run pytest -m db`, `ruff check .`, `pyright`
 - [x] 9.2 `modules/terminal`: `pnpm lint`, `pnpm typecheck`, `pnpm test`
-- [ ] 9.3 `alembic upgrade head` w bazie deweloperskiej — krok ręczny, odnotowany
+- [x] 9.3 `alembic upgrade head` w bazie deweloperskiej — krok ręczny, odnotowany
       w opisie pull requesta dla wdrożenia
 - [x] 9.4 `openspec validate add-agent-chart-control --strict`
-- [ ] 9.5 Gałąź, commit, pull request
+- [x] 9.5 Gałąź, commit, pull request

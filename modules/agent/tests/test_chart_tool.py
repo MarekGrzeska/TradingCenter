@@ -12,7 +12,7 @@ import json
 import pytest
 
 from agent import store
-from agent.models import ChartIndicator
+from agent.models import ChartIndicator, ChartSnapshot
 from agent.tools import ToolOutcome, ToolOutcomeKind
 from agent.tools.chart import ChartTool
 
@@ -208,6 +208,39 @@ async def test_a_resolution_that_symbol_is_not_collected_in_is_refused(db, pool)
 
     assert outcome.kind is ToolOutcomeKind.REFUSED
     assert "HOUR" in outcome.text and "MINUTE_5" in outcome.text
+
+
+async def test_a_symbol_only_command_is_checked_against_the_chart_s_current_interval(
+    db, pool
+) -> None:
+    session = await _session(db)
+
+    outcome = await _tool(pool).call(
+        {"symbol": "GOLD"},
+        session_id=session.id,
+        chart=ChartSnapshot(symbol="US100", resolution="HOUR"),
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+    assert "HOUR" in outcome.text and "GOLD" in outcome.text
+    assert await store.chart_state_after(db, sequence=0) is None
+
+
+async def test_a_symbol_only_command_is_accepted_when_the_current_interval_fits(
+    db, pool
+) -> None:
+    session = await _session(db)
+
+    outcome = await _tool(pool).call(
+        {"symbol": "GOLD"},
+        session_id=session.id,
+        chart=ChartSnapshot(symbol="US100", resolution="MINUTE_5"),
+    )
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    command = await store.chart_state_after(db, sequence=0)
+    assert command is not None
+    assert command.symbol == "GOLD"
 
 
 async def test_a_colour_the_chart_cannot_draw_is_refused(db, pool) -> None:

@@ -62,7 +62,6 @@ def upgrade() -> None:
     )
     # The one read: everything newer than the cursor, in order. The primary key's own
     # index answers it, so there is no second index here on purpose.
-    op.create_index("ix_chart_commands_session_id", "chart_commands", ["session_id"])
 
 
 def downgrade() -> None:

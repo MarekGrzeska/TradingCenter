@@ -428,3 +428,35 @@ async def test_a_local_tool_refusing_is_a_result_the_model_can_act_on() -> None:
     assert result["failed"] is False
     assert result["text"] == "shown instead"
     assert result["rounds"][0].results[0].text.startswith("'TSLA' is not collected")
+
+
+class RaisingLocalTool:
+    """A local tool broken the way `ChartTool.call` can be — a database gone away, not
+    a refusal it wrote itself."""
+
+    async def __call__(self, arguments: dict) -> ToolOutcome:
+        raise RuntimeError("connection reset")
+
+
+async def test_a_local_tool_that_raises_is_a_result_not_a_failed_turn() -> None:
+    """Mirrors `tool_server.call`'s own guard: a local tool breaking must not escape the
+    round the way an unguarded exception would, taking the whole turn's text with it."""
+    provider = FakeProvider(
+        [
+            [ToolCallRequest("c1", "set_chart", {"symbol": "US100"}), UsageReport(1, 1, None, None)],
+            [TextDelta("could not set it, but here is what I know"), UsageReport(1, 1, None, None)],
+        ]
+    )
+
+    result, _ = await _run(
+        provider,
+        FakeToolServer(),
+        tools=(CHART_TOOL,),
+        local_tools={"set_chart": RaisingLocalTool()},
+    )
+
+    assert result["failed"] is False
+    assert result["text"] == "could not set it, but here is what I know"
+    [call] = result["calls"]
+    assert call.outcome == "unavailable"
+    assert "connection reset" in call.text

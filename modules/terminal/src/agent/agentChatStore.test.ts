@@ -27,6 +27,7 @@ const CANDLES_CALL: AgentToolCall = {
   outcome: "ok",
   resultText: '{"candles": 78}',
   durationMs: 240,
+  source: "server",
 };
 
 const REFUSED_CALL: AgentToolCall = {
@@ -37,6 +38,7 @@ const REFUSED_CALL: AgentToolCall = {
   outcome: "refused",
   resultText: "market-data refused: no such pair",
   durationMs: 18,
+  source: "server",
 };
 
 /** A stream that only advances when the test tells it to — the fixed-array fake below

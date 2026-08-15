@@ -75,7 +75,7 @@
 ## 9. Domknięcie
 
 - [x] 9.1 `pnpm lint`, `pnpm typecheck`, `pnpm test` w `modules/terminal`
-- [ ] 9.2 Sprawdzić w uruchomionym terminalu: trzy EMA (20/50/200) w trzech kolorach,
+- [x] 9.2 Sprawdzić w uruchomionym terminalu: trzy EMA (20/50/200) w trzech kolorach,
       przeżywające przeładowanie strony
 - [x] 9.3 `openspec validate add-indicator-instances-and-colors --strict`
-- [ ] 9.4 Gałąź, commit, pull request
+- [x] 9.4 Gałąź, commit, pull request

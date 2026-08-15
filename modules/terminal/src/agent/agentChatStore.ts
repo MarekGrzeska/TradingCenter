@@ -196,6 +196,7 @@ export function createAgentChatStore(
   // so `ensureLoaded` can be called as often as anything likes without doubling it.
   let modelsInFlight = false;
   let sessionsInFlight = false;
+  let chartSyncInFlight = false;
   // Which conversation's transcript is actually on screen. `transcriptStatus` cannot say:
   // it starts "ready", because an empty panel is not a panel that is loading, so it reads
   // the same before the first read as after a successful one.
@@ -334,6 +335,25 @@ export function createAgentChatStore(
     if (expanded) ensureLoaded();
   }
 
+  /** Whatever the agent set while nobody was reading — on the way in, and after every
+   *  turn. Never awaited by anything the operator is waiting for: a chart that could not
+   *  be synced is not a reason to hold up a reply (`terminal-agent-chat` spec, "Nieudany
+   *  odczyt poleceń"). Guarded against overlap the same way `loadModels`/`loadSessions`
+   *  are — `ensureLoaded` can run from the panel's mount and from `setExpanded` in the
+   *  same tick, and applying one standing command twice would rebuild every indicator
+   *  series on the chart twice for nothing. */
+  async function syncChartCommands(): Promise<void> {
+    if (chartSyncInFlight) return;
+    chartSyncInFlight = true;
+    try {
+      const notice = describeChartControl(await syncChart());
+      if (notice === null) return;
+      commit({ ...state, chartNotice: notice });
+    } finally {
+      chartSyncInFlight = false;
+    }
+  }
+
   /**
    * Loads whatever an open panel needs and has not got, and is safe to call repeatedly.
    *
@@ -350,17 +370,13 @@ export function createAgentChatStore(
    * all. Observed in production on 13 August 2026; a reload reproduced it exactly,
    * because the race is deterministic rather than a race at all.
    */
-  /** Whatever the agent set while nobody was reading — on the way in, and after every
-   *  turn. Never awaited by anything the operator is waiting for: a chart that could not
-   *  be synced is not a reason to hold up a reply (`terminal-agent-chat` spec, "Nieudany
-   *  odczyt poleceń"). */
-  async function syncChartCommands(): Promise<void> {
-    const notice = describeChartControl(await syncChart());
-    if (notice === null) return;
-    commit({ ...state, chartNotice: notice });
-  }
-
   function ensureLoaded(): void {
+    // Read whether or not the panel is open — `terminal-agent-chat` spec, "MUST czytać
+    // nowe polecenia agenta po zakończonej turze oraz po wejściu na stronę", so a
+    // command issued before the tab closed is not left waiting on the operator opening
+    // the panel first. The notice this leaves in `state.chartNotice` renders the moment
+    // they do (`chartNotice` is cleared only by the next turn or a session switch, not
+    // by time), so nothing here is said and then lost.
     void syncChartCommands();
     if (!state.expanded) return;
     if (state.modelsStatus !== "ready") void loadModels();
@@ -378,6 +394,8 @@ export function createAgentChatStore(
       activeSessionId: id,
       selectedModelId: session?.currentModelId ?? state.selectedModelId,
       turn: null,
+      // Belongs to the conversation just left, not this one.
+      chartNotice: null,
     });
     persistActiveSessionId(id);
     void loadMessages(id);
@@ -394,6 +412,8 @@ export function createAgentChatStore(
       transcriptStatus: "ready",
       turn: null,
       selectedModelId: state.models[0]?.id ?? state.selectedModelId,
+      // Belongs to the conversation just left, not this one.
+      chartNotice: null,
     });
     persistActiveSessionId(null);
   }
@@ -497,6 +517,9 @@ export function createAgentChatStore(
       ...state,
       messages: [...state.messages, operatorMessage],
       turn: { status: "waiting", toolCalls: [] },
+      // Said once, about the turn that set it — carrying it into the next question would
+      // describe a chart the operator may since have changed by hand.
+      chartNotice: null,
     });
 
     let sessionId = state.activeSessionId;

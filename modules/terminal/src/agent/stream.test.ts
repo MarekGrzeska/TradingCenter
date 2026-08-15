@@ -77,6 +77,7 @@ describe("parseSseFrame", () => {
         outcome: "ok",
         result_text: '{"candles": 78}',
         duration_ms: 240,
+        source: "server",
       });
 
     expect(parseSseFrame(frame)).toEqual({
@@ -89,6 +90,7 @@ describe("parseSseFrame", () => {
         outcome: "ok",
         resultText: '{"candles": 78}',
         durationMs: 240,
+        source: "server",
       },
     });
   });
@@ -111,6 +113,40 @@ describe("parseSseFrame", () => {
     const event = parseSseFrame(frame);
 
     expect(event).toMatchObject({ kind: "toolCall", call: { outcome: "unknown" } });
+  });
+
+  it("names the module's own tool apart from a server one", () => {
+    const frame =
+      "event: tool_call\ndata: " +
+      JSON.stringify({
+        round_index: 0,
+        position: 0,
+        tool_name: "set_chart",
+        arguments: {},
+        outcome: "ok",
+        result_text: "the operator's chart is now set to symbol US100.",
+        duration_ms: 4,
+        source: "module",
+      });
+
+    expect(parseSseFrame(frame)).toMatchObject({ kind: "toolCall", call: { source: "module" } });
+  });
+
+  it("keeps a source it has no name for out of the two it does", () => {
+    const frame =
+      "event: tool_call\ndata: " +
+      JSON.stringify({
+        round_index: 0,
+        position: 0,
+        tool_name: "get_candles",
+        arguments: {},
+        outcome: "ok",
+        result_text: "78 candles",
+        duration_ms: 1,
+        source: "cache",
+      });
+
+    expect(parseSseFrame(frame)).toMatchObject({ kind: "toolCall", call: { source: "unknown" } });
   });
 
   it("ignores the keepalive comment", () => {

@@ -132,15 +132,22 @@ export async function syncAgentChart(
     }
 
     const targetSymbol = symbol ?? slot.symbol;
-    const targetResolution = (resolution ?? slot.resolution) as Resolution;
     const resolutions = targetSymbol === null ? undefined : allowed.get(targetSymbol);
 
     if (symbol !== null && resolutions === undefined) {
       skipped.push(`${symbol} is not collected`);
       symbol = null;
     }
-    if (resolution !== null && (resolutions === undefined || !resolutions.includes(targetResolution))) {
-      skipped.push(`${resolution} is not collected${targetSymbol ? ` for ${targetSymbol}` : ""}`);
+    // Checked against whichever symbol will actually end up on the slot, not the one just
+    // rejected above: a resolution the slot's *current* symbol collects fine must not be
+    // dropped for a reason that names an instrument the operator never asked for.
+    const effectiveSymbol = symbol ?? slot.symbol;
+    const effectiveResolutions = effectiveSymbol === null ? undefined : allowed.get(effectiveSymbol);
+    if (
+      resolution !== null &&
+      (effectiveResolutions === undefined || !effectiveResolutions.includes(resolution as Resolution))
+    ) {
+      skipped.push(`${resolution} is not collected${effectiveSymbol ? ` for ${effectiveSymbol}` : ""}`);
       resolution = null;
     }
     // A symbol whose own collected resolutions do not include the slot's current one

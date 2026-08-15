@@ -195,6 +195,7 @@ describe("agentApi.getMessages", () => {
                 outcome: "ok",
                 result_text: '{"close": 29698.2}',
                 duration_ms: 63,
+                source: "server",
               },
               {
                 round_index: 0,
@@ -204,6 +205,7 @@ describe("agentApi.getMessages", () => {
                 outcome: "refused",
                 result_text: "market-data refused: no such pair",
                 duration_ms: 18,
+                source: "server",
               },
             ],
           },
@@ -222,6 +224,7 @@ describe("agentApi.getMessages", () => {
         outcome: "ok",
         resultText: '{"close": 29698.2}',
         durationMs: 63,
+        source: "server",
       },
       {
         roundIndex: 0,
@@ -231,6 +234,7 @@ describe("agentApi.getMessages", () => {
         outcome: "refused",
         resultText: "market-data refused: no such pair",
         durationMs: 18,
+        source: "server",
       },
     ]);
   });

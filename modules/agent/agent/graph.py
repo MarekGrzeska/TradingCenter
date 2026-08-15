@@ -170,7 +170,19 @@ def build_graph(
 
             local = (local_tools or {}).get(request.name)
             if local is not None:
-                outcome = await local(request.arguments)
+                try:
+                    outcome = await local(request.arguments)
+                except Exception as err:  # noqa: BLE001 - a broken local tool is not a broken turn
+                    # Mirrors `ToolServer.call`'s own guard: this module's own tool can fail
+                    # (a database gone away, a malformed row) exactly as a remote one can,
+                    # and without this the exception reaches `turn.py`'s backstop, which
+                    # discards the whole turn's text rather than reporting one failed call.
+                    log.warning("local tool %s failed: %s", request.name, err)
+                    outcome = ToolOutcome(
+                        ToolOutcomeKind.UNAVAILABLE,
+                        f"this tool failed unexpectedly ({err}). Nothing was changed.",
+                        0,
+                    )
             elif tool_server is not None:
                 outcome = await tool_server.call(request.name, request.arguments)
             else:

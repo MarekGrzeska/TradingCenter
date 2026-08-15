@@ -105,23 +105,39 @@ def migrated_url(postgres_url: str) -> str:
     return postgres_url
 
 
+@pytest.fixture(scope="session")
+async def seeded_prompt_revision_max_id(migrated_url: str) -> int:
+    """Whatever id the migrations themselves left `prompt_revisions` on, captured once
+    right after they ran — so a later migration seeding another revision needs no edit
+    here, unlike a number written in by hand that this file has already had to bump once."""
+    conn = await asyncpg.connect(asyncpg_dsn(migrated_url))
+    try:
+        return await conn.fetchval("SELECT max(id) FROM prompt_revisions")
+    finally:
+        await conn.close()
+
+
 @pytest.fixture
-async def db(migrated_url: str) -> AsyncIterator[asyncpg.Connection]:
+async def db(
+    migrated_url: str, seeded_prompt_revision_max_id: int
+) -> AsyncIterator[asyncpg.Connection]:
     """A connection to the migrated database, with the tables emptied first.
 
     `prompt_revisions` is not in `TABLES`: unlike every other table here, the
     migrations themselves insert into it, and `migrated_url` runs them once for the
     whole session. Blindly truncating it would erase the seeds a test asserting on
-    their actual text depends on. Rows `id = 1` (`v4`) and `id = 2` (`v5`, which names
-    the chart tool) are those seeds — the only things ever written to a table nothing
-    else has touched yet — so dropping everything after them undoes whatever a previous
-    test's own `create_prompt_revision` calls added, without reconstructing seeded text
-    here a second time.
+    their actual text depends on. Everything up to `seeded_prompt_revision_max_id` is
+    those seeds — the only things ever written to a table nothing else has touched yet
+    — so dropping everything after it undoes whatever a previous test's own
+    `create_prompt_revision` calls added, without reconstructing seeded text here a
+    second time.
     """
     conn = await asyncpg.connect(asyncpg_dsn(migrated_url))
     try:
         await conn.execute(f"TRUNCATE {', '.join(TABLES)} RESTART IDENTITY CASCADE")
-        await conn.execute("DELETE FROM prompt_revisions WHERE id > 2")
+        await conn.execute(
+            "DELETE FROM prompt_revisions WHERE id > $1", seeded_prompt_revision_max_id
+        )
         yield conn
     finally:
         await conn.close()

@@ -114,7 +114,7 @@ async def run_turn(
     chart_tool = ChartTool(pool, tool_server)
 
     async def set_chart(arguments: dict) -> ToolOutcome:
-        return await chart_tool.call(arguments, session_id=session_id)
+        return await chart_tool.call(arguments, session_id=session_id, chart=chart)
 
     local_tools: dict[str, LocalTool] = {CHART_TOOL_NAME: set_chart}
     tools = [*server_tools, CHART_TOOL]

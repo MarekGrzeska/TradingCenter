@@ -46,7 +46,7 @@ import {
   type ChartColors,
 } from "./theme";
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
-import { type BarsRange, type IndicatorsState, useIndicators } from "./indicators/useIndicators";
+import { type BarsRange, useIndicators } from "./indicators/useIndicators";
 import { useIndicatorCatalogue } from "./indicators/useIndicatorCatalogue";
 import { RayPrimitive } from "./RayPrimitive";
 import { TimeProfilePrimitive, type ProfileBar } from "./TimeProfilePrimitive";
@@ -132,14 +132,17 @@ function drawnInstances(
 }
 
 /**
- * A colour per line of every drawn instance, in one pass so that no two lines on screen
- * collide by accident. An instance the operator gave a colour spends it on its first
- * line; its remaining lines (MACD's signal and histogram) keep taking from the cycle,
- * since three same-coloured lines in one pane say less than three different ones.
+ * A colour per line of every drawn instance, in one pass. An instance the operator gave a
+ * colour spends it on its first line; its remaining lines (MACD's signal and histogram)
+ * keep taking from the cycle, since three same-coloured lines in one pane say less than
+ * three different ones.
  *
- * The cycle skips every colour already claimed by hand, so choosing one for an average
- * cannot leave a neighbouring line drawn in the same hue. Instances beyond the palette's
- * eight repeat it, the way they always did — a legend, not the hue, is what names a line.
+ * The cycle index is fixed by draw order alone, never by which colours are already claimed
+ * by hand — matching `indicatorLines`' own invariant (theme.ts, "indexed by how many
+ * indicator lines are already drawn — never by which one a line is"). Choosing a colour for
+ * one instance can therefore only repaint that instance's own lines; it may occasionally
+ * land on a hue a still-auto line already cycled onto, which a legend disambiguates.
+ * Instances beyond the palette's eight repeat it, the way they always did.
  */
 function assignLineColors(
   drawn: DrawnInstance[],
@@ -156,29 +159,18 @@ function assignLineColors(
       : selection.color;
     chosen.set(selection.key, indicatorColorFromToken(colors, token));
   }
-  const claimed = new Set([...chosen.values()].filter((color): color is string => color !== null));
-
-  let cycle = 0;
-  function nextFromCycle(): string {
-    for (let step = 0; step < colors.indicatorLines.length; step += 1) {
-      const candidate = indicatorLineColor(colors, cycle);
-      cycle += 1;
-      if (!claimed.has(candidate)) return candidate;
-    }
-    // Every hue spoken for by hand. Repeating one beats inventing a ninth.
-    const candidate = indicatorLineColor(colors, cycle);
-    cycle += 1;
-    return candidate;
-  }
 
   const byKey = new Map<string, string[]>();
+  let cycle = 0;
   for (const { selection, entry } of drawn) {
     const own = chosen.get(selection.key) ?? null;
     // A markers/levels/zones entry declares no lines and still needs one colour.
     const lineCount = Math.max(entry.lines.length, 1);
     const assigned: string[] = [];
     for (let index = 0; index < lineCount; index += 1) {
-      assigned.push(index === 0 && own !== null ? own : nextFromCycle());
+      const cycled = indicatorLineColor(colors, cycle);
+      cycle += 1;
+      assigned.push(index === 0 && own !== null ? own : cycled);
     }
     byKey.set(selection.key, assigned);
   }
@@ -299,6 +291,21 @@ export function Chart({
     setIndicatorSelectionsState(next);
     onIndicatorSelectionsChangeRef.current?.(next);
   }, []);
+  // The lazy `useState` initializer above only ever runs once, at mount — a later change
+  // to the prop is otherwise invisible until the component remounts (a page reload,
+  // previously the only way an agent-set indicator ever appeared). Re-adopted here
+  // whenever the prop is a *different* array than the one already in state: the
+  // operator's own edit above already set that state before its callback reaches the
+  // grid store, so the round-tripped prop is the same reference and this is a no-op for
+  // it; a write from elsewhere — `chartControl.ts`'s `syncAgentChart`, so far the one
+  // other writer of a slot's indicators — hands back a new one and belongs on screen
+  // without the operator refreshing to see it.
+  useEffect(() => {
+    if (initialIndicatorSelections === undefined) return;
+    setIndicatorSelectionsState((current) =>
+      current === initialIndicatorSelections ? current : initialIndicatorSelections,
+    );
+  }, [initialIndicatorSelections]);
   // The range indicators are computed over — set from what `redraw` actually drew, not
   // from every live tick, so an indicator does not refetch on each forming-candle update
   // (design.md's "na żywo" is a later stage; see `useIndicators`).
@@ -346,6 +353,15 @@ export function Chart({
     () => new Map(indicatorSelections.map((selection) => [selection.key, selection.color])),
     [indicatorSelections],
   );
+
+  // The same assignment the sync effect makes, from the same input, kept out of the
+  // readout below: `shown` moves on every crosshair pixel and neither `drawnInstances`
+  // nor `assignLineColors` needs to redo its work that often.
+  const readoutAssignment = useMemo(() => {
+    const drawn = drawnInstances(indicatorsState.selections, indicatorsState.results, catalogueById);
+    const colors = colorsRef.current ?? readChartColors();
+    return { drawn, lineColors: assignLineColors(drawn, colors, instanceColors) };
+  }, [indicatorsState.selections, indicatorsState.results, catalogueById, instanceColors]);
 
   // The header badge says *that* indicators are unavailable; it has nowhere to put *why*
   // except a `title` nobody hovers. The reason is the useful part and is often actionable
@@ -1050,19 +1066,6 @@ export function Chart({
           />
         )}
 
-        {shown && (
-          <OhlcReadout
-            bar={shown.bar}
-            indicators={activeIndicatorReadout(
-              shown,
-              indicatorsState,
-              catalogueById,
-              instanceColors,
-              colorsRef.current ?? readChartColors(),
-            )}
-          />
-        )}
-
         <div className="ml-auto flex items-center gap-2">
           {unknownIndicatorIds.length > 0 && (
             <span
@@ -1120,6 +1123,30 @@ export function Chart({
 
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" data-testid="chart-canvas" />
+        {/* The legend sits *on* the chart rather than in the header above it, the way
+            every charting platform draws one — and here for a reason beyond convention.
+            In the header its height was part of the layout, so a value changing width
+            mid-pan could re-wrap the row, resize the chart container, and set the
+            `ResizeObserver` above re-laying out the whole chart in the middle of a drag.
+            Absolutely positioned it cannot change what the chart is given.
+            `pointer-events-none` so the candles underneath still take the drag. */}
+        {shown && (
+          <div
+            data-testid="chart-readout"
+            className="pointer-events-none absolute top-1.5 left-2 z-10"
+          >
+            <OhlcReadout
+              bar={shown.bar}
+              indicators={activeIndicatorReadout(
+                shown,
+                indicatorsState.times,
+                readoutAssignment.drawn,
+                readoutAssignment.lineColors,
+                colorsRef.current ?? readChartColors(),
+              )}
+            />
+          </div>
+        )}
         <FeedOverlay feed={feed} symbol={symbol} resolution={resolution} />
       </div>
     </section>
@@ -1177,6 +1204,9 @@ function OlderHistoryState({ older }: { older: ReturnType<typeof useOlderBars> }
 
 interface IndicatorReadoutEntry {
   key: string;
+  /** The catalogue id this line belongs to (`sma`, `macd`, …) — several instances of
+   *  one id are grouped onto one row; a different id always starts a row of its own. */
+  id: string;
   label: string;
   value: number | null;
   /** The colour the line is drawn in. Two instances of one entry with the same params
@@ -1190,25 +1220,34 @@ interface IndicatorReadoutEntry {
  * The indicator values for whichever bar `OhlcReadout` is already showing — the same
  * bar the OHLC fields answer for, found by matching time rather than index, since a
  * indicator's own axis can start later than the candle series (`warmup_from`).
+ *
+ * Not hovering falls back to the newest bar (`shown.hovered` false — see `shown`'s own
+ * computation), which is very often the one still forming: indicators are computed over
+ * `redraw`'s own range and do not refetch on every live tick, so the exact instant just
+ * traded is routinely a beat ahead of what the archive has answered for. Reading the
+ * newest *answered* instant instead of returning nothing here is what keeps this text
+ * matching the line already drawn on the chart, rather than blinking out every time the
+ * pointer leaves it — a bar the operator is deliberately pointing at gets no such
+ * fallback: an indicator with nothing to say about it says so.
+ *
+ * `drawn`/`lineColors` come in precomputed (memoized on the selections/results/colours
+ * that actually change them) rather than recomputed here — `shown` moves on every
+ * crosshair pixel, and neither `drawnInstances` nor `assignLineColors` needs to run
+ * that often.
  */
 function activeIndicatorReadout(
   shown: Readout,
-  indicatorsState: IndicatorsState,
-  catalogueById: Map<string, IndicatorCatalogueEntry>,
-  instanceColors: Map<string, string | null>,
+  times: number[],
+  drawn: DrawnInstance[],
+  lineColors: Map<string, string[]>,
   colors: ChartColors,
 ): IndicatorReadoutEntry[] {
-  const index = indicatorsState.times.indexOf(shown.bar.time);
+  let index = times.indexOf(shown.bar.time);
+  if (index === -1) {
+    if (shown.hovered) return [];
+    index = times.length - 1;
+  }
   if (index === -1) return [];
-
-  const drawn = drawnInstances(
-    indicatorsState.selections,
-    indicatorsState.results,
-    catalogueById,
-  );
-  // The same assignment the sync effect makes, from the same input: a readout naming a
-  // colour the line is not drawn in would be worse than naming none.
-  const lineColors = assignLineColors(drawn, colors, instanceColors);
 
   const entries: IndicatorReadoutEntry[] = [];
   for (const { selection, result, entry } of drawn) {
@@ -1217,6 +1256,7 @@ function activeIndicatorReadout(
     entry.lines.forEach((lineSpec, lineIndex) => {
       entries.push({
         key: `${selection.key}|${lineSpec.key}`,
+        id: selection.id,
         label: fillLabelTemplate(lineSpec.label, result.params),
         value: result.lines?.[lineSpec.key]?.[index] ?? null,
         color: assigned[lineIndex],
@@ -1224,6 +1264,18 @@ function activeIndicatorReadout(
     });
   }
   return entries;
+}
+
+/** One row per catalogue id, in the order its first instance was drawn — several SMAs
+ *  belong on one row together, a different indicator always starts its own. */
+function groupReadoutByIndicator(entries: IndicatorReadoutEntry[]): IndicatorReadoutEntry[][] {
+  const byId = new Map<string, IndicatorReadoutEntry[]>();
+  for (const entry of entries) {
+    const group = byId.get(entry.id);
+    if (group) group.push(entry);
+    else byId.set(entry.id, [entry]);
+  }
+  return [...byId.values()];
 }
 
 function fillLabelTemplate(template: string, params: Record<string, number>): string {
@@ -1234,21 +1286,39 @@ function fillLabelTemplate(template: string, params: Record<string, number>): st
 
 function OhlcReadout({ bar, indicators }: { bar: Bar; indicators: IndicatorReadoutEntry[] }) {
   return (
-    <span className="flex flex-wrap items-center gap-2 text-xs text-ink-secondary">
-      <Field label="O" value={bar.open} />
-      <Field label="H" value={bar.high} />
-      <Field label="L" value={bar.low} />
-      <Field label="C" value={bar.close} />
-      <time className="text-ink-muted">{formatInstant(bar.time)}</time>
-      {indicators.map((entry) => (
-        <span key={entry.key} className="flex items-center gap-1 text-ink-muted">
-          <span
-            aria-hidden
-            style={{ backgroundColor: entry.color }}
-            className="inline-block h-2 w-2 rounded-sm"
-          />
-          {entry.label}{" "}
-          <span className="text-ink">{entry.value === null ? "…" : entry.value}</span>
+    // `tabular-nums` throughout: proportional digits make every value its own width, so
+    // a price ticking 9.50 -> 21000.00 slid the swatch and the label after it sideways on
+    // each frame of a pan. Fixed-width figures hold the whole row still.
+    // `w-fit` so the panel-tinted background hugs the text rather than running the width
+    // of the chart, and the candles stay readable a centimetre to the right of it.
+    <span className="flex w-fit flex-col gap-0.5 rounded bg-panel/75 px-1.5 py-1 text-xs text-ink-secondary tabular-nums">
+      <span className="flex flex-wrap items-center gap-2">
+        <Field label="O" value={bar.open} />
+        <Field label="H" value={bar.high} />
+        <Field label="L" value={bar.low} />
+        <Field label="C" value={bar.close} />
+        <time className="text-ink-muted">{formatInstant(bar.time)}</time>
+      </span>
+      {/* One row per indicator *kind*, under the OHLC row: several SMAs sit beside each
+          other on the row their id owns, and a different indicator always gets a row of
+          its own rather than every instance stacking one below another. */}
+      {groupReadoutByIndicator(indicators).map((group) => (
+        <span
+          key={group[0].key}
+          data-testid="indicator-readout-row"
+          className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-ink-muted"
+        >
+          {group.map((entry) => (
+            <span key={entry.key} className="flex items-center gap-1">
+              <span
+                aria-hidden
+                style={{ backgroundColor: entry.color }}
+                className="inline-block h-2 w-2 rounded-sm"
+              />
+              {entry.label}{" "}
+              <span className="text-ink">{entry.value === null ? "…" : entry.value.toFixed(2)}</span>
+            </span>
+          ))}
         </span>
       ))}
     </span>

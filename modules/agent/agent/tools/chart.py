@@ -18,6 +18,7 @@ there is nothing to check against and the tool refuses rather than writing blind
 
 from __future__ import annotations
 
+import asyncio
 import json
 import time
 from typing import Any
@@ -25,7 +26,7 @@ from typing import Any
 import asyncpg
 
 from .. import store
-from ..models import ChartIndicator
+from ..models import ChartIndicator, ChartSnapshot
 from .client import ToolDescriptor, ToolOutcome, ToolOutcomeKind, ToolServer
 
 CHART_TOOL_NAME = "set_chart"
@@ -149,7 +150,10 @@ async def _read_json(tool_server: ToolServer, name: str, arguments: dict[str, An
 
 
 async def _check_pair(
-    tool_server: ToolServer, symbol: str | None, resolution: str | None
+    tool_server: ToolServer,
+    symbol: str | None,
+    resolution: str | None,
+    chart: ChartSnapshot | None,
 ) -> None:
     if symbol is None and resolution is None:
         return
@@ -166,17 +170,24 @@ async def _check_pair(
             f"{symbol!r} is not collected by the archive, so the chart would be empty. "
             f"Collected symbols: {known}."
         )
-    if resolution is None:
+    # A symbol-only command still lands on whatever interval the chart already shows —
+    # the terminal keeps its current one rather than picking a new one — so a symbol not
+    # collected at it would draw nothing just the same as one refused outright. Checked
+    # against the snapshot taken when the operator asked, not a later read of it
+    # (`agent-chart-control`, "Kolor rozwiązywany przy rysowaniu z bieżących selekcji"
+    # applies the same way here: what mattered is what was on screen at the time).
+    effective_resolution = resolution if resolution is not None else (chart.resolution if chart else None)
+    if effective_resolution is None:
         return
     # A resolution alone is checked against every collected pair: this tool does not know
     # which symbol the chart is on, and the terminal refuses the combination it cannot
     # draw anyway.
     allowed = tracked.get(symbol) if symbol is not None else set().union(*tracked.values()) if tracked else set()
-    if resolution not in (allowed or set()):
+    if effective_resolution not in (allowed or set()):
         where = f"for {symbol}" if symbol is not None else "for any collected symbol"
         known = ", ".join(sorted(allowed or set())) or "none"
         raise ChartRefusal(
-            f"{resolution!r} is not collected {where}. Collected there: {known}."
+            f"{effective_resolution!r} is not collected {where}. Collected there: {known}."
         )
 
 
@@ -186,7 +197,9 @@ async def _check_indicators(
     if not indicators:
         return
     catalogue = await _read_json(tool_server, "list_indicators", {})
-    entries = {entry["id"]: entry for entry in catalogue.get("indicators", [])}
+    if isinstance(catalogue, dict):  # a structured-content envelope, if one ever arrives
+        catalogue = catalogue.get("indicators", catalogue.get("result", []))
+    entries = {entry["id"]: entry for entry in catalogue}
 
     for indicator in indicators:
         entry = entries.get(indicator.id)
@@ -253,7 +266,11 @@ class ChartTool:
         self._tool_server = tool_server
 
     async def call(
-        self, arguments: dict[str, Any], *, session_id: int
+        self,
+        arguments: dict[str, Any],
+        *,
+        session_id: int,
+        chart: ChartSnapshot | None = None,
     ) -> ToolOutcome:
         started = time.monotonic()
 
@@ -282,11 +299,22 @@ class ChartTool:
                 "no archive to check this against right now, so the chart was left alone."
             )
 
-        try:
-            await _check_pair(self._tool_server, symbol, resolution)
-            await _check_indicators(self._tool_server, indicators)
-        except ChartRefusal as err:
-            return refuse(str(err))
+        # Independent reads, run together: neither check uses the other's answer, and
+        # sequencing them only adds one round trip's latency to every call that names
+        # both a pair and indicators. `return_exceptions=True` because `gather` otherwise
+        # abandons whichever task didn't raise first, which asyncio logs as an exception
+        # that was never retrieved — both are checked in the order they were checked
+        # before, so a refusal from the pair still wins the same way it did sequentially.
+        results = await asyncio.gather(
+            _check_pair(self._tool_server, symbol, resolution, chart),
+            _check_indicators(self._tool_server, indicators),
+            return_exceptions=True,
+        )
+        for result in results:
+            if isinstance(result, ChartRefusal):
+                return refuse(str(result))
+            if isinstance(result, BaseException):
+                raise result
 
         # Written whole or not at all: three indicators of which one is unknown is a
         # refusal, never two drawn (specs/agent-chart-control, "Odmowa nie zostawia

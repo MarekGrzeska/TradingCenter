@@ -19,6 +19,7 @@ Three things this file is responsible for, and they are easy to conflate:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from contextlib import AsyncExitStack
@@ -188,12 +189,23 @@ class ToolServer:
                 elapsed(),
             )
 
-        text = _text_of(result.content)
         if result.isError:
             # market-mcp's refusals are written for a reader who can act on them, so its
             # own words travel rather than a summary of them (specs/agent-tools, "Odmowa
-            # narzędzia jest wynikiem, nie awarią tury").
-            return ToolOutcome(ToolOutcomeKind.REFUSED, text, elapsed())
+            # narzędzia jest wynikiem, nie awarią tury"). A refusal has no structured
+            # output — the SDK reports it as unstructured prose only.
+            return ToolOutcome(ToolOutcomeKind.REFUSED, _text_of(result.content), elapsed())
+        # A tool whose return type is a bare list — `list_tracked_pairs`, e.g. — is not
+        # one text block but one *per item*, because `_convert_to_content` recurses into
+        # a list rather than serializing it whole. Joining those with `_text_of` below
+        # would hand a reader expecting one JSON document N of them back to back — valid
+        # for nothing (`json.loads` sees "Extra data" past the first), and silently wrong
+        # for exactly one (a single object, not the one-item array it should be).
+        # `structuredContent` is the SDK's own well-formed answer to that, built from the
+        # same return value before it gets split apart for `content` — read it when the
+        # server declared one instead of reassembling it by hand from prose blocks meant
+        # for a model to read, not a parser.
+        text = json.dumps(result.structuredContent) if result.structuredContent is not None else _text_of(result.content)
         return ToolOutcome(ToolOutcomeKind.OK, text, elapsed())
 
     async def _connected_session(self) -> ClientSession:

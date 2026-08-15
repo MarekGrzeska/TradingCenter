@@ -148,6 +148,25 @@ describe("syncAgentChart", () => {
     expect(result?.skipped).toEqual(["DAY is not collected for US100"]);
   });
 
+  it("does not let a rejected symbol veto a resolution the slot's own symbol collects", async () => {
+    const active = grid.getSnapshot().activeSlot;
+    grid.setSlotSymbol(active, "US100");
+    grid.setSlotResolution(active, "MINUTE_5");
+
+    const result = await syncAgentChart({
+      api: fakeApi(command({ symbol: "TSLA", resolution: "HOUR" })),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    const slot = grid.getSnapshot().slots[active];
+    expect(slot.symbol).toBe("US100");
+    expect(slot.resolution).toBe("HOUR");
+    expect(result?.applied).toEqual(["interval HOUR"]);
+    expect(result?.skipped).toEqual(["TSLA is not collected"]);
+  });
+
   it("does not apply the same command twice", async () => {
     const asked: number[] = [];
     const api = fakeApi(command({ indicators: [{ id: "ema", params: {}, color: null }] }), asked);
