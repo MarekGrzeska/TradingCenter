@@ -121,11 +121,19 @@ resource "azurerm_monitor_metric_alert" "database_storage" {
   }
 }
 
+# 92 has been this threshold twice over, meaning two different things. On B1 it was raised
+# from 85 because 85 sat on the plan's own baseline and fired on a normal Sunday
+# (openspec: raise-memory-alert-threshold); at 1.75 GB it left barely three points over the
+# nightly floor. On B2's 3.5 GB the same number means 3.2 GB in use against four apps whose
+# peaks add up to under a gigabyte — an anomaly rather than a Tuesday. Left unchanged on
+# purpose when the plan was scaled: moving the SKU and the threshold together would make
+# the next week of measurements unreadable, and lowering it is its own change with its own
+# measurement behind it.
 resource "azurerm_monitor_metric_alert" "plan_memory" {
   name                = "alert-plan-memory-high"
   resource_group_name = azurerm_resource_group.main.name
   scopes              = [azurerm_service_plan.main.id]
-  description         = "The B1 plan both apps share is over 92% memory."
+  description         = "The plan all four apps share is over 92% memory."
   severity            = 2
   frequency           = "PT5M"
   window_size         = "PT15M"
