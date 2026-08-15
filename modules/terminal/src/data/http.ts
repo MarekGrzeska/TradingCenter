@@ -14,7 +14,7 @@ import { MarketDataError } from "./types";
 
 export interface JsonRequest {
   signal: AbortSignal;
-  method?: "GET" | "POST" | "PATCH" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
 }
 

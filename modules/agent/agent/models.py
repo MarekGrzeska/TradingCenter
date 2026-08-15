@@ -92,6 +92,19 @@ class ToolCall(BaseModel):
     created_at: datetime
 
 
+class PromptRevision(BaseModel):
+    """One saved system prompt, both variants together — "two texts, one version",
+    the same shape `PROMPT_VERSION` always was, now a row instead of a constant
+    (specs/agent-prompt-management, "Zapis tworzy nową wersję, nigdy nie nadpisuje
+    istniejącej"). Never updated after insert; the current one is whichever has the
+    highest `id`."""
+
+    version: str
+    with_tools_body: str
+    without_tools_body: str
+    created_at: datetime
+
+
 class UsageAggregate(BaseModel):
     """One row of a `GROUP BY` over `usage` — by model, by session, or by day,
     depending which query built it. Sums ignore the rows they cannot price;

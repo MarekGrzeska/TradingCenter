@@ -174,6 +174,12 @@ function createFakeApi(): FakeApi {
     async usage() {
       return { totalCost: "0", byModel: [], bySession: [], byDay: [] };
     },
+    async getPrompt() {
+      throw new Error("not used");
+    },
+    async updatePrompt() {
+      throw new Error("not used");
+    },
   };
   return api;
 }

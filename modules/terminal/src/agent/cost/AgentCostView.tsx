@@ -37,21 +37,21 @@ export function AgentCostView({
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-border px-4 py-2">
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-3 border-b border-border pb-3">
         <DateRangeControls inputs={inputs} onChange={setInputs} />
         {usage.status === "ready" && usage.summary && (
           // The one place the range's total lives — `terminal-agent-cost` spec,
           // "Zakładka MUST pokazywać sumę kosztu dla wybranego zakresu w jednym
           // miejscu"; a sum scattered across three tables is not an answer to the
-          // question this tab exists for.
+          // question this section exists for.
           <span className="ml-auto text-sm">
             <span className="text-ink-muted">Total cost </span>
             <span className="font-semibold text-ink">${usage.summary.totalCost}</span>
           </span>
         )}
       </div>
-      <div className="min-h-0 flex-1 overflow-auto p-4">
+      <div className="max-h-[60vh] overflow-auto">
         <UsageBody usage={usage} onOpenConversation={openConversation} />
       </div>
     </div>
@@ -209,17 +209,7 @@ function AggregateTable({
               <td className="px-2 py-1.5 text-right text-ink-secondary">
                 {row.outputTokens.toLocaleString()}
               </td>
-              <td className="px-2 py-1.5 text-right text-ink-secondary">
-                ${row.cost}
-                {row.unknownCount > 0 && (
-                  // Excluded from the sum above, not silently zero — spec, "Zużycie
-                  // oznaczone przez moduł jako nieznane MUST być pokazane jako
-                  // nieznane, a nie jako zero".
-                  <span className="ml-1.5 text-[10px] font-semibold text-warning">
-                    +{row.unknownCount} unknown
-                  </span>
-                )}
-              </td>
+              <td className="px-2 py-1.5 text-right text-ink-secondary">${row.cost}</td>
               <td className="px-2 py-1.5 text-right">
                 {onRowOpen && (
                   <button

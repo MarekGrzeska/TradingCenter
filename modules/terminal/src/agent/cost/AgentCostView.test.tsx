@@ -40,6 +40,12 @@ function fakeApi(overrides: Partial<AgentApi> = {}): AgentApi {
       throw new Error("not used");
     },
     usage: async () => summaryFixture(),
+    getPrompt: async () => {
+      throw new Error("not used");
+    },
+    updatePrompt: async () => {
+      throw new Error("not used");
+    },
     ...overrides,
   };
 }
@@ -68,7 +74,9 @@ describe("AgentCostView", () => {
     // Cost is rendered as the module's own string with a `$` prefix — nothing here
     // parses it into a number, multiplies, or sums it with anything else.
     expect(screen.getAllByText("$1.2300")).toHaveLength(2);
-    expect(screen.getByText("+2 unknown")).toBeInTheDocument();
+    // Unknown-priced calls are excluded from the sum by the module already; the tab no
+    // longer says how many there were, since that count answered no question of its own.
+    expect(screen.queryByText(/unknown/i)).not.toBeInTheDocument();
     expect(screen.getByText("2026-08-11")).toBeInTheDocument();
   });
 

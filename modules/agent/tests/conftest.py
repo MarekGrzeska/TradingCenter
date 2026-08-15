@@ -106,10 +106,21 @@ def migrated_url(postgres_url: str) -> str:
 
 @pytest.fixture
 async def db(migrated_url: str) -> AsyncIterator[asyncpg.Connection]:
-    """A connection to the migrated database, with the tables emptied first."""
+    """A connection to the migrated database, with the tables emptied first.
+
+    `prompt_revisions` is not in `TABLES`: unlike every other table here, the
+    migration itself inserts a row into it, and `migrated_url` runs that migration
+    once for the whole session. Blindly truncating it would erase the seed a test
+    asserting on `"v4"`'s actual text depends on. Row `id = 1` is that seed — the
+    first thing ever written to a table nothing else has touched yet — so dropping
+    everything after it is enough to undo whatever a previous test's own
+    `create_prompt_revision` calls added, without reconstructing the seed's text
+    here a second time.
+    """
     conn = await asyncpg.connect(asyncpg_dsn(migrated_url))
     try:
         await conn.execute(f"TRUNCATE {', '.join(TABLES)} RESTART IDENTITY CASCADE")
+        await conn.execute("DELETE FROM prompt_revisions WHERE id > 1")
         yield conn
     finally:
         await conn.close()

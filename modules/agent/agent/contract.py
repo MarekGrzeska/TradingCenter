@@ -9,9 +9,9 @@ from __future__ import annotations
 from collections.abc import Sequence
 from datetime import datetime
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
-from .models import Message, RecordedCall, Session, ToolCall, UsageAggregate
+from .models import Message, PromptRevision, RecordedCall, Session, ToolCall, UsageAggregate
 from .models_catalogue import ModelCatalogueEntry
 
 # A name the operator types, not one derived from the first question — so it may be longer
@@ -207,3 +207,33 @@ class UsageSummaryOut(BaseModel):
     by_model: list[UsageAggregateOut]
     by_session: list[UsageAggregateOut]
     by_day: list[UsageAggregateOut]
+
+
+class PromptOut(BaseModel):
+    version: str
+    with_tools: str
+    without_tools: str
+    updated_at: datetime
+
+    @classmethod
+    def from_revision(cls, revision: PromptRevision) -> PromptOut:
+        return cls(
+            version=revision.version,
+            with_tools=revision.with_tools_body,
+            without_tools=revision.without_tools_body,
+            updated_at=revision.created_at,
+        )
+
+
+class PromptUpdateIn(BaseModel):
+    with_tools: str
+    without_tools: str
+
+    @field_validator("with_tools", "without_tools")
+    @classmethod
+    def _not_blank(cls, value: str, info: ValidationInfo) -> str:
+        if not value.strip():
+            raise ValueError(
+                f"{info.field_name} is blank — an agent needs a system prompt to run with."
+            )
+        return value

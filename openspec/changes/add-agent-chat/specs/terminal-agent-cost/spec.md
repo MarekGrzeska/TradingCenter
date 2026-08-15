@@ -40,14 +40,18 @@ kosztu z tokenów i cennika po swojej stronie — cennik zmieniał się już po 
 przeliczenie w przeglądarce rozjechałoby się z tym, co zapisano przy wywołaniu, a to
 zapisane jest tym, co zgadza się z fakturą.
 
-Zużycie oznaczone przez moduł jako nieznane MUST być pokazane jako nieznane, a nie jako
-zero.
+Zużycie oznaczone przez moduł jako nieznane MUST NOT być wliczane do sumy jako zero —
+suma MUST pozostać dokładnie tym, co moduł policzył z wierszy o znanej cenie. Zakładka
+MUST NOT pokazywać operatorowi, ile wierszy było nieznanych: to policzenie kosztu i sumy
+jest jedynym, co ta zakładka odpowiada, a licznik "+N unknown" był szumem obok niego, nie
+odpowiedzią na inne pytanie (decyzja operatora, 2026-08-15 — wcześniej ten sam wiersz
+wymagał odwrotnie).
 
 #### Scenario: Zużycie nieznane
 
 - **WHEN** wśród wierszy zakresu są takie, dla których dostawca nie podał zużycia
-- **THEN** zakładka pokazuje je jako nieznane
-- **AND** nie wlicza ich do sumy jako zera
+- **THEN** suma i koszt wiersza pomijają je tak, jakby ich nie było w tym zakresie
+- **AND** zakładka nie pokazuje żadnego licznika ani etykiety dla nich
 
 #### Scenario: Moduł agenta jest nieosiągalny
 

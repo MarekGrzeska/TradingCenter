@@ -327,3 +327,62 @@ describe("agentApi.usage", () => {
     expect(asked!.search).toBe("");
   });
 });
+
+describe("agentApi.getPrompt", () => {
+  it("maps the current revision, both variants and the version", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/prompt`, () =>
+        HttpResponse.json({
+          version: "v4",
+          with_tools: "you have tools",
+          without_tools: "you have none",
+          updated_at: "2026-08-11T10:00:00Z",
+        }),
+      ),
+    );
+
+    const prompt = await api().getPrompt(new AbortController().signal);
+    expect(prompt).toEqual({
+      version: "v4",
+      withTools: "you have tools",
+      withoutTools: "you have none",
+      updatedAt: 1786442400,
+    });
+  });
+});
+
+describe("agentApi.updatePrompt", () => {
+  it("PUTs both variants and maps back the new revision", async () => {
+    let body: unknown;
+    server.use(
+      http.put(`${HTTP_BASE}/prompt`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({
+          version: "v5",
+          with_tools: "edited with tools",
+          without_tools: "edited without tools",
+          updated_at: "2026-08-11T10:05:00Z",
+        });
+      }),
+    );
+
+    const prompt = await api().updatePrompt(
+      "edited with tools",
+      "edited without tools",
+      new AbortController().signal,
+    );
+    expect(body).toEqual({ with_tools: "edited with tools", without_tools: "edited without tools" });
+    expect(prompt.version).toBe("v5");
+  });
+
+  it("maps a blank variant to a refused error, not a raw 422", async () => {
+    server.use(
+      http.put(`${HTTP_BASE}/prompt`, () =>
+        HttpResponse.json({ detail: "with_tools is blank" }, { status: 422 }),
+      ),
+    );
+
+    const call = api().updatePrompt("   ", "fine", new AbortController().signal);
+    await expect(call).rejects.toMatchObject({ kind: "refused", message: "with_tools is blank" });
+  });
+});
