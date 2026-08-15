@@ -713,8 +713,9 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
       source.snapshot(long);
     });
 
-    // `around` lands exactly on candle 70; half of 2 is 1.
-    expect(stub.latest().rangesSet).toContainEqual({ from: 69, to: 71 });
+    // `around` lands exactly on candle 70; `bars: 2` must show exactly two candles, not
+    // three — a range of {69, 71} would be three (69, 70, 71).
+    expect(stub.latest().rangesSet).toContainEqual({ from: 69, to: 70 });
     expect(source.historyCalls).toHaveLength(0);
     expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
   });

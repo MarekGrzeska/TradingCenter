@@ -737,10 +737,11 @@ export function Chart({
       return true;
     }
     // The one shape left: `around` + `bars`, checked exactly one way by the module that
-    // wrote this request — `around` is never null here.
+    // wrote this request — `around` and `bars` are never null here.
     const index = nearestBarIndex(series, focus.around as number);
-    const half = Math.floor((focus.bars as number) / 2);
-    timeScale.setVisibleLogicalRange({ from: index - half, to: index + half });
+    const bars = focus.bars as number;
+    const from = index - Math.floor(bars / 2);
+    timeScale.setVisibleLogicalRange({ from, to: from + bars - 1 });
     return true;
   }, []);
 
