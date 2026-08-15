@@ -151,18 +151,30 @@ tury (żeby `chartNotice` zdążył poczekać), albo nowego kanału z `Chart.tsx
 ### Zachowanie kadru przy zmianie interwału
 
 Przy zmianie `resolution` `Chart` zapamiętuje w ref-ie trzy rzeczy z **ostatniego**
-widocznego zakresu: początek, koniec i to, czy prawa krawędź serii była widoczna. Po
-pierwszym `redraw` nowej serii zamiast `fitContent()` ustawia:
+widocznego zakresu: początek, koniec i to, czy prawa krawędź serii była widoczna — tylko
+wtedy, gdy porównanie z poprzednim renderem pokazuje, że zmieniła się wyłącznie
+`resolution` (ten sam `symbol`, to samo `source`). Zapisane w tej samej funkcji efektu,
+która zaraz czyści `barsRef` — nic go jeszcze nie wyczyściło, więc to ostatni moment, w
+którym stary wykres jest cały. Po pierwszym `redraw` nowej serii zamiast `fitContent()`
+ustawia:
 
-- liczbę świec `n = (koniec − początek) / długość_nowego_interwału`, przyciętą do
-  `[MIN_VISIBLE_BARS, MAX_VISIBLE_BARS]`;
-- kotwicę: prawa krawędź serii, jeśli tam stał, w przeciwnym razie środek dawnego odcinka.
+- liczbę świec `n = round((koniec − początek) / długość_nowego_interwału)`, przyciętą do
+  `MIN_VISIBLE_BARS = 10` … `MAX_VISIBLE_BARS = 500` — te same liczby co
+  `MIN_FOCUS_BARS`/`MAX_FOCUS_BARS` po stronie agenta, z tego samego powodu: dołu pilnuje
+  czytelność, góry — rozsądny rozmiar ekranu;
+- kotwicę: prawa krawędź serii, jeśli tam stał (z tolerancją `RIGHT_EDGE_SLACK_BARS = 3`,
+  żeby drobne niedokładności zaokrąglenia nie zrzuciły wykresu z krawędzi), w przeciwnym
+  razie środek dawnego odcinka, znaleziony w nowej serii przez `nearestBarIndex` — ten sam
+  helper, który lokalizuje punkt kadru `around`.
 
 Przycięcie wokół środka, nie wokół krawędzi: operator patrzący na wybicie ma je na środku
-ekranu i tam ma zostać.
+ekranu i tam ma zostać. Długość świecy liczona z tabeli przybliżeń
+(`RESOLUTION_SECONDS`) — inna niż `useOlderBars.ts`'s świadomy brak takiej tabeli, bo tu
+liczba tylko dobiera rozmiar okna, nigdy nie decyduje, którą sesję archiwum otworzyć.
 
 `fitContent()` zostaje jako zachowanie pierwszego rysowania slotu, który jeszcze niczego
-nie pokazywał — tam nie ma czego zachowywać.
+nie pokazywał, oraz zmiany symbolu — inny instrument nie ma czego dziedziczyć po starym
+oknie czasu.
 
 ### Prompt dostaje własną rewizję
 

@@ -253,11 +253,54 @@ interface Readout {
   hovered: boolean;
 }
 
+/** What the outgoing series' viewport looked like, captured the moment a resolution
+ *  change is about to clear it — everything `redraw` needs to put the incoming series'
+ *  first draw over the same stretch of time instead of the whole thing
+ *  (`terminal-chart` spec, "Rozdzielczość zmienia się bez przeładowania"). */
+interface PendingResolutionFrame {
+  from: number;
+  to: number;
+  /** Whether the outgoing view reached (within `RIGHT_EDGE_SLACK_BARS`) the newest drawn
+   *  bar — the anchor a chart standing at the live edge keeps, rather than the span's own
+   *  midpoint. */
+  atRightEdge: boolean;
+}
+
 /** How few candles may be left to the viewport's left before older ones are
  *  fetched, counted in bars. It is both the trigger and the target: the pager
  *  keeps going until the viewport has at least this much history behind it, so
  *  one drag to the edge is answered with a screenful rather than a page. */
 const OLDER_MARGIN_BARS = 50;
+
+/** How near the newest drawn bar counts as "standing at the live edge" — a resolution
+ *  change on a chart sitting there keeps sitting there, rather than being nudged into
+ *  history by however many bars a pan or a redraw happened to leave short of the exact
+ *  last index. */
+const RIGHT_EDGE_SLACK_BARS = 3;
+
+/** How many candles a resolution change shows, floor and ceiling — the same reasoning
+ *  `agent-chart-navigation`'s `MIN_FOCUS_BARS`/`MAX_FOCUS_BARS` used for a chart focus:
+ *  below the floor there is nothing readable, above the ceiling a mismatch between the
+ *  old and the new interval (WEEK's month of candles read as MINUTE_5) would ask for a
+ *  screen no operator can use anyway. */
+const MIN_VISIBLE_BARS = 10;
+const MAX_VISIBLE_BARS = 500;
+
+/** A candle's nominal length, seconds — an approximation good enough to size a viewport
+ *  around, never a claim about when a real session opens (`useOlderBars.ts` refuses to
+ *  keep a table like this for that reason, and does not need to: it measures the window
+ *  it asks for from the drawn series' own timestamps instead). This one only decides how
+ *  many candles roughly fill the span the operator was looking at. */
+const RESOLUTION_SECONDS: Record<Resolution, number> = {
+  MINUTE: 60,
+  MINUTE_5: 300,
+  MINUTE_15: 900,
+  MINUTE_30: 1800,
+  HOUR: 3600,
+  HOUR_4: 14400,
+  DAY: 86400,
+  WEEK: 604800,
+};
 
 /**
  * One candlestick chart, defined entirely by `symbol` + `resolution` — the same
@@ -653,6 +696,11 @@ export function Chart({
   const onFocusRequestSettledRef = useRef(onFocusRequestSettled);
   onFocusRequestSettledRef.current = onFocusRequestSettled;
 
+  // --- resolution change: the viewport it leaves behind, for the incoming series' first
+  // draw to stand over instead of `fitContent()`'s whole-series view ---
+  const pendingResolutionFrameRef = useRef<PendingResolutionFrame | null>(null);
+  const previousParamsRef = useRef({ source, symbol, resolution });
+
   const applyFocusToView = useCallback((focus: ChartFocusRequest): boolean => {
     const chart = chartRef.current;
     const series = barsRef.current;
@@ -737,6 +785,28 @@ export function Chart({
     setBarsRange(merged.length > 0 ? { from: merged[0].time, to: merged.at(-1)!.time } : null);
 
     if (previousFirstTime === undefined) {
+      // A resolution change leaves a viewport behind for exactly this moment — the
+      // series' first draw — to stand over, instead of the whole-series view
+      // `fitContent()` gives a slot that never had anything on screen before.
+      const pendingFrame = pendingResolutionFrameRef.current;
+      pendingResolutionFrameRef.current = null;
+      if (pendingFrame && merged.length > 0) {
+        const periodSeconds = RESOLUTION_SECONDS[resolution];
+        const span = Math.round((pendingFrame.to - pendingFrame.from) / periodSeconds);
+        const bars = Math.min(MAX_VISIBLE_BARS, Math.max(MIN_VISIBLE_BARS, span));
+        let from: number;
+        let to: number;
+        if (pendingFrame.atRightEdge) {
+          to = merged.length - 1;
+          from = to - bars + 1;
+        } else {
+          const centerIndex = nearestBarIndex(merged, (pendingFrame.from + pendingFrame.to) / 2);
+          from = centerIndex - Math.floor(bars / 2);
+          to = from + bars - 1;
+        }
+        timeScale?.setVisibleLogicalRange({ from, to });
+        return;
+      }
       timeScale?.fitContent();
       return;
     }
@@ -747,7 +817,7 @@ export function Chart({
         to: range.to + prepended,
       });
     }
-  }, []);
+  }, [resolution]);
 
   // --- the feed writes straight into the series ---
   const applyHistory = useCallback(
@@ -858,6 +928,35 @@ export function Chart({
   // under a "gateway" label for the seconds a deep read takes, which is not a
   // stale chart but a wrong one.
   useEffect(() => {
+    // `barsRef` still holds the outgoing series at this point — nothing has cleared it
+    // yet — so a resolution change (and only a resolution change: switching symbol or
+    // source is a different instrument or a different pipe, whose old window means
+    // nothing on the new one) captures its viewport here, before the lines below clear
+    // it. The comparison needs the *previous* render's params, which is exactly what a
+    // ref updated at the top of this same body, every time, keeps holding until now.
+    const previous = previousParamsRef.current;
+    previousParamsRef.current = { source, symbol, resolution };
+    const onlyResolutionChanged =
+      previous.source === source && previous.symbol === symbol && previous.resolution !== resolution;
+
+    if (onlyResolutionChanged) {
+      const range = chartRef.current?.timeScale().getVisibleLogicalRange();
+      const series = barsRef.current;
+      if (range && series.length > 0) {
+        const fromIndex = Math.max(0, Math.round(range.from));
+        const toIndex = Math.min(series.length - 1, Math.round(range.to));
+        const fromTime = series[fromIndex]?.time;
+        const toTime = series[toIndex]?.time;
+        if (fromTime !== undefined && toTime !== undefined) {
+          pendingResolutionFrameRef.current = {
+            from: fromTime,
+            to: toTime,
+            atRightEdge: toIndex >= series.length - 1 - RIGHT_EDGE_SLACK_BARS,
+          };
+        }
+      }
+    }
+
     barsRef.current = [];
     seriesRef.current?.setData([]);
     setReadout(null);

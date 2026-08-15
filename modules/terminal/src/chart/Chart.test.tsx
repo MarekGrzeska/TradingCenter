@@ -13,7 +13,7 @@ import {
   indicatorResult,
   makeFakeChart,
 } from "./testDoubles";
-import type { Bar, ChartFocusRequest, IndicatorSelection } from "../data/types";
+import type { Bar, ChartFocusRequest, IndicatorSelection, Resolution } from "../data/types";
 import { indicatorColorFromToken, readChartColors } from "./theme";
 import { Toaster } from "../ui/Toaster";
 import { toastStore } from "../ui/toastStore";
@@ -48,7 +48,7 @@ function renderChart(
   source: ControllableSource,
   props?: Partial<{
     symbol: string;
-    resolution: "MINUTE_5" | "HOUR";
+    resolution: Resolution;
     indicatorSource: FakeIndicatorSource;
     initialIndicatorSelections: IndicatorSelection[];
     onIndicatorSelectionsChange: (selections: IndicatorSelection[]) => void;
@@ -550,6 +550,108 @@ describe("Chart — older history (terminal-chart spec)", () => {
 
     expect(stub.latest().fitContentCalls).toBe(fittedOnce);
     expect(stub.latest().series[0].data().at(-1)?.time).toBe(280);
+  });
+});
+
+describe("Chart — resolution change keeps the frame (terminal-chart spec, agent-chart-navigation)", () => {
+  function series(count: number, periodSeconds: number): Bar[] {
+    return Array.from({ length: count }, (_, index) => bar(index * periodSeconds, index + 1));
+  }
+
+  it("keeps the same stretch of time, converted to the new interval's own candle count", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, { resolution: "MINUTE_5" });
+    await act(async () => {
+      source.snapshot(series(400, 300)); // 400 five-minute candles
+    });
+    await act(async () => {
+      // 240 candles wide (indices 50..290), 72 000 seconds — nowhere near either edge.
+      stub.latest().pan({ from: 50, to: 290 });
+    });
+
+    rerender(
+      <Chart source={source} symbol="US100" resolution="HOUR" onResolutionChange={onResolutionChange} />,
+    );
+    await act(async () => {
+      source.snapshot(series(100, 3600)); // 100 hourly candles
+    });
+
+    // 72 000 seconds at an hour a candle is 20; the old midpoint (51 000s) sits nearest
+    // hourly candle 14 (50 400s) — from 4 to 23 is candle 14 centred in a span of 20.
+    expect(stub.latest().rangesSet.at(-1)).toEqual({ from: 4, to: 23 });
+  });
+
+  it("keeps standing at the live edge, on the new interval's own newest candle", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, { resolution: "MINUTE_5" });
+    await act(async () => {
+      source.snapshot(series(400, 300));
+    });
+    await act(async () => {
+      stub.latest().pan({ from: 350, to: 399 }); // the newest candle is in view
+    });
+
+    rerender(
+      <Chart source={source} symbol="US100" resolution="HOUR" onResolutionChange={onResolutionChange} />,
+    );
+    await act(async () => {
+      source.snapshot(series(50, 3600));
+    });
+
+    // Clamped to the floor (14 700 seconds is under four hourly candles), anchored on
+    // the newest of the fifty hourly candles rather than its own span's centre.
+    expect(stub.latest().rangesSet.at(-1)).toEqual({ from: 40, to: 49 });
+  });
+
+  it("floors an interval mismatch too small to read at, instead of showing one or two candles", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, { resolution: "MINUTE" });
+    await act(async () => {
+      source.snapshot(series(100, 60));
+    });
+    await act(async () => {
+      stub.latest().pan({ from: 40, to: 45 }); // five minutes, nowhere near either edge
+    });
+
+    rerender(
+      <Chart source={source} symbol="US100" resolution="DAY" onResolutionChange={onResolutionChange} />,
+    );
+    await act(async () => {
+      source.snapshot(series(20, 86_400));
+    });
+
+    // Five minutes of DAY candles rounds to zero; floored to ten, centred on the nearest
+    // of the twenty daily candles to the old span's midpoint (candle 0, the closest one).
+    expect(stub.latest().rangesSet.at(-1)).toEqual({ from: -5, to: 4 });
+  });
+
+  it("still fits the whole series on a slot's very first draw — nothing to keep yet", async () => {
+    renderChart(source, { resolution: "MINUTE_5" });
+
+    await act(async () => {
+      source.snapshot(series(10, 300));
+    });
+
+    expect(stub.latest().fitContentCalls).toBeGreaterThan(0);
+    expect(stub.latest().rangesSet).toHaveLength(0);
+  });
+
+  it("does not touch the frame when the symbol changes instead of the resolution", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, { resolution: "MINUTE_5" });
+    await act(async () => {
+      source.snapshot(series(400, 300));
+    });
+    await act(async () => {
+      stub.latest().pan({ from: 50, to: 290 });
+    });
+
+    rerender(
+      <Chart source={source} symbol="GOLD" resolution="MINUTE_5" onResolutionChange={onResolutionChange} />,
+    );
+    await act(async () => {
+      source.snapshot(series(10, 300));
+    });
+
+    // A different instrument's old window means nothing here — the fresh series is
+    // simply fitted, the same as any symbol shown for the first time.
+    expect(stub.latest().fitContentCalls).toBeGreaterThan(0);
   });
 });
 

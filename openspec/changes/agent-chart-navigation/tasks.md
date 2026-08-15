@@ -45,11 +45,11 @@
 
 ## 7. Terminal: zmiana interwału zachowuje kadr
 
-- [ ] 7.1 Zapamiętanie przy zmianie `resolution`: początek i koniec widocznego zakresu oraz to, czy prawa krawędź serii była widoczna
-- [ ] 7.2 Pierwszy `redraw` nowej serii ustawia zachowany odcinek zamiast `fitContent()`; `fitContent()` zostaje tam, gdzie slot niczego jeszcze nie rysował
-- [ ] 7.3 Przycięcie liczby świec do `[MIN_VISIBLE_BARS, MAX_VISIBLE_BARS]` wokół środka odcinka
-- [ ] 7.4 Kotwica prawej krawędzi: wykres stojący na bieżącej świecy zostaje na bieżącej świecy nowego interwału
-- [ ] 7.5 Testy: zmiana interwału nad fragmentem historii, przy prawej krawędzi, oraz odcinek zbyt krótki dla nowego interwału
+- [x] 7.1 Zapamiętanie przy zmianie `resolution`: początek i koniec widocznego zakresu oraz to, czy prawa krawędź serii była widoczna (tylko gdy zmienia się sama `resolution` — `symbol`/`source` inne niż poprzednio zerują ten zamiar)
+- [x] 7.2 Pierwszy `redraw` nowej serii ustawia zachowany odcinek zamiast `fitContent()`; `fitContent()` zostaje tam, gdzie slot niczego jeszcze nie rysował
+- [x] 7.3 Przycięcie liczby świec do `[MIN_VISIBLE_BARS, MAX_VISIBLE_BARS]` = `[10, 500]` wokół środka odcinka
+- [x] 7.4 Kotwica prawej krawędzi (z tolerancją `RIGHT_EDGE_SLACK_BARS`): wykres stojący na bieżącej świecy zostaje na bieżącej świecy nowego interwału
+- [x] 7.5 Testy: zmiana interwału nad fragmentem historii, przy prawej krawędzi, odcinek zbyt krótki dla nowego interwału, brak zmiany przy pierwszym rysowaniu slotu i przy zmianie symbolu
 
 ## 8. Terminal: rejestr widocznego zakresu
 
