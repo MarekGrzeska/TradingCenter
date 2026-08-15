@@ -18,8 +18,10 @@ operator MUST móc przewijać i przybliżać swobodnie, a wykres MUST NOT wraca�
 zastosowanego kadru sam z siebie.
 
 Kadr żądający fragmentu, w którym archiwum nie ma ani jednej świecy, MUST zostać
-pominięty, a wykres MUST zostać tam, gdzie był. Pominięcie MUST być powiedziane tą samą
-drogą, którą terminal mówi o pominiętej części polecenia agenta.
+pominięty, a wykres MUST zostać tam, gdzie był. Pominięcie MUST być powiedziane operatorowi
+— tą samą drogą, którą wykres mówi już o wskaźniku, którego nie udało się policzyć, a nie
+przez kanał, którym panel rozmowy mówi o zastosowanym poleceniu: ten drugi zamyka się,
+zanim dociąganie w ogóle się zaczyna, a kadr bywa jeszcze w drodze.
 
 #### Scenario: Kadr na fragment już narysowany
 

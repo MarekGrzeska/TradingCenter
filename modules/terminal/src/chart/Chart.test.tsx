@@ -13,7 +13,7 @@ import {
   indicatorResult,
   makeFakeChart,
 } from "./testDoubles";
-import type { Bar, IndicatorSelection } from "../data/types";
+import type { Bar, ChartFocusRequest, IndicatorSelection } from "../data/types";
 import { indicatorColorFromToken, readChartColors } from "./theme";
 import { Toaster } from "../ui/Toaster";
 import { toastStore } from "../ui/toastStore";
@@ -52,9 +52,12 @@ function renderChart(
     indicatorSource: FakeIndicatorSource;
     initialIndicatorSelections: IndicatorSelection[];
     onIndicatorSelectionsChange: (selections: IndicatorSelection[]) => void;
+    focusRequest: ChartFocusRequest | null;
+    onFocusRequestSettled: () => void;
   }>,
 ) {
   const onResolutionChange = vi.fn();
+  const onFocusRequestSettled = props?.onFocusRequestSettled ?? vi.fn();
   const view = render(
     <Chart
       source={source}
@@ -64,9 +67,11 @@ function renderChart(
       onResolutionChange={onResolutionChange}
       initialIndicatorSelections={props?.initialIndicatorSelections}
       onIndicatorSelectionsChange={props?.onIndicatorSelectionsChange}
+      focusRequest={props?.focusRequest}
+      onFocusRequestSettled={onFocusRequestSettled}
     />,
   );
-  return { ...view, onResolutionChange };
+  return { ...view, onResolutionChange, onFocusRequestSettled };
 }
 
 let source: ControllableSource;
@@ -545,6 +550,117 @@ describe("Chart — older history (terminal-chart spec)", () => {
 
     expect(stub.latest().fitContentCalls).toBe(fittedOnce);
     expect(stub.latest().series[0].data().at(-1)?.time).toBe(280);
+  });
+});
+
+describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", () => {
+  const drawn = [bar(100, 1), bar(160, 2), bar(220, 3)];
+
+  function olderPage(count: number): Bar[] {
+    return Array.from({ length: count }, (_, index) => bar(100 - (count - index) * 60, 0.5));
+  }
+
+  it("applies a from/to focus already covered by the drawn series, reading nothing more", async () => {
+    const focus: ChartFocusRequest = { from: 100, to: 220, around: null, bars: null, lastBars: null };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: 100, to: 220 });
+    expect(source.historyCalls).toHaveLength(0);
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the newest N candles for a last-bars focus, by logical range", async () => {
+    // Sixty candles, not three: a series this short would itself sit inside the pager's
+    // own left-edge margin (`OLDER_MARGIN_BARS`) the moment the logical range narrows to
+    // the newest two, which would fetch more history for a reason that has nothing to do
+    // with this test.
+    const long = Array.from({ length: 60 }, (_, i) => bar(1000 + i * 60, i + 1));
+    const focus: ChartFocusRequest = { from: null, to: null, around: null, bars: null, lastBars: 2 };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(long);
+    });
+
+    expect(stub.latest().rangesSet).toContainEqual({ from: 58, to: 59 });
+    expect(source.historyCalls).toHaveLength(0);
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("centres an around/bars focus on the nearest drawn candle, by logical range", async () => {
+    // A hundred candles, well clear of the pager's own left-edge margin — see the
+    // last-bars test above for why a three-candle series would confuse this one.
+    const long = Array.from({ length: 100 }, (_, i) => bar(1000 + i * 60, i + 1));
+    const focus: ChartFocusRequest = {
+      from: null,
+      to: null,
+      around: 1000 + 70 * 60,
+      bars: 2,
+      lastBars: null,
+    };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(long);
+    });
+
+    // `around` lands exactly on candle 70; half of 2 is 1.
+    expect(stub.latest().rangesSet).toContainEqual({ from: 69, to: 71 });
+    expect(source.historyCalls).toHaveLength(0);
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("pages older history to reach a from/to focus, then applies it", async () => {
+    source.historyPages = [olderPage(60)];
+    const focus: ChartFocusRequest = { from: -20, to: 220, around: null, bars: null, lastBars: null };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    // One page reaches back to -3500 — far past -20 — so the pager stops there.
+    expect(source.historyCalls).toHaveLength(1);
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: -20, to: 220 });
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("skips a focus the archive has nothing for, leaves the view alone, and says so", async () => {
+    source.historyPages = []; // every read answers empty
+    const focus: ChartFocusRequest = {
+      from: -1_000_000,
+      to: -999_000,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+    render(<Toaster />);
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    expect(stub.latest().timeRangesSet).toHaveLength(0);
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("US100");
+    expect(toast).toHaveTextContent(/outside the archive/i);
+  });
+
+  it("does not pursue a focus that was never given", async () => {
+    renderChart(source, { focusRequest: null });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    expect(stub.latest().timeRangesSet).toHaveLength(0);
+    expect(source.historyCalls).toHaveLength(0);
   });
 });
 

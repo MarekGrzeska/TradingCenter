@@ -49,18 +49,6 @@ export interface GridConfig {
   slots: Record<SlotId, SlotConfig>;
 }
 
-/** A one-off request to show a fragment of a slot's time axis — epoch seconds, exactly
- *  one of the three shapes filled. Not part of `SlotConfig`: it is what the operator
- *  should be shown next, not something the slot remembers having (`gridStore`,
- *  "Kadr musi obudzić Chart, więc idzie ... jako pole przejściowe"). */
-export interface ChartFocusRequest {
-  from: number | null;
-  to: number | null;
-  around: number | null;
-  bars: number | null;
-  lastBars: number | null;
-}
-
 export function visibleSlotCount(layout: LayoutId): number {
   const { cols, rows } = LAYOUTS[layout];
   return cols * rows;

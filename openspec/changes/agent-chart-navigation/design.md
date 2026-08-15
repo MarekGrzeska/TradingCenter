@@ -120,6 +120,34 @@ Rozważane: osobny odczyt „daj mi zakres od–do" z pominięciem pagera. Odrzu
 i porzucenia wyniku po zmianie symbolu. Drugie źródło doklejania serii to drugie miejsce,
 w którym trzeba to wszystko zrobić poprawnie.
 
+Rozstrzygnięcie stwierdzone dopiero przy pisaniu kodu: „ustawienie zakończone" nie da się
+bezpiecznie wyczytać z `older.status` przez obserwację przejścia `loading → nie-loading`.
+React potrafi zbić `"loading"` i następujący po nim `"idle"` w jeden render, gdy odpowiedź
+przychodzi szybko — mockowane źródło w teście robi to zawsze, prawdziwe źródło czasem.
+Zamiast tego: sprawdzenie „czy już wystarczy" siedzi w `applyOlder` (funkcji, którą
+`deliver` wywołuje wprost, więc nigdy nie ginie w batchowaniu renderów) i sprawdzane jest
+po każdej dostarczonej stronie — ten sam warunek „strona nic nie wniosła", którego
+`useOlderBars` używa, żeby samemu rozpoznać wyczerpanie. Jedyny przypadek, którego
+`applyOlder` nie widzi — archiwum nie oddało ani jednej świecy, więc `deliver` nigdy nie
+padło — łapie osobny efekt, ale tylko na `"exhausted"`/`"error"`, nigdy na `"idle"`: te dwa
+stany nie są nigdy wartością początkową, więc samo ich zobaczenie, bez śledzenia przejścia,
+już dowodzi, że próba się zakończyła.
+
+### Odmowa kadru idzie przez `showToast`, nie przez zdanie panelu rozmowy
+
+`terminal-chart`, „Wykres przyjmuje kadr z zewnątrz" mówiło pierwotnie o tej samej drodze,
+którą `describeChartControl`/`chartNotice` mówi o pominiętej części polecenia. Napisane,
+zanim się okazało, że ta droga zamyka się zbyt wcześnie: `syncAgentChart` zwraca wynik i
+panel pokazuje zdanie, zanim dociąganie historii pod kadr w ogóle ruszy — kanał jest już
+zamknięty w chwili, w której dopiero wiadomo, czy kadr się uda.
+
+`Chart.tsx` i tak ma drogę do powiedzenia „nie udało się" niezależnie od rozmowy —
+`showToast`, którym mówi już o wskaźniku, którego nie policzył. Tą samą drogą mówi teraz
+o kadrze. Koszt: dwa różne miejsca, w których operator widzi niepowodzenie wykresu, zamiast
+jednego. Zaakceptowany — ujednolicenie wymagałoby albo przeniesienia kadru na sam koniec
+tury (żeby `chartNotice` zdążył poczekać), albo nowego kanału z `Chart.tsx` z powrotem do
+`agentChatStore`, a żadne z tych dwóch nie jest tej zmiany warte.
+
 ### Zachowanie kadru przy zmianie interwału
 
 Przy zmianie `resolution` `Chart` zapamiętuje w ref-ie trzy rzeczy z **ostatniego**

@@ -37,11 +37,11 @@
 
 ## 6. Terminal: wykres stosuje kadr
 
-- [ ] 6.1 `Chart.tsx` przyjmuje żądany kadr, zamienia trzy formy na docelowy zakres czasu i ustawia widok, gdy świece z niego są narysowane
-- [ ] 6.2 `useOlderBars`: drugi powód do dociągania — najstarsza narysowana świeca późniejsza niż początek żądanego kadru; ten sam `MAX_PAGES` kończy sprawę
-- [ ] 6.3 Kadr, którego pager nie zapełnił, zostaje pominięty: widok bez zmian, wpis w `skipped`, zdanie w panelu
-- [ ] 6.4 Kadr zużywa się raz: po zastosowaniu (albo pominięciu) slot go czyści, a przewijanie operatora do niego nie wraca
-- [ ] 6.5 Testy `Chart.test.tsx`: kadr na już narysowane świece bez odczytu, kadr wymagający dociągnięcia, kadr na okres bez świec
+- [x] 6.1 `Chart.tsx` przyjmuje żądany kadr, zamienia trzy formy na docelowy zakres czasu i ustawia widok, gdy świece z niego są narysowane
+- [x] 6.2 `useOlderBars`: drugi powód do dociągania — najstarsza narysowana świeca późniejsza niż początek żądanego kadru; ten sam `MAX_PAGES` kończy sprawę (przez `needsMore` w `olderReader`, `useOlderBars.ts` samo nietknięte)
+- [x] 6.3 Kadr, którego pager nie zapełnił, zostaje pominięty: widok bez zmian, toast (`showToast`) tą samą drogą co niedostępny wskaźnik — patrz design.md, decyzja o odejściu od `chartNotice`
+- [x] 6.4 Kadr zużywa się raz: po zastosowaniu (albo pominięciu) slot go czyści (`onFocusRequestSettled` → `gridStore.clearFocusRequest`), a przewijanie operatora do niego nie wraca
+- [x] 6.5 Testy `Chart.test.tsx`: kadr na już narysowane świece bez odczytu (from/to, last-bars, around/bars), kadr wymagający dociągnięcia, kadr na okres bez świec (toast)
 
 ## 7. Terminal: zmiana interwału zachowuje kadr
 

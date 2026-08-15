@@ -40,6 +40,10 @@ export interface FakeChart {
   rangeHandlers: Array<(range: LogicalRange | null) => void>;
   visibleRange: LogicalRange | null;
   rangesSet: LogicalRange[];
+  /** What `timeScale().setVisibleRange({from, to})` was called with — the time-based
+   *  sibling of `rangesSet`, used for a `from`/`to` focus rather than an `around`/`bars`
+   *  or `lastBars` one (both of which go through the logical-range call above). */
+  timeRangesSet: Array<{ from: number; to: number }>;
   pan(range: LogicalRange): void;
   /** Index 0 always exists — the price pane `createChart` makes implicitly, the
    *  same one the real library never asks anyone to create by hand. Every later
@@ -171,6 +175,7 @@ export function makeFakeChart(): FakeChart {
     rangeHandlers: [],
     visibleRange: null,
     rangesSet: [],
+    timeRangesSet: [],
     pan(range: LogicalRange) {
       this.visibleRange = range;
       for (const handler of [...this.rangeHandlers]) handler(range);
@@ -235,6 +240,9 @@ export function fakeChartApi(chart: FakeChart) {
         // which is what makes a chart correcting its own frame able to trigger
         // itself. The fake has to do it too, or that loop cannot be tested.
         chart.pan(range);
+      },
+      setVisibleRange: (range: { from: number; to: number }) => {
+        chart.timeRangesSet.push(range);
       },
       subscribeVisibleLogicalRangeChange: (handler: (range: LogicalRange | null) => void) =>
         chart.rangeHandlers.push(handler),

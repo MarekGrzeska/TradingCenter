@@ -1,12 +1,11 @@
 import {
   defaultGridConfig,
   parseGridConfig,
-  type ChartFocusRequest,
   type GridConfig,
   type LayoutId,
   type SlotId,
 } from "./model";
-import type { IndicatorSelection, Resolution } from "../data/types";
+import type { ChartFocusRequest, IndicatorSelection, Resolution } from "../data/types";
 
 /** Versioned so a future shape change is a clean miss (defaults) rather than a
  *  half-understood read — terminal-grid spec, "Zapisany stan jest nieczytelny". */

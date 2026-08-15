@@ -112,6 +112,12 @@ function Slot({
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
   const slot = config.slots[slotId];
   const allowedResolutions = slot.symbol ? resolutionsBySymbol.get(slot.symbol) : undefined;
+  // A separate subscription from the config above: setting a focus request must not
+  // re-render every slot watching the persisted layout, only the one it is for
+  // (`gridStore`, "Kadr musi obudzić Chart... jako pole przejściowe").
+  const focusRequest = useSyncExternalStore(gridStore.subscribeFocusRequest, () =>
+    gridStore.getFocusRequest(slotId),
+  );
 
   // Only a definite "no" — a fetch that actually finished and came back
   // without this pair — counts as stale. `unreachable` must never read as
@@ -160,6 +166,8 @@ function Slot({
           onResolutionChange={(resolution) => gridStore.setSlotResolution(slotId, resolution)}
           initialIndicatorSelections={slot.indicators}
           onIndicatorSelectionsChange={(next) => gridStore.setSlotIndicators(slotId, next)}
+          focusRequest={focusRequest}
+          onFocusRequestSettled={() => gridStore.clearFocusRequest(slotId)}
           headerLeft={
             <SymbolField
               label={`Symbol for slot ${slotId}`}

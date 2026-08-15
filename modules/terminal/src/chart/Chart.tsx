@@ -29,6 +29,7 @@ import type { IndicatorSource } from "../data/source";
 import {
   RESOLUTIONS,
   type Bar,
+  type ChartFocusRequest,
   type IndicatorCatalogueEntry,
   type IndicatorResult,
   type IndicatorSelection,
@@ -80,6 +81,16 @@ export interface ChartProps {
    *  nothing here needs the reverse (an external reset mid-session). */
   initialIndicatorSelections?: IndicatorSelection[];
   onIndicatorSelectionsChange?(selections: IndicatorSelection[]): void;
+  /** A one-off "show this fragment of the axis" — omitted, the chart never jumps on its
+   *  own. A new object (not a mutation of the previous one) is what triggers a pursuit;
+   *  the same reference twice is a no-op, which is what lets the caller pass its own
+   *  stored value on every render without refiring anything (`terminal-chart` spec,
+   *  "Wykres przyjmuje kadr z zewnątrz"). */
+  focusRequest?: ChartFocusRequest | null;
+  /** Called once `focusRequest` has been either applied or given up on — never both, and
+   *  never left uncalled for a request the chart accepted. The caller's cue to stop
+   *  offering it again (`terminal-chart` spec, "Kadr MUST być żądaniem jednorazowym"). */
+  onFocusRequestSettled?(): void;
 }
 
 /** Price-pane overlays, own-pane oscillators, price-pane markers, price-pane
@@ -194,6 +205,48 @@ function toCandlestick(bar: Bar): CandlestickData<Time> {
   };
 }
 
+/** Index of the drawn bar closest to `time` — the anchor for an `around`+`bars` focus,
+ *  which names a moment rather than a bar that necessarily exists at it (a session gap,
+ *  most often). `findBar` (`data/merge.ts`) only ever answers an exact match, which this
+ *  is deliberately not. */
+function nearestBarIndex(series: readonly Bar[], time: number): number {
+  let lo = 0;
+  let hi = series.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (series[mid].time < time) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo > 0 && Math.abs(series[lo - 1].time - time) <= Math.abs(series[lo].time - time)) {
+    return lo - 1;
+  }
+  return lo;
+}
+
+/** Whether the drawn series already reaches back far enough to show `focus` in full —
+ *  the condition that lets a focus apply immediately, without waiting on the pager. */
+function reachesBack(series: readonly Bar[], focus: ChartFocusRequest): boolean {
+  if (series.length === 0) return false;
+  if (focus.lastBars !== null) return series.length >= focus.lastBars;
+  const target = focus.from ?? focus.around;
+  return target !== null && series[0].time <= target;
+}
+
+/** Whether the drawn series has *any* candle the requested fragment could show — the
+ *  weaker condition checked once the pager has given up, since a fragment only partly
+ *  reached is still a fragment worth showing (`terminal-chart` spec, "Kadr na fragment
+ *  już narysowany" is the applied case; "Kadr na okres, którego archiwum nie ma" is the
+ *  one this returns `false` for). */
+function overlapsSeries(series: readonly Bar[], focus: ChartFocusRequest): boolean {
+  if (series.length === 0) return false;
+  if (focus.lastBars !== null) return true;
+  const oldest = series[0].time;
+  const newest = series[series.length - 1].time;
+  if (focus.from !== null && focus.to !== null) return newest >= focus.from && oldest <= focus.to;
+  if (focus.around !== null) return newest >= focus.around;
+  return false;
+}
+
 interface Readout {
   bar: Bar;
   /** True when this is the hovered bar rather than the latest one. */
@@ -225,6 +278,8 @@ export function Chart({
   indicatorSource,
   initialIndicatorSelections,
   onIndicatorSelectionsChange,
+  focusRequest = null,
+  onFocusRequestSettled,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -589,6 +644,80 @@ export function Chart({
     };
   }, []);
 
+  // --- focus: a one-off "show this fragment" from outside ---
+  // What is currently being pursued — set the moment a request cannot be shown yet,
+  // cleared the moment it settles one way or the other. Read by `needsMore` below, which
+  // is how a single `requestOlder()` call ends up paging until this is satisfied or the
+  // pager gives up on its own (design.md, "Dociąganie pod kadr przez istniejący pager").
+  const pendingFocusRef = useRef<ChartFocusRequest | null>(null);
+  const onFocusRequestSettledRef = useRef(onFocusRequestSettled);
+  onFocusRequestSettledRef.current = onFocusRequestSettled;
+
+  const applyFocusToView = useCallback((focus: ChartFocusRequest): boolean => {
+    const chart = chartRef.current;
+    const series = barsRef.current;
+    if (!chart || !overlapsSeries(series, focus)) return false;
+    const timeScale = chart.timeScale();
+    if (focus.lastBars !== null) {
+      const shown = Math.min(focus.lastBars, series.length);
+      timeScale.setVisibleLogicalRange({ from: series.length - shown, to: series.length - 1 });
+      return true;
+    }
+    if (focus.from !== null && focus.to !== null) {
+      timeScale.setVisibleRange({ from: focus.from as Time, to: focus.to as Time });
+      return true;
+    }
+    // The one shape left: `around` + `bars`, checked exactly one way by the module that
+    // wrote this request — `around` is never null here.
+    const index = nearestBarIndex(series, focus.around as number);
+    const half = Math.floor((focus.bars as number) / 2);
+    timeScale.setVisibleLogicalRange({ from: index - half, to: index + half });
+    return true;
+  }, []);
+
+  /** The one place a pursuit ends, however it ends: applies `focus` against whatever is
+   *  now drawn (which may be all of it, some of it, or — if nothing overlaps — none),
+   *  clears it as the pending one, and always tells the caller it is done. An application
+   *  that touched nothing is reported the way an unreadable indicator already is
+   *  (`terminal-chart` spec, "say it, do not hide it" — the same rule this file already
+   *  follows for indicators it could not compute). */
+  const settlePendingFocus = useCallback(
+    (focus: ChartFocusRequest) => {
+      pendingFocusRef.current = null;
+      const applied = applyFocusToView(focus);
+      onFocusRequestSettledRef.current?.();
+      if (!applied) {
+        showToast({
+          key: `focus:${symbol}:${resolution}`,
+          severity: "error",
+          title: `${symbol} · requested focus is outside the archive`,
+          detail: "The archive has no candles there right now.",
+        });
+      }
+    },
+    [applyFocusToView, symbol, resolution],
+  );
+
+  /** Applies `focus` now if the series already reaches back far enough; otherwise waits
+   *  for the pager, which `needsMore` (below) has been told to keep going for. Called
+   *  again once new history lands, since the first call often finds too little series to
+   *  even start the pager (`useOlderBars`'s own "at least two bars" floor). */
+  const pursueFocus = useCallback(
+    (focus: ChartFocusRequest) => {
+      if (reachesBack(barsRef.current, focus)) {
+        settlePendingFocus(focus);
+        return;
+      }
+      pendingFocusRef.current = focus;
+      requestOlderRef.current();
+    },
+    [settlePendingFocus],
+  );
+
+  useEffect(() => {
+    if (focusRequest) pursueFocus(focusRequest);
+  }, [focusRequest, pursueFocus]);
+
   /**
    * Redraw the whole series, keeping the operator looking at the same candles.
    *
@@ -639,8 +768,12 @@ export function Chart({
       redraw(merged, previousFirstTime);
       setLatestBar(merged.at(-1) ?? null);
       setReadout(null);
+      // The first attempt at a pending focus often finds too short a series to even
+      // start the pager (`useOlderBars`'s own "at least two bars" floor) — retried here
+      // now that the deep read has landed.
+      if (pendingFocusRef.current) pursueFocus(pendingFocusRef.current);
     },
-    [redraw],
+    [redraw, pursueFocus],
   );
 
   /** A page of candles older than everything drawn. Merged rather than
@@ -652,8 +785,23 @@ export function Chart({
       const merged = mergeSeries(barsRef.current, bars);
       barsRef.current = merged;
       redraw(merged, previousFirstTime);
+
+      // Checked here rather than by watching `older.status`: a `"loading"` render is not
+      // guaranteed to ever commit on its own — React is free to batch it away with the
+      // `"idle"` that follows a fast enough answer, which a mocked source in a test
+      // reliably is and a fast real one occasionally is too. A page landing is a plain
+      // function call, not a render, so it cannot be skipped the same way.
+      const pending = pendingFocusRef.current;
+      if (pending) {
+        const reached = reachesBack(merged, pending);
+        // The exact condition `useOlderBars` itself uses to call the archive out of
+        // history: a page that left the series starting where it started is a page of
+        // candles already drawn, and no later page will do better.
+        const noProgress = (merged[0]?.time ?? previousFirstTime) >= (previousFirstTime ?? -Infinity);
+        if (reached || noProgress) settlePendingFocus(pending);
+      }
     },
-    [redraw],
+    [redraw, settlePendingFocus],
   );
 
   const applyBar = useCallback((bar: Bar) => {
@@ -695,7 +843,10 @@ export function Chart({
       deliver: applyOlder,
       needsMore: () => {
         const range = chartRef.current?.timeScale().getVisibleLogicalRange();
-        return range ? range.from < OLDER_MARGIN_BARS : false;
+        const viewportNeedsMore = range ? range.from < OLDER_MARGIN_BARS : false;
+        const pending = pendingFocusRef.current;
+        const focusNeedsMore = pending !== null && !reachesBack(barsRef.current, pending);
+        return viewportNeedsMore || focusNeedsMore;
       },
     }),
     [applyOlder],
@@ -715,6 +866,19 @@ export function Chart({
     // while the new one loads — `barsRange` going null empties `indicatorsState.results`
     // (`useIndicators`), which the sync effect below reads as "remove every line".
     setBarsRange(null);
+    // The cleanup, not the body: a cleanup runs only when `source`/`symbol`/`resolution`
+    // are *about to change* — never on the initial mount, which is what a focus supplied
+    // as a starting prop needs, since the "pursue on prop change" effect below runs in
+    // the same commit and must not have what it just set undone by this one.
+    return () => {
+      // A focus pursued for the series that is about to be cleared cannot be honoured
+      // against whatever loads next — abandoned rather than retried, and told to the
+      // caller the same as any other settled request.
+      if (pendingFocusRef.current) {
+        pendingFocusRef.current = null;
+        onFocusRequestSettledRef.current?.();
+      }
+    };
   }, [source, symbol, resolution]);
 
   // --- indicators: one Line series per (instance, line key), synced to what the archive
@@ -1016,6 +1180,17 @@ export function Chart({
   const feed = useBarFeed(source, symbol, resolution, sink);
   const older = useOlderBars(source, symbol, resolution, olderReader);
   requestOlderRef.current = older.requestOlder;
+
+  /** The rare case `applyOlder`'s own check cannot see: the pager walked every empty
+   *  window and delivered nothing at all, or failed outright, so no page ever arrived to
+   *  trigger that check. `"exhausted"`/`"error"` are never the initial value — unlike
+   *  `"idle"`, seeing either one is on its own proof that a real attempt just ended, so
+   *  this needs no transition tracking the way a check keyed on `"idle"` would (`"idle"`
+   *  is also what the very first render reads, before anything has run at all). */
+  useEffect(() => {
+    if (older.status !== "exhausted" && older.status !== "error") return;
+    if (pendingFocusRef.current) settlePendingFocus(pendingFocusRef.current);
+  }, [older.status, settlePendingFocus]);
 
   const shown: Readout | null =
     readout ?? (latestBar ? { bar: latestBar, hovered: false } : null);
