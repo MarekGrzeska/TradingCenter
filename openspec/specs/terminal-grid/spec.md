@@ -104,21 +104,22 @@ jedno i drugie bez opuszczania siatki.
 
 ### Requirement: Slot przyjmuje wyłącznie instrument archiwizowany
 
-Symbol w slocie MUST być wybierany z podpowiedzi, których jedynym źródłem jest lista instrumentów
-archiwizowanych przez archiwum. Slot MUST NOT przyjmować symbolu wpisanego z ręki — wykres pary,
-której nikt nie zbiera, nie ma czego pokazać, a operator dowiadywał się o tym dopiero z komunikatu
-przy pustym wykresie.
+Symbol w slocie MUST być wybierany z listy, której jedynym źródłem jest lista instrumentów
+archiwizowanych przez archiwum, i która MUST pokazywać je wszystkie naraz — lista jest z założenia
+krótka, bo ogranicza ją pułap par zbieranych przez archiwum. Slot MUST NOT przyjmować symbolu wpisanego
+z ręki ani wymagać wpisania frazy, żeby zobaczyć, co jest do wyboru — wykres pary, której nikt nie
+zbiera, nie ma czego pokazać, a operator dowiadywał się o tym dopiero z komunikatu przy pustym wykresie.
 
 #### Scenario: Wybór instrumentu do slotu
 
 - **WHEN** operator otwiera pole instrumentu w slocie
-- **THEN** widzi wyłącznie instrumenty archiwizowane
+- **THEN** widzi wszystkie instrumenty archiwizowane i wyłącznie je
 - **AND** wybranie jednego z nich ustawia go w slocie
 
 #### Scenario: Instrument spoza archiwizowanych
 
-- **WHEN** operator wpisuje frazę pasującą do instrumentu, którego archiwum nie zbiera
-- **THEN** podpowiedzi go nie zawierają
+- **WHEN** archiwum nie zbiera danego instrumentu
+- **THEN** lista wyboru go nie zawiera
 - **AND** terminal wskazuje zakładkę `Instruments` jako miejsce, gdzie dokłada się instrument do
   archiwizowanych
 
@@ -126,7 +127,7 @@ przy pustym wykresie.
 
 - **WHEN** archiwum nie zbiera ani jednego instrumentu
 - **THEN** pole instrumentu mówi to wprost i kieruje do zakładki `Instruments`
-- **AND** MUST NOT pokazywać pustych podpowiedzi bez wyjaśnienia
+- **AND** MUST NOT pokazywać pustej listy bez wyjaśnienia
 
 #### Scenario: Listy archiwizowanych nie da się odczytać
 
