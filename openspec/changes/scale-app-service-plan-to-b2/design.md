@@ -19,9 +19,20 @@ w chwili planowania:
 | `database.tf:121`, `agent_outbound` | `for_each` na poziomie zasobu | **nie** |
 
 `database.tf` opisuje to zachowanie dla pierwszego wdrożenia i mówi, jak je obejść: raz
-`terraform apply -target=...`, potem apply bez `-target`. Zmiana SKU stawia listę adresów
-z powrotem w stanie „nieznana do czasu apply", więc ta sama dwufazowość wraca — tym razem
-nie przy tworzeniu, tylko przy zmianie warstwy.
+`terraform apply -target=...`, potem apply bez `-target`.
+
+**Zmierzone, nie przewidziane — i wyszło inaczej, niż napisano tu najpierw.** `terraform
+plan` w CI na tej gałęzi przeszedł czysto: `Plan: 0 to add, 12 to change, 0 to destroy`,
+bez błędu na `for_each`, a reguł firewalla nie ma w diffie **w ogóle**. Powód jest prosty i
+gorszy niż błąd: Terraform czyta `possible_outbound_ip_address_list` ze stanu, gdzie leży
+jako wartość znana, i nie ma skąd wiedzieć, że Azure ją przestawi przy zmianie warstwy.
+Plan pokazuje więc dwie zmiany, o które prosiliśmy, i milczy o trzeciej, która wydarzy się
+naprawdę.
+
+Dwufazowość zostaje, ale nie dlatego, że pierwszy `apply` odmówi — tylko dlatego, że po nim
+stan i rzeczywistość rozjadą się o adresy, których nikt jeszcze nie odczytał. Drugi `apply`
+jest tym odczytem. Gdyby go zaniechać, reguła firewalla wskazywałaby poprzednie adresy, a
+`market-data` i `agent` nie widziałyby bazy — bez jednego czerwonego znaku po drodze.
 
 ## Goals / Non-Goals
 
@@ -99,14 +110,21 @@ terraform apply -target=azurerm_service_plan.main    # SKU; aplikacje restartuj�
 terraform apply                                       # reguły firewalla na nowe adresy
 ```
 
-Powód jest w `Context`: `for_each` na poziomie zasobu odmawia planowania wobec wartości
-nieznanej do czasu apply, a lista adresów wyjściowych staje się taka w chwili, w której
-zmienia się warstwa planu. Ta sama dwufazowość, którą `database.tf` opisuje dla pierwszego
-wdrożenia, z tego samego powodu.
+Powód jest w `Context`, w akapicie o tym, co pokazał plan: drugi `apply` nie jest
+zabezpieczeniem przed błędem, tylko odczytem adresów, które Azure przestawi dopiero przy
+pierwszym. Plan o tym milczy, więc nie ma czerwonego znaku, który by o tym przypomniał —
+zostaje ta lista.
 
 Między jednym a drugim `apply` `market-data` i `agent` mogą nie widzieć bazy. To jest
 okno, nie usterka — ale jest to okno, o którym trzeba wiedzieć, że się otwiera, zamiast
 odkrywać je z alertu.
+
+Trzecia rzecz, którą pokazał plan i której nie wnosi ta zmiana: dziesięć zasobów „will be
+updated in-place" bez ani jednej widocznej różnicy — trzy `azuread_application_password`,
+Application Insights, Log Analytics, Static Web App i cztery aplikacje. To jest szum
+providera na atrybutach, których nikt nie ruszał, obecny w stanie przed tą zmianą.
+`apply` przepuści go razem ze skalowaniem; warto o tym wiedzieć przed, a nie w trakcie
+czytania diffu.
 
 ## Risks / Trade-offs
 

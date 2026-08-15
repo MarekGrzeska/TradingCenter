@@ -17,11 +17,13 @@
       both apps share is over 92% memory" — cztery aplikacje i nie B1. Próg 92 zostaje
       bez zmian (`design.md`, „Próg alertu zostaje na 92”).
 - [x] 1.4 `terraform fmt` i `terraform validate` w `infra/`.
-- [x] 1.5 Otworzyć PR — `terraform plan` w CI (`terraform.yml`) pokaże zmianę SKU i
-      przebudowę reguł firewalla wyliczanych z adresów wyjściowych planu. Sprawdzić na
-      planie, czy reguły `market_data_outbound` i `agent_outbound` faktycznie wchodzą do
-      diffu; jeśli plan w CI się wywraca na `for_each` wobec wartości nieznanej, to jest
-      to spodziewane zachowanie opisane w `design.md`, a nie błąd w zmianie.
+- [x] 1.5 Otworzyć PR — `terraform plan` w CI (`terraform.yml`). **Wynik: PR #94,
+      `Plan: 0 to add, 12 to change, 0 to destroy`, bez błędu.** Widoczne dokładnie dwie
+      zamierzone zmiany (`sku_name B1 -> B2`, opis alertu). Reguł `market_data_outbound`
+      i `agent_outbound` w diffie **nie ma** — Terraform czyta adresy wyjściowe ze stanu
+      jako wartość znaną i nie wie, że Azure je przestawi. `design.md` poprawione: to
+      czyni zadanie 2.2 ważniejszym, nie mniej ważnym. Pozostałe dziesięć pozycji
+      w planie to szum providera bez widocznej różnicy, obecny przed tą zmianą.
 
 ## 2. Wdrożenie (operator, nie CI)
 
