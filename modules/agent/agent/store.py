@@ -15,6 +15,7 @@ import asyncpg
 from .db import Conn, fetch_one
 from .models import (
     ChartCommand,
+    ChartFocus,
     ChartIndicator,
     Message,
     PromptRevision,
@@ -498,13 +499,13 @@ async def create_prompt_revision(
 # --- chart commands: what the agent set the terminal to draw -------------------------
 
 _INSERT_CHART_COMMAND = """
-    INSERT INTO chart_commands (session_id, symbol, resolution, indicators)
-    VALUES ($1, $2, $3, $4)
-    RETURNING id AS sequence, session_id, symbol, resolution, indicators, created_at
+    INSERT INTO chart_commands (session_id, symbol, resolution, indicators, focus)
+    VALUES ($1, $2, $3, $4, $5)
+    RETURNING id AS sequence, session_id, symbol, resolution, indicators, focus, created_at
 """
 
 _SELECT_CHART_COMMANDS_AFTER = """
-    SELECT id AS sequence, session_id, symbol, resolution, indicators, created_at
+    SELECT id AS sequence, session_id, symbol, resolution, indicators, focus, created_at
       FROM chart_commands
      WHERE id > $1
      ORDER BY id
@@ -517,6 +518,10 @@ def _chart_command_from_row(row: asyncpg.Record) -> ChartCommand:
     if isinstance(raw, str):
         raw = json.loads(raw)
     data["indicators"] = None if raw is None else [ChartIndicator(**item) for item in raw]
+    raw_focus = data["focus"]
+    if isinstance(raw_focus, str):
+        raw_focus = json.loads(raw_focus)
+    data["focus"] = None if raw_focus is None else ChartFocus(**raw_focus)
     return ChartCommand(**data)
 
 
@@ -527,6 +532,7 @@ async def record_chart_command(
     symbol: str | None,
     resolution: str | None,
     indicators: Sequence[ChartIndicator] | None,
+    focus: ChartFocus | None,
 ) -> ChartCommand:
     """One row per accepted command, never an update of the previous one. The id it comes
     back with is the sequence a consumer remembers having applied."""
@@ -535,7 +541,10 @@ async def record_chart_command(
         if indicators is None
         else json.dumps([indicator.model_dump() for indicator in indicators])
     )
-    row = await fetch_one(conn, _INSERT_CHART_COMMAND, session_id, symbol, resolution, payload)
+    focus_payload = None if focus is None else focus.model_dump_json(by_alias=True)
+    row = await fetch_one(
+        conn, _INSERT_CHART_COMMAND, session_id, symbol, resolution, payload, focus_payload
+    )
     return _chart_command_from_row(row)
 
 

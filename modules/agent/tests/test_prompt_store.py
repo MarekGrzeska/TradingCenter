@@ -13,9 +13,9 @@ pytestmark = pytest.mark.db
 
 async def test_migration_seeds_the_current_text(db) -> None:
     revision = await store.latest_prompt_revision(db)
-    # `v5` names the chart tool; `v4` is still in the table below it, which is what a
-    # transcript stamped `"v4"` reads back against.
-    assert revision.version == "v5"
+    # `v6` names the chart tool's focus; `v5` is still in the table below it, which is
+    # what a transcript stamped `"v5"` reads back against.
+    assert revision.version == "v6"
     assert revision.with_tools_body != revision.without_tools_body
 
 
@@ -95,7 +95,7 @@ async def test_create_prompt_revision_bumps_the_version(db) -> None:
     updated = await store.create_prompt_revision(
         db, with_tools_body="new with-tools text", without_tools_body="new without-tools text"
     )
-    assert updated.version == "v6"
+    assert updated.version == "v7"
     assert updated.with_tools_body == "new with-tools text"
     assert updated.without_tools_body == "new without-tools text"
 
@@ -114,7 +114,7 @@ async def test_create_prompt_revision_is_append_only(db) -> None:
 async def test_repeated_edits_keep_incrementing(db) -> None:
     await store.create_prompt_revision(db, with_tools_body="a1", without_tools_body="b1")
     second = await store.create_prompt_revision(db, with_tools_body="a2", without_tools_body="b2")
-    assert second.version == "v7"
+    assert second.version == "v8"
 
 
 async def test_both_seeded_texts_name_the_chart_tool(db) -> None:

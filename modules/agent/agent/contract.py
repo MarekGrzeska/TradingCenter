@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_va
 
 from .models import (
     ChartCommand,
+    ChartFocus,
     ChartIndicator,
     ChartSnapshot,
     Message,
@@ -219,6 +220,8 @@ class ChartSnapshotIn(BaseModel):
     symbol: str | None = None
     resolution: str | None = None
     indicators: list[ChartIndicatorIn] = Field(default_factory=list)
+    visible_from: datetime | None = None
+    visible_to: datetime | None = None
 
     def to_snapshot(self) -> ChartSnapshot:
         return ChartSnapshot(
@@ -227,6 +230,8 @@ class ChartSnapshotIn(BaseModel):
             indicators=[
                 ChartIndicator(id=i.id, params=i.params, color=i.color) for i in self.indicators
             ],
+            visible_from=self.visible_from,
+            visible_to=self.visible_to,
         )
 
 
@@ -245,6 +250,24 @@ class ChartIndicatorOut(BaseModel):
     color: str | None
 
 
+class ChartFocusOut(BaseModel):
+    from_: datetime | None = Field(default=None, serialization_alias="from")
+    to: datetime | None = None
+    around: datetime | None = None
+    bars: int | None = None
+    last_bars: int | None = None
+
+    @classmethod
+    def from_focus(cls, focus: ChartFocus) -> ChartFocusOut:
+        return cls(
+            from_=focus.from_,
+            to=focus.to,
+            around=focus.around,
+            bars=focus.bars,
+            last_bars=focus.last_bars,
+        )
+
+
 class ChartCommandOut(BaseModel):
     """What the chart should show now, and the sequence number that says so.
 
@@ -257,6 +280,7 @@ class ChartCommandOut(BaseModel):
     symbol: str | None
     resolution: str | None
     indicators: list[ChartIndicatorOut] | None
+    focus: ChartFocusOut | None
     created_at: datetime
 
     @classmethod
@@ -271,6 +295,7 @@ class ChartCommandOut(BaseModel):
                 ChartIndicatorOut(id=i.id, params=i.params, color=i.color)
                 for i in command.indicators
             ],
+            focus=None if command.focus is None else ChartFocusOut.from_focus(command.focus),
             created_at=command.created_at,
         )
 

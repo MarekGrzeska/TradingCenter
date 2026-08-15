@@ -7,10 +7,12 @@ tylko to, czego jeszcze nie zastosował".
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
 from agent import store
-from agent.models import ChartIndicator
+from agent.models import ChartFocus, ChartIndicator
 
 pytestmark = pytest.mark.db
 
@@ -31,6 +33,7 @@ async def test_sequence_rises_across_sessions(db) -> None:
         symbol="US100",
         resolution=None,
         indicators=None,
+        focus=None,
     )
     second = await store.record_chart_command(
         db,
@@ -38,6 +41,7 @@ async def test_sequence_rises_across_sessions(db) -> None:
         symbol=None,
         resolution="HOUR",
         indicators=None,
+        focus=None,
     )
 
     assert second.sequence > first.sequence
@@ -54,6 +58,7 @@ async def test_indicators_survive_the_round_trip(db) -> None:
             ChartIndicator(id="ema", params={"period": 20}, color="--color-accent"),
             ChartIndicator(id="ema", params={"period": 200}, color=None),
         ],
+        focus=None,
     )
 
     read = await store.chart_state_after(db, sequence=written.sequence - 1)
@@ -68,7 +73,8 @@ async def test_indicators_survive_the_round_trip(db) -> None:
 async def test_nothing_newer_than_the_cursor_is_nothing(db) -> None:
     session = await _session(db)
     written = await store.record_chart_command(
-        db, session_id=session.id, symbol="US100", resolution=None, indicators=None
+        db, session_id=session.id, symbol="US100", resolution=None, indicators=None,
+        focus=None,
     )
 
     assert await store.chart_state_after(db, sequence=written.sequence) is None
@@ -87,6 +93,7 @@ async def test_missed_commands_fold_into_one_answer(db) -> None:
         symbol="US100",
         resolution="MINUTE_5",
         indicators=[ChartIndicator(id="rsi", params={"period": 14})],
+        focus=None,
     )
     await store.record_chart_command(
         db,
@@ -94,9 +101,11 @@ async def test_missed_commands_fold_into_one_answer(db) -> None:
         symbol=None,
         resolution=None,
         indicators=[ChartIndicator(id="ema", params={"period": 50})],
+        focus=None,
     )
     last = await store.record_chart_command(
-        db, session_id=session.id, symbol="GOLD", resolution=None, indicators=None
+        db, session_id=session.id, symbol="GOLD", resolution=None, indicators=None,
+        focus=None,
     )
 
     folded = await store.chart_state_after(db, sequence=start.sequence - 1)
@@ -110,6 +119,43 @@ async def test_missed_commands_fold_into_one_answer(db) -> None:
     assert folded.indicators == [ChartIndicator(id="ema", params={"period": 50})]
 
 
+async def test_focus_survives_the_round_trip(db) -> None:
+    session = await _session(db)
+    around = datetime(2026, 1, 3, 12, 0, tzinfo=UTC)
+    written = await store.record_chart_command(
+        db,
+        session_id=session.id,
+        symbol=None,
+        resolution=None,
+        indicators=None,
+        focus=ChartFocus(around=around, bars=200),
+    )
+
+    read = await store.chart_state_after(db, sequence=written.sequence - 1)
+
+    assert read is not None
+    assert read.focus == ChartFocus(around=around, bars=200)
+
+
+async def test_a_command_with_only_a_focus_is_still_a_command(db) -> None:
+    # The check constraint the migration widens: a row that sets nothing at all cannot
+    # exist, but a focus-only command must not be rejected by it.
+    session = await _session(db)
+    written = await store.record_chart_command(
+        db,
+        session_id=session.id,
+        symbol=None,
+        resolution=None,
+        indicators=None,
+        focus=ChartFocus(last_bars=50),
+    )
+
+    read = await store.chart_state_after(db, sequence=written.sequence - 1)
+
+    assert read is not None
+    assert read.focus == ChartFocus(last_bars=50)
+
+
 async def test_drawing_none_is_a_command_of_its_own(db) -> None:
     # `[]` says "draw no indicators"; null says "leave them alone". Collapsing the two
     # would make "clear the chart" unsayable.
@@ -120,9 +166,11 @@ async def test_drawing_none_is_a_command_of_its_own(db) -> None:
         symbol=None,
         resolution=None,
         indicators=[ChartIndicator(id="ema", params={"period": 20})],
+        focus=None,
     )
     await store.record_chart_command(
-        db, session_id=session.id, symbol=None, resolution=None, indicators=[]
+        db, session_id=session.id, symbol=None, resolution=None, indicators=[],
+        focus=None,
     )
 
     folded = await store.chart_state_after(db, sequence=first.sequence - 1)

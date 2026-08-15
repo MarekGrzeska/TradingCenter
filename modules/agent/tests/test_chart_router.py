@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 from agent import store
 from agent.app import app
-from agent.models import ChartIndicator
+from agent.models import ChartFocus, ChartIndicator
 
 pytestmark = pytest.mark.db
 
@@ -40,6 +40,7 @@ async def _command(db, **overrides):
         symbol=overrides.get("symbol"),
         resolution=overrides.get("resolution"),
         indicators=overrides.get("indicators"),
+        focus=overrides.get("focus"),
     )
 
 
@@ -70,6 +71,26 @@ async def test_a_command_is_published_with_its_sequence(db) -> None:
     ]
 
 
+async def test_a_focus_is_published_with_its_from_alias(db) -> None:
+    written = await _command(
+        db,
+        symbol="US100",
+        focus=ChartFocus(last_bars=100),
+    )
+
+    with TestClient(app) as client:
+        body = client.get("/chart").json()
+
+    assert body["sequence"] == written.sequence
+    assert body["focus"] == {
+        "from": None,
+        "to": None,
+        "around": None,
+        "bars": None,
+        "last_bars": 100,
+    }
+
+
 async def test_nothing_newer_than_the_cursor_answers_with_nothing(db) -> None:
     written = await _command(db, symbol="US100")
 
@@ -91,9 +112,11 @@ async def test_a_consumer_coming_back_gets_everything_it_missed_as_one(db) -> No
         symbol="US100",
         resolution="MINUTE_5",
         indicators=[ChartIndicator(id="rsi", params={"period": 14})],
+        focus=None,
     )
     last = await store.record_chart_command(
-        db, session_id=session.id, symbol="GOLD", resolution=None, indicators=None
+        db, session_id=session.id, symbol="GOLD", resolution=None, indicators=None,
+        focus=None,
     )
 
     with TestClient(app) as client:

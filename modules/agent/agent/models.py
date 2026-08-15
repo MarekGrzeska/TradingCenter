@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Role(str, Enum):
@@ -110,6 +110,11 @@ class ChartSnapshot(BaseModel):
     symbol: str | None = None
     resolution: str | None = None
     indicators: list[ChartIndicator] = []
+    # The visible span, each half optional on its own: a consumer that draws but cannot
+    # say what is on screen still sends the rest (specs/agent-chat, "Tura wie, co terminal
+    # właśnie rysuje").
+    visible_from: datetime | None = None
+    visible_to: datetime | None = None
 
     def as_context(self) -> str:
         """One line for the system prompt. Written for a model to read, so it names the
@@ -130,7 +135,35 @@ class ChartSnapshot(BaseModel):
             f"interval {self.resolution}" if self.resolution else "no interval",
             f"indicators {drawn}" if drawn else "no indicators",
         ]
-        return "The operator's chart currently shows: " + "; ".join(parts) + "."
+        sentence = "The operator's chart currently shows: " + "; ".join(parts) + "."
+        if self.visible_from is not None and self.visible_to is not None:
+            sentence += (
+                f" The visible time span runs from {self.visible_from.isoformat()} "
+                f"to {self.visible_to.isoformat()}."
+            )
+        return sentence
+
+
+class ChartFocus(BaseModel):
+    """Which fragment of the time axis the chart should show. Exactly one of the three
+    shapes this carries MUST be filled: `from_`/`to` (a range), `around`/`bars` (a point
+    and a span around it), or `last_bars` (the newest N candles) — checked by the tool
+    that builds this, not here (specs/agent-chart-control, "Narzędzie ustawia zawartość
+    aktywnego slotu").
+
+    Absolute time on the wire, not relative to the moment the command is read: a command
+    sitting in the log for an hour must mean the same thing it meant when it was issued.
+    `last_bars` is the one named exception — it means "the end of the series", whatever
+    that is at the moment it is applied.
+    """
+
+    from_: datetime | None = Field(default=None, alias="from")
+    to: datetime | None = None
+    around: datetime | None = None
+    bars: int | None = None
+    last_bars: int | None = None
+
+    model_config = {"populate_by_name": True}
 
 
 class ChartCommand(BaseModel):
@@ -138,7 +171,8 @@ class ChartCommand(BaseModel):
     that as it is", never "clear it" — a model asked to add an average must not be able
     to blank the symbol by omission (specs/agent-chart-control, "Narzędzie ustawia
     zawartość aktywnego slotu"). An empty `indicators` list is the one way to say "draw
-    none", and it is a list, not a None.
+    none", and it is a list, not a None. A missing `focus` means "leave the operator
+    looking where they are".
 
     `sequence` is the row's own id: rising across the whole module, not per session, so a
     consumer holding one number knows what it has already applied.
@@ -149,6 +183,7 @@ class ChartCommand(BaseModel):
     symbol: str | None
     resolution: str | None
     indicators: list[ChartIndicator] | None
+    focus: ChartFocus | None
     created_at: datetime
 
     def merged_with(self, later: ChartCommand) -> ChartCommand:
@@ -164,6 +199,7 @@ class ChartCommand(BaseModel):
             symbol=later.symbol if later.symbol is not None else self.symbol,
             resolution=later.resolution if later.resolution is not None else self.resolution,
             indicators=later.indicators if later.indicators is not None else self.indicators,
+            focus=later.focus if later.focus is not None else self.focus,
             created_at=later.created_at,
         )
 
