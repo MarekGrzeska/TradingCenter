@@ -108,6 +108,28 @@ describe("PromptManagementView", () => {
     expect(screen.getByText("v4")).toBeInTheDocument();
   });
 
+  it("locks the fields while a save is in flight, so a keystroke cannot land between submit and response", async () => {
+    let resolveSave: (value: AgentPrompt) => void = () => {};
+    const api = fakeApi({
+      updatePrompt: async () =>
+        new Promise<AgentPrompt>((resolve) => {
+          resolveSave = resolve;
+        }),
+    });
+    const user = userEvent.setup();
+    render(<PromptManagementView api={api} />);
+    await screen.findByText("v4");
+
+    await user.type(screen.getByLabelText("With tools"), " more");
+    await user.click(screen.getByRole("button", { name: /save/i }));
+
+    expect(screen.getByLabelText("With tools")).toBeDisabled();
+
+    resolveSave(promptFixture({ version: "v5", withTools: "you have read-only tools more" }));
+    await screen.findByText("v5");
+    expect(screen.getByLabelText("With tools")).not.toBeDisabled();
+  });
+
   it("disables Save until something actually changed", async () => {
     render(<PromptManagementView api={fakeApi()} />);
     await screen.findByText("v4");

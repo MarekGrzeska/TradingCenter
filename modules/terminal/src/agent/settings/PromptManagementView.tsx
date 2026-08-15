@@ -88,12 +88,14 @@ export function PromptManagementView({ api = agentApi }: { api?: AgentApi } = {}
         label="With tools"
         value={draft.withTools}
         onChange={(withTools) => setDraft({ ...draft, withTools })}
+        disabled={saving}
       />
       <PromptField
         id="prompt-without-tools"
         label="Without tools"
         value={draft.withoutTools}
         onChange={(withoutTools) => setDraft({ ...draft, withoutTools })}
+        disabled={saving}
       />
 
       {saveError && <p className="text-sm text-critical">{saveError}</p>}
@@ -118,11 +120,13 @@ function PromptField({
   label,
   value,
   onChange,
+  disabled,
 }: {
   id: string;
   label: string;
   value: string;
   onChange: (value: string) => void;
+  disabled: boolean;
 }) {
   return (
     <div className="flex flex-col gap-1">
@@ -134,7 +138,8 @@ function PromptField({
         value={value}
         onChange={(event) => onChange(event.target.value)}
         rows={10}
-        className="w-full rounded border border-border bg-sunken px-2 py-1.5 text-sm text-ink"
+        disabled={disabled}
+        className="w-full rounded border border-border bg-sunken px-2 py-1.5 text-sm text-ink disabled:opacity-60"
       />
     </div>
   );
