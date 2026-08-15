@@ -1,10 +1,12 @@
+# agent-prompt-management Specification
+
 ## Purpose
 
 Trwały, wersjonowany magazyn promptu systemowego agenta i API do jego odczytu oraz
 nadpisania, tak że treść używana w rozmowach nie jest już zaszyta wyłącznie w kodzie
 modułu.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Odczyt aktualnego promptu
 

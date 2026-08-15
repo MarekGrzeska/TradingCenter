@@ -1,9 +1,11 @@
+# terminal-agent-prompt-management Specification
+
 ## Purpose
 
 Sekcja **Prompt management** na stronie Agent Settings, gdzie operator ogląda i edytuje
 system prompt agenta wprost z terminala, bez commitu i deployu.
 
-## ADDED Requirements
+## Requirements
 
 ### Requirement: Sekcja pokazuje aktualną treść i wersję z modułu
 
