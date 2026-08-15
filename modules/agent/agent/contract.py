@@ -11,13 +11,28 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
-from .models import Message, PromptRevision, RecordedCall, Session, ToolCall, UsageAggregate
+from .models import (
+    ChartCommand,
+    ChartIndicator,
+    ChartSnapshot,
+    Message,
+    PromptRevision,
+    RecordedCall,
+    Session,
+    ToolCall,
+    UsageAggregate,
+)
 from .models_catalogue import ModelCatalogueEntry
+from .tools.chart import CHART_TOOL_NAME
 
 # A name the operator types, not one derived from the first question — so it may be longer
 # than `store.derive_title`'s 60, but not unbounded: the conversation list is a narrow
 # column that truncates, and a title past this is one nothing can show.
 TITLE_MAX_CHARS = 120
+
+# Tools this module runs itself. Imported rather than spelled again: the tool's name is
+# decided where the tool is written.
+MODULE_TOOL_NAMES = frozenset({CHART_TOOL_NAME})
 
 
 class ModelOut(BaseModel):
@@ -61,6 +76,10 @@ class SessionOut(BaseModel):
         )
 
 
+def _source_of(tool_name: str) -> str:
+    return "module" if tool_name in MODULE_TOOL_NAMES else "server"
+
+
 class ToolCallOut(BaseModel):
     """One tool call, published in exactly one shape whether it is leaving as a stream
     event mid-turn or hanging off a message in a reloaded transcript. Both are built here
@@ -88,6 +107,11 @@ class ToolCallOut(BaseModel):
     # this is published (design.md, "Wynik w całości, bez własnego sufitu").
     result_text: str
     duration_ms: int
+    # Who ran it: the tool server, or this module itself. Derived from the name rather
+    # than stored, so there is one list of the module's own tools and no column that can
+    # disagree with it (specs/agent-tools, "Narzędzie własne modułu obok narzędzi
+    # serwera").
+    source: str = Field(examples=["server", "module"])
 
     @classmethod
     def from_tool_call(cls, call: ToolCall) -> ToolCallOut:
@@ -99,6 +123,7 @@ class ToolCallOut(BaseModel):
             outcome=call.outcome,
             result_text=call.result_text,
             duration_ms=call.duration_ms,
+            source=_source_of(call.tool_name),
         )
 
     @classmethod
@@ -111,6 +136,7 @@ class ToolCallOut(BaseModel):
             outcome=call.outcome,
             result_text=call.text,
             duration_ms=call.duration_ms,
+            source=_source_of(call.name),
         )
 
 
@@ -179,8 +205,74 @@ class PatchSessionIn(BaseModel):
         return self
 
 
+class ChartIndicatorIn(BaseModel):
+    id: str
+    params: dict[str, float] = Field(default_factory=dict)
+    color: str | None = None
+
+
+class ChartSnapshotIn(BaseModel):
+    """What the caller is drawing right now. Optional everywhere: a consumer without a
+    chart — every one except the terminal — has nothing to send, and a turn without this
+    behaves exactly as it did before the field existed."""
+
+    symbol: str | None = None
+    resolution: str | None = None
+    indicators: list[ChartIndicatorIn] = Field(default_factory=list)
+
+    def to_snapshot(self) -> ChartSnapshot:
+        return ChartSnapshot(
+            symbol=self.symbol,
+            resolution=self.resolution,
+            indicators=[
+                ChartIndicator(id=i.id, params=i.params, color=i.color) for i in self.indicators
+            ],
+        )
+
+
 class SendMessageIn(BaseModel):
     content: str
+    chart: ChartSnapshotIn | None = Field(
+        default=None,
+        description="what the caller is drawing as it asks; given to the model as context "
+        "for this turn only, never written to the transcript",
+    )
+
+
+class ChartIndicatorOut(BaseModel):
+    id: str
+    params: dict[str, float]
+    color: str | None
+
+
+class ChartCommandOut(BaseModel):
+    """What the chart should show now, and the sequence number that says so.
+
+    Several commands the consumer missed arrive folded into one — `sequence` is the
+    newest of them, and a field left null by every one of them is still null here,
+    meaning "leave it as it is" (specs/agent-chart-control, "Konsument czyta tylko to,
+    czego jeszcze nie zastosował")."""
+
+    sequence: int
+    symbol: str | None
+    resolution: str | None
+    indicators: list[ChartIndicatorOut] | None
+    created_at: datetime
+
+    @classmethod
+    def from_command(cls, command: ChartCommand) -> ChartCommandOut:
+        return cls(
+            sequence=command.sequence,
+            symbol=command.symbol,
+            resolution=command.resolution,
+            indicators=None
+            if command.indicators is None
+            else [
+                ChartIndicatorOut(id=i.id, params=i.params, color=i.color)
+                for i in command.indicators
+            ],
+            created_at=command.created_at,
+        )
 
 
 class UsageAggregateOut(BaseModel):

@@ -67,7 +67,7 @@ class FakeToolServer:
         )
 
 
-async def _run(provider, tool_server=None, *, tools=(PRICE_TOOL,), announced=None):
+async def _run(provider, tool_server=None, *, tools=(PRICE_TOOL,), announced=None, local_tools=None):
     """`announced` collects `(call, position)` for every tool call the graph announced —
     the events a caller watching the turn sees, as opposed to `result["calls"]`, which is
     what the turn hands back at the end. A test passing a list is asking about the first;
@@ -81,7 +81,7 @@ async def _run(provider, tool_server=None, *, tools=(PRICE_TOOL,), announced=Non
     async def on_tool_call(call: RecordedCall, position: int) -> None:
         announced_here.append((call, position))
 
-    graph = build_graph(provider, tool_server)  # pyright: ignore[reportArgumentType]
+    graph = build_graph(provider, tool_server, local_tools)  # pyright: ignore[reportArgumentType]
     result = await graph.ainvoke(
         initial_state(
             system_prompt="be helpful",
@@ -332,3 +332,99 @@ async def test_a_provider_failure_after_a_tool_call_keeps_the_text_and_the_recor
     # The call happened and cost time; a failed turn does not un-make it.
     assert len(result["calls"]) == 1
     assert len(result["usages"]) == 2
+
+
+# --- tools this module runs itself ---------------------------------------------------
+
+CHART_TOOL = ToolDescriptor(
+    name="set_chart",
+    description="Set what the operator's chart shows.",
+    input_schema={"type": "object", "properties": {"symbol": {"type": "string"}}},
+)
+
+
+class RecordingLocalTool:
+    """Stands in for `ChartTool.call` already bound to its session."""
+
+    def __init__(self, outcome: ToolOutcome | None = None) -> None:
+        self.seen: list[dict] = []
+        self._outcome = outcome or ToolOutcome(ToolOutcomeKind.OK, "chart set", 2)
+
+    async def __call__(self, arguments: dict) -> ToolOutcome:
+        self.seen.append(arguments)
+        return self._outcome
+
+
+async def test_a_local_tool_runs_here_and_never_reaches_the_server() -> None:
+    chart = RecordingLocalTool()
+    provider = FakeProvider(
+        [
+            [ToolCallRequest("c1", "set_chart", {"symbol": "US100"}), UsageReport(1, 1, None, None)],
+            [TextDelta("shown"), UsageReport(1, 1, None, None)],
+        ]
+    )
+    server = FakeToolServer()
+
+    result, _ = await _run(
+        provider,
+        server,
+        tools=(PRICE_TOOL, CHART_TOOL),
+        local_tools={"set_chart": chart},
+    )
+
+    assert chart.seen == [{"symbol": "US100"}]
+    assert server.seen == []
+    # One trace, the same shape as any other call, so the panel does not have to know
+    # which tools this module owns to show what happened.
+    [call] = result["calls"]
+    assert (call.name, call.outcome, call.text) == ("set_chart", "ok", "chart set")
+
+
+async def test_both_kinds_of_tool_share_one_turn_and_one_ceiling() -> None:
+    chart = RecordingLocalTool()
+    provider = FakeProvider(
+        [
+            [ToolCallRequest("c1", "get_last_price", {"symbol": "US100"}), UsageReport(1, 1, None, None)],
+            [ToolCallRequest("c2", "set_chart", {"symbol": "US100"}), UsageReport(1, 1, None, None)],
+            [TextDelta("done"), UsageReport(1, 1, None, None)],
+        ]
+    )
+    server = FakeToolServer()
+
+    result, _ = await _run(
+        provider,
+        server,
+        tools=(PRICE_TOOL, CHART_TOOL),
+        local_tools={"set_chart": chart},
+    )
+
+    assert [call.name for call in result["calls"]] == ["get_last_price", "set_chart"]
+    assert result["tool_calls_made"] == 2
+    assert result["failed"] is False
+
+
+async def test_a_local_tool_refusing_is_a_result_the_model_can_act_on() -> None:
+    chart = RecordingLocalTool(
+        ToolOutcome(ToolOutcomeKind.REFUSED, "'TSLA' is not collected by the archive.", 1)
+    )
+    provider = FakeProvider(
+        [
+            [ToolCallRequest("c1", "set_chart", {"symbol": "TSLA"}), UsageReport(1, 1, None, None)],
+            [ToolCallRequest("c2", "set_chart", {"symbol": "US100"}), UsageReport(1, 1, None, None)],
+            [TextDelta("shown instead"), UsageReport(1, 1, None, None)],
+        ]
+    )
+
+    result, _ = await _run(
+        provider,
+        FakeToolServer(),
+        tools=(CHART_TOOL,),
+        local_tools={"set_chart": chart},
+    )
+
+    # The refusal came back as a round result, so the model got to try again inside the
+    # same turn (specs/agent-tools, "Odmowa narzędzia jest wynikiem, nie awarią tury").
+    assert [call.outcome for call in result["calls"]] == ["refused", "refused"]
+    assert result["failed"] is False
+    assert result["text"] == "shown instead"
+    assert result["rounds"][0].results[0].text.startswith("'TSLA' is not collected")

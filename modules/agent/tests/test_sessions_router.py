@@ -40,10 +40,12 @@ def _env(migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
 class _FakeProvider:
     def __init__(self, chunks: list) -> None:
         self._chunks = chunks
+        self.prompts: list[str] = []
 
     async def stream(
         self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
     ):
+        self.prompts.append(system_prompt)
         for chunk in self._chunks:
             yield chunk
 
@@ -405,3 +407,43 @@ def test_a_broken_stream_reports_error_and_saves_the_partial_reply() -> None:
     assert [kind for kind, _ in events] == ["fragment", "fragment", "error"]
     assert messages[-1]["content"] == "cut off"
     assert messages[-1]["incomplete"] is True
+
+
+# --- what the terminal is drawing as it asks -----------------------------------------
+
+
+def test_a_turn_carrying_a_chart_snapshot_hands_it_to_the_model() -> None:
+    # specs/agent-chat, "Tura wie, co terminal właśnie rysuje"
+    provider = _FakeProvider([TextDelta("looking"), UsageReport(1, 1, None, None)])
+    with TestClient(app) as client:
+        app.state.provider = provider
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(
+            f"/sessions/{session_id}/messages",
+            json={
+                "content": "what do you see?",
+                "chart": {
+                    "symbol": "US100",
+                    "resolution": "HOUR",
+                    "indicators": [{"id": "ema", "params": {"period": 200}}],
+                },
+            },
+        )
+        messages = client.get(f"/sessions/{session_id}/messages").json()
+
+    assert "US100" in provider.prompts[0]
+    assert "ema(period=200)" in provider.prompts[0]
+    # The transcript is the conversation; what was on screen is not part of it.
+    assert [m["content"] for m in messages] == ["what do you see?", "looking"]
+
+
+def test_a_turn_without_a_snapshot_runs_the_prompt_untouched() -> None:
+    provider = _FakeProvider([TextDelta("fine"), UsageReport(1, 1, None, None)])
+    with TestClient(app) as client:
+        app.state.provider = provider
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(f"/sessions/{session_id}/messages", json={"content": "hello"})
+        prompt = client.get("/prompt").json()
+
+    assert provider.prompts[0] in (prompt["with_tools"], prompt["without_tools"])
+    assert "currently shows" not in provider.prompts[0]

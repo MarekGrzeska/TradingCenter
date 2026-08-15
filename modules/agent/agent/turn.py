@@ -17,12 +17,12 @@ from typing import Protocol
 import asyncpg
 
 from . import store
-from .graph import build_graph, initial_state
-from .models import RecordedCall
+from .graph import LocalTool, build_graph, initial_state
+from .models import ChartSnapshot, RecordedCall
 from .models_catalogue import ModelCatalogueEntry
 from .prompt import prompt_text
 from .provider import ModelProvider
-from .tools import ToolServer
+from .tools import CHART_TOOL, CHART_TOOL_NAME, ChartTool, ToolOutcome, ToolServer
 
 log = logging.getLogger(__name__)
 
@@ -67,6 +67,20 @@ class Queue(Protocol):
     def put_nowait(self, event: StreamEvent, /) -> None: ...
 
 
+def _system_prompt(revision, *, has_tools: bool, chart: ChartSnapshot | None) -> str:
+    """The revision's own text, plus one line about what the caller is looking at.
+
+    Appended to the system prompt rather than pushed into the transcript: the transcript
+    is the conversation, and what was on screen when a question was asked is not part of
+    it (specs/agent-chat, "Tura wie, co terminal właśnie rysuje"). It also means the line
+    describes *this* turn only — the next one brings its own, or none.
+    """
+    body = prompt_text(revision, has_tools=has_tools)
+    if chart is None:
+        return body
+    return body + "\n\n" + chart.as_context()
+
+
 async def run_turn(
     pool: asyncpg.Pool,
     *,
@@ -75,6 +89,7 @@ async def run_turn(
     provider: ModelProvider,
     queue: Queue,
     tool_server: ToolServer | None = None,
+    chart: ChartSnapshot | None = None,
 ) -> None:
     async with pool.acquire() as conn:
         messages = await store.get_messages(conn, session_id=session_id)
@@ -91,17 +106,31 @@ async def run_turn(
     # first model call: a list that changed between rounds would leave the provider
     # holding a call for a tool that had just gone away. An empty list is the whole
     # answer to a tool server that is down (specs/agent-tool-access).
-    tools = await tool_server.list_tools() if tool_server is not None else []
+    server_tools = await tool_server.list_tools() if tool_server is not None else []
 
-    graph = build_graph(provider, tool_server)
+    # This module's own tool sits beside the server's and is announced even when the
+    # server is down — it does not need market-mcp to exist, only to check against, and
+    # it says so itself when it cannot (specs/agent-tools, "Brak serwera narzędzi").
+    chart_tool = ChartTool(pool, tool_server)
+
+    async def set_chart(arguments: dict) -> ToolOutcome:
+        return await chart_tool.call(arguments, session_id=session_id)
+
+    local_tools: dict[str, LocalTool] = {CHART_TOOL_NAME: set_chart}
+    tools = [*server_tools, CHART_TOOL]
+
+    graph = build_graph(provider, tool_server, local_tools)
     try:
         result = await graph.ainvoke(
             initial_state(
                 # Which prompt this turn runs is a fact about the turn, not a change to
                 # the prompt: `revision` was current when this turn started, and the
                 # variant without tools is what an unreachable market-mcp degrades to
-                # (specs/agent-chat, "Agent bez narzędzi mówi, że ich nie ma").
-                system_prompt=prompt_text(revision, has_tools=bool(tools)),
+                # (specs/agent-chat, "Agent bez narzędzi mówi, że ich nie ma"). Measured
+                # against `server_tools` rather than `tools`: the chart tool is always
+                # there, and letting it stand for "has tools" would hide the archive
+                # being down. Both prompt variants name it; only one promises the archive.
+                system_prompt=_system_prompt(revision, has_tools=bool(server_tools), chart=chart),
                 history=history,
                 model=model_entry.model,
                 on_delta=on_delta,

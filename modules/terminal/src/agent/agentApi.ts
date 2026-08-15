@@ -85,6 +85,31 @@ export interface UsageRange {
   to?: number;
 }
 
+/** One indicator the agent asked the chart to draw — the terminal's own selection shape
+ *  minus the instance key, which this side hands out when it applies the command. */
+export interface AgentChartIndicator {
+  id: string;
+  params: Record<string, number>;
+  color: string | null;
+}
+
+/** What the agent set the chart to, as of `sequence`. A null field means "leave it as it
+ *  is": several commands arrive folded into one, and a field none of them touched is
+ *  still untouched here. */
+export interface AgentChartCommand {
+  sequence: number;
+  symbol: string | null;
+  resolution: string | null;
+  indicators: AgentChartIndicator[] | null;
+}
+
+/** What the terminal is drawing as it asks — context for one turn, never a message. */
+export interface AgentChartSnapshot {
+  symbol: string | null;
+  resolution: string;
+  indicators: Array<{ id: string; params: Record<string, number>; color: string | null }>;
+}
+
 export interface AgentApi {
   listModels(signal: AbortSignal): Promise<AgentModel[]>;
   listSessions(signal: AbortSignal): Promise<AgentSession[]>;
@@ -102,7 +127,17 @@ export interface AgentApi {
    *  accepted by the module; a rejection while iterating the result means the turn was
    *  accepted and broke partway through — `agentChatStore` tells the two apart, because
    *  only it knows what, if anything, is worth keeping on screen for each. */
-  sendMessage(id: number, content: string, signal: AbortSignal): Promise<AsyncGenerator<AgentStreamEvent>>;
+  sendMessage(
+    id: number,
+    content: string,
+    signal: AbortSignal,
+    chart?: AgentChartSnapshot | null,
+  ): Promise<AsyncGenerator<AgentStreamEvent>>;
+  /** What the agent set the chart to since `after`, or null when it set nothing. Safe to
+   *  repeat: the module keeps no cursor of its own, so asking twice answers twice the
+   *  same (specs/agent-chart-control, "Konsument czyta tylko to, czego jeszcze nie
+   *  zastosował"). */
+  chartCommand(after: number, signal: AbortSignal): Promise<AgentChartCommand | null>;
   usage(range: UsageRange, signal: AbortSignal): Promise<AgentUsageSummary>;
   getPrompt(signal: AbortSignal): Promise<AgentPrompt>;
   /** Rejects with a `"refused"` `MarketDataError` on a blank variant — the module's own
@@ -138,6 +173,29 @@ interface RawMessage {
    *  of the agent reads a transcript without it, and the panel must open rather than
    *  throw (design.md, "Agent sprzed zmiany wobec terminala po zmianie"). */
   tool_calls?: RawToolCall[];
+}
+
+interface RawChartCommand {
+  sequence: number;
+  symbol: string | null;
+  resolution: string | null;
+  indicators: Array<{ id: string; params: Record<string, number>; color: string | null }> | null;
+}
+
+function mapChartCommand(raw: RawChartCommand): AgentChartCommand {
+  return {
+    sequence: raw.sequence,
+    symbol: raw.symbol,
+    resolution: raw.resolution,
+    indicators:
+      raw.indicators === null
+        ? null
+        : raw.indicators.map((indicator) => ({
+            id: indicator.id,
+            params: indicator.params,
+            color: indicator.color,
+          })),
+  };
 }
 
 interface RawUsageAggregate {
@@ -287,16 +345,24 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
       return raw.map(mapMessage);
     },
 
-    async sendMessage(id, content, signal) {
+    async sendMessage(id, content, signal, chart = null) {
       const response = await http.send(`${httpBase}/sessions/${id}/messages`, {
         method: "POST",
-        body: { content },
+        body: chart === null ? { content } : { content, chart },
         signal,
       });
       if (response.body === null) {
         throw new MarketDataError("unknown", "agent sent no stream body");
       }
       return readAgentStream(response.body);
+    },
+
+    async chartCommand(after, signal) {
+      const raw = await http.json<RawChartCommand | null>(
+        `${httpBase}/chart?after=${after}`,
+        { signal },
+      );
+      return raw === null ? null : mapChartCommand(raw);
     },
 
     async usage(range, signal) {

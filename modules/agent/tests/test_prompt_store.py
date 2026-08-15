@@ -11,9 +11,11 @@ from agent import store
 pytestmark = pytest.mark.db
 
 
-async def test_migration_seeds_v4_with_todays_text(db) -> None:
+async def test_migration_seeds_the_current_text(db) -> None:
     revision = await store.latest_prompt_revision(db)
-    assert revision.version == "v4"
+    # `v5` names the chart tool; `v4` is still in the table below it, which is what a
+    # transcript stamped `"v4"` reads back against.
+    assert revision.version == "v5"
     assert revision.with_tools_body != revision.without_tools_body
 
 
@@ -45,11 +47,14 @@ async def test_with_tools_says_the_tools_change_nothing(db) -> None:
     assert "place an order" in lowered
 
 
-async def test_without_tools_says_so_plainly(db) -> None:
+async def test_without_tools_says_the_archive_is_out_of_reach(db) -> None:
     revision = await store.latest_prompt_revision(db)
     lowered = revision.without_tools_body.lower()
-    assert "no tools" in lowered
+    # Not "you have no tools" any more: the chart tool is this module's own and is
+    # offered whether or not market-mcp answers. What this variant must still say is
+    # that no market data can be read.
     assert "cannot reach the archive" in lowered
+    assert "cannot see candles" in lowered
 
 
 async def test_both_seeded_texts_disclaim_investment_advice(db) -> None:
@@ -90,7 +95,7 @@ async def test_create_prompt_revision_bumps_the_version(db) -> None:
     updated = await store.create_prompt_revision(
         db, with_tools_body="new with-tools text", without_tools_body="new without-tools text"
     )
-    assert updated.version == "v5"
+    assert updated.version == "v6"
     assert updated.with_tools_body == "new with-tools text"
     assert updated.without_tools_body == "new without-tools text"
 
@@ -109,4 +114,12 @@ async def test_create_prompt_revision_is_append_only(db) -> None:
 async def test_repeated_edits_keep_incrementing(db) -> None:
     await store.create_prompt_revision(db, with_tools_body="a1", without_tools_body="b1")
     second = await store.create_prompt_revision(db, with_tools_body="a2", without_tools_body="b2")
-    assert second.version == "v6"
+    assert second.version == "v7"
+
+
+async def test_both_seeded_texts_name_the_chart_tool(db) -> None:
+    # A tool the prompt does not mention is a tool the model does not reach for — and the
+    # chart tool is offered in both variants, because it does not need the archive.
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        assert "set_chart" in body

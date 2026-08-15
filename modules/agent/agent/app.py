@@ -26,7 +26,7 @@ from .config import Settings
 from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
 from .provider import OpenAIProvider
-from .routers import models, prompt, sessions, usage
+from .routers import chart, models, prompt, sessions, usage
 from .tools import ToolServer
 
 log = logging.getLogger(__name__)
@@ -77,7 +77,8 @@ app = FastAPI(
         "persist in this module's own database; each model call prices itself at the "
         "moment it is written, against the module's own rate configuration, never "
         "recomputed later. Read-only tools over the candle archive, reached through "
-        "market-mcp — nothing here writes anywhere."
+        "market-mcp, plus one tool of this module's own that sets what the operator's "
+        "terminal draws — the only thing the agent writes (specs/agent-tools)."
     ),
     version="0.1.0",
     lifespan=lifespan,
@@ -98,3 +99,4 @@ app.include_router(models.router)
 app.include_router(sessions.router)
 app.include_router(usage.router)
 app.include_router(prompt.router)
+app.include_router(chart.router)
