@@ -51,6 +51,25 @@ Needs a database: `../../compose.yaml` at the repo root starts one on
 `127.0.0.1:55432` (`./scripts/dev.sh` / `./scripts/dev.ps1` create the `agent` database
 inside it if it does not exist yet).
 
+`alembic upgrade head` is not optional and never implicit — the container will not run it
+(`Dockerfile`), and neither does `deploy-agent.yml`, so the module refuses to start when
+the revision it finds and the revision its image ships disagree (`schema_version.py`).
+That check exists because a deploy carrying `0003_prompt_revisions` ran against a database
+still at `0002`: everything worked except `GET /prompt`, which answered `500` from a table
+that was not there. Skipping the migration now fails at startup, naming both revisions,
+rather than one route failing quietly.
+
+In production the migration is only half of it, and the other half has no check at all.
+Migrations there are applied by the server's Entra administrator, so every table they
+create is owned by that administrator and the app's own role
+(`app-tradingcenter-agent`) is granted nothing on it — the original grant was one
+statement over the tables that existed that day. `prompt_revisions` was invisible to the
+app for that reason too, which reads as `permission denied` and not as a missing table.
+Fixed on 15 August by granting the new table what the others already carried and adding
+`ALTER DEFAULT PRIVILEGES FOR ROLE <administrator> IN SCHEMA public` so a future
+migration grants itself. That default is scoped to the role that creates the object: a
+migration applied by a *different* administrator identity lands back in the same hole.
+
 Does not need `market-mcp`: `MARKET_MCP_URL` left unset means no tools, and a server
 configured but not answering means the same thing for that turn. Pointing the URL
 anywhere off loopback needs `MARKET_MCP_SCOPE` set too — the module refuses to start

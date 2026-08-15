@@ -21,6 +21,7 @@ logging.basicConfig(
 
 from fastapi import FastAPI
 
+from . import schema_version
 from .config import Settings
 from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
@@ -45,16 +46,25 @@ async def lifespan(app: FastAPI):
         client_secret=settings.azure_client_secret,
         tenant_id=settings.azure_tenant_id,
     ) as pool:
-        app.state.settings = settings
-        app.state.pool = pool
-        app.state.catalogue = ModelCatalogue.from_settings(settings)
-        app.state.provider = OpenAIProvider(settings)
-        app.state.tool_server = tool_server
-        # Holds a turn's background task for as long as it runs, so nothing collects
-        # it mid-generation just because the request that started it ended
-        # (design.md, "Tura modelu przeżywa rozłączenie wołającego").
-        app.state.background_tasks = set()
+        # The `try` opens before the schema check, not after it: `ToolServer.__init__`
+        # already holds a credential when a scope is configured, and a refused start is
+        # exactly the path that would otherwise leak it.
         try:
+            # Before anything is built on top of it: a schema that does not match this
+            # image makes every query below a guess, and the only honest thing a process
+            # can do about that is not start (`schema_version.py`).
+            async with pool.acquire() as conn:
+                await schema_version.verify(conn)
+
+            app.state.settings = settings
+            app.state.pool = pool
+            app.state.catalogue = ModelCatalogue.from_settings(settings)
+            app.state.provider = OpenAIProvider(settings)
+            app.state.tool_server = tool_server
+            # Holds a turn's background task for as long as it runs, so nothing collects
+            # it mid-generation just because the request that started it ended
+            # (design.md, "Tura modelu przeżywa rozłączenie wołającego").
+            app.state.background_tasks = set()
             yield
         finally:
             await tool_server.aclose()
