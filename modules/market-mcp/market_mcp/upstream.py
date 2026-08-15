@@ -19,7 +19,6 @@ class UpstreamCandle(BaseModel):
     high: float | None = None
     low: float | None = None
     close: float | None = None
-    volume: float | None = None
 
 
 class UpstreamUncovered(BaseModel):
