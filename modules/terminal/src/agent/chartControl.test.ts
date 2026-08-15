@@ -307,7 +307,33 @@ describe("activeChartSnapshot", () => {
       symbol: "US100",
       resolution: "HOUR",
       indicators: [{ id: "ema", params: { period: 200 }, color: "--color-accent" }],
+      visibleFrom: null,
+      visibleTo: null,
     });
+  });
+
+  it("carries the active slot's visible range when the chart has reported one", () => {
+    const grid = createGridStore(memoryStorage());
+    grid.setActiveSlot("s1");
+    grid.setSlotSymbol("s1", "US100");
+    grid.setVisibleRange("s1", { from: 100, to: 200 });
+
+    const snapshot = activeChartSnapshot(grid);
+
+    expect(snapshot?.visibleFrom).toBe(100);
+    expect(snapshot?.visibleTo).toBe(200);
+  });
+
+  it("carries no visible range for a slot the active one just became", () => {
+    const grid = createGridStore(memoryStorage());
+    grid.setActiveSlot("s1");
+    grid.setSlotSymbol("s1", "US100");
+    grid.setVisibleRange("s2", { from: 100, to: 200 }); // a different slot's
+
+    const snapshot = activeChartSnapshot(grid);
+
+    expect(snapshot?.visibleFrom).toBeNull();
+    expect(snapshot?.visibleTo).toBeNull();
   });
 
   it("sends nothing at all for a slot with no instrument", () => {

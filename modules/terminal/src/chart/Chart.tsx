@@ -34,6 +34,7 @@ import {
   type IndicatorResult,
   type IndicatorSelection,
   type Resolution,
+  type VisibleTimeRange,
 } from "../data/types";
 import type { MarketDataSource } from "../data/source";
 import { formatCrosshairTime, formatInstant, formatTickMark } from "../ui/formatTime";
@@ -91,6 +92,13 @@ export interface ChartProps {
    *  never left uncalled for a request the chart accepted. The caller's cue to stop
    *  offering it again (`terminal-chart` spec, "Kadr MUST być żądaniem jednorazowym"). */
   onFocusRequestSettled?(): void;
+  /** Fired whenever the visible span changes — panning, zooming, a resolution change's
+   *  own repositioning, or `focusRequest` landing — and with `null` when there is
+   *  nothing to report (no series drawn yet, or the chart is going away). Never read
+   *  back by this component; it exists for a caller keeping its own record of what the
+   *  operator is looking at (`terminal-agent-chat` spec, "Panel wysyła migawkę tego, co
+   *  rysuje aktywny slot"). Not a controlled value — there is no prop that sets it. */
+  onVisibleRangeChange?(range: VisibleTimeRange | null): void;
 }
 
 /** Price-pane overlays, own-pane oscillators, price-pane markers, price-pane
@@ -323,6 +331,7 @@ export function Chart({
   onIndicatorSelectionsChange,
   focusRequest = null,
   onFocusRequestSettled,
+  onVisibleRangeChange,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -560,6 +569,15 @@ export function Chart({
     // filled, which is what stops it looping on its own frame correction.
     const onRangeChange = (range: LogicalRange | null) => {
       if (range && range.from < OLDER_MARGIN_BARS) requestOlderRef.current();
+
+      const series = barsRef.current;
+      const fromIndex = range ? Math.max(0, Math.round(range.from)) : -1;
+      const toIndex = range ? Math.min(series.length - 1, Math.round(range.to)) : -1;
+      const fromTime = series[fromIndex]?.time;
+      const toTime = series[toIndex]?.time;
+      onVisibleRangeChangeRef.current?.(
+        fromTime !== undefined && toTime !== undefined ? { from: fromTime, to: toTime } : null,
+      );
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange);
 
@@ -582,6 +600,7 @@ export function Chart({
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
       chart.remove();
+      onVisibleRangeChangeRef.current?.(null);
       chartRef.current = null;
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
@@ -695,6 +714,8 @@ export function Chart({
   const pendingFocusRef = useRef<ChartFocusRequest | null>(null);
   const onFocusRequestSettledRef = useRef(onFocusRequestSettled);
   onFocusRequestSettledRef.current = onFocusRequestSettled;
+  const onVisibleRangeChangeRef = useRef(onVisibleRangeChange);
+  onVisibleRangeChangeRef.current = onVisibleRangeChange;
 
   // --- resolution change: the viewport it leaves behind, for the incoming series' first
   // draw to stand over instead of `fitContent()`'s whole-series view ---

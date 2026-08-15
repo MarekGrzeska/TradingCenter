@@ -283,3 +283,56 @@ describe("createGridStore focus requests", () => {
     expect(second.getFocusRequest("s1")).toBeNull();
   });
 });
+
+describe("createGridStore visible range", () => {
+  it("has no range for a slot until one is set", () => {
+    const store = createGridStore(memoryStorage());
+    expect(store.getVisibleRange("s1")).toBeNull();
+  });
+
+  it("returns what was set for that slot", () => {
+    const store = createGridStore(memoryStorage());
+    store.setVisibleRange("s1", { from: 100, to: 200 });
+    expect(store.getVisibleRange("s1")).toEqual({ from: 100, to: 200 });
+  });
+
+  it("clears on a null set", () => {
+    const store = createGridStore(memoryStorage());
+    store.setVisibleRange("s1", { from: 100, to: 200 });
+    store.setVisibleRange("s1", null);
+    expect(store.getVisibleRange("s1")).toBeNull();
+  });
+
+  it("keeps one slot's range independent of another's", () => {
+    const store = createGridStore(memoryStorage());
+    store.setVisibleRange("s1", { from: 100, to: 200 });
+    store.setVisibleRange("s2", { from: 300, to: 400 });
+
+    expect(store.getVisibleRange("s1")).toEqual({ from: 100, to: 200 });
+    expect(store.getVisibleRange("s2")).toEqual({ from: 300, to: 400 });
+  });
+
+  it("never reaches storage, and does not notify the config listeners", () => {
+    const storage = memoryStorage();
+    const store = createGridStore(storage);
+    const configListener = vi.fn();
+    store.subscribe(configListener);
+
+    store.setVisibleRange("s1", { from: 100, to: 200 });
+    store.setLayout("1x1"); // the only thing that writes to storage
+
+    expect(storage.raw.get(STORAGE_KEY)).not.toContain("200");
+    // One notification, from setLayout — setVisibleRange fired none of its own.
+    expect(configListener).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not survive a reload — it is not part of the persisted config", () => {
+    const storage = memoryStorage();
+    const first = createGridStore(storage);
+    first.setVisibleRange("s1", { from: 100, to: 200 });
+    first.setLayout("1x1"); // forces a write, so there is something to reload
+
+    const second = createGridStore(storage);
+    expect(second.getVisibleRange("s1")).toBeNull();
+  });
+});

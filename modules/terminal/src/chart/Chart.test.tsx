@@ -54,10 +54,12 @@ function renderChart(
     onIndicatorSelectionsChange: (selections: IndicatorSelection[]) => void;
     focusRequest: ChartFocusRequest | null;
     onFocusRequestSettled: () => void;
+    onVisibleRangeChange: (range: { from: number; to: number } | null) => void;
   }>,
 ) {
   const onResolutionChange = vi.fn();
   const onFocusRequestSettled = props?.onFocusRequestSettled ?? vi.fn();
+  const onVisibleRangeChange = props?.onVisibleRangeChange ?? vi.fn();
   const view = render(
     <Chart
       source={source}
@@ -69,9 +71,10 @@ function renderChart(
       onIndicatorSelectionsChange={props?.onIndicatorSelectionsChange}
       focusRequest={props?.focusRequest}
       onFocusRequestSettled={onFocusRequestSettled}
+      onVisibleRangeChange={onVisibleRangeChange}
     />,
   );
-  return { ...view, onResolutionChange, onFocusRequestSettled };
+  return { ...view, onResolutionChange, onFocusRequestSettled, onVisibleRangeChange };
 }
 
 let source: ControllableSource;
@@ -763,6 +766,45 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
 
     expect(stub.latest().timeRangesSet).toHaveLength(0);
     expect(source.historyCalls).toHaveLength(0);
+  });
+});
+
+describe("Chart — reports the visible range (terminal-agent-chat spec, agent-chart-navigation)", () => {
+  it("reports the drawn bars' own times at the visible logical range, on a pan", async () => {
+    const { onVisibleRangeChange } = renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(160, 2), bar(220, 3), bar(280, 4)]);
+    });
+
+    await act(async () => {
+      stub.latest().pan({ from: 1, to: 2 });
+    });
+
+    expect(onVisibleRangeChange).toHaveBeenLastCalledWith({ from: 160, to: 220 });
+  });
+
+  it("reports null while nothing is drawn yet", async () => {
+    const { onVisibleRangeChange } = renderChart(source);
+
+    await act(async () => {
+      stub.latest().pan({ from: 0, to: 1 });
+    });
+
+    expect(onVisibleRangeChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("reports null once the chart is torn down", async () => {
+    const { unmount, onVisibleRangeChange } = renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(160, 2), bar(220, 3)]);
+    });
+    await act(async () => {
+      stub.latest().pan({ from: 0, to: 2 });
+    });
+
+    unmount();
+
+    expect(onVisibleRangeChange).toHaveBeenLastCalledWith(null);
   });
 });
 

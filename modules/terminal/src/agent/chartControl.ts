@@ -217,6 +217,7 @@ export function activeChartSnapshot(grid: GridStore = gridStore): AgentChartSnap
   const config = grid.getSnapshot();
   const slot = config.slots[config.activeSlot];
   if (slot.symbol === null) return null;
+  const visible = grid.getVisibleRange(config.activeSlot);
   return {
     symbol: slot.symbol,
     resolution: slot.resolution,
@@ -225,5 +226,7 @@ export function activeChartSnapshot(grid: GridStore = gridStore): AgentChartSnap
       params: selection.params,
       color: selection.color,
     })),
+    visibleFrom: visible?.from ?? null,
+    visibleTo: visible?.to ?? null,
   };
 }

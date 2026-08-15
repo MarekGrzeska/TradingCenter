@@ -271,6 +271,73 @@ describe("agentApi.sendMessage", () => {
     ]);
   });
 
+  function emptyCompleteStream() {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('event: complete\ndata: {"incomplete":false}\n\n'));
+        controller.close();
+      },
+    });
+  }
+
+  it("sends the visible span as ISO instants when both halves are known", async () => {
+    let body: unknown;
+    server.use(
+      http.post(`${HTTP_BASE}/sessions/7/messages`, async ({ request }) => {
+        body = await request.json();
+        return new Response(emptyCompleteStream(), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }),
+    );
+
+    await api().sendMessage(7, "what do you see", new AbortController().signal, {
+      symbol: "US100",
+      resolution: "MINUTE_5",
+      indicators: [],
+      visibleFrom: 1767398400,
+      visibleTo: 1767484800,
+    });
+
+    expect(body).toEqual({
+      content: "what do you see",
+      chart: {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        indicators: [],
+        visible_from: "2026-01-03T00:00:00.000Z",
+        visible_to: "2026-01-04T00:00:00.000Z",
+      },
+    });
+  });
+
+  it("sends neither half of the visible span when only one is known", async () => {
+    let body: unknown;
+    server.use(
+      http.post(`${HTTP_BASE}/sessions/7/messages`, async ({ request }) => {
+        body = await request.json();
+        return new Response(emptyCompleteStream(), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }),
+    );
+
+    await api().sendMessage(7, "what do you see", new AbortController().signal, {
+      symbol: "US100",
+      resolution: "MINUTE_5",
+      indicators: [],
+      visibleFrom: 1767398400,
+      visibleTo: null,
+    });
+
+    expect(body).toEqual({
+      content: "what do you see",
+      chart: { symbol: "US100", resolution: "MINUTE_5", indicators: [] },
+    });
+  });
+
   it("rejects before yielding anything when the session is missing", async () => {
     server.use(
       http.post(`${HTTP_BASE}/sessions/9/messages`, () =>

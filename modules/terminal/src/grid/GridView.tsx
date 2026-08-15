@@ -168,6 +168,7 @@ function Slot({
           onIndicatorSelectionsChange={(next) => gridStore.setSlotIndicators(slotId, next)}
           focusRequest={focusRequest}
           onFocusRequestSettled={() => gridStore.clearFocusRequest(slotId)}
+          onVisibleRangeChange={(range) => gridStore.setVisibleRange(slotId, range)}
           headerLeft={
             <SymbolField
               label={`Symbol for slot ${slotId}`}

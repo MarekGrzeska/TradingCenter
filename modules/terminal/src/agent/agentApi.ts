@@ -116,11 +116,16 @@ export interface AgentChartCommand {
   focus: AgentChartFocus | null;
 }
 
-/** What the terminal is drawing as it asks — context for one turn, never a message. */
+/** What the terminal is drawing as it asks — context for one turn, never a message.
+ *  `visibleFrom`/`visibleTo` (epoch seconds) are the visible span, both present or both
+ *  absent: half a span is not a span, and the module reads exactly that distinction to
+ *  decide whether to say anything about it at all. */
 export interface AgentChartSnapshot {
   symbol: string | null;
   resolution: string;
   indicators: Array<{ id: string; params: Record<string, number>; color: string | null }>;
+  visibleFrom?: number | null;
+  visibleTo?: number | null;
 }
 
 export interface AgentApi {
@@ -212,6 +217,33 @@ function mapChartFocus(raw: RawChartFocus): AgentChartFocus {
     bars: raw.bars,
     lastBars: raw.last_bars,
   };
+}
+
+interface WireChartSnapshot {
+  symbol: string | null;
+  resolution: string;
+  indicators: Array<{ id: string; params: Record<string, number>; color: string | null }>;
+  visible_from?: string;
+  visible_to?: string;
+}
+
+/** The one place `AgentChartSnapshot` meets the wire — `sendMessage`'s `chart` field is
+ *  otherwise passed through untouched, which only ever worked because `symbol`,
+ *  `resolution` and `indicators` happen to spell the same both ways. The visible span
+ *  does not: epoch seconds here, an ISO instant there, and included only when both
+ *  halves are known — an ISO instant invented for the half that is not would be a kadr
+ *  the module was never actually shown. */
+function chartSnapshotToWire(snapshot: AgentChartSnapshot): WireChartSnapshot {
+  const wire: WireChartSnapshot = {
+    symbol: snapshot.symbol,
+    resolution: snapshot.resolution,
+    indicators: snapshot.indicators,
+  };
+  if (snapshot.visibleFrom != null && snapshot.visibleTo != null) {
+    wire.visible_from = new Date(snapshot.visibleFrom * 1000).toISOString();
+    wire.visible_to = new Date(snapshot.visibleTo * 1000).toISOString();
+  }
+  return wire;
 }
 
 function mapChartCommand(raw: RawChartCommand): AgentChartCommand {
@@ -381,7 +413,7 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
     async sendMessage(id, content, signal, chart = null) {
       const response = await http.send(`${httpBase}/sessions/${id}/messages`, {
         method: "POST",
-        body: chart === null ? { content } : { content, chart },
+        body: chart === null ? { content } : { content, chart: chartSnapshotToWire(chart) },
         signal,
       });
       if (response.body === null) {

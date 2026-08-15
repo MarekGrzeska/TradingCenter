@@ -5,7 +5,7 @@ import {
   type LayoutId,
   type SlotId,
 } from "./model";
-import type { ChartFocusRequest, IndicatorSelection, Resolution } from "../data/types";
+import type { ChartFocusRequest, IndicatorSelection, Resolution, VisibleTimeRange } from "../data/types";
 
 /** Versioned so a future shape change is a clean miss (defaults) rather than a
  *  half-understood read — terminal-grid spec, "Zapisany stan jest nieczytelny". */
@@ -33,6 +33,14 @@ export interface GridStore {
   /** Consumed once applied — or once given up on. A request nobody clears would replay
    *  itself on the next unrelated re-render. */
   clearFocusRequest(slot: SlotId): void;
+  /** What a slot's chart last reported as visible — written by `Chart`'s own
+   *  `onVisibleRangeChange` on every pan and zoom, read only when a turn is about to ask
+   *  a question. No subscription at all, unlike the focus request above: nothing needs
+   *  to react to this changing, only to read whatever it last held (design.md, "kadr
+   *  reaktywny, widok nie") — a `subscribe` nobody calls is a `subscribe` that does not
+   *  belong here. */
+  getVisibleRange(slot: SlotId): VisibleTimeRange | null;
+  setVisibleRange(slot: SlotId, range: VisibleTimeRange | null): void;
 }
 
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
@@ -57,6 +65,7 @@ export function createGridStore(storage: Storage | null = safeLocalStorage()): G
   // wake a listener that only cares about the persisted layout.
   const focusRequests = new Map<SlotId, ChartFocusRequest>();
   const focusListeners = new Set<() => void>();
+  const visibleRanges = new Map<SlotId, VisibleTimeRange>();
 
   function commit(next: GridConfig): void {
     config = next;
@@ -114,6 +123,11 @@ export function createGridStore(storage: Storage | null = safeLocalStorage()): G
     clearFocusRequest(slot) {
       if (!focusRequests.delete(slot)) return;
       for (const listener of focusListeners) listener();
+    },
+    getVisibleRange: (slot) => visibleRanges.get(slot) ?? null,
+    setVisibleRange(slot, range) {
+      if (range === null) visibleRanges.delete(slot);
+      else visibleRanges.set(slot, range);
     },
   };
 }

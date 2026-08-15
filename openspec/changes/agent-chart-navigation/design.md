@@ -108,6 +108,32 @@ Dlatego zwykły, niereaktywny rejestr `slotId → {from, to}`, do którego `Char
 a czyta go wyłącznie `activeChartSnapshot` w chwili wysyłania pytania. Nikt się na nim nie
 subskrybuje, bo nikt nie musi.
 
+Rejestr żyje w `gridStore`, obok kadru, jako dwie kolejne metody `GridStore`
+(`getVisibleRange`/`setVisibleRange`) — nie w osobnym module `chartControl.ts`, mimo że to on go
+czyta. Sprawdzone przy pisaniu kodu: `chartControl.ts` importuje `agentApi`, którego
+konstrukcja modułowa (`createAgentApi(resolveEndpoints().agent, identity)`) sięga po
+`identity` z `data/marketData.ts` w chwili importu — a `GridView.tsx`, który musi pisać do
+rejestru, nie potrzebuje żadnego z tego. Import prowadzący przez `chartControl.ts`
+przeciągnąłby cały ten łańcuch do drzewa importów siatki, i to akurat wyszło na jaw jako
+zepsuty test (`GridView.test.tsx`, mock `data/marketData` bez `identity`) — nie jako coś
+przewidziane z góry. `gridStore` już jest tym, co `GridView` pisze, więc rejestr trzyma tę
+samą zasadę co kadr: agent czyta z siatki, siatka nigdy nie sięga do modułu agenta.
+
+`Chart.tsx` publikuje wartości tego rejestru przez nowy prop, `onVisibleRangeChange` — nie
+pisze do niego wprost, bo nie wie, czym jest `SlotId` (`terminal-chart` spec, „Wykres jest
+sterowany symbolem i rozdzielczością" — komponent nie zna siatki). `GridView` jest tym,
+co łączy jedno z drugim, tak samo jak już łączy `onResolutionChange` i
+`onFocusRequestSettled`.
+
+### Migawka na drucie: dopiero teraz naprawdę potrzebuje mappera
+
+`sendMessage`'s `chart` leciał dotąd na drut bez mapowania — działało tylko dlatego, że
+`symbol`, `resolution` i `indicators` piszą się tak samo po obu stronach. Widoczny zakres
+tego nie ma: `visibleFrom`/`visibleTo` to epoch-sekundy w `AgentChartSnapshot`,
+`visible_from`/`visible_to` w formacie ISO na drucie, i obecne tylko razem — brakująca
+połówka nie jest zmyślana. `chartSnapshotToWire` w `agentApi.ts` jest tym jednym miejscem,
+w którym to się teraz dzieje.
+
 ### Dociąganie pod kadr przez istniejący pager
 
 `useOlderBars` dostaje drugi powód do dociągania obok „widok blisko lewej krawędzi":

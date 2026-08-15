@@ -413,6 +413,14 @@ export interface ChartFocusRequest {
   lastBars: number | null;
 }
 
+/** The visible span, in the drawn series' own bar times (epoch seconds) — what a caller
+ *  needing to know "what is the operator looking at" reads, without touching the chart
+ *  library itself. */
+export interface VisibleTimeRange {
+  from: number;
+  to: number;
+}
+
 let fallbackKeys = 0;
 
 /** A fresh instance identity. `randomUUID` where there is one; a counter where there is

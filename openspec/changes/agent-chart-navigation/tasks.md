@@ -53,9 +53,9 @@
 
 ## 8. Terminal: rejestr widocznego zakresu
 
-- [ ] 8.1 Niereaktywny rejestr `slotId → {from, to}`, pisany przez `Chart` przy zmianie widocznego zakresu, czyszczony przy odmontowaniu slotu
-- [ ] 8.2 `activeChartSnapshot` czyta z niego i dokłada `visibleFrom`/`visibleTo` do migawki; brak wpisu znaczy brak pól, nie zera
-- [ ] 8.3 Testy: migawka slotu z odnotowanym zakresem, migawka slotu bez niego
+- [x] 8.1 Niereaktywny rejestr `slotId → {from, to}` — w `gridStore` (`getVisibleRange`/`setVisibleRange`), nie w osobnym module, żeby `GridView` nie musiało importować `chartControl.ts`/`agentApi`'s singletona; `Chart` zgłasza przez nowy prop `onVisibleRangeChange`, `GridView` zapisuje, czyszczone przy odmontowaniu slotu (wywołanie z `null` w cleanupie)
+- [x] 8.2 `activeChartSnapshot` czyta z niego i dokłada `visibleFrom`/`visibleTo` do migawki; brak wpisu znaczy `null`/`null`, nie zera. `chartSnapshotToWire` w `agentApi.ts` domyka mapowanie na drut (epoch → ISO, tylko gdy obie połówki znane) — dotąd `sendMessage` wysyłało `chart` bez mapowania
+- [x] 8.3 Testy: `gridStore` (get/set/clear, brak wpływu na `localStorage`/config listeners), `Chart.tsx` (`onVisibleRangeChange` na pan/pusta seria/unmount), `activeChartSnapshot` (z zakresem, bez, zakres innego slotu), `agentApi.sendMessage` (obie połówki, tylko jedna)
 
 ## 9. Domknięcie
 
