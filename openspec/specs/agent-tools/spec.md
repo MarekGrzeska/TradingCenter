@@ -5,9 +5,7 @@
 Opisuje narzędzia agenta: skąd bierze się ich zestaw, jak wygląda tura, w której model
 po nie sięga, ile razy może to zrobić, co się dzieje z odmową i co po wywołaniu zostaje
 zapisane.
-
 ## Requirements
-
 ### Requirement: Model sięga po narzędzia w trakcie odpowiadania
 
 Moduł MUST pozwalać modelowi poprosić o wywołanie narzędzia w trakcie tury, wykonać je i
@@ -32,10 +30,18 @@ zapisem rozmowy, a nie zapisem tego, jak agent do niej doszedł.
 ### Requirement: Zestaw narzędzi pochodzi z serwera, nie z tego modułu
 
 Moduł MUST pobierać zestaw dostępnych narzędzi wraz z ich opisami od serwera narzędzi i
-MUST NOT nieść własnej listy narzędzi ani własnych opisów. Narzędzie dołożone po stronie
-serwera MUST stać się dostępne modelowi bez zmiany w tym module.
+MUST NOT nieść własnej listy narzędzi ani własnych opisów **tych, które serwer ogłasza**.
+Narzędzie dołożone po stronie serwera MUST stać się dostępne modelowi bez zmiany w tym
+module.
 
-Moduł MUST NOT publikować modelowi narzędzia, którego serwer nie ogłosił.
+Moduł MUST NOT publikować modelowi narzędzia, którego serwer nie ogłosił — **poza
+narzędziami wymienionymi z nazwy w specyfikacjach tego modułu**. Dziś jest to jedno
+narzędzie: ustawienie zawartości wykresu w terminalu (`agent-chart-control`). Narzędzie
+własne modułu MUST być odróżnialne od narzędzia serwera w śladzie wywołania, żeby dało się
+powiedzieć, kto je wykonał.
+
+Moduł MUST NOT dokładać narzędzia własnego przez ustawienie ani tryb: granica przebiega
+w specyfikacji i jej przesunięcie kosztuje zmianę tego dokumentu.
 
 #### Scenario: Narzędzie dołożone po stronie serwera
 
@@ -47,20 +53,16 @@ Moduł MUST NOT publikować modelowi narzędzia, którego serwer nie ogłosił.
 - **WHEN** serwer zmienia opis narzędzia
 - **THEN** model widzi opis serwera, a nie kopię trzymaną w tym module
 
-### Requirement: Wszystkie narzędzia agenta są czytające
+#### Scenario: Narzędzie własne modułu obok narzędzi serwera
 
-Moduł MUST NOT wykonywać przez narzędzia żądania zmieniającego stan czegokolwiek: nie
-rozpoczyna zbierania pary, nie kasuje danych, nie składa zlecenia i nie zmienia
-konfiguracji żadnego modułu.
+- **WHEN** moduł ma połączenie z serwerem narzędzi
+- **THEN** model dostaje narzędzia serwera oraz narzędzie ustawiające wykres
+- **AND** ślad wywołania mówi, które z nich zostało wykonane przez ten moduł
 
-Nie SHALL istnieć ustawienie ani tryb, który dokłada agentowi narzędzie zapisujące.
-Granica przebiega w specyfikacji, a jej przesunięcie kosztuje zmianę tego dokumentu.
+#### Scenario: Brak serwera narzędzi
 
-#### Scenario: Operator prosi o wykonanie akcji
-
-- **WHEN** operator prosi agenta, żeby zaczął zbierać parę albo złożył zlecenie
-- **THEN** agent nie ma narzędzia, którym mógłby to zrobić
-- **AND** odpowiada, że to jest poza jego zakresem, zamiast zgłaszać chwilową awarię
+- **WHEN** moduł nie ma skonfigurowanego serwera narzędzi
+- **THEN** model dostaje samo narzędzie ustawiające wykres, zamiast żadnego
 
 ### Requirement: Tura ma sufit wywołań narzędzi
 
@@ -141,4 +143,34 @@ się ustawić względem siebie bez sięgania po ich czas zapisu.
 - **THEN** dostaje pustą listę wywołań, a nie brak pola
 - **AND** MUST NOT dać się jej pomylić z wypowiedzią, przy której wywołania odpadły po
   drodze
+
+### Requirement: Agent zapisuje wyłącznie w widoku terminala
+
+Jedyną zmianą stanu, jaką moduł MUST umieć wykonać przez narzędzie, jest ustawienie tego,
+co terminal rysuje: zestawu wskaźników, symbolu i interwału aktywnego slotu.
+
+Moduł MUST NOT wykonywać przez narzędzia żadnej innej zmiany stanu: nie rozpoczyna
+zbierania pary, nie kasuje danych, nie składa zlecenia, nie zmienia konfiguracji żadnego
+modułu i nie pisze do archiwum. Serwer narzędzi MUST pozostać czytający — zapis nie jedzie
+przez niego.
+
+Zapis MUST być odwracalny ręką operatora tym samym wybierakiem, którym operator ustawia
+wykres sam. Narzędzie, którego skutku operator nie umie cofnąć bez agenta, jest poza tym
+wymaganiem.
+
+#### Scenario: Operator prosi o pokazanie wskaźnika
+
+- **WHEN** operator prosi agenta, żeby pokazał EMA 200 na wykresie
+- **THEN** agent ma narzędzie, którym to robi, i wykres to pokazuje
+
+#### Scenario: Operator prosi o wykonanie akcji poza wykresem
+
+- **WHEN** operator prosi agenta, żeby zaczął zbierać parę albo złożył zlecenie
+- **THEN** agent nie ma narzędzia, którym mógłby to zrobić
+- **AND** odpowiada, że to jest poza jego zakresem, zamiast zgłaszać chwilową awarię
+
+#### Scenario: Operator cofa to, co ustawił agent
+
+- **WHEN** operator usuwa wybierakiem wskaźnik, który ustawił agent
+- **THEN** wskaźnik znika i nie wraca sam z siebie
 
