@@ -1,10 +1,10 @@
 ## 1. Kadr w module agent: kształt i zapis
 
-- [ ] 1.1 `agent/models.py`: `ChartFocus` (pola `from_`, `to`, `around`, `bars`, `last_bars`, wszystkie opcjonalne) plus `focus: ChartFocus | None` na `ChartCommand`; `merged_with` traktuje je jak resztę pól
-- [ ] 1.2 Migracja `0006`: nullowalna kolumna `JSONB focus` w `chart_commands`, `chart_commands_sets_something` rozszerzony o nią, `downgrade` zdejmujący obie zmiany
-- [ ] 1.3 `agent/store.py`: `record_chart_command` przyjmuje i zapisuje kadr, `_chart_command_from_row` go odczytuje
-- [ ] 1.4 `agent/contract.py`: `focus` na `ChartCommandOut`, wystawiany jako `null`, gdy polecenie go nie niosło
-- [ ] 1.5 Test integracyjny (`-m db`): zapis polecenia z kadrem i odczyt przez `chart_state_after`; polecenie z samym kadrem nie wpada w check bazy
+- [x] 1.1 `agent/models.py`: `ChartFocus` (pola `from_`, `to`, `around`, `bars`, `last_bars`, wszystkie opcjonalne) plus `focus: ChartFocus | None` na `ChartCommand`; `merged_with` traktuje je jak resztę pól
+- [x] 1.2 Migracja `0006`: nullowalna kolumna `JSONB focus` w `chart_commands`, `chart_commands_sets_something` rozszerzony o nią, `downgrade` zdejmujący obie zmiany
+- [x] 1.3 `agent/store.py`: `record_chart_command` przyjmuje i zapisuje kadr, `_chart_command_from_row` go odczytuje
+- [x] 1.4 `agent/contract.py`: `focus` na `ChartCommandOut`, wystawiany jako `null`, gdy polecenie go nie niosło
+- [x] 1.5 Test integracyjny (`-m db`): zapis polecenia z kadrem i odczyt przez `chart_state_after`; polecenie z samym kadrem nie wpada w check bazy
 
 ## 2. Kadr w narzędziu `set_chart`
 
@@ -17,15 +17,15 @@
 
 ## 3. Migawka niesie widoczny fragment osi
 
-- [ ] 3.1 `agent/models.py`: `visible_from` / `visible_to` na `ChartSnapshot`, oba opcjonalne osobno
-- [ ] 3.2 `ChartSnapshot.as_context`: zdanie o widocznym fragmencie, pomijane w całości, gdy pola są puste
-- [ ] 3.3 `agent/contract.py`: te pola na wejściu tury; żądanie bez nich działa jak dotąd
-- [ ] 3.4 Testy: migawka z fragmentem i bez niego, obie trafiające do promptu tury w oczekiwanym kształcie
+- [x] 3.1 `agent/models.py`: `visible_from` / `visible_to` na `ChartSnapshot`, oba opcjonalne osobno
+- [x] 3.2 `ChartSnapshot.as_context`: zdanie o widocznym fragmencie, pomijane w całości, gdy pola są puste
+- [x] 3.3 `agent/contract.py`: te pola na wejściu tury; żądanie bez nich działa jak dotąd
+- [x] 3.4 Testy: migawka z fragmentem i bez niego, obie trafiające do promptu tury w oczekiwanym kształcie
 
 ## 4. Prompt systemowy
 
-- [ ] 4.1 Migracja `0006` seeduje `v6`: akapit `set_chart` wymienia kadr i trzy sposoby jego podania, tekst `v5` przepisany w całości (oba warianty, jak w `0005`)
-- [ ] 4.2 Test sprawdzający, że zaseedowana rewizja istnieje i niesie nazwę narzędzia oraz słowo o kadrze
+- [x] 4.1 Migracja `0006` seeduje `v6`: akapit `set_chart` wymienia kadr i trzy sposoby jego podania, tekst `v5` przepisany w całości (oba warianty, jak w `0005`)
+- [x] 4.2 Test sprawdzający, że zaseedowana rewizja istnieje i niesie nazwę narzędzia oraz słowo o kadrze
 
 ## 5. Terminal: DTO i przekazanie kadru do slotu
 

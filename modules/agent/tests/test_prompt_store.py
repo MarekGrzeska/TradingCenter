@@ -123,3 +123,11 @@ async def test_both_seeded_texts_name_the_chart_tool(db) -> None:
     revision = await store.latest_prompt_revision(db)
     for body in (revision.with_tools_body, revision.without_tools_body):
         assert "set_chart" in body
+
+
+async def test_both_seeded_texts_name_the_focus_field(db) -> None:
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        lowered = body.lower()
+        assert "focus" in lowered
+        assert "last_bars" in lowered
