@@ -71,6 +71,13 @@ export interface AgentUsageSummary {
   byDay: AgentUsageAggregate[];
 }
 
+export interface AgentPrompt {
+  version: string;
+  withTools: string;
+  withoutTools: string;
+  updatedAt: number;
+}
+
 export interface UsageRange {
   /** Epoch seconds, inclusive — converted to the ISO instants `GET /usage`'s `from`/`to`
    *  query params expect. Absent means "no bound on this side". */
@@ -97,6 +104,10 @@ export interface AgentApi {
    *  only it knows what, if anything, is worth keeping on screen for each. */
   sendMessage(id: number, content: string, signal: AbortSignal): Promise<AsyncGenerator<AgentStreamEvent>>;
   usage(range: UsageRange, signal: AbortSignal): Promise<AgentUsageSummary>;
+  getPrompt(signal: AbortSignal): Promise<AgentPrompt>;
+  /** Rejects with a `"refused"` `MarketDataError` on a blank variant — the module's own
+   *  422, not a check this file makes first. */
+  updatePrompt(withTools: string, withoutTools: string, signal: AbortSignal): Promise<AgentPrompt>;
 }
 
 interface RawModel {
@@ -142,6 +153,13 @@ interface RawUsageSummary {
   by_model: RawUsageAggregate[];
   by_session: RawUsageAggregate[];
   by_day: RawUsageAggregate[];
+}
+
+interface RawPrompt {
+  version: string;
+  with_tools: string;
+  without_tools: string;
+  updated_at: string;
 }
 
 function mapModel(raw: RawModel): AgentModel {
@@ -193,6 +211,15 @@ function mapUsageSummary(raw: RawUsageSummary): AgentUsageSummary {
     byModel: raw.by_model.map(mapUsageAggregate),
     bySession: raw.by_session.map(mapUsageAggregate),
     byDay: raw.by_day.map(mapUsageAggregate),
+  };
+}
+
+function mapPrompt(raw: RawPrompt): AgentPrompt {
+  return {
+    version: raw.version,
+    withTools: raw.with_tools,
+    withoutTools: raw.without_tools,
+    updatedAt: parseIsoToEpochSeconds(raw.updated_at),
   };
 }
 
@@ -282,6 +309,20 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
         { signal },
       );
       return mapUsageSummary(raw);
+    },
+
+    async getPrompt(signal) {
+      const raw = await http.json<RawPrompt>(`${httpBase}/prompt`, { signal });
+      return mapPrompt(raw);
+    },
+
+    async updatePrompt(withTools, withoutTools, signal) {
+      const raw = await http.json<RawPrompt>(`${httpBase}/prompt`, {
+        method: "PUT",
+        body: { with_tools: withTools, without_tools: withoutTools },
+        signal,
+      });
+      return mapPrompt(raw);
     },
   };
 }

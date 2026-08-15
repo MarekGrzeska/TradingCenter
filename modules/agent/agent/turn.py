@@ -20,7 +20,7 @@ from . import store
 from .graph import build_graph, initial_state
 from .models import RecordedCall
 from .models_catalogue import ModelCatalogueEntry
-from .prompt import PROMPT_VERSION, system_prompt
+from .prompt import prompt_text
 from .provider import ModelProvider
 from .tools import ToolServer
 
@@ -78,6 +78,7 @@ async def run_turn(
 ) -> None:
     async with pool.acquire() as conn:
         messages = await store.get_messages(conn, session_id=session_id)
+        revision = await store.latest_prompt_revision(conn)
     history = [(m.role.value, m.content) for m in messages]
 
     async def on_delta(text: str) -> None:
@@ -97,10 +98,10 @@ async def run_turn(
         result = await graph.ainvoke(
             initial_state(
                 # Which prompt this turn runs is a fact about the turn, not a change to
-                # the prompt: both texts are `v3`, and the one without tools is what an
-                # unreachable market-mcp degrades to (specs/agent-chat, "Agent bez
-                # narzędzi mówi, że ich nie ma").
-                system_prompt=system_prompt(has_tools=bool(tools)),
+                # the prompt: `revision` was current when this turn started, and the
+                # variant without tools is what an unreachable market-mcp degrades to
+                # (specs/agent-chat, "Agent bez narzędzi mówi, że ich nie ma").
+                system_prompt=prompt_text(revision, has_tools=bool(tools)),
                 history=history,
                 model=model_entry.model,
                 on_delta=on_delta,
@@ -125,7 +126,7 @@ async def run_turn(
             session_id=session_id,
             content=text,
             model_id=model_entry.id,
-            prompt_version=PROMPT_VERSION,
+            prompt_version=revision.version,
             incomplete=failed,
         )
         # One row per model call, all pointing at this one reply. A turn that asked for

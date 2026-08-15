@@ -114,6 +114,31 @@ async def test_usage_never_reported_is_recorded_as_unknown_not_skipped(pool, db)
     assert rows[0]["cost"] is None
 
 
+async def test_a_reply_keeps_its_version_after_the_prompt_is_later_edited(pool, db) -> None:
+    # specs/agent-prompt-management, "Odpowiedź niesie wersję, pod jaką faktycznie
+    # padła" — editing the prompt between two turns of the same rozmowa must not
+    # reach back and relabel the first one.
+    session_id = await _new_session(db)
+    provider = FakeProvider([TextDelta("first"), UsageReport(1, 1, None, None)])
+    await run_turn(pool, session_id=session_id, model_entry=LUNA, provider=provider, queue=RecordingQueue())
+
+    first_reply = (await store.get_messages(db, session_id=session_id))[-1]
+    assert first_reply.prompt_version == "v4"
+
+    await store.create_prompt_revision(db, with_tools_body="edited", without_tools_body="edited")
+
+    await store.append_operator_message(db, session_id=session_id, content="again")
+    provider = FakeProvider([TextDelta("second"), UsageReport(1, 1, None, None)])
+    await run_turn(pool, session_id=session_id, model_entry=LUNA, provider=provider, queue=RecordingQueue())
+
+    messages = await store.get_messages(db, session_id=session_id)
+    second_reply = messages[-1]
+    assert second_reply.prompt_version == "v5"
+
+    first_reply_reread = next(m for m in messages if m.id == first_reply.id)
+    assert first_reply_reread.prompt_version == "v4"
+
+
 async def test_usage_reported_before_a_failure_is_still_recorded(pool, db) -> None:
     # specs/agent-usage, "Wywołanie zakończone błędem po tym, jak model zaczął
     # odpowiadać, MUST zapisać zużycie, które zdążyło powstać"

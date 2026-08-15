@@ -17,7 +17,6 @@ import pytest
 from agent import store
 from agent.config import ModelCatalogueEntry
 from agent.models import RecordedCall
-from agent.prompt import SYSTEM_PROMPT_WITH_TOOLS, SYSTEM_PROMPT_WITHOUT_TOOLS
 from agent.provider import TextDelta, ToolCallRequest, UsageReport
 from agent.tools import ToolOutcome, ToolOutcomeKind
 from agent.turn import ToolCalled, run_turn
@@ -352,8 +351,9 @@ async def test_a_turn_without_tools_runs_the_prompt_that_says_so(pool, db) -> No
         tool_server=ServerWithNoTools(),  # pyright: ignore[reportArgumentType]
     )
 
+    revision = await store.latest_prompt_revision(db)
     assert provider.calls[0]["tools"] == []
-    assert provider.calls[0]["system_prompt"] == SYSTEM_PROMPT_WITHOUT_TOOLS
+    assert provider.calls[0]["system_prompt"] == revision.without_tools_body
 
 
 async def test_a_turn_with_tools_runs_the_prompt_that_says_that(pool, db) -> None:
@@ -369,5 +369,6 @@ async def test_a_turn_with_tools_runs_the_prompt_that_says_that(pool, db) -> Non
         tool_server=ServerWithTools(),  # pyright: ignore[reportArgumentType]
     )
 
+    revision = await store.latest_prompt_revision(db)
     assert [tool.name for tool in provider.calls[0]["tools"]] == ["get_last_price"]
-    assert provider.calls[0]["system_prompt"] == SYSTEM_PROMPT_WITH_TOOLS
+    assert provider.calls[0]["system_prompt"] == revision.with_tools_body
