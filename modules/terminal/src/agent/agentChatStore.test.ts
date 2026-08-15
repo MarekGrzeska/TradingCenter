@@ -27,6 +27,7 @@ const CANDLES_CALL: AgentToolCall = {
   outcome: "ok",
   resultText: '{"candles": 78}',
   durationMs: 240,
+  source: "server",
 };
 
 const REFUSED_CALL: AgentToolCall = {
@@ -37,6 +38,7 @@ const REFUSED_CALL: AgentToolCall = {
   outcome: "refused",
   resultText: "market-data refused: no such pair",
   durationMs: 18,
+  source: "server",
 };
 
 /** A stream that only advances when the test tells it to — the fixed-array fake below
@@ -219,6 +221,9 @@ function createFakeApi(): FakeApi {
     },
     async updatePrompt() {
       throw new Error("not used");
+    },
+    async chartCommand() {
+      return null;
     },
   };
   return api;
@@ -711,5 +716,57 @@ describe("createAgentChatStore", () => {
     await waitFor(() => expect(store.getSnapshot().sessions).toHaveLength(1));
     expect(store.getSnapshot().activeSessionId).toBe(keep.id);
     expect(store.getSnapshot().sessions[0].id).toBe(keep.id);
+  });
+});
+
+
+describe("createAgentChatStore — the chart the agent can set", () => {
+  it("sends what the terminal is drawing with the turn", async () => {
+    const api = createFakeApi();
+    const sent: Array<unknown> = [];
+    const wrapped = {
+      ...api,
+      sendMessage: (id: number, content: string, signal: AbortSignal, chart?: unknown) => {
+        sent.push(chart);
+        return api.sendMessage(id, content, signal);
+      },
+    };
+    const snapshot = {
+      symbol: "US100",
+      resolution: "HOUR" as const,
+      indicators: [{ id: "ema", params: { period: 200 }, color: null }],
+    };
+    const store = createAgentChatStore(null, wrapped as typeof api, async () => null, () => snapshot);
+
+    store.send("what do you see?");
+    await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
+
+    expect(sent).toEqual([snapshot]);
+  });
+
+  it("says what the agent did to the chart, once the turn is over", async () => {
+    const api = createFakeApi();
+    const store = createAgentChatStore(null, api, async () => ({
+      applied: ["EMA period 200"],
+      skipped: [],
+    }));
+
+    expect(store.getSnapshot().chartNotice).toBeNull();
+    store.send("show me the slow average");
+
+    await waitFor(() =>
+      expect(store.getSnapshot().chartNotice).toBe("The agent set the chart: EMA period 200."),
+    );
+  });
+
+  it("keeps the conversation when the chart read fails", async () => {
+    const api = createFakeApi();
+    const store = createAgentChatStore(null, api, async () => null);
+
+    store.send("hello");
+    await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
+
+    expect(store.getSnapshot().chartNotice).toBeNull();
+    expect(store.getSnapshot().messages.map((m) => m.role)).toEqual(["operator", "agent"]);
   });
 });

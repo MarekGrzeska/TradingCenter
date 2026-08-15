@@ -1,5 +1,10 @@
 import { useState } from "react";
-import type { IndicatorCatalogueEntry, IndicatorSelection } from "../../data/types";
+import {
+  newIndicatorSelectionKey,
+  type IndicatorCatalogueEntry,
+  type IndicatorSelection,
+} from "../../data/types";
+import { INDICATOR_LINE_TOKENS } from "../theme";
 
 export interface IndicatorPickerProps {
   entries: IndicatorCatalogueEntry[];
@@ -13,6 +18,15 @@ export interface IndicatorPickerProps {
 
 function defaultParams(entry: IndicatorCatalogueEntry): Record<string, number> {
   return Object.fromEntries(entry.params.map((p) => [p.name, p.default]));
+}
+
+function newInstance(entry: IndicatorCatalogueEntry): IndicatorSelection {
+  return {
+    key: newIndicatorSelectionKey(),
+    id: entry.id,
+    params: defaultParams(entry),
+    color: null,
+  };
 }
 
 /** Everything an operator might reasonably type to mean this entry. `group` is in here
@@ -47,6 +61,10 @@ function matchedAlias(entry: IndicatorCatalogueEntry, needle: string): string | 
  * already accepts (`market-data-indicators` spec, "Katalog wystarcza do zbudowania
  * wybieraka"; `terminal-chart` spec, "Operator wybiera wskaźniki z tego, co oferuje
  * źródło").
+ *
+ * A catalogue entry may be chosen more than once. The checkbox is the entry's on/off —
+ * it adds the first instance and removes every one of them — while each instance below
+ * it carries its own params, its own colour and its own removal.
  */
 export function IndicatorPicker({ entries, selections, onChange, canDraw }: IndicatorPickerProps) {
   const [open, setOpen] = useState(false);
@@ -66,35 +84,57 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
     setQuery("");
   }
 
+  function instancesOf(entry: IndicatorCatalogueEntry): IndicatorSelection[] {
+    return selections.filter((s) => s.id === entry.id);
+  }
+
   function toggle(entry: IndicatorCatalogueEntry) {
     const active = selections.some((s) => s.id === entry.id);
     onChange(
-      active
-        ? selections.filter((s) => s.id !== entry.id)
-        : [...selections, { id: entry.id, params: defaultParams(entry) }],
+      active ? selections.filter((s) => s.id !== entry.id) : [...selections, newInstance(entry)],
     );
   }
 
-  function setParam(entry: IndicatorCatalogueEntry, paramName: string, raw: string) {
-    const key = `${entry.id}.${paramName}`;
+  function addInstance(entry: IndicatorCatalogueEntry) {
+    onChange([...selections, newInstance(entry)]);
+  }
+
+  function removeInstance(key: string) {
+    onChange(selections.filter((s) => s.key !== key));
+    setParamErrors((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([k]) => !k.startsWith(`${key}.`))),
+    );
+  }
+
+  function setColor(key: string, color: string | null) {
+    onChange(selections.map((s) => (s.key === key ? { ...s, color } : s)));
+  }
+
+  function setParam(
+    entry: IndicatorCatalogueEntry,
+    selection: IndicatorSelection,
+    paramName: string,
+    raw: string,
+  ) {
+    const errorKey = `${selection.key}.${paramName}`;
     const spec = entry.params.find((p) => p.name === paramName);
     if (!spec) return;
     const value = Number(raw);
     if (!Number.isFinite(value) || value < spec.min || value > spec.max) {
       setParamErrors((prev) => ({
         ...prev,
-        [key]: `${spec.name} must be between ${spec.min} and ${spec.max}`,
+        [errorKey]: `${spec.name} must be between ${spec.min} and ${spec.max}`,
       }));
       return;
     }
     setParamErrors((prev) => {
       const next = { ...prev };
-      delete next[key];
+      delete next[errorKey];
       return next;
     });
     onChange(
       selections.map((s) =>
-        s.id === entry.id ? { ...s, params: { ...s.params, [paramName]: value } } : s,
+        s.key === selection.key ? { ...s, params: { ...s.params, [paramName]: value } } : s,
       ),
     );
   }
@@ -118,7 +158,7 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
         // Left-anchored: the button sits near the left edge of the header, beside the
         // symbol and resolution controls. A right-anchored panel would pin its right
         // edge to the button's and grow leftward, running off the header entirely.
-        <div className="absolute left-0 top-full z-20 mt-1 flex max-h-80 w-64 flex-col rounded border border-border-strong bg-raised shadow-lg">
+        <div className="absolute left-0 top-full z-20 mt-1 flex max-h-80 w-72 flex-col rounded border border-border-strong bg-raised shadow-lg">
           {/* Outside the listbox, not inside it: a text field is not one of the options,
               and the catalogue is long enough that this is the first thing an operator
               reaches for. */}
@@ -149,7 +189,7 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
             <p className="p-1 text-xs text-ink-muted">No indicator matches “{query.trim()}”.</p>
           )}
           {shown.map((entry) => {
-            const selection = selections.find((s) => s.id === entry.id);
+            const instances = instancesOf(entry);
             const drawable = canDraw(entry);
             return (
               <div key={entry.id} className="border-b border-border py-1.5 last:border-b-0">
@@ -163,7 +203,7 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
                 >
                   <input
                     type="checkbox"
-                    checked={Boolean(selection)}
+                    checked={instances.length > 0}
                     disabled={!drawable}
                     onChange={() => toggle(entry)}
                   />
@@ -176,35 +216,32 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
                   {matchedAlias(entry, needle) ?? entry.name}
                 </span>
 
-                {selection && entry.params.length > 0 && (
-                  <div className="ml-5 mt-1 flex flex-wrap gap-2">
-                    {entry.params.map((param) => {
-                      const errorKey = `${entry.id}.${param.name}`;
-                      return (
-                        <div key={param.name} className="flex flex-col">
-                          <label
-                            className="text-[10px] text-ink-muted"
-                            htmlFor={`indicator-param-${entry.id}-${param.name}`}
-                          >
-                            {param.name}
-                          </label>
-                          <input
-                            id={`indicator-param-${entry.id}-${param.name}`}
-                            type="number"
-                            defaultValue={selection.params[param.name]}
-                            min={param.min}
-                            max={param.max}
-                            step={param.type === "int" ? 1 : "any"}
-                            className="w-16 rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink"
-                            onBlur={(e) => setParam(entry, param.name, e.target.value)}
-                          />
-                          {paramErrors[errorKey] && (
-                            <span className="text-[10px] text-critical">{paramErrors[errorKey]}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                {instances.map((selection, index) => (
+                  <IndicatorInstance
+                    key={selection.key}
+                    entry={entry}
+                    selection={selection}
+                    // 1-based and by position among this entry's instances: the operator
+                    // is looking at a list, not at keys.
+                    ordinal={index + 1}
+                    // A lone instance needs no ordinal to be identified by, and naming it
+                    // "EMA 1" would suggest a second one exists.
+                    named={instances.length > 1}
+                    paramErrors={paramErrors}
+                    onParam={(paramName, raw) => setParam(entry, selection, paramName, raw)}
+                    onColor={(color) => setColor(selection.key, color)}
+                    onRemove={() => removeInstance(selection.key)}
+                  />
+                ))}
+
+                {instances.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => addInstance(entry)}
+                    className="ml-5 mt-1 rounded border border-border px-1 py-0.5 text-[10px] text-ink-muted hover:bg-panel-strong"
+                  >
+                    + Add another {entry.id.toUpperCase()}
+                  </button>
                 )}
               </div>
             );
@@ -212,6 +249,102 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+interface IndicatorInstanceProps {
+  entry: IndicatorCatalogueEntry;
+  selection: IndicatorSelection;
+  ordinal: number;
+  named: boolean;
+  paramErrors: Record<string, string>;
+  onParam(paramName: string, raw: string): void;
+  onColor(color: string | null): void;
+  onRemove(): void;
+}
+
+/** One chosen instance: its params, its colour, and its own way out. Grouped and named,
+ *  because with three EMAs open the controls are otherwise three identical rows. */
+function IndicatorInstance({
+  entry,
+  selection,
+  ordinal,
+  named,
+  paramErrors,
+  onParam,
+  onColor,
+  onRemove,
+}: IndicatorInstanceProps) {
+  const label = named ? `${entry.id.toUpperCase()} ${ordinal}` : entry.id.toUpperCase();
+
+  return (
+    <div role="group" aria-label={label} className="ml-5 mt-1 border-l border-border pl-2">
+      <div className="flex flex-wrap items-end gap-2">
+        {entry.params.map((param) => {
+          const errorKey = `${selection.key}.${param.name}`;
+          return (
+            <div key={param.name} className="flex flex-col">
+              <label
+                className="text-[10px] text-ink-muted"
+                htmlFor={`indicator-param-${selection.key}-${param.name}`}
+              >
+                {param.name}
+              </label>
+              <input
+                id={`indicator-param-${selection.key}-${param.name}`}
+                type="number"
+                defaultValue={selection.params[param.name]}
+                min={param.min}
+                max={param.max}
+                step={param.type === "int" ? 1 : "any"}
+                className="w-16 rounded border border-border bg-sunken px-1 py-0.5 text-xs text-ink"
+                onBlur={(e) => onParam(param.name, e.target.value)}
+              />
+              {paramErrors[errorKey] && (
+                <span className="text-[10px] text-critical">{paramErrors[errorKey]}</span>
+              )}
+            </div>
+          );
+        })}
+
+        <button
+          type="button"
+          onClick={onRemove}
+          aria-label={`Remove ${label}`}
+          className="rounded border border-border px-1 py-0.5 text-[10px] text-ink-muted hover:bg-panel-strong"
+        >
+          Remove
+        </button>
+      </div>
+
+      <div className="mt-1 flex flex-wrap items-center gap-1">
+        {INDICATOR_LINE_TOKENS.map((token, index) => (
+          <button
+            key={token}
+            type="button"
+            onClick={() => onColor(token)}
+            aria-label={`Colour ${index + 1}`}
+            aria-pressed={selection.color === token}
+            // The token is the CSS variable itself, so the swatch and the line it stands
+            // for read the same value — one definition, both consumers (`theme.ts`).
+            style={{ backgroundColor: `var(${token})` }}
+            className={`h-3.5 w-3.5 rounded-sm border ${
+              selection.color === token ? "border-ink" : "border-border"
+            }`}
+          />
+        ))}
+        <button
+          type="button"
+          onClick={() => onColor(null)}
+          aria-pressed={selection.color === null}
+          className={`rounded border px-1 text-[10px] ${
+            selection.color === null ? "border-ink text-ink" : "border-border text-ink-muted"
+          }`}
+        >
+          Auto
+        </button>
+      </div>
     </div>
   );
 }

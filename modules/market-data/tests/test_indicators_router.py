@@ -158,6 +158,86 @@ async def test_computes_a_line_indicator_over_the_requested_range(api, pool) -> 
     assert all(v is not None for v in result["lines"]["sma"])
 
 
+class TestResultOrder:
+    """`market-data-indicators` spec, "Kolejność wyników" — position is the only thing
+    that binds a result back to the spec that asked for it. Id and params do not: two
+    identical specs are indistinguishable by either, and a consumer drawing the same
+    average twice in two colours needs to know which row is which."""
+
+    async def test_results_come_back_in_the_order_they_were_asked_for(self, api, pool) -> None:
+        async with pool.acquire() as conn:
+            await write_candles(conn, [candle(m) for m in range(40, -1, -1)])
+
+        specs = [
+            {"id": "ema", "params": {"period": 20}},
+            {"id": "sma", "params": {"period": 5}},
+            {"id": "ema", "params": {"period": 5}},
+        ]
+        response = await api.post(
+            "/indicators/US100",
+            json={
+                "resolution": "MINUTE",
+                "from": (NOW - timedelta(minutes=10)).isoformat(),
+                "to": (NOW + timedelta(minutes=1)).isoformat(),
+                "specs": specs,
+            },
+        )
+        body = response.json()
+
+        assert response.status_code == 200
+        assert [(r["id"], r["params"]) for r in body["results"]] == [
+            (spec["id"], spec["params"]) for spec in specs
+        ]
+
+    async def test_two_identical_specs_answer_on_their_own_positions(self, api, pool) -> None:
+        async with pool.acquire() as conn:
+            await write_candles(conn, [candle(m) for m in range(40, -1, -1)])
+
+        response = await api.post(
+            "/indicators/US100",
+            json={
+                "resolution": "MINUTE",
+                "from": (NOW - timedelta(minutes=10)).isoformat(),
+                "to": (NOW + timedelta(minutes=1)).isoformat(),
+                "specs": [
+                    {"id": "sma", "params": {"period": 5}},
+                    {"id": "ema", "params": {"period": 5}},
+                    {"id": "sma", "params": {"period": 5}},
+                ],
+            },
+        )
+        results = response.json()["results"]
+
+        assert [r["id"] for r in results] == ["sma", "ema", "sma"]
+        assert results[0]["lines"]["sma"] == results[2]["lines"]["sma"]
+
+    async def test_a_failing_spec_holds_its_position(self, api, pool) -> None:
+        async with pool.acquire() as conn:
+            await write_candles(
+                conn, [_day_candle(_TODAY - timedelta(days=d)) for d in range(5, -1, -1)]
+            )
+
+        response = await api.post(
+            "/indicators/US100",
+            json={
+                "resolution": "DAY",
+                "from": (_TODAY - timedelta(days=5)).isoformat(),
+                "to": (_TODAY + timedelta(days=1)).isoformat(),
+                "specs": [
+                    {"id": "sma", "params": {"period": 2}},
+                    {"id": "time_profile"},
+                    {"id": "sma", "params": {"period": 3}},
+                ],
+            },
+        )
+        results = response.json()["results"]
+
+        # A row that carries a reason instead of a shape still occupies its own position;
+        # a consumer zipping specs to results must not have to compact anything first.
+        assert [r["id"] for r in results] == ["sma", "time_profile", "sma"]
+        assert [r["error"] is None for r in results] == [True, False, True]
+
+
 async def test_reads_further_back_than_from_for_warmup(api, pool) -> None:
     async with pool.acquire() as conn:
         await write_candles(conn, [candle(m) for m in range(2, -1, -1)])  # only 3 candles

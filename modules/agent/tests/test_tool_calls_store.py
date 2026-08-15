@@ -18,7 +18,7 @@ from agent import store
 from agent.config import ModelCatalogueEntry
 from agent.models import RecordedCall
 from agent.provider import TextDelta, ToolCallRequest, UsageReport
-from agent.tools import ToolOutcome, ToolOutcomeKind
+from agent.tools import CHART_TOOL_NAME, ToolOutcome, ToolOutcomeKind
 from agent.turn import ToolCalled, run_turn
 
 from .test_graph import PRICE_TOOL, FakeProvider, FakeToolServer
@@ -352,7 +352,10 @@ async def test_a_turn_without_tools_runs_the_prompt_that_says_so(pool, db) -> No
     )
 
     revision = await store.latest_prompt_revision(db)
-    assert provider.calls[0]["tools"] == []
+    # The chart tool is this module's own and does not need market-mcp to exist, so it is
+    # still offered; the prompt is still the one that says the archive is unreachable
+    # (specs/agent-tools, "Brak serwera narzędzi").
+    assert [tool.name for tool in provider.calls[0]["tools"]] == [CHART_TOOL_NAME]
     assert provider.calls[0]["system_prompt"] == revision.without_tools_body
 
 
@@ -370,5 +373,9 @@ async def test_a_turn_with_tools_runs_the_prompt_that_says_that(pool, db) -> Non
     )
 
     revision = await store.latest_prompt_revision(db)
-    assert [tool.name for tool in provider.calls[0]["tools"]] == ["get_last_price"]
+    # The server's tools, then this module's own — one list, in that order.
+    assert [tool.name for tool in provider.calls[0]["tools"]] == [
+        "get_last_price",
+        CHART_TOOL_NAME,
+    ]
     assert provider.calls[0]["system_prompt"] == revision.with_tools_body

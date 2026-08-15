@@ -43,7 +43,7 @@ describe("parseGridConfig (terminal-grid spec, persistence guard)", () => {
           s1: {
             symbol: "US100",
             resolution: "MINUTE_5",
-            indicators: [{ id: "ema", params: { period: "20" } }],
+            indicators: [{ key: "ema", id: "ema", params: { period: "20" }, color: null }],
           },
         },
       },
@@ -59,6 +59,70 @@ describe("parseGridConfig (terminal-grid spec, persistence guard)", () => {
     ],
   ])("rejects %s", (_label, value) => {
     expect(parseGridConfig(value)).toBeNull();
+  });
+
+  it("reads a slot saved before indicators had instances or colours", () => {
+    const saved = {
+      ...defaultGridConfig(),
+      slots: {
+        ...defaultGridConfig().slots,
+        s1: {
+          symbol: "US100",
+          resolution: "MINUTE_5",
+          indicators: [{ id: "ema", params: { period: 20 } }, { id: "rsi", params: {} }],
+        },
+      },
+    };
+
+    const parsed = parseGridConfig(saved);
+
+    // Every indicator survives; the two fields it never had are filled in, not held
+    // against it (terminal-grid spec, "Slot zapisany przed instancjami i kolorami").
+    expect(parsed?.slots.s1.indicators).toEqual([
+      expect.objectContaining({ id: "ema", params: { period: 20 }, color: null }),
+      expect.objectContaining({ id: "rsi", params: {}, color: null }),
+    ]);
+    const [first, second] = parsed?.slots.s1.indicators ?? [];
+    expect(first.key).toEqual(expect.any(String));
+    expect(first.key).not.toBe(second.key);
+  });
+
+  it("keeps three instances of one entry, each with its own params and colour", () => {
+    const saved = {
+      ...defaultGridConfig(),
+      slots: {
+        ...defaultGridConfig().slots,
+        s1: {
+          symbol: "US100",
+          resolution: "MINUTE_5",
+          indicators: [
+            { key: "a", id: "ema", params: { period: 20 }, color: "--color-accent" },
+            { key: "b", id: "ema", params: { period: 50 }, color: "--color-indicator-5" },
+            { key: "c", id: "ema", params: { period: 200 }, color: null },
+          ],
+        },
+      },
+    };
+
+    expect(parseGridConfig(saved)?.slots.s1.indicators).toEqual(saved.slots.s1.indicators);
+  });
+
+  it("reads a colour the palette no longer offers as no colour, rather than losing the slot", () => {
+    const saved = {
+      ...defaultGridConfig(),
+      slots: {
+        ...defaultGridConfig().slots,
+        s1: {
+          symbol: "US100",
+          resolution: "MINUTE_5",
+          indicators: [{ key: "a", id: "ema", params: { period: 20 }, color: "#ff00ff" }],
+        },
+      },
+    };
+
+    expect(parseGridConfig(saved)?.slots.s1.indicators).toEqual([
+      { key: "a", id: "ema", params: { period: 20 }, color: null },
+    ]);
   });
 });
 
@@ -107,11 +171,11 @@ describe("createGridStore", () => {
   it("restores a saved slot's indicators the same way it restores symbol and resolution", () => {
     const storage = memoryStorage();
     const first = createGridStore(storage);
-    first.setSlotIndicators("s2", [{ id: "ema", params: { period: 20 } }]);
+    first.setSlotIndicators("s2", [{ key: "ema", id: "ema", params: { period: 20 }, color: null }]);
 
     const second = createGridStore(storage);
     expect(second.getSnapshot().slots.s2.indicators).toEqual([
-      { id: "ema", params: { period: 20 } },
+      { key: "ema", id: "ema", params: { period: 20 }, color: null },
     ]);
   });
 

@@ -37,7 +37,7 @@ function token(styles: CSSStyleDeclaration | null, name: string): string {
  * any other subset or order failed that check (orange next to yellow, ΔE 4.8 — below
  * the CVD floor); reusing the full eight, unchanged, is what passes.
  */
-const INDICATOR_LINE_TOKENS = [
+export const INDICATOR_LINE_TOKENS = [
   "--color-accent",
   "--color-indicator-2",
   "--color-up",
@@ -47,6 +47,12 @@ const INDICATOR_LINE_TOKENS = [
   "--color-indicator-7",
   "--color-down",
 ] as const;
+
+export type IndicatorColorToken = (typeof INDICATOR_LINE_TOKENS)[number];
+
+export function isIndicatorColorToken(value: unknown): value is IndicatorColorToken {
+  return typeof value === "string" && (INDICATOR_LINE_TOKENS as readonly string[]).includes(value);
+}
 
 export interface ChartColors {
   surface: string;
@@ -100,4 +106,16 @@ export function candlestickColors(colors: ChartColors) {
 
 export function indicatorLineColor(colors: ChartColors, index: number): string {
   return colors.indicatorLines[index % colors.indicatorLines.length];
+}
+
+/**
+ * The colour a token names, in whatever theme is current — `indicatorLines` is built from
+ * the same list in the same order, so the token's position in it is the lookup. Null for
+ * anything that is not one of the eight: a saved slot may name a token this palette no
+ * longer has, and that must read as "assign one" rather than paint the line undefined.
+ */
+export function indicatorColorFromToken(colors: ChartColors, token: string | null): string | null {
+  if (token === null) return null;
+  const index = INDICATOR_LINE_TOKENS.indexOf(token as IndicatorColorToken);
+  return index === -1 ? null : colors.indicatorLines[index];
 }

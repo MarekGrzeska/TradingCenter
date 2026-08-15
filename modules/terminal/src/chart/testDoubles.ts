@@ -103,8 +103,10 @@ export interface FakeSeries {
    *  object the mocked `lightweight-charts` module exports, the same way the
    *  real `chart.addSeries(LineSeries, …)` call identifies its own kind. */
   type: string;
-  /** The options the chart created this series with. */
+  /** The options the chart created this series with, plus whatever
+   *  `applyOptions` has changed since — recolouring an instance goes that way. */
   options: Record<string, unknown>;
+  applyOptions(options: Record<string, unknown>): void;
   /** The pane `addSeries`'s third argument put this series in, resolved once
    *  at creation — never restored to a bare number, so a later pane removal
    *  (this series' own or another's) is reflected the same live way the real
@@ -260,6 +262,9 @@ export function makeFakeSeries(
     pane,
     get paneIndex() {
       return this.pane.paneIndex();
+    },
+    applyOptions(next) {
+      this.options = { ...this.options, ...next };
     },
     setDataCalls: [],
     updateCalls: [],

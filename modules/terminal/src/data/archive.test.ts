@@ -1038,7 +1038,7 @@ describe("archive.computeIndicators", () => {
       "MINUTE_5" as Resolution,
       Date.parse("2026-08-07T14:00:00Z") / 1000,
       Date.parse("2026-08-07T15:00:00Z") / 1000,
-      [{ id: "ema", params: { period: 20 } }],
+      [{ key: "i1", id: "ema", params: { period: 20 }, color: null }],
       signal(),
     );
 
@@ -1047,6 +1047,45 @@ describe("archive.computeIndicators", () => {
     expect(emaResult.settled).toBe(true);
     expect(emaResult.warmupBars).toBe(210);
     expect(emaResult.lines).toEqual({ ema: [21042.5] });
+  });
+
+  it("keeps the instance key and the chosen colour off the wire", async () => {
+    // Both are the terminal's own vocabulary: the archive computes an indicator, it does
+    // not draw one, and nothing on `IndicatorSpecIn` would carry either.
+    let sentSpecs: unknown;
+    server.use(
+      http.post(`${HTTP_BASE}/indicators/US100`, async ({ request }) => {
+        sentSpecs = ((await request.json()) as { specs: unknown }).specs;
+        return HttpResponse.json({
+          symbol: "US100",
+          resolution: "MINUTE_5",
+          price_side: "bid",
+          derived: false,
+          algorithm_version: 1,
+          times: [],
+          warmup_from: null,
+          uncovered: [],
+          results: [],
+        });
+      }),
+    );
+
+    await source().computeIndicators(
+      "US100",
+      "MINUTE_5" as Resolution,
+      Date.parse("2026-08-07T14:00:00Z") / 1000,
+      Date.parse("2026-08-07T15:00:00Z") / 1000,
+      [
+        { key: "i1", id: "ema", params: { period: 20 }, color: "--color-accent" },
+        { key: "i2", id: "ema", params: { period: 50 }, color: null },
+      ],
+      signal(),
+    );
+
+    expect(sentSpecs).toEqual([
+      { id: "ema", params: { period: 20 } },
+      { id: "ema", params: { period: 50 } },
+    ]);
   });
 
   it("maps zones and markers to epoch seconds, null to null", async () => {
@@ -1093,7 +1132,7 @@ describe("archive.computeIndicators", () => {
       "MINUTE" as Resolution,
       0,
       1,
-      [{ id: "range_gap", params: {} }],
+      [{ key: "range_gap", id: "range_gap", params: {}, color: null }],
       signal(),
     );
 
@@ -1124,7 +1163,7 @@ describe("archive.computeIndicators", () => {
         "MINUTE" as Resolution,
         0,
         1,
-        [{ id: "not-real", params: {} }],
+        [{ key: "not-real", id: "not-real", params: {}, color: null }],
         signal(),
       ),
     ).rejects.toMatchObject({ kind: "refused" });

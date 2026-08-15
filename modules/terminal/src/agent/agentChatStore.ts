@@ -19,9 +19,16 @@ import {
   type AgentMessage,
   type AgentModel,
   type AgentSession,
+  type AgentChartSnapshot,
   type AgentToolCall,
   type ChatRole,
 } from "./agentApi";
+import {
+  activeChartSnapshot,
+  describeChartControl,
+  syncAgentChart,
+  type ChartControlResult,
+} from "./chartControl";
 import type { AgentStreamEvent } from "./stream";
 
 export type { ChatRole };
@@ -85,6 +92,10 @@ export interface AgentChatState {
    *  session's own `currentModelId` once one is open, or the pick that will become the
    *  first session's model once one exists. `null` only until the catalogue loads. */
   selectedModelId: string | null;
+  /** What the agent last did to the chart, in one sentence, or null when it has not
+   *  touched it. A chart that changes on its own without a word reads as a fault
+   *  (`terminal-agent-chat` spec, "Panel mówi, że wykres zmienił agent"). */
+  chartNotice: string | null;
 }
 
 export interface AgentChatStore {
@@ -158,6 +169,12 @@ function toChatMessage(message: AgentMessage): ChatMessage {
 export function createAgentChatStore(
   storage: Storage | null = safeLocalStorage(),
   api: AgentApi = agentApi,
+  // Injected rather than imported at the call site so a test can watch it without a
+  // grid, an archive and a localStorage behind it.
+  syncChart: () => Promise<ChartControlResult | null> = () => syncAgentChart(),
+  // What the terminal is drawing as the question is asked. Read at send time, not at
+  // construction: the operator may have changed slots since the panel opened.
+  chartSnapshot: () => AgentChartSnapshot | null = activeChartSnapshot,
 ): AgentChatStore {
   let state: AgentChatState = {
     expanded: loadExpanded(storage),
@@ -170,6 +187,7 @@ export function createAgentChatStore(
     models: [],
     modelsStatus: "loading",
     selectedModelId: null,
+    chartNotice: null,
   };
   let nextLocalId = 1;
   let transcriptSeq = 0;
@@ -178,6 +196,7 @@ export function createAgentChatStore(
   // so `ensureLoaded` can be called as often as anything likes without doubling it.
   let modelsInFlight = false;
   let sessionsInFlight = false;
+  let chartSyncInFlight = false;
   // Which conversation's transcript is actually on screen. `transcriptStatus` cannot say:
   // it starts "ready", because an empty panel is not a panel that is loading, so it reads
   // the same before the first read as after a successful one.
@@ -263,6 +282,11 @@ export function createAgentChatStore(
     calls: AgentToolCall[],
     errorMessage: string | null,
   ): Promise<void> {
+    // A turn is the one moment the chart is most likely to have been set, so the read
+    // happens here rather than on a timer. Not awaited by the transcript reload below:
+    // the two are independent, and neither should hold the other up.
+    void syncChartCommands();
+
     const seq = ++transcriptSeq;
     let messages: ChatMessage[] | null = null;
     try {
@@ -311,6 +335,25 @@ export function createAgentChatStore(
     if (expanded) ensureLoaded();
   }
 
+  /** Whatever the agent set while nobody was reading — on the way in, and after every
+   *  turn. Never awaited by anything the operator is waiting for: a chart that could not
+   *  be synced is not a reason to hold up a reply (`terminal-agent-chat` spec, "Nieudany
+   *  odczyt poleceń"). Guarded against overlap the same way `loadModels`/`loadSessions`
+   *  are — `ensureLoaded` can run from the panel's mount and from `setExpanded` in the
+   *  same tick, and applying one standing command twice would rebuild every indicator
+   *  series on the chart twice for nothing. */
+  async function syncChartCommands(): Promise<void> {
+    if (chartSyncInFlight) return;
+    chartSyncInFlight = true;
+    try {
+      const notice = describeChartControl(await syncChart());
+      if (notice === null) return;
+      commit({ ...state, chartNotice: notice });
+    } finally {
+      chartSyncInFlight = false;
+    }
+  }
+
   /**
    * Loads whatever an open panel needs and has not got, and is safe to call repeatedly.
    *
@@ -328,6 +371,13 @@ export function createAgentChatStore(
    * because the race is deterministic rather than a race at all.
    */
   function ensureLoaded(): void {
+    // Read whether or not the panel is open — `terminal-agent-chat` spec, "MUST czytać
+    // nowe polecenia agenta po zakończonej turze oraz po wejściu na stronę", so a
+    // command issued before the tab closed is not left waiting on the operator opening
+    // the panel first. The notice this leaves in `state.chartNotice` renders the moment
+    // they do (`chartNotice` is cleared only by the next turn or a session switch, not
+    // by time), so nothing here is said and then lost.
+    void syncChartCommands();
     if (!state.expanded) return;
     if (state.modelsStatus !== "ready") void loadModels();
     if (state.sessionsStatus !== "ready") void loadSessions();
@@ -344,6 +394,8 @@ export function createAgentChatStore(
       activeSessionId: id,
       selectedModelId: session?.currentModelId ?? state.selectedModelId,
       turn: null,
+      // Belongs to the conversation just left, not this one.
+      chartNotice: null,
     });
     persistActiveSessionId(id);
     void loadMessages(id);
@@ -360,6 +412,8 @@ export function createAgentChatStore(
       transcriptStatus: "ready",
       turn: null,
       selectedModelId: state.models[0]?.id ?? state.selectedModelId,
+      // Belongs to the conversation just left, not this one.
+      chartNotice: null,
     });
     persistActiveSessionId(null);
   }
@@ -463,6 +517,9 @@ export function createAgentChatStore(
       ...state,
       messages: [...state.messages, operatorMessage],
       turn: { status: "waiting", toolCalls: [] },
+      // Said once, about the turn that set it — carrying it into the next question would
+      // describe a chart the operator may since have changed by hand.
+      chartNotice: null,
     });
 
     let sessionId = state.activeSessionId;
@@ -479,7 +536,12 @@ export function createAgentChatStore(
 
       let events: AsyncGenerator<AgentStreamEvent>;
       try {
-        events = await api.sendMessage(sessionId, trimmed, new AbortController().signal);
+        events = await api.sendMessage(
+          sessionId,
+          trimmed,
+          new AbortController().signal,
+          chartSnapshot(),
+        );
       } catch (cause) {
         // Nothing accepted yet — no operator message, no turn, nothing to reload.
         commit({ ...state, turn: { status: "unreachable", message: describeError(cause) } });

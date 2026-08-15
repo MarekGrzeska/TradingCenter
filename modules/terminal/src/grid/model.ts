@@ -1,4 +1,10 @@
-import { RESOLUTIONS, type IndicatorSelection, type Resolution } from "../data/types";
+import {
+  RESOLUTIONS,
+  newIndicatorSelectionKey,
+  type IndicatorSelection,
+  type Resolution,
+} from "../data/types";
+import { isIndicatorColorToken } from "../chart/theme";
 
 /**
  * Six slots exist at all times, with fixed identities; the layout only decides
@@ -69,22 +75,42 @@ export function defaultGridConfig(): GridConfig {
 
 const RESOLUTION_SET = new Set<string>(RESOLUTIONS);
 
-function isIndicatorSelection(value: unknown): value is IndicatorSelection {
-  if (typeof value !== "object" || value === null) return false;
+/**
+ * `key` and `colour` are both optional on the way in: a slot saved before an indicator
+ * could be chosen twice, or given a colour, carries neither, and rejecting it would cost
+ * the operator every indicator in every slot for two fields with obvious defaults
+ * (terminal-grid spec, "Slot zapisany przed instancjami i kolorami"). A colour naming a
+ * token this palette does not offer is read as no colour, for the same reason.
+ */
+function readIndicatorSelection(value: unknown): IndicatorSelection | null {
+  if (typeof value !== "object" || value === null) return null;
   const selection = value as Record<string, unknown>;
-  if (typeof selection.id !== "string") return false;
-  if (typeof selection.params !== "object" || selection.params === null) return false;
-  return Object.values(selection.params).every((v) => typeof v === "number");
+  if (typeof selection.id !== "string") return null;
+  if (typeof selection.params !== "object" || selection.params === null) return null;
+  const params = selection.params as Record<string, unknown>;
+  if (!Object.values(params).every((v) => typeof v === "number")) return null;
+  return {
+    key: typeof selection.key === "string" ? selection.key : newIndicatorSelectionKey(),
+    id: selection.id,
+    params: params as Record<string, number>,
+    color: isIndicatorColorToken(selection.color) ? selection.color : null,
+  };
 }
 
-function isSlotConfig(value: unknown): value is SlotConfig {
-  if (typeof value !== "object" || value === null) return false;
+function readSlotConfig(value: unknown): SlotConfig | null {
+  if (typeof value !== "object" || value === null) return null;
   const slot = value as Record<string, unknown>;
-  const symbolOk = slot.symbol === null || typeof slot.symbol === "string";
-  const resolutionOk =
-    typeof slot.resolution === "string" && RESOLUTION_SET.has(slot.resolution);
-  const indicatorsOk = Array.isArray(slot.indicators) && slot.indicators.every(isIndicatorSelection);
-  return symbolOk && resolutionOk && indicatorsOk;
+  if (!(slot.symbol === null || typeof slot.symbol === "string")) return null;
+  if (typeof slot.resolution !== "string" || !RESOLUTION_SET.has(slot.resolution)) return null;
+  if (!Array.isArray(slot.indicators)) return null;
+
+  const indicators: IndicatorSelection[] = [];
+  for (const raw of slot.indicators) {
+    const selection = readIndicatorSelection(raw);
+    if (selection === null) return null;
+    indicators.push(selection);
+  }
+  return { symbol: slot.symbol, resolution: slot.resolution as Resolution, indicators };
 }
 
 /**
@@ -106,9 +132,9 @@ export function parseGridConfig(value: unknown): GridConfig | null {
   const rawSlots = raw.slots as Record<string, unknown>;
   const slots = {} as Record<SlotId, SlotConfig>;
   for (const id of SLOT_IDS) {
-    const slot = rawSlots[id];
-    if (!isSlotConfig(slot)) return null;
-    slots[id] = { symbol: slot.symbol, resolution: slot.resolution, indicators: slot.indicators };
+    const slot = readSlotConfig(rawSlots[id]);
+    if (slot === null) return null;
+    slots[id] = slot;
   }
 
   return {

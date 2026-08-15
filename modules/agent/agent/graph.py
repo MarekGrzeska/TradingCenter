@@ -20,7 +20,7 @@ file exists to avoid:
 from __future__ import annotations
 
 import logging
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import TypedDict
 
 from langgraph.graph import END, StateGraph
@@ -34,9 +34,16 @@ from .provider import (
     ToolRound,
     UsageReport,
 )
-from .tools import ToolDescriptor, ToolOutcomeKind, ToolServer
+from .tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind, ToolServer
 
 log = logging.getLogger(__name__)
+
+# A tool this module runs itself, already bound to whatever it needs beyond the model's
+# arguments (the session, the pool). The graph does not care which tools are local — it
+# looks a name up here first and falls through to the server — so the ceiling, the trace
+# and the three outcomes stay one mechanism for both kinds (specs/agent-tools, "Zestaw
+# narzędzi pochodzi z serwera, nie z tego modułu").
+LocalTool = Callable[[dict], Awaitable[ToolOutcome]]
 
 # A number in the code, not a setting — the same choice market-mcp made for its own
 # ceilings, and for the same reason: a safety ceiling in configuration is an invitation
@@ -80,7 +87,11 @@ class ConversationState(TypedDict):
     failed: bool
 
 
-def build_graph(provider: ModelProvider, tool_server: ToolServer | None = None):
+def build_graph(
+    provider: ModelProvider,
+    tool_server: ToolServer | None = None,
+    local_tools: Mapping[str, LocalTool] | None = None,
+):
     async def call_model(state: ConversationState) -> dict:
         parts: list[str] = []
         requests: list[ToolCallRequest] = []
@@ -157,7 +168,25 @@ def build_graph(provider: ModelProvider, tool_server: ToolServer | None = None):
                 )
                 continue
 
-            outcome = await tool_server.call(request.name, request.arguments) if tool_server else None
+            local = (local_tools or {}).get(request.name)
+            if local is not None:
+                try:
+                    outcome = await local(request.arguments)
+                except Exception as err:  # noqa: BLE001 - a broken local tool is not a broken turn
+                    # Mirrors `ToolServer.call`'s own guard: this module's own tool can fail
+                    # (a database gone away, a malformed row) exactly as a remote one can,
+                    # and without this the exception reaches `turn.py`'s backstop, which
+                    # discards the whole turn's text rather than reporting one failed call.
+                    log.warning("local tool %s failed: %s", request.name, err)
+                    outcome = ToolOutcome(
+                        ToolOutcomeKind.UNAVAILABLE,
+                        f"this tool failed unexpectedly ({err}). Nothing was changed.",
+                        0,
+                    )
+            elif tool_server is not None:
+                outcome = await tool_server.call(request.name, request.arguments)
+            else:
+                outcome = None
             made += 1
             if outcome is None:  # pragma: no cover - a graph built without a server
                 text, kind = "no tool server is available", ToolOutcomeKind.UNAVAILABLE

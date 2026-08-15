@@ -258,7 +258,7 @@ describe("GridView layout (terminal-grid spec)", () => {
 
     await waitFor(() =>
       expect(gridStore.getSnapshot().slots.s1.indicators).toEqual([
-        { id: "ema", params: { period: 20 } },
+        expect.objectContaining({ id: "ema", params: { period: 20 }, color: null }),
       ]),
     );
     unmount();

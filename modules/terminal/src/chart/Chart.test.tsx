@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { FakeSeries } from "./testDoubles";
 import {
@@ -14,7 +14,7 @@ import {
   makeFakeChart,
 } from "./testDoubles";
 import type { Bar, IndicatorSelection } from "../data/types";
-import { readChartColors } from "./theme";
+import { indicatorColorFromToken, readChartColors } from "./theme";
 import { Toaster } from "../ui/Toaster";
 import { toastStore } from "../ui/toastStore";
 
@@ -657,7 +657,7 @@ describe("Chart — indicators (terminal-chart spec, market-data-indicators)", (
       resolution: "MINUTE_5",
       from: 100,
       to: 200,
-      specs: [{ id: "ema", params: { period: 20 } }],
+      specs: [expect.objectContaining({ id: "ema", params: { period: 20 }, color: null })],
     });
 
     await waitFor(() => expect(lineSeries()).toHaveLength(1));
@@ -683,7 +683,7 @@ describe("Chart — indicators (terminal-chart spec, market-data-indicators)", (
     const onIndicatorSelectionsChange = vi.fn();
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "ema", params: { period: 20 } }],
+      initialIndicatorSelections: [{ key: "ema", id: "ema", params: { period: 20 }, color: null }],
       onIndicatorSelectionsChange,
     });
     await act(async () => {
@@ -702,6 +702,77 @@ describe("Chart — indicators (terminal-chart spec, market-data-indicators)", (
     expect(onIndicatorSelectionsChange).toHaveBeenCalledWith([]);
   });
 
+  it("keeps showing the newest known indicator value once the pointer leaves the chart, even when the freshest bar has none yet", async () => {
+    // Indicators are computed over `redraw`'s own range, not on every live tick — so the
+    // bar the readout falls back to without a crosshair (the newest one) is routinely a
+    // beat ahead of what the archive has answered for. The line itself still ends at the
+    // last value it has; the readout must say the same thing, not go blank.
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ key: "ema", id: "ema", params: { period: 20 }, color: null }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+    await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
+
+    // No crosshair move: `shown` falls back to the bar at time 200, which the indicator
+    // has no computed value for.
+    expect(await screen.findByText("EMA 20")).toBeInTheDocument();
+    expect(await screen.findByText("10.00")).toBeInTheDocument();
+  });
+
+  it("draws an indicator the slot gained from outside the picker, without remounting", async () => {
+    // What `syncAgentChart` (`chartControl.ts`) does after the agent sets the chart:
+    // it writes straight to `gridStore`, which hands this component a *new*
+    // `initialIndicatorSelections` array on its next render — the same component
+    // instance, never remounted. Before the sync effect below existed, the lazy
+    // `useState` initializer had already run once at mount and never looked at the
+    // prop again, so the operator saw nothing until they reloaded the page.
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ lines: { ema: [10] } })],
+      },
+    ];
+    const { rerender } = renderChart(source, { indicatorSource: indicators });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    expect(lineSeries()).toHaveLength(0);
+
+    rerender(
+      <Chart
+        source={source}
+        indicatorSource={indicators}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={() => {}}
+        initialIndicatorSelections={[{ key: "ema", id: "ema", params: { period: 20 }, color: null }]}
+      />,
+    );
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+  });
+
   it("skips a saved selection the catalogue no longer offers, and says so, without discarding it from the next save", async () => {
     const indicators = new FakeIndicatorSource();
     indicators.catalogueEntries = [indicatorEntry({ id: "ema" })];
@@ -709,8 +780,8 @@ describe("Chart — indicators (terminal-chart spec, market-data-indicators)", (
     renderChart(source, {
       indicatorSource: indicators,
       initialIndicatorSelections: [
-        { id: "retired_indicator", params: {} },
-        { id: "ema", params: { period: 20 } },
+        { key: "retired_indicator", id: "retired_indicator", params: {}, color: null },
+        { key: "ema", id: "ema", params: { period: 20 }, color: null },
       ],
       onIndicatorSelectionsChange,
     });
@@ -720,7 +791,7 @@ describe("Chart — indicators (terminal-chart spec, market-data-indicators)", (
 
     // Only the indicator the catalogue still recognizes is ever asked for.
     await waitFor(() => expect(indicators.computeCalls).toHaveLength(1));
-    expect(indicators.computeCalls[0].specs).toEqual([{ id: "ema", params: { period: 20 } }]);
+    expect(indicators.computeCalls[0].specs).toEqual([{ key: "ema", id: "ema", params: { period: 20 }, color: null }]);
 
     expect(await screen.findByText(/1 saved indicator unavailable/i)).toBeInTheDocument();
 
@@ -730,7 +801,7 @@ describe("Chart — indicators (terminal-chart spec, market-data-indicators)", (
     await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
     await userEvent.click(await screen.findByRole("checkbox", { name: /^ema$/i }));
     expect(onIndicatorSelectionsChange).toHaveBeenLastCalledWith([
-      { id: "retired_indicator", params: {} },
+      { key: "retired_indicator", id: "retired_indicator", params: {}, color: null },
     ]);
   });
 
@@ -930,7 +1001,7 @@ describe("Chart — indicators (terminal-chart spec, market-data-indicators)", (
     });
 
     expect(await screen.findByText("RSI 14")).toBeInTheDocument();
-    expect(await screen.findByText("63.5")).toBeInTheDocument();
+    expect(await screen.findByText("63.50")).toBeInTheDocument();
   });
 
   it("draws MACD's histogram line as a two-color Histogram series beside its two Line series", async () => {
@@ -1396,7 +1467,7 @@ describe("Chart — indicators markers (terminal-chart spec, task 3.8)", () => {
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "swing_points", params: { n: 2 } }],
+      initialIndicatorSelections: [{ key: "swing_points", id: "swing_points", params: { n: 2 }, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1), bar(200, 2)]);
@@ -1434,7 +1505,7 @@ describe("Chart — indicators markers (terminal-chart spec, task 3.8)", () => {
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "swing_points", params: { n: 2 } }],
+      initialIndicatorSelections: [{ key: "swing_points", id: "swing_points", params: { n: 2 }, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1488,7 +1559,7 @@ describe("Chart — indicators levels / ray primitive (terminal-chart spec, task
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "htf_levels_day", params: {} }],
+      initialIndicatorSelections: [{ key: "htf_levels_day", id: "htf_levels_day", params: {}, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1535,7 +1606,7 @@ describe("Chart — indicators levels / ray primitive (terminal-chart spec, task
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "htf_levels_day", params: {} }],
+      initialIndicatorSelections: [{ key: "htf_levels_day", id: "htf_levels_day", params: {}, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1574,7 +1645,7 @@ describe("Chart — indicators levels / ray primitive (terminal-chart spec, task
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "htf_levels_day", params: {} }],
+      initialIndicatorSelections: [{ key: "htf_levels_day", id: "htf_levels_day", params: {}, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1627,7 +1698,7 @@ describe("Chart — indicators zones / zone primitive (terminal-chart spec, task
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "range_gap", params: { skip_session_gaps: 1 } }],
+      initialIndicatorSelections: [{ key: "range_gap", id: "range_gap", params: { skip_session_gaps: 1 }, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1678,7 +1749,7 @@ describe("Chart — indicators zones / zone primitive (terminal-chart spec, task
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "range_gap", params: { skip_session_gaps: 1 } }],
+      initialIndicatorSelections: [{ key: "range_gap", id: "range_gap", params: { skip_session_gaps: 1 }, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1717,7 +1788,7 @@ describe("Chart — indicators zones / zone primitive (terminal-chart spec, task
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "range_gap", params: { skip_session_gaps: 1 } }],
+      initialIndicatorSelections: [{ key: "range_gap", id: "range_gap", params: { skip_session_gaps: 1 }, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1774,7 +1845,7 @@ describe("Chart — indicators time profile / histogram primitive (terminal-char
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "time_profile", params: {} }],
+      initialIndicatorSelections: [{ key: "time_profile", id: "time_profile", params: {}, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1806,7 +1877,7 @@ describe("Chart — indicators time profile / histogram primitive (terminal-char
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "time_profile", params: {} }],
+      initialIndicatorSelections: [{ key: "time_profile", id: "time_profile", params: {}, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1817,6 +1888,349 @@ describe("Chart — indicators time profile / histogram primitive (terminal-char
     await userEvent.click(await screen.findByRole("checkbox", { name: /^time_profile$/i }));
 
     await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
+  });
+});
+
+describe("Chart — several instances of one indicator, each with its own colour", () => {
+  function lineSeries() {
+    return stub.latest().series.filter((s) => s.type === "Line");
+  }
+
+  /** Two EMAs on one chart, answered in the order they were asked for. */
+  function twoEmas(indicators: FakeIndicatorSource) {
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ params: { period: 20 }, lines: { ema: [10, 20] } }),
+          indicatorResult({ params: { period: 50 }, lines: { ema: [11, 21] } }),
+        ],
+      },
+    ];
+  }
+
+  it("draws the same entry twice, each instance with its own values", async () => {
+    const indicators = new FakeIndicatorSource();
+    twoEmas(indicators);
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: null },
+        { key: "slow", id: "ema", params: { period: 50 }, color: null },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(2));
+    expect(lineSeries()[0].data()).toEqual([
+      { time: 100, value: 10 },
+      { time: 200, value: 20 },
+    ]);
+    expect(lineSeries()[1].data()).toEqual([
+      { time: 100, value: 11 },
+      { time: 200, value: 21 },
+    ]);
+  });
+
+  it("paints an instance in the colour the operator chose, and leaves the other to the cycle", async () => {
+    const indicators = new FakeIndicatorSource();
+    twoEmas(indicators);
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: "--color-indicator-5" },
+        { key: "slow", id: "ema", params: { period: 50 }, color: null },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(2));
+    const colors = readChartColors();
+    const chosen = indicatorColorFromToken(colors, "--color-indicator-5");
+    expect(lineSeries()[0].options.color).toBe(chosen);
+    // The cycle steps over a hue already spoken for, so the neighbouring line cannot
+    // come out the same colour by accident.
+    expect(lineSeries()[1].options.color).not.toBe(chosen);
+    expect(colors.indicatorLines).toContain(lineSeries()[1].options.color);
+  });
+
+  it("picking a colour for one instance never repaints another still on Auto", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({ params: { period: 10 }, lines: { ema: [1] } }),
+          indicatorResult({ params: { period: 20 }, lines: { ema: [2] } }),
+          indicatorResult({ params: { period: 50 }, lines: { ema: [3] } }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "one", id: "ema", params: { period: 10 }, color: null },
+        { key: "two", id: "ema", params: { period: 20 }, color: null },
+        { key: "three", id: "ema", params: { period: 50 }, color: null },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(lineSeries()).toHaveLength(3));
+    const [firstBefore, secondBefore] = lineSeries().map((s) => s.options.color);
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    // The third instance, still on Auto, is given a colour by hand — `theme.ts`'s own
+    // invariant on `indicatorLines` ("indexed by how many indicator lines are already
+    // drawn — never by which one a line is") says the first two must not move.
+    const thirdInstance = within(await screen.findByRole("group", { name: "EMA 3" }));
+    await userEvent.click(thirdInstance.getByRole("button", { name: "Colour 1" }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(3));
+    expect(lineSeries()[0].options.color).toBe(firstBefore);
+    expect(lineSeries()[1].options.color).toBe(secondBefore);
+    const chosen = indicatorColorFromToken(readChartColors(), "--color-accent");
+    expect(lineSeries()[2].options.color).toBe(chosen);
+  });
+
+  it("draws two instances of one entry in two colours the operator picked", async () => {
+    const indicators = new FakeIndicatorSource();
+    twoEmas(indicators);
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: "--color-indicator-2" },
+        { key: "slow", id: "ema", params: { period: 50 }, color: "--color-indicator-7" },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(2));
+    const colors = readChartColors();
+    expect(lineSeries()[0].options.color).toBe(indicatorColorFromToken(colors, "--color-indicator-2"));
+    expect(lineSeries()[1].options.color).toBe(indicatorColorFromToken(colors, "--color-indicator-7"));
+  });
+
+  it("keeps a chosen colour when another instance is added afterwards", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ params: { period: 20 }, lines: { ema: [10] } })],
+      },
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [
+          indicatorResult({ params: { period: 20 }, lines: { ema: [10] } }),
+          indicatorResult({ params: { period: 20 }, lines: { ema: [10] } }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: "--color-indicator-5" },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    const chosen = indicatorColorFromToken(readChartColors(), "--color-indicator-5");
+    expect(lineSeries()[0].options.color).toBe(chosen);
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("button", { name: /add another ema/i }));
+
+    await waitFor(() => expect(lineSeries()).toHaveLength(2));
+    expect(lineSeries()[0].options.color).toBe(chosen);
+  });
+
+  it("repaints a line the moment its colour is picked, without asking the archive again", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ params: { period: 20 }, lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: null },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(lineSeries()).toHaveLength(1));
+    const readsBefore = indicators.computeCalls.length;
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("button", { name: "Colour 5" }));
+
+    const chosen = indicatorColorFromToken(readChartColors(), "--color-indicator-5");
+    await waitFor(() => expect(lineSeries()[0].options.color).toBe(chosen));
+    expect(indicators.computeCalls).toHaveLength(readsBefore);
+  });
+
+  it("clears a restored colour back to the cycle when the operator picks Auto", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [indicatorEntry()];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100],
+        results: [indicatorResult({ params: { period: 20 }, lines: { ema: [10] } })],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: "--color-indicator-5" },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    const chosen = indicatorColorFromToken(readChartColors(), "--color-indicator-5");
+    await waitFor(() => expect(lineSeries()[0]?.options.color).toBe(chosen));
+
+    await userEvent.click(await screen.findByRole("button", { name: /indicators/i }));
+    await userEvent.click(await screen.findByRole("button", { name: "Auto" }));
+
+    // Picking Auto is a choice too, and it must land without waiting for a recompute.
+    await waitFor(() => expect(lineSeries()[0].options.color).not.toBe(chosen));
+    expect(indicators.computeCalls).toHaveLength(1);
+  });
+
+  it("gives the crosshair readout one entry per instance, each labelled with its own params", async () => {
+    const indicators = new FakeIndicatorSource();
+    twoEmas(indicators);
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: null },
+        { key: "slow", id: "ema", params: { period: 50 }, color: null },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+    await waitFor(() => expect(lineSeries()).toHaveLength(2));
+
+    await act(async () => {
+      for (const handler of stub.latest().crosshairHandlers) handler({ time: 200 });
+    });
+
+    expect(await screen.findByText("EMA 20")).toBeInTheDocument();
+    expect(await screen.findByText("EMA 50")).toBeInTheDocument();
+    expect(await screen.findByText("20.00")).toBeInTheDocument();
+    expect(await screen.findByText("21.00")).toBeInTheDocument();
+  });
+
+  it("draws the readout over the chart rather than in the header, so its height cannot resize the chart", async () => {
+    // The bug this locks: in the header, the readout's height was part of the layout, so
+    // a value changing width mid-pan re-wrapped its row, changed the chart container's
+    // height, and set the `ResizeObserver` re-laying out the whole chart in the middle of
+    // a drag. An overlay cannot change what the chart is given — and must not swallow the
+    // drag either, hence `pointer-events-none`.
+    const indicators = new FakeIndicatorSource();
+    twoEmas(indicators);
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [{ key: "fast", id: "ema", params: { period: 20 }, color: null }],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+
+    const readout = await screen.findByTestId("chart-readout");
+    expect(readout.className).toContain("pointer-events-none");
+    expect(document.querySelector("header")?.contains(readout)).toBe(false);
+  });
+
+  it("puts several instances of one indicator on one readout row, and a different indicator on its own", async () => {
+    const indicators = new FakeIndicatorSource();
+    indicators.catalogueEntries = [
+      indicatorEntry(),
+      indicatorEntry({
+        id: "rsi",
+        params: [{ name: "period", type: "int", default: 14, min: 2, max: 5000 }],
+        lines: [{ key: "rsi", label: "RSI {period}", style: null }],
+        render: { pane: "own", style: "line", scale: "fixed", autoscale: false, range: [0, 100], levels: [] },
+      }),
+    ];
+    indicators.computeQueue = [
+      {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        derived: false,
+        algorithmVersion: 1,
+        times: [100, 200],
+        results: [
+          indicatorResult({ id: "ema", params: { period: 20 }, lines: { ema: [10, 20] } }),
+          indicatorResult({ id: "ema", params: { period: 50 }, lines: { ema: [11, 21] } }),
+          indicatorResult({ id: "rsi", params: { period: 14 }, lines: { rsi: [40, 63.5] } }),
+        ],
+      },
+    ];
+    renderChart(source, {
+      indicatorSource: indicators,
+      initialIndicatorSelections: [
+        { key: "fast", id: "ema", params: { period: 20 }, color: null },
+        { key: "slow", id: "ema", params: { period: 50 }, color: null },
+        { key: "strength", id: "rsi", params: { period: 14 }, color: null },
+      ],
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(200, 2)]);
+    });
+    await waitFor(() => expect(lineSeries()).toHaveLength(3));
+
+    await act(async () => {
+      for (const handler of stub.latest().crosshairHandlers) handler({ time: 200 });
+    });
+
+    const rows = await screen.findAllByTestId("indicator-readout-row");
+    expect(rows).toHaveLength(2);
+    expect(within(rows[0]).getByText("EMA 20")).toBeInTheDocument();
+    expect(within(rows[0]).getByText("EMA 50")).toBeInTheDocument();
+    expect(within(rows[1]).getByText("RSI 14")).toBeInTheDocument();
   });
 });
 
@@ -1848,7 +2262,7 @@ describe("Chart — live indicators (terminal-chart spec, task 6.1/6.2/6.4)", ()
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "ema", params: { period: 20 } }],
+      initialIndicatorSelections: [{ key: "ema", id: "ema", params: { period: 20 }, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1889,7 +2303,7 @@ describe("Chart — live indicators (terminal-chart spec, task 6.1/6.2/6.4)", ()
     ];
     renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "ema", params: { period: 20 } }],
+      initialIndicatorSelections: [{ key: "ema", id: "ema", params: { period: 20 }, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);
@@ -1943,7 +2357,7 @@ describe("Chart — live indicators (terminal-chart spec, task 6.1/6.2/6.4)", ()
     ];
     const { rerender, onResolutionChange } = renderChart(source, {
       indicatorSource: indicators,
-      initialIndicatorSelections: [{ id: "range_gap", params: {} }],
+      initialIndicatorSelections: [{ key: "range_gap", id: "range_gap", params: {}, color: null }],
     });
     await act(async () => {
       source.snapshot([bar(100, 1)]);

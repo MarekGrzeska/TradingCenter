@@ -14,6 +14,7 @@ session would be a test of the mock.
 from __future__ import annotations
 
 import asyncio
+import json
 import socket
 import threading
 from collections.abc import AsyncIterator
@@ -21,6 +22,7 @@ from collections.abc import AsyncIterator
 import pytest
 import uvicorn
 from mcp.server.fastmcp import FastMCP
+from pydantic import BaseModel
 
 from agent.config import Settings
 from agent.tools import ToolOutcomeKind, ToolServer
@@ -55,6 +57,11 @@ def _free_port() -> int:
         return sock.getsockname()[1]
 
 
+class _PairOut(BaseModel):
+    symbol: str
+    resolution: str
+
+
 def _stand_in_server(port: int) -> FastMCP:
     mcp = FastMCP("stand-in", host="127.0.0.1", port=port)
 
@@ -69,6 +76,15 @@ def _stand_in_server(port: int) -> FastMCP:
     @mcp.tool(description="Lists the pairs the archive collects. At most 50.")
     def list_tracked_pairs() -> str:
         return "US100, EURUSD"
+
+    # market-mcp's real `list_tracked_pairs` returns `list[TrackedPairOut]`, not a
+    # string — the shape this stand-in exists to reproduce. The SDK turns a bare list
+    # return into one content block *per item* rather than one for the whole array
+    # (`_convert_to_content`), so a client reading `content` alone sees N JSON documents
+    # back to back, not the one array `structuredContent` carries.
+    @mcp.tool(description="Lists pairs the typed way — the shape that broke the client.")
+    def list_pairs_typed() -> list[_PairOut]:
+        return [_PairOut(symbol="US100", resolution="MINUTE_5"), _PairOut(symbol="US100", resolution="HOUR")]
 
     return mcp
 
@@ -100,7 +116,11 @@ async def tool_server() -> AsyncIterator[ToolServer]:
 async def test_the_tool_list_comes_from_the_server(tool_server: ToolServer) -> None:
     tools = await tool_server.list_tools()
 
-    assert {tool.name for tool in tools} == {"get_last_price", "list_tracked_pairs"}
+    assert {tool.name for tool in tools} == {
+        "get_last_price",
+        "list_tracked_pairs",
+        "list_pairs_typed",
+    }
     # The description is the server's, not a copy kept here — this is the assertion that
     # would fail the day someone writes a local catalogue (specs/agent-tool-access).
     price = next(tool for tool in tools if tool.name == "get_last_price")
@@ -131,6 +151,24 @@ async def test_a_refusal_arrives_as_a_result_with_the_servers_own_words(
     assert outcome.kind is ToolOutcomeKind.REFUSED
     # The point of the whole shape: the model can act on this sentence.
     assert "list_tracked_pairs" in outcome.text
+
+
+async def test_a_bare_list_return_reads_back_as_one_json_array(tool_server: ToolServer) -> None:
+    """The production bug: `list_tracked_pairs` answered "something unreadable" the
+    moment more than one pair was tracked, because the SDK splits a bare-list return
+    into one content block per item and joining them is N JSON documents, not one.
+    Reading `structuredContent` instead is what `chart.py`'s `_check_pair` was already
+    written to expect (`pairs.get("result", pairs.get("pairs", []))`)."""
+    outcome = await tool_server.call("list_pairs_typed", {})
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    parsed = json.loads(outcome.text)
+    assert parsed == {
+        "result": [
+            {"symbol": "US100", "resolution": "MINUTE_5"},
+            {"symbol": "US100", "resolution": "HOUR"},
+        ]
+    }
 
 
 async def test_an_unknown_tool_is_a_refusal_not_an_outage(tool_server: ToolServer) -> None:
