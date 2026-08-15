@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { AgentCostView } from "../agent/cost/AgentCostView";
+import { AgentSettingsView } from "../agent/settings/AgentSettingsView";
 import { CollectionHistoryView } from "../history/CollectionHistoryView";
 import { GridView } from "../grid/GridView";
 import { InstrumentsView } from "../instruments/InstrumentsView";
@@ -31,7 +31,12 @@ export const TABS: TabDefinition[] = [
     path: "data-history",
     Component: CollectionHistoryView,
   },
-  { id: "agents-cost", label: "Agents cost", path: "agents-cost", Component: AgentCostView },
+  {
+    id: "agent-settings",
+    label: "Agent Settings",
+    path: "agent-settings",
+    Component: AgentSettingsView,
+  },
 ];
 
 export const DEFAULT_TAB_PATH = "graph";
