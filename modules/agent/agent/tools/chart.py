@@ -21,15 +21,23 @@ from __future__ import annotations
 import asyncio
 import json
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 import asyncpg
 
 from .. import store
-from ..models import ChartIndicator, ChartSnapshot
+from ..models import ChartFocus, ChartIndicator, ChartSnapshot
 from .client import ToolDescriptor, ToolOutcome, ToolOutcomeKind, ToolServer
 
 CHART_TOOL_NAME = "set_chart"
+
+# The candle count a focus may name, either around a point or as "the newest N". Below
+# the floor a chart shows an approximation nobody could read; above the ceiling the
+# terminal would need more history reads than a single pan should cost
+# (design.md, "Granice liczby świec: 10 … 1000").
+MIN_FOCUS_BARS = 10
+MAX_FOCUS_BARS = 1000
 
 # What the terminal offers as a palette; a colour outside it is not a colour it can draw
 # (`terminal/src/chart/theme.ts`, `INDICATOR_LINE_TOKENS`). Duplicated rather than shared
@@ -49,13 +57,17 @@ CHART_COLORS = (
 CHART_TOOL = ToolDescriptor(
     name=CHART_TOOL_NAME,
     description=(
-        "Set what the operator's chart shows: its indicators, its symbol, its interval. "
-        "Every field is optional and an omitted one is left as it is, so sending only "
-        "`resolution` changes only the interval. `indicators` is the complete set to "
-        "draw, not an addition: send every indicator that should be visible, and an "
-        "empty list to draw none. Use it when the operator asks to see something, or "
-        "when what you found is easier to look at than to describe. Check the catalogue "
-        "with list_indicators first if you are unsure of an id or a parameter range."
+        "Set what the operator's chart shows: its indicators, its symbol, its interval, "
+        "and its focus — the span of time visible on it. Every field is optional and an "
+        "omitted one is left as it is, so sending only `resolution` changes only the "
+        "interval. `indicators` is the complete set to draw, not an addition: send every "
+        "indicator that should be visible, and an empty list to draw none. `focus` moves "
+        "the operator to a place on the chart; use it when they ask to be shown a "
+        "particular moment or to zoom in or out, together with the other fields in one "
+        "call if they ask for more than one at once. Use the rest of this tool when the "
+        "operator asks to see something, or when what you found is easier to look at "
+        "than to describe. Check the catalogue with list_indicators first if you are "
+        "unsure of an id or a parameter range."
     ),
     input_schema={
         "type": "object",
@@ -89,6 +101,33 @@ CHART_TOOL = ToolDescriptor(
                     "required": ["id"],
                     "additionalProperties": False,
                 },
+            },
+            "focus": {
+                "type": "object",
+                "description": (
+                    "the span of time to show, given in exactly one of three shapes: "
+                    "`from`+`to` (a range), `around`+`bars` (a point in time and a "
+                    "number of candles around it), or `last_bars` alone (the newest N "
+                    "candles). `from`, `to` and `around` are absolute ISO 8601 "
+                    "timestamps with a UTC offset (e.g. '2026-01-03T09:00:00Z'), not "
+                    "relative to now — `last_bars` is the one exception, and always "
+                    f"means the end of the series. `bars` and `last_bars` must be "
+                    f"between {MIN_FOCUS_BARS} and {MAX_FOCUS_BARS}."
+                ),
+                "properties": {
+                    "from": {"type": "string", "description": "range start, ISO 8601 UTC"},
+                    "to": {"type": "string", "description": "range end, ISO 8601 UTC"},
+                    "around": {"type": "string", "description": "point in time, ISO 8601 UTC"},
+                    "bars": {
+                        "type": "integer",
+                        "description": f"candles around `around`; {MIN_FOCUS_BARS}-{MAX_FOCUS_BARS}",
+                    },
+                    "last_bars": {
+                        "type": "integer",
+                        "description": f"newest N candles; {MIN_FOCUS_BARS}-{MAX_FOCUS_BARS}",
+                    },
+                },
+                "additionalProperties": False,
             },
         },
         "additionalProperties": False,
@@ -124,6 +163,88 @@ def _as_indicators(raw: Any) -> list[ChartIndicator] | None:
         except (TypeError, ValueError) as err:
             raise ChartRefusal(f"`params` for {item['id']!r} must be numbers: {err}") from err
     return indicators
+
+
+def _parse_focus_time(raw: dict[str, Any], field: str) -> datetime:
+    value = raw.get(field)
+    if not isinstance(value, str):
+        raise ChartRefusal(f"`focus.{field}` must be an ISO 8601 timestamp string.")
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError as err:
+        raise ChartRefusal(
+            f"`focus.{field}` is not a valid ISO 8601 timestamp: {value!r}."
+        ) from err
+    if parsed.tzinfo is None:
+        raise ChartRefusal(
+            f"`focus.{field}` must carry a UTC offset, e.g. '2026-01-03T09:00:00Z'."
+        )
+    return parsed
+
+
+def _parse_focus_bars(raw: dict[str, Any], field: str) -> int:
+    value = raw.get(field)
+    if not isinstance(value, int) or isinstance(value, bool):
+        raise ChartRefusal(f"`focus.{field}` must be a whole number of candles.")
+    if not (MIN_FOCUS_BARS <= value <= MAX_FOCUS_BARS):
+        raise ChartRefusal(
+            f"`focus.{field}`={value} must be between {MIN_FOCUS_BARS} and "
+            f"{MAX_FOCUS_BARS} candles."
+        )
+    return value
+
+
+def _as_focus(raw: Any, *, now: datetime) -> ChartFocus | None:
+    """The chart's requested frame, or `None` to leave the operator looking where they
+    are. Checked without reading anything: form, ordering, candle-count bounds, and
+    whether the frame is entirely in the future — everything a consumer needs to know is
+    already in the call (design.md, "Sprawdzenie kadru nie wymaga dodatkowego odczytu z
+    archiwum")."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ChartRefusal("`focus` must be an object.")
+
+    has_range = "from" in raw or "to" in raw
+    has_point = "around" in raw or "bars" in raw
+    has_last = "last_bars" in raw
+    if sum((has_range, has_point, has_last)) != 1:
+        raise ChartRefusal(
+            "`focus` must be given exactly one way: a `from`/`to` range, an `around` "
+            "point with `bars`, or `last_bars` alone — not zero of these and not more "
+            "than one."
+        )
+
+    if has_last:
+        last_bars = _parse_focus_bars(raw, "last_bars")
+        return ChartFocus(last_bars=last_bars)
+
+    if has_point:
+        if "around" not in raw or "bars" not in raw:
+            raise ChartRefusal("`focus.around` and `focus.bars` must be given together.")
+        around = _parse_focus_time(raw, "around")
+        bars = _parse_focus_bars(raw, "bars")
+        if around > now:
+            raise ChartRefusal(
+                f"`focus.around` ({raw['around']}) is in the future; the archive has "
+                "nothing there yet."
+            )
+        return ChartFocus(around=around, bars=bars)
+
+    if "from" not in raw or "to" not in raw:
+        raise ChartRefusal("`focus.from` and `focus.to` must be given together.")
+    start = _parse_focus_time(raw, "from")
+    end = _parse_focus_time(raw, "to")
+    if start >= end:
+        raise ChartRefusal(
+            f"`focus.from` ({raw['from']}) must be earlier than `focus.to` ({raw['to']})."
+        )
+    if start > now:
+        raise ChartRefusal(
+            f"`focus.from` ({raw['from']}) is in the future; the archive has nothing "
+            "there yet."
+        )
+    return ChartFocus(from_=start, to=end)
 
 
 async def _read_json(tool_server: ToolServer, name: str, arguments: dict[str, Any]) -> Any:
@@ -228,8 +349,21 @@ async def _check_indicators(
             )
 
 
+def _focus_text(focus: ChartFocus) -> str:
+    if focus.last_bars is not None:
+        return f"the newest {focus.last_bars} candles"
+    if focus.around is not None and focus.bars is not None:
+        return f"{focus.bars} candles around {focus.around.isoformat()}"
+    if focus.from_ is not None and focus.to is not None:
+        return f"{focus.from_.isoformat()} to {focus.to.isoformat()}"
+    raise AssertionError(f"a focus must carry one recognised shape: {focus!r}")
+
+
 def _confirmation(
-    symbol: str | None, resolution: str | None, indicators: list[ChartIndicator] | None
+    symbol: str | None,
+    resolution: str | None,
+    indicators: list[ChartIndicator] | None,
+    focus: ChartFocus | None,
 ) -> str:
     parts: list[str] = []
     if symbol is not None:
@@ -242,6 +376,8 @@ def _confirmation(
             for indicator in indicators
         )
         parts.append(f"indicators {drawn}" if drawn else "no indicators")
+    if focus is not None:
+        parts.append(f"focus {_focus_text(focus)}")
     return "the operator's chart is now set to " + "; ".join(parts) + "."
 
 
@@ -286,35 +422,49 @@ class ChartTool:
             indicators = _as_indicators(arguments.get("indicators"))
         except ChartRefusal as err:
             return refuse(str(err))
+        try:
+            focus = _as_focus(arguments.get("focus"), now=datetime.now(UTC))
+        except ChartRefusal as err:
+            return refuse(str(err))
 
-        if symbol is None and resolution is None and indicators is None:
+        if symbol is None and resolution is None and indicators is None and focus is None:
             return refuse(
-                "nothing to set: send at least one of `symbol`, `resolution`, `indicators`."
+                "nothing to set: send at least one of `symbol`, `resolution`, "
+                "`indicators`, `focus`."
             )
 
-        if self._tool_server is None or not self._tool_server.configured:
+        # Only symbol, resolution and indicators need the archive to check — a focus is
+        # checked entirely above, without a read (design.md, "Sprawdzenie kadru nie
+        # wymaga dodatkowego odczytu z archiwum"). A call naming only a focus must not
+        # refuse for a reason that has nothing to do with what it is setting.
+        needs_archive = symbol is not None or resolution is not None or indicators is not None
+
+        if needs_archive and (self._tool_server is None or not self._tool_server.configured):
             # Supported configuration (`MARKET_MCP_URL` unset), and the honest answer is
             # that the check cannot be made — not a command written blind.
             return refuse(
                 "no archive to check this against right now, so the chart was left alone."
             )
 
-        # Independent reads, run together: neither check uses the other's answer, and
-        # sequencing them only adds one round trip's latency to every call that names
-        # both a pair and indicators. `return_exceptions=True` because `gather` otherwise
-        # abandons whichever task didn't raise first, which asyncio logs as an exception
-        # that was never retrieved — both are checked in the order they were checked
-        # before, so a refusal from the pair still wins the same way it did sequentially.
-        results = await asyncio.gather(
-            _check_pair(self._tool_server, symbol, resolution, chart),
-            _check_indicators(self._tool_server, indicators),
-            return_exceptions=True,
-        )
-        for result in results:
-            if isinstance(result, ChartRefusal):
-                return refuse(str(result))
-            if isinstance(result, BaseException):
-                raise result
+        if needs_archive:
+            # Independent reads, run together: neither check uses the other's answer, and
+            # sequencing them only adds one round trip's latency to every call that names
+            # both a pair and indicators. `return_exceptions=True` because `gather`
+            # otherwise abandons whichever task didn't raise first, which asyncio logs as
+            # an exception that was never retrieved — both are checked in the order they
+            # were checked before, so a refusal from the pair still wins the same way it
+            # did sequentially.
+            assert self._tool_server is not None
+            results = await asyncio.gather(
+                _check_pair(self._tool_server, symbol, resolution, chart),
+                _check_indicators(self._tool_server, indicators),
+                return_exceptions=True,
+            )
+            for result in results:
+                if isinstance(result, ChartRefusal):
+                    return refuse(str(result))
+                if isinstance(result, BaseException):
+                    raise result
 
         # Written whole or not at all: three indicators of which one is unknown is a
         # refusal, never two drawn (specs/agent-chart-control, "Odmowa nie zostawia
@@ -326,7 +476,10 @@ class ChartTool:
                 symbol=symbol,
                 resolution=resolution,
                 indicators=indicators,
+                focus=focus,
             )
         return ToolOutcome(
-            ToolOutcomeKind.OK, _confirmation(symbol, resolution, indicators), elapsed()
+            ToolOutcomeKind.OK,
+            _confirmation(symbol, resolution, indicators, focus),
+            elapsed(),
         )

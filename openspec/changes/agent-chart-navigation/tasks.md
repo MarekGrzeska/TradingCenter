@@ -8,12 +8,12 @@
 
 ## 2. Kadr w narzędziu `set_chart`
 
-- [ ] 2.1 Schemat narzędzia: `focus` z opisem trzech form, granicami `[10, 1000]` dla `bars`/`last_bars` i formatem czasu ISO 8601 UTC
-- [ ] 2.2 `_as_focus`: parsowanie i odmowy — dokładnie jedna forma, `from < to`, granice liczby świec, czas dający się sparsować
-- [ ] 2.3 Odmowa kadru leżącego w całości w przyszłości (zegar modułu, bez odczytu z archiwum)
-- [ ] 2.4 `set_chart` bez żadnego z czterech pól (`symbol`, `resolution`, `indicators`, `focus`) nadal odmawia; kadr liczy się jako „coś do ustawienia"
-- [ ] 2.5 `_confirmation` mówi o kadrze zdaniem, które model może powtórzyć operatorowi
-- [ ] 2.6 Testy `test_chart_tool.py`: po jednym na każdą odmowę z 2.2–2.3 oraz na zapis polecenia z samym kadrem
+- [x] 2.1 Schemat narzędzia: `focus` z opisem trzech form, granicami `[10, 1000]` dla `bars`/`last_bars` i formatem czasu ISO 8601 UTC
+- [x] 2.2 `_as_focus`: parsowanie i odmowy — dokładnie jedna forma, `from < to`, granice liczby świec, czas dający się sparsować
+- [x] 2.3 Odmowa kadru leżącego w całości w przyszłości (zegar modułu, bez odczytu z archiwum)
+- [x] 2.4 `set_chart` bez żadnego z czterech pól (`symbol`, `resolution`, `indicators`, `focus`) nadal odmawia; kadr liczy się jako „coś do ustawienia"
+- [x] 2.5 `_confirmation` mówi o kadrze zdaniem, które model może powtórzyć operatorowi
+- [x] 2.6 Testy `test_chart_tool.py`: po jednym na każdą odmowę z 2.2–2.3 oraz na zapis polecenia z samym kadrem (`tests/test_chart_focus_tool.py`)
 
 ## 3. Migawka niesie widoczny fragment osi
 

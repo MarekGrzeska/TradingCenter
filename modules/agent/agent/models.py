@@ -7,7 +7,7 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class Role(str, Enum):
@@ -157,13 +157,14 @@ class ChartFocus(BaseModel):
     that is at the moment it is applied.
     """
 
-    from_: datetime | None = Field(default=None, alias="from")
+    # No wire alias here — this shape is only ever read back by this module's own store,
+    # never by another module. The "from" alias a caller actually sends and sees lives on
+    # `ChartFocusOut` and the tool's own parsing, where the wire is what matters.
+    from_: datetime | None = None
     to: datetime | None = None
     around: datetime | None = None
     bars: int | None = None
     last_bars: int | None = None
-
-    model_config = {"populate_by_name": True}
 
 
 class ChartCommand(BaseModel):

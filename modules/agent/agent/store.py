@@ -541,7 +541,7 @@ async def record_chart_command(
         if indicators is None
         else json.dumps([indicator.model_dump() for indicator in indicators])
     )
-    focus_payload = None if focus is None else focus.model_dump_json(by_alias=True)
+    focus_payload = None if focus is None else focus.model_dump_json()
     row = await fetch_one(
         conn, _INSERT_CHART_COMMAND, session_id, symbol, resolution, payload, focus_payload
     )
