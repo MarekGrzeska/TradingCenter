@@ -5,9 +5,10 @@ własny klucz OpenAI, sesje trwające poza przeglądarką, odpowiedź strumienie
 wyceniane w chwili zapisu. Terminal ma panel agenta obok outletu i zakładkę kosztów. Siedem
 nowych zdolności, 71 z 73 zadań odhaczonych.
 
-Dwa zadania zostają otwarte i oba są tego samego rodzaju — nikt tego nie zobaczył na
-wdrożonej aplikacji. To nie jest formalność: 12.5 dotyczy buforowania i zerwania strumienia
-po 230 s, czyli własności, których lokalny uvicorn nie ma i mieć nie może.
+Zadania 12.4 i 12.5 — przejście po wdrożonej aplikacji, gdzie widać buforowanie i zerwanie
+strumienia po 230 s — wykonał operator i potwierdził działanie (15 sierpnia 2026). Nie jest
+to coś, co ten przegląd mógł sprawdzić sam, i nie należy tego mylić z twierdzeniem
+niesprawdzonym: stos uruchamia operator i tylko on.
 
 Przegląd znalazł dwa realne defekty, oba w tej samej szczelinie — między obrazem a bazą — i
 oba wyszły dopiero w dniu archiwizacji, po tygodniu pracy modułu na produkcji. Jeden został
@@ -29,6 +30,8 @@ Uruchomione 15 sierpnia 2026, na tym, co leży na `main` po scaleniu PR #93:
   operatora).
 - Zadanie 12.4 po stronie modułu: trzy tury strumieniem na trzech różnych modelach, każda
   zakończona `complete`, `/usage` liczy trzy różne stawki, `unknown_count` = 0.
+- Zadania 12.4 (przez terminal) i 12.5 (strumień na wdrożonej aplikacji): przeszedł
+  operator, 15 sierpnia 2026.
 
 ## Findings
 
@@ -45,13 +48,6 @@ skasowanie sesji zmniejsza rachunek (nie zmniejsza — `test_deleting_a_session_
 
 ## Gaps
 
-- **Strumienia nikt nie widział na wdrożonej aplikacji.** Zadanie 12.5. App Service potrafi
-  buforować odpowiedź i przerywa połączenie po 230 s — obie własności są niewidoczne
-  lokalnie, gdzie uvicorn oddaje fragmenty natychmiast i nie ma limitu czasu. Twierdzenie
-  „strumień działa na produkcji" jest dziś wnioskiem z testów, nie obserwacją.
-- **Zadanie 12.4 jest odhaczone z resztą w treści.** Sam wpis mówi: zrobione po stronie
-  modułu, „zostaje przejście tą samą drogą przez terminal (5173)". Odhaczone zadanie z
-  niedokończoną połową jest gorsze niż nieodhaczone, bo znika z listy.
 - **Lista dozwolonych adresów nie jest sprawdzana żadnym testem.** Wymaganie „Wywołanie
   z przeglądarki przychodzi z uznanego adresu" spełnia warstwa przed modułem
   (`infra/app-service.tf`), a moduł świadomie nie dokłada własnego CORS —
@@ -133,12 +129,8 @@ Poza jedną luką nazwaną wyżej każde wymaganie ma nazwany dowód.
 
 ## Follow-ups
 
-- Zadanie 12.5: przejść strumieniem po wdrożonej aplikacji — buforowanie i zerwanie po
-  230 s. Do wykonania przez operatora, bo tylko on uruchamia stos i tylko na Azure to
-  widać.
-- Zadanie 12.4, druga połowa: ta sama droga przez terminal na `5173`.
 - Sonda po wdrożeniu, która sięga do kontenera zamiast do płaszczyzny sterowania — inaczej
   strażnik schematu chroni produkcję, ale nie zapala wdrożenia na czerwono.
-- `market_data` ma tę samą dziurę w uprawnieniach domyślnych co `agent` miał do dziś
-  (`pg_default_acl` pusta). Następna migracja tworząca tam tabelę powtórzy ten wypadek na
-  archiwum wartym dwadzieścia siedem godzin odtwarzania.
+- ~~`market_data` ma tę samą dziurę w uprawnieniach domyślnych co `agent`~~ — zamknięte
+  15 sierpnia 2026: obie bazy mają `ALTER DEFAULT PRIVILEGES` dla roli administratora,
+  potwierdzone odczytem `pg_default_acl`. Zapisane w README obu modułów.

@@ -76,6 +76,17 @@ module refuses to start when the two disagree (`schema_version.py`). Skipping it
 startup with the revision it found and the revision it wanted, rather than serving `500`
 from the four routes that read the new tables.
 
+In production the migration is only half of it. Migrations there are applied by the
+server's Entra administrator, so every table they create is owned by that administrator
+and `app-tradingcenter-market-data` is granted nothing on it — the original grant was one
+statement over the tables that existed that day. That reads as `permission denied`, not as
+a missing table, and no check catches it. `agent` hit exactly this on 15 August with
+`prompt_revisions`; both databases were given
+`ALTER DEFAULT PRIVILEGES FOR ROLE <administrator> IN SCHEMA public` the same day, so a
+future migration grants itself. That default is scoped to the role that creates the
+object: a migration applied by a *different* administrator identity lands back in the same
+hole.
+
 Leaving `DATABASE_USER` unset is what makes this local mode, and it cuts the module down to
 loopback: without an identity it refuses any remote host, production included
 (openspec: `market-data-database-connection`). The remote shape — Entra identity, TLS, no
