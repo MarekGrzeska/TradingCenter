@@ -122,16 +122,38 @@ Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń p
 
 ## 6. Terminal
 
-- [ ] 6.1 `pnpm contract:generate` po scaleniu kontraktu — plik generowany, nigdy ręcznie
-- [ ] 6.2 Panel harmonogramów i wyzwalaczy w zakładce `Teams` jako **nowe pliki**; jedna linia
-  montująca w `TeamsView.tsx`
-- [ ] 6.3 Najbliższe wyzwolenia brane z modułu; test, że terminal nie nosi własnego parsera
-  wyrażeń czasowych
-- [ ] 6.4 Moment wyzwolenia pokazany w UTC i w czasie lokalnym obok siebie
-- [ ] 6.5 Historia wyzwoleń, z wyzwoleniami bez przebiegu i przejściem do śladu tam, gdzie
-  przebieg był
-- [ ] 6.6 Odmowa modułu pokazana jego słowami, ścieżką `refusal.ts` z fazy 1
-- [ ] 6.7 `pnpm test`, `pnpm lint`, `pnpm typecheck`, `pnpm contract:check`
+- [x] 6.1 `pnpm contract:generate` po scaleniu kontraktu — plik generowany, nigdy ręcznie.
+  Znaczna część już przyszła zmergowana: równoległy agent (PR #124) trafił na ten sam
+  martwy kontrakt przy naprawie kolizji migracji i zregenerował go przy okazji; tu doszła
+  tylko końcówka (`start_run_on_revision` w docstringu `start_run`). `contract.generated.ts`
+  (market-data) bajt w bajt bez zmian, zgodnie z wymogiem.
+- [x] 6.2 Panel harmonogramów i wyzwalaczy w zakładce `Teams` jako **nowe pliki**
+  (`SchedulesPanel.tsx`, `FireHistoryList.tsx`, `scheduleDraft.ts`) — dwie linie montujące
+  w `TeamsView.tsx` (nowy wariant `Open` + jego gałąź JSX), nie jedna: `TeamCatalogue.tsx`
+  dostał też przycisk „Schedules" obok „Runs", bo bez wejścia z listy zespołów panel
+  byłby nieosiągalny
+- [x] 6.3 Najbliższe wyzwolenia brane z modułu (`GET /schedules/{id}/next-fires`, wołane
+  przy otwarciu formularza edycji, nie przy każdym uderzeniu klawisza) — test przechodzi
+  na wartościach, których żaden parser cron by nie wyliczył, co dowodzi, że wyświetlony
+  czas pochodzi z odpowiedzi, a nie z lokalnego liczenia
+- [x] 6.4 Moment wyzwolenia pokazany w UTC (`formatUtcInstant`, nowe w `ui/formatTime.ts`)
+  i w czasie lokalnym (`formatInstant`, istniejące) obok siebie — „lokalny" czyta się tu
+  jak wszędzie w tym terminalu: stała strefa Europe/Warsaw (`terminal-shell`,
+  „Czas jest pokazywany w polskiej strefie czasowej"), nie surowa strefa przeglądarki,
+  której terminal nigdzie indziej nie używa
+- [x] 6.5 Historia wyzwoleń (`FireHistoryList.tsx`, wspólna dla harmonogramów i
+  wyzwalaczy — `ScheduleFire` już jest wspólny), z wyzwoleniami bez przebiegu (przycisk
+  „Watch" nieobecny, gdy `runId` puste) i przejściem do śladu (`onWatchRun`) tam, gdzie był
+- [x] 6.6 Odmowa modułu pokazana jego słowami — `MarketDataError.kind === "refused"` ->
+  `cause.message` bez przetwarzania, ta sama ścieżka co `TeamEditor.tsx`'s `save()` dla
+  odmowy nienazywającej agenta. Bez wywołania `locateRefusal` z `refusal.ts` — nie ma tu
+  kanwy, na której umieszczałoby się odmowę przy węźle, więc nie ma czego lokalizować
+- [x] 6.7 `pnpm test` (840 przechodzi, 35 nowych: 25 `teamsApi.test.ts`, 10
+  `SchedulesPanel.test.tsx`), `pnpm lint`, `pnpm typecheck`, `pnpm contract:check`, plus
+  `pnpm build` (produkcyjny bundle się buduje). Bez ręcznego smoke testu w przeglądarce na
+  żywym stosie — nieprzetestowane interaktywnie na prawdziwym backendzie; testy RTL
+  renderują prawdziwe DOM i wchodzenia w interakcje, ale przeciwko fake API, nie
+  uruchomionemu modułowi
 
 ## 7. Konfiguracja, infrastruktura i CI
 

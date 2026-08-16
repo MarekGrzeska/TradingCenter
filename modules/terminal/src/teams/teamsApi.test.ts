@@ -359,3 +359,265 @@ describe("runs", () => {
     ]);
   });
 });
+
+const wireSchedule = {
+  id: 11,
+  team_id: 1,
+  revision_mode: "pinned",
+  pinned_revision_id: 3,
+  cron_expression: "*/5 * * * *",
+  next_fire_at: "2026-08-16T20:05:00Z",
+  enabled: true,
+  disabled_reason: null,
+  consecutive_failures: 0,
+  unattended_ack: false,
+  created_at: "2026-08-16T09:00:00Z",
+  updated_at: "2026-08-16T09:00:00Z",
+};
+
+describe("schedules", () => {
+  it("maps the wire shape, ISO instants to epoch seconds", async () => {
+    server.use(http.get(`${HTTP_BASE}/teams/1/schedules`, () => HttpResponse.json([wireSchedule])));
+
+    expect(await api().listSchedules(1, new AbortController().signal)).toEqual([
+      {
+        id: 11,
+        teamId: 1,
+        revisionMode: "pinned",
+        pinnedRevisionId: 3,
+        cronExpression: "*/5 * * * *",
+        nextFireAt: Date.parse("2026-08-16T20:05:00Z") / 1000,
+        enabled: true,
+        disabledReason: null,
+        consecutiveFailures: 0,
+        unattendedAck: false,
+        createdAt: Date.parse("2026-08-16T09:00:00Z") / 1000,
+        updatedAt: Date.parse("2026-08-16T09:00:00Z") / 1000,
+      },
+    ]);
+  });
+
+  it("posts a draft in the module's own spelling", async () => {
+    let body: unknown;
+    server.use(
+      http.post(`${HTTP_BASE}/teams/1/schedules`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(wireSchedule, { status: 201 });
+      }),
+    );
+
+    await api().createSchedule(
+      1,
+      { revisionMode: "pinned", pinnedRevisionId: 3, cronExpression: "*/5 * * * *", unattendedAck: false },
+      new AbortController().signal,
+    );
+
+    expect(body).toEqual({
+      revision_mode: "pinned",
+      pinned_revision_id: 3,
+      cron_expression: "*/5 * * * *",
+      unattended_ack: false,
+    });
+  });
+
+  it("carries a refusal through as the module wrote it", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/teams/1/schedules`, () =>
+        HttpResponse.json({ detail: "not a valid five-field cron expression" }, { status: 422 }),
+      ),
+    );
+
+    await expect(
+      api().createSchedule(
+        1,
+        { revisionMode: "pinned", pinnedRevisionId: 3, cronExpression: "not a cron", unattendedAck: false },
+        new AbortController().signal,
+      ),
+    ).rejects.toMatchObject({ kind: "refused", message: "not a valid five-field cron expression" });
+  });
+
+  it("enables and disables by id", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/schedules/11/disable`, () =>
+        HttpResponse.json({ ...wireSchedule, enabled: false }),
+      ),
+    );
+    expect((await api().disableSchedule(11, new AbortController().signal)).enabled).toBe(false);
+
+    server.resetHandlers();
+    server.use(
+      http.post(`${HTTP_BASE}/schedules/11/enable`, () => HttpResponse.json(wireSchedule)),
+    );
+    expect((await api().enableSchedule(11, new AbortController().signal)).enabled).toBe(true);
+  });
+
+  it("reads fire history, including a fire that started nothing", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/schedules/11/fires`, () =>
+        HttpResponse.json([
+          {
+            id: 1,
+            schedule_id: 11,
+            trigger_id: null,
+            fired_at: "2026-08-16T20:00:00Z",
+            outcome: "skipped",
+            reason: "the previous run of this schedule is still working",
+            run_id: null,
+            skipped_count: 0,
+          },
+        ]),
+      ),
+    );
+
+    const fires = await api().scheduleFires(11, new AbortController().signal);
+
+    expect(fires).toEqual([
+      {
+        id: 1,
+        scheduleId: 11,
+        triggerId: null,
+        firedAt: Date.parse("2026-08-16T20:00:00Z") / 1000,
+        outcome: "skipped",
+        reason: "the previous run of this schedule is still working",
+        runId: null,
+        skippedCount: 0,
+      },
+    ]);
+  });
+
+  it("asks for the next fires by count and maps them to epoch seconds", async () => {
+    let query: string | null = null;
+    server.use(
+      http.get(`${HTTP_BASE}/schedules/11/next-fires`, ({ request }) => {
+        query = new URL(request.url).searchParams.get("count");
+        return HttpResponse.json({ times: ["2026-08-16T20:05:00Z", "2026-08-16T20:10:00Z"] });
+      }),
+    );
+
+    const times = await api().nextFires(11, 2, new AbortController().signal);
+
+    expect(query).toBe("2");
+    expect(times).toEqual([Date.parse("2026-08-16T20:05:00Z") / 1000, Date.parse("2026-08-16T20:10:00Z") / 1000]);
+  });
+});
+
+const wireTrigger = {
+  id: 21,
+  team_id: 1,
+  revision_mode: "latest",
+  pinned_revision_id: null,
+  tool_name: "read_indicators",
+  arguments: { symbol: "US100" },
+  field_path: "rsi",
+  comparison: "gt",
+  threshold: "70.00000000",
+  cooldown_seconds: 900,
+  poll_interval_seconds: 300,
+  next_check_at: "2026-08-16T20:00:00Z",
+  last_result: null,
+  last_checked_at: null,
+  last_fired_at: null,
+  enabled: true,
+  disabled_reason: null,
+  consecutive_failures: 0,
+  unattended_ack: false,
+  created_at: "2026-08-16T09:00:00Z",
+  updated_at: "2026-08-16T09:00:00Z",
+};
+
+describe("triggers", () => {
+  it("maps the wire shape, including a lastResult that has never been checked", async () => {
+    server.use(http.get(`${HTTP_BASE}/teams/1/triggers`, () => HttpResponse.json([wireTrigger])));
+
+    const triggers = await api().listTriggers(1, new AbortController().signal);
+
+    expect(triggers).toEqual([
+      {
+        id: 21,
+        teamId: 1,
+        revisionMode: "latest",
+        pinnedRevisionId: null,
+        toolName: "read_indicators",
+        arguments: { symbol: "US100" },
+        fieldPath: "rsi",
+        comparison: "gt",
+        threshold: "70.00000000",
+        cooldownSeconds: 900,
+        pollIntervalSeconds: 300,
+        nextCheckAt: Date.parse("2026-08-16T20:00:00Z") / 1000,
+        lastResult: null,
+        lastCheckedAt: null,
+        lastFiredAt: null,
+        enabled: true,
+        disabledReason: null,
+        consecutiveFailures: 0,
+        unattendedAck: false,
+        createdAt: Date.parse("2026-08-16T09:00:00Z") / 1000,
+        updatedAt: Date.parse("2026-08-16T09:00:00Z") / 1000,
+      },
+    ]);
+  });
+
+  it("posts a draft in the module's own spelling", async () => {
+    let body: unknown;
+    server.use(
+      http.post(`${HTTP_BASE}/teams/1/triggers`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(wireTrigger, { status: 201 });
+      }),
+    );
+
+    await api().createTrigger(
+      1,
+      {
+        revisionMode: "latest",
+        pinnedRevisionId: null,
+        toolName: "read_indicators",
+        arguments: { symbol: "US100" },
+        fieldPath: "rsi",
+        comparison: "gt",
+        threshold: "70",
+        cooldownSeconds: 900,
+        pollIntervalSeconds: 300,
+        unattendedAck: false,
+      },
+      new AbortController().signal,
+    );
+
+    expect(body).toEqual({
+      revision_mode: "latest",
+      pinned_revision_id: null,
+      tool_name: "read_indicators",
+      arguments: { symbol: "US100" },
+      field_path: "rsi",
+      comparison: "gt",
+      threshold: "70",
+      cooldown_seconds: 900,
+      poll_interval_seconds: 300,
+      unattended_ack: false,
+    });
+  });
+
+  it("reads fire history, distinguishing unavailable from a started run", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/triggers/21/fires`, () =>
+        HttpResponse.json([
+          {
+            id: 2,
+            schedule_id: null,
+            trigger_id: 21,
+            fired_at: "2026-08-16T20:00:00Z",
+            outcome: "unavailable",
+            reason: "no tool server is configured (MARKET_MCP_URL is unset)",
+            run_id: null,
+            skipped_count: 0,
+          },
+        ]),
+      ),
+    );
+
+    const fires = await api().triggerFires(21, new AbortController().signal);
+
+    expect(fires[0]).toMatchObject({ outcome: "unavailable", runId: null });
+  });
+});
