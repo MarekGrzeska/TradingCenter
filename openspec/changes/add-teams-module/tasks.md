@@ -171,14 +171,36 @@
 
 ## 8. Koszt i granice
 
-- [ ] 8.1 Wiersz zużycia na każde wywołanie modelu, ze wskazaniem przebiegu, agenta i modelu
-- [ ] 8.2 Koszt liczony i zapisywany w chwili powstania wiersza, wraz ze stawkami
-- [ ] 8.3 Brak informacji o tokenach zapisany jako brak, nie jako zero
-- [ ] 8.4 Sprawdzenie granicy kosztu przebiegu przed wywołaniem modelu
-- [ ] 8.5 Sprawdzenie granicy dobowej zespołu przed uruchomieniem przebiegu
-- [ ] 8.6 `GET /usage` z rozbiciem pozwalającym przypisać koszt agentom
-- [ ] 8.7 Testy: zmiana stawki nie rusza kosztu wierszy sprzed zmiany
-- [ ] 8.8 Testy: przebieg dobijający do granicy zatrzymuje się ze wskazaniem kosztu
+- [x] 8.1 Wiersz zużycia na każde wywołanie modelu, ze wskazaniem przebiegu, agenta i modelu
+- [x] 8.2 Koszt liczony i zapisywany w chwili powstania wiersza, wraz ze stawkami
+- [x] 8.3 Brak informacji o tokenach zapisany jako brak, nie jako zero
+- [x] 8.4 Sprawdzenie granicy kosztu przebiegu przed wywołaniem modelu
+- [x] 8.5 Sprawdzenie granicy dobowej zespołu przed uruchomieniem przebiegu
+- [x] 8.6 `GET /usage` z rozbiciem pozwalającym przypisać koszt agentom
+- [x] 8.7 Testy: zmiana stawki nie rusza kosztu wierszy sprzed zmiany
+- [x] 8.8 Testy: przebieg dobijający do granicy zatrzymuje się ze wskazaniem kosztu
+
+  PR #115. 8.1–8.3 przyszły z grupą 7 (wiersza zużycia nie da się zapisać bez stawek);
+  tutaj doszło to, co je czyta. Cztery rzeczy warte odnotowania:
+
+  - **Zapis wiersza przesunięty z „po agencie" na „po każdym wywołaniu".** Bez tego
+    granica sprawdzana przed wywołaniem modelu czytałaby sumę, która aktualizuje się
+    dopiero, gdy agent skończy — agent z sześcioma rundami przejechałby limit sześć razy.
+    `loop.py` dostał dwa haki: `before_model_call` (jedyne wejście dla granicy) i
+    `on_model_call` (miejsce zapisu wiersza).
+  - **Strażnik liczy w pamięci, nie odpytuje bazy przed każdym wywołaniem.** Nie ze
+    względu na szybkość: wiersze lądują, gdy wywołania się kończą, kilku agentów pisze
+    naraz, a suma czytana w trakcie zapisu byłaby już nieaktualna. Przebieg jest jednym
+    procesem, więc akumulator *jest* sumą.
+  - **Granica dobowa liczona od północy UTC** i sprawdzana przed utworzeniem czegokolwiek
+    — przebieg odmówiony w połowie to przebieg, który już wydał. Jeden zegar modułu, bo
+    limit chodzący za strefą operatora byłby latem innym limitem.
+  - **`>=`, nie `>`.** Dokładnie na granicy budżet jest wyczerpany; wywołanie zrobione
+    „bo jeszcze nie przekroczyliśmy" jest tym, które przekracza.
+
+  `GET /usage` przyjmuje opcjonalne `run_id` i `team_id`; cudzy przebieg oddaje pustą
+  sumę, a nie 404 — to agregat, a różnica między „brak wierszy" a „nie twoje" jest
+  dokładnie tym, czego obcy nie ma prawa zobaczyć (`teams-browser-access`).
 
 ## 9. Terminal
 
