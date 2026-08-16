@@ -1,0 +1,243 @@
+<title>Fazy modułu teams — stan na 17 sierpnia 2026</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 56rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.9rem; margin: 1.5rem 0 0.4rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.82rem; }
+  td.num { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.79rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  .stage { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.2rem 0; }
+  .stage > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .stage .no { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.05em 0.45em; }
+  .stage dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.8rem 0 0; font-size: 0.92rem; }
+  .stage dt { font-family: var(--mono); font-size: 0.73rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); padding-top: 0.22rem; }
+  .stage dd { margin: 0; }
+  @media (max-width: 34rem) { .stage dl { grid-template-columns: 1fr; gap: 0.15rem; } .stage dd { margin-bottom: 0.6rem; } }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+<style>
+  figure { margin: 1.6rem 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { color: var(--text-dim); font-size: 0.82rem; margin-top: 0.6rem; }
+  .fig-box { fill: var(--surface); stroke: var(--border); }
+  .fig-box.accent { fill: var(--accent-soft); stroke: var(--accent); }
+  .fig-box.outside { fill: none; stroke: var(--text-dim); stroke-dasharray: 4 3; }
+  .fig-t { fill: var(--text); font-family: var(--mono); font-size: 12px; }
+  .fig-t.dim { fill: var(--text-dim); font-size: 10.5px; }
+  .fig-arrow { stroke: var(--text-dim); stroke-width: 1.2; fill: none; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.9rem; margin: 1.4rem 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.9rem 1rem; }
+  .card h4 { margin: 0 0 0.35rem; color: var(--text); text-transform: none; letter-spacing: 0; font-size: 0.92rem; }
+  .card p { margin: 0; font-size: 0.88rem; color: var(--text-dim); }
+</style>
+
+<main>
+
+<h1>Fazy modułu <code>teams</code> — gdzie co stoi</h1>
+<p class="lede">Cztery fazy, z których pierwsza jest zamknięta i po raz pierwszy stoi w Azure, druga i trzecia idą równolegle i właśnie spotkały się na jednej gałęzi, a czwarta jest na razie jednym zdaniem w propozycji. Ten dokument mówi, co jest zrobione, co zostało i co między fazami wypadło.</p>
+<p class="meta">
+  Stan na: <strong>17 sierpnia 2026</strong><br>
+  Gałąź bazowa: <code>feat/teams-platform</code><br>
+  Zmiany OpenSpec: <code>add-teams-module</code>, <code>add-trading-tools</code>, <code>add-teams-schedules-and-triggers</code>
+</p>
+
+<div class="callout">
+  <span class="tag">Gałąź bazowa</span>
+  <p><strong><code>feat/teams-platform</code> jest gałęzią bazową tej pracy i wszystko scala się teraz do niej.</strong> Każda faza, każda grupa zadań i każda poprawka idą pull requestem, którego bazą jest ta gałąź — nie <code>main</code> i nie <code>feat/teams-module</code>, która była gałęzią zbiorczą fazy 1 i została jej przodkiem.</p>
+  <p>Do <code>main</code> idzie <strong>jeden merge, na końcu</strong>, gdy fazy będą domknięte. Konsekwencja, którą trzeba znać z góry: dopóki tego merge'a nie ma, <code>main</code> nie zna ani <code>modules/teams</code>, ani <code>modules/trading-mcp</code>, ani ich infrastruktury — więc <code>deploy-teams.yml</code> nie jest zarejestrowany w GitHubie, a <code>terraform plan</code> puszczony z <code>main</code> zaproponowałby skasowanie zasobów teams, które już stoją w Azure.</p>
+</div>
+
+<h2>Jednym spojrzeniem</h2>
+
+<div class="scroll">
+<table>
+  <thead>
+    <tr><th>Faza</th><th>Co niesie</th><th>Zadania</th><th>Stan</th></tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>1 · moduł teams</strong><br><span class="dim">add-teams-module</span></td>
+      <td>katalog zespołów, rewizje, przebiegi, koszt, zakładka terminala</td>
+      <td class="num">97 / 99</td>
+      <td><span class="pill good">zamknięta</span><br><span class="dim">przegląd napisany, infrastruktura postawiona</span></td>
+    </tr>
+    <tr>
+      <td><strong>2 · narzędzia handlowe</strong><br><span class="dim">add-trading-tools</span></td>
+      <td>moduł <code>trading-mcp</code>, dwa serwery narzędzi, limity handlowe, ślad zleceń</td>
+      <td class="num">44 / 64</td>
+      <td><span class="pill warn">back end gotowy</span><br><span class="dim">terminal i infrastruktura przed nią</span></td>
+    </tr>
+    <tr>
+      <td><strong>3 · harmonogramy</strong><br><span class="dim">add-teams-schedules-and-triggers</span></td>
+      <td>zegar w procesie modułu, wyzwalacze warunkowe, bezpieczniki pracy bez nadzoru</td>
+      <td class="num">36 / 42</td>
+      <td><span class="pill warn">prawie</span><br><span class="dim">konfiguracja, README, przegląd</span></td>
+    </tr>
+    <tr>
+      <td><strong>4 · analityka i układ</strong></td>
+      <td>porównywanie rewizji między sobą, automatyczne układanie grafu</td>
+      <td class="num">—</td>
+      <td><span class="pill">nie zaczęta</span></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Azure — co naprawdę stoi</h2>
+
+<p>Faza 1 przestała być samym kodem 17 sierpnia: wykonany został <code>terraform apply</code>, a razem z nim kroki, których terraform nie robi. Jedna rzecz została i to ona odróżnia „infrastruktura stoi" od „moduł odpowiada".</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Element</th><th>Stan</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td class="field">app-tradingcenter-teams</td><td><span class="pill good">stoi</span></td><td>Easy Auth z <code>/health</code> poza wymaganiem tożsamości</td></tr>
+    <tr><td class="field">rejestracja Entra + pre-autoryzacja terminala</td><td><span class="pill good">stoi</span></td><td>terminal ma dziś jeden token, brany na zakres <code>market-data</code></td></tr>
+    <tr><td class="field">baza logiczna <code>teams</code></td><td><span class="pill good">stoi</span></td><td>trzecia baza na tym samym serwerze</td></tr>
+    <tr><td class="field">rola <code>app-tradingcenter-teams</code></td><td><span class="pill good">stoi</span></td><td>własność schematu przekazana, zero obiektów poza rolą</td></tr>
+    <tr><td class="field">sekret <code>teams-openai-api-key</code></td><td><span class="pill good">stoi</span></td><td>osobna linia na rachunku OpenAI, nie klucz agenta</td></tr>
+    <tr><td class="field">32 reguły zapory, polityka Key Vaulta, <code>allowed_applications</code></td><td><span class="pill good">stoi</span></td><td>każda reguła to osobna aktualizacja serwera — apply szedł ponad godzinę</td></tr>
+    <tr><td class="field">obraz aplikacji</td><td><span class="pill bad">brak</span></td><td>App Service chodzi na zaślepce</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Dlaczego obrazu nie ma</span>
+  <p><code>deploy-teams.yml</code> nie istnieje na <code>main</code>, a GitHub rejestruje workflow do uruchomienia wyłącznie z gałęzi domyślnej — <code>gh workflow list</code> go nie widzi. Przy przyjętej zasadzie „jeden merge do <code>main</code> na końcu" obrazu nie ma jak zbudować zwykłą drogą.</p>
+  <p>Droga bez merge'a jest sprawdzona i gotowa: federowane poświadczenie wisi na <code>environment: production</code>, nie na gałęzi (<code>infra/github-oidc.tf</code>), a środowisko nie ma polityki gałęzi. Wystarczy dopisać gałąź bazową do filtra <code>push:</code>, dać workflow zbudować i wdrożyć obraz ze smoke checkiem na <code>/health</code>, i filtr cofnąć.</p>
+</div>
+
+<h2>Faza 1 — moduł teams</h2>
+
+<p>Zamknięta co do treści: katalog zespołów jako graf z rewizjami append-only, przebiegi na LangGraphie z sufitem rund, limitem czasu i granicami kosztu, ślad pisany na bieżąco, strumień postępu, zakładka terminala z canvasem, panelem agenta i monitorem przebiegu. Do tego rozmieszczenie agentów zapamiętane obok rewizji, usuwanie zależności przy niej samej i cofanie ostatniej zmiany.</p>
+
+<p><code>review.md</code> napisany, trzy znaleziska zamknięte tego samego dnia: testy czytające <code>.env</code> dewelopera, wyścig między migawką a zapisem na zdarzenia w strumieniu przebiegu, i zerwane połączenie, którego monitor nie nazywał.</p>
+
+<h4>Co zostało otwarte</h4>
+<ul>
+  <li><strong>14.1 zespół przykładowy</strong> — porzucony świadomie: zespoły składa się samemu, a seed w katalogu trzeba by utrzymywać razem z definicją.</li>
+  <li><strong>14.2 przebieg od końca do końca na uruchomionym stosie</strong> — <em>nie odbył się</em>. Zakładka przeklikana, ale przebiegu, który naprawdę woła model i płaci za tokeny, nikt nie uruchomił. Wszystko, co dotyczy modelu, przechodzi dziś przez <code>ScriptedProvider</code>.</li>
+</ul>
+
+<h2>Faza 2 — narzędzia handlowe</h2>
+
+<p>Back end jest. Osobny moduł <code>trading-mcp</code> ze szkieletem, dostępem do <code>capital-gateway</code>, narzędziami rachunku i składaniem zleceń; w <code>teams</code> rejestr dwóch serwerów narzędzi zamiast jednego, limity handlowe (żaden nieobowiązkowy), ślad transakcji na drucie i migracja <code>0006_trades</code>.</p>
+
+<h4>Co zostało</h4>
+<ul>
+  <li><strong>Grupa 8 — terminal, w całości.</strong> Granice handlowe w panelu zespołu, odróżnienie narzędzi zapisujących od czytających w wybieraku, zlecenia przebiegu pokazane przy agencie, który je złożył, i granica zleceń jako przyczyna zatrzymania, odróżniona od kosztu.</li>
+  <li><strong>Grupa 9 — infrastruktura, w całości.</strong> <code>trading-mcp</code> nie ma ani rejestracji Entra, ani App Service'u, ani reguł w zaporze gateway. Moduł istnieje w repozytorium i nigdzie indziej.</li>
+  <li>Grupy 10 i 11 — CI, wdrożenie, domknięcie.</li>
+</ul>
+
+<h2>Faza 3 — harmonogramy i wyzwalacze</h2>
+
+<p>Schemat, kontrakt, zegar chodzący w procesie modułu (nie w Azure), wyzwalacze z warunkiem czytanym narzędziem, bezpieczniki pracy bez nadzoru i terminal — zrobione. Uruchomienie przebiegu przez zegar idzie tą samą drogą co kliknięcie w terminalu: <code>start_run_on_revision</code>, jedna funkcja, te same sprawdzenia.</p>
+
+<h4>Co zostało</h4>
+<ul>
+  <li>Ustawienia <code>SCHEDULER_*</code> w konfiguracji modułu i w <code>infra/app-service.tf</code> — razem z lewarkiem wyłączającym zegar.</li>
+  <li><code>modules/teams/README.md</code> — harmonogramy i wyzwalacze nie są tam jeszcze opisane.</li>
+  <li>Przebieg od końca do końca na uruchomionym stosie i <code>review.md</code>.</li>
+</ul>
+
+<h2>Co wypadło między fazy</h2>
+
+<div class="callout bad">
+  <span class="tag">Dziura w bezpieczniku, nie kosmetyka</span>
+  <p>Faza 3 ma w <code>validation.py</code> stałą <code>STATE_CHANGING_TOOLS = frozenset()</code> z komentarzem „pusty, dopóki faza 2 nie doda pierwszego". Faza 2 właśnie dodała <code>place_order</code> — i oznacza swoje narzędzia flagą <code>read_only</code> na drucie, czyli niesie już informację, której tamta stała miała pilnować ręcznie.</p>
+  <p>Dopóki te dwie rzeczy nie zostaną spięte, <strong>harmonogram uruchomi zespół z narzędziami zapisującymi bez jawnego potwierdzenia</strong>, którego wymaga <code>teams-schedules</code> („Harmonogram nad rewizją z narzędziami zapisującymi wymaga jawnego potwierdzenia"). Sprawdzenie istnieje, przechodzi testy i nie łapie niczego, bo pyta o pusty zbiór.</p>
+</div>
+
+<p>Poza tym trzy razy pod rząd zderzyły się migracje Alembica — dwie gałęzie dopisywały <code>0004</code> na <code>0003</code>. Za każdym razem objaw jest ten sam (<code>alembic upgrade head</code> odmawia z <code>MultipleHeads</code>, wszystkie testy <code>db</code> czerwienieją), a zasada jest już zapisana: kto scala drugi, przepina <code>down_revision</code>. Dziś łańcuch to <code>0004</code> układ agentów → <code>0005</code> harmonogramy → <code>0006</code> transakcje. Przy gałęzi bazowej, do której wszystko wpada, ten punkt styku będzie wracał przy każdej fazie dotykającej schematu.</p>
+
+<h2>Co dalej, w kolejności</h2>
+
+<ol>
+  <li><strong>Spiąć <code>read_only</code> z <code>STATE_CHANGING_TOOLS</code></strong> — jedyna rzecz na tej liście, która jest luką w ochronie, a nie brakiem funkcji.</li>
+  <li><strong>Wypchnąć obraz teams do Azure</strong> — gałąź w filtrze <code>push:</code>, workflow, smoke check na <code>/health</code>, filtr z powrotem. Dopiero wtedy „moduł stoi" jest prawdziwe.</li>
+  <li><strong>Przebieg od końca do końca</strong> — jeden prawdziwy przebieg powie to, czego nie powie żaden test: ile kosztuje i czy odpowiedzi składają się w cokolwiek. Zamyka 14.2 fazy 1 i 8.2 fazy 3.</li>
+  <li><strong>Faza 2: terminal i infrastruktura</strong> — bez grupy 9 <code>trading-mcp</code> nie istnieje poza repozytorium.</li>
+  <li><strong>Faza 3: konfiguracja, README, przegląd.</strong></li>
+  <li><strong>Jeden merge <code>feat/teams-platform</code> → <code>main</code></strong>, gdy fazy są domknięte — i dopiero wtedy <code>deploy-*.yml</code> oraz <code>terraform plan</code> na <code>main</code> zaczynają mówić prawdę.</li>
+</ol>
+
+<footer>
+  Stan wynika z <code>tasks.md</code> trzech zmian OpenSpec, odczytu Azure przez <code>az</code> i przebiegów testów na
+  <code>feat/teams-platform</code>: <code>teams</code> 337 zielonych, <code>trading-mcp</code> 58, terminal 840.
+  Dokument opisuje jeden dzień i zestarzeje się jak każdy raport — jeśli nie zgadza się z <code>tasks.md</code>, to
+  <code>tasks.md</code> ma rację.
+</footer>
+
+</main>
