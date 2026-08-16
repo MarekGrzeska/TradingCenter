@@ -343,6 +343,15 @@ resource "azurerm_linux_web_app" "market_data" {
     DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.prod.name}?sslmode=require"
     DATABASE_USER = local.market_data_app_name
 
+    # The module migrates its own database inside the lifespan, so App Service's warm-up
+    # window has to outlast the longest migration this module can run — the candle table
+    # is the largest thing in the system. 1800 is the platform's own ceiling here, which
+    # is why `migration_lock_wait_seconds` (market_data/config.py) sits below it at 1500
+    # rather than the other way round: the module has to be the one that gives up first
+    # and says why. The platform giving up first restarts the container, which starts the
+    # same migration again and explains nothing.
+    WEBSITES_CONTAINER_START_TIME_LIMIT = "1800"
+
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.market_data_easy_auth.value
 
     # Something *is* in front of this app, so the module refuses to hand out stream
@@ -407,6 +416,19 @@ resource "azurerm_linux_web_app" "agent" {
     require_authentication = true
     unauthenticated_action = "Return401"
     default_provider       = "azureactivedirectory"
+
+    # The health probe, and nothing else — the same exemption market-data's `/ping` and
+    # market-mcp's `/health` carry, for the same reason: every other path answers Easy
+    # Auth's 401 before the container is reached, dead or alive alike, so the deploy
+    # workflow had no way to tell a serving process from a crash loop. It read the
+    # control plane instead and reported green over a container exiting with code 3
+    # (16 August 2026).
+    #
+    # This route reads nothing and returns a fixed body (`agent/app.py`), so there is
+    # nothing here to protect. What makes it enough is the lifespan: it does not finish
+    # until the migration does, so a process that answers this at all has a database at
+    # the revision its image was built for.
+    excluded_paths = ["/health"]
 
     active_directory_v2 {
       client_id                  = azuread_application.agent_easy_auth.client_id

@@ -51,24 +51,23 @@ Needs a database: `../../compose.yaml` at the repo root starts one on
 `127.0.0.1:55432` (`./scripts/dev.sh` / `./scripts/dev.ps1` create the `agent` database
 inside it if it does not exist yet).
 
-`alembic upgrade head` is not optional and never implicit — the container will not run it
-(`Dockerfile`), and neither does `deploy-agent.yml`, so the module refuses to start when
-the revision it finds and the revision its image ships disagree (`schema_version.py`).
-That check exists because a deploy carrying `0003_prompt_revisions` ran against a database
-still at `0002`: everything worked except `GET /prompt`, which answered `500` from a table
-that was not there. Skipping the migration now fails at startup, naming both revisions,
-rather than one route failing quietly.
+`alembic upgrade head` above is the local convenience, not the mechanism: **the module
+migrates its own database at startup** (`migrate.py`, called from `app.py`'s lifespan),
+so running it by hand only saves the first start a few seconds. Production has no step of
+its own at all — a merge to `main` leaves it serving.
 
-In production the migration is only half of it, and the other half has no check at all.
-Migrations there are applied by the server's Entra administrator, so every table they
-create is owned by that administrator and the app's own role
-(`app-tradingcenter-agent`) is granted nothing on it — the original grant was one
-statement over the tables that existed that day. `prompt_revisions` was invisible to the
-app for that reason too, which reads as `permission denied` and not as a missing table.
-Fixed on 15 August by granting the new table what the others already carried and adding
-`ALTER DEFAULT PRIVILEGES FOR ROLE <administrator> IN SCHEMA public` so a future
-migration grants itself. That default is scoped to the role that creates the object: a
-migration applied by a *different* administrator identity lands back in the same hole.
+Two things hold that up. Migrations run under a Postgres advisory lock (`db.py`), so two
+instances starting together produce one migration and one waiter rather than a race. And
+they run as the module's **own** identity, not the server administrator's, which means
+every table they create belongs to the role that will read it — the reason there is no
+`GRANT` step here any more. That was the other half of the old arrangement and the half
+with no check on it: `prompt_revisions` was invisible to the app on 15 August, reading as
+`permission denied` rather than as a missing table.
+
+`schema_version.py` still runs, immediately after. It now catches the narrower pair the
+migration cannot fix: an upgrade that reported success without arriving, and an image
+older than the schema it found — the second being a rollback that moved the code back and
+left the database where it was.
 
 Does not need `market-mcp`: `MARKET_MCP_URL` left unset means no tools, and a server
 configured but not answering means the same thing for that turn. Pointing the URL

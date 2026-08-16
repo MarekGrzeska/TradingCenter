@@ -39,10 +39,11 @@ async def test_a_database_one_migration_behind_refuses_to_start() -> None:
         await verify(FakeConnection(["0002"]))  # type: ignore[arg-type]
 
     # The operator reads this in a container log with no other context, so it has to name
-    # both revisions and the command that closes the gap.
+    # both revisions. It no longer names a command to run: the module migrates itself
+    # before reaching here (`migrate.py`), so reaching here at all means the upgrade did
+    # not arrive where it reported — running it again by hand is not the answer.
     assert "0002" in str(err.value)
     assert next(iter(expected_heads())) in str(err.value)
-    assert "alembic upgrade head" in str(err.value)
 
 
 async def test_a_database_ahead_of_the_image_refuses_too() -> None:

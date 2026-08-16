@@ -133,6 +133,59 @@ one its own tests walk, not a broken one. The tools appear only after the operat
 same lever: clear `MARKET_MCP_URL`, restart, and the module is what it was, with the rows
 in `tool_calls` still recording what happened while it had them.
 
+## Migrations are never the operator's job
+
+**Standing rule, for every module that owns a schema — the two that exist and every one
+added later: a merge to `main` must leave production serving. No operator step between the
+merge and a working application, and none after it.** A module whose deployment cannot
+migrate its own database is not finished, and neither is the change that added it.
+
+What "satisfied" means, concretely, and all three are required:
+
+1. the deployment applies `alembic upgrade head` against that module's production database
+   itself, before the new image starts serving;
+2. the new tables are usable by the app's own role the moment they exist — see the grant
+   trap below, which is what turns a successful migration into `permission denied`;
+3. the deployment's own check fails when either of those did not happen. A check that reads
+   the App Service control plane proves the site is *running the right image*, not that the
+   process inside came up — `deploy-agent.yml` says so in its own comment.
+
+The rule is written from a failure, not from taste. Production `agent` sat dark on
+16 August 2026 with its database at `0005` and its image shipping `0009`, because nothing
+migrated it: not the container, not `deploy-agent.yml`, and the workflow's control-plane
+smoke check reported green over a container crash-looping on exit code 3.
+
+**How it is satisfied today** (`openspec/changes/archive/…-modules-migrate-their-own-database`):
+each module migrates in its own `lifespan`, through `migrate.py`, before it serves anything —
+and, in `market-data`, before it writes a single candle. Two properties carry it:
+
+- **A Postgres advisory lock** (`db.py`, `MIGRATION_LOCK_KEY`) rather than a rule against
+  migrating at startup. Two instances starting together give one migration and one waiter.
+  The wait is bounded and deliberately uneven: five minutes for `agent`, thirty for
+  `market-data`, whose candle table is the largest thing here. A lock held by a process that
+  died needs no timeout — it is session scoped and dies with the connection.
+- **The module's own identity**, not the server administrator's. A table created by the app
+  role belongs to it, so nothing has to be granted afterwards. This is what closed the
+  `ALTER DEFAULT PRIVILEGES` trap — that grant is scoped to the role creating the object, so
+  it only ever worked while one identity did all the creating (`prompt_revisions`, 15 August,
+  read as `permission denied` rather than as a missing table).
+
+`schema_version.py` still runs immediately after, and now means something narrower: an
+upgrade that reported success without arriving, or an image older than the schema it found.
+The second gets *more* likely under this arrangement, not less — the schema moves forward at
+every deploy while a rollback moves only the code back.
+
+What a new module with a database has to do: migrate in its own lifespan under its own lock
+key, with its own identity, and have a deploy check that reaches the process rather than the
+control plane. `deploy-agent.yml` reads `/health`, excluded from Easy Auth the way
+`market-data`'s `/ping` is — and because the lifespan blocks until the migration finishes, a
+process that answers is itself the proof that the schema is at head.
+
+One thing stays the operator's, exactly once per database: the app role must own what it is
+about to alter. `scripts/grant-schema-ownership.sql` transfers ownership of everything in
+`public` and grants `CREATE` on the schema. A database that has not had this done gives a
+module that will not start.
+
 ## A new field on market-data's wire
 
 The most expensive routine change in this repo — five stops, and every one of them is

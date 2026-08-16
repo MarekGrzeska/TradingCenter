@@ -21,7 +21,10 @@ ENV PATH="/app/.venv/bin:$PATH"
 # infra/app-service.tf, which sets no WEBSITES_PORT override.
 EXPOSE 80
 
-# Migrations are a deliberate, separate step run by the deploy workflow, never implicit
-# in container start — same reason as market-data: a restart racing another worker to
-# migrate the same database is a failure mode with no upside.
+# Migrations run at startup, inside the process — `agent/app.py`'s lifespan, not this
+# line. This file used to say the opposite, and the reason it gave was real: a restart
+# racing another worker to migrate the same database. What changed is not the risk but
+# the answer to it — a Postgres advisory lock (`db.py`), which the racing worker waits on
+# instead of duplicating the work. It also used to say the deploy workflow ran the
+# migration; it never did, and production stood dark on 16 August because of it.
 CMD ["uvicorn", "agent.app:app", "--host", "0.0.0.0", "--port", "80"]
