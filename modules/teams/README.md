@@ -9,9 +9,10 @@ Full shape of the module — the catalogue, a run's execution, the terminal's ca
 in `openspec/changes/add-teams-module/` (`proposal.md`, `design.md`, the `teams-*` and
 `terminal-teams` delta specs). **This README describes what exists in the code today**:
 the module starts, authenticates the same way `agent` and `market-data` do, migrates its
-own database, and serves the **catalogue** — teams, their append-only revisions, and
-retiring one. Running a team is not here yet; that lands in the changes building on top
-of this one.
+own database, serves the **catalogue** — teams, their append-only revisions, and retiring
+one — and **runs a team**: agents work in the order their dependencies allow, their trace
+is written as it happens, and progress is readable while it happens. What is not here yet
+is the cost ceiling that stops a run, and the terminal's own canvas.
 
 ## What
 
@@ -39,6 +40,16 @@ of this one.
 - `store.py` — the only door to `teams` and `team_revisions`. The owner is part of every
   statement, and there is no UPDATE against `team_revisions` in it: a save appends.
 - `routers/catalogue.py` — `/teams`, its revisions, and retiring a team.
+- `routers/runs.py` — starting a run, reading its trace, watching it (`/runs/{id}/events`,
+  server-sent), and interrupting it.
+- `provider.py` — OpenAI, streamed, and the only place langchain's message classes exist.
+  A twin of `agent`'s with one shape changed: a call carries a *briefing* built from an
+  agent's predecessors, not a conversation, because a team has no transcript to replay.
+- `runner/` — how a run happens, split by what each part may know. `graph.py` compiles the
+  definition to a LangGraph — one node per agent, the operator's edges, and the narrowing
+  that gives each agent only its predecessors' work. `loop.py` is one agent's own
+  model↔tools exchange under a round ceiling. `engine.py` is where the database, the
+  statuses, the time limit and whoever is watching meet.
 - `tools/` — the session with `market-mcp` (`client.py`, the only place `mcp` is
   imported) and who gets which tools (`assignment.py`). Both refusals that stop a run
   before an agent is called live in the second: a server that cannot be asked, and a tool

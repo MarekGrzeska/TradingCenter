@@ -130,19 +130,44 @@
 
 ## 7. Wykonanie przebiegu
 
-- [ ] 7.1 `provider.py` — bliźniak z `agent`: strumieniowanie, protokół dostawcy, odczyt zużycia
-- [ ] 7.2 Pętla jednego agenta: model ↔ narzędzia z granicą rund
-- [ ] 7.3 Kompilator definicji do grafu wykonania — węzeł na agenta, krawędzie z zależności
-- [ ] 7.4 Podawanie agentowi wyłącznie pracy jego poprzedników
-- [ ] 7.5 Równoległa praca agentów, których zależności są spełnione
-- [ ] 7.6 Zapis śladu na bieżąco: krok agenta, wywołanie narzędzia, wiersz zużycia
-- [ ] 7.7 Statusy przebiegu wraz z przyczyną zatrzymania
-- [ ] 7.8 Górna granica czasu przebiegu i przerwanie przebiegu przez operatora
-- [ ] 7.9 Routery przebiegu — uruchomienie, odczyt, przerwanie, lista przebiegów zespołu
-- [ ] 7.10 Strumień postępu; zerwanie odbioru nie przerywa przebiegu
-- [ ] 7.11 Odzysk przy starcie: przebieg zastany jako trwający zostaje zamknięty jako nieudany
-- [ ] 7.12 Testy: przebieg przerwany, błędny i przekraczający czas zostawiają ślad
-- [ ] 7.13 Testy: zmiana definicji w trakcie przebiegu nie zmienia rewizji, na której on biegnie
+- [x] 7.1 `provider.py` — bliźniak z `agent`: strumieniowanie, protokół dostawcy, odczyt zużycia
+- [x] 7.2 Pętla jednego agenta: model ↔ narzędzia z granicą rund
+- [x] 7.3 Kompilator definicji do grafu wykonania — węzeł na agenta, krawędzie z zależności
+- [x] 7.4 Podawanie agentowi wyłącznie pracy jego poprzedników
+- [x] 7.5 Równoległa praca agentów, których zależności są spełnione
+- [x] 7.6 Zapis śladu na bieżąco: krok agenta, wywołanie narzędzia, wiersz zużycia
+- [x] 7.7 Statusy przebiegu wraz z przyczyną zatrzymania
+- [x] 7.8 Górna granica czasu przebiegu i przerwanie przebiegu przez operatora
+- [x] 7.9 Routery przebiegu — uruchomienie, odczyt, przerwanie, lista przebiegów zespołu
+- [x] 7.10 Strumień postępu; zerwanie odbioru nie przerywa przebiegu
+- [x] 7.11 Odzysk przy starcie: przebieg zastany jako trwający zostaje zamknięty jako nieudany
+- [x] 7.12 Testy: przebieg przerwany, błędny i przekraczający czas zostawiają ślad
+- [x] 7.13 Testy: zmiana definicji w trakcie przebiegu nie zmienia rewizji, na której on biegnie
+
+  PR #114. Pięć rzeczy warto znać, zanim ktoś zajrzy do `teams/runner/`:
+
+  - **LangGraph niesie graf zespołu, nie pętlę agenta.** Węzeł na agenta i krawędzie
+    operatora — to z tego bierze się i kolejność, i równoległość, bez pisania planisty.
+    Wewnątrz węzła jest zwykła pętla `while` z sufitem rund: zagnieżdżanie drugiego grafu
+    w każdym węźle dołożyłoby superkroków między pytaniem operatora a odpowiedzią, a sufit
+    czyta się jako granica pętli, bo nią jest.
+  - **Zawężenie do poprzedników jest w `graph.py`,** nie w węźle. Stan LangGrapha trzyma
+    pracę wszystkich (inaczej nie da się jej przekazać), więc miejscem, w którym agent
+    dostaje wyłącznie swoje wejście, jest budowa węzła — `_predecessors_of` to całość
+    tego mechanizmu.
+  - **Sufit rund został w kodzie (6), limit czasu w konfiguracji (900 s).** „Ile razy
+    agent może sięgnąć po narzędzie" to własność bezpieczeństwa, której nie podnosi się
+    dlatego, że akurat przeszkadza; „jak długo wolno biec przebiegowi" zależy od tego, jak
+    duży zespół operator złożył. Sufit jest niższy niż ósemka z `agent`, bo tu mnoży się
+    przez liczbę agentów.
+  - **7.6 wchodzi w grupę 8 i to jest nieuniknione.** Wiersz zużycia powstaje przy każdym
+    wywołaniu modelu, ze stawkami kopiowanymi na wiersz i policzonym kosztem — czyli 8.1,
+    8.2 i 8.3 są zrobione po drodze, bo bez nich nie da się zapisać wiersza, którego
+    schemat wymaga stawek. Dla grupy 8 zostają granice kosztu (8.4, 8.5) i `GET /usage`
+    (8.6) wraz z ich testami.
+  - **Rejestr przebiegów siedzi w pamięci procesu** — plan ma dokładnie jednego workera
+    (`infra/app-service.tf`), a to, czego pamięć nie obejmuje, zamyka `fail_unfinished_runs`
+    przy starcie: przebieg zastany jako trwający należy do procesu, którego już nie ma.
 
 ## 8. Koszt i granice
 

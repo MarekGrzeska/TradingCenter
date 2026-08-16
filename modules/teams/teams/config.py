@@ -132,6 +132,20 @@ class Settings(BaseSettings):
     # room for its own work without turning one slow call into a run that never ends.
     market_mcp_request_timeout_seconds: float = 15.0
 
+    # --- how long one run may take ---
+    #
+    # A ceiling on the whole run, not on one agent: several agents work in it, some at the
+    # same time, and the thing an operator waits on is the run (specs/teams-runs,
+    # "Przebieg ma skończony czas i daje się przerwać"). Fifteen minutes is generous for a
+    # team of a handful of roles reading the archive, and short enough that a run nobody
+    # is watching cannot bill through the night.
+    #
+    # A setting rather than a constant, unlike the per-agent round ceiling: how long is
+    # too long depends on how big a team the operator built, while "how many times may one
+    # agent reach for a tool" is a safety property that should not be raised because it is
+    # inconvenient (`runner/loop.py`, ROUND_CEILING).
+    run_timeout_seconds: float = 900.0
+
     # --- who may call this module from a browser ---
     #
     # Mirrors market-data's and agent's own field and reasoning: a request without an

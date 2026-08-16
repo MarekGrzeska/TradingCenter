@@ -24,13 +24,15 @@ logging.basicConfig(
 
 from fastapi import FastAPI
 
-from . import migrate, schema_version
+from . import migrate, schema_version, store
 from .config import Settings
 from .db import MIGRATION_LOCK_KEY, advisory_lock
 from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
 from .openapi import require_response_fields
-from .routers import catalogue, models
+from .provider import OpenAIProvider
+from .routers import catalogue, models, runs
+from .runner import RunRegistry
 from .tools import ToolServer
 
 log = logging.getLogger(__name__)
@@ -65,6 +67,16 @@ async def lifespan(app: FastAPI):
             # the schema it found (`schema_version.py`).
             await schema_version.verify(conn)
 
+            # A run lives in the process that started it, so anything still `running` in
+            # the database belongs to a process that is gone — closed here, before a route
+            # can report it as work in progress that nobody is doing (specs/teams-runs,
+            # "Ślad przebiegu zostaje niezależnie od tego, jak przebieg się skończył").
+            orphans = await store.fail_unfinished_runs(
+                conn, reason="the module restarted while this run was in progress"
+            )
+            if orphans:
+                log.warning("closed %d run(s) left in progress by an earlier process: %s", len(orphans), orphans)
+
         # Built here, connected to nothing yet: the session opens on first use and the
         # tool list is read then. That is what keeps market-mcp off this module's start-up
         # path — a team assigning no tools never touches it, and the catalogue is served
@@ -78,6 +90,12 @@ async def lifespan(app: FastAPI):
         # Built once, from settings that were already refused if a model carried no rate
         # or a duplicate id (`config.py`) — so nothing downstream re-checks either.
         app.state.catalogue = ModelCatalogue.from_settings(settings)
+        app.state.provider = OpenAIProvider(settings)
+        # The runs this process is working on, and who is watching each. In memory on
+        # purpose: the plan runs exactly one worker (`infra/app-service.tf`), and the
+        # start-up sweep above is what covers the case this cannot — a process that died
+        # with runs in it.
+        app.state.runs = RunRegistry()
         # No `app.state.announced_tools` beside those two, and that is the point of the
         # session: what the tool server publishes is asked of it at the moment a definition
         # is saved (`routers/catalogue._check`), never copied onto app state at start-up. A
@@ -125,6 +143,7 @@ app.openapi = _openapi_with_required_fields  # type: ignore[method-assign]
 
 app.include_router(catalogue.router)
 app.include_router(models.router)
+app.include_router(runs.router)
 
 
 @app.get("/health")
