@@ -17,10 +17,9 @@ odpowiedzi agenta pochodzi wyłącznie z zapisu po stronie backendu (`_confirmat
 o froncie. Nie jest to jeszcze potwierdzone jako zamknięte — wynik ręcznego testu po
 restarcie stacku jest w toku poza tym dokumentem.
 
-Rezydualna, świadomie zaakceptowana luka: kadr `from`/`to` sięgający głębiej, niż pager
-zdąży dociągnąć w limicie `MAX_PAGES=20` bez trafienia ani warunku „już wystarczy", ani
-warunku „strona nic nie wniosła", zostaje w `pendingFocusRef` bez rozstrzygnięcia do
-najbliższej zmiany symbolu/rozdzielczości albo odmontowania — patrz Gaps.
+Luka opisana pierwotnie jako rezydualna — kadr `from`/`to` sięgający głębiej, niż pager
+zdąży dociągnąć w limicie `MAX_PAGES=20` — **została zamknięta** przy okazji review zmiany
+`agent-chart-drawings`, patrz Findings, wiersz drugi.
 
 ## Verified
 
@@ -39,6 +38,7 @@ najbliższej zmiany symbolu/rozdzielczości albo odmontowania — patrz Gaps.
 | Severity | Where | Finding | Status |
 |---|---|---|---|
 | Medium | `modules/terminal/src/chart/Chart.tsx`, `applyFocusToView` (`around`+`bars` gałąź) | `{from: index - half, to: index + half}` dla `half = floor(bars/2)` daje `bars+1` świec dla każdego parzystego `bars` (np. `bars=2` pokazywał 3 świece: `index-1, index, index+1`), niespójnie z `redraw`'s własną formułą `{from, to: from + bars - 1}` używaną do tego samego problemu przy zachowaniu kadru na zmianie interwału. | **FIXED** w `fbc5322` — ujednolicone do `from = index - floor(bars/2); to = from + bars - 1`; test `"centres an around/bars focus..."` poprawiony, żeby złapać ten błąd (`bars: 2` → oczekiwane `{from:69,to:70}`, nie `{from:69,to:71}`). |
+| Medium | `modules/terminal/src/chart/useOlderBars.ts` + `Chart.tsx`, `olderReader` | Bieg pagera, który wyczerpał `MAX_PAGES=20` stron, z których każda coś wniosła, kończy się statusem `"idle"` jak każdy inny — a efekt rozliczający kadr nasłuchuje tylko `"exhausted"`/`"error"`. Kadr zostawał w `pendingFocusRef`: wykres się nie ruszał, `onFocusRequestSettled` nie padało, a `gridStore` oferował to samo żądanie aż do zmiany symbolu. Pierwotnie zapisane niżej jako Gap. | **FIXED** w `5921e8d` — `OlderBarsReader.stoppedShort?()`, wołane, gdy bieg kończy się z `needsMore()` wciąż prawdziwym. Świadomie **nie** `"exhausted"`, które twierdziłoby, że archiwum nie ma nic starszego, a tu ma. `Chart` rozlicza kadr wobec tego, co faktycznie dociągnął — przypadek, dla którego istnieje `overlapsSeries`. Test `"settles a focus the pager ran out of pages before reaching"` sprawdzony jako czerwony bez poprawki. |
 
 Poza tym: żadnych innych ustaleń. Przejrzano cały diff `06acb0f..81db4e6` (backend:
 `models.py`, `store.py`, `contract.py`, `tools/chart.py`, migracja `0006`; terminal:
@@ -108,16 +108,9 @@ review — patrz Findings).
   językowego, nie deterministycznego kodu — żaden test jednostkowy ani integracyjny go nie
   dowodzi. Migawka dociera do promptu poprawnie (`test_as_context_names_the_visible_span`),
   ale to, co model z niej zrobi, jest poza zasięgiem tego review.
-- **Kadr `from`/`to` poza budżetem pagera** — jeśli `useOlderBars` wyczerpie `MAX_PAGES=20`
-  stron, z których każda robi *jakiś* postęp (więc ani warunek „już wystarczy", ani „strona
-  nic nie wniosła" nigdy nie trafia), `pendingFocusRef` zostaje nierozstrzygnięty: kadr nie
-  jest ani zastosowany, ani zgłoszony jako pominięty, `onFocusRequestSettled` nie pada, a
-  `gridStore`'owy rejestr żądania zostaje aż do zmiany symbolu/rozdzielczości albo
-  odmontowania (które go porzucają). Granice `MIN_FOCUS_BARS=10`/`MAX_FOCUS_BARS=1000` po
-  stronie agenta zostały dobrane tak, żeby to było rzadkie (`design.md`, „Granice liczby
-  świec"), ale scenariusz nie jest wykluczony ani otestowany — nizinowy interwał (np. DAY)
-  z kadrem sięgającym wyjątkowo daleko wstecz na rzadko notowanym instrumencie mógłby to
-  wywołać. Nieprzetestowane i nienaprawione w tej zmianie.
+- ~~**Kadr `from`/`to` poza budżetem pagera**~~ — **zamknięte** w `5921e8d`; przeniesione do
+  Findings. Bieg, który wyczerpał budżet stron z niezaspokojonym `needsMore()`, mówi to
+  teraz wprost (`stoppedShort`), a `Chart` rozlicza kadr wobec dociągniętego fragmentu.
 - **Task 9.3, ręczne przejście na żywym stacku** — w toku poza tym dokumentem; pierwszy
   wynik operatora (przed potwierdzonym restartem stacku) opisany w Verdict, nie jest
   jeszcze rozstrzygnięty jako pomyślny.

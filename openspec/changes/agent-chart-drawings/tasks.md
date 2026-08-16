@@ -63,8 +63,8 @@
 
 ## 8. Domknięcie
 
-- [ ] 8.1 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright` w `modules/agent`
-- [ ] 8.2 `pnpm test`, `pnpm lint`, `pnpm typecheck` w `modules/terminal`
+- [x] 8.1 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright` w `modules/agent`
+- [x] 8.2 `pnpm test`, `pnpm lint`, `pnpm typecheck` w `modules/terminal`
 - [ ] 8.3 Przejście ręką na żywym stacku: „nanieś opór na 21500", „co mamy naniesione", skasowanie z listy, przeżycie odświeżenia strony i zmiany interwału
-- [ ] 8.4 `openspec validate agent-chart-drawings --strict`
-- [ ] 8.5 `review.md` wg szablonu — bez niego zmiany nie da się zarchiwizować
+- [x] 8.4 `openspec validate agent-chart-drawings --strict`
+- [x] 8.5 `review.md` wg szablonu — bez niego zmiany nie da się zarchiwizować
