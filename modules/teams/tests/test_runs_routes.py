@@ -1,0 +1,271 @@
+"""Runs over HTTP: starting one, reading its trace, watching it, interrupting it — and
+the property the whole module is built around, that a run is judged against the revision
+it started on."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+from collections.abc import AsyncIterator, Iterator
+
+import asyncpg
+import pytest
+from fastapi.testclient import TestClient
+
+from teams.app import app
+from teams.provider import ProviderChunk, TextDelta, UsageReport
+
+from .scripted_provider import ScriptedProvider, says
+
+pytestmark = pytest.mark.db
+
+MODEL_ID = "gpt-5.6-luna"
+
+_ENV = {
+    "OPENAI_API_KEY": "key",
+    "MODELS": (
+        f'[{{"id":"{MODEL_ID}","model":"luna-prod","display_name":"Luna",'
+        '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
+    ),
+}
+
+OWNER = {"X-MS-CLIENT-PRINCIPAL-ID": "operator-1"}
+STRANGER = {"X-MS-CLIENT-PRINCIPAL-ID": "operator-2"}
+
+
+@pytest.fixture(autouse=True)
+def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("DATABASE_URL", migrated_url)
+    for key, value in _ENV.items():
+        monkeypatch.setenv(key, value)
+
+
+@pytest.fixture
+def client(db: asyncpg.Connection) -> Iterator[TestClient]:
+    """The real app and the real lifespan, with the provider replaced afterwards — the
+    routes read it off `app.state` per request, so nothing here needs an OpenAI key to be
+    a real one."""
+    with TestClient(app) as started:
+        app.state.provider = ScriptedProvider(default=says("done."))
+        yield started
+
+
+def _definition(agents: list[dict] | None = None, edges: list[dict] | None = None) -> dict:
+    return {
+        "agents": agents
+        or [
+            {
+                "key": "scout",
+                "role": "scout",
+                "prompt": "read the market",
+                "model_id": MODEL_ID,
+                "tools": [],
+            }
+        ],
+        "edges": edges or [],
+    }
+
+
+def _a_team(client: TestClient, definition: dict | None = None) -> int:
+    response = client.post(
+        "/teams",
+        json={"name": "a team", "description": "", "definition": definition or _definition()},
+        headers=OWNER,
+    )
+    assert response.status_code == 201, response.text
+    return response.json()["id"]
+
+
+def _wait_for_status(client: TestClient, run_id: int, wanted: set[str], tries: int = 60) -> dict:
+    """Polls the run's own route. Each request hands the loop back to the run's task,
+    which is what actually moves it along under `TestClient`."""
+    for _ in range(tries):
+        run = client.get(f"/runs/{run_id}", headers=OWNER).json()
+        if run["status"] in wanted:
+            return run
+    raise AssertionError(f"run {run_id} never reached {wanted}")
+
+
+def test_a_run_starts_and_finishes_with_a_trace(client: TestClient) -> None:
+    team_id = _a_team(client)
+
+    started = client.post(f"/teams/{team_id}/runs", headers=OWNER)
+    assert started.status_code == 201, started.text
+    run_id = started.json()["id"]
+    assert started.json()["status"] == "pending"
+
+    run = _wait_for_status(client, run_id, {"completed", "failed", "cancelled"})
+    assert run["status"] == "completed"
+    assert run["finished_at"] is not None
+
+    steps = client.get(f"/runs/{run_id}/steps", headers=OWNER).json()
+    assert [step["agent_key"] for step in steps] == ["scout"]
+    assert steps[0]["status"] == "completed"
+    assert steps[0]["output"] == "done."
+    assert client.get(f"/runs/{run_id}/tool-calls", headers=OWNER).json() == []
+
+
+def test_runs_are_listed_for_their_team_newest_first(client: TestClient) -> None:
+    team_id = _a_team(client)
+    first = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, first, {"completed", "failed"})
+    second = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, second, {"completed", "failed"})
+
+    listed = client.get(f"/teams/{team_id}/runs", headers=OWNER).json()
+
+    assert [run["id"] for run in listed] == [second, first]
+
+
+def test_a_strangers_run_reads_exactly_like_one_that_does_not_exist(client: TestClient) -> None:
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    assert client.get(f"/runs/{run_id}", headers=STRANGER).status_code == 404
+    assert client.get(f"/runs/{run_id}/steps", headers=STRANGER).status_code == 404
+    assert client.get(f"/runs/{run_id}/tool-calls", headers=STRANGER).status_code == 404
+    assert client.get(f"/runs/{run_id + 1000}", headers=OWNER).status_code == 404
+    assert client.post(f"/teams/{team_id}/runs", headers=STRANGER).status_code == 404
+
+
+def test_a_revision_naming_a_model_since_withdrawn_cannot_be_run(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """specs/teams-models — the saved revision is checked again at the moment it would
+    run, and refused by name rather than quietly answered by another model."""
+    team_id = _a_team(client)
+
+    class EmptyCatalogue:
+        def ids(self):
+            return frozenset()
+
+    monkeypatch.setattr(app.state, "catalogue", EmptyCatalogue())
+    response = client.post(f"/teams/{team_id}/runs", headers=OWNER)
+
+    assert response.status_code == 422
+    assert "scout" in response.text and MODEL_ID in response.text
+
+
+class _Sleeper:
+    """A provider whose first agent never finishes — for everything that has to reach a
+    run while it is still working."""
+
+    def __init__(self) -> None:
+        self.entered = asyncio.Event()
+
+    def stream(self, **kwargs) -> AsyncIterator[ProviderChunk]:
+        del kwargs
+
+        async def chunks() -> AsyncIterator[ProviderChunk]:
+            self.entered.set()
+            await asyncio.sleep(30)
+            yield TextDelta("never")  # pragma: no cover
+            yield UsageReport(None, None, None, None)  # pragma: no cover
+
+        return chunks()
+
+
+def _start_a_slow_run(client: TestClient) -> tuple[int, int, _Sleeper]:
+    team_id = _a_team(client)
+    sleeper = _Sleeper()
+    app.state.provider = sleeper
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"running"})
+    return team_id, run_id, sleeper
+
+
+def test_saving_a_revision_mid_run_does_not_move_the_run(client: TestClient) -> None:
+    """specs/teams-runs, "Definicja zmieniona w trakcie przebiegu" — the property every
+    comparison in this module rests on."""
+    team_id, run_id, _ = _start_a_slow_run(client)
+    before = client.get(f"/runs/{run_id}", headers=OWNER).json()
+
+    saved = client.post(
+        f"/teams/{team_id}/revisions",
+        json={
+            "definition": _definition(
+                [
+                    {
+                        "key": "scout",
+                        "role": "scout",
+                        "prompt": "completely different instructions",
+                        "model_id": MODEL_ID,
+                        "tools": [],
+                    }
+                ]
+            )
+        },
+        headers=OWNER,
+    )
+    assert saved.status_code == 201, saved.text
+    assert saved.json()["version"] == 2
+
+    after = client.get(f"/runs/{run_id}", headers=OWNER).json()
+    assert after["team_revision_id"] == before["team_revision_id"]
+    # And it is the first revision, not the one just saved.
+    assert after["team_revision_id"] != saved.json()["id"]
+
+    client.post(f"/runs/{run_id}/cancel", headers=OWNER)
+    _wait_for_status(client, run_id, {"cancelled", "failed"})
+
+
+def test_an_operator_can_interrupt_a_run(client: TestClient) -> None:
+    """specs/teams-runs, "Operator przerywa przebieg w trakcie"."""
+    _, run_id, _ = _start_a_slow_run(client)
+
+    cancelled = client.post(f"/runs/{run_id}/cancel", headers=OWNER)
+    assert cancelled.status_code == 202
+
+    run = _wait_for_status(client, run_id, {"cancelled"})
+    assert "interrupted" in run["stopped_reason"]
+    steps = client.get(f"/runs/{run_id}/steps", headers=OWNER).json()
+    assert steps[0]["status"] == "failed"
+
+
+def test_interrupting_a_finished_run_is_refused(client: TestClient) -> None:
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    response = client.post(f"/runs/{run_id}/cancel", headers=OWNER)
+
+    assert response.status_code == 409
+    assert "already" in response.text
+
+
+def test_a_strangers_run_cannot_be_interrupted(client: TestClient) -> None:
+    _, run_id, _ = _start_a_slow_run(client)
+
+    assert client.post(f"/runs/{run_id}/cancel", headers=STRANGER).status_code == 404
+
+    client.post(f"/runs/{run_id}/cancel", headers=OWNER)
+    _wait_for_status(client, run_id, {"cancelled", "failed"})
+
+
+def test_the_stream_opens_with_where_the_run_is_now(client: TestClient) -> None:
+    """specs/teams-runs, "po ponownym otwarciu widać jego bieżący stan" — a viewer that
+    arrives after the fact still gets the whole picture, and the stream then closes rather
+    than hanging on a run that will never move again."""
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    with client.stream("GET", f"/runs/{run_id}/events", headers=OWNER) as stream:
+        assert stream.status_code == 200
+        body = "".join(stream.iter_text())
+
+    assert "event: snapshot" in body
+    payload = json.loads(body.split("data: ", 1)[1].split("\n", 1)[0])
+    assert payload["run"]["status"] == "completed"
+    assert [step["agent_key"] for step in payload["steps"]] == ["scout"]
+    assert payload["steps"][0]["output"] == "done."
+
+
+def test_a_strangers_stream_is_refused(client: TestClient) -> None:
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    with client.stream("GET", f"/runs/{run_id}/events", headers=STRANGER) as stream:
+        assert stream.status_code == 404

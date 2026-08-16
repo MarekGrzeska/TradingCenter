@@ -30,6 +30,13 @@ dependencies = [
     # against httpx directly. It arrives with `mcp` anyway; named here because this
     # module's own code imports it, which is what a dependency list is for.
     "httpx>=0.27",
+    # The team's own graph: one node per agent, the operator's edges between them, and
+    # concurrent supersteps for agents whose dependencies are already met. Chosen because
+    # its model maps one to one onto what a revision stores, and because the repository
+    # already runs it in `agent` (design.md, "LangGraph, nie OpenAI Agents SDK").
+    "langgraph>=0.2",
+    # The provider, and the one place its message classes exist (`provider.py`).
+    "langchain-openai>=0.2",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.

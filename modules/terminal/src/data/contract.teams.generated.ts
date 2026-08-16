@@ -45,6 +45,110 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run */
+        get: operations["get_run_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Cancel Run
+         * @description Asks a run to stop. 202, not 200: the status is written by the run itself as it
+         *     unwinds, so what comes back here is the run as it was when the interruption was
+         *     accepted — the operator's own view catches up through the stream or a reload.
+         */
+        post: operations["cancel_run_runs__run_id__cancel_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Run Events
+         * @description Progress as it happens, starting with where the run is now.
+         *
+         *     The snapshot first, then live events: a viewer that opens halfway through has to see
+         *     the agents that already finished, and one that reconnects must not have to guess what
+         *     it missed. Dropping the connection unsubscribes a queue and nothing else — the run
+         *     holds no reference to any of this (specs/teams-runs, "Zerwanie połączenia odbierającego
+         *     postęp MUST NOT przerwać przebiegu").
+         */
+        get: operations["run_events_runs__run_id__events_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/steps": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Steps
+         * @description Who is waiting, who is working, who has finished and what they handed over — the
+         *     same picture the progress stream carries, for a viewer that arrived late or came back
+         *     (specs/teams-runs, "po ponownym otwarciu widać jego bieżący stan").
+         */
+        get: operations["get_run_steps_runs__run_id__steps_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/runs/{run_id}/tool-calls": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Run Tool Calls */
+        get: operations["get_run_tool_calls_runs__run_id__tool_calls_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -151,6 +255,35 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Runs
+         * @description Every run of this team, newest first — including runs of revisions since replaced,
+         *     which is what makes two of them comparable at all.
+         */
+        get: operations["list_runs_teams__team_id__runs_get"];
+        put?: never;
+        /**
+         * Start Run
+         * @description Starts a run of the team's latest revision and answers immediately.
+         *
+         *     201 with the run, not the run's result: a team takes minutes, and a request held open
+         *     for it would be a request that fails whenever the network does. What the operator
+         *     watches afterwards is `/runs/{id}/events`, and what survives either way is the trace.
+         */
+        post: operations["start_run_teams__team_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -231,6 +364,45 @@ export interface components {
             /** Output Rate Per 1M */
             output_rate_per_1m: string;
         };
+        /** RunOut */
+        RunOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: number;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+            /** Stopped Reason */
+            stopped_reason: string | null;
+            /** Team Revision Id */
+            team_revision_id: number;
+        };
+        /** RunStepOut */
+        RunStepOut: {
+            /** Agent Key */
+            agent_key: string;
+            /** Finished At */
+            finished_at: string | null;
+            /** Id */
+            id: number;
+            /** Output */
+            output: string | null;
+            /** Rounds */
+            rounds: number;
+            /** Run Id */
+            run_id: number;
+            /** Started At */
+            started_at: string | null;
+            /** Status */
+            status: string;
+        };
         /** SaveRevisionIn */
         SaveRevisionIn: {
             definition: components["schemas"]["TeamDefinition"];
@@ -301,6 +473,34 @@ export interface components {
             /** Version */
             version: number;
         };
+        /** ToolCallOut */
+        ToolCallOut: {
+            /** Arguments */
+            arguments: {
+                [key: string]: unknown;
+            };
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Duration Ms */
+            duration_ms: number;
+            /** Id */
+            id: number;
+            /** Outcome */
+            outcome: string;
+            /** Position */
+            position: number;
+            /** Result Text */
+            result_text: string;
+            /** Round Index */
+            round_index: number;
+            /** Run Step Id */
+            run_step_id: number;
+            /** Tool Name */
+            tool_name: string;
+        };
         /** ValidationError */
         ValidationError: {
             /** Context */
@@ -361,6 +561,161 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelOut"][];
+                };
+            };
+        };
+    };
+    get_run_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    cancel_run_runs__run_id__cancel_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    run_events_runs__run_id__events_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_steps_runs__run_id__steps_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunStepOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_tool_calls_runs__run_id__tool_calls_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolCallOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -563,6 +918,68 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TeamRevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_runs_teams__team_id__runs_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    start_run_teams__team_id__runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RunOut"];
                 };
             };
             /** @description Validation Error */
