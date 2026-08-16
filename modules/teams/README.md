@@ -30,8 +30,12 @@ of this one.
   everything the JSON alone answers — unique agent keys, edges naming real agents, no
   isolated agent, no dependency cycle.
 - `validation.py` — the rest of "can this be run", which needs something outside the
-  JSON: the configured model catalogue, and the tools the tool server announces. Both are
-  checked when a revision is *saved*, never when it is run.
+  JSON: the configured model catalogue, and the tools the tool server announces. Checked
+  when a revision is *saved*; `check_runnable` is the same check again at the moment a
+  saved revision is about to run, for the model dropped from the configuration since.
+- `models_catalogue.py` — the models a team's agents can be assigned, cheapest first.
+  A twin of `agent`'s, minus the default: a revision names a model per agent or it is
+  refused, so there is nothing to fall back to.
 - `store.py` — the only door to `teams` and `team_revisions`. The owner is part of every
   statement, and there is no UPDATE against `team_revisions` in it: a save appends.
 - `routers/catalogue.py` — `/teams`, its revisions, and retiring a team.
@@ -169,10 +173,12 @@ when `contract.py` does not — `pnpm contract:check` is what catches a stale ge
 | | |
 |---|---|
 | `GET /health` | outside the identity requirement, and what the deploy's smoke check asks |
+| `GET /models` | the model catalogue, cheapest first — everything a picker needs |
 | `GET /teams` · `POST /teams` | the catalogue, and a new team with its first revision |
 | `GET /teams/{id}` · `DELETE /teams/{id}` | one entry; the delete retires it, keeping its runs |
 | `POST /teams/{id}/revisions` | appends the next revision; never touches the previous one |
 | `GET /teams/{id}/revisions/latest` · `/{version}` | a definition as it was saved |
 
-Everything but `/health` answers only to the identity that saved the team, and answers a
-team owned by somebody else exactly as it answers one that does not exist.
+Every `/teams` route answers only to the identity that saved the team, and answers a team
+owned by somebody else exactly as it answers one that does not exist. `/models` is the
+same for everyone — it publishes configuration, not anybody's data.

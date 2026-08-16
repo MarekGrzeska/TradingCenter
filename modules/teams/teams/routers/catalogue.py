@@ -33,14 +33,15 @@ async def _check(request: Request, definition: TeamDefinition) -> None:
     is answered correctly and without a restart, and there is no second copy of its
     catalogue to drift (specs/teams-tool-access). `announced_tool_names` answers `None`
     when the server cannot be asked at all, which `validation.py` turns into its own
-    sentence — a different refusal from "that tool is gone".
+    sentence — a different refusal from "that tool is gone". The models are the other way
+    round on purpose: that catalogue is this module's own configuration, checked once at
+    start-up, so it is read from `app.state` rather than asked for again.
     """
-    settings = request.app.state.settings
     try:
         check_definition(
             definition,
-            model_ids=[entry.id for entry in settings.models],
-            announced_tools=await announced_tool_names(settings),
+            model_ids=request.app.state.catalogue.ids(),
+            announced_tools=await announced_tool_names(request.app.state.settings),
         )
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err

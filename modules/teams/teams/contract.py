@@ -30,11 +30,39 @@ from typing import Any
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
+from .config import ModelCatalogueEntry
+
 
 def _parse_jsonb(value: object) -> Any:
     # asyncpg hands JSONB back as text unless a codec is registered — same reading
     # agent's own store.py gives its JSONB columns.
     return json.loads(value) if isinstance(value, str) else value
+
+
+class ModelOut(BaseModel):
+    """One entry of the model catalogue — everything a picker needs and nothing else
+    (specs/teams-models, "Katalog modeli wystarcza do zbudowania wybieraka"). The
+    terminal MUST NOT carry a model id of its own, so a model added to this module's
+    configuration reaches the picker with no terminal change at all."""
+
+    id: str
+    display_name: str
+    cost_rank: int
+    # Per 1,000,000 tokens, the unit providers quote — published in the unit it is
+    # configured in, so the terminal renders what arrives and never rescales it. Strings
+    # for the same reason every cost on this wire is one (see `CostLimits`).
+    input_rate_per_1m: str
+    output_rate_per_1m: str
+
+    @classmethod
+    def from_entry(cls, entry: ModelCatalogueEntry) -> ModelOut:
+        return cls(
+            id=entry.id,
+            display_name=entry.display_name,
+            cost_rank=entry.cost_rank,
+            input_rate_per_1m=str(entry.input_rate_per_1m),
+            output_rate_per_1m=str(entry.output_rate_per_1m),
+        )
 
 
 class AgentDefinition(BaseModel):
@@ -114,6 +142,34 @@ class TeamDefinition(BaseModel):
     agents: list[AgentDefinition]
     edges: list[TeamEdge] = Field(default_factory=list)
     limits: CostLimits = Field(default_factory=CostLimits)
+
+    @model_validator(mode="before")
+    @classmethod
+    def _every_agent_names_a_model(cls, data: Any) -> Any:
+        """Before the agents parse, so the refusal can name the agent by its own `key`.
+
+        `model_id` is a required field, so Pydantic would refuse this on its own — but as
+        `agents.2.model_id`, which leaves the operator counting rows in a canvas to find
+        out which role it means (specs/teams-models, "Agent bez wskazanego modelu": the
+        refusal names *that agent*).
+        """
+        if not isinstance(data, dict):
+            return data
+        agents = data.get("agents")
+        if not isinstance(agents, list):
+            return data
+        for index, agent in enumerate(agents):
+            if not isinstance(agent, dict):
+                continue
+            model_id = agent.get("model_id")
+            if isinstance(model_id, str) and model_id.strip():
+                continue
+            named = agent.get("key") if isinstance(agent.get("key"), str) else index
+            raise ValueError(
+                f"agent {named!r} names no model — every agent in a team names its own "
+                "(there is no team-wide default)"
+            )
+        return data
 
     @field_validator("agents")
     @classmethod
