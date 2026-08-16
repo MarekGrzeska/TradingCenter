@@ -106,9 +106,15 @@ wyścig boli najbardziej.
 
 Czekanie realizuje `pg_try_advisory_lock` w pętli z kresem, a nie blokujący
 `pg_advisory_lock`, żeby kres w ogóle dało się nałożyć. Kres: **`agent` 5 minut**,
-**`market-data` 30 minut** — druga liczba wynika z tego, że archiwum świec jest największą
+**`market-data` 25 minut** — druga liczba wynika z tego, że archiwum świec jest największą
 bazą w systemie i przebudowa indeksu na tabeli świec trwa dłużej niż start procesu
 (`market-data-database-connection`, „Kres MUST być dłuższy niż najdłuższa migracja").
+
+Nie 30 minut, choć taka była pierwsza liczba: App Service tnie
+`WEBSITES_CONTAINER_START_TIME_LIMIT` na 1800 s, a przy kresie równym sufitowi platformy
+to platforma mogłaby poddać się pierwsza — czyli zrestartować kontener i zacząć tę samą
+migrację od nowa, nie mówiąc dlaczego. Moduł musi odmawiać pierwszy, więc jego kres stoi
+poniżej sufitu, nie na nim.
 
 ### 4. Alembic wołany w procesie, nie jako podproces
 
@@ -174,7 +180,8 @@ to, co i tak wynika z faktu odpowiadania).
 Kolejność jest częścią zmiany, nie przypisem — kod wdrożony przed krokiem 1 daje moduł,
 który nie wstaje.
 
-1. **Operator, raz, na obu bazach produkcyjnych** (`agent` i `tradingcenter`), tożsamością
+1. **Operator, raz, na obu bazach produkcyjnych** (`agent` i `market_data` — `tradingcenter`
+   to nazwa *serwera*, nie bazy na nim), tożsamością
    administratora Entra: przeniesienie własności wszystkich tabel, sekwencji i widoków
    schematu `public` oraz `alembic_version` na rolę aplikacji, plus
    `GRANT CREATE ON SCHEMA public`. Zapytanie kontrolne wypisujące obiekty, których

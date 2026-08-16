@@ -35,8 +35,8 @@
 
 - [x] 5.1 `scripts/grant-schema-ownership.sql`: przeniesienie własności wszystkich tabel, sekwencji i widoków schematu `public` oraz `alembic_version` na wskazaną rolę, plus `GRANT CREATE ON SCHEMA public`
 - [x] 5.2 Zapytanie kontrolne w tym samym pliku: obiekty, których właścicielem nie jest rola aplikacji — MUST zwrócić zero wierszy
-- [ ] 5.3 Wykonanie na bazie `agent` i sprawdzenie kontrolne
-- [ ] 5.4 Wykonanie na bazie `tradingcenter` i sprawdzenie kontrolne
+- [x] 5.3 Wykonanie na bazie `agent` i sprawdzenie kontrolne
+- [x] 5.4 Wykonanie na bazie `market_data` i sprawdzenie kontrolne
 
 ## 6. Wdrożenie i potwierdzenie
 

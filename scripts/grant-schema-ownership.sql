@@ -18,7 +18,10 @@
 --         user=<entra-admin-upn> sslmode=require" \
 --        -v role=app-tradingcenter-agent -f scripts/grant-schema-ownership.sql
 --
---   ... and again with dbname=tradingcenter, role=app-tradingcenter-market-data.
+--   ... and again with dbname=market_data, role=app-tradingcenter-market-data.
+--
+-- The two databases are `agent` and `market_data` (infra/database.tf). `tradingcenter`
+-- is the *server*, not a database on it, and asking for it by that name is a FATAL.
 --
 -- The password is an Entra access token:
 --   az account get-access-token --resource https://ossrdbms-aad.database.windows.net \
@@ -67,11 +70,17 @@ BEGIN
         JOIN pg_namespace n ON n.oid = c.relnamespace
         WHERE n.nspname = 'public'
           AND c.relkind IN ('r', 'p', 'S', 'v', 'm')
-          -- A sequence owned by an identity/serial column follows its table and cannot
-          -- be reassigned on its own.
+          -- A sequence tied to a column follows its table and cannot be reassigned on
+          -- its own — Postgres refuses with "cannot change owner of sequence ... is
+          -- linked to table ...". Both link kinds have to be excluded: `a` is what a
+          -- `serial` column produces, `i` what an identity column does. Filtering on
+          -- `a` alone passes over the identity case, which is what `prompt_revisions`
+          -- uses and what stopped the first run of this script.
           AND NOT EXISTS (
               SELECT 1 FROM pg_depend d
-              WHERE d.objid = c.oid AND d.deptype = 'a'
+              WHERE d.classid = 'pg_class'::regclass
+                AND d.objid = c.oid
+                AND d.deptype IN ('a', 'i')
           )
     LOOP
         EXECUTE format('ALTER %s public.%I OWNER TO %I', obj.kind, obj.name, target);
