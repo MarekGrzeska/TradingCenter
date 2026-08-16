@@ -23,7 +23,7 @@ from fastapi.responses import StreamingResponse
 
 from .. import store
 from ..auth import current_principal
-from ..contract import RunOut, RunStepOut, TeamRevisionOut, ToolCallOut
+from ..contract import RunOut, RunStepOut, TeamRevisionOut, ToolCallOut, TradeOut
 from ..runner import RunFinished, StepFinished, StepStarted, ToolCalled, execute_run
 from ..runner.cost import DailyCostLimitReached, limit_from
 from ..runner.trading import DailyOrderLimitReached
@@ -167,6 +167,26 @@ async def get_run_tool_calls(
             raise HTTPException(404, detail="no such run")
         rows = await store.get_run_tool_calls(conn, run_id=run_id)
     return [ToolCallOut.from_row(dict(row)) for row in rows]
+
+
+@router.get("/runs/{run_id}/trades")
+async def get_run_trades(
+    run_id: int, request: Request, owner: str = Depends(current_principal)
+) -> list[TradeOut]:
+    """What this run did to the account, in the order it did it.
+
+    Beside `/tool-calls` rather than folded into it: that route answers "what did the
+    agents ask for", this one answers "what happened to the money", and an operator who
+    just watched a team trade is asking the second (specs/teams-trading). The owner
+    filter is the same one every other run route uses — a stranger's run is 404, the
+    same answer as one that never existed (specs/teams-browser-access).
+    """
+    async with request.app.state.pool.acquire() as conn:
+        run = await store.get_run(conn, run_id=run_id, owner_principal=owner)
+        if run is None:
+            raise HTTPException(404, detail="no such run")
+        rows = await store.get_run_trades(conn, run_id=run_id)
+    return [TradeOut.from_row(dict(row)) for row in rows]
 
 
 @router.post("/runs/{run_id}/cancel", status_code=202)

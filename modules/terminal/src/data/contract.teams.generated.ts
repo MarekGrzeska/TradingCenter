@@ -173,6 +173,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{run_id}/trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Trades
+         * @description What this run did to the account, in the order it did it.
+         *
+         *     Beside `/tool-calls` rather than folded into it: that route answers "what did the
+         *     agents ask for", this one answers "what happened to the money", and an operator who
+         *     just watched a team trade is asking the second (specs/teams-trading). The owner
+         *     filter is the same one every other run route uses — a stranger's run is 404, the
+         *     same answer as one that never existed (specs/teams-browser-access).
+         */
+        get: operations["get_run_trades_runs__run_id__trades_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -599,6 +625,63 @@ export interface components {
             read_only: boolean | null;
         };
         /**
+         * TradeOut
+         * @description One call a run made that could change the account — specs/teams-trading, "Każde
+         *     wywołanie zapisujące zostawia własny wiersz śladu".
+         *
+         *     The same event is also a `ToolCallOut`, with the arguments and the reply verbatim.
+         *     This is that event read as a *trade*: the fields an operator asks about after the
+         *     fact — what, which way, how much, and what came of it — as columns rather than as
+         *     JSON somebody has to read.
+         *
+         *     `status` is this module's own reading of the outcome and is one of `sent`, `settled`,
+         *     `unsettled`, `refused`, `unknown`. `result_status` beside it is the provider's word
+         *     — FILLED, WORKING, PENDING, REJECTED — kept separate because a row can carry the
+         *     first without the second ever arriving.
+         *
+         *     A row still saying `sent` after its run has finished is an order this module does not
+         *     know the fate of. That is not a gap in the trace; it is the trace saying the one
+         *     thing it must be able to say (`0004_trades.py`).
+         *
+         *     `size` and `level` are strings, like every other number on this wire that is compared
+         *     rather than recomputed.
+         */
+        TradeOut: {
+            /** Agent Key */
+            agent_key: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Direction */
+            direction: string | null;
+            /** Id */
+            id: number;
+            /** Level */
+            level: string | null;
+            /** Provider Order Id */
+            provider_order_id: string | null;
+            /** Reference */
+            reference: string | null;
+            /** Result Status */
+            result_status: string | null;
+            /** Run Id */
+            run_id: number;
+            /** Run Step Id */
+            run_step_id: number;
+            /** Settled At */
+            settled_at: string | null;
+            /** Size */
+            size: string | null;
+            /** Status */
+            status: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Tool Name */
+            tool_name: string;
+        };
+        /**
          * TradingLimits
          * @description What a revision allows its agents to do to the account — specs/teams-trading.
          *
@@ -898,6 +981,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolCallOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_trades_runs__run_id__trades_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeOut"][];
                 };
             };
             /** @description Validation Error */

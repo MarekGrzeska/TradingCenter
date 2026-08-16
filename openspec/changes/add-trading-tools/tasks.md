@@ -149,9 +149,26 @@
 - [x] 7.1 Rewizja Alembica w `teams` z tabelą śladu handlowego (numer rewizji brany przy implementacji — patrz nota o fazie 3 na końcu) — `0004`, zrobione z grupą 6
 - [x] 7.2 Zapis wiersza przed wysłaniem wywołania; uzupełnienie o skutek po odpowiedzi — zrobione z grupą 6
 - [x] 7.3 Skutek nieznany zapisany jako nieznany, nie jako nieudany — zrobione z grupą 6
-- [ ] 7.4 `contract.py` — kształt wiersza śladu handlowego i granic handlowych (wyłącznie dodanie modeli)
-- [ ] 7.5 Trasa odczytu zleceń przebiegu, z filtrem właściciela jak reszta modułu
-- [ ] 7.6 Testy `-m db`: migracja od zera dochodzi do rewizji czołowej; wiersz przeżywa przerwanie przebiegu
+- [x] 7.4 `contract.py` — kształt wiersza śladu handlowego i granic handlowych (wyłącznie dodanie modeli)
+- [x] 7.5 Trasa odczytu zleceń przebiegu, z filtrem właściciela jak reszta modułu
+- [x] 7.6 Testy `-m db`: migracja od zera dochodzi do rewizji czołowej; wiersz przeżywa przerwanie przebiegu
+
+  `TradingLimits` doszło już z grupą 6 (definicja jedzie na drucie, więc nie dało się
+  jej odłożyć), tu doszedł `TradeOut` — kolumny zamiast JSON-a, `size` i `level` jako
+  łańcuchy jak każda inna liczba na tym drucie, którą się porównuje, a nie przelicza.
+  `status` (odczyt tego modułu) obok `result_status` (słowo providera) zostały osobno:
+  wiersz może nieść pierwsze bez drugiego, gdy odpowiedź nigdy nie przyszła.
+
+  `GET /runs/{id}/trades` obok `/tool-calls`, nie zamiast — tamta trasa odpowiada „o co
+  agenci prosili", ta „co się stało z rachunkiem", a operator po przebiegu pyta o
+  drugie. Filtr właściciela ten sam co wszędzie: cudzy przebieg to 404.
+
+  Pierwsza połowa 7.6 była już spełniona, zanim ta grupa się zaczęła:
+  `test_migrate.py::test_an_empty_database_is_brought_to_head` porównuje `applied_heads`
+  z `expected_heads()`, więc rewizja `0004` weszła do niego sama. Zamiast duplikatu
+  doszły dwa testy, których tamten nie pokrywa: zamknięty zbiór statusów w schemacie
+  (`CheckViolationError` na szóstej pisowni) i przerwanie przebiegu po złożonym
+  zleceniu — wiersz zostaje, ze statusem `settled`, bo przerwanie przyszło później.
 
 ## 8. Terminal
 
