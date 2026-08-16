@@ -145,7 +145,7 @@
 - [x] 11.5 `README.md` i `docs/architecture.md` — moduł w tabeli i na rysunku
 - [x] 11.6 `CLAUDE.md` — moduł w mapie, jego komendy i port
 
-  PR #108. Cztery rzeczy warte odnotowania:
+  PR #109. Cztery rzeczy warte odnotowania:
 
   - **`deploy-teams.yml` pyta o jedno i drugie** — płaszczyzny sterowania o obraz i
     `/health` o proces, dokładnie jak `deploy-agent.yml` po 16 sierpnia. Kolejność jest
