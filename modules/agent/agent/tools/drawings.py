@@ -23,6 +23,7 @@ import math
 import time
 from collections.abc import Callable
 from datetime import datetime
+from itertools import combinations
 from typing import Any
 
 import asyncpg
@@ -393,7 +394,7 @@ def _geometry_text(geometry: ChartDrawingGeometry) -> str:
     return body + (f" ({geometry.label})" if geometry.label else "")
 
 
-async def _switch(conn: Any, symbol: str, ids: list[int], *, hidden: bool) -> list[int]:
+async def _switch(conn: store.Conn, symbol: str, ids: list[int], *, hidden: bool) -> list[int]:
     """Hide or show, refusing the whole call over an id that is not on this instrument —
     the same contract `remove` has, and deliberately so: a model told "two of the three
     were hidden" has to work out which, where a refusal names it."""
@@ -513,16 +514,22 @@ class DrawOnChartTool:
                 "delete, `hide` or `show` with ids to take off the chart or put back."
             )
 
-        # Two opposite orders about one drawing have no outcome the model could have
-        # predicted, and picking a winner would be a rule it cannot read off the schema
-        # (design.md, "Sprzeczne polecenie jest odmową, nie rozstrzygnięciem").
-        both = sorted(set(to_hide) & set(to_show))
-        if both:
-            named = ", ".join(f"#{drawing_id}" for drawing_id in both)
+        # Two orders about one drawing have no outcome the model could have predicted,
+        # and picking a winner would be a rule it cannot read off the schema (design.md,
+        # "Sprzeczne polecenie jest odmową, nie rozstrzygnięciem"). Every pair of the
+        # three lists, not just hide-against-show: `remove` beside `hide` would otherwise
+        # run the removal first and refuse the hiding as "no drawing with that id", which
+        # sends the model hunting a wrong id instead of looking at the two lists it wrote.
+        named_in = {"remove": removals, "hide": to_hide, "show": to_show}
+        for first, second in combinations(named_in, 2):
+            shared = sorted(set(named_in[first]) & set(named_in[second]))
+            if not shared:
+                continue
+            ids = ", ".join(f"#{drawing_id}" for drawing_id in shared)
             return refuse(
-                f"{named} {'is' if len(both) == 1 else 'are'} in both `hide` and `show`, "
-                "so there is no telling what was meant. Name each drawing in one of them; "
-                "nothing was changed."
+                f"{ids} {'is' if len(shared) == 1 else 'are'} in both `{first}` and "
+                f"`{second}`, so there is no telling what was meant. Name each drawing in "
+                "one list only; nothing was changed."
             )
 
         if self._tool_server is None or not self._tool_server.configured:

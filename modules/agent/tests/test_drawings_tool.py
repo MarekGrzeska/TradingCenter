@@ -763,3 +763,23 @@ def test_the_tool_offers_hide_and_show_beside_remove() -> None:
     assert {"add", "remove", "hide", "show"} <= properties.keys()
     # The one distinction the model has to carry away from this schema.
     assert "without deleting" in properties["hide"]["description"]
+
+
+async def test_removing_and_hiding_one_id_at_once_is_refused_by_name(db, pool) -> None:
+    """Without this the removal runs first and the hiding refuses as "no drawing with that
+    id", which sends the model hunting a wrong id instead of at the two lists it wrote."""
+    session = await _session(db)
+    [standing] = await store.add_drawings(
+        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
+    )
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "remove": [standing.id], "hide": [standing.id]},
+        session_id=session.id,
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+    assert "`remove`" in outcome.text and "`hide`" in outcome.text
+    assert str(standing.id) in outcome.text
+    # And the removal it ran first is taken back with it.
+    assert len(await store.list_drawings(db, symbol="US100")) == 1
