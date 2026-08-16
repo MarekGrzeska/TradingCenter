@@ -109,7 +109,7 @@ class Settings(BaseSettings):
     models: list[ModelCatalogueEntry] = Field(default_factory=list)
     default_model_id: str
 
-    # --- market-mcp, this module's only tool server ---
+    # --- market-mcp, the tool server that reads the archive ---
     #
     # Unset means no tools, deliberately: the module answers from the model alone, the
     # way it did before this setting existed. That is also the state a failed connection
@@ -123,6 +123,21 @@ class Settings(BaseSettings):
     # own ceiling on reaching the archive is 10s — a little more than that here leaves
     # room for its own work without turning one slow call into a turn that never ends.
     market_mcp_request_timeout_seconds: float = 15.0
+
+    # --- teams-mcp, the tool server that builds and runs teams ---
+    #
+    # Unset means the same thing market-mcp's absence means, one catalogue over: the
+    # module works, and this half of what it can do is simply not there. The two are
+    # configured and fail independently — one being down never costs the model the
+    # other's tools (specs/agent-tool-access, "Jeden serwer odpowiada, drugi nie").
+    teams_mcp_url: str | None = None
+    teams_mcp_scope: str | None = None
+    # Longer than market-mcp's, and for a reason that is about the far side rather than
+    # this one: a call here can create a team or start a run, and teams-mcp waits on
+    # teams for up to 30s before giving up. A ceiling below that would time out this
+    # side of a write that had already happened — the worst shape of all, since the
+    # model would be told nothing about a team that now exists.
+    teams_mcp_request_timeout_seconds: float = 35.0
 
     # --- who may call this module from a browser ---
     #
@@ -140,7 +155,13 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_user", "market_mcp_url", "market_mcp_scope")
+    @field_validator(
+        "database_user",
+        "market_mcp_url",
+        "market_mcp_scope",
+        "teams_mcp_url",
+        "teams_mcp_scope",
+    )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
         # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent,
@@ -184,41 +205,20 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def _tool_server_mode_is_coherent(self) -> Settings:
+    def _tool_server_modes_are_coherent(self) -> Settings:
         """The third copy of the rule market-data set for its database and market-mcp
         set for its archive: name one mode, or none, never both
         (specs/agent-tool-access, "Tryb połączenia z serwerem narzędzi jest wybrany
-        jednoznacznie")."""
-        if self.market_mcp_url is None:
-            if self.market_mcp_scope is not None:
-                raise ValueError(
-                    "MARKET_MCP_SCOPE is set but MARKET_MCP_URL is not — a scope names "
-                    "the audience of a token for a server this module has no address "
-                    "for. Set the URL, or unset the scope to run without tools."
-                )
-            return self
+        jednoznacznie").
 
-        self.market_mcp_url = self.market_mcp_url.rstrip("/")
-        host = (urlparse(self.market_mcp_url).hostname or "").lower()
-        is_loopback = host == "localhost" or host.startswith("127.") or host == "::1"
-
-        if self.market_mcp_scope is not None:
-            if is_loopback:
-                raise ValueError(
-                    f"MARKET_MCP_SCOPE is set but MARKET_MCP_URL points at loopback "
-                    f"({self.market_mcp_url!r}) — a scope belongs to a remote tool "
-                    "server; unset MARKET_MCP_SCOPE for local development, or point "
-                    "the URL at the remote instance it names a token for."
-                )
-            return self
-
-        if not is_loopback:
-            raise ValueError(
-                f"MARKET_MCP_URL points at {host!r} with no MARKET_MCP_SCOPE set. "
-                "Without a scope this module only reaches a tool server on this "
-                "machine's loopback — a remote one needs MARKET_MCP_SCOPE and the "
-                "managed identity it is requested for."
-            )
+        Run once per server rather than once, because the module has two of them now and
+        they are configured independently — and every message names the one it is about,
+        since "the tool server" stopped being unambiguous.
+        """
+        self.market_mcp_url = _checked_server(
+            "MARKET_MCP", self.market_mcp_url, self.market_mcp_scope
+        )
+        self.teams_mcp_url = _checked_server("TEAMS_MCP", self.teams_mcp_url, self.teams_mcp_scope)
         return self
 
     @model_validator(mode="after")
@@ -238,3 +238,40 @@ class Settings(BaseSettings):
                 "fall back to."
             )
         return self
+
+
+def _checked_server(prefix: str, url: str | None, scope: str | None) -> str | None:
+    """One tool server's mode, refused rather than guessed — see `Settings.
+    _tool_server_modes_are_coherent`. Returns the URL with any trailing slash removed,
+    or `None` for a server this module simply does not have."""
+    if url is None:
+        if scope is not None:
+            raise ValueError(
+                f"{prefix}_SCOPE is set but {prefix}_URL is not — a scope names the "
+                "audience of a token for a server this module has no address for. Set "
+                "the URL, or unset the scope to run without that server's tools."
+            )
+        return None
+
+    url = url.rstrip("/")
+    host = (urlparse(url).hostname or "").lower()
+    is_loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+
+    if scope is not None:
+        if is_loopback:
+            raise ValueError(
+                f"{prefix}_SCOPE is set but {prefix}_URL points at loopback ({url!r}) — "
+                f"a scope belongs to a remote tool server; unset {prefix}_SCOPE for "
+                "local development, or point the URL at the remote instance it names a "
+                "token for."
+            )
+        return url
+
+    if not is_loopback:
+        raise ValueError(
+            f"{prefix}_URL points at {host!r} with no {prefix}_SCOPE set. Without a "
+            "scope this module only reaches a tool server on this machine's loopback — "
+            f"a remote one needs {prefix}_SCOPE and the managed identity it is "
+            "requested for."
+        )
+    return url

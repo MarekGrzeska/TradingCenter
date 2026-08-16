@@ -283,10 +283,16 @@ class _ScriptedProvider:
 
 
 class _FakeToolServer:
+    """Both methods take the operator's token, because the real registry does and the
+    turn forwards it. A fake that could not accept it made the turn task raise, which the
+    stream then waited on forever — a hang rather than a failed assertion."""
+
     def __init__(self, outcomes: dict[str, ToolOutcome] | None = None) -> None:
         self._outcomes = outcomes or {}
+        self.tokens: list[str | None] = []
 
-    async def list_tools(self):
+    async def list_tools(self, operator_token: str | None = None):
+        self.tokens.append(operator_token)
         return [
             ToolDescriptor(
                 name="get_last_price",
@@ -295,7 +301,10 @@ class _FakeToolServer:
             )
         ]
 
-    async def call(self, name: str, arguments: dict) -> ToolOutcome:
+    async def call(
+        self, name: str, arguments: dict, operator_token: str | None = None
+    ) -> ToolOutcome:
+        self.tokens.append(operator_token)
         return self._outcomes.get(name, ToolOutcome(ToolOutcomeKind.OK, f"{name} says 29698.2", 63))
 
 
@@ -447,3 +456,26 @@ def test_a_turn_without_a_snapshot_runs_the_prompt_untouched() -> None:
 
     assert provider.prompts[0] in (prompt["with_tools"], prompt["without_tools"])
     assert "currently shows" not in provider.prompts[0]
+
+
+def test_a_turn_that_dies_before_it_can_report_closes_the_stream() -> None:
+    """A turn raising before `run_turn`'s own guard used to leave the stream waiting on
+    an event that never came — a hang held open by keep-alives, not an error. Found when
+    a tool-server stub had the wrong signature; the defect was older than that."""
+
+    class _BrokenToolServer:
+        async def list_tools(self, operator_token: str | None = None):
+            raise RuntimeError("the tool server blew up while being asked what it has")
+
+        async def call(self, name, arguments, operator_token=None):  # pragma: no cover
+            raise AssertionError("never reached")
+
+    with TestClient(app) as client:
+        app.state.provider = _FakeProvider([TextDelta("hi"), UsageReport(1, 1, None, None)])
+        app.state.tool_server = _BrokenToolServer()
+        session_id = client.post("/sessions", json={}).json()["id"]
+        response = client.post(f"/sessions/{session_id}/messages", json={"content": "hello"})
+        events = _sse_events(response.text)
+
+    assert [kind for kind, _ in events] == ["error"]
+    assert "failed" in events[0][1]

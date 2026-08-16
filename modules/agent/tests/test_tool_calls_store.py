@@ -53,7 +53,7 @@ class ServerWithTools(FakeToolServer):
     """A tool server the turn can also ask for a tool list — `run_turn` reads one before
     the first model call."""
 
-    async def list_tools(self):
+    async def list_tools(self, operator_token: str | None = None):
         return [PRICE_TOOL]
 
 
@@ -336,7 +336,7 @@ class ServerWithNoTools(FakeToolServer):
     than raising, which is the whole of `agent-tool-access`'s "Brak serwera narzędzi nie
     odbiera agentowi mowy"."""
 
-    async def list_tools(self):
+    async def list_tools(self, operator_token: str | None = None):
         return []
 
 

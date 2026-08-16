@@ -70,17 +70,17 @@
 
 ## 6. `agent` uczy się drugiego serwera
 
-- [ ] 6.1 Rejestr serwerów narzędzi w `agent/tools/client.py`, kształt przeniesiony z
+- [x] 6.1 Rejestr serwerów narzędzi w `agent/tools/client.py`, kształt przeniesiony z
   `teams/tools/client.py` — kopiowany, nie importowany
-- [ ] 6.2 Ustawienia `TEAMS_MCP_URL`, `TEAMS_MCP_SCOPE`, `TEAMS_MCP_REQUEST_TIMEOUT_SECONDS`
+- [x] 6.2 Ustawienia `TEAMS_MCP_URL`, `TEAMS_MCP_SCOPE`, `TEAMS_MCP_REQUEST_TIMEOUT_SECONDS`
   w `config.py` i `.env.example`; brak `TEAMS_MCP_URL` zostaje stanem wspieranym
-- [ ] 6.3 Konfiguracja i niedostępność każdego serwera niezależnie od drugiego; komunikat
+- [x] 6.3 Konfiguracja i niedostępność każdego serwera niezależnie od drugiego; komunikat
   nazywa serwer, którego dotyczy (`agent-tool-access`)
-- [ ] 6.4 Przeniesienie tokenu wołającego do wywołań serwera zespołów
-- [ ] 6.5 Prompt wie, że te narzędzia istnieją i po co są — nowa rewizja promptu
-- [ ] 6.6 Agent mówi „nie mam teraz dostępu do katalogu zespołów", zamiast twierdzić, że
+- [x] 6.4 Przeniesienie tokenu wołającego do wywołań serwera zespołów
+- [x] 6.5 Prompt wie, że te narzędzia istnieją i po co są — nowa rewizja promptu
+- [x] 6.6 Agent mówi „nie mam teraz dostępu do katalogu zespołów", zamiast twierdzić, że
   zespół powstał, gdy serwer jest nieosiągalny
-- [ ] 6.7 Testy grupy 6, w tym jeden serwer odpowiadający przy drugim nieosiągalnym
+- [x] 6.7 Testy grupy 6, w tym jeden serwer odpowiadający przy drugim nieosiągalnym
 
 ## 7. Infrastruktura
 

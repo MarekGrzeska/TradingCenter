@@ -122,6 +122,18 @@ async def delete_session(
         raise HTTPException(404, detail="no such session")
 
 
+def _bearer(request: Request) -> str | None:
+    """The caller's own token, as presented. Easy Auth validates it and leaves it in
+    place, so this is the same credential the terminal holds — not a copy this module
+    minted and not one it may keep: it is passed on for the length of a turn and never
+    written down."""
+    header = request.headers.get("authorization", "")
+    scheme, _, value = header.partition(" ")
+    if scheme.lower() != "bearer" or not value.strip():
+        return None
+    return value.strip()
+
+
 def _sse(event: str, data: dict) -> str:
     return f"event: {event}\ndata: {json.dumps(data)}\n\n"
 
@@ -152,6 +164,12 @@ async def send_message(
             queue=queue,
             tool_server=request.app.state.tool_server,
             chart=body.chart.to_snapshot() if body.chart is not None else None,
+            # The operator's own credential, taken off the request being served and
+            # carried no further than the tool servers that act in their name. Tools
+            # that create teams and spend money must belong to the person asking, not to
+            # this module (design.md of add-teams-mcp, D2). Absent — local development,
+            # where nothing authenticates — those tools refuse and say why.
+            operator_token=_bearer(request),
         )
     )
     # A task with nothing referencing it is eligible for collection mid-run — kept here
@@ -160,6 +178,26 @@ async def send_message(
     background = request.app.state.background_tasks
     background.add(task)
     task.add_done_callback(background.discard)
+
+    def _close_stream_if_the_turn_died(finished: asyncio.Task) -> None:
+        """A turn that raises before its own guard leaves nothing on the queue, and the
+        stream below then waits for an event that will never come — a hang rather than an
+        error, held open by keep-alives until the client gives up.
+
+        `run_turn` guards the model call itself, but everything before it — reading the
+        prompt, asking the tool servers what they publish — is outside that guard, and
+        this is what covers it. Found by a tool server whose stub had the wrong signature;
+        the bug it exposed is older than that change.
+        """
+        if finished.cancelled() or finished.exception() is None:
+            return
+        log.exception(
+            "the turn task failed before it could report anything",
+            exc_info=finished.exception(),
+        )
+        queue.put_nowait(Failed("the turn failed before it could answer"))
+
+    task.add_done_callback(_close_stream_if_the_turn_died)
 
     async def event_stream():
         while True:
