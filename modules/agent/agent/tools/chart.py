@@ -247,7 +247,7 @@ def _as_focus(raw: Any, *, now: datetime) -> ChartFocus | None:
     return ChartFocus(from_=start, to=end)
 
 
-async def _read_json(tool_server: ToolServer, name: str, arguments: dict[str, Any]) -> Any:
+async def read_json(tool_server: ToolServer, name: str, arguments: dict[str, Any]) -> Any:
     """One market-mcp call, answered as data rather than prose.
 
     A tool that refused or never answered is not something this tool can work around: it
@@ -278,7 +278,7 @@ async def _check_pair(
 ) -> None:
     if symbol is None and resolution is None:
         return
-    pairs = await _read_json(tool_server, "list_tracked_pairs", {})
+    pairs = await read_json(tool_server, "list_tracked_pairs", {})
     if isinstance(pairs, dict):  # a structured-content envelope, if one ever arrives
         pairs = pairs.get("result", pairs.get("pairs", []))
     tracked: dict[str, set[str]] = {}
@@ -317,7 +317,7 @@ async def _check_indicators(
 ) -> None:
     if not indicators:
         return
-    catalogue = await _read_json(tool_server, "list_indicators", {})
+    catalogue = await read_json(tool_server, "list_indicators", {})
     if isinstance(catalogue, dict):  # a structured-content envelope, if one ever arrives
         catalogue = catalogue.get("indicators", catalogue.get("result", []))
     entries = {entry["id"]: entry for entry in catalogue}

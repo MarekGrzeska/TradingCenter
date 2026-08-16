@@ -10,14 +10,14 @@
 
 ## 2. Narzędzia agenta
 
-- [ ] 2.1 `agent/tools/drawings.py`: deskryptor `draw_on_chart` — `symbol`, `add[]` (trzy kształty z polami po ludzku), `remove[]` (identyfikatory), kolory z `CHART_COLORS` importowanych z `tools/chart.py`
-- [ ] 2.2 Sprawdzenie symbolu przez `list_tracked_pairs` w `market-mcp`, z tą samą odmową, gdy serwera narzędzi nie ma, co w `set_chart`
-- [ ] 2.3 Odmowy: kolor spoza palety, strefa o cenach równych albo odwróconych, linia trendu o punktach w tej samej chwili, cena niedodatnia, sufit, identyfikator nieistniejący na tym instrumencie
-- [ ] 2.4 Atomowość: całe wywołanie w jednej transakcji, wywołanie z jednym rysunkiem nie do przyjęcia nie stawia żadnego
-- [ ] 2.5 Deskryptor `list_chart_drawings(symbol)` i jego wykonanie — odczyt z identyfikatorami, bezpieczny do powtórzenia
-- [ ] 2.6 `agent/tools/__init__.py` i miejsce składania zestawu narzędzi tury: trzy narzędzia własne zamiast jednego
-- [ ] 2.7 `agent/contract.py`: `MODULE_TOOL_NAMES` obejmuje nowe nazwy, żeby `source` w śladzie wywołania mówił „module"
-- [ ] 2.8 Testy `test_drawings_tool.py`: po jednym na każdą odmowę z 2.3, na atomowość, na odczyt i na parę „odczytaj, potem skasuj"
+- [x] 2.1 `agent/tools/drawings.py`: deskryptor `draw_on_chart` — `symbol`, `add[]` (trzy kształty z polami po ludzku), `remove[]` (identyfikatory), kolory z `CHART_COLORS` importowanych z `tools/chart.py`
+- [x] 2.2 Sprawdzenie symbolu przez `list_tracked_pairs` w `market-mcp`, z tą samą odmową, gdy serwera narzędzi nie ma, co w `set_chart`
+- [x] 2.3 Odmowy: kolor spoza palety, strefa o cenach równych albo odwróconych, linia trendu o punktach w tej samej chwili, cena niedodatnia, sufit, identyfikator nieistniejący na tym instrumencie
+- [x] 2.4 Atomowość: całe wywołanie w jednej transakcji, wywołanie z jednym rysunkiem nie do przyjęcia nie stawia żadnego
+- [x] 2.5 Deskryptor `list_chart_drawings(symbol)` i jego wykonanie — odczyt z identyfikatorami, bezpieczny do powtórzenia
+- [x] 2.6 `agent/tools/__init__.py` i miejsce składania zestawu narzędzi tury: trzy narzędzia własne zamiast jednego
+- [x] 2.7 `agent/contract.py`: `MODULE_TOOL_NAMES` obejmuje nowe nazwy, żeby `source` w śladzie wywołania mówił „module"
+- [x] 2.8 Testy `test_drawings_tool.py`: po jednym na każdą odmowę z 2.3, na atomowość, na odczyt i na parę „odczytaj, potem skasuj"
 
 ## 3. Publikacja rysunków
 

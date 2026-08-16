@@ -22,7 +22,19 @@ from .models import ChartSnapshot, RecordedCall
 from .models_catalogue import ModelCatalogueEntry
 from .prompt import prompt_text
 from .provider import ModelProvider
-from .tools import CHART_TOOL, CHART_TOOL_NAME, ChartTool, ToolOutcome, ToolServer
+from .tools import (
+    CHART_TOOL,
+    CHART_TOOL_NAME,
+    DRAW_TOOL,
+    DRAW_TOOL_NAME,
+    LIST_DRAWINGS_TOOL,
+    LIST_DRAWINGS_TOOL_NAME,
+    ChartTool,
+    DrawOnChartTool,
+    ListChartDrawingsTool,
+    ToolOutcome,
+    ToolServer,
+)
 
 log = logging.getLogger(__name__)
 
@@ -108,16 +120,30 @@ async def run_turn(
     # answer to a tool server that is down (specs/agent-tool-access).
     server_tools = await tool_server.list_tools() if tool_server is not None else []
 
-    # This module's own tool sits beside the server's and is announced even when the
-    # server is down — it does not need market-mcp to exist, only to check against, and
-    # it says so itself when it cannot (specs/agent-tools, "Brak serwera narzędzi").
+    # This module's own tools sit beside the server's and are announced even when the
+    # server is down — they do not need market-mcp to exist, only to check against, and
+    # they say so themselves when they cannot (specs/agent-tools, "Brak serwera
+    # narzędzi"). `list_chart_drawings` does not even need that much: it reads this
+    # module's own table and answers whatever the archive is doing.
     chart_tool = ChartTool(pool, tool_server)
+    draw_tool = DrawOnChartTool(pool, tool_server)
+    list_drawings_tool = ListChartDrawingsTool(pool)
 
     async def set_chart(arguments: dict) -> ToolOutcome:
         return await chart_tool.call(arguments, session_id=session_id, chart=chart)
 
-    local_tools: dict[str, LocalTool] = {CHART_TOOL_NAME: set_chart}
-    tools = [*server_tools, CHART_TOOL]
+    async def draw_on_chart(arguments: dict) -> ToolOutcome:
+        return await draw_tool.call(arguments, session_id=session_id)
+
+    async def list_chart_drawings(arguments: dict) -> ToolOutcome:
+        return await list_drawings_tool.call(arguments)
+
+    local_tools: dict[str, LocalTool] = {
+        CHART_TOOL_NAME: set_chart,
+        DRAW_TOOL_NAME: draw_on_chart,
+        LIST_DRAWINGS_TOOL_NAME: list_chart_drawings,
+    }
+    tools = [*server_tools, CHART_TOOL, DRAW_TOOL, LIST_DRAWINGS_TOOL]
 
     graph = build_graph(provider, tool_server, local_tools)
     try:

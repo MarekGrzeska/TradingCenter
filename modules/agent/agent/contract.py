@@ -25,15 +25,16 @@ from .models import (
 )
 from .models_catalogue import ModelCatalogueEntry
 from .tools.chart import CHART_TOOL_NAME
+from .tools.drawings import DRAW_TOOL_NAME, LIST_DRAWINGS_TOOL_NAME
 
 # A name the operator types, not one derived from the first question — so it may be longer
 # than `store.derive_title`'s 60, but not unbounded: the conversation list is a narrow
 # column that truncates, and a title past this is one nothing can show.
 TITLE_MAX_CHARS = 120
 
-# Tools this module runs itself. Imported rather than spelled again: the tool's name is
+# Tools this module runs itself. Imported rather than spelled again: a tool's name is
 # decided where the tool is written.
-MODULE_TOOL_NAMES = frozenset({CHART_TOOL_NAME})
+MODULE_TOOL_NAMES = frozenset({CHART_TOOL_NAME, DRAW_TOOL_NAME, LIST_DRAWINGS_TOOL_NAME})
 
 
 class ModelOut(BaseModel):
