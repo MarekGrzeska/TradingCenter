@@ -4,3 +4,6 @@
 # stale contract on a clean clone — on a machine where nothing is stale. Pinned to LF so
 # the working copy matches what the generator writes.
 modules/terminal/src/data/contract.generated.ts text eol=lf
+# Same for teams' own generated contract — added when a fresh checkout on Windows
+# reported it stale for exactly this reason, one group after the file appeared.
+modules/terminal/src/data/contract.teams.generated.ts text eol=lf

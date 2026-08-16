@@ -53,6 +53,7 @@ describe("resolveEndpoints", () => {
         VITE_ARCHIVE_HTTP: "/archive-api",
         VITE_ARCHIVE_WS: "/archive-api/ws",
         VITE_AGENT_HTTP: "/agent-api",
+        VITE_TEAMS_HTTP: "/teams-api",
       },
       devLoc,
     );
@@ -60,6 +61,7 @@ describe("resolveEndpoints", () => {
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
       agentHttp: "/agent-api",
+      teamsHttp: "/teams-api",
     });
   });
 
@@ -69,6 +71,7 @@ describe("resolveEndpoints", () => {
         VITE_ARCHIVE_HTTP: "https://archive.example.com",
         VITE_ARCHIVE_WS: "wss://archive.example.com/ws",
         VITE_AGENT_HTTP: "https://agent.example.com",
+        VITE_TEAMS_HTTP: "https://teams.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
@@ -76,6 +79,7 @@ describe("resolveEndpoints", () => {
       archiveHttp: "https://archive.example.com",
       archiveWs: "wss://archive.example.com/ws",
       agentHttp: "https://agent.example.com",
+      teamsHttp: "https://teams.example.com",
     });
   });
 
@@ -84,6 +88,7 @@ describe("resolveEndpoints", () => {
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
       agentHttp: "/agent-api",
+      teamsHttp: "/teams-api",
     });
   });
 
@@ -95,11 +100,13 @@ describe("resolveEndpoints", () => {
   // The relative prefix is only safe if no tab claims it, so it is compared
   // against the route list rather than eyeballed. Covers the agent's prefix too,
   // since it is a relative default of the same shape.
-  it("gives the archive and agent no relative prefix that a tab route already claims", () => {
-    const { archiveHttp, archiveWs, agentHttp } = resolveEndpoints({}, devLoc);
+  it("gives no back end a relative prefix that a tab route already claims", () => {
+    const { archiveHttp, archiveWs, agentHttp, teamsHttp } = resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
-    const prefixes = [archiveHttp, new URL(archiveWs).pathname, agentHttp]
+    // `teamsHttp` matters most of the four: the tab it would shadow is `/teams`, one
+    // character away from its own default.
+    const prefixes = [archiveHttp, new URL(archiveWs).pathname, agentHttp, teamsHttp]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);
 

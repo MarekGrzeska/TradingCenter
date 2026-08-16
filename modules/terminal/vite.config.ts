@@ -62,6 +62,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
   const agent = env.AGENT_PROXY_TARGET || "http://localhost:8030";
+  const teams = env.TEAMS_PROXY_TARGET || "http://localhost:8050";
 
   return {
     plugins: [react(), tailwindcss()],
@@ -96,6 +97,16 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/agent-api/, ""),
           configure: quietProxyErrors("agent", agent),
+        },
+
+        // teams, on 8050 — a fifth module, reached directly like the agent. Nothing to
+        // upgrade here either: a run's progress rides the same `fetch` +
+        // `ReadableStream` the agent's turn does.
+        "/teams-api": {
+          target: teams,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/teams-api/, ""),
+          configure: quietProxyErrors("teams", teams),
         },
       },
     },

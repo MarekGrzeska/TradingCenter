@@ -157,18 +157,39 @@
 
 ## 9. Terminal
 
-- [ ] 9.1 Zależność `@xyflow/react`; wpis w `src/app/tabs.ts`, katalog widoków zakładki
-- [ ] 9.2 `VITE_TEAMS_HTTP` w `src/data/config.ts` i proxy `/teams-api` w `vite.config.ts`
-- [ ] 9.3 Warstwa wywołań modułu na typach generowanych z kontraktu
+- [x] 9.1 Zależność `@xyflow/react`; wpis w `src/app/tabs.ts`, katalog widoków zakładki
+- [x] 9.2 `VITE_TEAMS_HTTP` w `src/data/config.ts` i proxy `/teams-api` w `vite.config.ts`
+- [x] 9.3 Warstwa wywołań modułu na typach generowanych z kontraktu
 - [ ] 9.4 Widok katalogu — lista zespołów, otwarcie do edycji, uruchomienie przebiegu
-- [ ] 9.5 Canvas zespołu: agenci, zależności, rola i model przy każdym agencie
-- [ ] 9.6 Edycja w widoku zespołu — dodanie i usunięcie agenta, poprowadzenie i usunięcie zależności
+- [x] 9.5 Canvas zespołu: agenci, zależności, rola i model przy każdym agencie
+- [x] 9.6 Edycja w widoku zespołu — dodanie i usunięcie agenta, poprowadzenie i usunięcie zależności
 - [ ] 9.7 Panel agenta — rola, prompt, wytyczne, wybór modelu z katalogu, wybór narzędzi z ogłaszanych
-- [ ] 9.8 Odmowa zapisu pokazana przy agencie albo zależności, której dotyczy
+- [x] 9.8 Odmowa zapisu pokazana przy agencie albo zależności, której dotyczy
 - [ ] 9.9 Monitor przebiegu na tym samym canvasie — stan agentów, ich praca, wywołane narzędzia
 - [ ] 9.10 Odbiór postępu; zamknięcie i ponowne otwarcie widoku pokazuje stan bieżący
-- [ ] 9.11 Testy: wybierak modeli i narzędzi powstaje bez identyfikatorów wpisanych w kod terminala
-- [ ] 9.12 `pnpm lint`, `typecheck`, `test`, `contract:check` przechodzą
+- [x] 9.11 Testy: wybierak modeli i narzędzi powstaje bez identyfikatorów wpisanych w kod terminala
+- [x] 9.12 `pnpm lint`, `typecheck`, `test`, `contract:check` przechodzą
+
+  PR #113. Grupa zrobiona w części, która nie czeka na grupę 7 — katalog, canvas, edycja, panel,
+  odmowa. Trzy pozycje zostają otwarte i każda z konkretnego powodu:
+
+  - **9.4 bez uruchomienia przebiegu.** Moduł nie ma jeszcze trasy `POST /runs`; przycisk,
+    który nic nie robi, jest gorszy niż jego brak. Reszta punktu (lista, otwarcie, a przy
+    okazji wycofanie zespołu przez `ConfirmDialog`) jest zrobiona.
+  - **9.7 bez wybieraka narzędzi.** Moduł nie ogłasza narzędzi na drucie — grupa 6 trzyma
+    je w `app.state`, ale nie publikuje `GET /tools`. Warstwa wywołań już o nią pyta i
+    czyta 404 jako „nic nie ogłoszono" (panel dalej edytuje rolę, prompt i model, a
+    narzędzie przypisane w starszej rewizji zostaje widoczne i odznaczalne). Trasa jest
+    do dopisania po merge'u grupy 6 — wtedy 9.7 się domyka bez ruszania terminala.
+  - **9.9 i 9.10** to monitor przebiegu, czyli wprost grupa 7.
+
+  Dwie rzeczy poza literą listy: `layout()` układa agentów w kolumny po głębokości
+  zależności (wymóg „kierunek pracy bez klikania" — wire nie niesie współrzędnych, więc
+  przeciąganie węzłów byłoby gubione przy każdym odczycie), a `refusal.ts` wyciąga klucze
+  agentów z komunikatu modułu, żeby postawić odmowę przy węźle, którego dotyczy. Przy
+  okazji: `contract.teams.generated.ts` dopisany do `.gitattributes` (`eol=lf`) — bez tego
+  `contract:check` na świeżym klonie pod Windows raportuje nieaktualność pliku, który jest
+  aktualny.
 
 ## 10. Infrastruktura
 
