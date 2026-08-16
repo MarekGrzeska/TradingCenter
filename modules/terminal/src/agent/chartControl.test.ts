@@ -222,7 +222,10 @@ describe("syncAgentChart", () => {
       storage,
     });
 
-    expect(result).toBeNull();
+    // Said, not swallowed: the agent has told the operator the chart changed, and a chart
+    // that did not change owes them a reason.
+    expect(result?.applied).toEqual([]);
+    expect(result?.skipped.join(" ")).toContain("could not say what it collects");
     // The cursor stays put, so the command is applied once the archive answers again.
     expect(storage.raw.has(CHART_CURSOR_KEY)).toBe(false);
   });
@@ -342,5 +345,69 @@ describe("activeChartSnapshot", () => {
     grid.clearSlotSymbol("s5");
 
     expect(activeChartSnapshot(grid)).toBeNull();
+  });
+});
+
+describe("syncAgentChart — a command carrying more than one thing at once", () => {
+  let grid: ReturnType<typeof createGridStore>;
+  let storage: ReturnType<typeof memoryStorage>;
+
+  beforeEach(() => {
+    storage = memoryStorage();
+    grid = createGridStore(memoryStorage());
+  });
+
+  /** Reported from a live session: one `set_chart` with a symbol, an interval, indicators
+   *  and a focus changed the interval and did not move the chart; a second, focus-only
+   *  request moved it. */
+  it("applies the focus as well as the interval when one command carries both", async () => {
+    const focus = { from: null, to: null, around: 1_770_000_000, bars: 100, lastBars: null };
+    const result = await syncAgentChart({
+      api: fakeApi(command({ symbol: "US100", resolution: "MINUTE_5", focus })),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    const slotId = grid.getSnapshot().activeSlot;
+    expect(grid.getSnapshot().slots[slotId].resolution).toBe("MINUTE_5");
+    expect(grid.getFocusRequest(slotId)).toEqual(focus);
+    expect(result?.applied).toContain("interval MINUTE_5");
+  });
+
+  it("applies the focus even when the interval beside it is refused", async () => {
+    // Half a command is not a reason to drop the other half: the interval names something
+    // the archive does not collect, the focus names a moment, and the moment is fine.
+    const focus = { from: null, to: null, around: 1_770_000_000, bars: 100, lastBars: null };
+    const result = await syncAgentChart({
+      api: fakeApi(command({ resolution: "WEEK", focus })),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    const slotId = grid.getSnapshot().activeSlot;
+    expect(grid.getFocusRequest(slotId)).toEqual(focus);
+    expect(result?.skipped.join(" ")).toContain("WEEK");
+  });
+
+  it("keeps the focus when the archive cannot say what it collects", async () => {
+    // The pair read is what the symbol and the interval need. A focus needs nothing from
+    // it — it names a moment, and moments are not collected.
+    const focus = { from: null, to: null, around: 1_770_000_000, bars: 100, lastBars: null };
+    const failing = {
+      listPairs: async () => {
+        throw new Error("archive unreachable");
+      },
+    } as unknown as ArchiveAdmin;
+
+    await syncAgentChart({
+      api: fakeApi(command({ symbol: "US100", resolution: "MINUTE_5", focus })),
+      grid,
+      pairs: failing,
+      storage,
+    });
+
+    expect(grid.getFocusRequest(grid.getSnapshot().activeSlot)).toEqual(focus);
   });
 });
