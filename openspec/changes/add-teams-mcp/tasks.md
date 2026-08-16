@@ -18,16 +18,16 @@
 
 ## 2. Szkielet modułu
 
-- [ ] 2.1 `modules/teams-mcp/` — `pyproject.toml`, `uv.lock`, `ruff`, `pyright`, układ pakietu
+- [x] 2.1 `modules/teams-mcp/` — `pyproject.toml`, `uv.lock`, `ruff`, `pyright`, układ pakietu
   wzorem `modules/trading-mcp`
-- [ ] 2.2 `config.py` — `TEAMS_URL`, `TEAMS_SCOPE`, `TEAMS_REQUEST_TIMEOUT_SECONDS`, port
+- [x] 2.2 `config.py` — `TEAMS_URL`, `TEAMS_SCOPE`, `TEAMS_REQUEST_TIMEOUT_SECONDS`, port
   **8070**, host, `REQUIRE_AUTHENTICATED_PRINCIPAL`
-- [ ] 2.3 Odmowa startu przy adresie zdalnym bez tożsamości i przy obu trybach naraz
+- [x] 2.3 Odmowa startu przy adresie zdalnym bez tożsamości i przy obu trybach naraz
   (`teams-mcp-upstream-access`)
-- [ ] 2.4 Transport wyłącznie sieciowy, bez wariantu uruchamianego jako proces potomny
+- [x] 2.4 Transport wyłącznie sieciowy, bez wariantu uruchamianego jako proces potomny
   (`teams-mcp-transport`)
-- [ ] 2.5 `/health` bez poświadczenia, nieujawniające niczego o katalogu
-- [ ] 2.6 Testy na 2.3–2.5
+- [x] 2.5 `/health` bez poświadczenia, nieujawniające niczego o katalogu
+- [x] 2.6 Testy na 2.3–2.5
 
 ## 3. Rozmowa z `teams`
 
