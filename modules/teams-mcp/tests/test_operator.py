@@ -75,3 +75,30 @@ def test_redacted_says_whether_there_was_one_and_nothing_else() -> None:
     assert redacted("a-real-looking-token") == "present"
     assert redacted(None) == "absent"
     assert "a-real-looking-token" not in redacted("a-real-looking-token")
+
+
+async def test_the_operators_token_never_reaches_a_log_line(caplog, monkeypatch) -> None:
+    """specs/teams-mcp-authorship and design.md's "Cena, którą ta droga ma" — the token
+    passes through two processes and neither may write it down. Checked at DEBUG, where
+    a library that logs request headers would show up."""
+    import logging
+
+    import httpx
+    import respx
+
+    from teams_mcp.client import TeamsClient
+    from teams_mcp.config import Settings
+
+    secret = "operator-token-that-must-not-be-logged"
+    settings = Settings(teams_url="http://127.0.0.1:8050", _env_file=None)  # type: ignore[call-arg]
+    client = TeamsClient(settings)
+
+    with caplog.at_level(logging.DEBUG), respx.mock:
+        respx.get("http://127.0.0.1:8050/teams").mock(
+            return_value=httpx.Response(200, json=[])
+        )
+        await client.get("/teams", token=secret)
+
+    await client.aclose()
+    assert secret not in caplog.text
+    assert secret not in "".join(record.getMessage() for record in caplog.records)

@@ -61,9 +61,9 @@
 - [x] 5.2 Odmowa każdego narzędzia — czytającego i zapisującego — gdy tożsamości operatora
   nie da się ustalić, z powodem nazywającym ten brak
 - [x] 5.3 Tożsamość z argumentu narzędzia zignorowana albo odrzucona; nigdy użyta
-- [ ] 5.4 Token operatora nie trafia do logu, do śladu narzędzia ani do treści oddawanej
+- [x] 5.4 Token operatora nie trafia do logu, do śladu narzędzia ani do treści oddawanej
   modelowi — test przy `LOG_LEVEL=DEBUG`
-- [ ] 5.5 Wygasły token operatora daje niedostępność nazywającą wygasłe poświadczenie, nie
+- [x] 5.5 Wygasły token operatora daje niedostępność nazywającą wygasłe poświadczenie, nie
   puste odpowiedzi
 - [x] 5.6 Testy `teams-mcp-authorship`: zespół powstaje na tożsamości operatora, cudzy jest
   nieodróżnialny od nieistniejącego, odmowa `teams` dociera jego słowami
