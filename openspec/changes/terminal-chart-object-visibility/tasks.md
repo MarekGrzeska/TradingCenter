@@ -48,4 +48,4 @@
 - [x] 6.2 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright` w `modules/agent`
 - [ ] 6.3 Przejście ręką na żywym stacku: zgaszenie z listy i z karty, zapalenie z powrotem, przeżycie odświeżenia strony, zgaszenie przez agenta
 - [x] 6.4 `openspec validate terminal-chart-object-visibility --strict`
-- [ ] 6.5 `review.md` wg szablonu — bez niego zmiany nie da się zarchiwizować
+- [x] 6.5 `review.md` wg szablonu — bez niego zmiany nie da się zarchiwizować
