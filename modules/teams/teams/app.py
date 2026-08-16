@@ -27,6 +27,7 @@ from . import migrate, schema_version
 from .config import Settings
 from .db import MIGRATION_LOCK_KEY, advisory_lock
 from .db import pool as make_pool
+from .openapi import require_response_fields
 
 log = logging.getLogger(__name__)
 
@@ -82,6 +83,20 @@ app = FastAPI(
 # same reasoning as agent.app and market_data.app: App Service's own CORS layer answers
 # the cross-origin preflight before Easy Auth would refuse it for carrying no
 # credential. See infra/app-service.tf.
+
+# `app.openapi` replaced with a wrapper rather than called once at import time — FastAPI
+# caches whatever the wrapper returns on `app.openapi_schema`, so this runs once per
+# process and every later `.openapi()` call (from `/openapi.json`, from `teams.openapi.
+# document()`, from a test) reads the same augmented dict (`market_data.app`'s own
+# comment explains the caching this relies on).
+_routes_openapi = app.openapi
+
+
+def _openapi_with_required_fields() -> dict:
+    return require_response_fields(_routes_openapi())
+
+
+app.openapi = _openapi_with_required_fields  # type: ignore[method-assign]
 
 
 @app.get("/health")
