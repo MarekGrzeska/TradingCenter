@@ -1,0 +1,112 @@
+## 1. Rozstrzygnięcie, na którym stoi reszta
+
+- [ ] 1.1 Sprawdzić na działającym `agent` w Azure, czy Easy Auth przepuszcza do procesu
+  oryginalny nagłówek `Authorization` — tymczasowa trasa diagnostyczna albo odczyt z logu,
+  usuwana zaraz po pomiarze
+- [ ] 1.2 Zapisać wynik w `design.md` jako pomiar z datą; przy wyniku negatywnym przejść na
+  alternatywę A z D2 i poprawić `design.md` oraz zadania grupy 5, zanim ruszy grupa 2
+
+## 2. Szkielet modułu
+
+- [ ] 2.1 `modules/teams-mcp/` — `pyproject.toml`, `uv.lock`, `ruff`, `pyright`, układ pakietu
+  wzorem `modules/trading-mcp`
+- [ ] 2.2 `config.py` — `TEAMS_URL`, `TEAMS_SCOPE`, `TEAMS_REQUEST_TIMEOUT_SECONDS`, port
+  **8070**, host, `REQUIRE_AUTHENTICATED_PRINCIPAL`
+- [ ] 2.3 Odmowa startu przy adresie zdalnym bez tożsamości i przy obu trybach naraz
+  (`teams-mcp-upstream-access`)
+- [ ] 2.4 Transport wyłącznie sieciowy, bez wariantu uruchamianego jako proces potomny
+  (`teams-mcp-transport`)
+- [ ] 2.5 `/health` bez poświadczenia, nieujawniające niczego o katalogu
+- [ ] 2.6 Testy na 2.3–2.5
+
+## 3. Rozmowa z `teams`
+
+- [ ] 3.1 Klient HTTP do `teams` z granicą czasu i bez ponawiania zapisu
+- [ ] 3.2 Trzy wyniki, nie dwa: odpowiedź, odmowa `teams` z jego własnym powodem,
+  niedostępność
+- [ ] 3.3 Migawka kontraktu `teams` w `contract/teams.openapi.json` i `scripts/contract.py
+  check`, wzorem obu istniejących serwerów MCP
+- [ ] 3.4 Testy przeciw dublerowi `teams`: odmowa, przekroczenie czasu, brak ponowienia zapisu
+
+## 4. Katalog narzędzi
+
+- [ ] 4.1 Narzędzia czytające: `list_teams`, `read_team`, `list_runs`, `read_run`,
+  `list_schedules` — oznaczone jako czytające
+- [ ] 4.2 Narzędzia zapisujące: `create_team`, `revise_team`, `run_team`, `schedule_team` —
+  oznaczone jako zmieniające stan
+- [ ] 4.3 `create_team` zakłada zespół wraz z pierwszą rewizją jednym wywołaniem
+- [ ] 4.4 `revise_team` przyjmuje poprawkę bez przepisywania niezmienionych ról
+- [ ] 4.5 `read_run` odpowiada także dla przebiegu trwającego, mówiąc że nie jest zakończony
+- [ ] 4.6 `schedule_team` **nie** przyjmuje `unattended_ack` jako argumentu (D4)
+- [ ] 4.7 `schedule_team` mówi, gdy zegar `teams` jest wyłączony ustawieniem, i mimo to zapisuje
+- [ ] 4.8 Opisy narzędzi niosą warunki odmowy — granicę dobową kosztu i granice handlowe —
+  oraz katalog modeli i nazwy narzędzi, które wolno wpisać w definicję
+- [ ] 4.9 Testy: każde narzędzie ma test odpowiedzi i test odmowy; katalog rozróżnia odczyt
+  od zapisu
+
+## 5. Tożsamość operatora
+
+- [ ] 5.1 Przyjęcie przeniesionego tokenu operatora osobnym nagłówkiem i przedstawienie go
+  jako `Authorization` w wywołaniu do `teams`
+- [ ] 5.2 Odmowa każdego narzędzia — czytającego i zapisującego — gdy tożsamości operatora
+  nie da się ustalić, z powodem nazywającym ten brak
+- [ ] 5.3 Tożsamość z argumentu narzędzia zignorowana albo odrzucona; nigdy użyta
+- [ ] 5.4 Token operatora nie trafia do logu, do śladu narzędzia ani do treści oddawanej
+  modelowi — test przy `LOG_LEVEL=DEBUG`
+- [ ] 5.5 Wygasły token operatora daje niedostępność nazywającą wygasłe poświadczenie, nie
+  puste odpowiedzi
+- [ ] 5.6 Testy `teams-mcp-authorship`: zespół powstaje na tożsamości operatora, cudzy jest
+  nieodróżnialny od nieistniejącego, odmowa `teams` dociera jego słowami
+
+## 6. `agent` uczy się drugiego serwera
+
+- [ ] 6.1 Rejestr serwerów narzędzi w `agent/tools/client.py`, kształt przeniesiony z
+  `teams/tools/client.py` — kopiowany, nie importowany
+- [ ] 6.2 Ustawienia `TEAMS_MCP_URL`, `TEAMS_MCP_SCOPE`, `TEAMS_MCP_REQUEST_TIMEOUT_SECONDS`
+  w `config.py` i `.env.example`; brak `TEAMS_MCP_URL` zostaje stanem wspieranym
+- [ ] 6.3 Konfiguracja i niedostępność każdego serwera niezależnie od drugiego; komunikat
+  nazywa serwer, którego dotyczy (`agent-tool-access`)
+- [ ] 6.4 Przeniesienie tokenu wołającego do wywołań serwera zespołów
+- [ ] 6.5 Prompt wie, że te narzędzia istnieją i po co są — nowa rewizja promptu
+- [ ] 6.6 Agent mówi „nie mam teraz dostępu do katalogu zespołów", zamiast twierdzić, że
+  zespół powstał, gdy serwer jest nieosiągalny
+- [ ] 6.7 Testy grupy 6, w tym jeden serwer odpowiadający przy drugim nieosiągalnym
+
+## 7. Infrastruktura
+
+- [ ] 7.1 SKU planu na **B3**, `apply` operatora, odczyt pamięci po zmianie zapisany w
+  `review.md` — **przed** zadaniem 7.2
+- [ ] 7.2 App Service `teams-mcp`, tożsamość zarządzana, Easy Auth z `agent` jako jedynym
+  wołającym, `/health` poza uwierzytelnieniem
+- [ ] 7.3 Tożsamość `teams-mcp` w `allowed_applications` po stronie `teams`
+- [ ] 7.4 `TEAMS_MCP_URL` i `TEAMS_MCP_SCOPE` w ustawieniach `agent` — jako **ostatni** krok
+  wdrożenia (Migration Plan, punkt 5)
+- [ ] 7.5 `terraform fmt`, `validate`, `plan` bez `azuread_*` poza tym, co operator stosuje sam
+
+## 8. CI i wdrożenie
+
+- [ ] 8.1 Job `teams-mcp` w `checks.yml` z filtrem po katalogu modułu
+- [ ] 8.2 Zmiana `teams/contract.py` wciąga job `teams-mcp` — migawka jest tam po to, żeby
+  łapać rozjazd
+- [ ] 8.3 `deploy-teams-mcp.yml` — obraz do GHCR, wdrożenie, smoke check sięgający procesu
+  przez `/health`, nie warstwy sterującej
+
+## 9. Stos deweloperski i dokumentacja
+
+- [ ] 9.1 `teams-mcp` w `scripts/dev.sh` i `dev.ps1` — po `teams`, przed `agent`, z czekaniem
+  na odpowiedź
+- [ ] 9.2 Ostrzeżenie przy starcie, gdy `agent` nie ma `TEAMS_MCP_URL`, wzorem istniejącego
+  dla `MARKET_MCP_URL`
+- [ ] 9.3 `modules/teams-mcp/README.md`
+- [ ] 9.4 `CLAUDE.md`, `README.md`, `docs/architecture.md` — siódmy moduł, port 8070, nowa
+  krawędź `agent` → `teams-mcp` → `teams`
+
+## 10. Domknięcie
+
+- [ ] 10.1 Przebieg od końca do końca lokalnie: z czatu założyć zespół, zobaczyć go w zakładce
+  Teams, uruchomić, przeczytać ślad, poprawić rolę na podstawie śladu, uruchomić ponownie
+- [ ] 10.2 Przebieg dowodzący własności: zespół założony z czatu jest widoczny i edytowalny w
+  terminalu jako zespół tego samego operatora
+- [ ] 10.3 `uv run pytest`, `ruff`, `pyright` w `teams-mcp` i w `agent`; `pnpm test` w
+  terminalu, jeśli cokolwiek go dotknęło
+- [ ] 10.4 `review.md`
