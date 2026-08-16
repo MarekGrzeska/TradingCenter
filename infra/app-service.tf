@@ -642,6 +642,14 @@ resource "azurerm_linux_web_app" "teams" {
 
     REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
 
+    # The lever that stops a schedule or trigger from firing on its own, without
+    # deploying anything — flip to "false" and restart, and every schedule and trigger
+    # stays exactly where it is, and a run started by hand still works (design.md,
+    # "Zegar w procesie modułu, nie w Azure"). "true" is the operating default; the
+    # other two SCHEDULER_* settings keep `config.py`'s own defaults and are not named
+    # here, the same way RUN_TIMEOUT_SECONDS is not.
+    SCHEDULER_ENABLED = "true"
+
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
   }
 
