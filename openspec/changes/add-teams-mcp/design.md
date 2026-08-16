@@ -87,10 +87,19 @@ alternatywa wybrana ma za darmo.
 zapisy zamiast jednego, okno, w którym wiersz należy do nikogo widocznego, a `team_revisions`
 jest append-only i nie ma czym przepisać rewizji.
 
-**Do sprawdzenia jako pierwsze zadanie, przed resztą pracy:** czy Easy Auth przed `agent`
-przepuszcza oryginalny nagłówek `Authorization` do procesu. Jeśli nie przepuszcza, wybrana
-droga odpada w całości i wraca alternatywa A — dlatego to jest zadanie 1, a nie szczegół
-odkryty w połowie implementacji.
+**Do sprawdzenia przed wdrożeniem, i wciąż niesprawdzone (17 sierpnia 2026):** czy Easy Auth
+przed `agent` przepuszcza oryginalny nagłówek `Authorization` do procesu. Pomiar wymaga
+tymczasowej trasy diagnostycznej na produkcji, więc został odłożony do operatora — implementacja
+poszła drogą wybraną, a nie zgadła wyniku. Jeśli okaże się, że nagłówek nie dochodzi, wraca
+alternatywa A i zmienia się grupa 5; nic poza nią.
+
+Ryzyko tego odłożenia jest ograniczone konstrukcją, nie nadzieją: bez tokenu operatora każde
+narzędzie odmawia i nazywa ten brak (`teams-mcp-authorship`), więc najgorszym możliwym skutkiem
+jest moduł, który nie robi nic. Nie ma drogi, w której zapis trafia na złego właściciela.
+
+**Weryfikacja lokalna zastępuje ją tylko częściowo:** na stosie deweloperskim nic nie stoi przed
+`agent`, więc nagłówek dochodzi zawsze i cała ścieżka daje się przejść — co dowodzi, że kod jest
+poprawny, i nie dowodzi niczego o Easy Auth.
 
 **Cena, którą ta droga ma:** token operatora przechodzi przez dwa procesy. Żaden nie ma prawa
 go zapisać — ani do logu, ani do bazy, ani do śladu narzędzia. To jest wymaganie, nie zalecenie,

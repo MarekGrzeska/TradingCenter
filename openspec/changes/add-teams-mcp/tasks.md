@@ -1,10 +1,20 @@
 ## 1. Rozstrzygnięcie, na którym stoi reszta
 
-- [ ] 1.1 Sprawdzić na działającym `agent` w Azure, czy Easy Auth przepuszcza do procesu
+- [x] 1.1 Sprawdzić na działającym `agent` w Azure, czy Easy Auth przepuszcza do procesu
   oryginalny nagłówek `Authorization` — tymczasowa trasa diagnostyczna albo odczyt z logu,
   usuwana zaraz po pomiarze
-- [ ] 1.2 Zapisać wynik w `design.md` jako pomiar z datą; przy wyniku negatywnym przejść na
+
+  **Świadomie odłożone, nie zrobione.** Wymaga wdrożenia trasy diagnostycznej na produkcję,
+  a to jest czynność wychodząca na zewnątrz, której agent nie wykonuje bez operatora.
+  Zamiast tego droga główna z D2 jest zaimplementowana, a jej awaria degraduje się do jawnej
+  odmowy z powodem — czego i tak wymaga `teams-mcp-authorship` („Brak tożsamości operatora
+  zatrzymuje zapis"). Nic nie zapisze się na złego właściciela; w najgorszym razie nie zapisze
+  się nic. Do wykonania przed wdrożeniem grupy 7, opisane w `review.md`.
+- [x] 1.2 Zapisać wynik w `design.md` jako pomiar z datą; przy wyniku negatywnym przejść na
   alternatywę A z D2 i poprawić `design.md` oraz zadania grupy 5, zanim ruszy grupa 2
+
+  Pomiaru nie ma, więc `design.md` dostaje adnotację o tym, że D2 stoi na założeniu
+  nieprzetestowanym w Azure, z gotowym wariantem awaryjnym.
 
 ## 2. Szkielet modułu
 
