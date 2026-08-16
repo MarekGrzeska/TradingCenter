@@ -1,0 +1,614 @@
+<title>Teams</title>
+<style>
+  :root {
+    --bg: #FAFBFA;
+    --surface: #F0F4F1;
+    --surface-2: #E7EDE9;
+    --ink: #17211B;
+    --muted: #5C6B62;
+    --line: #D9E1DB;
+    --accent: #0E8F68;
+    --accent-soft: #DCEFE7;
+    --red: #BE4D4D;
+    --amber: #A3712A;
+    --code-bg: #EDF1EE;
+  }
+  :root:not([data-theme="light"]) {
+    @media (prefers-color-scheme: dark) {
+      --bg: #10150F;
+      --surface: #171E18;
+      --surface-2: #1E2720;
+      --ink: #E4EBE6;
+      --muted: #97A69C;
+      --line: #28322B;
+      --accent: #3BBE8D;
+      --accent-soft: #17342A;
+      --red: #E07070;
+      --amber: #D3A051;
+      --code-bg: #1B231D;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #10150F;
+    --surface: #171E18;
+    --surface-2: #1E2720;
+    --ink: #E4EBE6;
+    --muted: #97A69C;
+    --line: #28322B;
+    --accent: #3BBE8D;
+    --accent-soft: #17342A;
+    --red: #E07070;
+    --amber: #D3A051;
+    --code-bg: #1B231D;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: system-ui, "Segoe UI", sans-serif;
+    line-height: 1.65;
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 76rem;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 6rem;
+  }
+  .prose { max-width: 46rem; }
+  .eyebrow {
+    font-family: ui-monospace, Consolas, "SF Mono", monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 0.75rem;
+  }
+  h1 {
+    font-size: clamp(2rem, 5vw, 2.9rem);
+    font-weight: 750;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+  .lead { font-size: 1.08rem; color: var(--muted); margin: 0 0 2.5rem; }
+  h2 {
+    font-size: 1.45rem;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    margin: 3.5rem 0 1rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--line);
+    text-wrap: balance;
+  }
+  h2 .num {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.8em;
+    color: var(--accent);
+    margin-right: 0.6rem;
+  }
+  h3 { font-size: 1.08rem; font-weight: 650; margin: 2rem 0 0.5rem; }
+  p { margin: 0 0 1rem; }
+  ul, ol { margin: 0 0 1rem; padding-left: 1.4rem; }
+  li { margin-bottom: 0.35rem; }
+  code {
+    font-family: ui-monospace, Consolas, "SF Mono", monospace;
+    font-size: 0.86em;
+    background: var(--code-bg);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+  }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  strong { font-weight: 650; }
+
+  .tldr {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.25rem 1.5rem;
+    margin: 0 0 1rem;
+    max-width: 46rem;
+  }
+  .tldr .eyebrow { color: var(--muted); margin-bottom: 0.5rem; }
+  .tldr ul { margin: 0; }
+
+  .toc {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.82rem;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.2rem;
+    margin: 1.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    max-width: 46rem;
+  }
+  .toc a { color: var(--muted); text-decoration: none; }
+  .toc a:hover { color: var(--accent); }
+  .toc .n { color: var(--accent); margin-right: 0.3em; }
+
+  .tablebox { overflow-x: auto; margin: 1.25rem 0 1.5rem; }
+  table {
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    min-width: 100%;
+  }
+  th {
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    text-align: left;
+    font-weight: 600;
+    padding: 0.5rem 1rem 0.5rem 0;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+  }
+  td {
+    padding: 0.55rem 1rem 0.55rem 0;
+    border-bottom: 1px solid var(--line);
+    vertical-align: top;
+  }
+  td:first-child, th:first-child { padding-left: 0; }
+  .num-col { font-variant-numeric: tabular-nums; }
+
+  figure {
+    margin: 1.5rem 0 2rem;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.5rem;
+    overflow-x: auto;
+  }
+  figure svg { display: block; max-width: 100%; height: auto; min-width: 640px; margin: 0 auto; color: var(--ink); }
+  figcaption {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 1rem;
+    max-width: 46rem;
+  }
+  .pill {
+    display: inline-block;
+    font-family: ui-monospace, Consolas, monospace;
+    font-size: 0.72rem;
+    padding: 0.1rem 0.55rem;
+    border-radius: 99px;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    margin-right: 0.35rem;
+    white-space: nowrap;
+  }
+  .pill.acc { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+  .callout {
+    border-left: 3px solid var(--amber);
+    background: var(--surface);
+    border-radius: 0 8px 8px 0;
+    padding: 0.9rem 1.25rem;
+    margin: 1.25rem 0;
+    max-width: 46rem;
+  }
+  .callout.riskbox { border-left-color: var(--red); }
+  .callout p:last-child { margin-bottom: 0; }
+  .grid2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 1rem;
+    margin: 1.25rem 0 1.5rem;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 1.1rem 1.25rem;
+  }
+  .card h4 {
+    margin: 0 0 0.4rem;
+    font-size: 0.95rem;
+    font-weight: 650;
+  }
+  .card p { font-size: 0.9rem; color: var(--muted); margin: 0; }
+  .footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--line);
+    font-size: 0.8rem;
+    color: var(--muted);
+    font-family: ui-monospace, Consolas, monospace;
+  }
+</style>
+
+<div class="wrap">
+  <p class="eyebrow">TradingCenter · research / koncept · 2026-08-16</p>
+  <h1>Teams — zespoły agentów tradujące na demo</h1>
+  <p class="lead prose">Propozycja wysokopoziomowa nowego modułu: konfigurowalne, wieloagentowe zespoły LLM definiowane i monitorowane z&nbsp;terminala, zapisywane do katalogu, uruchamiane ręcznie albo triggerami czasowymi i&nbsp;cenowymi, tradujące wyłącznie na koncie demo w&nbsp;celach eksperymentalnych.</p>
+
+  <div class="tldr">
+    <p class="eyebrow">TL;DR — rekomendacje</p>
+    <ul>
+      <li>Nowy, <strong>piąty moduł backendowy</strong> <code>modules/teams</code> (port 8050, własna baza <code>teams</code>) — nie rozbudowa istniejącego <code>agent</code>.</li>
+      <li>Orkiestracja: <strong>LangGraph</strong> — już jest w repo (<code>agent/graph.py</code>); graf zespołu budowany dynamicznie z definicji w bazie.</li>
+      <li>Canvas zespołu na FE: <strong>React Flow (xyflow)</strong> + auto-layout <strong>elkjs</strong> — standard branżowy (Langflow, Flowise, Dify na nim stoją), MIT, pasuje do React 19 + Vite.</li>
+      <li>Narzędzia agentów: odczyt przez <strong>market-mcp</strong> (jak dziś), trading jako <strong>narzędzia lokalne</strong> modułu wołające <code>capital-gateway</code> — pierwszy w historii repo konsument endpointów zapisu.</li>
+      <li>Scheduler wewnątrz modułu, wzorowany na <code>market_data/jobs/runner.py</code> + <code>ingest/supervisor.py</code>; triggery: czasowe (cron), cenowe, ręczne.</li>
+      <li>Kontrakt dla terminala <strong>generowany</strong> (<code>pnpm contract:generate</code>), jak market-data — nie ręczne DTO jak dziś przy agencie.</li>
+      <li>Osobny <code>OPENAI_API_KEY</code> dla modułu (własna pozycja w Key Vault) — koszty eksperymentów widoczne oddzielnie od czatu operatora.</li>
+      <li>Model dobierany <strong>per agent</strong> z tego samego katalogu co dziś w <code>agent</code> — nie jeden model na cały zespół.</li>
+      <li>Pełna ścieżka <strong>OpenSpec</strong> — zmiana dotyka kontraktów między modułami i <code>infra/**</code>.</li>
+    </ul>
+  </div>
+
+  <ul class="toc">
+    <li><a href="#stan"><span class="n">1</span>Stan wyjściowy</a></li>
+    <li><a href="#koncept"><span class="n">2</span>Koncept modułu</a></li>
+    <li><a href="#architektura"><span class="n">3</span>Architektura</a></li>
+    <li><a href="#domena"><span class="n">4</span>Model domeny</a></li>
+    <li><a href="#orkiestracja"><span class="n">5</span>Orkiestracja</a></li>
+    <li><a href="#frontend"><span class="n">6</span>Frontend i diagram</a></li>
+    <li><a href="#scheduler"><span class="n">7</span>Scheduler i triggery</a></li>
+    <li><a href="#ryzyka"><span class="n">8</span>Guardraile i ryzyka</a></li>
+    <li><a href="#fazy"><span class="n">9</span>Fazy realizacji</a></li>
+    <li><a href="#decyzje"><span class="n">10</span>Decyzje otwarte</a></li>
+  </ul>
+
+  <h2 id="stan"><span class="num">1</span>Stan wyjściowy — co repo już ma, a czego nie</h2>
+  <div class="prose">
+    <p>Research kodu (stan na 2026-08-16, branch bazowy z <code>feat/market-data-migrates-itself</code>) daje cztery fakty, na których opiera się cała propozycja:</p>
+  </div>
+  <div class="tablebox">
+    <table>
+      <tr><th>Obszar</th><th>Fakt</th><th>Konsekwencja dla Teams</th></tr>
+      <tr>
+        <td><strong>Pętla agenta</strong></td>
+        <td><code>agent/graph.py</code> to już <strong>LangGraph</strong> — dwuwęzłowy <code>StateGraph</code> (model ↔ tools), ceiling 8 rund, trzy klasy porażek. Provider (<code>provider.py</code>) streamuje z <code>/v1/responses</code>, protokół <code>ModelProvider</code> wymienny.</td>
+        <td>Wewnętrzna pętla jednego agenta jest gotowa do skopiowania (zasada „bliźniaków", nie shared lib). Zespół to warstwa <em>nad</em> nią.</td>
+      </tr>
+      <tr>
+        <td><strong>Trading</strong></td>
+        <td><code>capital-gateway</code> ma komplet endpointów zapisu (<code>POST /orders</code>, <code>PUT/DELETE /positions/{id}</code>, working orders) — i <strong>nikt ich dziś nie woła</strong> poza testami live. Demo-only wymuszone w <code>config.py</code> gatewaya. Rate limit 10 req/s <em>na konto</em>.</td>
+        <td>Teams będzie pierwszym konsumentem zapisu. Wymaga wpisu w <code>ip_restriction</code>, <code>GATEWAY_API_KEY</code> z Key Vault i zmiany OpenSpec (teren <code>capital-trading</code>).</td>
+      </tr>
+      <tr>
+        <td><strong>Narzędzia</strong></td>
+        <td><code>market-mcp</code>: 10 narzędzi read-only (candles, wskaźniki, poziomy, coverage), transport streamable HTTP, auth przez managed identity. Zapis <strong>strukturalnie zabroniony</strong> w kliencie i specyfikacji.</td>
+        <td>Odczyt rynku: gotowy, bez zmian. Narzędzia tradingowe <em>nie mogą</em> być w MCP — muszą być narzędziami lokalnymi Teams (wzorzec <code>LocalTool</code> z <code>agent/graph.py</code>).</td>
+      </tr>
+      <tr>
+        <td><strong>Scheduler / FE</strong></td>
+        <td>Schedulera nie ma nigdzie. Najbliższe wzorce: <code>market_data/jobs/runner.py</code> (pętla claim-and-work, odzysk sierot) i <code>ingest/supervisor.py</code> (task na encję, rekoncyliacja <code>sync()</code>). Terminal (React 19, Vite 7, Tailwind 4, zero bibliotek stanu, zero kodu diagramowego).</td>
+        <td>Scheduler piszemy w Teams według tych wzorców. Diagram zespołu to nowa zależność FE — sekcja 6.</td>
+      </tr>
+    </table>
+  </div>
+  <div class="prose">
+    <p>Z istniejącego <code>agent</code> do skopiowania niemal wprost: <code>db.py</code> (pool + advisory lock), <code>migrate.py</code>, <code>schema_version.py</code>, <code>auth.py</code>, <code>provider.py</code>, <code>tools/client.py</code>, model licznikowania kosztów (stawka Decimal zapisywana na wierszu). Nie do przenoszenia: sesje/wiadomości czatu, globalny pojedynczy prompt, komendy wykresu.</p>
+  </div>
+
+  <h2 id="koncept"><span class="num">2</span>Koncept modułu</h2>
+  <div class="prose">
+    <p>Nazwa modułu: <strong><code>modules/teams</code></strong> — zgodna z nazwą centralnej encji katalogu (tabela <code>teams</code>, sekcja 4), tym samym wzorcem co <code>market-data</code> nazwane od tego, co archiwizuje. Cztery filary funkcjonalne, zgodnie z zamówieniem:</p>
+  </div>
+  <div class="grid2">
+    <div class="card">
+      <h4>Builder zespołu</h4>
+      <p>Definiowanie na FE dowolnej liczby agentów: rola, prompt, model z katalogu, przydzielone narzędzia, wytyczne, oraz krawędzie zależności między agentami (kto komu przekazuje pracę). Edycja na canvasie diagramowym.</p>
+    </div>
+    <div class="card">
+      <h4>Katalog</h4>
+      <p>Zapis zespołu do katalogu w bazie: nazwane, wersjonowane definicje (rewizje append-only, jak <code>prompt_revisions</code>). Klonowanie i porównywanie wariantów tego samego systemu.</p>
+    </div>
+    <div class="card">
+      <h4>Aktywacja / scheduler</h4>
+      <p>Zakładka harmonogramu: triggery czasowe (cron), cenowe (przekroczenie poziomu, zmiana %) i ręczne. Trigger uruchamia przebieg (run) zespołu; harmonogram ma okna aktywności i kill-switch.</p>
+    </div>
+    <div class="card">
+      <h4>Monitoring</h4>
+      <p>Podgląd przebiegu na żywo na tym samym diagramie (stan węzłów), pełny ślad: wiadomości między agentami, wywołania narzędzi, złożone zlecenia, koszt tokenów, P&amp;L pozycji demo.</p>
+    </div>
+  </div>
+  <div class="callout">
+    <p><strong>Dlaczego nowy moduł, a nie rozbudowa <code>agent</code>?</strong> Schemat <code>agent</code> jest zbudowany wokół jednej rozmowy operatora (sesje, wiadomości, principal właściciela, globalny prompt) — zespół, katalog i scheduler to inna domena z innym cyklem życia. Architektura repo faworyzuje osobne moduły z własną bazą; usunięcie eksperymentu to wtedy usunięcie katalogu. Czat pozostaje nietknięty i stabilny.</p>
+  </div>
+
+  <h2 id="architektura"><span class="num">3</span>Architektura — Teams w ekosystemie</h2>
+  <figure>
+    <svg viewBox="0 0 900 470" role="img" aria-label="Teams jako piąty moduł: terminal woła Teams przez REST i SSE; Teams czyta rynek przez market-mcp, traduje przez capital-gateway (nowa ścieżka zapisu), używa własnego klucza OpenAI i własnej bazy teams w tym samym serwerze Postgres.">
+      <defs>
+        <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+        </marker>
+        <marker id="arrAcc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#0E8F68"/>
+        </marker>
+      </defs>
+      <g font-family="ui-monospace, Consolas, monospace" font-size="12">
+        <!-- terminal -->
+        <rect x="30" y="175" width="150" height="70" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="105" y="205" text-anchor="middle" font-weight="bold">terminal</text>
+        <text x="105" y="223" text-anchor="middle" opacity="0.6">:5173 · React</text>
+
+        <!-- teams -->
+        <rect x="280" y="155" width="200" height="110" rx="8" fill="none" stroke="#0E8F68" stroke-width="2"/>
+        <text x="380" y="185" text-anchor="middle" font-weight="bold" fill="#0E8F68">teams  (NOWY)</text>
+        <text x="380" y="203" text-anchor="middle" opacity="0.7">:8050 · Python</text>
+        <text x="380" y="221" text-anchor="middle" opacity="0.7">orkiestrator LangGraph</text>
+        <text x="380" y="239" text-anchor="middle" opacity="0.7">scheduler + katalog</text>
+
+        <!-- openai -->
+        <rect x="620" y="30" width="150" height="52" rx="8" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="5 4"/>
+        <text x="695" y="52" text-anchor="middle" font-weight="bold">OpenAI</text>
+        <text x="695" y="70" text-anchor="middle" opacity="0.6">/v1/responses · własny klucz</text>
+
+        <!-- market-mcp -->
+        <rect x="620" y="130" width="150" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="695" y="155" text-anchor="middle" font-weight="bold">market-mcp</text>
+        <text x="695" y="173" text-anchor="middle" opacity="0.6">:8040 · read-only</text>
+
+        <!-- market-data -->
+        <rect x="620" y="230" width="150" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="695" y="255" text-anchor="middle" font-weight="bold">market-data</text>
+        <text x="695" y="273" text-anchor="middle" opacity="0.6">:8020 · archiwum</text>
+
+        <!-- gateway -->
+        <rect x="620" y="340" width="150" height="70" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="695" y="367" text-anchor="middle" font-weight="bold">capital-gateway</text>
+        <text x="695" y="385" text-anchor="middle" opacity="0.6">:8010 · tylko DEMO</text>
+
+        <!-- postgres -->
+        <rect x="280" y="360" width="200" height="60" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="380" y="385" text-anchor="middle" font-weight="bold">psql-tradingcenter</text>
+        <text x="380" y="403" text-anchor="middle" opacity="0.6">market_data · agent · teams*</text>
+
+        <!-- edges -->
+        <line x1="180" y1="210" x2="276" y2="210" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr)"/>
+        <text x="228" y="200" text-anchor="middle" opacity="0.7" font-size="11">REST + SSE</text>
+
+        <line x1="480" y1="175" x2="617" y2="62" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr)"/>
+        <text x="540" y="105" text-anchor="middle" opacity="0.7" font-size="11">wywołania modeli</text>
+
+        <line x1="480" y1="200" x2="617" y2="163" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr)"/>
+        <text x="545" y="168" text-anchor="middle" opacity="0.7" font-size="11">tools: odczyt rynku</text>
+
+        <line x1="695" y1="190" x2="695" y2="227" stroke="currentColor" stroke-width="1" opacity="0.5" marker-end="url(#arr)"/>
+        <line x1="695" y1="290" x2="695" y2="337" stroke="currentColor" stroke-width="1" opacity="0.5" marker-end="url(#arr)"/>
+        <text x="710" y="318" opacity="0.5" font-size="11">candles</text>
+
+        <line x1="480" y1="250" x2="617" y2="365" stroke="#0E8F68" stroke-width="2" marker-end="url(#arrAcc)"/>
+        <text x="530" y="330" text-anchor="middle" fill="#0E8F68" font-size="11" font-weight="bold">POST /orders — NOWE</text>
+        <text x="530" y="345" text-anchor="middle" fill="#0E8F68" font-size="11">pierwszy zapis w repo</text>
+
+        <line x1="380" y1="265" x2="380" y2="357" stroke="#0E8F68" stroke-width="1.5" marker-end="url(#arrAcc)"/>
+        <text x="330" y="315" text-anchor="middle" fill="#0E8F68" font-size="11">baza teams*</text>
+      </g>
+    </svg>
+    <figcaption>Teams (akcent) jako piąty moduł. Zielone krawędzie są nowe: trzecia logiczna baza w istniejącym serwerze Postgres oraz pierwsza w historii repo ścieżka do endpointów zapisu gatewaya. Reszta ekosystemu bez zmian — Teams czyta rynek tą samą drogą co dzisiejszy agent czatu.</figcaption>
+  </figure>
+  <div class="prose">
+    <p>Moduł powiela sprawdzony wykrój: własny pakiet, <code>Dockerfile</code>, <code>.env.example</code>, migracje przy starcie pod advisory lockiem (klucz = port 8050), własna tożsamość Entra, Easy Auth z <code>excluded_paths=["/health"]</code>, workflow <code>deploy-teams.yml</code> ze smoke checkiem sięgającym procesu, job w <code>checks.yml</code>. Na FE: nowy wpis w <code>tabs.ts</code>, <code>VITE_TEAMS_HTTP</code> + proxy <code>/teams-api</code> w Vite. Sekret <code>teams-openai-api-key</code> jako osobna pozycja w Key Vault, obok istniejącego <code>openai-api-key</code> agenta — koszt eksperymentów widoczny oddzielnie na rachunku OpenAI.</p>
+  </div>
+
+  <h2 id="domena"><span class="num">4</span>Model domeny — katalog, rewizje, przebiegi</h2>
+  <div class="prose">
+    <p>Rdzeń: <strong>definicja zespołu to graf zapisany jako dane</strong> (JSONB), wersjonowany append-only. Przebieg (run) zawsze wskazuje konkretną rewizję — wyniki eksperymentu są odtwarzalne i porównywalne między wariantami, a edycja zespołu nigdy nie zmienia historii.</p>
+  </div>
+  <div class="tablebox">
+    <table>
+      <tr><th>Tabela</th><th>Rola</th><th>Kluczowe kolumny</th></tr>
+      <tr><td><code>teams</code></td><td>pozycja katalogu</td><td>name, description, archived_at</td></tr>
+      <tr><td><code>team_revisions</code></td><td>niemutowalna definicja grafu</td><td>team_id, version, graph JSONB (agenci: rola, prompt, model_id, tools[], wytyczne; krawędzie: from→to, typ), limits JSONB (budżety — sekcja 8)</td></tr>
+      <tr><td><code>runs</code></td><td>jeden przebieg zespołu</td><td>team_revision_id, trigger_id NULL, status (pending / running / completed / failed / cancelled), started_at, finished_at, cost</td></tr>
+      <tr><td><code>run_steps</code></td><td>ślad: krok agenta w przebiegu</td><td>run_id, agent_key, round, input, output, status — zasilanie monitora na żywo</td></tr>
+      <tr><td><code>tool_calls</code></td><td>każde wywołanie narzędzia</td><td>jak w <code>agent</code>: arguments JSONB, outcome ok/refused/unavailable, duration_ms</td></tr>
+      <tr><td><code>trades</code></td><td>decyzje handlowe przebiegu</td><td>run_id, order payload, odpowiedź gatewaya (deal reference, status), symbol, direction, size, sl/tp</td></tr>
+      <tr><td><code>triggers</code></td><td>definicje aktywacji</td><td>team_revision_id, kind (cron / price / manual), spec JSONB, enabled, okna aktywności</td></tr>
+      <tr><td><code>usage</code></td><td>licznikowanie tokenów</td><td>jak w <code>agent</code>: stawki Decimal kopiowane na wiersz w momencie zapisu</td></tr>
+    </table>
+  </div>
+  <div class="prose">
+    <p><code>model_id</code> na węźle agenta wskazuje pozycję w <strong>jednym, zbiorczym katalogu modeli modułu</strong> — ten sam wzorzec co <code>ModelCatalogueEntry</code> w <code>agent/config.py</code> (id, model, display_name, cost_rank, stawki wejścia/wyjścia jako Decimal), tylko skonfigurowany raz dla całego Teams i wybierany osobno dla każdego agenta w builderze. Tani model dla analityków zbierających dane, droższy dla tradera podejmującego decyzję — bez dodatkowego mechanizmu, budowa katalogu wystarcza.</p>
+  </div>
+  <div class="prose">
+    <p>Kontrakt HTTP modułu (<code>teams/contract.py</code>) publikuje te kształty dla terminala — ścieżką <code>market-data</code>, nie agenta: schemat wchodzi do <code>pnpm contract:generate</code>, <code>src/data/contract.generated.ts</code> rośnie o trzeci moduł, <code>contract:check</code> w CI pilnuje aktualności. Powód decyzji: powierzchnia Teams (definicje grafów, triggerów, przebiegów) jest szersza i bardziej zmienna niż wąskie DTO czatu — ręczne utrzymywanie typów tu boli szybciej.</p>
+  </div>
+
+  <h2 id="orkiestracja"><span class="num">5</span>Orkiestracja — LangGraph, graf budowany z danych</h2>
+  <div class="prose">
+    <p>Rozważone dwie opcje:</p>
+  </div>
+  <div class="tablebox">
+    <table>
+      <tr><th></th><th>LangGraph <span class="pill acc">rekomendacja</span></th><th>OpenAI Agents SDK</th></tr>
+      <tr><td>Obecność w repo</td><td>już jest — <code>agent/graph.py</code>, provider, wzorce błędów przetestowane produkcyjnie</td><td>nowa zależność, drugi framework obok istniejącego</td></tr>
+      <tr><td>Model topologii</td><td>jawny graf (StateGraph) — <strong>1:1 z diagramem na FE</strong> i z definicją JSONB w bazie</td><td>handoffs / agents-as-tools — topologia niejawna, w kodzie</td></tr>
+      <tr><td>Dowolność konfiguracji</td><td>węzły i krawędzie dodawane dynamicznie w pętli po definicji — dokładnie wymaganie „dowolne zespoły"</td><td>dynamiczna budowa możliwa, ale wzorce SDK zakładają topologię znaną w kodzie</td></tr>
+      <tr><td>Wzorce zespołów</td><td>supervisor, pipeline, debata, fan-out — wszystkie wyrażalne tym samym mechanizmem</td><td>najlepszy przy prostych handoffach</td></tr>
+    </table>
+  </div>
+  <div class="prose">
+    <p>Konstrukcja: <strong>kompilator definicji</strong> — funkcja czytająca <code>team_revisions.graph</code> i składająca <code>StateGraph</code>, w którym każdy agent to węzeł opakowujący dzisiejszą dwuwęzłową pętlę (model ↔ tools, z ceilingiem) ze swoim promptem, modelem i podzbiorem narzędzi. Krawędzie definicji stają się krawędziami grafu; stan współdzielony niesie wypowiedzi agentów zgodnie z zależnościami. Walidacja przy zapisie rewizji: acykliczność (ew. jawne, ograniczone pętle debaty), osiągalność węzłów, istnienie narzędzi i modeli.</p>
+    <p>Wzorcowy zespół do seedu katalogu — układ z pracy <a href="https://arxiv.org/abs/2412.20138">TradingAgents (arXiv 2412.20138)</a>, dopasowany do naszych danych (tylko price action + wskaźniki; wolumenu nie używamy — niewiarygodny dla CFD):</p>
+  </div>
+  <figure>
+    <svg viewBox="0 0 880 300" role="img" aria-label="Przykładowy zespół: dwaj analitycy techniczni zasilają debatę byka z niedźwiedziem, trader podejmuje decyzję, risk manager ją zatwierdza i dopiero wtedy idzie zlecenie do gatewaya.">
+      <defs>
+        <marker id="arr2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="currentColor"/>
+        </marker>
+        <marker id="arr2Acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0 0 L10 5 L0 10 z" fill="#0E8F68"/>
+        </marker>
+      </defs>
+      <g font-family="ui-monospace, Consolas, monospace" font-size="12">
+        <rect x="20" y="60" width="150" height="52" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="95" y="82" text-anchor="middle" font-weight="bold">Analityk H1</text>
+        <text x="95" y="100" text-anchor="middle" opacity="0.6">mcp: candles, RSI…</text>
+
+        <rect x="20" y="180" width="150" height="52" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="95" y="202" text-anchor="middle" font-weight="bold">Analityk D1</text>
+        <text x="95" y="220" text-anchor="middle" opacity="0.6">mcp: levels, trend</text>
+
+        <rect x="250" y="30" width="130" height="52" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="315" y="52" text-anchor="middle" font-weight="bold">Byk</text>
+        <text x="315" y="70" text-anchor="middle" opacity="0.6">teza za wejściem</text>
+
+        <rect x="250" y="210" width="130" height="52" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="315" y="232" text-anchor="middle" font-weight="bold">Niedźwiedź</text>
+        <text x="315" y="250" text-anchor="middle" opacity="0.6">teza przeciw</text>
+
+        <rect x="470" y="120" width="130" height="52" rx="8" fill="none" stroke="currentColor" stroke-width="1.2"/>
+        <text x="535" y="142" text-anchor="middle" font-weight="bold">Trader</text>
+        <text x="535" y="160" text-anchor="middle" opacity="0.6">decyzja + rozmiar</text>
+
+        <rect x="660" y="120" width="130" height="52" rx="8" fill="none" stroke="#0E8F68" stroke-width="1.6"/>
+        <text x="725" y="142" text-anchor="middle" font-weight="bold" fill="#0E8F68">Risk</text>
+        <text x="725" y="160" text-anchor="middle" opacity="0.6">limity, weto</text>
+
+        <line x1="170" y1="80" x2="246" y2="60" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <line x1="170" y1="95" x2="246" y2="228" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <line x1="170" y1="200" x2="246" y2="70" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <line x1="170" y1="212" x2="246" y2="238" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr2)"/>
+
+        <path d="M310 82 C300 130, 300 165, 310 210" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr2)"/>
+        <path d="M322 210 C332 165, 332 130, 322 82" fill="none" stroke="currentColor" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arr2)"/>
+        <text x="352" y="150" opacity="0.6" font-size="11">debata ×N</text>
+
+        <line x1="380" y1="70" x2="466" y2="132" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <line x1="380" y1="228" x2="466" y2="162" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <line x1="600" y1="146" x2="656" y2="146" stroke="currentColor" stroke-width="1.2" marker-end="url(#arr2)"/>
+        <text x="628" y="136" text-anchor="middle" opacity="0.7" font-size="11">plan</text>
+
+        <line x1="725" y1="172" x2="725" y2="240" stroke="#0E8F68" stroke-width="1.6" marker-end="url(#arr2Acc)"/>
+        <text x="738" y="210" fill="#0E8F68" font-size="11">zatwierdzone →</text>
+        <text x="738" y="225" fill="#0E8F68" font-size="11">POST /orders</text>
+      </g>
+    </svg>
+    <figcaption>Przykład z katalogu: analitycy → debata byk/niedźwiedź (ograniczona liczba rund) → trader → risk. Tylko węzeł Risk (akcent) ma dostęp do narzędzia składania zleceń — separacja decyzji od egzekucji jest cechą definicji zespołu, nie kodu. To jeden z możliwych układów; builder pozwala złożyć dowolny.</figcaption>
+  </figure>
+
+  <h2 id="frontend"><span class="num">6</span>Frontend — canvas zespołu i biblioteka diagramów</h2>
+  <div class="prose">
+    <p>Research bibliotek node-based UI dla React (zamówiony w wymaganiach):</p>
+  </div>
+  <div class="tablebox">
+    <table>
+      <tr><th>Biblioteka</th><th>Licencja</th><th>Ocena dla nas</th></tr>
+      <tr>
+        <td><a href="https://reactflow.dev/">React Flow (xyflow)</a> <span class="pill acc">rekomendacja</span></td>
+        <td>MIT</td>
+        <td>Standard branżowy do builderów agentowych — <a href="https://blckalpaca.at/en/knowledge-base/ai-agents/ai-agent-frameworks-comparison/langflow-vs-flowise-vs-n8n">Langflow i Flowise budują na nim swoje canvasy</a>. Custom nodes jako komponenty React (pełny Tailwind), edycja krawędzi drag-and-drop, minimapa, kontrolki zoomu. Rozwijany od 2019, ogromna adopcja.</td>
+      </tr>
+      <tr>
+        <td>elkjs / dagre</td>
+        <td>EPL / MIT</td>
+        <td>Nie alternatywa, lecz <strong>uzupełnienie</strong>: auto-layout grafu (React Flow nie układa węzłów sam). elkjs — lepsze wyniki dla grafów warstwowych; przycisk „ułóż automatycznie" w builderze.</td>
+      </tr>
+      <tr>
+        <td><a href="https://jsplumbtoolkit.com/reactflow-alternative">JointJS+ / GoJS / jsPlumb</a></td>
+        <td>komercyjne</td>
+        <td>Dojrzałe, ale płatne licencje i własny model renderowania obok Reacta — bez przewagi uzasadniającej koszt.</td>
+      </tr>
+      <tr>
+        <td>Rete.js / AntV X6</td>
+        <td>MIT</td>
+        <td>Zdolne, mniejsza społeczność, integracja z React słabsza niż natywna biblioteka React-first.</td>
+      </tr>
+      <tr>
+        <td>Mermaid / czysty SVG</td>
+        <td>—</td>
+        <td>Tylko odczyt — odpada, bo canvas ma być edytorem (definiowanie krawędzi myszą), nie ilustracją.</td>
+      </tr>
+    </table>
+  </div>
+  <div class="prose">
+    <p>Jedna zakładka <code>teams</code> w <code>tabs.ts</code>, wewnątrz trzy widoki:</p>
+    <ul>
+      <li><strong>Builder / katalog</strong> — lista zespołów z katalogu; po wejściu canvas React Flow: węzeł-agent (rola, model, badge narzędzi), panel boczny edycji (prompt, wytyczne, wybór narzędzi z katalogu modułu), zapis jako nowa rewizja.</li>
+      <li><strong>Monitor</strong> — ten sam canvas w trybie read-only; stan węzłów z przebiegu (oczekuje / myśli / narzędzie / gotowe / błąd) kolorowany na żywo, obok strumień kroków i wywołań narzędzi. Transport: SSE po POST, wzorzec <code>stream.ts</code> z czatu (fetch + ReadableStream, keepalive ping).</li>
+      <li><strong>Harmonogram</strong> — lista triggerów z przełącznikami enable, edytor cron/price, historia odpaleń z wynikiem i kosztem, globalny kill-switch modułu.</li>
+    </ul>
+    <p>Stan po stronie FE jak wszędzie w terminalu: ręczny external store + <code>useSyncExternalStore</code>, bez nowej biblioteki stanu. React Flow trzyma tylko stan canvasu.</p>
+  </div>
+
+  <h2 id="scheduler"><span class="num">7</span>Scheduler i triggery</h2>
+  <div class="prose">
+    <p>Wewnątrz modułu, bez zewnętrznych zależności (APScheduler zbędny) — repo ma już dwa przetestowane wzorce, które wystarczą:</p>
+    <ul>
+      <li><strong>Pętla wykonawcza</strong> à la <code>jobs/runner.py</code>: przebiegi wstawiane do <code>runs</code> jako <code>pending</code>, worker klamruje je transakcyjnie (<code>FOR UPDATE SKIP LOCKED</code>), przy starcie procesu odzyskuje osierocone <code>running</code>. Jedna instancja App Service (worker_count=1) upraszcza sprawę, ale wzorzec od razu jest poprawny przy N instancjach.</li>
+      <li><strong>Supervisor triggerów</strong> à la <code>ingest/supervisor.py</code>: jeden task na aktywny trigger, rekoncyliacja <code>sync()</code> po każdej zmianie definicji, bez restartu procesu.</li>
+    </ul>
+    <p>Rodzaje triggerów na start:</p>
+    <ul>
+      <li><strong>Czasowy</strong> — wyrażenie cron + strefa + okno aktywności (np. tylko godziny sesji); tick co minutę wystarczy.</li>
+      <li><strong>Cenowy</strong> — warunek na ostatniej cenie (przekroczenie poziomu, zmiana % w oknie). Źródło: narzędzie <code>get_last_price</code> z market-mcp, odpytywane w interwale triggera — Teams nie ma własnej, osobnej ścieżki do market-data (decyzja w sekcji 10). Warunek uzbrajany po przekroczeniu (re-arm), żeby jeden poziom nie strzelał seriami.</li>
+      <li><strong>Ręczny</strong> — przycisk „uruchom teraz" w terminalu; ta sama ścieżka co triggery, po prostu bez warunku.</li>
+    </ul>
+    <p>Reguły zbiegu: <strong>jeden aktywny przebieg na zespół</strong> (trigger strzelający w trakcie pracy zespołu jest tłumiony i logowany), limit równoległych przebiegów całego modułu (budżet 10 req/s do Capital jest wspólny z ingestem market-data — sekcja 8), maksymalny czas przebiegu z twardym anulowaniem.</p>
+  </div>
+
+  <h2 id="ryzyka"><span class="num">8</span>Guardraile i ryzyka</h2>
+  <div class="callout riskbox">
+    <p><strong>Zasada nadrzędna: moduł nie może stać się bramą do rachunku live.</strong> Pierwsza linia już istnieje — <code>capital-gateway</code> odmawia startu z adresem innym niż demo. Teams dokłada własne, jawne limity w definicji zespołu, bo eksperyment z LLM składającym zlecenia musi mieć zderzak niezależny od jakości promptów.</p>
+  </div>
+  <div class="tablebox">
+    <table>
+      <tr><th>Ryzyko</th><th>Zderzak</th></tr>
+      <tr><td>Niekontrolowane zlecenia (halucynacja rozmiaru, pętla wejść)</td><td><code>limits</code> na rewizji zespołu: max wielkość pozycji, max liczba zleceń na przebieg i na dobę, dozwolone symbole, wymagane SL. Egzekwowane <strong>w narzędziu lokalnym</strong>, przed wysyłką do gatewaya — nie w prompcie.</td></tr>
+      <tr><td>Koszt tokenów (N agentów × debaty × scheduler nocą)</td><td>Budżet kosztu na przebieg i dzienny na zespół; przekroczenie = twarde zatrzymanie przebiegu ze statusem i powodem. Licznikowanie jak w <code>agent</code> (stawka na wierszu usage).</td></tr>
+      <tr><td>Wspólny budżet 10 req/s do Capital (na konto!)</td><td>Zlecenia idą pojedynczo przez gateway (ma własny rategate); Teams dodatkowo ogranicza równoległość przebiegów. Odczyt rynku idzie przez market-data (cache archiwum), nie bezpośrednio.</td></tr>
+      <tr><td>Zapętlona debata / niekończący się przebieg</td><td>Ceiling rund per agent (dziedziczony wzorzec, dziś 8), limit rund debaty w definicji krawędzi, max czas przebiegu z anulowaniem.</td></tr>
+      <tr><td>Niesprzątnięte pozycje po eksperymencie</td><td>Opcja „flat po przebiegu" w definicji (zamknij wszystko, co przebieg otworzył) + widok otwartych pozycji demo w monitorze z ręcznym zamknięciem.</td></tr>
+      <tr><td>Awaria w trakcie przebiegu</td><td>Każdy krok i każde zlecenie zapisane przed skutkiem; odzysk sierot przy starcie oznacza przebieg jako <code>failed</code> — bez wznawiania w ciemno. <code>trades</code> trzyma referencję dealu, więc stan konta jest odtwarzalny.</td></tr>
+    </table>
+  </div>
+
+  <h2 id="fazy"><span class="num">9</span>Fazy realizacji</h2>
+  <div class="tablebox">
+    <table>
+      <tr><th class="num-col">Faza</th><th>Zakres</th><th>Wartość weryfikowana</th></tr>
+      <tr>
+        <td class="num-col">1</td>
+        <td>Szkielet modułu (baza, migracje, health, deploy) + katalog zespołów + builder na React Flow + kompilator definicji → LangGraph + przebieg ręczny <strong>bez narzędzi tradingowych</strong> (agenci czytają rynek przez market-mcp, decyzja kończy się rekomendacją zapisaną w śladzie).</td>
+        <td>Czy definiowalny na FE zespół w ogóle produkuje sensowne, odtwarzalne przebiegi. „Paper mode" jest naturalnym stanem początkowym, tak jak agent bez <code>MARKET_MCP_URL</code>.</td>
+      </tr>
+      <tr>
+        <td class="num-col">2</td>
+        <td>Narzędzia tradingowe (place/close/amend na demo) + tabela <code>trades</code> + limity z sekcji 8 + zmiany infra (ip_restriction, klucz z Key Vault) + monitor na żywo.</td>
+        <td>Pełny cykl decyzja → zlecenie → pozycja demo → P&amp;L, z zderzakami.</td>
+      </tr>
+      <tr>
+        <td class="num-col">3</td>
+        <td>Scheduler: triggery czasowe i ręczne, okna aktywności, kill-switch, historia odpaleń.</td>
+        <td>Zespoły pracujące bez operatora przy zachowaniu limitów kosztów.</td>
+      </tr>
+      <tr>
+        <td class="num-col">4</td>
+        <td>Triggery cenowe + analityka wyników (porównanie rewizji/zespołów: koszt, liczba transakcji, P&amp;L) + auto-layout elkjs, dopieszczenie monitora.</td>
+        <td>Porównywanie systemów między sobą — właściwy cel eksperymentu.</td>
+      </tr>
+    </table>
+  </div>
+  <div class="prose">
+    <p>Każda faza kończy się modułem, który startuje, migruje się sam i przechodzi swój smoke check — zgodnie ze standing rule repo. Faza 1 to pełnoprawna zmiana OpenSpec (nowe spec-i <code>teams-*</code>, teren <code>infra/**</code>); faza 2 dotyka dodatkowo <code>capital-trading</code> i polityk dostępu gatewaya.</p>
+  </div>
+
+  <h2 id="decyzje"><span class="num">10</span>Decyzje</h2>
+  <div class="prose">
+    <p class="eyebrow" style="margin-bottom:0.5rem">Rozstrzygnięte</p>
+    <ul>
+      <li><strong>Nazwa modułu</strong> — <code>modules/teams</code>. Konsekwentne z tabelą <code>teams</code> w katalogu (sekcja 4).</li>
+      <li><strong>Klucz OpenAI</strong> — osobny sekret <code>teams-openai-api-key</code>, nie współdzielony z <code>agent</code>. Koszty eksperymentów widoczne oddzielnie na rachunku OpenAI.</li>
+      <li><strong>Kontrakt dla terminala</strong> — generowany, ścieżką <code>market-data</code> (<code>pnpm contract:generate</code>), nie ręczne DTO jak przy agencie. Uzasadnienie: powierzchnia (grafy, triggery, przebiegi) jest szersza i zmienia się częściej niż wąskie DTO czatu.</li>
+      <li><strong>Model per agent</strong> — potwierdzone od fazy 1: jeden zbiorczy katalog modeli modułu (jak <code>ModelCatalogueEntry</code> w <code>agent/config.py</code>), każdy węzeł grafu wybiera swój <code>model_id</code> niezależnie w builderze.</li>
+      <li><strong>Trigger cenowy → dane</strong> — przez <strong>market-mcp</strong>, tą samą drogą co dziś agent czatu. Teams nigdy nie omija market-mcp; zero nowej infry (bez osobnego <code>MARKET_DATA_SCOPE</code>, bez wpisu w <code>allowed_applications</code> market-data). Wystarczające przy triggerach sprawdzanych co minutę-kilka — to nie handel wysokiej częstotliwości. Zachowuje regułę „tylko market-mcp czyta market-data bezpośrednio".</li>
+    </ul>
+  </div>
+  <div class="prose">
+    <p class="eyebrow" style="margin-bottom:0.5rem">Otwarte</p>
+    <ol>
+      <li><strong>Komunikacja między agentami</strong> — w fazie 1 wyłącznie przez stan grafu (wypowiedź poprzednika w kontekście następnika). Czy docelowo potrzebna tablica ogłoszeń / pamięć zespołu między przebiegami? Zostawić na wnioski z fazy 1.</li>
+    </ol>
+  </div>
+
+  <p class="footer">TradingCenter · docs/archive · research przed decyzją — droga, nie stan · źródła: kod repo (stan 2026-08-16), arXiv 2412.20138, reactflow.dev, xyflow.com</p>
+</div>
