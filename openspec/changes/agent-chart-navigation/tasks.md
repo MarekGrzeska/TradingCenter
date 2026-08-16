@@ -59,8 +59,8 @@
 
 ## 9. Domknięcie
 
-- [ ] 9.1 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright` w `modules/agent`
-- [ ] 9.2 `pnpm test`, `pnpm lint`, `pnpm typecheck` w `modules/terminal`
-- [ ] 9.3 Przejście ręką na żywym stacku: „pokaż mi wczorajszy poranek", „przybliż ostatnie 50 świec", zmiana interwału nad tym samym miejscem
-- [ ] 9.4 `openspec validate agent-chart-navigation --strict`
-- [ ] 9.5 `review.md` wg szablonu — bez niego zmiany nie da się zarchiwizować
+- [x] 9.1 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright` w `modules/agent` — 233 + 131, czysto
+- [x] 9.2 `pnpm test`, `pnpm lint`, `pnpm typecheck` w `modules/terminal` — 618 testów, czysto
+- [ ] 9.3 Przejście ręką na żywym stacku: „pokaż mi wczorajszy poranek", „przybliż ostatnie 50 świec", zmiana interwału nad tym samym miejscem — operator testuje sam
+- [x] 9.4 `openspec validate agent-chart-navigation --strict`
+- [x] 9.5 `review.md` wg szablonu — bez niego zmiany nie da się zarchiwizować
