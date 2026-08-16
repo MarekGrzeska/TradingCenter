@@ -108,12 +108,12 @@
 
 ## 9. Stos deweloperski i dokumentacja
 
-- [ ] 9.1 `teams-mcp` w `scripts/dev.sh` i `dev.ps1` — po `teams`, przed `agent`, z czekaniem
+- [x] 9.1 `teams-mcp` w `scripts/dev.sh` i `dev.ps1` — po `teams`, przed `agent`, z czekaniem
   na odpowiedź
-- [ ] 9.2 Ostrzeżenie przy starcie, gdy `agent` nie ma `TEAMS_MCP_URL`, wzorem istniejącego
+- [x] 9.2 Ostrzeżenie przy starcie, gdy `agent` nie ma `TEAMS_MCP_URL`, wzorem istniejącego
   dla `MARKET_MCP_URL`
-- [ ] 9.3 `modules/teams-mcp/README.md`
-- [ ] 9.4 `CLAUDE.md`, `README.md`, `docs/architecture.md` — siódmy moduł, port 8070, nowa
+- [x] 9.3 `modules/teams-mcp/README.md`
+- [x] 9.4 `CLAUDE.md`, `README.md`, `docs/architecture.md` — siódmy moduł, port 8070, nowa
   krawędź `agent` → `teams-mcp` → `teams`
 
 ## 10. Domknięcie

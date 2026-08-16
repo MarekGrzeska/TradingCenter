@@ -21,6 +21,7 @@ modules move here one at a time.
 | [agent](modules/agent/) | The operator's conversation with a model — its own database, its own OpenAI key, and read-only tools over the archive through market-mcp. | HTTP, streamed |
 | [teams](modules/teams/) | Teams of agents as **data**, not code — a graph the operator composes, versioned append-only, run against both tool servers. Its own database, its own OpenAI key. | HTTP + OpenAPI |
 | [trading-mcp](modules/trading-mcp/) | MCP tools over the gateway's **demo account** — positions, balance, and orders a team can actually place. Network transport only, one named caller, demo checked against the gateway rather than against a setting. | MCP (streamable HTTP) |
+| [teams-mcp](modules/teams-mcp/) | MCP tools over the **teams catalogue**, so a team can be built and corrected by talking to the agent instead of by dragging boxes. One named caller, and every tool acts in the operator's own name — their token travels with the call. | MCP (streamable HTTP) |
 | [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, the agent panel and the teams canvas. | consumes capital-gateway, market-data, agent and teams |
 
 ## Layout
@@ -55,7 +56,8 @@ convenience wrappers; no module depends on one.
 Both bring the same things up in the same order:
 
 ```
-migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp -> agent
+migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp -> teams
+             -> teams-mcp -> agent
           -> teams -> terminal
 ```
 
@@ -63,7 +65,8 @@ The order is not tidiness — every arrow in it is a real dependency. `market-da
 subscribes to the gateway as it starts, `market-mcp` reads `market-data`, `trading-mcp`
 asks the gateway whether it is bound to the demo account and refuses to open a port if it
 is not, `agent` and `teams` ask `market-mcp` for their tool list — `teams` asks
-`trading-mcp` for a second one — and the terminal's charts read `market-data` too.
+`trading-mcp` for a second one, and `agent` reads `teams` through `teams-mcp` for a third
+— and the terminal's charts read `market-data` too.
 Starting anything early fills the console with retries, or — in the agent's case —
 quietly produces a turn answered without tools, which is worse because nothing reports it.
 Each step waits for the one before it to actually answer. Ctrl+C stops the services.
@@ -153,6 +156,7 @@ written for.
 | `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
 | `market-mcp` | `scripts/contract.py check`, `ruff check`, `pyright`, `pytest` |
 | `trading-mcp` | the same four — its snapshot is `capital-gateway`'s document, so **any** change under that module runs this job |
+| `teams-mcp` | the same four — its snapshot is `teams`' document, watched through `teams/contract.py`, which is where that document is printed from |
 | `agent` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's; its `live` tests need a real OpenAI key and stay behind `--run-live` |
 | `teams` | `ruff check`, `pyright`, `pytest` — same again; nothing in the suite reaches OpenAI or market-mcp |
 | `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
