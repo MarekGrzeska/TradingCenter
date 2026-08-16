@@ -21,16 +21,22 @@ narzędzie odpowiada tym samym błędem, i którego awarię widać dopiero w śr
 - **THEN** odmawia startu z komunikatem nazywającym brakujące ustawienie
 - **AND** nie zaczyna nasłuchiwać
 
-### Requirement: Tryb dostępu do gatewaya jest wybrany jednoznacznie
+### Requirement: Poświadczenie do gatewaya jest wymagane niezależnie od adresu
 
-Konfiguracja MUST wskazywać dokładnie jeden tryb dostępu: adres zdalny wraz z tożsamością,
-którą moduł się przedstawia, albo pętlę zwrotną bez niej. Konfiguracja nazywająca oba tryby
-naraz albo adres zdalny bez tożsamości MUST być odrzucona przy starcie.
+`capital-gateway` przyjmuje wywołania wyłącznie z własnym poświadczeniem dołączonym do
+każdego żądania — jego wymóg nie zależy od tego, czy gateway stoi na tej samej maszynie, czy
+zdalnie. Konfiguracja tego modułu MUST nieść to poświadczenie przy każdym adresie gatewaya,
+loopback nie wyłącza go.
 
-#### Scenario: Adres zdalny bez tożsamości
+To inny kształt niż tryb dostępu do serwera narzędzi (`teams-tool-access`): tam pętla
+zwrotna bez tożsamości jest poprawnym trybem, bo Easy Auth stoi tylko przed zdalną
+instancją. Gateway żąda tego samego nagłówka od każdego wołającego, więc nie ma tu trybu do
+wybierania.
 
-- **WHEN** moduł startuje ze wskazanym adresem gatewaya spoza pętli zwrotnej i bez
-  skonfigurowanej tożsamości
+#### Scenario: Poświadczenie nieskonfigurowane przy adresie loopback
+
+- **WHEN** moduł startuje z adresem gatewaya w pętli zwrotnej i bez skonfigurowanego
+  poświadczenia
 - **THEN** MUST odmówić startu z komunikatem nazywającym brakujące ustawienie
 
 ### Requirement: Moduł pracuje wyłącznie na rachunku demonstracyjnym

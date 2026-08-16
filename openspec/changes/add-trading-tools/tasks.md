@@ -1,21 +1,36 @@
 ## 1. Szkielet `trading-mcp`
 
-- [ ] 1.1 Katalog `modules/trading-mcp/` z `pyproject.toml`, `README.md`, `.env.example`, `Dockerfile`
-- [ ] 1.2 `config.py` — adres i poświadczenie gatewaya, tożsamość, port 8060, wymóg ustalonej tożsamości wołającego
-- [ ] 1.3 Walidatory `Settings()`: tryb dostępu do gatewaya, odmowa startu bez poświadczenia
-- [ ] 1.4 `server.py` i `__main__.py` — wyłącznie transport sieciowy, bez `stdio`
-- [ ] 1.5 `network_identity.py` — odrzucenie żądania bez ustalonej tożsamości wołającego
-- [ ] 1.6 `/health` bez sesji MCP i bez poświadczenia, odpowiadające wyłącznie stanem modułu
-- [ ] 1.7 Testy: odmowa startu przy każdej niespójnej konfiguracji z 1.3; `/health` nie ujawnia rachunku ani narzędzi
+- [x] 1.1 Katalog `modules/trading-mcp/` z `pyproject.toml`, `README.md`, `.env.example`, `Dockerfile`
+- [x] 1.2 `config.py` — adres i poświadczenie gatewaya, tożsamość, port 8060, wymóg ustalonej tożsamości wołającego
+- [x] 1.3 Walidatory `Settings()`: poświadczenie gatewaya wymagane niezależnie od adresu, odmowa startu bez niego
+- [x] 1.4 `server.py` i `__main__.py` — wyłącznie transport sieciowy, bez `stdio`
+- [x] 1.5 `network_identity.py` — odrzucenie żądania bez ustalonej tożsamości wołającego
+- [x] 1.6 `/health` bez sesji MCP i bez poświadczenia, odpowiadające wyłącznie stanem modułu
+- [x] 1.7 Testy: odmowa startu przy każdej niespójnej konfiguracji z 1.3; `/health` nie ujawnia rachunku ani narzędzi
+
+  Jedna korekta wobec `design.md`, znaleziona przy czytaniu `capital_gateway/config.py`
+  i `app.py`: gateway nie ma trybu dostępu jak `market-data` (tożsamość zdalna kontra
+  pętla zwrotna bez niej) — `RequireGatewayKey` sprawdza ten sam nagłówek
+  `X-Gateway-Key` od każdego wołającego, loopback też. `trading-mcp-upstream-access`
+  poprawiony przed implementacją: jeden wymóg (poświadczenie zawsze), nie dwa tryby.
 
 ## 2. Dostęp do `capital-gateway`
 
-- [ ] 2.1 `client.py` — poświadczenie na żądanie, górna granica czasu, brak ponawiania żądań zmieniających stan
-- [ ] 2.2 Sprawdzenie środowiska przez `GET /capabilities` przy starcie; odmowa startu poza demo
-- [ ] 2.3 Powtórzenie sprawdzenia po odzyskaniu połączenia, przed obsłużeniem narzędzia zapisującego
-- [ ] 2.4 `errors.py` — rozdzielenie odmowy narzędzia od awarii dostępu; poświadczenie poza logami i odpowiedziami
-- [ ] 2.5 Snapshot kontraktu gatewaya w `contract/` i `scripts/contract.py check` na wzór `market-mcp`
-- [ ] 2.6 Testy: odmowa startu przy środowisku innym niż demo, timeout jako awaria dostępu, brak ponowienia po awarii
+- [x] 2.1 `client.py` — poświadczenie na żądanie, górna granica czasu, brak ponawiania żądań zmieniających stan
+- [x] 2.2 Sprawdzenie środowiska przez `GET /capabilities` przy starcie; odmowa startu poza demo
+- [x] 2.3 Powtórzenie sprawdzenia po odzyskaniu połączenia, przed obsłużeniem narzędzia zapisującego
+- [x] 2.4 `errors.py` — rozdzielenie odmowy narzędzia od awarii dostępu; poświadczenie poza logami i odpowiedziami
+- [x] 2.5 Snapshot kontraktu gatewaya w `contract/` i `scripts/contract.py check` na wzór `market-mcp`
+- [x] 2.6 Testy: odmowa startu przy środowisku innym niż demo, timeout jako awaria dostępu, brak ponowienia po awarii
+
+  `GatewayClient.ensure_demo_environment()` trzyma jeden bit stanu (`_demo_verified`),
+  zerowany przy każdej nieudanej rozmowie z gatewayem — 2.3 jest przez to
+  mechanizmem gotowym do wpięcia w każde narzędzie zapisujące (grupa 3), nie
+  wywołaniem, którego jeszcze nie ma czego strzec. `ToolRefusal` w `errors.py` jest z
+  tego samego powodu: kształt gotowy, zanim pierwsze narzędzie go użyje.
+  `scripts/contract.py` czyta schemat przez `app.openapi()` w `capital-gateway` (ten
+  moduł nie ma dedykowanego modułu `openapi.py` jak `market-data`) — bez bazy, bez
+  sesji providera i bez `CAPITAL_*`.
 
 ## 3. Zestaw narzędzi
 
