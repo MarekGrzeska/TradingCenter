@@ -225,13 +225,43 @@
 
 ## 9. Infrastruktura
 
-- [ ] 9.1 Rejestracja Entra dla `trading-mcp` w `infra/entra.tf`
-- [ ] 9.2 App Service w `infra/app-service.tf` — tożsamość, obraz, Easy Auth z `/health` poza wymaganiem
-- [ ] 9.3 `allowed_applications` modułu ograniczone do tożsamości `teams`
-- [ ] 9.4 Polityka Key Vault i odwołanie do `gateway-api-key` w ustawieniach aplikacji
-- [ ] 9.5 Adresy wyjściowe `trading-mcp` w zaporze `capital-gateway`
-- [ ] 9.6 `TRADING_MCP_URL` i `TRADING_MCP_SCOPE` w ustawieniach `teams`
-- [ ] 9.7 Instrukcja dla operatora w `modules/trading-mcp/README.md` — `apply -target`, pełny `apply`, kolejność wdrożenia
+- [x] 9.1 Rejestracja Entra dla `trading-mcp` — w `infra/app-service.tf`, nie w `entra.tf`
+- [x] 9.2 App Service w `infra/app-service.tf` — tożsamość, obraz, Easy Auth z `/health` poza wymaganiem
+- [x] 9.3 `allowed_applications` modułu ograniczone do tożsamości `teams`
+- [x] 9.4 Polityka Key Vault i odwołanie do `gateway-api-key` w ustawieniach aplikacji
+- [x] 9.5 Adresy wyjściowe `trading-mcp` w zaporze `capital-gateway`
+- [x] 9.6 `TRADING_MCP_URL` i `TRADING_MCP_SCOPE` w ustawieniach `teams`
+- [x] 9.7 Instrukcja dla operatora w `modules/trading-mcp/README.md` — `apply -target`, pełny `apply`, kolejność wdrożenia
+
+  **9.1 wylądowało w `app-service.tf`, nie w `entra.tf` jak mówi litera zadania**, i to jest
+  ta sama zasada, którą trzyma `market-mcp`: w `entra.tf` siedzą rejestracje, które ktoś
+  woła jako *użytkownik* — terminal i trzy API z delegowanym zakresem. Rejestracja bez
+  zakresu, istniejąca tylko po to, żeby cudza tożsamość zarządzana miała co pokazać, stoi
+  obok swojej aplikacji, bo czytana jest razem z nią. Rozdzielenie ich zostawiłoby dwa
+  pliki, w których trzeba trzymać palec naraz.
+
+  `allowed_applications` ma **jeden wpis** i to jest cała treść 9.3. U `market-mcp` są dwa,
+  bo archiwum czyta i agent, i teams; tutaj nikt poza `teams` nie ma po co składać zleceń, a
+  terminal najmniej ze wszystkich — przeglądarka rozmawia z `teams`, a `teams` tutaj.
+
+  Reguła w zaporze gatewaya jest **osobnym blokiem** (`AllowTradingMcp-*`, priorytety od
+  200), a nie poszerzeniem reguły `market-data`. Obie aplikacje stoją dziś na jednym planie
+  i najpewniej zgłoszą te same adresy — ale to fakt o planie, nie obietnica, a regułę
+  nazwaną modułem da się usunąć razem z modułem.
+
+  Nowego sekretu nie ma: moduł czyta `gateway-api-key`, ten sam, który gateway sprawdza, a
+  market-data przedstawia. Polityka Key Vaulta (9.4) jest mimo to obowiązkowa i z dwóch
+  powodów naraz — bez niej nie rozwiąże się ani ten klucz, ani `docker_registry_password`, a
+  ta druga porażka wygląda jak zepsute poświadczenie do GHCR i kosztowała już godzinę
+  diagnozy przy `market-mcp` (komentarz w `app-service.tf`).
+
+  Sprawdzone `terraform plan` na żywym stanie (odczyt, bez `apply`): **5 do utworzenia, 12
+  do zmiany, 0 do usunięcia**. Piątka to rejestracja, jej sekret, service principal,
+  polityka Key Vaulta i sama aplikacja. Dwunastka to w większości szum, który plan tego
+  roota ma od dawna — puste `tags` i listy `allowed_applications` przechodzące w „known
+  after apply", bo źródła danych czytające tożsamości zarządzane są odraczane, gdy
+  cokolwiek w planie czeka. Prawdziwe zmiany w tej dwunastce są dwie: zapora gatewaya i
+  ustawienia `teams`.
 
 ## 10. CI i wdrożenie
 

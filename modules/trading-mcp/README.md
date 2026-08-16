@@ -55,3 +55,50 @@ uv run pytest
 uv run ruff check .
 uv run pyright
 ```
+
+## Deploy
+
+This module's infrastructure is in `infra/app-service.tf`: an Entra registration of its
+own, the App Service, a Key Vault read policy, a rule in `capital-gateway`'s firewall, and
+the `TRADING_MCP_*` pair on `teams`. Applying it is the operator's job and never CI's —
+CI plans only, and `terraform-apply.yml` refuses any plan touching `azuread_*` outright,
+because the CI principal holds `Application.Read.All` and not write.
+
+**There is no new secret to set.** This module reads `gateway-api-key`, the same value
+capital-gateway checks and market-data presents. If the platform is running at all, it is
+already in the vault.
+
+The order is forced by the gateway's firewall, which reads the outbound addresses off an
+App Service that has to exist first:
+
+1. **`terraform apply -target=azurerm_linux_web_app.trading_mcp`.** The app must stand
+   before anything can read its addresses — a resource-level `for_each` refuses to plan
+   against a value known only after apply, which is the same two-phase start market-data,
+   agent and teams each needed. The Entra registration and its secret come along as
+   dependencies of this target rather than as a second `-target`.
+
+2. **`terraform apply`,** unrestricted. This is what converges the rest: the rule in
+   `capital-gateway`'s firewall, the Key Vault access policy, this module's
+   `allowed_applications` (one entry — `teams`'s managed identity, and nothing else ever),
+   and `TRADING_MCP_URL` / `TRADING_MCP_SCOPE` on `teams`. The settings change restarts
+   `teams` on its own; until it has restarted, its write tools are simply not there.
+
+3. **`deploy-trading-mcp.yml`** builds the image and deploys it, ending in a smoke check on
+   `/health` — the one path outside Easy Auth, answering with the module's own state and
+   naming neither the account nor the tools. Until that runs, the App Service serves the
+   placeholder image Terraform created it with, `teams` finds no tools at the address it
+   was given, and a team carrying a write tool is refused at start-up rather than left to
+   guess (specs/teams-tool-access).
+
+**What to check after the first deploy, and it is not the same as "the site answers".**
+This module refuses to start against anything but the demo account, checked against the
+gateway's own `GET /capabilities` rather than against its own configuration
+(specs/trading-mcp-upstream-access). A `/health` that answers is therefore already proof
+of two things: the gateway is reachable with the shared key, and it is a demo session.
+
+**Rollback.** Clear `TRADING_MCP_URL` and `TRADING_MCP_SCOPE` on `teams` and restart it.
+The read tools stay exactly where they were, teams without write tools is the state it ran
+in for the whole of phase 1, and every order already placed keeps its row in that module's
+trade trace. Nothing here is undone by removing this module: an order that reached the
+account is the broker's, not this platform's, and the demo positions are closed in the
+terminal the way they always were.
