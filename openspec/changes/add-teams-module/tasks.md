@@ -238,7 +238,7 @@
   `contract:check` na świeżym klonie pod Windows raportuje nieaktualność pliku, który jest
   aktualny.
 
-  Domknięcie grupy (PR #116), po merge'u grup 6, 7 i 8 — cztery pozycje otwarte wtedy
+  Domknięcie grupy (PR #117), po merge'u grup 6, 7 i 8 — cztery pozycje otwarte wtedy
   i dwie trasy, których do ich zamknięcia zabrakło:
 
   - **`GET /tools` w module** (9.7). Serwer narzędzi był dotąd pytany tylko przy zapisie
