@@ -1,6 +1,12 @@
-# One Linux App Service Plan, four apps (capital-gateway, market-data, market-mcp, agent —
-# design.md, "App Service, nie Container Apps"): all of them run non-stop, so one shared
-# plan is cheaper than as many Container Apps billed by CPU-second.
+# One Linux App Service Plan, six apps (capital-gateway, market-data, market-mcp, agent,
+# teams, trading-mcp — design.md, "App Service, nie Container Apps"): all of them run
+# non-stop, so one shared plan is cheaper than as many Container Apps billed by CPU-second.
+#
+# The fifth and sixth apps arrive after the measurement below was taken against four, and
+# the shape of that measurement says what to expect: most of the plan's memory is platform
+# overhead that grows per *app*, not per unit of work. So `plan_memory` (monitoring.tf,
+# alert at 92%) is the thing to watch after each of them is deployed, and the answer if it
+# fires is the same one B1 got — a bigger SKU, never a second worker.
 #
 # B2 rather than the B1 this started on, and the measurement is the reason (openspec:
 # scale-app-service-plan-to-b2). The two changes that added the third and fourth app both
@@ -38,6 +44,8 @@ locals {
   market_data_app_name     = "app-tradingcenter-market-data"
   market_mcp_app_name      = "app-tradingcenter-market-mcp"
   agent_app_name           = "app-tradingcenter-agent"
+  teams_app_name           = "app-tradingcenter-teams"
+  trading_mcp_app_name     = "app-tradingcenter-trading-mcp"
 
   # Deterministic App Service hostnames — used ahead of `terraform apply` (e.g. in the
   # Easy Auth redirect URI below) instead of waiting on the computed `default_hostname`,
@@ -46,6 +54,8 @@ locals {
   market_data_hostname     = "${local.market_data_app_name}.azurewebsites.net"
   market_mcp_hostname      = "${local.market_mcp_app_name}.azurewebsites.net"
   agent_hostname           = "${local.agent_app_name}.azurewebsites.net"
+  teams_hostname           = "${local.teams_app_name}.azurewebsites.net"
+  trading_mcp_hostname     = "${local.trading_mcp_app_name}.azurewebsites.net"
 
   # What `market-data` is called when it is the *resource* a token is asked for, rather
   # than the app serving a request. The terminal asks Entra for `<uri>/<scope>`; Easy
@@ -59,11 +69,23 @@ locals {
   # `market_data_api_scope` above).
   market_mcp_api_uri = "api://tradingcenter-market-mcp"
 
+  # And the same one level further out, for the tool server that writes. Like market-mcp's
+  # and unlike market-data's, this pairs with no delegated scope: the only caller is
+  # `teams`, presenting a client-credentials token from its managed identity. A browser
+  # never asks for this one, and there is nobody to consent on whose behalf.
+  trading_mcp_api_uri = "api://tradingcenter-trading-mcp"
+
   # The same shape for the agent's own registration (entra.tf) — see the comment there
   # for why its scope is granted to the terminal today but not yet the one the
   # terminal's token actually carries.
   agent_api_uri   = "api://tradingcenter-agent"
   agent_api_scope = "access_as_user"
+
+  # And the same for teams (entra.tf). It is both a resource — the terminal asks for a
+  # token naming it — and a caller: its managed identity presents one to market-mcp, the
+  # way the agent's does.
+  teams_api_uri   = "api://tradingcenter-teams"
+  teams_api_scope = "access_as_user"
 
   # Where the terminal is served from. One string, used in three places that MUST agree:
   # the SPA registration's redirect URI, the origin market-data allows a browser to call
@@ -96,10 +118,11 @@ locals {
 
 # capital-gateway: not public. design.md, "Uwierzytelnianie gatewaya w kodzie, nie w
 # konfiguracji platformy" — the in-code X-Gateway-Key check is the first layer; this
-# ip_restriction is the second. Its only intended caller is market-data, on the same
-# plan, so the exception is the plan's own outbound addresses rather than "the
-# internet." Read from market-data's resource (5.6 does the same for the database
-# firewall) — never typed by hand, because they change with the plan's SKU.
+# ip_restriction is the second. Its callers are market-data and, since phase 2 of the
+# teams work, trading-mcp — both on the same plan, so the exception is those apps' own
+# outbound addresses rather than "the internet." Read from their resources (5.6 does the
+# same for the database firewall) — never typed by hand, because they change with the
+# plan's SKU.
 resource "azurerm_linux_web_app" "capital_gateway" {
   name                = local.capital_gateway_app_name
   resource_group_name = azurerm_resource_group.main.name
@@ -134,6 +157,27 @@ resource "azurerm_linux_web_app" "capital_gateway" {
         ip_address  = "${ip_restriction.value}/32"
         priority    = 100 + tonumber(ip_restriction.key)
         description = "market-data's own outbound address read from its resource"
+      }
+    }
+
+    # The gateway's second caller, and the first one that writes: `trading-mcp` places
+    # orders through this app (specs/trading-mcp-upstream-access). Its own block, read off
+    # its own resource, rather than a widened market-data rule — the two apps share a plan
+    # today and will very likely report the same addresses, but that is a fact about the
+    # plan, not a promise, and a rule named after the module that needs it is the one that
+    # can be removed with the module.
+    #
+    # What this does NOT buy is a second rate budget: capital.com counts its 10 req/s
+    # against the *account*, so the tools called here spend the same allowance market-data
+    # fills the archive from (design.md, "Drugi wołający `capital-gateway`").
+    dynamic "ip_restriction" {
+      for_each = azurerm_linux_web_app.trading_mcp.possible_outbound_ip_address_list
+      content {
+        name        = "AllowTradingMcp-${ip_restriction.key}"
+        action      = "Allow"
+        ip_address  = "${ip_restriction.value}/32"
+        priority    = 200 + tonumber(ip_restriction.key)
+        description = "trading-mcp's own outbound address read from its resource"
       }
     }
   }
@@ -507,6 +551,174 @@ resource "azurerm_linux_web_app" "agent" {
   }
 }
 
+# teams: the same shape as agent, and for the same reasons — a browser reaches it
+# directly under its own hostname (Static Web Apps proxies nothing here), Easy Auth gates
+# it, and its own managed identity is what it presents to the database and to market-mcp.
+#
+# What it is not: a second agent. One request here starts a whole team of model calls,
+# which is why `REQUIRE_AUTHENTICATED_PRINCIPAL` below matters more than anywhere else in
+# this file — the module refuses to trust that the Easy Auth block above it was left
+# switched on (specs/teams-browser-access, "Moduł nie bierze na wiarę warstwy przed sobą").
+resource "azurerm_linux_web_app" "teams" {
+  name                = local.teams_app_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  service_plan_id     = azurerm_service_plan.main.id
+  https_only          = true
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    always_on = true
+    # No `websockets_enabled`, same as agent: run progress is delivered over plain HTTP,
+    # because a browser cannot put an `Authorization` header on a WebSocket handshake and
+    # the credential must not travel in the address instead (specs/teams-browser-access,
+    # "Poświadczenie nie wędruje w adresie").
+
+    # Same reasoning as market-data's and agent's own CORS blocks: the preflight for a
+    # cross-origin request carrying `Authorization` has no credential on it, and Easy Auth
+    # would refuse it before the container saw it. teams MUST NOT add a CORS middleware of
+    # its own — two layers double the header and a browser rejects that.
+    cors {
+      allowed_origins     = [local.terminal_origin]
+      support_credentials = false
+    }
+
+    application_stack {
+      # Placeholder — `deploy-teams.yml` pushes the real GHCR image after the first build.
+      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
+    }
+  }
+
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = true
+    unauthenticated_action = "Return401"
+    default_provider       = "azureactivedirectory"
+
+    # The health probe, and nothing else — the exemption every module here carries, and
+    # the one that makes a deploy check worth running: with it, `deploy-teams.yml` reaches
+    # the *process*, not the control plane, which reported green over a crash-looping
+    # container on 16 August 2026. The lifespan does not finish until the migration does,
+    # so a process answering this at all has a database at its image's revision.
+    excluded_paths = ["/health"]
+
+    active_directory_v2 {
+      client_id                  = azuread_application.teams_easy_auth.client_id
+      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
+      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      # Both spellings of this module's own audience, plus market-data's — see the comment
+      # on `teams_easy_auth` (entra.tf). The terminal holds one token today, asked for by
+      # market-data's scope; the scope of this module's own stands pre-authorized for
+      # whenever the terminal asks for it by name.
+      allowed_audiences = [
+        local.teams_api_uri,
+        azuread_application.teams_easy_auth.client_id,
+        local.market_data_api_uri,
+        azuread_application.market_data_easy_auth.client_id,
+      ]
+
+      allowed_applications = [azuread_application.terminal.client_id]
+    }
+
+    login {
+      token_store_enabled = true
+    }
+  }
+
+  app_settings = {
+    # No credential in the URL and no AZURE_CLIENT_* triple — `teams/config.py` refuses a
+    # DATABASE_URL carrying one when DATABASE_USER is set, and the system-assigned identity
+    # is ambient. DATABASE_USER is the role the operator creates in the `teams` database
+    # (README's Deploy section), named after this app so the two never drift apart.
+    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.teams.name}?sslmode=require"
+    DATABASE_USER = local.teams_app_name
+
+    # This module's own OpenAI key, not the one agent reads — a separate secret so the
+    # cost of these experiments shows up on its own line (key-vault.tf). Key Vault
+    # reference rather than a literal: the value never enters Terraform state or a log.
+    OPENAI_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.teams_openai_api_key})"
+
+    # The module's own catalogue — `var.teams_models`, separate from `var.agent_models`
+    # for the reason that variable's description gives. No DEFAULT_MODEL_ID to pair with
+    # it: every agent in a saved revision names its own model (specs/teams-models).
+    MODELS = jsonencode([
+      for id, m in var.teams_models : {
+        id                 = id
+        model              = m.model
+        display_name       = m.display_name
+        cost_rank          = m.cost_rank
+        input_rate_per_1m  = m.input_rate_per_1m
+        output_rate_per_1m = m.output_rate_per_1m
+      }
+    ])
+
+    # The tool server, and the scope this app's managed identity asks Entra for a token to
+    # reach it with. Both or neither: `teams/config.py` refuses a remote URL with no scope
+    # at startup. Clearing MARKET_MCP_URL is also the rollback for the whole tool loop —
+    # teams without a tool server is a supported state, not a broken one, as long as no
+    # team assigns tools to its agents (specs/teams-tool-access).
+    MARKET_MCP_URL   = "https://${local.market_mcp_hostname}"
+    MARKET_MCP_SCOPE = "${local.market_mcp_api_uri}/.default"
+
+    # The second tool server, and the one that writes. Independently optional from the
+    # pair above: clearing these two and restarting takes the *write* tools away and leaves
+    # the read ones exactly where they were — which is both the rollback for phase 2 and
+    # the state this module ran in for the whole of phase 1 (specs/teams-tool-access,
+    # "Nieosiągalny jest tylko serwer, z którego nikt nic nie ma").
+    #
+    # Both or neither, again: `teams/config.py` refuses a remote URL with no scope and a
+    # scope with no URL, checked separately per server so the error names which of the two
+    # is half-configured.
+    TRADING_MCP_URL   = "https://${local.trading_mcp_hostname}"
+    TRADING_MCP_SCOPE = "${local.trading_mcp_api_uri}/.default"
+
+    # The module's own clock — schedules and triggers fire from a task in this app's
+    # `lifespan`, not from anything in Azure (design.md, "Zegar w procesie modułu, nie w
+    # Azure"). A timer calling in from outside would need its own Entra registration to
+    # get past Easy Auth, and would put the schedule in Terraform, which is to say back
+    # in the operator's hands rather than in the catalogue where they set it.
+    #
+    # **Off, deliberately, and this is the one setting in this file whose value is a
+    # decision rather than a fact.** `teams/config.py` defaults it to `true`, so leaving
+    # it out of this map would *enable* the clock — the opposite of leaving it alone.
+    #
+    # The reason it is off has changed, and the new one is weaker. It *was* a broken
+    # guard: `teams/validation.py` consulted a hand-kept `STATE_CHANGING_TOOLS =
+    # frozenset()`, so the check refusing an unattended schedule over a revision carrying
+    # write tools (specs/teams-schedules) asked an empty set and refused nothing, while
+    # this app already had `TRADING_MCP_URL`. That is closed — the check now reads each
+    # server's own `readOnlyHint` at save time and refuses anything it cannot confirm is
+    # a read.
+    #
+    # What is left is that no schedule has ever fired on a running stack (task 8.2 of
+    # `add-teams-schedules-and-triggers`). Turning the clock on here is the operator's
+    # call after that pass, not something to slip in with a code change.
+    #
+    # Flipping it is one line here plus an `apply`; every schedule and trigger already
+    # in the catalogue stays exactly where it is either way, and a run started by hand
+    # works with the clock off (specs/teams-schedules, "Budzenie wyłączone ustawieniem").
+    SCHEDULER_ENABLED = "false"
+
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.teams_easy_auth.value
+
+    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+  }
+
+  lifecycle {
+    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
+  }
+}
+
 # Secret-read access only — Set/Delete/Purge stays with the operator (key-vault.tf).
 resource "azurerm_key_vault_access_policy" "capital_gateway" {
   key_vault_id = azurerm_key_vault.main.id
@@ -531,6 +743,18 @@ resource "azurerm_key_vault_access_policy" "agent" {
   key_vault_id = azurerm_key_vault.main.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
   object_id    = azurerm_linux_web_app.agent.identity[0].principal_id
+
+  secret_permissions = ["Get", "List"]
+}
+
+# Two references to resolve here, not one: `docker_registry_password` and this module's
+# own `teams-openai-api-key`. Without this policy neither resolves, and the failure is the
+# quiet kind market-mcp's comment below documents — a reference the app cannot read
+# resolves to nothing rather than to an error.
+resource "azurerm_key_vault_access_policy" "teams" {
+  key_vault_id = azurerm_key_vault.main.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.teams.identity[0].principal_id
 
   secret_permissions = ["Get", "List"]
 }
@@ -573,6 +797,15 @@ output "market_data_managed_identity_principal_id" {
   value       = azurerm_linux_web_app.market_data.identity[0].principal_id
 }
 
+output "teams_hostname" {
+  value = azurerm_linux_web_app.teams.default_hostname
+}
+
+output "teams_managed_identity_principal_id" {
+  description = "The operator's one-off Postgres role creation for the `teams` database needs this object id (modules/teams/README.md, Deploy)."
+  value       = azurerm_linux_web_app.teams.identity[0].principal_id
+}
+
 output "agent_managed_identity_principal_id" {
   description = "The operator's manual Postgres role creation for `agent` needs this object id (design.md's Risk, \"Baza `agent` w produkcji zakładana ręcznie\")."
   value       = azurerm_linux_web_app.agent.identity[0].principal_id
@@ -584,6 +817,12 @@ output "agent_managed_identity_principal_id" {
 # the identity's `client_id` lives on the service principal found by that object id.
 data "azuread_service_principal" "agent_managed_identity" {
   object_id = azurerm_linux_web_app.agent.identity[0].principal_id
+}
+
+# The same lookup for teams — it is market-mcp's second caller, and `allowed_applications`
+# there names client ids, which `identity[0]` does not export.
+data "azuread_service_principal" "teams_managed_identity" {
+  object_id = azurerm_linux_web_app.teams.identity[0].principal_id
 }
 
 # market-mcp: not public in the sense the terminal ever reaches it — its only intended
@@ -694,9 +933,18 @@ resource "azurerm_linux_web_app" "market_mcp" {
       # market-data's list — `identity[0]` exports the Entra object id, and the client
       # id lives on the service principal behind it.
       #
-      # There is deliberately no second entry. The terminal never reaches this app; a
-      # browser talks to the agent, and the agent talks here.
-      allowed_applications = [data.azuread_service_principal.agent_managed_identity.client_id]
+      # Two backend callers now, and still no browser: teams reads the archive through
+      # the same tools the agent does, with its own managed identity rather than a
+      # borrowed one (proposal.md — "`market-mcp` zyskuje drugiego wołającego, co jest
+      # wpisem w `allowed_applications`, a nie zmianą jego zachowania"). market-mcp itself
+      # changes not one line for this.
+      #
+      # The terminal is still absent from this list on purpose: a browser talks to agent
+      # or to teams, and they talk here.
+      allowed_applications = [
+        data.azuread_service_principal.agent_managed_identity.client_id,
+        data.azuread_service_principal.teams_managed_identity.client_id,
+      ]
     }
 
     login {
@@ -741,4 +989,170 @@ data "azuread_service_principal" "market_mcp_managed_identity" {
 
 output "market_mcp_hostname" {
   value = azurerm_linux_web_app.market_mcp.default_hostname
+}
+
+# trading-mcp: the sixth app, and the second tool server. Shaped after market-mcp and not
+# after market-data, for the same reason market-mcp is: its only caller is a backend
+# service presenting a managed identity, so there is no delegated scope and no consent
+# screen — only client credentials.
+#
+# Where it differs from market-mcp is what sits behind it. market-mcp reads an archive;
+# this one places orders on a live broker connection, which is why every gate below is
+# written as narrow as it can be: one caller in `allowed_applications`, one exempt path,
+# and a credential the app resolves from Key Vault rather than one this root ever holds.
+resource "azuread_application" "trading_mcp_easy_auth" {
+  display_name    = "app-tradingcenter-trading-mcp-easyauth"
+  identifier_uris = [local.trading_mcp_api_uri]
+
+  # Required even with no scope inside it — see market-mcp's own comment above, and the
+  # interrupted apply of 13 August 2026 that wrote it: the tenant policy on identifier
+  # URIs exempts applications asking for v2 tokens, and Easy Auth below is configured
+  # against the `/v2.0` endpoint. The default is 1, and both failures it causes name
+  # something other than the version.
+  api {
+    requested_access_token_version = 2
+  }
+
+  web {
+    redirect_uris = ["https://${local.trading_mcp_hostname}/.auth/login/aad/callback"]
+  }
+}
+
+resource "azuread_service_principal" "trading_mcp_easy_auth" {
+  client_id = azuread_application.trading_mcp_easy_auth.client_id
+}
+
+resource "azuread_application_password" "trading_mcp_easy_auth" {
+  application_id = azuread_application.trading_mcp_easy_auth.id
+  display_name   = "easy-auth"
+  end_date       = timeadd(timestamp(), "8760h")
+
+  lifecycle {
+    ignore_changes = [end_date]
+  }
+}
+
+resource "azurerm_linux_web_app" "trading_mcp" {
+  name                = local.trading_mcp_app_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  service_plan_id     = azurerm_service_plan.main.id
+  https_only          = true
+
+  # Not for reaching capital-gateway — that is a static key in a header, checked by the
+  # gateway on every caller including this one. This identity exists so the app can read
+  # its own Key Vault references (the GHCR pull token and that very key), which is the
+  # grant `azurerm_key_vault_access_policy.trading_mcp` below makes.
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    always_on = true
+    # No `cors` and no `ip_restriction`, the same two omissions market-mcp makes: no
+    # browser ever calls this app, so there is no preflight to answer, and the gate on who
+    # may reach it is Easy Auth below rather than an address list.
+
+    application_stack {
+      # Placeholder — `deploy-trading-mcp.yml` (group 10) pushes the real GHCR image after
+      # the first build; the lifecycle block below is what stops Terraform reverting it.
+      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
+    }
+  }
+
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = true
+    unauthenticated_action = "Return401"
+    default_provider       = "azureactivedirectory"
+
+    # The health probe and nothing else, exactly as market-mcp and teams have it: the
+    # platform restarts the container off this response and speaks no Easy Auth
+    # (specs/trading-mcp-transport, "Zdrowie modułu da się sprawdzić bez sesji MCP"). It
+    # answers with the module's own state and names neither the account nor the tools.
+    excluded_paths = ["/health"]
+
+    active_directory_v2 {
+      client_id                  = azuread_application.trading_mcp_easy_auth.client_id
+      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
+      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      allowed_audiences = [
+        local.trading_mcp_api_uri,
+        azuread_application.trading_mcp_easy_auth.client_id,
+      ]
+
+      # **One caller, and it is a list of one on purpose** (specs/trading-mcp-transport,
+      # "Wołający jest wskazany imiennie" — an enumerated list, never "anyone authenticated
+      # in the directory"). market-mcp's list has two entries
+      # because two modules read the archive; nothing but `teams` has any business placing
+      # an order, and the terminal least of all — a browser talks to `teams`, and `teams`
+      # talks here. Adding an entry to this list is the single largest change anyone can
+      # make to what this platform can do to the account.
+      allowed_applications = [
+        data.azuread_service_principal.teams_managed_identity.client_id,
+      ]
+    }
+
+    login {
+      token_store_enabled = true
+    }
+  }
+
+  app_settings = {
+    # The gateway by its own hostname, over TLS. Its firewall (top of this file) admits
+    # this app's outbound addresses; its `X-Gateway-Key` check admits the credential
+    # below. Both are needed — the gateway checks the header on every caller, loopback
+    # included, so there is no address here that would make the key optional
+    # (`trading_mcp/config.py`).
+    CAPITAL_GATEWAY_URL = "https://${local.capital_gateway_hostname}"
+
+    # The same secret capital-gateway itself reads and market-data presents — one value,
+    # three readers, and a Key Vault reference rather than a literal so it never enters
+    # Terraform state or a deploy log. With no value in the vault the reference resolves
+    # to nothing and this module refuses to start, which is the intended failure and not
+    # a quiet one (`config.py` requires the key).
+    CAPITAL_GATEWAY_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
+
+    # App Service's default expectation for a Linux custom container, matching what the
+    # Dockerfile's own ENV sets. Said here as well as there so a reader of either file
+    # sees the number the other one uses (no WEBSITES_PORT override, like the other five).
+    TRADING_MCP_PORT = "80"
+
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.trading_mcp_easy_auth.value
+
+    # The module checks the caller's identity itself rather than trusting that the block
+    # above is switched on — the same refusal to take the platform on faith that
+    # market-mcp and teams both make (specs/trading-mcp-transport, "Wołający jest wskazany
+    # imiennie": a request with no established identity is refused before it reaches a
+    # tool). For a module that writes to an account, the
+    # failure this guards against is the one that would matter most.
+    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+  }
+
+  lifecycle {
+    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
+  }
+}
+
+# Two references to resolve, and neither is optional: `docker_registry_password` and
+# `CAPITAL_GATEWAY_API_KEY`. Without this policy the first fails the way market-mcp's
+# comment above describes — an unauthorized GHCR pull that reads like a broken registry
+# credential — and the second would leave the module refusing to start with a blank key.
+resource "azurerm_key_vault_access_policy" "trading_mcp" {
+  key_vault_id = azurerm_key_vault.main.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
+
+  secret_permissions = ["Get", "List"]
+}
+
+output "trading_mcp_hostname" {
+  value = azurerm_linux_web_app.trading_mcp.default_hostname
 }

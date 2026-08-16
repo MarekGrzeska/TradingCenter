@@ -55,6 +55,11 @@ export interface Endpoints {
    *  design.md, "Static Web Apps nie przeprowadzi strumienia". No WS counterpart: the
    *  agent's stream rides plain HTTP (`fetch` + `ReadableStream`), not a socket. */
   agentHttp: string;
+  /** `teams`, for the team catalogue, the model catalogue it publishes and — later — a
+   *  run's progress. Its own address for the same reason the agent has one: it is a
+   *  module of its own, on a host of its own, and nothing proxies it through the
+   *  archive. */
+  teamsHttp: string;
 }
 
 // Same defaults as .env.example: a checkout without one falls back to the dev proxy
@@ -65,11 +70,13 @@ export interface Endpoints {
 const DEFAULT_ARCHIVE_HTTP = "/archive-api";
 const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 const DEFAULT_AGENT_HTTP = "/agent-api";
+const DEFAULT_TEAMS_HTTP = "/teams-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
   VITE_ARCHIVE_WS?: string;
   VITE_AGENT_HTTP?: string;
+  VITE_TEAMS_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
@@ -117,5 +124,6 @@ export function resolveEndpoints(
     archiveHttp: resolveHttpBase(env.VITE_ARCHIVE_HTTP || DEFAULT_ARCHIVE_HTTP),
     archiveWs: resolveWsBase(env.VITE_ARCHIVE_WS || DEFAULT_ARCHIVE_WS, loc),
     agentHttp: resolveHttpBase(env.VITE_AGENT_HTTP || DEFAULT_AGENT_HTTP),
+    teamsHttp: resolveHttpBase(env.VITE_TEAMS_HTTP || DEFAULT_TEAMS_HTTP),
   };
 }

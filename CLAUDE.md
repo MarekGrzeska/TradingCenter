@@ -18,7 +18,9 @@ modules/capital-gateway   Python · capital.com: trading, history, live stream. 
 modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway.
 modules/market-mcp        Python · MCP tools over market-data, reduced for a model. Read-only — no tool writes. Depends on market-data.
 modules/agent             Python · the operator's conversation with a model. Own database, own OpenAI key. Reads the archive through market-mcp's tools.
-modules/terminal          React+TS · the operator's screen. Consumes the gateway, market-data and agent. Publishes nothing.
+modules/teams             Python · teams of agents as data — a graph the operator composes, revisions, runs and their cost. Own database, own OpenAI key. Same market-mcp tools as agent, plus trading-mcp's; no edge to agent itself.
+modules/trading-mcp       Python · MCP tools over the gateway's demo account: positions, balance, orders. Network transport only, one named caller (teams). Demo checked against the gateway, not against a setting.
+modules/terminal          React+TS · the operator's screen. Consumes the gateway, market-data, agent and teams. Publishes nothing.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
 docs/                     architecture and reference — only what is true today
@@ -38,6 +40,8 @@ Run these from the module directory. Nothing at the repo root builds or tests ev
 | `market-data` | `uv run alembic upgrade head` then `uv run uvicorn market_data.app:app --reload --port 8020`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `market-mcp` | `uv run python -m market_mcp stdio` (desktop client) or `... http` (port 8040)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
 | `agent` | `uv run alembic upgrade head` then `uv run uvicorn agent.app:app --reload --port 8030`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
+| `teams` | `uv run alembic upgrade head` then `uv run uvicorn teams.app:app --reload --port 8050`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
+| `trading-mcp` | `uv run python -m trading_mcp` (port 8060 — one transport, no `stdio` to choose)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
 | `terminal` | `pnpm dev` · `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm contract:check` |
 
 Test flags that matter:
@@ -51,9 +55,16 @@ Test flags that matter:
 
 The whole stack: `./scripts/dev.sh` on macOS and Linux, `./scripts/dev.ps1` on Windows —
 the same script twice (`--no-terminal` / `-NoTerminal` for back end only). It starts things
-in dependency order — migrations → gateway → market-data → market-mcp → agent → terminal —
-waiting for each to actually answer. Ports are fixed: **8010** gateway, **8020**
-market-data, **8030** agent, **8040** market-mcp, **5173** terminal.
+in dependency order — migrations → gateway → market-data → market-mcp → trading-mcp →
+agent → teams → terminal — waiting for each to actually answer. Ports are fixed: **8010**
+gateway, **8020** market-data, **8030** agent, **8040** market-mcp, **8050** teams,
+**8060** trading-mcp, **5173** terminal.
+
+`trading-mcp` is the one module that will not start on a wish: `CAPITAL_GATEWAY_API_KEY` in
+its `.env` must be the gateway's own `GATEWAY_API_KEY` (the gateway checks the header on
+loopback too), and it asks the gateway whether the account is a demo one *before* it opens
+a port. Both dev scripts compare the two files and refuse up front, because otherwise the
+symptom is the whole stack going down with "a service exited".
 
 ## Things that will bite you
 
@@ -67,12 +78,12 @@ Production connects with an Entra identity instead — `DATABASE_USER` set in
 arrangement where dev ran on the Azure server; it was reversed the same day it was made —
 `openspec/changes/local-dev-database-in-docker`.)
 
-`agent` writes to a second logical database (`agent`) in the same container, on the same
-port — one Postgres server, two schemas, the same shape as production's own `psql-
-tradingcenter` (`infra/database.tf`). The dev scripts create the role and the database
-themselves if either is missing, since `docker-entrypoint-initdb.d` only ever runs against
-an empty volume and would never fire for a `tradingcenter-db-data` from before `agent`
-existed.
+`agent` and `teams` write to further logical databases (`agent`, `teams`) in the same
+container, on the same port — one Postgres server, three schemas, the same shape as
+production's own `psql-tradingcenter` (`infra/database.tf`). The dev scripts create each
+role and database themselves if either is missing, since `docker-entrypoint-initdb.d` only
+ever runs against an empty volume and would never fire for a `tradingcenter-db-data` from
+before those modules existed.
 
 **The terminal's contract is generated.** `src/data/contract.generated.ts` is built from the
 schema `market-data` derives from its own models. After changing anything in
@@ -119,6 +130,22 @@ tools, which is what it was before it had any. An `.env` copied before this chan
 usual reason a local agent answers from memory while market-mcp sits there idle —
 `dev.sh`/`dev.ps1` say so at startup rather than leave it to be discovered.
 
+`teams` needs the same three — `DATABASE_URL`, `OPENAI_API_KEY`, `MODELS` — and none of
+them are agent's: a **separate** OpenAI key (`teams-openai-api-key` in Key Vault, so the
+experiments' cost has its own line) and a catalogue of its own, with no `DEFAULT_MODEL_ID`,
+because every agent in a saved team revision names its own model. `MARKET_MCP_URL` is
+optional here too, with a sharper consequence than agent's: a team whose agents were
+assigned tools refuses to run rather than answer without them. `TRADING_MCP_URL` is the
+same setting for the write tools, checked independently — clearing it takes the order tools
+away and leaves the reading ones exactly where they were.
+
+`trading-mcp` is the exception to market-mcp's "no `.env` needed locally": it has one
+required setting, `CAPITAL_GATEWAY_API_KEY`, and it must be the gateway's own
+`GATEWAY_API_KEY` — the gateway checks that header on every caller, loopback included, so
+there is no local mode where it can be left out. Together with the demo check it makes at
+start-up, that is why this module exits rather than degrades when something is wrong, and
+why both dev scripts compare the two files before starting anything.
+
 **Terraform `apply` is the operator's job, never CI's.** CI plans only, deliberately —
 applying would hand the CI principal Entra directory write access. `infra/bootstrap/` keeps
 local state that *is* committed; its storage-account keys are in that file and are inert by
@@ -135,7 +162,7 @@ in `tool_calls` still recording what happened while it had them.
 
 ## Migrations are never the operator's job
 
-**Standing rule, for every module that owns a schema — the two that exist and every one
+**Standing rule, for every module that owns a schema — the three that exist and every one
 added later: a merge to `main` must leave production serving. No operator step between the
 merge and a working application, and none after it.** A module whose deployment cannot
 migrate its own database is not finished, and neither is the change that added it.
@@ -299,24 +326,34 @@ comment exists is usually clearest to whoever is already reading the code around
 `.github/workflows/checks.yml` runs on every PR to `main` and every push to it: one job per
 module, running the same commands listed above, and **only for the modules the diff can
 have broken** — a `changes` job works that out first. `live` tests stay out. If you touch
-`market_data/contract.py` or `agent/contract.py`, expect the terminal's job to run too;
-that is deliberate, since `contract:check` and the terminal's own hand-written DTOs are the
-checks for exactly those pairings — `agent`'s contract is not wired into
-`pnpm contract:generate`, so its half of that pairing is the terminal's tests passing, not
-a regenerated file. `market_data/contract.py` pulls in `market-mcp`'s job for the same
+`market_data/contract.py`, `agent/contract.py` or `teams/contract.py`, expect the terminal's
+job to run too; that is deliberate, since `contract:check` and the terminal's own
+hand-written DTOs are the checks for exactly those pairings — `teams`' contract is generated
+the way market-data's is (`pnpm contract:generate` reads two sources and writes a file per
+source), while `agent`'s is not wired into the generator at all, so its half of that pairing
+is the terminal's tests passing rather than a regenerated file. `market_data/contract.py` pulls in `market-mcp`'s job for the same
 reason: that module keeps its own committed snapshot of the same schema
 (`contract/market-data.openapi.json`), and `scripts/contract.py check` is what catches it
-going stale.
+going stale. `trading-mcp` holds the same kind of snapshot one module further out —
+`capital-gateway`'s whole OpenAPI document — so **any** change under the gateway runs that
+job too; the document is built from its routes as well as its DTOs, and there is no
+narrower filter that would still be true.
 
 There is no branch protection on this repository — a private repo on the free plan cannot
 have it — so a skipped job blocks nothing. If that changes, the filter needs stand-in jobs
 or a required check will sit pending forever.
 
-Five `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
+Seven `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
 the matching module, each ending in a smoke check of the deployed thing — they differ in
-how they can reach it: market-data has one path excluded from Easy Auth and market-mcp
-answers `/health` outright, so both probe directly, while capital-gateway and agent have
-no such path and confirm through the Azure control plane instead.
+how they can reach it: market-data has one path excluded from Easy Auth, market-mcp and
+trading-mcp answer `/health` outright, and agent and teams have `/health` excluded and ask
+the control plane which image is serving on top of it. trading-mcp's probe is the one that
+proves the most for its length: that module refuses to open a port unless the gateway just
+confirmed a demo account, so a 200 there means it reached the gateway, through its
+firewall, with the shared key. capital-gateway is the one that cannot be probed at all — it
+admits only market-data's and trading-mcp's addresses, so the control plane is the only
+question its deploy can ask, which is the weaker one: it reported `Running` over a
+crash-looping container on 16 August 2026.
 `terraform.yml` plans on infra PRs; `terraform-apply.yml` is a manual `workflow_dispatch`
 that applies — and refuses any plan touching `azuread_*`, because CI holds
 `Application.Read.All` and not write. Entra changes are applied locally by the operator.

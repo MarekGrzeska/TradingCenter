@@ -21,7 +21,9 @@ with it, in one confirmed step that says so plainly before it happens. What it r
 what makes a re-add later start from nothing rather than quietly inheriting a shorter
 range it was never given, and it stays visible afterwards as an entry in `Data History`.
 
-**Tabs.** `Graph` is the grid of charts. `Instruments` is the one place that says what is
+**Tabs.** `Graph` is the grid of charts. `Teams` is where a team of agents is composed —
+roles and the dependencies between them, drawn rather than listed, because the
+dependencies are what decide who sees whose work. `Instruments` is the one place that says what is
 archived — one row per instrument, every resolution of it in one column, and since when
 there is data for it: one date when the resolutions agree, split per resolution when they
 reach differently far back — and where an
@@ -66,6 +68,19 @@ before it is asked anything else.
   in one timeline with the jobs, ordered newest first. A row opens the job it came from as a
   whole — every pair, every failure, and the one Retry, which covers the whole job because
   that is what it has always done.
+- `teams/` — the `Teams` tab: the catalogue of operator-defined teams, and one team open on
+  a canvas (`@xyflow/react`) as its agents and the dependencies between them. Unlike the
+  agent's hand-written DTOs, this module's client (`teamsApi.ts`) is built on types
+  generated from its own OpenAPI document — its surface is graphs and revisions, wide
+  enough that a renamed field would arrive as `undefined` rather than as a compile error.
+  Both pickers in the agent panel are built from what the module publishes: the model
+  catalogue, and whatever its tool server announces. No model id and no tool name is
+  written down here, and a test reads the source to keep it that way. A run is started
+  from the catalogue and watched on that same canvas — each agent carrying the state of
+  its step, its output and what it called — over the module's server-sent progress
+  (`runs.ts`, `useRunMonitor.ts`). The graph a run is watched on is *its* revision, read
+  by the id the run names; leaving the view drops the stream and nothing else, and the
+  catalogue's run list is the way back in.
 
 ## Run
 
@@ -76,7 +91,9 @@ pnpm dev                  # http://localhost:5173
 ```
 
 `market-data` must be running on port 8020 and `capital-gateway` on 8010 — there is no
-offline mode. Either being down is survivable and says so: without the archive the charts
+offline mode. `agent` (8030) and `teams` (8050) are optional in the same sense every
+back end here is: their tabs report what is unreachable rather than the app failing to
+start. Either being down is survivable and says so: without the archive the charts
 report that candles are stale, without the gateway the instrument search stops. From the
 repo root, `./scripts/dev.ps1` starts the gateway, waits for it, then starts the terminal
 against it; the archive is started separately (see `modules/market-data/README.md`).
@@ -87,7 +104,7 @@ against it; the archive is started separately (see `modules/market-data/README.m
 pnpm test            # vitest — data layer, shell, autocomplete, chart, grid, instruments, history
 pnpm typecheck
 pnpm lint
-pnpm contract:check  # fails when src/data/contract.generated.ts is stale
+pnpm contract:check  # fails when either generated contract (market-data, teams) is stale
 ```
 
 All four run on every pull request (`.github/workflows/checks.yml`). The `pnpm` version is

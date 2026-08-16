@@ -39,7 +39,9 @@ jobs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
       market-data: ${{ steps.filter.outputs.market-data }}
       market-mcp: ${{ steps.filter.outputs.market-mcp }}
+      trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
       agent: ${{ steps.filter.outputs.agent }}
+      teams: ${{ steps.filter.outputs.teams }}
       terminal: ${{ steps.filter.outputs.terminal }}
       openspec: ${{ steps.filter.outputs.openspec }}
     steps:
@@ -76,6 +78,7 @@ jobs:
           gateway='^modules/capital-gateway/'
           archive='^modules/market-data/'
           agent='^modules/agent/'
+          teams='^modules/teams/'
           # The terminal's `contract:check` compares its generated types against the
           # schema market-data builds from `contract.py`. Filtering the terminal on its
           # own directory alone would let a contract change land with the check that
@@ -85,20 +88,33 @@ jobs:
           # into `contract:generate` (design.md, "Kontrakt terminala pisany ręcznie, bez
           # generatora") — the terminal's hand-written DTOs in `agentApi.ts` are the
           # check for *that* contract, and they only run if this job does.
-          terminal='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/agent/agent/contract\.py$'
+          #
+          # `teams/contract.py` is the third, and it is the generated kind: from the
+          # add-teams-module change on, `contract:generate` reads two schema sources and
+          # writes a file per source, so a change here leaves the terminal's committed
+          # types stale exactly the way market-data's would.
+          terminal='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/agent/agent/contract\.py$|^modules/teams/teams/contract\.py$'
           # Same reasoning as the terminal's own filter, one line up: market-mcp keeps a
           # committed snapshot of the same contract (`contract/market-data.openapi.json`),
           # and `test_contract.py` is the check that catches it going stale.
           mcp='^modules/market-mcp/|^modules/market-data/market_data/contract\.py$'
+          # The same rule again, one module along: trading-mcp keeps a committed snapshot
+          # of capital-gateway's whole OpenAPI document (`contract/capital-gateway.
+          # openapi.json`), and `scripts/contract.py check` is what catches it going
+          # stale. The gateway's *whole* directory, not one file: that document is built
+          # from its routes as well as its DTOs, so there is no narrower honest filter.
+          trading='^modules/trading-mcp/|^modules/capital-gateway/'
           # The archive-shape check, plus the script that is the shape.
           specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
 
-          for name in capital-gateway market-data market-mcp agent terminal openspec; do
+          for name in capital-gateway market-data market-mcp trading-mcp agent teams terminal openspec; do
             case "$name" in
               capital-gateway) pattern="$gateway" ;;
               market-data)     pattern="$archive" ;;
               market-mcp)      pattern="$mcp" ;;
+              trading-mcp)     pattern="$trading" ;;
               agent)           pattern="$agent" ;;
+              teams)           pattern="$teams" ;;
               terminal)        pattern="$terminal" ;;
               openspec)        pattern="$specs" ;;
             esac
@@ -177,6 +193,31 @@ jobs:
       - run: uv run pyright
       - run: uv run pytest -q
 
+  trading-mcp:
+    name: trading-mcp
+    needs: changes
+    if: needs.changes.outputs.trading-mcp == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/trading-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # Before the tests, same as market-mcp's own: `scripts/contract.py` reaches into
+      # `../capital-gateway` in this same checkout and reads its OpenAPI document off the
+      # app object — no database, no provider session and no CAPITAL_* credentials, since
+      # that module builds its Settings inside `lifespan` rather than at import.
+      - run: uv run python scripts/contract.py check
+      - run: uv run ruff check .
+      - run: uv run pyright
+      # Nothing here reaches capital.com or a running gateway: every test doubles the
+      # upstream. The demo-only guard is exercised against that double, which is the only
+      # place it can be exercised without an account to refuse.
+      - run: uv run pytest -q
+
   agent:
     name: agent
     needs: changes
@@ -198,6 +239,29 @@ jobs:
       # conftest.py, not on a flag, and this runner has it — so one `pytest -q` also
       # runs them, real PostgreSQL and all. `live` tests need a real OpenAI key and
       # stay behind --run-live, never here.
+      - run: uv run pytest -q
+
+  teams:
+    name: teams
+    needs: changes
+    if: needs.changes.outputs.teams == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/teams
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      # Types, which ruff does not check. Scope and mode are in `[tool.pyright]`; the
+      # version is pinned in the same file, so this step answers the same way twice.
+      - run: uv run pyright
+      # Same as market-data's and agent's: the `db` tests are gated on Docker inside
+      # conftest.py rather than on a flag, and this runner has it — so one `pytest -q`
+      # runs the migration tests against a real PostgreSQL too. Nothing here reaches
+      # OpenAI or market-mcp; anything that would is a `live` test behind `--run-live`.
       - run: uv run pytest -q
 
   terminal:

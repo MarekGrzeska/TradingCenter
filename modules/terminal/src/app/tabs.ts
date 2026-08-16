@@ -3,6 +3,7 @@ import { AgentSettingsView } from "../agent/settings/AgentSettingsView";
 import { CollectionHistoryView } from "../history/CollectionHistoryView";
 import { GridView } from "../grid/GridView";
 import { InstrumentsView } from "../instruments/InstrumentsView";
+import { TeamsView } from "../teams/TeamsView";
 
 /**
  * The one place tabs are declared — routing and the nav bar are both derived
@@ -31,6 +32,7 @@ export const TABS: TabDefinition[] = [
     path: "data-history",
     Component: CollectionHistoryView,
   },
+  { id: "teams", label: "Teams", path: "teams", Component: TeamsView },
   {
     id: "agent-settings",
     label: "Agent Settings",

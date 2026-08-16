@@ -1,0 +1,315 @@
+<title>teams — fazy 1–3 i co dalej</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 56rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.9rem; margin: 1.5rem 0 0.4rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.82rem; }
+  td.num { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.79rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  .stage { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.2rem 0; }
+  .stage > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .stage .no { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.05em 0.45em; }
+  .stage dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.8rem 0 0; font-size: 0.92rem; }
+  .stage dt { font-family: var(--mono); font-size: 0.73rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); padding-top: 0.22rem; }
+  .stage dd { margin: 0; }
+  @media (max-width: 34rem) { .stage dl { grid-template-columns: 1fr; gap: 0.15rem; } .stage dd { margin-bottom: 0.6rem; } }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+<main>
+
+<h1><code>teams</code> — co domykają fazy 1–3, co sprawdzisz u siebie, co dalej</h1>
+<p class="lede">Jeden dokument zamiast trzech <code>tasks.md</code>. Po lewej: co już działa i skąd to wiadomo. W środku: co da się przejść ręką na własnym laptopie, krok po kroku. Na końcu: co widzę na fazę 4 i dlaczego akurat to.</p>
+<p class="meta">
+  Stan na: <strong>16 sierpnia 2026</strong>, gałąź <code>feat/teams-platform</code><br>
+  Dotyczy: <code>modules/teams</code> (port <strong>8050</strong>), <code>modules/trading-mcp</code> (<strong>8060</strong>), <code>modules/terminal</code> (zakładka <em>Teams</em>)<br>
+  Źródła: trzy zmiany OpenSpec — <code>add-teams-module</code>, <code>add-trading-tools</code>, <code>add-teams-schedules-and-triggers</code> — i ich <code>review.md</code>
+</p>
+
+<h2>W trzech zdaniach</h2>
+
+<p><strong>Faza 1</strong> dała zespół, który operator składa na ekranie jak graf i uruchamia klikając — a moduł zapisuje każdą rewizję, każdy przebieg i każdy grosz. <strong>Faza 2</strong> dała temu zespołowi rękę: osobny moduł <code>trading-mcp</code> nad kontem <em>demo</em>, narzędzia składające zlecenia i granice, w których wolno mu ich użyć. <strong>Faza 3</strong> zabrała z tego operatora: zespół budzi się sam — o godzinie z wyrażenia cron albo w chwili, w której warunek na rynku przeszedł z fałszu w prawdę — i zostawia po każdym przebudzeniu wiersz mówiący, co zrobił <em>albo dlaczego nie</em>.</p>
+
+<div class="callout warn">
+  <span class="tag">Jedna rzecz, którą trzeba wiedzieć od razu</span>
+  <p><strong>Cały kod trzech faz jest napisany, przetestowany i zmergowany do <code>feat/teams-platform</code>. W Azure nie stoi.</strong> <code>teams</code> i <code>trading-mcp</code> mają infrastrukturę i workflow wdrożeniowy, ale obrazy nie zostały jeszcze wypchnięte, bo gałąź nie poszła do <code>main</code>. Lokalnie działa wszystko — łącznie z zegarem, który na produkcji jest wyłączony ustawieniem.</p>
+</div>
+
+<h2>Faza 1 — zespół jako dana</h2>
+
+<p><span class="pill good">kod gotowy</span> <span class="pill warn">nie stoi w Azure</span></p>
+
+<p>Zespół nie jest kodem. Jest wierszem w bazie: lista agentów (rola, prompt, model, narzędzia) i lista krawędzi między nimi. Operator układa to na kanwie w terminalu, a moduł kompiluje graf do przebiegu.</p>
+
+<h4>Co ta faza domyka</h4>
+<ul>
+  <li><strong>Katalog zespołów z rewizjami tylko dopisywanymi.</strong> Zapis zmiany nie nadpisuje poprzedniej wersji — tworzy nową. Przebieg sprzed miesiąca wskazuje na rewizję, która wyglądała wtedy dokładnie tak jak wtedy. To jest cały fundament pod porównywanie wariantów.</li>
+  <li><strong>Przebieg i jego ślad.</strong> Kto pracował, w jakiej kolejności, co dostał od poprzedników, co odpowiedział, jakie narzędzia wołał i z jakim skutkiem. Widać to na żywo na kanwie i po powrocie do zamkniętej karty.</li>
+  <li><strong>Dwie granice kosztu.</strong> Granica przebiegu sprawdzana <em>przed każdym</em> wywołaniem modelu i granica dobowa zespołu sprawdzana <em>przed startem</em> przebiegu — bo przebieg przerwany w połowie to przebieg, który już wydał.</li>
+  <li><strong>Narzędzia z <code>market-mcp</code>, wybierane z tego, co serwer sam ogłasza.</strong> Moduł nie trzyma własnej kopii cudzego katalogu. Nie ma serwera → zespół bez narzędzi rusza normalnie, zespół z narzędziami odmawia startu, zamiast pozwolić agentom zgadywać.</li>
+  <li><strong>Własna baza, własny klucz OpenAI, własna tożsamość.</strong> Koszt eksperymentów ma osobną linię na rachunku niż <code>agent</code>.</li>
+</ul>
+
+<h2>Faza 2 — ręka na koncie demo</h2>
+
+<p><span class="pill good">kod gotowy</span> <span class="pill warn">nie stoi w Azure</span></p>
+
+<p>Rekomendacji zapisanej w śladzie nie da się ocenić: nie wiadomo, po jakiej cenie zespół wszedłby ani czy jego stop przetrwałby ruch. Faza 2 zamienia prozę w wiersze, które da się policzyć.</p>
+
+<h4>Co ta faza domyka</h4>
+<ul>
+  <li><strong>Nowy moduł <code>trading-mcp</code></strong> (port 8060) — serwer MCP nad <code>capital-gateway</code>. Zapis dostał <em>własny</em> moduł, bo <code>market-mcp</code> ma w specyfikacji zapisane, że narzędzia zapisującego nie publikuje, i ta granica zostaje tam, gdzie jest.</li>
+  <li><strong>Konto demo sprawdzone u źródła, nie w ustawieniu.</strong> Moduł pyta gateway, jakie to konto, <em>zanim</em> otworzy port. Odpowiedź inna niż „demo" znaczy, że proces nie wstaje. Żadne ustawienie tego nie wyłącza.</li>
+  <li><strong>Wynik zlecenia rozliczony albo nazwany jako nierozliczony</strong> — nigdy zgadnięty. Narzędzie nie ponawia zlecenia po własnej awarii, bo powtórzone zlecenie to druga pozycja, a nie ta sama.</li>
+  <li><strong>Granice handlowe</strong> — wielkość jednego zlecenia, zleceń na przebieg, zleceń na dobę. Każdą można wyłączyć i moduł żadnej nie narzuca; nieodwracalne jest tylko to, co siedzi w <code>trading-mcp</code>.</li>
+  <li><strong>Ślad transakcji</strong> — wiersz powstaje <em>przed</em> wysłaniem wywołania, więc proces, który padnie w środku, zostawia „wysłano, los nieznany", a nie ciszę.</li>
+</ul>
+
+<h2>Faza 3 — zegar i wyzwalacze</h2>
+
+<p><span class="pill good">kod gotowy</span> <span class="pill good">review zamknięte</span> <span class="pill warn">zegar wyłączony na produkcji</span></p>
+
+<p>Powtarzalność eksperymentu nie może zależeć od tego, czy ktoś siedział przed terminalem o 9:30. A rynek i tak nie pyta o godzinę.</p>
+
+<h4>Co ta faza domyka</h4>
+<ul>
+  <li><strong>Zegar w procesie modułu</strong>, nie w Azure. Budzi się co 15 sekund, przejmuje należne wyzwolenie <em>warunkowym <code>UPDATE</code></em> w bazie i startuje przebieg tą samą funkcją, którą woła przycisk w terminalu. Dwa procesy przy jednym wyzwoleniu dają jeden przebieg — to własność samego zapytania, nie żadnego „lidera".</li>
+  <li><strong>Harmonogram wskazuje rewizję przypiętą.</strong> Tryb „najnowsza" istnieje, ale trzeba go wybrać ręką — inaczej wieczorna edycja zespołu po cichu zmieniałaby to, co robi robot o dziewiątej rano.</li>
+  <li><strong>Wyzwalacz na warunku rynkowym</strong>, czytanym <em>tym samym narzędziem</em>, którym czyta agent. Reaguje na <strong>zbocze</strong> (warunek stał się prawdą), nie na stan, i ma własny czas martwy. Sprawdzenie warunku nie woła modelu — obserwowanie rynku kosztuje zero tokenów, dopóki nic się nie stanie.</li>
+  <li><strong>Trzy stany zamiast dwóch.</strong> „Warunek fałszywy" i „nie dowiedziałem się, co robi rynek" to nie to samo. Drugie zapisuje się jako <code>unavailable</code> i nie uruchamia niczego.</li>
+  <li><strong>Historia wyzwoleń, w tym tych, które nic nie uruchomiły</strong>, z powodem: poprzedni przebieg wciąż trwa, wyczerpana granica dobowa, rewizja nie do uruchomienia, czas martwy. Bez tego harmonogram działający poprawnie i zepsuty wyglądają identycznie — oba milczą.</li>
+  <li><strong>Pominięte wyzwolenia zwijają się do jednego.</strong> Moduł nieobecny przez noc rusza raz, z zapisaną liczbą pominięć, a nie sześć razy z odpowiedziami na pytania, których nikt już nie zadaje.</li>
+  <li><strong>Samoczynne wyłączenie po trzech nieudanych przebiegach z rzędu</strong>, z powodem, który operator widzi — i z możliwością włączenia z powrotem.</li>
+  <li><strong>Potwierdzenie pracy bez nadzoru.</strong> Harmonogram nad zespołem, który może złożyć zlecenie, wymaga jawnego „wiem, że to pójdzie bez nadzoru".</li>
+</ul>
+
+<div class="callout">
+  <span class="tag">Co znalazło review fazy 3</span>
+  <p>Trzy błędy, wszystkie na szwie z fazą 2 (która scaliła się później), wszystkie naprawione:</p>
+  <ol>
+    <li><strong>Bezpiecznik pracy bez nadzoru był ślepy.</strong> Sprawdzenie pytało ręcznie prowadzoną listę groźnych nazw, która przez całą fazę 2 była pusta — więc harmonogram nad zespołem składającym zlecenia przechodził bez potwierdzenia. Teraz moduł czyta adnotację <code>readOnlyHint</code> prosto z serwerów i wymaga potwierdzenia dla <em>wszystkiego, czego nie potwierdzi jako odczyt</em>: zapisu, narzędzia bez adnotacji i narzędzia z serwera, którego nie dało się zapytać.</li>
+    <li><strong>Drugi sufit dobowy z fazy 2 wysadzał całą pobudkę.</strong> Zegar łapał tylko sufit kosztu, nie sufit zleceń — więc wyzwolenie zespołu po limicie zleceń nie zostawiało wiersza w historii i <em>zabierało ze sobą wszystkie kolejne harmonogramy w tej pobudce</em>, u wszystkich operatorów.</li>
+    <li><strong>Jeden wiersz mógł uciszyć resztę.</strong> Pobudka nie izolowała harmonogramów od siebie; teraz każdy ma własny <code>try</code> i własny log.</li>
+  </ol>
+  <p>Pełny zapis: <code>openspec/changes/add-teams-schedules-and-triggers/review.md</code>.</p>
+</div>
+
+<h2>Co sprawdzisz lokalnie</h2>
+
+<p>Trzy poziomy, coraz droższe. Pierwsze dwa nie kosztują nic i nie dotykają niczego prawdziwego.</p>
+
+<h3>Poziom 1 — testy, które nie potrzebują niczego</h3>
+
+<p>Z katalogu modułu, bez Dockera, bez sieci, bez kluczy:</p>
+
+<pre><code>cd modules/teams
+uv run pytest          # 345 testów
+uv run ruff check .
+uv run pyright</code></pre>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Moduł</th><th>Testy</th><th>Co dowodzą bez bazy i sieci</th></tr></thead>
+  <tbody>
+    <tr><td class="field">teams</td><td class="num">345</td><td>kształt definicji, kompilacja grafu, granice kosztu, pętla agenta, zwijanie pominiętych wyzwoleń, odmowy przy zapisie</td></tr>
+    <tr><td class="field">trading-mcp</td><td class="num">68</td><td>strażnik konta demo, kształt zleceń, rozliczanie wyniku, odmowa vs niedostępność</td></tr>
+    <tr><td class="field">market-data</td><td class="num">1036</td><td>archiwum świec, wskaźniki, kontrakt na drucie</td></tr>
+    <tr><td class="field">agent</td><td class="num">323</td><td>rozmowa, narzędzia, rysowanie na wykresie</td></tr>
+    <tr><td class="field">capital-gateway</td><td class="num">204</td><td>sesje, historia, strumień — przeciw dublerowi</td></tr>
+    <tr><td class="field">market-mcp</td><td class="num">123</td><td>narzędzia nad archiwum, migawka kontraktu</td></tr>
+    <tr><td class="field">terminal</td><td class="num">854</td><td>cała zakładka <em>Teams</em> w prawdziwym DOM, przeciw udawanemu API</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Poziom 2 — testy przeciw prawdziwej bazie</h3>
+
+<p>Potrzebny <strong>tylko Docker</strong>. Kontener PostgreSQL wstaje na losowym porcie i znika po testach, więc można to puszczać równolegle i nic nie psuje bazy deweloperskiej.</p>
+
+<pre><code>cd modules/teams
+uv run pytest -m db    # 165 testów</code></pre>
+
+<p>To jest poziom, który naprawdę dowodzi rzeczy z fazy 3 — i warto wiedzieć czego, bo brzmią jak coś, co wymaga „prawdziwego uruchomienia":</p>
+
+<ul>
+  <li>dwa procesy walczące o to samo wyzwolenie dają <strong>dokładnie jednego</strong> zwycięzcę;</li>
+  <li>harmonogram spóźniony o sześć godzin startuje <strong>raz</strong> i zapisuje, ile slotów pominął;</li>
+  <li>wyzwolenie przy trwającym poprzednim przebiegu zostawia wiersz z powodem, zamiast kolejkować;</li>
+  <li>warunek przekraczający próg wyzwala <strong>raz</strong>, a migoczący wokół progu nie wyzwala wcale — przeciw <em>prawdziwemu</em> serwerowi MCP na prawdziwym porcie, nie przeciw dublerowi;</li>
+  <li>sprawdzanie niespełnionego warunku nie tworzy <strong>ani jednego</strong> wiersza zużycia tokenów;</li>
+  <li>trzy nieudane przebiegi z rzędu wyłączają harmonogram i zapisują dlaczego;</li>
+  <li>cudzy harmonogram jest nieodróżnialny od nieistniejącego.</li>
+</ul>
+
+<h3>Poziom 3 — cały stos na własnym laptopie</h3>
+
+<p>Jedna komenda, moduły startują w kolejności zależności i każdy jest odpytywany, czy naprawdę odpowiada:</p>
+
+<pre><code>./scripts/dev.sh            # macOS / Linux
+./scripts/dev.ps1           # Windows
+./scripts/dev.sh --no-terminal   # sam backend</code></pre>
+
+<div class="callout warn">
+  <span class="tag">Cztery rzeczy, które psują to, zanim się zacznie</span>
+  <ul>
+    <li><strong>Docker musi być wstały</strong> — baza deweloperska to kontener z <code>compose.yaml</code> na <code>127.0.0.1:55432</code>. Trzy bazy logiczne w jednym serwerze; skrypt zakłada rolę i bazę sam, jeśli którejś nie ma.</li>
+    <li><strong><code>.env</code> jest per moduł i nie jest w gicie.</strong> Kopiuj z <code>.env.example</code>. <code>teams</code> nie wstanie bez <code>OPENAI_API_KEY</code> i <code>MODELS</code>, i to jest zamierzone.</li>
+    <li><strong><code>CAPITAL_GATEWAY_API_KEY</code> w <code>trading-mcp</code> musi być <em>tym samym</em> ciągiem, co <code>GATEWAY_API_KEY</code> w gatewayu.</strong> Oba skrypty deweloperskie porównują te pliki i odmawiają startu z góry, bo inaczej objawem jest cały stos padający z „a service exited".</li>
+    <li><strong>Jeden stos naraz.</strong> Porty są stałe, baza jedna, a capital.com liczy swoje 10 zapytań na sekundę <em>na konto</em> — dwa stosy zagłodzą się nawzajem.</li>
+  </ul>
+</div>
+
+<p>Porty: <strong>8010</strong> gateway · <strong>8020</strong> market-data · <strong>8030</strong> agent · <strong>8040</strong> market-mcp · <strong>8050</strong> teams · <strong>8060</strong> trading-mcp · <strong>5173</strong> terminal.</p>
+
+<h4>Cztery scenariusze do przejścia ręką</h4>
+
+<div class="stage">
+  <h3><span class="no">1</span> Zespół, który tylko czyta</h3>
+  <p>Zakładka <em>Teams</em> → nowy zespół, dwóch agentów, krawędź między nimi, najtańszy model z listy, granica dobowa ustawiona. Uruchom i patrz na kanwę.</p>
+  <dl>
+    <dt>Co udowadnia</dt><dd>Że definicja z ekranu kompiluje się do przebiegu, agenci dostają pracę poprzedników, a ślad da się przeczytać po zamknięciu karty.</dd>
+    <dt>Koszt</dt><dd>Prawdziwe pieniądze na kluczu OpenAI — dlatego dwóch agentów, nie pięciu.</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">2</span> Zespół, który składa zlecenie</h3>
+  <p>Dodaj agentowi narzędzie zapisujące z <code>trading-mcp</code>, ustaw <em>wszystkie</em> trzy granice handlowe i uruchom. Potem sprawdź pozycję w panelu capital.com.</p>
+  <dl>
+    <dt>Co udowadnia</dt><dd>Że zlecenie naprawdę wychodzi, wraca rozliczone i ląduje w śladzie przebiegu.</dd>
+    <dt>Uwaga</dt><dd>Konto <em>demo</em> — moduł nie wstanie przy żadnym innym. Ale to nadal prawdziwa pozycja, którą trzeba potem zamknąć.</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">3</span> Harmonogram co dwie minuty</h3>
+  <p>Panel <em>Schedules</em> → nowy harmonogram, <code>*/2 * * * *</code>, rewizja przypięta. Zostaw stos na kwadrans. Potem otwórz historię.</p>
+  <dl>
+    <dt>Co udowadnia</dt><dd>To, czego żaden test nie dowiedzie: że zegar naprawdę budzi się sam w prawdziwym procesie i że tak zapisany harmonogram wyzwala o tej godzinie, o której operator myślał.</dd>
+    <dt>Sztuczka</dt><dd>Ustaw dwuminutowy cron nad zespołem, który pracuje dłużej niż dwie minuty — drugie wyzwolenie <em>musi</em> wylądować w historii jako pominięte, z powodem „poprzedni przebieg wciąż pracuje". To najtańszy sposób zobaczenia bezpiecznika w akcji.</dd>
+    <dt>Lokalnie</dt><dd><code>SCHEDULER_ENABLED</code> domyśla się <strong>true</strong>, więc u siebie zegar chodzi bez ustawiania czegokolwiek. Na produkcji jest jawnie wyłączony.</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">4</span> Wyzwalacz na warunku rynkowym</h3>
+  <p>Panel <em>Triggers</em> → narzędzie z listy, ścieżka do pola w odpowiedzi, porównanie i próg. Ustaw próg tak, żeby <em>na pewno</em> był spełniony, i zobacz jedno wyzwolenie. Potem przestaw na niemożliwy i zobacz ciszę.</p>
+  <dl>
+    <dt>Co udowadnia</dt><dd>Że warunek czyta się prawdziwym narzędziem, że wyzwala raz na zbocze, a nie co sprawdzenie, i że czas martwy naprawdę tłumi.</dd>
+    <dt>Co sprawdzić przy okazji</dt><dd>Zatrzymaj <code>market-mcp</code> na chwilę: ostatni odczyt ma pokazać „nie wiadomo", a nie „warunek niespełniony", i nie ma prawa nic uruchomić.</dd>
+  </dl>
+</div>
+
+<h3>Czego lokalnie nie sprawdzisz</h3>
+
+<ul>
+  <li><strong>Easy Auth i tożsamości zarządzane</strong> — lokalnie wszystko jedzie po pętli zwrotnej bez tokenów. Sprawdza się to dopiero po wdrożeniu.</li>
+  <li><strong>Migrację przy starcie na prawdziwej bazie produkcyjnej</strong> pod blokadą doradczą i z dwiema instancjami wstającymi naraz.</li>
+  <li><strong>Zegar w App Service</strong> — czy proces naprawdę żyje między pobudkami i czy plan nie usypia kontenera.</li>
+  <li><strong><code>SCHEDULER_ENABLED</code> jako dźwignię</strong> — lokalnie to zmienna w pliku, na produkcji ustawienie aplikacji, które ma zatrzymać zegar bez wdrożenia.</li>
+</ul>
+
+<h2>Co dalej — faza 4</h2>
+
+<p>Kierunek jest zapisany od fazy 1 i się nie zmienił: <strong>analityka porównawcza rewizji</strong>. Cały append-only w rewizjach i cały ślad przebiegu istnieją po to, żeby ta faza miała co porównywać. Fazy 2 i 3 dołożyły do tego dwie rzeczy, bez których porównanie byłoby czytaniem prozy: <em>skutek na rachunku</em> (wiersze transakcji) i <em>powtarzalność</em> (ten sam zespół, ta sama rewizja, ta sama godzina, przez tydzień).</p>
+
+<h4>Trzon fazy</h4>
+<ul>
+  <li><strong>Zestawienie dwóch rewizji obok siebie</strong> — ile przebiegów, ile kosztowały, ile złożyły zleceń, jak się te zlecenia skończyły. Bez ocen; liczby i ślady.</li>
+  <li><strong>Wynik przebiegu jako liczba, nie jako proza.</strong> Dziś przebieg kończy się rekomendacją i garścią transakcji; brakuje kroku, który mówi, co z tych transakcji wyszło po godzinie, dniu, tygodniu. To najprawdopodobniej nowa tabela i coś, co domyka pozycje po czasie — nie zmiana w niczym, co już jest.</li>
+  <li><strong>Automatyczne układanie grafu</strong> — na kanwie da się dziś przesuwać agentów ręką i pozycje się zapisują; brakuje „ułóż to sensownie".</li>
+</ul>
+
+<h4>Rzeczy, które faza 3 zostawiła otwarte, i które naturalnie wpadają w tę samą fazę</h4>
+<ul>
+  <li><strong>Przebieg nie mówi, że przyszedł z zegara.</strong> Wiersz wyzwolenia wskazuje swój przebieg, ale nie odwrotnie — więc otwarty ślad nie mówi „to uruchomił harmonogram". Przy porównywaniu rewizji to zaczyna przeszkadzać od razu: przebiegi ręczne i automatyczne to dwie różne próbki.</li>
+  <li><strong>Granice kosztu nie mają wybieraka w terminalu.</strong> Jadą na drucie od fazy 1 i nigdy go nie miały — ustawia się je poza ekranem.</li>
+  <li><strong>Podgląd „kiedy to wyzwoli" działa dopiero po zapisaniu harmonogramu.</strong> Przy zakładaniu nowego operator nie widzi nic. Domyka to trasa przyjmująca samo wyrażenie cron — <em>nie</em> parser po stronie terminala.</li>
+  <li><strong>Niedostępność serwera narzędzi po stronie harmonogramu</strong> kończy się dziś nieudanym przebiegiem, a nie pominięciem z powodem. Wyzwalacz robi to dobrze, harmonogram nie.</li>
+</ul>
+
+<h4>Pytanie otwarte, na które nie odpowiem bez kilku prawdziwych tygodni</h4>
+<p>Czy zespoły potrzebują <strong>pamięci między przebiegami</strong> — tablicy ogłoszeń, wniosków z poprzednich prób — czy stan współdzielony w obrębie jednego przebiegu wystarcza. Harmonogram czyni to pytanie realnym po raz pierwszy: zespół budzący się co rano przez tydzień albo się czegoś uczy, albo siedem razy zaczyna od zera. Odpowiedź wymaga zobaczenia tych siedmiu przebiegów, a nie zaprojektowania tabeli z góry.</p>
+
+<h4>Zanim faza 4 w ogóle ma sens</h4>
+<ol>
+  <li><strong>Wypchnąć obrazy <code>teams</code> i <code>trading-mcp</code> do Azure</strong> — dopóki tego nie ma, „moduł stoi" jest nieprawdą. Przy <code>trading-mcp</code> sonda <code>/health</code> mówi więcej niż zwykle: proces nie otwiera portu, dopóki gateway nie potwierdzi konta demo, więc 200 znaczy „dotarł, przez zaporę, właściwym kluczem, i to jest demo".</li>
+  <li><strong>Przejść scenariusze 1–4 z tego dokumentu ręką</strong> na uruchomionym stosie. To jedyna rzecz stojąca dziś między fazą 3 a włączeniem zegara na produkcji.</li>
+  <li><strong>Włączyć zegar</strong> — <code>SCHEDULER_ENABLED = "true"</code>, jedna linia w <code>infra/app-service.tf</code> plus <code>apply</code>. Powód, dla którego jest wyłączony, przestał być techniczny: ślepy bezpiecznik został naprawiony w review, zostało tylko to, że nikt jeszcze nie widział, jak zegar wyzwala naprawdę.</li>
+  <li><strong>Jeden merge <code>feat/teams-platform</code> → <code>main</code></strong>, i dopiero wtedy <code>deploy-*.yml</code> oraz <code>terraform plan</code> na <code>main</code> zaczynają mówić prawdę.</li>
+</ol>
+
+<footer>
+  Dokument podsumowujący, nie specyfikacja. Prawdą o systemie są <code>openspec/specs/teams-*</code>, <code>terminal-teams*</code> i <code>trading-mcp-*</code> oraz <code>modules/teams/README.md</code>. Scenariusze ręczne w rozszerzonej wersji: <code>docs/teams-testy-lokalne.html</code>. Stan wdrożenia faza po fazie: <code>docs/teams-fazy-stan.html</code>.
+</footer>
+
+</main>

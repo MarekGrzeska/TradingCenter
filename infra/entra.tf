@@ -47,6 +47,19 @@ resource "azuread_application" "terminal" {
       type = "Scope"
     }
   }
+
+  # And the same again for teams, standing ready for the same reason — the terminal's
+  # teams tab (tasks.md group 9) reaches that module with the token it already holds, and
+  # this block is what a later change needs to have been here for the terminal to ask for
+  # a token scoped to teams by name instead.
+  required_resource_access {
+    resource_app_id = azuread_application.teams_easy_auth.client_id
+
+    resource_access {
+      id   = random_uuid.teams_scope.result
+      type = "Scope"
+    }
+  }
 }
 
 resource "azuread_service_principal" "terminal" {
@@ -126,6 +139,72 @@ resource "azuread_application_pre_authorized" "agent_terminal" {
   application_id       = azuread_application.agent_easy_auth.id
   authorized_client_id = azuread_application.terminal.client_id
   permission_ids       = [random_uuid.agent_scope.result]
+}
+
+# --- teams, as an API of its own -----------------------------------------------------
+#
+# The fifth backend module and the fourth registration of this shape. Its own, for the
+# reason the agent's comment above gives: each backend module is its own API here the
+# same way each is its own deployable, and a module that borrowed another's registration
+# could never be removed without touching the one it borrowed from (design.md, "Moduł ma
+# dać się usunąć przez skasowanie katalogu i zasobów").
+#
+# The scope below is granted to the terminal and pre-authorized, but is not yet what the
+# terminal's token carries — `src/auth/` asks Entra for market-data's scope and reuses
+# that token everywhere. So `allowed_audiences` on the teams App Service (app-service.tf)
+# accepts market-data's audience as well, exactly as agent's does, and for exactly as
+# long: until the terminal is taught to ask for each module's scope by name.
+resource "azuread_application" "teams_easy_auth" {
+  display_name = "app-tradingcenter-teams-easyauth"
+
+  identifier_uris = [local.teams_api_uri]
+
+  api {
+    requested_access_token_version = 2
+
+    oauth2_permission_scope {
+      id                         = random_uuid.teams_scope.result
+      value                      = local.teams_api_scope
+      type                       = "User"
+      enabled                    = true
+      admin_consent_display_name = "Compose and run agent teams"
+      admin_consent_description  = "Allows the app to reach the teams module as the signed-in operator."
+      user_consent_display_name  = "Compose and run your agent teams"
+      user_consent_description   = "Allows the app to reach the teams module as you."
+    }
+  }
+
+  web {
+    redirect_uris = ["https://${local.teams_hostname}/.auth/login/aad/callback"]
+
+    implicit_grant {
+      id_token_issuance_enabled = true
+    }
+  }
+}
+
+# Stable across applies, same as the other two scope ids — regenerating it would revoke
+# the terminal's permission and grant a different one on every apply.
+resource "random_uuid" "teams_scope" {}
+
+resource "azuread_service_principal" "teams_easy_auth" {
+  client_id = azuread_application.teams_easy_auth.client_id
+}
+
+resource "azuread_application_password" "teams_easy_auth" {
+  application_id = azuread_application.teams_easy_auth.id
+  display_name   = "easy-auth"
+  end_date       = timeadd(timestamp(), "8760h")
+
+  lifecycle {
+    ignore_changes = [end_date]
+  }
+}
+
+resource "azuread_application_pre_authorized" "teams_terminal" {
+  application_id       = azuread_application.teams_easy_auth.id
+  authorized_client_id = azuread_application.terminal.client_id
+  permission_ids       = [random_uuid.teams_scope.result]
 }
 
 # The three values the terminal's build needs (deploy-terminal.yml). All three are public

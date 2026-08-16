@@ -1,0 +1,439 @@
+<title>teams — testy lokalne</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 56rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.9rem; margin: 1.5rem 0 0.4rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.82rem; }
+  td.num { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.79rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  .stage { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.2rem 0; }
+  .stage > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .stage .no { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.05em 0.45em; }
+  .stage dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.8rem 0 0; font-size: 0.92rem; }
+  .stage dt { font-family: var(--mono); font-size: 0.73rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); padding-top: 0.22rem; }
+  .stage dd { margin: 0; }
+  @media (max-width: 34rem) { .stage dl { grid-template-columns: 1fr; gap: 0.15rem; } .stage dd { margin-bottom: 0.6rem; } }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+<main>
+
+<h1><code>teams</code> — testy lokalne</h1>
+<p class="lede">Scenariusze do przejścia ręką na działającym stosie, zanim gałąź <code>feat/teams-module</code> pójdzie do <code>main</code>. To, czego nie sprawdzi żaden test automatyczny: konfiguracja, prawdziwy model po drugiej stronie, prawdziwe pieniądze i to, co widać na ekranie.</p>
+<p class="meta">
+  Dotyczy: <code>modules/teams</code> (port <strong>8050</strong>), <code>modules/terminal</code> (zakładka <em>Teams</em>)<br>
+  Zmiana: <code>openspec/changes/add-teams-module</code>, zadanie <strong>12.2</strong><br>
+  Opis modułu i mapa architektury: <code>docs/teams-modul-i-architektura.html</code>
+</p>
+
+<div class="callout bad">
+  <span class="tag">Przeczytaj to przed pierwszym przebiegiem</span>
+  <p><strong>Przebieg zespołu wydaje prawdziwe pieniądze na prawdziwym kluczu OpenAI</strong> — i to nie jedno wywołanie, tylko tyle, ilu agentów razy do sześciu rund każdy. Klucz jest osobny od <code>agent</code> (<code>teams-openai-api-key</code>) właśnie po to, żeby ten koszt było widać na własnej linii rachunku.</p>
+  <p>Każda definicja z tego dokumentu ma ustawione <code>limits</code>. Nie usuwaj ich „na chwilę". Zacznij od najtańszego modelu z <code>GET /models</code> i od dwóch agentów, nie od pięciu.</p>
+</div>
+
+<h2>Zanim zaczniesz</h2>
+
+<div class="callout warn">
+  <span class="tag">Cztery rzeczy, które psują przebieg, zanim się zacznie</span>
+  <ul>
+    <li><strong>Docker musi być wstały.</strong> Baza deweloperska to kontener z <code>compose.yaml</code>, <code>127.0.0.1:55432</code>. <code>teams</code> to trzecia baza logiczna w tym samym kontenerze; skrypty <code>dev.*</code> zakładają rolę i bazę same, jeśli którejś nie ma.</li>
+    <li><strong><code>.env</code> jest per moduł i nie jest w gicie.</strong> Skopiuj z <code>modules/teams/.env.example</code> i wypełnij <code>OPENAI_API_KEY</code> oraz <code>MODELS</code>. Bez klucza moduł <em>nie wstanie</em> — i to jest zamierzone.</li>
+    <li><strong>Identyfikatory modeli z <code>.env.example</code> są przykładowe.</strong> Wpisz te, które twoje konto OpenAI faktycznie serwuje. Nazwa, której konto nie zna, przechodzi konfigurację bez słowa i wywala się na pierwszym wywołaniu pierwszego przebiegu.</li>
+    <li><strong>Jeden stos naraz.</strong> Porty są stałe, kontener bazy jeden, a budżet zapytań capital.com liczy się na konto — także między <code>git worktree</code>.</li>
+  </ul>
+</div>
+
+<h3>Testy automatyczne — najpierw one</h3>
+
+<p>Ręczny przebieg ma sens dopiero, gdy to jest zielone. Komendy z katalogu modułu; w repozytorium nie ma niczego, co zbuduje albo przetestuje wszystko naraz.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Gdzie</th><th>Komenda</th><th>Oczekiwane</th></tr></thead>
+  <tbody>
+    <tr><td class="field">teams</td><td class="field">uv run pytest</td><td>0 failed <span class="dim">— testy <code>db</code> wchodzą same, gdy Docker działa</span></td></tr>
+    <tr><td class="field">teams</td><td class="field">uv run pytest -m db</td><td>0 failed <span class="dim">— osobny kontener PostgreSQL, losowy port</span></td></tr>
+    <tr><td class="field">teams</td><td class="field">uv run ruff check .</td><td>All checks passed!</td></tr>
+    <tr><td class="field">teams</td><td class="field">uv run pyright</td><td>0 errors, 0 warnings</td></tr>
+    <tr><td class="field">teams</td><td class="field">uv run python -m teams.openapi</td><td>dokument OpenAPI na stdout, bez uruchomionego serwera</td></tr>
+    <tr><td class="field">terminal</td><td class="field">pnpm test</td><td>0 failed</td></tr>
+    <tr><td class="field">terminal</td><td class="field">pnpm lint · typecheck</td><td>bez wyjścia</td></tr>
+    <tr><td class="field">terminal</td><td class="field">pnpm contract:check</td><td>Contract is up to date. <span class="dim">— sprawdza <em>oba</em> źródła</span></td></tr>
+    <tr><td class="field">repozytorium</td><td class="field">openspec validate add-teams-module --strict</td><td>Change 'add-teams-module' is valid</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Podniesienie stosu</h3>
+
+<pre><code>./scripts/dev.ps1               # Windows
+./scripts/dev.sh                # macOS, Linux
+./scripts/dev.ps1 -NoTerminal   # sam back end</code></pre>
+
+<p>Kolejność jest wymuszona i każdy krok czeka, aż poprzedni <em>odpowie</em>: migracje → <code>capital-gateway</code> (<strong>8010</strong>) → <code>market-data</code> (<strong>8020</strong>) → <code>market-mcp</code> (<strong>8040</strong>) → <code>agent</code> (<strong>8030</strong>) → <code>teams</code> (<strong>8050</strong>) → terminal (<strong>5173</strong>).</p>
+
+<h3>Wspólny nagłówek dla scenariuszy HTTP</h3>
+
+<p>Lokalnie nikt nie stoi przed modułem, więc <code>REQUIRE_AUTHENTICATED_PRINCIPAL=false</code> nadaje każdemu żądaniu tożsamość <code>anonymous</code>. Cudzą tożsamość udaje się nagłówkiem — tak samo, jak zrobiłby to Easy Auth.</p>
+
+<pre><code>$t   = "http://127.0.0.1:8050"
+$ja  = @{}                                        # anonymous
+$ktos= @{ "X-MS-CLIENT-PRINCIPAL-ID" = "ktos-inny" }
+
+function Get-Json($url, $h = $ja) { Invoke-RestMethod -Uri $url -Headers $h }
+function Post-Json($url, $body, $h = $ja) {
+  Invoke-RestMethod -Method Post -Uri $url -Headers $h `
+    -ContentType application/json -Body ($body | ConvertTo-Json -Depth 8)
+}</code></pre>
+
+<h2>A. Start i konfiguracja</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-01</span> Moduł migruje się sam i dopiero potem odpowiada</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Skasuj bazę logiczną (<code>DROP DATABASE teams</code> w kontenerze) i uruchom stos od nowa. Potem: <code>Get-Json "$t/health"</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Skrypt <code>dev.*</code> zakłada rolę i bazę. Moduł wykonuje migracje we własnym <code>lifespan</code>, pod advisory lockiem o kluczu <code>8050</code>, <em>zanim</em> zacznie odpowiadać — więc sam fakt, że <code>/health</code> odpowiada, jest dowodem, że schemat jest na głowie. Żadnego kroku operatora między jednym a drugim.</dd>
+    <dt>Podstawa</dt><dd>spec <code>teams-database-connection</code>; <code>CLAUDE.md</code>, „Migrations are never the operator's job"</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-02</span> Niespójna konfiguracja to odmowa startu, nie zgadywanie</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Po kolei, każde osobno, uruchamiając moduł ręką (<code>uv run uvicorn teams.app:app --port 8050</code>): (a) <code>MODELS=[]</code>; (b) wpis w <code>MODELS</code> bez <code>input_rate_per_1m</code>; (c) <code>DATABASE_URL</code> na zdalny host przy pustym <code>DATABASE_USER</code>; (d) <code>MARKET_MCP_SCOPE</code> ustawione przy <code>MARKET_MCP_URL</code> na loopback; (e) puste <code>OPENAI_API_KEY</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Za każdym razem proces <strong>nie wstaje</strong>, a komunikat nazywa konkretne ustawienie. Nic nie startuje „w trybie awaryjnym" — moduł, który nie wstał, nie ma czego źle użyć.</dd>
+    <dt>Podstawa</dt><dd>zadanie 1.3, 1.9; <code>config.py</code></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-03</span> Bez serwera narzędzi moduł działa — to jest stan wspierany</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Wyczyść <code>MARKET_MCP_URL</code> w <code>.env</code> modułu i uruchom go sam. Wykonaj TC-05 i TC-06.</dd>
+    <dt>Oczekiwane</dt><dd>Moduł wstaje, katalog działa, zespół <em>bez</em> przypisanych narzędzi zapisuje się i rusza normalnie. Zespół z narzędziami zostaje odmówiony — przy zapisie komunikatem nazywającym brak serwera, a nie brak narzędzia.</dd>
+    <dt>Podstawa</dt><dd>zadania 6.6, 6.7; spec <code>teams-tool-access</code></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-04</span> Zespół z narzędziami przy padniętym market-mcp nie rusza w ogóle</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Przy skonfigurowanym <code>MARKET_MCP_URL</code> zatrzymaj <code>market-mcp</code> (Ctrl+C w jego oknie). Spróbuj uruchomić przebieg zespołu, którego agenci mają przypisane narzędzia.</dd>
+    <dt>Oczekiwane</dt><dd>Odmowa <strong>przed</strong> wywołaniem pierwszego agenta, z dostępem do narzędzi nazwanym jako przyczyna. Nie jest to „gorsza tura" — byłoby to kilku agentów zgadujących niezależnie, każdy za pieniądze. Zespół bez narzędzi w tym samym momencie rusza bez przeszkód: on serwera nawet nie pyta.</dd>
+    <dt>Podstawa</dt><dd>zadania 6.3, 6.6</dd>
+  </dl>
+</div>
+
+<h2>B. Katalog, walidacja i własność</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-05</span> Katalog modeli jest jedynym źródłem wybieraka</h3>
+  <dl>
+    <dt>Kroki</dt><dd><code>Get-Json "$t/models"</code>. Potem dopisz czwarty model do <code>MODELS</code> w <code>.env</code>, zrestartuj moduł i odśwież zakładkę <em>Teams</em> w terminalu.</dd>
+    <dt>Oczekiwane</dt><dd>Lista posortowana po <code>cost_rank</code>, od najtańszego. Stawki jako <strong>łańcuchy</strong>, nie liczby zmiennoprzecinkowe, w jednostce „za 1 000 000 tokenów". Nowy model pojawia się w wybieraku przy agencie <em>bez żadnej zmiany w terminalu</em> — jeśli trzeba było cokolwiek dopisać po stronie frontu, to jest błąd.</dd>
+    <dt>Podstawa</dt><dd>spec <code>teams-models</code>, „Katalog modeli wystarcza do zbudowania wybieraka"</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-06</span> Zespół powstaje razem z pierwszą rewizją</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Podstaw pod <code>$tani</code> i <code>$drogi</code> identyfikatory z <code>GET /models</code>:</dd>
+  </dl>
+<pre><code>$def = @{
+  agents = @(
+    @{ key="zbieracz"; role="Zbiera fakty"; prompt="Wypisz trzy fakty o rynku US100 z dostepnych danych.";
+       model_id=$tani;  tools=@() },
+    @{ key="sedzia";   role="Decyduje";     prompt="Na podstawie faktow poprzednika napisz jedno zdanie rekomendacji.";
+       model_id=$drogi; tools=@() }
+  )
+  edges  = @( @{ from="zbieracz"; to="sedzia" } )
+  limits = @{ run_limit="0.05"; daily_limit="0.20" }
+}
+$zespol = Post-Json "$t/teams" @{ name="Proba 1"; description="scenariusz TC-06"; definition=$def }
+$zespol</code></pre>
+  <dl>
+    <dt>Oczekiwane</dt><dd><span class="pill good">201</span>, <code>latest_revision = 1</code>. <code>GET /teams</code> pokazuje wpis; <code>GET /teams/{id}/revisions/latest</code> oddaje definicję dokładnie taką, jaka poszła — łącznie z <code>limits</code> jako łańcuchami.</dd>
+    <dt>Podstawa</dt><dd>zadania 4.2, 4.4</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-07</span> Cztery odmowy zapisu, każda nazywająca winowajcę</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Ta sama definicja, popsuta po kolei na cztery sposoby: <strong>(a) cykl</strong> — dołóż krawędź <code>sedzia → zbieracz</code>; <strong>(b) agent bez modelu</strong> — usuń <code>model_id</code> u <code>sedzia</code>; <strong>(c) model spoza katalogu</strong> — wpisz <code>model_id="nie-ma-takiego"</code>; <strong>(d) agent odcięty</strong> — dołóż trzeciego agenta bez żadnej krawędzi.</dd>
+    <dt>Oczekiwane</dt><dd>Cztery razy <span class="pill bad">422</span>. Każdy komunikat nazywa <em>agenta jego kluczem</em> albo zależność — nigdy pozycją na liście. W szczególności (b) musi dać <code>agent 'sedzia' names no model</code>, a nie <code>agents.1.model_id</code>: operator liczący wiersze na canvasie to jest właśnie ten błąd, którego ta walidacja unika.</dd>
+    <dt>Podstawa</dt><dd>zadania 4.3, 4.7, 5.3</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-08</span> Zapis dokłada rewizję, nigdy nie rusza poprzedniej</h3>
+  <dl>
+    <dt>Kroki</dt><dd><code>Post-Json "$t/teams/$($zespol.id)/revisions" @{ definition = $inny }</code>, potem <code>GET .../revisions/1</code> i <code>GET .../revisions/2</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Wersja <strong>2</strong> obok wersji 1, która jest bit w bit tym, co było. <code>latest_revision</code> na wpisie katalogu idzie w górę. W bazie nie ma żadnego <code>UPDATE</code> na <code>team_revisions</code> — to jest ta własność, dzięki której przebieg sprzed tygodnia wciąż da się porównać.</dd>
+    <dt>Podstawa</dt><dd>zadanie 4.6; spec <code>teams-catalogue</code>, „Rewizja raz zapisana się nie zmienia"</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-09</span> Wycofanie zespołu zostawia jego przebiegi</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Po wykonaniu choć jednego przebiegu (sekcja D): <code>Invoke-RestMethod -Method Delete -Uri "$t/teams/$($zespol.id)"</code>. Potem <code>GET /teams</code> i <code>GET /usage?team_id=...</code>.</dd>
+    <dt>Oczekiwane</dt><dd><span class="pill good">204</span>. Zespół znika z katalogu, ale ślad przebiegów i wiersze zużycia zostają — kasowanie wpisu nie kasuje historii eksperymentu.</dd>
+    <dt>Podstawa</dt><dd>zadanie 4.6</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-10</span> Cudzy zespół jest nieodróżnialny od nieistniejącego</h3>
+  <dl>
+    <dt>Kroki</dt><dd><code>Get-Json "$t/teams/$($zespol.id)" $ktos</code>, potem <code>Get-Json "$t/teams/999999" $ktos</code>. Dalej: <code>Get-Json "$t/teams" $ktos</code> oraz <code>Get-Json "$t/usage?run_id=&lt;twoj_przebieg&gt;" $ktos</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Oba pierwsze: <span class="pill bad">404</span> z <em>identycznym</em> ciałem. Lista cudzej tożsamości jest pusta. <code>/usage</code> na cudzy przebieg oddaje <strong>zerową sumę</strong>, nie 404 — to agregat, a różnica między „brak wierszy" a „nie twoje" jest dokładnie tym, czego obcy nie ma prawa zobaczyć.</dd>
+    <dt>Podstawa</dt><dd>zadanie 4.5; spec <code>teams-browser-access</code></dd>
+  </dl>
+</div>
+
+<h2>C. Terminal — canvas i katalog</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-11</span> Zakładka Teams: katalog i otwarcie zespołu</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Terminal → <em>Teams</em>. Otwórz zespół z TC-06. Zatrzymaj moduł <code>teams</code> i odśwież zakładkę.</dd>
+    <dt>Oczekiwane</dt><dd>Lista zespołów z liczbą rewizji i datami. Po otwarciu — canvas. Przy padniętym module widok pokazuje błąd z przyciskiem <strong>Retry</strong> i wraca bez przeładowania strony, gdy moduł wstanie. Brak katalogu modeli jest awarią <em>całej</em> zakładki, nie jej rogu: bez niego nowego agenta nie da się dodać, bo terminal nie ma własnego identyfikatora modelu, na który mógłby się wycofać.</dd>
+    <dt>Podstawa</dt><dd>zadania 9.4, 9.11</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-12</span> Canvas układa agentów sam, w kierunku pracy</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Otwórz zespół o co najmniej trzech agentach i dwóch poziomach zależności. Zamknij i otwórz ponownie.</dd>
+    <dt>Oczekiwane</dt><dd>Agenci ustawieni w kolumny <strong>po głębokości zależności</strong> — kierunek pracy widać bez klikania. Układ jest taki sam po ponownym otwarciu, bo nie jest zapisywany: druty nie niosą współrzędnych, więc przeciąganie węzłów byłoby gubione przy każdym odczycie. Przy każdym agencie widać rolę i nazwę modelu.</dd>
+    <dt>Podstawa</dt><dd>zadania 9.5, 9.6</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-13</span> Odmowa staje przy tym agencie, którego dotyczy</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Na canvasie zbuduj cykl (poprowadź krawędź powrotną) i zapisz. Potem: usuń model u jednego agenta i zapisz.</dd>
+    <dt>Oczekiwane</dt><dd>Komunikat modułu pojawia się <strong>przy węźle</strong> albo przy krawędzi, której dotyczy — nie jako pasek u góry ekranu. Terminal wyciąga klucze agentów z treści odmowy, więc to działa dla odmów, których front sam nie rozumie.</dd>
+    <dt>Podstawa</dt><dd>zadanie 9.8</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-14</span> Panel agenta bez wybieraka narzędzi — stan przejściowy</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Kliknij agenta. Sprawdź sekcję narzędzi. Otwórz starszą rewizję, w której agent miał przypisane narzędzie.</dd>
+    <dt>Oczekiwane</dt><dd>Rola, prompt, wytyczne i wybór modelu działają. W miejscu narzędzi: „the module announces no tools" — moduł nie publikuje ich jeszcze na drucie (zadanie 9.7, czeka na <code>GET /tools</code>). Narzędzie przypisane w starszej rewizji <strong>zostaje widoczne i możliwe do odznaczenia</strong>: brak wybieraka nie może po cichu skasować przypisania.</dd>
+    <dt>Podstawa</dt><dd>zadanie 9.7 — świadomie otwarte</dd>
+  </dl>
+</div>
+
+<h2>D. Przebieg</h2>
+
+<div class="callout">
+  <span class="tag">Skąd oglądać przebieg</span>
+  <p>Monitor na canvasie to zadania 9.9 i 9.10 — jeszcze ich nie ma. Do tego czasu przebieg uruchamia się i ogląda przez HTTP, i to jest w tym momencie <em>jedyna</em> droga; przycisku startu w katalogu też jeszcze nie ma (9.4).</p>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-15</span> Start odpowiada od razu, a praca dzieje się w tle</h3>
+  <dl>
+    <dt>Kroki</dt><dd><code>$run = Post-Json "$t/teams/$($zespol.id)/runs" @{}</code>, natychmiast potem <code>Get-Json "$t/runs/$($run.id)/steps"</code>, i to samo po kilkudziesięciu sekundach.</dd>
+    <dt>Oczekiwane</dt><dd><span class="pill good">201</span> wraca w ułamku sekundy, ze statusem <code>pending</code> albo <code>running</code> — <strong>nie</strong> z wynikiem. Kroki pojawiają się i zmieniają status w czasie: <code>zbieracz</code> kończy, zanim <code>sedzia</code> ruszy. Na końcu przebieg ma status <code>completed</code>, a krok <code>sedzia</code> niesie wypowiedź w polu <code>output</code>.</dd>
+    <dt>Podstawa</dt><dd>zadania 7.5, 7.9; spec <code>teams-runs</code></dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-16</span> Agent widzi poprzedników, a nie całą historię</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zespół o trzech agentach: <code>a → c</code> oraz <code>b → c</code>, przy czym <code>a</code> i <code>b</code> nie są ze sobą połączeni. W prompcie <code>b</code> wpisz: „Zacznij odpowiedz od slowa BANAN". W prompcie <code>a</code>: „Wypisz doslownie wszystko, co dostales w kontekscie".</dd>
+    <dt>Oczekiwane</dt><dd>W <code>output</code> agenta <code>a</code> <strong>nie ma</strong> słowa BANAN — <code>a</code> i <code>b</code> pracują równolegle i nic o sobie nie wiedzą. W <code>c</code> są obie wypowiedzi. To jest ta własność, przez którą koszt nie rośnie kwadratowo z liczbą agentów.</dd>
+    <dt>Podstawa</dt><dd>zadania 7.4, 7.5; spec <code>teams-runs</code>, „Agent widzi wypowiedzi poprzedników"</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-17</span> Strumień postępu: najpierw migawka, potem zdarzenia</h3>
+  <dl>
+    <dt>Kroki</dt><dd>W trakcie przebiegu otwórz <code>curl -N http://127.0.0.1:8050/runs/&lt;id&gt;/events</code> (albo tę samą trasę w przeglądarce). Zerwij połączenie w połowie i podłącz się ponownie. Otwórz też strumień na przebieg już zakończony.</dd>
+    <dt>Oczekiwane</dt><dd>Pierwsze zdarzenie to zawsze <code>snapshot</code> ze stanem <em>bieżącym</em>, więc widz, który przyszedł późno, widzi agentów już skończonych. Potem <code>step_started</code>, <code>tool_call</code>, <code>step_finished</code>, <code>run_finished</code>. Cisza dłuższa niż ~15 s daje komentarz keep-alive (<code>: ping</code>). <strong>Zerwanie odbioru nie przerywa przebiegu</strong> — sprawdź to, patrząc na <code>/runs/{id}/steps</code> po rozłączeniu. Strumień na przebieg zakończony wysyła migawkę i <em>zamyka się</em>, zamiast wisieć.</dd>
+    <dt>Podstawa</dt><dd>zadania 7.10, 9.10</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-18</span> Przerwanie przez operatora</h3>
+  <dl>
+    <dt>Kroki</dt><dd>W trakcie przebiegu: <code>Invoke-RestMethod -Method Post -Uri "$t/runs/$($run.id)/cancel"</code>. Potem to samo na przebiegu już zakończonym.</dd>
+    <dt>Oczekiwane</dt><dd>Pierwsze: <span class="pill">202</span> — status pisze sam przebieg, rozwijając się, więc w odpowiedzi jest przebieg z chwili przyjęcia prośby. Po chwili status to <code>cancelled</code> ze <code>stopped_reason</code>, a ślad wszystkiego, co zdążyło się wydarzyć, <strong>zostaje</strong>. Drugie: <span class="pill bad">409</span> z nazwaniem obecnego statusu.</dd>
+    <dt>Podstawa</dt><dd>zadania 7.8, 7.12</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-19</span> Limit czasu przebiegu</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Ustaw <code>RUN_TIMEOUT_SECONDS=20</code>, zrestartuj moduł, uruchom zespół, który na pewno tyle nie zdąży (trzech agentów szeregowo, dłuższe prompty).</dd>
+    <dt>Oczekiwane</dt><dd>Status <code>failed</code>, <code>stopped_reason</code> nazywający <em>limit czasu</em>, a nie ogólną awarię. Kroki, które zdążyły się skończyć, mają swoje wypowiedzi. Przywróć <code>900</code> po scenariuszu.</dd>
+    <dt>Podstawa</dt><dd>zadania 7.8, 7.12</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-20</span> Przebieg zastany po restarcie nie udaje trwającego</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Uruchom przebieg i w jego trakcie ubij proces modułu (Ctrl+C). Podnieś go z powrotem i sprawdź <code>GET /runs/{id}</code>. Spróbuj też go anulować.</dd>
+    <dt>Oczekiwane</dt><dd>Po starcie przebieg jest zamknięty jako <code>failed</code> — rejestr przebiegów siedzi w pamięci procesu, a przebieg zastany jako trwający należy do procesu, którego już nie ma. Anulowanie takiego przebiegu daje <span class="pill bad">409</span> („the run is not being worked on by this instance"), a nie udawane przerwanie.</dd>
+    <dt>Podstawa</dt><dd>zadanie 7.11</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-21</span> Edycja zespołu w trakcie przebiegu nie zmienia tego przebiegu</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Uruchom przebieg. Zanim się skończy, zapisz nową rewizję z innym zestawem agentów. Po zakończeniu porównaj <code>run.team_revision_id</code> z numerami rewizji.</dd>
+    <dt>Oczekiwane</dt><dd>Przebieg do końca pracuje na rewizji, na której ruszył, i wskazuje ją w <code>team_revision_id</code>. Kroki dotyczą agentów <em>tamtej</em> rewizji. To jest cały powód, dla którego przebieg wskazuje rewizję, a nie zespół.</dd>
+    <dt>Podstawa</dt><dd>zadanie 7.13</dd>
+  </dl>
+</div>
+
+<h2>E. Koszt</h2>
+
+<div class="stage">
+  <h3><span class="no">TC-22</span> Granica kosztu przebiegu zatrzymuje go, nazywając liczbę</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zapisz rewizję z <code>limits.run_limit = "0.0001"</code> i uruchom przebieg.</dd>
+    <dt>Oczekiwane</dt><dd>Status <code>failed</code>, a <code>stopped_reason</code> zawiera <strong>obie liczby</strong>: ile wydano i ile było wolno („the run's cost limit was reached: X spent of Y allowed"). „Za drogo" nic operatorowi nie mówi o tym, co zmienić. Ślad tego, co zdążyło powstać, zostaje — łącznie z wierszami <code>usage</code>.</dd>
+    <dt>Podstawa</dt><dd>zadania 8.4, 8.8</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-23</span> Granica dobowa odmawia, zanim cokolwiek powstanie</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zapisz rewizję z <code>limits.daily_limit = "0.0001"</code>, wykonaj jeden przebieg, a potem spróbuj drugiego. Sprawdź <code>GET /teams/{id}/runs</code>.</dd>
+    <dt>Oczekiwane</dt><dd>Drugi start to <span class="pill bad">422</span> z liczbami („this team's daily cost limit is used up: X spent today of Y allowed. No run was started"). Na liście przebiegów <strong>nie ma</strong> wiersza po tej próbie — przebieg odmówiony w połowie to przebieg, który już wydał, więc sprawdzenie jest przed utworzeniem czegokolwiek. Doba liczy się od północy UTC, nie od twojej strefy.</dd>
+    <dt>Podstawa</dt><dd>zadanie 8.5</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-24</span> Rozbicie kosztu pozwala przypisać go rolom</h3>
+  <dl>
+    <dt>Kroki</dt><dd><code>Get-Json "$t/usage?run_id=$($run.id)"</code>, potem <code>?team_id=</code>, potem bez filtra.</dd>
+    <dt>Oczekiwane</dt><dd><code>by_agent</code> i <code>by_model</code>, plus <code>total_cost</code>. Suma po agentach zgadza się z sumą po modelach. Tani zbieracz i drogi sędzia mają wyraźnie różne kwoty — to jest ten pomiar, dla którego moduł powstał. <code>unknown_count</code> liczy wywołania, dla których dostawca nie podał tokenów: brak jest zapisany jako <strong>brak</strong>, nigdy jako zero.</dd>
+    <dt>Podstawa</dt><dd>zadania 8.3, 8.6</dd>
+  </dl>
+</div>
+
+<div class="stage">
+  <h3><span class="no">TC-25</span> Zmiana cennika nie rusza rachunku sprzed zmiany</h3>
+  <dl>
+    <dt>Kroki</dt><dd>Zanotuj <code>total_cost</code> przebiegu. Zmień stawki tego modelu w <code>MODELS</code> (np. dziesięciokrotnie), zrestartuj moduł i odczytaj <code>GET /usage?run_id=...</code> ponownie.</dd>
+    <dt>Oczekiwane</dt><dd><strong>Ta sama liczba.</strong> Stawka jest kopiowana na wiersz w chwili jego powstania i nic nie jest przeliczane przy odczycie — rachunek sprzed miesiąca daje się odtworzyć po zmianie cennika. Nowy przebieg policzy się już po nowej stawce.</dd>
+    <dt>Podstawa</dt><dd>zadania 8.2, 8.7</dd>
+  </dl>
+</div>
+
+<h2>Sprzątanie po przebiegu</h2>
+
+<pre><code># Ile poszło łącznie w tej sesji testowej
+Get-Json "$t/usage" | Select-Object total_cost
+
+# Wycofanie zespołów testowych (ślad zostaje — to zamierzone)
+Get-Json "$t/teams" | ForEach-Object {
+  Invoke-RestMethod -Method Delete -Uri "$t/teams/$($_.id)"
+}</code></pre>
+
+<p>Przywróć w <code>.env</code>: <code>RUN_TIMEOUT_SECONDS=900</code>, oryginalne stawki w <code>MODELS</code>, <code>MARKET_MCP_URL</code>. Bazę testową kasuje się razem z wolumenem kontenera — ale nie musisz: katalog zespołów jest mały, to nie jest tabela świec.</p>
+
+<h2>Czego ten przebieg nie sprawdza</h2>
+
+<div class="callout warn">
+  <span class="tag">Uczciwie, żeby nie było potem niespodzianki</span>
+  <p><strong>Monitor przebiegu w terminalu (9.9, 9.10) i start z katalogu (9.4)</strong> nie istnieją, więc scenariusze D idą przez HTTP. Gdy grupa 9 się domknie, TC-15, TC-17 i TC-18 zyskają wariant „to samo, ale z canvasu".</p>
+  <p><strong><code>GET /tools</code> i wybierak narzędzi (9.7)</strong> — TC-14 sprawdza dziś stan przejściowy, a nie docelowy.</p>
+  <p><strong>Azure.</strong> Kod infrastruktury jest napisany i <code>terraform validate</code> przechodzi, ale <code>apply</code> jest robotą operatora i nie został wykonany — w chmurze nie stoi jeszcze nic. Wdrożenie ma własną kolejność (<code>-target</code> na App Service, pełny <code>apply</code>, sekret w Key Vault, rola w bazie i <code>grant-schema-ownership.sql</code>) opisaną w sekcji „Deploy" pliku <code>modules/teams/README.md</code>; jedna rzecz jest tam jawnie oznaczona jako do sprawdzenia — dokładne wywołanie zakładające rolę Entra w bazie.</p>
+  <p><strong>Zachowanie przy dwóch instancjach.</strong> Rejestr przebiegów siedzi w pamięci procesu, a plan ma dokładnie jednego workera. Drugi worker nie jest testowany, bo nie jest wspieraną konfiguracją — odpowiedzią na brak pamięci jest większy SKU, nigdy drugi worker.</p>
+</div>
+
+<footer>
+  Dokument roboczy do zadania 12.2 zmiany <code>add-teams-module</code>. Po przejściu scenariuszy wynik idzie do <code>review.md</code>; ten plik zostaje jako zapis, co i jak było sprawdzone ręką. Prawdą o systemie są specyfikacje <code>teams-*</code> i <code>terminal-teams</code>.
+</footer>
+
+</main>

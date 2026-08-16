@@ -3,32 +3,39 @@
     Everything the terminal needs, in the order it needs it.
 
 .DESCRIPTION
-    migrations -> capital-gateway -> market-data -> market-mcp -> agent -> terminal
+    migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp ->
+    agent -> teams -> terminal
 
     The order is not tidiness, and every arrow in it is now a real dependency.
     market-data opens a subscription per tracked pair as it starts, so a gateway
     that is not listening yet costs it a round of backoff; market-mcp reads
-    market-data's own contract; the agent asks market-mcp for its tool list on the
-    first turn, and a market-mcp that was not up yet means an agent answering
-    without tools rather than an error anyone would notice; the terminal's charts
-    read the archive, so starting it first fills the console with proxy errors that
-    mean nothing. Each step waits for the one before it to answer, not merely to
-    have been launched.
+    market-data's own contract; trading-mcp asks the gateway whether it is bound to
+    the demo account and refuses to open a port at all if it is not, so a gateway
+    that is not answering yet is a module that exits rather than waits; the agent
+    asks market-mcp for its tool list on the first turn, and a market-mcp that was
+    not up yet means an agent answering without tools rather than an error anyone
+    would notice; teams reads both tool lists for the agents a run assigns tools to;
+    the terminal's charts read the archive, so starting it first fills the console
+    with proxy errors that mean nothing. Each step waits for the one before it to
+    answer, not merely to have been launched.
 
     market-mcp needs no .env of its own here: every setting it reads has a
     working default for loopback (config.py), unlike the gateway and the archive,
-    which hold real credentials with no safe default to fall back to.
+    which hold real credentials with no safe default to fall back to. trading-mcp is
+    the other kind: the gateway checks its X-Gateway-Key on every caller, loopback
+    included, so this one module has a credential to fill in even locally.
 
     The database is the container in ..\compose.yaml — started here, before
     migrations (openspec/changes/local-dev-database-in-docker). The services run
     here on the host, where they reload on save and can be attached to;
     `docker compose down` stops the database and keeps the data.
 
-    `agent`'s own database is a second logical database in that same container,
-    created here if missing rather than through docker-entrypoint-initdb.d — that
-    only runs on a volume's first boot, so it would never fire for anyone who
-    already has tradingcenter-db-data from before this module existed
-    (design.md, "Baza: druga baza logiczna, jeden serwer").
+    `agent`'s and `teams`' own databases are further logical databases in that same
+    container, created here if missing rather than through
+    docker-entrypoint-initdb.d — that only runs on a volume's first boot, so it
+    would never fire for anyone who already has tradingcenter-db-data from before
+    either module existed (design.md, "Baza: druga baza logiczna, jeden serwer").
+    Three databases, one server, the same shape production has.
 
     Neither module depends on this script: each still starts on its own with the
     command in its README. `scripts/dev.sh` is the macOS and Linux counterpart.
@@ -57,13 +64,17 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $gatewayDir = Join-Path $repoRoot "modules\capital-gateway"
 $archiveDir = Join-Path $repoRoot "modules\market-data"
 $mcpDir = Join-Path $repoRoot "modules\market-mcp"
+$tradingDir = Join-Path $repoRoot "modules\trading-mcp"
 $agentDir = Join-Path $repoRoot "modules\agent"
+$teamsDir = Join-Path $repoRoot "modules\teams"
 $terminalDir = Join-Path $repoRoot "modules\terminal"
 
 $gatewayPort = 8010
 $archivePort = 8020
 $agentPort = 8030
 $mcpPort = 8040
+$teamsPort = 8050
+$tradingPort = 8060
 $terminalPort = 5173
 # 127.0.0.1, not "localhost": uvicorn binds IPv4 loopback, while "localhost" can
 # resolve to ::1 first on Windows.
@@ -71,6 +82,8 @@ $gatewayUrl = "http://127.0.0.1:$gatewayPort"
 $archiveUrl = "http://127.0.0.1:$archivePort"
 $agentUrl = "http://127.0.0.1:$agentPort"
 $mcpUrl = "http://127.0.0.1:$mcpPort"
+$teamsUrl = "http://127.0.0.1:$teamsPort"
+$tradingUrl = "http://127.0.0.1:$tradingPort"
 $terminalUrl = "http://localhost:$terminalPort"
 
 Write-Host "Checking prerequisites..." -ForegroundColor Cyan
@@ -113,6 +126,18 @@ $agentEnv = Join-Path $agentDir ".env"
 if (-not (Test-Path $agentEnv)) {
     $problems += "$agentEnv is missing - copy .env.example and fill in OPENAI_API_KEY"
 }
+# teams needs a key and a MODELS catalogue: config.py refuses to build Settings without
+# either, so the module would exit at import rather than start and misbehave.
+$teamsEnv = Join-Path $teamsDir ".env"
+if (-not (Test-Path $teamsEnv)) {
+    $problems += "$teamsEnv is missing - copy .env.example and fill in OPENAI_API_KEY (MODELS has a working default there)"
+}
+# trading-mcp cannot fall back the way market-mcp does: config.py requires the gateway's
+# caller key, and the gateway checks it on loopback too.
+$tradingEnv = Join-Path $tradingDir ".env"
+if (-not (Test-Path $tradingEnv)) {
+    $problems += "$tradingEnv is missing - copy .env.example and set CAPITAL_GATEWAY_API_KEY to the gateway's own GATEWAY_API_KEY"
+}
 
 if (-not $NoTerminal) {
     if (Get-Command pnpm -ErrorAction SilentlyContinue) {
@@ -146,7 +171,7 @@ function Get-PortOwner {
     return "$($proc.ProcessName) (pid $($proc.Id))"
 }
 
-$ports = @($gatewayPort, $archivePort, $mcpPort, $agentPort)
+$ports = @($gatewayPort, $archivePort, $mcpPort, $tradingPort, $agentPort, $teamsPort)
 if (-not $NoTerminal) { $ports += $terminalPort }
 foreach ($port in $ports) {
     $owner = Get-PortOwner -Port $port
@@ -172,6 +197,28 @@ function Test-LocalDatabaseHost {
 }
 Test-LocalDatabaseHost -EnvPath $archiveEnv -Label "modules\market-data\.env"
 Test-LocalDatabaseHost -EnvPath $agentEnv -Label "modules\agent\.env"
+Test-LocalDatabaseHost -EnvPath $teamsEnv -Label "modules\teams\.env"
+
+# The two halves of one credential, in two files. The gateway checks X-Gateway-Key on
+# every caller including loopback, and trading-mcp asks it about the account *before* it
+# opens a port - so a mismatch here is not a failed tool call later, it is a module that
+# exits during start-up and takes this whole script down with it.
+function Get-EnvValue {
+    param([string]$EnvPath, [string]$Name)
+    if (-not (Test-Path $EnvPath)) { return $null }
+    $line = Select-String -Path $EnvPath -Pattern "^$Name=(.*)$" | Select-Object -First 1
+    if ($null -eq $line) { return $null }
+    return $line.Matches[0].Groups[1].Value
+}
+$gatewayKey = Get-EnvValue -EnvPath $gatewayEnv -Name "GATEWAY_API_KEY"
+$tradingKey = Get-EnvValue -EnvPath $tradingEnv -Name "CAPITAL_GATEWAY_API_KEY"
+if ([string]::IsNullOrWhiteSpace($tradingKey)) {
+    if (Test-Path $tradingEnv) {
+        $problems += "modules\trading-mcp\.env has no CAPITAL_GATEWAY_API_KEY - the gateway requires it from every caller, loopback included"
+    }
+} elseif (-not [string]::IsNullOrWhiteSpace($gatewayKey) -and $gatewayKey -ne $tradingKey) {
+    $problems += "modules\trading-mcp\.env's CAPITAL_GATEWAY_API_KEY does not match modules\capital-gateway\.env's GATEWAY_API_KEY - trading-mcp would be refused by the gateway and exit before it listens"
+}
 
 if ($problems.Count -gt 0) {
     Write-Host "Cannot start:" -ForegroundColor Red
@@ -189,11 +236,59 @@ if ((Test-Path $agentEnv) -and
     Write-Host "  Add MARKET_MCP_URL=$mcpUrl to give it market-mcp's, as .env.example does." -ForegroundColor DarkGray
 }
 
+# Same for teams, with a sharper edge: the agent without a tool server answers from the
+# model alone, while a team whose agents were *assigned* tools refuses to run at all
+# (specs/teams-tool-access). Both are supported states; only one of them looks like the
+# module is broken.
+if ((Test-Path $teamsEnv) -and
+    -not (Select-String -Path $teamsEnv -Pattern '^MARKET_MCP_URL=.+' -Quiet)) {
+    Write-Host "modules\teams\.env has no MARKET_MCP_URL - teams whose agents assign tools will refuse to run." -ForegroundColor DarkGray
+    Write-Host "  Add MARKET_MCP_URL=$mcpUrl to give it market-mcp's, as .env.example does." -ForegroundColor DarkGray
+}
+
+# The same again for the write half, and it is the one worth saying twice: a team given
+# only reading tools runs perfectly without this line, so its absence shows up as a
+# refusal on the one run that was supposed to place an order.
+if ((Test-Path $teamsEnv) -and
+    -not (Select-String -Path $teamsEnv -Pattern '^TRADING_MCP_URL=.+' -Quiet)) {
+    Write-Host "modules\teams\.env has no TRADING_MCP_URL - teams will have no order tools, and one assigning them refuses to run." -ForegroundColor DarkGray
+    Write-Host "  Add TRADING_MCP_URL=$tradingUrl to give it trading-mcp's, as .env.example does." -ForegroundColor DarkGray
+}
+
 $gatewayJob = $null
 $archiveJob = $null
 $mcpJob = $null
+$tradingJob = $null
 $agentJob = $null
+$teamsJob = $null
 $terminalJob = $null
+
+# One logical database and the role that owns it, created if either is missing. Called
+# from inside a Push-Location on the repository root, where `docker compose` finds
+# compose.yaml.
+function Confirm-LogicalDatabase {
+    param([string]$Name)
+    # "$(...)" and not (...).Trim(): psql -tAc prints nothing at all when the row is
+    # absent, PowerShell binds that to $null, and $null.Trim() throws "You cannot call a
+    # method on a null-valued expression" - in exactly the case this exists to handle.
+    # The subexpression makes an absent row an empty string.
+    $roleExists = "$(docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_roles WHERE rolname = '$Name'")".Trim()
+    if ($roleExists -ne "1") {
+        docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 -c "CREATE ROLE $Name LOGIN PASSWORD 'change-me';"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "could not create the '$Name' role." -ForegroundColor Red
+            exit 1
+        }
+    }
+    $dbExists = "$(docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_database WHERE datname = '$Name'")".Trim()
+    if ($dbExists -ne "1") {
+        docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 -c "CREATE DATABASE $Name OWNER $Name;"
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "could not create the '$Name' database." -ForegroundColor Red
+            exit 1
+        }
+    }
+}
 
 function Write-Prefixed {
     param([string]$Prefix, [string]$Color, [object[]]$Lines)
@@ -248,41 +343,23 @@ try {
     }
     Write-Host "Database is up." -ForegroundColor Green
 
-    # --- the agent's own database ---
+    # --- the agent's and teams' own databases ---
     #
-    # A second logical database in the same container, not a second container - the
-    # free grant is one Postgres server and this mirrors it (design.md, "Baza: druga
-    # baza logiczna, jeden serwer"). Checked and created here rather than through
+    # Further logical databases in the same container, not further containers - the free
+    # grant is one Postgres server and this mirrors it (design.md, "Baza: druga baza
+    # logiczna, jeden serwer"). Checked and created here rather than through
     # docker-entrypoint-initdb.d, which only ever runs against an empty volume: anyone
-    # with a tradingcenter-db-data from before this module existed would never see it
+    # with a tradingcenter-db-data from before either module existed would never see it
     # fire.
-    Write-Host "Ensuring the agent database exists..." -ForegroundColor Cyan
+    Write-Host "Ensuring the agent and teams databases exist..." -ForegroundColor Cyan
     Push-Location $repoRoot
     try {
-        # "$(...)" and not (...).Trim(): psql -tAc prints nothing at all when the row is
-        # absent, PowerShell binds that to $null, and $null.Trim() throws "You cannot
-        # call a method on a null-valued expression" - in exactly the case this block
-        # exists to handle. The subexpression makes an absent row an empty string.
-        $roleExists = "$(docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'agent'")".Trim()
-        if ($roleExists -ne "1") {
-            docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 -c "CREATE ROLE agent LOGIN PASSWORD 'change-me';"
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "could not create the 'agent' role." -ForegroundColor Red
-                exit 1
-            }
-        }
-        $dbExists = "$(docker compose exec -T db psql -U market_data -d market_data -tAc "SELECT 1 FROM pg_database WHERE datname = 'agent'")".Trim()
-        if ($dbExists -ne "1") {
-            docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 -c "CREATE DATABASE agent OWNER agent;"
-            if ($LASTEXITCODE -ne 0) {
-                Write-Host "could not create the 'agent' database." -ForegroundColor Red
-                exit 1
-            }
-        }
+        Confirm-LogicalDatabase -Name "agent"
+        Confirm-LogicalDatabase -Name "teams"
     } finally {
         Pop-Location
     }
-    Write-Host "agent database is ready." -ForegroundColor Green
+    Write-Host "agent and teams databases are ready." -ForegroundColor Green
 
     # --- migrations ---
 
@@ -305,6 +382,16 @@ try {
         uv run alembic upgrade head
         if ($LASTEXITCODE -ne 0) {
             Write-Host "agent's migrations failed - it would fail on its first query, so stopping here." -ForegroundColor Red
+            exit 1
+        }
+    } finally {
+        Pop-Location
+    }
+    Push-Location $teamsDir
+    try {
+        uv run alembic upgrade head
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "teams' migrations failed - it would fail on its first query, so stopping here." -ForegroundColor Red
             exit 1
         }
     } finally {
@@ -370,6 +457,30 @@ try {
     }
     Write-Host "market-mcp is answering." -ForegroundColor Green
 
+    # --- trading-mcp ---
+    #
+    # After the gateway, and this one is not a preference: __main__.py asks
+    # GET /capabilities and refuses to open a port unless the answer says `demo`
+    # (specs/trading-mcp-upstream-access). A gateway that is not answering yet is a
+    # module that exits rather than one that retries.
+    #
+    # No `--reload`, same as market-mcp: the ASGI app is built in Python (the
+    # caller-identity wrapper), not handed to uvicorn's CLI.
+
+    Write-Host "Starting trading-mcp on port $tradingPort..." -ForegroundColor Cyan
+    $tradingJob = Start-Job -Name "trading" -ScriptBlock {
+        param($dir)
+        Set-Location $dir
+        uv run python -m trading_mcp 2>&1
+    } -ArgumentList $tradingDir
+
+    if (-not (Wait-ForHttp -Url "$tradingUrl/health" -Label "trading-mcp" `
+                -Job $tradingJob -Prefix "trading " -Color DarkGreen)) {
+        Write-Prefixed -Prefix "trading " -Color Yellow -Lines (Receive-Job $tradingJob)
+        exit 1
+    }
+    Write-Host "trading-mcp is answering." -ForegroundColor Green
+
     # --- agent ---
     #
     # Last among the back ends: nothing else calls it, so nothing else waits on it -
@@ -390,6 +501,26 @@ try {
         exit 1
     }
     Write-Host "agent is answering." -ForegroundColor Green
+
+    # --- teams ---
+    #
+    # After market-mcp for the same reason the agent is, and after the agent for no
+    # reason at all beyond a fixed order: nothing calls teams, and teams calls nobody the
+    # agent does not. The two are siblings, not a chain.
+
+    Write-Host "Starting teams on port $teamsPort..." -ForegroundColor Cyan
+    $teamsJob = Start-Job -Name "teams" -ScriptBlock {
+        param($dir, $port)
+        Set-Location $dir
+        uv run uvicorn teams.app:app --reload --port $port 2>&1
+    } -ArgumentList $teamsDir, $teamsPort
+
+    if (-not (Wait-ForHttp -Url "$teamsUrl/health" -Label "teams" `
+                -Job $teamsJob -Prefix "teams   " -Color DarkCyan)) {
+        Write-Prefixed -Prefix "teams   " -Color Yellow -Lines (Receive-Job $teamsJob)
+        exit 1
+    }
+    Write-Host "teams is answering." -ForegroundColor Green
 
     # --- the terminal ---
 
@@ -415,8 +546,10 @@ try {
     Write-Host "  market-data docs    $archiveUrl/docs"
     Write-Host "  Gateway docs        $gatewayUrl/docs"
     Write-Host "  market-mcp health   $mcpUrl/health"
+    Write-Host "  trading-mcp health  $tradingUrl/health"
     Write-Host "  agent docs          $agentUrl/docs"
-    Write-Host "  Database            market_data @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
+    Write-Host "  teams docs          $teamsUrl/docs"
+    Write-Host "  Database            market_data, agent, teams @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
     Write-Host ""
     Write-Host "Nothing is archived until a pair is added in the Archive panel - that is deliberate." -ForegroundColor DarkGray
     Write-Host "Ctrl+C to stop the services." -ForegroundColor DarkGray
@@ -426,7 +559,9 @@ try {
         @{ Job = $gatewayJob; Label = "capital-gateway"; Prefix = "gateway "; Color = "Blue" },
         @{ Job = $archiveJob; Label = "market-data"; Prefix = "archive "; Color = "Magenta" },
         @{ Job = $mcpJob; Label = "market-mcp"; Prefix = "mcp     "; Color = "Green" },
-        @{ Job = $agentJob; Label = "agent"; Prefix = "agent   "; Color = "Yellow" }
+        @{ Job = $tradingJob; Label = "trading-mcp"; Prefix = "trading "; Color = "DarkGreen" },
+        @{ Job = $agentJob; Label = "agent"; Prefix = "agent   "; Color = "Yellow" },
+        @{ Job = $teamsJob; Label = "teams"; Prefix = "teams   "; Color = "DarkCyan" }
     )
     if (-not $NoTerminal) {
         $watched += @{ Job = $terminalJob; Label = "terminal"; Prefix = "terminal"; Color = "Cyan" }
@@ -448,7 +583,7 @@ try {
 finally {
     Write-Host ""
     Write-Host "Stopping..." -ForegroundColor Cyan
-    foreach ($job in @($gatewayJob, $archiveJob, $mcpJob, $agentJob, $terminalJob)) {
+    foreach ($job in @($gatewayJob, $archiveJob, $mcpJob, $tradingJob, $agentJob, $teamsJob, $terminalJob)) {
         if ($null -ne $job) {
             Stop-Job $job -ErrorAction SilentlyContinue | Out-Null
             Remove-Job $job -Force -ErrorAction SilentlyContinue | Out-Null
@@ -457,7 +592,7 @@ finally {
     # Start-Job's child process tree (uv -> uvicorn, pnpm -> vite) can outlive the
     # job object itself, which is what actually leaves a process squatting on the
     # port - so processes bound to the ports we used are swept explicitly too.
-    $sweep = @($gatewayPort, $archivePort, $mcpPort, $agentPort)
+    $sweep = @($gatewayPort, $archivePort, $mcpPort, $tradingPort, $agentPort, $teamsPort)
     if (-not $NoTerminal) { $sweep += $terminalPort }
     foreach ($port in $sweep) {
         Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |

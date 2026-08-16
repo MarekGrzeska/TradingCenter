@@ -31,16 +31,23 @@ that runs on its own and publishes a contract. Nothing imports across that bound
                │          │              │ MCP (stdio)    │
                │   MCP    │              ▼                │
                │  (streamable HTTP)  the operator's       │
-               │          │           desktop client      │
-               │          ▼                               │
-               │  ┌──────────────────────────────┐        │
-               │  │  agent                       │◀────── OpenAI
-               │  │  conversation · tools · cost │        │
-               │  └──────────────┬───────────────┘        │
-               │                 │ HTTP, streamed         │
-               ▼                 ▼                        ▼
+               │  ┌───────┤           desktop client      │
+               │  │       ▼                               │
+               │  │  ┌──────────────────────────────┐     │
+               │  │  │  agent                       │◀─── OpenAI
+               │  │  │  conversation · tools · cost │     │
+               │  │  └──────────────┬───────────────┘     │
+               │  │                 │ HTTP, streamed      │
+               │  └────┐            │                     │
+               │       ▼            │                     │
+               │     ┌──────────────────────────────┐     │
+               │     │  teams                       │◀─── OpenAI
+               │     │  agents as data · runs · cost│     │
+               │     └──────────────┬───────────────┘     │
+               │                    │ HTTP, streamed      │
+               ▼                    ▼                     ▼
                             terminal ◀────────────────────┘
-        charts · grid · search · archive panel · agent panel
+    charts · grid · search · archive panel · agent panel · teams canvas
 ```
 
 `terminal` is a consumer, not a peer: it publishes no contract of its own and nothing
@@ -49,7 +56,9 @@ implementations behind it — candles and the live stream from `market-data`, th
 catalogue from `capital-gateway`, composed into a single instance the views never see
 through. The charts were not rewritten when the archive arrived, which is the whole point
 of having had the interface first. `agent` is a third, unrelated source behind its own
-interface — a conversation and its cost, nothing that shares a shape with a candle.
+interface — a conversation and its cost, nothing that shares a shape with a candle. `teams`
+is a fourth, and unlike the agent's it publishes a shape the terminal *edits*: a graph the
+operator composes on a canvas and saves as a new revision.
 
 `market-data` sits between the two on purpose. capital.com counts its rate limit against the
 account rather than the process, so a second client anywhere spends the same allowance twice:
@@ -59,10 +68,11 @@ upstream URLs point anywhere else.
 `market-mcp` is a consumer of `market-data`, the same shape as `terminal`: it reads the
 published contract and imports nothing. Where it differs is the shape of what it hands
 onward — a chart wants every candle, a model wants a summary, so the same archive read
-comes out reduced rather than proxied. It has two callers and they arrive by different
-doors: `agent`, over streamable HTTP from its own container, and whatever MCP client the
-operator runs on the desktop, over stdio. One tool set, registered once; the transport
-decides only how a request gets in.
+comes out reduced rather than proxied. It has three callers and they arrive by two doors:
+`agent` and `teams`, over streamable HTTP from their own containers, and whatever MCP
+client the operator runs on the desktop, over stdio. One tool set, registered once; the
+transport decides only how a request gets in, and a second HTTP caller is an entry in
+`allowed_applications` rather than a change to this module.
 
 `agent` reaches OpenAI and `market-mcp`, and nothing else in this diagram. That it is not
 drawn under `market-data` is the point: the archive is two hops away, and the module has
@@ -78,6 +88,51 @@ same session that uses them, so there is no second copy to drift and nothing to
 regenerate. The trade is that a tool added on the `market-mcp` side reaches the model with
 no review on the `agent` side, which is safe exactly as long as that module's own
 specification keeps forbidding a tool that writes.
+
+`teams` sits beside `agent`, not under it: the same edges out to OpenAI and `market-mcp`,
+its own database, its own key, and no edge between the two modules at all. What differs is
+what it stores. `agent` keeps a conversation; `teams` keeps the *definition* of a team —
+agents, their roles and the dependencies between them — as data in a revision that never
+changes once written, so a run months apart from another can be compared against the same
+definition rather than against a memory of it.
+
+## The order path
+
+`teams` has one more edge than the diagram above draws, and it is drawn apart because the
+picture is a straight line while the read path is a fan — folding it in would cross three
+arrows to say something simpler than any of them:
+
+```
+        ┌──────────────────────────────┐
+        │  capital-gateway             │  the only door to the provider,
+        │  trade · history · stream    │  for orders as much as for candles
+        └──────────────▲───────────────┘
+                       │ HTTP · caller key on every request, loopback included
+                       │ demo confirmed by asking, not by configuration
+        ┌──────────────┴───────────────┐
+        │  trading-mcp                 │
+        │  MCP tools · account · orders│
+        └──────────────▲───────────────┘
+                       │ MCP (streamable HTTP) · exactly one named caller
+        ┌──────────────┴───────────────┐
+        │  teams                       │
+        └──────────────────────────────┘
+```
+
+A sixth module rather than a switch on the fifth. `market-mcp` stays read-only to the
+letter, and the two tool servers are separate deployables with separate identities, so
+"which module may move the account" is answered by a list of callers rather than by a flag
+inside one that reads.
+
+The demo-only guarantee lives here and nowhere else that can be turned off: `trading-mcp`
+asks `capital-gateway` what environment it is bound to and refuses to open a port unless
+the answer is the demo one. It is not a setting of its own — a module that decided this
+from its own configuration would be a module an environment variable could aim at real
+money. Everything the operator *can* change — how large an order may be, how many a run or
+a day may place — lives one module up, in a `teams` revision, where every one of them is
+optional and an absent one means no limit at all. That split is the rule worth carrying to
+the next ceiling anyone adds: **a number the operator must not be able to change belongs in
+`trading-mcp`; a budget that is theirs belongs in the revision.**
 
 ## Why no shared library
 
