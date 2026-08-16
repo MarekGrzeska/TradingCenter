@@ -24,11 +24,8 @@ ENV PATH="/app/.venv/bin:$PATH"
 # infra/app-service.tf, which sets no WEBSITES_PORT override.
 EXPOSE 80
 
-# Migrations run at startup, inside the process — `market_data/app.py`'s lifespan, not
-# this line. This file used to say the opposite, and the reason it gave was real: two
-# workers restarting together would race to migrate the same database. What changed is
-# not the risk but the answer to it — a Postgres advisory lock (`db.py`), which the
-# racing worker waits on instead of duplicating the work. What that bought is in
-# `market-data-database-connection`, "Moduł sam doprowadza bazę do rewizji, dla której
-# powstał": a merge to main leaves production serving, with no step in between.
+# Migrations (8.6) are a deliberate, separate step — `alembic upgrade head` run by hand
+# or by the deploy workflow, never implicit in container start. Running it here would
+# mean every restart (and every one of the two workers a bad `worker_count` edit could
+# add — see app-service.tf) racing to migrate the same database.
 CMD ["uvicorn", "market_data.app:app", "--host", "0.0.0.0", "--port", "80"]

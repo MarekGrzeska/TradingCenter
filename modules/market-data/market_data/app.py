@@ -21,7 +21,7 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
-from . import migrate, schema_version, telemetry
+from . import schema_version, telemetry
 
 # Must run before `from fastapi import FastAPI` below, not merely before `FastAPI(...)` is
 # called. OpenTelemetry's FastAPI auto-instrumentation (enabled by `configure_azure_monitor`
@@ -37,7 +37,6 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from .config import Settings
-from .db import MIGRATION_LOCK_KEY, advisory_lock
 from .db import pool as make_pool
 from .errors import GatewayError, GatewayUnreachable
 from .gateway import GatewayHistory, GatewayInstruments, http_client
@@ -95,24 +94,10 @@ async def lifespan(app: FastAPI):
         ) as pool,
         http_client(settings.gateway_api_key) as client,
     ):
-        # The database is brought to this image's revision here, before anything is
-        # built on top of it, before a request is served and — the one that leaves a
-        # mark — before a single candle is written
-        # (`market-data-database-connection`, "Moduł sam doprowadza bazę do rewizji,
-        # dla której powstał"). `ingest.start()` is far below, which is what makes that
-        # ordering hold.
-        #
-        # One connection held for the whole of it: the advisory lock is session scoped,
-        # so it has to be released on the connection that took it, and handing that
-        # connection back to the pool in between would release it early.
+        # Before anything is built on top of it: a schema that does not match this image
+        # makes every query below a guess, and the only honest thing a process can do
+        # about that is not start (`schema_version.py`).
         async with pool.acquire() as conn:
-            async with advisory_lock(
-                conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds
-            ):
-                await migrate.run()
-            # Still checked, and now for a narrower pair of accidents than before: a
-            # migration that reported success without arriving, and an image older than
-            # the schema it found (`schema_version.py`).
             await schema_version.verify(conn)
 
         history = GatewayHistory(settings.gateway_base_url, client)

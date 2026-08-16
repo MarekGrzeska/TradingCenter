@@ -138,9 +138,13 @@ def migrated_url(postgres_url: str) -> str:
     a thread with no loop already running. A sync fixture is such a thread; an async one
     is not.
     """
-    from market_data.migrate import upgrade_to_head
+    from alembic import command
+    from alembic.config import Config
 
-    upgrade_to_head(sqlalchemy_url(postgres_url))
+    config = Config(str(MODULE_ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(MODULE_ROOT / "migrations"))
+    config.set_main_option("sqlalchemy.url", sqlalchemy_url(postgres_url))
+    command.upgrade(config, "head")
     return postgres_url
 
 
