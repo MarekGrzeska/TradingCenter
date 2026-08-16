@@ -10,18 +10,18 @@
 
 ## 2. To samo w market-data
 
-- [ ] 2.1 `market_data/db.py`: bliźniak blokady z 1.1, własna wartość klucza
-- [ ] 2.2 `market_data/migrate.py`: bliźniak 1.2
-- [ ] 2.3 `market_data/config.py`: kres czekania, domyślnie 30 minut
-- [ ] 2.4 `market_data/app.py`: wywołanie w `lifespan` przed `verify` i **przed startem zbierania**
-- [ ] 2.5 Testy jednostkowe i `-m db` jak w 1.5–1.6, plus: zbieranie nie rusza przed końcem migracji
-- [ ] 2.6 `uv run ruff check .`, `uv run pyright`, `uv run pytest -m db`
+- [x] 2.1 `market_data/db.py`: bliźniak blokady z 1.1, własna wartość klucza
+- [x] 2.2 `market_data/migrate.py`: bliźniak 1.2
+- [x] 2.3 `market_data/config.py`: kres czekania, domyślnie 30 minut
+- [x] 2.4 `market_data/app.py`: wywołanie w `lifespan` przed `verify` i **przed startem zbierania**
+- [x] 2.5 Testy jednostkowe i `-m db` jak w 1.5–1.6, plus: zbieranie nie rusza przed końcem migracji
+- [x] 2.6 `uv run ruff check .`, `uv run pyright`, `uv run pytest -m db`
 
 ## 3. Komentarze i dokumentacja, które dziś mówią coś przeciwnego
 
-- [ ] 3.1 `modules/agent/Dockerfile` i `modules/market-data/Dockerfile`: komentarz o `CMD` — powodem odwrócenia jest blokada, nie zmiana zdania
-- [ ] 3.2 `modules/agent/README.md`, `modules/market-data/README.md`: sekcja o ręcznej migracji na produkcji znika; zostaje lokalne `alembic upgrade head` i zdanie o tym, że produkcja migruje sama
-- [ ] 3.3 `agent/schema_version.py`, `market_data/schema_version.py`: docstring mówi teraz, czego ten check pilnuje po zmianie
+- [x] 3.1 `modules/agent/Dockerfile` i `modules/market-data/Dockerfile`: komentarz o `CMD` — powodem odwrócenia jest blokada, nie zmiana zdania
+- [x] 3.2 `modules/agent/README.md`, `modules/market-data/README.md`: sekcja o ręcznej migracji na produkcji znika; zostaje lokalne `alembic upgrade head` i zdanie o tym, że produkcja migruje sama
+- [x] 3.3 `agent/schema_version.py`, `market_data/schema_version.py`: docstring mówi teraz, czego ten check pilnuje po zmianie
 - [x] 3.4 `CLAUDE.md`: akapit o spłacanym długu znika z sekcji „Migrations are never the operator's job"
 
 ## 4. Infrastruktura i wdrożenie
