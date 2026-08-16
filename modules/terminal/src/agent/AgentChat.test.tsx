@@ -184,6 +184,13 @@ function createFakeApi(): FakeApi {
     async chartCommand() {
       return null;
     },
+    async listDrawings() {
+      return [];
+    },
+    async patchDrawing(): Promise<never> {
+      throw new Error("not used");
+    },
+    async deleteDrawing() {},
   };
   return api;
 }

@@ -47,6 +47,11 @@ function fakeApi(overrides: Partial<AgentApi> = {}): AgentApi {
       throw new Error("not used");
     },
     chartCommand: async () => null,
+    listDrawings: async () => [],
+    patchDrawing: async () => {
+      throw new Error("not used in this test");
+    },
+    deleteDrawing: async () => {},
     ...overrides,
   };
 }

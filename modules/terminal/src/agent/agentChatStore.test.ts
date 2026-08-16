@@ -225,6 +225,13 @@ function createFakeApi(): FakeApi {
     async chartCommand() {
       return null;
     },
+    async listDrawings() {
+      return [];
+    },
+    async patchDrawing(): Promise<never> {
+      throw new Error("not used");
+    },
+    async deleteDrawing() {},
   };
   return api;
 }
@@ -768,5 +775,70 @@ describe("createAgentChatStore — the chart the agent can set", () => {
 
     expect(store.getSnapshot().chartNotice).toBeNull();
     expect(store.getSnapshot().messages.map((m) => m.role)).toEqual(["operator", "agent"]);
+  });
+
+  /** A drawings store that answers one fixed difference and records that it was asked. */
+  function fakeDrawings(change = { added: 0, removed: 0 }) {
+    const store = {
+      calls: 0,
+      subscribe: () => () => {},
+      getSnapshot: () => ({}),
+      ensureLoaded: () => {},
+      refresh: async () => change,
+      async refreshAll() {
+        store.calls += 1;
+        return change;
+      },
+      remove: async () => null,
+      patch: async () => null,
+    };
+    return store;
+  }
+
+  it("says what the agent drew, once the turn is over", async () => {
+    const api = createFakeApi();
+    const drawings = fakeDrawings({ added: 1, removed: 0 });
+    const store = createAgentChatStore(null, api, async () => null, () => null, drawings);
+
+    store.send("mark the weekly high");
+
+    await waitFor(() =>
+      expect(store.getSnapshot().chartNotice).toBe("The agent drew 1 object on the chart."),
+    );
+  });
+
+  it("says both in one sentence when the agent set the chart and drew on it", async () => {
+    // One channel, not two — `terminal-agent-chat` spec, "tą samą drogą i w tej samej
+    // chwili co o poleceniu wykresu".
+    const api = createFakeApi();
+    const store = createAgentChatStore(
+      null,
+      api,
+      async () => ({ applied: ["EMA period 200"], skipped: [] }),
+      () => null,
+      fakeDrawings({ added: 2, removed: 1 }),
+    );
+
+    store.send("show the slow average and mark the range");
+
+    await waitFor(() =>
+      expect(store.getSnapshot().chartNotice).toBe(
+        "The agent set the chart: EMA period 200. The agent drew 2 objects and removed 1 on the chart.",
+      ),
+    );
+  });
+
+  it("reads the objects after every turn, even one that set no chart", async () => {
+    const api = createFakeApi();
+    const drawings = fakeDrawings();
+    const store = createAgentChatStore(null, api, async () => null, () => null, drawings);
+
+    store.send("hello");
+    await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
+
+    // The read happens because the turn ended, not because the chart command read found
+    // something: the agent may have drawn without touching the chart at all.
+    await waitFor(() => expect(drawings.calls).toBeGreaterThanOrEqual(1));
+    expect(store.getSnapshot().chartNotice).toBeNull();
   });
 });

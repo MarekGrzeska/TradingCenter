@@ -24,6 +24,8 @@ import {
   type UTCTimestamp,
   type WhitespaceData,
 } from "lightweight-charts";
+import type { AgentChartDrawing, AgentDrawingPatch } from "../agent/agentApi";
+import type { DrawingsStatus } from "../agent/drawingsStore";
 import { findBar, mergeBar, mergeSeries } from "../data/merge";
 import type { IndicatorSource } from "../data/source";
 import {
@@ -47,6 +49,7 @@ import {
   readChartColors,
   type ChartColors,
 } from "./theme";
+import { DrawingList } from "./DrawingList";
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
 import { type BarsRange, useIndicators } from "./indicators/useIndicators";
 import { useIndicatorCatalogue } from "./indicators/useIndicatorCatalogue";
@@ -54,6 +57,7 @@ import { RayPrimitive } from "./RayPrimitive";
 import { TimeProfilePrimitive, type ProfileBar } from "./TimeProfilePrimitive";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
+import { TrendlinePrimitive, type DrawnTrendline } from "./TrendlinePrimitive";
 import { ZonePrimitive, type DrawnZone } from "./ZonePrimitive";
 
 export interface ChartProps {
@@ -99,6 +103,27 @@ export interface ChartProps {
    *  operator is looking at (`terminal-agent-chat` spec, "Panel wysyła migawkę tego, co
    *  rysuje aktywny slot"). Not a controlled value — there is no prop that sets it. */
   onVisibleRangeChange?(range: VisibleTimeRange | null): void;
+  /** Objects drawn on this instrument — levels, zones and trend lines the agent and the
+   *  operator left on it — together with the operator's own hand on them. Not indicators
+   *  and not on the same lifecycle: they are not computed from candles and they survive a
+   *  resolution change, because they belong to the instrument rather than to the view
+   *  (`terminal-chart` spec, "Wykres rysuje obiekty naniesione na instrument"). Omitted,
+   *  the chart draws none and offers no list — a caller with nowhere to read them from
+   *  simply does not pass any. */
+  drawings?: ChartDrawings;
+}
+
+/** What the chart needs to draw the objects on an instrument and let the operator manage
+ *  them: the list, how the last read went, and the two writes. `remove` and `patch`
+ *  answer null on success and the sentence to show on failure — the list keeps whatever
+ *  it had rather than guessing (`terminal-chart` spec, "Nieudane usunięcie albo nieudana
+ *  poprawka"). */
+export interface ChartDrawings {
+  items: readonly AgentChartDrawing[];
+  status: DrawingsStatus;
+  error: string | null;
+  remove(id: number): Promise<string | null>;
+  patch(id: number, patch: AgentDrawingPatch): Promise<string | null>;
 }
 
 /** Price-pane overlays, own-pane oscillators, price-pane markers, price-pane
@@ -201,6 +226,10 @@ function assignLineColors(
  *  height — `lightweight-charts`' default (equal stretch for every pane) reads
  *  as "RSI is as important as the candles" the moment a second pane exists. */
 const PRICE_PANE_STRETCH = 4;
+
+/** One shared empty array for a chart with no drawings, so "none" is the same reference
+ *  on every render and never restarts the sync effect that watches it. */
+const EMPTY_DRAWINGS: readonly AgentChartDrawing[] = [];
 const OWN_PANE_STRETCH = 1;
 
 function toCandlestick(bar: Bar): CandlestickData<Time> {
@@ -332,6 +361,7 @@ export function Chart({
   focusRequest = null,
   onFocusRequestSettled,
   onVisibleRangeChange,
+  drawings,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -376,6 +406,20 @@ export function Chart({
   // `levels` with `render.style === "histogram"` — `time_profile`, the one
   // entry that draws a histogram rather than reference rays (task 5.4).
   const timeProfilePrimitivesRef = useRef<Map<string, TimeProfilePrimitive>>(new Map());
+  // The drawings' own three primitives, in their own refs — deliberately not the maps
+  // above. Sharing them would be one line of code and one bug that looks like supports
+  // vanishing: the indicator cleanup detaches whatever it does not recognise as an
+  // active instance, and a resolution change empties `indicatorsState.results` on
+  // purpose (design.md, "Rysunki i wskaźniki dzielą prymitywy, ale nie cykl życia").
+  // Keyed by the drawing's own id, one primitive each: `RayPrimitive` and `ZonePrimitive`
+  // hold one colour for everything they draw, and every drawing carries its own.
+  const drawingPrimitivesRef = useRef<
+    Map<number, RayPrimitive | ZonePrimitive | TrendlinePrimitive>
+  >(new Map());
+
+  // The array alone, not the whole prop: a caller that rebuilds the object every render
+  // (the grid slot does) must not make the sync effect below run every render with it.
+  const drawnObjects = drawings?.items ?? EMPTY_DRAWINGS;
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -1298,6 +1342,97 @@ export function Chart({
     catalogueById,
   ]);
 
+  // --- drawings: the objects standing on this instrument, on their own primitives and
+  // their own lifecycle. Keyed on `drawings` alone, so a resolution change leaves them
+  // exactly where they were — the effect above cannot reach them, and this one has no
+  // reason to run (`terminal-chart` spec, "Zmiana rozdzielczości MUST zachować narysowane
+  // obiekty"). A symbol change replaces them because the caller reads a different
+  // instrument's list and hands over a different array.
+  useEffect(() => {
+    const chart = chartRef.current;
+    const priceSeries = seriesRef.current;
+    if (!chart || !priceSeries) return;
+    const colors = colorsRef.current ?? readChartColors();
+    const standing = drawnObjects;
+    const live = new Set<number>();
+
+    standing.forEach((drawing, index) => {
+      live.add(drawing.id);
+      // The drawing's own colour, or one the chart picks — cycled by position so two
+      // uncoloured objects are still told apart (`agent-chart-drawings` spec, "obiekt
+      // bez koloru MUST dostać kolor od wykresu").
+      const color =
+        indicatorColorFromToken(colors, drawing.color) ?? indicatorLineColor(colors, index);
+      const existing = drawingPrimitivesRef.current.get(drawing.id);
+      const geometry = drawing.geometry;
+
+      if (geometry.kind === "level") {
+        const ray = existing instanceof RayPrimitive ? existing : new RayPrimitive(color);
+        if (ray !== existing) {
+          if (existing) priceSeries.detachPrimitive(existing);
+          priceSeries.attachPrimitive(ray);
+          drawingPrimitivesRef.current.set(drawing.id, ray);
+        }
+        ray.setColor(color);
+        // A null `at` means the level has always been in effect. Sent as epoch 0 rather
+        // than as the oldest drawn bar's own time: `timeToX` snaps a moment with no bar
+        // to the nearest one, so this resolves to the left edge of whatever is loaded and
+        // keeps doing so as the pager reaches further back — where a time read once here
+        // would freeze at whichever bar happened to be oldest at the time.
+        const from = geometry.at ?? 0;
+        ray.setLevels([{ time: from as UTCTimestamp, price: geometry.price, label: drawing.label }]);
+        return;
+      }
+
+      if (geometry.kind === "zone") {
+        const zoneColors = { bullish: color, bearish: color, neutral: color };
+        const zone = existing instanceof ZonePrimitive ? existing : new ZonePrimitive(zoneColors);
+        if (zone !== existing) {
+          if (existing) priceSeries.detachPrimitive(existing);
+          priceSeries.attachPrimitive(zone);
+          drawingPrimitivesRef.current.set(drawing.id, zone);
+        }
+        // One colour in all three slots: a drawn zone has no direction to colour by, the
+        // way an indicator's does — it is the operator's band, not a bullish or bearish
+        // reading of one.
+        zone.setColors(zoneColors);
+        zone.setZones([
+          {
+            from: (geometry.from ?? 0) as UTCTimestamp,
+            to: geometry.to === null ? null : (geometry.to as UTCTimestamp),
+            top: geometry.top,
+            bottom: geometry.bottom,
+            direction: null,
+          },
+        ]);
+        return;
+      }
+
+      const line = existing instanceof TrendlinePrimitive ? existing : new TrendlinePrimitive(color);
+      if (line !== existing) {
+        if (existing) priceSeries.detachPrimitive(existing);
+        priceSeries.attachPrimitive(line);
+        drawingPrimitivesRef.current.set(drawing.id, line);
+      }
+      line.setColor(color);
+      const drawn: DrawnTrendline = {
+        from: geometry.a.time as UTCTimestamp,
+        to: geometry.b.time as UTCTimestamp,
+        fromPrice: geometry.a.price,
+        toPrice: geometry.b.price,
+        label: drawing.label,
+        color: null,
+      };
+      line.setLines([drawn]);
+    });
+
+    for (const [id, primitive] of drawingPrimitivesRef.current) {
+      if (live.has(id)) continue;
+      priceSeries.detachPrimitive(primitive);
+      drawingPrimitivesRef.current.delete(id);
+    }
+  }, [drawnObjects]);
+
   const feed = useBarFeed(source, symbol, resolution, sink);
   const older = useOlderBars(source, symbol, resolution, olderReader);
   requestOlderRef.current = older.requestOlder;
@@ -1361,6 +1496,12 @@ export function Chart({
             canDraw={canDrawIndicator}
           />
         )}
+
+        {/* Beside the indicator picker, and for the same reason it is there rather than
+            in the agent panel: this is the one place the operator undoes what the agent
+            drew, and it has to be reachable without a conversation (`agent-tools` spec,
+            "Zapis MUST być odwracalny ręką operatora"). */}
+        {drawings && <DrawingList drawings={drawings} />}
 
         <div className="ml-auto flex items-center gap-2">
           {unknownIndicatorIds.length > 0 && (

@@ -116,6 +116,46 @@ export interface AgentChartCommand {
   focus: AgentChartFocus | null;
 }
 
+/** One object standing on an instrument's chart, in the terminal's own shapes: epoch
+ *  seconds for every moment, and the geometry a union discriminated by `kind` exactly as
+ *  the module publishes it (`agent-chart-drawings` spec, "Rysunek należy do instrumentu,
+ *  nie do widoku").
+ *
+ *  Unlike an indicator result, this is not computed from candles and does not belong to
+ *  the interval it was made on — it belongs to the instrument, and the chart keeps it
+ *  across a resolution change. */
+export type AgentDrawingGeometry =
+  | { kind: "level"; price: number; at: number | null }
+  | { kind: "zone"; top: number; bottom: number; from: number | null; to: number | null }
+  | {
+      kind: "trendline";
+      a: { time: number; price: number };
+      b: { time: number; price: number };
+    };
+
+export interface AgentChartDrawing {
+  id: number;
+  symbol: string;
+  geometry: AgentDrawingGeometry;
+  label: string | null;
+  color: string | null;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** What the operator may correct by hand. Every field optional and at least one required
+ *  — the module's own 422 says so, this side does not check first. The price fields are
+ *  named by the role they play in a shape, and only the ones that shape has are accepted
+ *  (`agent/contract.py`, `PatchDrawingIn`). */
+export interface AgentDrawingPatch {
+  price?: number;
+  top?: number;
+  bottom?: number;
+  aPrice?: number;
+  bPrice?: number;
+  label?: string;
+}
+
 /** What the terminal is drawing as it asks — context for one turn, never a message.
  *  `visibleFrom`/`visibleTo` (epoch seconds) are the visible span, both present or both
  *  absent: half a span is not a span, and the module reads exactly that distinction to
@@ -156,6 +196,22 @@ export interface AgentApi {
    *  same (specs/agent-chart-control, "Konsument czyta tylko to, czego jeszcze nie
    *  zastosował"). */
   chartCommand(after: number, signal: AbortSignal): Promise<AgentChartCommand | null>;
+  /** Everything drawn on this instrument, read whole. No cursor and nothing folded: a
+   *  drawing is the instrument's state, not a log to catch up with, so the answer
+   *  replaces what the chart shows rather than adding to it (design.md of
+   *  `agent-chart-drawings`, "Rysunek jest stanem, nie logiem"). */
+  listDrawings(symbol: string, signal: AbortSignal): Promise<AgentChartDrawing[]>;
+  /** Rejects with a `"refused"` `MarketDataError` on a price role this shape does not
+   *  have, or a zone whose band would end up inverted — the module's own 422. */
+  patchDrawing(
+    id: number,
+    patch: AgentDrawingPatch,
+    signal: AbortSignal,
+  ): Promise<AgentChartDrawing>;
+  /** Resolves on 204. A drawing already gone answers 404 — a `"not-found"` error rather
+   *  than a quiet success, which is what lets the list say the removal did not happen
+   *  (`terminal-chart` spec, "Usunięcie się nie powiodło"). */
+  deleteDrawing(id: number, signal: AbortSignal): Promise<void>;
   usage(range: UsageRange, signal: AbortSignal): Promise<AgentUsageSummary>;
   getPrompt(signal: AbortSignal): Promise<AgentPrompt>;
   /** Rejects with a `"refused"` `MarketDataError` on a blank variant — the module's own
@@ -261,6 +317,75 @@ function mapChartCommand(raw: RawChartCommand): AgentChartCommand {
           })),
     focus: raw.focus === null ? null : mapChartFocus(raw.focus),
   };
+}
+
+interface RawDrawing {
+  id: number;
+  symbol: string;
+  geometry: Record<string, unknown> & { kind: string };
+  label: string | null;
+  color: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+function mapDrawingGeometry(raw: RawDrawing["geometry"]): AgentDrawingGeometry | null {
+  // A `kind` this terminal has no shape for is skipped, not thrown on: a module deployed
+  // ahead of the terminal may publish a fourth shape, and one unknown object must not
+  // take the whole read — and with it every drawing the chart *can* draw — down with it
+  // (design.md, "Agent sprzed zmiany wobec terminala po zmianie", read the other way
+  // round).
+  if (raw.kind === "level") {
+    return {
+      kind: "level",
+      price: raw.price as number,
+      at: raw.at == null ? null : parseIsoToEpochSeconds(raw.at as string),
+    };
+  }
+  if (raw.kind === "zone") {
+    return {
+      kind: "zone",
+      top: raw.top as number,
+      bottom: raw.bottom as number,
+      from: raw.from == null ? null : parseIsoToEpochSeconds(raw.from as string),
+      to: raw.to == null ? null : parseIsoToEpochSeconds(raw.to as string),
+    };
+  }
+  if (raw.kind === "trendline") {
+    const a = raw.a as { time: string; price: number };
+    const b = raw.b as { time: string; price: number };
+    return {
+      kind: "trendline",
+      a: { time: parseIsoToEpochSeconds(a.time), price: a.price },
+      b: { time: parseIsoToEpochSeconds(b.time), price: b.price },
+    };
+  }
+  return null;
+}
+
+function mapDrawing(raw: RawDrawing): AgentChartDrawing | null {
+  const geometry = mapDrawingGeometry(raw.geometry);
+  if (geometry === null) return null;
+  return {
+    id: raw.id,
+    symbol: raw.symbol,
+    geometry,
+    label: raw.label,
+    color: raw.color,
+    createdAt: parseIsoToEpochSeconds(raw.created_at),
+    updatedAt: parseIsoToEpochSeconds(raw.updated_at),
+  };
+}
+
+function drawingPatchToWire(patch: AgentDrawingPatch): Record<string, number | string> {
+  const wire: Record<string, number | string> = {};
+  if (patch.price !== undefined) wire.price = patch.price;
+  if (patch.top !== undefined) wire.top = patch.top;
+  if (patch.bottom !== undefined) wire.bottom = patch.bottom;
+  if (patch.aPrice !== undefined) wire.a_price = patch.aPrice;
+  if (patch.bPrice !== undefined) wire.b_price = patch.bPrice;
+  if (patch.label !== undefined) wire.label = patch.label;
+  return wire;
 }
 
 interface RawUsageAggregate {
@@ -428,6 +553,34 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
         { signal },
       );
       return raw === null ? null : mapChartCommand(raw);
+    },
+
+    async listDrawings(symbol, signal) {
+      const raw = await http.json<RawDrawing[]>(
+        `${httpBase}/drawings?symbol=${encodeURIComponent(symbol)}`,
+        { signal },
+      );
+      return raw.map(mapDrawing).filter((drawing): drawing is AgentChartDrawing => drawing !== null);
+    },
+
+    async patchDrawing(id, patch, signal) {
+      const raw = await http.json<RawDrawing>(`${httpBase}/drawings/${id}`, {
+        method: "PATCH",
+        body: drawingPatchToWire(patch),
+        signal,
+      });
+      const mapped = mapDrawing(raw);
+      if (mapped === null) {
+        // The corrected drawing came back in a shape this terminal cannot draw. Skipping
+        // it the way a list read does would leave the caller with nothing to show and no
+        // reason why.
+        throw new MarketDataError("unknown", `drawing ${id} came back in an unknown shape`);
+      }
+      return mapped;
+    },
+
+    async deleteDrawing(id, signal) {
+      await http.send(`${httpBase}/drawings/${id}`, { method: "DELETE", signal });
     },
 
     async usage(range, signal) {

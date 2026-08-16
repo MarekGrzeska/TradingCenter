@@ -72,6 +72,28 @@ vi.mock("../data/marketData", () => ({
   },
 }));
 
+// The slot reads what is drawn on its instrument from this store, which reaches the
+// agent module — a road these tests have no business travelling. Stubbed empty: the grid's
+// own job is layout and slot wiring, and `DrawingList.test.tsx` is where the list itself
+// is proven.
+vi.mock("../agent/drawingsStore", () => {
+  // One frozen object, returned every time: `useSyncExternalStore` compares snapshots by
+  // identity, and a fresh `{}` per call is an infinite render loop — the same contract
+  // the real store keeps by holding its snapshot in a variable.
+  const empty = Object.freeze({});
+  return {
+  drawingsStore: {
+    subscribe: () => () => {},
+    getSnapshot: () => empty,
+    ensureLoaded: () => {},
+    refresh: async () => ({ added: 0, removed: 0 }),
+    refreshAll: async () => ({ added: 0, removed: 0 }),
+    remove: async () => null,
+    patch: async () => null,
+  },
+  };
+});
+
 const { GridView } = await import("./GridView");
 const { gridStore, STORAGE_KEY } = await import("./gridStore");
 const { defaultGridConfig, SLOT_IDS } = await import("./model");

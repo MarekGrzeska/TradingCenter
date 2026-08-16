@@ -39,6 +39,8 @@ vi.mock("lightweight-charts", () => ({
 }));
 
 const { Chart } = await import("./Chart");
+type ChartDrawings = import("./Chart").ChartDrawings;
+type AgentChartDrawing = import("../agent/agentApi").AgentChartDrawing;
 
 // The store is a module singleton; a toast left behind would show up in the next test's
 // document as if that test had raised it.
@@ -55,6 +57,7 @@ function renderChart(
     focusRequest: ChartFocusRequest | null;
     onFocusRequestSettled: () => void;
     onVisibleRangeChange: (range: { from: number; to: number } | null) => void;
+    drawings: ChartDrawings;
   }>,
 ) {
   const onResolutionChange = vi.fn();
@@ -72,6 +75,7 @@ function renderChart(
       focusRequest={props?.focusRequest}
       onFocusRequestSettled={onFocusRequestSettled}
       onVisibleRangeChange={onVisibleRangeChange}
+      drawings={props?.drawings}
     />,
   );
   return { ...view, onResolutionChange, onFocusRequestSettled, onVisibleRangeChange };
@@ -2660,5 +2664,138 @@ describe("Chart — live indicators (terminal-chart spec, task 6.1/6.2/6.4)", ()
     // `indicatorsState.results` before the new series has even loaded — the
     // previous symbol's zone primitive must not linger through that gap.
     await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
+  });
+});
+
+describe("Chart — objects drawn on the instrument (terminal-chart spec, agent-chart-drawings)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  function drawing(id: number, geometry: AgentChartDrawing["geometry"]): AgentChartDrawing {
+    return {
+      id,
+      symbol: "US100",
+      geometry,
+      label: null,
+      color: null,
+      createdAt: 1767398400,
+      updatedAt: 1767398400,
+    };
+  }
+
+  function chartDrawings(items: AgentChartDrawing[]): ChartDrawings {
+    return {
+      items,
+      status: "ready",
+      error: null,
+      remove: async () => null,
+      patch: async () => null,
+    };
+  }
+
+  const THREE_SHAPES = [
+    drawing(1, { kind: "level", price: 110, at: null }),
+    drawing(2, { kind: "zone", top: 120, bottom: 115, from: null, to: null }),
+    drawing(3, {
+      kind: "trendline",
+      a: { time: 100, price: 90 },
+      b: { time: 200, price: 130 },
+    }),
+  ];
+
+  it("attaches one primitive per drawing, for all three shapes", async () => {
+    renderChart(source, { drawings: chartDrawings(THREE_SHAPES) });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(3));
+  });
+
+  it("keeps the objects through a resolution change", async () => {
+    // The one thing that separates a drawing from an indicator: it belongs to the
+    // instrument, not to the view, so the interval changing must not take it off
+    // (`terminal-chart` spec, "Zmiana rozdzielczości MUST zachować narysowane obiekty").
+    const items = chartDrawings(THREE_SHAPES);
+    const { rerender, onResolutionChange } = renderChart(source, { drawings: items });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(3));
+    const attached = [...priceSeries().primitives];
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="HOUR"
+        onResolutionChange={onResolutionChange}
+        drawings={items}
+      />,
+    );
+    await act(async () => {
+      source.snapshot([bar(200, 1)]);
+    });
+
+    // The same instances, not merely the same count: rebuilding them would be a redraw
+    // the operator sees as a flicker, and a new instance is how a shared map with the
+    // indicators would have shown up.
+    expect(priceSeries().primitives).toEqual(attached);
+  });
+
+  it("replaces them when the symbol changes", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings(THREE_SHAPES),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(3));
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="GOLD"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([drawing(9, { kind: "level", price: 2400, at: null })])}
+      />,
+    );
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("takes a removed object off without touching the others", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings(THREE_SHAPES),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(3));
+    const kept = priceSeries().primitives[0];
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([THREE_SHAPES[0]])}
+      />,
+    );
+
+    await waitFor(() => expect(priceSeries().primitives).toEqual([kept]));
+  });
+
+  it("draws nothing and offers no list when the caller passes none", async () => {
+    renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    expect(priceSeries().primitives).toHaveLength(0);
+    expect(screen.queryByLabelText("Drawn objects")).toBeNull();
   });
 });

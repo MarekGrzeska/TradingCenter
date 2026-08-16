@@ -528,3 +528,113 @@ describe("agentApi.updatePrompt", () => {
     await expect(call).rejects.toMatchObject({ kind: "refused", message: "with_tools is blank" });
   });
 });
+
+describe("agentApi drawings", () => {
+  function raw(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 7,
+      symbol: "US100",
+      geometry: { kind: "level", price: 21500, at: null },
+      label: "weekly high",
+      color: "--color-up",
+      created_at: "2026-01-03T00:00:00Z",
+      updated_at: "2026-01-03T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  it("maps a level, its moments as epoch seconds", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/drawings`, () =>
+        HttpResponse.json([raw({ geometry: { kind: "level", price: 21500, at: "2026-01-03T09:00:00Z" } })]),
+      ),
+    );
+
+    const drawings = await api().listDrawings("US100", new AbortController().signal);
+    expect(drawings).toEqual([
+      {
+        id: 7,
+        symbol: "US100",
+        geometry: { kind: "level", price: 21500, at: 1767430800 },
+        label: "weekly high",
+        color: "--color-up",
+        createdAt: 1767398400,
+        updatedAt: 1767398400,
+      },
+    ]);
+  });
+
+  it("maps a zone, keeping `top` and `bottom` apart", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/drawings`, () =>
+        HttpResponse.json([
+          raw({ geometry: { kind: "zone", top: 21600, bottom: 21550, from: null, to: null } }),
+        ]),
+      ),
+    );
+
+    const [drawing] = await api().listDrawings("US100", new AbortController().signal);
+    expect(drawing.geometry).toEqual({ kind: "zone", top: 21600, bottom: 21550, from: null, to: null });
+  });
+
+  it("maps a trend line's two points", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/drawings`, () =>
+        HttpResponse.json([
+          raw({
+            geometry: {
+              kind: "trendline",
+              a: { time: "2026-01-03T00:00:00Z", price: 21000 },
+              b: { time: "2026-01-04T00:00:00Z", price: 21400 },
+            },
+          }),
+        ]),
+      ),
+    );
+
+    const [drawing] = await api().listDrawings("US100", new AbortController().signal);
+    expect(drawing.geometry).toEqual({
+      kind: "trendline",
+      a: { time: 1767398400, price: 21000 },
+      b: { time: 1767484800, price: 21400 },
+    });
+  });
+
+  it("skips a kind it has no shape for rather than dropping the whole read", async () => {
+    // A module deployed ahead of this terminal may publish a fourth shape. The objects
+    // this terminal *can* draw must survive it.
+    server.use(
+      http.get(`${HTTP_BASE}/drawings`, () =>
+        HttpResponse.json([raw({ id: 8, geometry: { kind: "fibonacci", levels: [] } }), raw()]),
+      ),
+    );
+
+    const drawings = await api().listDrawings("US100", new AbortController().signal);
+    expect(drawings.map((drawing) => drawing.id)).toEqual([7]);
+  });
+
+  it("sends only the price roles the caller named, in the module's own names", async () => {
+    let body: unknown;
+    server.use(
+      http.patch(`${HTTP_BASE}/drawings/7`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(raw());
+      }),
+    );
+
+    await api().patchDrawing(7, { aPrice: 21000, label: "trend" }, new AbortController().signal);
+    expect(body).toEqual({ a_price: 21000, label: "trend" });
+  });
+
+  it("turns a 404 on removal into a not-found error rather than a silent success", async () => {
+    server.use(
+      http.delete(`${HTTP_BASE}/drawings/7`, () =>
+        HttpResponse.json({ detail: "no drawing #7" }, { status: 404 }),
+      ),
+    );
+
+    await expect(api().deleteDrawing(7, new AbortController().signal)).rejects.toBeInstanceOf(
+      MarketDataError,
+    );
+  });
+});
