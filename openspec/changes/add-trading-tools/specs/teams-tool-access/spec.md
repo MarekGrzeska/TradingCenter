@@ -72,7 +72,8 @@ uważa, że złożył zlecenie, a nie złożył, produkuje wniosek o rachunku, k
 - **WHEN** operator uruchamia przebieg zespołu, którego agenci mają wyłącznie narzędzia
   odczytu, a nieosiągalny jest serwer zapisu
 - **THEN** przebieg rusza normalnie
-- **AND** nieosiągalny serwer nie jest w ogóle pytany
+- **AND** nieosiągalność serwera zapisu nie wpływa na wynik — żadna nazwa przypisana w
+  definicji nie zostaje bez wyjaśnienia po stronie serwerów, które odpowiedziały
 
 ## ADDED Requirements
 

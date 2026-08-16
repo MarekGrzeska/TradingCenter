@@ -186,3 +186,68 @@ def test_remote_tool_server_with_a_scope_is_accepted() -> None:
 
 def test_a_blank_tool_server_url_means_unset() -> None:
     assert settings(market_mcp_url="   ").market_mcp_url is None
+
+
+# --- the second tool server, checked independently (specs/teams-tool-access,
+# "Moduł MAY być skonfigurowany z więcej niż jednym serwerem narzędzi") ---
+
+
+def test_no_trading_mcp_configured_is_a_valid_state() -> None:
+    assert settings().trading_mcp_url is None
+
+
+def test_remote_trading_mcp_without_a_scope_is_refused() -> None:
+    with pytest.raises(ValidationError) as err:
+        settings(trading_mcp_url="https://trading-mcp.example.com")
+    assert "TRADING_MCP_SCOPE" in str(err.value)
+
+
+def test_scope_with_a_loopback_trading_mcp_is_refused() -> None:
+    with pytest.raises(ValidationError) as err:
+        settings(
+            trading_mcp_url="http://127.0.0.1:8060",
+            trading_mcp_scope="api://some-app/.default",
+        )
+    assert "loopback" in str(err.value)
+
+
+def test_loopback_trading_mcp_without_a_scope_is_accepted() -> None:
+    assert settings(trading_mcp_url="http://127.0.0.1:8060").trading_mcp_url == (
+        "http://127.0.0.1:8060"
+    )
+
+
+def test_remote_trading_mcp_with_a_scope_is_accepted() -> None:
+    resolved = settings(
+        trading_mcp_url="https://trading-mcp.example.com/",
+        trading_mcp_scope="api://some-app/.default",
+    )
+    assert resolved.trading_mcp_url == "https://trading-mcp.example.com"
+
+
+def test_a_blank_trading_mcp_url_means_unset() -> None:
+    assert settings(trading_mcp_url="   ").trading_mcp_url is None
+
+
+def test_one_valid_server_and_one_broken_server_is_refused_naming_the_broken_one() -> None:
+    """specs/teams-tool-access, "Niespójność dotyczy drugiego serwera": market-mcp is
+    fine here, and the refusal has to say it is trading-mcp's configuration that is
+    not — an operator fixing the wrong one would still be stuck."""
+    with pytest.raises(ValidationError) as err:
+        settings(
+            market_mcp_url="http://127.0.0.1:8040",
+            trading_mcp_url="https://trading-mcp.example.com",
+        )
+    message = str(err.value)
+    assert "TRADING_MCP_SCOPE" in message
+    assert "MARKET_MCP_SCOPE" not in message
+
+
+def test_both_servers_configured_independently_is_accepted() -> None:
+    resolved = settings(
+        market_mcp_url="http://127.0.0.1:8040",
+        trading_mcp_url="https://trading-mcp.example.com",
+        trading_mcp_scope="api://some-app/.default",
+    )
+    assert resolved.market_mcp_url == "http://127.0.0.1:8040"
+    assert resolved.trading_mcp_url == "https://trading-mcp.example.com"

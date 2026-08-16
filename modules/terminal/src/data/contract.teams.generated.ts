@@ -173,6 +173,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/runs/{run_id}/trades": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Run Trades
+         * @description What this run did to the account, in the order it did it.
+         *
+         *     Beside `/tool-calls` rather than folded into it: that route answers "what did the
+         *     agents ask for", this one answers "what happened to the money", and an operator who
+         *     just watched a team trade is asking the second (specs/teams-trading). The owner
+         *     filter is the same one every other run route uses — a stranger's run is 404, the
+         *     same answer as one that never existed (specs/teams-browser-access).
+         */
+        get: operations["get_run_trades_runs__run_id__trades_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/schedules/{schedule_id}": {
         parameters: {
             query?: never;
@@ -830,8 +856,14 @@ export interface components {
         /**
          * TeamDefinition
          * @description The whole of what a team revision carries — every agent, every dependency between
-         *     them, and the cost limits a run against this revision must respect. One immutable
-         *     blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie zmienia").
+         *     them, and the cost and trading limits a run against this revision must respect. One
+         *     immutable blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie
+         *     zmienia").
+         *
+         *     `trading` defaults to an empty `TradingLimits`, which is what every revision saved
+         *     before this field existed reads back as — and it means the same thing there as it
+         *     does for a new one: no limit. Nothing about an old revision changes by being read
+         *     (specs/teams-catalogue, "Rewizja z fazy sprzed narzędzi handlowych").
          */
         TeamDefinition: {
             /** Agents */
@@ -839,6 +871,7 @@ export interface components {
             /** Edges */
             edges?: components["schemas"]["TeamEdge"][];
             limits?: components["schemas"]["CostLimits"];
+            trading?: components["schemas"]["TradingLimits"];
         };
         /**
          * TeamEdge
@@ -940,12 +973,113 @@ export interface components {
          *     tool by name and carries nothing else about it, so the picker needs a label and a line
          *     of prose. Publishing the schema would put a copy of somebody else's contract on this
          *     module's wire, where it would be stale from the first argument market-mcp renames.
+         *
+         *     `read_only` is the one property that does travel — read straight off the server's own
+         *     `readOnlyHint`, not decided here, so an operator picking tools for an agent sees which
+         *     ones move the account before assigning one (specs/trading-mcp-tools, "Narzędzie
+         *     zapisujące jest oznaczone jako zmieniające stan"). `None` when a tool carries no
+         *     annotation at all — unknown, not assumed read-only.
          */
         ToolOut: {
             /** Description */
             description: string;
             /** Name */
             name: string;
+            /** Read Only */
+            read_only: boolean | null;
+        };
+        /**
+         * TradeOut
+         * @description One call a run made that could change the account — specs/teams-trading, "Każde
+         *     wywołanie zapisujące zostawia własny wiersz śladu".
+         *
+         *     The same event is also a `ToolCallOut`, with the arguments and the reply verbatim.
+         *     This is that event read as a *trade*: the fields an operator asks about after the
+         *     fact — what, which way, how much, and what came of it — as columns rather than as
+         *     JSON somebody has to read.
+         *
+         *     `status` is this module's own reading of the outcome and is one of `sent`, `settled`,
+         *     `unsettled`, `refused`, `unknown`. `result_status` beside it is the provider's word
+         *     — FILLED, WORKING, PENDING, REJECTED — kept separate because a row can carry the
+         *     first without the second ever arriving.
+         *
+         *     A row still saying `sent` after its run has finished is an order this module does not
+         *     know the fate of. That is not a gap in the trace; it is the trace saying the one
+         *     thing it must be able to say (`0004_trades.py`).
+         *
+         *     `size` and `level` are strings, like every other number on this wire that is compared
+         *     rather than recomputed.
+         */
+        TradeOut: {
+            /** Agent Key */
+            agent_key: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Direction */
+            direction: string | null;
+            /** Id */
+            id: number;
+            /** Level */
+            level: string | null;
+            /** Provider Order Id */
+            provider_order_id: string | null;
+            /** Reference */
+            reference: string | null;
+            /** Result Status */
+            result_status: string | null;
+            /** Run Id */
+            run_id: number;
+            /** Run Step Id */
+            run_step_id: number;
+            /** Settled At */
+            settled_at: string | null;
+            /** Size */
+            size: string | null;
+            /** Status */
+            status: string;
+            /** Symbol */
+            symbol: string | null;
+            /** Tool Name */
+            tool_name: string;
+        };
+        /**
+         * TradingLimits
+         * @description What a revision allows its agents to do to the account — specs/teams-trading.
+         *
+         *     **Every one of the three is optional, and an omitted one means no limit at all.** The
+         *     module substitutes nothing and holds no ceiling of its own in code: a team the
+         *     operator deliberately lets trade with everything it has is an experiment they are
+         *     entitled to run, and a module refusing to save it would be making that call for them
+         *     (specs/teams-trading, "Każda granica handlowa daje się wyłączyć, a moduł żadnej nie
+         *     narzuca").
+         *
+         *     What is *not* negotiable lives a module away: `trading-mcp` refuses to start against
+         *     anything but the demo account, and no setting here or there turns that off
+         *     (specs/trading-mcp-upstream-access). That is the split — the irreversible thing is
+         *     fixed, the operator's own budget is theirs.
+         *
+         *     `max_order_size` is a string for the same reason every cost on this wire is: it is
+         *     compared, never recomputed, and a string round-trips exactly.
+         */
+        TradingLimits: {
+            /**
+             * Max Order Size
+             * @description largest size one order may carry; null means no limit
+             */
+            max_order_size?: string | null;
+            /**
+             * Orders Per Day
+             * @description how many orders this team may place per UTC day; null means no limit
+             */
+            orders_per_day?: number | null;
+            /**
+             * Orders Per Run
+             * @description how many orders one run may place; null means no limit
+             */
+            orders_per_run?: number | null;
         };
         /**
          * TriggerIn
@@ -1315,6 +1449,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolCallOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_run_trades_runs__run_id__trades_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                run_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TradeOut"][];
                 };
             };
             /** @description Validation Error */

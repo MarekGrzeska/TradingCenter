@@ -33,8 +33,9 @@ _ENV = {
 @pytest.fixture
 def _env(db: asyncpg.Connection, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", migrated_url)
-    # No MARKET_MCP_URL here on purpose — `conftest._no_developer_env` is what keeps it
-    # unset, and it does it with a blank value rather than a deletion (see the note there).
+    # Neither MARKET_MCP_URL nor TRADING_MCP_URL here on purpose — `conftest`'s
+    # `_no_developer_env` is what keeps both unset, and it does it with a blank value
+    # rather than a deletion (see the note there).
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 
@@ -55,7 +56,26 @@ def test_what_the_server_announces_is_what_the_route_publishes(announcing: TestC
     # show, and this module writes neither.
     assert published[0]["description"].startswith("Returns the last price")
     # And nothing else: an input schema here would be a copy of somebody else's contract.
-    assert set(published[0]) == {"name", "description"}
+    assert set(published[0]) == {"name", "description", "read_only"}
+
+
+def test_tools_from_both_servers_are_published_with_write_marked(
+    _env: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    with (
+        serving_sync(("get_last_price",)) as market_url,
+        serving_sync(("place_order",)) as trading_url,
+    ):
+        monkeypatch.setenv("MARKET_MCP_URL", market_url)
+        monkeypatch.setenv("TRADING_MCP_URL", trading_url)
+        with TestClient(app) as client:
+            published = client.get("/tools").json()
+
+    by_name = {tool["name"]: tool for tool in published}
+    assert set(by_name) == {"get_last_price", "place_order"}
+    assert by_name["get_last_price"]["read_only"] is None  # the stand-in sets no
+    # annotation for this one — unknown, not assumed
+    assert by_name["place_order"]["read_only"] is False
 
 
 def test_no_tool_server_configured_announces_nothing_rather_than_failing(
@@ -86,7 +106,8 @@ def test_a_configured_server_that_cannot_be_asked_is_an_outage_not_an_empty_list
 def test_the_route_does_not_need_the_run_session_and_leaves_it_alone(
     announcing: TestClient,
 ) -> None:
-    """Two reads in a row, each through a session of its own (`announced_tools`).
+    """Two reads in a row, each through sessions of their own
+    (`announced_tools_by_server`).
 
     The one thing this asserts is that the second answers at all: a session opened inside
     a request's task and left open corrupts anyio's scope stack, and the failure shows up
@@ -94,4 +115,5 @@ def test_the_route_does_not_need_the_run_session_and_leaves_it_alone(
     """
     assert announcing.get("/tools").status_code == 200
     assert announcing.get("/tools").status_code == 200
-    assert app.state.tools._session is None  # the long-lived one was never opened
+    # The long-lived registry's own sessions were never opened by either read.
+    assert all(server._session is None for server in app.state.tools.servers.values())

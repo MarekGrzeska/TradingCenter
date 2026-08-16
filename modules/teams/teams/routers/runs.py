@@ -22,9 +22,10 @@ from fastapi.responses import StreamingResponse
 
 from .. import store
 from ..auth import current_principal
-from ..contract import RunOut, RunStepOut, ToolCallOut
+from ..contract import RunOut, RunStepOut, ToolCallOut, TradeOut
 from ..runner import RunFinished, StepFinished, StepStarted, ToolCalled, start_run_on_revision
 from ..runner.cost import DailyCostLimitReached
+from ..runner.trading import DailyOrderLimitReached
 from ..validation import DefinitionRefused
 
 log = logging.getLogger(__name__)
@@ -57,19 +58,26 @@ async def start_run(
         raise HTTPException(404, detail="no such team")
 
     try:
+        # Every check and the start itself live in `start_run_on_revision`: the model
+        # catalogue, the team's daily cost ceiling and — since phase 2 — its daily order
+        # ceiling. A schedule firing at 3am takes exactly the same ones, which is the whole
+        # reason that function exists rather than this body.
         run, _task = await start_run_on_revision(
             pool,
             revision=dict(revision),
             owner_principal=owner,
             catalogue=request.app.state.catalogue,
             provider=request.app.state.provider,
-            tool_server=request.app.state.tools,
+            tool_registry=request.app.state.tools,
             settings=request.app.state.settings,
             registry=request.app.state.runs,
         )
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
-    except DailyCostLimitReached as err:
+    except (DailyCostLimitReached, DailyOrderLimitReached) as err:
+        # Both are 422 and both name their own number — after "why did nothing start" the
+        # operator's next question is "how much of what" (specs/teams-usage,
+        # specs/teams-trading).
         raise HTTPException(422, detail=str(err)) from err
     return RunOut.from_row(dict(run))
 
@@ -122,6 +130,26 @@ async def get_run_tool_calls(
             raise HTTPException(404, detail="no such run")
         rows = await store.get_run_tool_calls(conn, run_id=run_id)
     return [ToolCallOut.from_row(dict(row)) for row in rows]
+
+
+@router.get("/runs/{run_id}/trades")
+async def get_run_trades(
+    run_id: int, request: Request, owner: str = Depends(current_principal)
+) -> list[TradeOut]:
+    """What this run did to the account, in the order it did it.
+
+    Beside `/tool-calls` rather than folded into it: that route answers "what did the
+    agents ask for", this one answers "what happened to the money", and an operator who
+    just watched a team trade is asking the second (specs/teams-trading). The owner
+    filter is the same one every other run route uses — a stranger's run is 404, the
+    same answer as one that never existed (specs/teams-browser-access).
+    """
+    async with request.app.state.pool.acquire() as conn:
+        run = await store.get_run(conn, run_id=run_id, owner_principal=owner)
+        if run is None:
+            raise HTTPException(404, detail="no such run")
+        rows = await store.get_run_trades(conn, run_id=run_id)
+    return [TradeOut.from_row(dict(row)) for row in rows]
 
 
 @router.post("/runs/{run_id}/cancel", status_code=202)

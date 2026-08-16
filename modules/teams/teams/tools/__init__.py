@@ -1,20 +1,21 @@
-"""The module's access to `market-mcp`: the session, and who gets which tools.
+"""The module's access to its tool servers — `market-mcp` for reads, `trading-mcp` for
+writes — and who gets which tools.
 
 `client.py` is the only place the `mcp` package exists. Everything past this package
 speaks `ToolDescriptor`, `ToolOutcome` and `ToolPlan` — which is what keeps a run's own
-code from growing an opinion about a protocol it does not own.
-
-Unlike `agent`, there are no locally implemented tools here: this phase reads the market
-through market-mcp and writes nothing at all (proposal.md, "Faza 1 nie składa zleceń").
+code from growing an opinion about a protocol it does not own, and lets a second server
+join the first without either speaking a word of MCP itself.
 """
 
 from __future__ import annotations
 
 from .assignment import (
+    AnnouncedSnapshot,
+    ToolNameCollision,
     ToolNoLongerAnnounced,
     ToolPlan,
-    announced_tool_names,
-    announced_tools,
+    announced_snapshot,
+    announced_tools_by_server,
     plan_tools,
 )
 from .client import (
@@ -23,19 +24,23 @@ from .client import (
     ToolOutcome,
     ToolOutcomeKind,
     ToolServer,
+    ToolServerRegistry,
     ToolServerUnavailable,
 )
 
 __all__ = [
+    "AnnouncedSnapshot",
     "ToolAccessError",
     "ToolDescriptor",
+    "ToolNameCollision",
     "ToolNoLongerAnnounced",
     "ToolOutcome",
     "ToolOutcomeKind",
     "ToolPlan",
     "ToolServer",
+    "ToolServerRegistry",
     "ToolServerUnavailable",
-    "announced_tool_names",
-    "announced_tools",
+    "announced_snapshot",
+    "announced_tools_by_server",
     "plan_tools",
 ]

@@ -23,6 +23,7 @@ from contextlib import asynccontextmanager, contextmanager
 
 import uvicorn
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
 from teams.config import Settings
@@ -91,6 +92,17 @@ def _register(mcp: FastMCP, name: str) -> None:
         @mcp.tool(name=name, description="Reads indicator values for a symbol.")
         def read_indicators(symbol: str) -> str:
             return f"{symbol}: RSI 61, ATR 42"
+
+    elif name == "place_order":
+        # A trading-mcp-shaped tool for tests standing in for the write server — the
+        # one thing about it that matters here is the annotation, not the behaviour.
+        @mcp.tool(
+            name=name,
+            description="Places an order.",
+            annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=True),
+        )
+        def place_order() -> str:
+            return "order placed"
 
     else:  # pragma: no cover - a typo in a test, caught the moment it is written
         raise KeyError(f"the stand-in has no tool called {name!r}")

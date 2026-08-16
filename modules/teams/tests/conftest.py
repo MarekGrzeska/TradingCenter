@@ -27,6 +27,7 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 # references `schedules`, `triggers` and `runs`; `schedules` and `triggers` each
 # reference `team_revisions`. `team_layouts` references `teams` directly, not a revision.
 TABLES: tuple[str, ...] = (
+    "trades",
     "usage",
     "tool_calls",
     "schedule_fires",

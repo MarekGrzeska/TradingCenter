@@ -74,10 +74,17 @@ class ToolOut(BaseModel):
     tool by name and carries nothing else about it, so the picker needs a label and a line
     of prose. Publishing the schema would put a copy of somebody else's contract on this
     module's wire, where it would be stale from the first argument market-mcp renames.
+
+    `read_only` is the one property that does travel — read straight off the server's own
+    `readOnlyHint`, not decided here, so an operator picking tools for an agent sees which
+    ones move the account before assigning one (specs/trading-mcp-tools, "Narzędzie
+    zapisujące jest oznaczone jako zmieniające stan"). `None` when a tool carries no
+    annotation at all — unknown, not assumed read-only.
     """
 
     name: str
     description: str
+    read_only: bool | None = None
 
 
 class AgentDefinition(BaseModel):
@@ -149,14 +156,76 @@ class CostLimits(BaseModel):
         return str(parsed)
 
 
+class TradingLimits(BaseModel):
+    """What a revision allows its agents to do to the account — specs/teams-trading.
+
+    **Every one of the three is optional, and an omitted one means no limit at all.** The
+    module substitutes nothing and holds no ceiling of its own in code: a team the
+    operator deliberately lets trade with everything it has is an experiment they are
+    entitled to run, and a module refusing to save it would be making that call for them
+    (specs/teams-trading, "Każda granica handlowa daje się wyłączyć, a moduł żadnej nie
+    narzuca").
+
+    What is *not* negotiable lives a module away: `trading-mcp` refuses to start against
+    anything but the demo account, and no setting here or there turns that off
+    (specs/trading-mcp-upstream-access). That is the split — the irreversible thing is
+    fixed, the operator's own budget is theirs.
+
+    `max_order_size` is a string for the same reason every cost on this wire is: it is
+    compared, never recomputed, and a string round-trips exactly.
+    """
+
+    max_order_size: str | None = Field(
+        default=None, description="largest size one order may carry; null means no limit"
+    )
+    orders_per_run: int | None = Field(
+        default=None, description="how many orders one run may place; null means no limit"
+    )
+    orders_per_day: int | None = Field(
+        default=None,
+        description="how many orders this team may place per UTC day; null means no limit",
+    )
+
+    @field_validator("max_order_size")
+    @classmethod
+    def _positive_decimal(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return None
+        try:
+            parsed = Decimal(value)
+        except InvalidOperation as err:
+            raise ValueError(f"{info.field_name} is not a number: {value!r}") from err
+        if parsed <= 0:
+            raise ValueError(f"{info.field_name} must be positive, got {value}")
+        return str(parsed)
+
+    @field_validator("orders_per_run", "orders_per_day")
+    @classmethod
+    def _positive_count(cls, value: int | None, info: ValidationInfo) -> int | None:
+        # Zero is refused rather than read as "none allowed": a team that may place no
+        # orders is one whose agents should carry no write tools, and the two are
+        # different statements. There is no upper bound — see the class docstring.
+        if value is not None and value <= 0:
+            raise ValueError(f"{info.field_name} must be positive, got {value}")
+        return value
+
+
 class TeamDefinition(BaseModel):
     """The whole of what a team revision carries — every agent, every dependency between
-    them, and the cost limits a run against this revision must respect. One immutable
-    blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie zmienia")."""
+    them, and the cost and trading limits a run against this revision must respect. One
+    immutable blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie
+    zmienia").
+
+    `trading` defaults to an empty `TradingLimits`, which is what every revision saved
+    before this field existed reads back as — and it means the same thing there as it
+    does for a new one: no limit. Nothing about an old revision changes by being read
+    (specs/teams-catalogue, "Rewizja z fazy sprzed narzędzi handlowych").
+    """
 
     agents: list[AgentDefinition]
     edges: list[TeamEdge] = Field(default_factory=list)
     limits: CostLimits = Field(default_factory=CostLimits)
+    trading: TradingLimits = Field(default_factory=TradingLimits)
 
     @model_validator(mode="before")
     @classmethod
@@ -435,6 +504,67 @@ class ToolCallOut(BaseModel):
             result_text=row["result_text"],
             duration_ms=row["duration_ms"],
             created_at=row["created_at"],
+        )
+
+
+class TradeOut(BaseModel):
+    """One call a run made that could change the account — specs/teams-trading, "Każde
+    wywołanie zapisujące zostawia własny wiersz śladu".
+
+    The same event is also a `ToolCallOut`, with the arguments and the reply verbatim.
+    This is that event read as a *trade*: the fields an operator asks about after the
+    fact — what, which way, how much, and what came of it — as columns rather than as
+    JSON somebody has to read.
+
+    `status` is this module's own reading of the outcome and is one of `sent`, `settled`,
+    `unsettled`, `refused`, `unknown`. `result_status` beside it is the provider's word
+    — FILLED, WORKING, PENDING, REJECTED — kept separate because a row can carry the
+    first without the second ever arriving.
+
+    A row still saying `sent` after its run has finished is an order this module does not
+    know the fate of. That is not a gap in the trace; it is the trace saying the one
+    thing it must be able to say (`0004_trades.py`).
+
+    `size` and `level` are strings, like every other number on this wire that is compared
+    rather than recomputed.
+    """
+
+    id: int
+    run_id: int
+    run_step_id: int
+    agent_key: str
+    tool_name: str
+    symbol: str | None
+    direction: str | None
+    size: str | None
+    level: str | None
+    status: str
+    result_status: str | None
+    provider_order_id: str | None
+    reference: str | None
+    created_at: datetime
+    settled_at: datetime | None
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> TradeOut:
+        size = row["size"]
+        level = row["level"]
+        return cls(
+            id=row["id"],
+            run_id=row["run_id"],
+            run_step_id=row["run_step_id"],
+            agent_key=row["agent_key"],
+            tool_name=row["tool_name"],
+            symbol=row["symbol"],
+            direction=row["direction"],
+            size=None if size is None else str(size),
+            level=None if level is None else str(level),
+            status=row["status"],
+            result_status=row["result_status"],
+            provider_order_id=row["provider_order_id"],
+            reference=row["reference"],
+            created_at=row["created_at"],
+            settled_at=row["settled_at"],
         )
 
 

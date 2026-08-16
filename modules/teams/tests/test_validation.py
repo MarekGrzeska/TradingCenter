@@ -11,6 +11,7 @@ from __future__ import annotations
 import pytest
 
 from teams.contract import AgentDefinition, TeamDefinition
+from teams.tools import AnnouncedSnapshot
 from teams.validation import (
     DefinitionRefused,
     check_definition,
@@ -31,26 +32,30 @@ def _agent(key: str, *, model_id: str = "gpt-5.6-luna", tools: list[str] | None 
     )
 
 
+def snapshot(*names: str, from_: str = "market-mcp", unreachable: list[str] | None = None) -> AnnouncedSnapshot:
+    return AnnouncedSnapshot(by_name={name: [from_] for name in names}, unreachable=unreachable or [])
+
+
 def test_a_definition_naming_known_models_and_announced_tools_passes() -> None:
     definition = TeamDefinition(agents=[_agent("scout", tools=["get_candles"])])
-    check_definition(definition, model_ids=MODELS, announced_tools=["get_candles", "get_symbols"])
+    check_definition(definition, model_ids=MODELS, announced=snapshot("get_candles", "get_symbols"))
 
 
 def test_a_model_outside_the_catalogue_is_refused_naming_the_agent_and_the_model() -> None:
     definition = TeamDefinition(agents=[_agent("scout"), _agent("judge", model_id="gpt-9-imaginary")])
 
     with pytest.raises(DefinitionRefused) as err:
-        check_definition(definition, model_ids=MODELS, announced_tools=[])
+        check_definition(definition, model_ids=MODELS, announced=snapshot())
 
     assert "judge" in str(err.value)
     assert "gpt-9-imaginary" in str(err.value)
 
 
-def test_a_tool_the_server_does_not_announce_is_refused_naming_the_agent_and_the_tool() -> None:
+def test_a_tool_no_server_announces_is_refused_naming_the_agent_and_the_tool() -> None:
     definition = TeamDefinition(agents=[_agent("scout", tools=["get_candles", "place_order"])])
 
     with pytest.raises(DefinitionRefused) as err:
-        check_definition(definition, model_ids=MODELS, announced_tools=["get_candles"])
+        check_definition(definition, model_ids=MODELS, announced=snapshot("get_candles"))
 
     assert "scout" in str(err.value)
     assert "place_order" in str(err.value)
@@ -58,21 +63,52 @@ def test_a_tool_the_server_does_not_announce_is_refused_naming_the_agent_and_the
 
 def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
     # Distinct from the case above on purpose: "no server to ask" is a configuration
-    # someone can fix, "the server does not have it" is a definition someone must change.
+    # someone can fix, "no server has it" is a definition someone must change.
     definition = TeamDefinition(agents=[_agent("scout", tools=["get_candles"])])
 
     with pytest.raises(DefinitionRefused) as err:
-        check_definition(definition, model_ids=MODELS, announced_tools=None)
+        check_definition(definition, model_ids=MODELS, announced=None)
 
     assert "scout" in str(err.value)
     assert "MARKET_MCP_URL" in str(err.value)
+    assert "TRADING_MCP_URL" in str(err.value)
 
 
 def test_a_team_assigning_no_tools_passes_without_a_tool_server() -> None:
-    # specs/teams-tool-access: a team whose agents carry no tools never needs the server,
+    # specs/teams-tool-access: a team whose agents carry no tools never needs a server,
     # at save time or at run time.
     definition = TeamDefinition(agents=[_agent("scout"), _agent("judge")], edges=[])
-    check_definition(definition, model_ids=MODELS, announced_tools=None)
+    check_definition(definition, model_ids=MODELS, announced=None)
+
+
+def test_a_name_two_servers_announce_is_refused_naming_both() -> None:
+    definition = TeamDefinition(agents=[_agent("scout", tools=["place_order"])])
+    announced = AnnouncedSnapshot(
+        by_name={"place_order": ["market-mcp", "trading-mcp"]}, unreachable=[]
+    )
+
+    with pytest.raises(DefinitionRefused) as err:
+        check_definition(definition, model_ids=MODELS, announced=announced)
+
+    assert "scout" in str(err.value)
+    assert "place_order" in str(err.value)
+    assert "market-mcp" in str(err.value)
+    assert "trading-mcp" in str(err.value)
+
+
+def test_a_tool_not_confirmed_because_a_server_was_unreachable_says_so() -> None:
+    """Distinct wording from "no server announces it": the tool might be there, this
+    module just could not check (specs/teams-tool-access)."""
+    definition = TeamDefinition(agents=[_agent("scout", tools=["place_order"])])
+    announced = snapshot("get_candles", unreachable=["trading-mcp"])
+
+    with pytest.raises(DefinitionRefused) as err:
+        check_definition(definition, model_ids=MODELS, announced=announced)
+
+    assert "scout" in str(err.value)
+    assert "place_order" in str(err.value)
+    assert "trading-mcp" in str(err.value)
+    assert "could not be reached" in str(err.value)
 
 
 # --- specs/teams-schedules, "Harmonogram nad rewizją z narzędziami zapisującymi wymaga

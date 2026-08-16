@@ -35,7 +35,7 @@ from .routers import catalogue, models, runs, schedules, usage
 from .routers import tools as tools_router
 from .runner import RunRegistry
 from .scheduler import Clock
-from .tools import ToolServer
+from .tools import ToolServerRegistry
 
 log = logging.getLogger(__name__)
 
@@ -79,12 +79,13 @@ async def lifespan(app: FastAPI):
             if orphans:
                 log.warning("closed %d run(s) left in progress by an earlier process: %s", len(orphans), orphans)
 
-        # Built here, connected to nothing yet: the session opens on first use and the
-        # tool list is read then. That is what keeps market-mcp off this module's start-up
-        # path — a team assigning no tools never touches it, and the catalogue is served
-        # whether or not it answers (specs/teams-tool-access, "Moduł startuje bez serwera
-        # narzędzi"). The refusal a missing server earns belongs to starting a *run*.
-        tools = ToolServer(settings)
+        # Built here, connected to nothing yet: each session opens on first use and its
+        # tool list is read then. That is what keeps either server off this module's
+        # start-up path — a team assigning no tools never touches either, and the
+        # catalogue is served whether or not they answer (specs/teams-tool-access,
+        # "Moduł startuje bez serwera narzędzi"). The refusal a missing server earns
+        # belongs to starting a *run*.
+        tools = ToolServerRegistry.from_settings(settings)
 
         app.state.settings = settings
         app.state.pool = pool
@@ -114,7 +115,7 @@ async def lifespan(app: FastAPI):
             pool,
             catalogue=app.state.catalogue,
             provider=app.state.provider,
-            tool_server=tools,
+            tool_registry=tools,
             settings=settings,
             registry=app.state.runs,
         )

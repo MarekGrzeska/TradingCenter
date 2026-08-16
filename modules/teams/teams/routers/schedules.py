@@ -38,7 +38,7 @@ from ..contract import (
     TriggerIn,
     TriggerOut,
 )
-from ..tools import announced_tool_names
+from ..tools import announced_snapshot
 from ..validation import DefinitionRefused, check_trigger_tool, check_unattended
 
 router = APIRouter()
@@ -246,10 +246,13 @@ async def next_fires(
 
 
 async def _check_trigger_tool(request: Request, tool_name: str) -> None:
-    # `announced_tool_names` already turns "not configured" and "configured but
-    # unreachable" into the same `None` — the save path does not need to tell them apart
-    # (`tools/assignment.py`'s own docstring on why).
-    announced = await announced_tool_names(request.app.state.settings)
+    # `announced_snapshot` answers `None` when no server is configured at all; a server
+    # that is configured and could not be asked comes back inside the snapshot instead,
+    # under `unreachable`. A trigger names one tool, so what this needs from either shape
+    # is the set of names — a name nobody announces is refused the same way whether the
+    # silence is a missing server or an unreachable one (`validation.check_trigger_tool`).
+    snapshot = await announced_snapshot(request.app.state.settings)
+    announced = None if snapshot is None else sorted(snapshot.by_name)
     try:
         check_trigger_tool(tool_name, announced_tools=announced)
     except DefinitionRefused as err:

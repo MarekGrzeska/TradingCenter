@@ -38,7 +38,7 @@ from ..models_catalogue import ModelCatalogue
 from ..provider import ModelProvider
 from ..runner import RunRegistry, start_run_on_revision
 from ..runner.cost import DailyCostLimitReached
-from ..tools import ToolOutcomeKind, ToolServer
+from ..tools import ToolOutcomeKind, ToolServer, ToolServerRegistry, ToolServerUnavailable
 from ..validation import DefinitionRefused
 
 log = logging.getLogger(__name__)
@@ -56,7 +56,7 @@ _COMPARISONS: dict[str, Callable[[float, float], bool]] = {
 
 class Clock:
     """Owns exactly one background task, started in `app.py`'s `lifespan` and stopped
-    with it — the same shape `ToolServer`'s own lifetime already has."""
+    with it — the same shape `ToolServerRegistry`'s own lifetime already has."""
 
     def __init__(
         self,
@@ -64,14 +64,14 @@ class Clock:
         *,
         catalogue: ModelCatalogue,
         provider: ModelProvider,
-        tool_server: ToolServer,
+        tool_registry: ToolServerRegistry,
         settings: Settings,
         registry: RunRegistry,
     ) -> None:
         self._pool = pool
         self._catalogue = catalogue
         self._provider = provider
-        self._tool_server = tool_server
+        self._tool_registry = tool_registry
         self._settings = settings
         self._registry = registry
         self._task: asyncio.Task[None] | None = None
@@ -122,7 +122,7 @@ class Clock:
                 dict(schedule),
                 catalogue=self._catalogue,
                 provider=self._provider,
-                tool_server=self._tool_server,
+                tool_registry=self._tool_registry,
                 settings=self._settings,
                 registry=self._registry,
             )
@@ -137,7 +137,7 @@ class Clock:
                 dict(trigger),
                 catalogue=self._catalogue,
                 provider=self._provider,
-                tool_server=self._tool_server,
+                tool_registry=self._tool_registry,
                 settings=self._settings,
                 registry=self._registry,
             )
@@ -168,7 +168,7 @@ async def _start_from(
     row: Mapping[str, Any],
     catalogue: ModelCatalogue,
     provider: ModelProvider,
-    tool_server: ToolServer,
+    tool_registry: ToolServerRegistry,
     settings: Settings,
     registry: RunRegistry,
 ) -> tuple[asyncpg.Record, asyncio.Task[None]] | str:
@@ -188,7 +188,7 @@ async def _start_from(
             owner_principal=row["owner_principal"],
             catalogue=catalogue,
             provider=provider,
-            tool_server=tool_server,
+            tool_registry=tool_registry,
             settings=settings,
             registry=registry,
         )
@@ -222,7 +222,7 @@ async def _fire_schedule(
     *,
     catalogue: ModelCatalogue,
     provider: ModelProvider,
-    tool_server: ToolServer,
+    tool_registry: ToolServerRegistry,
     settings: Settings,
     registry: RunRegistry,
 ) -> asyncio.Task[None] | None:
@@ -267,7 +267,7 @@ async def _fire_schedule(
         row=claimed,
         catalogue=catalogue,
         provider=provider,
-        tool_server=tool_server,
+        tool_registry=tool_registry,
         settings=settings,
         registry=registry,
     )
@@ -322,22 +322,51 @@ def _walk(payload: Any, field_path: str) -> Any:
     return current
 
 
+async def _server_announcing(
+    servers: list[ToolServer], tool_name: str
+) -> ToolServer | None:
+    """The first configured server that publishes this name, or `None` — which covers
+    both "nobody announces it" and "nobody could be asked". A trigger treats those the
+    same way it treats a refused call: it did not learn what the market is doing, so it
+    MUST NOT fire (specs/teams-triggers)."""
+    for server in servers:
+        try:
+            tools = await server.list_tools()
+        except ToolServerUnavailable:
+            continue
+        if any(tool.name == tool_name for tool in tools):
+            return server
+    return None
+
+
 async def _evaluate_condition(
-    trigger: Mapping[str, Any], *, tool_server: ToolServer
+    trigger: Mapping[str, Any], *, tool_registry: ToolServerRegistry
 ) -> tuple[bool | None, str | None]:
     """`(result, unavailable_reason)` — `result` is `None` exactly when
     `unavailable_reason` is set. A server that could not be asked, one that refused the
     call, and an answer with no such field are all the same fact from a trigger's own
     seat: it did not learn what the market is doing, so it MUST NOT fire either way. The
     reason text is what tells the two apart on the way to `schedule_fires`."""
-    if not tool_server.configured:
+    configured = tool_registry.configured()
+    if not configured:
         return None, "no tool server is configured (MARKET_MCP_URL is unset)"
 
     arguments = trigger["arguments"]
     if isinstance(arguments, str):
         arguments = json.loads(arguments)
 
-    outcome = await tool_server.call(trigger["tool_name"], arguments)
+    # Which server owns the name is asked here rather than assumed: since phase 2 there
+    # are two, and a trigger names one tool without saying whose. The list is read once
+    # per session and cached in the client, so this costs a round trip on the first tick
+    # after a restart and nothing afterwards.
+    server = await _server_announcing(configured, trigger["tool_name"])
+    if server is None:
+        return None, (
+            f"no configured tool server announces {trigger['tool_name']!r}, "
+            "or none could be asked"
+        )
+
+    outcome = await server.call(trigger["tool_name"], arguments)
     if outcome.kind is ToolOutcomeKind.UNAVAILABLE:
         return None, f"the tool server could not be asked: {outcome.text}"
     if outcome.kind is ToolOutcomeKind.REFUSED:
@@ -361,7 +390,7 @@ async def _check_trigger(
     *,
     catalogue: ModelCatalogue,
     provider: ModelProvider,
-    tool_server: ToolServer,
+    tool_registry: ToolServerRegistry,
     settings: Settings,
     registry: RunRegistry,
 ) -> asyncio.Task[None] | None:
@@ -382,7 +411,7 @@ async def _check_trigger(
     # Evaluating the condition never calls a model — one tool call, nothing charged to
     # this team's usage (specs/teams-triggers, "Obserwowanie rynku nie kosztuje tokenów
     # modelu") — so a trigger checked every few seconds costs nothing until it fires.
-    result, unavailable_reason = await _evaluate_condition(claimed, tool_server=tool_server)
+    result, unavailable_reason = await _evaluate_condition(claimed, tool_registry=tool_registry)
     if unavailable_reason is not None:
         async with pool.acquire() as conn:
             await store.record_trigger_check(conn, trigger_id=trigger_id, result=None, fired=False)
@@ -437,7 +466,7 @@ async def _check_trigger(
         row=claimed,
         catalogue=catalogue,
         provider=provider,
-        tool_server=tool_server,
+        tool_registry=tool_registry,
         settings=settings,
         registry=registry,
     )

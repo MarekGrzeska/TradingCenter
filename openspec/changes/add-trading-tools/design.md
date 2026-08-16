@@ -122,6 +122,28 @@ zespołów, niewidoczną w śladzie; **granice w prompcie** — nie są granicam
 podziału: moduł chroni rachunek przed tym, czego nie da się cofnąć, `teams` chroni
 eksperyment przed sobą samym.
 
+### Każda granica handlowa jest pomijalna, i to jest granica między dwoma rodzajami ochrony
+
+Wszystkie trzy są opcjonalne, każda niezależnie, a pominięta znaczy „bez ograniczenia" —
+dokładnie jak `CostLimits` z fazy 1. Moduł nie podstawia wartości domyślnej i nie trzyma
+w kodzie sufitu, którego operator nie może podnieść; zespół, któremu operator świadomie
+pozwala handlować całym kapitałem, zapisuje się i rusza.
+
+Rozważone i **odrzucone**: **granica wymagana przy narzędziu zapisującym** (odmowa zapisu
+rewizji bez niej), co ta zmiana pierwotnie zakładała. Odrzucone, bo miesza dwie ochrony,
+które muszą zostać rozdzielone:
+
+- **czego nie wolno nikomu** — konto rzeczywiste. Wymuszone u gatewaya, bez ustawienia,
+  które to wyłącza (`trading-mcp-upstream-access`). Tu sztywność jest cała wartością;
+- **ile operator sobie pozwala** — trzy granice w rewizji. Tu sztywność jest wadą: to jest
+  jego eksperyment, jego konto demonstracyjne i jego decyzja, a moduł odmawiający zapisania
+  zespołu bez limitu podejmuje ją za niego.
+
+Skutkiem tego rozdziału jest reguła, którą warto trzymać przy każdej kolejnej granicy
+dokładanej do tego modułu: **liczba, której operator nie może zmienić, należy do
+`trading-mcp`, nie do `teams`.** Wszystko, co `teams` egzekwuje, pochodzi z rewizji i daje
+się z niej usunąć.
+
 ### Ślad handlowy dostaje własną tabelę, mimo że wywołanie już jest w `tool_calls`
 
 Wiersz na wywołanie zapisujące: przebieg, agent, symbol, kierunek, wielkość, poziom, skutek,
@@ -168,7 +190,9 @@ sięga po rzeczy nieodwracalne.
 - **Zespół może złożyć zlecenie na podstawie nieporozumienia — i to jest istota fazy** →
   konto demo wymuszone u gatewaya, trzy granice w rewizji sprawdzane przed wywołaniem, ślad
   wiążący każde zlecenie z agentem i przebiegiem. Cofnięcia zlecenia nie ma i nie da się go
-  obiecać.
+  obiecać. Granice są przy tym opcjonalne, więc zespół bez nich zatrzymuje wyłącznie konto
+  demo — przyjęte świadomie: to jest ten sam rachunek demonstracyjny, na którym operator
+  ma prawo sprawdzić także wariant bez ograniczeń.
 - **Zlecenie złożone, którego model nie zobaczył** (rozliczenie nie przyszło na czas, sesja
   padła po żądaniu) → zakaz ponawiania plus narzędzia czytające rachunek w tym samym
   zestawie; ślad zapisuje wywołanie **przed** odpowiedzią, więc zlecenie bez skutku w bazie

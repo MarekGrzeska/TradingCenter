@@ -25,7 +25,7 @@ from teams.contract import AgentDefinition, TeamDefinition
 from teams.models_catalogue import ModelCatalogue
 from teams.runner import RunRegistry
 from teams.scheduler.clock import Clock, _check_trigger
-from teams.tools import ToolServer
+from teams.tools import ToolServerRegistry
 
 from .mcp_stand_in import serving, settings_for
 from .scripted_provider import ScriptedProvider, breaks, says
@@ -105,7 +105,7 @@ def _clock(pool: asyncpg.Pool, *, provider, settings) -> Clock:
         pool,
         catalogue=ModelCatalogue.from_settings(settings),
         provider=provider,
-        tool_server=ToolServer(settings),
+        tool_registry=ToolServerRegistry.from_settings(settings),
         settings=settings,
         registry=RunRegistry(),
     )
@@ -273,17 +273,25 @@ async def _check_directly(pool: asyncpg.Pool, trigger_id: int, *, provider, sett
     async with pool.acquire() as conn:
         row = await store.get_trigger(conn, trigger_id=trigger_id, owner_principal=OWNER)
     assert row is not None
-    task = await _check_trigger(
-        pool,
-        dict(row),
-        catalogue=ModelCatalogue.from_settings(settings),
-        provider=provider,
-        tool_server=ToolServer(settings),
-        settings=settings,
-        registry=RunRegistry(),
-    )
-    assert task is not None
-    await task
+    # Closed when this helper is done, the way `app.py`'s lifespan closes the one it
+    # builds. A registry left open holds an MCP session that outlives the task it was
+    # opened in, and anyio reports that as "attempted to exit cancel scope in a different
+    # task" somewhere entirely unrelated (`tools/client.py`'s own note on the trap).
+    tools = ToolServerRegistry.from_settings(settings)
+    try:
+        task = await _check_trigger(
+            pool,
+            dict(row),
+            catalogue=ModelCatalogue.from_settings(settings),
+            provider=provider,
+            tool_registry=tools,
+            settings=settings,
+            registry=RunRegistry(),
+        )
+        assert task is not None
+        await task
+    finally:
+        await tools.aclose()
 
 
 async def test_three_consecutive_failed_runs_disable_the_trigger(pool: asyncpg.Pool) -> None:

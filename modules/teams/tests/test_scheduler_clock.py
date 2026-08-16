@@ -23,7 +23,7 @@ from teams.contract import AgentDefinition, CostLimits, TeamDefinition
 from teams.models_catalogue import ModelCatalogue
 from teams.runner import RunRegistry
 from teams.scheduler.clock import Clock, _fire_schedule, _next_fire_and_skipped
-from teams.tools import ToolServer
+from teams.tools import ToolServerRegistry
 
 from .mcp_stand_in import settings_for
 from .scripted_provider import ScriptedProvider, breaks, says
@@ -81,7 +81,7 @@ def _clock(pool: asyncpg.Pool, *, provider, settings=None) -> Clock:
         pool,
         catalogue=ModelCatalogue.from_settings(settings),
         provider=provider,
-        tool_server=ToolServer(settings),
+        tool_registry=ToolServerRegistry.from_settings(settings),
         settings=settings,
         registry=RunRegistry(),
     )
@@ -257,7 +257,7 @@ async def _fire_directly(pool: asyncpg.Pool, schedule_id: int, *, provider, sett
         dict(row),
         catalogue=ModelCatalogue.from_settings(settings),
         provider=provider,
-        tool_server=ToolServer(settings),
+        tool_registry=ToolServerRegistry.from_settings(settings),
         settings=settings,
         registry=RunRegistry(),
     )

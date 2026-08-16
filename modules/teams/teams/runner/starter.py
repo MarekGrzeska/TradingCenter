@@ -24,6 +24,7 @@ from ..contract import TeamRevisionOut
 from ..validation import check_runnable
 from .cost import DailyCostLimitReached, limit_from
 from .engine import RunRegistry, execute_run
+from .trading import DailyOrderLimitReached
 
 
 async def start_run_on_revision(
@@ -33,7 +34,7 @@ async def start_run_on_revision(
     owner_principal: str,
     catalogue: Any,
     provider: Any,
-    tool_server: Any,
+    tool_registry: Any,
     settings: Any,
     registry: RunRegistry,
 ) -> tuple[asyncpg.Record, asyncio.Task]:
@@ -41,8 +42,9 @@ async def start_run_on_revision(
     row and that task, so a caller that cares when the run finishes (the clock does; the
     route does not) can await it.
 
-    Raises `validation.DefinitionRefused` or `runner.cost.DailyCostLimitReached` instead
-    of starting anything — both carry a message a caller can show or record as-is.
+    Raises `validation.DefinitionRefused`, `runner.cost.DailyCostLimitReached` or
+    `runner.trading.DailyOrderLimitReached` instead of starting anything — each carries a
+    message a caller can show or record as-is.
     """
     definition = TeamRevisionOut.from_row(dict(revision)).definition
     # The saved revision, checked again now — a model dropped from the configuration
@@ -56,14 +58,33 @@ async def start_run_on_revision(
     # limit that moved with the operator's own timezone would be a different limit in
     # summer — the same reason specs/teams-schedules keeps the clock in UTC too.
     daily_limit = limit_from(definition.limits.daily_limit)
-    if daily_limit is not None:
+    daily_orders = definition.trading.orders_per_day
+    if daily_limit is not None or daily_orders is not None:
         midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
         async with pool.acquire() as conn:
-            spent = await store.team_cost_since(
-                conn, team_id=revision["team_id"], owner_principal=owner_principal, since=midnight
-            )
-        if spent >= daily_limit:
-            raise DailyCostLimitReached(spent, daily_limit)
+            if daily_limit is not None:
+                spent = await store.team_cost_since(
+                    conn,
+                    team_id=revision["team_id"],
+                    owner_principal=owner_principal,
+                    since=midnight,
+                )
+                if spent >= daily_limit:
+                    raise DailyCostLimitReached(spent, daily_limit)
+            if daily_orders is not None:
+                # The same midnight as the cost ceiling, and checked in the same place for
+                # the same reason a schedule firing at 3am takes the route's own checks: a
+                # ceiling the clock does not read is a ceiling that holds only while the
+                # operator is watching (specs/teams-trading, "Granica dobowa jest
+                # sprawdzana przed utworzeniem przebiegu").
+                placed = await store.team_trades_since(
+                    conn,
+                    team_id=revision["team_id"],
+                    owner_principal=owner_principal,
+                    since=midnight,
+                )
+                if placed >= daily_orders:
+                    raise DailyOrderLimitReached(placed, daily_orders)
 
     async with pool.acquire() as conn:
         run, _steps = await store.create_run(
@@ -79,7 +100,7 @@ async def start_run_on_revision(
             run_id=run["id"],
             definition=definition,
             provider=provider,
-            tool_server=tool_server,
+            tool_registry=tool_registry,
             catalogue=catalogue,
             settings=settings,
             registry=registry,

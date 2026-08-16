@@ -26,6 +26,38 @@ trzymana w konfiguracji byłaby jedną liczbą dla wszystkich wariantów i nie b
 - **THEN** powstaje kolejna rewizja
 - **AND** przebiegi wykonane na poprzedniej pozostają opisane jej granicami
 
+### Requirement: Każda granica handlowa daje się wyłączyć, a moduł żadnej nie narzuca
+
+Każda z trzech granic MUST być pomijalna niezależnie od pozostałych, a granica pominięta
+MUST znaczyć „bez ograniczenia". Moduł MUST NOT podstawiać żadnej wartości domyślnej,
+MUST NOT trzymać w kodzie sufitu, którego operator nie może podnieść, i MUST NOT odmówić
+zapisu ani uruchomienia wyłącznie z powodu pominiętej granicy.
+
+Granice są narzędziem operatora, nie zgodą, której moduł mu udziela. Zespół, któremu
+operator świadomie pozwala handlować całym kapitałem, MUST dać się w tym module zapisać i
+uruchomić — a sufit wpisany na sztywno byłby dokładnie tą decyzją podjętą za operatora,
+której ten moduł podejmować nie ma prawa. Ochroną przed nieodwracalnym skutkiem jest tu
+konto demonstracyjne wymuszone u gatewaya (`trading-mcp-upstream-access`), a nie liczba,
+której nie da się zmienić.
+
+#### Scenario: Zespół bez żadnej granicy handlowej
+
+- **WHEN** operator zapisuje i uruchamia rewizję, której agenci mają narzędzia zapisujące,
+  a która nie niesie żadnej granicy handlowej
+- **THEN** zapis zostaje przyjęty, a przebieg rusza
+- **AND** żadne wywołanie zapisujące nie zostaje zatrzymane z powodu granicy
+
+#### Scenario: Jedna granica ustawiona, pozostałe pominięte
+
+- **WHEN** definicja niesie wyłącznie maksymalną wielkość zlecenia
+- **THEN** wielkość jest egzekwowana
+- **AND** liczba zleceń w przebiegu i dobowa pozostają nieograniczone
+
+#### Scenario: Granica wyższa, niż moduł uznałby za rozsądną
+
+- **WHEN** operator ustawia granicę o dowolnie dużej wartości
+- **THEN** moduł przyjmuje ją bez zmiany i egzekwuje dokładnie tę wartość
+
 ### Requirement: Granica jest sprawdzana przed wywołaniem narzędzia zapisującego
 
 Moduł MUST sprawdzić granice handlowe przed każdym wywołaniem narzędzia zmieniającego stan

@@ -117,7 +117,7 @@ class Settings(BaseSettings):
     # there is nothing here to fall back to (specs/teams-models).
     models: list[ModelCatalogueEntry] = Field(default_factory=list)
 
-    # --- market-mcp, this module's only tool server ---
+    # --- market-mcp, the read tool server ---
     #
     # Unset means no tools, deliberately: a team whose agents carry no assigned tools
     # never reaches this at all, and a team that does is refused at run time rather than
@@ -131,6 +131,19 @@ class Settings(BaseSettings):
     # own ceiling on reaching the archive is 10s — a little more than that here leaves
     # room for its own work without turning one slow call into a run that never ends.
     market_mcp_request_timeout_seconds: float = 15.0
+
+    # --- trading-mcp, the write tool server ---
+    #
+    # Same shape as market-mcp's three settings above, and independently optional: a
+    # team whose agents carry no write tool never touches this one even when it is
+    # unreachable (specs/teams-tool-access, "Nieosiągalny jest tylko serwer, z którego
+    # nikt nic nie ma").
+    trading_mcp_url: str | None = None
+    trading_mcp_scope: str | None = None
+    # A little past trading-mcp's own ceiling on capital-gateway (30s) — a write that
+    # takes the gateway's full worst case still has to read here as "slow", not as
+    # this module's own timeout firing first.
+    trading_mcp_request_timeout_seconds: float = 35.0
 
     # --- how long one run may take ---
     #
@@ -185,7 +198,9 @@ class Settings(BaseSettings):
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()
 
-    @field_validator("database_user", "market_mcp_url", "market_mcp_scope")
+    @field_validator(
+        "database_user", "market_mcp_url", "market_mcp_scope", "trading_mcp_url", "trading_mcp_scope"
+    )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
         # `MARKET_MCP_URL=` left in a .env is the same intent as the line being absent,
@@ -230,43 +245,55 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
-    def _tool_server_mode_is_coherent(self) -> Settings:
+    def _tool_server_modes_are_coherent(self) -> Settings:
         """The same rule market-data set for its database and market-mcp set for its
         archive, and agent set for its own tool server: name one mode, or none, never
-        both (specs/teams-tool-access, "Tryb połączenia z serwerem narzędzi jest wybrany
-        jednoznacznie")."""
-        if self.market_mcp_url is None:
-            if self.market_mcp_scope is not None:
-                raise ValueError(
-                    "MARKET_MCP_SCOPE is set but MARKET_MCP_URL is not — a scope names "
-                    "the audience of a token for a server this module has no address "
-                    "for. Set the URL, or unset the scope to run without a configured "
-                    "tool server."
-                )
-            return self
+        both — checked independently for each configured tool server, so an operator
+        fixing one does not have to guess which of the two a bare error names
+        (specs/teams-tool-access, "Tryb połączenia z serwerem narzędzi jest wybrany
+        jednoznacznie", "Niespójność dotyczy drugiego serwera")."""
+        self.market_mcp_url = self._coherent_tool_server_url(
+            url=self.market_mcp_url, scope=self.market_mcp_scope, env_prefix="MARKET_MCP"
+        )
+        self.trading_mcp_url = self._coherent_tool_server_url(
+            url=self.trading_mcp_url, scope=self.trading_mcp_scope, env_prefix="TRADING_MCP"
+        )
+        return self
 
-        self.market_mcp_url = self.market_mcp_url.rstrip("/")
-        host = (urlparse(self.market_mcp_url).hostname or "").lower()
+    @staticmethod
+    def _coherent_tool_server_url(*, url: str | None, scope: str | None, env_prefix: str) -> str | None:
+        if url is None:
+            if scope is not None:
+                raise ValueError(
+                    f"{env_prefix}_SCOPE is set but {env_prefix}_URL is not — a scope "
+                    "names the audience of a token for a server this module has no "
+                    f"address for. Set the URL, or unset {env_prefix}_SCOPE to run "
+                    "without this tool server configured."
+                )
+            return None
+
+        url = url.rstrip("/")
+        host = (urlparse(url).hostname or "").lower()
         is_loopback = host == "localhost" or host.startswith("127.") or host == "::1"
 
-        if self.market_mcp_scope is not None:
+        if scope is not None:
             if is_loopback:
                 raise ValueError(
-                    f"MARKET_MCP_SCOPE is set but MARKET_MCP_URL points at loopback "
-                    f"({self.market_mcp_url!r}) — a scope belongs to a remote tool "
-                    "server; unset MARKET_MCP_SCOPE for local development, or point "
-                    "the URL at the remote instance it names a token for."
+                    f"{env_prefix}_SCOPE is set but {env_prefix}_URL points at loopback "
+                    f"({url!r}) — a scope belongs to a remote tool server; unset "
+                    f"{env_prefix}_SCOPE for local development, or point the URL at the "
+                    "remote instance it names a token for."
                 )
-            return self
+            return url
 
         if not is_loopback:
             raise ValueError(
-                f"MARKET_MCP_URL points at {host!r} with no MARKET_MCP_SCOPE set. "
+                f"{env_prefix}_URL points at {host!r} with no {env_prefix}_SCOPE set. "
                 "Without a scope this module only reaches a tool server on this "
-                "machine's loopback — a remote one needs MARKET_MCP_SCOPE and the "
+                f"machine's loopback — a remote one needs {env_prefix}_SCOPE and the "
                 "managed identity it is requested for."
             )
-        return self
+        return url
 
     @model_validator(mode="after")
     def _catalogue_is_coherent(self) -> Settings:

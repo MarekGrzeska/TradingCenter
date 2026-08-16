@@ -13,7 +13,7 @@ from teams import store
 from teams.contract import AgentDefinition, CostLimits, TeamDefinition, TeamEdge
 from teams.models_catalogue import ModelCatalogue
 from teams.runner import RunRegistry, execute_run
-from teams.tools import ToolServer
+from teams.tools import ToolServerRegistry
 
 from .mcp_stand_in import settings_for
 from .scripted_provider import ScriptedProvider, says
@@ -51,7 +51,7 @@ async def _run(
         run_id=run["id"],
         definition=definition,
         provider=provider,
-        tool_server=ToolServer(settings),
+        tool_registry=ToolServerRegistry.from_settings(settings),
         catalogue=ModelCatalogue.from_settings(settings),
         settings=settings,
         registry=RunRegistry(),

@@ -16,7 +16,9 @@ from teams import store
 from teams.app import app
 from teams.provider import ProviderChunk, TextDelta, UsageReport
 
+from .mcp_stand_in import serving_sync
 from .scripted_provider import ScriptedProvider, says
+from .write_server import places_orders
 
 pytestmark = pytest.mark.db
 
@@ -326,3 +328,117 @@ def test_a_strangers_stream_is_refused(client: TestClient) -> None:
 
     with client.stream("GET", f"/runs/{run_id}/events", headers=STRANGER) as stream:
         assert stream.status_code == 404
+
+
+# --- the daily order ceiling (specs/teams-trading) ------------------------------------
+
+
+@pytest.fixture
+def trading_client(db: asyncpg.Connection, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+    """The app against a stand-in announcing one *write* tool.
+
+    A real announcing server rather than an `app.state.tools` override, because the save
+    path does not read `app.state`: it asks whatever servers the settings name
+    (`announced_snapshot`), which is what keeps a saved definition checked against what
+    is actually published (specs/teams-tool-access).
+    """
+    with serving_sync(("place_order",)) as url:
+        monkeypatch.setenv("TRADING_MCP_URL", url)
+        with TestClient(app) as started:
+            app.state.provider = ScriptedProvider(default=places_orders(1))
+            yield started
+
+
+def _trading_team(client: TestClient, trading: dict) -> int:
+    definition = _definition(
+        agents=[
+            {
+                "key": "trader",
+                "role": "trader",
+                "prompt": "trade",
+                "model_id": MODEL_ID,
+                "tools": ["place_order"],
+            }
+        ]
+    )
+    definition["trading"] = trading
+    return _a_team(client, definition)
+
+
+def test_a_team_that_used_up_its_daily_orders_is_refused_before_any_agent_runs(
+    trading_client: TestClient,
+) -> None:
+    """specs/teams-trading, "Granica dobowa jest sprawdzana przed utworzeniem przebiegu".
+    A run refused halfway is a run that already traded, so the count is read before
+    anything is created — and the refusal names the day, not the run."""
+    team_id = _trading_team(trading_client, {"orders_per_day": 1})
+
+    first = trading_client.post(f"/teams/{team_id}/runs", headers=OWNER)
+    assert first.status_code == 201
+    _wait_for_status(trading_client, first.json()["id"], {"completed", "failed"})
+
+    second = trading_client.post(f"/teams/{team_id}/runs", headers=OWNER)
+
+    assert second.status_code == 422
+    assert "daily order limit" in second.json()["detail"]
+    # Nothing was created for the refused attempt.
+    assert len(trading_client.get(f"/teams/{team_id}/runs", headers=OWNER).json()) == 1
+
+
+def test_a_team_with_no_daily_order_limit_keeps_starting_runs(
+    trading_client: TestClient,
+) -> None:
+    """The operator's own call again: no limit set means none applied, however many
+    orders the earlier runs placed."""
+    team_id = _trading_team(trading_client, {})
+
+    for _ in range(3):
+        started = trading_client.post(f"/teams/{team_id}/runs", headers=OWNER)
+        assert started.status_code == 201
+        _wait_for_status(trading_client, started.json()["id"], {"completed", "failed"})
+
+    assert len(trading_client.get(f"/teams/{team_id}/runs", headers=OWNER).json()) == 3
+
+
+def test_the_trades_of_a_run_are_readable_on_their_own_route(
+    trading_client: TestClient,
+) -> None:
+    """specs/teams-trading, "Odczyt zleceń przebiegu". Beside `/tool-calls`, not folded
+    into it: that route answers what the agents asked for, this one what happened to the
+    account."""
+    team_id = _trading_team(trading_client, {})
+    run_id = trading_client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(trading_client, run_id, {"completed", "failed"})
+
+    trades = trading_client.get(f"/runs/{run_id}/trades", headers=OWNER)
+
+    assert trades.status_code == 200
+    [trade] = trades.json()
+    assert trade["agent_key"] == "trader"
+    assert trade["tool_name"] == "place_order"
+    assert trade["symbol"] == "GOLD"
+    assert trade["direction"] == "BUY"
+    # The stand-in answers in prose rather than in trading-mcp's JSON, so the outcome is
+    # unknown — and the row says so instead of guessing (specs/teams-trading).
+    assert trade["status"] == "unknown"
+    assert trade["created_at"] is not None
+
+
+def test_a_run_that_placed_nothing_has_an_empty_trades_list(client: TestClient) -> None:
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    trades = client.get(f"/runs/{run_id}/trades", headers=OWNER)
+
+    assert trades.status_code == 200
+    assert trades.json() == []
+
+
+def test_a_strangers_trades_are_not_readable(client: TestClient) -> None:
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    # 404, the same answer as a run that never existed (specs/teams-browser-access).
+    assert client.get(f"/runs/{run_id}/trades", headers=STRANGER).status_code == 404
