@@ -680,6 +680,29 @@ resource "azurerm_linux_web_app" "teams" {
     TRADING_MCP_URL   = "https://${local.trading_mcp_hostname}"
     TRADING_MCP_SCOPE = "${local.trading_mcp_api_uri}/.default"
 
+    # The module's own clock — schedules and triggers fire from a task in this app's
+    # `lifespan`, not from anything in Azure (design.md, "Zegar w procesie modułu, nie w
+    # Azure"). A timer calling in from outside would need its own Entra registration to
+    # get past Easy Auth, and would put the schedule in Terraform, which is to say back
+    # in the operator's hands rather than in the catalogue where they set it.
+    #
+    # **Off, deliberately, and this is the one setting in this file whose value is a
+    # decision rather than a fact.** `teams/config.py` defaults it to `true`, so leaving
+    # it out of this map would *enable* the clock — the opposite of leaving it alone.
+    #
+    # It stays `false` until `teams/validation.py`'s `STATE_CHANGING_TOOLS` is wired to
+    # the `read_only` flag phase 2 put on the wire. Until then the check that refuses an
+    # unattended schedule over a revision carrying write tools (specs/teams-schedules)
+    # asks an empty set and refuses nothing — and this app now has `TRADING_MCP_URL`, so
+    # the tools it would be refusing are real. A clock that can place orders while
+    # nobody is watching, guarded by a check that cannot see them, is not a state to
+    # deploy into.
+    #
+    # Flipping it is one line here plus an `apply`; every schedule and trigger already
+    # in the catalogue stays exactly where it is either way, and a run started by hand
+    # works with the clock off (specs/teams-schedules, "Budzenie wyłączone ustawieniem").
+    SCHEDULER_ENABLED = "false"
+
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.teams_easy_auth.value
 
     REQUIRE_AUTHENTICATED_PRINCIPAL = "true"

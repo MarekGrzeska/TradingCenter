@@ -157,11 +157,36 @@ Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń p
 
 ## 7. Konfiguracja, infrastruktura i CI
 
-- [ ] 7.1 Ustawienia `SCHEDULER_*` w `config.py` — **dopisane na końcu klasy** — i w
-  `.env.example`
-- [ ] 7.2 `SCHEDULER_ENABLED` w ustawieniach aplikacji `teams` w `infra/app-service.tf`
-- [ ] 7.3 `modules/teams/README.md` — harmonogramy, wyzwalacze i lever wyłączający zegar
-- [ ] 7.4 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright`
+- [x] 7.1 Ustawienia `SCHEDULER_*` w `config.py` — **dopisane na końcu klasy** — i w
+  `.env.example` — było zrobione przy grupie 3, tylko nieodhaczone
+- [x] 7.2 `SCHEDULER_ENABLED` w ustawieniach aplikacji `teams` w `infra/app-service.tf`
+- [x] 7.3 `modules/teams/README.md` — harmonogramy, wyzwalacze i lever wyłączający zegar
+- [x] 7.4 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright`
+
+  **7.2 wylądowało jako `"false"` i to jest decyzja, a nie stan przejściowy.** Warto ją
+  znać z góry: `config.py` domyśla się `true`, więc *nieumieszczenie* tego ustawienia w
+  mapie włączyłoby zegar — nie zostawiłoby go w spokoju. Zostaje wyłączony, dopóki
+  `STATE_CHANGING_TOOLS` w `validation.py` nie zostanie spięte z flagą `read_only`, którą
+  faza 2 położyła na drucie: sprawdzenie odmawiające harmonogramu nad rewizją z narzędziami
+  zapisującymi chodzi, przechodzi testy i nie łapie niczego, bo pyta o pusty zbiór — a ta
+  aplikacja ma od wczoraj `TRADING_MCP_URL`, więc narzędzia, których nie widzi, są
+  prawdziwe. Zegar mogący składać zlecenia bez nadzoru, pilnowany przez ślepe sprawdzenie,
+  nie jest stanem, w który się wdraża. Przełączenie to jedna linia i `apply`; ani jeden
+  wiersz w katalogu się przy tym nie zmienia.
+
+  `apply` wykonany (0 dodanych, 1 zmieniony, 0 usuniętych) i sprawdzony odczytem:
+  `az webapp config appsettings list` oddaje `SCHEDULER_ENABLED=false`.
+
+  7.3 przy okazji odświeżyło sekcję „What", która stała na fazie 1: `config.py` ma trzy
+  przełączniki trybu, nie dwa; `tools/` to rejestr dwóch serwerów, nie jedna sesja; doszły
+  `scheduler/clock.py` i `routers/schedules.py`, `runner/trading.py` obok `cost.py`, a lista
+  migracji kończyła się na `0003` zamiast na `0006`. Nowa sekcja „Schedules and triggers"
+  niesie oba mechanizmy, trzy bezpieczniki pracy bez nadzoru, zwijanie pominiętych wyzwoleń
+  do jednego (`_next_fire_and_skipped`, sprawdzone w kodzie, nie założone) i lewarek — oraz
+  wyżej opisaną dziurę, wprost, jako rzecz do zamknięcia najpierw.
+
+  7.4: `ruff` czysto, `pyright` 0 błędów, `pytest` **337 passed**, `pytest -m db`
+  **159 passed** przeciw prawdziwemu PostgreSQL-owi w kontenerze jednorazowym.
 
 ## 8. Domknięcie
 

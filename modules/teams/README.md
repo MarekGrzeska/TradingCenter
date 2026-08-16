@@ -17,11 +17,13 @@ canvas.
 
 ## What
 
-- `config.py` — settings and two mode switches, each refusing a configuration that
+- `config.py` — settings and three mode switches, each refusing a configuration that
   leaves ambiguous which of two things is really in effect: the database (identity vs.
-  local password) and the tool server (identity vs. loopback). No `default_model_id`
-  the way `agent` has one: a team's definition must name a model for every agent it
-  holds, so there is no session-wide fallback to have.
+  local password) and each of the two tool servers (identity vs. loopback), checked
+  separately so an error names which one is half-configured. No `default_model_id` the
+  way `agent` has one: a team's definition must name a model for every agent it holds,
+  so there is no session-wide fallback to have. The `SCHEDULER_*` trio at the end of the
+  class is the clock's own — see "Schedules and triggers" below.
 - `db.py` — the connection, in the two shapes asyncpg and SQLAlchemy each insist on;
   duplicated from `agent/db.py`, not shared. Advisory-lock key `8050`, this module's
   own port.
@@ -51,21 +53,35 @@ canvas.
 - `provider.py` — OpenAI, streamed, and the only place langchain's message classes exist.
   A twin of `agent`'s with one shape changed: a call carries a *briefing* built from an
   agent's predecessors, not a conversation, because a team has no transcript to replay.
+- `scheduler/clock.py` — the module's own clock: one task in `app.py`'s lifespan that
+  wakes on `SCHEDULER_POLL_INTERVAL_SECONDS`, claims what is due, and starts it through
+  `start_run_on_revision` — the same function the terminal's button calls, so a run
+  nobody watched went through the same checks as one somebody did.
+- `routers/schedules.py` — schedules, triggers and their fire history. Every write here
+  runs `validation.check_unattended` against the revision that would be put to work
+  without an operator watching.
 - `runner/` — how a run happens, split by what each part may know. `graph.py` compiles the
   definition to a LangGraph — one node per agent, the operator's edges, and the narrowing
   that gives each agent only its predecessors' work. `loop.py` is one agent's own
   model↔tools exchange under a round ceiling. `engine.py` is where the database, the
   statuses, the time limit and whoever is watching meet. `cost.py` holds the two ceilings:
   the run's, checked before every model call, and the team's daily one, checked before a
-  run starts — a run refused halfway is a run that already spent.
-- `tools/` — the session with `market-mcp` (`client.py`, the only place `mcp` is
-  imported) and who gets which tools (`assignment.py`). Both refusals that stop a run
-  before an agent is called live in the second: a server that cannot be asked, and a tool
-  the server no longer announces. A team assigning no tools never touches either.
+  run starts — a run refused halfway is a run that already spent. `trading.py` is its
+  deliberate twin for orders, with one difference that is the whole point: every limit
+  there is optional and an absent one means no limit at all.
+- `tools/` — the sessions with the tool servers (`client.py`, the only place `mcp` is
+  imported) and who gets which tools (`assignment.py`). Two servers since phase 2, kept
+  in a registry rather than one connection: `market-mcp` reads the archive, `trading-mcp`
+  moves the account, and each is independently optional. Both refusals that stop a run
+  before an agent is called live in `assignment.py`: a server that cannot be asked *and
+  is needed*, and a tool no server announces. A team assigning no tools never touches
+  either, and an unreachable server nobody has a tool from never reaches the caller.
 - `app.py` — assembly only: the lifespan, the routers mounted on it, and the tool server
   it builds without connecting. Nothing that decides anything.
 - `migrations/` — the schema, as the statements a deployment actually runs: the catalogue
-  (`0001`), runs and their steps (`0002`), the usage ledger (`0003`).
+  (`0001`), runs and their steps (`0002`), the usage ledger (`0003`), where the operator
+  left each agent on the canvas (`0004`), schedules and triggers (`0005`), and the trade
+  trace (`0006`).
 
 ## Run
 
@@ -84,19 +100,71 @@ CREATE ROLE teams WITH LOGIN PASSWORD 'change-me';
 CREATE DATABASE teams OWNER teams;
 ```
 
-Does not need `market-mcp` to start, and the difference from `agent` is worth knowing:
-`MARKET_MCP_URL` left unset means every team whose agents assign **no** tools runs
-normally, while a team that does assign them is refused at the moment a run starts,
+Does not need either tool server to start, and the difference from `agent` is worth
+knowing: `MARKET_MCP_URL` left unset means every team whose agents assign **no** tools
+runs normally, while a team that does assign them is refused at the moment a run starts,
 naming tool access as the reason. It is not a turn answered worse — it would be several
-agents guessing independently, each guess paid for. Pointing the URL anywhere off
-loopback needs `MARKET_MCP_SCOPE` set too, the same way a remote database needs an
-identity.
+agents guessing independently, each guess paid for. `TRADING_MCP_URL` is the same setting
+for the tools that place orders, checked independently: clearing it takes the order tools
+away and leaves the reading ones exactly where they were. Pointing either URL anywhere off
+loopback needs its `*_SCOPE` set too, the same way a remote database needs an identity.
 
 `alembic upgrade head` above is the local convenience, not the mechanism: **the module
 migrates its own database at startup** (`migrate.py`, called from `app.py`'s lifespan),
 under a Postgres advisory lock, as the module's own identity — the same arrangement
 `agent` and `market-data` both run today, so there is no `GRANT` step here either, once
 the database exists.
+
+## Schedules and triggers
+
+A team can start itself. Two ways, both rows in this module's own database rather than
+anything in Azure (design.md, "Zegar w procesie modułu, nie w Azure"):
+
+- a **schedule** — a cron expression, and either a pinned revision or "whatever is latest
+  at the moment of each fire", which is an explicit choice and never the default;
+- a **trigger** — a market condition, expressed as a call to a tool this module already
+  has a session for, with a field path, a comparison and a threshold. Never a locally
+  computed indicator: the condition is read with the same tools an agent would use.
+
+Both fire through `start_run_on_revision`, the same function the terminal's Run button
+calls. A run nobody watched has therefore passed the same checks as one somebody did —
+the model catalogue, the announced tools, the daily cost ceiling, the daily order count.
+
+**A fire that starts nothing still leaves a row.** A schedule due while its own previous
+run is still going is skipped rather than queued, and the skip is recorded with its reason
+and a count, because "it did not run" and "it ran and did nothing" are answers an operator
+has to be able to tell apart. `GET /schedules/{id}/fires` is that history.
+
+**Working unattended has its own safeguards**, and they are the reason this is not simply
+a cron entry:
+
+- a schedule or trigger over a revision that carries a **state-changing tool** requires an
+  explicit acknowledgement (`unattended_ack`), refused by name at every write;
+- after `SCHEDULER_FAILURE_THRESHOLD` **consecutive** failed runs it disables itself and
+  records why — enough failures that one bad model response is not mistaken for a broken
+  schedule, few enough that a genuinely broken one does not bill through the night;
+- `GET /schedules/{id}/next-fires` answers when it fires next. The terminal never computes
+  that itself: the row's own `next_fire_at` reflects the last *claim*, not a forecast.
+
+> **Known gap, and it is the one to close first.** `validation.py`'s
+> `STATE_CHANGING_TOOLS` is still `frozenset()`, from before `trading-mcp` existed. The
+> acknowledgement check above runs, passes its tests, and catches nothing, because it asks
+> an empty set — while `trading-mcp` already marks every write tool with `read_only` on
+> the wire. Until the two are wired together, a schedule over a trading team is accepted
+> without the acknowledgement its own specification requires. This is why
+> `SCHEDULER_ENABLED` is `false` in `infra/app-service.tf`.
+
+### The lever
+
+`SCHEDULER_ENABLED=false` stops the clock without a redeploy and without touching a single
+row: every schedule and trigger stays exactly where it was, disabled ones stay disabled,
+and starting a run by hand keeps working (specs/teams-schedules, "Budzenie wyłączone
+ustawieniem"). Turning it back on resumes from the catalogue as it stands — a schedule that
+was due while the clock was off fires once, not once per missed slot.
+
+`SCHEDULER_POLL_INTERVAL_SECONDS` (15) is how often the clock looks for something due, and
+`SCHEDULER_FAILURE_THRESHOLD` (3) is the streak above. Both have working defaults; neither
+needs setting locally.
 
 ## Test
 
@@ -168,6 +236,13 @@ The order below is forced by dependencies, not by preference:
    `app-service.tf`) is itself the proof that the schema is at head. A check reading the
    App Service control plane instead proves the site runs the right *image*, which reported
    green over a crash-looping container on 16 August 2026.
+
+**The clock arrives off.** `SCHEDULER_ENABLED` is `"false"` in `infra/app-service.tf`, and
+that is a decision rather than an oversight: `config.py` defaults it to `true`, so leaving
+it out of the app settings would *enable* it. It stays off until the gap in the "Schedules
+and triggers" section above is closed — a clock that can place orders unattended, guarded
+by a check that cannot see the tools it is guarding against, is not a state to deploy into.
+Flipping it is one line and an `apply`; nothing in the catalogue changes either way.
 
 **Rollback.** Nothing depends on this module, so withdrawing it touches none of the other
 four. Clearing `MARKET_MCP_URL` and restarting takes the tools away and leaves the module
