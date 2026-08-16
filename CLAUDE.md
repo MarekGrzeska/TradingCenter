@@ -133,6 +133,56 @@ one its own tests walk, not a broken one. The tools appear only after the operat
 same lever: clear `MARKET_MCP_URL`, restart, and the module is what it was, with the rows
 in `tool_calls` still recording what happened while it had them.
 
+## Migrations are never the operator's job
+
+**Standing rule, for every module that owns a schema — the two that exist and every one
+added later: a merge to `main` must leave production serving. No operator step between the
+merge and a working application, and none after it.** A module whose deployment cannot
+migrate its own database is not finished, and neither is the change that added it.
+
+What "satisfied" means, concretely, and all three are required:
+
+1. the deployment applies `alembic upgrade head` against that module's production database
+   itself, before the new image starts serving;
+2. the new tables are usable by the app's own role the moment they exist — see the grant
+   trap below, which is what turns a successful migration into `permission denied`;
+3. the deployment's own check fails when either of those did not happen. A check that reads
+   the App Service control plane proves the site is *running the right image*, not that the
+   process inside came up — `deploy-agent.yml` says so in its own comment.
+
+The rule is written from a failure, not from taste. `schema_version.py` (both copies) refuses
+to start when the revision in the database and the head in the image disagree, so an
+unmigrated deploy takes the whole module dark rather than breaking one route quietly. That
+is the right failure and it stays — but as of 16 August 2026 it is *all* there is: the
+container does not migrate (`Dockerfile`), `deploy-agent.yml` and `deploy-market-data.yml`
+do not migrate, and their control-plane smoke checks report green over a container that is
+crash-looping on exit code 3. Production `agent` sat dark that day for exactly that reason,
+its database still at `0003` while the image shipped `0009`.
+
+Two things make this harder than adding a step, and neither is optional to solve:
+
+- **The runner has no stable address.** `psql-tradingcenter` admits callers by firewall rule
+  (`infra/database.tf`) — a fixed developer IP and the web apps' outbound lists. A GitHub
+  runner has neither, so the job has to open a rule for its own egress address and remove it
+  again, on every path out including failure.
+- **Grants follow the role that created the object.** Migrations are applied by an Entra
+  administrator, so every table is owned by that identity and the app's role is granted
+  nothing on it. `ALTER DEFAULT PRIVILEGES FOR ROLE <administrator> IN SCHEMA public` is what
+  closes it — and it is *scoped to that one role*, so a migration applied by a different
+  administrator (the CI principal, say) lands straight back in the hole. Whichever identity
+  ends up running migrations needs its own default privileges in both production databases.
+  Diagnosed 15 August on `prompt_revisions`, which read as `permission denied` and not as a
+  missing table.
+
+Both of those are `infra/**`, so building this is an OpenSpec change, and it is the one
+place where `terraform apply` staying the operator's job (above) and this rule have to be
+reconciled rather than assumed compatible.
+
+Until it is built, the manual step is `uv run alembic upgrade head` from the module
+directory with `DATABASE_USER` set to the Entra administrator — a stopgap being paid off,
+not a documented workflow. Do not add a new module with a database and leave it on that
+step.
+
 ## A new field on market-data's wire
 
 The most expensive routine change in this repo — five stops, and every one of them is
