@@ -25,11 +25,15 @@
 -- `tradingcenter` is the *server*, not a database on it, and asking for it by that name
 -- is a FATAL.
 --
--- **A brand-new, empty database still needs this**, and that is the case `teams` is in:
--- Terraform creates it owned by the administrator, and `CREATE ON SCHEMA public` has not
--- been granted to PUBLIC since PostgreSQL 15 — so the module's first migration fails on
--- its first `CREATE TABLE`, at startup, before it serves anything. Nothing here needs the
--- database to have objects in it; the loop below simply finds none.
+-- **A brand-new, empty database still needs this.** Terraform creates it owned by the
+-- administrator, and `CREATE ON SCHEMA public` has not been granted to PUBLIC since
+-- PostgreSQL 15 — so a module deployed onto an untouched database fails on its first
+-- `CREATE TABLE`, at startup, before it serves anything. Nothing here needs the database
+-- to have objects in it; the loop below simply finds none.
+--
+-- `teams` has had this done — checked on 16 August 2026, before its first deployment:
+-- `nspacl` on `public` carries `app-tradingcenter-teams=UC`, the same shape `agent` has,
+-- and the database holds no tables to reassign. Nothing is owed before that module ships.
 --
 -- The password is an Entra access token:
 --   az account get-access-token --resource https://ossrdbms-aad.database.windows.net \
