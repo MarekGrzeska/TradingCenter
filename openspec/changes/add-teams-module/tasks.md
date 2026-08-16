@@ -144,7 +144,7 @@
 - [x] 7.12 Testy: przebieg przerwany, błędny i przekraczający czas zostawiają ślad
 - [x] 7.13 Testy: zmiana definicji w trakcie przebiegu nie zmienia rewizji, na której on biegnie
 
-  PR #113. Pięć rzeczy warto znać, zanim ktoś zajrzy do `teams/runner/`:
+  PR #114. Pięć rzeczy warto znać, zanim ktoś zajrzy do `teams/runner/`:
 
   - **LangGraph niesie graf zespołu, nie pętlę agenta.** Węzeł na agenta i krawędzie
     operatora — to z tego bierze się i kolejność, i równoległość, bez pisania planisty.
