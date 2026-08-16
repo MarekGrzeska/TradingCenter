@@ -48,6 +48,8 @@ def test_every_route_the_tools_use_is_in_the_snapshot() -> None:
 
 @pytest.mark.contract
 def test_the_snapshot_matches_what_teams_publishes_right_now() -> None:
-    import scripts.contract as contract  # noqa: PLC0415 - only when this mark is run
+    # Imported here rather than at module scope: it shells out to the teams module,
+    # and the unmarked tests in this file must not pay for that.
+    from scripts import contract
 
     assert SNAPSHOT.read_text(encoding="utf-8") == contract.schema_text()
