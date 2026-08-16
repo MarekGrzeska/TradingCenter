@@ -27,8 +27,8 @@ written down (specs/teams-schedules, "Wyzwolenie bez przebiegu zostawia zapisany
 powód"). `runs` gets no `schedule_id` column for the same reason this table exists at
 all: a fire that started nothing has no run row to hang the fact from.
 
-Revision ID: 0004
-Revises: 0003
+Revision ID: 0005
+Revises: 0004
 """
 
 from __future__ import annotations
@@ -39,8 +39,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0004"
-down_revision: str | None = "0003"
+revision: str = "0005"
+down_revision: str | None = "0004"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

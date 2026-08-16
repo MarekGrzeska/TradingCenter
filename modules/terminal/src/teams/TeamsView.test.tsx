@@ -194,6 +194,82 @@ describe("the team on the canvas", () => {
   });
 });
 
+describe("taking the last change back", () => {
+  it("undoes an agent that was just added", async () => {
+    await openTheTeam(fakeApi());
+
+    await userEvent.click(screen.getByRole("button", { name: "Add agent" }));
+    expect(await screen.findByTestId("agent-node-New role")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("agent-node-New role")).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("agent-node-Scout")).toBeInTheDocument();
+  });
+
+  it("undoes a removed dependency, which is what puts the line back", async () => {
+    await openTheTeam(fakeApi());
+
+    await userEvent.click(await screen.findByRole("button", { name: /Remove dependency/ }));
+    await waitFor(() =>
+      expect(screen.queryByRole("button", { name: /Remove dependency/ })).not.toBeInTheDocument(),
+    );
+    expect(screen.getByText("unsaved changes")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    expect(await screen.findByRole("button", { name: /Remove dependency/ })).toBeInTheDocument();
+    // And back to nothing to save: the draft is the saved revision again, which is the
+    // whole of what "take it back" means here.
+    await waitFor(() => expect(screen.queryByText("unsaved changes")).not.toBeInTheDocument());
+  });
+
+  it("answers to Ctrl+Z as well as to the button", async () => {
+    await openTheTeam(fakeApi());
+    await userEvent.click(screen.getByRole("button", { name: "Add agent" }));
+    await screen.findByTestId("agent-node-New role");
+
+    fireEvent.keyDown(document, { key: "z", ctrlKey: true });
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("agent-node-New role")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("leaves the shortcut to the field that has the text in it", async () => {
+    // Inside a textarea the browser's own undo is the better one, and taking it away to
+    // revert the whole agent instead would be the worse trade.
+    await openTheTeam(fakeApi());
+    await userEvent.click(screen.getByRole("button", { name: "Add agent" }));
+    const prompt = await screen.findByLabelText("Prompt");
+
+    fireEvent.keyDown(prompt, { key: "z", ctrlKey: true });
+
+    expect(screen.getByTestId("agent-node-New role")).toBeInTheDocument();
+  });
+
+  it("has nothing to take back on a team just opened", async () => {
+    await openTheTeam(fakeApi());
+
+    expect(screen.getByRole("button", { name: "Undo" })).toBeDisabled();
+  });
+
+  it("collapses a burst of typing into one step", async () => {
+    // `edit` runs per keystroke; one undo gives back what was there before the typing
+    // started rather than the word minus its last letter.
+    await openTheTeam(fakeApi());
+
+    await userEvent.type(await screen.findByLabelText("Role"), "ing");
+    expect(await screen.findByTestId("agent-node-Scouting")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
+  });
+});
+
 describe("the agent panel", () => {
   it("offers the models the module published and nothing else", async () => {
     // The requirement `terminal-teams` states twice: the picker is built from the
