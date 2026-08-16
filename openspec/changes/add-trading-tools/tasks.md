@@ -175,12 +175,53 @@
 - [x] 8.1 `pnpm contract:generate` po zmianach w `teams/contract.py` — zrobione przy
   scaleniu fazy 2 do `feat/teams-platform`; plik niesie teraz oba wiersze naraz, handlowy
   i harmonogramowy
-- [ ] 8.2 Granice handlowe w panelu zespołu; odmowa zapisu pokazana przy agencie
-- [ ] 8.3 Narzędzia zapisujące odróżnione od czytających w wybieraku narzędzi
-- [ ] 8.4 Zlecenia przebiegu przy agencie, który je złożył — symbol, kierunek, wielkość, skutek
-- [ ] 8.5 Zlecenie o nieznanym skutku pokazane jako nieznane
-- [ ] 8.6 Granica zleceń jako przyczyna zatrzymania, odróżniona od kosztu
-- [ ] 8.7 `pnpm lint`, `typecheck`, `test`, `contract:check` przechodzą
+- [x] 8.2 Granice handlowe w panelu zespołu; ~~odmowa zapisu pokazana przy agencie~~ —
+  drugiej połowy nie ma, bo po odwróceniu decyzji z grupy 6 taka odmowa nie istnieje
+- [x] 8.3 Narzędzia zapisujące odróżnione od czytających w wybieraku narzędzi
+- [x] 8.4 Zlecenia przebiegu przy agencie, który je złożył — symbol, kierunek, wielkość, skutek
+- [x] 8.5 Zlecenie o nieznanym skutku pokazane jako nieznane
+- [x] 8.6 Granica zleceń jako przyczyna zatrzymania, odróżniona od kosztu
+- [x] 8.7 `pnpm lint`, `typecheck`, `test`, `contract:check` przechodzą — 853 zielone
+  (było 840), `contract:check` bez zmian w wygenerowanym pliku: grupa 5 i 7 wygenerowały
+  go już wcześniej
+
+  **Ostatni ślad odwróconej decyzji z grupy 6 był w `terminal-teams`, nie w kodzie.** Delta
+  tej zmiany dalej wymagała „odmowy zapisu z powodu brakującej granicy pokazanej przy
+  agencie" — wymogu, którego moduł od grupy 6 nie stawia. Poprawione tutaj, z zapisanym
+  powodem: pusta granica jest wyborem operatora, terminal niczego nie wymusza i niczego z
+  tego powodu nie ostrzega. Test `saves an agent given a write tool and no limit at all` jest
+  tego dowodem od tej strony.
+
+  Granice handlowe dostały **panel zespołu** (`TeamPanel.tsx`) w prawej kolumnie edytora —
+  ten sam pas, w którym siedzi panel agenta, pokazywany, gdy żaden agent nie jest wybrany, z
+  nowym przyciskiem `Team` jako drogą powrotną. Powód: to jedyne miejsce w tym widoku, które
+  należy do zespołu, a nie do agenta. Granice kosztu (`limits`) zostały tam świadomie **nie**
+  dołożone — jadą na drucie od fazy 1 i nigdy nie miały wybieraka; dołożenie ich tutaj byłoby
+  rozszerzeniem tej zmiany o cudzy brak. Warte odnotowania jako dziura, nie jako zadanie tej
+  grupy.
+
+  8.6 opiera się na zdaniu modułu, bo nic innego nie jedzie na drucie: `stopped_reason` to
+  proza, a obie granice piszą własną (`runner/trading.py`, `runner/cost.py`). `stopCause()`
+  w `runs.ts` czyta z niej **wyłącznie nagłówek** („Order limit" / „Cost limit"); samo zdanie
+  zawsze idzie w całości. Przeredagowane u źródła kosztuje nagłówek i nic więcej — zdanie
+  dalej mówi prawdę, bo jest modułu. Precedens jest w tym samym katalogu: `refusal.ts` czyta
+  klucze agentów z odmowy modułu i z tego samego powodu.
+
+  Zlecenia nie jadą strumieniem — moduł publikuje postęp, a zlecenie jest wierszem do
+  odczytania — więc `useRunMonitor` czyta `/runs/{id}/trades` po migawce, przy każdym zdarzeniu
+  wywołania narzędzia (bo tylko wtedy może przybyć wiersz) i raz jeszcze na końcu przebiegu
+  (ostatni wiersz domyka się po odpowiedzi, która przychodzi po zdarzeniu). Jeden odczyt naraz,
+  strażnik na `useRef` — runda trzech agentów inaczej startuje trzy odczyty tej samej listy.
+
+  `outcomeOf()` czyta wiersz `sent` przez to, czy przebieg się skończył: w trakcie to zlecenie
+  w drodze, po końcu to zlecenie o nieznanym skutku — dokładnie to, co o tym wierszu mówi
+  docstring `TradeOut` w `contract.py`. Zgadywanie? Nie: to jedyne zdanie, jakie ten wiersz
+  niesie, i moduł sam je tak nazywa.
+
+  `pickersComeFromTheModule.test.ts` musiał dostać wyjątek na `read_only`: jego wzorzec na
+  nazwę narzędzia (`(get|list|read)_…`) łapie tę **właściwość drutu**, którą wybierak czyta,
+  żeby oznaczyć narzędzia ruszające rachunek — czyli dokładne przeciwieństwo listy narzędzi
+  wpisanej w terminal. Wycięta przed sprawdzeniem, zamiast rozluźniania samego wzorca.
 
 ## 9. Infrastruktura
 

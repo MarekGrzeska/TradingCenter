@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MarketDataError } from "../data/types";
 import { AgentPanel } from "./AgentPanel";
 import { TeamCanvas } from "./TeamCanvas";
+import { TeamPanel } from "./TeamPanel";
 import { NO_HISTORY, kindForPatch, remember, undo, type EditHistory } from "./editHistory";
 import { locateRefusal, type Refusal } from "./refusal";
 import {
@@ -11,6 +12,7 @@ import {
   hasChanges,
   removeAgent,
   removeDependency,
+  setTradingLimit,
   updateAgent,
 } from "./teamDraft";
 import type {
@@ -269,6 +271,16 @@ export function TeamEditor({
         >
           Undo
         </button>
+        {/* The way back to the team itself once an agent is open — the panel it opens is
+            the one the right-hand column starts on, and the only door to the trading
+            limits when every agent is worth looking at instead. */}
+        <button
+          type="button"
+          onClick={() => setSelectedKey(null)}
+          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
+        >
+          Team
+        </button>
         <button
           type="button"
           onClick={() => edit(addAgent(draft, defaultModelId))}
@@ -325,10 +337,10 @@ export function TeamEditor({
             onDisconnect={(edge) => edit(removeDependency(draft, edge))}
           />
         ) : (
-          <p className="border-l border-border p-3 text-xs text-ink-muted">
-            Pick an agent to edit it, or drag from one agent's right edge to another's left
-            to make it wait for that one.
-          </p>
+          <TeamPanel
+            trading={draft.trading}
+            onChange={(patch, kind) => edit(setTradingLimit(draft, patch), kind)}
+          />
         )}
       </div>
     </div>

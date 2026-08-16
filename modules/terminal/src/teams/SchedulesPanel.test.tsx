@@ -10,7 +10,12 @@ const REVISION: TeamRevision = {
   id: 9,
   teamId: 1,
   version: 2,
-  definition: { agents: [], dependencies: [], limits: { runLimit: null, dailyLimit: null } },
+  definition: {
+    agents: [],
+    dependencies: [],
+    limits: { runLimit: null, dailyLimit: null },
+    trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
+  },
   createdAt: 1_760_000_000,
 };
 
@@ -65,7 +70,9 @@ async function scheduleRow(): Promise<HTMLElement> {
 function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
   return {
     listModels: vi.fn(async () => []),
-    listTools: vi.fn(async () => [{ name: "read_indicators", description: "reads indicators" }]),
+    listTools: vi.fn(async () => [
+      { name: "read_indicators", description: "reads indicators", readOnly: true },
+    ]),
     listTeams: vi.fn(async () => []),
     createTeam: vi.fn(async () => {
       throw new Error("not stubbed");
@@ -89,6 +96,7 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     }),
     runSteps: vi.fn(async () => []),
     runToolCalls: vi.fn(async () => []),
+    runTrades: vi.fn(async () => []),
     cancelRun: vi.fn(async () => {
       throw new Error("not stubbed");
     }),
@@ -260,7 +268,7 @@ describe("triggers", () => {
         api={api}
         teamId={1}
         teamName="Morning desk"
-        tools={[{ name: "read_indicators", description: "reads indicators" }]}
+        tools={[{ name: "read_indicators", description: "reads indicators", readOnly: true }]}
         onClose={vi.fn()}
         onWatchRun={vi.fn()}
       />,

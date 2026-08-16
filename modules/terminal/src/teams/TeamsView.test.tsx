@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MarketDataError } from "../data/types";
 import { TeamsView } from "./TeamsView";
-import type { RunStreamEvent, TeamRun, TeamRunStep } from "./runs";
+import type { RunStreamEvent, TeamRun, TeamRunStep, TeamTrade } from "./runs";
 import type { TeamDefinition, TeamsApi, TeamSummary, TeamRevision } from "./teamsApi";
 
 const MODELS = [
@@ -33,6 +33,7 @@ const DEFINITION: TeamDefinition = {
   ],
   dependencies: [{ from: "agent-1", to: "agent-2" }],
   limits: { runLimit: null, dailyLimit: null },
+  trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
 };
 
 function revision(definition: TeamDefinition = DEFINITION): TeamRevision {
@@ -52,6 +53,7 @@ const TRIO: TeamDefinition = {
     { from: "agent-2", to: "agent-3" },
   ],
   limits: { runLimit: null, dailyLimit: null },
+  trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
 };
 
 const RUN: TeamRun = {
@@ -77,6 +79,26 @@ function step(id: number, agentKey: string, status: string, output: string | nul
   };
 }
 
+/** One order this run placed, settled unless a test says otherwise. */
+function trade(over: Partial<TeamTrade> & { agentKey: string }): TeamTrade {
+  return {
+    id: 4,
+    runId: RUN.id,
+    toolName: "an order tool",
+    symbol: "US100",
+    direction: "BUY",
+    size: "1.5",
+    level: null,
+    status: "settled",
+    resultStatus: "FILLED",
+    providerOrderId: "o-1",
+    reference: null,
+    createdAt: 1_760_000_800,
+    settledAt: 1_760_000_801,
+    ...over,
+  };
+}
+
 const MIDWAY: TeamRunStep[] = [
   step(1, "agent-1", "completed", "US100 is trending"),
   step(2, "agent-2", "running"),
@@ -90,7 +112,9 @@ async function* streamOf(events: RunStreamEvent[]): AsyncGenerator<RunStreamEven
 function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
   return {
     listModels: vi.fn(async () => MODELS),
-    listTools: vi.fn(async () => [{ name: "get_candles", description: "candles from the archive" }]),
+    listTools: vi.fn(async () => [
+      { name: "get_candles", description: "candles from the archive", readOnly: true },
+    ]),
     listTeams: vi.fn(async () => [TEAM]),
     createTeam: vi.fn(async () => TEAM),
     getTeam: vi.fn(async () => TEAM),
@@ -106,6 +130,7 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     getRun: vi.fn(async () => RUN),
     runSteps: vi.fn(async () => MIDWAY),
     runToolCalls: vi.fn(async () => []),
+    runTrades: vi.fn(async () => []),
     cancelRun: vi.fn(async () => RUN),
     watchRun: vi.fn(async () => streamOf([{ kind: "snapshot", run: RUN, steps: MIDWAY }])),
     listSchedules: vi.fn(async () => []),
@@ -373,6 +398,86 @@ describe("the agent panel", () => {
   });
 });
 
+describe("the trading limits", () => {
+  it("sets them in the same view the team is composed in", async () => {
+    // specs/terminal-teams, "Granice handlowe ustawia się w tym samym widoku co resztę
+    // zespołu" — the panel beside the canvas, on the team rather than on any one agent.
+    const api = fakeApi();
+    await openTheTeam(api);
+
+    await userEvent.click(screen.getByRole("button", { name: "Team" }));
+    await userEvent.type(await screen.findByLabelText("Largest order size"), "1.5");
+    await userEvent.type(screen.getByLabelText("Orders per run"), "2");
+    await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
+
+    await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
+    const [, saved] = (api.saveRevision as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect((saved as TeamDefinition).trading).toEqual({
+      maxOrderSize: "1.5",
+      ordersPerRun: 2,
+      ordersPerDay: null,
+    });
+  });
+
+  it("saves an agent given a write tool and no limit at all, because none is required", async () => {
+    // The reversed decision this change carries (specs/teams-trading, "Każda granica
+    // handlowa daje się wyłączyć, a moduł żadnej nie narzuca"): an empty limit is the
+    // operator's choice, not an omission for the terminal to nag about or hold a save on.
+    const api = fakeApi({
+      listTools: vi.fn(async () => [
+        { name: "place_order", description: "an order", readOnly: false },
+      ]),
+    });
+    await openTheTeam(api);
+
+    await userEvent.click(await screen.findByLabelText(/place_order/));
+    await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
+
+    await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
+    const [, saved] = (api.saveRevision as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect((saved as TeamDefinition).trading).toEqual({
+      maxOrderSize: null,
+      ordersPerRun: null,
+      ordersPerDay: null,
+    });
+  });
+
+  it("takes a limit back like any other change", async () => {
+    await openTheTeam(fakeApi());
+
+    await userEvent.click(screen.getByRole("button", { name: "Team" }));
+    await userEvent.type(await screen.findByLabelText("Orders per day"), "5");
+    expect(screen.getByText("unsaved changes")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Undo" }));
+
+    await waitFor(() =>
+      expect((screen.getByLabelText("Orders per day") as HTMLInputElement).value).toBe(""),
+    );
+  });
+
+  it("marks the tools that move the account, and says when nobody annotated one", async () => {
+    // specs/terminal-teams, "narzędzia zmieniające stan rachunku są odróżnione od
+    // czytających" — read off the server's own annotation, with `null` kept as a third
+    // value rather than promoted to "reads only".
+    const api = fakeApi({
+      listTools: vi.fn(async () => [
+        { name: "get_candles", description: "candles", readOnly: true },
+        { name: "place_order", description: "an order", readOnly: false },
+        { name: "who_knows", description: "nobody said", readOnly: null },
+      ]),
+    });
+    await openTheTeam(api);
+
+    const writes = (await screen.findByText("place_order")).closest("label");
+    expect(within(writes as HTMLElement).getByText("moves the account")).toBeInTheDocument();
+    const reads = screen.getByText("get_candles").closest("label");
+    expect(within(reads as HTMLElement).queryByText("moves the account")).not.toBeInTheDocument();
+    const unknown = screen.getByText("who_knows").closest("label");
+    expect(within(unknown as HTMLElement).getByText("unannotated")).toBeInTheDocument();
+  });
+});
+
 describe("starting a run", () => {
   async function startFrom(api: TeamsApi) {
     render(<TeamsView api={api} />);
@@ -554,10 +659,61 @@ describe("watching a run", () => {
     await watch(api);
 
     expect(await screen.findByText(/cost limit of 2.00/)).toBeInTheDocument();
+    expect(screen.getByText("Cost limit")).toBeInTheDocument();
     fireEvent.click(screen.getByTestId("agent-node-Scout"));
     expect(await screen.findByText("US100 is trending")).toBeInTheDocument();
     // Nothing left to stop, so nothing offering to.
     expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+  });
+
+  it("shows an order beside the agent that placed it", async () => {
+    // specs/terminal-teams, "Złożone zlecenia widać przy agencie, który je złożył" — with
+    // the symbol, the direction, the size and what came of it, and beside the agent
+    // rather than inside a list of tool calls nobody reads for this.
+    const api = fakeApi({ runTrades: vi.fn(async () => [trade({ agentKey: "agent-1" })]) });
+    await watch(api);
+
+    fireEvent.click(screen.getByTestId("agent-node-Scout"));
+
+    const orders = (await screen.findByText("Orders")).closest("section") as HTMLElement;
+    expect(within(orders).getByText("US100")).toBeInTheDocument();
+    expect(within(orders).getByText("BUY")).toBeInTheDocument();
+    expect(within(orders).getByText(/1\.5/)).toBeInTheDocument();
+    expect(within(orders).getByText("FILLED")).toBeInTheDocument();
+  });
+
+  it("shows an order of unknown outcome as unknown rather than dropping it", async () => {
+    const api = fakeApi({
+      runTrades: vi.fn(async () => [
+        trade({ agentKey: "agent-1", status: "unknown", resultStatus: null }),
+      ]),
+    });
+    await watch(api);
+
+    fireEvent.click(screen.getByTestId("agent-node-Scout"));
+
+    expect(await screen.findByText("outcome unknown")).toBeInTheDocument();
+  });
+
+  it("names the order limit as the reason, apart from the cost, and lists what was placed", async () => {
+    // specs/terminal-teams, "Zatrzymanie z powodu granicy zleceń jest pokazane jako
+    // takie" — the module's sentence, headed by which ceiling it was, and the orders the
+    // team did place beneath it.
+    const stopped: TeamRun = {
+      ...RUN,
+      status: "failed",
+      stoppedReason: "the run's order limit was reached: 2 of 2 allowed placed.",
+      finishedAt: 1_760_000_900,
+    };
+    const api = fakeApi({
+      watchRun: vi.fn(async () => streamOf([{ kind: "snapshot", run: stopped, steps: MIDWAY }])),
+      runTrades: vi.fn(async () => [trade({ agentKey: "agent-1" })]),
+    });
+    await watch(api);
+
+    expect(await screen.findByText("Order limit")).toBeInTheDocument();
+    expect(screen.queryByText("Cost limit")).not.toBeInTheDocument();
+    expect(await screen.findByText("Orders placed (1)")).toBeInTheDocument();
   });
 
   it("asks the module to stop a run the operator interrupts", async () => {

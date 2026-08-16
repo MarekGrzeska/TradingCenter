@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatInstant } from "../ui/formatTime";
 import { TeamCanvas } from "./TeamCanvas";
-import type { TeamRun, TeamRunStep, TeamRunToolCall } from "./runs";
+import { outcomeOf, stopCause, type TeamRun, type TeamRunStep, type TeamRunToolCall, type TeamTrade } from "./runs";
 import type { TeamDefinition, TeamLayout, TeamsApi, TeamsModel } from "./teamsApi";
 import { useRunMonitor } from "./useRunMonitor";
 
@@ -30,7 +30,7 @@ export function RunMonitor({
   onClose(): void;
 }) {
   const monitor = useRunMonitor(api, runId);
-  const { run, steps, toolCalls } = monitor;
+  const { run, steps, toolCalls, trades } = monitor;
   const [definition, setDefinition] = useState<TeamDefinition | null>(null);
   const [places, setPlaces] = useState<TeamLayout>(new Map());
   const [version, setVersion] = useState<number | null>(null);
@@ -81,6 +81,14 @@ export function RunMonitor({
     return grouped;
   }, [toolCalls]);
 
+  const tradesByAgent = useMemo(() => {
+    const grouped = new Map<string, TeamTrade[]>();
+    for (const trade of trades) {
+      grouped.set(trade.agentKey, [...(grouped.get(trade.agentKey) ?? []), trade]);
+    }
+    return grouped;
+  }, [trades]);
+
   const selectedStep = steps.find((step) => step.agentKey === selectedKey) ?? null;
   const working = run !== null && (run.status === "pending" || run.status === "running");
 
@@ -129,9 +137,14 @@ export function RunMonitor({
 
       {/* The module's own sentence, whatever stopped it — a cost ceiling names the cost
           (specs/teams-usage), a timeout names the limit, the operator's own interruption
-          says so. Kept above the canvas because it explains everything below it. */}
+          says so. Kept above the canvas because it explains everything below it, and
+          headed by which ceiling it was: an operator reading "cost" buys more budget, one
+          reading "orders" learns their team wanted to trade more than they allowed, and
+          those are two different mornings (specs/terminal-teams, "Zatrzymanie z powodu
+          granicy zleceń jest pokazane jako takie"). */}
       {run?.stoppedReason && (
         <p className="border-b border-border px-2 py-1 text-xs text-warning">
+          <StopHeading cause={stopCause(run.stoppedReason)} />
           {run.stoppedReason}
         </p>
       )}
@@ -176,9 +189,17 @@ export function RunMonitor({
               step={selectedStep}
               role={definition?.agents.find((agent) => agent.key === selectedKey)?.role ?? null}
               calls={callsByAgent.get(selectedStep.agentKey) ?? []}
+              trades={tradesByAgent.get(selectedStep.agentKey) ?? []}
+              runOver={run !== null && !working}
             />
           ) : (
-            <RunSummary run={run} steps={steps} calls={toolCalls} />
+            <RunSummary
+              run={run}
+              steps={steps}
+              calls={toolCalls}
+              trades={trades}
+              runOver={run !== null && !working}
+            />
           )}
         </div>
       </div>
@@ -193,10 +214,14 @@ function AgentWork({
   step,
   role,
   calls,
+  trades,
+  runOver,
 }: {
   step: TeamRunStep;
   role: string | null;
   calls: TeamRunToolCall[];
+  trades: TeamTrade[];
+  runOver: boolean;
 }) {
   return (
     <>
@@ -218,6 +243,20 @@ function AgentWork({
           </p>
         )}
       </section>
+
+      {/* Above the tool calls, and not folded into them: a call is what the agent asked
+          for, an order is what happened to the account, and the operator watching a team
+          trade is asking the second (specs/terminal-teams, "Złożone zlecenia widać przy
+          agencie, który je złożył"). An agent that placed nothing has no section here —
+          most of them never will. */}
+      {trades.length > 0 && (
+        <section className="flex flex-col gap-1">
+          <h4 className="text-xs uppercase tracking-wide text-ink-faint">Orders</h4>
+          {trades.map((trade) => (
+            <TradeRow key={trade.id} trade={trade} runOver={runOver} />
+          ))}
+        </section>
+      )}
 
       <section className="flex flex-col gap-1">
         <h4 className="text-xs uppercase tracking-wide text-ink-faint">Tools called</h4>
@@ -245,10 +284,14 @@ function RunSummary({
   run,
   steps,
   calls,
+  trades,
+  runOver,
 }: {
   run: TeamRun | null;
   steps: TeamRunStep[];
   calls: TeamRunToolCall[];
+  trades: TeamTrade[];
+  runOver: boolean;
 }) {
   if (run === null) return <p className="text-xs text-ink-muted">Reading the run…</p>;
   const done = steps.filter((step) => step.status === "completed").length;
@@ -263,7 +306,50 @@ function RunSummary({
         <Row label="Tool calls" value={String(calls.length)} />
         {run.finishedAt !== null && <Row label="Finished" value={formatInstant(run.finishedAt)} />}
       </dl>
+
+      {/* The whole run's orders, in the order they were placed. This is what a run stopped
+          by its order limit is read on — the ceiling says how many, and this says which
+          (specs/terminal-teams, "pokazuje złożone dotąd zlecenia"). */}
+      {trades.length > 0 && (
+        <section className="flex flex-col gap-1">
+          <h4 className="text-xs uppercase tracking-wide text-ink-faint">
+            Orders placed ({trades.length})
+          </h4>
+          {trades.map((trade) => (
+            <TradeRow key={trade.id} trade={trade} runOver={runOver} />
+          ))}
+        </section>
+      )}
     </>
+  );
+}
+
+/** One order: what, which way, how much, and what came of it. The size and the level are
+ *  shown as the module wrote them — strings, never rescaled here. */
+function TradeRow({ trade, runOver }: { trade: TeamTrade; runOver: boolean }) {
+  const outcome = outcomeOf(trade, runOver);
+  return (
+    <div className="flex items-baseline justify-between gap-2 text-xs">
+      <span className="text-ink">
+        {trade.symbol ?? trade.toolName}
+        {trade.direction && <span className="text-ink-faint"> {trade.direction}</span>}
+        {trade.size && <span className="text-ink-faint"> ×{trade.size}</span>}
+        {trade.level && <span className="text-ink-faint"> @{trade.level}</span>}
+      </span>
+      <span className={outcome.known ? "text-ink-faint" : "text-warning"}>{outcome.text}</span>
+    </div>
+  );
+}
+
+/** Which ceiling this was, when the sentence says. Absent for anything else — a timeout,
+ *  the operator's own interruption, an agent that failed — where the module's sentence is
+ *  already the whole of what there is to say. */
+function StopHeading({ cause }: { cause: ReturnType<typeof stopCause> }) {
+  if (cause !== "orders" && cause !== "cost") return null;
+  return (
+    <span className="mr-2 font-medium uppercase">
+      {cause === "orders" ? "Order limit" : "Cost limit"}
+    </span>
   );
 }
 

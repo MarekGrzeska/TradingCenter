@@ -7,6 +7,7 @@ function team(role: string): TeamDefinition {
     agents: [{ key: "agent-1", role, prompt: "", guidance: "", modelId: "a-model", tools: [] }],
     dependencies: [],
     limits: { runLimit: null, dailyLimit: null },
+    trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
   };
 }
 

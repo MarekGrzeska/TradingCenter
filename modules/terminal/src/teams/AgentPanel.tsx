@@ -128,6 +128,7 @@ export function AgentPanel({
               />
               <span>
                 <span className="font-medium">{tool.name}</span>
+                <ToolMark readOnly={tool.readOnly} />
                 {tool.description && (
                   <span className="block text-ink-faint">{tool.description}</span>
                 )}
@@ -216,6 +217,31 @@ export function AgentPanel({
         Remove agent
       </button>
     </div>
+  );
+}
+
+/**
+ * What ticking this tool lets the agent do to the account.
+ *
+ * Marked, rather than sorted into two lists: an operator picking tools reads them by what
+ * they do, and splitting the picker would put the one tool that matters at the bottom of
+ * a scroll (`terminal-teams`, "narzędzia zmieniające stan rachunku są odróżnione od
+ * czytających").
+ *
+ * Three states, not two. A tool the server annotates as read-only gets no mark at all —
+ * reading is what a tool does unless somebody says otherwise — while one carrying no
+ * annotation is shown as exactly that. Both of this module's tool servers annotate
+ * everything they publish, so an unmarked-and-unannotated tool means a third server
+ * nobody here has an opinion about (specs/teams-tool-access).
+ */
+function ToolMark({ readOnly }: { readOnly: boolean | null }) {
+  if (readOnly === true) return null;
+  return readOnly === false ? (
+    <span className="ml-1 rounded border border-warning px-1 text-[0.65rem] uppercase text-warning">
+      moves the account
+    </span>
+  ) : (
+    <span className="ml-1 text-[0.65rem] uppercase text-ink-faint">unannotated</span>
   );
 }
 

@@ -1,4 +1,9 @@
-import type { TeamAgent, TeamDefinition, TeamDependency } from "./teamsApi";
+import type {
+  TeamAgent,
+  TeamDefinition,
+  TeamDependency,
+  TeamTradingLimits,
+} from "./teamsApi";
 
 /**
  * Editing a definition, as plain functions over a plain value.
@@ -39,6 +44,10 @@ export function emptyDefinition(modelId: string): TeamDefinition {
     agents: [newAgent("agent-1", modelId)],
     dependencies: [],
     limits: { runLimit: null, dailyLimit: null },
+    // Three empty trading limits, which is a team allowed to trade without one — the
+    // module holds no default and puts no ceiling in for a missing one, so neither does
+    // this (specs/teams-trading, "Każda granica handlowa daje się wyłączyć").
+    trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
   };
 }
 
@@ -77,6 +86,17 @@ export function updateAgent(
       agent.key === key ? { ...agent, ...patch } : agent,
     ),
   };
+}
+
+/** One trading limit changed, the other two left alone. An empty field is `null` — no
+ *  limit — and never a zero: the module refuses a zero outright, because a team that may
+ *  place no orders is a team whose agents carry no write tools, and the two say different
+ *  things. */
+export function setTradingLimit(
+  definition: TeamDefinition,
+  patch: Partial<TeamTradingLimits>,
+): TeamDefinition {
+  return { ...definition, trading: { ...definition.trading, ...patch } };
 }
 
 export function addDependency(

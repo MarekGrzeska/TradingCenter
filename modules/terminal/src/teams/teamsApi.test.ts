@@ -34,6 +34,7 @@ const wireRevision = {
     ],
     edges: [{ from: "agent-1", to: "agent-2" }],
     limits: { run_limit: "0.5", daily_limit: null },
+    trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null },
   },
 };
 
@@ -51,6 +52,7 @@ const definition: TeamDefinition = {
   ],
   dependencies: [{ from: "agent-1", to: "agent-2" }],
   limits: { runLimit: "0.5", dailyLimit: null },
+  trading: { maxOrderSize: "2", ordersPerRun: 3, ordersPerDay: null },
 };
 
 describe("listTeams", () => {
@@ -126,6 +128,7 @@ describe("a revision, both ways", () => {
         ],
         edges: [{ from: "agent-1", to: "agent-2" }],
         limits: { run_limit: "0.5", daily_limit: null },
+        trading: { max_order_size: "2", orders_per_run: 3, orders_per_day: null },
       },
     });
   });
@@ -245,7 +248,26 @@ describe("the layout", () => {
 });
 
 describe("listTools", () => {
-  it("reads what the module announces", async () => {
+  it("reads what the module announces, including which tools move the account", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/tools`, () =>
+        HttpResponse.json([
+          { name: "get_candles", description: "candles", read_only: true },
+          { name: "place_order", description: "an order", read_only: false },
+        ]),
+      ),
+    );
+
+    expect(await api().listTools(new AbortController().signal)).toEqual([
+      { name: "get_candles", description: "candles", readOnly: true },
+      { name: "place_order", description: "an order", readOnly: false },
+    ]);
+  });
+
+  it("keeps an unannotated tool unannotated rather than calling it read-only", async () => {
+    // specs/trading-mcp-tools over this side of the wire: `null` is a third value. A tool
+    // nobody annotated is one nobody said anything about, and promoting it to "reads
+    // only" here would be this terminal holding an opinion about somebody else's tool.
     server.use(
       http.get(`${HTTP_BASE}/tools`, () =>
         HttpResponse.json([{ name: "get_candles", description: "candles" }]),
@@ -253,7 +275,7 @@ describe("listTools", () => {
     );
 
     expect(await api().listTools(new AbortController().signal)).toEqual([
-      { name: "get_candles", description: "candles" },
+      { name: "get_candles", description: "candles", readOnly: null },
     ]);
   });
 
@@ -356,6 +378,51 @@ describe("runs", () => {
     expect(seen).toEqual([
       { kind: "snapshot", run: expect.objectContaining({ id: 7 }), steps: [] },
       { kind: "stepStarted", agentKey: "agent-1" },
+    ]);
+  });
+
+  it("reads what the run did to the account, each row naming its own agent", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/runs/7/trades`, () =>
+        HttpResponse.json([
+          {
+            id: 4,
+            run_id: 7,
+            run_step_id: 2,
+            agent_key: "agent-2",
+            tool_name: "place_order",
+            symbol: "US100",
+            direction: "BUY",
+            size: "1.5",
+            level: null,
+            status: "settled",
+            result_status: "FILLED",
+            provider_order_id: "o-1",
+            reference: "r-1",
+            created_at: "2026-08-16T10:01:00Z",
+            settled_at: "2026-08-16T10:01:02Z",
+          },
+        ]),
+      ),
+    );
+
+    expect(await api().runTrades(7, new AbortController().signal)).toEqual([
+      {
+        id: 4,
+        runId: 7,
+        agentKey: "agent-2",
+        toolName: "place_order",
+        symbol: "US100",
+        direction: "BUY",
+        size: "1.5",
+        level: null,
+        status: "settled",
+        resultStatus: "FILLED",
+        providerOrderId: "o-1",
+        reference: "r-1",
+        createdAt: Date.parse("2026-08-16T10:01:00Z") / 1000,
+        settledAt: Date.parse("2026-08-16T10:01:02Z") / 1000,
+      },
     ]);
   });
 });
