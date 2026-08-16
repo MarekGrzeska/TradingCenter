@@ -31,6 +31,7 @@ from ..contract import AgentDefinition, TeamDefinition
 from ..models_catalogue import ModelCatalogue
 from ..provider import ModelProvider
 from ..tools import ToolAccessError, ToolPlan, ToolServer, plan_tools
+from .cost import CostGuard, CostLimitReached, limit_from
 from .graph import AgentFailed, compile_team
 from .loop import RecordedCall, briefing_for, run_agent
 
@@ -161,6 +162,9 @@ async def execute_run(
             status, reason = "failed", f"tool access: {err}"
             return
 
+        # One guard for the whole run, shared by every agent in it: the ceiling is on what
+        # the run spends, not on what any one role does (specs/teams-usage).
+        guard = CostGuard(limit_from(definition.limits.run_limit))
         graph = compile_team(
             definition,
             _agent_runner(
@@ -171,6 +175,7 @@ async def execute_run(
                 tool_server=tool_server,
                 catalogue=catalogue,
                 registry=registry,
+                guard=guard,
             ),
         )
         try:
@@ -179,6 +184,13 @@ async def execute_run(
             )
         except TimeoutError:
             status, reason = "failed", _TIME_LIMIT_REASON
+            return
+        except CostLimitReached as err:
+            # Failed, and the reason names the number — an operator whose run stopped over
+            # money has one question, and it is "how much of what" (specs/teams-usage,
+            # "statusem nazywającym koszt jako przyczynę"). Everything written up to here
+            # stays: a run stopped by its budget is a result like any other.
+            status, reason = "failed", str(err)
             return
         except AgentFailed as err:
             status, reason = "failed", str(err)
@@ -239,6 +251,7 @@ def _agent_runner(
     tool_server: ToolServer,
     catalogue: ModelCatalogue,
     registry: RunRegistry,
+    guard: CostGuard,
 ):
     async def run_one(agent: AgentDefinition, given: Sequence[tuple[str, str]]) -> str:
         entry = catalogue.get(agent.model_id)
@@ -262,22 +275,15 @@ def _agent_runner(
                 )
             registry.publish(run_id, ToolCalled(agent_key=agent.key, call=call))
 
-        work = await run_agent(
-            agent,
-            model=entry.model,
-            briefing=briefing_for(agent, given),
-            provider=provider,
-            tools=plan.for_agent(agent.key),
-            call_tool=tool_server.call,
-            on_tool_call=on_tool_call,
-        )
+        async def before_model_call() -> None:
+            guard.check()
 
-        async with pool.acquire() as conn:
-            # The usage rows first: an agent whose work is about to be marked failed was
-            # still billed for every call it made, and a row written after the step's
-            # status would be lost if the run stopped in between.
-            for usage in work.usages:
-                await store.record_usage(
+        async def on_model_call(usage) -> None:
+            """One row per model call, written as the call finishes rather than when the
+            agent does — which is what makes the guard's own total current enough to stop
+            the *next* call (specs/teams-usage)."""
+            async with pool.acquire() as conn:
+                row = await store.record_usage(
                     conn,
                     run_id=run_id,
                     run_step_id=step["id"],
@@ -289,6 +295,21 @@ def _agent_runner(
                     input_rate_per_1m=entry.input_rate_per_1m,
                     output_rate_per_1m=entry.output_rate_per_1m,
                 )
+            guard.add(row["cost"])
+
+        work = await run_agent(
+            agent,
+            model=entry.model,
+            briefing=briefing_for(agent, given),
+            provider=provider,
+            tools=plan.for_agent(agent.key),
+            call_tool=tool_server.call,
+            on_tool_call=on_tool_call,
+            before_model_call=before_model_call,
+            on_model_call=on_model_call,
+        )
+
+        async with pool.acquire() as conn:
             if work.failed:
                 await store.finish_step(
                     conn, step_id=step["id"], status="failed", output=None, rounds=work.rounds

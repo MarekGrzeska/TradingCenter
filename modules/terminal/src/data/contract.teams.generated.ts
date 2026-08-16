@@ -284,6 +284,31 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Usage
+         * @description Both filters are optional and combine: no filter is everything this operator ever
+         *     spent, `run_id` is one run's own bill, `team_id` is one team across its revisions.
+         *
+         *     A run belonging to somebody else returns nothing rather than 404 — this is an
+         *     aggregate, and the difference between "no rows" and "not yours" is exactly what
+         *     specs/teams-browser-access says a stranger must not be able to tell.
+         */
+        get: operations["get_usage_usage_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -500,6 +525,33 @@ export interface components {
             run_step_id: number;
             /** Tool Name */
             tool_name: string;
+        };
+        /** UsageAggregateOut */
+        UsageAggregateOut: {
+            /** Cost */
+            cost: string;
+            /** Input Tokens */
+            input_tokens: number;
+            /** Key */
+            key: string;
+            /** Output Tokens */
+            output_tokens: number;
+            /** Unknown Count */
+            unknown_count: number;
+        };
+        /**
+         * UsageSummaryOut
+         * @description specs/teams-usage, "Odczyt zużycia w rozbiciu na role" — `by_agent` is the read
+         *     that requirement is for; `by_model` is agent's own `UsageSummaryOut` precedent,
+         *     kept because a run can genuinely mix cheap and expensive models across agents.
+         */
+        UsageSummaryOut: {
+            /** By Agent */
+            by_agent: components["schemas"]["UsageAggregateOut"][];
+            /** By Model */
+            by_model: components["schemas"]["UsageAggregateOut"][];
+            /** Total Cost */
+            total_cost: string;
         };
         /** ValidationError */
         ValidationError: {
@@ -980,6 +1032,38 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["RunOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_usage_usage_get: {
+        parameters: {
+            query?: {
+                run_id?: number | null;
+                team_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UsageSummaryOut"];
                 };
             };
             /** @description Validation Error */

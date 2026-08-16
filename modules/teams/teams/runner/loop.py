@@ -87,6 +87,11 @@ class AgentWork:
 
 ToolCaller = Callable[[str, dict[str, Any]], Awaitable[ToolOutcome]]
 OnToolCall = Callable[[RecordedCall], Awaitable[None]]
+# Called before each model call and allowed to raise — the cost ceiling's only way in
+# (`cost.py`). Called after each one with what the provider reported, which is where the
+# usage row is written.
+BeforeModelCall = Callable[[], Awaitable[None]]
+OnModelCall = Callable[[UsageReport | None], Awaitable[None]]
 
 
 def system_prompt_for(agent: AgentDefinition, *, has_tools: bool) -> str:
@@ -137,18 +142,29 @@ async def run_agent(
     tools: Sequence[ToolDescriptor],
     call_tool: ToolCaller,
     on_tool_call: OnToolCall,
+    before_model_call: BeforeModelCall | None = None,
+    on_model_call: OnModelCall | None = None,
 ) -> AgentWork:
     """Model → tools → model, until the model stops asking or the ceiling is reached.
 
     Never raises for a broken provider or a broken tool: both come back inside `AgentWork`,
     because the text an agent produced before something broke is part of the trace this
     module exists to keep.
+
+    The two hooks are the exception, and they are deliberately outside that guarantee.
+    `before_model_call` is what a cost ceiling raises from — a run stopped for money did
+    not fail, and the difference has to reach the status (specs/teams-usage). `on_model_call`
+    is where the usage row is written, once per call rather than once per agent: a limit
+    checked against a total that only updates when an agent finishes would let a six-round
+    agent spend six rounds past it.
     """
     work = AgentWork()
     system_prompt = system_prompt_for(agent, has_tools=bool(tools))
     rounds: list[ToolRound] = []
 
     while True:
+        if before_model_call is not None:
+            await before_model_call()
         at_ceiling = work.rounds >= ROUND_CEILING
         # Past the ceiling the model is called with no tools at all, rather than with
         # tools it is told not to use. A model holding a tool it may not call is being
@@ -179,11 +195,17 @@ async def run_agent(
             log.exception("the model call failed for agent %s after %d round(s)", agent.key, work.rounds)
             work.text += "".join(parts)
             work.usages.append(usage)
+            if on_model_call is not None:
+                # The call happened and was billed, however it ended — a row written only
+                # for calls that succeeded would under-report the bill (specs/teams-usage).
+                await on_model_call(usage)
             work.failed = True
             return work
 
         work.text += "".join(parts)
         work.usages.append(usage)
+        if on_model_call is not None:
+            await on_model_call(usage)
 
         if not requests or at_ceiling:
             # At the ceiling the model was offered nothing, so anything it asked for could

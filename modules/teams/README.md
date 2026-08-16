@@ -11,8 +11,9 @@ in `openspec/changes/add-teams-module/` (`proposal.md`, `design.md`, the `teams-
 the module starts, authenticates the same way `agent` and `market-data` do, migrates its
 own database, serves the **catalogue** — teams, their append-only revisions, and retiring
 one — and **runs a team**: agents work in the order their dependencies allow, their trace
-is written as it happens, and progress is readable while it happens. What is not here yet
-is the cost ceiling that stops a run, and the terminal's own canvas.
+is written as it happens, progress is readable while it happens, and a run stops when it
+reaches the cost its definition allows it. What is not here yet is the terminal's own
+canvas.
 
 ## What
 
@@ -42,6 +43,8 @@ is the cost ceiling that stops a run, and the terminal's own canvas.
 - `routers/catalogue.py` — `/teams`, its revisions, and retiring a team.
 - `routers/runs.py` — starting a run, reading its trace, watching it (`/runs/{id}/events`,
   server-sent), and interrupting it.
+- `routers/usage.py` — `GET /usage`, broken down by agent and by model. Every number is a
+  sum over costs written when their calls happened; nothing is recomputed at read time.
 - `provider.py` — OpenAI, streamed, and the only place langchain's message classes exist.
   A twin of `agent`'s with one shape changed: a call carries a *briefing* built from an
   agent's predecessors, not a conversation, because a team has no transcript to replay.
@@ -49,7 +52,9 @@ is the cost ceiling that stops a run, and the terminal's own canvas.
   definition to a LangGraph — one node per agent, the operator's edges, and the narrowing
   that gives each agent only its predecessors' work. `loop.py` is one agent's own
   model↔tools exchange under a round ceiling. `engine.py` is where the database, the
-  statuses, the time limit and whoever is watching meet.
+  statuses, the time limit and whoever is watching meet. `cost.py` holds the two ceilings:
+  the run's, checked before every model call, and the team's daily one, checked before a
+  run starts — a run refused halfway is a run that already spent.
 - `tools/` — the session with `market-mcp` (`client.py`, the only place `mcp` is
   imported) and who gets which tools (`assignment.py`). Both refusals that stop a run
   before an agent is called live in the second: a server that cannot be asked, and a tool

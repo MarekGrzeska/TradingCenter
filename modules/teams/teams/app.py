@@ -2,9 +2,9 @@
 
 Assembly only, same split as `agent/app.py` and `market_data/app.py`: the lifespan and
 the routers mounted onto it. The lifespan brings the module's own database to the
-revision it was built for and puts what the routes read — the pool, the model catalogue,
-the tool server's announcement — on `app.state`; the run and tool-server routers arrive
-in later changes, each mounted here the same way.
+revision it was built for, closes any run an earlier process left open, and puts what the
+routes read — the pool, the model catalogue, the tool session, the model provider and the
+registry of running runs — on `app.state`.
 """
 
 from __future__ import annotations
@@ -31,7 +31,7 @@ from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
 from .openapi import require_response_fields
 from .provider import OpenAIProvider
-from .routers import catalogue, models, runs
+from .routers import catalogue, models, runs, usage
 from .runner import RunRegistry
 from .tools import ToolServer
 
@@ -144,6 +144,7 @@ app.openapi = _openapi_with_required_fields  # type: ignore[method-assign]
 app.include_router(catalogue.router)
 app.include_router(models.router)
 app.include_router(runs.router)
+app.include_router(usage.router)
 
 
 @app.get("/health")

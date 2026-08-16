@@ -16,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
@@ -24,6 +25,7 @@ from .. import store
 from ..auth import current_principal
 from ..contract import RunOut, RunStepOut, TeamRevisionOut, ToolCallOut
 from ..runner import RunFinished, StepFinished, StepStarted, ToolCalled, execute_run
+from ..runner.cost import DailyCostLimitReached, limit_from
 from ..validation import DefinitionRefused, check_runnable
 
 log = logging.getLogger(__name__)
@@ -62,6 +64,20 @@ async def start_run(
         check_runnable(definition, model_ids=request.app.state.catalogue.ids())
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
+
+    # The daily ceiling, before anything is created — a run refused halfway is a run that
+    # already spent (specs/teams-usage, "Zespół wyczerpał granicę dobową"). Checked against
+    # what the team spent since midnight UTC: the module keeps one clock, and a limit that
+    # moved with the operator's own timezone would be a different limit in summer.
+    daily_limit = limit_from(definition.limits.daily_limit)
+    if daily_limit is not None:
+        midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+        async with pool.acquire() as conn:
+            spent = await store.team_cost_since(
+                conn, team_id=team_id, owner_principal=owner, since=midnight
+            )
+        if spent >= daily_limit:
+            raise HTTPException(422, detail=str(DailyCostLimitReached(spent, daily_limit)))
 
     async with pool.acquire() as conn:
         run, _steps = await store.create_run(
