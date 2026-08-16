@@ -20,28 +20,36 @@ class FakeConnection:
         return [{"version_num": version} for version in self._versions]
 
 
-def test_expected_heads_is_empty_before_any_migration_exists() -> None:
-    # Not a broken state: zero migrations is a valid "at head" the same way a directory
-    # with nothing in it has nothing missing from it. The next change adds the first
-    # revision, and this assertion is what will need to change alongside it.
-    assert expected_heads() == set()
+def test_the_expected_head_is_read_from_the_migrations_beside_the_package() -> None:
+    # Not asserted against a literal revision id: that would have to be edited by every
+    # migration, and the thing worth proving is that the directory is found at all.
+    assert len(expected_heads()) == 1
 
 
-async def test_a_never_migrated_database_matches_the_still_empty_expectation() -> None:
-    # `applied_heads` reads "no revision at all" the same way whether the table is
-    # missing or the image expects nothing — the two are indistinguishable and both
-    # correct here, since nothing has been migrated on either side yet.
-    await verify(FakeConnection(None))  # type: ignore[arg-type]
+async def test_a_database_at_the_expected_head_starts() -> None:
+    head = next(iter(expected_heads()))
+
+    await verify(FakeConnection([head]))  # type: ignore[arg-type]
 
 
-async def test_a_database_carrying_a_revision_this_image_does_not_know_refuses() -> None:
-    # The case that will matter once a migration exists: a database ahead of the image,
-    # here simulated as a database carrying anything at all while the image expects
-    # nothing.
+async def test_a_database_one_migration_behind_refuses_to_start() -> None:
     with pytest.raises(SchemaMismatch) as err:
+        await verify(FakeConnection(["0002"]))  # type: ignore[arg-type]
+
+    assert "0002" in str(err.value)
+    assert next(iter(expected_heads())) in str(err.value)
+
+
+async def test_a_database_ahead_of_the_image_refuses_too() -> None:
+    with pytest.raises(SchemaMismatch):
         await verify(FakeConnection(["9999_from_a_newer_image"]))  # type: ignore[arg-type]
 
-    assert "9999_from_a_newer_image" in str(err.value)
+
+async def test_a_database_that_was_never_migrated_says_so() -> None:
+    with pytest.raises(SchemaMismatch) as err:
+        await verify(FakeConnection(None))  # type: ignore[arg-type]
+
+    assert "never migrated" in str(err.value)
 
 
 async def test_a_missing_version_table_reads_as_no_revision_rather_than_an_error() -> None:
@@ -51,6 +59,5 @@ async def test_a_missing_version_table_reads_as_no_revision_rather_than_an_error
 @pytest.mark.db
 async def test_the_migrated_database_the_tests_run_against_passes(db: asyncpg.Connection) -> None:
     # The fixture applies the migrations with alembic itself, so this is the real pairing
-    # a deployment has: this image's `migrations/` against a database they were run on —
-    # today, both sides empty.
+    # a deployment has: this image's `migrations/` against a database they were run on.
     await verify(db)
