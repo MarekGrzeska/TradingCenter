@@ -173,6 +173,97 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/schedules/{schedule_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Schedule */
+        get: operations["get_schedule_schedules__schedule_id__get"];
+        /** Update Schedule */
+        put: operations["update_schedule_schedules__schedule_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/schedules/{schedule_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disable Schedule */
+        post: operations["disable_schedule_schedules__schedule_id__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/schedules/{schedule_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable Schedule */
+        post: operations["enable_schedule_schedules__schedule_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/schedules/{schedule_id}/fires": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Schedule Fires */
+        get: operations["get_schedule_fires_schedules__schedule_id__fires_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/schedules/{schedule_id}/next-fires": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Next Fires
+         * @description specs/terminal-teams-schedules, "Terminal nie liczy czasu wyzwolenia sam" — every
+         *     time in the answer is rolled forward from now by this module, not the row's stored
+         *     `next_fire_at`, which only reflects the last claim.
+         */
+        get: operations["next_fires_schedules__schedule_id__next_fires_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -340,6 +431,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/schedules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Schedules */
+        get: operations["list_schedules_teams__team_id__schedules_get"];
+        put?: never;
+        /** Create Schedule */
+        post: operations["create_schedule_teams__team_id__schedules_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/triggers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Triggers */
+        get: operations["list_triggers_teams__team_id__triggers_get"];
+        put?: never;
+        /** Create Trigger */
+        post: operations["create_trigger_teams__team_id__triggers_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/tools": {
         parameters: {
             query?: never;
@@ -349,6 +476,75 @@ export interface paths {
         };
         /** List Tools */
         get: operations["list_tools_tools_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/triggers/{trigger_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Trigger */
+        get: operations["get_trigger_triggers__trigger_id__get"];
+        /** Update Trigger */
+        put: operations["update_trigger_triggers__trigger_id__put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/triggers/{trigger_id}/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Disable Trigger */
+        post: operations["disable_trigger_triggers__trigger_id__disable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/triggers/{trigger_id}/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Enable Trigger */
+        post: operations["enable_trigger_triggers__trigger_id__enable_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/triggers/{trigger_id}/fires": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Trigger Fires */
+        get: operations["get_trigger_fires_triggers__trigger_id__fires_get"];
         put?: never;
         post?: never;
         delete?: never;
@@ -479,6 +675,18 @@ export interface components {
             /** Output Rate Per 1M */
             output_rate_per_1m: string;
         };
+        /**
+         * NextFiresOut
+         * @description specs/terminal-teams-schedules, "Terminal nie liczy czasu wyzwolenia sam" — the
+         *     module's own answer to "when does this schedule fire next", computed fresh from
+         *     `cron_expression` rather than read off the row's own `next_fire_at` — which reflects
+         *     the last *claim*, not a live forecast, and goes stale the moment a schedule is
+         *     disabled.
+         */
+        NextFiresOut: {
+            /** Times */
+            times: string[];
+        };
         /** RunOut */
         RunOut: {
             /**
@@ -530,6 +738,90 @@ export interface components {
         /** SaveRevisionIn */
         SaveRevisionIn: {
             definition: components["schemas"]["TeamDefinition"];
+        };
+        /**
+         * ScheduleFireOut
+         * @description One fire attempt from either source, including one that started nothing
+         *     (specs/teams-schedules, "Wyzwolenie bez przebiegu zostawia zapisany powód"). Exactly
+         *     one of `schedule_id`/`trigger_id` is set, mirroring the row's own CHECK constraint.
+         */
+        ScheduleFireOut: {
+            /**
+             * Fired At
+             * Format: date-time
+             */
+            fired_at: string;
+            /** Id */
+            id: number;
+            /** Outcome */
+            outcome: string;
+            /** Reason */
+            reason: string | null;
+            /** Run Id */
+            run_id: number | null;
+            /** Schedule Id */
+            schedule_id: number | null;
+            /** Skipped Count */
+            skipped_count: number;
+            /** Trigger Id */
+            trigger_id: number | null;
+        };
+        /**
+         * ScheduleIn
+         * @description What an operator submits to create or edit a schedule.
+         */
+        ScheduleIn: {
+            /** Cron Expression */
+            cron_expression: string;
+            /** Pinned Revision Id */
+            pinned_revision_id?: number | null;
+            /**
+             * Revision Mode
+             * @default pinned
+             * @enum {string}
+             */
+            revision_mode: "pinned" | "latest";
+            /**
+             * Unattended Ack
+             * @default false
+             */
+            unattended_ack: boolean;
+        };
+        /** ScheduleOut */
+        ScheduleOut: {
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Cron Expression */
+            cron_expression: string;
+            /** Disabled Reason */
+            disabled_reason: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Id */
+            id: number;
+            /**
+             * Next Fire At
+             * Format: date-time
+             */
+            next_fire_at: string;
+            /** Pinned Revision Id */
+            pinned_revision_id: number | null;
+            /** Revision Mode */
+            revision_mode: string;
+            /** Team Id */
+            team_id: number;
+            /** Unattended Ack */
+            unattended_ack: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /**
          * TeamDefinition
@@ -650,6 +942,110 @@ export interface components {
             description: string;
             /** Name */
             name: string;
+        };
+        /**
+         * TriggerIn
+         * @description A market condition, expressed as a call to a tool this module already has a
+         *     session for (specs/teams-triggers, "Warunek jest czytany narzędziami serwera
+         *     narzędzi") — never a locally computed indicator. `field_path` names the value inside
+         *     that call's result to compare; `threshold` is a string for the same reason every
+         *     other number on this contract that a caller must not rescale is (see `CostLimits`).
+         */
+        TriggerIn: {
+            /** Arguments */
+            arguments?: {
+                [key: string]: unknown;
+            };
+            /**
+             * Comparison
+             * @enum {string}
+             */
+            comparison: "gt" | "gte" | "lt" | "lte" | "eq";
+            /**
+             * Cooldown Seconds
+             * @default 900
+             */
+            cooldown_seconds: number;
+            /** Field Path */
+            field_path: string;
+            /** Pinned Revision Id */
+            pinned_revision_id?: number | null;
+            /**
+             * Poll Interval Seconds
+             * @default 300
+             */
+            poll_interval_seconds: number;
+            /**
+             * Revision Mode
+             * @default pinned
+             * @enum {string}
+             */
+            revision_mode: "pinned" | "latest";
+            /** Threshold */
+            threshold: string;
+            /** Tool Name */
+            tool_name: string;
+            /**
+             * Unattended Ack
+             * @default false
+             */
+            unattended_ack: boolean;
+        };
+        /** TriggerOut */
+        TriggerOut: {
+            /** Arguments */
+            arguments: {
+                [key: string]: unknown;
+            };
+            /** Comparison */
+            comparison: string;
+            /** Consecutive Failures */
+            consecutive_failures: number;
+            /** Cooldown Seconds */
+            cooldown_seconds: number;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Disabled Reason */
+            disabled_reason: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /** Field Path */
+            field_path: string;
+            /** Id */
+            id: number;
+            /** Last Checked At */
+            last_checked_at: string | null;
+            /** Last Fired At */
+            last_fired_at: string | null;
+            /** Last Result */
+            last_result: boolean | null;
+            /**
+             * Next Check At
+             * Format: date-time
+             */
+            next_check_at: string;
+            /** Pinned Revision Id */
+            pinned_revision_id: number | null;
+            /** Poll Interval Seconds */
+            poll_interval_seconds: number;
+            /** Revision Mode */
+            revision_mode: string;
+            /** Team Id */
+            team_id: number;
+            /** Threshold */
+            threshold: string;
+            /** Tool Name */
+            tool_name: string;
+            /** Unattended Ack */
+            unattended_ack: boolean;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
         };
         /** UsageAggregateOut */
         UsageAggregateOut: {
@@ -915,6 +1311,198 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolCallOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_schedule_schedules__schedule_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_schedule_schedules__schedule_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_schedule_schedules__schedule_id__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_schedule_schedules__schedule_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_schedule_fires_schedules__schedule_id__fires_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleFireOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    next_fires_schedules__schedule_id__next_fires_get: {
+        parameters: {
+            query?: {
+                count?: number;
+            };
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NextFiresOut"];
                 };
             };
             /** @description Validation Error */
@@ -1267,6 +1855,138 @@ export interface operations {
             };
         };
     };
+    list_schedules_teams__team_id__schedules_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_schedule_teams__team_id__schedules_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ScheduleIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_triggers_teams__team_id__triggers_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_trigger_teams__team_id__triggers_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_tools_tools_get: {
         parameters: {
             query?: never;
@@ -1283,6 +2003,165 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ToolOut"][];
+                };
+            };
+        };
+    };
+    get_trigger_triggers__trigger_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_trigger_triggers__trigger_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TriggerIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    disable_trigger_triggers__trigger_id__disable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    enable_trigger_triggers__trigger_id__enable_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TriggerOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_trigger_fires_triggers__trigger_id__fires_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScheduleFireOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
