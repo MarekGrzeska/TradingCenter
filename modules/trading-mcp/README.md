@@ -28,9 +28,18 @@ to mean something (specs/trading-mcp-transport).
   gateway's answer.
 - `network_identity.py` — a deliberate twin of `market_mcp`'s file of the same name:
   who may reach this module over the network, and the one exempt path (`/health`).
-- `server.py` / `__main__.py` — the FastMCP instance and its one transport. No tools
-  are registered yet; the account-read and order-write tools land with the next
-  group of this change.
+- `server.py` / `__main__.py` — the FastMCP instance and its one transport.
+- `tools/account.py` — `get_positions`, `get_working_orders`, `get_balance`: reads,
+  annotated `readOnlyHint=True`.
+- `tools/orders.py` — `place_order`, `close_position`, `amend_stops`,
+  `cancel_working_order`: writes, annotated as changing state. Every one re-checks
+  the demo environment before touching the gateway and is never retried by this
+  module on its own failure.
+- `tools/_shared.py` — the two seams every tool goes through: `_read` and `_write`,
+  which turn a `GatewayClient` outcome into a refusal, an access failure, or a
+  settled/unsettled `OrderResultOut`. A provider `REJECTED` is a refusal naming the
+  reason; a `PENDING` settlement is `outcome="unsettled"`, carried through rather
+  than resolved.
 
 ## Running
 

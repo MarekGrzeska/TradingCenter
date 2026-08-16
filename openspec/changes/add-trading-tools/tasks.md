@@ -34,19 +34,36 @@
 
 ## 3. Zestaw narzędzi
 
-- [ ] 3.1 Narzędzia czytające rachunek: pozycje, zlecenia oczekujące, saldo
-- [ ] 3.2 Narzędzia zapisujące: złożenie zlecenia MARKET/LIMIT/STOP, zamknięcie pozycji, zmiana stopów, anulowanie zlecenia oczekującego
-- [ ] 3.3 Adnotacje MCP zgodne z tym, co narzędzie robi — zapisujące oznaczone jako zmieniające stan
-- [ ] 3.4 Odmowy przed dotknięciem rachunku: brak poziomu przy LIMIT/STOP, nieznany albo niehandlowalny symbol
-- [ ] 3.5 Opis zestawu wskazujący archiwum jako miejsce pytań o rynek; brak narzędzi o cenach i świecach
-- [ ] 3.6 Testy: lista narzędzi z adnotacjami, każda odmowa z 3.4, brak narzędzia rynkowego w zestawie
+- [x] 3.1 Narzędzia czytające rachunek: pozycje, zlecenia oczekujące, saldo
+- [x] 3.2 Narzędzia zapisujące: złożenie zlecenia MARKET/LIMIT/STOP, zamknięcie pozycji, zmiana stopów, anulowanie zlecenia oczekującego
+- [x] 3.3 Adnotacje MCP zgodne z tym, co narzędzie robi — zapisujące oznaczone jako zmieniające stan
+- [x] 3.4 Odmowy przed dotknięciem rachunku: brak poziomu przy LIMIT/STOP, nieznany albo niehandlowalny symbol
+- [x] 3.5 Opis zestawu wskazujący archiwum jako miejsce pytań o rynek; brak narzędzi o cenach i świecach
+- [x] 3.6 Testy: lista narzędzi z adnotacjami, każda odmowa z 3.4, brak narzędzia rynkowego w zestawie
+
+  `amend_stops` dostał dwie dodatkowe flagi (`clear_stop_loss`, `clear_take_profit`)
+  wobec gołego tri-state z `UpdatePositionRequest` — model dostający jawny parametr
+  do wyczyszczenia stopu radzi sobie lepiej niż model, który ma pominąć pole w
+  JSON-ie. `_shared.py` niesie oba narzędzia (`_read`, `_write`), nie każde
+  osobno — to jest jedyne miejsce tłumaczące `GatewayError` na `ToolRefusal`, więc
+  ma być jedno.
+
+  Nieznany symbol nie dostał osobnego sprawdzenia przed wysłaniem — provider
+  odpowiada `REJECTED` z powodem, a `_write` zamienia to w odmowę zanim rewizja
+  zobaczy cokolwiek jako wykonane; osobna walidacja duplikowałaby to, co gateway już
+  robi, i mogłaby się z nim rozjechać.
 
 ## 4. Wynik zlecenia
 
-- [ ] 4.1 Mapowanie wyniku gatewaya na wynik narzędzia — rozliczony albo jawnie nierozliczony z referencją
-- [ ] 4.2 Odrzucenie providera jako wynik odrzucony z jego powodem, nie jako awaria
-- [ ] 4.3 Awaria dostępu jako wynik nazywający nieznany skutek
-- [ ] 4.4 Testy: nierozliczone potwierdzenie nie jest raportowane jako wykonanie; awaria nie jest raportowana jako odrzucenie
+- [x] 4.1 Mapowanie wyniku gatewaya na wynik narzędzia — rozliczony albo jawnie nierozliczony z referencją
+- [x] 4.2 Odrzucenie providera jako wynik odrzucony z jego powodem, nie jako awaria
+- [x] 4.3 Awaria dostępu jako wynik nazywający nieznany skutek
+- [x] 4.4 Testy: nierozliczone potwierdzenie nie jest raportowane jako wykonanie; awaria nie jest raportowana jako odrzucenie
+
+  Jeden podział doszedł wobec design.md, warty odnotowania: `5xx` na zapisie trafia
+  do awarii dostępu, nie do odmowy — inaczej niż `4xx`, `5xx` może zdarzyć się już
+  po tym, jak provider zobaczył żądanie, więc tylko `4xx` (walidacja gatewaya
+  zatrzymana przed providerem) jest bezpieczną odmową „nic się nie zmieniło".
 
 ## 5. Dwa serwery narzędzi w `teams`
 
