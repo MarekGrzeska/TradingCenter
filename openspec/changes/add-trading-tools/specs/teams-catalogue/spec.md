@@ -1,21 +1,26 @@
 ## ADDED Requirements
 
-### Requirement: Rewizja przypisująca narzędzie zapisujące MUST nieść granice handlowe
+### Requirement: Granice handlowe są wyborem operatora, nie warunkiem zapisu
 
-Zapis rewizji, w której któremukolwiek agentowi przypisano narzędzie zmieniające stan
-rachunku, MUST zostać odrzucony, gdy definicja nie niesie granic handlowych. Odmowa MUST
-nazywać agenta i brakującą granicę.
+Zapis rewizji MUST NOT zostać odrzucony z powodu pominiętych granic handlowych — także
+wtedy, gdy któremuś agentowi przypisano narzędzie zmieniające stan rachunku. Moduł
+MUST NOT dopisać do definicji granicy, której operator nie ustawił.
 
-Granice kosztu wolno pominąć — przebieg bez nich najwyżej wyda więcej, niż operator zamierzał,
-i widać to na rachunku po fakcie. Zlecenie nie ma tej właściwości, więc jego granica nie jest
-polem opcjonalnym w tej samej definicji, w której komuś dano narzędzie do jego złożenia.
+Rozważano regułę odwrotną — „narzędzie zapisujące wymaga granicy" — i została odrzucona.
+Zespół handlujący całym kapitałem jest eksperymentem, który operator ma prawo
+przeprowadzić, a moduł, który odmawia go zapisać, decyduje za operatora o zakresie jego
+własnego doświadczenia. Nieodwracalnemu skutkowi zapobiega tu konto demonstracyjne
+wymuszone u gatewaya (`trading-mcp-upstream-access`, "Moduł pracuje wyłącznie na rachunku
+demonstracyjnym"), którego żadne ustawienie nie wyłącza — i to jest granica, której nie ma
+prawa przesunąć nikt, w odróżnieniu od granic z `teams-trading`, które operator ustawia
+sam.
 
 #### Scenario: Zapis zespołu z narzędziem zapisującym i bez granic
 
 - **WHEN** operator zapisuje rewizję przypisującą agentowi narzędzie zmieniające stan
   rachunku, bez ustawionych granic handlowych
-- **THEN** zapis zostaje odrzucony komunikatem nazywającym agenta i brakującą granicę
-- **AND** poprzednia rewizja pozostaje bez zmian
+- **THEN** zapis zostaje przyjęty
+- **AND** rewizja niesie brak granic, a nie granice podstawione przez moduł
 
 #### Scenario: Zapis zespołu bez narzędzi zapisujących
 

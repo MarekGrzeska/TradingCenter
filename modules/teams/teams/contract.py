@@ -155,14 +155,76 @@ class CostLimits(BaseModel):
         return str(parsed)
 
 
+class TradingLimits(BaseModel):
+    """What a revision allows its agents to do to the account — specs/teams-trading.
+
+    **Every one of the three is optional, and an omitted one means no limit at all.** The
+    module substitutes nothing and holds no ceiling of its own in code: a team the
+    operator deliberately lets trade with everything it has is an experiment they are
+    entitled to run, and a module refusing to save it would be making that call for them
+    (specs/teams-trading, "Każda granica handlowa daje się wyłączyć, a moduł żadnej nie
+    narzuca").
+
+    What is *not* negotiable lives a module away: `trading-mcp` refuses to start against
+    anything but the demo account, and no setting here or there turns that off
+    (specs/trading-mcp-upstream-access). That is the split — the irreversible thing is
+    fixed, the operator's own budget is theirs.
+
+    `max_order_size` is a string for the same reason every cost on this wire is: it is
+    compared, never recomputed, and a string round-trips exactly.
+    """
+
+    max_order_size: str | None = Field(
+        default=None, description="largest size one order may carry; null means no limit"
+    )
+    orders_per_run: int | None = Field(
+        default=None, description="how many orders one run may place; null means no limit"
+    )
+    orders_per_day: int | None = Field(
+        default=None,
+        description="how many orders this team may place per UTC day; null means no limit",
+    )
+
+    @field_validator("max_order_size")
+    @classmethod
+    def _positive_decimal(cls, value: str | None, info: ValidationInfo) -> str | None:
+        if value is None:
+            return None
+        try:
+            parsed = Decimal(value)
+        except InvalidOperation as err:
+            raise ValueError(f"{info.field_name} is not a number: {value!r}") from err
+        if parsed <= 0:
+            raise ValueError(f"{info.field_name} must be positive, got {value}")
+        return str(parsed)
+
+    @field_validator("orders_per_run", "orders_per_day")
+    @classmethod
+    def _positive_count(cls, value: int | None, info: ValidationInfo) -> int | None:
+        # Zero is refused rather than read as "none allowed": a team that may place no
+        # orders is one whose agents should carry no write tools, and the two are
+        # different statements. There is no upper bound — see the class docstring.
+        if value is not None and value <= 0:
+            raise ValueError(f"{info.field_name} must be positive, got {value}")
+        return value
+
+
 class TeamDefinition(BaseModel):
     """The whole of what a team revision carries — every agent, every dependency between
-    them, and the cost limits a run against this revision must respect. One immutable
-    blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie zmienia")."""
+    them, and the cost and trading limits a run against this revision must respect. One
+    immutable blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie
+    zmienia").
+
+    `trading` defaults to an empty `TradingLimits`, which is what every revision saved
+    before this field existed reads back as — and it means the same thing there as it
+    does for a new one: no limit. Nothing about an old revision changes by being read
+    (specs/teams-catalogue, "Rewizja z fazy sprzed narzędzi handlowych").
+    """
 
     agents: list[AgentDefinition]
     edges: list[TeamEdge] = Field(default_factory=list)
     limits: CostLimits = Field(default_factory=CostLimits)
+    trading: TradingLimits = Field(default_factory=TradingLimits)
 
     @model_validator(mode="before")
     @classmethod

@@ -25,6 +25,7 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 # `run_steps` references `runs`, `runs` references `team_revisions`, `team_revisions`
 # references `teams` — the same convention agent's own TABLES follows.
 TABLES: tuple[str, ...] = (
+    "trades",
     "usage",
     "tool_calls",
     "run_steps",
