@@ -1,10 +1,12 @@
 import { useState } from "react";
-import type { AgentChartDrawing, AgentDrawingPatch } from "../agent/agentApi";
-import { formatInstant } from "../ui/formatTime";
 import type { ChartDrawings } from "./Chart";
+import { DrawingEditor } from "./DrawingEditor";
+import { priceSummary, shapeLabel } from "./drawingFields";
+import { formatInstant } from "../ui/formatTime";
 
 /**
- * The objects standing on this instrument, and the only way the operator takes one off.
+ * The objects standing on this instrument, and one of the two ways the operator takes one
+ * off — the other being the card beside the object itself.
  *
  * That is what it is for: whatever the agent draws must be undoable by hand, without a
  * conversation and without the model (`agent-tools` spec, "Zapis MUST być odwracalny ręką
@@ -19,41 +21,16 @@ import type { ChartDrawings } from "./Chart";
  */
 export interface DrawingListProps {
   drawings: ChartDrawings;
+  /** Which object is picked out, and how to change that. Held by `Chart` rather than
+   *  here, because the chart shows the same pick — two pieces of state would be two
+   *  answers to "which object is chosen", one of them always stale
+   *  (`terminal-chart-objects` spec, "Wskazanie jest jedno, wspólne z listą"). */
+  selectedId: number | null;
+  onSelect(id: number | null): void;
 }
 
-/** The prices a shape has, by the role each plays — the same roles `PatchDrawingIn`
- *  accepts, so an edited field maps to its patch without a second table anywhere. */
-type PriceRole = "price" | "top" | "bottom" | "aPrice" | "bPrice";
-
-function priceFields(drawing: AgentChartDrawing): Array<{ role: PriceRole; label: string; value: number }> {
-  const geometry = drawing.geometry;
-  if (geometry.kind === "level") return [{ role: "price", label: "Price", value: geometry.price }];
-  if (geometry.kind === "zone") {
-    return [
-      { role: "top", label: "Top", value: geometry.top },
-      { role: "bottom", label: "Bottom", value: geometry.bottom },
-    ];
-  }
-  return [
-    { role: "aPrice", label: "From", value: geometry.a.price },
-    { role: "bPrice", label: "To", value: geometry.b.price },
-  ];
-}
-
-function shapeLabel(drawing: AgentChartDrawing): string {
-  return drawing.geometry.kind === "trendline" ? "trend line" : drawing.geometry.kind;
-}
-
-/** The prices as one line, for the row's own summary — `priceFields` in reading order. */
-function priceSummary(drawing: AgentChartDrawing): string {
-  return priceFields(drawing)
-    .map((field) => field.value)
-    .join(" – ");
-}
-
-export function DrawingList({ drawings }: DrawingListProps) {
+export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps) {
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<number | null>(null);
   // What the last write said went wrong, if anything. One at a time: the operator is
   // acting on one row, and a list of stale failures is noise rather than information.
   const [failure, setFailure] = useState<string | null>(null);
@@ -77,7 +54,6 @@ export function DrawingList({ drawings }: DrawingListProps) {
         onClick={() => {
           setOpen(!open);
           setFailure(null);
-          setEditing(null);
         }}
         aria-expanded={open}
         aria-label="Drawn objects"
@@ -88,7 +64,7 @@ export function DrawingList({ drawings }: DrawingListProps) {
       </button>
 
       {open && (
-        <div className="absolute left-0 top-7 z-20 max-h-96 w-80 overflow-y-auto rounded border border-border bg-panel p-2 shadow-lg">
+        <div className="absolute top-7 left-0 z-20 max-h-96 w-80 overflow-y-auto rounded border border-border bg-panel p-2 shadow-lg">
           {drawings.status === "error" ? (
             // Said as its own line above whatever is still on screen: the chart keeps
             // drawing what it last read, and this says the list may be out of date rather
@@ -123,10 +99,15 @@ export function DrawingList({ drawings }: DrawingListProps) {
                 <li
                   key={drawing.id}
                   data-testid={`drawing-${drawing.id}`}
-                  className="rounded border border-border px-2 py-1"
+                  aria-current={selectedId === drawing.id}
+                  className={
+                    selectedId === drawing.id
+                      ? "rounded border border-primary bg-panel-strong px-2 py-1"
+                      : "rounded border border-border px-2 py-1"
+                  }
                 >
                   <div className="flex items-baseline gap-2">
-                    <span className="text-[10px] uppercase tracking-wide text-secondary">
+                    <span className="text-[10px] tracking-wide text-secondary uppercase">
                       {shapeLabel(drawing)}
                     </span>
                     <span className="text-xs text-ink">{priceSummary(drawing)}</span>
@@ -136,8 +117,11 @@ export function DrawingList({ drawings }: DrawingListProps) {
                     <span className="ml-auto flex gap-1">
                       <button
                         type="button"
+                        // Picking a row out is the same act as clicking the object on the
+                        // chart, and opens the same editor — the row is where the editor
+                        // appears, the chart is where the card does.
                         onClick={() => {
-                          setEditing(editing === drawing.id ? null : drawing.id);
+                          onSelect(selectedId === drawing.id ? null : drawing.id);
                           setFailure(null);
                         }}
                         className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong"
@@ -158,13 +142,13 @@ export function DrawingList({ drawings }: DrawingListProps) {
                   <p className="text-[10px] text-secondary">
                     drawn {formatInstant(drawing.createdAt)}
                   </p>
-                  {editing === drawing.id && (
+                  {selectedId === drawing.id && (
                     <DrawingEditor
                       drawing={drawing}
                       busy={busy === drawing.id}
                       onSubmit={async (patch) => {
                         if (await act(drawing.id, () => drawings.patch(drawing.id, patch))) {
-                          setEditing(null);
+                          onSelect(null);
                         }
                       }}
                     />
@@ -176,95 +160,5 @@ export function DrawingList({ drawings }: DrawingListProps) {
         </div>
       )}
     </div>
-  );
-}
-
-/** The prices and the caption of one object, editable. Built from `priceFields`, so a
- *  shape's own roles are the only ones it offers — the module refuses the others anyway,
- *  and offering a field that can only be refused is a form that lies. */
-function DrawingEditor({
-  drawing,
-  busy,
-  onSubmit,
-}: {
-  drawing: AgentChartDrawing;
-  busy: boolean;
-  onSubmit(patch: AgentDrawingPatch): Promise<void>;
-}) {
-  const fields = priceFields(drawing);
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(fields.map((field) => [field.role, String(field.value)])),
-  );
-  const [label, setLabel] = useState(drawing.label ?? "");
-
-  function build(): AgentDrawingPatch | string {
-    const patch: AgentDrawingPatch = {};
-    for (const field of fields) {
-      const raw = values[field.role] ?? "";
-      const value = Number(raw);
-      if (!Number.isFinite(value) || value <= 0) return `${field.label} must be a price above zero`;
-      // Only what actually moved: sending every field back would make a correction of the
-      // caption alone into a write of the prices too.
-      if (value !== field.value) patch[field.role] = value;
-    }
-    const trimmed = label.trim();
-    if (trimmed !== (drawing.label ?? "")) {
-      if (trimmed === "") return "A caption cannot be blank — leave the old one or type a new one";
-      patch.label = trimmed;
-    }
-    if (Object.keys(patch).length === 0) return "Nothing was changed";
-    return patch;
-  }
-
-  const [problem, setProblem] = useState<string | null>(null);
-
-  return (
-    <form
-      className="mt-1 flex flex-col gap-1"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const built = build();
-        if (typeof built === "string") {
-          setProblem(built);
-          return;
-        }
-        setProblem(null);
-        void onSubmit(built);
-      }}
-    >
-      {fields.map((field) => (
-        <label key={field.role} className="flex items-center gap-2 text-[10px] text-ink-muted">
-          <span className="w-12">{field.label}</span>
-          <input
-            type="number"
-            step="any"
-            aria-label={`${field.label} of drawing ${drawing.id}`}
-            value={values[field.role] ?? ""}
-            onChange={(event) =>
-              setValues({ ...values, [field.role]: event.target.value })
-            }
-            className="w-24 rounded border border-border bg-sunken px-1 text-xs text-ink"
-          />
-        </label>
-      ))}
-      <label className="flex items-center gap-2 text-[10px] text-ink-muted">
-        <span className="w-12">Caption</span>
-        <input
-          type="text"
-          aria-label={`Caption of drawing ${drawing.id}`}
-          value={label}
-          onChange={(event) => setLabel(event.target.value)}
-          className="w-40 rounded border border-border bg-sunken px-1 text-xs text-ink"
-        />
-      </label>
-      {problem !== null && <p className="text-[10px] text-critical">{problem}</p>}
-      <button
-        type="submit"
-        disabled={busy}
-        className="self-start rounded border border-border px-1.5 py-0.5 text-[10px] text-ink hover:bg-panel-strong disabled:opacity-50"
-      >
-        Save
-      </button>
-    </form>
   );
 }

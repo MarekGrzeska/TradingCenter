@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -34,8 +35,33 @@ function props(overrides: Partial<ChartDrawings> = {}): ChartDrawings {
   };
 }
 
-async function open(drawings: ChartDrawings) {
-  render(<DrawingList drawings={drawings} />);
+/** The list does not own the selection any more — `Chart` does, and hands it back down
+ *  (`terminal-chart-objects` spec, "Wskazanie jest jedno, wspólne z listą"). This stands
+ *  in for that owner so the list can be exercised on its own. */
+function Host({
+  drawings,
+  initialSelectedId = null,
+  onSelect,
+}: {
+  drawings: ChartDrawings;
+  initialSelectedId?: number | null;
+  onSelect?: (id: number | null) => void;
+}) {
+  const [selectedId, setSelectedId] = useState<number | null>(initialSelectedId);
+  return (
+    <DrawingList
+      drawings={drawings}
+      selectedId={selectedId}
+      onSelect={(id) => {
+        setSelectedId(id);
+        onSelect?.(id);
+      }}
+    />
+  );
+}
+
+async function open(drawings: ChartDrawings, initialSelectedId: number | null = null) {
+  render(<Host drawings={drawings} initialSelectedId={initialSelectedId} />);
   await userEvent.click(screen.getByLabelText("Drawn objects"));
 }
 
@@ -173,5 +199,31 @@ describe("DrawingList", () => {
 
     expect(screen.getByTestId("drawing-1")).toBeInTheDocument();
     expect(screen.getByText(/could not be read/)).toBeInTheDocument();
+  });
+});
+
+describe("DrawingList — one selection, shared with the chart", () => {
+  it("marks out the row of the object picked elsewhere", async () => {
+    // Picked on the chart, arriving here as a prop: from the list's side there is no
+    // difference between that and its own row being clicked, which is the point.
+    await open(props(), 1);
+
+    expect(screen.getByTestId("drawing-1")).toHaveAttribute("aria-current", "true");
+  });
+
+  it("reports a row picked here rather than keeping it", async () => {
+    const onSelect = vi.fn();
+    render(<Host drawings={props()} onSelect={onSelect} />);
+    await userEvent.click(screen.getByLabelText("Drawn objects"));
+
+    await userEvent.click(screen.getByRole("button", { name: "Edit" }));
+
+    expect(onSelect).toHaveBeenCalledWith(1);
+  });
+
+  it("nothing is marked out when nothing is picked", async () => {
+    await open(props(), null);
+
+    expect(screen.getByTestId("drawing-1")).toHaveAttribute("aria-current", "false");
   });
 });

@@ -44,11 +44,15 @@ import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { showToast } from "../ui/toastStore";
 import {
   candlestickColors,
+  drawingColorFor,
+  drawingColorFromToken,
   indicatorColorFromToken,
   indicatorLineColor,
   readChartColors,
   type ChartColors,
 } from "./theme";
+import type { Emphasis, MarkPalette } from "./drawingStyle";
+import { DrawingCard } from "./DrawingCard";
 import { DrawingList } from "./DrawingList";
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
 import { type BarsRange, useIndicators } from "./indicators/useIndicators";
@@ -510,10 +514,53 @@ export function Chart({
   const drawingPrimitivesRef = useRef<
     Map<number, RayPrimitive | ZonePrimitive | TrendlinePrimitive>
   >(new Map());
+  // The newest close, for a primitive built after the last candle arrived — the effect
+  // that pushes it to the others runs on a different trigger than the one that builds them.
+  const currentPriceRef = useRef<number | null>(null);
 
   // The array alone, not the whole prop: a caller that rebuilds the object every render
   // (the grid slot does) must not make the sync effect below run every render with it.
   const drawnObjects = drawings?.items ?? EMPTY_DRAWINGS;
+
+  // --- the object the operator picked out, by its own id.
+  //
+  // State of the *screen*, and of this slot's screen alone — not of the instrument, which
+  // is what `drawingsStore` holds. Two slots showing US100 show the same objects, and the
+  // operator points at one of them in one of the slots (design.md, "Zaznaczenie mieszka
+  // w `Chart`, nie w `drawingsStore`"). The list in the header is rendered from here too,
+  // so one piece of state answers both and no channel between them is needed.
+  const [selected, setSelected] = useState<{ id: number; at: { x: number; y: number } | null } | null>(
+    null,
+  );
+  const selectedId = selected?.id ?? null;
+  const selectedDrawing = drawnObjects.find((drawing) => drawing.id === selectedId) ?? null;
+
+  // The objects of the previous instrument are not on the chart any more, so nothing of
+  // theirs can be picked out (`terminal-chart-objects` spec, "Zmiana symbolu przy
+  // wskazanym obiekcie").
+  useEffect(() => {
+    setSelected(null);
+  }, [symbol]);
+
+  // An object removed while picked — by the card, by the list, or by the agent's own next
+  // turn — takes the selection with it: what is not there cannot be pointed at.
+  useEffect(() => {
+    setSelected((current) =>
+      current === null || drawnObjects.some((drawing) => drawing.id === current.id) ? current : null,
+    );
+  }, [drawnObjects]);
+
+  useEffect(() => {
+    if (selectedId === null) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelected(null);
+    };
+    // On the document rather than on the chart's own element: `Escape` has to reach the
+    // selection wherever the focus happens to be, which is the reason it exists beside
+    // clicking on empty space (`terminal-chart-objects` spec, "Odznaczenie klawiszem").
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selectedId]);
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -871,6 +918,32 @@ export function Chart({
       if (frame) cancelAnimationFrame(frame);
       chart.unsubscribeCrosshairMove(handler);
     };
+  }, []);
+
+  // --- picking an object out of the chart ---
+  //
+  // `hoveredObjectId` is whatever the primitives' own `hitTest` answered on these very
+  // coordinates, so the geometry a click is measured against is the geometry the object
+  // was drawn with — one description of the shape, not a second one kept in step by hand
+  // (design.md, "Trafianie natywnym `hitTest`").
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    const onClick = (param: MouseEventParams<Time>) => {
+      const hovered = param.hoveredObjectId;
+      const id = typeof hovered === "string" ? Number(hovered) : NaN;
+      // Empty space is an answer, not a missing one: it puts the selection down
+      // (`terminal-chart-objects` spec, "Kliknięcie w puste miejsce").
+      if (!Number.isFinite(id)) {
+        setSelected(null);
+        return;
+      }
+      setSelected({ id, at: param.point ? { x: param.point.x, y: param.point.y } : null });
+    };
+
+    chart.subscribeClick(onClick);
+    return () => chart.unsubscribeClick(onClick);
   }, []);
 
   // --- focus: a one-off "show this fragment" from outside ---
@@ -1505,24 +1578,32 @@ export function Chart({
     const standing = drawnObjects;
     const live = new Set<number>();
 
-    standing.forEach((drawing, index) => {
+    const palette: MarkPalette = {
+      onFill: colors.surface,
+      support: colors.up,
+      resistance: colors.down,
+    };
+    const currentPrice = currentPriceRef.current;
+
+    standing.forEach((drawing) => {
       live.add(drawing.id);
-      // The drawing's own colour, or one the chart picks — cycled by position so two
-      // uncoloured objects are still told apart (`agent-chart-drawings` spec, "obiekt
-      // bez koloru MUST dostać kolor od wykresu").
-      const color =
-        indicatorColorFromToken(colors, drawing.color) ?? indicatorLineColor(colors, index);
+      // The drawing's own colour, or one the chart derives from its id — never from where
+      // it stands in this array, so removing the object beside it repaints nothing
+      // (`terminal-chart` spec, "Kolor obiektu po usunięciu innego").
+      const color = drawingColorFromToken(colors, drawing.color) ?? drawingColorFor(drawing.id, colors);
+      const marks = { weight: "drawing" as const, objectId: String(drawing.id), palette };
       const existing = drawingPrimitivesRef.current.get(drawing.id);
       const geometry = drawing.geometry;
 
       if (geometry.kind === "level") {
-        const ray = existing instanceof RayPrimitive ? existing : new RayPrimitive(color);
+        const ray = existing instanceof RayPrimitive ? existing : new RayPrimitive(color, marks);
         if (ray !== existing) {
           if (existing) priceSeries.detachPrimitive(existing);
           priceSeries.attachPrimitive(ray);
           drawingPrimitivesRef.current.set(drawing.id, ray);
         }
         ray.setColor(color);
+        ray.setCurrentPrice(currentPrice);
         // A null `at` means the level has always been in effect. Sent as epoch 0 rather
         // than as the oldest drawn bar's own time: `timeToX` snaps a moment with no bar
         // to the nearest one, so this resolves to the left edge of whatever is loaded and
@@ -1535,7 +1616,8 @@ export function Chart({
 
       if (geometry.kind === "zone") {
         const zoneColors = { bullish: color, bearish: color, neutral: color };
-        const zone = existing instanceof ZonePrimitive ? existing : new ZonePrimitive(zoneColors);
+        const zone =
+          existing instanceof ZonePrimitive ? existing : new ZonePrimitive(zoneColors, marks);
         if (zone !== existing) {
           if (existing) priceSeries.detachPrimitive(existing);
           priceSeries.attachPrimitive(zone);
@@ -1545,6 +1627,7 @@ export function Chart({
         // way an indicator's does — it is the operator's band, not a bullish or bearish
         // reading of one.
         zone.setColors(zoneColors);
+        zone.setCurrentPrice(currentPrice);
         zone.setZones([
           {
             from: (geometry.from ?? 0) as UTCTimestamp,
@@ -1552,18 +1635,21 @@ export function Chart({
             top: geometry.top,
             bottom: geometry.bottom,
             direction: null,
+            label: drawing.label,
           },
         ]);
         return;
       }
 
-      const line = existing instanceof TrendlinePrimitive ? existing : new TrendlinePrimitive(color);
+      const line =
+        existing instanceof TrendlinePrimitive ? existing : new TrendlinePrimitive(color, marks);
       if (line !== existing) {
         if (existing) priceSeries.detachPrimitive(existing);
         priceSeries.attachPrimitive(line);
         drawingPrimitivesRef.current.set(drawing.id, line);
       }
       line.setColor(color);
+      line.setCurrentPrice(currentPrice);
       const drawn: DrawnTrendline = {
         from: geometry.a.time as UTCTimestamp,
         to: geometry.b.time as UTCTimestamp,
@@ -1581,6 +1667,28 @@ export function Chart({
       drawingPrimitivesRef.current.delete(id);
     }
   }, [drawnObjects]);
+
+  // The role its price-axis label announces is read off the newest candle, so it follows
+  // the market on its own: a level the price breaks through stops calling itself
+  // resistance (design.md, "Rola przelicza się z ostatniej świecy"). Its own effect
+  // rather than a dependency of the one above — a forming candle must not rebuild
+  // anything, only hand over a number.
+  useEffect(() => {
+    const price = latestBar?.close ?? null;
+    currentPriceRef.current = price;
+    for (const primitive of drawingPrimitivesRef.current.values()) primitive.setCurrentPrice(price);
+  }, [latestBar]);
+
+  // Picked out, or standing back for whatever is (`terminal-chart-objects` spec, "Wskazany
+  // obiekt widać, że jest wskazany"). Nothing here touches what the object *is* — only
+  // how heavily it is drawn.
+  useEffect(() => {
+    for (const [id, primitive] of drawingPrimitivesRef.current) {
+      const emphasis: Emphasis =
+        selectedId === null ? "normal" : id === selectedId ? "selected" : "dimmed";
+      primitive.setEmphasis(emphasis);
+    }
+  }, [selectedId, drawnObjects]);
 
   const feed = useBarFeed(source, symbol, resolution, sink);
   const older = useOlderBars(source, symbol, resolution, olderReader);
@@ -1651,7 +1759,15 @@ export function Chart({
             in the agent panel: this is the one place the operator undoes what the agent
             drew, and it has to be reachable without a conversation (`agent-tools` spec,
             "Zapis MUST być odwracalny ręką operatora"). */}
-        {drawings && <DrawingList drawings={drawings} />}
+        {drawings && (
+          <DrawingList
+            drawings={drawings}
+            selectedId={selectedId}
+            // Picked from the list, so there is no click on the chart to sit beside — the
+            // card takes its own corner (`DrawingCard.cardPosition`).
+            onSelect={(id) => setSelected(id === null ? null : { id, at: null })}
+          />
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           {unknownIndicatorIds.length > 0 && (
@@ -1733,6 +1849,14 @@ export function Chart({
               )}
             />
           </div>
+        )}
+        {drawings && selectedDrawing && (
+          <DrawingCard
+            drawing={selectedDrawing}
+            drawings={drawings}
+            at={selected?.at ?? null}
+            onClose={() => setSelected(null)}
+          />
         )}
         <FeedOverlay feed={feed} symbol={symbol} resolution={resolution} />
       </div>

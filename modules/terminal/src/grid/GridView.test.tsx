@@ -30,6 +30,8 @@ vi.mock("lightweight-charts", () => ({
     }),
     subscribeCrosshairMove: () => {},
     unsubscribeCrosshairMove: () => {},
+    subscribeClick: () => {},
+    unsubscribeClick: () => {},
   }),
 }));
 

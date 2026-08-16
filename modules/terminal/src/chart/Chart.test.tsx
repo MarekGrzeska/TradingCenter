@@ -2978,3 +2978,164 @@ describe("Chart — objects drawn on the instrument (terminal-chart spec, agent-
     expect(screen.queryByLabelText("Drawn objects")).toBeNull();
   });
 });
+
+describe("Chart — picking an object out of the chart (terminal-chart-objects spec)", () => {
+  function drawing(id: number, geometry: AgentChartDrawing["geometry"]): AgentChartDrawing {
+    return {
+      id,
+      symbol: "US100",
+      geometry,
+      label: "weekly high",
+      color: null,
+      createdAt: 1767398400,
+      updatedAt: 1767398400,
+    };
+  }
+
+  const A_LEVEL = drawing(1, { kind: "level", price: 110, at: null });
+  const A_ZONE = drawing(2, { kind: "zone", top: 120, bottom: 115, from: null, to: null });
+
+  function chartDrawings(items: AgentChartDrawing[], overrides: Partial<ChartDrawings> = {}): ChartDrawings {
+    return {
+      items,
+      status: "ready",
+      error: null,
+      remove: vi.fn(async () => null),
+      patch: vi.fn(async () => null),
+      ...overrides,
+    };
+  }
+
+  async function drawn(items: AgentChartDrawing[] = [A_LEVEL, A_ZONE]) {
+    const drawings = chartDrawings(items);
+    const view = renderChart(source, { drawings });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    return { ...view, drawings };
+  }
+
+  /** What the real chart hands a click subscriber: whatever the primitives' own
+   *  `hitTest` answered on those coordinates, already resolved to an id. */
+  async function clickChart(hoveredObjectId?: string) {
+    await act(async () => {
+      stub.latest().click({ hoveredObjectId, point: { x: 120, y: 90 } });
+    });
+  }
+
+  it("picks out the object clicked, and says what it is beside it", async () => {
+    await drawn();
+
+    await clickChart("1");
+
+    const card = await screen.findByTestId("drawing-card-1");
+    expect(card).toHaveTextContent("level");
+    expect(card).toHaveTextContent("110");
+    expect(card).toHaveTextContent("weekly high");
+    expect(card).toHaveTextContent(/drawn/);
+  });
+
+  it("puts the selection down on a click into empty space", async () => {
+    await drawn();
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+
+    // No `hoveredObjectId`: nothing was under the pointer.
+    await clickChart(undefined);
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-1")).toBeNull());
+  });
+
+  it("puts the selection down on Escape", async () => {
+    await drawn();
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-1")).toBeNull());
+  });
+
+  it("carries no selection across a symbol change", async () => {
+    // The previous instrument's objects are not on the chart, so none of them can be
+    // pointed at (`terminal-chart-objects` spec, "Zmiana symbolu przy wskazanym obiekcie").
+    const drawings = chartDrawings([A_LEVEL, A_ZONE]);
+    const { rerender, onResolutionChange } = renderChart(source, { drawings });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="GOLD"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([drawing(9, { kind: "level", price: 2400, at: null })])}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-1")).toBeNull());
+    expect(screen.queryByTestId("drawing-card-9")).toBeNull();
+  });
+
+  it("picking an object out is not a change to it", async () => {
+    // `terminal-chart-objects` spec, "Wskazanie nie jest zmianą obiektu": it moves
+    // nothing, and writes nothing.
+    const { drawings } = await drawn();
+
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+    await userEvent.keyboard("{Escape}");
+
+    expect(drawings.patch).not.toHaveBeenCalled();
+    expect(drawings.remove).not.toHaveBeenCalled();
+    expect(drawings.items[0].geometry).toEqual({ kind: "level", price: 110, at: null });
+    expect(drawings.items[0].color).toBeNull();
+  });
+
+  it("shows the object picked on the chart marked out on the list too", async () => {
+    await drawn();
+    await clickChart("2");
+
+    await userEvent.click(screen.getByLabelText("Drawn objects"));
+
+    expect(screen.getByTestId("drawing-2")).toHaveAttribute("aria-current", "true");
+    expect(screen.getByTestId("drawing-1")).toHaveAttribute("aria-current", "false");
+  });
+
+  it("picks out on the chart what was chosen from the list", async () => {
+    await drawn();
+
+    await userEvent.click(screen.getByLabelText("Drawn objects"));
+    await userEvent.click(within(screen.getByTestId("drawing-2")).getByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByTestId("drawing-card-2")).toBeInTheDocument();
+  });
+
+  it("lets go of an object that stops being there", async () => {
+    // Removed from the card, from the list, or by the agent's own next turn — what is
+    // gone cannot stay pointed at.
+    const drawings = chartDrawings([A_LEVEL, A_ZONE]);
+    const { rerender, onResolutionChange } = renderChart(source, { drawings });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([A_ZONE])}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-1")).toBeNull());
+  });
+});

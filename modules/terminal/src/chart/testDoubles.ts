@@ -29,6 +29,11 @@ export interface FakeChart {
   removed: boolean;
   resized: Array<{ width: number; height: number }>;
   crosshairHandlers: Array<(param: unknown) => void>;
+  /** Handlers `chart.subscribeClick` attached. `click()` is what a test uses to aim a
+   *  pointer at an object the way the real chart does — with whatever its own `hitTest`
+   *  answered already resolved into `hoveredObjectId`. */
+  clickHandlers: Array<(param: unknown) => void>;
+  click(param: { hoveredObjectId?: unknown; point?: { x: number; y: number } }): void;
   series: FakeSeries[];
   /** Series removed with `chart.removeSeries()` — kept out of `series` above (which
    *  mirrors what is actually drawn) but not discarded, so a test can assert one
@@ -169,6 +174,10 @@ export function makeFakeChart(): FakeChart {
     removed: false,
     resized: [],
     crosshairHandlers: [],
+    clickHandlers: [],
+    click(param) {
+      for (const handler of [...this.clickHandlers]) handler(param);
+    },
     series: [],
     removedSeries: [],
     fitContentCalls: 0,
@@ -254,6 +263,10 @@ export function fakeChartApi(chart: FakeChart) {
       chart.crosshairHandlers.push(handler),
     unsubscribeCrosshairMove: (handler: (param: unknown) => void) => {
       chart.crosshairHandlers = chart.crosshairHandlers.filter((existing) => existing !== handler);
+    },
+    subscribeClick: (handler: (param: unknown) => void) => chart.clickHandlers.push(handler),
+    unsubscribeClick: (handler: (param: unknown) => void) => {
+      chart.clickHandlers = chart.clickHandlers.filter((existing) => existing !== handler);
     },
   };
 }
