@@ -353,6 +353,11 @@ class ChartDrawingOut(BaseModel):
     geometry: ChartGeometryOut
     label: str | None
     color: str | None
+    # Whether the chart draws it. A hidden drawing is published like any other — the list
+    # in the terminal is the only way back to it, and a read that left it out would hide
+    # it for good (specs/terminal-chart, "Operator zarządza naniesionymi obiektami
+    # z listy").
+    hidden: bool
     created_at: datetime
     updated_at: datetime
 
@@ -377,6 +382,7 @@ class ChartDrawingOut(BaseModel):
             geometry=shape,
             label=geometry.label,
             color=geometry.color,
+            hidden=drawing.hidden,
             created_at=drawing.created_at,
             updated_at=drawing.updated_at,
         )
@@ -400,6 +406,10 @@ class PatchDrawingIn(BaseModel):
     a_price: float | None = Field(default=None, description="a trend line's first price")
     b_price: float | None = Field(default=None, description="a trend line's second price")
     label: str | None = None
+    # Hiding is a correction of the drawing like any other, so it rides this route rather
+    # than one of its own — and `None` keeps meaning "leave it", which is what lets a
+    # price correction travel without saying anything about visibility.
+    hidden: bool | None = None
 
     @field_validator("price", "top", "bottom", "a_price", "b_price")
     @classmethod
@@ -427,7 +437,15 @@ class PatchDrawingIn(BaseModel):
     def _asks_for_something(self) -> PatchDrawingIn:
         if all(
             field is None
-            for field in (self.price, self.top, self.bottom, self.a_price, self.b_price, self.label)
+            for field in (
+                self.price,
+                self.top,
+                self.bottom,
+                self.a_price,
+                self.b_price,
+                self.label,
+                self.hidden,
+            )
         ):
             raise ValueError("this request changes nothing")
         return self

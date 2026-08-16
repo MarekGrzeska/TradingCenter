@@ -129,9 +129,13 @@ DRAW_TOOL = ToolDescriptor(
         "Drawings belong to the instrument, not to the interval or to what is on screen: "
         "they stay visible on every chart of that symbol and survive the conversation. "
         "This tool is incremental, not declarative — unlike set_chart, `add` only adds "
-        "and only an id named in `remove` goes away, so a drawing you do not mention "
-        "stays where it is. Moving a level means removing the old id and adding the new "
-        "one in the same call. Use it when the operator asks to mark, note or keep a "
+        "and only an id you name is touched, so a drawing you do not mention stays where "
+        "it is. Moving a level means removing the old id and adding the new one in the "
+        "same call. `hide` takes a drawing off the chart without deleting it and `show` "
+        "puts it back exactly as it was: prefer `hide` when the operator wants a cleaner "
+        "chart rather than the drawing gone, because hiding is undoable and removing is "
+        "not — a removed drawing takes its id, its caption and the moment it was made "
+        "with it. Use it when the operator asks to mark, note or keep a "
         "price; call list_chart_drawings first when you need the ids of what is already "
         "there. A drawing is something the operator wanted kept — it is not the output "
         "of levels_near_price, which recomputes support and resistance from the archive "
@@ -151,7 +155,21 @@ DRAW_TOOL = ToolDescriptor(
             },
             "remove": {
                 "type": "array",
-                "description": "ids of drawings to take off, as given by list_chart_drawings",
+                "description": "ids of drawings to delete for good, as given by "
+                "list_chart_drawings; use `hide` instead unless the drawing is really "
+                "meant to be gone",
+                "items": {"type": "integer"},
+            },
+            "hide": {
+                "type": "array",
+                "description": "ids of drawings to take off the chart without deleting "
+                "them; they keep their id, caption and everything else, and `show` puts "
+                "them back",
+                "items": {"type": "integer"},
+            },
+            "show": {
+                "type": "array",
+                "description": "ids of hidden drawings to put back on the chart",
                 "items": {"type": "integer"},
             },
         },
@@ -324,16 +342,18 @@ def _as_additions(raw: Any) -> list[ChartDrawingGeometry]:
     return [_as_geometry(item, index) for index, item in enumerate(raw)]
 
 
-def _as_removals(raw: Any) -> list[int]:
+def _as_ids(raw: Any, field: str) -> list[int]:
+    """One parser for `remove`, `hide` and `show` — three lists of the same thing, and
+    three copies of this would be three places for the id checks to drift apart."""
     if raw is None:
         return []
     if not isinstance(raw, list):
-        raise ChartRefusal("`remove` must be a list of drawing ids.")
+        raise ChartRefusal(f"`{field}` must be a list of drawing ids.")
     ids: list[int] = []
     for item in raw:
         if isinstance(item, bool) or not isinstance(item, int):
             raise ChartRefusal(
-                f"`remove` takes ids as whole numbers; {item!r} is not one. "
+                f"`{field}` takes ids as whole numbers; {item!r} is not one. "
                 "Call list_chart_drawings for the ids."
             )
         # Bounded here, not left to the driver: an id past `bigint` makes asyncpg raise,
@@ -373,13 +393,45 @@ def _geometry_text(geometry: ChartDrawingGeometry) -> str:
     return body + (f" ({geometry.label})" if geometry.label else "")
 
 
-def _confirmation(added: list[ChartDrawing], removed: list[int], symbol: str, total: int) -> str:
+async def _switch(conn: Any, symbol: str, ids: list[int], *, hidden: bool) -> list[int]:
+    """Hide or show, refusing the whole call over an id that is not on this instrument —
+    the same contract `remove` has, and deliberately so: a model told "two of the three
+    were hidden" has to work out which, where a refusal names it."""
+    if not ids:
+        return []
+    switched = await store.set_drawings_hidden(conn, symbol=symbol, ids=ids, hidden=hidden)
+    missing = sorted(set(ids) - set(switched))
+    if missing:
+        verb = "hide" if hidden else "show"
+        raise ChartRefusal(
+            f"cannot {verb} — no drawing on {symbol} with "
+            f"{'id' if len(missing) == 1 else 'ids'} "
+            + ", ".join(f"#{drawing_id}" for drawing_id in missing)
+            + ". Call list_chart_drawings to see what is there now; nothing was changed."
+        )
+    return switched
+
+
+def _confirmation(
+    added: list[ChartDrawing],
+    removed: list[int],
+    hidden: list[int],
+    shown: list[int],
+    symbol: str,
+    total: int,
+) -> str:
     parts: list[str] = []
     if added:
         drawn = ", ".join(f"#{d.id} {_geometry_text(d.geometry)}" for d in added)
         parts.append(f"drew {drawn}")
     if removed:
         parts.append("removed " + ", ".join(f"#{drawing_id}" for drawing_id in sorted(removed)))
+    # Said apart from "removed" in as many words: the operator reads this back through the
+    # model, and one of the two is undoable.
+    if hidden:
+        parts.append("hid " + ", ".join(f"#{drawing_id}" for drawing_id in sorted(hidden)))
+    if shown:
+        parts.append("showed " + ", ".join(f"#{drawing_id}" for drawing_id in sorted(shown)))
     return (
         f"{'; '.join(parts)} on {symbol}. It now carries {total} "
         f"{'drawing' if total == 1 else 'drawings'}."
@@ -413,6 +465,10 @@ def _drawing_as_json(drawing: ChartDrawing) -> dict[str, Any]:
         **body,
         "label": geometry.label,
         "color": geometry.color,
+        # Without this the model hides what is already hidden, and cannot answer what the
+        # operator is actually looking at (specs/agent-chart-drawings, "Odczyt mówi, który
+        # rysunek jest zgaszony").
+        "hidden": drawing.hidden,
         "created_at": drawing.created_at.isoformat(),
     }
 
@@ -445,14 +501,28 @@ class DrawOnChartTool:
         try:
             symbol = _as_symbol(arguments)
             additions = _as_additions(arguments.get("add"))
-            removals = _as_removals(arguments.get("remove"))
+            removals = _as_ids(arguments.get("remove"), "remove")
+            to_hide = _as_ids(arguments.get("hide"), "hide")
+            to_show = _as_ids(arguments.get("show"), "show")
         except ChartRefusal as err:
             return refuse(str(err))
 
-        if not additions and not removals:
+        if not additions and not removals and not to_hide and not to_show:
             return refuse(
                 "nothing to do: send `add` with drawings to make, `remove` with ids to "
-                "take off, or both."
+                "delete, `hide` or `show` with ids to take off the chart or put back."
+            )
+
+        # Two opposite orders about one drawing have no outcome the model could have
+        # predicted, and picking a winner would be a rule it cannot read off the schema
+        # (design.md, "Sprzeczne polecenie jest odmową, nie rozstrzygnięciem").
+        both = sorted(set(to_hide) & set(to_show))
+        if both:
+            named = ", ".join(f"#{drawing_id}" for drawing_id in both)
+            return refuse(
+                f"{named} {'is' if len(both) == 1 else 'are'} in both `hide` and `show`, "
+                "so there is no telling what was meant. Name each drawing in one of them; "
+                "nothing was changed."
             )
 
         if self._tool_server is None or not self._tool_server.configured:
@@ -489,6 +559,11 @@ class DrawOnChartTool:
                         "Call list_chart_drawings to see what is there now; nothing was "
                         "changed."
                     )
+                # Hiding and showing after removals and before the ceiling: neither one
+                # changes how many drawings the instrument carries, so neither belongs in
+                # that count (specs/agent-chart-drawings, "Zgaszone liczą się do sufitu").
+                hidden = await _switch(conn, symbol, to_hide, hidden=True)
+                shown = await _switch(conn, symbol, to_show, hidden=False)
                 standing = await store.count_drawings(conn, symbol=symbol)
                 if standing + len(additions) > MAX_DRAWINGS_PER_SYMBOL:
                     raise ChartRefusal(
@@ -508,7 +583,9 @@ class DrawOnChartTool:
             return refuse(str(err))
 
         return ToolOutcome(
-            ToolOutcomeKind.OK, _confirmation(added, removed, symbol, total), elapsed()
+            ToolOutcomeKind.OK,
+            _confirmation(added, removed, hidden, shown, symbol, total),
+            elapsed(),
         )
 
 

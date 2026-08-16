@@ -267,6 +267,11 @@ class ChartDrawing(BaseModel):
     symbol: str
     session_id: int | None
     geometry: ChartDrawingGeometry
+    # Whether the chart draws it. Beside `created_at` rather than inside `geometry` on
+    # purpose: `label` and `color` say how the drawing looks, this says whether it is
+    # drawn at all, and at a change of shape it would have nowhere to go
+    # (specs/agent-chart-drawings, "Rysunki są trwałe i mają własną tożsamość").
+    hidden: bool
     created_at: datetime
     updated_at: datetime
 

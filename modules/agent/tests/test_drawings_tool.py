@@ -453,6 +453,7 @@ async def test_the_read_carries_ids_shapes_and_labels(db, pool) -> None:
         "price": 21500.0,
         "label": "weekly high",
         "color": "--color-up",
+        "hidden": False,
         "created_at": written[0].created_at.isoformat(),
     }
     assert payload["drawings"][1]["top"] == 21600.0
@@ -562,3 +563,203 @@ def test_the_tool_offers_the_drawing_palette_and_no_indicator_token() -> None:
 
     assert offered == set(DRAWING_COLORS)
     assert offered.isdisjoint(CHART_COLORS)
+
+
+# --- hiding, which is not removing ---------------------------------------------------
+
+
+async def test_hiding_takes_a_drawing_off_the_chart_and_keeps_it(db, pool) -> None:
+    """specs/agent-chart-drawings, "Agent gasi rysunek zamiast go kasować"."""
+    session = await _session(db)
+    [standing] = await store.add_drawings(
+        db,
+        session_id=session.id,
+        symbol="US100",
+        geometries=[ChartLevel(price=21500.0, label="weekly high")],
+    )
+
+    outcome = await _draw(pool).call({"symbol": "US100", "hide": [standing.id]}, session_id=session.id)
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    [after] = await store.list_drawings(db, symbol="US100")
+    assert after.hidden is True
+    # Everything else is exactly what it was — that is the whole difference from removing.
+    assert after.id == standing.id
+    assert after.created_at == standing.created_at
+    assert after.geometry == standing.geometry
+
+
+async def test_showing_gives_back_the_same_drawing(db, pool) -> None:
+    session = await _session(db)
+    [standing] = await store.add_drawings(
+        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
+    )
+    await _draw(pool).call({"symbol": "US100", "hide": [standing.id]}, session_id=session.id)
+
+    outcome = await _draw(pool).call({"symbol": "US100", "show": [standing.id]}, session_id=session.id)
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    [after] = await store.list_drawings(db, symbol="US100")
+    assert after.hidden is False
+    assert after.geometry == standing.geometry
+
+
+async def test_hiding_and_showing_one_id_at_once_is_refused(db, pool) -> None:
+    """Two opposite orders about one drawing have no outcome the model could have
+    predicted (specs/agent-chart-drawings, "Zgaszenie i zapalenie jednego rysunku naraz")."""
+    session = await _session(db)
+    [standing] = await store.add_drawings(
+        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
+    )
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "hide": [standing.id], "show": [standing.id]}, session_id=session.id
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+    assert str(standing.id) in outcome.text
+    assert (await store.list_drawings(db, symbol="US100"))[0].hidden is False
+
+
+async def test_hiding_an_id_that_is_not_there_takes_back_the_others(db, pool) -> None:
+    """The transaction is the whole call, the same as for a removal
+    (specs/agent-chart-drawings, "Gaszenie identyfikatora, którego nie ma")."""
+    session = await _session(db)
+    written = await store.add_drawings(
+        db,
+        session_id=session.id,
+        symbol="US100",
+        geometries=[ChartLevel(price=21500.0), ChartLevel(price=21400.0)],
+    )
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "hide": [written[0].id, written[1].id + 99]}, session_id=session.id
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+    assert str(written[1].id + 99) in outcome.text
+    assert [d.hidden for d in await store.list_drawings(db, symbol="US100")] == [False, False]
+
+
+async def test_an_id_from_another_instrument_is_not_hideable(db, pool) -> None:
+    session = await _session(db)
+    [elsewhere] = await store.add_drawings(
+        db, session_id=session.id, symbol="GOLD", geometries=[ChartLevel(price=2400.0)]
+    )
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "hide": [elsewhere.id]}, session_id=session.id
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+    assert (await store.list_drawings(db, symbol="GOLD"))[0].hidden is False
+
+
+async def test_hiding_does_not_touch_what_it_was_not_told_to(db, pool) -> None:
+    """specs/agent-chart-drawings, "Agent nie gasi przez pominięcie"."""
+    session = await _session(db)
+    written = await store.add_drawings(
+        db,
+        session_id=session.id,
+        symbol="US100",
+        geometries=[
+            ChartLevel(price=21500.0),
+            ChartLevel(price=21400.0),
+            ChartLevel(price=21300.0),
+        ],
+    )
+
+    await _draw(pool).call({"symbol": "US100", "hide": [written[0].id]}, session_id=session.id)
+
+    assert [d.hidden for d in await store.list_drawings(db, symbol="US100")] == [True, False, False]
+
+
+async def test_hiding_and_drawing_travel_together(db, pool) -> None:
+    """"Hide the old resistance and put up the new one" is one move, not two — the reason
+    hiding went into this tool rather than beside it (design.md, "`hide`/`show`
+    w `draw_on_chart`, nie czwarte narzędzie do wykresu")."""
+    session = await _session(db)
+    [old] = await store.add_drawings(
+        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
+    )
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "hide": [old.id], "add": [{"kind": "level", "price": 21600.0}]},
+        session_id=session.id,
+    )
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    standing = await store.list_drawings(db, symbol="US100")
+    assert [(d.geometry.price, d.hidden) for d in standing] == [(21500.0, True), (21600.0, False)]
+
+
+async def test_the_confirmation_says_hidden_rather_than_removed(db, pool) -> None:
+    # The operator reads this back through the model, and one of the two is undoable.
+    session = await _session(db)
+    [standing] = await store.add_drawings(
+        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
+    )
+
+    outcome = await _draw(pool).call({"symbol": "US100", "hide": [standing.id]}, session_id=session.id)
+
+    assert "hid" in outcome.text
+    assert "removed" not in outcome.text
+
+
+async def test_a_call_that_only_names_empty_lists_is_still_refused(db, pool) -> None:
+    session = await _session(db)
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "add": [], "remove": [], "hide": [], "show": []},
+        session_id=session.id,
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+
+
+async def test_hidden_drawings_still_count_towards_the_ceiling(db, pool) -> None:
+    """The ceiling is about the record, not about how crowded the screen looks; one that
+    can be walked around by hiding is not a ceiling (proposal.md, "Impact")."""
+    session = await _session(db)
+    written = await store.add_drawings(
+        db,
+        session_id=session.id,
+        symbol="US100",
+        geometries=[ChartLevel(price=20000.0 + n) for n in range(MAX_DRAWINGS_PER_SYMBOL)],
+    )
+    await _draw(pool).call(
+        {"symbol": "US100", "hide": [d.id for d in written[:50]]}, session_id=session.id
+    )
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "add": [{"kind": "level", "price": 21999.0}]}, session_id=session.id
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+    assert str(MAX_DRAWINGS_PER_SYMBOL) in outcome.text
+
+
+async def test_the_read_says_which_drawings_are_hidden(db, pool) -> None:
+    """specs/agent-chart-drawings, "Odczyt mówi, który rysunek jest zgaszony"."""
+    session = await _session(db)
+    written = await store.add_drawings(
+        db,
+        session_id=session.id,
+        symbol="US100",
+        geometries=[ChartLevel(price=21500.0), ChartLevel(price=21400.0)],
+    )
+    await _draw(pool).call({"symbol": "US100", "hide": [written[0].id]}, session_id=session.id)
+
+    outcome = await _read(pool).call({"symbol": "US100"})
+
+    payload = json.loads(outcome.text)
+    assert [d["hidden"] for d in payload["drawings"]] == [True, False]
+
+
+def test_the_tool_offers_hide_and_show_beside_remove() -> None:
+    from agent.tools.drawings import DRAW_TOOL
+
+    properties = DRAW_TOOL.input_schema["properties"]
+    assert {"add", "remove", "hide", "show"} <= properties.keys()
+    # The one distinction the model has to carry away from this schema.
+    assert "without deleting" in properties["hide"]["description"]

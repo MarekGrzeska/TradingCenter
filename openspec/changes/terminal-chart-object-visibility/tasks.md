@@ -1,25 +1,25 @@
 ## 1. Zapis i kontrakt agenta
 
-- [ ] 1.1 Migracja: `hidden boolean not null default false` w `chart_drawings`, plus rewizja promptu przepisana w całości, oba warianty
-- [ ] 1.2 `agent/models.py`: `ChartDrawing.hidden`, obok `created_at`, nie w geometrii
-- [ ] 1.3 `agent/store.py`: `hidden` w kolumnach odczytu i w `_drawing_from_row`; `update_drawing` przyjmuje je jak resztę pól, `None` znaczy „zostaw"
-- [ ] 1.4 `agent/store.py`: `set_drawings_hidden(symbol, ids, hidden)` zwracające identyfikatory, na których faktycznie usiadło — tak jak `remove_drawings`
-- [ ] 1.5 `agent/contract.py`: `ChartDrawingOut.hidden` oraz `PatchDrawingIn.hidden`, dołożone też do listy w `_asks_for_something`
-- [ ] 1.6 `agent/routers/drawings.py`: `PATCH` przepuszcza `hidden`
-- [ ] 1.7 Testy `test_chart_drawings_store.py`: zapis i odczyt `hidden`, gaszenie i zapalanie, identyfikator z innego instrumentu nie daje się zgasić
-- [ ] 1.8 Testy `test_drawings_router.py`: `PATCH` gasi i zapala, samo `hidden` wystarcza za zmianę, 404 dla nieznanego identyfikatora
+- [x] 1.1 Migracja: `hidden boolean not null default false` w `chart_drawings`, plus rewizja promptu przepisana w całości, oba warianty
+- [x] 1.2 `agent/models.py`: `ChartDrawing.hidden`, obok `created_at`, nie w geometrii
+- [x] 1.3 `agent/store.py`: `hidden` w kolumnach odczytu i w `_drawing_from_row`; `update_drawing` przyjmuje je jak resztę pól, `None` znaczy „zostaw"
+- [x] 1.4 `agent/store.py`: `set_drawings_hidden(symbol, ids, hidden)` zwracające identyfikatory, na których faktycznie usiadło — tak jak `remove_drawings`
+- [x] 1.5 `agent/contract.py`: `ChartDrawingOut.hidden` oraz `PatchDrawingIn.hidden`, dołożone też do listy w `_asks_for_something`
+- [x] 1.6 `agent/routers/drawings.py`: `PATCH` przepuszcza `hidden`
+- [x] 1.7 Testy `test_chart_drawings_store.py`: zapis i odczyt `hidden`, gaszenie i zapalanie, identyfikator z innego instrumentu nie daje się zgasić
+- [x] 1.8 Testy `test_drawings_router.py`: `PATCH` gasi i zapala, samo `hidden` wystarcza za zmianę, 404 dla nieznanego identyfikatora
 
 ## 2. Narzędzie modelu
 
-- [ ] 2.1 `agent/tools/drawings.py`: `hide` i `show` w schemacie `draw_on_chart`, opisane jako odwracalne wobec nieodwracalnego `remove`
-- [ ] 2.2 Wykonanie `hide`/`show` w tej samej transakcji co `add`/`remove`, pod regułą „w całości albo wcale”
-- [ ] 2.3 Nieznany identyfikator w `hide`/`show` odrzuca całe wywołanie i nazywa ten identyfikator — jak w `remove`
-- [ ] 2.4 Ten sam identyfikator w `hide` i `show` naraz: odmowa nazywająca go
-- [ ] 2.5 Wywołanie, które nie robi nic z czterech list, nadal odrzucane
-- [ ] 2.6 `list_chart_drawings` niesie `hidden` przy każdym rysunku
-- [ ] 2.7 Sufit: `count_drawings` liczy zgaszone — test stawiający na instrumencie pełnym zgaszonych
-- [ ] 2.8 Testy `test_drawings_tool.py`: gaszenie, zapalanie, sprzeczne polecenie, nieznany identyfikator cofa resztę, odczyt mówi o zgaszonych
-- [ ] 2.9 Testy `test_prompt_store.py`: rewizja mówi o gaszeniu i o tym, że jest odwracalne
+- [x] 2.1 `agent/tools/drawings.py`: `hide` i `show` w schemacie `draw_on_chart`, opisane jako odwracalne wobec nieodwracalnego `remove`
+- [x] 2.2 Wykonanie `hide`/`show` w tej samej transakcji co `add`/`remove`, pod regułą „w całości albo wcale”
+- [x] 2.3 Nieznany identyfikator w `hide`/`show` odrzuca całe wywołanie i nazywa ten identyfikator — jak w `remove`
+- [x] 2.4 Ten sam identyfikator w `hide` i `show` naraz: odmowa nazywająca go
+- [x] 2.5 Wywołanie, które nie robi nic z czterech list, nadal odrzucane
+- [x] 2.6 `list_chart_drawings` niesie `hidden` przy każdym rysunku
+- [x] 2.7 Sufit: `count_drawings` liczy zgaszone — test stawiający na instrumencie pełnym zgaszonych
+- [x] 2.8 Testy `test_drawings_tool.py`: gaszenie, zapalanie, sprzeczne polecenie, nieznany identyfikator cofa resztę, odczyt mówi o zgaszonych
+- [x] 2.9 Testy `test_prompt_store.py`: rewizja mówi o gaszeniu i o tym, że jest odwracalne
 
 ## 3. Terminal — druty i sklep
 

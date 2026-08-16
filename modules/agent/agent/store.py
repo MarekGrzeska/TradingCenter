@@ -594,7 +594,7 @@ async def chart_state_after(conn: Conn, *, sequence: int) -> ChartCommand | None
 
 _SELECT_DRAWING_COLUMNS = (
     "id, symbol, session_id, kind, time_a, price_a, time_b, price_b, label, color, "
-    "created_at, updated_at"
+    "hidden, created_at, updated_at"
 )
 
 _SELECT_DRAWINGS_BY_SYMBOL = f"""
@@ -633,9 +633,21 @@ _UPDATE_DRAWING = f"""
        SET price_a = COALESCE($2, price_a),
            price_b = COALESCE($3, price_b),
            label = COALESCE($4, label),
+           hidden = COALESCE($5, hidden),
            updated_at = now()
      WHERE id = $1
     RETURNING {_SELECT_DRAWING_COLUMNS}
+"""
+
+# Scoped to the symbol for the same reason `_DELETE_DRAWINGS` is: an id belonging to
+# another instrument comes back as untouched rather than quietly acted on. Returns only
+# the rows that actually moved, so the caller can tell the model which ids it could not
+# act on.
+_SET_DRAWINGS_HIDDEN = """
+    UPDATE chart_drawings
+       SET hidden = $3, updated_at = now()
+     WHERE symbol = $1 AND id = ANY($2::bigint[])
+    RETURNING id
 """
 
 
@@ -672,6 +684,7 @@ def _drawing_from_row(row: asyncpg.Record) -> ChartDrawing:
         symbol=row["symbol"],
         session_id=row["session_id"],
         geometry=_geometry_from_row(row).model_copy(update={"label": row["label"], "color": row["color"]}),
+        hidden=row["hidden"],
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -761,6 +774,7 @@ async def update_drawing(
     price_a: float | None,
     price_b: float | None,
     label: str | None,
+    hidden: bool | None = None,
 ) -> ChartDrawing | None:
     """`None` on any field leaves it as it is — the same convention `PatchSessionIn`
     already uses, so this is not a new rule to learn. `None` return means no row with
@@ -768,5 +782,19 @@ async def update_drawing(
 
     `conn.fetchrow`, not `fetch_one`: an id nobody has is an expected outcome here, not
     the broken invariant `fetch_one` exists to catch."""
-    row = await conn.fetchrow(_UPDATE_DRAWING, drawing_id, price_a, price_b, label)
+    row = await conn.fetchrow(_UPDATE_DRAWING, drawing_id, price_a, price_b, label, hidden)
     return None if row is None else _drawing_from_row(row)
+
+
+async def set_drawings_hidden(
+    conn: Conn, *, symbol: str, ids: Sequence[int], hidden: bool
+) -> list[int]:
+    """The ids actually switched — same contract as `remove_drawings`, and for the same
+    reason: an id belonging to another instrument, or to nothing at all, comes back as
+    untouched, and the caller compares that against what it asked for.
+
+    Hiding is not removing, and nothing else about the row moves: the drawing keeps its
+    id, its moment and its geometry, so showing it again gives back exactly what was there
+    (specs/agent-chart-drawings, "Zapalony rysunek jest tym samym rysunkiem")."""
+    rows = await conn.fetch(_SET_DRAWINGS_HIDDEN, symbol, list(ids), hidden)
+    return [row["id"] for row in rows]

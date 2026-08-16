@@ -198,3 +198,63 @@ async def test_a_correction_is_what_the_model_reads_back(db) -> None:
     [standing] = await store.list_drawings(db, symbol="US100")
     assert standing.id == written.id
     assert standing.geometry.price == 21550.0  # pyright: ignore[reportAttributeAccessIssue]
+
+
+async def test_a_drawing_is_published_as_lit_until_it_is_hidden(db) -> None:
+    await _draw(db)
+
+    with TestClient(app) as client:
+        [published] = client.get("/drawings", params={"symbol": "US100"}).json()
+
+    assert published["hidden"] is False
+
+
+async def test_the_operator_hides_a_drawing_and_shows_it_again(db) -> None:
+    """specs/terminal-chart, "Operator gasi poziom z listy" — hiding travels the same
+    route a price correction does, because it is a correction of the drawing like any
+    other (design.md, "Operator gasi przez `PATCH /drawings/{id}`")."""
+    written = await _draw(db)
+
+    with TestClient(app) as client:
+        hidden = client.patch(f"/drawings/{written.id}", json={"hidden": True})
+        [after_hiding] = client.get("/drawings", params={"symbol": "US100"}).json()
+        shown = client.patch(f"/drawings/{written.id}", json={"hidden": False})
+
+    assert hidden.status_code == 200
+    assert hidden.json()["hidden"] is True
+    assert after_hiding["hidden"] is True
+    # And back, unchanged in every other way.
+    assert shown.json()["hidden"] is False
+    assert shown.json()["geometry"] == {"kind": "level", "price": 21500.0, "at": None}
+    assert shown.json()["label"] == "weekly high"
+
+
+async def test_hiding_alone_counts_as_a_change(db) -> None:
+    # `{}` is refused as "this request changes nothing"; `{"hidden": true}` must not fall
+    # into the same bucket now that it is a field of its own.
+    written = await _draw(db)
+
+    with TestClient(app) as client:
+        response = client.patch(f"/drawings/{written.id}", json={"hidden": True})
+
+    assert response.status_code == 200
+
+
+async def test_a_correction_says_nothing_about_visibility_unless_asked(db) -> None:
+    written = await _draw(db)
+
+    with TestClient(app) as client:
+        client.patch(f"/drawings/{written.id}", json={"hidden": True})
+        corrected = client.patch(f"/drawings/{written.id}", json={"price": 21550.0}).json()
+
+    assert corrected["geometry"]["price"] == 21550.0
+    assert corrected["hidden"] is True
+
+
+async def test_hiding_a_drawing_that_is_not_there_is_a_404(db) -> None:
+    written = await _draw(db)
+
+    with TestClient(app) as client:
+        response = client.patch(f"/drawings/{written.id + 99}", json={"hidden": True})
+
+    assert response.status_code == 404

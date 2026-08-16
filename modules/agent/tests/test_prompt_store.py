@@ -13,9 +13,9 @@ pytestmark = pytest.mark.db
 
 async def test_migration_seeds_the_current_text(db) -> None:
     revision = await store.latest_prompt_revision(db)
-    # `v8` names the drawing palette; every revision under it is still in the table,
-    # which is what a transcript stamped `"v6"` or `"v7"` reads back against.
-    assert revision.version == "v8"
+    # `v9` names hiding; every revision under it is still in the table, which is what a
+    # transcript stamped `"v7"` or `"v8"` reads back against.
+    assert revision.version == "v9"
     assert revision.with_tools_body != revision.without_tools_body
 
 
@@ -95,7 +95,7 @@ async def test_create_prompt_revision_bumps_the_version(db) -> None:
     updated = await store.create_prompt_revision(
         db, with_tools_body="new with-tools text", without_tools_body="new without-tools text"
     )
-    assert updated.version == "v9"
+    assert updated.version == "v10"
     assert updated.with_tools_body == "new with-tools text"
     assert updated.without_tools_body == "new without-tools text"
 
@@ -114,7 +114,7 @@ async def test_create_prompt_revision_is_append_only(db) -> None:
 async def test_repeated_edits_keep_incrementing(db) -> None:
     await store.create_prompt_revision(db, with_tools_body="a1", without_tools_body="b1")
     second = await store.create_prompt_revision(db, with_tools_body="a2", without_tools_body="b2")
-    assert second.version == "v10"
+    assert second.version == "v11"
 
 
 async def test_both_seeded_texts_name_the_chart_tool(db) -> None:
@@ -173,3 +173,15 @@ async def test_the_drawing_paragraph_no_longer_promises_the_indicator_palette(db
     for body in (revision.with_tools_body, revision.without_tools_body):
         assert "same palette set_chart" not in body
         assert "drawing palette" in body
+
+
+async def test_the_drawing_paragraph_says_hiding_is_undoable_and_removing_is_not(db) -> None:
+    # A model that does not know hiding exists deletes to clear the chart, which is the
+    # loss this whole change exists to prevent (specs/agent-chart-drawings, "Agent gasi
+    # rysunek zamiast go kasować").
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        lowered = body.lower()
+        assert "`hide`" in lowered
+        assert "`show`" in lowered
+        assert "undoable" in lowered

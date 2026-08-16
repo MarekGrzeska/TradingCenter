@@ -236,3 +236,92 @@ async def test_update_changes_only_the_fields_given(db) -> None:
 async def test_update_of_an_unknown_id_answers_none(db) -> None:
     result = await store.update_drawing(db, drawing_id=999_999, price_a=1.0, price_b=None, label=None)
     assert result is None
+
+
+async def test_a_drawing_starts_lit(db) -> None:
+    [written] = await store.add_drawings(
+        db, session_id=None, symbol="US100", geometries=[ChartLevel(price=21500.0)]
+    )
+    assert written.hidden is False
+
+
+async def test_hiding_and_showing_leave_everything_else_alone(db) -> None:
+    """The whole point of hiding rather than removing (specs/agent-chart-drawings,
+    "Zapalony rysunek jest tym samym rysunkiem")."""
+    [written] = await store.add_drawings(
+        db,
+        session_id=None,
+        symbol="US100",
+        geometries=[ChartLevel(price=21500.0, label="weekly high", color="--color-drawing-1")],
+    )
+
+    assert await store.set_drawings_hidden(db, symbol="US100", ids=[written.id], hidden=True) == [
+        written.id
+    ]
+    [hidden] = await store.list_drawings(db, symbol="US100")
+    assert hidden.hidden is True
+
+    await store.set_drawings_hidden(db, symbol="US100", ids=[written.id], hidden=False)
+    [shown] = await store.list_drawings(db, symbol="US100")
+    assert shown.hidden is False
+    assert shown.id == written.id
+    assert shown.created_at == written.created_at
+    assert shown.geometry == written.geometry
+
+
+async def test_set_hidden_ignores_an_id_belonging_to_another_symbol(db) -> None:
+    # Same scoping as `remove_drawings`: the caller compares this against what it asked
+    # for, and an id from elsewhere must read as "not acted on".
+    [elsewhere] = await store.add_drawings(
+        db, session_id=None, symbol="GOLD", geometries=[ChartLevel(price=2400.0)]
+    )
+
+    switched = await store.set_drawings_hidden(
+        db, symbol="US100", ids=[elsewhere.id], hidden=True
+    )
+
+    assert switched == []
+    assert (await store.list_drawings(db, symbol="GOLD"))[0].hidden is False
+
+
+async def test_update_leaves_visibility_alone_unless_asked(db) -> None:
+    """`None` keeps meaning "leave it", which is what lets a price correction travel
+    without saying anything about visibility."""
+    [written] = await store.add_drawings(
+        db, session_id=None, symbol="US100", geometries=[ChartLevel(price=21500.0)]
+    )
+    await store.set_drawings_hidden(db, symbol="US100", ids=[written.id], hidden=True)
+
+    corrected = await store.update_drawing(
+        db, drawing_id=written.id, price_a=21550.0, price_b=None, label=None
+    )
+
+    assert corrected is not None
+    assert corrected.geometry.price == 21550.0
+    assert corrected.hidden is True
+
+
+async def test_update_can_switch_visibility_on_its_own(db) -> None:
+    [written] = await store.add_drawings(
+        db, session_id=None, symbol="US100", geometries=[ChartLevel(price=21500.0)]
+    )
+
+    corrected = await store.update_drawing(
+        db, drawing_id=written.id, price_a=None, price_b=None, label=None, hidden=True
+    )
+
+    assert corrected is not None
+    assert corrected.hidden is True
+    assert corrected.geometry.price == 21500.0
+
+
+async def test_count_counts_hidden_drawings_too(db) -> None:
+    written = await store.add_drawings(
+        db,
+        session_id=None,
+        symbol="US100",
+        geometries=[ChartLevel(price=21500.0), ChartLevel(price=21400.0)],
+    )
+    await store.set_drawings_hidden(db, symbol="US100", ids=[written[0].id], hidden=True)
+
+    assert await store.count_drawings(db, symbol="US100") == 2

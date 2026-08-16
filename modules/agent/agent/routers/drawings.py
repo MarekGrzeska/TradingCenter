@@ -104,6 +104,7 @@ async def patch_drawing(
             price_a=price_a,
             price_b=price_b,
             label=patch.label,
+            hidden=patch.hidden,
         )
     # The row is locked for the whole transaction, so it cannot have gone between the
     # read and the write — this is the type narrowing, not a race being handled.
