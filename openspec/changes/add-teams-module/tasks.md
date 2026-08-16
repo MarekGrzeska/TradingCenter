@@ -1,22 +1,32 @@
 ## 1. Szkielet modułu
 
-- [ ] 1.1 Katalog `modules/teams/` z `pyproject.toml`, `README.md`, `.env.example`, `Dockerfile`
-- [ ] 1.2 `config.py` — ustawienia bazy, tożsamości, dostawcy modeli, serwera narzędzi
-- [ ] 1.3 Walidatory `Settings()`: tryb bazy, tryb serwera narzędzi, niepusty katalog modeli ze stawkami
-- [ ] 1.4 `db.py` — pula połączeń, dostawca poświadczenia tożsamości, `advisory_lock` z kluczem 8050
-- [ ] 1.5 `migrate.py` i `schema_version.py` — bliźniaki z `agent`
-- [ ] 1.6 `auth.py` — odczyt tożsamości ustalonej przed modułem
-- [ ] 1.7 `app.py` — `lifespan` w kolejności: ustawienia, pula, blokada, migracje, sprawdzenie rewizji
-- [ ] 1.8 `GET /health` poza wymaganiem tożsamości
-- [ ] 1.9 Testy: odmowa startu przy każdej niespójnej konfiguracji z 1.3 i przy trybie lokalnym ze zdalnym adresem
+- [x] 1.1 Katalog `modules/teams/` z `pyproject.toml`, `README.md`, `.env.example`, `Dockerfile`
+- [x] 1.2 `config.py` — ustawienia bazy, tożsamości, dostawcy modeli, serwera narzędzi
+- [x] 1.3 Walidatory `Settings()`: tryb bazy, tryb serwera narzędzi, niepusty katalog modeli ze stawkami
+- [x] 1.4 `db.py` — pula połączeń, dostawca poświadczenia tożsamości, `advisory_lock` z kluczem 8050
+- [x] 1.5 `migrate.py` i `schema_version.py` — bliźniaki z `agent`
+- [x] 1.6 `auth.py` — odczyt tożsamości ustalonej przed modułem
+- [x] 1.7 `app.py` — `lifespan` w kolejności: ustawienia, pula, blokada, migracje, sprawdzenie rewizji
+- [x] 1.8 `GET /health` poza wymaganiem tożsamości
+- [x] 1.9 Testy: odmowa startu przy każdej niespójnej konfiguracji z 1.3 i przy trybie lokalnym ze zdalnym adresem
+
+  PR #105. Jedno odstępstwo od planu: pusty szkielet Alembica (`migrations/env.py`,
+  `alembic.ini`, puste `versions/`) wylądował tutaj zamiast w grupie 2, bo
+  `schema_version.expected_heads()` potrzebuje istniejącego katalogu migracji, żeby
+  w ogóle zadziałać — zero migracji jest poprawnym stanem „na głowie".
 
 ## 2. Schemat bazy
 
-- [ ] 2.1 Alembic w module — `migrations/env.py`, pierwsza rewizja
-- [ ] 2.2 Tabele `teams` i `team_revisions` (definicja jako JSONB, wersja, właściciel)
-- [ ] 2.3 Tabele `runs`, `run_steps`, `tool_calls`
-- [ ] 2.4 Tabela `usage` ze stawkami zapisywanymi na wierszu
-- [ ] 2.5 Testy `-m db`: migracja od zera dochodzi do rewizji czołowej
+- [x] 2.1 Alembic w module — `migrations/env.py`, pierwsza rewizja
+- [x] 2.2 Tabele `teams` i `team_revisions` (definicja jako JSONB, wersja, właściciel)
+- [x] 2.3 Tabele `runs`, `run_steps`, `tool_calls`
+- [x] 2.4 Tabela `usage` ze stawkami zapisywanymi na wierszu
+- [x] 2.5 Testy `-m db`: migracja od zera dochodzi do rewizji czołowej
+
+  PR #106. `env.py` już istniał z grupy 1 — tu doszła pierwsza rewizja (trzy migracje:
+  `0001` katalog, `0002` przebiegi, `0003` zużycie). `run_steps` to jeden wiersz na
+  agenta w przebiegu, nie na rundę — rundy siedzą w `tool_calls`, jak w `agent`
+  rozdzielone są `messages`/`tool_calls`.
 
 ## 3. Kontrakt i jego generowanie
 
