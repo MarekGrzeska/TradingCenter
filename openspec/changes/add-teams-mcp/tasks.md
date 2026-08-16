@@ -100,10 +100,10 @@
 
 ## 8. CI i wdrożenie
 
-- [ ] 8.1 Job `teams-mcp` w `checks.yml` z filtrem po katalogu modułu
-- [ ] 8.2 Zmiana `teams/contract.py` wciąga job `teams-mcp` — migawka jest tam po to, żeby
+- [x] 8.1 Job `teams-mcp` w `checks.yml` z filtrem po katalogu modułu
+- [x] 8.2 Zmiana `teams/contract.py` wciąga job `teams-mcp` — migawka jest tam po to, żeby
   łapać rozjazd
-- [ ] 8.3 `deploy-teams-mcp.yml` — obraz do GHCR, wdrożenie, smoke check sięgający procesu
+- [x] 8.3 `deploy-teams-mcp.yml` — obraz do GHCR, wdrożenie, smoke check sięgający procesu
   przez `/health`, nie warstwy sterującej
 
 ## 9. Stos deweloperski i dokumentacja
