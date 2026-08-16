@@ -134,8 +134,8 @@
     <tr>
       <td><strong>2 · narzędzia handlowe</strong><br><span class="dim">add-trading-tools</span></td>
       <td>moduł <code>trading-mcp</code>, dwa serwery narzędzi, limity handlowe, ślad zleceń</td>
-      <td class="num">61 / 64</td>
-      <td><span class="pill warn">kod komplet</span><br><span class="dim">zostaje <code>apply</code>, obraz i domknięcie</span></td>
+      <td class="num">64 / 64</td>
+      <td><span class="pill good">zamknięta</span><br><span class="dim">przegląd napisany, infrastruktura postawiona, obrazu brak</span></td>
     </tr>
     <tr>
       <td><strong>3 · harmonogramy</strong><br><span class="dim">add-teams-schedules-and-triggers</span></td>
@@ -157,7 +157,7 @@
 
 <p>Faza 1 przestała być samym kodem 17 sierpnia: wykonany został <code>terraform apply</code>, a razem z nim kroki, których terraform nie robi. Jedna rzecz została i to ona odróżnia „infrastruktura stoi" od „moduł odpowiada".</p>
 
-<p>Faza 2 jest o krok wcześniej: infrastruktura <code>trading-mcp</code> jest <strong>opisana i zaplanowana, ale nie zaaplikowana</strong>. <code>terraform plan</code> na żywym stanie mówi <code>5 do utworzenia, 12 do zmiany, 0 do usunięcia</code> — i tyle. <code>apply</code> należy do operatora i nie może należeć do CI: trzy z tych pięciu zasobów to <code>azuread_*</code>, a <code>terraform-apply.yml</code> odmawia każdemu planowi, który ich dotyka.</p>
+<p>Faza 2 przeszła tę samą granicę 17 sierpnia: <code>terraform apply</code> wykonany w kolejności z README modułu — najpierw <code>-target</code> na App Service (3 dodane, 5 zmienionych), potem pełny <code>apply</code> (2 dodane, 7 zmienionych, <strong>0 usuniętych</strong>). Stan poniżej jest odczytem z Azure po tym applyu, a nie ze stanu Terraforma.</p>
 
 <div class="scroll">
 <table>
@@ -170,7 +170,11 @@
     <tr><td class="field">sekret <code>teams-openai-api-key</code></td><td><span class="pill good">stoi</span></td><td>osobna linia na rachunku OpenAI, nie klucz agenta</td></tr>
     <tr><td class="field">32 reguły zapory, polityka Key Vaulta, <code>allowed_applications</code></td><td><span class="pill good">stoi</span></td><td>każda reguła to osobna aktualizacja serwera — apply szedł ponad godzinę</td></tr>
     <tr><td class="field">obraz aplikacji <code>teams</code></td><td><span class="pill bad">brak</span></td><td>App Service chodzi na zaślepce</td></tr>
-    <tr><td class="field">wszystko dla <code>trading-mcp</code></td><td><span class="pill warn">zaplanowane</span></td><td>rejestracja, App Service, polityka Key Vaulta, reguła w zaporze gatewaya, ustawienia <code>TRADING_MCP_*</code> w teams — czeka na <code>apply</code> operatora</td></tr>
+    <tr><td class="field">app-tradingcenter-trading-mcp</td><td><span class="pill good">stoi</span></td><td>Easy Auth z <code>/health</code> poza wymaganiem, <code>Return401</code></td></tr>
+    <tr><td class="field"><code>allowed_applications</code> modułu</td><td><span class="pill good">stoi</span></td><td><strong>jeden wpis</strong>, sprawdzony przez <code>az ad sp show</code> jako tożsamość <code>app-tradingcenter-teams</code></td></tr>
+    <tr><td class="field">32 reguły <code>AllowTradingMcp-*</code> w zaporze gatewaya</td><td><span class="pill good">stoi</span></td><td>osobny blok obok reguł market-data, nie poszerzenie tamtych</td></tr>
+    <tr><td class="field">polityka Key Vaulta, <code>TRADING_MCP_*</code> w teams</td><td><span class="pill good">stoi</span></td><td>nowego sekretu nie było — moduł czyta <code>gateway-api-key</code></td></tr>
+    <tr><td class="field">obraz aplikacji <code>trading-mcp</code></td><td><span class="pill bad">brak</span></td><td><code>/health</code> odpowiada 503, tak samo jak teams i z tego samego powodu</td></tr>
   </tbody>
 </table>
 </div>
@@ -213,10 +217,16 @@
   <p>Ta sama właściwość ma drugą stronę, którą widać lokalnie: moduł <strong>wychodzi</strong> zamiast się degradować, a <code>dev.sh</code> ubija wtedy cały stos komunikatem „a service exited", który nie mówi, o co chodziło. Dlatego oba skrypty porównują <code>CAPITAL_GATEWAY_API_KEY</code> z <code>GATEWAY_API_KEY</code> gatewaya i odmawiają, zanim cokolwiek wystartuje.</p>
 </div>
 
+<h4>Co powiedział przegląd</h4>
+
+<p><code>review.md</code> napisany, <strong>sześć znalezisk i wszystkie w jednym miejscu</strong>: przy obietnicy, na której ten moduł stoi — że model odróżni „twoje żądanie było złe" od „nie mogłem zapytać". Najostrzejsze z nich: <strong>401 od gatewaya, czyli odrzucone poświadczenie tego modułu, docierał do modelu jako odmowa zlecenia</strong>. Agent dostawał sygnał „popraw zlecenie" dla czegoś, na co nikt nawet nie spojrzał, i spalał na tym rundy.</p>
+
+<p>Trzy z sześciu zamknęła jedna zmiana: jedna lista statusów (<code>5xx</code>, 401, 403, 408, 429) w <code>errors.py</code>, czytana przez oba seamy narzędzi i przez pamięć bramki demo. Dwa dalsze to bramka demo przeniesiona do środka <code>_write</code> — jej awarie były jedynymi w module docierającymi bez tłumaczenia i bez zdania, które w tym miejscu jest najważniejsze („nic nie zostało wysłane") — oraz odmowa <code>level</code> przy zleceniu MARKET, które gateway milcząco odrzuca, przez co pułap ceny agenta znikał bez śladu. Szósty, granica 30 s, okazał się dobrą decyzją opartą na złej arytmetyce: liczba została, uzasadnienie poprawione. Dziesięć nowych testów, 68 zielonych wobec 58.</p>
+
 <h4>Co zostało</h4>
 <ul>
-  <li><strong>Grupa 11 — domknięcie.</strong> Przykładowy zespół handlowy w katalogu, przebieg od końca do końca zakończony zleceniem na koncie demo, <code>review.md</code>.</li>
-  <li><strong><code>terraform apply</code> operatora</strong> i wypchnięcie obrazu — dopóki ich nie ma, <code>trading-mcp</code> istnieje w repozytorium i w planie, a nie w Azure.</li>
+  <li><strong>Obraz.</strong> To jedyna rzecz, która dzieli „infrastruktura stoi" od „moduł odpowiada" — i dotyczy teraz obu modułów naraz.</li>
+  <li><strong>11.1 i 11.2 zamknięte bez wykonania, decyzją operatora</strong> — zespół przykładowy i przebieg zakończony zleceniem na koncie demo domykają się razem z fazą 3, która i tak dotyka tej samej ścieżki uruchamiania. Nic w tej fazie nie było sprawdzone przeciw prawdziwemu kontu; wszystko, co dotyczy gatewaya, przechodzi dziś przez dublera w testach.</li>
   <li>Poza grupami, zauważone przy okazji: <strong>granice kosztu nadal nie mają w terminalu żadnego wybieraka.</strong> Jadą na drucie od fazy 1 i nigdy go nie miały — dołożenie ich przy granicach handlowych rozszerzyłoby tę zmianę o cudzy brak, więc jest to zapisane jako dziura, nie zrobione po cichu.</li>
 </ul>
 
@@ -245,18 +255,17 @@
 
 <ol>
   <li><strong>Spiąć <code>read_only</code> z <code>STATE_CHANGING_TOOLS</code></strong> — jedyna rzecz na tej liście, która jest luką w ochronie, a nie brakiem funkcji.</li>
-  <li><strong>Wypchnąć obraz teams do Azure</strong> — gałąź w filtrze <code>push:</code>, workflow, smoke check na <code>/health</code>, filtr z powrotem. Dopiero wtedy „moduł stoi" jest prawdziwe.</li>
+  <li><strong>Wypchnąć obrazy teams i trading-mcp do Azure</strong> — gałąź w filtrze <code>push:</code>, workflow, smoke check na <code>/health</code>, filtr z powrotem. Dwa moduły, jedna droga, i dopiero po niej „moduł stoi" jest prawdziwe. Przy <code>trading-mcp</code> ta sonda mówi więcej niż zwykle: proces nie otwiera portu, dopóki gateway nie potwierdzi konta demo, więc 200 znaczy „dotarł, przez zaporę, właściwym kluczem, i to jest demo".</li>
   <li><strong>Przebieg od końca do końca</strong> — jeden prawdziwy przebieg powie to, czego nie powie żaden test: ile kosztuje i czy odpowiedzi składają się w cokolwiek. Zamyka 14.2 fazy 1 i 8.2 fazy 3.</li>
-  <li><strong>Faza 2: <code>apply</code>, obraz, grupa 11</strong> — <code>terraform apply -target</code> na App Service, potem pełny <code>apply</code>, potem obraz tą samą drogą co teams. Na końcu przykładowy zespół, przebieg i przegląd. Kod jest cały; brakuje tego, co robi się z klawiatury operatora.</li>
-  <li><strong>Faza 3: konfiguracja, README, przegląd.</strong></li>
+  <li><strong>Faza 3: konfiguracja, README, przegląd</strong> — plus przykładowy zespół i przebieg od końca do końca, które faza 2 zostawiła jej świadomie.</li>
   <li><strong>Jeden merge <code>feat/teams-platform</code> → <code>main</code></strong>, gdy fazy są domknięte — i dopiero wtedy <code>deploy-*.yml</code> oraz <code>terraform plan</code> na <code>main</code> zaczynają mówić prawdę.</li>
 </ol>
 
 <footer>
   Stan wynika z <code>tasks.md</code> trzech zmian OpenSpec, odczytu Azure przez <code>az</code> i przebiegów testów na
-  <code>feat/teams-platform</code>: <code>teams</code> 337 zielonych, <code>trading-mcp</code> 58, terminal 853
-  (840 przed grupą 8). Stan Azure dla fazy 2 jest odczytem z <code>terraform plan</code>, nie z
-  <code>az</code> — bo nie ma tam jeszcze czego czytać.
+  <code>feat/teams-platform</code>: <code>teams</code> 337 zielonych, <code>trading-mcp</code> 68
+  (58 przed przeglądem), terminal 853 (840 przed grupą 8). Stan Azure odczytany przez
+  <code>az</code> po wykonanym <code>apply</code>, nie ze stanu Terraforma.
   Dokument opisuje jeden dzień i zestarzeje się jak każdy raport — jeśli nie zgadza się z <code>tasks.md</code>, to
   <code>tasks.md</code> ma rację.
 </footer>

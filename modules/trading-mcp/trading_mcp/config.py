@@ -25,9 +25,25 @@ class Settings(BaseSettings):
     # --- capital-gateway, this module's only upstream ---
     capital_gateway_url: str = "http://127.0.0.1:8010"
     capital_gateway_api_key: str
-    # The gateway's own worst case is its confirm-poll loop (adapter.py, 5 attempts *
-    # 0.4s) layered on its own 20s upstream timeout (client.py) — this has to outlast
-    # both, or a slow-but-real settlement reads as this module's own failure.
+    # Chosen against the gateway's *ordinary* worst case, not its pathological one, and
+    # the difference is worth stating because the arithmetic here was wrong once.
+    #
+    # Ordinary: one slow upstream call (`capital_gateway/client.py`, 20s) plus the
+    # confirm-poll loop answering promptly (`adapter.py`, 5 attempts, 0.4s apart) ≈ 22s.
+    # 30 covers that with room.
+    #
+    # Pathological: every one of those 5 polls *itself* times out at 20s, and the
+    # gateway takes ~122s to answer at all. Nothing here waits that long on purpose. A
+    # gateway in that state is a gateway in trouble, and this module's answer —
+    # "access failure, the effect on the account is unknown, go read positions, do not
+    # repeat this call" — is the true one; the order it stopped waiting for may well
+    # have filled, and saying so is exactly what `outcome` unknown means downstream
+    # (`teams`' trade trace keeps that row as `sent`).
+    #
+    # So: raising this buys precision in a case where the gateway is already failing,
+    # and costs an agent — and the operator watching it — two minutes of a run's
+    # 15-minute ceiling on every such call. `teams` sets its own ceiling just past this
+    # one (35s) so the layering stays in this order.
     capital_gateway_request_timeout_seconds: float = 30.0
 
     # --- this module's own HTTP surface, for the streamable-http transport ---

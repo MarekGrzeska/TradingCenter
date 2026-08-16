@@ -430,3 +430,148 @@ async def test_write_refuses_when_the_gateway_is_not_demo(server) -> None:
 
     assert order_route.calls.call_count == 0
     await gateway.aclose()
+
+
+# --- the boundary between "your request was wrong" and "I could not ask" ---
+
+
+@respx.mock
+async def test_a_rejected_caller_key_is_an_access_failure_not_a_refusal(server) -> None:
+    """A 401 is this module's own credential being turned away — nobody looked at the
+    order. Reported as a refusal it would send an agent off re-editing an order that was
+    never the problem (specs/trading-mcp-tools, "Odmowa narzędzia jest odróżnialna od
+    awarii dostępu")."""
+    mcp, gateway = server
+    _capabilities_demo()
+    respx.post(f"{BASE}/orders").mock(
+        return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
+    )
+
+    with pytest.raises(ToolError, match="access failure") as excinfo:
+        await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
+
+    assert "unknown" in str(excinfo.value)
+    await gateway.aclose()
+
+
+@respx.mock
+async def test_a_rate_limited_write_is_an_access_failure(server) -> None:
+    mcp, gateway = server
+    _capabilities_demo()
+    respx.post(f"{BASE}/orders").mock(
+        return_value=httpx.Response(429, json={"detail": "too many requests"})
+    )
+
+    with pytest.raises(ToolError, match="access failure"):
+        await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
+    await gateway.aclose()
+
+
+@respx.mock
+async def test_a_404_on_a_position_stays_a_refusal(server) -> None:
+    """The other side of the same boundary: an id that is gone is an answer about the
+    request, and it names what to change."""
+    mcp, gateway = server
+    _capabilities_demo()
+    respx.delete(f"{BASE}/positions/gone").mock(
+        return_value=httpx.Response(404, json={"detail": "no such position"})
+    )
+
+    with pytest.raises(ToolError, match="refused") as excinfo:
+        await mcp.call_tool("close_position", {"position_id": "gone"})
+
+    assert "access failure" not in str(excinfo.value)
+    await gateway.aclose()
+
+
+# --- arguments a MARKET order cannot carry ---
+
+
+@respx.mock
+async def test_a_market_order_with_a_level_is_refused_before_any_request(server) -> None:
+    """capital-gateway drops `level` and `good_till` from a MARKET order without a word,
+    and the `level` that comes back is the fill price — so an agent that meant "buy, but
+    not above this" would be filled anywhere and read nothing about it."""
+    mcp, gateway = server
+    _capabilities_demo()
+    order_route = respx.post(f"{BASE}/orders")
+
+    with pytest.raises(ToolError, match="ignored") as excinfo:
+        await mcp.call_tool(
+            "place_order",
+            {"symbol": "GOLD", "direction": "BUY", "size": 0.1, "level": 2400.0},
+        )
+
+    assert "LIMIT" in str(excinfo.value)
+    assert order_route.calls.call_count == 0
+    await gateway.aclose()
+
+
+@respx.mock
+async def test_a_market_order_with_good_till_is_refused_and_names_it(server) -> None:
+    mcp, gateway = server
+    _capabilities_demo()
+    order_route = respx.post(f"{BASE}/orders")
+
+    with pytest.raises(ToolError, match="good_till"):
+        await mcp.call_tool(
+            "place_order",
+            {
+                "symbol": "GOLD",
+                "direction": "BUY",
+                "size": 0.1,
+                "good_till": "2026-08-18T10:00:00Z",
+            },
+        )
+
+    assert order_route.calls.call_count == 0
+    await gateway.aclose()
+
+
+# --- the demo check's own failures are this module's, and nothing was sent ---
+
+
+@respx.mock
+async def test_an_unreachable_gateway_during_the_demo_check_says_nothing_was_sent(server) -> None:
+    mcp, gateway = server
+    respx.get(f"{BASE}/capabilities").mock(side_effect=httpx.ConnectError("dropped"))
+    order_route = respx.post(f"{BASE}/orders")
+
+    with pytest.raises(ToolError, match="access failure") as excinfo:
+        await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
+
+    assert "Nothing was sent" in str(excinfo.value)
+    assert order_route.calls.call_count == 0
+    await gateway.aclose()
+
+
+@respx.mock
+async def test_a_refused_demo_check_is_an_access_failure_not_an_order_refusal(server) -> None:
+    mcp, gateway = server
+    respx.get(f"{BASE}/capabilities").mock(
+        return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
+    )
+    order_route = respx.post(f"{BASE}/orders")
+
+    with pytest.raises(ToolError, match="access failure") as excinfo:
+        await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
+
+    assert "Nothing was sent" in str(excinfo.value)
+    assert order_route.calls.call_count == 0
+    await gateway.aclose()
+
+
+@respx.mock
+async def test_a_live_account_is_refused_with_nothing_sent(server) -> None:
+    mcp, gateway = server
+    respx.get(f"{BASE}/capabilities").mock(
+        return_value=httpx.Response(200, json={"environment": "live"})
+    )
+    order_route = respx.post(f"{BASE}/orders")
+
+    with pytest.raises(ToolError, match="refused") as excinfo:
+        await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
+
+    assert "Nothing was sent" in str(excinfo.value)
+    assert order_route.calls.call_count == 0
+    await gateway.aclose()

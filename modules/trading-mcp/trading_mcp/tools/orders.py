@@ -1,8 +1,14 @@
-"""Changing the account: place, close, amend, cancel. Every tool here re-checks the
-demo environment before the gateway is touched (`GatewayClient.
-ensure_demo_environment`, cheap unless a prior call failed) and is never retried by
-this module on its own failure (specs/trading-mcp-execution, "Moduł nie ponawia
-zlecenia po własnej awarii").
+"""Changing the account: place, close, amend, cancel.
+
+Every tool here re-checks the demo environment before the gateway is touched — inside
+`_write`, which is also where its failures get the same wording as every other failure
+in this module (`_shared.py`'s own docstring says why that moved). What is left in this
+file is what each tool alone can decide: the arguments that cannot mean anything
+together, refused before a request is built rather than after the account has an
+opinion about them.
+
+No tool here is retried by this module on its own failure (specs/trading-mcp-execution,
+"Moduł nie ponawia zlecenia po własnej awarii").
 """
 
 from __future__ import annotations
@@ -40,6 +46,22 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
             raise ToolRefusal(
                 f"refused: {order_type} orders need a target level — provide `level`."
             )
+        # The mirror of the line above, and it is the one that costs money if it is
+        # missing: `capital-gateway` builds a MARKET order from symbol, direction, size
+        # and the two stops, and **silently drops `level` and `good_till`**
+        # (`capital_gateway/adapter.py`). An agent that meant "buy, but not above this
+        # price" would be filled at whatever the market is, and the `level` it reads back
+        # is the fill price — so nothing in the answer reveals its cap was ignored.
+        # Refused by name instead, with both ways out of it.
+        if order_type == "MARKET":
+            ignored = [name for name, value in (("level", level), ("good_till", good_till)) if value is not None]
+            if ignored:
+                raise ToolRefusal(
+                    f"refused: a MARKET order fills at the current price, so "
+                    f"{' and '.join(ignored)} would be ignored, not honoured. Drop "
+                    f"{'them' if len(ignored) > 1 else 'it'}, or ask for a LIMIT or STOP "
+                    "order, which rests until the market reaches `level`."
+                )
         body: dict[str, str | float] = {
             "symbol": symbol,
             "direction": direction,
@@ -55,13 +77,11 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
         if good_till is not None:
             body["good_till"] = good_till
 
-        await gateway.ensure_demo_environment()
         return await _write(gateway, "POST", "/orders", json=body)
 
     @mcp.tool(annotations=WRITE)
     async def close_position(position_id: str) -> OrderResultOut:
         """Close an open position by id. Read `get_positions` first for the id."""
-        await gateway.ensure_demo_environment()
         return await _write(gateway, "DELETE", f"/positions/{position_id}")
 
     @mcp.tool(annotations=WRITE)
@@ -99,12 +119,10 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
         elif take_profit is not None:
             body["take_profit"] = take_profit
 
-        await gateway.ensure_demo_environment()
         return await _write(gateway, "PUT", f"/positions/{position_id}", json=body)
 
     @mcp.tool(annotations=WRITE)
     async def cancel_working_order(order_id: str) -> OrderResultOut:
         """Cancel a resting LIMIT or STOP order by id. Read `get_working_orders`
         first for the id."""
-        await gateway.ensure_demo_environment()
         return await _write(gateway, "DELETE", f"/working-orders/{order_id}")

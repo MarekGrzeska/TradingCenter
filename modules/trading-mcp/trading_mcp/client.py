@@ -71,7 +71,7 @@ class GatewayClient:
 
     async def _send(self, method: str, path: str, **kwargs) -> httpx.Response:
         try:
-            return await self._http.request(method, path, **kwargs)
+            response = await self._http.request(method, path, **kwargs)
         except httpx.TimeoutException as err:
             self._demo_verified = False
             raise GatewayUnavailable(
@@ -81,6 +81,20 @@ class GatewayClient:
         except httpx.RequestError as err:
             self._demo_verified = False
             raise GatewayUnavailable(f"the gateway is unreachable: {err}") from err
+
+        # An error *response* is a failed call too, and forgetting that is how the
+        # re-check came to skip the case it exists for: a gateway restarted behind App
+        # Service answers 503, not a `RequestError`, so a connection that dropped and
+        # came back would have kept using an environment answer taken before it did
+        # (specs/trading-mcp-upstream-access, "Gateway zmienia środowisko przy
+        # odzyskanym połączeniu").
+        #
+        # Every error status, not only the ones `is_access_failure` names: this is a
+        # cache being invalidated, not a caller being told something, and the cost of
+        # being wrong is one extra `/capabilities` read before the next write.
+        if response.is_error:
+            self._demo_verified = False
+        return response
 
 
 def _parsed(response: httpx.Response) -> dict:

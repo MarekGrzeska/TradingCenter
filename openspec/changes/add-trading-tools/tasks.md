@@ -312,9 +312,36 @@
 
 ## 11. Domknięcie
 
-- [ ] 11.1 Przykładowy zespół handlowy w katalogu jako punkt wyjścia dla operatora
-- [ ] 11.2 Przebieg od końca do końca na uruchomionym stosie, zakończony zleceniem na koncie demo
-- [ ] 11.3 `review.md`
+- [x] 11.1 ~~Przykładowy zespół handlowy w katalogu jako punkt wyjścia dla operatora~~ —
+  **zamknięte bez wykonania, decyzją operatora**: domyka się razem z fazą 3
+- [x] 11.2 ~~Przebieg od końca do końca na uruchomionym stosie, zakończony zleceniem na
+  koncie demo~~ — **zamknięte bez wykonania, decyzją operatora**: rynek w niedzielę jest
+  zamknięty, a faza 3 dotyka tej samej ścieżki uruchamiania przebiegu, więc oba domykają się
+  razem z nią
+- [x] 11.3 `review.md`
+
+  **Przegląd znalazł sześć defektów i wszystkie skupiały się wokół jednej obietnicy tego
+  modułu** — że model odróżni „twoje żądanie było złe" od „nie mogłem zapytać". Trzy z nich
+  zamknęła jedna zmiana: `GatewayRefused.is_access_failure` w `errors.py`, jedna lista
+  statusów (`5xx`, 401, 403, 408, 429) czytana przez oba seamy w `_shared.py`. Wcześniej 401
+  — odrzucone poświadczenie tego modułu — docierał do modelu jako odmowa zlecenia, czyli
+  sygnał „popraw zlecenie" dla czegoś, na co nikt nie spojrzał.
+
+  Dwa dalsze: bramka demo przeniesiona do środka `_write` (jej awarie były jedynymi w module
+  docierającymi do wołającego bez tłumaczenia i bez zdania, które w tym miejscu jest
+  najważniejsze — *nic nie zostało wysłane*), oraz odmowa `level`/`good_till` przy zleceniu
+  MARKET, które gateway milcząco odrzuca. Szósty — granica 30 s — okazał się dobrą decyzją
+  opartą na złej arytmetyce i został zamknięty poprawionym uzasadnieniem, nie zmianą liczby.
+
+  Dziesięć nowych testów: **68 zielonych** wobec 58 przed przeglądem.
+
+  **`terraform apply` wykonany** — pierwszy raz w tej serii faz. Kolejność z README:
+  `-target` na App Service (3 dodane, 5 zmienionych), potem pełny `apply` (2 dodane, 7
+  zmienionych, 0 usuniętych). Stan sprawdzony potem odczytem z Azure, nie ze stanu
+  Terraforma: `allowedApplications` z jednym wpisem potwierdzonym jako tożsamość `teams`,
+  `/health` poza Easy Auth, 32 reguły w zaporze gatewaya, polityka Key Vaulta,
+  `TRADING_MCP_*` w ustawieniach `teams`. Obrazu nadal nie ma — `/health` odpowiada 503, tak
+  samo jak `teams`, i z tego samego powodu.
 
 ## Nota o równoległości z fazą 3
 

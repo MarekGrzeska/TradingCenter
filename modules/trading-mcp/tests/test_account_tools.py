@@ -156,3 +156,21 @@ async def test_a_gateway_refusal_names_the_detail(server) -> None:
     with pytest.raises(ToolError, match="bad request"):
         await mcp.call_tool("get_positions", {})
     await gateway.aclose()
+
+
+@respx.mock
+async def test_a_read_the_gateway_would_not_serve_is_an_access_failure(server) -> None:
+    """A 401 or a 503 on a read means the read never happened. Answered as a refusal it
+    would read as an answer *about the account* — which is the one thing this module's
+    tools must never let a caller believe (specs/trading-mcp-tools, "Odmowa narzędzia
+    jest odróżnialna od awarii dostępu")."""
+    mcp, gateway = server
+    respx.get(f"{BASE}/positions").mock(
+        return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
+    )
+
+    with pytest.raises(ToolError, match="access failure") as excinfo:
+        await mcp.call_tool("get_positions", {})
+
+    assert "Nothing was read" in str(excinfo.value)
+    await gateway.aclose()

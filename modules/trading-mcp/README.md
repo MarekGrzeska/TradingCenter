@@ -32,14 +32,19 @@ to mean something (specs/trading-mcp-transport).
 - `tools/account.py` — `get_positions`, `get_working_orders`, `get_balance`: reads,
   annotated `readOnlyHint=True`.
 - `tools/orders.py` — `place_order`, `close_position`, `amend_stops`,
-  `cancel_working_order`: writes, annotated as changing state. Every one re-checks
-  the demo environment before touching the gateway and is never retried by this
-  module on its own failure.
+  `cancel_working_order`: writes, annotated as changing state, never retried by this
+  module on its own failure. What each one decides for itself is only what its own
+  arguments cannot mean together — a LIMIT with no `level`, a MARKET carrying one
+  (capital-gateway drops it without a word), a stop both set and cleared.
 - `tools/_shared.py` — the two seams every tool goes through: `_read` and `_write`,
   which turn a `GatewayClient` outcome into a refusal, an access failure, or a
   settled/unsettled `OrderResultOut`. A provider `REJECTED` is a refusal naming the
   reason; a `PENDING` settlement is `outcome="unsettled"`, carried through rather
-  than resolved.
+  than resolved. `_write` also owns the demo check, so its failures carry the same
+  wording as every other one here and say the thing that matters at that point:
+  nothing was sent. Which gateway status is a refusal and which is "I could not ask"
+  is `GatewayRefused.is_access_failure` — one list, in `errors.py`, because a 401
+  read as a refusal sends an agent re-editing an order nobody looked at.
 
 ## Running
 

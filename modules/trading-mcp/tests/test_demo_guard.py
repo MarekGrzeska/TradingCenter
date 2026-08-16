@@ -9,7 +9,7 @@ import respx
 
 from trading_mcp.client import GatewayClient
 from trading_mcp.config import Settings
-from trading_mcp.errors import GatewayUnavailable, NotDemoEnvironment
+from trading_mcp.errors import GatewayRefused, GatewayUnavailable, NotDemoEnvironment
 
 BASE = "http://127.0.0.1:8010"
 
@@ -67,6 +67,27 @@ async def test_a_failed_call_forces_a_fresh_check_next_time(client: GatewayClien
 
     respx.get(f"{BASE}/positions").mock(side_effect=httpx.ConnectError("dropped"))
     with pytest.raises(GatewayUnavailable):
+        await client.get("/positions")
+
+    await client.ensure_demo_environment()
+    assert route.call_count == 2
+    await client.aclose()
+
+
+@respx.mock
+async def test_an_error_response_also_forces_a_fresh_check(client: GatewayClient) -> None:
+    """The case the transport-error test above does not cover, and the one that actually
+    happens in Azure: a gateway restarted behind App Service answers 503, not a
+    `RequestError`. Trusting the environment answer taken before that restart is exactly
+    what the re-check exists to prevent."""
+    route = respx.get(f"{BASE}/capabilities").mock(
+        return_value=httpx.Response(200, json={"environment": "demo"})
+    )
+    await client.ensure_demo_environment()
+    assert route.call_count == 1
+
+    respx.get(f"{BASE}/positions").mock(return_value=httpx.Response(503, json={"detail": "down"}))
+    with pytest.raises(GatewayRefused):
         await client.get("/positions")
 
     await client.ensure_demo_environment()
