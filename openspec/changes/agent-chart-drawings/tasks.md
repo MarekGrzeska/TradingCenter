@@ -21,18 +21,18 @@
 
 ## 3. Publikacja rysunków
 
-- [ ] 3.1 `agent/contract.py`: `ChartDrawingOut` jako unia dyskryminowana, `PatchDrawingIn` na ceny i etykietę
-- [ ] 3.2 `agent/routers/drawings.py`: `GET /drawings?symbol=`, `PATCH /drawings/{id}`, `DELETE /drawings/{id}` — globalne, `current_principal` wyłącznie do odrzucenia nieuwierzytelnionego żądania
-- [ ] 3.3 `PATCH` zachowuje tożsamość rysunku i nie pozwala zmienić `kind` ani `symbol`
-- [ ] 3.4 `DELETE` nieistniejącego rysunku odpowiada 404, a nie cichym sukcesem
-- [ ] 3.5 Router wpięty w `agent/app.py`
-- [ ] 3.6 Testy routera: odczyt po symbolu nie zwraca cudzych rysunków, poprawka zachowuje identyfikator, usunięcie jest trwałe
+- [x] 3.1 `agent/contract.py`: `ChartDrawingOut` jako unia dyskryminowana, `PatchDrawingIn` na ceny i etykietę
+- [x] 3.2 `agent/routers/drawings.py`: `GET /drawings?symbol=`, `PATCH /drawings/{id}`, `DELETE /drawings/{id}` — globalne, `current_principal` wyłącznie do odrzucenia nieuwierzytelnionego żądania
+- [x] 3.3 `PATCH` zachowuje tożsamość rysunku i nie pozwala zmienić `kind` ani `symbol`
+- [x] 3.4 `DELETE` nieistniejącego rysunku odpowiada 404, a nie cichym sukcesem
+- [x] 3.5 Router wpięty w `agent/app.py`
+- [x] 3.6 Testy routera: odczyt po symbolu nie zwraca cudzych rysunków, poprawka zachowuje identyfikator, usunięcie jest trwałe
 
 ## 4. Prompt systemowy
 
-- [ ] 4.1 Migracja seedująca nową rewizję: akapit o obu narzędziach, tekst poprzedniej rewizji przepisany w całości (oba warianty)
-- [ ] 4.2 Zdanie odróżniające rysunek operatora od `levels_near_price` — jedno jest ustaleniem, drugie odczytem z archiwum
-- [ ] 4.3 Test sprawdzający, że rewizja istnieje i niesie obie nazwy narzędzi
+- [x] 4.1 Migracja seedująca nową rewizję: akapit o obu narzędziach, tekst poprzedniej rewizji przepisany w całości (oba warianty)
+- [x] 4.2 Zdanie odróżniające rysunek operatora od `levels_near_price` — jedno jest ustaleniem, drugie odczytem z archiwum
+- [x] 4.3 Test sprawdzający, że rewizja istnieje i niesie obie nazwy narzędzi
 
 ## 5. Terminal: odczyt i zapis rysunków
 

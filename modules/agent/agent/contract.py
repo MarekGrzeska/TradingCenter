@@ -6,16 +6,21 @@ sides rather than wired into `pnpm contract:generate`, which is market-data's al
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 from .models import (
     ChartCommand,
+    ChartDrawing,
     ChartFocus,
     ChartIndicator,
+    ChartLevel,
     ChartSnapshot,
+    ChartZone,
     Message,
     PromptRevision,
     RecordedCall,
@@ -299,6 +304,133 @@ class ChartCommandOut(BaseModel):
             focus=None if command.focus is None else ChartFocusOut.from_focus(command.focus),
             created_at=command.created_at,
         )
+
+
+class ChartLevelOut(BaseModel):
+    kind: Literal["level"] = "level"
+    price: float
+    at: datetime | None
+
+
+class ChartZoneOut(BaseModel):
+    kind: Literal["zone"] = "zone"
+    top: float
+    bottom: float
+    from_: datetime | None = Field(default=None, serialization_alias="from")
+    to: datetime | None
+
+
+class ChartPointOut(BaseModel):
+    time: datetime
+    price: float
+
+
+class ChartTrendlineOut(BaseModel):
+    kind: Literal["trendline"] = "trendline"
+    a: ChartPointOut
+    b: ChartPointOut
+
+
+ChartGeometryOut = Annotated[
+    ChartLevelOut | ChartZoneOut | ChartTrendlineOut, Field(discriminator="kind")
+]
+
+
+class ChartDrawingOut(BaseModel):
+    """One object standing on an instrument's chart.
+
+    The geometry is a union discriminated by `kind`, with each shape's fields named for
+    what they are — a consumer reading `top` and `bottom` cannot mix them up the way one
+    reading the storage's `price_a`/`price_b` could (design.md, "Zapis: cztery kolumny
+    geometrii i CHECK per kształt; druty: unia po `kind`").
+
+    No `sequence` and no cursor: this is the instrument's state, read whole and replaced
+    whole, not a log a consumer catches up with (`ChartCommandOut` is the other one).
+    """
+
+    id: int
+    symbol: str
+    geometry: ChartGeometryOut
+    label: str | None
+    color: str | None
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_drawing(cls, drawing: ChartDrawing) -> ChartDrawingOut:
+        geometry = drawing.geometry
+        shape: ChartGeometryOut
+        if isinstance(geometry, ChartLevel):
+            shape = ChartLevelOut(price=geometry.price, at=geometry.at)
+        elif isinstance(geometry, ChartZone):
+            shape = ChartZoneOut(
+                top=geometry.top, bottom=geometry.bottom, from_=geometry.from_, to=geometry.to
+            )
+        else:
+            shape = ChartTrendlineOut(
+                a=ChartPointOut(time=geometry.a.time, price=geometry.a.price),
+                b=ChartPointOut(time=geometry.b.time, price=geometry.b.price),
+            )
+        return cls(
+            id=drawing.id,
+            symbol=drawing.symbol,
+            geometry=shape,
+            label=geometry.label,
+            color=geometry.color,
+            created_at=drawing.created_at,
+            updated_at=drawing.updated_at,
+        )
+
+
+class PatchDrawingIn(BaseModel):
+    """What the operator may correct by hand: the prices and the caption.
+
+    Not `kind` and not `symbol` — a level that became a zone, or a drawing that moved to
+    another instrument, is a different drawing and should be made as one
+    (specs/agent-chart-drawings, "Poprawienie MUST zachować tożsamość rysunku").
+
+    One field per price *role*, not per column: which of them a request may carry depends
+    on the drawing's `kind`, and the route refuses the ones that do not belong to it
+    rather than silently writing into a column that means something else there.
+    """
+
+    price: float | None = Field(default=None, description="a level's price")
+    top: float | None = Field(default=None, description="a zone's upper price")
+    bottom: float | None = Field(default=None, description="a zone's lower price")
+    a_price: float | None = Field(default=None, description="a trend line's first price")
+    b_price: float | None = Field(default=None, description="a trend line's second price")
+    label: str | None = None
+
+    @field_validator("price", "top", "bottom", "a_price", "b_price")
+    @classmethod
+    def _is_a_price(cls, value: float | None, info: ValidationInfo) -> float | None:
+        if value is None:
+            return None
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError(f"{info.field_name} must be a price above zero")
+        return value
+
+    @field_validator("label")
+    @classmethod
+    def _label_is_a_caption(cls, value: str | None) -> str | None:
+        # Blank refused rather than taken as "clear it", the same way `PatchSessionIn`
+        # treats a blank title: a request that means to erase should say so in a way a
+        # dropped field cannot be mistaken for.
+        if value is None:
+            return None
+        collapsed = " ".join(value.split())
+        if not collapsed:
+            raise ValueError("label is blank — send the text it should read instead")
+        return collapsed
+
+    @model_validator(mode="after")
+    def _asks_for_something(self) -> PatchDrawingIn:
+        if all(
+            field is None
+            for field in (self.price, self.top, self.bottom, self.a_price, self.b_price, self.label)
+        ):
+            raise ValueError("this request changes nothing")
+        return self
 
 
 class UsageAggregateOut(BaseModel):

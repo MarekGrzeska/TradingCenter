@@ -607,11 +607,20 @@ _INSERT_DRAWING = f"""
     RETURNING {_SELECT_DRAWING_COLUMNS}
 """
 
+_SELECT_DRAWING = f"""
+    SELECT {_SELECT_DRAWING_COLUMNS}
+      FROM chart_drawings
+     WHERE id = $1
+       FOR UPDATE
+"""
+
 _DELETE_DRAWINGS = """
     DELETE FROM chart_drawings
      WHERE symbol = $1 AND id = ANY($2::bigint[])
     RETURNING id
 """
+
+_DELETE_DRAWING = "DELETE FROM chart_drawings WHERE id = $1 RETURNING id"
 
 _UPDATE_DRAWING = f"""
     UPDATE chart_drawings
@@ -717,6 +726,26 @@ async def remove_drawings(conn: Conn, *, symbol: str, ids: Sequence[int]) -> lis
     which ids it could not act on."""
     rows = await conn.fetch(_DELETE_DRAWINGS, symbol, list(ids))
     return [row["id"] for row in rows]
+
+
+async def lock_drawing(conn: Conn, *, drawing_id: int) -> ChartDrawing | None:
+    """One drawing, held until the surrounding transaction ends.
+
+    `FOR UPDATE` because the only caller reads it to decide what a partial correction
+    means — a zone patched with a new `top` alone is checked against the `bottom` it
+    already has, and that bottom must not change between the check and the write
+    (`routers/drawings.py`). `None` means no row with this id, which is a 404 rather
+    than a broken invariant."""
+    row = await conn.fetchrow(_SELECT_DRAWING, drawing_id)
+    return None if row is None else _drawing_from_row(row)
+
+
+async def delete_drawing(conn: Conn, *, drawing_id: int) -> bool:
+    """Whether a row was there to delete — the operator's own removal, which unlike the
+    tool's knows the id but not the symbol it belongs to. `False` becomes a 404: a
+    delete that quietly succeeded on nothing reads to the operator exactly like one that
+    worked (specs/agent-chart-drawings, "Operator cofa rysunek ręką")."""
+    return await conn.fetchval(_DELETE_DRAWING, drawing_id) is not None
 
 
 async def update_drawing(

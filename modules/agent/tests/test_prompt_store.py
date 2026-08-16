@@ -131,3 +131,34 @@ async def test_both_seeded_texts_name_the_focus_field(db) -> None:
         lowered = body.lower()
         assert "focus" in lowered
         assert "last_bars" in lowered
+
+
+async def test_both_seeded_texts_name_the_drawing_tools(db) -> None:
+    # Both variants, because `list_chart_drawings` reads this module's own table and
+    # `draw_on_chart` says for itself when it cannot check a symbol — neither one goes
+    # away with the archive (specs/agent-tools, "Brak serwera narzędzi").
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        assert "draw_on_chart" in body
+        assert "list_chart_drawings" in body
+
+
+async def test_the_drawing_paragraph_tells_a_drawing_apart_from_a_computed_level(db) -> None:
+    # The one confusion the paragraph exists to prevent: `levels_near_price` computes
+    # support and resistance from the archive on every call, and a drawing is what the
+    # operator asked to keep. A model that conflates them reads one when asked about the
+    # other (design.md, "Prompt dostaje rewizję i jedno zdanie o rozróżnieniu").
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        assert "levels_near_price" in body
+
+
+async def test_the_drawing_paragraph_says_it_is_incremental(db) -> None:
+    # The inversion of set_chart's rule, and the one a model carries over by habit if the
+    # prompt does not say otherwise (specs/agent-chart-drawings, "Agent nie kasuje przez
+    # pominięcie").
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        lowered = body.lower()
+        assert "incremental, not declarative" in lowered
+        assert "remove" in lowered
