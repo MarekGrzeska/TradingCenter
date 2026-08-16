@@ -1,0 +1,122 @@
+## 1. Szkielet modułu
+
+- [ ] 1.1 Katalog `modules/teams/` z `pyproject.toml`, `README.md`, `.env.example`, `Dockerfile`
+- [ ] 1.2 `config.py` — ustawienia bazy, tożsamości, dostawcy modeli, serwera narzędzi
+- [ ] 1.3 Walidatory `Settings()`: tryb bazy, tryb serwera narzędzi, niepusty katalog modeli ze stawkami
+- [ ] 1.4 `db.py` — pula połączeń, dostawca poświadczenia tożsamości, `advisory_lock` z kluczem 8050
+- [ ] 1.5 `migrate.py` i `schema_version.py` — bliźniaki z `agent`
+- [ ] 1.6 `auth.py` — odczyt tożsamości ustalonej przed modułem
+- [ ] 1.7 `app.py` — `lifespan` w kolejności: ustawienia, pula, blokada, migracje, sprawdzenie rewizji
+- [ ] 1.8 `GET /health` poza wymaganiem tożsamości
+- [ ] 1.9 Testy: odmowa startu przy każdej niespójnej konfiguracji z 1.3 i przy trybie lokalnym ze zdalnym adresem
+
+## 2. Schemat bazy
+
+- [ ] 2.1 Alembic w module — `migrations/env.py`, pierwsza rewizja
+- [ ] 2.2 Tabele `teams` i `team_revisions` (definicja jako JSONB, wersja, właściciel)
+- [ ] 2.3 Tabele `runs`, `run_steps`, `tool_calls`
+- [ ] 2.4 Tabela `usage` ze stawkami zapisywanymi na wierszu
+- [ ] 2.5 Testy `-m db`: migracja od zera dochodzi do rewizji czołowej
+
+## 3. Kontrakt i jego generowanie
+
+- [ ] 3.1 `teams/contract.py` — kształty definicji, rewizji, katalogu, przebiegu, kroku, zużycia
+- [ ] 3.2 `teams/openapi.py` — bliźniak z `market-data`, razem z `require_response_fields`
+- [ ] 3.3 Uogólnienie `modules/terminal/scripts/contract.mjs` na wiele źródeł, każde ze swoim plikiem wyjściowym
+- [ ] 3.4 Sprawdzenie, że wyjście dla `market-data` nie zmieniło się co do bajtu
+- [ ] 3.5 `pnpm contract:generate` wytwarza plik dla modułu; `contract:check` wykrywa jego nieaktualność
+
+## 4. Katalog zespołów
+
+- [ ] 4.1 Model domenowy definicji: agent, zależność, granice kosztu
+- [ ] 4.2 Zapytania `store.py`: zapis rewizji, odczyt rewizji, lista katalogu, wycofanie zespołu
+- [ ] 4.3 Walidacja definicji przy zapisie: cykl, agent nieosiągalny, nieznany model, nieznane narzędzie
+- [ ] 4.4 Routery katalogu — lista, odczyt, zapis rewizji, wycofanie
+- [ ] 4.5 Ograniczenie odczytu i zapisu do tożsamości właściciela; odmowa nieodróżnialna od nieistnienia
+- [ ] 4.6 Testy: zapis kolejnej rewizji nie rusza poprzedniej; wycofanie zespołu zostawia przebiegi
+- [ ] 4.7 Testy: każda odmowa z 4.3 nazywa agenta albo zależność
+
+## 5. Katalog modeli
+
+- [ ] 5.1 Wpis katalogu modeli w konfiguracji — identyfikator, nazwa, porządek kosztu, stawki jako `Decimal`
+- [ ] 5.2 `GET /models`
+- [ ] 5.3 Odmowa zapisu rewizji wskazującej model spoza katalogu i rewizji bez modelu przy agencie
+- [ ] 5.4 Odmowa uruchomienia rewizji wskazującej model wycofany z konfiguracji
+- [ ] 5.5 Testy: rewizja na wycofanym modelu pozostaje czytelna wraz ze śladem swoich przebiegów
+
+## 6. Dostęp do serwera narzędzi
+
+- [ ] 6.1 `tools/client.py` — bliźniak z `agent`: jedna sesja, tożsamość na żądanie, `ToolOutcome`
+- [ ] 6.2 Zawężenie zestawu narzędzi do przypisanych agentowi w definicji
+- [ ] 6.3 Odmowa uruchomienia przebiegu, gdy agent ma narzędzia, a serwer jest nieosiągalny
+- [ ] 6.4 Odmowa uruchomienia rewizji wskazującej narzędzie, którego serwer już nie ogłasza
+- [ ] 6.5 Górna granica czasu wywołania; przekroczenie odróżnione od odmowy narzędzia
+- [ ] 6.6 Testy: zespół bez przypisanych narzędzi rusza mimo nieosiągalnego serwera
+- [ ] 6.7 Testy: moduł wstaje i obsługuje katalog bez skonfigurowanego serwera narzędzi
+
+## 7. Wykonanie przebiegu
+
+- [ ] 7.1 `provider.py` — bliźniak z `agent`: strumieniowanie, protokół dostawcy, odczyt zużycia
+- [ ] 7.2 Pętla jednego agenta: model ↔ narzędzia z granicą rund
+- [ ] 7.3 Kompilator definicji do grafu wykonania — węzeł na agenta, krawędzie z zależności
+- [ ] 7.4 Podawanie agentowi wyłącznie pracy jego poprzedników
+- [ ] 7.5 Równoległa praca agentów, których zależności są spełnione
+- [ ] 7.6 Zapis śladu na bieżąco: krok agenta, wywołanie narzędzia, wiersz zużycia
+- [ ] 7.7 Statusy przebiegu wraz z przyczyną zatrzymania
+- [ ] 7.8 Górna granica czasu przebiegu i przerwanie przebiegu przez operatora
+- [ ] 7.9 Routery przebiegu — uruchomienie, odczyt, przerwanie, lista przebiegów zespołu
+- [ ] 7.10 Strumień postępu; zerwanie odbioru nie przerywa przebiegu
+- [ ] 7.11 Odzysk przy starcie: przebieg zastany jako trwający zostaje zamknięty jako nieudany
+- [ ] 7.12 Testy: przebieg przerwany, błędny i przekraczający czas zostawiają ślad
+- [ ] 7.13 Testy: zmiana definicji w trakcie przebiegu nie zmienia rewizji, na której on biegnie
+
+## 8. Koszt i granice
+
+- [ ] 8.1 Wiersz zużycia na każde wywołanie modelu, ze wskazaniem przebiegu, agenta i modelu
+- [ ] 8.2 Koszt liczony i zapisywany w chwili powstania wiersza, wraz ze stawkami
+- [ ] 8.3 Brak informacji o tokenach zapisany jako brak, nie jako zero
+- [ ] 8.4 Sprawdzenie granicy kosztu przebiegu przed wywołaniem modelu
+- [ ] 8.5 Sprawdzenie granicy dobowej zespołu przed uruchomieniem przebiegu
+- [ ] 8.6 `GET /usage` z rozbiciem pozwalającym przypisać koszt agentom
+- [ ] 8.7 Testy: zmiana stawki nie rusza kosztu wierszy sprzed zmiany
+- [ ] 8.8 Testy: przebieg dobijający do granicy zatrzymuje się ze wskazaniem kosztu
+
+## 9. Terminal
+
+- [ ] 9.1 Zależność `@xyflow/react`; wpis w `src/app/tabs.ts`, katalog widoków zakładki
+- [ ] 9.2 `VITE_TEAMS_HTTP` w `src/data/config.ts` i proxy `/teams-api` w `vite.config.ts`
+- [ ] 9.3 Warstwa wywołań modułu na typach generowanych z kontraktu
+- [ ] 9.4 Widok katalogu — lista zespołów, otwarcie do edycji, uruchomienie przebiegu
+- [ ] 9.5 Canvas zespołu: agenci, zależności, rola i model przy każdym agencie
+- [ ] 9.6 Edycja w widoku zespołu — dodanie i usunięcie agenta, poprowadzenie i usunięcie zależności
+- [ ] 9.7 Panel agenta — rola, prompt, wytyczne, wybór modelu z katalogu, wybór narzędzi z ogłaszanych
+- [ ] 9.8 Odmowa zapisu pokazana przy agencie albo zależności, której dotyczy
+- [ ] 9.9 Monitor przebiegu na tym samym canvasie — stan agentów, ich praca, wywołane narzędzia
+- [ ] 9.10 Odbiór postępu; zamknięcie i ponowne otwarcie widoku pokazuje stan bieżący
+- [ ] 9.11 Testy: wybierak modeli i narzędzi powstaje bez identyfikatorów wpisanych w kod terminala
+- [ ] 9.12 `pnpm lint`, `typecheck`, `test`, `contract:check` przechodzą
+
+## 10. Infrastruktura
+
+- [ ] 10.1 Rejestracja Entra dla modułu w `infra/entra.tf`
+- [ ] 10.2 App Service w `infra/app-service.tf` — tożsamość, obraz, Easy Auth z `/health` poza wymaganiem
+- [ ] 10.3 Polityka dostępu do Key Vault dla tożsamości modułu
+- [ ] 10.4 Sekret `teams-openai-api-key` i odwołanie do niego w ustawieniach aplikacji
+- [ ] 10.5 Baza logiczna `teams` i reguły zapory dla adresów wyjściowych aplikacji w `infra/database.tf`
+- [ ] 10.6 Tożsamość modułu w `allowed_applications` serwera narzędzi
+- [ ] 10.7 Instrukcja dla operatora: `apply -target`, pełny `apply`, `grant-schema-ownership.sql`
+
+## 11. CI i wdrożenie
+
+- [ ] 11.1 Filtr i job modułu w `.github/workflows/checks.yml`
+- [ ] 11.2 Rozszerzenie filtra terminala o `modules/teams/teams/contract.py`
+- [ ] 11.3 `.github/workflows/deploy-teams.yml` — obraz do GHCR, wdrożenie, smoke check pytający `/health`
+- [ ] 11.4 `scripts/dev.sh` i `scripts/dev.ps1` — moduł w kolejności startu, tworzenie bazy i roli, gdy ich nie ma
+- [ ] 11.5 `README.md` i `docs/architecture.md` — moduł w tabeli i na rysunku
+- [ ] 11.6 `CLAUDE.md` — moduł w mapie, jego komendy i port
+
+## 12. Domknięcie
+
+- [ ] 12.1 Zespół przykładowy w katalogu jako punkt wyjścia dla operatora
+- [ ] 12.2 Przebieg od końca do końca na uruchomionym stosie
+- [ ] 12.3 `review.md`
