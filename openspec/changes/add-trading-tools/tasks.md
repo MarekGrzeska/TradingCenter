@@ -265,10 +265,50 @@
 
 ## 10. CI i wdrożenie
 
-- [ ] 10.1 Filtr i job modułu w `.github/workflows/checks.yml`
-- [ ] 10.2 `.github/workflows/deploy-trading-mcp.yml` — obraz do GHCR, wdrożenie, smoke check pytający `/health`
-- [ ] 10.3 `scripts/dev.sh` i `scripts/dev.ps1` — moduł w kolejności startu, port 8060
-- [ ] 10.4 `README.md`, `docs/architecture.md` i `CLAUDE.md` — moduł w tabeli, na rysunku i w mapie
+- [x] 10.1 Filtr i job modułu w `.github/workflows/checks.yml`
+- [x] 10.2 `.github/workflows/deploy-trading-mcp.yml` — obraz do GHCR, wdrożenie, smoke check pytający `/health`
+- [x] 10.3 `scripts/dev.sh` i `scripts/dev.ps1` — moduł w kolejności startu, port 8060
+- [x] 10.4 `README.md`, `docs/architecture.md` i `CLAUDE.md` — moduł w tabeli, na rysunku i w mapie
+
+  **Filtr modułu jest szerszy, niż wyglądałby z nazwy: łapie cały `modules/capital-gateway/`.**
+  Ten moduł trzyma migawkę *całego* dokumentu OpenAPI gatewaya, a ten powstaje z tras tak
+  samo jak z DTO — węższy filtr (`dtos.py`) byłby filtrem nieprawdziwym, przepuszczającym
+  dokładnie tę zmianę, dla której `scripts/contract.py check` istnieje. Logika filtra
+  sprawdzona lokalnie na wyciętym kawałku skryptu: zmiana w `capital_gateway/dtos.py`
+  uruchamia `capital-gateway` i `trading-mcp`, zmiana w `docs/` nie uruchamia niczego,
+  zmiana w samym `checks.yml` uruchamia wszystko.
+
+  Cztery komendy joba przebiegły lokalnie na tym module: `contract.py check` (aktualny),
+  `ruff`, `pyright` (0 błędów) i `pytest` — **58 zielonych**.
+
+  **Smoke check tego modułu dowodzi więcej niż żywotności i to jest jego treść.** Proces
+  pyta gateway `GET /capabilities` i nie otwiera portu, dopóki odpowiedź nie mówi `demo`
+  (`__main__.py`), więc 200 na `/health` znaczy, że kontener dotarł do gatewaya, przez jego
+  zaporę, ze wspólnym kluczem — i że sesja jest demonstracyjna. Kontener, któremu nie udało
+  się cokolwiek z tych trzech, nigdy nie słucha, a to sprawdzenie zamienia go w nieudane
+  wdrożenie zamiast w ciche.
+
+  W skryptach `dev.*` doszły dwie rzeczy ponad literę 10.3, obie z tego samego powodu — bo
+  ten moduł **wychodzi** zamiast się degradować, a skrypt ubija wtedy cały stos:
+
+  - `.env` modułu jest wymagany (nie jak `market-mcp`, który ma działające domyślne
+    ustawienia dla pętli zwrotnej): gateway sprawdza `X-Gateway-Key` u każdego wołającego,
+    loopback włącznie, więc nie ma trybu lokalnego bez klucza;
+  - **oba skrypty porównują `CAPITAL_GATEWAY_API_KEY` z `GATEWAY_API_KEY` gatewaya** i
+    odmawiają przed startem czegokolwiek. Niezgodność nie jest nieudanym wywołaniem
+    narzędzia później — to moduł kończący się w trakcie startu i komunikat „A service
+    exited", który nie mówi, o co chodziło.
+
+  `modules/teams/.env.example` dostał `TRADING_MCP_*` — nie było ich tam od grupy 5, a
+  skrypty odsyłają do tego pliku („as .env.example does"), więc notatka odsyłałaby do
+  czegoś, czego nie ma.
+
+  10.4 zamiast wciskać `trading-mcp` w główny rysunek `docs/architecture.md` dokłada **osobny
+  rysunek ścieżki zleceń**: gateway ← `trading-mcp` ← `teams`, prosta linia obok wachlarza
+  odczytów. Wciśnięcie jej w tamten rysunek przecięłoby trzy strzałki, żeby powiedzieć coś
+  prostszego od każdej z nich. Przy okazji zapisana tam jest zasada podziału gwarancji: demo
+  jest sprawdzane w `trading-mcp` i nie da się go wyłączyć ustawieniem, a wszystko, co
+  operator *ma* móc zmienić, siedzi w rewizji `teams`.
 
 ## 11. Domknięcie
 

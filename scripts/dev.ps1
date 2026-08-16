@@ -3,22 +3,27 @@
     Everything the terminal needs, in the order it needs it.
 
 .DESCRIPTION
-    migrations -> capital-gateway -> market-data -> market-mcp -> agent -> teams -> terminal
+    migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp ->
+    agent -> teams -> terminal
 
     The order is not tidiness, and every arrow in it is now a real dependency.
     market-data opens a subscription per tracked pair as it starts, so a gateway
     that is not listening yet costs it a round of backoff; market-mcp reads
-    market-data's own contract; the agent asks market-mcp for its tool list on the
-    first turn, and a market-mcp that was not up yet means an agent answering
-    without tools rather than an error anyone would notice; teams reads the same
-    tool list for the agents a run assigns tools to; the terminal's charts read the
-    archive, so starting it first fills the console with proxy errors that mean
-    nothing. Each step waits for the one before it to answer, not merely to have
-    been launched.
+    market-data's own contract; trading-mcp asks the gateway whether it is bound to
+    the demo account and refuses to open a port at all if it is not, so a gateway
+    that is not answering yet is a module that exits rather than waits; the agent
+    asks market-mcp for its tool list on the first turn, and a market-mcp that was
+    not up yet means an agent answering without tools rather than an error anyone
+    would notice; teams reads both tool lists for the agents a run assigns tools to;
+    the terminal's charts read the archive, so starting it first fills the console
+    with proxy errors that mean nothing. Each step waits for the one before it to
+    answer, not merely to have been launched.
 
     market-mcp needs no .env of its own here: every setting it reads has a
     working default for loopback (config.py), unlike the gateway and the archive,
-    which hold real credentials with no safe default to fall back to.
+    which hold real credentials with no safe default to fall back to. trading-mcp is
+    the other kind: the gateway checks its X-Gateway-Key on every caller, loopback
+    included, so this one module has a credential to fill in even locally.
 
     The database is the container in ..\compose.yaml — started here, before
     migrations (openspec/changes/local-dev-database-in-docker). The services run
@@ -59,6 +64,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $gatewayDir = Join-Path $repoRoot "modules\capital-gateway"
 $archiveDir = Join-Path $repoRoot "modules\market-data"
 $mcpDir = Join-Path $repoRoot "modules\market-mcp"
+$tradingDir = Join-Path $repoRoot "modules\trading-mcp"
 $agentDir = Join-Path $repoRoot "modules\agent"
 $teamsDir = Join-Path $repoRoot "modules\teams"
 $terminalDir = Join-Path $repoRoot "modules\terminal"
@@ -68,6 +74,7 @@ $archivePort = 8020
 $agentPort = 8030
 $mcpPort = 8040
 $teamsPort = 8050
+$tradingPort = 8060
 $terminalPort = 5173
 # 127.0.0.1, not "localhost": uvicorn binds IPv4 loopback, while "localhost" can
 # resolve to ::1 first on Windows.
@@ -76,6 +83,7 @@ $archiveUrl = "http://127.0.0.1:$archivePort"
 $agentUrl = "http://127.0.0.1:$agentPort"
 $mcpUrl = "http://127.0.0.1:$mcpPort"
 $teamsUrl = "http://127.0.0.1:$teamsPort"
+$tradingUrl = "http://127.0.0.1:$tradingPort"
 $terminalUrl = "http://localhost:$terminalPort"
 
 Write-Host "Checking prerequisites..." -ForegroundColor Cyan
@@ -124,6 +132,12 @@ $teamsEnv = Join-Path $teamsDir ".env"
 if (-not (Test-Path $teamsEnv)) {
     $problems += "$teamsEnv is missing - copy .env.example and fill in OPENAI_API_KEY (MODELS has a working default there)"
 }
+# trading-mcp cannot fall back the way market-mcp does: config.py requires the gateway's
+# caller key, and the gateway checks it on loopback too.
+$tradingEnv = Join-Path $tradingDir ".env"
+if (-not (Test-Path $tradingEnv)) {
+    $problems += "$tradingEnv is missing - copy .env.example and set CAPITAL_GATEWAY_API_KEY to the gateway's own GATEWAY_API_KEY"
+}
 
 if (-not $NoTerminal) {
     if (Get-Command pnpm -ErrorAction SilentlyContinue) {
@@ -157,7 +171,7 @@ function Get-PortOwner {
     return "$($proc.ProcessName) (pid $($proc.Id))"
 }
 
-$ports = @($gatewayPort, $archivePort, $mcpPort, $agentPort, $teamsPort)
+$ports = @($gatewayPort, $archivePort, $mcpPort, $tradingPort, $agentPort, $teamsPort)
 if (-not $NoTerminal) { $ports += $terminalPort }
 foreach ($port in $ports) {
     $owner = Get-PortOwner -Port $port
@@ -185,6 +199,27 @@ Test-LocalDatabaseHost -EnvPath $archiveEnv -Label "modules\market-data\.env"
 Test-LocalDatabaseHost -EnvPath $agentEnv -Label "modules\agent\.env"
 Test-LocalDatabaseHost -EnvPath $teamsEnv -Label "modules\teams\.env"
 
+# The two halves of one credential, in two files. The gateway checks X-Gateway-Key on
+# every caller including loopback, and trading-mcp asks it about the account *before* it
+# opens a port - so a mismatch here is not a failed tool call later, it is a module that
+# exits during start-up and takes this whole script down with it.
+function Get-EnvValue {
+    param([string]$EnvPath, [string]$Name)
+    if (-not (Test-Path $EnvPath)) { return $null }
+    $line = Select-String -Path $EnvPath -Pattern "^$Name=(.*)$" | Select-Object -First 1
+    if ($null -eq $line) { return $null }
+    return $line.Matches[0].Groups[1].Value
+}
+$gatewayKey = Get-EnvValue -EnvPath $gatewayEnv -Name "GATEWAY_API_KEY"
+$tradingKey = Get-EnvValue -EnvPath $tradingEnv -Name "CAPITAL_GATEWAY_API_KEY"
+if ([string]::IsNullOrWhiteSpace($tradingKey)) {
+    if (Test-Path $tradingEnv) {
+        $problems += "modules\trading-mcp\.env has no CAPITAL_GATEWAY_API_KEY - the gateway requires it from every caller, loopback included"
+    }
+} elseif (-not [string]::IsNullOrWhiteSpace($gatewayKey) -and $gatewayKey -ne $tradingKey) {
+    $problems += "modules\trading-mcp\.env's CAPITAL_GATEWAY_API_KEY does not match modules\capital-gateway\.env's GATEWAY_API_KEY - trading-mcp would be refused by the gateway and exit before it listens"
+}
+
 if ($problems.Count -gt 0) {
     Write-Host "Cannot start:" -ForegroundColor Red
     foreach ($p in $problems) { Write-Host "  - $p" -ForegroundColor Red }
@@ -211,9 +246,19 @@ if ((Test-Path $teamsEnv) -and
     Write-Host "  Add MARKET_MCP_URL=$mcpUrl to give it market-mcp's, as .env.example does." -ForegroundColor DarkGray
 }
 
+# The same again for the write half, and it is the one worth saying twice: a team given
+# only reading tools runs perfectly without this line, so its absence shows up as a
+# refusal on the one run that was supposed to place an order.
+if ((Test-Path $teamsEnv) -and
+    -not (Select-String -Path $teamsEnv -Pattern '^TRADING_MCP_URL=.+' -Quiet)) {
+    Write-Host "modules\teams\.env has no TRADING_MCP_URL - teams will have no order tools, and one assigning them refuses to run." -ForegroundColor DarkGray
+    Write-Host "  Add TRADING_MCP_URL=$tradingUrl to give it trading-mcp's, as .env.example does." -ForegroundColor DarkGray
+}
+
 $gatewayJob = $null
 $archiveJob = $null
 $mcpJob = $null
+$tradingJob = $null
 $agentJob = $null
 $teamsJob = $null
 $terminalJob = $null
@@ -412,6 +457,30 @@ try {
     }
     Write-Host "market-mcp is answering." -ForegroundColor Green
 
+    # --- trading-mcp ---
+    #
+    # After the gateway, and this one is not a preference: __main__.py asks
+    # GET /capabilities and refuses to open a port unless the answer says `demo`
+    # (specs/trading-mcp-upstream-access). A gateway that is not answering yet is a
+    # module that exits rather than one that retries.
+    #
+    # No `--reload`, same as market-mcp: the ASGI app is built in Python (the
+    # caller-identity wrapper), not handed to uvicorn's CLI.
+
+    Write-Host "Starting trading-mcp on port $tradingPort..." -ForegroundColor Cyan
+    $tradingJob = Start-Job -Name "trading" -ScriptBlock {
+        param($dir)
+        Set-Location $dir
+        uv run python -m trading_mcp 2>&1
+    } -ArgumentList $tradingDir
+
+    if (-not (Wait-ForHttp -Url "$tradingUrl/health" -Label "trading-mcp" `
+                -Job $tradingJob -Prefix "trading " -Color DarkGreen)) {
+        Write-Prefixed -Prefix "trading " -Color Yellow -Lines (Receive-Job $tradingJob)
+        exit 1
+    }
+    Write-Host "trading-mcp is answering." -ForegroundColor Green
+
     # --- agent ---
     #
     # Last among the back ends: nothing else calls it, so nothing else waits on it -
@@ -477,6 +546,7 @@ try {
     Write-Host "  market-data docs    $archiveUrl/docs"
     Write-Host "  Gateway docs        $gatewayUrl/docs"
     Write-Host "  market-mcp health   $mcpUrl/health"
+    Write-Host "  trading-mcp health  $tradingUrl/health"
     Write-Host "  agent docs          $agentUrl/docs"
     Write-Host "  teams docs          $teamsUrl/docs"
     Write-Host "  Database            market_data, agent, teams @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
@@ -489,6 +559,7 @@ try {
         @{ Job = $gatewayJob; Label = "capital-gateway"; Prefix = "gateway "; Color = "Blue" },
         @{ Job = $archiveJob; Label = "market-data"; Prefix = "archive "; Color = "Magenta" },
         @{ Job = $mcpJob; Label = "market-mcp"; Prefix = "mcp     "; Color = "Green" },
+        @{ Job = $tradingJob; Label = "trading-mcp"; Prefix = "trading "; Color = "DarkGreen" },
         @{ Job = $agentJob; Label = "agent"; Prefix = "agent   "; Color = "Yellow" },
         @{ Job = $teamsJob; Label = "teams"; Prefix = "teams   "; Color = "DarkCyan" }
     )
@@ -512,7 +583,7 @@ try {
 finally {
     Write-Host ""
     Write-Host "Stopping..." -ForegroundColor Cyan
-    foreach ($job in @($gatewayJob, $archiveJob, $mcpJob, $agentJob, $teamsJob, $terminalJob)) {
+    foreach ($job in @($gatewayJob, $archiveJob, $mcpJob, $tradingJob, $agentJob, $teamsJob, $terminalJob)) {
         if ($null -ne $job) {
             Stop-Job $job -ErrorAction SilentlyContinue | Out-Null
             Remove-Job $job -Force -ErrorAction SilentlyContinue | Out-Null
@@ -521,7 +592,7 @@ finally {
     # Start-Job's child process tree (uv -> uvicorn, pnpm -> vite) can outlive the
     # job object itself, which is what actually leaves a process squatting on the
     # port - so processes bound to the ports we used are swept explicitly too.
-    $sweep = @($gatewayPort, $archivePort, $mcpPort, $agentPort, $teamsPort)
+    $sweep = @($gatewayPort, $archivePort, $mcpPort, $tradingPort, $agentPort, $teamsPort)
     if (-not $NoTerminal) { $sweep += $terminalPort }
     foreach ($port in $sweep) {
         Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |

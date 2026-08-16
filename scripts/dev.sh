@@ -3,21 +3,26 @@
 # Everything the terminal needs, in the order it needs it — the macOS and Linux
 # counterpart of dev.ps1.
 #
-#   migrations -> capital-gateway -> market-data -> market-mcp -> agent -> teams -> terminal
+#   migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp -> agent
+#   -> teams -> terminal
 #
 # The order is not tidiness, and every arrow in it is now a real dependency.
 # market-data opens a subscription per tracked pair the moment it starts, so a gateway
 # that is not listening yet costs it a round of backoff; market-mcp reads market-data's
-# own contract; the agent asks market-mcp for its tool list on the first turn, and a
-# market-mcp that was not up yet means an agent answering without tools rather than an
-# error anyone would notice; teams reads the same tool list for the agents a run assigns
-# tools to; the terminal's charts read the archive, so starting it first fills the
-# console with proxy errors that mean nothing. Each step waits for the one before it to
-# actually answer, not merely to have been launched.
+# own contract; trading-mcp asks the gateway whether it is bound to the demo account and
+# refuses to open a port at all if it is not, so a gateway that is not answering yet is a
+# module that exits rather than waits; the agent asks market-mcp for its tool list on the
+# first turn, and a market-mcp that was not up yet means an agent answering without tools
+# rather than an error anyone would notice; teams reads both tool lists for the agents a
+# run assigns tools to; the terminal's charts read the archive, so starting it first fills
+# the console with proxy errors that mean nothing. Each step waits for the one before it
+# to actually answer, not merely to have been launched.
 #
 # market-mcp needs no .env of its own to run here: every setting it reads has a
 # working default for loopback (`config.py`), unlike the gateway and the archive,
-# which hold real credentials with no safe default to fall back to.
+# which hold real credentials with no safe default to fall back to. trading-mcp is the
+# other kind: the gateway checks its `X-Gateway-Key` on every caller, loopback included,
+# so this one module has a credential to fill in even locally.
 #
 # The database is the container in ../compose.yaml — started here, before migrations
 # (openspec/changes/local-dev-database-in-docker; the spell in Azure is over, production
@@ -42,6 +47,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GATEWAY_DIR="$REPO_ROOT/modules/capital-gateway"
 ARCHIVE_DIR="$REPO_ROOT/modules/market-data"
 MCP_DIR="$REPO_ROOT/modules/market-mcp"
+TRADING_DIR="$REPO_ROOT/modules/trading-mcp"
 AGENT_DIR="$REPO_ROOT/modules/agent"
 TEAMS_DIR="$REPO_ROOT/modules/teams"
 TERMINAL_DIR="$REPO_ROOT/modules/terminal"
@@ -51,6 +57,7 @@ ARCHIVE_PORT=8020
 AGENT_PORT=8030
 MCP_PORT=8040
 TEAMS_PORT=8050
+TRADING_PORT=8060
 TERMINAL_PORT=5173
 
 # 127.0.0.1 rather than "localhost": uvicorn binds IPv4 loopback, and on a machine
@@ -60,6 +67,7 @@ ARCHIVE_URL="http://127.0.0.1:$ARCHIVE_PORT"
 AGENT_URL="http://127.0.0.1:$AGENT_PORT"
 MCP_URL="http://127.0.0.1:$MCP_PORT"
 TEAMS_URL="http://127.0.0.1:$TEAMS_PORT"
+TRADING_URL="http://127.0.0.1:$TRADING_PORT"
 
 START_TERMINAL=1
 WAIT_SECONDS=120
@@ -67,7 +75,7 @@ WAIT_SECONDS=120
 for arg in "$@"; do
   case "$arg" in
     --no-terminal) START_TERMINAL=0 ;;
-    -h|--help) sed -n '2,37p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,42p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
   esac
 done
@@ -76,6 +84,9 @@ BLUE=$'\033[34m'; MAGENTA=$'\033[35m'; CYAN=$'\033[36m'; YELLOW=$'\033[33m'
 GREEN=$'\033[32m'; RED=$'\033[31m'; DIM=$'\033[2m'; RESET=$'\033[0m'
 # Bright blue for teams — six services now, and the six basic colours were spoken for.
 BRIGHT_BLUE=$'\033[94m'
+# And bright green for trading-mcp, deliberately a shade of market-mcp's own: the two
+# tool servers read as a pair in the log, which is what they are.
+BRIGHT_GREEN=$'\033[92m'
 
 say()  { printf '%s%s%s\n' "$CYAN" "$1" "$RESET"; }
 ok()   { printf '%s%s%s\n' "$GREEN" "$1" "$RESET"; }
@@ -105,6 +116,9 @@ fi
 # teams needs a key and a MODELS catalogue: config.py refuses to build Settings without
 # either, so the module would exit at import rather than start and misbehave.
 [[ -f "$TEAMS_DIR/.env" ]] || problems+=("$TEAMS_DIR/.env is missing — copy .env.example and fill in OPENAI_API_KEY (MODELS has a working default there)")
+# trading-mcp cannot fall back the way market-mcp does: `config.py` requires the
+# gateway's caller key, and the gateway checks it on loopback too.
+[[ -f "$TRADING_DIR/.env" ]] || problems+=("$TRADING_DIR/.env is missing — copy .env.example and set CAPITAL_GATEWAY_API_KEY to the gateway's own GATEWAY_API_KEY")
 
 if (( START_TERMINAL )); then
   if command -v pnpm >/dev/null 2>&1; then
@@ -140,7 +154,7 @@ port_owner() {
   printf ' by %s (pid %s)' "$(ps -p "$pid" -o comm= 2>/dev/null || echo process)" "$pid"
 }
 
-ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$MCP_PORT" "$AGENT_PORT" "$TEAMS_PORT")
+ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$MCP_PORT" "$TRADING_PORT" "$AGENT_PORT" "$TEAMS_PORT")
 (( START_TERMINAL )) && ports+=("$TERMINAL_PORT")
 for port in "${ports[@]}"; do
   port_in_use "$port" || continue
@@ -171,6 +185,19 @@ case "$teams_db_host" in
   *) problems+=("modules/teams/.env's DATABASE_URL points at '$teams_db_host' — local runs use the compose.yaml container (localhost), never a remote database") ;;
 esac
 
+# The two halves of one credential, in two files. The gateway checks `X-Gateway-Key` on
+# every caller including loopback, and trading-mcp asks it about the account *before* it
+# opens a port — so a mismatch here is not a failed tool call later, it is a module that
+# exits during start-up and takes this whole script down with it. Cheap to compare, and
+# the message is the fix.
+gateway_key="$(sed -n 's|^GATEWAY_API_KEY=\(.*\)|\1|p' "$GATEWAY_DIR/.env" 2>/dev/null | head -1)"
+trading_key="$(sed -n 's|^CAPITAL_GATEWAY_API_KEY=\(.*\)|\1|p' "$TRADING_DIR/.env" 2>/dev/null | head -1)"
+if [[ -n "$gateway_key" && -n "$trading_key" && "$gateway_key" != "$trading_key" ]]; then
+  problems+=("modules/trading-mcp/.env's CAPITAL_GATEWAY_API_KEY does not match modules/capital-gateway/.env's GATEWAY_API_KEY — trading-mcp would be refused by the gateway and exit before it listens")
+elif [[ -z "$trading_key" ]]; then
+  problems+=("modules/trading-mcp/.env has no CAPITAL_GATEWAY_API_KEY — the gateway requires it from every caller, loopback included")
+fi
+
 if (( ${#problems[@]} )); then
   fail "Cannot start:"
   for problem in "${problems[@]}"; do fail "  - $problem"; done
@@ -193,6 +220,14 @@ fi
 if ! grep -qs '^MARKET_MCP_URL=..*' "$TEAMS_DIR/.env"; then
   note "modules/teams/.env has no MARKET_MCP_URL — teams whose agents assign tools will refuse to run."
   note "  Add MARKET_MCP_URL=$MCP_URL to give it market-mcp's, as .env.example does."
+fi
+
+# The same again for the write half, and it is the one worth saying twice: a team given
+# only reading tools runs perfectly without this line, so its absence shows up as a
+# refusal on the one run that was supposed to place an order.
+if ! grep -qs '^TRADING_MCP_URL=..*' "$TEAMS_DIR/.env"; then
+  note "modules/teams/.env has no TRADING_MCP_URL — teams will have no order tools, and one assigning them refuses to run."
+  note "  Add TRADING_MCP_URL=$TRADING_URL to give it trading-mcp's, as .env.example does."
 fi
 
 # --- shutting everything down -------------------------------------------------
@@ -339,6 +374,22 @@ run_service "mcp     " "$GREEN" "$MCP_DIR" uv run python -m market_mcp http
 wait_for_http "$MCP_URL/health" "market-mcp" || exit 1
 ok "market-mcp is answering."
 
+# --- trading-mcp ------------------------------------------------------------------
+#
+# After the gateway, and this one is not a preference: `__main__.py` asks
+# `GET /capabilities` and refuses to open a port unless the answer says `demo`
+# (specs/trading-mcp-upstream-access). A gateway that is not answering yet is therefore a
+# module that exits rather than one that retries — which the watchdog at the bottom of
+# this script reports as "A service exited", and it would be telling the truth.
+#
+# No `--reload`, same as market-mcp: the ASGI app is built in Python (the caller-identity
+# wrapper), not handed to uvicorn's CLI, so a code change here needs a restart.
+
+say "Starting trading-mcp on port $TRADING_PORT..."
+run_service "trading " "$BRIGHT_GREEN" "$TRADING_DIR" uv run python -m trading_mcp
+wait_for_http "$TRADING_URL/health" "trading-mcp" || exit 1
+ok "trading-mcp is answering."
+
 # --- agent ----------------------------------------------------------------------
 #
 # Last among the back ends: nothing else calls it, so nothing else waits on it —
@@ -378,6 +429,7 @@ fi
 echo "  market-data docs    $ARCHIVE_URL/docs"
 echo "  Gateway docs        $GATEWAY_URL/docs"
 echo "  market-mcp health   $MCP_URL/health"
+echo "  trading-mcp health  $TRADING_URL/health"
 echo "  agent docs          $AGENT_URL/docs"
 echo "  teams docs          $TEAMS_URL/docs"
 echo "  Database            market_data, agent, teams @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
