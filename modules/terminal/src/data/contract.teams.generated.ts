@@ -28,6 +28,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/models": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Models */
+        get: operations["list_models_models_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams": {
         parameters: {
             query?: never;
@@ -195,6 +212,25 @@ export interface components {
             /** Detail */
             detail: components["schemas"]["ValidationError"][];
         };
+        /**
+         * ModelOut
+         * @description One entry of the model catalogue — everything a picker needs and nothing else
+         *     (specs/teams-models, "Katalog modeli wystarcza do zbudowania wybieraka"). The
+         *     terminal MUST NOT carry a model id of its own, so a model added to this module's
+         *     configuration reaches the picker with no terminal change at all.
+         */
+        ModelOut: {
+            /** Cost Rank */
+            cost_rank: number;
+            /** Display Name */
+            display_name: string;
+            /** Id */
+            id: string;
+            /** Input Rate Per 1M */
+            input_rate_per_1m: string;
+            /** Output Rate Per 1M */
+            output_rate_per_1m: string;
+        };
         /** SaveRevisionIn */
         SaveRevisionIn: {
             definition: components["schemas"]["TeamDefinition"];
@@ -305,6 +341,26 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    list_models_models_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ModelOut"][];
                 };
             };
         };

@@ -26,11 +26,10 @@ def _check(request: Request, definition: TeamDefinition) -> None:
     """The surroundings half of the save-time check — see `validation.py`. 422 rather
     than 400, so a refusal over an unknown model reads to the terminal exactly like a
     refusal over a cycle, which FastAPI raises for itself from the same body."""
-    settings = request.app.state.settings
     try:
         check_definition(
             definition,
-            model_ids=[entry.id for entry in settings.models],
+            model_ids=request.app.state.catalogue.ids(),
             announced_tools=request.app.state.announced_tools,
         )
     except DefinitionRefused as err:

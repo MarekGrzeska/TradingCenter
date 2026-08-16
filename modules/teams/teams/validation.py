@@ -46,6 +46,22 @@ def check_definition(
     _every_assigned_tool_is_announced(definition, announced_tools)
 
 
+def check_runnable(definition: TeamDefinition, *, model_ids: Collection[str]) -> None:
+    """The same model check, at the moment a saved revision is about to run.
+
+    Not redundant with `check_definition`: a revision saved a month ago names whatever
+    the catalogue held then, and a model dropped from the configuration since is exactly
+    the case specs/teams-models cares about — the revision and every run it already has
+    stay readable, and only *starting a new one* is refused, naming the agent and the
+    model (there is no substitution, silent or otherwise).
+
+    The tool half of this check belongs here too and arrives with the tool session in
+    group 6 — a revision naming a tool the server no longer announces is the same shape
+    of refusal (specs/teams-tool-access, "Narzędzie znika po stronie serwera").
+    """
+    _every_agent_names_a_known_model(definition, model_ids)
+
+
 def _every_agent_names_a_known_model(
     definition: TeamDefinition, model_ids: Collection[str]
 ) -> None:
