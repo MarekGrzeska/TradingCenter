@@ -63,6 +63,74 @@ uv run ruff check .
 uv run pyright
 ```
 
+## Deploy
+
+The module's infrastructure is in `infra/` (`app-service.tf`, `entra.tf`, `database.tf`,
+`key-vault.tf`). Applying it is the operator's job and never CI's — CI plans only, on
+purpose, because applying would hand the CI principal Entra directory write access.
+
+The order below is forced by dependencies, not by preference:
+
+0. **Confirm the model catalogue.** `var.teams_models` (`infra/variables.tf`) names models
+   this root does not create and cannot verify — they are OpenAI's, reached with a key. A
+   name that account does not serve passes `apply` without a word and falls over on the
+   first call of the first run. Check it against `GET https://api.openai.com/v1/models`.
+
+1. **`terraform apply -target=azurerm_linux_web_app.teams`.** The database firewall rules
+   read this app's own outbound addresses off its resource, and a resource-level `for_each`
+   refuses to plan against a value that is only known after apply — the same two-phase
+   start `market-data` and `agent` each needed. The Entra registration and its secret come
+   along as dependencies of this target; they are not a separate `-target`.
+
+2. **`terraform apply`,** unrestricted. This is what converges the rest: the logical
+   database, the firewall rules from step 1's addresses, the Key Vault access policy, and
+   this module's managed identity into market-mcp's `allowed_applications`.
+
+3. **The secret, before the first container start.**
+
+   ```bash
+   az keyvault secret set --vault-name "$(terraform -chdir=infra output -raw key_vault_name)" \
+      --name teams-openai-api-key --value "<the key>"
+   ```
+
+   A key of this module's own, not `agent`'s `openai-api-key` — the cost of these
+   experiments belongs on its own line. The app reads it as a `@Microsoft.KeyVault(...)`
+   reference: with no value there, the reference resolves to nothing and the module
+   refuses to start (`config.py` requires it), which is the intended failure.
+
+4. **The Postgres role, once per database.** Terraform creates the `teams` database but
+   not the role inside it — the server's Entra administrator does, in a `psql` session
+   against `dbname=teams`, for the managed identity `terraform -chdir=infra output -raw
+   teams_managed_identity_principal_id` names. Check the exact spelling of the
+   principal-creation call against what the server accepts (Azure's own
+   `pgaadauth_create_principal_with_oid`) before running it; that step was never written
+   down when `agent`'s role was created.
+
+   Then, in the same session, hand the database over:
+
+   ```bash
+   psql "host=psql-tradingcenter.postgres.database.azure.com port=5432 dbname=teams \
+         user=<entra-admin-upn> sslmode=require" \
+        -v role=app-tradingcenter-teams -f scripts/grant-schema-ownership.sql
+   ```
+
+   Idempotent, and required *before* the first deploy: the module migrates itself as its
+   own identity, and `ALTER TABLE` from a role that does not own the table is refused. A
+   database that has not had this done gives a module that will not start.
+
+5. **`deploy-teams.yml`** builds the image and deploys it. Nothing migrates the database
+   from outside: the module does it in its own `lifespan`, under the advisory lock, before
+   it serves anything — so the smoke check asking `/health` (excluded from Easy Auth in
+   `app-service.tf`) is itself the proof that the schema is at head. A check reading the
+   App Service control plane instead proves the site runs the right *image*, which reported
+   green over a crash-looping container on 16 August 2026.
+
+**Rollback.** Nothing depends on this module, so withdrawing it touches none of the other
+four. Clearing `MARKET_MCP_URL` and restarting takes the tools away and leaves the module
+what it was without them, with every run already traced still in the database. Rolling the
+image back moves the code back but not the schema — the known asymmetry `schema_version.py`
+exists to catch.
+
 ## Contract
 
 Not yet published — this phase has no routes beyond `/health`. The catalogue and run

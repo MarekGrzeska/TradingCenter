@@ -80,6 +80,19 @@ resource "azurerm_postgresql_flexible_server_database" "agent" {
   charset   = "UTF8"
 }
 
+# A third, same server again and for the same reason — the free grant is 750 hours of one
+# B1ms, and a module owning its own *schema* is the rule, not owning its own server
+# (specs/teams-database-connection, "Moduł nie dzieli bazy z innym modułem"). The role
+# this database's data belongs to is not created here: like `market_data`'s and `agent`'s,
+# it is a one-off `psql` step against the server's AD Administrator, and
+# `teams_managed_identity_principal_id` (app-service.tf) is the object id that step grants.
+resource "azurerm_postgresql_flexible_server_database" "teams" {
+  name      = "teams"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  collation = "en_US.utf8"
+  charset   = "UTF8"
+}
+
 # `market_data_dev` used to sit beside it — the database local development wrote to for
 # the one morning that arrangement lasted (openspec/changes/local-dev-database-in-docker).
 # Applying its removal DROPS it, data and all; dev data is disposable by definition, but
@@ -121,6 +134,24 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "agent_outbound" {
   for_each = toset(azurerm_linux_web_app.agent.possible_outbound_ip_address_list)
 
   name             = "AllowAgentOutbound-${replace(each.value, ".", "-")}"
+  server_id        = azurerm_postgresql_flexible_server.main.id
+  start_ip_address = each.value
+  end_ip_address   = each.value
+}
+
+# Third time the same shape, and the two-apply order is not optional here either:
+# `terraform apply -target=azurerm_linux_web_app.teams` once, then the normal apply. A
+# resource-level `for_each` refuses to plan against a list that is only "known after
+# apply", and the app has to exist before its outbound addresses are.
+#
+# In practice these are the plan's addresses, shared with the other apps, so the rules
+# below usually duplicate existing ones under a different name. That is deliberate: read
+# off *this* app's resource, they stay right through a plan-tier change that reassigns
+# them, and a future move of one app to its own plan needs no edit here.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "teams_outbound" {
+  for_each = toset(azurerm_linux_web_app.teams.possible_outbound_ip_address_list)
+
+  name             = "AllowTeamsOutbound-${replace(each.value, ".", "-")}"
   server_id        = azurerm_postgresql_flexible_server.main.id
   start_ip_address = each.value
   end_ip_address   = each.value

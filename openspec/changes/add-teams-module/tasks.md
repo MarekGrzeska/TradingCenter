@@ -108,13 +108,32 @@
 
 ## 10. Infrastruktura
 
-- [ ] 10.1 Rejestracja Entra dla modułu w `infra/entra.tf`
-- [ ] 10.2 App Service w `infra/app-service.tf` — tożsamość, obraz, Easy Auth z `/health` poza wymaganiem
-- [ ] 10.3 Polityka dostępu do Key Vault dla tożsamości modułu
-- [ ] 10.4 Sekret `teams-openai-api-key` i odwołanie do niego w ustawieniach aplikacji
-- [ ] 10.5 Baza logiczna `teams` i reguły zapory dla adresów wyjściowych aplikacji w `infra/database.tf`
-- [ ] 10.6 Tożsamość modułu w `allowed_applications` serwera narzędzi
-- [ ] 10.7 Instrukcja dla operatora: `apply -target`, pełny `apply`, `grant-schema-ownership.sql`
+- [x] 10.1 Rejestracja Entra dla modułu w `infra/entra.tf`
+- [x] 10.2 App Service w `infra/app-service.tf` — tożsamość, obraz, Easy Auth z `/health` poza wymaganiem
+- [x] 10.3 Polityka dostępu do Key Vault dla tożsamości modułu
+- [x] 10.4 Sekret `teams-openai-api-key` i odwołanie do niego w ustawieniach aplikacji
+- [x] 10.5 Baza logiczna `teams` i reguły zapory dla adresów wyjściowych aplikacji w `infra/database.tf`
+- [x] 10.6 Tożsamość modułu w `allowed_applications` serwera narzędzi
+- [x] 10.7 Instrukcja dla operatora: `apply -target`, pełny `apply`, `grant-schema-ownership.sql`
+
+  Kod napisany, `terraform validate` przechodzi; `apply` pozostaje robotą operatora, więc
+  w Azure nie stoi jeszcze nic. Cztery rzeczy warte odnotowania:
+
+  - **Katalog modeli i klucz są osobne od `agent`.** `var.teams_models` obok
+    `var.agent_models` i sekret `teams-openai-api-key` obok `openai-api-key` — dwie linie
+    na rachunku OpenAI zamiast jednej, inaczej kosztu eksperymentów nie da się ocenić.
+  - **Easy Auth modułu przyjmuje też audience `market-data`,** dokładnie jak `agent`.
+    Terminal ma dziś jeden token, brany na zakres `market-data`; własny zakres modułu jest
+    zarejestrowany i pre-autoryzowany, ale nic go jeszcze nie prosi. Grupa 9 nie musi więc
+    ruszać `src/auth/`.
+  - **Piąta aplikacja na planie B2,** którego pomiar (83% pamięci) zrobiono przy czterech.
+    Alarm `plan_memory` w `monitoring.tf` jest tym, co to wyłapie; odpowiedzią zostaje
+    większy SKU, nigdy drugi worker.
+  - **10.7 wylądowało w `modules/teams/README.md`** (sekcja „Deploy") — nie ma w repo
+    strony operatorskiej, a instrukcje `agent` zostały wtedy w Migration Plan zmiany,
+    czyli tam, gdzie po archiwizacji nikt ich nie szuka. Jedna rzecz jest tam jawnie
+    oznaczona jako do sprawdzenia: dokładne wywołanie zakładające rolę Entra w bazie nie
+    zostało nigdzie zapisane, gdy robiono to dla `agent`.
 
 ## 11. CI i wdrożenie
 

@@ -94,6 +94,59 @@ variable "agent_models" {
   }
 }
 
+variable "teams_models" {
+  description = <<-EOT
+    The teams module's own model catalogue, one entry per model — the same shape as
+    `agent_models` above and deliberately a separate variable rather than a reuse of it.
+    The two modules pick models for different work: agent runs one conversation, a team
+    runs several agents at once and picks a cheaper model for the roles that gather and a
+    dearer one for the role that decides (proposal.md, "Zbiorczy katalog modeli modułu").
+    Sharing one variable would mean neither catalogue could move without the other.
+
+    Same non-guarantees as `agent_models`: this root creates nothing from it — the models
+    are OpenAI's, reached with an API key — and nothing here verifies that `model` names
+    something OpenAI serves. A name from memory fails at the first call, not at `apply`.
+
+    Rates are per 1,000,000 tokens, the unit OpenAI's pricing page quotes. The defaults
+    below are the ones `modules/teams/.env.example` carries, read from public pricing in
+    August 2026; check the pricing page before trusting them at deploy time.
+
+    Unlike `agent`, there is no default model id to pair with this: every agent in a saved
+    team revision MUST name its own model, so there is nothing to fall back to
+    (`teams/config.py`, specs/teams-models).
+  EOT
+  type = map(object({
+    model              = string
+    display_name       = string
+    cost_rank          = number
+    input_rate_per_1m  = string
+    output_rate_per_1m = string
+  }))
+  default = {
+    "gpt-5.6-luna" = {
+      model              = "gpt-5.6-luna"
+      display_name       = "Luna"
+      cost_rank          = 1
+      input_rate_per_1m  = "0.2"
+      output_rate_per_1m = "1.2"
+    }
+    "gpt-5.6-terra" = {
+      model              = "gpt-5.6-terra"
+      display_name       = "Terra"
+      cost_rank          = 2
+      input_rate_per_1m  = "2"
+      output_rate_per_1m = "12"
+    }
+    "gpt-5.6-sol" = {
+      model              = "gpt-5.6-sol"
+      display_name       = "Sol"
+      cost_rank          = 3
+      input_rate_per_1m  = "5"
+      output_rate_per_1m = "30"
+    }
+  }
+}
+
 variable "operator_object_id" {
   description = <<-EOT
     Entra object id of the human operator — the one who writes Key Vault secret values
