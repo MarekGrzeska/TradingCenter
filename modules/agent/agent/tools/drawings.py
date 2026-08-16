@@ -37,16 +37,20 @@ from ..models import (
     ChartZone,
 )
 from ..store import MAX_DRAWING_ID, MAX_DRAWINGS_PER_SYMBOL
-from .chart import CHART_COLORS, ChartRefusal, read_json
+from .chart import DRAWING_COLORS, ChartRefusal, read_json
 from .client import ToolDescriptor, ToolOutcome, ToolOutcomeKind, ToolServer
 
 DRAW_TOOL_NAME = "draw_on_chart"
 LIST_DRAWINGS_TOOL_NAME = "list_chart_drawings"
 
+# The drawing palette, not the indicator one: a drawing is not an indicator and has no
+# reason to wear its colour. Objects already standing in the record with an indicator
+# token keep drawing in it — the terminal still resolves those — but nothing new is
+# offered one (design.md, "Paleta rysunków dokłada tokeny, nie odbiera starych").
 _COLOR_SCHEMA = {
     "type": "string",
-    "description": "one of " + ", ".join(CHART_COLORS) + "; omit to let the chart choose",
-    "enum": list(CHART_COLORS),
+    "description": "one of " + ", ".join(DRAWING_COLORS) + "; omit to let the chart choose",
+    "enum": list(DRAWING_COLORS),
 }
 _LABEL_SCHEMA = {
     "type": "string",
@@ -231,9 +235,10 @@ def _as_text(raw: Any, field: str) -> str | None:
 def _as_color(raw: Any) -> str | None:
     if raw is None:
         return None
-    if raw not in CHART_COLORS:
+    if raw not in DRAWING_COLORS:
         raise ChartRefusal(
-            f"{raw!r} is not a colour the chart draws. Use one of: {', '.join(CHART_COLORS)}."
+            f"{raw!r} is not a colour the chart draws drawings in. "
+            f"Use one of: {', '.join(DRAWING_COLORS)}."
         )
     return raw
 

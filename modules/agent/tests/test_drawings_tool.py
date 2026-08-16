@@ -514,3 +514,51 @@ async def test_read_then_remove_uses_the_same_id(db, pool) -> None:
     assert outcome.kind is ToolOutcomeKind.OK
     remaining = await store.list_drawings(db, symbol="US100")
     assert [d.id for d in remaining] == [read["drawings"][1]["id"]]
+
+
+# --- the palette a drawing is drawn from ---------------------------------------------
+
+
+async def test_a_colour_from_the_drawing_palette_is_taken(db, pool) -> None:
+    """specs/agent-chart-drawings, "Kolor z palety rysunków"."""
+    session = await _session(db)
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "add": [{"kind": "level", "price": 21500.0, "color": "--color-drawing-2"}]},
+        session_id=session.id,
+    )
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    standing = await store.list_drawings(db, symbol="US100")
+    assert [drawing.geometry.color for drawing in standing] == ["--color-drawing-2"]
+
+
+async def test_an_indicator_colour_is_refused_and_named(db, pool) -> None:
+    """A drawing is not an indicator, and wearing its colour is exactly what made the two
+    indistinguishable on one chart. The refusal names the token so the model can correct
+    it in the same turn (specs/agent-chart-drawings, "Kolor spoza palety rysunków")."""
+    session = await _session(db)
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "add": [{"kind": "level", "price": 21500.0, "color": "--color-accent"}]},
+        session_id=session.id,
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+    assert "--color-accent" in outcome.text
+    assert "--color-drawing-1" in outcome.text
+    assert await store.list_drawings(db, symbol="US100") == []
+
+
+def test_the_tool_offers_the_drawing_palette_and_no_indicator_token() -> None:
+    """What the model sees before it picks: a schema offering a colour that can only be
+    refused is a schema that lies."""
+    from agent.tools.chart import CHART_COLORS, DRAWING_COLORS
+    from agent.tools.drawings import DRAW_TOOL
+
+    offered = set()
+    for shape in DRAW_TOOL.input_schema["properties"]["add"]["items"]["oneOf"]:
+        offered.update(shape["properties"]["color"]["enum"])
+
+    assert offered == set(DRAWING_COLORS)
+    assert offered.isdisjoint(CHART_COLORS)

@@ -54,6 +54,21 @@ CHART_COLORS = (
     "--color-down",
 )
 
+# What the terminal draws an operator's own objects in, and it shares no colour with the
+# list above (`terminal/src/chart/theme.ts`, `DRAWING_LINE_TOKENS`). A level somebody put
+# on the chart and a level an indicator computed are two different things, and drawn in
+# one colour they cannot be told apart exactly when it matters
+# (specs/agent-chart-drawings, "Paleta rysunków MUST być odrębna"). Four rather than
+# eight: a drawing's colour can end up beside any other drawing's, and four is where that
+# still clears the palette gates — the terminal's `index.css` carries the measurements.
+# Duplicated for the same reason `CHART_COLORS` is: there is no library between modules.
+DRAWING_COLORS = (
+    "--color-drawing-1",
+    "--color-drawing-2",
+    "--color-drawing-3",
+    "--color-drawing-4",
+)
+
 CHART_TOOL = ToolDescriptor(
     name=CHART_TOOL_NAME,
     description=(
