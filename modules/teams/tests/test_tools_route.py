@@ -33,7 +33,8 @@ _ENV = {
 @pytest.fixture
 def _env(db: asyncpg.Connection, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", migrated_url)
-    monkeypatch.delenv("MARKET_MCP_URL", raising=False)
+    # No MARKET_MCP_URL here on purpose — `conftest._no_developer_env` is what keeps it
+    # unset, and it does it with a blank value rather than a deletion (see the note there).
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 
