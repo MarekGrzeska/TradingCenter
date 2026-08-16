@@ -9,11 +9,13 @@ import {
   mapRecordedToolCall,
   mapRun,
   mapRunStep,
+  mapRunTrade,
   readRunStream,
   type RecordedToolCall,
   type RunStreamEvent,
   type TeamRun,
   type TeamRunStep,
+  type TeamRunTrade,
 } from "./runs";
 
 /**
@@ -43,6 +45,8 @@ type RawTool = Wire["ToolOut"];
 type RawRun = Wire["RunOut"];
 type RawStep = Wire["RunStepOut"];
 type RawToolCall = Wire["ToolCallOut"];
+type RawTrade = Wire["TradeOut"];
+type RawTradingLimits = Wire["TradingLimits"];
 
 /** One entry of the catalogue — everything the list needs, and no definition: reading
  *  the list must not pull down every team's graph (specs/teams-catalogue). */
@@ -82,10 +86,28 @@ export interface TeamLimits {
   dailyLimit: string | null;
 }
 
+/**
+ * What a revision allows its agents to do to the account.
+ *
+ * `null` on any of the three means **no limit**, and the terminal treats it as exactly
+ * that: it never substitutes a default and never fills a blank field in for the operator
+ * (`teams-trading`, "Każda granica handlowa daje się wyłączyć, a moduł żadnej nie
+ * narzuca"). A team deliberately let loose on the whole account is theirs to compose.
+ *
+ * `maxOrderSize` is a string for the same reason every other number here is — rendered
+ * and sent back, never computed with.
+ */
+export interface TeamTradingLimits {
+  maxOrderSize: string | null;
+  ordersPerRun: number | null;
+  ordersPerDay: number | null;
+}
+
 export interface TeamDefinition {
   agents: TeamAgent[];
   dependencies: TeamDependency[];
   limits: TeamLimits;
+  trading: TeamTradingLimits;
 }
 
 export interface TeamRevision {
@@ -104,13 +126,18 @@ export interface TeamsModel {
   outputRatePer1M: string;
 }
 
-/** One tool the module's tool server announces. Name and description only: a definition
- *  points at a tool by name and carries nothing else about it, so a description that
- *  changes upstream needs no revision rewritten (specs/teams-tool-access, "Moduł nie
- *  trzyma kopii tego, co ogłasza serwer narzędzi"). */
+/** One tool the module's tool server announces. Name, description, and whether it only
+ *  reads — a definition points at a tool by name and carries nothing else about it, so a
+ *  description that changes upstream needs no revision rewritten (specs/teams-tool-access,
+ *  "Moduł nie trzyma kopii tego, co ogłasza serwer narzędzi").
+ *
+ *  `readOnly` is the server's own `readOnlyHint`, passed through by the module. `null`
+ *  means the tool carried no annotation at all — unknown, which the picker shows as
+ *  unknown rather than resolving either way (specs/trading-mcp-tools). */
 export interface TeamsTool {
   name: string;
   description: string;
+  readOnly: boolean | null;
 }
 
 export interface TeamsApi {
@@ -158,6 +185,10 @@ export interface TeamsApi {
   /** What the agents called, as recorded — each naming its step rather than its agent.
    *  `attachAgentKeys` in `runs.ts` is where the two become one shape. */
   runToolCalls(runId: number, signal: AbortSignal): Promise<RecordedToolCall[]>;
+  /** What this run did to the account, in the order it did it. Read beside the tool
+   *  calls rather than derived from them: a call says a tool was reached for, a trade
+   *  says what was placed and what came of it (specs/teams-trading). */
+  runTrades(runId: number, signal: AbortSignal): Promise<TeamRunTrade[]>;
   /** Asks the run to stop. The module answers 202 with the run as it was when the
    *  interruption was accepted — the status is written by the run itself as it unwinds,
    *  and this view catches up through the stream. */
@@ -200,6 +231,17 @@ function mapDefinition(raw: RawDefinition): TeamDefinition {
       runLimit: raw.limits?.run_limit ?? null,
       dailyLimit: raw.limits?.daily_limit ?? null,
     },
+    // Absent on a revision saved before trading limits existed, and it reads as what it
+    // is: no limits (specs/teams-catalogue, "Rewizja z fazy sprzed narzędzi handlowych").
+    trading: mapTradingLimits(raw.trading),
+  };
+}
+
+function mapTradingLimits(raw: RawTradingLimits | undefined): TeamTradingLimits {
+  return {
+    maxOrderSize: raw?.max_order_size ?? null,
+    ordersPerRun: raw?.orders_per_run ?? null,
+    ordersPerDay: raw?.orders_per_day ?? null,
   };
 }
 
@@ -217,6 +259,11 @@ function definitionToWire(definition: TeamDefinition): RawDefinition {
     limits: {
       run_limit: definition.limits.runLimit,
       daily_limit: definition.limits.dailyLimit,
+    },
+    trading: {
+      max_order_size: definition.trading.maxOrderSize,
+      orders_per_run: definition.trading.ordersPerRun,
+      orders_per_day: definition.trading.ordersPerDay,
     },
   };
 }
@@ -262,7 +309,12 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
     async listTools(signal) {
       try {
         const raw = await http.json<RawTool[]>(`${httpBase}/tools`, { signal });
-        return raw.map((tool) => ({ name: tool.name, description: tool.description }));
+        return raw.map((tool) => ({
+          name: tool.name,
+          description: tool.description,
+          // `null` when the server annotated nothing — unknown, not "reads".
+          readOnly: tool.read_only ?? null,
+        }));
       } catch (cause) {
         // A module deployed before this route existed answers 404 here, and that reads
         // as "nothing announced" rather than as a failure: the panel still edits the
@@ -356,6 +408,11 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
         signal,
       });
       return raw.map(mapRecordedToolCall);
+    },
+
+    async runTrades(runId, signal) {
+      const raw = await http.json<RawTrade[]>(`${httpBase}/runs/${runId}/trades`, { signal });
+      return raw.map(mapRunTrade);
     },
 
     async cancelRun(runId, signal) {

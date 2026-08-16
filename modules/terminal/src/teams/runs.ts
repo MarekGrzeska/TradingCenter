@@ -22,6 +22,7 @@ type Wire = components["schemas"];
 type RawRun = Wire["RunOut"];
 type RawStep = Wire["RunStepOut"];
 type RawToolCall = Wire["ToolCallOut"];
+type RawTrade = Wire["TradeOut"];
 
 /** `runs.status` — a plain string here, as on the module's wire, where the CHECK
  *  constraint is the enforcement. `pending`, `running`, `completed`, `failed`,
@@ -79,6 +80,33 @@ export interface RecordedToolCall extends Omit<TeamRunToolCall, "agentKey"> {
   runStepId: number;
 }
 
+/**
+ * One order a run placed, as the module recorded it — the same event as a tool call,
+ * read as a trade (specs/teams-trading).
+ *
+ * `agentKey` comes straight off the row here: unlike a tool call, a trade names the
+ * agent itself, so nothing has to be resolved through the steps.
+ *
+ * `status` is the module's own reading — `sent`, `settled`, `unsettled`, `refused`,
+ * `unknown` — and `unknown` is the one that matters most to whoever is watching: the
+ * order may well have reached the account and this module cannot say. It is never shown
+ * as a failure (`terminal-teams`, "Zlecenie bez znanego skutku"). `resultStatus` beside
+ * it is the provider's own word, when one arrived.
+ */
+export interface TeamRunTrade {
+  id: number;
+  agentKey: string;
+  toolName: string;
+  symbol: string | null;
+  direction: string | null;
+  size: string | null;
+  level: string | null;
+  status: string;
+  resultStatus: string | null;
+  providerOrderId: string | null;
+  createdAt: number;
+}
+
 export type RunStreamEvent =
   /** Where the run is now, sent first on every connection — which is what makes closing
    *  and reopening the view show the current state rather than the state at the drop
@@ -126,6 +154,22 @@ export function mapRecordedToolCall(raw: RawToolCall): RecordedToolCall {
     toolName: raw.tool_name,
     outcome: raw.outcome,
     durationMs: raw.duration_ms,
+  };
+}
+
+export function mapRunTrade(raw: RawTrade): TeamRunTrade {
+  return {
+    id: raw.id,
+    agentKey: raw.agent_key,
+    toolName: raw.tool_name,
+    symbol: raw.symbol,
+    direction: raw.direction,
+    size: raw.size,
+    level: raw.level,
+    status: raw.status,
+    resultStatus: raw.result_status,
+    providerOrderId: raw.provider_order_id,
+    createdAt: parseIsoToEpochSeconds(raw.created_at),
   };
 }
 

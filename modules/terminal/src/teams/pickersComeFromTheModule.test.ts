@@ -22,9 +22,16 @@ const TEAMS = join(process.cwd(), "src", "teams");
  *  `ModelCatalogueEntry.id` in the module's own configuration is set from. */
 const MODEL_ID = /\b(gpt|claude|gemini|llama|mistral|o\d)[-.][\w.-]+/i;
 
-/** market-mcp announces snake_case names like these; a definition points at one by name
- *  and this terminal only ever learns them from `GET /tools`. */
-const TOOL_NAME = /\b(get|list|read)_[a-z_]+\b/;
+/**
+ * market-mcp and trading-mcp announce snake_case names like these; a definition points at
+ * one by name and this terminal only ever learns them from `GET /tools`.
+ *
+ * Quoted, because that is the shape a hardcoded list actually takes — `["get_candles"]`,
+ * `case "place_order":`. Matching the bare word caught `tool.read_only` in the mapper,
+ * which is a *field on the wire* and reading it is the opposite of carrying a list of
+ * one's own.
+ */
+const TOOL_NAME = /["'`](get|list|read|place|close|cancel|amend)_[a-z_]+["'`]/;
 
 function sourceFiles(dir: string, prefix = ""): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {

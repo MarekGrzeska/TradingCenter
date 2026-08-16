@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MarketDataError } from "../data/types";
 import { TeamsView } from "./TeamsView";
-import type { RunStreamEvent, TeamRun, TeamRunStep } from "./runs";
+import type { RunStreamEvent, TeamRun, TeamRunStep, TeamRunTrade } from "./runs";
 import type { TeamDefinition, TeamsApi, TeamSummary, TeamRevision } from "./teamsApi";
 
 const MODELS = [
@@ -33,6 +33,7 @@ const DEFINITION: TeamDefinition = {
   ],
   dependencies: [{ from: "agent-1", to: "agent-2" }],
   limits: { runLimit: null, dailyLimit: null },
+  trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
 };
 
 function revision(definition: TeamDefinition = DEFINITION): TeamRevision {
@@ -52,6 +53,7 @@ const TRIO: TeamDefinition = {
     { from: "agent-2", to: "agent-3" },
   ],
   limits: { runLimit: null, dailyLimit: null },
+  trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
 };
 
 const RUN: TeamRun = {
@@ -83,6 +85,26 @@ const MIDWAY: TeamRunStep[] = [
   step(3, "agent-3", "pending"),
 ];
 
+function trade(overrides: Partial<TeamRunTrade> = {}): TeamRunTrade {
+  return {
+    id: 1,
+    agentKey: "agent-1",
+    toolName: "place_order",
+    symbol: "GOLD",
+    direction: "BUY",
+    size: "0.5",
+    level: null,
+    status: "settled",
+    resultStatus: "FILLED",
+    providerOrderId: "deal-1",
+    createdAt: 1_760_000_800,
+    ...overrides,
+  };
+}
+
+const SETTLED_ORDER = trade();
+const UNKNOWN_ORDER = trade({ id: 2, status: "unknown", resultStatus: null, providerOrderId: null });
+
 async function* streamOf(events: RunStreamEvent[]): AsyncGenerator<RunStreamEvent> {
   for (const event of events) yield event;
 }
@@ -90,7 +112,9 @@ async function* streamOf(events: RunStreamEvent[]): AsyncGenerator<RunStreamEven
 function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
   return {
     listModels: vi.fn(async () => MODELS),
-    listTools: vi.fn(async () => [{ name: "get_candles", description: "candles from the archive" }]),
+    listTools: vi.fn(async () => [
+      { name: "get_candles", description: "candles from the archive", readOnly: true },
+    ]),
     listTeams: vi.fn(async () => [TEAM]),
     createTeam: vi.fn(async () => TEAM),
     getTeam: vi.fn(async () => TEAM),
@@ -104,6 +128,7 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     getRun: vi.fn(async () => RUN),
     runSteps: vi.fn(async () => MIDWAY),
     runToolCalls: vi.fn(async () => []),
+    runTrades: vi.fn(async () => []),
     cancelRun: vi.fn(async () => RUN),
     watchRun: vi.fn(async () => streamOf([{ kind: "snapshot", run: RUN, steps: MIDWAY }])),
     ...overrides,
@@ -195,6 +220,102 @@ describe("the agent panel", () => {
     await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
     const [, saved] = (api.saveRevision as ReturnType<typeof vi.fn>).mock.calls[0];
     expect((saved as TeamDefinition).dependencies).toEqual([]);
+  });
+});
+
+describe("picking tools that move the account", () => {
+  const READ_AND_WRITE = [
+    { name: "get_candles", description: "candles from the archive", readOnly: true },
+    { name: "place_order", description: "places an order", readOnly: false },
+    { name: "mystery", description: "an older server said nothing about this one", readOnly: null },
+  ];
+
+  it("marks a write tool apart from a read tool", async () => {
+    // `terminal-teams`, "Narzędzia zapisujące są rozpoznawalne przy wyborze" — before it
+    // is ticked, not after a run places something.
+    await openTheTeam(fakeApi({ listTools: vi.fn(async () => READ_AND_WRITE) }));
+
+    expect(await screen.findByText("changes the account")).toBeInTheDocument();
+    const reader = await screen.findByLabelText(/get_candles/);
+    expect(reader.closest("label")).not.toHaveTextContent("changes the account");
+  });
+
+  it("says unknown for a tool whose server annotated nothing", async () => {
+    // Three answers, not two: this terminal knows nothing the module did not tell it.
+    await openTheTeam(fakeApi({ listTools: vi.fn(async () => READ_AND_WRITE) }));
+
+    expect(await screen.findByText("unknown effect")).toBeInTheDocument();
+  });
+});
+
+describe("the team's trading limits", () => {
+  /** The panel opens on an agent; the team's own settings are what is there when no
+   *  agent is selected. */
+  async function openTeamSettings(api: TeamsApi) {
+    await openTheTeam(api);
+    await userEvent.click(screen.getByTestId("agent-node-Scout"));
+    await userEvent.click(screen.getByRole("button", { name: "Remove agent" }));
+    return screen.findByText("Trading limits");
+  }
+
+  it("starts every limit empty, and says what that means", async () => {
+    // `teams-trading`, "Każda granica handlowa daje się wyłączyć, a moduł żadnej nie
+    // narzuca" — the terminal suggests no number either.
+    await openTeamSettings(fakeApi());
+
+    expect(await screen.findByLabelText("Max order size")).toHaveValue("");
+    expect(screen.getByLabelText("Orders per run")).toHaveValue(null);
+    expect(screen.getByLabelText("Orders per day")).toHaveValue(null);
+    expect(screen.getByTestId("unlimited-note")).toBeInTheDocument();
+  });
+
+  it("sends the limits the operator typed, and only those", async () => {
+    const api = fakeApi();
+    await openTeamSettings(api);
+
+    await userEvent.type(screen.getByLabelText("Max order size"), "0.5");
+    await userEvent.type(screen.getByLabelText("Orders per run"), "3");
+    await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
+
+    await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
+    const [, saved] = (api.saveRevision as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect((saved as TeamDefinition).trading).toEqual({
+      maxOrderSize: "0.5",
+      ordersPerRun: 3,
+      // Left alone means left unlimited — the terminal invents nothing for it.
+      ordersPerDay: null,
+    });
+  });
+
+  it("saves a team with no limits at all rather than refusing it", async () => {
+    // The operator's own call: a team let loose on the demo account is theirs to run,
+    // and nothing in this view stands in the way (`terminal-teams`).
+    const api = fakeApi();
+    await openTeamSettings(api);
+
+    await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
+
+    await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
+    const [, saved] = (api.saveRevision as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect((saved as TeamDefinition).trading).toEqual({
+      maxOrderSize: null,
+      ordersPerRun: null,
+      ordersPerDay: null,
+    });
+  });
+
+  it("clearing a limit puts it back to no limit", async () => {
+    const api = fakeApi();
+    await openTeamSettings(api);
+
+    const size = screen.getByLabelText("Max order size");
+    await userEvent.type(size, "2");
+    await userEvent.clear(size);
+    await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
+
+    await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
+    const [, saved] = (api.saveRevision as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect((saved as TeamDefinition).trading.maxOrderSize).toBeNull();
   });
 });
 
@@ -356,6 +477,66 @@ describe("watching a run", () => {
     expect(await screen.findByText("US100 is trending")).toBeInTheDocument();
     // Nothing left to stop, so nothing offering to.
     expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+  });
+
+  it("shows the orders an agent placed, at that agent", async () => {
+    // `terminal-teams`, "Złożone zlecenia widać przy agencie, który je złożył".
+    const api = fakeApi({ runTrades: vi.fn(async () => [SETTLED_ORDER]) });
+    await watch(api);
+
+    fireEvent.click(screen.getByTestId("agent-node-Scout"));
+
+    const trade = await screen.findByTestId("trade");
+    expect(trade).toHaveTextContent("BUY");
+    expect(trade).toHaveTextContent("GOLD");
+    expect(trade).toHaveTextContent("0.5");
+    expect(trade).toHaveTextContent("settled");
+  });
+
+  it("shows an order whose outcome never came back as unknown, not as failed", async () => {
+    // `terminal-teams`, "Zlecenie bez znanego skutku": the order may well have reached
+    // the account, so the operator is pointed at the account rather than reassured.
+    const api = fakeApi({ runTrades: vi.fn(async () => [UNKNOWN_ORDER]) });
+    await watch(api);
+
+    fireEvent.click(screen.getByTestId("agent-node-Scout"));
+
+    const trade = await screen.findByTestId("trade");
+    expect(trade).toHaveTextContent(/unknown/);
+    expect(trade).toHaveTextContent(/check the account/);
+    expect(trade).not.toHaveTextContent(/failed/);
+  });
+
+  it("keeps an agent that placed nothing free of an orders section", async () => {
+    const api = fakeApi({ runTrades: vi.fn(async () => [SETTLED_ORDER]) });
+    await watch(api);
+
+    fireEvent.click(screen.getByTestId("agent-node-Judge"));
+
+    expect(screen.queryByTestId("trade")).not.toBeInTheDocument();
+    expect(screen.queryByText("Orders placed")).not.toBeInTheDocument();
+  });
+
+  it("names the order limit as the reason, apart from the cost limit", async () => {
+    // `terminal-teams`, "Zatrzymanie z powodu granicy zleceń jest pokazane jako takie" —
+    // and the orders already placed stay readable beside it.
+    const stopped: TeamRun = {
+      ...RUN,
+      status: "failed",
+      stoppedReason:
+        "the run's order limit was reached: 2 of 2 allowed placed. The next order was not sent.",
+      finishedAt: 1_760_000_900,
+    };
+    const api = fakeApi({
+      watchRun: vi.fn(async () => streamOf([{ kind: "snapshot", run: stopped, steps: MIDWAY }])),
+      runTrades: vi.fn(async () => [SETTLED_ORDER]),
+    });
+    await watch(api);
+
+    expect(await screen.findByTestId("stop-kind")).toHaveTextContent("order limit");
+    expect(screen.getByTestId("stop-kind")).not.toHaveTextContent("cost");
+    fireEvent.click(screen.getByTestId("agent-node-Scout"));
+    expect(await screen.findByTestId("trade")).toBeInTheDocument();
   });
 
   it("asks the module to stop a run the operator interrupts", async () => {

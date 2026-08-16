@@ -26,6 +26,7 @@ function three(): TeamDefinition {
       { from: "agent-2", to: "agent-3" },
     ],
     limits: { runLimit: null, dailyLimit: null },
+    trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
   };
 }
 
