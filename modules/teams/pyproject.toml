@@ -1,0 +1,61 @@
+[project]
+name = "teams"
+version = "0.1.0"
+description = "Operator-defined teams of agents, saved to a catalogue and run by hand — this phase writes no order"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "pydantic-settings>=2.2",
+    "asyncpg>=0.30",
+    "alembic>=1.14",
+    # Alembic drives migrations through SQLAlchemy Core; the module's own queries go
+    # straight through asyncpg, so no ORM is pulled into the runtime path — same split
+    # as market-data and agent.
+    "sqlalchemy[asyncio]>=2.0",
+    # The database credential, and only that: a managed identity in Azure, a service
+    # principal (client secret) locally — never a stored password. The model provider
+    # does not use it, because OpenAI is not in Entra.
+    "azure-identity>=1.19",
+    # azure-identity's `aio` credentials build an async HTTP pipeline that imports this
+    # at construction time — `DefaultAzureCredential()` fails without it, not just the
+    # tool-server session that will use it directly in a later change.
+    "aiohttp>=3.10",
+]
+
+# Not a packaged library — uv only manages the venv and deps, no build step.
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint.flake8-bugbear]
+# FastAPI's Depends()/Query() in argument defaults are idiomatic, not the B008 bug.
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query"]
+
+[tool.pyright]
+include = ["teams", "migrations"]
+typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = [
+    "db: needs a real PostgreSQL (a throwaway container, started on demand — see conftest)",
+]
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.411",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff==0.16.2",
+    # FastAPI's TestClient is a thin wrapper over httpx; this module makes no HTTP calls
+    # of its own at runtime, so it belongs to the dev group rather than the app's deps.
+    "httpx>=0.27",
+    # Brings up a throwaway PostgreSQL per test session, same reason as agent and
+    # market-data: the schema is the thing under test.
+    "testcontainers[postgres]>=4.8",
+]
