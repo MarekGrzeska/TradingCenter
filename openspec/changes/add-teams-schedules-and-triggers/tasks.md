@@ -157,11 +157,22 @@ Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń p
 
 ## 7. Konfiguracja, infrastruktura i CI
 
-- [ ] 7.1 Ustawienia `SCHEDULER_*` w `config.py` — **dopisane na końcu klasy** — i w
-  `.env.example`
-- [ ] 7.2 `SCHEDULER_ENABLED` w ustawieniach aplikacji `teams` w `infra/app-service.tf`
-- [ ] 7.3 `modules/teams/README.md` — harmonogramy, wyzwalacze i lever wyłączający zegar
-- [ ] 7.4 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright`
+- [x] 7.1 Ustawienia `SCHEDULER_*` w `config.py` — **dopisane na końcu klasy** — i w
+  `.env.example` — zrobione wcześniej, w grupie 3 (`scheduler_enabled`,
+  `scheduler_poll_interval_seconds`, `scheduler_failure_threshold` — sam zegar potrzebował
+  ich już wtedy)
+- [x] 7.2 `SCHEDULER_ENABLED` w ustawieniach aplikacji `teams` w `infra/app-service.tf` —
+  jedno ustawienie (`"true"`); `SCHEDULER_POLL_INTERVAL_SECONDS` i
+  `SCHEDULER_FAILURE_THRESHOLD` zostają na domyślnych z `config.py`, tą samą zasadą co
+  `RUN_TIMEOUT_SECONDS` nie jest tu wymieniony. `terraform fmt -check` i `terraform
+  validate` przechodzą
+- [x] 7.3 `modules/teams/README.md` — nowa sekcja o `scheduler/clock.py` i
+  `runner/starter.py` w „What", `SCHEDULER_ENABLED` i lever w „Run", trasy harmonogramów
+  i wyzwalaczy w tabeli „Contract". Przy okazji poprawione zdanie twierdzące, że „kanwy
+  terminala jeszcze nie ma" — jest, od fazy 1 grupy 9, i harmonogramy/wyzwalacze
+  doszły od tego czasu też
+- [x] 7.4 `uv run pytest` (291, w tym `-m db`), `uv run ruff check .`, `uv run pyright` —
+  wszystkie czyste po zmergowaniu grupy 6
 
 ## 8. Domknięcie
 

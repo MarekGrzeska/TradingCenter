@@ -6,14 +6,16 @@ versioned append-only — compiled to a run rather than written as code. This ph
 no order: a run ends in a recommendation kept in its trace, not a position.
 
 Full shape of the module — the catalogue, a run's execution, the terminal's canvas — is
-in `openspec/changes/add-teams-module/` (`proposal.md`, `design.md`, the `teams-*` and
-`terminal-teams` delta specs). **This README describes what exists in the code today**:
-the module starts, authenticates the same way `agent` and `market-data` do, migrates its
-own database, serves the **catalogue** — teams, their append-only revisions, and retiring
-one — and **runs a team**: agents work in the order their dependencies allow, their trace
-is written as it happens, progress is readable while it happens, and a run stops when it
-reaches the cost its definition allows it. What is not here yet is the terminal's own
-canvas.
+in `openspec/changes/add-teams-module/`; the module's own clock is in
+`openspec/changes/add-teams-schedules-and-triggers/` (`proposal.md`, `design.md`, the
+`teams-*` and `terminal-teams*` delta specs in both). **This README describes what
+exists in the code today**: the module starts, authenticates the same way `agent` and
+`market-data` do, migrates its own database, serves the **catalogue** — teams, their
+append-only revisions, and retiring one — **runs a team**: agents work in the order their
+dependencies allow, their trace is written as it happens, progress is readable while it
+happens, and a run stops when it reaches the cost its definition allows it — and now runs
+one **without an operator**: a schedule fires on a cron expression, a trigger fires on a
+market condition's edge, and both take the identical path a click at the terminal does.
 
 ## What
 
@@ -62,10 +64,29 @@ canvas.
   imported) and who gets which tools (`assignment.py`). Both refusals that stop a run
   before an agent is called live in the second: a server that cannot be asked, and a tool
   the server no longer announces. A team assigning no tools never touches either.
-- `app.py` — assembly only: the lifespan, the routers mounted on it, and the tool server
-  it builds without connecting. Nothing that decides anything.
+- `routers/schedules.py` — creating, editing, enabling and disabling both schedules and
+  triggers, their fire history, and a schedule's next-fires preview
+  (`GET /schedules/{id}/next-fires`) — rolled forward from `cron_expression` fresh on
+  every call, never read off the row's own `next_fire_at`, which only reflects the last
+  claim.
+- `scheduler/clock.py` — the module's own clock: one `asyncio` task, started and stopped
+  in `app.py`'s `lifespan`, waking every `SCHEDULER_POLL_INTERVAL_SECONDS`. Each wake
+  claims every due schedule and trigger with a conditional `UPDATE` (exactly-once even
+  across two processes mid-deploy) and starts a run through `runner.starter` — the same
+  function `routers/runs.py`'s own `POST /runs` calls, so a 3am fire takes the identical
+  checks a click does. A run's own outcome, read back after its background task finishes,
+  drives a consecutive-failure counter that disables a schedule or trigger after
+  `SCHEDULER_FAILURE_THRESHOLD` in a row.
+- `runner/starter.py` — `start_run_on_revision`: the checks and the start itself, shared
+  by the route and the clock, given only an already-resolved revision. Resolving *which*
+  revision runs stays each caller's own job — a route asks for a team's current latest, a
+  pinned schedule may ask for one from months ago.
+- `app.py` — assembly only: the lifespan, the routers mounted on it, the tool server it
+  builds without connecting, and the clock it starts last and stops first. Nothing that
+  decides anything.
 - `migrations/` — the schema, as the statements a deployment actually runs: the catalogue
-  (`0001`), runs and their steps (`0002`), the usage ledger (`0003`).
+  (`0001`), runs and their steps (`0002`), the usage ledger (`0003`), the team-layout
+  positions (`0004`), schedules, triggers and their fire history (`0005`).
 
 ## Run
 
@@ -97,6 +118,14 @@ migrates its own database at startup** (`migrate.py`, called from `app.py`'s lif
 under a Postgres advisory lock, as the module's own identity — the same arrangement
 `agent` and `market-data` both run today, so there is no `GRANT` step here either, once
 the database exists.
+
+The module's own clock starts the same way, right after — a schedule due the instant the
+process comes up sees the same catalogue, provider and tool session a route would.
+`SCHEDULER_ENABLED=false` (`.env.example`, `SCHEDULER_*`) turns it off without touching
+anything else: every schedule and trigger stays exactly where it is, and starting a run
+by hand — from the terminal, or `curl -X POST .../teams/{id}/runs` — still works. That is
+also the whole of the rollback for the clock specifically, short of rolling the image
+back.
 
 ## Test
 
@@ -199,6 +228,15 @@ when `contract.py` does not — `pnpm contract:check` is what catches a stale ge
 | `GET /teams/{id}/revisions/latest` · `/{version}` | a definition as it was saved |
 | `GET /revisions/{id}` | the same definition, by the id a run names it by |
 | `GET /tools` | what the tool server announces right now; `[]` when none is configured, 503 when one is and could not be asked |
+| `GET /teams/{id}/schedules` · `POST /teams/{id}/schedules` | a team's schedules, and a new one |
+| `GET /schedules/{id}` · `PUT /schedules/{id}` | one schedule, and editing it |
+| `POST /schedules/{id}/enable` · `/disable` | toggles it; disabling by hand carries no manufactured reason |
+| `GET /schedules/{id}/fires` | its fire history, including fires that started nothing |
+| `GET /schedules/{id}/next-fires` | the next few fires, rolled forward fresh from `cron_expression` — never the stored `next_fire_at` |
+| `GET /teams/{id}/triggers` · `POST /teams/{id}/triggers` | a team's triggers, and a new one |
+| `GET /triggers/{id}` · `PUT /triggers/{id}` | one trigger, and editing it |
+| `POST /triggers/{id}/enable` · `/disable` | toggles it, same shape as a schedule's |
+| `GET /triggers/{id}/fires` | its fire history |
 
 Every `/teams` route answers only to the identity that saved the team, and answers a team
 owned by somebody else exactly as it answers one that does not exist. `/models` is the
