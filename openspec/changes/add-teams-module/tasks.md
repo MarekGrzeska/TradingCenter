@@ -75,7 +75,7 @@
 - [x] 5.4 Odmowa uruchomienia rewizji wskazującej model wycofany z konfiguracji
 - [x] 5.5 Testy: rewizja na wycofanym modelu pozostaje czytelna wraz ze śladem swoich przebiegów
 
-  5.1 stało już w `config.py` z grupy 1 (`ModelCatalogueEntry`, stawki jako `Decimal`,
+  PR #111. 5.1 stało już w `config.py` z grupy 1 (`ModelCatalogueEntry`, stawki jako `Decimal`,
   odmowa startu przy wpisie bez stawki) — tutaj doszła nad tym warstwa odpytywalna:
   `models_catalogue.py`, bliźniak z `agent` bez `default_model_id` i bez `resolve()`.
   Ten brak jest celowy: sesja może powstać bez wskazania modelu, rewizja nie może, więc
