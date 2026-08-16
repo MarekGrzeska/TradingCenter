@@ -224,4 +224,94 @@ describe("listTools", () => {
 
     expect(await api().listTools(new AbortController().signal)).toEqual([]);
   });
+
+  it("does not read an unreachable tool server as an empty catalogue", async () => {
+    // 503 is the module saying it could not ask — a different fact from "nothing is
+    // announced", and one the panel says in its own words rather than hiding.
+    server.use(
+      http.get(`${HTTP_BASE}/tools`, () =>
+        HttpResponse.json({ detail: "the tool server did not answer" }, { status: 503 }),
+      ),
+    );
+
+    await expect(api().listTools(new AbortController().signal)).rejects.toBeInstanceOf(
+      MarketDataError,
+    );
+  });
+});
+
+const wireRun = {
+  id: 7,
+  team_revision_id: 3,
+  status: "running",
+  stopped_reason: null,
+  started_at: "2026-08-16T10:00:05Z",
+  finished_at: null,
+  created_at: "2026-08-16T10:00:00Z",
+};
+
+describe("runs", () => {
+  it("starts one on the team and maps what comes back", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/teams/1/runs`, () => HttpResponse.json(wireRun, { status: 201 })),
+    );
+
+    expect(await api().startRun(1, new AbortController().signal)).toEqual({
+      id: 7,
+      teamRevisionId: 3,
+      status: "running",
+      stoppedReason: null,
+      startedAt: Date.parse("2026-08-16T10:00:05Z") / 1000,
+      finishedAt: null,
+      createdAt: Date.parse("2026-08-16T10:00:00Z") / 1000,
+    });
+  });
+
+  it("carries a refusal to start through as the module wrote it", async () => {
+    server.use(
+      http.post(`${HTTP_BASE}/teams/1/runs`, () =>
+        HttpResponse.json(
+          { detail: "the team spent 4.20 of its daily 4.00" },
+          { status: 422 },
+        ),
+      ),
+    );
+
+    await expect(api().startRun(1, new AbortController().signal)).rejects.toMatchObject({
+      kind: "refused",
+      message: "the team spent 4.20 of its daily 4.00",
+    });
+  });
+
+  it("reads the revision a run names, by its id", async () => {
+    server.use(http.get(`${HTTP_BASE}/revisions/3`, () => HttpResponse.json(wireRevision)));
+
+    const revision = await api().revisionById(3, new AbortController().signal);
+
+    expect(revision.version).toBe(2);
+    expect(revision.definition).toEqual(definition);
+  });
+
+  it("reads the progress stream as the events it carries", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/runs/7/events`, () =>
+        new HttpResponse(
+          `event: snapshot\ndata: ${JSON.stringify({ run: wireRun, steps: [] })}\n\n` +
+            ': ping\n\nevent: step_started\ndata: {"agent_key":"agent-1"}\n\n',
+          { headers: { "Content-Type": "text/event-stream" } },
+        ),
+      ),
+    );
+
+    const seen = [];
+    for await (const event of await api().watchRun(7, new AbortController().signal)) {
+      seen.push(event);
+    }
+
+    // The keepalive between them is not an event, and the snapshot arrives mapped.
+    expect(seen).toEqual([
+      { kind: "snapshot", run: expect.objectContaining({ id: 7 }), steps: [] },
+      { kind: "stepStarted", agentKey: "agent-1" },
+    ]);
+  });
 });

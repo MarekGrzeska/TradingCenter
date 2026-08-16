@@ -32,6 +32,7 @@ from .models_catalogue import ModelCatalogue
 from .openapi import require_response_fields
 from .provider import OpenAIProvider
 from .routers import catalogue, models, runs, usage
+from .routers import tools as tools_router
 from .runner import RunRegistry
 from .tools import ToolServer
 
@@ -144,6 +145,7 @@ app.openapi = _openapi_with_required_fields  # type: ignore[method-assign]
 app.include_router(catalogue.router)
 app.include_router(models.router)
 app.include_router(runs.router)
+app.include_router(tools_router.router)
 app.include_router(usage.router)
 
 

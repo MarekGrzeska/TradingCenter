@@ -75,7 +75,12 @@ before it is asked anything else.
   enough that a renamed field would arrive as `undefined` rather than as a compile error.
   Both pickers in the agent panel are built from what the module publishes: the model
   catalogue, and whatever its tool server announces. No model id and no tool name is
-  written down here, and a test reads the source to keep it that way.
+  written down here, and a test reads the source to keep it that way. A run is started
+  from the catalogue and watched on that same canvas — each agent carrying the state of
+  its step, its output and what it called — over the module's server-sent progress
+  (`runs.ts`, `useRunMonitor.ts`). The graph a run is watched on is *its* revision, read
+  by the id the run names; leaving the view drops the stream and nothing else, and the
+  catalogue's run list is the way back in.
 
 ## Run
 

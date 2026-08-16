@@ -115,6 +115,33 @@ def test_an_edge_survives_the_round_trip_under_its_wire_name(client: TestClient)
     assert revision["definition"]["edges"] == [{"from": "scout", "to": "judge"}]
 
 
+def test_a_revision_reads_by_the_id_a_run_names_it_by(client: TestClient) -> None:
+    # What a run watcher has in hand is `team_revision_id` and nothing else — reading the
+    # team's latest instead would draw a graph the run is not running.
+    team_id = _create(client).json()["id"]
+    first = client.get(f"/teams/{team_id}/revisions/1", headers=OWNER).json()
+    client.post(f"/teams/{team_id}/revisions", json={"definition": _definition()}, headers=OWNER)
+
+    by_id = client.get(f"/revisions/{first['id']}", headers=OWNER)
+
+    assert by_id.status_code == 200
+    assert by_id.json() == first
+    # Still the older one, after a newer revision landed on the same team.
+    assert by_id.json()["version"] == 1
+
+
+def test_someone_elses_revision_by_id_answers_like_a_missing_one(client: TestClient) -> None:
+    revision_id = client.get(
+        f"/teams/{_create(client).json()['id']}/revisions/1", headers=OWNER
+    ).json()["id"]
+
+    foreign = client.get(f"/revisions/{revision_id}", headers=STRANGER)
+    absent = client.get(f"/revisions/{revision_id + 1000}", headers=STRANGER)
+
+    assert foreign.status_code == absent.status_code == 404
+    assert foreign.json() == absent.json()
+
+
 def test_a_retired_team_leaves_the_catalogue_but_keeps_its_revisions(client: TestClient) -> None:
     team_id = _create(client).json()["id"]
 

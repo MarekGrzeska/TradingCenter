@@ -97,6 +97,17 @@ _SELECT_REVISION = """
      WHERE r.team_id = $1 AND t.owner_principal = $2 AND r.version = $3
 """
 
+# By id rather than by team and version: this is what a *run* names (`runs.team_revision_id`),
+# and a viewer watching one has the run in hand and nothing else. Going through the version
+# would mean asking the run's team which version this is — a question whose only honest
+# answer is this row.
+_SELECT_REVISION_BY_ID = """
+    SELECT r.id, r.team_id, r.version, r.definition, r.created_at
+      FROM team_revisions r
+      JOIN teams t ON t.id = r.team_id
+     WHERE r.id = $1 AND t.owner_principal = $2
+"""
+
 _SELECT_LATEST_REVISION = """
     SELECT r.id, r.team_id, r.version, r.definition, r.created_at
       FROM team_revisions r
@@ -172,6 +183,13 @@ async def get_revision(
     """A revision exactly as it was saved, including one of a team since retired — that is
     what makes an old run's trace mean anything (specs/teams-catalogue)."""
     return await conn.fetchrow(_SELECT_REVISION, team_id, owner_principal, version)
+
+
+async def get_revision_by_id(
+    conn: Conn, *, revision_id: int, owner_principal: str
+) -> asyncpg.Record | None:
+    """The revision a run points at, fetched the way the run names it."""
+    return await conn.fetchrow(_SELECT_REVISION_BY_ID, revision_id, owner_principal)
 
 
 async def get_latest_revision(

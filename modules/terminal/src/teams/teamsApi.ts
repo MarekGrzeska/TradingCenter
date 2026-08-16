@@ -5,6 +5,16 @@ import { jsonClient } from "../data/http";
 import { identity } from "../data/marketData";
 import { parseIsoToEpochSeconds } from "../data/time";
 import { MarketDataError } from "../data/types";
+import {
+  mapRecordedToolCall,
+  mapRun,
+  mapRunStep,
+  readRunStream,
+  type RecordedToolCall,
+  type RunStreamEvent,
+  type TeamRun,
+  type TeamRunStep,
+} from "./runs";
 
 /**
  * The teams module's client, over types generated from its own OpenAPI document rather
@@ -15,7 +25,9 @@ import { MarketDataError } from "../data/types";
  *
  * Regenerate with `pnpm contract:generate`; `pnpm contract:check` fails on a stale file.
  *
- * The module's own spelling (snake_case, `from` on an edge) stays inside this file. Every
+ * The module's own spelling (snake_case, `from` on an edge) stays inside this file and in
+ * `runs.ts`, which holds the same rule for the run half — a progress frame carries the
+ * same facts as the JSON read beside it, so both go through one set of mappers. Every
  * other file in `src/teams/` speaks the camelCase shapes below — same rule as
  * `archive.ts` and `agentApi.ts`, and the reason a wire change lands in one place.
  */
@@ -27,6 +39,10 @@ type RawRevision = Wire["TeamRevisionOut"];
 type RawDefinition = Wire["TeamDefinition"];
 type RawAgent = Wire["AgentDefinition"];
 type RawModel = Wire["ModelOut"];
+type RawTool = Wire["ToolOut"];
+type RawRun = Wire["RunOut"];
+type RawStep = Wire["RunStepOut"];
+type RawToolCall = Wire["ToolCallOut"];
 
 /** One entry of the catalogue — everything the list needs, and no definition: reading
  *  the list must not pull down every team's graph (specs/teams-catalogue). */
@@ -115,6 +131,9 @@ export interface TeamsApi {
    *  team itself — so this answering 404 means the team is gone or was never anyone's. */
   latestRevision(id: number, signal: AbortSignal): Promise<TeamRevision>;
   getRevision(id: number, version: number, signal: AbortSignal): Promise<TeamRevision>;
+  /** The revision by its own id — what a run names, and therefore what a monitor draws.
+   *  Asking for the team's latest instead would show a graph the run is not running. */
+  revisionById(revisionId: number, signal: AbortSignal): Promise<TeamRevision>;
   /** Appends. Rejects with a `"refused"` `MarketDataError` carrying the module's own
    *  message — which names the agent or the dependency at fault, and is what
    *  `refusal.ts` reads to put it next to that node on the canvas. */
@@ -126,6 +145,27 @@ export interface TeamsApi {
   /** Retires a team from the catalogue. Its runs and revisions stay readable — this is
    *  not a delete, whatever the verb says. */
   archiveTeam(id: number, signal: AbortSignal): Promise<void>;
+
+  /** Starts a run of the team's latest revision and comes back at once with the run, not
+   *  with its result: a team takes minutes. Rejects `"refused"` when the module will not
+   *  start it — a model withdrawn since the revision was saved, a tool no longer
+   *  announced, the team's daily budget already spent — carrying the module's sentence. */
+  startRun(teamId: number, signal: AbortSignal): Promise<TeamRun>;
+  /** Every run of this team, newest first, including runs of revisions since replaced. */
+  listRuns(teamId: number, signal: AbortSignal): Promise<TeamRun[]>;
+  getRun(runId: number, signal: AbortSignal): Promise<TeamRun>;
+  runSteps(runId: number, signal: AbortSignal): Promise<TeamRunStep[]>;
+  /** What the agents called, as recorded — each naming its step rather than its agent.
+   *  `attachAgentKeys` in `runs.ts` is where the two become one shape. */
+  runToolCalls(runId: number, signal: AbortSignal): Promise<RecordedToolCall[]>;
+  /** Asks the run to stop. The module answers 202 with the run as it was when the
+   *  interruption was accepted — the status is written by the run itself as it unwinds,
+   *  and this view catches up through the stream. */
+  cancelRun(runId: number, signal: AbortSignal): Promise<TeamRun>;
+  /** Progress as it happens, beginning with a snapshot of where the run is now. Dropping
+   *  the connection — closing the view, aborting the signal — unsubscribes and nothing
+   *  else: the run does not know anyone was watching (specs/teams-runs). */
+  watchRun(runId: number, signal: AbortSignal): Promise<AsyncGenerator<RunStreamEvent>>;
 }
 
 function mapTeam(raw: RawTeam): TeamSummary {
@@ -221,13 +261,18 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
 
     async listTools(signal) {
       try {
-        return await http.json<TeamsTool[]>(`${httpBase}/tools`, { signal });
+        const raw = await http.json<RawTool[]>(`${httpBase}/tools`, { signal });
+        return raw.map((tool) => ({ name: tool.name, description: tool.description }));
       } catch (cause) {
         // A module deployed before this route existed answers 404 here, and that reads
         // as "nothing announced" rather than as a failure: the panel still edits the
         // rest of an agent, and an already-assigned tool keeps its name (specs/
         // teams-tool-access — the module's announcement is the only source there is,
         // and inventing one here is exactly what it forbids).
+        //
+        // A tool server that is configured and unreachable is *not* folded in here: the
+        // module answers 503, that reaches the panel as "the tool list could not be
+        // read", and it is a different sentence because it is a different fact.
         if (cause instanceof MarketDataError && cause.kind === "not-found") return [];
         throw cause;
       }
@@ -275,8 +320,58 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
       return mapRevision(raw);
     },
 
+    async revisionById(revisionId, signal) {
+      const raw = await http.json<RawRevision>(`${httpBase}/revisions/${revisionId}`, { signal });
+      return mapRevision(raw);
+    },
+
     async archiveTeam(id, signal) {
       await http.send(`${httpBase}/teams/${id}`, { method: "DELETE", signal });
+    },
+
+    async startRun(teamId, signal) {
+      const raw = await http.json<RawRun>(`${httpBase}/teams/${teamId}/runs`, {
+        method: "POST",
+        signal,
+      });
+      return mapRun(raw);
+    },
+
+    async listRuns(teamId, signal) {
+      const raw = await http.json<RawRun[]>(`${httpBase}/teams/${teamId}/runs`, { signal });
+      return raw.map(mapRun);
+    },
+
+    async getRun(runId, signal) {
+      return mapRun(await http.json<RawRun>(`${httpBase}/runs/${runId}`, { signal }));
+    },
+
+    async runSteps(runId, signal) {
+      const raw = await http.json<RawStep[]>(`${httpBase}/runs/${runId}/steps`, { signal });
+      return raw.map(mapRunStep);
+    },
+
+    async runToolCalls(runId, signal) {
+      const raw = await http.json<RawToolCall[]>(`${httpBase}/runs/${runId}/tool-calls`, {
+        signal,
+      });
+      return raw.map(mapRecordedToolCall);
+    },
+
+    async cancelRun(runId, signal) {
+      const raw = await http.json<RawRun>(`${httpBase}/runs/${runId}/cancel`, {
+        method: "POST",
+        signal,
+      });
+      return mapRun(raw);
+    },
+
+    async watchRun(runId, signal) {
+      const response = await http.send(`${httpBase}/runs/${runId}/events`, { signal });
+      if (response.body === null) {
+        throw new MarketDataError("unknown", "teams sent no progress stream");
+      }
+      return readRunStream(response.body);
     },
   };
 }

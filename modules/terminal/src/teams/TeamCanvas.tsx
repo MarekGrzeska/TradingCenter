@@ -30,6 +30,7 @@ export function TeamCanvas({
   models,
   selectedKey,
   refusal,
+  runStatuses,
   onSelect,
   onConnect,
   onDisconnect,
@@ -38,9 +39,16 @@ export function TeamCanvas({
   models: TeamsModel[];
   selectedKey: string | null;
   refusal: Refusal | null;
+  /** Each agent's step in the run being watched, when this canvas is watching one. The
+   *  editor passes nothing and gets the same picture without badges — one component, so
+   *  a run is followed on the graph the operator composed rather than on a second
+   *  drawing of it (`terminal-teams`). */
+  runStatuses?: Map<string, string>;
   onSelect(key: string | null): void;
-  onConnect(edge: TeamDependency): void;
-  onDisconnect(edge: TeamDependency): void;
+  /** Left out while a run is being watched: its revision is saved and immutable, and a
+   *  handle that draws an edge nothing will keep is a handle that lies. */
+  onConnect?(edge: TeamDependency): void;
+  onDisconnect?(edge: TeamDependency): void;
 }) {
   const modelLabels = useMemo(
     () => new Map(models.map((model) => [model.id, model.displayName])),
@@ -64,9 +72,10 @@ export function TeamCanvas({
         modelLabel: modelLabels.get(agent.modelId) ?? agent.modelId,
         toolCount: agent.tools.length,
         refused: refusedAgents.has(agent.key),
+        runStatus: runStatuses?.get(agent.key),
       },
     }));
-  }, [definition, modelLabels, refusedAgents, selectedKey]);
+  }, [definition, modelLabels, refusedAgents, runStatuses, selectedKey]);
 
   const edges: Edge[] = useMemo(
     () =>
@@ -90,15 +99,18 @@ export function TeamCanvas({
         edges={edges}
         nodeTypes={NODE_TYPES}
         nodesDraggable={false}
+        nodesConnectable={onConnect !== undefined}
+        edgesReconnectable={false}
         fitView
         onNodeClick={handleNodeClick}
         onPaneClick={() => onSelect(null)}
         onConnect={(connection: Connection) => {
-          if (connection.source && connection.target) {
+          if (onConnect && connection.source && connection.target) {
             onConnect({ from: connection.source, to: connection.target });
           }
         }}
         onEdgesDelete={(deleted) => {
+          if (!onDisconnect) return;
           for (const edge of deleted) onDisconnect({ from: edge.source, to: edge.target });
         }}
         proOptions={{ hideAttribution: false }}

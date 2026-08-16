@@ -86,6 +86,26 @@ async def plan_tools(definition: TeamDefinition, server: ToolServer) -> ToolPlan
     )
 
 
+async def announced_tools(settings: Settings) -> list[ToolDescriptor]:
+    """What the server publishes right now, raising `ToolServerUnavailable` when it could
+    not be asked — the shape a *route* wants, which has a status code for each answer.
+
+    **A session of its own, opened and closed inside this call, rather than the long-lived
+    one on `app.state`.** Measured, not preferred: the streamable-http transport holds its
+    halves in anyio task groups, and a session opened inside a request's task and left
+    open when that task returns corrupts anyio's scope stack — "Attempted to exit a cancel
+    scope that isn't the current task's current cancel scope", raised on the way out of
+    the request rather than anywhere near the cause. An operator pressing a button is not
+    a rate that makes one connection per press worth avoiding; a run, which is where the
+    shared session belongs, holds its own task for as long as the session lives.
+    """
+    probe = ToolServer(settings)
+    try:
+        return list(await probe.list_tools())
+    finally:
+        await probe.aclose()
+
+
 async def announced_tool_names(settings: Settings) -> list[str] | None:
     """What the server publishes, in the shape the *save* path wants: `None` when it could
     not be asked at all.
@@ -96,23 +116,11 @@ async def announced_tool_names(settings: Settings) -> list[str] | None:
     reason and with a different sentence — "there is no tool server to check against"
     rather than "that tool is gone". Swallowing the exception here is what lets the save
     path tell the operator which of the two happened.
-
-    **A session of its own, opened and closed inside this call, rather than the long-lived
-    one on `app.state`.** Measured, not preferred: the streamable-http transport holds its
-    halves in anyio task groups, and a session opened inside a request's task and left
-    open when that task returns corrupts anyio's scope stack — "Attempted to exit a cancel
-    scope that isn't the current task's current cancel scope", raised on the way out of
-    the request rather than anywhere near the cause. A save is an operator pressing a
-    button, so one connection per save costs nothing worth having; a run, which is where
-    the shared session belongs, holds its own task for as long as the session lives.
     """
-    probe = ToolServer(settings)
     try:
-        return [tool.name for tool in await probe.list_tools()]
+        return [tool.name for tool in await announced_tools(settings)]
     except ToolServerUnavailable:
         return None
-    finally:
-        await probe.aclose()
 
 
 def _agents_wanting(definition: TeamDefinition, tools: list[str]) -> list[str]:
