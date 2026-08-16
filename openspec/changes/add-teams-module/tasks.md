@@ -50,7 +50,7 @@
 - [x] 4.6 Testy: zapis kolejnej rewizji nie rusza poprzedniej; wycofanie zespołu zostawia przebiegi
 - [x] 4.7 Testy: każda odmowa z 4.3 nazywa agenta albo zależność
 
-  4.1 zapadło już w grupie 3: `TeamDefinition` jest modelem domenowym i wiadomością naraz,
+  PR #110. 4.1 zapadło już w grupie 3: `TeamDefinition` jest modelem domenowym i wiadomością naraz,
   więc tutaj nie doszła druga jego kopia. Walidacja rozpadła się na dwie po tym, czego
   potrzebuje: kształt (cykl, agent bez żadnej krawędzi, krawędź wskazująca nieznanego
   agenta) siedzi w `contract.py` i odrzuca ciało żądania, zanim dojdzie ono do routera;
