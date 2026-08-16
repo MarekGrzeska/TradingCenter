@@ -38,6 +38,12 @@ from .models import (
 # sits where usefulness already ends rather than at some larger, arbitrary number.
 MAX_DRAWINGS_PER_SYMBOL = 100
 
+# The largest value `chart_drawings.id` can hold — PostgreSQL's `bigint`. Checked before a
+# query rather than left to the driver: asyncpg refuses an out-of-range integer by raising,
+# which for a tool call means a turn that died instead of a refusal the model could act on.
+# Python's ints have no such ceiling, so a model inventing a long number reaches this.
+MAX_DRAWING_ID = 2**63 - 1
+
 # How much of the first message becomes the session's title (specs/agent-chat, "Tytuł
 # powstaje z pierwszego pytania"). Long enough to be recognisable in a narrow list,
 # short enough that one does not crowd out its neighbours.

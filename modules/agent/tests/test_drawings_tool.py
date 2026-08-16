@@ -223,6 +223,70 @@ async def test_a_zone_with_equal_prices_is_not_a_zone(db, pool) -> None:
     assert await store.list_drawings(db, symbol="US100") == []
 
 
+async def test_a_zone_that_ends_before_it_starts_is_refused(db, pool) -> None:
+    """Not a `CHECK`, unlike every other shape rule: a zone's two moments are both
+    optional, so the database has nothing to pin their order against. The terminal draws
+    such a band as a rectangle of zero width — a drawing that silently is not there."""
+    session = await _session(db)
+
+    outcome = await _draw(pool).call(
+        {
+            "symbol": "US100",
+            "add": [
+                {
+                    "kind": "zone",
+                    "top": 21600.0,
+                    "bottom": 21550.0,
+                    "from": "2026-01-05T09:00:00Z",
+                    "to": "2026-01-03T09:00:00Z",
+                }
+            ],
+        },
+        session_id=session.id,
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+    assert "ends before it starts" in outcome.text
+    assert await store.list_drawings(db, symbol="US100") == []
+
+
+async def test_a_zone_open_ended_in_time_is_accepted(db, pool) -> None:
+    session = await _session(db)
+
+    outcome = await _draw(pool).call(
+        {
+            "symbol": "US100",
+            "add": [
+                {
+                    "kind": "zone",
+                    "top": 21600.0,
+                    "bottom": 21550.0,
+                    "from": "2026-01-03T09:00:00Z",
+                }
+            ],
+        },
+        session_id=session.id,
+    )
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    [standing] = await store.list_drawings(db, symbol="US100")
+    assert isinstance(standing.geometry, ChartZone)
+    assert standing.geometry.to is None
+
+
+async def test_an_id_no_column_could_hold_is_refused_rather_than_raised(db, pool) -> None:
+    """A model inventing a long number must get a sentence back, not a dead turn: asyncpg
+    refuses an integer past `bigint` by raising, and Python's ints have no such ceiling."""
+    session = await _session(db)
+
+    outcome = await _draw(pool).call(
+        {"symbol": "US100", "remove": [10**25]}, session_id=session.id
+    )
+
+    assert outcome.kind is ToolOutcomeKind.REFUSED
+    assert "no drawing" in outcome.text
+
+
 async def test_a_trendline_with_both_points_at_one_moment_is_refused(db, pool) -> None:
     session = await _session(db)
 

@@ -36,7 +36,7 @@ from ..models import (
     ChartTrendlinePoint,
     ChartZone,
 )
-from ..store import MAX_DRAWINGS_PER_SYMBOL
+from ..store import MAX_DRAWING_ID, MAX_DRAWINGS_PER_SYMBOL
 from .chart import CHART_COLORS, ChartRefusal, read_json
 from .client import ToolDescriptor, ToolOutcome, ToolOutcomeKind, ToolServer
 
@@ -275,11 +275,22 @@ def _as_geometry(item: Any, index: int) -> ChartDrawingGeometry:
                 f"{where} is not a zone: `top`={top:g} must be above `bottom`={bottom:g}. "
                 "Swap them if you had them the other way round."
             )
+        start = _optional_time(item, "from", f"{where}.from")
+        end = _optional_time(item, "to", f"{where}.to")
+        # A band that ends before it starts is not a band. Refused here and nowhere else:
+        # unlike a trend line's two moments, a zone's are both optional, so there is no
+        # `CHECK` pinning their order — and the terminal draws such a zone as a rectangle
+        # of zero width, which is a drawing that silently is not there.
+        if start is not None and end is not None and start >= end:
+            raise ChartRefusal(
+                f"{where} ends before it starts: `to` ({end.isoformat()}) is not after "
+                f"`from` ({start.isoformat()}). Leave `to` out for a band with no end."
+            )
         return ChartZone(
             top=top,
             bottom=bottom,
-            from_=_optional_time(item, "from", f"{where}.from"),
-            to=_optional_time(item, "to", f"{where}.to"),
+            from_=start,
+            to=end,
             label=label,
             color=color,
         )
@@ -319,6 +330,14 @@ def _as_removals(raw: Any) -> list[int]:
             raise ChartRefusal(
                 f"`remove` takes ids as whole numbers; {item!r} is not one. "
                 "Call list_chart_drawings for the ids."
+            )
+        # Bounded here, not left to the driver: an id past `bigint` makes asyncpg raise,
+        # and a raised exception is a dead turn where this is a sentence the model can act
+        # on (specs/agent-tools, "Odmowa narzędzia jest wynikiem, nie awarią tury").
+        if not 0 < item <= MAX_DRAWING_ID:
+            raise ChartRefusal(
+                f"there is no drawing with id {item}. Call list_chart_drawings for the "
+                "ids that exist."
             )
         ids.append(item)
     return ids
