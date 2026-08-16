@@ -30,7 +30,7 @@ from ..config import Settings
 from ..contract import AgentDefinition, TeamDefinition
 from ..models_catalogue import ModelCatalogue
 from ..provider import ModelProvider
-from ..tools import ToolAccessError, ToolPlan, ToolServer, plan_tools
+from ..tools import ToolAccessError, ToolPlan, ToolServerRegistry, plan_tools
 from .cost import CostGuard, CostLimitReached, limit_from
 from .graph import AgentFailed, compile_team
 from .loop import RecordedCall, briefing_for, run_agent
@@ -131,7 +131,7 @@ async def execute_run(
     run_id: int,
     definition: TeamDefinition,
     provider: ModelProvider,
-    tool_server: ToolServer,
+    tool_registry: ToolServerRegistry,
     catalogue: ModelCatalogue,
     settings: Settings,
     registry: RunRegistry,
@@ -151,9 +151,11 @@ async def execute_run(
     try:
         try:
             # Before anything else, and before a single agent is called: a team that
-            # assigns no tools never touches the server at all, and one that does is
-            # refused here rather than three agents into the run.
-            plan = await plan_tools(definition, tool_server)
+            # assigns no tools never touches a server at all, and one that does is
+            # refused here rather than three agents into the run. `plan` remembers
+            # which server announced each assigned name, so no agent's own call needs
+            # to ask again (`ToolPlan.call`).
+            plan = await plan_tools(definition, tool_registry)
         except ToolAccessError as err:
             # Named as tool access rather than as a generic failure, and refused before a
             # single agent is called — nothing is paid for a run that cannot check
@@ -172,7 +174,6 @@ async def execute_run(
                 run_id=run_id,
                 plan=plan,
                 provider=provider,
-                tool_server=tool_server,
                 catalogue=catalogue,
                 registry=registry,
                 guard=guard,
@@ -248,7 +249,6 @@ def _agent_runner(
     run_id: int,
     plan: ToolPlan,
     provider: ModelProvider,
-    tool_server: ToolServer,
     catalogue: ModelCatalogue,
     registry: RunRegistry,
     guard: CostGuard,
@@ -303,7 +303,7 @@ def _agent_runner(
             briefing=briefing_for(agent, given),
             provider=provider,
             tools=plan.for_agent(agent.key),
-            call_tool=tool_server.call,
+            call_tool=plan.call,
             on_tool_call=on_tool_call,
             before_model_call=before_model_call,
             on_model_call=on_model_call,

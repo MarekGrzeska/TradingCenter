@@ -73,10 +73,17 @@ class ToolOut(BaseModel):
     tool by name and carries nothing else about it, so the picker needs a label and a line
     of prose. Publishing the schema would put a copy of somebody else's contract on this
     module's wire, where it would be stale from the first argument market-mcp renames.
+
+    `read_only` is the one property that does travel — read straight off the server's own
+    `readOnlyHint`, not decided here, so an operator picking tools for an agent sees which
+    ones move the account before assigning one (specs/trading-mcp-tools, "Narzędzie
+    zapisujące jest oznaczone jako zmieniające stan"). `None` when a tool carries no
+    annotation at all — unknown, not assumed read-only.
     """
 
     name: str
     description: str
+    read_only: bool | None = None
 
 
 class AgentDefinition(BaseModel):

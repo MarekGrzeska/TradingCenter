@@ -80,6 +80,10 @@ class ToolDescriptor:
     name: str
     description: str
     input_schema: dict[str, Any]
+    # From the server's own `readOnlyHint` — `None` when a tool carries no annotation at
+    # all, which `GET /tools` reads as "unknown" rather than guessing (specs/
+    # trading-mcp-tools, "Narzędzie zapisujące jest oznaczone jako zmieniające stan").
+    read_only: bool | None = None
 
 
 class ToolOutcomeKind(StrEnum):
@@ -123,10 +127,24 @@ class _ManagedIdentityAuth(httpx.Auth):
 
 
 class ToolServer:
-    def __init__(self, settings: Settings) -> None:
-        self._url = settings.market_mcp_url
-        self._scope = settings.market_mcp_scope
-        self._timeout = settings.market_mcp_request_timeout_seconds
+    """One MCP session over one server, named by which triplet of `Settings` fields it
+    reads.
+
+    `prefix` selects the field group — `"market_mcp"` reads `market_mcp_url` etc., the
+    only one that existed before this module had a second server. A `ToolServerRegistry`
+    builds one of these per configured server; every call site that predates the
+    registry keeps constructing a bare `ToolServer(settings)` and gets exactly the
+    market-mcp instance it always did — the default carries the whole of that history so
+    nothing already calling it had to change (specs/teams-tool-access, "Moduł MAY być
+    skonfigurowany z więcej niż jednym serwerem narzędzi").
+    """
+
+    def __init__(self, settings: Settings, *, prefix: str = "market_mcp") -> None:
+        self.label = prefix.replace("_", "-")
+        self._env_prefix = prefix.upper()
+        self._url: str | None = getattr(settings, f"{prefix}_url")
+        self._scope: str | None = getattr(settings, f"{prefix}_scope")
+        self._timeout: float = getattr(settings, f"{prefix}_request_timeout_seconds")
         self._credential = DefaultAzureCredential() if self._scope else None
 
         self._stack: AsyncExitStack | None = None
@@ -138,10 +156,11 @@ class ToolServer:
         self._lock = asyncio.Lock()
 
         if self._url is None:
-            log.info("no tool server configured — only teams assigning no tools can run")
+            log.info("%s: no tool server configured — only teams assigning no tools can run", self.label)
         else:
             log.info(
-                "tool server at %s, authenticating with a managed identity: %s",
+                "%s: tool server at %s, authenticating with a managed identity: %s",
+                self.label,
                 self._url,
                 f"scope={self._scope}" if self._scope else "no (loopback)",
             )
@@ -164,8 +183,8 @@ class ToolServer:
         """
         if self._url is None:
             raise ToolServerUnavailable(
-                "no tool server is configured (MARKET_MCP_URL is unset), so its tools "
-                "could not be read"
+                f"no tool server is configured ({self._env_prefix}_URL is unset), so "
+                f"its tools could not be read"
             )
         if self._tools is not None:
             return self._tools
@@ -175,24 +194,27 @@ class ToolServer:
         except TimeoutError as err:
             await self._disconnect()
             raise ToolServerUnavailable(
-                f"the tool server at {self._url} did not answer within {self._timeout:g}s"
+                f"the {self.label} tool server at {self._url} did not answer within "
+                f"{self._timeout:g}s"
             ) from err
         except Exception as err:
             # Every failure here means the same thing to a caller — the server could not
             # be asked — so they are narrowed into one type rather than sorted.
             await self._disconnect()
             raise ToolServerUnavailable(
-                f"the tool server at {self._url} could not be reached: {_describe(err)}"
+                f"the {self.label} tool server at {self._url} could not be reached: "
+                f"{_describe(err)}"
             ) from err
         self._tools = [
             ToolDescriptor(
                 name=tool.name,
                 description=tool.description or "",
                 input_schema=tool.inputSchema or {},
+                read_only=tool.annotations.readOnlyHint if tool.annotations else None,
             )
             for tool in result.tools
         ]
-        log.info("tool server published %d tools", len(self._tools))
+        log.info("%s: tool server published %d tools", self.label, len(self._tools))
         return self._tools
 
     async def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
@@ -204,7 +226,7 @@ class ToolServer:
         if self._url is None:
             return ToolOutcome(
                 ToolOutcomeKind.UNAVAILABLE,
-                "no tool server is configured, so this call was not made",
+                f"no tool server is configured ({self.label}), so this call was not made",
                 elapsed(),
             )
         try:
@@ -216,8 +238,9 @@ class ToolServer:
             await self._disconnect()
             return ToolOutcome(
                 ToolOutcomeKind.UNAVAILABLE,
-                f"the tool server did not answer within {self._timeout:g}s. The call was "
-                "not made — this says nothing about the archive's own data.",
+                f"the {self.label} tool server did not answer within {self._timeout:g}s. "
+                "The call was not made — this says nothing about what the tool would "
+                "have answered.",
                 elapsed(),
             )
         except Exception as err:  # noqa: BLE001 - a broken session is not a broken run
@@ -225,8 +248,9 @@ class ToolServer:
             await self._disconnect()
             return ToolOutcome(
                 ToolOutcomeKind.UNAVAILABLE,
-                f"the tool server could not be reached: {_describe(err)}. The call was not "
-                "made — this says nothing about the archive's own data.",
+                f"the {self.label} tool server could not be reached: {_describe(err)}. "
+                "The call was not made — this says nothing about what the tool would "
+                "have answered.",
                 elapsed(),
             )
 
@@ -298,6 +322,37 @@ class ToolServer:
             await stack.aclose()
         except Exception as err:  # noqa: BLE001 - closing a broken stream often raises
             log.debug("closing the tool session raised on the way out: %s", err)
+
+
+@dataclass(frozen=True)
+class ToolServerRegistry:
+    """Every tool server this module knows about, by label.
+
+    A registry in place of the one `ToolServer` earlier groups built around — the
+    module now has two, and every caller above `client.py` reaches them through this
+    rather than naming `market_mcp` or `trading_mcp` itself (specs/teams-tool-access,
+    "Moduł MAY być skonfigurowany z więcej niż jednym serwerem narzędzi"). Adding a
+    third server later is a line in `from_settings`, not a signature change here or in
+    `assignment.py`.
+    """
+
+    servers: dict[str, ToolServer]
+
+    @classmethod
+    def from_settings(cls, settings: Settings) -> ToolServerRegistry:
+        return cls(
+            {
+                "market-mcp": ToolServer(settings, prefix="market_mcp"),
+                "trading-mcp": ToolServer(settings, prefix="trading_mcp"),
+            }
+        )
+
+    def configured(self) -> list[ToolServer]:
+        return [server for server in self.servers.values() if server.configured]
+
+    async def aclose(self) -> None:
+        for server in self.servers.values():
+            await server.aclose()
 
 
 def _describe(err: BaseException) -> str:
