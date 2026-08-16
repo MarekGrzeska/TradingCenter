@@ -22,6 +22,7 @@ type Wire = components["schemas"];
 type RawRun = Wire["RunOut"];
 type RawStep = Wire["RunStepOut"];
 type RawToolCall = Wire["ToolCallOut"];
+type RawTrade = Wire["TradeOut"];
 
 /** `runs.status` — a plain string here, as on the module's wire, where the CHECK
  *  constraint is the enforcement. `pending`, `running`, `completed`, `failed`,
@@ -79,6 +80,31 @@ export interface RecordedToolCall extends Omit<TeamRunToolCall, "agentKey"> {
   runStepId: number;
 }
 
+/** One thing a run did to the account, read from `/runs/{id}/trades` — the same event as
+ *  a tool call, read as a trade: what, which way, how much, and what came of it. It names
+ *  its agent itself, so nothing has to be attached the way a recorded call does. */
+export interface TeamTrade {
+  id: number;
+  runId: number;
+  agentKey: string;
+  toolName: string;
+  symbol: string | null;
+  direction: string | null;
+  /** A string, like every number on this wire the terminal compares rather than adds. */
+  size: string | null;
+  level: string | null;
+  /** The module's own reading: `sent`, `settled`, `unsettled`, `refused` or `unknown`.
+   *  `outcomeOf` is where that becomes a sentence, because one of them means something
+   *  different once the run is over. */
+  status: string;
+  /** The provider's word — FILLED, WORKING, REJECTED — when one ever arrived. */
+  resultStatus: string | null;
+  providerOrderId: string | null;
+  reference: string | null;
+  createdAt: number;
+  settledAt: number | null;
+}
+
 export type RunStreamEvent =
   /** Where the run is now, sent first on every connection — which is what makes closing
    *  and reopening the view show the current state rather than the state at the drop
@@ -127,6 +153,74 @@ export function mapRecordedToolCall(raw: RawToolCall): RecordedToolCall {
     outcome: raw.outcome,
     durationMs: raw.duration_ms,
   };
+}
+
+export function mapTrade(raw: RawTrade): TeamTrade {
+  return {
+    id: raw.id,
+    runId: raw.run_id,
+    agentKey: raw.agent_key,
+    toolName: raw.tool_name,
+    symbol: raw.symbol,
+    direction: raw.direction,
+    size: raw.size,
+    level: raw.level,
+    status: raw.status,
+    resultStatus: raw.result_status,
+    providerOrderId: raw.provider_order_id,
+    reference: raw.reference,
+    createdAt: parseIsoToEpochSeconds(raw.created_at),
+    settledAt: epochOrNull(raw.settled_at),
+  };
+}
+
+/** What to say about an order, and how loudly. `unknown` is a value the module writes on
+ *  purpose — a call whose reply never arrived may well have reached the account — and it
+ *  is shown as unknown rather than folded in with a refusal (specs/terminal-teams,
+ *  "Zlecenie o skutku nieznanym MUST być pokazane jako nieznane").
+ *
+ *  `sent` is the one reading that depends on the run: while the run works it is an order
+ *  on its way, and once the run is over it is an order this module never learned the fate
+ *  of — the module's own `contract.py` says so of the row, and this is that sentence on
+ *  screen. */
+export function outcomeOf(trade: TeamTrade, runOver: boolean): { text: string; known: boolean } {
+  switch (trade.status) {
+    case "settled":
+      return { text: trade.resultStatus ?? "settled", known: true };
+    case "refused":
+      return { text: "refused", known: true };
+    case "unsettled":
+      return { text: trade.resultStatus ?? "not settled", known: true };
+    case "sent":
+      return runOver
+        ? { text: "outcome unknown", known: false }
+        : { text: "sent", known: true };
+    default:
+      return { text: "outcome unknown", known: false };
+  }
+}
+
+/**
+ * Which ceiling stopped a run, when one did.
+ *
+ * The module writes the sentence and it travels intact — this only picks the heading
+ * above it (specs/terminal-teams, "Terminal MUST pokazywać granicę zleceń jako przyczynę
+ * zatrzymania, odróżniając ją od granicy kosztu"). There is nothing else on the wire to
+ * read: `stopped_reason` is prose, and both ceilings write their own words for it
+ * (`runner/trading.py`, `runner/cost.py`).
+ *
+ * Reworded upstream, this falls back to `"other"` and the reason is shown with no heading
+ * — the sentence still says which limit it was, because it is the module's own. That is
+ * the whole of what a miss costs here, and it is why the terminal does not translate the
+ * sentence into words of its own.
+ */
+export type StopCause = "orders" | "cost" | "other";
+
+export function stopCause(reason: string | null): StopCause | null {
+  if (reason === null) return null;
+  if (/order limit/i.test(reason)) return "orders";
+  if (/cost limit/i.test(reason)) return "cost";
+  return "other";
 }
 
 /**

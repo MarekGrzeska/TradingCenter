@@ -41,6 +41,14 @@ function contents(relative: string): string {
   return readFileSync(join(TEAMS, relative), "utf8");
 }
 
+/** Fields of the module's own wire that read like a tool name to the pattern above.
+ *  `read_only` is a property of every announced tool and is exactly what makes the picker
+ *  able to mark the ones that move the account — the opposite of a tool list written down
+ *  here, so it is taken out before the check rather than the check being loosened. */
+function withoutWireFields(relative: string): string {
+  return contents(relative).replace(/\bread_only\b/g, "");
+}
+
 describe("the model and tool pickers carry no list of their own", () => {
   it("finds the tab's own source to read", () => {
     const files = sourceFiles(TEAMS);
@@ -54,7 +62,7 @@ describe("the model and tool pickers carry no list of their own", () => {
   });
 
   it("names no tool", () => {
-    const offenders = sourceFiles(TEAMS).filter((file) => TOOL_NAME.test(contents(file)));
+    const offenders = sourceFiles(TEAMS).filter((file) => TOOL_NAME.test(withoutWireFields(file)));
     expect(offenders).toEqual([]);
   });
 });

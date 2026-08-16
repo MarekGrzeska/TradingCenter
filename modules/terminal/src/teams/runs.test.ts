@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { attachAgentKeys, parseRunFrame, splitSseFrames, type TeamRunStep } from "./runs";
+import {
+  attachAgentKeys,
+  outcomeOf,
+  parseRunFrame,
+  splitSseFrames,
+  stopCause,
+  type TeamRunStep,
+  type TeamTrade,
+} from "./runs";
 
 /**
  * The pure half of `runs.ts`. A frame arriving split across two network reads, and a
@@ -101,6 +109,58 @@ describe("parseRunFrame", () => {
     expect(parseRunFrame(": ping")).toBeNull();
     expect(parseRunFrame("")).toBeNull();
     expect(parseRunFrame('event: something-new\ndata: {"x":1}')).toBeNull();
+  });
+});
+
+describe("what came of an order", () => {
+  function trade(status: string, resultStatus: string | null = null): TeamTrade {
+    return {
+      id: 1,
+      runId: 7,
+      agentKey: "trader",
+      toolName: "an order tool",
+      symbol: "US100",
+      direction: "BUY",
+      size: "1",
+      level: null,
+      status,
+      resultStatus,
+      providerOrderId: null,
+      reference: null,
+      createdAt: 1_786_874_400,
+      settledAt: null,
+    };
+  }
+
+  it("says the provider's own word when the order settled", () => {
+    expect(outcomeOf(trade("settled", "FILLED"), true)).toEqual({ text: "FILLED", known: true });
+  });
+
+  it("shows an order of unknown outcome as unknown, not as a failure", () => {
+    // specs/terminal-teams — the module writes `unknown` when a call's reply never came,
+    // which is not the same statement as a refusal and must not read like one.
+    expect(outcomeOf(trade("unknown"), true)).toEqual({ text: "outcome unknown", known: false });
+    expect(outcomeOf(trade("refused"), true)).toEqual({ text: "refused", known: true });
+  });
+
+  it("reads a row still saying `sent` by whether the run is over", () => {
+    // While the run works it is an order on its way; once the run is over it is an order
+    // the module never learned the fate of, which is what its own contract says of the
+    // row (`0004_trades.py`).
+    expect(outcomeOf(trade("sent"), false)).toEqual({ text: "sent", known: true });
+    expect(outcomeOf(trade("sent"), true)).toEqual({ text: "outcome unknown", known: false });
+  });
+});
+
+describe("stopCause", () => {
+  it("tells the order limit from the cost limit", () => {
+    // The two sentences the module writes (`runner/trading.py`, `runner/cost.py`). Only
+    // the heading above the reason is picked here — the sentence itself always travels
+    // intact, which is why a reworded one costs a heading and nothing else.
+    expect(stopCause("the run's order limit was reached: 2 of 2 allowed placed.")).toBe("orders");
+    expect(stopCause("the run's cost limit was reached: 2.01 spent of 2.00 allowed.")).toBe("cost");
+    expect(stopCause("the operator interrupted the run")).toBe("other");
+    expect(stopCause(null)).toBeNull();
   });
 });
 

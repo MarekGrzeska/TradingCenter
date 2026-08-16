@@ -4,6 +4,7 @@ import {
   type TeamRun,
   type TeamRunStep,
   type TeamRunToolCall,
+  type TeamTrade,
 } from "./runs";
 import type { TeamsApi } from "./teamsApi";
 
@@ -28,6 +29,10 @@ export interface RunMonitor {
   run: TeamRun | null;
   steps: TeamRunStep[];
   toolCalls: TeamRunToolCall[];
+  /** What the run did to the account. Not on the stream — the module publishes progress,
+   *  and an order is a row read back — so this is re-read whenever a call lands and once
+   *  more when the run ends. */
+  trades: TeamTrade[];
   error: string | null;
   /** Opens the stream again — after a dropped connection, and after the operator asked
    *  the run to stop, so the view is never left guessing. */
@@ -39,11 +44,16 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
   const [run, setRun] = useState<TeamRun | null>(null);
   const [steps, setSteps] = useState<TeamRunStep[]>([]);
   const [toolCalls, setToolCalls] = useState<TeamRunToolCall[]>([]);
+  const [trades, setTrades] = useState<TeamTrade[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   // Read once per connection, and only after the first snapshot: the steps it needs to
   // resolve a call's agent are in that snapshot.
   const recordedRead = useRef(false);
+  // One trades read at a time. A round of calls from three agents at once would otherwise
+  // start three reads of the same list, and the last to answer would not be the last to
+  // have been asked.
+  const tradesInFlight = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,6 +61,7 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
     setStatus("loading");
     setError(null);
     recordedRead.current = false;
+    tradesInFlight.current = false;
 
     async function watch() {
       const events = await api.watchRun(runId, controller.signal);
@@ -75,6 +86,7 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
               recordedRead.current = true;
               void readRecordedCalls(event.steps);
             }
+            void readTrades();
             break;
           case "stepStarted":
             setSteps((current) => patchStep(current, event.agentKey, { status: "running" }));
@@ -89,6 +101,11 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
             break;
           case "toolCall":
             setToolCalls((current) => [...current, event.call]);
+            // A trade is written by a call, so a call is the only moment one can appear.
+            // Reading the list rather than deriving a row from the event: the event says
+            // a tool was called, the row says what it did to the account, and the second
+            // is not in the first.
+            void readTrades();
             break;
           case "runFinished":
             setRun((current) =>
@@ -96,6 +113,9 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
                 ? current
                 : { ...current, status: event.status, stoppedReason: event.stoppedReason },
             );
+            // Once more at the end, because the last order's row is written as the reply
+            // lands — which can be after the call event that started it.
+            void readTrades();
             break;
         }
       }
@@ -118,6 +138,22 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
       }
     }
 
+    async function readTrades() {
+      if (tradesInFlight.current) return;
+      tradesInFlight.current = true;
+      try {
+        const placed = await api.runTrades(runId, controller.signal);
+        if (!cancelled) setTrades(placed);
+      } catch {
+        // The list the module already answered stays on screen. A module deployed before
+        // this route existed answers 404 here, and a run that placed nothing is the same
+        // empty list either way — neither is worth failing the monitor over, whose job is
+        // the run's own progress.
+      } finally {
+        tradesInFlight.current = false;
+      }
+    }
+
     watch().catch((cause: unknown) => {
       if (cancelled || controller.signal.aborted) return;
       setError(cause instanceof Error ? cause.message : "the run could not be watched");
@@ -135,6 +171,7 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
     run,
     steps,
     toolCalls,
+    trades,
     error,
     reload: useCallback(() => {
       setToolCalls([]);
