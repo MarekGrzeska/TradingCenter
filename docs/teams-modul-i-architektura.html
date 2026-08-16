@@ -1,0 +1,457 @@
+<title>Moduł teams — co robi i jak jest zrobiony</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 56rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.9rem; margin: 1.5rem 0 0.4rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.82rem; }
+  td.num { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; color: var(--text-dim); }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.79rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  .stage { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.2rem 0; }
+  .stage > h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.6rem; flex-wrap: wrap; }
+  .stage .no { font-family: var(--mono); font-size: 0.78rem; color: var(--accent); border: 1px solid var(--accent); border-radius: 4px; padding: 0.05em 0.45em; }
+  .stage dl { display: grid; grid-template-columns: max-content 1fr; gap: 0.35rem 1rem; margin: 0.8rem 0 0; font-size: 0.92rem; }
+  .stage dt { font-family: var(--mono); font-size: 0.73rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); padding-top: 0.22rem; }
+  .stage dd { margin: 0; }
+  @media (max-width: 34rem) { .stage dl { grid-template-columns: 1fr; gap: 0.15rem; } .stage dd { margin-bottom: 0.6rem; } }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+<style>
+  figure { margin: 1.6rem 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { color: var(--text-dim); font-size: 0.82rem; margin-top: 0.6rem; }
+  .fig-box { fill: var(--surface); stroke: var(--border); }
+  .fig-box.accent { fill: var(--accent-soft); stroke: var(--accent); }
+  .fig-box.outside { fill: none; stroke: var(--text-dim); stroke-dasharray: 4 3; }
+  .fig-t { fill: var(--text); font-family: var(--mono); font-size: 12px; }
+  .fig-t.dim { fill: var(--text-dim); font-size: 10.5px; }
+  .fig-arrow { stroke: var(--text-dim); stroke-width: 1.2; fill: none; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.9rem; margin: 1.4rem 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.9rem 1rem; }
+  .card h4 { margin: 0 0 0.35rem; color: var(--text); text-transform: none; letter-spacing: 0; font-size: 0.92rem; }
+  .card p { margin: 0; font-size: 0.88rem; color: var(--text-dim); }
+</style>
+
+<main>
+
+<h1>Moduł <code>teams</code> — co robi i jak jest zrobiony</h1>
+<p class="lede">Zespół agentów jako <strong>dana, nie kod</strong>: operator składa graf ról w terminalu, zapisuje go do katalogu i uruchamia przebiegi, a ślad każdego przebiegu zostaje w bazie w postaci pozwalającej zestawić warianty ze sobą. Ten dokument opisuje, co w module już jest, jak to działa i co przyjdzie po nim.</p>
+<p class="meta">
+  Dotyczy: <code>modules/teams</code> (port <strong>8050</strong>), <code>modules/terminal</code> (zakładka <em>Teams</em>)<br>
+  Zmiana OpenSpec: <code>openspec/changes/add-teams-module</code><br>
+  Stan: grupy zadań <strong>1–8, 10, 11 zrobione</strong>, grupa <strong>9 częściowo</strong>, grupa <strong>12 otwarta</strong>
+</p>
+
+<div class="callout">
+  <span class="tag">W jednym akapicie</span>
+  <p><code>agent</code> prowadzi <em>jedną</em> rozmowę operatora z modelem. <code>teams</code> pozwala rozdzielić pracę między kilku agentów o różnych rolach, kazać im pracować nad wspólną decyzją i porównać dwa układy ról ze sobą. Kluczowa różnica jest w tym, <em>gdzie siedzi topologia</em>: nie w kodzie, tylko w bazie — jako graf w JSONB, wersjonowany append-only. Dzięki temu „inny zespół" to zapis rewizji, a nie deploy.</p>
+</div>
+
+<h2>Czym jest zespół</h2>
+
+<p>Zespół to trzy rzeczy naraz: wpis w katalogu (nazwa, opis, właściciel), ciąg <strong>rewizji</strong> i zbiór <strong>przebiegów</strong>. Rewizja niesie całą definicję — i to ona, a nie zespół, jest tym, na czym przebieg pracuje.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pojęcie</th><th>Co niesie</th><th>Reguła, która to trzyma</th></tr></thead>
+  <tbody>
+    <tr><td class="field">agent (węzeł)</td><td><code>key</code>, <code>role</code>, <code>prompt</code>, <code>guidance</code>, <code>model_id</code>, <code>tools[]</code></td><td>każdy agent nazywa <strong>swój</strong> model — nie ma domyślnego dla całego zespołu</td></tr>
+    <tr><td class="field">zależność (krawędź)</td><td><code>from</code> → <code>to</code></td><td>następnik czeka na poprzednika i dostaje <em>tylko jego</em> wypowiedź</td></tr>
+    <tr><td class="field">granice kosztu</td><td><code>run_limit</code>, <code>daily_limit</code> (opcjonalne, jako łańcuchy)</td><td>sprawdzane w kodzie, nigdy w prompcie</td></tr>
+    <tr><td class="field">rewizja</td><td>cała definicja w JSONB + numer wersji</td><td>zapis <strong>dokłada</strong> następną; nie ma <code>UPDATE</code> na <code>team_revisions</code></td></tr>
+    <tr><td class="field">przebieg</td><td><code>team_revision_id</code>, status, powód zatrzymania, ślad</td><td>wskazuje rewizję, więc edycja zespołu nie zmienia historii</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout">
+  <span class="tag">Dlaczego akurat tak</span>
+  <p><strong>Mutowalna definicja</strong> została odrzucona: eksperyment, którego definicja zmienia się pod spodem, nie daje się porównać z własnym wynikiem sprzed tygodnia. <strong>Definicja jako kod</strong> (klasa albo plik per zespół) też — wtedy „złóż zespół na froncie" znaczy „wygeneruj i wdróż kod", a to inna funkcjonalność niż zamówiona.</p>
+</div>
+
+<h2>Mapa architektury</h2>
+
+<h3>Gdzie moduł stoi w repozytorium</h3>
+
+<p><code>teams</code> jest <strong>piątym</strong> modułem back-endu i stoi <em>obok</em> <code>agent</code>, nie pod nim: te same dwie krawędzie na zewnątrz (OpenAI, <code>market-mcp</code>), własna baza, własna tożsamość — i <strong>żadnej krawędzi między nimi</strong>. To nie przeoczenie, tylko cel: awaria eksperymentów nie może ruszyć czatu operatora.</p>
+
+<pre><code>                  capital.com
+                  (REST + WS)
+                       │
+                       ▼
+        ┌──────────────────────────────┐
+        │  capital-gateway     :8010   │──────────────────┐
+        │  trade · history · stream    │                  │
+        └──────────────┬───────────────┘                  │ instruments
+                       │ HTTP + WebSocket                 │
+                       ▼                                  │
+        ┌──────────────────────────────┐                  │
+        │  market-data         :8020   │                  │
+        │  archive · coverage · rollups│                  │
+        └──────┬───────────────┬───────┘                  │
+     candles,  │               │  to samo archiwum,       │
+     strumień  │               │  zredukowane dla modelu  │
+               │               ▼                          │
+               │      ┌──────────────────────┐            │
+               │      │  market-mcp   :8040  │            │
+               │      │  narzędzia MCP,      │            │
+               │      │  tylko odczyt        │            │
+               │      └───┬──────────────┬───┘            │
+               │          │              │                │
+               │   MCP    │              │                │
+               │  ┌───────┤              ▼                │
+               │  │       ▼        klient desktopowy      │
+               │  │  ┌──────────────────────────────┐     │
+               │  │  │  agent               :8030   │◀─── OpenAI
+               │  │  │  rozmowa · narzędzia · koszt │     │
+               │  │  └──────────────┬───────────────┘     │
+               │  │                 │                     │
+               │  └────┐            │                     │
+               │       ▼            │                     │
+               │     ┌──────────────────────────────┐     │
+               │     │  teams               :8050   │◀─── OpenAI (własny klucz)
+               │     │  zespół jako dana · przebieg │     │
+               │     │  · ślad · koszt              │     │
+               │     └──────────────┬───────────────┘     │
+               │                    │                     │
+               ▼                    ▼                     ▼
+                            terminal :5173 ◀──────────────┘
+    wykresy · grid · archiwum · panel agenta · canvas zespołów</code></pre>
+
+<p class="dim">Rysunek za <code>docs/architecture.md</code>. Trzy fakty, które z niego wynikają: <code>teams</code> nie importuje niczego z <code>agent</code> (bliźniaki są <em>kopiowane</em>, nie współdzielone), <code>market-mcp</code> zyskał drugiego wołającego, a nie nowe zachowanie, i nic w repozytorium nie zależy od <code>teams</code> — wycofanie modułu nie dotyka pozostałych czterech.</p>
+
+<h3>Jak moduł jest zbudowany w środku</h3>
+
+<figure>
+<svg viewBox="0 0 700 400" role="img" aria-label="Warstwy modułu teams: wejście, routery, reguły, wykonanie, świat zewnętrzny">
+  <!-- band 1 -->
+  <rect class="fig-box" x="20" y="20" width="325" height="44" rx="6"/>
+  <text class="fig-t" x="34" y="40">terminal — zakładka Teams</text>
+  <text class="fig-t dim" x="34" y="55">canvas, katalog, panel agenta</text>
+  <rect class="fig-box outside" x="360" y="20" width="325" height="44" rx="6"/>
+  <text class="fig-t" x="374" y="40">Easy Auth (w Azure)</text>
+  <text class="fig-t dim" x="374" y="55">X-MS-CLIENT-PRINCIPAL-ID · lokalnie nikogo nie ma</text>
+
+  <path class="fig-arrow" d="M182 64 L182 96 M178 90 L182 96 L186 90"/>
+  <path class="fig-arrow" d="M522 64 L522 96 M518 90 L522 96 L526 90"/>
+
+  <!-- band 2 -->
+  <rect class="fig-box" x="20" y="100" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="32" y="122">routers/catalogue</text>
+  <text class="fig-t dim" x="32" y="137">/teams · rewizje</text>
+  <rect class="fig-box" x="190" y="100" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="202" y="122">routers/runs</text>
+  <text class="fig-t dim" x="202" y="137">start · ślad · SSE</text>
+  <rect class="fig-box" x="360" y="100" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="372" y="122">routers/models</text>
+  <text class="fig-t dim" x="372" y="137">katalog modeli</text>
+  <rect class="fig-box" x="530" y="100" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="542" y="122">routers/usage</text>
+  <text class="fig-t dim" x="542" y="137">rozbicie kosztu</text>
+
+  <path class="fig-arrow" d="M97 146 L97 176 M93 170 L97 176 L101 170"/>
+  <path class="fig-arrow" d="M267 146 L267 176 M263 170 L267 176 L271 170"/>
+  <path class="fig-arrow" d="M437 146 L437 176 M433 170 L437 176 L441 170"/>
+  <path class="fig-arrow" d="M607 146 L607 176 M603 170 L607 176 L611 170"/>
+
+  <!-- band 3 -->
+  <rect class="fig-box" x="20" y="180" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="32" y="202">contract.py</text>
+  <text class="fig-t dim" x="32" y="217">kształt definicji</text>
+  <rect class="fig-box" x="190" y="180" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="202" y="202">validation.py</text>
+  <text class="fig-t dim" x="202" y="217">otoczenie definicji</text>
+  <rect class="fig-box" x="360" y="180" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="372" y="202">models_catalogue</text>
+  <text class="fig-t dim" x="372" y="217">z konfiguracji</text>
+  <rect class="fig-box" x="530" y="180" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="542" y="202">auth.py</text>
+  <text class="fig-t dim" x="542" y="217">kto woła</text>
+
+  <path class="fig-arrow" d="M97 226 L97 256 M93 250 L97 256 L101 250"/>
+  <path class="fig-arrow" d="M267 226 L267 256 M263 250 L267 256 L271 250"/>
+
+  <!-- band 4 -->
+  <rect class="fig-box" x="20" y="260" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="32" y="282">store.py</text>
+  <text class="fig-t dim" x="32" y="297">jedyne drzwi do bazy</text>
+  <rect class="fig-box accent" x="190" y="260" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="202" y="282">runner/</text>
+  <text class="fig-t dim" x="202" y="297">graph · loop · cost</text>
+  <rect class="fig-box" x="360" y="260" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="372" y="282">tools/</text>
+  <text class="fig-t dim" x="372" y="297">client · assignment</text>
+  <rect class="fig-box" x="530" y="260" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="542" y="282">provider.py</text>
+  <text class="fig-t dim" x="542" y="297">OpenAI, strumieniowo</text>
+
+  <path class="fig-arrow" d="M267 306 L267 320 L97 320 L97 336 M93 330 L97 336 L101 330"/>
+  <path class="fig-arrow" d="M267 306 L267 320 L437 320 L437 336 M433 330 L437 336 L441 330"/>
+  <path class="fig-arrow" d="M267 306 L267 320 L607 320 L607 336 M603 330 L607 336 L611 330"/>
+  <path class="fig-arrow" d="M97 306 L97 336 M93 330 L97 336 L101 330"/>
+
+  <!-- band 5 -->
+  <rect class="fig-box outside" x="20" y="340" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="32" y="362">PostgreSQL</text>
+  <text class="fig-t dim" x="32" y="377">baza `teams`</text>
+  <rect class="fig-box outside" x="360" y="340" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="372" y="362">market-mcp :8040</text>
+  <text class="fig-t dim" x="372" y="377">narzędzia, tylko odczyt</text>
+  <rect class="fig-box outside" x="530" y="340" width="155" height="46" rx="6"/>
+  <text class="fig-t" x="542" y="362">OpenAI</text>
+  <text class="fig-t dim" x="542" y="377">własny klucz modułu</text>
+</svg>
+<figcaption>Warstwy modułu. Przerywane obramowanie to rzeczy poza modułem. <code>runner/</code> jest jedynym miejscem, które dotyka wszystkich trzech naraz — i jedynym, które cokolwiek wydaje.</figcaption>
+</figure>
+
+<h2>Droga jednego przebiegu</h2>
+
+<p>Od kliknięcia do zamkniętego śladu. Numery odpowiadają temu, co realnie dzieje się w kodzie — warto je znać, bo każdy z nich jest osobnym miejscem, w którym przebieg może zostać <em>odmówiony</em>, a nie „popsuć się".</p>
+
+<div class="stage">
+  <h3><span class="no">1</span> Zapis definicji</h3>
+  <p><code>POST /teams</code> albo <code>POST /teams/{id}/revisions</code>. Walidacja rozpada się na dwie po tym, <em>czego potrzebuje</em>. Kształt — unikalne klucze agentów, krawędzie wskazujące istniejących agentów, brak cyklu, brak agenta odciętego od reszty — sprawdza <code>contract.py</code>, czyli sam Pydantic, jeszcze zanim żądanie dojdzie do routera. Otoczenie — czy model jest w katalogu modułu, czy narzędzie jest tym, co serwer <em>dziś</em> ogłasza — sprawdza <code>validation.py</code>. Obie drogi kończą się <span class="pill">422</span> i obie nazywają agenta, którego dotyczą.</p>
+</div>
+
+<div class="stage">
+  <h3><span class="no">2</span> Start przebiegu</h3>
+  <p><code>POST /teams/{id}/runs</code> bierze <strong>najnowszą rewizję</strong>, sprawdza ją jeszcze raz (<code>check_runnable</code> — model wycofany z konfiguracji od czasu zapisu jest dokładnie tym przypadkiem), sprawdza granicę dobową zespołu i dopiero wtedy tworzy wiersz przebiegu. Odpowiada <span class="pill">201</span> <em>natychmiast</em> — nie wynikiem. Zespół pracuje minutami, a żądanie trzymane otwarte przez ten czas to żądanie, które pada razem z siecią.</p>
+</div>
+
+<div class="stage">
+  <h3><span class="no">3</span> Kompilacja definicji do grafu</h3>
+  <p><code>runner/graph.py</code> buduje LangGraph: <strong>węzeł na agenta</strong>, krawędzie operatora. Kolejność i równoległość biorą się z tego same — agent rusza, gdy jego poprzednicy skończyli, a agenci o spełnionych zależnościach pracują w tym samym superkroku. Tu też siedzi zawężenie: stan grafu trzyma pracę wszystkich (inaczej nie dałoby się jej przekazać), więc <em>miejscem</em>, w którym agent dostaje wyłącznie swoje wejście, jest budowa węzła.</p>
+</div>
+
+<div class="stage">
+  <h3><span class="no">4</span> Pętla jednego agenta</h3>
+  <p><code>runner/loop.py</code>: model ↔ narzędzia, dopóki model prosi o narzędzia, nie dłużej niż <strong>6 rund</strong>. Wewnątrz węzła jest zwykłe <code>while</code>, nie drugi graf — zagnieżdżanie grafu w grafie dołożyłoby superkroków między pytaniem a odpowiedzią, a sufit rund czyta się jako granica pętli, bo nią jest. Kontekst agenta to <em>briefing</em> zbudowany z wypowiedzi poprzedników, nie rozmowa: zespół nie ma transkryptu do odtworzenia.</p>
+</div>
+
+<div class="stage">
+  <h3><span class="no">5</span> Ślad, na bieżąco</h3>
+  <p><code>run_steps</code> (wiersz na agenta), <code>tool_calls</code> (wiersz na wywołanie narzędzia), <code>usage</code> (wiersz na <strong>każde</strong> wywołanie modelu, ze stawkami skopiowanymi na wiersz i policzonym kosztem). Nic nie jest składane na końcu: przebieg, który się urwał, też jest wynikiem — częściej tym ciekawszym — a ślad pisany na końcu byłby pusty dokładnie wtedy, gdy jest potrzebny.</p>
+</div>
+
+<div class="stage">
+  <h3><span class="no">6</span> Zamknięcie</h3>
+  <p>Jeden status i jeden powód: <code>completed</code>, <code>failed</code> albo <code>cancelled</code>, ze <code>stopped_reason</code> nazywającym przyczynę — koszt, czas, dostęp do narzędzi, przewrócony agent. Awaria jest <em>statusem</em>, nie wyjątkiem lecącym w górę. Kto patrzy przez <code>GET /runs/{id}/events</code>, dostaje najpierw migawkę stanu, potem zdarzenia na żywo; zerwanie odbioru odpina kolejkę i nic poza tym — przebieg nie trzyma referencji do żadnego widza.</p>
+</div>
+
+<h2>Cztery bezpieczniki, i czemu są cztery</h2>
+
+<div class="cards">
+  <div class="card">
+    <h4>Sufit rund — 6, w kodzie</h4>
+    <p>„Ile razy agent może sięgnąć po narzędzie" to własność bezpieczeństwa, której nie podnosi się dlatego, że akurat przeszkadza. Niższy niż ósemka z <code>agent</code>, bo tutaj mnoży się przez liczbę agentów.</p>
+  </div>
+  <div class="card">
+    <h4>Limit czasu — 900 s, w konfiguracji</h4>
+    <p><code>RUN_TIMEOUT_SECONDS</code>, na cały przebieg, nie na agenta. To zależy od tego, jak duży zespół operator złożył, więc jest ustawieniem, a nie stałą.</p>
+  </div>
+  <div class="card">
+    <h4>Granica kosztu przebiegu</h4>
+    <p>Sprawdzana <strong>przed każdym wywołaniem modelu</strong> — ostatni moment, w którym niewydanie jest jeszcze możliwe. Licznik trzymany w pamięci przebiegu: wiersze lądują, gdy wywołania się kończą, więc suma czytana z bazy w trakcie byłaby już nieaktualna.</p>
+  </div>
+  <div class="card">
+    <h4>Granica dobowa zespołu</h4>
+    <p>Liczona od północy UTC i sprawdzana <strong>zanim cokolwiek powstanie</strong> — przebieg odmówiony w połowie to przebieg, który już wydał. Jeden zegar modułu, bo limit chodzący za strefą operatora byłby latem innym limitem.</p>
+  </div>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Szczegół, który decyduje o rachunku</span>
+  <p>Porównanie to <code>&gt;=</code>, nie <code>&gt;</code>. Dokładnie na granicy budżet jest wyczerpany, a wywołanie zrobione „bo jeszcze nie przekroczyliśmy" jest tym, które przekracza. Żaden z tych czterech bezpieczników nie jest zdaniem w prompcie: prompt prosi model, żeby się powstrzymał, a granica ma trzymać wtedy, gdy model prosi o to, o co nie powinien.</p>
+</div>
+
+<h2>Plik po pliku</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Plik</th><th>Za co odpowiada</th><th>Czego tam nie ma</th></tr></thead>
+  <tbody>
+    <tr><td class="field">config.py</td><td>ustawienia i dwa przełączniki trybu — baza (tożsamość vs. hasło) i serwer narzędzi (tożsamość vs. loopback)</td><td><code>DEFAULT_MODEL_ID</code> — każdy agent nazywa swój model, więc nie ma do czego wracać</td></tr>
+    <tr><td class="field">db.py</td><td>połączenie w dwóch kształtach (asyncpg i SQLAlchemy), advisory lock o kluczu <code>8050</code></td><td>współdzielenia z <code>agent</code> — to świadomy bliźniak, nie import</td></tr>
+    <tr><td class="field">contract.py</td><td>kształty na drucie; <code>TeamDefinition</code> jest jednocześnie tym, co siedzi w JSONB</td><td>osobnej warstwy domenowej — tabele mapują się na druty niemal jeden do jednego</td></tr>
+    <tr><td class="field">validation.py</td><td>to, czego sam JSON nie rozstrzygnie: katalog modeli i narzędzia ogłaszane przez serwer</td><td>drugiej kopii cudzego katalogu narzędzi</td></tr>
+    <tr><td class="field">store.py</td><td>jedyne drzwi do <code>teams</code> i <code>team_revisions</code>; właściciel jest częścią <em>każdego</em> zapytania</td><td>ani jednego <code>UPDATE</code> na <code>team_revisions</code></td></tr>
+    <tr><td class="field">runner/graph.py</td><td>definicja → LangGraph; zawężenie wejścia agenta do poprzedników</td><td>planisty kolejności — to robi graf</td></tr>
+    <tr><td class="field">runner/loop.py</td><td>pętla model ↔ narzędzia jednego agenta, sufit rund, dwa haki dla kosztu</td><td>wiedzy o bazie i o innych agentach</td></tr>
+    <tr><td class="field">runner/engine.py</td><td>miejsce, gdzie baza, statusy, limit czasu i widzowie się spotykają</td><td>decyzji o kolejności pracy</td></tr>
+    <tr><td class="field">runner/cost.py</td><td>dwie granice i jedno miejsce, w którym przebieg staje za pieniądze</td><td>odpytywania bazy przed każdym wywołaniem</td></tr>
+    <tr><td class="field">tools/client.py</td><td>sesja z <code>market-mcp</code> — jedyne miejsce, gdzie importowany jest <code>mcp</code></td><td>—</td></tr>
+    <tr><td class="field">tools/assignment.py</td><td>kto dostaje które narzędzia; obie odmowy zatrzymujące przebieg <em>przed</em> wywołaniem agenta</td><td>—</td></tr>
+    <tr><td class="field">provider.py</td><td>OpenAI, strumieniowo; jedyne miejsce z klasami wiadomości langchaina</td><td>rozmowy — wywołanie niesie briefing, nie historię</td></tr>
+    <tr><td class="field">app.py</td><td>montaż: lifespan, routery, serwer narzędzi zbudowany bez łączenia</td><td>czegokolwiek, co coś rozstrzyga</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Trasy HTTP</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Trasa</th><th>Co robi</th></tr></thead>
+  <tbody>
+    <tr><td class="field">GET /health</td><td>poza wymaganiem tożsamości; o to pyta smoke check wdrożenia</td></tr>
+    <tr><td class="field">GET /models</td><td>katalog modeli, od najtańszego — wszystko, czego potrzebuje wybierak</td></tr>
+    <tr><td class="field">GET · POST /teams</td><td>katalog i nowy zespół wraz z pierwszą rewizją</td></tr>
+    <tr><td class="field">GET · DELETE /teams/{id}</td><td>jeden wpis; <code>DELETE</code> <em>wycofuje</em> zespół, zostawiając jego przebiegi</td></tr>
+    <tr><td class="field">POST /teams/{id}/revisions</td><td>dokłada następną rewizję; nigdy nie rusza poprzedniej</td></tr>
+    <tr><td class="field">GET /teams/{id}/revisions/latest · /{version}</td><td>definicja taka, jaka została zapisana</td></tr>
+    <tr><td class="field">POST /teams/{id}/runs</td><td>uruchamia przebieg najnowszej rewizji, odpowiada <span class="pill">201</span> od razu</td></tr>
+    <tr><td class="field">GET /teams/{id}/runs</td><td>przebiegi zespołu, najnowsze pierwsze — także te na rewizjach już zastąpionych</td></tr>
+    <tr><td class="field">GET /runs/{id} · /steps · /tool-calls</td><td>przebieg i jego ślad</td></tr>
+    <tr><td class="field">GET /runs/{id}/events</td><td>SSE: najpierw migawka, potem postęp na żywo</td></tr>
+    <tr><td class="field">POST /runs/{id}/cancel</td><td>prosi przebieg, żeby stanął — <span class="pill">202</span>, bo status pisze sam przebieg, rozwijając się</td></tr>
+    <tr><td class="field">GET /usage</td><td>rozbicie kosztu po agentach i po modelach; opcjonalne <code>run_id</code>, <code>team_id</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Każda trasa <code>/teams</code> odpowiada wyłącznie tożsamości, która zespół zapisała, i <strong>cudzy zespół odpowiada dokładnie tak, jak nieistniejący</strong> — różnica między tymi dwoma odpowiedziami byłaby informacją o tym, ile zespołów istnieje. <code>/models</code> jest dla wszystkich taki sam: publikuje konfigurację, nie czyjeś dane. <code>/usage</code> na cudzy przebieg oddaje <em>pustą sumę</em>, nie 404 — to agregat.</p>
+
+<h2>Decyzje, które warto znać</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Wybrano</th><th>Zamiast</th><th>Bo</th></tr></thead>
+  <tbody>
+    <tr><td>osobny moduł</td><td>rozbudowa <code>agent</code></td><td>schemat <code>agent</code> jest zbudowany wokół jednej rozmowy; zespół wszedłby w tabele projektowane pod czat i każdy eksperyment ryzykowałby czatem operatora</td></tr>
+    <tr><td>LangGraph</td><td>OpenAI Agents SDK · własny orkiestrator</td><td>jest już w repozytorium, a jego model — jawne węzły i krawędzie — odwzorowuje się jeden do jednego na JSONB i na diagram w terminalu</td></tr>
+    <tr><td>rewizje append-only</td><td>mutowalna definicja</td><td>tylko przebieg wskazujący rewizję sprawia, że ślad znaczy cokolwiek miesiąc później</td></tr>
+    <tr><td>agent widzi poprzedników</td><td>pełna historia dla każdego</td><td>koszt rósłby kwadratowo, a rozdzielenie ról przestaje cokolwiek znaczyć, jeśli każdy widzi wszystko — wtedy zespół jest jednym agentem z kilkoma promptami</td></tr>
+    <tr><td>kontrakt <strong>generowany</strong></td><td>ręczne DTO (ścieżka <code>agent</code>)</td><td>powierzchnia tego modułu jest szersza i zmienia się częściej niż wąskie DTO czatu, a ręczne typy psują się cicho</td></tr>
+    <tr><td><code>@xyflow/react</code></td><td>JointJS/GoJS · własne SVG · Mermaid</td><td>węzły są zwykłymi komponentami Reacta; własne SVG odrzucono nie z powodu rysowania, tylko edycji</td></tr>
+    <tr><td>faza 1 nie składa zleceń</td><td>trading od razu</td><td>najpierw trzeba sprawdzić, czy definiowalny na froncie zespół w ogóle produkuje sensowne i powtarzalne przebiegi; nieodwracalne skutki po stronie rachunku odpowiadałyby na dwa pytania naraz</td></tr>
+    <tr><td>bliźniaki kopiowane</td><td>biblioteka współdzielona</td><td>odrzucone wprost przez architekturę repozytorium — <code>db.py</code>, <code>migrate.py</code>, <code>auth.py</code>, <code>provider.py</code>, <code>tools/client.py</code> są świadomymi kopiami</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Stan na dziś</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Grupa zadań</th><th>Stan</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td>1–2 · szkielet, schemat</td><td><span class="pill good">zrobione</span></td><td>PR #105, #106 — trzy migracje: katalog, przebiegi, zużycie</td></tr>
+    <tr><td>3 · kontrakt i generowanie</td><td><span class="pill good">zrobione</span></td><td>PR #108 — wyjście dla <code>market-data</code> wyszło bajt w bajt takie samo</td></tr>
+    <tr><td>4–5 · katalog zespołów, modele</td><td><span class="pill good">zrobione</span></td><td>PR #110, #111</td></tr>
+    <tr><td>6 · dostęp do narzędzi</td><td><span class="pill good">zrobione</span></td><td>PR #112 — zespół bez narzędzi w ogóle nie dotyka serwera</td></tr>
+    <tr><td>7–8 · przebieg, koszt</td><td><span class="pill good">zrobione</span></td><td>PR #114, #115</td></tr>
+    <tr><td>9 · terminal</td><td><span class="pill warn">w części</span></td><td>PR #113 — katalog, canvas, edycja i panel są; otwarte 9.4, 9.7, 9.9, 9.10</td></tr>
+    <tr><td>10–11 · infrastruktura, CI</td><td><span class="pill good">kod zrobiony</span></td><td>PR #107, #109 — <code>terraform apply</code> pozostaje robotą operatora, więc w Azure nie stoi jeszcze nic</td></tr>
+    <tr><td>12 · domknięcie</td><td><span class="pill">otwarte</span></td><td>zespół przykładowy, przebieg od końca do końca na stosie, <code>review.md</code></td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Co zostaje otwarte w terminalu i dlaczego akurat to</span>
+  <ul>
+    <li><strong>9.4 — uruchomienie przebiegu z katalogu.</strong> Widok katalogu jest, przycisku startu nie ma. Przycisk, który nic nie robi, jest gorszy niż jego brak; trasa <code>POST /teams/{id}/runs</code> przyszła dopiero grupą 7.</li>
+    <li><strong>9.7 — wybierak narzędzi.</strong> Moduł trzyma ogłoszone narzędzia, ale nie publikuje ich jeszcze na drucie. Warstwa wywołań terminala już o nie pyta i czyta 404 jako „nic nie ogłoszono": panel dalej edytuje rolę, prompt i model, a narzędzie przypisane w starszej rewizji zostaje widoczne i odznaczalne.</li>
+    <li><strong>9.9 i 9.10 — monitor przebiegu na canvasie.</strong> Stan agentów na żywo i odbiór postępu. Do czasu ich domknięcia przebieg ogląda się przez HTTP — jak w scenariuszach dokumentu <em>testy lokalne</em>.</li>
+  </ul>
+</div>
+
+<h2>Co dalej</h2>
+
+<p>Faza 1 kończy się rekomendacją zapisaną w śladzie. To, co przyjdzie po niej, jest wyłączone z tej zmiany <strong>świadomie</strong>, a nie zapomniane — każda z tych rzeczy dopisze modele do <code>contract.py</code> i po jednej rewizji Alembica, i to są znane punkty styku, a nie odkrycie przy merge'u.</p>
+
+<div class="cards">
+  <div class="card">
+    <h4>Faza 2 — narzędzia tradingowe</h4>
+    <p>Dostęp do <code>capital-gateway</code>, czyli pierwsza krawędź, po której zespół może zrobić coś nieodwracalnego. Dopiero po wykazaniu, że przebiegi są sensowne i powtarzalne.</p>
+  </div>
+  <div class="card">
+    <h4>Faza 3 — scheduler i triggery</h4>
+    <p>Przebieg budzony harmonogramem albo zdarzeniem rynkowym, zamiast ręką operatora. To jest moment, w którym granice kosztu przestają być wygodą i stają się jedyną rzeczą między eksperymentem a rachunkiem, którego nikt nie zatwierdził.</p>
+  </div>
+  <div class="card">
+    <h4>Faza 4 — analityka porównawcza</h4>
+    <p>Zestawianie rewizji ze sobą i automatyczne układanie grafu. Cały append-only w rewizjach istnieje po to, żeby ta faza miała co porównywać.</p>
+  </div>
+  <div class="card">
+    <h4>Pytanie otwarte</h4>
+    <p>Czy zespoły będą potrzebowały pamięci <em>między</em> przebiegami — tablicy ogłoszeń, wniosków z poprzednich prób — czy stan współdzielony w obrębie jednego przebiegu wystarcza. Odpowiedź wymaga zobaczenia kilku prawdziwych przebiegów; doszłaby jako osobna tabela, bez ruszania definicji ani śladu.</p>
+  </div>
+</div>
+
+<p>Najbliższe kroki są jednak bliżej: domknięcie grupy 9 (start przebiegu i monitor na canvasie, <code>GET /tools</code> dla wybieraka), zespół przykładowy jako punkt wyjścia, przebieg od końca do końca na uruchomionym stosie — i dopiero potem <code>terraform apply</code> operatora, bez którego moduł nie stoi jeszcze w Azure.</p>
+
+<footer>
+  Dokument opisowy do zmiany <code>add-teams-module</code>. Prawdą o systemie są specyfikacje <code>teams-*</code> i <code>terminal-teams</code> oraz <code>modules/teams/README.md</code>; ten plik jest ich streszczeniem dla kogoś, kto wchodzi w moduł od zera. Scenariusze do przejścia ręką są w <code>docs/teams-testy-lokalne.html</code>.
+</footer>
+
+</main>
