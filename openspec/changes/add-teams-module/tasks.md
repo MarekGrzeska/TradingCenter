@@ -138,12 +138,29 @@
 
 ## 11. CI i wdrożenie
 
-- [ ] 11.1 Filtr i job modułu w `.github/workflows/checks.yml`
-- [ ] 11.2 Rozszerzenie filtra terminala o `modules/teams/teams/contract.py`
-- [ ] 11.3 `.github/workflows/deploy-teams.yml` — obraz do GHCR, wdrożenie, smoke check pytający `/health`
-- [ ] 11.4 `scripts/dev.sh` i `scripts/dev.ps1` — moduł w kolejności startu, tworzenie bazy i roli, gdy ich nie ma
-- [ ] 11.5 `README.md` i `docs/architecture.md` — moduł w tabeli i na rysunku
-- [ ] 11.6 `CLAUDE.md` — moduł w mapie, jego komendy i port
+- [x] 11.1 Filtr i job modułu w `.github/workflows/checks.yml`
+- [x] 11.2 Rozszerzenie filtra terminala o `modules/teams/teams/contract.py`
+- [x] 11.3 `.github/workflows/deploy-teams.yml` — obraz do GHCR, wdrożenie, smoke check pytający `/health`
+- [x] 11.4 `scripts/dev.sh` i `scripts/dev.ps1` — moduł w kolejności startu, tworzenie bazy i roli, gdy ich nie ma
+- [x] 11.5 `README.md` i `docs/architecture.md` — moduł w tabeli i na rysunku
+- [x] 11.6 `CLAUDE.md` — moduł w mapie, jego komendy i port
+
+  PR #108. Cztery rzeczy warte odnotowania:
+
+  - **`deploy-teams.yml` pyta o jedno i drugie** — płaszczyzny sterowania o obraz i
+    `/health` o proces, dokładnie jak `deploy-agent.yml` po 16 sierpnia. Kolejność jest
+    tu odwrotna niż w grupie 10: workflow istnieje, zanim aplikacja stoi w Azure, więc
+    pierwszy jego przebieg będzie dopiero po `apply` operatora.
+  - **Zakładanie bazy i roli wyszło do funkcji** (`ensure_database` w `dev.sh`,
+    `Confirm-LogicalDatabase` w `dev.ps1`) — trzecia baza była momentem, w którym kopia
+    tego samego bloku przestała się bronić.
+  - **Poprawione po drodze:** `README.md` i `CLAUDE.md` twierdziły, że `agent` nie ma
+    ścieżki wyjętej spod Easy Auth i potwierdza wdrożenie tylko przez płaszczyznę
+    sterowania. Ma ją od 16 sierpnia i jego workflow pyta `/health` — jedyną aplikacją
+    bez tej możliwości jest `capital-gateway`, do którego runner nie ma dostępu sieciowego.
+  - **Rysunek w `docs/architecture.md` przerysowany:** `teams` stoi obok `agent`, nie pod
+    nim, i oba biorą narzędzia z `market-mcp`. Między nimi nie ma krawędzi — i o to
+    chodziło.
 
 ## 12. Domknięcie
 

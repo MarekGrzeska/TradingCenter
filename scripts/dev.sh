@@ -3,16 +3,17 @@
 # Everything the terminal needs, in the order it needs it — the macOS and Linux
 # counterpart of dev.ps1.
 #
-#   migrations -> capital-gateway -> market-data -> market-mcp -> agent -> terminal
+#   migrations -> capital-gateway -> market-data -> market-mcp -> agent -> teams -> terminal
 #
 # The order is not tidiness, and every arrow in it is now a real dependency.
 # market-data opens a subscription per tracked pair the moment it starts, so a gateway
 # that is not listening yet costs it a round of backoff; market-mcp reads market-data's
 # own contract; the agent asks market-mcp for its tool list on the first turn, and a
 # market-mcp that was not up yet means an agent answering without tools rather than an
-# error anyone would notice; the terminal's charts read the archive, so starting it
-# first fills the console with proxy errors that mean nothing. Each step waits for the
-# one before it to actually answer, not merely to have been launched.
+# error anyone would notice; teams reads the same tool list for the agents a run assigns
+# tools to; the terminal's charts read the archive, so starting it first fills the
+# console with proxy errors that mean nothing. Each step waits for the one before it to
+# actually answer, not merely to have been launched.
 #
 # market-mcp needs no .env of its own to run here: every setting it reads has a
 # working default for loopback (`config.py`), unlike the gateway and the archive,
@@ -22,11 +23,12 @@
 # (openspec/changes/local-dev-database-in-docker; the spell in Azure is over, production
 # stays there and development does not). `docker compose down` keeps the data.
 #
-# `agent`'s own database is a second logical database in that same container, created
-# here if missing rather than through docker-entrypoint-initdb.d — that only runs on a
-# volume's first boot, so it would never fire for anyone who already has
-# tradingcenter-db-data from before this module existed (design.md, "Baza: druga baza
-# logiczna, jeden serwer").
+# `agent`'s and `teams`' own databases are further logical databases in that same
+# container, created here if missing rather than through docker-entrypoint-initdb.d —
+# that only runs on a volume's first boot, so it would never fire for anyone who already
+# has tradingcenter-db-data from before either module existed (design.md, "Baza: druga
+# baza logiczna, jeden serwer"). Three databases, one server, the same shape production
+# has.
 #
 #   ./scripts/dev.sh              # everything
 #   ./scripts/dev.sh --no-terminal    # back end only, e.g. to run the live tests
@@ -41,12 +43,14 @@ GATEWAY_DIR="$REPO_ROOT/modules/capital-gateway"
 ARCHIVE_DIR="$REPO_ROOT/modules/market-data"
 MCP_DIR="$REPO_ROOT/modules/market-mcp"
 AGENT_DIR="$REPO_ROOT/modules/agent"
+TEAMS_DIR="$REPO_ROOT/modules/teams"
 TERMINAL_DIR="$REPO_ROOT/modules/terminal"
 
 GATEWAY_PORT=8010
 ARCHIVE_PORT=8020
 AGENT_PORT=8030
 MCP_PORT=8040
+TEAMS_PORT=8050
 TERMINAL_PORT=5173
 
 # 127.0.0.1 rather than "localhost": uvicorn binds IPv4 loopback, and on a machine
@@ -55,6 +59,7 @@ GATEWAY_URL="http://127.0.0.1:$GATEWAY_PORT"
 ARCHIVE_URL="http://127.0.0.1:$ARCHIVE_PORT"
 AGENT_URL="http://127.0.0.1:$AGENT_PORT"
 MCP_URL="http://127.0.0.1:$MCP_PORT"
+TEAMS_URL="http://127.0.0.1:$TEAMS_PORT"
 
 START_TERMINAL=1
 WAIT_SECONDS=120
@@ -62,13 +67,15 @@ WAIT_SECONDS=120
 for arg in "$@"; do
   case "$arg" in
     --no-terminal) START_TERMINAL=0 ;;
-    -h|--help) sed -n '2,35p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,37p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $arg (try --help)" >&2; exit 2 ;;
   esac
 done
 
 BLUE=$'\033[34m'; MAGENTA=$'\033[35m'; CYAN=$'\033[36m'; YELLOW=$'\033[33m'
 GREEN=$'\033[32m'; RED=$'\033[31m'; DIM=$'\033[2m'; RESET=$'\033[0m'
+# Bright blue for teams — six services now, and the six basic colours were spoken for.
+BRIGHT_BLUE=$'\033[94m'
 
 say()  { printf '%s%s%s\n' "$CYAN" "$1" "$RESET"; }
 ok()   { printf '%s%s%s\n' "$GREEN" "$1" "$RESET"; }
@@ -95,6 +102,9 @@ fi
 [[ -f "$GATEWAY_DIR/.env" ]] || problems+=("$GATEWAY_DIR/.env is missing — copy .env.example and fill in demo credentials")
 [[ -f "$ARCHIVE_DIR/.env" ]] || problems+=("$ARCHIVE_DIR/.env is missing — copy .env.example; the defaults match compose.yaml")
 [[ -f "$AGENT_DIR/.env" ]] || problems+=("$AGENT_DIR/.env is missing — copy .env.example and fill in OPENAI_API_KEY")
+# teams needs a key and a MODELS catalogue: config.py refuses to build Settings without
+# either, so the module would exit at import rather than start and misbehave.
+[[ -f "$TEAMS_DIR/.env" ]] || problems+=("$TEAMS_DIR/.env is missing — copy .env.example and fill in OPENAI_API_KEY (MODELS has a working default there)")
 
 if (( START_TERMINAL )); then
   if command -v pnpm >/dev/null 2>&1; then
@@ -130,7 +140,7 @@ port_owner() {
   printf ' by %s (pid %s)' "$(ps -p "$pid" -o comm= 2>/dev/null || echo process)" "$pid"
 }
 
-ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$MCP_PORT" "$AGENT_PORT")
+ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$MCP_PORT" "$AGENT_PORT" "$TEAMS_PORT")
 (( START_TERMINAL )) && ports+=("$TERMINAL_PORT")
 for port in "${ports[@]}"; do
   port_in_use "$port" || continue
@@ -155,6 +165,12 @@ case "$agent_db_host" in
   *) problems+=("modules/agent/.env's DATABASE_URL points at '$agent_db_host' — local runs use the compose.yaml container (localhost), never a remote database") ;;
 esac
 
+teams_db_host="$(sed -n 's|^DATABASE_URL=[a-z+]*://\([^@/]*@\)\{0,1\}\([^:/?]*\).*|\2|p' "$TEAMS_DIR/.env" 2>/dev/null | head -1)"
+case "$teams_db_host" in
+  ""|localhost|127.*|::1) ;;
+  *) problems+=("modules/teams/.env's DATABASE_URL points at '$teams_db_host' — local runs use the compose.yaml container (localhost), never a remote database") ;;
+esac
+
 if (( ${#problems[@]} )); then
   fail "Cannot start:"
   for problem in "${problems[@]}"; do fail "  - $problem"; done
@@ -167,6 +183,15 @@ fi
 # from the panel exactly like tools that are broken.
 if ! grep -qs '^MARKET_MCP_URL=..*' "$AGENT_DIR/.env"; then
   note "modules/agent/.env has no MARKET_MCP_URL — the agent will run without tools."
+  note "  Add MARKET_MCP_URL=$MCP_URL to give it market-mcp's, as .env.example does."
+fi
+
+# Same for teams, with a sharper edge: the agent without a tool server answers from the
+# model alone, while a team whose agents were *assigned* tools refuses to run at all
+# (specs/teams-tool-access). Both are supported states; only one of them looks like the
+# module is broken.
+if ! grep -qs '^MARKET_MCP_URL=..*' "$TEAMS_DIR/.env"; then
+  note "modules/teams/.env has no MARKET_MCP_URL — teams whose agents assign tools will refuse to run."
   note "  Add MARKET_MCP_URL=$MCP_URL to give it market-mcp's, as .env.example does."
 fi
 
@@ -248,14 +273,20 @@ ok "Database is up."
 # a tradingcenter-db-data from before this module existed would never see it fire.
 psql_super() { ( cd "$REPO_ROOT" && docker compose exec -T db psql -U market_data -d market_data -v ON_ERROR_STOP=1 "$@" ); }
 
-say "Ensuring the agent database exists..."
-if ! psql_super -tAc "SELECT 1 FROM pg_roles WHERE rolname = 'agent'" | grep -q 1; then
-  psql_super -c "CREATE ROLE agent LOGIN PASSWORD 'change-me';" || { fail "could not create the 'agent' role"; exit 1; }
-fi
-if ! psql_super -tAc "SELECT 1 FROM pg_database WHERE datname = 'agent'" | grep -q 1; then
-  psql_super -c "CREATE DATABASE agent OWNER agent;" || { fail "could not create the 'agent' database"; exit 1; }
-fi
-ok "agent database is ready."
+ensure_database() {
+  local name="$1"
+  if ! psql_super -tAc "SELECT 1 FROM pg_roles WHERE rolname = '$name'" | grep -q 1; then
+    psql_super -c "CREATE ROLE $name LOGIN PASSWORD 'change-me';" || { fail "could not create the '$name' role"; exit 1; }
+  fi
+  if ! psql_super -tAc "SELECT 1 FROM pg_database WHERE datname = '$name'" | grep -q 1; then
+    psql_super -c "CREATE DATABASE $name OWNER $name;" || { fail "could not create the '$name' database"; exit 1; }
+  fi
+}
+
+say "Ensuring the agent and teams databases exist..."
+ensure_database agent
+ensure_database teams
+ok "agent and teams databases are ready."
 
 # --- migrations -----------------------------------------------------------------
 
@@ -269,6 +300,10 @@ if ! ( cd "$ARCHIVE_DIR" && uv run alembic upgrade head ); then
 fi
 if ! ( cd "$AGENT_DIR" && uv run alembic upgrade head ); then
   fail "agent's migrations failed — it would fail on its first query, so stopping here."
+  exit 1
+fi
+if ! ( cd "$TEAMS_DIR" && uv run alembic upgrade head ); then
+  fail "teams' migrations failed — it would fail on its first query, so stopping here."
   exit 1
 fi
 ok "Schema is up to date."
@@ -316,6 +351,17 @@ run_service "agent   " "$YELLOW" "$AGENT_DIR" uv run uvicorn agent.app:app --rel
 wait_for_http "$AGENT_URL/health" "agent" || exit 1
 ok "agent is answering."
 
+# --- teams ------------------------------------------------------------------------
+#
+# After market-mcp for the same reason the agent is, and after the agent for no reason
+# at all beyond a fixed order: nothing calls teams, and teams calls nobody the agent
+# does not. The two are siblings, not a chain.
+
+say "Starting teams on port $TEAMS_PORT..."
+run_service "teams   " "$BRIGHT_BLUE" "$TEAMS_DIR" uv run uvicorn teams.app:app --reload --port "$TEAMS_PORT"
+wait_for_http "$TEAMS_URL/health" "teams" || exit 1
+ok "teams is answering."
+
 # --- the terminal -------------------------------------------------------------
 
 if (( START_TERMINAL )); then
@@ -333,7 +379,8 @@ echo "  market-data docs    $ARCHIVE_URL/docs"
 echo "  Gateway docs        $GATEWAY_URL/docs"
 echo "  market-mcp health   $MCP_URL/health"
 echo "  agent docs          $AGENT_URL/docs"
-echo "  Database            market_data @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
+echo "  teams docs          $TEAMS_URL/docs"
+echo "  Database            market_data, agent, teams @ localhost:55432 (compose.yaml; 'docker compose down' keeps the data)"
 echo
 note "Nothing is archived until a pair is added in the Archive panel — that is deliberate."
 note "Ctrl+C to stop the services."

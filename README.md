@@ -19,7 +19,8 @@ modules move here one at a time.
 | [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. | HTTP + WebSocket |
 | [market-mcp](modules/market-mcp/) | MCP tools over market-data's archive, reduced for a model rather than proxied for a chart. Read-only — no tool writes. | MCP (stdio + streamable HTTP) |
 | [agent](modules/agent/) | The operator's conversation with a model — its own database, its own OpenAI key, and read-only tools over the archive through market-mcp. | HTTP, streamed |
-| [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, and the agent panel. | consumes capital-gateway, market-data and agent |
+| [teams](modules/teams/) | Teams of agents as **data**, not code — a graph the operator composes, versioned append-only, run against the same read-only tools. Its own database, its own OpenAI key. | HTTP + OpenAPI |
+| [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, the agent panel and the teams canvas. | consumes capital-gateway, market-data, agent and teams |
 
 ## Layout
 
@@ -53,19 +54,22 @@ convenience wrappers; no module depends on one.
 Both bring the same things up in the same order:
 
 ```
-migrations  ->  capital-gateway  ->  market-data  ->  market-mcp  ->  agent  ->  terminal
+migrations -> capital-gateway -> market-data -> market-mcp -> agent -> teams -> terminal
 ```
 
 The order is not tidiness — every arrow in it is a real dependency. `market-data`
-subscribes to the gateway as it starts, `market-mcp` reads `market-data`, `agent` asks
-`market-mcp` for its tool list on the first turn, and the terminal's charts read
+subscribes to the gateway as it starts, `market-mcp` reads `market-data`, `agent` and
+`teams` both ask `market-mcp` for their tool list, and the terminal's charts read
 `market-data` too. Starting anything early fills the console with retries, or — in the
 agent's case — quietly produces a turn answered without tools, which is worse because
 nothing reports it. Each step waits for the one before it to actually answer. Ctrl+C stops
 the services.
 
-The agent needs `MARKET_MCP_URL` in its own `.env` to use the tools at all; `.env.example`
-has it, and both scripts say so at startup if an older `.env` does not.
+`agent` and `teams` each need `MARKET_MCP_URL` in their own `.env` to use the tools at
+all; both `.env.example`s have it, and both scripts say so at startup if an older `.env`
+does not. The consequence differs between the two, which is why the messages do: an agent
+without a tool server answers from the model alone, while a team whose agents were
+*assigned* tools refuses to run at all rather than guess.
 
 **The database is local again.** `market-data` writes to the PostgreSQL container in
 [compose.yaml](compose.yaml), which the scripts start first — so Docker is a requirement for
@@ -74,14 +78,15 @@ running the stack, not only for testing it. The archive survives Ctrl+C and
 on the Azure server, for production fidelity; the standing tax — latency, an IP allowlist, a
 yearly secret rotation — cost more than the fidelity bought, and
 `openspec/changes/local-dev-database-in-docker` reversed it. Production stays in Azure.)
-The scripts refuse to start if `modules/market-data/.env` or `modules/agent/.env` points
+The scripts refuse to start if the `.env` of `market-data`, `agent` or `teams` points
 `DATABASE_URL` at any host that is not loopback, and each module refuses the same at
 startup: without an identity configured it does not reach beyond the machine, so pointing a
 local run at production is a named error, not a quiet write.
 
-`agent` writes to a second logical database (`agent`) in the same container — one Postgres
-server, two schemas, mirroring how production shares one server between them. The scripts
-create the role and the database themselves the first time they are missing.
+`agent` and `teams` write to further logical databases (`agent`, `teams`) in the same
+container — one Postgres server, three schemas, mirroring how production shares one server
+between them. The scripts create each role and database themselves the first time they are
+missing.
 
 Useful variants:
 
@@ -116,18 +121,20 @@ When it is a change:
 ### Checks
 
 Every pull request to `main`, and every push to it, runs
-[`.github/workflows/checks.yml`](.github/workflows/checks.yml): five jobs in parallel, one
+[`.github/workflows/checks.yml`](.github/workflows/checks.yml): six jobs in parallel, one
 per module, running the same commands a developer runs — and only for the modules the
 change can have broken. A first job works out which those are from the diff; a change under
 `docs/` or `infra/` runs no module suite at all.
 
-One exception is worth knowing: the terminal's job also runs when `market_data/contract.py`
-or `agent/contract.py` changes, even if no terminal file did, and market-mcp's runs on the
-first of those two for the same reason. `contract:check` and `scripts/contract.py check`
-exist to catch exactly that pairing with `market_data/contract.py`; `agent/contract.py` has
-no generator to fail, so the terminal's own tests against its hand-written DTOs are what
-catch it instead — and none of them run at all if the job never fires. Filtering any of
-them out by directory would retire the check in the one case it was written for.
+One exception is worth knowing: the terminal's job also runs when `market_data/contract.py`,
+`agent/contract.py` or `teams/contract.py` changes, even if no terminal file did, and
+market-mcp's runs on the first of those three for the same reason. `contract:check` and
+`scripts/contract.py check` exist to catch exactly that pairing with
+`market_data/contract.py`, and `teams/contract.py` is generated the same way;
+`agent/contract.py` has no generator to fail, so the terminal's own tests against its
+hand-written DTOs are what catch it instead — and none of them run at all if the job never
+fires. Filtering any of them out by directory would retire the check in the one case it was
+written for.
 
 | Job | Runs |
 |---|---|
@@ -135,6 +142,7 @@ them out by directory would retire the check in the one case it was written for.
 | `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
 | `market-mcp` | `scripts/contract.py check`, `ruff check`, `pyright`, `pytest` |
 | `agent` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's; its `live` tests need a real OpenAI key and stay behind `--run-live` |
+| `teams` | `ruff check`, `pyright`, `pytest` — same again; nothing in the suite reaches OpenAI or market-mcp |
 | `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
 
 `contract:check` runs before the terminal's tests on purpose, and `scripts/contract.py
@@ -154,11 +162,18 @@ Pushing to `main` deploys the module that changed. Each deploy ends by checking 
 actually answers, not merely that Azure accepted the request: `market-data` is probed on
 `/ws/candles`, the one path Easy Auth lets through to the container; `market-mcp` is probed
 on `/health`, excluded from Easy Auth the same way and answering a plain 200 with no trick
-needed; the terminal is checked on both `/` and a tab address, because deep links have
-broken here before while the root kept working. `capital-gateway` admits only
-market-data's addresses, so a runner cannot reach it at all — there, and for `agent`, which
-carves out no path of its own from Easy Auth, the deploy confirms through the Azure control
-plane instead that the site is running the image this commit built.
+needed; `agent` and `teams` ask both questions, the control plane for which image is
+serving and `/health` for whether the process behind it came up; the terminal is checked on
+both `/` and a tab address, because deep links have broken here before while the root kept
+working. `capital-gateway` admits only market-data's addresses, so a runner cannot reach it
+at all, and the control plane is the only question its deploy can ask.
+
+That second question is why the other four ask it. The control plane reports the state of
+the *site*: on 16 August 2026 it read `Running` for the better part of an hour over an
+`agent` container exiting with code 3 on every restart, and the deploy that shipped it went
+green. A module that carves a health path out of Easy Auth is answerable directly — and
+because these modules migrate inside their own lifespan, a process that answers at all has a
+database at the revision its image was built for.
 
 Infrastructure is applied by hand, from
 [`terraform-apply.yml`](.github/workflows/terraform-apply.yml) — Actions → terraform-apply →
