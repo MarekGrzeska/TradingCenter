@@ -23,12 +23,17 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 # Children before parents: `usage` and `tool_calls` both reference `run_steps`,
 # `run_steps` references `runs`, `runs` references `team_revisions`, `team_revisions`
-# references `teams` — the same convention agent's own TABLES follows.
+# references `teams` — the same convention agent's own TABLES follows. `schedule_fires`
+# references `schedules`, `triggers` and `runs`; `schedules` and `triggers` each
+# reference `team_revisions`.
 TABLES: tuple[str, ...] = (
     "usage",
     "tool_calls",
+    "schedule_fires",
     "run_steps",
     "runs",
+    "schedules",
+    "triggers",
     "team_revisions",
     "teams",
 )

@@ -1,19 +1,26 @@
 ## 1. Schemat i przechowywanie
 
-- [ ] 1.1 Migracja: `schedules` — właściciel, zespół, tryb rewizji (`pinned` / `latest`)
+- [x] 1.1 Migracja: `schedules` — właściciel, zespół, tryb rewizji (`pinned` / `latest`)
   i przypięta rewizja, wyrażenie cron, `next_fire_at`, `enabled`, powód wyłączenia, licznik
   kolejnych niepowodzeń, potwierdzenie pracy bez nadzoru
-- [ ] 1.2 Migracja: `triggers` — wyzwalacz nad harmonogramem albo samodzielny, opis warunku
-  (instrument, interwał, wielkość, porównanie, próg), wynik ostatniego sprawdzenia, moment
-  ostatniego wyzwolenia, czas martwy
-- [ ] 1.3 Migracja: `schedule_fires` — moment, źródło wyzwolenia, wynik (`started`, `skipped`,
-  `unavailable`), powód, `run_id` dopuszczalnie pusty, liczba pominiętych wyzwoleń
-- [ ] 1.4 Więzy sprawdzające sprzeczne stany wierszy, wzorem `runs` i `run_steps` z fazy 1
-  (wyzwolenie `started` bez `run_id`, `skipped` bez powodu, tryb `pinned` bez rewizji)
-- [ ] 1.5 Zapytania w `store.py`: zapis i odczyt harmonogramów i wyzwalaczy z filtrem
-  właściciela w samym zdaniu, historia wyzwoleń, licznik niepowodzeń
-- [ ] 1.6 Testy `-m db` na powyższe, w tym: cudzy harmonogram jest nieodróżnialny od
-  nieistniejącego
+- [x] 1.2 Migracja: `triggers` — wyzwalacz samodzielny (własny `team_id` i tryb rewizji,
+  bez wskazania na harmonogram — dwie równorzędne tabele, nie zagnieżdżenie), opis warunku
+  jako wywołanie narzędzia (`tool_name`, `arguments`, `field_path`, `comparison`,
+  `threshold`), trzystanowy wynik ostatniego sprawdzenia, moment ostatniego wyzwolenia,
+  czas martwy i osobny interwał sprawdzania
+- [x] 1.3 Migracja: `schedule_fires` — moment, źródło wyzwolenia (`schedule_id` albo
+  `trigger_id`, dokładnie jedno), wynik (`started`, `skipped`, `unavailable`), powód,
+  `run_id` dopuszczalnie pusty, liczba pominiętych wyzwoleń
+- [x] 1.4 Więzy sprawdzające sprzeczne stany wierszy, wzorem `runs` i `run_steps` z fazy 1
+  (wyzwolenie `started` bez `run_id`, `skipped`/`unavailable` bez powodu, tryb `pinned`
+  bez rewizji, `schedule_fires` bez dokładnie jednego źródła)
+- [x] 1.5 Zapytania w `store.py`: zapis i odczyt harmonogramów i wyzwalaczy z filtrem
+  właściciela w samym zdaniu, przejęcie wyzwolenia warunkowym `UPDATE` (`claim_due_schedule`,
+  `claim_trigger_for_check`), włączanie/wyłączanie, licznik niepowodzeń, historia wyzwoleń
+- [x] 1.6 Testy `-m db` na powyższe (`tests/test_schedules_store.py`, 22 testów): cudzy
+  harmonogram i wyzwalacz są nieodróżnialne od nieistniejących, dwa równoległe przejęcia
+  tego samego wiersza (harmonogramu i wyzwalacza) dają dokładnie jednego zwycięzcę, wynik
+  „nieznany" wyzwalacza to `NULL`, nie `false`
 
 ## 2. Kontrakt i trasy
 
