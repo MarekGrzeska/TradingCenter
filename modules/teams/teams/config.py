@@ -155,6 +155,29 @@ class Settings(BaseSettings):
     # and there is no identity to have.
     require_authenticated_principal: bool = False
 
+    # --- the module's own clock ---
+    #
+    # A schedule or trigger fires from a task in this process's own `lifespan`, not from
+    # anything in Azure (design.md, "Zegar w procesie modułu, nie w Azure") — a timer
+    # calling in from outside would need its own Entra registration to get past Easy
+    # Auth, and would put the schedule in Terraform, which is to say back in the
+    # operator's hands.
+    #
+    # The lever that turns it off without a redeploy — clearing this and restarting
+    # leaves every schedule and trigger exactly where it was, and a run started by hand
+    # still works (specs/teams-schedules, "Budzenie wyłączone ustawieniem").
+    scheduler_enabled: bool = True
+    # How often the clock wakes to look for a due schedule or trigger. Fifteen seconds:
+    # short enough that a five-minute schedule fires close to on time, long enough that
+    # an idle catalogue costs one cheap query a wake rather than a busy loop.
+    scheduler_poll_interval_seconds: float = 15.0
+    # How many *consecutive* failed runs a schedule or trigger tolerates before it
+    # disables itself (specs/teams-schedules, "Harmonogram po serii nieudanych
+    # przebiegów wyłącza się sam"). Three: enough that one bad model response is not
+    # mistaken for a broken schedule, few enough that a genuinely broken one does not
+    # bill through the night before an operator notices.
+    scheduler_failure_threshold: int = 3
+
     @field_validator("database_url", "openai_api_key")
     @classmethod
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:
@@ -257,3 +280,17 @@ class Settings(BaseSettings):
         if len(ids) != len(set(ids)):
             raise ValueError(f"MODELS has duplicate model ids: {ids}")
         return self
+
+    @field_validator("scheduler_poll_interval_seconds")
+    @classmethod
+    def _poll_interval_is_positive(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError(f"SCHEDULER_POLL_INTERVAL_SECONDS must be positive, got {value}")
+        return value
+
+    @field_validator("scheduler_failure_threshold")
+    @classmethod
+    def _failure_threshold_is_positive(cls, value: int) -> int:
+        if value <= 0:
+            raise ValueError(f"SCHEDULER_FAILURE_THRESHOLD must be positive, got {value}")
+        return value

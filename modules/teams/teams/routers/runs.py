@@ -16,17 +16,16 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from .. import store
 from ..auth import current_principal
-from ..contract import RunOut, RunStepOut, TeamRevisionOut, ToolCallOut
-from ..runner import RunFinished, StepFinished, StepStarted, ToolCalled, execute_run
-from ..runner.cost import DailyCostLimitReached, limit_from
-from ..validation import DefinitionRefused, check_runnable
+from ..contract import RunOut, RunStepOut, ToolCallOut
+from ..runner import RunFinished, StepFinished, StepStarted, ToolCalled, start_run_on_revision
+from ..runner.cost import DailyCostLimitReached
+from ..validation import DefinitionRefused
 
 log = logging.getLogger(__name__)
 
@@ -46,6 +45,10 @@ async def start_run(
     201 with the run, not the run's result: a team takes minutes, and a request held open
     for it would be a request that fails whenever the network does. What the operator
     watches afterwards is `/runs/{id}/events`, and what survives either way is the trace.
+
+    The checks and the start itself are `runner.start_run_on_revision` — the same
+    function the schedule/trigger clock calls once it has resolved its own revision
+    (design.md, "Uruchomienie przebiegu tą samą drogą co router").
     """
     pool = request.app.state.pool
     async with pool.acquire() as conn:
@@ -53,54 +56,21 @@ async def start_run(
     if revision is None:
         raise HTTPException(404, detail="no such team")
 
-    # Through the wire model rather than by parsing the JSONB here: `TeamRevisionOut` is
-    # already the one place that knows how a stored definition is read back.
-    definition = TeamRevisionOut.from_row(dict(revision)).definition
     try:
-        # The saved revision, checked again now — a model dropped from the configuration
-        # since it was saved is exactly what this is for (specs/teams-models). The tool
-        # half of the same question is asked by the engine, which needs a session to ask
-        # it with.
-        check_runnable(definition, model_ids=request.app.state.catalogue.ids())
-    except DefinitionRefused as err:
-        raise HTTPException(422, detail=str(err)) from err
-
-    # The daily ceiling, before anything is created — a run refused halfway is a run that
-    # already spent (specs/teams-usage, "Zespół wyczerpał granicę dobową"). Checked against
-    # what the team spent since midnight UTC: the module keeps one clock, and a limit that
-    # moved with the operator's own timezone would be a different limit in summer.
-    daily_limit = limit_from(definition.limits.daily_limit)
-    if daily_limit is not None:
-        midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
-        async with pool.acquire() as conn:
-            spent = await store.team_cost_since(
-                conn, team_id=team_id, owner_principal=owner, since=midnight
-            )
-        if spent >= daily_limit:
-            raise HTTPException(422, detail=str(DailyCostLimitReached(spent, daily_limit)))
-
-    async with pool.acquire() as conn:
-        run, _steps = await store.create_run(
-            conn,
-            team_revision_id=revision["id"],
-            owner_principal=owner,
-            agent_keys=[agent.key for agent in definition.agents],
-        )
-
-    registry = request.app.state.runs
-    task = asyncio.create_task(
-        execute_run(
+        run, _task = await start_run_on_revision(
             pool,
-            run_id=run["id"],
-            definition=definition,
+            revision=dict(revision),
+            owner_principal=owner,
+            catalogue=request.app.state.catalogue,
             provider=request.app.state.provider,
             tool_server=request.app.state.tools,
-            catalogue=request.app.state.catalogue,
             settings=request.app.state.settings,
-            registry=registry,
+            registry=request.app.state.runs,
         )
-    )
-    registry.register(run["id"], task)
+    except DefinitionRefused as err:
+        raise HTTPException(422, detail=str(err)) from err
+    except DailyCostLimitReached as err:
+        raise HTTPException(422, detail=str(err)) from err
     return RunOut.from_row(dict(run))
 
 

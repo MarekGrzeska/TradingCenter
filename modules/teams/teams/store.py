@@ -281,6 +281,14 @@ _SELECT_RUN = """
      WHERE id = $1 AND owner_principal = $2
 """
 
+# No owner filter — the caller already knows the run by an id it resolved itself (the
+# schedule/trigger clock, tracking a run it started, and matching `list_due_schedules`'
+# own reach across every owner). Not `get_run`'s job: that one exists precisely to
+# refuse a stranger's run, and this one has no stranger to refuse.
+_SELECT_RUN_STATUS = """
+    SELECT status FROM runs WHERE id = $1
+"""
+
 # Every run of one team, newest first — the runs of *all* its revisions, because that is
 # the comparison the module exists for (design.md, "Dwa przebiegi tej samej rewizji mają
 # być porównywalne", and two of different ones are the other half of it).
@@ -403,6 +411,10 @@ async def create_run(
 
 async def get_run(conn: Conn, *, run_id: int, owner_principal: str) -> asyncpg.Record | None:
     return await conn.fetchrow(_SELECT_RUN, run_id, owner_principal)
+
+
+async def get_run_status(conn: Conn, *, run_id: int) -> str | None:
+    return await conn.fetchval(_SELECT_RUN_STATUS, run_id)
 
 
 async def list_runs_for_team(
@@ -708,6 +720,14 @@ _CLAIM_DUE_SCHEDULE = f"""
     RETURNING {_SCHEDULE_COLUMNS}
 """
 
+# No owner filter — the clock (`scheduler/`) works across every operator's schedules at
+# once, the one place in this module that legitimately does. `enabled` rides in the
+# WHERE rather than being filtered in Python so the index on `(next_fire_at) WHERE
+# enabled` (migration `0005`) is what answers this, not a table scan.
+_SELECT_DUE_SCHEDULES = f"""
+    SELECT {_SCHEDULE_COLUMNS} FROM schedules WHERE enabled AND next_fire_at <= now()
+"""
+
 
 async def create_schedule(
     conn: Conn,
@@ -796,6 +816,12 @@ async def claim_due_schedule(
     return await conn.fetchrow(_CLAIM_DUE_SCHEDULE, schedule_id, next_fire_at)
 
 
+async def list_due_schedules(conn: Conn) -> list[asyncpg.Record]:
+    """Every enabled schedule due right now, across every owner — what one wake of the
+    clock works through before attempting to claim each (specs/teams-schedules)."""
+    return list(await conn.fetch(_SELECT_DUE_SCHEDULES))
+
+
 _TRIGGER_COLUMNS = """
     id, team_id, owner_principal, revision_mode, pinned_revision_id, tool_name,
     arguments, field_path, comparison, threshold, cooldown_seconds,
@@ -865,6 +891,10 @@ _CLAIM_TRIGGER_FOR_CHECK = f"""
     UPDATE triggers SET next_check_at = $2, updated_at = now()
      WHERE id = $1 AND enabled AND next_check_at <= now()
     RETURNING {_TRIGGER_COLUMNS}
+"""
+
+_SELECT_DUE_TRIGGERS = f"""
+    SELECT {_TRIGGER_COLUMNS} FROM triggers WHERE enabled AND next_check_at <= now()
 """
 
 # The edge-detection state itself: what the condition answered, and when it last fired.
@@ -992,6 +1022,12 @@ async def claim_trigger_for_check(
     return await conn.fetchrow(_CLAIM_TRIGGER_FOR_CHECK, trigger_id, next_check_at)
 
 
+async def list_due_triggers(conn: Conn) -> list[asyncpg.Record]:
+    """Every enabled trigger due for a check right now, across every owner — mirrors
+    `list_due_schedules`."""
+    return list(await conn.fetch(_SELECT_DUE_TRIGGERS))
+
+
 async def record_trigger_check(
     conn: Conn, *, trigger_id: int, result: bool | None, fired: bool
 ) -> asyncpg.Record:
@@ -1053,3 +1089,37 @@ async def list_fires_for_trigger(
     conn: Conn, *, trigger_id: int, owner_principal: str
 ) -> list[asyncpg.Record]:
     return list(await conn.fetch(_SELECT_FIRES_FOR_TRIGGER, trigger_id, owner_principal))
+
+
+# `runs` carries no `schedule_id`/`trigger_id` (design.md, "Trzy nowe tabele, zero zmian
+# w tabelach fazy 1") — the fire that started a run is the only record of which run
+# belongs to which schedule or trigger, so "is the previous run of this schedule still
+# working" is answered by walking back to the most recent `started` fire and reading the
+# status of the run it names, not by a join `runs` itself could ever offer.
+_LATEST_RUN_STATUS_FOR_SCHEDULE = """
+    SELECT r.status
+      FROM schedule_fires f
+      JOIN runs r ON r.id = f.run_id
+     WHERE f.schedule_id = $1 AND f.outcome = 'started'
+     ORDER BY f.fired_at DESC
+     LIMIT 1
+"""
+
+_LATEST_RUN_STATUS_FOR_TRIGGER = """
+    SELECT r.status
+      FROM schedule_fires f
+      JOIN runs r ON r.id = f.run_id
+     WHERE f.trigger_id = $1 AND f.outcome = 'started'
+     ORDER BY f.fired_at DESC
+     LIMIT 1
+"""
+
+
+async def latest_run_status_for_schedule(conn: Conn, *, schedule_id: int) -> str | None:
+    """`None` when this schedule has never started a run — never mistaken for "the run
+    finished", which is a real status (`completed`) and not the absence of one."""
+    return await conn.fetchval(_LATEST_RUN_STATUS_FOR_SCHEDULE, schedule_id)
+
+
+async def latest_run_status_for_trigger(conn: Conn, *, trigger_id: int) -> str | None:
+    return await conn.fetchval(_LATEST_RUN_STATUS_FOR_TRIGGER, trigger_id)
