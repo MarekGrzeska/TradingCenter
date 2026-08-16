@@ -269,6 +269,25 @@ function reachesBack(series: readonly Bar[], focus: ChartFocusRequest): boolean 
   return target !== null && series[0].time <= target;
 }
 
+/** The earliest moment a focus needs drawn before it can be shown in full, or null for
+ *  one that names no moment at all (`lastBars`, which is always at the newest end and can
+ *  only ever want *more* of what is already there).
+ *
+ *  Not simply `focus.from ?? focus.around`, which is what `reachesBack` asks: an
+ *  `around`+`bars` focus is centred, so half its candles sit *before* the moment it names.
+ *  Reading only as far back as `around` puts the target on the series' first bar, and a
+ *  frame centred there is the one the operator asked for shifted half a screen right.
+ *  Sized with `RESOLUTION_SECONDS`, which is an approximation — a generous one here, since
+ *  reading a little too far back costs candles nobody looks at and reading too little
+ *  costs the frame. */
+function focusNeedsBackTo(focus: ChartFocusRequest, resolution: Resolution): number | null {
+  if (focus.from !== null) return focus.from;
+  if (focus.around !== null && focus.bars !== null) {
+    return focus.around - Math.ceil(focus.bars / 2) * RESOLUTION_SECONDS[resolution];
+  }
+  return null;
+}
+
 /** Whether the drawn series has *any* candle the requested fragment could show — the
  *  weaker condition checked once the pager has given up, since a fragment only partly
  *  reached is still a fragment worth showing (`terminal-chart` spec, "Kadr na fragment
@@ -370,6 +389,9 @@ export function Chart({
   // The pan handler is attached once, with the chart; the pager it calls is
   // recreated whenever symbol, resolution or source change.
   const requestOlderRef = useRef<() => void>(() => {});
+  // The pager's other door: one read straight to a named moment, for a focus that would
+  // otherwise be walked to a page at a time (`useOlderBars`, `reachBack`).
+  const reachBackRef = useRef<(target: number) => void>(() => {});
   // The current price, drawn as a line with its own axis label — see
   // `syncPriceLine` for why the series' built-in one does not do.
   const priceLineRef = useRef<IPriceLine | null>(null);
@@ -812,10 +834,18 @@ export function Chart({
     [applyFocusToView, symbol, resolution],
   );
 
-  /** Applies `focus` now if the series already reaches back far enough; otherwise waits
-   *  for the pager, which `needsMore` (below) has been told to keep going for. Called
-   *  again once new history lands, since the first call often finds too little series to
-   *  even start the pager (`useOlderBars`'s own "at least two bars" floor). */
+  /** Applies `focus` now if the series already reaches back far enough; otherwise asks
+   *  the archive for what is missing and waits.
+   *
+   *  A focus that names a moment is fetched in one read of exactly the window between
+   *  that moment and the oldest drawn bar (`reachBack`) — not walked to by the pager,
+   *  which moves about a day of calendar per page on MINUTE_5 and stops after twenty of
+   *  them. Walking is right for a drag to the left edge, where the destination is "a bit
+   *  more"; it is wrong for "the middle of March", where the destination is known before
+   *  the first request and five months away.
+   *
+   *  `lastBars` names no moment and keeps the walk: it wants more of the newest end, which
+   *  is what the pager's own margin is already for. */
   const pursueFocus = useCallback(
     (focus: ChartFocusRequest) => {
       if (reachesBack(barsRef.current, focus)) {
@@ -823,9 +853,11 @@ export function Chart({
         return;
       }
       pendingFocusRef.current = focus;
-      requestOlderRef.current();
+      const target = focusNeedsBackTo(focus, resolution);
+      if (target === null) requestOlderRef.current();
+      else reachBackRef.current(target);
     },
-    [settlePendingFocus],
+    [settlePendingFocus, resolution],
   );
 
   useEffect(() => {
@@ -1445,6 +1477,7 @@ export function Chart({
   const feed = useBarFeed(source, symbol, resolution, sink);
   const older = useOlderBars(source, symbol, resolution, olderReader);
   requestOlderRef.current = older.requestOlder;
+  reachBackRef.current = older.reachBack;
 
   /** The rare case `applyOlder`'s own check cannot see: the pager walked every empty
    *  window and delivered nothing at all, or failed outright, so no page ever arrived to

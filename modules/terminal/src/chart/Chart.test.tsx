@@ -739,15 +739,59 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
     expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
   });
 
-  it("settles a focus the pager ran out of pages before reaching", async () => {
-    // Every page makes progress, so neither of `applyOlder`'s own conditions ever fires —
-    // the pager simply hits its own `MAX_PAGES` budget with the focus still out of reach.
-    // Before `stoppedShort`, the request sat in `pendingFocusRef` unsettled: the chart
-    // never moved, `onFocusRequestSettled` never fired, and the grid store went on
-    // offering the same request until the symbol changed.
-    source.historyPages = Array.from({ length: 20 }, (_, index) => [
-      bar(100 - (index + 1) * 60, 0.5),
-    ]);
+  it("asks for the whole window to a distant focus in one read, not a page at a time", async () => {
+    // The bug this exists for: the pager walks about a day of calendar per page on
+    // MINUTE_5 and stops after twenty of them, so a focus five months back was never
+    // reached — the chart landed on wherever the walk had got to and looked like it had
+    // moved on purpose. A named moment is asked for once, by name.
+    source.historyPages = [olderPage(60)];
+    const focus: ChartFocusRequest = {
+      from: -1_000_000,
+      to: 220,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    expect(source.historyCalls).toHaveLength(1);
+    // The window between the moment asked for and the oldest bar drawn — not a page-sized
+    // step back from the drawn edge.
+    expect(source.historyCalls[0]).toMatchObject({ from: -1_000_000, to: 100 });
+  });
+
+  it("reads back past an around/bars focus by the half of it that sits before the moment", async () => {
+    // A centred frame needs candles on both sides. Reading only as far back as `around`
+    // puts it on the series' first bar, and the frame the operator asked for comes out
+    // shifted half a screen to the right.
+    const focus: ChartFocusRequest = {
+      from: null,
+      to: null,
+      around: -50_000,
+      bars: 100,
+      lastBars: null,
+    };
+    source.historyPages = [olderPage(60)];
+    renderChart(source, { focusRequest: focus, resolution: "MINUTE_5" });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    // 50 candles of MINUTE_5 before the moment named: 50 * 300 seconds.
+    expect(source.historyCalls[0]).toMatchObject({ from: -50_000 - 15_000, to: 100 });
+  });
+
+  it("settles a focus the archive has no candles far enough back for", async () => {
+    // One read is the whole attempt, so the wait ends either way. Before `stoppedShort`
+    // the request sat in `pendingFocusRef` unsettled: the chart never moved,
+    // `onFocusRequestSettled` never fired, and the grid store went on offering the same
+    // request until the symbol changed.
+    source.historyPages = [olderPage(60)]; // reaches -3500, nowhere near the target
     const focus: ChartFocusRequest = {
       from: -1_000_000,
       to: 220,
