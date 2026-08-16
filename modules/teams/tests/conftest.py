@@ -21,10 +21,17 @@ MODULE_ROOT = Path(__file__).resolve().parent.parent
 # Docker Desktop for macOS, and the container fixture already stops cleanly on its own.
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
-# No tables yet — this phase ships the migration machinery against zero revisions. A
-# later change fills this in as its own migration lands, the same way agent's own
-# TABLES grew with each change that added a table.
-TABLES: tuple[str, ...] = ()
+# Children before parents: `usage` and `tool_calls` both reference `run_steps`,
+# `run_steps` references `runs`, `runs` references `team_revisions`, `team_revisions`
+# references `teams` — the same convention agent's own TABLES follows.
+TABLES: tuple[str, ...] = (
+    "usage",
+    "tool_calls",
+    "run_steps",
+    "runs",
+    "team_revisions",
+    "teams",
+)
 
 DOCKER_PING_TIMEOUT = 15
 
@@ -82,9 +89,6 @@ def migrated_url(postgres_url: str) -> str:
     """The same database with the module's migrations applied — through the same
     function the module runs at startup, so the schema under test is the one a
     deployment actually applies rather than a second arrangement that resembles it.
-
-    A no-op today: there are zero migrations, so this only proves the machinery runs
-    end to end against a real database without raising.
     """
     from teams.migrate import upgrade_to_head
 
