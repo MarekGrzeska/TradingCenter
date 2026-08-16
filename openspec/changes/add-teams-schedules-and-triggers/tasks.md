@@ -165,8 +165,11 @@ Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń p
 
 ## 8. Domknięcie
 
-- [ ] 8.1 Uzgodnienie z fazą 2, jeśli scala się jako druga: przenumerowanie rewizji Alembica
-  i `down_revision`, ponowne `pnpm contract:generate`
+- [x] 8.1 Uzgodnienie z fazą 2 — zrobione, tyle że w drugą stronę: to faza 2 scaliła się
+  jako druga, więc jej `0004_trades` została przenumerowana na `0006` nad
+  `0005_schedules_and_triggers`. Przy okazji zegar przeszedł na `ToolServerRegistry`, a
+  narzędzie wyzwalacza jest rozwiązywane przez serwer, który je ogłasza, zamiast przez
+  jedyny, jaki wcześniej istniał.
 - [ ] 8.2 Przebieg od końca do końca na uruchomionym stosie: harmonogram co kilka minut,
   jedno wyzwolenie pominięte celowo (drugi przebieg w trakcie), jedno wyzwolenie warunkowe
 - [ ] 8.3 `review.md`

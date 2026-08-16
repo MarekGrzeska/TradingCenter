@@ -172,7 +172,9 @@
 
 ## 8. Terminal
 
-- [ ] 8.1 `pnpm contract:generate` po zmianach w `teams/contract.py`
+- [x] 8.1 `pnpm contract:generate` po zmianach w `teams/contract.py` — zrobione przy
+  scaleniu fazy 2 do `feat/teams-platform`; plik niesie teraz oba wiersze naraz, handlowy
+  i harmonogramowy
 - [ ] 8.2 Granice handlowe w panelu zespołu; odmowa zapisu pokazana przy agencie
 - [ ] 8.3 Narzędzia zapisujące odróżnione od czytających w wybieraku narzędzi
 - [ ] 8.4 Zlecenia przebiegu przy agencie, który je złożył — symbol, kierunek, wielkość, skutek
