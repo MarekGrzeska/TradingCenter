@@ -520,7 +520,16 @@ export function Chart({
 
   // The array alone, not the whole prop: a caller that rebuilds the object every render
   // (the grid slot does) must not make the sync effect below run every render with it.
-  const drawnObjects = drawings?.items ?? EMPTY_DRAWINGS;
+  const allObjects = drawings?.items ?? EMPTY_DRAWINGS;
+  // What the chart draws, against what the instrument carries — two different questions.
+  // A hidden object is as absent from the canvas as one that was removed: it occludes no
+  // candles, puts nothing on the price axis and cannot be clicked (`terminal-chart` spec,
+  // "Zgaszony obiekt nie jest rysowany"). The list below gets `allObjects`, because it is
+  // the only way back to a hidden one.
+  const drawnObjects = useMemo(
+    () => (allObjects.some((drawing) => drawing.hidden) ? allObjects.filter((d) => !d.hidden) : allObjects),
+    [allObjects],
+  );
 
   // --- the object the operator picked out, by its own id.
   //
@@ -533,7 +542,11 @@ export function Chart({
     null,
   );
   const selectedId = selected?.id ?? null;
-  const selectedDrawing = drawnObjects.find((drawing) => drawing.id === selectedId) ?? null;
+  // From the whole list, not from what is drawn: hiding the picked object leaves its card
+  // open with the button flipped to bring it back, because the nearest way to undo has to
+  // be where the action happened (design.md, "Zaznaczenie wskazuje obiekt z zapisu, nie
+  // z płótna").
+  const selectedDrawing = allObjects.find((drawing) => drawing.id === selectedId) ?? null;
 
   // The objects of the previous instrument are not on the chart any more, so nothing of
   // theirs can be picked out (`terminal-chart-objects` spec, "Zmiana symbolu przy
@@ -543,12 +556,14 @@ export function Chart({
   }, [symbol]);
 
   // An object removed while picked — by the card, by the list, or by the agent's own next
-  // turn — takes the selection with it: what is not there cannot be pointed at.
+  // turn — takes the selection with it: what is not there cannot be pointed at. Hiding is
+  // deliberately not that: the object is still on the instrument, so it can still be the
+  // one being looked at.
   useEffect(() => {
     setSelected((current) =>
-      current === null || drawnObjects.some((drawing) => drawing.id === current.id) ? current : null,
+      current === null || allObjects.some((drawing) => drawing.id === current.id) ? current : null,
     );
-  }, [drawnObjects]);
+  }, [allObjects]);
 
   useEffect(() => {
     if (selectedId === null) return;

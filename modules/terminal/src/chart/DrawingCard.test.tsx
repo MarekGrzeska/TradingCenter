@@ -10,6 +10,7 @@ function drawing(
   id: number,
   geometry: AgentChartDrawing["geometry"],
   label: string | null = "weekly high",
+  hidden = false,
 ): AgentChartDrawing {
   return {
     id,
@@ -17,6 +18,7 @@ function drawing(
     geometry,
     label,
     color: null,
+    hidden,
     createdAt: 1767398400,
     updatedAt: 1767398400,
   };
@@ -156,5 +158,53 @@ describe("DrawingCard — where it stands", () => {
   it("takes a corner of its own for an object chosen from the list", () => {
     // Nothing on the chart was clicked, so there is no pointer to sit beside.
     expect(cardPosition(null, pane)).toEqual({ left: 12, top: 12 });
+  });
+});
+
+describe("DrawingCard — hiding, which is not removing", () => {
+  it("hides through the same patch route a price correction takes", async () => {
+    const patch = vi.fn(async () => null);
+    show(A_LEVEL, drawings({ patch }));
+
+    await userEvent.click(screen.getByLabelText("Hide drawing 1"));
+
+    expect(patch).toHaveBeenCalledWith(1, { hidden: true });
+  });
+
+  it("offers to bring a hidden object back, and says it is hidden", async () => {
+    const patch = vi.fn(async () => null);
+    const hidden = { ...A_LEVEL, hidden: true };
+    show(hidden, drawings({ items: [hidden], patch }));
+
+    expect(screen.getByTestId("drawing-card-1")).toHaveTextContent(/hidden/i);
+    await userEvent.click(screen.getByLabelText("Show drawing 1"));
+
+    expect(patch).toHaveBeenCalledWith(1, { hidden: false });
+  });
+
+  it("does not close the card, the way removing does", async () => {
+    // The card is where the operator hid it, so the nearest way back is there too
+    // (`terminal-chart-objects` spec, "Zgaszenie z opisu"). The card stays mounted; what
+    // takes it away is the object leaving the instrument, which hiding does not do.
+    const onClose = vi.fn();
+    render(
+      <DrawingCard drawing={A_LEVEL} drawings={drawings()} at={{ x: 10, y: 10 }} onClose={onClose} />,
+    );
+
+    await userEvent.click(screen.getByLabelText("Hide drawing 1"));
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByTestId("drawing-card-1")).toBeInTheDocument();
+  });
+
+  it("says a failed hiding failed, and leaves the object alone", async () => {
+    const patch = vi.fn(async () => "the agent module is not reachable");
+    show(A_LEVEL, drawings({ patch }));
+
+    await userEvent.click(screen.getByLabelText("Hide drawing 1"));
+
+    expect(await screen.findByText("the agent module is not reachable")).toBeInTheDocument();
+    // Still offering to hide, because it is still not hidden.
+    expect(screen.getByLabelText("Hide drawing 1")).toBeInTheDocument();
   });
 });

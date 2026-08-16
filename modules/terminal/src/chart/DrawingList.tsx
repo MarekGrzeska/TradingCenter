@@ -100,16 +100,29 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
                   key={drawing.id}
                   data-testid={`drawing-${drawing.id}`}
                   aria-current={selectedId === drawing.id}
+                  data-hidden={drawing.hidden}
                   className={
-                    selectedId === drawing.id
+                    (selectedId === drawing.id
                       ? "rounded border border-primary bg-panel-strong px-2 py-1"
-                      : "rounded border border-border px-2 py-1"
+                      : "rounded border border-border px-2 py-1") +
+                    // Faded, but never dropped: this list is the only way back to a
+                    // hidden object, so one that left it would be hidden for good
+                    // (`terminal-chart` spec, "Operator zarządza naniesionymi obiektami
+                    // z listy").
+                    (drawing.hidden ? " opacity-60" : "")
                   }
                 >
                   <div className="flex items-baseline gap-2">
                     <span className="text-[10px] tracking-wide text-secondary uppercase">
                       {shapeLabel(drawing)}
                     </span>
+                    {drawing.hidden && (
+                      // Said in a word rather than by the fading alone: the operator has
+                      // to be able to tell "hidden" from "not selected".
+                      <span className="text-[10px] tracking-wide text-warning uppercase">
+                        hidden
+                      </span>
+                    )}
                     <span className="text-xs text-ink">{priceSummary(drawing)}</span>
                     {drawing.label && (
                       <span className="truncate text-xs text-ink-muted">{drawing.label}</span>
@@ -127,6 +140,21 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
                         className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong"
                       >
                         Edit
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy === drawing.id}
+                        aria-label={
+                          drawing.hidden ? `Show drawing ${drawing.id}` : `Hide drawing ${drawing.id}`
+                        }
+                        onClick={() =>
+                          void act(drawing.id, () =>
+                            drawings.patch(drawing.id, { hidden: !drawing.hidden }),
+                          )
+                        }
+                        className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong disabled:opacity-50"
+                      >
+                        {drawing.hidden ? "Show" : "Hide"}
                       </button>
                       <button
                         type="button"

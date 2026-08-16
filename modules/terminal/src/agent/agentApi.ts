@@ -139,6 +139,10 @@ export interface AgentChartDrawing {
   geometry: AgentDrawingGeometry;
   label: string | null;
   color: string | null;
+  /** Whether the chart draws it. Hidden is not removed: the object keeps everything else
+   *  it has and comes back exactly as it was (`agent-chart-drawings` spec, "Zapalony
+   *  rysunek jest tym samym rysunkiem"). */
+  hidden: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -154,6 +158,9 @@ export interface AgentDrawingPatch {
   aPrice?: number;
   bPrice?: number;
   label?: string;
+  /** Hiding travels this route rather than one of its own: it is a correction of the
+   *  drawing like any other, and an absent field keeps meaning "leave it". */
+  hidden?: boolean;
 }
 
 /** What the terminal is drawing as it asks — context for one turn, never a message.
@@ -325,6 +332,7 @@ interface RawDrawing {
   geometry: Record<string, unknown> & { kind: string };
   label: string | null;
   color: string | null;
+  hidden?: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -372,19 +380,26 @@ function mapDrawing(raw: RawDrawing): AgentChartDrawing | null {
     geometry,
     label: raw.label,
     color: raw.color,
+    // An absent field reads as lit, never as an object to leave off the chart: a terminal
+    // deployed ahead of the module would otherwise draw an empty instrument for the
+    // length of one deploy (design.md, "Terminal wdrożony przed agentem").
+    hidden: raw.hidden ?? false,
     createdAt: parseIsoToEpochSeconds(raw.created_at),
     updatedAt: parseIsoToEpochSeconds(raw.updated_at),
   };
 }
 
-function drawingPatchToWire(patch: AgentDrawingPatch): Record<string, number | string> {
-  const wire: Record<string, number | string> = {};
+function drawingPatchToWire(
+  patch: AgentDrawingPatch,
+): Record<string, number | string | boolean> {
+  const wire: Record<string, number | string | boolean> = {};
   if (patch.price !== undefined) wire.price = patch.price;
   if (patch.top !== undefined) wire.top = patch.top;
   if (patch.bottom !== undefined) wire.bottom = patch.bottom;
   if (patch.aPrice !== undefined) wire.a_price = patch.aPrice;
   if (patch.bPrice !== undefined) wire.b_price = patch.bPrice;
   if (patch.label !== undefined) wire.label = patch.label;
+  if (patch.hidden !== undefined) wire.hidden = patch.hidden;
   return wire;
 }
 

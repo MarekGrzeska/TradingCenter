@@ -3,13 +3,19 @@ import type { AgentApi, AgentChartDrawing, AgentDrawingPatch } from "./agentApi"
 import { createDrawingsStore, describeDrawingsChange } from "./drawingsStore";
 import { MarketDataError } from "../data/types";
 
-function level(id: number, price: number, symbol = "US100"): AgentChartDrawing {
+function level(
+  id: number,
+  price: number,
+  symbol = "US100",
+  hidden = false,
+): AgentChartDrawing {
   return {
     id,
     symbol,
     geometry: { kind: "level", price, at: null },
     label: null,
     color: null,
+    hidden,
     createdAt: 1767398400,
     updatedAt: 1767398400,
   };
@@ -174,5 +180,51 @@ describe("describeDrawingsChange", () => {
     expect(describeDrawingsChange({ added: 2, removed: 1 })).toBe(
       "The agent drew 2 objects and removed 1 on the chart.",
     );
+  });
+});
+
+describe("drawingsStore — hiding", () => {
+  it("hides through patch and re-reads, rather than editing the copy in hand", async () => {
+    const patchDrawing = vi.fn(async () => level(1, 21500, "US100", true));
+    const listDrawings = vi
+      .fn()
+      .mockResolvedValueOnce([level(1, 21500)])
+      .mockResolvedValueOnce([level(1, 21500, "US100", true)]);
+    const store = createDrawingsStore(fakeApi({ listDrawings, patchDrawing }));
+    store.ensureLoaded("US100");
+    await vi.waitFor(() => expect(store.getSnapshot().US100.status).toBe("ready"));
+
+    expect(await store.patch(1, { hidden: true })).toBeNull();
+
+    expect(patchDrawing).toHaveBeenCalledWith(1, { hidden: true }, expect.anything());
+    // The module is the record; this is what it answered on the second read.
+    expect(store.getSnapshot().US100.drawings[0].hidden).toBe(true);
+  });
+
+  it("says a failed hiding failed and leaves the list as it was", async () => {
+    const patchDrawing = vi.fn(async () => {
+      throw new MarketDataError("not-found", "no drawing #1");
+    });
+    const listDrawings = vi.fn(async () => [level(1, 21500)]);
+    const store = createDrawingsStore(fakeApi({ listDrawings, patchDrawing }));
+    store.ensureLoaded("US100");
+    await vi.waitFor(() => expect(store.getSnapshot().US100.status).toBe("ready"));
+
+    expect(await store.patch(1, { hidden: true })).toBe("no drawing #1");
+    expect(store.getSnapshot().US100.drawings[0].hidden).toBe(false);
+  });
+
+  it("counts a hidden object as still there, not as removed", async () => {
+    // The panel's sentence after a turn is about what appeared and went; hiding is
+    // neither, and reporting it as a removal would be a claim the record contradicts.
+    const listDrawings = vi
+      .fn()
+      .mockResolvedValueOnce([level(1, 21500)])
+      .mockResolvedValueOnce([level(1, 21500, "US100", true)]);
+    const store = createDrawingsStore(fakeApi({ listDrawings }));
+    store.ensureLoaded("US100");
+    await vi.waitFor(() => expect(store.getSnapshot().US100.status).toBe("ready"));
+
+    expect(await store.refresh("US100")).toEqual({ added: 0, removed: 0 });
   });
 });

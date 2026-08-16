@@ -10,6 +10,7 @@ function drawing(
   id: number,
   geometry: AgentChartDrawing["geometry"],
   label: string | null = null,
+  hidden = false,
 ): AgentChartDrawing {
   return {
     id,
@@ -17,6 +18,7 @@ function drawing(
     geometry,
     label,
     color: null,
+    hidden,
     createdAt: 1767398400,
     updatedAt: 1767398400,
   };
@@ -225,5 +227,53 @@ describe("DrawingList — one selection, shared with the chart", () => {
     await open(props(), null);
 
     expect(screen.getByTestId("drawing-1")).toHaveAttribute("aria-current", "false");
+  });
+});
+
+describe("DrawingList — hiding without removing", () => {
+  const HIDDEN = { ...A_LEVEL, hidden: true };
+
+  it("hides a row's object through patch, not through remove", async () => {
+    const patch = vi.fn(async () => null);
+    const remove = vi.fn(async () => null);
+    await open(props({ patch, remove }));
+
+    await userEvent.click(screen.getByLabelText("Hide drawing 1"));
+
+    expect(patch).toHaveBeenCalledWith(1, { hidden: true });
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("keeps a hidden object on the list, marked out and offering to bring it back", async () => {
+    // The list is the only way back to a hidden object, so one that dropped off it would
+    // be hidden for good (`terminal-chart` spec, "Operator zarządza naniesionymi obiektami
+    // z listy").
+    const patch = vi.fn(async () => null);
+    await open(props({ items: [HIDDEN], patch }));
+
+    const row = screen.getByTestId("drawing-1");
+    expect(row).toHaveAttribute("data-hidden", "true");
+    expect(row).toHaveTextContent(/hidden/i);
+
+    await userEvent.click(screen.getByLabelText("Show drawing 1"));
+    expect(patch).toHaveBeenCalledWith(1, { hidden: false });
+  });
+
+  it("an instrument with everything hidden does not read as an empty one", async () => {
+    // `terminal-chart` spec, "Instrument z samymi zgaszonymi obiektami".
+    await open(props({ items: [HIDDEN] }));
+
+    expect(screen.queryByText("Nothing is drawn on this instrument.")).toBeNull();
+    expect(screen.getByTestId("drawing-1")).toBeInTheDocument();
+  });
+
+  it("says a failed hiding failed and leaves the row lit", async () => {
+    const patch = vi.fn(async () => "the agent module is not reachable");
+    await open(props({ patch }));
+
+    await userEvent.click(screen.getByLabelText("Hide drawing 1"));
+
+    expect(await screen.findByText("the agent module is not reachable")).toBeInTheDocument();
+    expect(screen.getByTestId("drawing-1")).toHaveAttribute("data-hidden", "false");
   });
 });

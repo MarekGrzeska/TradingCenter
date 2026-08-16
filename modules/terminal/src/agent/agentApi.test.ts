@@ -558,6 +558,7 @@ describe("agentApi drawings", () => {
         geometry: { kind: "level", price: 21500, at: 1767430800 },
         label: "weekly high",
         color: "--color-up",
+        hidden: false,
         createdAt: 1767398400,
         updatedAt: 1767398400,
       },

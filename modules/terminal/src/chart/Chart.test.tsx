@@ -2851,13 +2851,18 @@ describe("Chart — objects drawn on the instrument (terminal-chart spec, agent-
     return stub.latest().series.find((s) => s.type === "Candlestick")!;
   }
 
-  function drawing(id: number, geometry: AgentChartDrawing["geometry"]): AgentChartDrawing {
+  function drawing(
+    id: number,
+    geometry: AgentChartDrawing["geometry"],
+    hidden = false,
+  ): AgentChartDrawing {
     return {
       id,
       symbol: "US100",
       geometry,
       label: null,
       color: null,
+      hidden,
       createdAt: 1767398400,
       updatedAt: 1767398400,
     };
@@ -2980,13 +2985,18 @@ describe("Chart — objects drawn on the instrument (terminal-chart spec, agent-
 });
 
 describe("Chart — picking an object out of the chart (terminal-chart-objects spec)", () => {
-  function drawing(id: number, geometry: AgentChartDrawing["geometry"]): AgentChartDrawing {
+  function drawing(
+    id: number,
+    geometry: AgentChartDrawing["geometry"],
+    hidden = false,
+  ): AgentChartDrawing {
     return {
       id,
       symbol: "US100",
       geometry,
       label: "weekly high",
       color: null,
+      hidden,
       createdAt: 1767398400,
       updatedAt: 1767398400,
     };
@@ -3137,5 +3147,156 @@ describe("Chart — picking an object out of the chart (terminal-chart-objects s
     );
 
     await waitFor(() => expect(screen.queryByTestId("drawing-card-1")).toBeNull());
+  });
+});
+
+describe("Chart — a hidden object is not drawn (terminal-chart spec)", () => {
+  function drawing(
+    id: number,
+    geometry: AgentChartDrawing["geometry"],
+    hidden = false,
+  ): AgentChartDrawing {
+    return {
+      id,
+      symbol: "US100",
+      geometry,
+      label: "weekly high",
+      color: null,
+      hidden,
+      createdAt: 1767398400,
+      updatedAt: 1767398400,
+    };
+  }
+
+  function chartDrawings(items: AgentChartDrawing[]): ChartDrawings {
+    return {
+      items,
+      status: "ready",
+      error: null,
+      remove: vi.fn(async () => null),
+      patch: vi.fn(async () => null),
+    };
+  }
+
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const LIT = drawing(1, { kind: "level", price: 110, at: null });
+  const DARK = drawing(2, { kind: "level", price: 120, at: null }, true);
+
+  it("gives a hidden object no primitive at all", async () => {
+    // As absent from the canvas as one that was removed: it occludes no candles and puts
+    // nothing on the price axis (`terminal-chart` spec, "Zgaszony obiekt nie jest
+    // rysowany").
+    renderChart(source, { drawings: chartDrawings([LIT, DARK]) });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("takes the primitive off when an object is hidden, and gives it back on show", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings([LIT, drawing(2, { kind: "level", price: 120, at: null })]),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(2));
+    const kept = priceSeries().primitives[0];
+
+    const shown = (
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([LIT, DARK])}
+      />
+    );
+    rerender(shown);
+    // The object beside it is untouched — same instance, so its colour cannot have moved
+    // either (`terminal-chart` spec, "Kolor obiektu po zgaszeniu innego").
+    await waitFor(() => expect(priceSeries().primitives).toEqual([kept]));
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([LIT, drawing(2, { kind: "level", price: 120, at: null })])}
+      />,
+    );
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(2));
+  });
+
+  it("keeps the picked object's card open when it is hidden", async () => {
+    // Hiding is undoable, so the nearest way back stays where the action happened
+    // (`terminal-chart-objects` spec, "Zgaszenie z opisu").
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings([LIT, drawing(2, { kind: "level", price: 120, at: null })]),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await act(async () => {
+      stub.latest().click({ hoveredObjectId: "2", point: { x: 120, y: 90 } });
+    });
+    await screen.findByTestId("drawing-card-2");
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([LIT, DARK])}
+      />,
+    );
+
+    const card = await screen.findByTestId("drawing-card-2");
+    expect(card).toHaveTextContent(/hidden/i);
+    // Named by its aria-label, which carries the id — the visible word is "Show".
+    expect(within(card).getByLabelText("Show drawing 2")).toBeInTheDocument();
+  });
+
+  it("still lets go of an object that is removed while picked", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings([LIT, drawing(2, { kind: "level", price: 120, at: null })]),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await act(async () => {
+      stub.latest().click({ hoveredObjectId: "2", point: { x: 120, y: 90 } });
+    });
+    await screen.findByTestId("drawing-card-2");
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([LIT])}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-2")).toBeNull());
+  });
+
+  it("shows a hidden object on the list, so there is a way back to it", async () => {
+    renderChart(source, { drawings: chartDrawings([LIT, DARK]) });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await userEvent.click(screen.getByLabelText("Drawn objects"));
+
+    expect(screen.getByTestId("drawing-2")).toHaveAttribute("data-hidden", "true");
+    expect(screen.getByLabelText("Show drawing 2")).toBeInTheDocument();
   });
 });

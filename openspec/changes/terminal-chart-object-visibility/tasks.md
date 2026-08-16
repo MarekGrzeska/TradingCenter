@@ -23,29 +23,29 @@
 
 ## 3. Terminal — druty i sklep
 
-- [ ] 3.1 `src/agent/agentApi.ts`: `hidden` na kształcie rysunku i w łatce; brak pola na drucie czytany jako zapalony, nie jako brak obiektu
-- [ ] 3.2 `src/agent/drawingsStore.ts`: `setHidden(id, hidden)` obok `remove` i `patch`, z tą samą umową „null albo zdanie o niepowodzeniu”
-- [ ] 3.3 Testy sklepu: zgaszenie idzie do modułu i sklep czyta na nowo; nieudane zostawia stan bez zmian
+- [x] 3.1 `src/agent/agentApi.ts`: `hidden` na kształcie rysunku i w łatce; brak pola na drucie czytany jako zapalony, nie jako brak obiektu
+- [x] 3.2 `src/agent/drawingsStore.ts`: `setHidden(id, hidden)` obok `remove` i `patch`, z tą samą umową „null albo zdanie o niepowodzeniu”
+- [x] 3.3 Testy sklepu: zgaszenie idzie do modułu i sklep czyta na nowo; nieudane zostawia stan bez zmian
 
 ## 4. Terminal — wykres
 
-- [ ] 4.1 `Chart.tsx`: prymitywy budowane z zapalonych, lista dostaje całość
-- [ ] 4.2 Zgaszony obiekt nie ma prymitywu, więc nie trafia i nie stawia etykiety przy osi — bez nowej gałęzi w prymitywach
-- [ ] 4.3 Wskazanie przeżywa zgaszenie, ale nie usunięcie
-- [ ] 4.4 Testy `Chart.test.tsx`: zgaszony nie jest rysowany, kliknięcie w jego miejsce nic nie wskazuje, kolory pozostałych bez zmian po zgaszeniu, wskazanie po zgaszeniu
+- [x] 4.1 `Chart.tsx`: prymitywy budowane z zapalonych, lista dostaje całość
+- [x] 4.2 Zgaszony obiekt nie ma prymitywu, więc nie trafia i nie stawia etykiety przy osi — bez nowej gałęzi w prymitywach
+- [x] 4.3 Wskazanie przeżywa zgaszenie, ale nie usunięcie
+- [x] 4.4 Testy `Chart.test.tsx`: zgaszony nie jest rysowany, kliknięcie w jego miejsce nic nie wskazuje, kolory pozostałych bez zmian po zgaszeniu, wskazanie po zgaszeniu
 
 ## 5. Terminal — lista i karta
 
-- [ ] 5.1 `DrawingList.tsx`: przełącznik przy wierszu, wiersz zgaszonego wyraźnie oznaczony
-- [ ] 5.2 Instrument z samymi zgaszonymi nie czyta się jak instrument bez obiektów
-- [ ] 5.3 `DrawingCard.tsx`: „Zgaś”/„Zapal” obok „Usuń”, karta zostaje otwarta po zgaszeniu
-- [ ] 5.4 Nieudane zgaszenie zostawia obiekt zapalony i mówi o tym — w obu miejscach
-- [ ] 5.5 Testy `DrawingList.test.tsx` i `DrawingCard.test.tsx`: gaszenie, zapalanie, nieudane gaszenie, karta po zgaszeniu, lista samych zgaszonych
+- [x] 5.1 `DrawingList.tsx`: przełącznik przy wierszu, wiersz zgaszonego wyraźnie oznaczony
+- [x] 5.2 Instrument z samymi zgaszonymi nie czyta się jak instrument bez obiektów
+- [x] 5.3 `DrawingCard.tsx`: „Zgaś”/„Zapal” obok „Usuń”, karta zostaje otwarta po zgaszeniu
+- [x] 5.4 Nieudane zgaszenie zostawia obiekt zapalony i mówi o tym — w obu miejscach
+- [x] 5.5 Testy `DrawingList.test.tsx` i `DrawingCard.test.tsx`: gaszenie, zapalanie, nieudane gaszenie, karta po zgaszeniu, lista samych zgaszonych
 
 ## 6. Domknięcie
 
-- [ ] 6.1 `pnpm test`, `pnpm lint`, `pnpm typecheck` w `modules/terminal`
-- [ ] 6.2 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright` w `modules/agent`
+- [x] 6.1 `pnpm test`, `pnpm lint`, `pnpm typecheck` w `modules/terminal`
+- [x] 6.2 `uv run pytest`, `uv run pytest -m db`, `uv run ruff check .`, `uv run pyright` w `modules/agent`
 - [ ] 6.3 Przejście ręką na żywym stacku: zgaszenie z listy i z karty, zapalenie z powrotem, przeżycie odświeżenia strony, zgaszenie przez agenta
-- [ ] 6.4 `openspec validate terminal-chart-object-visibility --strict`
+- [x] 6.4 `openspec validate terminal-chart-object-visibility --strict`
 - [ ] 6.5 `review.md` wg szablonu — bez niego zmiany nie da się zarchiwizować

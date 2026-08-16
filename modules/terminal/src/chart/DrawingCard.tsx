@@ -79,7 +79,10 @@ export function DrawingCard({ drawing, drawings, at, onClose }: DrawingCardProps
       </div>
 
       {drawing.label && <p className="mt-0.5 truncate text-xs text-ink-muted">{drawing.label}</p>}
-      <p className="text-[10px] text-secondary">drawn {formatInstant(drawing.createdAt)}</p>
+      <p className="text-[10px] text-secondary">
+        drawn {formatInstant(drawing.createdAt)}
+        {drawing.hidden && <span className="ml-1 text-warning uppercase">· hidden</span>}
+      </p>
 
       {failure !== null && (
         <p className="mt-1 rounded border border-critical/40 px-1.5 py-0.5 text-[10px] text-critical">
@@ -97,6 +100,18 @@ export function DrawingCard({ drawing, drawings, at, onClose }: DrawingCardProps
           className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong"
         >
           Edit
+        </button>
+        <button
+          type="button"
+          disabled={busy}
+          aria-label={drawing.hidden ? `Show drawing ${drawing.id}` : `Hide drawing ${drawing.id}`}
+          // The card stays open afterwards, with this button flipped: hiding is undoable,
+          // and the nearest way back has to be where the action happened rather than in
+          // the list (`terminal-chart-objects` spec, "Zgaszenie z opisu").
+          onClick={() => void act(() => drawings.patch(drawing.id, { hidden: !drawing.hidden }))}
+          className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong disabled:opacity-50"
+        >
+          {drawing.hidden ? "Show" : "Hide"}
         </button>
         <button
           type="button"
