@@ -13,7 +13,15 @@ function fakeContext() {
     save: vi.fn(),
     restore: vi.fn(),
     fillRect: vi.fn(),
+    strokeRect: vi.fn(),
+    fillText: vi.fn(),
+    measureText: vi.fn((text: string) => ({ width: text.length * 6 })),
+    setLineDash: vi.fn(),
     fillStyle: "",
+    strokeStyle: "",
+    lineWidth: 0,
+    font: "",
+    textBaseline: "",
     globalAlpha: 1,
   };
 }
@@ -94,7 +102,15 @@ describe("ZonePrimitive — coordinate resolution", () => {
     primitive.setZones([zone({ from: 100 as Time, to: 200 as Time, top: 110, bottom: 90 })]);
 
     expect(primitive.renderItems()).toEqual([
-      { open: false, xStart: 100, xEnd: 200, yTop: 110, yBottom: 90, color: COLORS.bullish },
+      {
+        open: false,
+        xStart: 100,
+        xEnd: 200,
+        yTop: 110,
+        yBottom: 90,
+        color: COLORS.bullish,
+        label: null,
+      },
     ]);
   });
 
@@ -272,5 +288,94 @@ describe("ZonePrimitive — drawing", () => {
     primitive.paneViews()[0]?.renderer()?.draw(target);
 
     expect(ctx.fillRect).not.toHaveBeenCalled();
+  });
+});
+
+describe("ZonePrimitive — an operator's own band (terminal-chart, terminal-chart-objects)", () => {
+  function drawnBand(overrides: Partial<DrawnZone> = {}) {
+    const primitive = new ZonePrimitive(COLORS, {
+      weight: "drawing",
+      objectId: "5",
+      palette: { onFill: "#000", support: "#up", resistance: "#down" },
+    });
+    attach(primitive);
+    primitive.setZones([zone(overrides)]);
+    return primitive;
+  }
+
+  it("outlines the band it draws, where an indicator's stays a bare wash", () => {
+    const drawn = drawnBand({ label: "supply" });
+    const drawnTarget = fakeTarget(400);
+    drawn.paneViews()[0].renderer()?.draw(drawnTarget.target);
+    expect(drawnTarget.ctx.strokeRect).toHaveBeenCalled();
+    expect(drawnTarget.ctx.lineWidth).toBe(2);
+    // The caption goes on a plate too — a band with no name is a coloured rectangle.
+    expect(drawnTarget.ctx.fillText).toHaveBeenCalledWith("supply", expect.any(Number), expect.any(Number));
+
+    const computed = new ZonePrimitive(COLORS);
+    attach(computed);
+    computed.setZones([zone()]);
+    const computedTarget = fakeTarget(400);
+    computed.paneViews()[0].renderer()?.draw(computedTarget.target);
+    expect(computedTarget.ctx.strokeRect).not.toHaveBeenCalled();
+  });
+
+  it("says both of its prices at the axis, each coloured by its own side", () => {
+    const drawn = drawnBand();
+    drawn.setCurrentPrice(100);
+    const [top, bottom] = drawn.priceAxisViews();
+    // Top 110 is above the price and bottom 90 below it, so one band can carry both roles
+    // at once — which is exactly what a band straddling the price is.
+    expect(top.backColor()).toBe("#down");
+    expect(bottom.backColor()).toBe("#up");
+  });
+
+  it("leaves the axis alone for an indicator's own zones", () => {
+    const computed = new ZonePrimitive(COLORS);
+    attach(computed);
+    computed.setZones([zone()]);
+    expect(computed.priceAxisViews()).toEqual([]);
+  });
+
+  it("is clicked anywhere inside its own rectangle, and nowhere outside it", () => {
+    // A shape with an area needs no tolerance margin the way a line does (design.md,
+    // "Tolerancja trafienia mieszka w `hitTest` każdego prymitywu").
+    const drawn = drawnBand();
+    expect(drawn.hitTest(150, 100)?.externalId).toBe("5");
+    expect(drawn.hitTest(150, 200)).toBeNull();
+    expect(drawn.hitTest(300, 100)).toBeNull();
+  });
+
+  it("is clicked to the right edge while it is still open", () => {
+    expect(drawnBand({ to: null }).hitTest(9000, 100)?.externalId).toBe("5");
+  });
+
+  it("never answers for an indicator's own zone", () => {
+    const computed = new ZonePrimitive(COLORS);
+    attach(computed);
+    computed.setZones([zone()]);
+    expect(computed.hitTest(150, 100)).toBeNull();
+  });
+});
+
+describe("ZonePrimitive — the band picked out (terminal-chart-objects spec)", () => {
+  function band(emphasis: "normal" | "selected" | "dimmed") {
+    const primitive = new ZonePrimitive(COLORS, { weight: "drawing", objectId: "5" });
+    attach(primitive);
+    primitive.setZones([zone()]);
+    primitive.setEmphasis(emphasis);
+    const { target, ctx } = fakeTarget(400);
+    primitive.paneViews()[0].renderer()?.draw(target);
+    return ctx;
+  }
+
+  it("draws the picked band with a wash around it, and the rest faded", () => {
+    // The picked one grows an outline and a wash; the others stand back, so "picked" is a
+    // state the operator can confirm by looking (`terminal-chart-objects` spec, "Wskazany
+    // obiekt widać, że jest wskazany").
+    expect(band("selected").strokeRect).toHaveBeenCalledTimes(2);
+    expect(band("normal").strokeRect).toHaveBeenCalledTimes(1);
+    expect(band("dimmed").strokeRect).toHaveBeenCalledTimes(1);
+    expect(band("dimmed").globalAlpha).toBeLessThan(band("normal").globalAlpha);
   });
 });

@@ -12,9 +12,14 @@ function fakeContext() {
     lineTo: vi.fn(),
     stroke: vi.fn(),
     fillText: vi.fn(),
+    fillRect: vi.fn(),
+    // A width proportional to the text, so a chip's own geometry is predictable in a
+    // test the way it is not in a real font metric.
+    measureText: vi.fn((text: string) => ({ width: text.length * 6 })),
     setLineDash: vi.fn(),
     strokeStyle: "",
     lineWidth: 0,
+    globalAlpha: 1,
     fillStyle: "",
     font: "",
     textBaseline: "",
@@ -241,6 +246,76 @@ describe("TrendlinePrimitive", () => {
     const { ctx, target } = fakeTarget(400);
     primitive.paneViews()[0].renderer()?.draw(target);
 
-    expect(ctx.fillText).toHaveBeenCalledWith("trend", 264, 46);
+    expect(ctx.fillText).toHaveBeenCalledWith("trend", 264, 40);
+  });
+});
+
+describe("TrendlinePrimitive — an operator's own line (terminal-chart-objects spec)", () => {
+  /** Rising from (40, 200) to (260, 50) on screen — the two ends the tests measure a
+   *  click against. */
+  function drawnLine() {
+    const primitive = new TrendlinePrimitive("#fff", {
+      weight: "drawing",
+      objectId: "8",
+      palette: { onFill: "#000", support: "#up", resistance: "#down" },
+    });
+    attach(
+      primitive,
+      new Map([
+        [100, 40],
+        [200, 260],
+      ]),
+      new Map([
+        [10, 200],
+        [20, 50],
+      ]),
+    );
+    primitive.setLines([aLine()]);
+    return primitive;
+  }
+
+  it("draws an operator's line heavier and unbroken", () => {
+    const drawn = drawnLine();
+    const { target, ctx } = fakeTarget(400);
+    drawn.paneViews()[0].renderer()?.draw(target);
+    expect(ctx.lineWidth).toBe(2);
+    expect(ctx.setLineDash).toHaveBeenCalledWith([]);
+  });
+
+  it("says both of its ends at the axis", () => {
+    const drawn = drawnLine();
+    drawn.setCurrentPrice(15);
+    const views = drawn.priceAxisViews();
+    expect(views).toHaveLength(2);
+    expect(views[0].backColor()).toBe("#up");
+    expect(views[1].backColor()).toBe("#down");
+  });
+
+  it("is clicked on the segment, and near it, but not past its ends", () => {
+    const drawn = drawnLine();
+    // The midpoint of the segment, and three pixels off it.
+    expect(drawn.hitTest(150, 125)?.externalId).toBe("8");
+    expect(drawn.hitTest(150, 128)?.externalId).toBe("8");
+    expect(drawn.hitTest(150, 160)).toBeNull();
+    // On the line the segment lies on, but beyond where it was drawn to: a trend line
+    // ends where the operator ended it (`terminal-chart` spec, "MUST NOT być przedłużana").
+    expect(drawn.hitTest(400, -45)).toBeNull();
+  });
+
+  it("never answers for a primitive with no object behind it", () => {
+    const primitive = new TrendlinePrimitive("#fff");
+    attach(
+      primitive,
+      new Map([
+        [100, 40],
+        [200, 260],
+      ]),
+      new Map([
+        [10, 200],
+        [20, 50],
+      ]),
+    );
+    primitive.setLines([aLine()]);
+    expect(primitive.hitTest(150, 125)).toBeNull();
   });
 });

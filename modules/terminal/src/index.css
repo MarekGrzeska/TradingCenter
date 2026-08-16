@@ -70,6 +70,20 @@
   --color-indicator-6: #008300;
   --color-indicator-7: #9085e9;
 
+  /* The objects the operator puts on an instrument, kept off the eight above: a
+   * drawn resistance in exactly EMA 200's colour is not a matter of taste but an
+   * object that cannot be told from something else entirely
+   * (`agent-chart-drawings` spec, "Paleta rysunków MUST być odrębna"). Four rather
+   * than eight because a drawing's colour comes from its own id, so any two of
+   * them can end up side by side — which is the validator's `--pairs all` list,
+   * and four is where that list still clears every gate on this surface (worst
+   * pair CVD ΔE 8.1, normal-vision 16.3). A fifth hue failed it every way it was
+   * tried, the same wall the eight-hue palette hits past its third slot. */
+  --color-drawing-1: #009fb4;
+  --color-drawing-2: #8f5ada;
+  --color-drawing-3: #7f9422;
+  --color-drawing-4: #d14f72;
+
   --font-sans:
     system-ui, -apple-system, "Segoe UI", sans-serif;
 }

@@ -5,11 +5,23 @@ import type {
   IPrimitivePaneView,
   ISeriesApi,
   ISeriesPrimitive,
+  ISeriesPrimitiveAxisView,
+  PrimitiveHoveredItem,
   SeriesAttachedParameter,
   SeriesType,
   Time,
 } from "lightweight-charts";
 
+import {
+  DrawingPriceAxisView,
+  defaultMarkPalette,
+  drawChip,
+  strokeSpec,
+  type Emphasis,
+  type MarkOptions,
+  type MarkPalette,
+  type MarkWeight,
+} from "./drawingStyle";
 import { timeToX } from "./timeCoordinates";
 
 /**
@@ -24,6 +36,9 @@ export interface DrawnZone {
   top: number;
   bottom: number;
   direction: "bullish" | "bearish" | null;
+  /** Only an operator's band carries one; an indicator's zones are named by the
+   *  indicator, not one by one. */
+  label?: string | null;
 }
 
 export interface ZoneColors {
@@ -44,20 +59,28 @@ interface ZoneRenderItem {
   yTop: number | null;
   yBottom: number | null;
   color: string;
+  label: string | null;
 }
 
 const FILL_ALPHA = 0.18;
 
 class ZonePaneRenderer implements IPrimitivePaneRenderer {
   private readonly items: readonly ZoneRenderItem[];
+  private readonly weight: MarkWeight;
+  private readonly emphasis: Emphasis;
+  private readonly palette: MarkPalette;
 
-  constructor(items: readonly ZoneRenderItem[]) {
-    this.items = items;
+  constructor(source: ZonePrimitive) {
+    this.items = source.renderItems();
+    this.weight = source.markWeight;
+    this.emphasis = source.emphasis;
+    this.palette = source.palette;
   }
 
   draw(target: CanvasRenderingTarget2D): void {
     target.useBitmapCoordinateSpace((scope) => {
       const ctx = scope.context;
+      const stroke = strokeSpec(this.weight, this.emphasis);
       for (const item of this.items) {
         if (item.xStart === null || item.yTop === null || item.yBottom === null) continue;
         if (!item.open && item.xEnd === null) continue;
@@ -70,10 +93,39 @@ class ZonePaneRenderer implements IPrimitivePaneRenderer {
         const yBottom = Math.max(item.yTop, item.yBottom) * scope.verticalPixelRatio;
 
         ctx.save();
-        ctx.globalAlpha = FILL_ALPHA;
+        ctx.globalAlpha = FILL_ALPHA * stroke.alpha;
         ctx.fillStyle = item.color;
         ctx.fillRect(xStart, yTop, Math.max(xEnd - xStart, 0), Math.max(yBottom - yTop, 1));
         ctx.restore();
+
+        // A band the operator drew gets its edges outlined at the drawing's own weight;
+        // a computed one stays the bare wash it always was. The fill alone carries no
+        // weight to tell the two apart with.
+        if (this.weight === "drawing") {
+          ctx.save();
+          ctx.strokeStyle = item.color;
+          if (stroke.halo > 0) {
+            // Outside the band's own edge and wider than it, the same wash the other two
+            // shapes wear when they are the one picked out.
+            ctx.globalAlpha = 0.3;
+            ctx.lineWidth = stroke.halo * scope.verticalPixelRatio;
+            ctx.setLineDash([]);
+            ctx.strokeRect(xStart, yTop, Math.max(xEnd - xStart, 0), Math.max(yBottom - yTop, 1));
+          }
+          ctx.globalAlpha = stroke.alpha;
+          ctx.lineWidth = stroke.lineWidth * scope.verticalPixelRatio;
+          ctx.setLineDash(stroke.dash);
+          ctx.strokeRect(xStart, yTop, Math.max(xEnd - xStart, 0), Math.max(yBottom - yTop, 1));
+          if (item.label) {
+            drawChip(ctx, item.label, item.color, this.palette, {
+              x: xStart,
+              y: yTop,
+              ratio: scope.verticalPixelRatio,
+              paneWidth: scope.bitmapSize.width,
+            });
+          }
+          ctx.restore();
+        }
       }
     });
   }
@@ -87,7 +139,7 @@ class ZonePaneView implements IPrimitivePaneView {
   }
 
   renderer(): IPrimitivePaneRenderer | null {
-    return new ZonePaneRenderer(this.source.renderItems());
+    return new ZonePaneRenderer(this.source);
   }
 }
 
@@ -100,8 +152,9 @@ function colorFor(direction: DrawnZone["direction"], colors: ZoneColors): string
 /**
  * A series primitive drawing every `Zone` a `zones`-output indicator answered
  * with — `range_gap`, `body_gap`, `session_range_*`, `opening_range` (task
- * 4.7). Its zones are replaced wholesale on every recompute, the same
- * convention `RayPrimitive.setLevels` already uses for `levels`.
+ * 4.7) — and, at the `drawing` weight, an operator's own band. Its zones are
+ * replaced wholesale on every recompute, the same convention
+ * `RayPrimitive.setLevels` already uses for `levels`.
  *
  * Only zones overlapping the time scale's current visible range are turned
  * into screen coordinates at all — with a few hundred zones open on a wide
@@ -115,32 +168,79 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
   private colors: ZoneColors;
   private chart: IChartApi | null = null;
   private series: ISeriesApi<SeriesType, Time> | null = null;
+  private currentPrice: number | null = null;
+  private requestUpdate: (() => void) | null = null;
+  private axisViews: readonly ISeriesPrimitiveAxisView[] = [];
   private readonly views: readonly IPrimitivePaneView[] = [new ZonePaneView(this)];
 
-  constructor(colors: ZoneColors) {
+  readonly markWeight: MarkWeight;
+  readonly objectId: string | null;
+  readonly palette: MarkPalette;
+  emphasis: Emphasis = "normal";
+
+  constructor(colors: ZoneColors, options: MarkOptions = {}) {
     this.colors = colors;
+    this.markWeight = options.weight ?? "indicator";
+    this.objectId = options.objectId ?? null;
+    this.palette = options.palette ?? defaultMarkPalette();
   }
 
   setZones(zones: readonly DrawnZone[]): void {
     this.zones = zones;
+    this.rebuildAxisViews();
   }
 
   setColors(colors: ZoneColors): void {
     this.colors = colors;
   }
 
-  attached({ chart, series }: SeriesAttachedParameter<Time>): void {
+  setCurrentPrice(price: number | null): void {
+    this.currentPrice = price;
+  }
+
+  setEmphasis(emphasis: Emphasis): void {
+    if (this.emphasis === emphasis) return;
+    this.emphasis = emphasis;
+    this.requestUpdate?.();
+  }
+
+  attached({ chart, series, requestUpdate }: SeriesAttachedParameter<Time>): void {
     this.chart = chart;
     this.series = series;
+    this.requestUpdate = requestUpdate;
   }
 
   detached(): void {
     this.chart = null;
     this.series = null;
+    this.requestUpdate = null;
   }
 
   paneViews(): readonly IPrimitivePaneView[] {
     return this.views;
+  }
+
+  priceAxisViews(): readonly ISeriesPrimitiveAxisView[] {
+    return this.axisViews;
+  }
+
+  /** The band's own rectangle is the tolerance — a shape with an area needs no margin
+   *  around it the way a line does (design.md, "Tolerancja trafienia mieszka w `hitTest`
+   *  każdego prymitywu, bo każdy kształt ma swoją"). */
+  hitTest(x: number, y: number): PrimitiveHoveredItem | null {
+    const id = this.objectId;
+    if (id === null) return null;
+    for (const item of this.renderItems()) {
+      if (item.xStart === null || item.yTop === null || item.yBottom === null) continue;
+      if (!item.open && item.xEnd === null) continue;
+      // An open band runs to whatever the right edge is at this moment, which the pane
+      // knows and this does not — unbounded is the same answer without asking.
+      const right = item.open || item.xEnd === null ? Number.POSITIVE_INFINITY : item.xEnd;
+      if (x < Math.max(0, item.xStart) || x > right) continue;
+      if (y < Math.min(item.yTop, item.yBottom) || y > Math.max(item.yTop, item.yBottom)) continue;
+      return { externalId: id, zOrder: "normal", cursorStyle: "pointer" };
+    }
+    return null;
   }
 
   /** Package-visible for `ZonePaneView`, not the public API of this class. */
@@ -166,8 +266,32 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
         yTop: series.priceToCoordinate(zone.top),
         yBottom: series.priceToCoordinate(zone.bottom),
         color: colorFor(zone.direction, this.colors),
+        label: zone.label ?? null,
       });
     }
     return items;
+  }
+
+  /** Both edges, the same two prices the object list shows for a zone. */
+  private rebuildAxisViews(): void {
+    if (this.objectId === null) {
+      this.axisViews = [];
+      return;
+    }
+    const views: ISeriesPrimitiveAxisView[] = [];
+    for (const zone of this.zones) {
+      for (const price of [zone.top, zone.bottom]) {
+        views.push(
+          new DrawingPriceAxisView(() => ({
+            coordinate: this.series?.priceToCoordinate(price) ?? null,
+            price,
+            color: colorFor(zone.direction, this.colors),
+            currentPrice: this.currentPrice,
+            palette: this.palette,
+          })),
+        );
+      }
+    }
+    this.axisViews = views;
   }
 }

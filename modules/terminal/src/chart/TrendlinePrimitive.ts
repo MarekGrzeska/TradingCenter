@@ -5,11 +5,25 @@ import type {
   IPrimitivePaneView,
   ISeriesApi,
   ISeriesPrimitive,
+  ISeriesPrimitiveAxisView,
+  PrimitiveHoveredItem,
   SeriesAttachedParameter,
   SeriesType,
   Time,
 } from "lightweight-charts";
 
+import {
+  DrawingPriceAxisView,
+  HIT_TOLERANCE,
+  defaultMarkPalette,
+  distanceToSegment,
+  drawChip,
+  strokeSpec,
+  type Emphasis,
+  type MarkOptions,
+  type MarkPalette,
+  type MarkWeight,
+} from "./drawingStyle";
 import { timeToX } from "./timeCoordinates";
 
 /**
@@ -45,19 +59,23 @@ interface TrendlineRenderItem {
   label: string | null;
 }
 
-const LABEL_FONT = "10px sans-serif";
-const LABEL_PADDING = 4;
-
 class TrendlinePaneRenderer implements IPrimitivePaneRenderer {
   private readonly items: readonly TrendlineRenderItem[];
+  private readonly weight: MarkWeight;
+  private readonly emphasis: Emphasis;
+  private readonly palette: MarkPalette;
 
-  constructor(items: readonly TrendlineRenderItem[]) {
-    this.items = items;
+  constructor(source: TrendlinePrimitive) {
+    this.items = source.renderItems();
+    this.weight = source.markWeight;
+    this.emphasis = source.emphasis;
+    this.palette = source.palette;
   }
 
   draw(target: CanvasRenderingTarget2D): void {
     target.useBitmapCoordinateSpace((scope) => {
       const ctx = scope.context;
+      const stroke = strokeSpec(this.weight, this.emphasis);
       for (const item of this.items) {
         // Either endpoint unplaceable means there is no segment to draw — unlike a ray,
         // whose far end is the pane's edge and always exists. Both coordinates are kept
@@ -71,19 +89,34 @@ class TrendlinePaneRenderer implements IPrimitivePaneRenderer {
 
         ctx.save();
         ctx.strokeStyle = item.color;
-        ctx.lineWidth = 1;
+        if (stroke.halo > 0) {
+          ctx.globalAlpha = 0.3;
+          ctx.lineWidth = stroke.halo * scope.verticalPixelRatio;
+          ctx.setLineDash([]);
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = stroke.alpha;
+        ctx.lineWidth = stroke.lineWidth * scope.verticalPixelRatio;
+        ctx.setLineDash(stroke.dash);
         ctx.beginPath();
         ctx.moveTo(x1, y1);
         ctx.lineTo(x2, y2);
         ctx.stroke();
 
         if (item.label) {
-          ctx.font = LABEL_FONT;
-          ctx.fillStyle = item.color;
-          ctx.textBaseline = "bottom";
           // At the later end, where a trend line is read from: the newest point is the
-          // one the operator is looking at when the chart sits at the live edge.
-          ctx.fillText(item.label, x2 + LABEL_PADDING, y2 - LABEL_PADDING);
+          // one the operator is looking at when the chart sits at the live edge. The chip
+          // keeps itself inside the pane from there, so a line running in from off-screen
+          // is still named.
+          drawChip(ctx, item.label, item.color, this.palette, {
+            x: x2,
+            y: y2,
+            ratio: scope.verticalPixelRatio,
+            paneWidth: scope.bitmapSize.width,
+          });
         }
         ctx.restore();
       }
@@ -99,7 +132,7 @@ class TrendlinePaneView implements IPrimitivePaneView {
   }
 
   renderer(): IPrimitivePaneRenderer | null {
-    return new TrendlinePaneRenderer(this.source.renderItems());
+    return new TrendlinePaneRenderer(this.source);
   }
 }
 
@@ -108,32 +141,73 @@ export class TrendlinePrimitive implements ISeriesPrimitive<Time> {
   private color: string;
   private chart: IChartApi | null = null;
   private series: ISeriesApi<SeriesType, Time> | null = null;
+  private currentPrice: number | null = null;
+  private requestUpdate: (() => void) | null = null;
+  private axisViews: readonly ISeriesPrimitiveAxisView[] = [];
   private readonly views: readonly IPrimitivePaneView[] = [new TrendlinePaneView(this)];
 
-  constructor(color: string) {
+  readonly markWeight: MarkWeight;
+  readonly objectId: string | null;
+  readonly palette: MarkPalette;
+  emphasis: Emphasis = "normal";
+
+  constructor(color: string, options: MarkOptions = {}) {
     this.color = color;
+    this.markWeight = options.weight ?? "indicator";
+    this.objectId = options.objectId ?? null;
+    this.palette = options.palette ?? defaultMarkPalette();
   }
 
   setLines(lines: readonly DrawnTrendline[]): void {
     this.lines = lines;
+    this.rebuildAxisViews();
   }
 
   setColor(color: string): void {
     this.color = color;
   }
 
-  attached({ chart, series }: SeriesAttachedParameter<Time>): void {
+  setCurrentPrice(price: number | null): void {
+    this.currentPrice = price;
+  }
+
+  setEmphasis(emphasis: Emphasis): void {
+    if (this.emphasis === emphasis) return;
+    this.emphasis = emphasis;
+    this.requestUpdate?.();
+  }
+
+  attached({ chart, series, requestUpdate }: SeriesAttachedParameter<Time>): void {
     this.chart = chart;
     this.series = series;
+    this.requestUpdate = requestUpdate;
   }
 
   detached(): void {
     this.chart = null;
     this.series = null;
+    this.requestUpdate = null;
   }
 
   paneViews(): readonly IPrimitivePaneView[] {
     return this.views;
+  }
+
+  priceAxisViews(): readonly ISeriesPrimitiveAxisView[] {
+    return this.axisViews;
+  }
+
+  /** The tolerance band around the segment itself, not around the whole line it lies on:
+   *  a trend line ends where it was drawn to end, and so does the click into it. */
+  hitTest(x: number, y: number): PrimitiveHoveredItem | null {
+    const id = this.objectId;
+    if (id === null) return null;
+    for (const item of this.renderItems()) {
+      if (item.x1 === null || item.y1 === null || item.x2 === null || item.y2 === null) continue;
+      if (distanceToSegment(x, y, item.x1, item.y1, item.x2, item.y2) > HIT_TOLERANCE) continue;
+      return { externalId: id, zOrder: "normal", cursorStyle: "pointer" };
+    }
+    return null;
   }
 
   /** Package-visible for `TrendlinePaneView`, not the public API of this class. */
@@ -153,5 +227,28 @@ export class TrendlinePrimitive implements ISeriesPrimitive<Time> {
       color: line.color ?? this.color,
       label: line.label,
     }));
+  }
+
+  /** Both ends, the same two prices the object list shows for a trend line. */
+  private rebuildAxisViews(): void {
+    if (this.objectId === null) {
+      this.axisViews = [];
+      return;
+    }
+    const views: ISeriesPrimitiveAxisView[] = [];
+    for (const line of this.lines) {
+      for (const price of [line.fromPrice, line.toPrice]) {
+        views.push(
+          new DrawingPriceAxisView(() => ({
+            coordinate: this.series?.priceToCoordinate(price) ?? null,
+            price,
+            color: line.color ?? this.color,
+            currentPrice: this.currentPrice,
+            palette: this.palette,
+          })),
+        );
+      }
+    }
+    this.axisViews = views;
   }
 }
