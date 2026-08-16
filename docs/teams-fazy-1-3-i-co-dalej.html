@@ -99,14 +99,15 @@
 
 <p><strong>Faza 1</strong> dała zespół, który operator składa na ekranie jak graf i uruchamia klikając — a moduł zapisuje każdą rewizję, każdy przebieg i każdy grosz. <strong>Faza 2</strong> dała temu zespołowi rękę: osobny moduł <code>trading-mcp</code> nad kontem <em>demo</em>, narzędzia składające zlecenia i granice, w których wolno mu ich użyć. <strong>Faza 3</strong> zabrała z tego operatora: zespół budzi się sam — o godzinie z wyrażenia cron albo w chwili, w której warunek na rynku przeszedł z fałszu w prawdę — i zostawia po każdym przebudzeniu wiersz mówiący, co zrobił <em>albo dlaczego nie</em>.</p>
 
-<div class="callout warn">
-  <span class="tag">Jedna rzecz, którą trzeba wiedzieć od razu</span>
-  <p><strong>Cały kod trzech faz jest napisany, przetestowany i zmergowany do <code>feat/teams-platform</code>. W Azure nie stoi.</strong> <code>teams</code> i <code>trading-mcp</code> mają infrastrukturę i workflow wdrożeniowy, ale obrazy nie zostały jeszcze wypchnięte, bo gałąź nie poszła do <code>main</code>. Lokalnie działa wszystko — łącznie z zegarem, który na produkcji jest wyłączony ustawieniem.</p>
+<div class="callout good">
+  <span class="tag">Stan wdrożenia — 16 sierpnia 2026, 21:20 UTC</span>
+  <p><strong>Wszystkie trzy fazy stoją w Azure.</strong> PR #135 zmergowany, trzy wdrożenia zielone (<code>teams</code>, <code>trading-mcp</code>, <code>terminal</code>), oba nowe moduły serwują obraz z commita <code>73c781a</code> i odpowiadają na <code>/health</code>. Baza <code>teams</code> zmigrowała się sama przy starcie do <code>0006</code> — wszystkie 12 tabel należy do <code>app-tradingcenter-teams</code>, czyli moduł zrobił to własną tożsamością, nie administratorem.</p>
+  <p><strong>Zegar jest wyłączony</strong> (<code>SCHEDULER_ENABLED=false</code>) i tak zostaje, dopóki nie przejdzie ręczny przebieg z tego dokumentu. Żaden harmonogram nie wyzwoli sam.</p>
 </div>
 
 <h2>Faza 1 — zespół jako dana</h2>
 
-<p><span class="pill good">kod gotowy</span> <span class="pill warn">nie stoi w Azure</span></p>
+<p><span class="pill good">kod gotowy</span> <span class="pill good">stoi w Azure</span></p>
 
 <p>Zespół nie jest kodem. Jest wierszem w bazie: lista agentów (rola, prompt, model, narzędzia) i lista krawędzi między nimi. Operator układa to na kanwie w terminalu, a moduł kompiluje graf do przebiegu.</p>
 
@@ -121,7 +122,7 @@
 
 <h2>Faza 2 — ręka na koncie demo</h2>
 
-<p><span class="pill good">kod gotowy</span> <span class="pill warn">nie stoi w Azure</span></p>
+<p><span class="pill good">kod gotowy</span> <span class="pill good">stoi w Azure</span></p>
 
 <p>Rekomendacji zapisanej w śladzie nie da się ocenić: nie wiadomo, po jakiej cenie zespół wszedłby ani czy jego stop przetrwałby ruch. Faza 2 zamienia prozę w wiersze, które da się policzyć.</p>
 
@@ -136,7 +137,7 @@
 
 <h2>Faza 3 — zegar i wyzwalacze</h2>
 
-<p><span class="pill good">kod gotowy</span> <span class="pill good">review zamknięte</span> <span class="pill warn">zegar wyłączony na produkcji</span></p>
+<p><span class="pill good">kod gotowy</span> <span class="pill good">review zamknięte</span> <span class="pill good">stoi w Azure</span> <span class="pill warn">zegar wyłączony</span></p>
 
 <p>Powtarzalność eksperymentu nie może zależeć od tego, czy ktoś siedział przed terminalem o 9:30. A rynek i tak nie pyta o godzinę.</p>
 
@@ -302,8 +303,8 @@ uv run pytest -m db    # 165 testów</code></pre>
 
 <h4>Zanim faza 4 w ogóle ma sens</h4>
 <ol>
-  <li><strong>Wypchnąć obrazy <code>teams</code> i <code>trading-mcp</code> do Azure</strong> — dopóki tego nie ma, „moduł stoi" jest nieprawdą. Przy <code>trading-mcp</code> sonda <code>/health</code> mówi więcej niż zwykle: proces nie otwiera portu, dopóki gateway nie potwierdzi konta demo, więc 200 znaczy „dotarł, przez zaporę, właściwym kluczem, i to jest demo".</li>
-  <li><strong>Przejść scenariusze 1–4 z tego dokumentu ręką</strong> na uruchomionym stosie. To jedyna rzecz stojąca dziś między fazą 3 a włączeniem zegara na produkcji.</li>
+  <li><strong>Wypchnąć obrazy do Azure</strong> — <span class="pill good">zrobione 16.08.2026</span>. Sonda <code>/health</code> przy <code>trading-mcp</code> powiedziała przy okazji najwięcej z całej trójki: proces nie otwiera portu, dopóki gateway nie potwierdzi konta demo, więc 200 znaczy „dotarł, przez zaporę, właściwym kluczem, i to jest demo".</li>
+  <li><strong>Przejść scenariusze 1–4 z tego dokumentu ręką</strong> — teraz już na produkcji, nie tylko lokalnie. To jedyna rzecz stojąca między fazą 3 a włączeniem zegara.</li>
   <li><strong>Włączyć zegar</strong> — <code>SCHEDULER_ENABLED = "true"</code>, jedna linia w <code>infra/app-service.tf</code> plus <code>apply</code>. Powód, dla którego jest wyłączony, przestał być techniczny: ślepy bezpiecznik został naprawiony w review, zostało tylko to, że nikt jeszcze nie widział, jak zegar wyzwala naprawdę.</li>
   <li><strong>Jeden merge <code>feat/teams-platform</code> → <code>main</code></strong>, i dopiero wtedy <code>deploy-*.yml</code> oraz <code>terraform plan</code> na <code>main</code> zaczynają mówić prawdę.</li>
 </ol>
