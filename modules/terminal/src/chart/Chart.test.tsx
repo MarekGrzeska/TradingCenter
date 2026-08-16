@@ -786,6 +786,113 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
     expect(source.historyCalls[0]).toMatchObject({ from: -50_000 - 15_000, to: 100 });
   });
 
+  it("applies a focus that arrives in the same breath as a resolution change", async () => {
+    // One `set_chart` carrying both is one commit here: the slot's resolution and its
+    // focus request land together. Reported from a live session — the interval changed
+    // and the chart stayed where it was, and only a second, focus-only request moved it.
+    const { rerender, onResolutionChange, onFocusRequestSettled } = renderChart(source, {
+      resolution: "MINUTE_5",
+    });
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    const focus: ChartFocusRequest = { from: 100, to: 220, around: null, bars: null, lastBars: null };
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="HOUR"
+        onResolutionChange={onResolutionChange}
+        focusRequest={focus}
+        onFocusRequestSettled={onFocusRequestSettled}
+      />,
+    );
+    // The new interval's own series, which is what the focus has to be applied against.
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    await waitFor(() => expect(onFocusRequestSettled).toHaveBeenCalledTimes(1));
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: 100, to: 220 });
+  });
+
+  it("applies a distant focus that arrives with a resolution change, not only the change", async () => {
+    // The shape the live session actually sent: one `set_chart` with a symbol, an
+    // interval, indicators and a focus months back. The interval changed and the chart
+    // did not move; a second, focus-only request moved it.
+    source.historyPages = [olderPage(60), olderPage(60)];
+    const { rerender, onResolutionChange, onFocusRequestSettled } = renderChart(source, {
+      resolution: "HOUR",
+    });
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    const focus: ChartFocusRequest = {
+      from: -2_000,
+      to: -1_000,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        focusRequest={focus}
+        onFocusRequestSettled={onFocusRequestSettled}
+      />,
+    );
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    await waitFor(() => expect(onFocusRequestSettled).toHaveBeenCalledTimes(1));
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: -2_000, to: -1_000 });
+  });
+
+  it("does not lose a new focus to the abandoning of the one before it", async () => {
+    // The live sequence: a focus was asked for and could not be reached, so it sat
+    // pending; the next command carried a new focus *and* a new interval. The interval
+    // change abandons whatever was pending — and telling the caller so clears the request
+    // the store is holding, which by then is the new one.
+    source.historyPages = []; // nothing older, so the first focus stays out of reach
+    const first: ChartFocusRequest = {
+      from: -9_000_000,
+      to: -8_999_000,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    const { rerender, onResolutionChange, onFocusRequestSettled } = renderChart(source, {
+      resolution: "HOUR",
+      focusRequest: first,
+    });
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    const second: ChartFocusRequest = { from: 100, to: 220, around: null, bars: null, lastBars: null };
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        focusRequest={second}
+        onFocusRequestSettled={onFocusRequestSettled}
+      />,
+    );
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    await waitFor(() => expect(stub.latest().timeRangesSet).toContainEqual({ from: 100, to: 220 }));
+  });
+
   it("settles a focus the archive has no candles far enough back for", async () => {
     // One read is the whole attempt, so the wait ends either way. Before `stoppedShort`
     // the request sat in `pendingFocusRef` unsettled: the chart never moved,

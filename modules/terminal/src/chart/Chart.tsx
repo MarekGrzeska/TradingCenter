@@ -269,6 +269,58 @@ function reachesBack(series: readonly Bar[], focus: ChartFocusRequest): boolean 
   return target !== null && series[0].time <= target;
 }
 
+/** The window indicators are computed over: what is on screen, widened by a margin, and
+ *  never wider than `MAX_INDICATOR_SPAN_BARS` of the resolution's own candles.
+ *
+ *  Follows the viewport rather than the drawn series, and that is the whole point. The
+ *  series after a focus jump runs from March to the live edge with a five-month hole in
+ *  the middle; asking for indicators over *that* prices a request nobody wants and gets a
+ *  refusal for it. What the operator is looking at is a screenful either way.
+ *
+ *  `visible` is null before the chart has a frame — the first draw, and every draw where
+ *  the library has not answered yet. The newest candles are the honest guess there: it is
+ *  where an unfocused chart opens. */
+function indicatorWindow(
+  series: readonly Bar[],
+  visible: LogicalRange | null,
+  resolution: Resolution,
+): BarsRange | null {
+  if (series.length === 0) return null;
+  const lastIndex = series.length - 1;
+  const rawFrom = visible === null ? lastIndex - MAX_INDICATOR_SPAN_BARS : Math.floor(visible.from);
+  const rawTo = visible === null ? lastIndex : Math.ceil(visible.to);
+
+  const fromIndex = Math.max(0, Math.min(lastIndex, rawFrom - INDICATOR_MARGIN_BARS));
+  let toIndex = Math.max(fromIndex, Math.min(lastIndex, rawTo + INDICATOR_MARGIN_BARS));
+  // Never the forming candle. A window ending on it would move with every tick, and
+  // moving the window is what asks the archive for a new answer — the one thing this
+  // must not do while a candle is still being built ("na żywo" is a later stage; see
+  // `useIndicators`). Ending on the bar that last settled is what `applyBar` always did.
+  if (series[toIndex].forming && toIndex > fromIndex) toIndex -= 1;
+
+  const to = series[toIndex].time;
+  // Clamped in time, not in candle count: the count is what the module prices, and it
+  // prices it as periods between two moments — so a window straddling the hole a jump
+  // leaves in the series is enormous however few candles are actually in it.
+  const floor = to - MAX_INDICATOR_SPAN_BARS * RESOLUTION_SECONDS[resolution];
+  return { from: Math.max(series[fromIndex].time, floor), to };
+}
+
+/** Whether `window` still covers what is on screen, margins excluded — the test for
+ *  leaving a computed answer alone. Panning inside the margin changes the window this
+ *  function is not asked about; panning out of it is what earns a new read. */
+function windowStillCovers(
+  window: BarsRange,
+  series: readonly Bar[],
+  visible: LogicalRange | null,
+): boolean {
+  if (visible === null || series.length === 0) return true;
+  const lastIndex = series.length - 1;
+  const from = series[Math.max(0, Math.min(lastIndex, Math.floor(visible.from)))].time;
+  const to = series[Math.max(0, Math.min(lastIndex, Math.ceil(visible.to)))].time;
+  return from >= window.from && to <= window.to;
+}
+
 /** The earliest moment a focus needs drawn before it can be shown in full, or null for
  *  one that names no moment at all (`lastBars`, which is always at the newest end and can
  *  only ever want *more* of what is already there).
@@ -327,6 +379,26 @@ interface PendingResolutionFrame {
  *  keeps going until the viewport has at least this much history behind it, so
  *  one drag to the edge is answered with a screenful rather than a page. */
 const OLDER_MARGIN_BARS = 50;
+
+/** How many candles either side of what is on screen the indicators are computed for.
+ *  Ordinary panning then moves inside an answer already in hand rather than asking the
+ *  archive for a new one on every drag. */
+const INDICATOR_MARGIN_BARS = 300;
+
+/** The widest span, in candles, one indicator request may cover.
+ *
+ *  Indicators used to be computed over the whole drawn series, which was fine while the
+ *  series was whatever the operator had panned through. It stopped being fine when a
+ *  focus could jump five months back: market-data prices a request as
+ *  candles×indicators against a ceiling of 200,000, and six months of MINUTE_5 with four
+ *  averages on it asks for 211,000 — a 422, and a chart that draws candles with no
+ *  indicators on them at all.
+ *
+ *  Chosen against that ceiling with room for the instances an operator actually stacks:
+ *  five thousand candles carries forty of them and still fits. It is not a copy of the
+ *  module's number — the module refuses for its own reasons and this is the terminal not
+ *  asking absurd questions in the first place. */
+const MAX_INDICATOR_SPAN_BARS = 5_000;
 
 /** How near the newest drawn bar counts as "standing at the live edge" — a resolution
  *  change on a chart sitting there keeps sitting there, rather than being nudged into
@@ -483,6 +555,32 @@ export function Chart({
   // from every live tick, so an indicator does not refetch on each forming-candle update
   // (design.md's "na żywo" is a later stage; see `useIndicators`).
   const [barsRange, setBarsRange] = useState<BarsRange | null>(null);
+  // What was last asked for, so a pan inside it costs nothing. State cannot answer this:
+  // the range handler runs on every frame the library reports, long before a render.
+  const heldIndicatorWindowRef = useRef<BarsRange | null>(null);
+
+  /** Points the indicator window at what is on screen now, if what is on screen has left
+   *  the window already computed. `force` for the structural changes that invalidate an
+   *  answer whatever the frame is doing: a new period at the live edge, a series that
+   *  just grew at the front. */
+  const syncIndicatorWindow = useCallback(
+    (force = false) => {
+      const series = barsRef.current;
+      const visible = chartRef.current?.timeScale().getVisibleLogicalRange() ?? null;
+      const held = heldIndicatorWindowRef.current;
+      if (!force && held !== null && windowStillCovers(held, series, visible)) return;
+      // A forced sync always hands over a fresh object, even for an unchanged window, and
+      // that is load-bearing rather than sloppy: `useIndicators` watches `range` by
+      // reference, and a candle closing has to be recomputed over exactly the window that
+      // was already asked for. Equal values, different answer.
+      const next = indicatorWindow(series, visible, resolution);
+      heldIndicatorWindowRef.current = next;
+      setBarsRange(next);
+    },
+    [resolution],
+  );
+  const syncIndicatorWindowRef = useRef(syncIndicatorWindow);
+  syncIndicatorWindowRef.current = syncIndicatorWindow;
 
   const catalogue = useIndicatorCatalogue(indicatorSource);
   const catalogueById = useMemo(
@@ -635,6 +733,9 @@ export function Chart({
     // filled, which is what stops it looping on its own frame correction.
     const onRangeChange = (range: LogicalRange | null) => {
       if (range && range.from < OLDER_MARGIN_BARS) requestOlderRef.current();
+      // Panning off the computed window is what asks for a new one — the operator who
+      // jumped to March needs indicators over March, not over the whole series behind it.
+      syncIndicatorWindowRef.current();
 
       const series = barsRef.current;
       const fromIndex = range ? Math.max(0, Math.round(range.from)) : -1;
@@ -878,10 +979,11 @@ export function Chart({
     const range = timeScale?.getVisibleLogicalRange() ?? null;
 
     seriesRef.current?.setData(merged.map(toCandlestick));
-    // Structural change to what is drawn — recompute indicators over the new span.
-    // Not on every live tick: `applyBar`'s hot path never calls `redraw`.
-    setBarsRange(merged.length > 0 ? { from: merged[0].time, to: merged.at(-1)!.time } : null);
 
+    // Wrapped so the indicator window is pointed at the frame this leaves behind, not the
+    // one it found: every branch below either sets a frame or corrects one, and reading
+    // the viewport before that lands would compute indicators for where the chart was.
+    const reframe = () => {
     if (previousFirstTime === undefined) {
       // A resolution change leaves a viewport behind for exactly this moment — the
       // series' first draw — to stand over, instead of the whole-series view
@@ -915,6 +1017,11 @@ export function Chart({
         to: range.to + prepended,
       });
     }
+    };
+    reframe();
+    // Structural change to what is drawn — recompute, whatever the frame did.
+    // Not on every live tick: `applyBar`'s hot path never calls `redraw`.
+    syncIndicatorWindowRef.current(true);
   }, [resolution]);
 
   // --- the feed writes straight into the series ---
@@ -987,7 +1094,7 @@ export function Chart({
         // new (task 6.1). Still not on every tick: `bar.time === last.time`
         // above (the forming candle itself moving) never reaches here, which
         // is what keeps task 6.2 true.
-        setBarsRange(previous.length > 0 ? { from: previous[0].time, to: last.time } : null);
+        syncIndicatorWindowRef.current(true);
       }
     } else {
       // Older than what is drawn — a reconnect's gap fill. `update()` rejects
@@ -1071,6 +1178,7 @@ export function Chart({
     // An indicator computed for the previous series has no business staying on screen
     // while the new one loads — `barsRange` going null empties `indicatorsState.results`
     // (`useIndicators`), which the sync effect below reads as "remove every line".
+    heldIndicatorWindowRef.current = null;
     setBarsRange(null);
     // The cleanup, not the body: a cleanup runs only when `source`/`symbol`/`resolution`
     // are *about to change* — never on the initial mount, which is what a focus supplied
