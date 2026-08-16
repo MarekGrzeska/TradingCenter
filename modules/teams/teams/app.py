@@ -34,6 +34,7 @@ from .provider import OpenAIProvider
 from .routers import catalogue, models, runs, schedules, usage
 from .routers import tools as tools_router
 from .runner import RunRegistry
+from .scheduler import Clock
 from .tools import ToolServer
 
 log = logging.getLogger(__name__)
@@ -103,9 +104,26 @@ async def lifespan(app: FastAPI):
         # list kept here would be a second copy of somebody else's catalogue, stale from
         # the first tool that server adds (specs/teams-tool-access, "Moduł nie trzyma kopii
         # tego, co ogłasza serwer narzędzi").
+
+        # Started last, once everything a fire could possibly need is already on
+        # `app.state` — a schedule due the instant this process comes up MUST see the
+        # same catalogue, provider and tool session a route would (design.md, "Zegar w
+        # procesie modułu, nie w Azure"). Stopped first in `finally`, before the tool
+        # session it may still be mid-call against.
+        clock = Clock(
+            pool,
+            catalogue=app.state.catalogue,
+            provider=app.state.provider,
+            tool_server=tools,
+            settings=settings,
+            registry=app.state.runs,
+        )
+        app.state.clock = clock
+        clock.start()
         try:
             yield
         finally:
+            await clock.aclose()
             await tools.aclose()
 
 

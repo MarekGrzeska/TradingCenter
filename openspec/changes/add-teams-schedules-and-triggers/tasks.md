@@ -45,42 +45,80 @@
 
 ## 3. Zegar i przejęcie wyzwolenia
 
-- [ ] 3.1 `scheduler/` — zadanie budzące się co ustawiony interwał, startowane i gaszone
-  w `lifespan`, wyłączane ustawieniem `SCHEDULER_ENABLED`
-- [ ] 3.2 Przejęcie wyzwolenia warunkowym `UPDATE … WHERE next_fire_at <= now() RETURNING`
-  i wyliczenie kolejnego momentu przez `croniter`
-- [ ] 3.3 Test: dwa równoległe przejęcia tego samego wiersza dają jeden przebieg
-- [ ] 3.4 Zwijanie pominiętych wyzwoleń do jednego, z zapisaną liczbą pominięć
-- [ ] 3.5 Uruchomienie przebiegu tą samą drogą co router: rozwiązanie rewizji zgodnie z trybem,
-  właściciel z harmonogramu, rejestracja w `RunRegistry`
-- [ ] 3.6 Pominięcie przy trwającym poprzednim przebiegu tego harmonogramu, z wpisem w historii
+- [x] 3.1 `scheduler/clock.py` — `Clock`, jedno zadanie `asyncio` budzące się co
+  `SCHEDULER_POLL_INTERVAL_SECONDS` (tick natychmiast na starcie, potem sen), startowane
+  i gaszone w `lifespan` (po `RunRegistry`, przed `tools.aclose()`), pomijane przy
+  `SCHEDULER_ENABLED=false`
+- [x] 3.2 Przejęcie wyzwolenia warunkowym `UPDATE … WHERE next_fire_at <= now() RETURNING`
+  (`store.claim_due_schedule`, z grupy 1) i wyliczenie kolejnego momentu przez `croniter`
+  (`_next_fire_and_skipped`)
+- [x] 3.3 Test: dwa równoległe przejęcia tego samego wiersza dają jeden przebieg —
+  własność samego `UPDATE`, dowiedziona na poziomie `store.py` w grupie 1
+  (`test_two_processes_racing_the_same_due_schedule_give_exactly_one_winner`); silnik nie
+  dokłada tu żadnej dodatkowej synchronizacji, więc nie ma czego drugi raz dowodzić
+- [x] 3.4 Zwijanie pominiętych wyzwoleń do jednego, z zapisaną liczbą pominięć —
+  `_next_fire_and_skipped` (2 testy czyste + 1 integracyjny, `tests/test_scheduler_clock.py`)
+- [x] 3.5 Uruchomienie przebiegu tą samą drogą co router: `teams/runner/starter.py` —
+  `start_run_on_revision` wydzielone z `routers/runs.py::start_run` (który teraz go
+  wywołuje), żeby harmonogram/wyzwalacz i kliknięcie w terminalu przechodziły identyczny
+  ciąg sprawdzeń
+- [x] 3.6 Pominięcie przy trwającym poprzednim przebiegu tego harmonogramu, z wpisem w
+  historii — `store.latest_run_status_for_schedule` (nowa funkcja: `runs` celowo nie ma
+  `schedule_id`, więc „poprzedni przebieg tego harmonogramu" czyta się przez ostatni
+  wiersz `schedule_fires` z `outcome='started'`)
 - [x] 3.7 `croniter` w `pyproject.toml` — zrobione wcześniej, w grupie 2 (`_first_fire_at`
   w `routers/schedules.py`), bo POST/PUT harmonogramu potrzebują wyliczyć `next_fire_at`
   przy zapisie. Grupa 3 dodaje drugie miejsce użycia (przeliczenie po każdym przejęciu),
   nie samą zależność
 
+  Dodatkowo, nieprzewidziane w tasks.md: licznik `consecutive_failures` i samoczynne
+  wyłączenie (spec teams-schedules) wymagają wiedzieć, jak skończył się przebieg
+  uruchomiony przez harmonogram — a to dzieje się w tle, po tym jak `tick()` już wrócił.
+  `_track_run` w `clock.py` czeka na task `execute_run`, czyta `store.get_run_status`
+  (nowa funkcja, bez filtra właściciela — wołający zna już `run_id`) i woła
+  `reset_schedule_failures` / `increment_schedule_failures` / `disable_schedule_for_failures`.
+  `Clock.tick()` zwraca listę tych tasków (w produkcji ignorowaną — `_run_forever` puszcza
+  je bez czekania), żeby testy mogły `asyncio.gather` zamiast zgadywać przez `sleep`.
+
 ## 4. Wyzwalacze
 
-- [ ] 4.1 Ocena warunku przez sesję narzędzi modułu, bez wywołania modelu
-- [ ] 4.2 Test dowodzący, że wielokrotne sprawdzenie niespełnionego warunku nie tworzy ani
-  jednego wiersza `usage`
-- [ ] 4.3 Reakcja na zbocze `false → true` ze stanem trzymanym na wierszu wyzwalacza
-- [ ] 4.4 Czas martwy po wyzwoleniu, z wpisem w historii przy odrzuconym wyzwoleniu
-- [ ] 4.5 Niedostępność serwera narzędzi jako trzeci stan obok prawdy i fałszu — bez
-  wyzwolenia, z zapisem; odmowa narzędzia zapisywana odrębnie
-- [ ] 4.6 Sprawdzenie przy zapisie, że warunek nazywa wielkość ogłaszaną przez serwer narzędzi
+- [x] 4.1 Ocena warunku przez sesję narzędzi modułu (`_evaluate_condition`), bez wywołania
+  modelu — jedno wywołanie `tool_server.call`, żadnego `ModelProvider`
+- [x] 4.2 Test dowodzący, że wielokrotne sprawdzenie niespełnionego warunku nie tworzy ani
+  jednego wiersza `usage` (`test_a_condition_below_threshold_does_not_fire_or_cost_tokens`)
+- [x] 4.3 Reakcja na zbocze `false → true` ze stanem trzymanym na wierszu wyzwalacza
+  (`triggers.last_result`, `store.record_trigger_check`, z grupy 1)
+- [x] 4.4 Czas martwy po wyzwoleniu, z wpisem w historii przy odrzuconym wyzwoleniu —
+  `last_fired_at` przesuwa się tylko wtedy, gdy zbocze faktycznie przejdzie przez czas
+  martwy, inaczej migoczący warunek nigdy by go nie wyczyścił
+- [x] 4.5 Niedostępność serwera narzędzi jako trzeci stan obok prawdy i fałszu — bez
+  wyzwolenia, z zapisem (`outcome='unavailable'`, `last_result=NULL`). Odmowa narzędzia
+  zapisywana **tym samym** `outcome='unavailable'`, ale osobnym tekstem powodu
+  („the tool refused the call: …" vs „the tool server could not be asked: …") — nie osobną
+  wartością w `schedule_fires.outcome`, bo z punktu widzenia wyzwalacza obie znaczą to
+  samo („nie dowiedział się, co robi rynek"), a rozróżnienie w tekście już wystarcza do
+  odczytania, co dokładnie się stało. Zapisane tu jako świadome odejście od dosłownego
+  brzmienia `specs/teams-triggers`, do rewizji, gdyby okazało się za słabe w praktyce.
+- [x] 4.6 Sprawdzenie przy zapisie, że warunek nazywa wielkość ogłaszaną przez serwer
+  narzędzi — `validation.check_trigger_tool`, zrobione w grupie 2
+  (`routers/schedules.py::_check_trigger_tool`)
 
 ## 5. Bezpieczniki pracy bez nadzoru
 
-- [ ] 5.1 Dobowa granica kosztu zespołu sprawdzana **przed** utworzeniem przebiegu, z wpisem
-  w historii zamiast odpowiedzi HTTP
-- [ ] 5.2 Samoczynne wyłączenie harmonogramu po serii nieudanych przebiegów, z zapisanym
-  powodem i możliwością włączenia z powrotem
-- [ ] 5.3 Odmowa utworzenia harmonogramu lub wyzwalacza nad rewizją, której agent ma narzędzie
-  zmieniające stan poza modułem, bez jawnego potwierdzenia — wraz z testem, który dziś
-  przechodzi w próżni (żadne narzędzie takie nie jest)
-- [ ] 5.4 Rewizja, której nie da się uruchomić (model zniknął z katalogu), pomija wyzwolenie
-  z zapisanym powodem zamiast przewracać zegar
+Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń przechodzą przez
+`_start_from` w `clock.py`, które woła dokładnie to samo `start_run_on_revision` co router.
+
+- [x] 5.1 Dobowa granica kosztu zespołu sprawdzana **przed** utworzeniem przebiegu, z wpisem
+  w historii zamiast odpowiedzi HTTP (`test_the_daily_cost_limit_stops_a_schedule_before_it_spends`)
+- [x] 5.2 Samoczynne wyłączenie harmonogramu **i** wyzwalacza po serii nieudanych
+  przebiegów, z zapisanym powodem i możliwością włączenia z powrotem (po 3/8 —
+  `_track_run`, testy w obu plikach `test_scheduler_*.py`)
+- [x] 5.3 Odmowa utworzenia harmonogramu lub wyzwalacza nad rewizją, której agent ma
+  narzędzie zmieniające stan poza modułem, bez jawnego potwierdzenia — zrobione w grupie 2
+  (`validation.check_unattended`, `STATE_CHANGING_TOOLS` pusty dziś)
+- [x] 5.4 Rewizja, której nie da się uruchomić (model zniknął z katalogu), pomija
+  wyzwolenie z zapisanym powodem zamiast przewracać zegar
+  (`test_a_revision_naming_a_model_outside_the_catalogue_is_skipped`)
 
 ## 6. Terminal
 

@@ -20,6 +20,7 @@ from .engine import (
 )
 from .graph import AgentFailed, compile_team
 from .loop import ROUND_CEILING, AgentWork, RecordedCall, run_agent
+from .starter import start_run_on_revision
 
 __all__ = [
     "ROUND_CEILING",
@@ -35,4 +36,5 @@ __all__ = [
     "compile_team",
     "execute_run",
     "run_agent",
+    "start_run_on_revision",
 ]
