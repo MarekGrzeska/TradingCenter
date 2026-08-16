@@ -9,9 +9,6 @@ jest nim transport sieciowy").
 `custom_route` puts `/health` on the same Starlette app `streamable_http_app()`
 builds, the same mechanism `market_mcp/server.py` uses for the same reason: the
 platform that restarts the container on a failed probe does not speak MCP.
-
-No tools are registered yet — group 3 adds `trading_mcp.tools.register(mcp, gateway)`
-here once the tool set exists.
 """
 
 from __future__ import annotations
@@ -21,6 +18,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
+from . import tools
 from .client import GatewayClient
 from .config import Settings
 from .network_identity import RequireCallerIdentity
@@ -43,6 +41,8 @@ def build_server(settings: Settings, gateway: GatewayClient) -> FastMCP:
     @mcp.custom_route("/health", methods=["GET"])
     async def health(_request: Request) -> JSONResponse:
         return JSONResponse({"status": "ok"})
+
+    tools.register(mcp, gateway)
 
     return mcp
 

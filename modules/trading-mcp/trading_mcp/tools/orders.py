@@ -1,0 +1,110 @@
+"""Changing the account: place, close, amend, cancel. Every tool here re-checks the
+demo environment before the gateway is touched (`GatewayClient.
+ensure_demo_environment`, cheap unless a prior call failed) and is never retried by
+this module on its own failure (specs/trading-mcp-execution, "Moduł nie ponawia
+zlecenia po własnej awarii").
+"""
+
+from __future__ import annotations
+
+from typing import Literal
+
+from mcp.server.fastmcp import FastMCP
+
+from ..client import GatewayClient
+from ..errors import ToolRefusal
+from ._shared import WRITE, OrderResultOut, _write
+
+
+def register(mcp: FastMCP, gateway: GatewayClient) -> None:
+    @mcp.tool(annotations=WRITE)
+    async def place_order(
+        symbol: str,
+        direction: Literal["BUY", "SELL"],
+        size: float,
+        order_type: Literal["MARKET", "LIMIT", "STOP"] = "MARKET",
+        level: float | None = None,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        good_till: str | None = None,
+    ) -> OrderResultOut:
+        """Place an order on the demo account. MARKET fills now; LIMIT and STOP rest
+        until the market reaches `level`, which both require. `stop_loss` and
+        `take_profit` attach on open. A symbol the provider does not know or cannot
+        trade comes back as a refusal naming it, not as a settled order. Never
+        retried on this module's own failure — call `get_positions` or
+        `get_working_orders` to check the effect of a call that did not come back
+        clean before trying again.
+        """
+        if order_type != "MARKET" and level is None:
+            raise ToolRefusal(
+                f"refused: {order_type} orders need a target level — provide `level`."
+            )
+        body: dict[str, str | float] = {
+            "symbol": symbol,
+            "direction": direction,
+            "size": size,
+            "order_type": order_type,
+        }
+        if level is not None:
+            body["level"] = level
+        if stop_loss is not None:
+            body["stop_loss"] = stop_loss
+        if take_profit is not None:
+            body["take_profit"] = take_profit
+        if good_till is not None:
+            body["good_till"] = good_till
+
+        await gateway.ensure_demo_environment()
+        return await _write(gateway, "POST", "/orders", json=body)
+
+    @mcp.tool(annotations=WRITE)
+    async def close_position(position_id: str) -> OrderResultOut:
+        """Close an open position by id. Read `get_positions` first for the id."""
+        await gateway.ensure_demo_environment()
+        return await _write(gateway, "DELETE", f"/positions/{position_id}")
+
+    @mcp.tool(annotations=WRITE)
+    async def amend_stops(
+        position_id: str,
+        stop_loss: float | None = None,
+        take_profit: float | None = None,
+        clear_stop_loss: bool = False,
+        clear_take_profit: bool = False,
+    ) -> OrderResultOut:
+        """Set or clear an open position's stop-loss and take-profit, independently.
+        Give `stop_loss`/`take_profit` a number to set it, `clear_stop_loss`/
+        `clear_take_profit` to remove it, or say nothing about a stop to leave it
+        exactly as it is — capital-gateway treats an omitted field as unchanged and
+        an explicit removal as different from a value, so setting one stop never
+        clears the other.
+        """
+        if stop_loss is not None and clear_stop_loss:
+            raise ToolRefusal("refused: stop_loss and clear_stop_loss cannot both be given")
+        if take_profit is not None and clear_take_profit:
+            raise ToolRefusal("refused: take_profit and clear_take_profit cannot both be given")
+        if stop_loss is None and take_profit is None and not clear_stop_loss and not clear_take_profit:
+            raise ToolRefusal(
+                "refused: provide stop_loss and/or take_profit to set, or "
+                "clear_stop_loss/clear_take_profit to remove — nothing to change"
+            )
+
+        body: dict[str, float | None] = {}
+        if clear_stop_loss:
+            body["stop_loss"] = None
+        elif stop_loss is not None:
+            body["stop_loss"] = stop_loss
+        if clear_take_profit:
+            body["take_profit"] = None
+        elif take_profit is not None:
+            body["take_profit"] = take_profit
+
+        await gateway.ensure_demo_environment()
+        return await _write(gateway, "PUT", f"/positions/{position_id}", json=body)
+
+    @mcp.tool(annotations=WRITE)
+    async def cancel_working_order(order_id: str) -> OrderResultOut:
+        """Cancel a resting LIMIT or STOP order by id. Read `get_working_orders`
+        first for the id."""
+        await gateway.ensure_demo_environment()
+        return await _write(gateway, "DELETE", f"/working-orders/{order_id}")
