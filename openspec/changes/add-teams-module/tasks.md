@@ -64,7 +64,7 @@
 - [x] 6.6 Testy: zespół bez przypisanych narzędzi rusza mimo nieosiągalnego serwera
 - [x] 6.7 Testy: moduł wstaje i obsługuje katalog bez skonfigurowanego serwera narzędzi
 
-  PR #110. Jedno świadome odstępstwo od bliźniaka i jeden podział, który warto znać:
+  PR #112. Jedno świadome odstępstwo od bliźniaka i jeden podział, który warto znać:
 
   - **`list_tools()` rzuca, zamiast oddać pustą listę.** W `agent` brak narzędzi to
     gorsza, ale użyteczna tura; tutaj `ToolServerUnavailable` jest tym, co pozwala
