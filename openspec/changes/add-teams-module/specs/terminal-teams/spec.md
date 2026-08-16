@@ -44,6 +44,45 @@ terminal MUST NOT nieść własnej listy jednych ani drugich.
 - **THEN** wybiera spośród modeli z katalogu modułu
 - **AND** terminal nie ma w swoim kodzie ani jednego identyfikatora modelu
 
+#### Scenario: Usunięcie zależności przy niej samej
+
+- **WHEN** operator usuwa zależność wskazaną na obrazie zespołu
+- **THEN** znika ona z definicji bez otwierania panelu któregokolwiek z jej końców
+
+### Requirement: Ostatnią zmianę w zespole da się cofnąć
+
+Terminal MUST pozwalać cofnąć ostatnią zmianę wprowadzoną w składanym zespole — dodanie
+i usunięcie agenta, poprowadzenie i usunięcie zależności, zmianę pól agenta oraz przesunięcie
+agenta. Cofnięcie MUST przywrócić stan sprzed tej zmiany i MUST NOT sięgać poza to, co
+operator zrobił od otwarcia zespołu.
+
+Ciąg pisania w jednym polu MUST być cofany jako jedna zmiana, a nie znak po znaku. Cofnięcie
+MUST NOT odbierać przeglądarce jej własnego cofania wewnątrz pola tekstowego.
+
+Cofnięcie dotyczy szkicu, nie zapisu: MUST NOT usuwać zapisanej rewizji ani zatrzymywać
+przebiegu. Zespół doprowadzony cofaniem z powrotem do stanu ostatniej rewizji MUST przestać
+mieć niezapisane zmiany.
+
+Canvas jest miejscem, w którym operator próbuje układów. Bez cofnięcia każda próba jest
+zakładem: usunięta rola to prompt, wytyczne i narzędzia do napisania od nowa, a to zmienia
+sposób pracy z „sprawdźmy" na „lepiej nie ruszać".
+
+#### Scenario: Operator cofa usunięcie agenta
+
+- **WHEN** operator usuwa agenta, a potem cofa ostatnią zmianę
+- **THEN** agent wraca wraz ze swoim promptem, modelem i przypisanymi narzędziami
+
+#### Scenario: Cofnięcie do stanu ostatniej rewizji
+
+- **WHEN** operator cofa wszystkie zmiany wprowadzone od zapisu
+- **THEN** zespół przestaje mieć niezapisane zmiany
+- **AND** żadna zapisana rewizja nie zostaje usunięta
+
+#### Scenario: Cofanie w polu tekstowym
+
+- **WHEN** operator cofa zmianę, mając kursor w polu, w którym pisze
+- **THEN** cofnięcie dotyczy tekstu w tym polu, a nie całego zespołu
+
 ### Requirement: Rozmieszczenie agentów jest wyborem operatora i przeżywa zamknięcie widoku
 
 Operator MUST móc przesunąć agenta na obrazie zespołu, a moduł MUST zapamiętać to

@@ -356,11 +356,34 @@
   i podświetlenie przy najechaniu; doszła też druga droga do zależności — wybierak „waits
   for" w panelu agenta, bo tę da się przejść testem, czego przeciągania w jsdom nie da.
 
-## 13. Domknięcie
+## 13. Usunięcie zależności i cofanie
 
-- [ ] 13.1 Zespół przykładowy w katalogu jako punkt wyjścia dla operatora
-- [ ] 13.2 Przebieg od końca do końca na uruchomionym stosie
-- [x] 13.3 `review.md`
+- [x] 13.1 Zależność usuwana przy niej samej — krzyżyk na krawędzi, obok drogi przez panel
+- [x] 13.2 Historia zmian szkicu: dodanie i usunięcie agenta, zależność, pola agenta, przesunięcie
+- [x] 13.3 Zwijanie ciągu pisania w jedną zmianę
+- [x] 13.4 Przycisk „Undo" i skrót Ctrl+Z, z pominięciem pól tekstowych
+- [x] 13.5 Testy: cofnięcie każdej z tych zmian, zwijanie pisania, skrót w polu tekstowym
+
+  Historia siedzi w `editHistory.ts` jako czyste funkcje, bo to jest ta część, którą da się
+  udowodnić bez canvasu — `TeamEditor` tylko trzyma stos i woła `remember`/`undo`. Trzy
+  rzeczy warte odnotowania:
+
+  - **Zwijanie po rodzaju zmiany, nie po czasie.** `edit()` chodzi przy każdym naciśnięciu
+    klawisza, więc ciąg zmian o tym samym kluczu `text:<agent>:<pole>` zostawia stan sprzed
+    całego ciągu. Wszystko inne zawsze odkłada osobno: dwa usunięcia agentów to dwa
+    cofnięcia, nie jedno.
+  - **Ctrl+Z omija pola tekstowe.** W `textarea` własne cofanie przeglądarki jest lepsze niż
+    cofnięcie całego agenta; odebranie go byłoby gorszym interesem niż brak skrótu.
+  - **Krzyżyka na krawędzi nie pilnuje żaden test i to jest luka wpisana świadomie.**
+    React Flow nie rysuje w jsdom ani jednej krawędzi (węzły nie mają wymiarów, zmierzone
+    zero) — sprawdzone wprost, `.react-flow__edge` jest zerem. Droga przez panel robi to
+    samo i ma swoje testy; cofanie usunięcia zależności też.
+
+## 14. Domknięcie
+
+- [ ] 14.1 Zespół przykładowy w katalogu jako punkt wyjścia dla operatora
+- [ ] 14.2 Przebieg od końca do końca na uruchomionym stosie
+- [x] 14.3 `review.md`
 
   Przegląd zrobiony 16 sierpnia 2026 na `64b8665`. Trzy znaleziska, wszystkie zamknięte
   tego samego dnia: `conftest._no_developer_env` trzyma `.env` modułu poza testami

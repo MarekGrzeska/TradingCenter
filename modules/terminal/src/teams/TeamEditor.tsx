@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MarketDataError } from "../data/types";
 import { AgentPanel } from "./AgentPanel";
 import { TeamCanvas } from "./TeamCanvas";
+import { NO_HISTORY, kindForPatch, remember, undo, type EditHistory } from "./editHistory";
 import { locateRefusal, type Refusal } from "./refusal";
 import {
   addAgent,
@@ -72,6 +73,9 @@ export function TeamEditor({
   // make the Save button light up (specs/terminal-teams, "Przesunięcie nie jest zmianą
   // definicji").
   const [places, setPlaces] = useState<TeamLayout>(new Map());
+  // What one step back restores, deepest last. Emptied when another team is opened: this
+  // is the history of what the operator did to *this* draft.
+  const [history, setHistory] = useState<EditHistory>(NO_HISTORY);
 
   useEffect(() => {
     if (teamId === null) {
@@ -80,6 +84,7 @@ export function TeamEditor({
       setDraft(fresh);
       setVersion(null);
       setPlaces(new Map());
+      setHistory(NO_HISTORY);
       setSelectedKey(fresh.agents[0]?.key ?? null);
       return;
     }
@@ -102,6 +107,7 @@ export function TeamEditor({
         setSaved(revision.definition);
         setDraft(revision.definition);
         setPlaces(layout);
+        setHistory(NO_HISTORY);
         setSelectedKey(revision.definition.agents[0]?.key ?? null);
       })
       .catch((cause: unknown) => {
@@ -116,7 +122,29 @@ export function TeamEditor({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, teamId]);
 
-  function edit(next: TeamDefinition) {
+  // Ctrl+Z on the document, so it reaches the draft wherever the operator's hands are —
+  // except inside something being typed into, where the browser's own undo is the better
+  // one and taking it away would be a worse trade than not having the shortcut at all.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== "z" || !(event.ctrlKey || event.metaKey)) return;
+      if (event.shiftKey) return;
+      const target = event.target;
+      if (
+        target instanceof HTMLElement &&
+        (target.isContentEditable || ["INPUT", "TEXTAREA"].includes(target.tagName))
+      ) {
+        return;
+      }
+      event.preventDefault();
+      takeBack();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  });
+
+  function edit(next: TeamDefinition, kind = "structure") {
+    if (draft) setHistory((current) => remember(current, { definition: draft, places }, kind));
     setDraft(next);
     // The refusal described the definition that was sent, so the first edit after it
     // retires it — leaving it on would keep a node marked for a reason that may already
@@ -125,7 +153,15 @@ export function TeamEditor({
   }
 
   function move(agentKey: string, at: { x: number; y: number }) {
-    const moved = new Map(places).set(agentKey, at);
+    if (draft) {
+      setHistory((current) =>
+        remember(current, { definition: draft, places }, `move:${agentKey}`),
+      );
+    }
+    place(new Map(places).set(agentKey, at));
+  }
+
+  function place(moved: TeamLayout) {
     setPlaces(moved);
     // A team that does not exist yet has nowhere to put this; it is saved with the rest
     // of the arrangement the first time the operator drags something after creating it.
@@ -134,6 +170,17 @@ export function TeamEditor({
     // already where the operator put it, and an error banner over a position is louder
     // than what was lost.
     void api.saveLayout(teamId, moved, new AbortController().signal).catch(() => {});
+  }
+
+  function takeBack() {
+    const step = undo(history);
+    if (step === null) return;
+    setHistory(step.history);
+    setDraft(step.state.definition);
+    setRefusal(null);
+    // The arrangement travels with the rest of the step and is written back the same way a
+    // drag writes it: a node put back where it was is only put back if the module agrees.
+    if (step.state.places !== places) place(step.state.places);
   }
 
   async function save() {
@@ -215,6 +262,15 @@ export function TeamEditor({
 
         <button
           type="button"
+          onClick={takeBack}
+          disabled={history.length === 0}
+          title="Undo the last change (Ctrl+Z)"
+          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Undo
+        </button>
+        <button
+          type="button"
           onClick={() => edit(addAgent(draft, defaultModelId))}
           className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
         >
@@ -258,7 +314,9 @@ export function TeamEditor({
             tools={tools}
             toolsNote={toolsNote}
             refusal={refusal}
-            onChange={(patch) => edit(updateAgent(draft, selected.key, patch))}
+            onChange={(patch) =>
+              edit(updateAgent(draft, selected.key, patch), kindForPatch(selected.key, patch))
+            }
             onConnect={(edge) => edit(addDependency(draft, edge))}
             onRemove={() => {
               edit(removeAgent(draft, selected.key));

@@ -4,16 +4,17 @@ import {
   Controls,
   ReactFlow,
   type Connection,
-  type Edge,
   type NodeMouseHandler,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { AgentNode, type AgentFlowNode } from "./AgentNode";
+import { DependencyEdge, type DependencyFlowEdge } from "./DependencyEdge";
 import { layout } from "./teamDraft";
 import type { TeamDefinition, TeamDependency, TeamLayout, TeamsModel } from "./teamsApi";
 import type { Refusal } from "./refusal";
 
 const NODE_TYPES = { agent: AgentNode };
+const EDGE_TYPES = { dependency: DependencyEdge };
 
 /**
  * The team as a picture of its dependencies, which is the point of the tab: a list of
@@ -91,17 +92,16 @@ export function TeamCanvas({
     }));
   }, [definition, modelLabels, places, refusedAgents, runStatuses, selectedKey]);
 
-  const edges: Edge[] = useMemo(
+  const edges: DependencyFlowEdge[] = useMemo(
     () =>
       definition.dependencies.map((edge) => ({
         id: edgeId(edge),
+        type: "dependency" as const,
         source: edge.from,
         target: edge.to,
-        style: refusedEdges.has(edgeId(edge))
-          ? { stroke: "var(--color-critical)", strokeWidth: 2 }
-          : undefined,
+        data: { onRemove: onDisconnect, refused: refusedEdges.has(edgeId(edge)) },
       })),
-    [definition.dependencies, refusedEdges],
+    [definition.dependencies, onDisconnect, refusedEdges],
   );
 
   const handleNodeClick: NodeMouseHandler = (_event, node) => onSelect(node.id);
@@ -115,6 +115,7 @@ export function TeamCanvas({
         nodes={nodes}
         edges={edges}
         nodeTypes={NODE_TYPES}
+        edgeTypes={EDGE_TYPES}
         nodesDraggable={onMove !== undefined}
         nodesConnectable={onConnect !== undefined}
         edgesReconnectable={false}
