@@ -17,8 +17,9 @@ from __future__ import annotations
 import asyncio
 import socket
 import threading
-from collections.abc import AsyncIterator, Callable
-from contextlib import asynccontextmanager
+import time
+from collections.abc import AsyncIterator, Callable, Iterator
+from contextlib import asynccontextmanager, contextmanager
 
 import uvicorn
 from mcp.server.fastmcp import FastMCP
@@ -96,6 +97,35 @@ def _register(mcp: FastMCP, name: str) -> None:
 
 
 DEFAULT_TOOLS = ("get_last_price", "list_tracked_pairs", "read_indicators")
+
+
+@contextmanager
+def serving_sync(tools: tuple[str, ...] = DEFAULT_TOOLS) -> Iterator[str]:
+    """The same stand-in for a test that is not itself async — `TestClient` drives the app
+    through its own portal, so a test around it cannot be a coroutine."""
+    port = free_port()
+    mcp = FastMCP("stand-in", host="127.0.0.1", port=port)
+    for name in tools:
+        _register(mcp, name)
+
+    config = uvicorn.Config(
+        mcp.streamable_http_app(), host="127.0.0.1", port=port, log_level="error"
+    )
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    for _ in range(100):
+        if server.started:
+            break
+        time.sleep(0.05)
+    else:  # pragma: no cover - only reached if the stand-in never comes up
+        raise RuntimeError("the stand-in tool server did not start in time")
+
+    try:
+        yield f"http://127.0.0.1:{port}"
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
 
 
 @asynccontextmanager

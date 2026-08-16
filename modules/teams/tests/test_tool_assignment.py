@@ -10,6 +10,7 @@ from teams.tools import (
     ToolNoLongerAnnounced,
     ToolServer,
     ToolServerUnavailable,
+    announced_tool_names,
     plan_tools,
 )
 
@@ -174,6 +175,22 @@ async def test_an_agent_carrying_no_tools_beside_one_that_does_gets_none() -> No
 
     assert [tool.name for tool in plan.for_agent("reader")] == ["get_last_price"]
     assert plan.for_agent("thinker") == ()
+
+
+async def test_announced_names_are_the_servers_own() -> None:
+    """The save-time shape (`validation.py` checks against this), and its own session:
+    a name list rather than descriptors, because a save has nothing to call."""
+    async with serving(tools=("get_last_price", "read_indicators")) as url:
+        names = await announced_tool_names(settings_for(url))
+
+    assert names == ["get_last_price", "read_indicators"]
+
+
+async def test_announced_names_are_none_when_the_server_cannot_be_asked() -> None:
+    # `None`, not `[]`: "nobody to ask" and "the server announces nothing" are different
+    # facts, and `validation.py` writes a different refusal for each.
+    assert await announced_tool_names(settings_for(None)) is None
+    assert await announced_tool_names(settings_for(f"http://127.0.0.1:{free_port()}")) is None
 
 
 async def test_an_unknown_agent_key_is_a_programming_error() -> None:

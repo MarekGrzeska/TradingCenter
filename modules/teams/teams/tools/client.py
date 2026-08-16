@@ -23,6 +23,15 @@ agents guessing independently, each guess paid for, and a trace that looks like 
 experiment's result without being one (specs/teams-tool-access, "Brak serwera narzędzi
 zatrzymuje przebieg, zamiast pozwolić zespołowi zgadywać"). Refusing is `assignment.py`'s
 job; raising is how this file reports the fact it needs.
+
+**One constraint on where a session may be opened, found the hard way and worth knowing
+before the run loop is written.** The transport holds its halves in anyio task groups, so
+a session opened inside a task that then *returns* — a request handler, typically — leaves
+those scopes on that task's stack and the next scope exit raises "Attempted to exit a
+cancel scope that isn't the current task's current cancel scope", nowhere near the cause.
+Open a session in a task that lives as long as the session does. That is why the save-time
+check (`assignment.announced_tool_names`) opens one of its own and closes it before
+answering, rather than borrowing the long-lived one on `app.state`.
 """
 
 from __future__ import annotations

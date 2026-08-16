@@ -17,8 +17,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from ..config import Settings
 from ..contract import TeamDefinition
-from .client import ToolAccessError, ToolDescriptor, ToolServer
+from .client import ToolAccessError, ToolDescriptor, ToolServer, ToolServerUnavailable
 
 
 class ToolNoLongerAnnounced(ToolAccessError):
@@ -83,6 +84,35 @@ async def plan_tools(definition: TeamDefinition, server: ToolServer) -> ToolPlan
     return ToolPlan(
         {agent.key: tuple(by_name[name] for name in agent.tools) for agent in definition.agents}
     )
+
+
+async def announced_tool_names(settings: Settings) -> list[str] | None:
+    """What the server publishes, in the shape the *save* path wants: `None` when it could
+    not be asked at all.
+
+    The asymmetry with `plan_tools` is deliberate and it is `validation.py`'s, not this
+    module's. Starting a run without reachable tools is refused as an outage; saving a
+    definition that names tools nobody can confirm is refused too, but for a different
+    reason and with a different sentence — "there is no tool server to check against"
+    rather than "that tool is gone". Swallowing the exception here is what lets the save
+    path tell the operator which of the two happened.
+
+    **A session of its own, opened and closed inside this call, rather than the long-lived
+    one on `app.state`.** Measured, not preferred: the streamable-http transport holds its
+    halves in anyio task groups, and a session opened inside a request's task and left
+    open when that task returns corrupts anyio's scope stack — "Attempted to exit a cancel
+    scope that isn't the current task's current cancel scope", raised on the way out of
+    the request rather than anywhere near the cause. A save is an operator pressing a
+    button, so one connection per save costs nothing worth having; a run, which is where
+    the shared session belongs, holds its own task for as long as the session lives.
+    """
+    probe = ToolServer(settings)
+    try:
+        return [tool.name for tool in await probe.list_tools()]
+    except ToolServerUnavailable:
+        return None
+    finally:
+        await probe.aclose()
 
 
 def _agents_wanting(definition: TeamDefinition, tools: list[str]) -> list[str]:

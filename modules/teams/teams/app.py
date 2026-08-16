@@ -1,9 +1,9 @@
 """The published surface: FastAPI over the module.
 
 Assembly only, same split as `agent/app.py` and `market_data/app.py`: the lifespan and
-the routers mounted onto it. This is the skeleton — the lifespan brings the module's own
-database to the revision it was built for and nothing else; the catalogue, run and
-tool-server routers arrive in later changes, each mounted here the same way.
+the routers mounted onto it. The lifespan brings the module's own database to the
+revision it was built for and puts the catalogue's two dependencies on `app.state`; the
+run and tool-server routers arrive in later changes, each mounted here the same way.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ from .config import Settings
 from .db import MIGRATION_LOCK_KEY, advisory_lock
 from .db import pool as make_pool
 from .openapi import require_response_fields
+from .routers import catalogue
 from .tools import ToolServer
 
 log = logging.getLogger(__name__)
@@ -72,6 +73,12 @@ async def lifespan(app: FastAPI):
         app.state.settings = settings
         app.state.pool = pool
         app.state.tools = tools
+        # No `app.state.announced_tools` beside it, and that is the point of the session:
+        # what the server publishes is read from it at the moment a definition is saved
+        # (`routers/catalogue._check`), not copied onto app state at start-up. A list kept
+        # here would be a second copy of somebody else's catalogue, stale from the first
+        # tool the server adds (specs/teams-tool-access, "Moduł nie trzyma kopii tego, co
+        # ogłasza serwer narzędzi").
         try:
             yield
         finally:
@@ -109,6 +116,9 @@ def _openapi_with_required_fields() -> dict:
 
 
 app.openapi = _openapi_with_required_fields  # type: ignore[method-assign]
+
+
+app.include_router(catalogue.router)
 
 
 @app.get("/health")

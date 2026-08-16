@@ -7,10 +7,11 @@ no order: a run ends in a recommendation kept in its trace, not a position.
 
 Full shape of the module — the catalogue, a run's execution, the terminal's canvas — is
 in `openspec/changes/add-teams-module/` (`proposal.md`, `design.md`, the `teams-*` and
-`terminal-teams` delta specs). **This README describes what exists in the code today**,
-which is the module's skeleton: it starts, authenticates the same way `agent` and
-`market-data` do, migrates its own (currently empty) database, and answers `/health`.
-Nothing here serves a team yet — that lands in the changes building on top of this one.
+`terminal-teams` delta specs). **This README describes what exists in the code today**:
+the module starts, authenticates the same way `agent` and `market-data` do, migrates its
+own database, and serves the **catalogue** — teams, their append-only revisions, and
+retiring one. Running a team is not here yet; that lands in the changes building on top
+of this one.
 
 ## What
 
@@ -24,16 +25,24 @@ Nothing here serves a team yet — that lands in the changes building on top of 
   own port.
 - `auth.py` — reads the identity a platform authenticator puts on a request, the same
   two headers `agent` and `market-data` read.
-- `contract.py` — the wire: the definition's own shapes (`AgentDefinition`, `TeamEdge`,
-  `TeamDefinition`) and the `*Out` models the terminal's types are generated from.
+- `contract.py` — the wire shapes, and `TeamDefinition` with them: the one model that is
+  both what a revision stores in JSONB and what the wire carries. What it validates is
+  everything the JSON alone answers — unique agent keys, edges naming real agents, no
+  isolated agent, no dependency cycle.
+- `validation.py` — the rest of "can this be run", which needs something outside the
+  JSON: the configured model catalogue, and the tools the tool server announces. Both are
+  checked when a revision is *saved*, never when it is run.
+- `store.py` — the only door to `teams` and `team_revisions`. The owner is part of every
+  statement, and there is no UPDATE against `team_revisions` in it: a save appends.
+- `routers/catalogue.py` — `/teams`, its revisions, and retiring a team.
 - `tools/` — the session with `market-mcp` (`client.py`, the only place `mcp` is
   imported) and who gets which tools (`assignment.py`). Both refusals that stop a run
-  before an agent is called live in the second: a server that cannot be asked, and a
-  tool the server no longer announces. A team assigning no tools never touches either.
-- `app.py` — assembly only: the lifespan, the tool server it builds without connecting
-  it, and (for now) a single `/health` route. Nothing that decides anything.
-- `migrations/` — the schema, as the statements a deployment actually runs: `0001` the
-  catalogue, `0002` runs and their trace, `0003` usage.
+  before an agent is called live in the second: a server that cannot be asked, and a tool
+  the server no longer announces. A team assigning no tools never touches either.
+- `app.py` — assembly only: the lifespan, the routers mounted on it, and the tool server
+  it builds without connecting. Nothing that decides anything.
+- `migrations/` — the schema, as the statements a deployment actually runs: the catalogue
+  (`0001`), runs and their steps (`0002`), the usage ledger (`0003`).
 
 ## Run
 
@@ -145,8 +154,25 @@ exists to catch.
 
 ## Contract
 
-Not yet published — this phase has no routes beyond `/health`. The catalogue and run
-routers, when they arrive, publish their contract the way `market-data` does: FastAPI's
-own OpenAPI document, generated into the terminal's types rather than copied by hand
-(`design.md`, "Kontrakt generowany; `scripts/contract.mjs` przestaje być
-jednoźródłowy").
+Published the way `market-data`'s is: FastAPI's own OpenAPI document, generated into the
+terminal's types rather than copied by hand (`design.md`, "Kontrakt generowany;
+`scripts/contract.mjs` przestaje być jednoźródłowy").
+
+```bash
+uv run python -m teams.openapi          # the document, from the models — nothing running
+cd ../terminal && pnpm contract:generate  # rewrites src/data/contract.teams.generated.ts
+```
+
+The document is built from the routes *and* the models, so adding a route changes it even
+when `contract.py` does not — `pnpm contract:check` is what catches a stale generated file.
+
+| | |
+|---|---|
+| `GET /health` | outside the identity requirement, and what the deploy's smoke check asks |
+| `GET /teams` · `POST /teams` | the catalogue, and a new team with its first revision |
+| `GET /teams/{id}` · `DELETE /teams/{id}` | one entry; the delete retires it, keeping its runs |
+| `POST /teams/{id}/revisions` | appends the next revision; never touches the previous one |
+| `GET /teams/{id}/revisions/latest` · `/{version}` | a definition as it was saved |
+
+Everything but `/health` answers only to the identity that saved the team, and answers a
+team owned by somebody else exactly as it answers one that does not exist.
