@@ -324,8 +324,49 @@
     nim, i oba biorą narzędzia z `market-mcp`. Między nimi nie ma krawędzi — i o to
     chodziło.
 
-## 12. Domknięcie
+## 12. Rozmieszczenie agentów
 
-- [ ] 12.1 Zespół przykładowy w katalogu jako punkt wyjścia dla operatora
-- [ ] 12.2 Przebieg od końca do końca na uruchomionym stosie
-- [ ] 12.3 `review.md`
+- [x] 12.1 Migracja `0004` — tabela `team_layouts` (zespół, klucz agenta, x, y)
+- [x] 12.2 `store.py` — odczyt układu zespołu i zapis nadpisujący go w miejscu
+- [x] 12.3 `contract.py` — kształt układu na drucie, osobny od definicji
+- [x] 12.4 `GET` i `PUT /teams/{id}/layout`, z tym samym filtrem właściciela co reszta katalogu
+- [x] 12.5 Terminal: przeciąganie węzłów, zapis po puszczeniu, `layout()` dla agentów bez miejsca
+- [x] 12.6 Testy: przesunięcie nie tworzy rewizji; zespół otwarty ponownie ma agentów tam, gdzie je zostawiono
+- [x] 12.7 `pnpm contract:generate` i komplet sprawdzeń obu modułów
+
+  Zapis układu **zastępuje** cały układ zespołu, a nie łata pojedynczy węzeł: canvas wie,
+  gdzie stoi każdy narysowany przez niego agent, a agent usunięty z definicji musi stracić
+  swój wiersz, zamiast czekać na klucz użyty ponownie. Trzy rzeczy warte odnotowania:
+
+  - **Układ należy do zespołu, nie do rewizji** — także monitor przebiegu go czyta, więc
+    przebieg ogląda się na obrazie, który operator ułożył, a nie na drugim, liczonym od
+    nowa. Agent, którego układ nie zna (dołożony później albo obecny tylko w starszej
+    rewizji), dostaje miejsce z `layout()`.
+  - **`updated_at` zespołu nie drga przy przesunięciu.** „Moment ostatniej zmiany"
+    w katalogu dotyczy definicji; kolumna ruszana szturchnięciem węzła przestawiałaby listę
+    bez powodu.
+  - **Zapis jest bezgłośny w razie błędu.** Węzeł jest już tam, gdzie operator go
+    postawił; pasek błędu nad pozycją byłby głośniejszy niż to, co przepadło.
+
+  Przy okazji, z komentarzy operatora do wdrożonej aplikacji: chrom React Flow dostał
+  tokeny terminala (`index.css`, klasa `teams-canvas`). Biblioteka wysyła jasny motyw
+  domyślnie i przełącza się na ciemny tylko pod klasą `.dark`, której ta aplikacja nie
+  używa — stąd przyciski zoomu białe na białym i uchwyt połączenia jako 6-pikselowa
+  kropka `#1a192b` na `--color-panel`. Uchwyty mają teraz 11 px, kolor `--color-primary`
+  i podświetlenie przy najechaniu; doszła też druga droga do zależności — wybierak „waits
+  for" w panelu agenta, bo tę da się przejść testem, czego przeciągania w jsdom nie da.
+
+## 13. Domknięcie
+
+- [ ] 13.1 Zespół przykładowy w katalogu jako punkt wyjścia dla operatora
+- [ ] 13.2 Przebieg od końca do końca na uruchomionym stosie
+- [x] 13.3 `review.md`
+
+  Przegląd zrobiony 16 sierpnia 2026 na `64b8665`. Trzy znaleziska, wszystkie zamknięte
+  tego samego dnia: `conftest._no_developer_env` trzyma `.env` modułu poza testami
+  (blankiem, nie usunięciem — usunięcie odsłania plik); `subscribe` przed odczytem
+  migawki w `/runs/{id}/events`, z testem na samą kolejność; monitor przebiegu nazywa
+  zerwane połączenie zamiast pokazywać ostatnią migawkę w nieskończoność. Oryginalne
+  brzmienie znalezisk zostaje w `review.md`.
+
+  Moduł nie stoi jeszcze w Azure — `apply` operatora jest przed nim, nie za nim.

@@ -54,8 +54,18 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
 
     async function watch() {
       const events = await api.watchRun(runId, controller.signal);
+      // The module closes the stream itself once the run is over, and only then. A body
+      // that ends while the run is still working is a dropped connection, and it has to be
+      // said: the last snapshot stays on screen either way, so silence here reads exactly
+      // like an agent thinking for a long time.
+      let over = false;
+      let working = true;
       for await (const event of events) {
         if (cancelled) return;
+        if (event.kind === "snapshot") {
+          working = event.run.status === "pending" || event.run.status === "running";
+        }
+        if (event.kind === "runFinished") over = true;
         switch (event.kind) {
           case "snapshot":
             setRun(event.run);
@@ -88,6 +98,10 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
             );
             break;
         }
+      }
+      if (!cancelled && working && !over) {
+        setError("the connection to the run was lost — it is still working, this view is not");
+        setStatus("error");
       }
     }
 

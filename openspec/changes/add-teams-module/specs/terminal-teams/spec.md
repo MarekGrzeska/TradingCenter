@@ -44,6 +44,38 @@ terminal MUST NOT nieść własnej listy jednych ani drugich.
 - **THEN** wybiera spośród modeli z katalogu modułu
 - **AND** terminal nie ma w swoim kodzie ani jednego identyfikatora modelu
 
+### Requirement: Rozmieszczenie agentów jest wyborem operatora i przeżywa zamknięcie widoku
+
+Operator MUST móc przesunąć agenta na obrazie zespołu, a moduł MUST zapamiętać to
+rozmieszczenie i oddać je przy kolejnym otwarciu. Rozmieszczenie MUST NOT być częścią rewizji:
+przesunięcie agenta MUST NOT tworzyć nowej rewizji ani zmieniać żadnej zapisanej.
+
+Agent, którego rozmieszczenie nie obejmuje — dołożony po ostatnim przesunięciu albo obecny
+w rewizji, na której biegnie oglądany przebieg — MUST dostać miejsce wyliczone z zależności,
+zamiast wylądować w rogu.
+
+Układ automatyczny odczytuje kierunek pracy i na tym kończy swoją wiedzę. Operator wie
+o swoim zespole rzeczy, których w grafie nie ma — które role są tą samą myślą, co czym jest
+tylko podparte — i to jest jedyna rzecz, którą obraz może po nim zapamiętać. Poza rewizją,
+bo dwa przebiegi tej samej rewizji MUST różnić się odpowiedzią modelu, nigdy pikselami.
+
+#### Scenario: Operator przesuwa agenta i wraca do zespołu
+
+- **WHEN** operator przesuwa agenta na obrazie zespołu, zamyka zespół i otwiera go ponownie
+- **THEN** agent jest tam, gdzie operator go zostawił
+
+#### Scenario: Przesunięcie nie jest zmianą definicji
+
+- **WHEN** operator przesuwa agenta i nie zmienia niczego więcej
+- **THEN** wersja zespołu pozostaje ta sama
+- **AND** żadna zapisana rewizja się nie zmienia
+
+#### Scenario: Agent bez zapamiętanego miejsca
+
+- **WHEN** operator otwiera zespół, do którego dołożył agenta po ostatnim przesuwaniu
+- **THEN** ten agent dostaje miejsce wyliczone z zależności, a pozostali zostają tam, gdzie ich
+  zostawiono
+
 ### Requirement: Zapis odrzucony przez moduł jest pokazany przy miejscu, którego dotyczy
 
 Gdy moduł odrzuca zapis definicji, terminal MUST pokazać przyczynę i MUST wskazać agenta albo

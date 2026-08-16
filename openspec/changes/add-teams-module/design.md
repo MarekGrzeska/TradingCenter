@@ -115,6 +115,26 @@ odrzucone nie z powodu rysowania, tylko edycji: przeciąganie krawędzi, zaznacz
 kilkaset linii, których nikt tu nie chce utrzymywać. **Mermaid** — tylko odczyt, a canvas ma
 być edytorem.
 
+### Rozmieszczenie agentów obok rewizji, nie w niej
+
+Operator przesuwa agentów, a moduł to pamięta — w **osobnej tabeli `team_layouts`**, kluczowanej
+zespołem i kluczem agenta, nadpisywanej w miejscu. Nie w definicji.
+
+Rozważone i odrzucone: **współrzędne w `TeamDefinition`**, czyli w JSONB rewizji. Kusi, bo nie
+wymaga ani migracji, ani trasy — i psuje dokładnie tę rzecz, dla której rewizje są
+niezmienne: przeciągnięcie węzła mintowałoby rewizję, a katalog, w którym „v7 vs v8" znaczy
+czasem inny zespół, a czasem ten sam zespół przesunięty o piksel, przestaje odpowiadać na
+pytanie, po co powstał (`teams-catalogue`, „Rewizja raz zapisana się nie zmienia";
+`teams-runs`, „Przebieg odbywa się na rewizji"). Odrzucone też **trzymanie układu
+w przeglądarce** (`localStorage`): zespół jest w bazie, więc jego obraz na drugiej maszynie
+byłby innym zespołem, a operator dowiedziałby się o tym po fakcie.
+
+Konsekwencja przyjęta świadomie: układ jest wspólny dla wszystkich rewizji zespołu, także tych
+sprzed przesunięcia. Agent, którego układ nie zna — dołożony później albo obecny tylko
+w starszej rewizji, na której biegnie oglądany przebieg — dostaje miejsce z `layout()`,
+liczonego z zależności. Układ jest więc podpowiedzią zapisaną w bazie, nie kontraktem o tym,
+gdzie coś stoi.
+
 ### Faza 1 nie składa zleceń
 
 Zespół kończy pracę rekomendacją w śladzie. Narzędzia tradingowe wchodzą fazą 2.
