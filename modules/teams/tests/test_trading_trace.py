@@ -8,6 +8,7 @@ and "Granica dobowa jest sprawdzana przed utworzeniem przebiegu".
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
@@ -381,3 +382,96 @@ async def test_an_unsettled_order_still_counts_against_the_day(pool: asyncpg.Poo
         )
 
     assert placed == 1
+
+
+# --- the table itself, and what outlives a run (task 7.6) ---
+
+
+async def test_the_table_refuses_a_status_it_does_not_know(pool: asyncpg.Pool) -> None:
+    """The five statuses are a closed set in the schema, not a convention in the code —
+    a sixth spelling arriving from a future edit fails the insert rather than becoming a
+    value nothing knows how to read (`0004_trades.py`)."""
+    definition = TeamDefinition(agents=[a_trader()])
+    run_id = await _run(pool, definition, ScriptedProvider(default=places_orders(1)))
+
+    async with pool.acquire() as conn:
+        row = (await store.get_run_trades(conn, run_id=run_id))[0]
+        with pytest.raises(asyncpg.CheckViolationError):
+            await conn.execute(
+                "UPDATE trades SET status = 'nearly' WHERE id = $1", row["id"]
+            )
+
+
+class _PlacesThenSleeps:
+    """Places one order, then never answers again — so a run can be interrupted with an
+    order already in its trace."""
+
+    def __init__(self) -> None:
+        self.placed = asyncio.Event()
+
+    def stream(self, *, rounds, **kwargs):
+        del kwargs
+
+        async def chunks():
+            if not rounds:
+                yield ToolCallRequest(
+                    id="call-0",
+                    name="place_order",
+                    arguments={"symbol": "GOLD", "direction": "BUY", "size": 1},
+                )
+                yield UsageReport(10, 2, None, None)
+                return
+            self.placed.set()
+            await asyncio.sleep(30)
+            yield TextDelta("never")  # pragma: no cover - the sleep is never outlived
+
+        return chunks()
+
+
+async def test_a_trade_row_survives_an_interrupted_run(pool: asyncpg.Pool) -> None:
+    """specs/teams-runs, "Przebieg przerwany po złożeniu zlecenia": interrupting a run
+    does not un-place what it already placed, and the trace has to keep saying so."""
+    definition = TeamDefinition(agents=[a_trader()])
+    provider = _PlacesThenSleeps()
+
+    async with pool.acquire() as conn:
+        _team_row, revision = await store.create_team(
+            conn, owner_principal=OWNER, name="a team", description="", definition=definition
+        )
+        run, _ = await store.create_run(
+            conn,
+            team_revision_id=revision["id"],
+            owner_principal=OWNER,
+            agent_keys=["trader"],
+        )
+    settings = settings_for(None)
+    registry = RunRegistry()
+    task = asyncio.create_task(
+        execute_run(
+            pool,
+            run_id=run["id"],
+            definition=definition,
+            provider=provider,
+            tool_registry=ToolServerRegistry({"trading-mcp": WriteServer()}),
+            catalogue=ModelCatalogue.from_settings(settings),
+            settings=settings,
+            registry=registry,
+        )
+    )
+    registry.register(run["id"], task)
+
+    async with asyncio.timeout(10):
+        await provider.placed.wait()
+    assert registry.cancel(run["id"]) is True
+    with pytest.raises(asyncio.CancelledError):
+        await task
+
+    async with pool.acquire() as conn:
+        run_row = await store.get_run(conn, run_id=run["id"], owner_principal=OWNER)
+    trades = await _trades(pool, run["id"])
+
+    assert run_row["status"] == "cancelled"  # type: ignore[index]
+    # The order stands, and it stands as settled — the interruption came afterwards.
+    assert len(trades) == 1
+    assert trades[0]["status"] == "settled"
+    assert trades[0]["provider_order_id"] == "deal-1"

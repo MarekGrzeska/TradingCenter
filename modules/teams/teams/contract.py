@@ -461,6 +461,67 @@ class ToolCallOut(BaseModel):
         )
 
 
+class TradeOut(BaseModel):
+    """One call a run made that could change the account — specs/teams-trading, "Każde
+    wywołanie zapisujące zostawia własny wiersz śladu".
+
+    The same event is also a `ToolCallOut`, with the arguments and the reply verbatim.
+    This is that event read as a *trade*: the fields an operator asks about after the
+    fact — what, which way, how much, and what came of it — as columns rather than as
+    JSON somebody has to read.
+
+    `status` is this module's own reading of the outcome and is one of `sent`, `settled`,
+    `unsettled`, `refused`, `unknown`. `result_status` beside it is the provider's word
+    — FILLED, WORKING, PENDING, REJECTED — kept separate because a row can carry the
+    first without the second ever arriving.
+
+    A row still saying `sent` after its run has finished is an order this module does not
+    know the fate of. That is not a gap in the trace; it is the trace saying the one
+    thing it must be able to say (`0004_trades.py`).
+
+    `size` and `level` are strings, like every other number on this wire that is compared
+    rather than recomputed.
+    """
+
+    id: int
+    run_id: int
+    run_step_id: int
+    agent_key: str
+    tool_name: str
+    symbol: str | None
+    direction: str | None
+    size: str | None
+    level: str | None
+    status: str
+    result_status: str | None
+    provider_order_id: str | None
+    reference: str | None
+    created_at: datetime
+    settled_at: datetime | None
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> TradeOut:
+        size = row["size"]
+        level = row["level"]
+        return cls(
+            id=row["id"],
+            run_id=row["run_id"],
+            run_step_id=row["run_step_id"],
+            agent_key=row["agent_key"],
+            tool_name=row["tool_name"],
+            symbol=row["symbol"],
+            direction=row["direction"],
+            size=None if size is None else str(size),
+            level=None if level is None else str(level),
+            status=row["status"],
+            result_status=row["result_status"],
+            provider_order_id=row["provider_order_id"],
+            reference=row["reference"],
+            created_at=row["created_at"],
+            settled_at=row["settled_at"],
+        )
+
+
 class UsageOut(BaseModel):
     id: int
     run_id: int

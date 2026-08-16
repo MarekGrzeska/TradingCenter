@@ -341,3 +341,47 @@ def test_a_team_with_no_daily_order_limit_keeps_starting_runs(
         _wait_for_status(trading_client, started.json()["id"], {"completed", "failed"})
 
     assert len(trading_client.get(f"/teams/{team_id}/runs", headers=OWNER).json()) == 3
+
+
+def test_the_trades_of_a_run_are_readable_on_their_own_route(
+    trading_client: TestClient,
+) -> None:
+    """specs/teams-trading, "Odczyt zleceń przebiegu". Beside `/tool-calls`, not folded
+    into it: that route answers what the agents asked for, this one what happened to the
+    account."""
+    team_id = _trading_team(trading_client, {})
+    run_id = trading_client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(trading_client, run_id, {"completed", "failed"})
+
+    trades = trading_client.get(f"/runs/{run_id}/trades", headers=OWNER)
+
+    assert trades.status_code == 200
+    [trade] = trades.json()
+    assert trade["agent_key"] == "trader"
+    assert trade["tool_name"] == "place_order"
+    assert trade["symbol"] == "GOLD"
+    assert trade["direction"] == "BUY"
+    # The stand-in answers in prose rather than in trading-mcp's JSON, so the outcome is
+    # unknown — and the row says so instead of guessing (specs/teams-trading).
+    assert trade["status"] == "unknown"
+    assert trade["created_at"] is not None
+
+
+def test_a_run_that_placed_nothing_has_an_empty_trades_list(client: TestClient) -> None:
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    trades = client.get(f"/runs/{run_id}/trades", headers=OWNER)
+
+    assert trades.status_code == 200
+    assert trades.json() == []
+
+
+def test_a_strangers_trades_are_not_readable(client: TestClient) -> None:
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    # 404, the same answer as a run that never existed (specs/teams-browser-access).
+    assert client.get(f"/runs/{run_id}/trades", headers=STRANGER).status_code == 404
