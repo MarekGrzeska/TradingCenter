@@ -768,6 +768,27 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
     expect(stub.latest().timeRangesSet).toHaveLength(0);
     expect(source.historyCalls).toHaveLength(0);
   });
+
+  it("lets the operator pan freely after a focus applies, without snapping back", async () => {
+    // `pan()` is what a drag looks like from the library's side: it moves the range and
+    // notifies subscribers, the same as `setVisibleLogicalRange` — but it is not a call
+    // `Chart.tsx` itself made, so it never lands in `rangesSet`, which only records what
+    // this component wrote. A focus that kept re-asserting itself would show up there as
+    // a second write; one that behaved would not.
+    const focus: ChartFocusRequest = { from: null, to: null, around: null, bars: null, lastBars: 2 };
+    renderChart(source, { focusRequest: focus });
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+    const rangesWrittenByTheFocus = stub.latest().rangesSet.length;
+
+    await act(async () => {
+      stub.latest().pan({ from: 0, to: 2 });
+    });
+
+    expect(stub.latest().rangesSet.length).toBe(rangesWrittenByTheFocus);
+    expect(stub.latest().visibleRange).toEqual({ from: 0, to: 2 });
+  });
 });
 
 describe("Chart — reports the visible range (terminal-agent-chat spec, agent-chart-navigation)", () => {
