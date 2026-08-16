@@ -97,3 +97,57 @@ def _every_assigned_tool_is_announced(
                 f"agent {agent.key!r} is assigned tool(s) {unknown}, which the tool server "
                 f"does not announce ({sorted(known)})"
             )
+
+
+# Names of tools that change state outside this module. Empty today — market-mcp serves
+# nothing but reads in this phase (proposal.md, "Faza 1 nie składa zleceń") — and this is
+# where the first one is registered the day phase 2 adds it, rather than a check
+# discovered only once an unattended team has already placed an order
+# (specs/teams-schedules, "Harmonogram nad rewizją z narzędziami zapisującymi wymaga
+# jawnego potwierdzenia"). A frozenset rather than a `Settings` field: this is a fact
+# about market-mcp's own catalogue, not something an operator's `.env` should be able to
+# quietly turn off.
+STATE_CHANGING_TOOLS: frozenset[str] = frozenset()
+
+
+def check_unattended(
+    definition: TeamDefinition,
+    *,
+    unattended_ack: bool,
+    state_changing_tools: Collection[str] = STATE_CHANGING_TOOLS,
+) -> None:
+    """Raises `DefinitionRefused` naming the agent and the tool, unless `unattended_ack`
+    is set — the check a schedule or trigger runs against the revision it would put to
+    work without an operator watching (specs/teams-schedules).
+
+    `state_changing_tools` takes the module default so a test can prove the refusal path
+    exists without market-mcp ever having announced such a tool for real.
+    """
+    if unattended_ack:
+        return
+    risky = set(state_changing_tools)
+    for agent in definition.agents:
+        named = sorted(tool for tool in agent.tools if tool in risky)
+        if named:
+            raise DefinitionRefused(
+                f"agent {agent.key!r} carries state-changing tool(s) {named} — unattended "
+                "work over this revision (a schedule or a trigger) needs an explicit "
+                "acknowledgement (unattended_ack)"
+            )
+
+
+def check_trigger_tool(tool_name: str, *, announced_tools: Collection[str] | None) -> None:
+    """The same shape of check `_every_assigned_tool_is_announced` runs for a team's own
+    agents, run instead for the one tool a trigger's condition calls
+    (specs/teams-triggers, "Warunek jest czytany narzędziami serwera narzędzi")."""
+    if announced_tools is None:
+        raise DefinitionRefused(
+            f"trigger names tool {tool_name!r}, but this module has no tool server to "
+            "check it against — configure MARKET_MCP_URL, or do not save this trigger"
+        )
+    known = set(announced_tools)
+    if tool_name not in known:
+        raise DefinitionRefused(
+            f"trigger names tool {tool_name!r}, which the tool server does not announce "
+            f"({sorted(known)})"
+        )

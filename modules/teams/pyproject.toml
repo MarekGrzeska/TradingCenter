@@ -37,6 +37,11 @@ dependencies = [
     "langgraph>=0.2",
     # The provider, and the one place its message classes exist (`provider.py`).
     "langchain-openai>=0.2",
+    # Rolls a five-field cron expression forward from a point in time — the one place
+    # this module resolves "when does this schedule fire next", used at save time to
+    # seed `next_fire_at` and by the clock itself to advance it after a claim
+    # (design.md, "Wyrażenie cron w UTC, rozwijane przez croniter").
+    "croniter>=3.0",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.

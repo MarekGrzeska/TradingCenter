@@ -1,30 +1,47 @@
 ## 1. Schemat i przechowywanie
 
-- [ ] 1.1 Migracja: `schedules` — właściciel, zespół, tryb rewizji (`pinned` / `latest`)
+- [x] 1.1 Migracja: `schedules` — właściciel, zespół, tryb rewizji (`pinned` / `latest`)
   i przypięta rewizja, wyrażenie cron, `next_fire_at`, `enabled`, powód wyłączenia, licznik
   kolejnych niepowodzeń, potwierdzenie pracy bez nadzoru
-- [ ] 1.2 Migracja: `triggers` — wyzwalacz nad harmonogramem albo samodzielny, opis warunku
-  (instrument, interwał, wielkość, porównanie, próg), wynik ostatniego sprawdzenia, moment
-  ostatniego wyzwolenia, czas martwy
-- [ ] 1.3 Migracja: `schedule_fires` — moment, źródło wyzwolenia, wynik (`started`, `skipped`,
-  `unavailable`), powód, `run_id` dopuszczalnie pusty, liczba pominiętych wyzwoleń
-- [ ] 1.4 Więzy sprawdzające sprzeczne stany wierszy, wzorem `runs` i `run_steps` z fazy 1
-  (wyzwolenie `started` bez `run_id`, `skipped` bez powodu, tryb `pinned` bez rewizji)
-- [ ] 1.5 Zapytania w `store.py`: zapis i odczyt harmonogramów i wyzwalaczy z filtrem
-  właściciela w samym zdaniu, historia wyzwoleń, licznik niepowodzeń
-- [ ] 1.6 Testy `-m db` na powyższe, w tym: cudzy harmonogram jest nieodróżnialny od
-  nieistniejącego
+- [x] 1.2 Migracja: `triggers` — wyzwalacz samodzielny (własny `team_id` i tryb rewizji,
+  bez wskazania na harmonogram — dwie równorzędne tabele, nie zagnieżdżenie), opis warunku
+  jako wywołanie narzędzia (`tool_name`, `arguments`, `field_path`, `comparison`,
+  `threshold`), trzystanowy wynik ostatniego sprawdzenia, moment ostatniego wyzwolenia,
+  czas martwy i osobny interwał sprawdzania
+- [x] 1.3 Migracja: `schedule_fires` — moment, źródło wyzwolenia (`schedule_id` albo
+  `trigger_id`, dokładnie jedno), wynik (`started`, `skipped`, `unavailable`), powód,
+  `run_id` dopuszczalnie pusty, liczba pominiętych wyzwoleń
+- [x] 1.4 Więzy sprawdzające sprzeczne stany wierszy, wzorem `runs` i `run_steps` z fazy 1
+  (wyzwolenie `started` bez `run_id`, `skipped`/`unavailable` bez powodu, tryb `pinned`
+  bez rewizji, `schedule_fires` bez dokładnie jednego źródła)
+- [x] 1.5 Zapytania w `store.py`: zapis i odczyt harmonogramów i wyzwalaczy z filtrem
+  właściciela w samym zdaniu, przejęcie wyzwolenia warunkowym `UPDATE` (`claim_due_schedule`,
+  `claim_trigger_for_check`), włączanie/wyłączanie, licznik niepowodzeń, historia wyzwoleń
+- [x] 1.6 Testy `-m db` na powyższe (`tests/test_schedules_store.py`, 22 testów): cudzy
+  harmonogram i wyzwalacz są nieodróżnialne od nieistniejących, dwa równoległe przejęcia
+  tego samego wiersza (harmonogramu i wyzwalacza) dają dokładnie jednego zwycięzcę, wynik
+  „nieznany" wyzwalacza to `NULL`, nie `false`
 
 ## 2. Kontrakt i trasy
 
-- [ ] 2.1 Modele wire w `contract.py` — **dopisane na końcu pliku**, w osobnej sekcji
+- [x] 2.1 Modele wire w `contract.py` — **dopisane na końcu pliku**, w osobnej sekcji
   (`ScheduleOut`, `ScheduleIn`, `TriggerOut`, `TriggerIn`, `ScheduleFireOut`,
-  `NextFiresOut`); walidacja czystego kształtu wyrażenia cron tam, gdzie nie wymaga bazy
-- [ ] 2.2 `routers/schedules.py` — utworzenie, odczyt, zmiana, włączenie i wyłączenie
-  harmonogramu oraz wyzwalacza, historia wyzwoleń
-- [ ] 2.3 Trasa podglądu najbliższych wyzwoleń, liczona przez moduł
-- [ ] 2.4 `include_router` w `app.py` — **dopisany po istniejących**
-- [ ] 2.5 Testy tras, w tym odmowy: zły cron, nieznana wielkość warunku, brak serwera narzędzi
+  `NextFiresOut`); walidacja czystego kształtu wyrażenia cron przez `croniter.is_valid`
+  (dependency przeniesiona tu z grupy 3 — POST/PUT muszą wyliczyć `next_fire_at` przy
+  zapisie, więc `croniter` jest potrzebny już teraz, nie dopiero w zegarze)
+- [x] 2.2 `routers/schedules.py` — utworzenie, odczyt, zmiana, włączenie i wyłączenie
+  harmonogramu oraz wyzwalacza, historia wyzwoleń. Sprawdzenie `unattended_ack` żyje w
+  nowym `validation.check_unattended` (`STATE_CHANGING_TOOLS` — dziś pusty zbiór, patrz
+  `validation.py`), sprawdzenie narzędzia wyzwalacza w nowym `validation.check_trigger_tool`
+- [x] 2.3 Trasa podglądu najbliższych wyzwoleń, liczona przez moduł
+  (`GET /schedules/{id}/next-fires`) — świeże liczenie z `cron_expression` przez
+  `croniter`, nie odczyt zapisanego `next_fire_at`
+- [x] 2.4 `include_router` w `app.py` — **dopisany po istniejących**
+- [x] 2.5 Testy tras (`tests/test_schedules_routes.py`, 15 testów; plus 6 nowych w
+  `tests/test_validation.py`), w tym odmowy: zły cron, rewizja z innego zespołu, wyzwalacz
+  bez skonfigurowanego serwera narzędzi, wyzwalacz z nieogłaszaną nazwą narzędzia (przez
+  prawdziwy stand-in MCP, `mcp_stand_in.serving_sync`), rewizja z narzędziem zmieniającym
+  stan bez potwierdzenia (na poziomie `validation.py`, jawnym `state_changing_tools`)
 
 ## 3. Zegar i przejęcie wyzwolenia
 
@@ -37,7 +54,10 @@
 - [ ] 3.5 Uruchomienie przebiegu tą samą drogą co router: rozwiązanie rewizji zgodnie z trybem,
   właściciel z harmonogramu, rejestracja w `RunRegistry`
 - [ ] 3.6 Pominięcie przy trwającym poprzednim przebiegu tego harmonogramu, z wpisem w historii
-- [ ] 3.7 `croniter` w `pyproject.toml`, schowany za własną funkcją rozwijania
+- [x] 3.7 `croniter` w `pyproject.toml` — zrobione wcześniej, w grupie 2 (`_first_fire_at`
+  w `routers/schedules.py`), bo POST/PUT harmonogramu potrzebują wyliczyć `next_fire_at`
+  przy zapisie. Grupa 3 dodaje drugie miejsce użycia (przeliczenie po każdym przejęciu),
+  nie samą zależność
 
 ## 4. Wyzwalacze
 

@@ -11,7 +11,12 @@ from __future__ import annotations
 import pytest
 
 from teams.contract import AgentDefinition, TeamDefinition
-from teams.validation import DefinitionRefused, check_definition
+from teams.validation import (
+    DefinitionRefused,
+    check_definition,
+    check_trigger_tool,
+    check_unattended,
+)
 
 MODELS = ("gpt-5.6-luna", "gpt-5.6-mini")
 
@@ -68,3 +73,53 @@ def test_a_team_assigning_no_tools_passes_without_a_tool_server() -> None:
     # at save time or at run time.
     definition = TeamDefinition(agents=[_agent("scout"), _agent("judge")], edges=[])
     check_definition(definition, model_ids=MODELS, announced_tools=None)
+
+
+# --- specs/teams-schedules, "Harmonogram nad rewizją z narzędziami zapisującymi wymaga
+# jawnego potwierdzenia" — today's catalogue has no state-changing tool at all, so these
+# pass `state_changing_tools` explicitly rather than relying on the module's own (empty)
+# default, which is exactly what proves the refusal branch is real code and not dead.
+
+
+def test_a_revision_with_no_state_changing_tools_needs_no_acknowledgement() -> None:
+    definition = TeamDefinition(agents=[_agent("scout", tools=["get_candles"])])
+    check_unattended(
+        definition, unattended_ack=False, state_changing_tools={"place_order"}
+    )
+
+
+def test_a_revision_naming_a_state_changing_tool_is_refused_without_acknowledgement() -> None:
+    definition = TeamDefinition(agents=[_agent("trader", tools=["place_order"])])
+
+    with pytest.raises(DefinitionRefused) as err:
+        check_unattended(
+            definition, unattended_ack=False, state_changing_tools={"place_order"}
+        )
+
+    assert "trader" in str(err.value)
+    assert "place_order" in str(err.value)
+
+
+def test_the_same_revision_is_accepted_with_an_explicit_acknowledgement() -> None:
+    definition = TeamDefinition(agents=[_agent("trader", tools=["place_order"])])
+    check_unattended(
+        definition, unattended_ack=True, state_changing_tools={"place_order"}
+    )
+
+
+def test_a_trigger_naming_an_announced_tool_passes() -> None:
+    check_trigger_tool("get_candles", announced_tools=["get_candles", "get_symbols"])
+
+
+def test_a_trigger_naming_a_tool_the_server_does_not_announce_is_refused() -> None:
+    with pytest.raises(DefinitionRefused) as err:
+        check_trigger_tool("invent_a_price", announced_tools=["get_candles"])
+
+    assert "invent_a_price" in str(err.value)
+
+
+def test_a_trigger_with_no_tool_server_is_refused_and_says_so() -> None:
+    with pytest.raises(DefinitionRefused) as err:
+        check_trigger_tool("get_candles", announced_tools=None)
+
+    assert "MARKET_MCP_URL" in str(err.value)

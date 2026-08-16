@@ -26,8 +26,9 @@ import json
 from collections.abc import Iterable, Mapping
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
-from typing import Any
+from typing import Any, Literal
 
+from croniter import croniter
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 from .config import ModelCatalogueEntry
@@ -484,3 +485,223 @@ class UsageSummaryOut(BaseModel):
     total_cost: str
     by_agent: list[UsageAggregateOut]
     by_model: list[UsageAggregateOut]
+
+
+# --- schedules, triggers, and the fires either one produces ---------------------------
+#
+# Phase 3 — a team running without an operator at the keyboard. `ScheduleIn`/`TriggerIn`
+# carry the same revision-selection shape (`revision_mode`/`pinned_revision_id`) and are
+# validated the same way (`_revision_selection_is_coherent`) rather than sharing a base
+# class: everything else about the two diverges (a cron expression against a market
+# condition), and a base class for two fields would cost more to read than it saves to
+# write.
+
+
+def _revision_selection_is_coherent(revision_mode: str, pinned_revision_id: int | None) -> None:
+    """specs/teams-schedules, "Harmonogram uruchamia rewizję przypiętą, a tryb «najnowsza»
+    jest jawnym wyborem" — `pinned` names a revision, `latest` names none, and nothing
+    else is well-formed."""
+    if revision_mode == "pinned" and pinned_revision_id is None:
+        raise ValueError("revision_mode 'pinned' needs pinned_revision_id")
+    if revision_mode == "latest" and pinned_revision_id is not None:
+        raise ValueError("revision_mode 'latest' must not carry pinned_revision_id")
+
+
+class ScheduleIn(BaseModel):
+    """What an operator submits to create or edit a schedule."""
+
+    revision_mode: Literal["pinned", "latest"] = "pinned"
+    pinned_revision_id: int | None = None
+    cron_expression: str
+    # Refused unless true, the day the pinned or latest revision's agents carry a
+    # state-changing tool — `validation.check_unattended` is where that is enforced,
+    # because it needs the revision's own definition, which this model does not carry
+    # (specs/teams-schedules, "Harmonogram nad rewizją z narzędziami zapisującymi wymaga
+    # jawnego potwierdzenia").
+    unattended_ack: bool = False
+
+    @field_validator("cron_expression")
+    @classmethod
+    def _cron_is_well_formed(cls, value: str) -> str:
+        stripped = value.strip()
+        if not croniter.is_valid(stripped):
+            raise ValueError(f"{stripped!r} is not a valid five-field cron expression")
+        return stripped
+
+    @model_validator(mode="after")
+    def _revision_selection(self) -> ScheduleIn:
+        _revision_selection_is_coherent(self.revision_mode, self.pinned_revision_id)
+        return self
+
+
+class ScheduleOut(BaseModel):
+    id: int
+    team_id: int
+    revision_mode: str
+    pinned_revision_id: int | None
+    cron_expression: str
+    # Set at creation and after every claim — never read by a caller to decide anything,
+    # only shown; the module is the one clock (specs/teams-schedules, "Moduł ma jeden
+    # zegar i sam publikuje najbliższe wyzwolenia").
+    next_fire_at: datetime
+    enabled: bool
+    disabled_reason: str | None
+    consecutive_failures: int
+    unattended_ack: bool
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> ScheduleOut:
+        return cls(
+            id=row["id"],
+            team_id=row["team_id"],
+            revision_mode=row["revision_mode"],
+            pinned_revision_id=row["pinned_revision_id"],
+            cron_expression=row["cron_expression"],
+            next_fire_at=row["next_fire_at"],
+            enabled=row["enabled"],
+            disabled_reason=row["disabled_reason"],
+            consecutive_failures=row["consecutive_failures"],
+            unattended_ack=row["unattended_ack"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+
+class NextFiresOut(BaseModel):
+    """specs/terminal-teams-schedules, "Terminal nie liczy czasu wyzwolenia sam" — the
+    module's own answer to "when does this schedule fire next", computed fresh from
+    `cron_expression` rather than read off the row's own `next_fire_at` — which reflects
+    the last *claim*, not a live forecast, and goes stale the moment a schedule is
+    disabled."""
+
+    times: list[datetime]
+
+
+class TriggerIn(BaseModel):
+    """A market condition, expressed as a call to a tool this module already has a
+    session for (specs/teams-triggers, "Warunek jest czytany narzędziami serwera
+    narzędzi") — never a locally computed indicator. `field_path` names the value inside
+    that call's result to compare; `threshold` is a string for the same reason every
+    other number on this contract that a caller must not rescale is (see `CostLimits`)."""
+
+    revision_mode: Literal["pinned", "latest"] = "pinned"
+    pinned_revision_id: int | None = None
+    tool_name: str
+    arguments: dict[str, Any] = Field(default_factory=dict)
+    field_path: str
+    comparison: Literal["gt", "gte", "lt", "lte", "eq"]
+    threshold: str
+    cooldown_seconds: int = 900
+    poll_interval_seconds: int = 300
+    unattended_ack: bool = False
+
+    @field_validator("tool_name", "field_path")
+    @classmethod
+    def _not_blank(cls, value: str, info: ValidationInfo) -> str:
+        if not value.strip():
+            raise ValueError(f"{info.field_name} must not be blank")
+        return value.strip()
+
+    @field_validator("threshold")
+    @classmethod
+    def _threshold_is_a_number(cls, value: str) -> str:
+        try:
+            parsed = Decimal(value)
+        except InvalidOperation as err:
+            raise ValueError(f"threshold is not a number: {value!r}") from err
+        return str(parsed)
+
+    @field_validator("cooldown_seconds", "poll_interval_seconds")
+    @classmethod
+    def _positive(cls, value: int, info: ValidationInfo) -> int:
+        if value <= 0:
+            raise ValueError(f"{info.field_name} must be positive, got {value}")
+        return value
+
+    @model_validator(mode="after")
+    def _revision_selection(self) -> TriggerIn:
+        _revision_selection_is_coherent(self.revision_mode, self.pinned_revision_id)
+        return self
+
+
+class TriggerOut(BaseModel):
+    id: int
+    team_id: int
+    revision_mode: str
+    pinned_revision_id: int | None
+    tool_name: str
+    arguments: dict[str, Any]
+    field_path: str
+    comparison: str
+    threshold: str
+    cooldown_seconds: int
+    poll_interval_seconds: int
+    next_check_at: datetime
+    # `None` until the first check ever runs, and `None` again whenever the tool server
+    # could not be asked — a third value, not a `false` (specs/teams-triggers,
+    # "Niedostępność serwera narzędzi to nie jest niespełniony warunek").
+    last_result: bool | None
+    last_checked_at: datetime | None
+    last_fired_at: datetime | None
+    enabled: bool
+    disabled_reason: str | None
+    consecutive_failures: int
+    unattended_ack: bool
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> TriggerOut:
+        return cls(
+            id=row["id"],
+            team_id=row["team_id"],
+            revision_mode=row["revision_mode"],
+            pinned_revision_id=row["pinned_revision_id"],
+            tool_name=row["tool_name"],
+            arguments=_parse_jsonb(row["arguments"]),
+            field_path=row["field_path"],
+            comparison=row["comparison"],
+            threshold=str(row["threshold"]),
+            cooldown_seconds=row["cooldown_seconds"],
+            poll_interval_seconds=row["poll_interval_seconds"],
+            next_check_at=row["next_check_at"],
+            last_result=row["last_result"],
+            last_checked_at=row["last_checked_at"],
+            last_fired_at=row["last_fired_at"],
+            enabled=row["enabled"],
+            disabled_reason=row["disabled_reason"],
+            consecutive_failures=row["consecutive_failures"],
+            unattended_ack=row["unattended_ack"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+        )
+
+
+class ScheduleFireOut(BaseModel):
+    """One fire attempt from either source, including one that started nothing
+    (specs/teams-schedules, "Wyzwolenie bez przebiegu zostawia zapisany powód"). Exactly
+    one of `schedule_id`/`trigger_id` is set, mirroring the row's own CHECK constraint."""
+
+    id: int
+    schedule_id: int | None
+    trigger_id: int | None
+    fired_at: datetime
+    outcome: str
+    reason: str | None
+    run_id: int | None
+    skipped_count: int
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> ScheduleFireOut:
+        return cls(
+            id=row["id"],
+            schedule_id=row["schedule_id"],
+            trigger_id=row["trigger_id"],
+            fired_at=row["fired_at"],
+            outcome=row["outcome"],
+            reason=row["reason"],
+            run_id=row["run_id"],
+            skipped_count=row["skipped_count"],
+        )

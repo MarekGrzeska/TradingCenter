@@ -617,3 +617,439 @@ async def fail_unfinished_runs(conn: Conn, *, reason: str) -> list[int]:
         await conn.execute(_FAIL_ORPHAN_STEPS)
         rows = await conn.fetch(_FAIL_ORPHAN_RUNS, reason)
     return [row["id"] for row in rows]
+
+
+# --- schedules, triggers, and the fires either one produces ---------------------------
+#
+# `schedules.owner_principal` and `triggers.owner_principal` are copied at creation
+# rather than reached through the team they point at — the same reasoning
+# `runs.owner_principal` already carries in this file: an access check MUST NOT depend
+# on a join, and a row survives its team being retired (specs/teams-schedules,
+# "Harmonogram należy do operatora, który go zapisał").
+#
+# Every "claim" statement below is a conditional UPDATE whose WHERE clause is the whole
+# of the exactly-once guarantee (design.md, "Wyzwolenie przejmowane w bazie, nie
+# posiadane przez proces"): a second caller's UPDATE waits on Postgres's own row lock,
+# then re-evaluates the same WHERE against the row the first caller already advanced —
+# and finds it no longer due. No advisory lock, no "leader" process, nothing that
+# outlives one statement.
+
+_SCHEDULE_COLUMNS = """
+    id, team_id, owner_principal, revision_mode, pinned_revision_id, cron_expression,
+    next_fire_at, enabled, disabled_reason, consecutive_failures, unattended_ack,
+    created_at, updated_at
+"""
+
+_INSERT_SCHEDULE = f"""
+    INSERT INTO schedules (
+        team_id, owner_principal, revision_mode, pinned_revision_id,
+        cron_expression, next_fire_at, unattended_ack
+    )
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING {_SCHEDULE_COLUMNS}
+"""
+
+_SELECT_SCHEDULE = f"""
+    SELECT {_SCHEDULE_COLUMNS} FROM schedules WHERE id = $1 AND owner_principal = $2
+"""
+
+_SELECT_SCHEDULES_FOR_TEAM = f"""
+    SELECT {_SCHEDULE_COLUMNS} FROM schedules
+     WHERE team_id = $1 AND owner_principal = $2
+     ORDER BY created_at DESC, id DESC
+"""
+
+_UPDATE_SCHEDULE = f"""
+    UPDATE schedules
+       SET revision_mode = $3, pinned_revision_id = $4, cron_expression = $5,
+           next_fire_at = $6, unattended_ack = $7, updated_at = now()
+     WHERE id = $1 AND owner_principal = $2
+    RETURNING {_SCHEDULE_COLUMNS}
+"""
+
+# Re-enabling clears whatever disabled it and gives it a clean run of failures — the
+# same "włączyć z powrotem" specs/teams-schedules describes. Disabling by an operator's
+# own choice leaves `disabled_reason` as it was (usually NULL): the operator needs no
+# explanation of a decision they just made themselves.
+_SET_SCHEDULE_ENABLED = f"""
+    UPDATE schedules
+       SET enabled = $3,
+           disabled_reason = CASE WHEN $3 THEN NULL ELSE disabled_reason END,
+           consecutive_failures = CASE WHEN $3 THEN 0 ELSE consecutive_failures END,
+           updated_at = now()
+     WHERE id = $1 AND owner_principal = $2
+    RETURNING {_SCHEDULE_COLUMNS}
+"""
+
+# System-initiated — no owner filter, because the caller is the clock loop acting on a
+# row it already resolved, not an operator's request (specs/teams-schedules, "Harmonogram
+# po serii nieudanych przebiegów wyłącza się sam").
+_DISABLE_SCHEDULE_FOR_FAILURES = f"""
+    UPDATE schedules SET enabled = false, disabled_reason = $2, updated_at = now()
+     WHERE id = $1
+    RETURNING {_SCHEDULE_COLUMNS}
+"""
+
+_INCREMENT_SCHEDULE_FAILURES = f"""
+    UPDATE schedules SET consecutive_failures = consecutive_failures + 1, updated_at = now()
+     WHERE id = $1
+    RETURNING {_SCHEDULE_COLUMNS}
+"""
+
+_RESET_SCHEDULE_FAILURES = f"""
+    UPDATE schedules SET consecutive_failures = 0, updated_at = now()
+     WHERE id = $1
+    RETURNING {_SCHEDULE_COLUMNS}
+"""
+
+_CLAIM_DUE_SCHEDULE = f"""
+    UPDATE schedules SET next_fire_at = $2, updated_at = now()
+     WHERE id = $1 AND enabled AND next_fire_at <= now()
+    RETURNING {_SCHEDULE_COLUMNS}
+"""
+
+
+async def create_schedule(
+    conn: Conn,
+    *,
+    team_id: int,
+    owner_principal: str,
+    revision_mode: str,
+    pinned_revision_id: int | None,
+    cron_expression: str,
+    next_fire_at: datetime,
+    unattended_ack: bool,
+) -> asyncpg.Record:
+    return await fetch_one(
+        conn,
+        _INSERT_SCHEDULE,
+        team_id,
+        owner_principal,
+        revision_mode,
+        pinned_revision_id,
+        cron_expression,
+        next_fire_at,
+        unattended_ack,
+    )
+
+
+async def get_schedule(
+    conn: Conn, *, schedule_id: int, owner_principal: str
+) -> asyncpg.Record | None:
+    return await conn.fetchrow(_SELECT_SCHEDULE, schedule_id, owner_principal)
+
+
+async def list_schedules_for_team(
+    conn: Conn, *, team_id: int, owner_principal: str
+) -> list[asyncpg.Record]:
+    return list(await conn.fetch(_SELECT_SCHEDULES_FOR_TEAM, team_id, owner_principal))
+
+
+async def update_schedule(
+    conn: Conn,
+    *,
+    schedule_id: int,
+    owner_principal: str,
+    revision_mode: str,
+    pinned_revision_id: int | None,
+    cron_expression: str,
+    next_fire_at: datetime,
+    unattended_ack: bool,
+) -> asyncpg.Record | None:
+    return await conn.fetchrow(
+        _UPDATE_SCHEDULE,
+        schedule_id,
+        owner_principal,
+        revision_mode,
+        pinned_revision_id,
+        cron_expression,
+        next_fire_at,
+        unattended_ack,
+    )
+
+
+async def set_schedule_enabled(
+    conn: Conn, *, schedule_id: int, owner_principal: str, enabled: bool
+) -> asyncpg.Record | None:
+    return await conn.fetchrow(_SET_SCHEDULE_ENABLED, schedule_id, owner_principal, enabled)
+
+
+async def disable_schedule_for_failures(
+    conn: Conn, *, schedule_id: int, reason: str
+) -> asyncpg.Record | None:
+    return await conn.fetchrow(_DISABLE_SCHEDULE_FOR_FAILURES, schedule_id, reason)
+
+
+async def increment_schedule_failures(conn: Conn, *, schedule_id: int) -> asyncpg.Record | None:
+    return await conn.fetchrow(_INCREMENT_SCHEDULE_FAILURES, schedule_id)
+
+
+async def reset_schedule_failures(conn: Conn, *, schedule_id: int) -> asyncpg.Record | None:
+    return await conn.fetchrow(_RESET_SCHEDULE_FAILURES, schedule_id)
+
+
+async def claim_due_schedule(
+    conn: Conn, *, schedule_id: int, next_fire_at: datetime
+) -> asyncpg.Record | None:
+    """`None` means somebody else already claimed this fire, or it was disabled between
+    being listed as due and this call — either way, this caller does nothing further."""
+    return await conn.fetchrow(_CLAIM_DUE_SCHEDULE, schedule_id, next_fire_at)
+
+
+_TRIGGER_COLUMNS = """
+    id, team_id, owner_principal, revision_mode, pinned_revision_id, tool_name,
+    arguments, field_path, comparison, threshold, cooldown_seconds,
+    poll_interval_seconds, next_check_at, last_result, last_checked_at, last_fired_at,
+    enabled, disabled_reason, consecutive_failures, unattended_ack, created_at, updated_at
+"""
+
+_INSERT_TRIGGER = f"""
+    INSERT INTO triggers (
+        team_id, owner_principal, revision_mode, pinned_revision_id,
+        tool_name, arguments, field_path, comparison, threshold,
+        cooldown_seconds, poll_interval_seconds, next_check_at, unattended_ack
+    )
+    VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13)
+    RETURNING {_TRIGGER_COLUMNS}
+"""
+
+_SELECT_TRIGGER = f"""
+    SELECT {_TRIGGER_COLUMNS} FROM triggers WHERE id = $1 AND owner_principal = $2
+"""
+
+_SELECT_TRIGGERS_FOR_TEAM = f"""
+    SELECT {_TRIGGER_COLUMNS} FROM triggers
+     WHERE team_id = $1 AND owner_principal = $2
+     ORDER BY created_at DESC, id DESC
+"""
+
+_UPDATE_TRIGGER = f"""
+    UPDATE triggers
+       SET revision_mode = $3, pinned_revision_id = $4, tool_name = $5,
+           arguments = $6::jsonb, field_path = $7, comparison = $8, threshold = $9,
+           cooldown_seconds = $10, poll_interval_seconds = $11, unattended_ack = $12,
+           updated_at = now()
+     WHERE id = $1 AND owner_principal = $2
+    RETURNING {_TRIGGER_COLUMNS}
+"""
+
+_SET_TRIGGER_ENABLED = f"""
+    UPDATE triggers
+       SET enabled = $3,
+           disabled_reason = CASE WHEN $3 THEN NULL ELSE disabled_reason END,
+           consecutive_failures = CASE WHEN $3 THEN 0 ELSE consecutive_failures END,
+           updated_at = now()
+     WHERE id = $1 AND owner_principal = $2
+    RETURNING {_TRIGGER_COLUMNS}
+"""
+
+_DISABLE_TRIGGER_FOR_FAILURES = f"""
+    UPDATE triggers SET enabled = false, disabled_reason = $2, updated_at = now()
+     WHERE id = $1
+    RETURNING {_TRIGGER_COLUMNS}
+"""
+
+_INCREMENT_TRIGGER_FAILURES = f"""
+    UPDATE triggers SET consecutive_failures = consecutive_failures + 1, updated_at = now()
+     WHERE id = $1
+    RETURNING {_TRIGGER_COLUMNS}
+"""
+
+_RESET_TRIGGER_FAILURES = f"""
+    UPDATE triggers SET consecutive_failures = 0, updated_at = now()
+     WHERE id = $1
+    RETURNING {_TRIGGER_COLUMNS}
+"""
+
+_CLAIM_TRIGGER_FOR_CHECK = f"""
+    UPDATE triggers SET next_check_at = $2, updated_at = now()
+     WHERE id = $1 AND enabled AND next_check_at <= now()
+    RETURNING {_TRIGGER_COLUMNS}
+"""
+
+# The edge-detection state itself: what the condition answered, and when it last fired.
+# `result` is `NULL` when the tool server could not be asked at all — a third value, not
+# a `false` (specs/teams-triggers, "Niedostępność serwera narzędzi to nie jest niespełniony
+# warunek") — so this statement, not the caller's Python, is what a reader trusts for
+# "was this ever actually evaluated".
+_RECORD_TRIGGER_CHECK = f"""
+    UPDATE triggers
+       SET last_result = $2,
+           last_checked_at = now(),
+           last_fired_at = CASE WHEN $3 THEN now() ELSE last_fired_at END,
+           updated_at = now()
+     WHERE id = $1
+    RETURNING {_TRIGGER_COLUMNS}
+"""
+
+
+async def create_trigger(
+    conn: Conn,
+    *,
+    team_id: int,
+    owner_principal: str,
+    revision_mode: str,
+    pinned_revision_id: int | None,
+    tool_name: str,
+    arguments: dict,
+    field_path: str,
+    comparison: str,
+    threshold: Decimal,
+    cooldown_seconds: int,
+    poll_interval_seconds: int,
+    next_check_at: datetime,
+    unattended_ack: bool,
+) -> asyncpg.Record:
+    return await fetch_one(
+        conn,
+        _INSERT_TRIGGER,
+        team_id,
+        owner_principal,
+        revision_mode,
+        pinned_revision_id,
+        tool_name,
+        json.dumps(arguments),
+        field_path,
+        comparison,
+        threshold,
+        cooldown_seconds,
+        poll_interval_seconds,
+        next_check_at,
+        unattended_ack,
+    )
+
+
+async def get_trigger(
+    conn: Conn, *, trigger_id: int, owner_principal: str
+) -> asyncpg.Record | None:
+    return await conn.fetchrow(_SELECT_TRIGGER, trigger_id, owner_principal)
+
+
+async def list_triggers_for_team(
+    conn: Conn, *, team_id: int, owner_principal: str
+) -> list[asyncpg.Record]:
+    return list(await conn.fetch(_SELECT_TRIGGERS_FOR_TEAM, team_id, owner_principal))
+
+
+async def update_trigger(
+    conn: Conn,
+    *,
+    trigger_id: int,
+    owner_principal: str,
+    revision_mode: str,
+    pinned_revision_id: int | None,
+    tool_name: str,
+    arguments: dict,
+    field_path: str,
+    comparison: str,
+    threshold: Decimal,
+    cooldown_seconds: int,
+    poll_interval_seconds: int,
+    unattended_ack: bool,
+) -> asyncpg.Record | None:
+    return await conn.fetchrow(
+        _UPDATE_TRIGGER,
+        trigger_id,
+        owner_principal,
+        revision_mode,
+        pinned_revision_id,
+        tool_name,
+        json.dumps(arguments),
+        field_path,
+        comparison,
+        threshold,
+        cooldown_seconds,
+        poll_interval_seconds,
+        unattended_ack,
+    )
+
+
+async def set_trigger_enabled(
+    conn: Conn, *, trigger_id: int, owner_principal: str, enabled: bool
+) -> asyncpg.Record | None:
+    return await conn.fetchrow(_SET_TRIGGER_ENABLED, trigger_id, owner_principal, enabled)
+
+
+async def disable_trigger_for_failures(
+    conn: Conn, *, trigger_id: int, reason: str
+) -> asyncpg.Record | None:
+    return await conn.fetchrow(_DISABLE_TRIGGER_FOR_FAILURES, trigger_id, reason)
+
+
+async def increment_trigger_failures(conn: Conn, *, trigger_id: int) -> asyncpg.Record | None:
+    return await conn.fetchrow(_INCREMENT_TRIGGER_FAILURES, trigger_id)
+
+
+async def reset_trigger_failures(conn: Conn, *, trigger_id: int) -> asyncpg.Record | None:
+    return await conn.fetchrow(_RESET_TRIGGER_FAILURES, trigger_id)
+
+
+async def claim_trigger_for_check(
+    conn: Conn, *, trigger_id: int, next_check_at: datetime
+) -> asyncpg.Record | None:
+    """`None` means another process is already evaluating this trigger's next check, or
+    it was disabled in between — mirrors `claim_due_schedule`."""
+    return await conn.fetchrow(_CLAIM_TRIGGER_FOR_CHECK, trigger_id, next_check_at)
+
+
+async def record_trigger_check(
+    conn: Conn, *, trigger_id: int, result: bool | None, fired: bool
+) -> asyncpg.Record:
+    return await fetch_one(conn, _RECORD_TRIGGER_CHECK, trigger_id, result, fired)
+
+
+_INSERT_FIRE = """
+    INSERT INTO schedule_fires (
+        schedule_id, trigger_id, outcome, reason, run_id, skipped_count
+    )
+    VALUES ($1, $2, $3, $4, $5, $6)
+    RETURNING id, schedule_id, trigger_id, fired_at, outcome, reason, run_id, skipped_count
+"""
+
+_SELECT_FIRES_FOR_SCHEDULE = """
+    SELECT f.id, f.schedule_id, f.trigger_id, f.fired_at, f.outcome, f.reason,
+           f.run_id, f.skipped_count
+      FROM schedule_fires f
+      JOIN schedules s ON s.id = f.schedule_id
+     WHERE f.schedule_id = $1 AND s.owner_principal = $2
+     ORDER BY f.fired_at DESC, f.id DESC
+"""
+
+_SELECT_FIRES_FOR_TRIGGER = """
+    SELECT f.id, f.schedule_id, f.trigger_id, f.fired_at, f.outcome, f.reason,
+           f.run_id, f.skipped_count
+      FROM schedule_fires f
+      JOIN triggers t ON t.id = f.trigger_id
+     WHERE f.trigger_id = $1 AND t.owner_principal = $2
+     ORDER BY f.fired_at DESC, f.id DESC
+"""
+
+
+async def record_fire(
+    conn: Conn,
+    *,
+    schedule_id: int | None = None,
+    trigger_id: int | None = None,
+    outcome: str,
+    reason: str | None = None,
+    run_id: int | None = None,
+    skipped_count: int = 0,
+) -> asyncpg.Record:
+    """One row for a fire attempt from either source, whether or not it started a run —
+    `outcome != 'started'` with no run at all is exactly what specs/teams-schedules asks
+    to be kept ("Wyzwolenie bez przebiegu zostawia zapisany powód")."""
+    return await fetch_one(
+        conn, _INSERT_FIRE, schedule_id, trigger_id, outcome, reason, run_id, skipped_count
+    )
+
+
+async def list_fires_for_schedule(
+    conn: Conn, *, schedule_id: int, owner_principal: str
+) -> list[asyncpg.Record]:
+    return list(await conn.fetch(_SELECT_FIRES_FOR_SCHEDULE, schedule_id, owner_principal))
+
+
+async def list_fires_for_trigger(
+    conn: Conn, *, trigger_id: int, owner_principal: str
+) -> list[asyncpg.Record]:
+    return list(await conn.fetch(_SELECT_FIRES_FOR_TRIGGER, trigger_id, owner_principal))
