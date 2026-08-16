@@ -28,10 +28,257 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Teams
+         * @description The whole of what a picker needs, and no definition — see `store._LATEST_REVISION`.
+         */
+        get: operations["list_teams_teams_get"];
+        put?: never;
+        /** Create Team */
+        post: operations["create_team_teams_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Team */
+        get: operations["get_team_teams__team_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Archive Team
+         * @description Retires the team from the catalogue. Its runs and the revisions they name stay —
+         *     see `store._ARCHIVE_TEAM`.
+         */
+        delete: operations["archive_team_teams__team_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Save Revision
+         * @description Appends. The previous revision is not read, not touched and not made obsolete —
+         *     a run already pointing at it keeps meaning what it meant.
+         */
+        post: operations["save_revision_teams__team_id__revisions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/revisions/latest": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Latest Revision
+         * @description What the canvas opens on. Declared before the `{version}` route below, or FastAPI
+         *     would try to parse "latest" as an int and answer 422.
+         */
+        get: operations["get_latest_revision_teams__team_id__revisions_latest_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/revisions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Revision
+         * @description Including a revision of a retired team: a run points at a revision, and a trace
+         *     that cannot be opened is not a trace (specs/teams-catalogue).
+         */
+        get: operations["get_revision_teams__team_id__revisions__version__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: never;
+    schemas: {
+        /**
+         * AgentDefinition
+         * @description One role inside a team: what it is told, which model answers for it, and which
+         *     tools it may reach for.
+         */
+        AgentDefinition: {
+            /**
+             * Guidance
+             * @default
+             */
+            guidance: string;
+            /** Key */
+            key: string;
+            /** Model Id */
+            model_id: string;
+            /** Prompt */
+            prompt: string;
+            /** Role */
+            role: string;
+            /** Tools */
+            tools?: string[];
+        };
+        /**
+         * CostLimits
+         * @description Budgets a revision may carry — specs/teams-usage, 'Przekroczenie granicy kosztu
+         *     zatrzymuje przebieg'. Strings, like every other cost on this contract's wire: nothing
+         *     here computes with these, only compares them against a running total, and a string
+         *     round-trips exactly where a float would invite rescaling it should never do.
+         */
+        CostLimits: {
+            /**
+             * Daily Limit
+             * @description max cost per day for this team
+             */
+            daily_limit?: string | null;
+            /**
+             * Run Limit
+             * @description max cost for one run
+             */
+            run_limit?: string | null;
+        };
+        /** CreateTeamIn */
+        CreateTeamIn: {
+            definition: components["schemas"]["TeamDefinition"];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Name */
+            name: string;
+        };
+        /** HTTPValidationError */
+        HTTPValidationError: {
+            /** Detail */
+            detail: components["schemas"]["ValidationError"][];
+        };
+        /** SaveRevisionIn */
+        SaveRevisionIn: {
+            definition: components["schemas"]["TeamDefinition"];
+        };
+        /**
+         * TeamDefinition
+         * @description The whole of what a team revision carries — every agent, every dependency between
+         *     them, and the cost limits a run against this revision must respect. One immutable
+         *     blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie zmienia").
+         */
+        TeamDefinition: {
+            /** Agents */
+            agents: components["schemas"]["AgentDefinition"][];
+            /** Edges */
+            edges?: components["schemas"]["TeamEdge"][];
+            limits?: components["schemas"]["CostLimits"];
+        };
+        /**
+         * TeamEdge
+         * @description One dependency: `to` waits for `from_` and receives its output — specs/teams-runs,
+         *     'Agent widzi wypowiedzi poprzedników, a nie całą historię przebiegu'.
+         */
+        TeamEdge: {
+            /** From */
+            from: string;
+            /** To */
+            to: string;
+        };
+        /**
+         * TeamOut
+         * @description A row in the catalogue — specs/teams-catalogue, "Katalog wystarcza, żeby wybrać
+         *     zespół bez otwierania go". No `owner_principal` on the wire: ownership gates which
+         *     rows a query returns at all (specs/teams-browser-access), the same way agent's own
+         *     `SessionOut` never carries one either.
+         */
+        TeamOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /** Latest Revision */
+            latest_revision: number;
+            /** Name */
+            name: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /** TeamRevisionOut */
+        TeamRevisionOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            definition: components["schemas"]["TeamDefinition"];
+            /** Id */
+            id: number;
+            /** Team Id */
+            team_id: number;
+            /** Version */
+            version: number;
+        };
+        /** ValidationError */
+        ValidationError: {
+            /** Context */
+            ctx: Record<string, never>;
+            /** Input */
+            input: unknown;
+            /** Location */
+            loc: (string | number)[];
+            /** Message */
+            msg: string;
+            /** Error Type */
+            type: string;
+        };
+    };
     responses: never;
     parameters: never;
     requestBodies: never;
@@ -58,6 +305,217 @@ export interface operations {
                     "application/json": {
                         [key: string]: string;
                     };
+                };
+            };
+        };
+    };
+    list_teams_teams_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamOut"][];
+                };
+            };
+        };
+    };
+    create_team_teams_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTeamIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_team_teams__team_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    archive_team_teams__team_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_revision_teams__team_id__revisions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveRevisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamRevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_latest_revision_teams__team_id__revisions_latest_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamRevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_revision_teams__team_id__revisions__version__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamRevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };

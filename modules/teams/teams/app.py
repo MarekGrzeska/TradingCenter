@@ -1,9 +1,9 @@
 """The published surface: FastAPI over the module.
 
 Assembly only, same split as `agent/app.py` and `market_data/app.py`: the lifespan and
-the routers mounted onto it. This is the skeleton — the lifespan brings the module's own
-database to the revision it was built for and nothing else; the catalogue, run and
-tool-server routers arrive in later changes, each mounted here the same way.
+the routers mounted onto it. The lifespan brings the module's own database to the
+revision it was built for and puts the catalogue's two dependencies on `app.state`; the
+run and tool-server routers arrive in later changes, each mounted here the same way.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ from .config import Settings
 from .db import MIGRATION_LOCK_KEY, advisory_lock
 from .db import pool as make_pool
 from .openapi import require_response_fields
+from .routers import catalogue
 
 log = logging.getLogger(__name__)
 
@@ -63,6 +64,12 @@ async def lifespan(app: FastAPI):
 
         app.state.settings = settings
         app.state.pool = pool
+        # What the tool server announces, checked against whenever a definition assigns
+        # an agent a tool (`validation.py`). `None` is "this module has no session with a
+        # tool server", which is a supported state and the only one there is until the
+        # session arrives — a module with no tool server still serves the catalogue
+        # (specs/teams-tool-access, "Moduł startuje bez serwera narzędzi").
+        app.state.announced_tools = None
         yield
 
 
@@ -97,6 +104,9 @@ def _openapi_with_required_fields() -> dict:
 
 
 app.openapi = _openapi_with_required_fields  # type: ignore[method-assign]
+
+
+app.include_router(catalogue.router)
 
 
 @app.get("/health")

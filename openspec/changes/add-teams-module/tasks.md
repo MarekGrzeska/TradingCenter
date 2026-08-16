@@ -30,21 +30,42 @@
 
 ## 3. Kontrakt i jego generowanie
 
-- [ ] 3.1 `teams/contract.py` — kształty definicji, rewizji, katalogu, przebiegu, kroku, zużycia
-- [ ] 3.2 `teams/openapi.py` — bliźniak z `market-data`, razem z `require_response_fields`
-- [ ] 3.3 Uogólnienie `modules/terminal/scripts/contract.mjs` na wiele źródeł, każde ze swoim plikiem wyjściowym
-- [ ] 3.4 Sprawdzenie, że wyjście dla `market-data` nie zmieniło się co do bajtu
-- [ ] 3.5 `pnpm contract:generate` wytwarza plik dla modułu; `contract:check` wykrywa jego nieaktualność
+- [x] 3.1 `teams/contract.py` — kształty definicji, rewizji, katalogu, przebiegu, kroku, zużycia
+- [x] 3.2 `teams/openapi.py` — bliźniak z `market-data`, razem z `require_response_fields`
+- [x] 3.3 Uogólnienie `modules/terminal/scripts/contract.mjs` na wiele źródeł, każde ze swoim plikiem wyjściowym
+- [x] 3.4 Sprawdzenie, że wyjście dla `market-data` nie zmieniło się co do bajtu
+- [x] 3.5 `pnpm contract:generate` wytwarza plik dla modułu; `contract:check` wykrywa jego nieaktualność
+
+  PR #108. `contract.py` nie ma warstwy domenowej pod sobą — `TeamDefinition` jest
+  jednocześnie tym, co siedzi w JSONB, i tym, co jedzie na drucie, a każdy `*Out` czyta
+  wiersz swoim `from_row`. Wyjście dla `market-data` wyszło bajt w bajt takie samo.
 
 ## 4. Katalog zespołów
 
-- [ ] 4.1 Model domenowy definicji: agent, zależność, granice kosztu
-- [ ] 4.2 Zapytania `store.py`: zapis rewizji, odczyt rewizji, lista katalogu, wycofanie zespołu
-- [ ] 4.3 Walidacja definicji przy zapisie: cykl, agent nieosiągalny, nieznany model, nieznane narzędzie
-- [ ] 4.4 Routery katalogu — lista, odczyt, zapis rewizji, wycofanie
-- [ ] 4.5 Ograniczenie odczytu i zapisu do tożsamości właściciela; odmowa nieodróżnialna od nieistnienia
-- [ ] 4.6 Testy: zapis kolejnej rewizji nie rusza poprzedniej; wycofanie zespołu zostawia przebiegi
-- [ ] 4.7 Testy: każda odmowa z 4.3 nazywa agenta albo zależność
+- [x] 4.1 Model domenowy definicji: agent, zależność, granice kosztu
+- [x] 4.2 Zapytania `store.py`: zapis rewizji, odczyt rewizji, lista katalogu, wycofanie zespołu
+- [x] 4.3 Walidacja definicji przy zapisie: cykl, agent nieosiągalny, nieznany model, nieznane narzędzie
+- [x] 4.4 Routery katalogu — lista, odczyt, zapis rewizji, wycofanie
+- [x] 4.5 Ograniczenie odczytu i zapisu do tożsamości właściciela; odmowa nieodróżnialna od nieistnienia
+- [x] 4.6 Testy: zapis kolejnej rewizji nie rusza poprzedniej; wycofanie zespołu zostawia przebiegi
+- [x] 4.7 Testy: każda odmowa z 4.3 nazywa agenta albo zależność
+
+  PR #110. 4.1 zapadło już w grupie 3: `TeamDefinition` jest modelem domenowym i wiadomością naraz,
+  więc tutaj nie doszła druga jego kopia. Walidacja rozpadła się na dwie po tym, czego
+  potrzebuje: kształt (cykl, agent bez żadnej krawędzi, krawędź wskazująca nieznanego
+  agenta) siedzi w `contract.py` i odrzuca ciało żądania, zanim dojdzie ono do routera;
+  otoczenie (katalog modeli, ogłoszenie serwera narzędzi) w nowym `validation.py`. Obie
+  drogi kończą się 422 i obie nazywają agenta.
+
+  Narzędzia sprawdzane są przy zapisie wobec `app.state.announced_tools`, które na razie
+  jest `None` — grupa 6 wstawi tam sesję z serwerem narzędzi. Do tego czasu zapis definicji
+  przypisującej agentowi narzędzie jest odmawiany komunikatem nazywającym brak serwera, a
+  nie brak narzędzia; zespół bez narzędzi zapisuje się normalnie, tak jak normalnie ruszy
+  bez serwera (`teams-tool-access`).
+
+  Dwa dodatki wobec litery listy: `GET /teams/{id}/revisions/latest` (canvas musi mieć od
+  czego zacząć) i regeneracja `contract.teams.generated.ts` — dokument OpenAPI zmienił się
+  od samych tras, mimo że `contract.py` nie drgnął.
 
 ## 5. Katalog modeli
 
