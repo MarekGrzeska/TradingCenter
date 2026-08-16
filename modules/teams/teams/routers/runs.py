@@ -192,16 +192,32 @@ async def run_events(
     postęp MUST NOT przerwać przebiegu").
     """
     pool = request.app.state.pool
-    async with pool.acquire() as conn:
-        run = await store.get_run(conn, run_id=run_id, owner_principal=owner)
-        if run is None:
-            raise HTTPException(404, detail="no such run")
-        steps = await store.get_run_steps(conn, run_id=run_id)
-
     registry = request.app.state.runs
-    # Subscribed before the snapshot is sent, so an event landing between the two is
-    # queued rather than lost.
+    # Subscribed before the snapshot is **read**, not merely before it is sent. Reading it
+    # first left a window nothing covered: releasing the connection is a suspension point,
+    # so a step finishing right there landed in neither place — too late for the snapshot,
+    # too early for a queue that did not exist. The same window swallowed the end of a run
+    # outright, and `finished` read from that same stale row left the stream open for ever
+    # over a run that was already closed.
+    #
+    # The cost of this order is a queue held over a request that may turn out to be a 404,
+    # which is what the `except` below is for. Nothing is disclosed by it: the subscription
+    # is a queue nobody reads, and the ownership check still happens before a single frame
+    # is written. The other cost is an event that is both in the snapshot and in the queue,
+    # repeated to a watcher that has already seen it — deliberately the direction to fail
+    # in: a step told twice that it finished still reads as finished, and a step whose
+    # finish was dropped reads as working for ever.
     queue = registry.subscribe(run_id)
+    try:
+        async with pool.acquire() as conn:
+            run = await store.get_run(conn, run_id=run_id, owner_principal=owner)
+            if run is None:
+                raise HTTPException(404, detail="no such run")
+            steps = await store.get_run_steps(conn, run_id=run_id)
+    except BaseException:
+        registry.unsubscribe(run_id, queue)
+        raise
+
     snapshot = {
         "run": RunOut.from_row(dict(run)).model_dump(mode="json"),
         "steps": [RunStepOut.from_row(dict(row)).model_dump(mode="json") for row in steps],

@@ -14,7 +14,15 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 
 from .. import store
 from ..auth import current_principal
-from ..contract import CreateTeamIn, SaveRevisionIn, TeamDefinition, TeamOut, TeamRevisionOut
+from ..contract import (
+    CreateTeamIn,
+    SaveLayoutIn,
+    SaveRevisionIn,
+    TeamDefinition,
+    TeamLayoutOut,
+    TeamOut,
+    TeamRevisionOut,
+)
 from ..tools import announced_tool_names
 from ..validation import DefinitionRefused, check_definition
 
@@ -147,6 +155,48 @@ async def get_revision_by_id(
     if row is None:
         raise HTTPException(404, detail="no such revision")
     return TeamRevisionOut.from_row(dict(row))
+
+
+@router.get("/teams/{team_id}/layout")
+async def get_layout(
+    team_id: int, request: Request, owner: str = Depends(current_principal)
+) -> TeamLayoutOut:
+    """Where the operator left each agent. A team with nothing saved answers with an empty
+    layout rather than a 404 — never having been arranged is the ordinary state, and the
+    canvas computes places from the dependencies for every agent this does not name."""
+    async with request.app.state.pool.acquire() as conn:
+        team = await store.get_team(conn, team_id=team_id, owner_principal=owner)
+        if team is None:
+            raise HTTPException(404, detail="no such team")
+        rows = await store.get_layout(conn, team_id=team_id, owner_principal=owner)
+    return TeamLayoutOut.from_rows(dict(row) for row in rows)
+
+
+@router.put("/teams/{team_id}/layout")
+async def save_layout(
+    team_id: int,
+    body: SaveLayoutIn,
+    request: Request,
+    owner: str = Depends(current_principal),
+) -> TeamLayoutOut:
+    """Replaces the layout. Not a revision and not a change to one: this route never
+    touches `team_revisions`, which is the whole reason the table it writes exists
+    (specs/terminal-teams, "Przesunięcie nie jest zmianą definicji").
+
+    Agent keys are not checked against any revision on purpose. The canvas sends what it
+    drew, an unsaved draft can carry an agent no revision knows yet, and a key that never
+    becomes one is a row nobody reads.
+    """
+    async with request.app.state.pool.acquire() as conn:
+        saved = await store.save_layout(
+            conn,
+            team_id=team_id,
+            owner_principal=owner,
+            places=[(place.agent_key, place.x, place.y) for place in body.places],
+        )
+    if not saved:
+        raise HTTPException(404, detail="no such team")
+    return TeamLayoutOut(places=body.places)
 
 
 @router.delete("/teams/{team_id}", status_code=204)

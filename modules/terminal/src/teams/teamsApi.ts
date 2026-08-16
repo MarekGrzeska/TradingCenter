@@ -40,6 +40,7 @@ type RawDefinition = Wire["TeamDefinition"];
 type RawAgent = Wire["AgentDefinition"];
 type RawModel = Wire["ModelOut"];
 type RawTool = Wire["ToolOut"];
+type RawLayout = Wire["TeamLayoutOut"];
 type RawRun = Wire["RunOut"];
 type RawStep = Wire["RunStepOut"];
 type RawToolCall = Wire["ToolCallOut"];
@@ -87,6 +88,12 @@ export interface TeamDefinition {
   dependencies: TeamDependency[];
   limits: TeamLimits;
 }
+
+/** Agent key → where the operator left it. Sparse on purpose: an agent this does not name
+ *  is placed by `layout()` from the dependencies, which is also the whole picture for a
+ *  team nobody has arranged yet (specs/terminal-teams, "Agent bez zapamiętanego miejsca").
+ *  Not part of `TeamDefinition` — moving a node is not a revision. */
+export type TeamLayout = Map<string, { x: number; y: number }>;
 
 export interface TeamRevision {
   id: number;
@@ -145,6 +152,14 @@ export interface TeamsApi {
   /** Retires a team from the catalogue. Its runs and revisions stay readable — this is
    *  not a delete, whatever the verb says. */
   archiveTeam(id: number, signal: AbortSignal): Promise<void>;
+
+  /** Where the operator left each agent. A team nobody has arranged answers with an empty
+   *  layout, which is not an error: the canvas then places every agent from the
+   *  dependencies (specs/terminal-teams). */
+  layout(id: number, signal: AbortSignal): Promise<TeamLayout>;
+  /** Replaces the layout. Never a revision — a moved node changes where the team is
+   *  drawn, not what it is. */
+  saveLayout(id: number, layout: TeamLayout, signal: AbortSignal): Promise<void>;
 
   /** Starts a run of the team's latest revision and comes back at once with the run, not
    *  with its result: a team takes minutes. Rejects `"refused"` when the module will not
@@ -327,6 +342,21 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
 
     async archiveTeam(id, signal) {
       await http.send(`${httpBase}/teams/${id}`, { method: "DELETE", signal });
+    },
+
+    async layout(id, signal) {
+      const raw = await http.json<RawLayout>(`${httpBase}/teams/${id}/layout`, { signal });
+      return new Map(raw.places.map((place) => [place.agent_key, { x: place.x, y: place.y }]));
+    },
+
+    async saveLayout(id, layout, signal) {
+      await http.send(`${httpBase}/teams/${id}/layout`, {
+        method: "PUT",
+        body: {
+          places: [...layout].map(([agentKey, at]) => ({ agent_key: agentKey, x: at.x, y: at.y })),
+        },
+        signal,
+      });
     },
 
     async startRun(teamId, signal) {

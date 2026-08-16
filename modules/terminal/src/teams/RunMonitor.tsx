@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatInstant } from "../ui/formatTime";
 import { TeamCanvas } from "./TeamCanvas";
 import type { TeamRun, TeamRunStep, TeamRunToolCall } from "./runs";
-import type { TeamDefinition, TeamsApi, TeamsModel } from "./teamsApi";
+import type { TeamDefinition, TeamLayout, TeamsApi, TeamsModel } from "./teamsApi";
 import { useRunMonitor } from "./useRunMonitor";
 
 /**
@@ -32,6 +32,7 @@ export function RunMonitor({
   const monitor = useRunMonitor(api, runId);
   const { run, steps, toolCalls } = monitor;
   const [definition, setDefinition] = useState<TeamDefinition | null>(null);
+  const [places, setPlaces] = useState<TeamLayout>(new Map());
   const [version, setVersion] = useState<number | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [stopping, setStopping] = useState(false);
@@ -45,10 +46,16 @@ export function RunMonitor({
 
     api
       .revisionById(revisionId, controller.signal)
-      .then((revision) => {
+      .then(async (revision) => {
         if (cancelled) return;
         setDefinition(revision.definition);
         setVersion(revision.version);
+        // The team's arrangement, so a run is watched on the picture the operator built
+        // rather than on a second one laid out from scratch. It belongs to the team and
+        // this revision may be older than it — an agent it does not name falls back to
+        // `layout()` inside the canvas, which is the case the spec names.
+        const layout = await api.layout(revision.teamId, controller.signal).catch(() => new Map());
+        if (!cancelled) setPlaces(layout);
       })
       .catch(() => {
         // The stream is still the run's own state and keeps arriving; what is missing is
@@ -152,6 +159,7 @@ export function RunMonitor({
             selectedKey={selectedKey}
             refusal={null}
             runStatuses={runStatuses}
+            places={places}
             onSelect={setSelectedKey}
           />
         ) : (

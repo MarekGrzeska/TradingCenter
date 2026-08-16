@@ -216,6 +216,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/layout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Layout
+         * @description Where the operator left each agent. A team with nothing saved answers with an empty
+         *     layout rather than a 404 — never having been arranged is the ordinary state, and the
+         *     canvas computes places from the dependencies for every agent this does not name.
+         */
+        get: operations["get_layout_teams__team_id__layout_get"];
+        /**
+         * Save Layout
+         * @description Replaces the layout. Not a revision and not a change to one: this route never
+         *     touches `team_revisions`, which is the whole reason the table it writes exists
+         *     (specs/terminal-teams, "Przesunięcie nie jest zmianą definicji").
+         *
+         *     Agent keys are not checked against any revision on purpose. The canvas sends what it
+         *     drew, an unsaved draft can carry an agent no revision knows yet, and a key that never
+         *     becomes one is a row nobody reads.
+         */
+        put: operations["save_layout_teams__team_id__layout_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}/revisions": {
         parameters: {
             query?: never;
@@ -377,6 +409,23 @@ export interface components {
             tools?: string[];
         };
         /**
+         * AgentPlace
+         * @description One agent's place on the canvas — the definition's own key and two coordinates.
+         *
+         *     Its own shape rather than a field on `AgentDefinition`, and that is the decision
+         *     rather than an accident: a definition is immutable once saved and is what a run points
+         *     at, so a coordinate inside it would mint a revision every time a node was dragged
+         *     (design.md, "Rozmieszczenie agentów obok rewizji, nie w niej").
+         */
+        AgentPlace: {
+            /** Agent Key */
+            agent_key: string;
+            /** X */
+            x: number;
+            /** Y */
+            y: number;
+        };
+        /**
          * CostLimits
          * @description Budgets a revision may carry — specs/teams-usage, 'Przekroczenie granicy kosztu
          *     zatrzymuje przebieg'. Strings, like every other cost on this contract's wire: nothing
@@ -469,6 +518,15 @@ export interface components {
             /** Status */
             status: string;
         };
+        /**
+         * SaveLayoutIn
+         * @description The whole layout at once, replacing what was stored. A patch per node would need
+         *     the module to know which agents still exist, and the canvas already does.
+         */
+        SaveLayoutIn: {
+            /** Places */
+            places: components["schemas"]["AgentPlace"][];
+        };
         /** SaveRevisionIn */
         SaveRevisionIn: {
             definition: components["schemas"]["TeamDefinition"];
@@ -496,6 +554,16 @@ export interface components {
             from: string;
             /** To */
             to: string;
+        };
+        /**
+         * TeamLayoutOut
+         * @description Where the operator left each agent. Absent keys are not an error and not a zero:
+         *     the canvas computes a place from the dependencies for anything this does not name
+         *     (specs/terminal-teams, "Agent bez zapamiętanego miejsca").
+         */
+        TeamLayoutOut: {
+            /** Places */
+            places: components["schemas"]["AgentPlace"][];
         };
         /**
          * TeamOut
@@ -961,6 +1029,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_layout_teams__team_id__layout_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamLayoutOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    save_layout_teams__team_id__layout_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveLayoutIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamLayoutOut"];
+                };
             };
             /** @description Validation Error */
             422: {

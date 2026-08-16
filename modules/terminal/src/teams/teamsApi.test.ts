@@ -200,6 +200,50 @@ describe("archiveTeam", () => {
   });
 });
 
+describe("the layout", () => {
+  it("reads the module's places into a map keyed by agent", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/teams/1/layout`, () =>
+        HttpResponse.json({
+          places: [
+            { agent_key: "agent-1", x: -120.5, y: 40 },
+            { agent_key: "agent-2", x: 320, y: 40 },
+          ],
+        }),
+      ),
+    );
+
+    const layout = await api().layout(1, new AbortController().signal);
+
+    expect(layout.get("agent-1")).toEqual({ x: -120.5, y: 40 });
+    expect(layout.get("agent-2")).toEqual({ x: 320, y: 40 });
+  });
+
+  it("reads a team nobody has arranged as an empty map, not as a missing one", async () => {
+    server.use(http.get(`${HTTP_BASE}/teams/1/layout`, () => HttpResponse.json({ places: [] })));
+
+    expect((await api().layout(1, new AbortController().signal)).size).toBe(0);
+  });
+
+  it("sends the whole arrangement back in the module's own spelling", async () => {
+    let sent: unknown = null;
+    server.use(
+      http.put(`${HTTP_BASE}/teams/1/layout`, async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({ places: [] });
+      }),
+    );
+
+    await api().saveLayout(
+      1,
+      new Map([["agent-1", { x: 10, y: 20 }]]),
+      new AbortController().signal,
+    );
+
+    expect(sent).toEqual({ places: [{ agent_key: "agent-1", x: 10, y: 20 }] });
+  });
+});
+
 describe("listTools", () => {
   it("reads what the module announces", async () => {
     server.use(

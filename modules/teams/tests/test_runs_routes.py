@@ -12,6 +12,7 @@ import asyncpg
 import pytest
 from fastapi.testclient import TestClient
 
+from teams import store
 from teams.app import app
 from teams.provider import ProviderChunk, TextDelta, UsageReport
 
@@ -260,6 +261,62 @@ def test_the_stream_opens_with_where_the_run_is_now(client: TestClient) -> None:
     assert payload["run"]["status"] == "completed"
     assert [step["agent_key"] for step in payload["steps"]] == ["scout"]
     assert payload["steps"][0]["output"] == "done."
+
+
+def test_a_watcher_is_subscribed_before_the_snapshot_is_read(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Reading the snapshot first left a window with no owner: releasing the connection it
+    was read on is a suspension point, and an event published there is too late for the
+    snapshot and too early for a queue that does not exist yet. A run ending in that window
+    left the stream open for ever, because `finished` came off the same stale row.
+
+    The order is what is asserted, not the timing — the window is one turn of the event
+    loop and no test can sit inside it."""
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    order: list[str] = []
+    registry = app.state.runs
+    subscribed = registry.subscribe
+    read_steps = store.get_run_steps
+
+    def spy_subscribe(watched_run_id: int):
+        order.append("subscribe")
+        return subscribed(watched_run_id)
+
+    async def spy_get_run_steps(conn, *, run_id: int):
+        order.append("snapshot")
+        return await read_steps(conn, run_id=run_id)
+
+    monkeypatch.setattr(registry, "subscribe", spy_subscribe)
+    monkeypatch.setattr(store, "get_run_steps", spy_get_run_steps)
+
+    with client.stream("GET", f"/runs/{run_id}/events", headers=OWNER) as stream:
+        assert stream.status_code == 200
+        "".join(stream.iter_text())
+
+    assert order == ["subscribe", "snapshot"]
+
+
+def test_a_stranger_who_is_refused_leaves_no_watcher_behind(
+    client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The price of subscribing first: a queue held over a request that turns out to be a
+    404. It is given back, so a refused stranger cannot grow the watcher list of somebody
+    else's run."""
+    team_id = _a_team(client)
+    run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
+    _wait_for_status(client, run_id, {"completed", "failed"})
+
+    registry = app.state.runs
+    with client.stream("GET", f"/runs/{run_id}/events", headers=STRANGER) as stream:
+        assert stream.status_code == 404
+
+    # `publish` walks exactly this set; empty is the difference between a queue nobody
+    # reads and a queue nobody gave back.
+    assert registry._watchers.get(run_id) is None
 
 
 def test_a_strangers_stream_is_refused(client: TestClient) -> None:

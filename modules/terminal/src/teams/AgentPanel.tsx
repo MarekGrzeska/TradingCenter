@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Refusal } from "./refusal";
 import type { TeamAgent, TeamDefinition, TeamDependency, TeamsModel, TeamsTool } from "./teamsApi";
 
@@ -20,6 +21,7 @@ export function AgentPanel({
   refusal,
   onChange,
   onRemove,
+  onConnect,
   onDisconnect,
 }: {
   agent: TeamAgent;
@@ -32,10 +34,19 @@ export function AgentPanel({
   refusal: Refusal | null;
   onChange(patch: Partial<Omit<TeamAgent, "key">>): void;
   onRemove(): void;
+  onConnect(edge: TeamDependency): void;
   onDisconnect(edge: TeamDependency): void;
 }) {
+  const [waitFor, setWaitFor] = useState("");
   const incoming = definition.dependencies.filter((edge) => edge.to === agent.key);
   const outgoing = definition.dependencies.filter((edge) => edge.from === agent.key);
+  // Itself excluded, and so is anything it already waits for. An agent it hands to is left
+  // in: the module refuses a cycle by name, and hiding the option would replace a refusal
+  // that says which agents are on the cycle with a list that quietly lacks one.
+  const available = definition.agents.filter(
+    (candidate) =>
+      candidate.key !== agent.key && !incoming.some((edge) => edge.from === candidate.key),
+  );
   const roleOf = (key: string) =>
     definition.agents.find((candidate) => candidate.key === key)?.role ?? key;
   const refusedHere = refusal?.agents.includes(agent.key) ?? false;
@@ -160,6 +171,41 @@ export function AgentPanel({
             onRemove={() => onDisconnect(edge)}
           />
         ))}
+        {/* The second way to draw an edge, and the one that works without a mouse. Dragging
+            between two handles on the canvas is the direct way and stays the direct way;
+            this exists because a dependency is a choice of agent, and choosing an agent
+            from a list of them is a thing a list is good at. */}
+        {available.length > 0 && (
+          <div className="mt-1 flex items-center gap-1">
+            <label htmlFor="agent-waits-for" className="sr-only">
+              Waits for
+            </label>
+            <select
+              id="agent-waits-for"
+              value={waitFor}
+              onChange={(event) => setWaitFor(event.target.value)}
+              className="min-w-0 flex-1 rounded border border-border bg-panel px-2 py-1 text-xs text-ink"
+            >
+              <option value="">waits for…</option>
+              {available.map((candidate) => (
+                <option key={candidate.key} value={candidate.key}>
+                  {candidate.role}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              disabled={waitFor === ""}
+              onClick={() => {
+                onConnect({ from: waitFor, to: agent.key });
+                setWaitFor("");
+              }}
+              className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Add
+            </button>
+          </div>
+        )}
       </section>
 
       <button

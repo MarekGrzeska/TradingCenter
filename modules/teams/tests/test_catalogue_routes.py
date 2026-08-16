@@ -257,3 +257,113 @@ def test_the_refusal_writes_nothing(client: TestClient) -> None:
 
     assert refused.status_code == 422
     assert client.get(f"/teams/{team_id}", headers=OWNER).json()["latest_revision"] == 1
+
+
+def test_a_team_with_nothing_arranged_answers_with_an_empty_layout(client: TestClient) -> None:
+    # Never having been arranged is the ordinary state of a team, not a 404 — the canvas
+    # then places every agent from its dependencies (specs/terminal-teams, "Agent bez
+    # zapamiętanego miejsca").
+    team_id = _create(client).json()["id"]
+
+    response = client.get(f"/teams/{team_id}/layout", headers=OWNER)
+
+    assert response.status_code == 200
+    assert response.json() == {"places": []}
+
+
+def test_where_the_operator_left_an_agent_is_where_it_reads_back(client: TestClient) -> None:
+    team_id = _create(client).json()["id"]
+    places = [
+        {"agent_key": "scout", "x": -120.5, "y": 40},
+        {"agent_key": "judge", "x": 320, "y": 40},
+    ]
+
+    saved = client.put(f"/teams/{team_id}/layout", json={"places": places}, headers=OWNER)
+
+    assert saved.status_code == 200
+    assert client.get(f"/teams/{team_id}/layout", headers=OWNER).json() == {
+        "places": [
+            {"agent_key": "judge", "x": 320.0, "y": 40.0},
+            {"agent_key": "scout", "x": -120.5, "y": 40.0},
+        ]
+    }
+
+
+def test_moving_an_agent_is_not_a_new_revision(client: TestClient) -> None:
+    """specs/terminal-teams, "Przesunięcie nie jest zmianą definicji" — the whole reason
+    the layout lives in its own table rather than in the definition's JSONB."""
+    team_id = _create(client).json()["id"]
+    before = client.get(f"/teams/{team_id}/revisions/latest", headers=OWNER).json()
+
+    client.put(
+        f"/teams/{team_id}/layout",
+        json={"places": [{"agent_key": "scout", "x": 10, "y": 10}]},
+        headers=OWNER,
+    )
+
+    assert client.get(f"/teams/{team_id}", headers=OWNER).json()["latest_revision"] == 1
+    assert client.get(f"/teams/{team_id}/revisions/latest", headers=OWNER).json() == before
+
+
+def test_saving_a_layout_replaces_the_one_before_it(client: TestClient) -> None:
+    # An agent removed from the team has to lose its place too, or a key reused later
+    # inherits a position nobody chose for it.
+    team_id = _create(client).json()["id"]
+    client.put(
+        f"/teams/{team_id}/layout",
+        json={
+            "places": [
+                {"agent_key": "scout", "x": 0, "y": 0},
+                {"agent_key": "judge", "x": 200, "y": 0},
+            ]
+        },
+        headers=OWNER,
+    )
+
+    client.put(
+        f"/teams/{team_id}/layout",
+        json={"places": [{"agent_key": "scout", "x": 5, "y": 5}]},
+        headers=OWNER,
+    )
+
+    assert client.get(f"/teams/{team_id}/layout", headers=OWNER).json() == {
+        "places": [{"agent_key": "scout", "x": 5.0, "y": 5.0}]
+    }
+
+
+def test_the_same_agent_placed_twice_is_refused(client: TestClient) -> None:
+    team_id = _create(client).json()["id"]
+
+    response = client.put(
+        f"/teams/{team_id}/layout",
+        json={
+            "places": [
+                {"agent_key": "scout", "x": 0, "y": 0},
+                {"agent_key": "scout", "x": 9, "y": 9},
+            ]
+        },
+        headers=OWNER,
+    )
+
+    assert response.status_code == 422
+
+
+def test_a_stranger_neither_reads_nor_moves_a_layout(client: TestClient) -> None:
+    team_id = _create(client).json()["id"]
+    client.put(
+        f"/teams/{team_id}/layout",
+        json={"places": [{"agent_key": "scout", "x": 1, "y": 2}]},
+        headers=OWNER,
+    )
+
+    assert client.get(f"/teams/{team_id}/layout", headers=STRANGER).status_code == 404
+    moved = client.put(
+        f"/teams/{team_id}/layout",
+        json={"places": [{"agent_key": "scout", "x": 99, "y": 99}]},
+        headers=STRANGER,
+    )
+
+    assert moved.status_code == 404
+    assert client.get(f"/teams/{team_id}/layout", headers=OWNER).json() == {
+        "places": [{"agent_key": "scout", "x": 1.0, "y": 2.0}]
+    }

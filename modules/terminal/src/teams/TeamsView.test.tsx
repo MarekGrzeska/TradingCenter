@@ -99,6 +99,8 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     revisionById: vi.fn(async () => ({ ...revision(TRIO), id: RUN.teamRevisionId })),
     saveRevision: vi.fn(async () => revision()),
     archiveTeam: vi.fn(async () => {}),
+    layout: vi.fn(async () => new Map<string, { x: number; y: number }>()),
+    saveLayout: vi.fn(async () => {}),
     startRun: vi.fn(async () => RUN),
     listRuns: vi.fn(async () => [RUN]),
     getRun: vi.fn(async () => RUN),
@@ -108,6 +110,14 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     watchRun: vi.fn(async () => streamOf([{ kind: "snapshot", run: RUN, steps: MIDWAY }])),
     ...overrides,
   };
+}
+
+/** The node React Flow positions, which is the parent of what `AgentNode` renders — the
+ *  `transform` is where a place ends up, so it is where a test can read one. */
+function nodeElement(testId: string): HTMLElement {
+  const node = screen.getByTestId(testId).closest(".react-flow__node");
+  if (!(node instanceof HTMLElement)) throw new Error(`${testId} is not on the canvas`);
+  return node;
 }
 
 async function openTheTeam(api: TeamsApi) {
@@ -143,6 +153,36 @@ describe("the team on the canvas", () => {
 
     expect(within(screen.getByTestId("agent-node-Scout")).getByText("Mini")).toBeInTheDocument();
     expect(within(screen.getByTestId("agent-node-Judge")).getByText("Luna")).toBeInTheDocument();
+  });
+
+  it("puts an agent where the operator left it, and calls that no change at all", async () => {
+    // specs/terminal-teams, "Rozmieszczenie agentów jest wyborem operatora" — the layout
+    // is read beside the revision and is not part of it, so a remembered place must not
+    // read as something waiting to be saved.
+    const api = fakeApi({
+      layout: vi.fn(async () => new Map([["agent-1", { x: 640, y: 80 }]])),
+    });
+    await openTheTeam(api);
+
+    await waitFor(() =>
+      expect(nodeElement("agent-node-Scout").style.transform).toContain("translate(640px,80px)"),
+    );
+    expect(api.layout).toHaveBeenCalledWith(1, expect.anything());
+    expect(screen.queryByText("unsaved changes")).not.toBeInTheDocument();
+  });
+
+  it("places an agent the layout does not name from its dependencies", async () => {
+    // The judge was added after the last drag: it gets the column `layout()` computes for
+    // it rather than the corner, and the scout stays where it was put.
+    const api = fakeApi({
+      layout: vi.fn(async () => new Map([["agent-1", { x: 640, y: 80 }]])),
+    });
+    await openTheTeam(api);
+
+    await waitFor(() =>
+      expect(nodeElement("agent-node-Scout").style.transform).toContain("translate(640px,80px)"),
+    );
+    expect(nodeElement("agent-node-Judge").style.transform).toContain("translate(280px,0px)");
   });
 
   it("adds an agent without leaving the view", async () => {
@@ -183,6 +223,36 @@ describe("the agent panel", () => {
     await openTheTeam(fakeApi({ listTools: vi.fn(async () => []) }));
 
     expect(await screen.findByText("the module announces no tools")).toBeInTheDocument();
+  });
+
+  it("makes an agent wait for another one without dragging anything", async () => {
+    // The canvas keeps its handles; this is the same edge drawn from the panel, and it is
+    // the path a test can walk — jsdom has no layout, so a drag between two handles is not
+    // something this suite can prove either way.
+    const loose: TeamDefinition = { ...DEFINITION, dependencies: [] };
+    const api = fakeApi({ latestRevision: vi.fn(async () => revision(loose)) });
+    await openTheTeam(api);
+
+    // `fireEvent` for the same reason as the run tests below: a pointer press on the
+    // canvas wakes d3-zoom, which reaches for a `document` jsdom has already torn down.
+    fireEvent.click(screen.getByTestId("agent-node-Judge"));
+    await userEvent.selectOptions(await screen.findByLabelText("Waits for"), "agent-1");
+    await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
+
+    await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
+    const [, saved] = (api.saveRevision as ReturnType<typeof vi.fn>).mock.calls[0];
+    expect((saved as TeamDefinition).dependencies).toEqual([{ from: "agent-1", to: "agent-2" }]);
+  });
+
+  it("offers no one to wait for when it already waits for everyone it could", async () => {
+    // The default team is two agents with one edge between them, so the judge's only
+    // candidate is the scout it already waits for — and itself, which is never a candidate.
+    await openTheTeam(fakeApi());
+
+    fireEvent.click(screen.getByTestId("agent-node-Judge"));
+    expect(await screen.findByText(/waits for Scout/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Waits for")).not.toBeInTheDocument();
   });
 
   it("removes a dependency from the agent it belongs to", async () => {
@@ -335,6 +405,33 @@ describe("watching a run", () => {
       expect(within(screen.getByTestId("agent-node-Scribe")).getByText("done")).toBeInTheDocument(),
     );
     expect(screen.getByTestId("run-status")).toHaveTextContent("completed");
+  });
+
+  it("says the connection was lost when the stream ends on a run that is still working", async () => {
+    // The module closes the stream itself only once the run is over, so a body that ends
+    // while an agent is working is a dropped connection — and one that says nothing looks
+    // exactly like an agent thinking. What is on screen stays: the run is still running,
+    // it is this view that stopped following it.
+    await watch(fakeApi());
+
+    expect(await screen.findByText(/the connection to the run was lost/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Watch again" })).toBeInTheDocument();
+    expect(within(screen.getByTestId("agent-node-Scout")).getByText("done")).toBeInTheDocument();
+  });
+
+  it("says nothing about a lost connection when the run finished on the stream", async () => {
+    const api = fakeApi({
+      watchRun: vi.fn(async () =>
+        streamOf([
+          { kind: "snapshot", run: RUN, steps: MIDWAY },
+          { kind: "runFinished", status: "completed", stoppedReason: null },
+        ]),
+      ),
+    });
+    await watch(api);
+
+    await waitFor(() => expect(screen.getByTestId("run-status")).toHaveTextContent("completed"));
+    expect(screen.queryByText(/the connection to the run was lost/)).not.toBeInTheDocument();
   });
 
   it("names the cost as the reason, and keeps what the agents had produced", async () => {

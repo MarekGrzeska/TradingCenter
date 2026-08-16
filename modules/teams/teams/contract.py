@@ -23,7 +23,7 @@ odrzucana przy zapisie").
 from __future__ import annotations
 
 import json
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from typing import Any, Literal
@@ -269,6 +269,51 @@ class CreateTeamIn(BaseModel):
 
 class SaveRevisionIn(BaseModel):
     definition: TeamDefinition
+
+
+class AgentPlace(BaseModel):
+    """One agent's place on the canvas — the definition's own key and two coordinates.
+
+    Its own shape rather than a field on `AgentDefinition`, and that is the decision
+    rather than an accident: a definition is immutable once saved and is what a run points
+    at, so a coordinate inside it would mint a revision every time a node was dragged
+    (design.md, "Rozmieszczenie agentów obok rewizji, nie w niej").
+    """
+
+    agent_key: str
+    x: float
+    y: float
+
+
+class TeamLayoutOut(BaseModel):
+    """Where the operator left each agent. Absent keys are not an error and not a zero:
+    the canvas computes a place from the dependencies for anything this does not name
+    (specs/terminal-teams, "Agent bez zapamiętanego miejsca")."""
+
+    places: list[AgentPlace]
+
+    @classmethod
+    def from_rows(cls, rows: Iterable[Mapping[str, Any]]) -> TeamLayoutOut:
+        return cls(
+            places=[
+                AgentPlace(agent_key=row["agent_key"], x=row["x"], y=row["y"]) for row in rows
+            ]
+        )
+
+
+class SaveLayoutIn(BaseModel):
+    """The whole layout at once, replacing what was stored. A patch per node would need
+    the module to know which agents still exist, and the canvas already does."""
+
+    places: list[AgentPlace]
+
+    @field_validator("places")
+    @classmethod
+    def _keys_are_distinct(cls, value: list[AgentPlace]) -> list[AgentPlace]:
+        keys = [place.agent_key for place in value]
+        if len(set(keys)) != len(keys):
+            raise ValueError("the same agent is placed twice")
+        return value
 
 
 class TeamOut(BaseModel):
