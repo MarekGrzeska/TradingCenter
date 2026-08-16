@@ -28,6 +28,7 @@ from .config import Settings
 from .db import MIGRATION_LOCK_KEY, advisory_lock
 from .db import pool as make_pool
 from .openapi import require_response_fields
+from .tools import ToolServer
 
 log = logging.getLogger(__name__)
 
@@ -61,9 +62,20 @@ async def lifespan(app: FastAPI):
             # the schema it found (`schema_version.py`).
             await schema_version.verify(conn)
 
+        # Built here, connected to nothing yet: the session opens on first use and the
+        # tool list is read then. That is what keeps market-mcp off this module's start-up
+        # path — a team assigning no tools never touches it, and the catalogue is served
+        # whether or not it answers (specs/teams-tool-access, "Moduł startuje bez serwera
+        # narzędzi"). The refusal a missing server earns belongs to starting a *run*.
+        tools = ToolServer(settings)
+
         app.state.settings = settings
         app.state.pool = pool
-        yield
+        app.state.tools = tools
+        try:
+            yield
+        finally:
+            await tools.aclose()
 
 
 app = FastAPI(

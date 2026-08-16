@@ -19,8 +19,17 @@ dependencies = [
     "azure-identity>=1.19",
     # azure-identity's `aio` credentials build an async HTTP pipeline that imports this
     # at construction time — `DefaultAzureCredential()` fails without it, not just the
-    # tool-server session that will use it directly in a later change.
+    # tool-server session that uses it directly.
     "aiohttp>=3.10",
+    # The MCP client half of the same SDK market-mcp serves with, and pinned exactly for
+    # the same reason `agent` pins it: `mcp` shipped a 2.0.0 that moved public names
+    # during a minor series, and this module imports two of them (`ClientSession`,
+    # `streamable_http_client`) plus one private helper.
+    "mcp==1.27.0",
+    # `tools/client.py` builds the session's HTTP client and its per-request auth flow
+    # against httpx directly. It arrives with `mcp` anyway; named here because this
+    # module's own code imports it, which is what a dependency list is for.
+    "httpx>=0.27",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
@@ -52,9 +61,6 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "ruff==0.16.2",
-    # FastAPI's TestClient is a thin wrapper over httpx; this module makes no HTTP calls
-    # of its own at runtime, so it belongs to the dev group rather than the app's deps.
-    "httpx>=0.27",
     # Brings up a throwaway PostgreSQL per test session, same reason as agent and
     # market-data: the schema is the thing under test.
     "testcontainers[postgres]>=4.8",

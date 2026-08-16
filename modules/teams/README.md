@@ -24,29 +24,41 @@ Nothing here serves a team yet — that lands in the changes building on top of 
   own port.
 - `auth.py` — reads the identity a platform authenticator puts on a request, the same
   two headers `agent` and `market-data` read.
-- `app.py` — assembly only: lifespan and (for now) a single `/health` route. Nothing
-  that decides anything.
-- `migrations/` — the schema, as the statements a deployment actually runs. Empty of
-  actual migrations for now; the machinery (`migrate.py`, `schema_version.py`,
-  `migrations/env.py`) is real and already running against zero revisions, which is a
-  valid "at head" state.
+- `contract.py` — the wire: the definition's own shapes (`AgentDefinition`, `TeamEdge`,
+  `TeamDefinition`) and the `*Out` models the terminal's types are generated from.
+- `tools/` — the session with `market-mcp` (`client.py`, the only place `mcp` is
+  imported) and who gets which tools (`assignment.py`). Both refusals that stop a run
+  before an agent is called live in the second: a server that cannot be asked, and a
+  tool the server no longer announces. A team assigning no tools never touches either.
+- `app.py` — assembly only: the lifespan, the tool server it builds without connecting
+  it, and (for now) a single `/health` route. Nothing that decides anything.
+- `migrations/` — the schema, as the statements a deployment actually runs: `0001` the
+  catalogue, `0002` runs and their trace, `0003` usage.
 
 ## Run
 
 ```bash
 cp .env.example .env   # then fill in OPENAI_API_KEY and MODELS
-uv run alembic upgrade head   # no-op today — there are no revisions yet
+uv run alembic upgrade head
 uv run uvicorn teams.app:app --reload --port 8050
 ```
 
-Needs a database: `../../compose.yaml` at the repo root starts one on
-`127.0.0.1:55432`. Until the dev scripts are taught about this module (a later change
-in this series), create the role and database by hand the way `agent`'s once needed:
+Needs a database: `../../compose.yaml` at the repo root starts one on `127.0.0.1:55432`,
+and `./scripts/dev.sh` / `./scripts/dev.ps1` create the `teams` role and database inside
+it if either is missing. By hand, if you are not using those scripts:
 
 ```sql
 CREATE ROLE teams WITH LOGIN PASSWORD 'change-me';
 CREATE DATABASE teams OWNER teams;
 ```
+
+Does not need `market-mcp` to start, and the difference from `agent` is worth knowing:
+`MARKET_MCP_URL` left unset means every team whose agents assign **no** tools runs
+normally, while a team that does assign them is refused at the moment a run starts,
+naming tool access as the reason. It is not a turn answered worse — it would be several
+agents guessing independently, each guess paid for. Pointing the URL anywhere off
+loopback needs `MARKET_MCP_SCOPE` set too, the same way a remote database needs an
+identity.
 
 `alembic upgrade head` above is the local convenience, not the mechanism: **the module
 migrates its own database at startup** (`migrate.py`, called from `app.py`'s lifespan),

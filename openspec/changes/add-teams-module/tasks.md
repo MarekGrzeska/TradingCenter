@@ -56,13 +56,28 @@
 
 ## 6. Dostęp do serwera narzędzi
 
-- [ ] 6.1 `tools/client.py` — bliźniak z `agent`: jedna sesja, tożsamość na żądanie, `ToolOutcome`
-- [ ] 6.2 Zawężenie zestawu narzędzi do przypisanych agentowi w definicji
-- [ ] 6.3 Odmowa uruchomienia przebiegu, gdy agent ma narzędzia, a serwer jest nieosiągalny
-- [ ] 6.4 Odmowa uruchomienia rewizji wskazującej narzędzie, którego serwer już nie ogłasza
-- [ ] 6.5 Górna granica czasu wywołania; przekroczenie odróżnione od odmowy narzędzia
-- [ ] 6.6 Testy: zespół bez przypisanych narzędzi rusza mimo nieosiągalnego serwera
-- [ ] 6.7 Testy: moduł wstaje i obsługuje katalog bez skonfigurowanego serwera narzędzi
+- [x] 6.1 `tools/client.py` — bliźniak z `agent`: jedna sesja, tożsamość na żądanie, `ToolOutcome`
+- [x] 6.2 Zawężenie zestawu narzędzi do przypisanych agentowi w definicji
+- [x] 6.3 Odmowa uruchomienia przebiegu, gdy agent ma narzędzia, a serwer jest nieosiągalny
+- [x] 6.4 Odmowa uruchomienia rewizji wskazującej narzędzie, którego serwer już nie ogłasza
+- [x] 6.5 Górna granica czasu wywołania; przekroczenie odróżnione od odmowy narzędzia
+- [x] 6.6 Testy: zespół bez przypisanych narzędzi rusza mimo nieosiągalnego serwera
+- [x] 6.7 Testy: moduł wstaje i obsługuje katalog bez skonfigurowanego serwera narzędzi
+
+  PR #110. Jedno świadome odstępstwo od bliźniaka i jeden podział, który warto znać:
+
+  - **`list_tools()` rzuca, zamiast oddać pustą listę.** W `agent` brak narzędzi to
+    gorsza, ale użyteczna tura; tutaj `ToolServerUnavailable` jest tym, co pozwala
+    odmówić uruchomienia zamiast wypuścić kilku agentów zgadujących niezależnie, każdy
+    za pieniądze. `call()` zostaje bez zmian — w trakcie przebiegu awaria kosztuje
+    jednego agenta jedną odpowiedź, nie cały ślad.
+  - **6.2–6.4 wylądowały w `tools/assignment.py`,** nie w kliencie. `plan_tools()`
+    rozwiązuje nazwy z definicji raz na przebieg — dwa razy oznaczałoby, że dwaj agenci
+    tego samego przebiegu pracują na dwóch różnych listach narzędzi.
+  - **Zespół bez narzędzi w ogóle nie dotyka serwera** — nie „pyta i wybacza". Awaria
+    market-mcp nie zatrzymuje przebiegu, który go nigdy nie potrzebował.
+  - **`ToolServer` wisi w `lifespan`** i nie łączy się przy starcie; sesja otwiera się
+    przy pierwszym użyciu. To jest to, co czyni 6.7 czymś więcej niż zapewnieniem.
 
 ## 7. Wykonanie przebiegu
 
