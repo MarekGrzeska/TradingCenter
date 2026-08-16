@@ -70,22 +70,27 @@ it and edits nothing about the database. `../../scripts/dev.sh` (or `dev.ps1`) d
 the above plus the gateway and the terminal, in the order they need each other. Migrations
 step with `uv run alembic downgrade -1`.
 
-`alembic upgrade head` is not optional and never implicit — the container will not run it
-(`Dockerfile`), and since a deploy on 10 August landed new code on the previous schema, the
-module refuses to start when the two disagree (`schema_version.py`). Skipping it fails at
-startup with the revision it found and the revision it wanted, rather than serving `500`
-from the four routes that read the new tables.
+`alembic upgrade head` above is the local convenience, not the mechanism: **the module
+migrates its own database at startup** (`migrate.py`, called from `app.py`'s lifespan),
+before a request is served and before a single candle is written. Production has no step
+of its own at all — a merge to `main` leaves it serving.
 
-In production the migration is only half of it. Migrations there are applied by the
-server's Entra administrator, so every table they create is owned by that administrator
-and `app-tradingcenter-market-data` is granted nothing on it — the original grant was one
-statement over the tables that existed that day. That reads as `permission denied`, not as
-a missing table, and no check catches it. `agent` hit exactly this on 15 August with
-`prompt_revisions`; both databases were given
-`ALTER DEFAULT PRIVILEGES FOR ROLE <administrator> IN SCHEMA public` the same day, so a
-future migration grants itself. That default is scoped to the role that creates the
-object: a migration applied by a *different* administrator identity lands back in the same
-hole.
+Two things hold that up. Migrations run under a Postgres advisory lock (`db.py`), so two
+instances starting together produce one migration and one waiter rather than the race the
+`Dockerfile` used to refuse on. The wait is twenty-five minutes here against the agent's
+five, because the candle table is the largest thing in this system and an index rebuilt
+over it outlasts several ordinary starts. And they run as the module's **own** identity,
+not the server administrator's, so every table they create belongs to the role that will
+read it — the reason there is no `GRANT` step here any more. That was the half with no
+check on it: `agent` lost `prompt_revisions` to exactly that on 15 August, reading as
+`permission denied` rather than as a missing table.
+
+`schema_version.py` still runs, immediately after. It now catches the narrower pair the
+migration cannot fix: an upgrade that reported success without arriving, and an image
+older than the schema it found — the second being a rollback that moved the code back and
+left the database where it was. The first version of that check was written after
+10 August, when a deploy landed new code on the previous schema and four routes answered
+`500` for thirty-five minutes while the deploy sat green.
 
 Leaving `DATABASE_USER` unset is what makes this local mode, and it cuts the module down to
 loopback: without an identity it refuses any remote host, production included

@@ -93,15 +93,12 @@ def postgres_url() -> Iterator[str]:
 
 @pytest.fixture(scope="session")
 def migrated_url(postgres_url: str) -> str:
-    """The same database with the module's migrations applied — run through alembic
-    itself, so the schema under test is the one a deployment will actually apply."""
-    from alembic import command
-    from alembic.config import Config
+    """The same database with the module's migrations applied — through the same
+    function the module runs at startup, so the schema under test is the one a
+    deployment actually applies rather than a second arrangement that resembles it."""
+    from agent.migrate import upgrade_to_head
 
-    config = Config(str(MODULE_ROOT / "alembic.ini"))
-    config.set_main_option("script_location", str(MODULE_ROOT / "migrations"))
-    config.set_main_option("sqlalchemy.url", sqlalchemy_url(postgres_url))
-    command.upgrade(config, "head")
+    upgrade_to_head(sqlalchemy_url(postgres_url))
     return postgres_url
 
 

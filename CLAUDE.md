@@ -150,38 +150,41 @@ What "satisfied" means, concretely, and all three are required:
    the App Service control plane proves the site is *running the right image*, not that the
    process inside came up — `deploy-agent.yml` says so in its own comment.
 
-The rule is written from a failure, not from taste. `schema_version.py` (both copies) refuses
-to start when the revision in the database and the head in the image disagree, so an
-unmigrated deploy takes the whole module dark rather than breaking one route quietly. That
-is the right failure and it stays — but as of 16 August 2026 it is *all* there is: the
-container does not migrate (`Dockerfile`), `deploy-agent.yml` and `deploy-market-data.yml`
-do not migrate, and their control-plane smoke checks report green over a container that is
-crash-looping on exit code 3. Production `agent` sat dark that day for exactly that reason,
-its database still at `0003` while the image shipped `0009`.
+The rule is written from a failure, not from taste. Production `agent` sat dark on
+16 August 2026 with its database at `0005` and its image shipping `0009`, because nothing
+migrated it: not the container, not `deploy-agent.yml`, and the workflow's control-plane
+smoke check reported green over a container crash-looping on exit code 3.
 
-Two things make this harder than adding a step, and neither is optional to solve:
+**How it is satisfied today** (`openspec/changes/archive/…-modules-migrate-their-own-database`):
+each module migrates in its own `lifespan`, through `migrate.py`, before it serves anything —
+and, in `market-data`, before it writes a single candle. Two properties carry it:
 
-- **The runner has no stable address.** `psql-tradingcenter` admits callers by firewall rule
-  (`infra/database.tf`) — a fixed developer IP and the web apps' outbound lists. A GitHub
-  runner has neither, so the job has to open a rule for its own egress address and remove it
-  again, on every path out including failure.
-- **Grants follow the role that created the object.** Migrations are applied by an Entra
-  administrator, so every table is owned by that identity and the app's role is granted
-  nothing on it. `ALTER DEFAULT PRIVILEGES FOR ROLE <administrator> IN SCHEMA public` is what
-  closes it — and it is *scoped to that one role*, so a migration applied by a different
-  administrator (the CI principal, say) lands straight back in the hole. Whichever identity
-  ends up running migrations needs its own default privileges in both production databases.
-  Diagnosed 15 August on `prompt_revisions`, which read as `permission denied` and not as a
-  missing table.
+- **A Postgres advisory lock** (`db.py`, `MIGRATION_LOCK_KEY`) rather than a rule against
+  migrating at startup. Two instances starting together give one migration and one waiter.
+  The wait is bounded and deliberately uneven: five minutes for `agent`, thirty for
+  `market-data`, whose candle table is the largest thing here. A lock held by a process that
+  died needs no timeout — it is session scoped and dies with the connection.
+- **The module's own identity**, not the server administrator's. A table created by the app
+  role belongs to it, so nothing has to be granted afterwards. This is what closed the
+  `ALTER DEFAULT PRIVILEGES` trap — that grant is scoped to the role creating the object, so
+  it only ever worked while one identity did all the creating (`prompt_revisions`, 15 August,
+  read as `permission denied` rather than as a missing table).
 
-Both of those are `infra/**`, so building this is an OpenSpec change, and it is the one
-place where `terraform apply` staying the operator's job (above) and this rule have to be
-reconciled rather than assumed compatible.
+`schema_version.py` still runs immediately after, and now means something narrower: an
+upgrade that reported success without arriving, or an image older than the schema it found.
+The second gets *more* likely under this arrangement, not less — the schema moves forward at
+every deploy while a rollback moves only the code back.
 
-Until it is built, the manual step is `uv run alembic upgrade head` from the module
-directory with `DATABASE_USER` set to the Entra administrator — a stopgap being paid off,
-not a documented workflow. Do not add a new module with a database and leave it on that
-step.
+What a new module with a database has to do: migrate in its own lifespan under its own lock
+key, with its own identity, and have a deploy check that reaches the process rather than the
+control plane. `deploy-agent.yml` reads `/health`, excluded from Easy Auth the way
+`market-data`'s `/ping` is — and because the lifespan blocks until the migration finishes, a
+process that answers is itself the proof that the schema is at head.
+
+One thing stays the operator's, exactly once per database: the app role must own what it is
+about to alter. `scripts/grant-schema-ownership.sql` transfers ownership of everything in
+`public` and grants `CREATE` on the schema. A database that has not had this done gives a
+module that will not start.
 
 ## A new field on market-data's wire
 

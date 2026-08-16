@@ -60,34 +60,36 @@ jobs:
           app-name: app-tradingcenter-agent
           images: ${{ steps.image.outputs.name }}:${{ github.sha }}
 
-      # Same shape as deploy-gateway.yml's own check, for the same reason: unlike
-      # market-data, this app has no path excluded from Easy Auth
-      # (infra/app-service.tf — the agent has no WebSocket route needing one, so none
-      # was carved out) — every path answers Easy Auth's own 401 before the container
-      # is reached, dead or alive, alike. The control plane answers instead, over the
-      # same OIDC session the deploy used.
+      # Two questions, and the second is the one that used to go unasked.
       #
-      # What this proves: the site is running and the image App Service will serve is
-      # the one this run pushed. What it does not prove: that the process inside came
-      # up clean — task 12.5 (`add-agent-chat`) is what checks the SSE stream itself
-      # actually works once deployed, by hand, since App Service's buffering behaviour
-      # only shows up there.
-      - name: Confirm the deployed image is this commit's
+      # The control plane says which image App Service will serve. It does not say
+      # whether the process inside it came up: `state` is the state of the *site*, and
+      # on 16 August it read `Running` for the better part of an hour while the
+      # container exited with code 3 on every restart. A deploy that reports green over
+      # a dark module is worse than one that reports nothing.
+      #
+      # `/health` answers that second question, and answers it completely. It is
+      # excluded from Easy Auth (infra/app-service.tf) so a caller without a token
+      # reaches the container rather than the platform's 401 — and because the module's
+      # lifespan does not finish until its migrations do (`agent/migrate.py`), a process
+      # answering here at all is a process whose database is at the revision this image
+      # was built for. There is nothing further to ask.
+      - name: Confirm this commit's image is the one serving
         run: |
           set -euo pipefail
           expected="${{ steps.image.outputs.name }}:${{ github.sha }}"
-          for attempt in $(seq 1 10); do
-            state=$(az webapp show --name app-tradingcenter-agent \
-              --resource-group rg-tradingcenter --query state -o tsv)
+          url="https://app-tradingcenter-agent.azurewebsites.net/health"
+          for attempt in $(seq 1 20); do
             image=$(az webapp config container show --name app-tradingcenter-agent \
               --resource-group rg-tradingcenter \
               --query "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value | [0]" -o tsv)
-            echo "attempt $attempt: state=$state image=${image:-none}"
-            if [ "$state" = "Running" ] && [ "${image#DOCKER|}" = "$expected" ]; then
-              echo "deployed: $expected"
+            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo "000")
+            echo "attempt $attempt: image=${image:-none} health=$code"
+            if [ "${image#DOCKER|}" = "$expected" ] && [ "$code" = "200" ]; then
+              echo "serving: $expected"
               exit 0
             fi
             sleep 15
           done
-          echo "::error::app-tradingcenter-agent is not serving $expected — state=$state image=${image:-none}"
+          echo "::error::app-tradingcenter-agent is not serving $expected — image=${image:-none} health=$code"
           exit 1

@@ -90,6 +90,12 @@ class Settings(BaseSettings):
     azure_client_id: str | None = None
     azure_client_secret: str | None = None
     azure_tenant_id: str | None = None
+    # How long this module waits for another process to finish migrating before it gives
+    # up and refuses to start. Sized for the slow case — a migration running ahead of us —
+    # not for a dead one, which releases its lock with its connection. This module's
+    # migrations touch small tables; market-data's twin allows far longer, because its
+    # tables are not small.
+    migration_lock_wait_seconds: float = 300.0
 
     # --- OpenAI, this module's only model provider ---
     #
