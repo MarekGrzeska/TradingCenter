@@ -15,6 +15,7 @@ import {
 import type {
   TeamDefinition,
   TeamDependency,
+  TeamLayout,
   TeamSummary,
   TeamsApi,
   TeamsModel,
@@ -66,6 +67,11 @@ export function TeamEditor({
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  // Where the operator left each agent. Kept beside the draft rather than in it: the
+  // module stores it beside the revision for the same reason, and a moved node must not
+  // make the Save button light up (specs/terminal-teams, "Przesunięcie nie jest zmianą
+  // definicji").
+  const [places, setPlaces] = useState<TeamLayout>(new Map());
 
   useEffect(() => {
     if (teamId === null) {
@@ -73,6 +79,7 @@ export function TeamEditor({
       setSaved(null);
       setDraft(fresh);
       setVersion(null);
+      setPlaces(new Map());
       setSelectedKey(fresh.agents[0]?.key ?? null);
       return;
     }
@@ -80,14 +87,21 @@ export function TeamEditor({
     const controller = new AbortController();
     setError(null);
 
-    Promise.all([api.getTeam(teamId, controller.signal), api.latestRevision(teamId, controller.signal)])
-      .then(([team, revision]) => {
+    Promise.all([
+      api.getTeam(teamId, controller.signal),
+      api.latestRevision(teamId, controller.signal),
+      // Its own read, and its failure is not the team's: a layout that cannot be fetched
+      // leaves every agent placed by `layout()`, which is where they all started anyway.
+      api.layout(teamId, controller.signal).catch(() => new Map()),
+    ])
+      .then(([team, revision, layout]) => {
         if (cancelled) return;
         setName(team.name);
         setDescription(team.description);
         setVersion(revision.version);
         setSaved(revision.definition);
         setDraft(revision.definition);
+        setPlaces(layout);
         setSelectedKey(revision.definition.agents[0]?.key ?? null);
       })
       .catch((cause: unknown) => {
@@ -108,6 +122,18 @@ export function TeamEditor({
     // retires it — leaving it on would keep a node marked for a reason that may already
     // be gone, which is worse than saying nothing.
     setRefusal(null);
+  }
+
+  function move(agentKey: string, at: { x: number; y: number }) {
+    const moved = new Map(places).set(agentKey, at);
+    setPlaces(moved);
+    // A team that does not exist yet has nowhere to put this; it is saved with the rest
+    // of the arrangement the first time the operator drags something after creating it.
+    if (teamId === null) return;
+    // Fire and forget on purpose, and the failure is deliberately quiet: the node is
+    // already where the operator put it, and an error banner over a position is louder
+    // than what was lost.
+    void api.saveLayout(teamId, moved, new AbortController().signal).catch(() => {});
   }
 
   async function save() {
@@ -218,7 +244,9 @@ export function TeamEditor({
           models={models}
           selectedKey={selectedKey}
           refusal={refusal}
+          places={places}
           onSelect={setSelectedKey}
+          onMove={move}
           onConnect={(edge: TeamDependency) => edit(addDependency(draft, edge))}
           onDisconnect={(edge: TeamDependency) => edit(removeDependency(draft, edge))}
         />
@@ -231,6 +259,7 @@ export function TeamEditor({
             toolsNote={toolsNote}
             refusal={refusal}
             onChange={(patch) => edit(updateAgent(draft, selected.key, patch))}
+            onConnect={(edge) => edit(addDependency(draft, edge))}
             onRemove={() => {
               edit(removeAgent(draft, selected.key));
               setSelectedKey(null);

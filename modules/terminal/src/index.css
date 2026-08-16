@@ -88,6 +88,69 @@
     system-ui, -apple-system, "Segoe UI", sans-serif;
 }
 
+/*
+ * React Flow's own chrome, mapped onto the tokens above.
+ *
+ * Its stylesheet ships a light theme by default and switches to the dark one only under a
+ * `.dark` class this app does not use — `color-scheme: dark` is not what it reads. That is
+ * how the zoom buttons ended up unreadable: white background with `color: inherit`, which
+ * inherits `--color-ink`, i.e. white on white. The connection handles were the same
+ * mistake with a worse consequence — a 6px `#1a192b` dot on `--color-panel` is invisible,
+ * and a handle nobody can see is an edge nobody can draw.
+ *
+ * Everything here is a variable the library already reads; only the handle's size and
+ * offset are rules of ours, and they are ours because a 6px target is not a target.
+ */
+.teams-canvas {
+  --xy-background-color: var(--color-canvas);
+  --xy-background-pattern-color: var(--color-grid);
+
+  --xy-edge-stroke: var(--color-secondary);
+  --xy-edge-stroke-selected: var(--color-primary);
+  --xy-edge-stroke-width: 1.5;
+  --xy-connectionline-stroke: var(--color-primary);
+  --xy-connectionline-stroke-width: 2;
+
+  --xy-handle-background-color: var(--color-primary);
+  --xy-handle-border-color: var(--color-canvas);
+
+  --xy-controls-button-background-color: var(--color-panel-strong);
+  --xy-controls-button-background-color-hover: var(--color-raised);
+  --xy-controls-button-color: var(--color-ink);
+  --xy-controls-button-color-hover: var(--color-primary);
+  --xy-controls-button-border-color: var(--color-border);
+  --xy-controls-box-shadow: 0 1px 4px rgb(0 0 0 / 0.45);
+
+  --xy-attribution-background-color: transparent;
+}
+
+.teams-canvas .react-flow__handle {
+  width: 11px;
+  height: 11px;
+  border-width: 2px;
+}
+
+/* Half outside the node on the side it points at: an edge is drawn between two of these,
+   so they have to be reachable without landing on the card. */
+.teams-canvas .react-flow__handle-left {
+  left: -6px;
+}
+
+.teams-canvas .react-flow__handle-right {
+  right: -6px;
+}
+
+.teams-canvas .react-flow__handle:hover,
+.teams-canvas .react-flow__handle.connectingfrom,
+.teams-canvas .react-flow__handle.connectingto {
+  background-color: var(--color-primary-strong);
+  box-shadow: 0 0 0 4px var(--color-primary-soft);
+}
+
+.teams-canvas .react-flow__attribution a {
+  color: var(--color-ink-faint);
+}
+
 html {
   color-scheme: dark;
 }
