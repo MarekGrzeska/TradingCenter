@@ -31,12 +31,12 @@
 
 ## 3. Rozmowa z `teams`
 
-- [ ] 3.1 Klient HTTP do `teams` z granicą czasu i bez ponawiania zapisu
-- [ ] 3.2 Trzy wyniki, nie dwa: odpowiedź, odmowa `teams` z jego własnym powodem,
+- [x] 3.1 Klient HTTP do `teams` z granicą czasu i bez ponawiania zapisu
+- [x] 3.2 Trzy wyniki, nie dwa: odpowiedź, odmowa `teams` z jego własnym powodem,
   niedostępność
-- [ ] 3.3 Migawka kontraktu `teams` w `contract/teams.openapi.json` i `scripts/contract.py
+- [x] 3.3 Migawka kontraktu `teams` w `contract/teams.openapi.json` i `scripts/contract.py
   check`, wzorem obu istniejących serwerów MCP
-- [ ] 3.4 Testy przeciw dublerowi `teams`: odmowa, przekroczenie czasu, brak ponowienia zapisu
+- [x] 3.4 Testy przeciw dublerowi `teams`: odmowa, przekroczenie czasu, brak ponowienia zapisu
 
 ## 4. Katalog narzędzi
 

@@ -1,0 +1,2821 @@
+{
+  "components": {
+    "schemas": {
+      "AgentDefinition": {
+        "description": "One role inside a team: what it is told, which model answers for it, and which\ntools it may reach for.",
+        "properties": {
+          "guidance": {
+            "default": "",
+            "title": "Guidance",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "model_id": {
+            "title": "Model Id",
+            "type": "string"
+          },
+          "prompt": {
+            "title": "Prompt",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "tools": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tools",
+            "type": "array"
+          }
+        },
+        "required": [
+          "key",
+          "role",
+          "prompt",
+          "model_id"
+        ],
+        "title": "AgentDefinition",
+        "type": "object"
+      },
+      "AgentPlace": {
+        "description": "One agent's place on the canvas \u2014 the definition's own key and two coordinates.\n\nIts own shape rather than a field on `AgentDefinition`, and that is the decision\nrather than an accident: a definition is immutable once saved and is what a run points\nat, so a coordinate inside it would mint a revision every time a node was dragged\n(design.md, \"Rozmieszczenie agent\u00f3w obok rewizji, nie w niej\").",
+        "properties": {
+          "agent_key": {
+            "title": "Agent Key",
+            "type": "string"
+          },
+          "x": {
+            "title": "X",
+            "type": "number"
+          },
+          "y": {
+            "title": "Y",
+            "type": "number"
+          }
+        },
+        "required": [
+          "agent_key",
+          "x",
+          "y"
+        ],
+        "title": "AgentPlace",
+        "type": "object"
+      },
+      "CostLimits": {
+        "description": "Budgets a revision may carry \u2014 specs/teams-usage, 'Przekroczenie granicy kosztu\nzatrzymuje przebieg'. Strings, like every other cost on this contract's wire: nothing\nhere computes with these, only compares them against a running total, and a string\nround-trips exactly where a float would invite rescaling it should never do.",
+        "properties": {
+          "daily_limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "max cost per day for this team",
+            "title": "Daily Limit"
+          },
+          "run_limit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "max cost for one run",
+            "title": "Run Limit"
+          }
+        },
+        "title": "CostLimits",
+        "type": "object"
+      },
+      "CreateTeamIn": {
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/TeamDefinition"
+          },
+          "description": {
+            "default": "",
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "definition"
+        ],
+        "title": "CreateTeamIn",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "required": [
+          "detail"
+        ],
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "ModelOut": {
+        "description": "One entry of the model catalogue \u2014 everything a picker needs and nothing else\n(specs/teams-models, \"Katalog modeli wystarcza do zbudowania wybieraka\"). The\nterminal MUST NOT carry a model id of its own, so a model added to this module's\nconfiguration reaches the picker with no terminal change at all.",
+        "properties": {
+          "cost_rank": {
+            "title": "Cost Rank",
+            "type": "integer"
+          },
+          "display_name": {
+            "title": "Display Name",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "input_rate_per_1m": {
+            "title": "Input Rate Per 1M",
+            "type": "string"
+          },
+          "output_rate_per_1m": {
+            "title": "Output Rate Per 1M",
+            "type": "string"
+          }
+        },
+        "required": [
+          "cost_rank",
+          "display_name",
+          "id",
+          "input_rate_per_1m",
+          "output_rate_per_1m"
+        ],
+        "title": "ModelOut",
+        "type": "object"
+      },
+      "NextFiresOut": {
+        "description": "specs/terminal-teams-schedules, \"Terminal nie liczy czasu wyzwolenia sam\" \u2014 the\nmodule's own answer to \"when does this schedule fire next\", computed fresh from\n`cron_expression` rather than read off the row's own `next_fire_at` \u2014 which reflects\nthe last *claim*, not a live forecast, and goes stale the moment a schedule is\ndisabled.",
+        "properties": {
+          "times": {
+            "items": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "title": "Times",
+            "type": "array"
+          }
+        },
+        "required": [
+          "times"
+        ],
+        "title": "NextFiresOut",
+        "type": "object"
+      },
+      "RunOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "stopped_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stopped Reason"
+          },
+          "team_revision_id": {
+            "title": "Team Revision Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created_at",
+          "finished_at",
+          "id",
+          "started_at",
+          "status",
+          "stopped_reason",
+          "team_revision_id"
+        ],
+        "title": "RunOut",
+        "type": "object"
+      },
+      "RunStepOut": {
+        "properties": {
+          "agent_key": {
+            "title": "Agent Key",
+            "type": "string"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "output": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output"
+          },
+          "rounds": {
+            "title": "Rounds",
+            "type": "integer"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "integer"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_key",
+          "finished_at",
+          "id",
+          "output",
+          "rounds",
+          "run_id",
+          "started_at",
+          "status"
+        ],
+        "title": "RunStepOut",
+        "type": "object"
+      },
+      "SaveLayoutIn": {
+        "description": "The whole layout at once, replacing what was stored. A patch per node would need\nthe module to know which agents still exist, and the canvas already does.",
+        "properties": {
+          "places": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPlace"
+            },
+            "title": "Places",
+            "type": "array"
+          }
+        },
+        "required": [
+          "places"
+        ],
+        "title": "SaveLayoutIn",
+        "type": "object"
+      },
+      "SaveRevisionIn": {
+        "properties": {
+          "definition": {
+            "$ref": "#/components/schemas/TeamDefinition"
+          }
+        },
+        "required": [
+          "definition"
+        ],
+        "title": "SaveRevisionIn",
+        "type": "object"
+      },
+      "ScheduleFireOut": {
+        "description": "One fire attempt from either source, including one that started nothing\n(specs/teams-schedules, \"Wyzwolenie bez przebiegu zostawia zapisany pow\u00f3d\"). Exactly\none of `schedule_id`/`trigger_id` is set, mirroring the row's own CHECK constraint.",
+        "properties": {
+          "fired_at": {
+            "format": "date-time",
+            "title": "Fired At",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "schedule_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Schedule Id"
+          },
+          "skipped_count": {
+            "title": "Skipped Count",
+            "type": "integer"
+          },
+          "trigger_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trigger Id"
+          }
+        },
+        "required": [
+          "fired_at",
+          "id",
+          "outcome",
+          "reason",
+          "run_id",
+          "schedule_id",
+          "skipped_count",
+          "trigger_id"
+        ],
+        "title": "ScheduleFireOut",
+        "type": "object"
+      },
+      "ScheduleIn": {
+        "description": "What an operator submits to create or edit a schedule.",
+        "properties": {
+          "cron_expression": {
+            "title": "Cron Expression",
+            "type": "string"
+          },
+          "pinned_revision_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned Revision Id"
+          },
+          "revision_mode": {
+            "default": "pinned",
+            "enum": [
+              "pinned",
+              "latest"
+            ],
+            "title": "Revision Mode",
+            "type": "string"
+          },
+          "unattended_ack": {
+            "default": false,
+            "title": "Unattended Ack",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "cron_expression"
+        ],
+        "title": "ScheduleIn",
+        "type": "object"
+      },
+      "ScheduleOut": {
+        "properties": {
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "cron_expression": {
+            "title": "Cron Expression",
+            "type": "string"
+          },
+          "disabled_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled Reason"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "next_fire_at": {
+            "format": "date-time",
+            "title": "Next Fire At",
+            "type": "string"
+          },
+          "pinned_revision_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned Revision Id"
+          },
+          "revision_mode": {
+            "title": "Revision Mode",
+            "type": "string"
+          },
+          "team_id": {
+            "title": "Team Id",
+            "type": "integer"
+          },
+          "unattended_ack": {
+            "title": "Unattended Ack",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "consecutive_failures",
+          "created_at",
+          "cron_expression",
+          "disabled_reason",
+          "enabled",
+          "id",
+          "next_fire_at",
+          "pinned_revision_id",
+          "revision_mode",
+          "team_id",
+          "unattended_ack",
+          "updated_at"
+        ],
+        "title": "ScheduleOut",
+        "type": "object"
+      },
+      "TeamDefinition": {
+        "description": "The whole of what a team revision carries \u2014 every agent, every dependency between\nthem, and the cost and trading limits a run against this revision must respect. One\nimmutable blob per revision (specs/teams-catalogue, \"Rewizja raz zapisana si\u0119 nie\nzmienia\").\n\n`trading` defaults to an empty `TradingLimits`, which is what every revision saved\nbefore this field existed reads back as \u2014 and it means the same thing there as it\ndoes for a new one: no limit. Nothing about an old revision changes by being read\n(specs/teams-catalogue, \"Rewizja z fazy sprzed narz\u0119dzi handlowych\").",
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentDefinition"
+            },
+            "title": "Agents",
+            "type": "array"
+          },
+          "edges": {
+            "items": {
+              "$ref": "#/components/schemas/TeamEdge"
+            },
+            "title": "Edges",
+            "type": "array"
+          },
+          "limits": {
+            "$ref": "#/components/schemas/CostLimits"
+          },
+          "trading": {
+            "$ref": "#/components/schemas/TradingLimits"
+          }
+        },
+        "required": [
+          "agents"
+        ],
+        "title": "TeamDefinition",
+        "type": "object"
+      },
+      "TeamEdge": {
+        "description": "One dependency: `to` waits for `from_` and receives its output \u2014 specs/teams-runs,\n'Agent widzi wypowiedzi poprzednik\u00f3w, a nie ca\u0142\u0105 histori\u0119 przebiegu'.",
+        "properties": {
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "to": {
+            "title": "To",
+            "type": "string"
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "title": "TeamEdge",
+        "type": "object"
+      },
+      "TeamLayoutOut": {
+        "description": "Where the operator left each agent. Absent keys are not an error and not a zero:\nthe canvas computes a place from the dependencies for anything this does not name\n(specs/terminal-teams, \"Agent bez zapami\u0119tanego miejsca\").",
+        "properties": {
+          "places": {
+            "items": {
+              "$ref": "#/components/schemas/AgentPlace"
+            },
+            "title": "Places",
+            "type": "array"
+          }
+        },
+        "required": [
+          "places"
+        ],
+        "title": "TeamLayoutOut",
+        "type": "object"
+      },
+      "TeamOut": {
+        "description": "A row in the catalogue \u2014 specs/teams-catalogue, \"Katalog wystarcza, \u017ceby wybra\u0107\nzesp\u00f3\u0142 bez otwierania go\". No `owner_principal` on the wire: ownership gates which\nrows a query returns at all (specs/teams-browser-access), the same way agent's own\n`SessionOut` never carries one either.",
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "latest_revision": {
+            "title": "Latest Revision",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "created_at",
+          "description",
+          "id",
+          "latest_revision",
+          "name",
+          "updated_at"
+        ],
+        "title": "TeamOut",
+        "type": "object"
+      },
+      "TeamRevisionOut": {
+        "properties": {
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "definition": {
+            "$ref": "#/components/schemas/TeamDefinition"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "team_id": {
+            "title": "Team Id",
+            "type": "integer"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "created_at",
+          "definition",
+          "id",
+          "team_id",
+          "version"
+        ],
+        "title": "TeamRevisionOut",
+        "type": "object"
+      },
+      "ToolCallOut": {
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "duration_ms": {
+            "title": "Duration Ms",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "position": {
+            "title": "Position",
+            "type": "integer"
+          },
+          "result_text": {
+            "title": "Result Text",
+            "type": "string"
+          },
+          "round_index": {
+            "title": "Round Index",
+            "type": "integer"
+          },
+          "run_step_id": {
+            "title": "Run Step Id",
+            "type": "integer"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arguments",
+          "created_at",
+          "duration_ms",
+          "id",
+          "outcome",
+          "position",
+          "result_text",
+          "round_index",
+          "run_step_id",
+          "tool_name"
+        ],
+        "title": "ToolCallOut",
+        "type": "object"
+      },
+      "ToolOut": {
+        "description": "One tool as the tool server announces it right now (specs/teams-tool-access,\n\"Modu\u0142 nie trzyma kopii tego, co og\u0142asza serwer narz\u0119dzi\").\n\nName and description, and deliberately not the input schema: a definition points at a\ntool by name and carries nothing else about it, so the picker needs a label and a line\nof prose. Publishing the schema would put a copy of somebody else's contract on this\nmodule's wire, where it would be stale from the first argument market-mcp renames.\n\n`read_only` is the one property that does travel \u2014 read straight off the server's own\n`readOnlyHint`, not decided here, so an operator picking tools for an agent sees which\nones move the account before assigning one (specs/trading-mcp-tools, \"Narz\u0119dzie\nzapisuj\u0105ce jest oznaczone jako zmieniaj\u0105ce stan\"). `None` when a tool carries no\nannotation at all \u2014 unknown, not assumed read-only.",
+        "properties": {
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "read_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Read Only"
+          }
+        },
+        "required": [
+          "description",
+          "name",
+          "read_only"
+        ],
+        "title": "ToolOut",
+        "type": "object"
+      },
+      "TradeOut": {
+        "description": "One call a run made that could change the account \u2014 specs/teams-trading, \"Ka\u017cde\nwywo\u0142anie zapisuj\u0105ce zostawia w\u0142asny wiersz \u015bladu\".\n\nThe same event is also a `ToolCallOut`, with the arguments and the reply verbatim.\nThis is that event read as a *trade*: the fields an operator asks about after the\nfact \u2014 what, which way, how much, and what came of it \u2014 as columns rather than as\nJSON somebody has to read.\n\n`status` is this module's own reading of the outcome and is one of `sent`, `settled`,\n`unsettled`, `refused`, `unknown`. `result_status` beside it is the provider's word\n\u2014 FILLED, WORKING, PENDING, REJECTED \u2014 kept separate because a row can carry the\nfirst without the second ever arriving.\n\nA row still saying `sent` after its run has finished is an order this module does not\nknow the fate of. That is not a gap in the trace; it is the trace saying the one\nthing it must be able to say (`0004_trades.py`).\n\n`size` and `level` are strings, like every other number on this wire that is compared\nrather than recomputed.",
+        "properties": {
+          "agent_key": {
+            "title": "Agent Key",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "direction": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Direction"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "level": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Level"
+          },
+          "provider_order_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Provider Order Id"
+          },
+          "reference": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reference"
+          },
+          "result_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result Status"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "integer"
+          },
+          "run_step_id": {
+            "title": "Run Step Id",
+            "type": "integer"
+          },
+          "settled_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Settled At"
+          },
+          "size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "symbol": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Symbol"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "agent_key",
+          "created_at",
+          "direction",
+          "id",
+          "level",
+          "provider_order_id",
+          "reference",
+          "result_status",
+          "run_id",
+          "run_step_id",
+          "settled_at",
+          "size",
+          "status",
+          "symbol",
+          "tool_name"
+        ],
+        "title": "TradeOut",
+        "type": "object"
+      },
+      "TradingLimits": {
+        "description": "What a revision allows its agents to do to the account \u2014 specs/teams-trading.\n\n**Every one of the three is optional, and an omitted one means no limit at all.** The\nmodule substitutes nothing and holds no ceiling of its own in code: a team the\noperator deliberately lets trade with everything it has is an experiment they are\nentitled to run, and a module refusing to save it would be making that call for them\n(specs/teams-trading, \"Ka\u017cda granica handlowa daje si\u0119 wy\u0142\u0105czy\u0107, a modu\u0142 \u017cadnej nie\nnarzuca\").\n\nWhat is *not* negotiable lives a module away: `trading-mcp` refuses to start against\nanything but the demo account, and no setting here or there turns that off\n(specs/trading-mcp-upstream-access). That is the split \u2014 the irreversible thing is\nfixed, the operator's own budget is theirs.\n\n`max_order_size` is a string for the same reason every cost on this wire is: it is\ncompared, never recomputed, and a string round-trips exactly.",
+        "properties": {
+          "max_order_size": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "largest size one order may carry; null means no limit",
+            "title": "Max Order Size"
+          },
+          "orders_per_day": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "how many orders this team may place per UTC day; null means no limit",
+            "title": "Orders Per Day"
+          },
+          "orders_per_run": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "how many orders one run may place; null means no limit",
+            "title": "Orders Per Run"
+          }
+        },
+        "title": "TradingLimits",
+        "type": "object"
+      },
+      "TriggerIn": {
+        "description": "A market condition, expressed as a call to a tool this module already has a\nsession for (specs/teams-triggers, \"Warunek jest czytany narz\u0119dziami serwera\nnarz\u0119dzi\") \u2014 never a locally computed indicator. `field_path` names the value inside\nthat call's result to compare; `threshold` is a string for the same reason every\nother number on this contract that a caller must not rescale is (see `CostLimits`).",
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "comparison": {
+            "enum": [
+              "gt",
+              "gte",
+              "lt",
+              "lte",
+              "eq"
+            ],
+            "title": "Comparison",
+            "type": "string"
+          },
+          "cooldown_seconds": {
+            "default": 900,
+            "title": "Cooldown Seconds",
+            "type": "integer"
+          },
+          "field_path": {
+            "title": "Field Path",
+            "type": "string"
+          },
+          "pinned_revision_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned Revision Id"
+          },
+          "poll_interval_seconds": {
+            "default": 300,
+            "title": "Poll Interval Seconds",
+            "type": "integer"
+          },
+          "revision_mode": {
+            "default": "pinned",
+            "enum": [
+              "pinned",
+              "latest"
+            ],
+            "title": "Revision Mode",
+            "type": "string"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "unattended_ack": {
+            "default": false,
+            "title": "Unattended Ack",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "tool_name",
+          "field_path",
+          "comparison",
+          "threshold"
+        ],
+        "title": "TriggerIn",
+        "type": "object"
+      },
+      "TriggerOut": {
+        "properties": {
+          "arguments": {
+            "additionalProperties": true,
+            "title": "Arguments",
+            "type": "object"
+          },
+          "comparison": {
+            "title": "Comparison",
+            "type": "string"
+          },
+          "consecutive_failures": {
+            "title": "Consecutive Failures",
+            "type": "integer"
+          },
+          "cooldown_seconds": {
+            "title": "Cooldown Seconds",
+            "type": "integer"
+          },
+          "created_at": {
+            "format": "date-time",
+            "title": "Created At",
+            "type": "string"
+          },
+          "disabled_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Disabled Reason"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "field_path": {
+            "title": "Field Path",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "last_checked_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Checked At"
+          },
+          "last_fired_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Fired At"
+          },
+          "last_result": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Result"
+          },
+          "next_check_at": {
+            "format": "date-time",
+            "title": "Next Check At",
+            "type": "string"
+          },
+          "pinned_revision_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pinned Revision Id"
+          },
+          "poll_interval_seconds": {
+            "title": "Poll Interval Seconds",
+            "type": "integer"
+          },
+          "revision_mode": {
+            "title": "Revision Mode",
+            "type": "string"
+          },
+          "team_id": {
+            "title": "Team Id",
+            "type": "integer"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "string"
+          },
+          "tool_name": {
+            "title": "Tool Name",
+            "type": "string"
+          },
+          "unattended_ack": {
+            "title": "Unattended Ack",
+            "type": "boolean"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "arguments",
+          "comparison",
+          "consecutive_failures",
+          "cooldown_seconds",
+          "created_at",
+          "disabled_reason",
+          "enabled",
+          "field_path",
+          "id",
+          "last_checked_at",
+          "last_fired_at",
+          "last_result",
+          "next_check_at",
+          "pinned_revision_id",
+          "poll_interval_seconds",
+          "revision_mode",
+          "team_id",
+          "threshold",
+          "tool_name",
+          "unattended_ack",
+          "updated_at"
+        ],
+        "title": "TriggerOut",
+        "type": "object"
+      },
+      "UsageAggregateOut": {
+        "properties": {
+          "cost": {
+            "title": "Cost",
+            "type": "string"
+          },
+          "input_tokens": {
+            "title": "Input Tokens",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "output_tokens": {
+            "title": "Output Tokens",
+            "type": "integer"
+          },
+          "unknown_count": {
+            "title": "Unknown Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cost",
+          "input_tokens",
+          "key",
+          "output_tokens",
+          "unknown_count"
+        ],
+        "title": "UsageAggregateOut",
+        "type": "object"
+      },
+      "UsageSummaryOut": {
+        "description": "specs/teams-usage, \"Odczyt zu\u017cycia w rozbiciu na role\" \u2014 `by_agent` is the read\nthat requirement is for; `by_model` is agent's own `UsageSummaryOut` precedent,\nkept because a run can genuinely mix cheap and expensive models across agents.",
+        "properties": {
+          "by_agent": {
+            "items": {
+              "$ref": "#/components/schemas/UsageAggregateOut"
+            },
+            "title": "By Agent",
+            "type": "array"
+          },
+          "by_model": {
+            "items": {
+              "$ref": "#/components/schemas/UsageAggregateOut"
+            },
+            "title": "By Model",
+            "type": "array"
+          },
+          "total_cost": {
+            "title": "Total Cost",
+            "type": "string"
+          }
+        },
+        "required": [
+          "by_agent",
+          "by_model",
+          "total_cost"
+        ],
+        "title": "UsageSummaryOut",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ctx",
+          "input",
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "description": "Operator-defined teams of agents, saved to a catalogue and run by hand. A team's definition is data \u2014 a graph of roles and dependencies, versioned append-only \u2014 compiled to a run rather than written as code. This phase writes no order: a run ends in a recommendation kept in its trace, not a position (specs/teams-runs).",
+    "title": "TradingCenter \u00b7 teams",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "title": "Response Health Health Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/models": {
+      "get": {
+        "operationId": "list_models_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ModelOut"
+                  },
+                  "title": "Response List Models Models Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Models"
+      }
+    },
+    "/revisions/{revision_id}": {
+      "get": {
+        "description": "The definition a run is working on, reached the way a run names it \u2014 by the id on\n`runs.team_revision_id` rather than by a version the watcher would first have to look\nup. Drawing a run against the team's *latest* revision instead would show the operator\na graph the run is not running (specs/teams-runs, \"Przebieg odbywa si\u0119 na rewizji, nie\nna zespole\").",
+        "operationId": "get_revision_by_id_revisions__revision_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "revision_id",
+            "required": true,
+            "schema": {
+              "title": "Revision Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamRevisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Revision By Id"
+      }
+    },
+    "/runs/{run_id}": {
+      "get": {
+        "operationId": "get_run_runs__run_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run"
+      }
+    },
+    "/runs/{run_id}/cancel": {
+      "post": {
+        "description": "Asks a run to stop. 202, not 200: the status is written by the run itself as it\nunwinds, so what comes back here is the run as it was when the interruption was\naccepted \u2014 the operator's own view catches up through the stream or a reload.",
+        "operationId": "cancel_run_runs__run_id__cancel_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Cancel Run"
+      }
+    },
+    "/runs/{run_id}/events": {
+      "get": {
+        "description": "Progress as it happens, starting with where the run is now.\n\nThe snapshot first, then live events: a viewer that opens halfway through has to see\nthe agents that already finished, and one that reconnects must not have to guess what\nit missed. Dropping the connection unsubscribes a queue and nothing else \u2014 the run\nholds no reference to any of this (specs/teams-runs, \"Zerwanie po\u0142\u0105czenia odbieraj\u0105cego\npost\u0119p MUST NOT przerwa\u0107 przebiegu\").",
+        "operationId": "run_events_runs__run_id__events_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Run Events"
+      }
+    },
+    "/runs/{run_id}/steps": {
+      "get": {
+        "description": "Who is waiting, who is working, who has finished and what they handed over \u2014 the\nsame picture the progress stream carries, for a viewer that arrived late or came back\n(specs/teams-runs, \"po ponownym otwarciu wida\u0107 jego bie\u017c\u0105cy stan\").",
+        "operationId": "get_run_steps_runs__run_id__steps_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunStepOut"
+                  },
+                  "title": "Response Get Run Steps Runs  Run Id  Steps Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run Steps"
+      }
+    },
+    "/runs/{run_id}/tool-calls": {
+      "get": {
+        "operationId": "get_run_tool_calls_runs__run_id__tool_calls_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ToolCallOut"
+                  },
+                  "title": "Response Get Run Tool Calls Runs  Run Id  Tool Calls Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run Tool Calls"
+      }
+    },
+    "/runs/{run_id}/trades": {
+      "get": {
+        "description": "What this run did to the account, in the order it did it.\n\nBeside `/tool-calls` rather than folded into it: that route answers \"what did the\nagents ask for\", this one answers \"what happened to the money\", and an operator who\njust watched a team trade is asking the second (specs/teams-trading). The owner\nfilter is the same one every other run route uses \u2014 a stranger's run is 404, the\nsame answer as one that never existed (specs/teams-browser-access).",
+        "operationId": "get_run_trades_runs__run_id__trades_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "run_id",
+            "required": true,
+            "schema": {
+              "title": "Run Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TradeOut"
+                  },
+                  "title": "Response Get Run Trades Runs  Run Id  Trades Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Run Trades"
+      }
+    },
+    "/schedules/{schedule_id}": {
+      "get": {
+        "operationId": "get_schedule_schedules__schedule_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Schedule"
+      },
+      "put": {
+        "operationId": "update_schedule_schedules__schedule_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Schedule"
+      }
+    },
+    "/schedules/{schedule_id}/disable": {
+      "post": {
+        "operationId": "disable_schedule_schedules__schedule_id__disable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disable Schedule"
+      }
+    },
+    "/schedules/{schedule_id}/enable": {
+      "post": {
+        "operationId": "enable_schedule_schedules__schedule_id__enable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enable Schedule"
+      }
+    },
+    "/schedules/{schedule_id}/fires": {
+      "get": {
+        "operationId": "get_schedule_fires_schedules__schedule_id__fires_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleFireOut"
+                  },
+                  "title": "Response Get Schedule Fires Schedules  Schedule Id  Fires Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Schedule Fires"
+      }
+    },
+    "/schedules/{schedule_id}/next-fires": {
+      "get": {
+        "description": "specs/terminal-teams-schedules, \"Terminal nie liczy czasu wyzwolenia sam\" \u2014 every\ntime in the answer is rolled forward from now by this module, not the row's stored\n`next_fire_at`, which only reflects the last claim.",
+        "operationId": "next_fires_schedules__schedule_id__next_fires_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "schedule_id",
+            "required": true,
+            "schema": {
+              "title": "Schedule Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "count",
+            "required": false,
+            "schema": {
+              "default": 5,
+              "maximum": 20,
+              "minimum": 1,
+              "title": "Count",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextFiresOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Next Fires"
+      }
+    },
+    "/teams": {
+      "get": {
+        "description": "The whole of what a picker needs, and no definition \u2014 see `store._LATEST_REVISION`.",
+        "operationId": "list_teams_teams_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TeamOut"
+                  },
+                  "title": "Response List Teams Teams Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Teams"
+      },
+      "post": {
+        "operationId": "create_team_teams_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTeamIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Team"
+      }
+    },
+    "/teams/{team_id}": {
+      "delete": {
+        "description": "Retires the team from the catalogue. Its runs and the revisions they name stay \u2014\nsee `store._ARCHIVE_TEAM`.",
+        "operationId": "archive_team_teams__team_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Archive Team"
+      },
+      "get": {
+        "operationId": "get_team_teams__team_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Team"
+      }
+    },
+    "/teams/{team_id}/layout": {
+      "get": {
+        "description": "Where the operator left each agent. A team with nothing saved answers with an empty\nlayout rather than a 404 \u2014 never having been arranged is the ordinary state, and the\ncanvas computes places from the dependencies for every agent this does not name.",
+        "operationId": "get_layout_teams__team_id__layout_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamLayoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Layout"
+      },
+      "put": {
+        "description": "Replaces the layout. Not a revision and not a change to one: this route never\ntouches `team_revisions`, which is the whole reason the table it writes exists\n(specs/terminal-teams, \"Przesuni\u0119cie nie jest zmian\u0105 definicji\").\n\nAgent keys are not checked against any revision on purpose. The canvas sends what it\ndrew, an unsaved draft can carry an agent no revision knows yet, and a key that never\nbecomes one is a row nobody reads.",
+        "operationId": "save_layout_teams__team_id__layout_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveLayoutIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamLayoutOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Layout"
+      }
+    },
+    "/teams/{team_id}/revisions": {
+      "post": {
+        "description": "Appends. The previous revision is not read, not touched and not made obsolete \u2014\na run already pointing at it keeps meaning what it meant.",
+        "operationId": "save_revision_teams__team_id__revisions_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SaveRevisionIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamRevisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Save Revision"
+      }
+    },
+    "/teams/{team_id}/revisions/latest": {
+      "get": {
+        "description": "What the canvas opens on. Declared before the `{version}` route below, or FastAPI\nwould try to parse \"latest\" as an int and answer 422.",
+        "operationId": "get_latest_revision_teams__team_id__revisions_latest_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamRevisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Latest Revision"
+      }
+    },
+    "/teams/{team_id}/revisions/{version}": {
+      "get": {
+        "description": "Including a revision of a retired team: a run points at a revision, and a trace\nthat cannot be opened is not a trace (specs/teams-catalogue).",
+        "operationId": "get_revision_teams__team_id__revisions__version__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "path",
+            "name": "version",
+            "required": true,
+            "schema": {
+              "title": "Version",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamRevisionOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Revision"
+      }
+    },
+    "/teams/{team_id}/runs": {
+      "get": {
+        "description": "Every run of this team, newest first \u2014 including runs of revisions since replaced,\nwhich is what makes two of them comparable at all.",
+        "operationId": "list_runs_teams__team_id__runs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/RunOut"
+                  },
+                  "title": "Response List Runs Teams  Team Id  Runs Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Runs"
+      },
+      "post": {
+        "description": "Starts a run of the team's latest revision and answers immediately.\n\n201 with the run, not the run's result: a team takes minutes, and a request held open\nfor it would be a request that fails whenever the network does. What the operator\nwatches afterwards is `/runs/{id}/events`, and what survives either way is the trace.\n\nThe checks and the start itself are `runner.start_run_on_revision` \u2014 the same\nfunction the schedule/trigger clock calls once it has resolved its own revision\n(design.md, \"Uruchomienie przebiegu t\u0105 sam\u0105 drog\u0105 co router\").",
+        "operationId": "start_run_teams__team_id__runs_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RunOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Run"
+      }
+    },
+    "/teams/{team_id}/schedules": {
+      "get": {
+        "operationId": "list_schedules_teams__team_id__schedules_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleOut"
+                  },
+                  "title": "Response List Schedules Teams  Team Id  Schedules Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Schedules"
+      },
+      "post": {
+        "operationId": "create_schedule_teams__team_id__schedules_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScheduleIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScheduleOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Schedule"
+      }
+    },
+    "/teams/{team_id}/triggers": {
+      "get": {
+        "operationId": "list_triggers_teams__team_id__triggers_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/TriggerOut"
+                  },
+                  "title": "Response List Triggers Teams  Team Id  Triggers Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Triggers"
+      },
+      "post": {
+        "operationId": "create_trigger_teams__team_id__triggers_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "team_id",
+            "required": true,
+            "schema": {
+              "title": "Team Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriggerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Trigger"
+      }
+    },
+    "/tools": {
+      "get": {
+        "operationId": "list_tools_tools_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ToolOut"
+                  },
+                  "title": "Response List Tools Tools Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Tools"
+      }
+    },
+    "/triggers/{trigger_id}": {
+      "get": {
+        "operationId": "get_trigger_triggers__trigger_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trigger_id",
+            "required": true,
+            "schema": {
+              "title": "Trigger Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Trigger"
+      },
+      "put": {
+        "operationId": "update_trigger_triggers__trigger_id__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trigger_id",
+            "required": true,
+            "schema": {
+              "title": "Trigger Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TriggerIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Trigger"
+      }
+    },
+    "/triggers/{trigger_id}/disable": {
+      "post": {
+        "operationId": "disable_trigger_triggers__trigger_id__disable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trigger_id",
+            "required": true,
+            "schema": {
+              "title": "Trigger Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Disable Trigger"
+      }
+    },
+    "/triggers/{trigger_id}/enable": {
+      "post": {
+        "operationId": "enable_trigger_triggers__trigger_id__enable_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trigger_id",
+            "required": true,
+            "schema": {
+              "title": "Trigger Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TriggerOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Enable Trigger"
+      }
+    },
+    "/triggers/{trigger_id}/fires": {
+      "get": {
+        "operationId": "get_trigger_fires_triggers__trigger_id__fires_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "trigger_id",
+            "required": true,
+            "schema": {
+              "title": "Trigger Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ScheduleFireOut"
+                  },
+                  "title": "Response Get Trigger Fires Triggers  Trigger Id  Fires Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Trigger Fires"
+      }
+    },
+    "/usage": {
+      "get": {
+        "description": "Both filters are optional and combine: no filter is everything this operator ever\nspent, `run_id` is one run's own bill, `team_id` is one team across its revisions.\n\nA run belonging to somebody else returns nothing rather than 404 \u2014 this is an\naggregate, and the difference between \"no rows\" and \"not yours\" is exactly what\nspecs/teams-browser-access says a stranger must not be able to tell.",
+        "operationId": "get_usage_usage_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run Id"
+            }
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Team Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UsageSummaryOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Usage"
+      }
+    }
+  }
+}
