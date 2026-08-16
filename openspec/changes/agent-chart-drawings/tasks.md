@@ -1,12 +1,12 @@
 ## 1. Zapis rysunków w module agent
 
-- [ ] 1.1 Migracja: tabela `chart_drawings` — `id` (Identity), `session_id` (FK, nullowalny), `symbol`, `kind`, `time_a`, `price_a`, `time_b`, `price_b`, `label`, `color`, `created_at`, `updated_at`
-- [ ] 1.2 Ta sama migracja: `CHECK` per kształt wg tabeli w `design.md` — `level`, `zone` (`price_b > price_a`), `trendline` (oba czasy wymagane, `time_b > time_a`), oraz `price_a > 0`
-- [ ] 1.3 Indeks po `symbol` — jedyny odczyt, jaki ta tabela obsługuje
-- [ ] 1.4 `agent/models.py`: `ChartDrawing` jako unia trzech kształtów dyskryminowana przez `kind`
-- [ ] 1.5 `agent/store.py`: `list_drawings(symbol)`, `add_drawings(...)`, `remove_drawings(ids, symbol)`, `update_drawing(id, ...)` plus tłumaczenie unia ↔ cztery kolumny, w obie strony
-- [ ] 1.6 Sufit 100 rysunków na instrument sprawdzany w tej samej transakcji, w której powstają
-- [ ] 1.7 Testy integracyjne (`-m db`): każdy `CHECK` odrzuca to, co ma odrzucać; round-trip każdego z trzech kształtów; sufit
+- [x] 1.1 Migracja: tabela `chart_drawings` — `id` (Identity), `session_id` (FK, nullowalny), `symbol`, `kind`, `time_a`, `price_a`, `time_b`, `price_b`, `label`, `color`, `created_at`, `updated_at`
+- [x] 1.2 Ta sama migracja: `CHECK` per kształt wg tabeli w `design.md` — `level`, `zone` (`price_b > price_a`), `trendline` (oba czasy wymagane, `time_b > time_a`), oraz `price_a > 0`
+- [x] 1.3 Indeks po `symbol` — jedyny odczyt, jaki ta tabela obsługuje
+- [x] 1.4 `agent/models.py`: `ChartDrawing` jako unia trzech kształtów dyskryminowana przez `kind`
+- [x] 1.5 `agent/store.py`: `list_drawings(symbol)`, `add_drawings(...)`, `remove_drawings(ids, symbol)`, `update_drawing(id, ...)` plus tłumaczenie unia ↔ cztery kolumny, w obie strony
+- [x] 1.6 Sufit 100 rysunków na instrument sprawdzany w tej samej transakcji, w której powstają
+- [x] 1.7 Testy integracyjne (`-m db`): każdy `CHECK` odrzuca to, co ma odrzucać; round-trip każdego z trzech kształtów; sufit
 
 ## 2. Narzędzia agenta
 

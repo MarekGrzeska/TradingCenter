@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -203,6 +204,71 @@ class ChartCommand(BaseModel):
             focus=later.focus if later.focus is not None else self.focus,
             created_at=later.created_at,
         )
+
+
+class ChartLevel(BaseModel):
+    """A single price, optionally in effect only from a moment on — support, resistance,
+    a level the operator or the agent wants to keep looking at. `kind` is what the
+    store's four-column geometry (`design.md`, "Zapis: cztery kolumny geometrii i CHECK
+    per kształt") discriminates on; `at` fills `time_a`, `price` fills `price_a`, and
+    `time_b`/`price_b` stay null — the shape the database's own `chart_drawings_level_
+    shape` check enforces independently of this class ever agreeing."""
+
+    kind: Literal["level"] = "level"
+    price: float
+    at: datetime | None = None
+    label: str | None = None
+    color: str | None = None
+
+
+class ChartZone(BaseModel):
+    """A price band, optionally bounded in time. `bottom` fills `price_a`, `top` fills
+    `price_b` and must exceed it — checked here for an early refusal, and by
+    `chart_drawings_zone_shape` regardless."""
+
+    kind: Literal["zone"] = "zone"
+    top: float
+    bottom: float
+    from_: datetime | None = None
+    to: datetime | None = None
+    label: str | None = None
+    color: str | None = None
+
+
+class ChartTrendlinePoint(BaseModel):
+    time: datetime
+    price: float
+
+
+class ChartTrendline(BaseModel):
+    """Two points, `a` and `b` — never `from`/`to`, which `ChartZone` already uses for a
+    pair of moments alone; a trend line's pair is a moment *and* a price each. `a.time`
+    fills `time_a`, `b.time` fills `time_b` and must be later."""
+
+    kind: Literal["trendline"] = "trendline"
+    a: ChartTrendlinePoint
+    b: ChartTrendlinePoint
+    label: str | None = None
+    color: str | None = None
+
+
+# What `draw_on_chart`'s `add` carries in, and what `store.add_drawings` takes — the
+# shape alone, without the identity the database hands out on insert.
+ChartDrawingGeometry = ChartLevel | ChartZone | ChartTrendline
+
+
+class ChartDrawing(BaseModel):
+    """One drawing as stored: `geometry`'s own `kind` says which of the three shapes it
+    is, and carries that shape's fields plus the label and colour every shape takes the
+    same way (specs/agent-chart-drawings, "Rysunek należy do instrumentu, nie do
+    widoku"). `session_id` is nullable — a drawing outlives the session that made it."""
+
+    id: int
+    symbol: str
+    session_id: int | None
+    geometry: ChartDrawingGeometry
+    created_at: datetime
+    updated_at: datetime
 
 
 class PromptRevision(BaseModel):
