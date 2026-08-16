@@ -69,11 +69,29 @@
 
 ## 5. Katalog modeli
 
-- [ ] 5.1 Wpis katalogu modeli w konfiguracji — identyfikator, nazwa, porządek kosztu, stawki jako `Decimal`
-- [ ] 5.2 `GET /models`
-- [ ] 5.3 Odmowa zapisu rewizji wskazującej model spoza katalogu i rewizji bez modelu przy agencie
-- [ ] 5.4 Odmowa uruchomienia rewizji wskazującej model wycofany z konfiguracji
-- [ ] 5.5 Testy: rewizja na wycofanym modelu pozostaje czytelna wraz ze śladem swoich przebiegów
+- [x] 5.1 Wpis katalogu modeli w konfiguracji — identyfikator, nazwa, porządek kosztu, stawki jako `Decimal`
+- [x] 5.2 `GET /models`
+- [x] 5.3 Odmowa zapisu rewizji wskazującej model spoza katalogu i rewizji bez modelu przy agencie
+- [x] 5.4 Odmowa uruchomienia rewizji wskazującej model wycofany z konfiguracji
+- [x] 5.5 Testy: rewizja na wycofanym modelu pozostaje czytelna wraz ze śladem swoich przebiegów
+
+  5.1 stało już w `config.py` z grupy 1 (`ModelCatalogueEntry`, stawki jako `Decimal`,
+  odmowa startu przy wpisie bez stawki) — tutaj doszła nad tym warstwa odpytywalna:
+  `models_catalogue.py`, bliźniak z `agent` bez `default_model_id` i bez `resolve()`.
+  Ten brak jest celowy: sesja może powstać bez wskazania modelu, rewizja nie może, więc
+  fallback byłby dokładnie tą cichą podmianą, której zabrania `teams-models`.
+
+  5.3 rozpadło się na dwie odmowy w dwóch miejscach. Model spoza katalogu łapie
+  `validation.py` (nazywa agenta i model). Agent bez modelu łapie `TeamDefinition` —
+  walidatorem `mode="before"`, żeby komunikat nazwał agenta jego kluczem, a nie pozycją
+  na liście: samo `model_id` jako pole wymagane dałoby `agents.2.model_id`, czyli
+  operatora liczącego wiersze na canvasie.
+
+  5.4 to `validation.check_runnable`, wołane przez router przebiegu z grupy 7 — tutaj
+  pokryte testem na samej funkcji. Połowa narzędziowa tego sprawdzenia (narzędzie, którego
+  serwer już nie ogłasza) dojdzie do niej w grupie 6.
+
+  `contract.py` urósł o `ModelOut`, więc `contract.teams.generated.ts` przegenerowany.
 
 ## 6. Dostęp do serwera narzędzi
 

@@ -2,8 +2,9 @@
 
 Assembly only, same split as `agent/app.py` and `market_data/app.py`: the lifespan and
 the routers mounted onto it. The lifespan brings the module's own database to the
-revision it was built for and puts the catalogue's two dependencies on `app.state`; the
-run and tool-server routers arrive in later changes, each mounted here the same way.
+revision it was built for and puts what the routes read — the pool, the model catalogue,
+the tool server's announcement — on `app.state`; the run and tool-server routers arrive
+in later changes, each mounted here the same way.
 """
 
 from __future__ import annotations
@@ -27,8 +28,9 @@ from . import migrate, schema_version
 from .config import Settings
 from .db import MIGRATION_LOCK_KEY, advisory_lock
 from .db import pool as make_pool
+from .models_catalogue import ModelCatalogue
 from .openapi import require_response_fields
-from .routers import catalogue
+from .routers import catalogue, models
 
 log = logging.getLogger(__name__)
 
@@ -64,6 +66,9 @@ async def lifespan(app: FastAPI):
 
         app.state.settings = settings
         app.state.pool = pool
+        # Built once, from settings that were already refused if a model carried no rate
+        # or a duplicate id (`config.py`) — so nothing downstream re-checks either.
+        app.state.catalogue = ModelCatalogue.from_settings(settings)
         # What the tool server announces, checked against whenever a definition assigns
         # an agent a tool (`validation.py`). `None` is "this module has no session with a
         # tool server", which is a supported state and the only one there is until the
@@ -107,6 +112,7 @@ app.openapi = _openapi_with_required_fields  # type: ignore[method-assign]
 
 
 app.include_router(catalogue.router)
+app.include_router(models.router)
 
 
 @app.get("/health")
