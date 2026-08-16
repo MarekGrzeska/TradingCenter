@@ -2,11 +2,13 @@
 that survives both — including the fires that started nothing.
 
 Purely additive — no column touches `runs`, `team_revisions` or any table from `0001`
-through `0003`. That is deliberate and organizational as much as technical: phase 2
+through `0004`. That is deliberate and organizational as much as technical: phase 2
 (trading tools) is being written in parallel from the same ancestor, and a migration
 that only creates tables commutes with one that only creates other tables — whichever
 branch merges second just renumbers its own revision and `down_revision`
-(design.md, "Punkty styku z fazą 2").
+(design.md, "Punkty styku z fazą 2"). Renumbered from `0004` to `0005` for exactly that
+reason: `0004` landed first as `team_layouts`, on a branch neither of these two depended
+on or knew about.
 
 `schedules` and `triggers` share the same revision-selection shape (`revision_mode`
 `pinned`/`latest`, `pinned_revision_id`) and the same unattended-work safety fields
@@ -27,8 +29,8 @@ written down (specs/teams-schedules, "Wyzwolenie bez przebiegu zostawia zapisany
 powód"). `runs` gets no `schedule_id` column for the same reason this table exists at
 all: a fire that started nothing has no run row to hang the fact from.
 
-Revision ID: 0004
-Revises: 0003
+Revision ID: 0005
+Revises: 0004
 """
 
 from __future__ import annotations
@@ -39,8 +41,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
 
-revision: str = "0004"
-down_revision: str | None = "0003"
+revision: str = "0005"
+down_revision: str | None = "0004"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
