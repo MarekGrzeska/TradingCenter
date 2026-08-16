@@ -476,8 +476,14 @@ export interface components {
         /**
          * TeamDefinition
          * @description The whole of what a team revision carries — every agent, every dependency between
-         *     them, and the cost limits a run against this revision must respect. One immutable
-         *     blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie zmienia").
+         *     them, and the cost and trading limits a run against this revision must respect. One
+         *     immutable blob per revision (specs/teams-catalogue, "Rewizja raz zapisana się nie
+         *     zmienia").
+         *
+         *     `trading` defaults to an empty `TradingLimits`, which is what every revision saved
+         *     before this field existed reads back as — and it means the same thing there as it
+         *     does for a new one: no limit. Nothing about an old revision changes by being read
+         *     (specs/teams-catalogue, "Rewizja z fazy sprzed narzędzi handlowych").
          */
         TeamDefinition: {
             /** Agents */
@@ -485,6 +491,7 @@ export interface components {
             /** Edges */
             edges?: components["schemas"]["TeamEdge"][];
             limits?: components["schemas"]["CostLimits"];
+            trading?: components["schemas"]["TradingLimits"];
         };
         /**
          * TeamEdge
@@ -590,6 +597,42 @@ export interface components {
             name: string;
             /** Read Only */
             read_only: boolean | null;
+        };
+        /**
+         * TradingLimits
+         * @description What a revision allows its agents to do to the account — specs/teams-trading.
+         *
+         *     **Every one of the three is optional, and an omitted one means no limit at all.** The
+         *     module substitutes nothing and holds no ceiling of its own in code: a team the
+         *     operator deliberately lets trade with everything it has is an experiment they are
+         *     entitled to run, and a module refusing to save it would be making that call for them
+         *     (specs/teams-trading, "Każda granica handlowa daje się wyłączyć, a moduł żadnej nie
+         *     narzuca").
+         *
+         *     What is *not* negotiable lives a module away: `trading-mcp` refuses to start against
+         *     anything but the demo account, and no setting here or there turns that off
+         *     (specs/trading-mcp-upstream-access). That is the split — the irreversible thing is
+         *     fixed, the operator's own budget is theirs.
+         *
+         *     `max_order_size` is a string for the same reason every cost on this wire is: it is
+         *     compared, never recomputed, and a string round-trips exactly.
+         */
+        TradingLimits: {
+            /**
+             * Max Order Size
+             * @description largest size one order may carry; null means no limit
+             */
+            max_order_size?: string | null;
+            /**
+             * Orders Per Day
+             * @description how many orders this team may place per UTC day; null means no limit
+             */
+            orders_per_day?: number | null;
+            /**
+             * Orders Per Run
+             * @description how many orders one run may place; null means no limit
+             */
+            orders_per_run?: number | null;
         };
         /** UsageAggregateOut */
         UsageAggregateOut: {

@@ -30,7 +30,10 @@ ta granica zostaje tam, gdzie jest.
   co czytające, komu definicja je przypisała.
 - **Granice handlowe, bliźniaczo do granic kosztu**: liczba zleceń na przebieg i liczba
   zleceń dobowa na zespół, sprawdzane **przed** wywołaniem narzędzia zapisującego, w kodzie,
-  nie w prompcie. Przekroczenie zatrzymuje przebieg ze statusem i powodem.
+  nie w prompcie. Przekroczenie zatrzymuje przebieg ze statusem i powodem. Każda z nich jest
+  **pomijalna, a pominięta znaczy „bez ograniczenia"** — moduł nie podstawia domyślnych i nie
+  trzyma w kodzie sufitu, którego operator nie może podnieść. Przed skutkiem nieodwracalnym
+  chroni tu konto demo wymuszone u gatewaya, a nie liczba, której nie da się zmienić.
 - **Ślad handlowy w bazie `teams`**: wiersz na każde wywołanie zapisujące — przebieg, agent,
   symbol, kierunek, wielkość, poziom, skutek i identyfikator zlecenia od providera. Jedna
   rewizja Alembica.
@@ -70,8 +73,8 @@ skutków na rachunku.
 - `teams-tool-access`: moduł łączy się z więcej niż jednym serwerem narzędzi; kolizja nazw
   między serwerami jest odmową; nieosiągalny serwer zapisu zatrzymuje przebieg tak samo jak
   serwer odczytu.
-- `teams-catalogue`: definicja zespołu niesie granice handlowe, a zapis rewizji przypisującej
-  narzędzie zapisujące jest odmawiany, gdy granice nie zostały ustawione.
+- `teams-catalogue`: definicja zespołu niesie granice handlowe, a zapis rewizji nigdy nie
+  jest odmawiany z powodu granicy pominiętej — także przy narzędziu zapisującym.
 - `teams-runs`: przebieg zatrzymany granicą zleceń ma własny powód zatrzymania, odróżnialny
   od granicy kosztu.
 - `terminal-teams`: monitor przebiegu pokazuje złożone zlecenia przy agencie, a panel zespołu

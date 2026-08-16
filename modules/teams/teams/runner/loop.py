@@ -35,7 +35,7 @@ from ..provider import (
     ToolRound,
     UsageReport,
 )
-from ..tools import ToolDescriptor, ToolOutcome
+from ..tools import ToolDescriptor, ToolOutcome, ToolOutcomeKind
 
 log = logging.getLogger(__name__)
 
@@ -65,6 +65,11 @@ class RecordedCall:
     outcome: str
     text: str
     duration_ms: int
+    # Whether the tool's own server declared it as changing the account. Carried on the
+    # call rather than looked up again by whoever handles it: the descriptors belong to
+    # the session this loop was handed, and a second lookup elsewhere would be a second
+    # place that could disagree (specs/teams-trading).
+    writes: bool = False
 
 
 @dataclass
@@ -92,6 +97,15 @@ OnToolCall = Callable[[RecordedCall], Awaitable[None]]
 # usage row is written.
 BeforeModelCall = Callable[[], Awaitable[None]]
 OnModelCall = Callable[[UsageReport | None], Awaitable[None]]
+# Called before a call to a tool its server declared as changing the account, and only
+# for those — the trading ceiling's only way in (`trading.py`), and where the trade row
+# is written before the order is sent.
+#
+# Three things it may do, and they are three different facts: raise (a ceiling nothing
+# the model does next can move — the run stops), answer with a sentence (this one call
+# is refused and the model can correct it), or answer `None` (the order is being sent,
+# and by then its row exists).
+BeforeWriteCall = Callable[[str, dict[str, Any]], Awaitable[str | None]]
 
 
 def system_prompt_for(agent: AgentDefinition, *, has_tools: bool) -> str:
@@ -144,6 +158,7 @@ async def run_agent(
     on_tool_call: OnToolCall,
     before_model_call: BeforeModelCall | None = None,
     on_model_call: OnModelCall | None = None,
+    before_write_call: BeforeWriteCall | None = None,
 ) -> AgentWork:
     """Model → tools → model, until the model stops asking or the ceiling is reached.
 
@@ -151,12 +166,14 @@ async def run_agent(
     because the text an agent produced before something broke is part of the trace this
     module exists to keep.
 
-    The two hooks are the exception, and they are deliberately outside that guarantee.
+    The hooks are the exception, and they are deliberately outside that guarantee.
     `before_model_call` is what a cost ceiling raises from — a run stopped for money did
     not fail, and the difference has to reach the status (specs/teams-usage). `on_model_call`
     is where the usage row is written, once per call rather than once per agent: a limit
     checked against a total that only updates when an agent finishes would let a six-round
-    agent spend six rounds past it.
+    agent spend six rounds past it. `before_write_call` is the same seam for orders, and
+    it fires only for tools their own server declared as changing the account
+    (specs/teams-trading).
     """
     work = AgentWork()
     system_prompt = system_prompt_for(agent, has_tools=bool(tools))
@@ -214,8 +231,29 @@ async def run_agent(
             return work
 
         results: list[ToolCallResult] = []
+        by_name = {tool.name: tool for tool in tools}
         for position, request in enumerate(requests):
-            outcome = await call_tool(request.name, request.arguments)
+            # A write is a tool whose own server said so. `read_only is False` and not
+            # `not read_only`: a tool carrying no annotation at all is unknown, and this
+            # module does not promote unknown to "changes the account" — the servers it
+            # is built against annotate every tool they publish, and inventing a reading
+            # for a third one would be this module holding an opinion about somebody
+            # else's contract (specs/trading-mcp-tools).
+            descriptor = by_name.get(request.name)
+            writes = descriptor is not None and descriptor.read_only is False
+
+            refusal: str | None = None
+            if writes and before_write_call is not None:
+                # Raises to stop the run (an exhausted count), or answers with a sentence
+                # to refuse this one call and carry on (a size the agent can correct) —
+                # see `trading.TradeGuard.check`.
+                refusal = await before_write_call(request.name, request.arguments)
+
+            if refusal is not None:
+                outcome = ToolOutcome(ToolOutcomeKind.REFUSED, refusal, 0)
+            else:
+                outcome = await call_tool(request.name, request.arguments)
+
             results.append(ToolCallResult(id=request.id, name=request.name, text=outcome.text))
             call = RecordedCall(
                 round_index=work.rounds,
@@ -225,6 +263,7 @@ async def run_agent(
                 outcome=str(outcome.kind),
                 text=outcome.text,
                 duration_ms=outcome.duration_ms,
+                writes=writes,
             )
             work.calls.append(call)
             # Announced as it resolves, not when the round ends: a round of three calls

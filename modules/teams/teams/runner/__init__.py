@@ -20,18 +20,30 @@ from .engine import (
 )
 from .graph import AgentFailed, compile_team
 from .loop import ROUND_CEILING, AgentWork, RecordedCall, run_agent
+from .trading import (
+    DailyOrderLimitReached,
+    OrderTooLarge,
+    RunOrderLimitReached,
+    TradeGuard,
+    TradeLimitReached,
+)
 
 __all__ = [
     "ROUND_CEILING",
     "AgentFailed",
     "AgentWork",
+    "DailyOrderLimitReached",
+    "OrderTooLarge",
     "RecordedCall",
     "RunEvent",
     "RunFinished",
+    "RunOrderLimitReached",
     "RunRegistry",
     "StepFinished",
     "StepStarted",
     "ToolCalled",
+    "TradeGuard",
+    "TradeLimitReached",
     "compile_team",
     "execute_run",
     "run_agent",

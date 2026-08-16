@@ -26,6 +26,7 @@ from ..auth import current_principal
 from ..contract import RunOut, RunStepOut, TeamRevisionOut, ToolCallOut
 from ..runner import RunFinished, StepFinished, StepStarted, ToolCalled, execute_run
 from ..runner.cost import DailyCostLimitReached, limit_from
+from ..runner.trading import DailyOrderLimitReached
 from ..validation import DefinitionRefused, check_runnable
 
 log = logging.getLogger(__name__)
@@ -70,14 +71,28 @@ async def start_run(
     # what the team spent since midnight UTC: the module keeps one clock, and a limit that
     # moved with the operator's own timezone would be a different limit in summer.
     daily_limit = limit_from(definition.limits.daily_limit)
-    if daily_limit is not None:
+    daily_orders = definition.trading.orders_per_day
+    if daily_limit is not None or daily_orders is not None:
         midnight = datetime.now(UTC).replace(hour=0, minute=0, second=0, microsecond=0)
         async with pool.acquire() as conn:
-            spent = await store.team_cost_since(
-                conn, team_id=team_id, owner_principal=owner, since=midnight
-            )
-        if spent >= daily_limit:
-            raise HTTPException(422, detail=str(DailyCostLimitReached(spent, daily_limit)))
+            if daily_limit is not None:
+                spent = await store.team_cost_since(
+                    conn, team_id=team_id, owner_principal=owner, since=midnight
+                )
+                if spent >= daily_limit:
+                    raise HTTPException(422, detail=str(DailyCostLimitReached(spent, daily_limit)))
+            if daily_orders is not None:
+                # The same clock and the same moment as the cost ceiling above — one
+                # module-wide midnight, because a limit following the operator's own
+                # timezone would be a different limit in summer (specs/teams-trading,
+                # "Granica dobowa jest sprawdzana przed utworzeniem przebiegu").
+                placed = await store.team_trades_since(
+                    conn, team_id=team_id, owner_principal=owner, since=midnight
+                )
+                if placed >= daily_orders:
+                    raise HTTPException(
+                        422, detail=str(DailyOrderLimitReached(placed, daily_orders))
+                    )
 
     async with pool.acquire() as conn:
         run, _steps = await store.create_run(

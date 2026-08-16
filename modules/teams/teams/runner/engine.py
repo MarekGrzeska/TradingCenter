@@ -19,9 +19,11 @@ whose process died from reading as one that is still working.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 
 import asyncpg
 
@@ -30,10 +32,11 @@ from ..config import Settings
 from ..contract import AgentDefinition, TeamDefinition
 from ..models_catalogue import ModelCatalogue
 from ..provider import ModelProvider
-from ..tools import ToolAccessError, ToolPlan, ToolServerRegistry, plan_tools
+from ..tools import ToolAccessError, ToolOutcomeKind, ToolPlan, ToolServerRegistry, plan_tools
 from .cost import CostGuard, CostLimitReached, limit_from
 from .graph import AgentFailed, compile_team
 from .loop import RecordedCall, briefing_for, run_agent
+from .trading import OrderTooLarge, TradeGuard, TradeLimitReached
 
 log = logging.getLogger(__name__)
 
@@ -164,9 +167,11 @@ async def execute_run(
             status, reason = "failed", f"tool access: {err}"
             return
 
-        # One guard for the whole run, shared by every agent in it: the ceiling is on what
-        # the run spends, not on what any one role does (specs/teams-usage).
+        # One guard of each kind for the whole run, shared by every agent in it: both
+        # ceilings are on what the *run* does, not on what any one role does
+        # (specs/teams-usage, specs/teams-trading).
         guard = CostGuard(limit_from(definition.limits.run_limit))
+        trades = TradeGuard(definition.trading)
         graph = compile_team(
             definition,
             _agent_runner(
@@ -177,6 +182,7 @@ async def execute_run(
                 catalogue=catalogue,
                 registry=registry,
                 guard=guard,
+                trades=trades,
             ),
         )
         try:
@@ -191,6 +197,14 @@ async def execute_run(
             # money has one question, and it is "how much of what" (specs/teams-usage,
             # "statusem nazywającym koszt jako przyczynę"). Everything written up to here
             # stays: a run stopped by its budget is a result like any other.
+            status, reason = "failed", str(err)
+            return
+        except TradeLimitReached as err:
+            # A separate branch from the one above, and the sentence it writes is the
+            # difference: an operator reads "cost" and buys more budget, reads "orders"
+            # and learns their team wanted to trade more than they allowed — which is a
+            # result of the experiment, not a fault in it (specs/teams-runs, "Powód
+            # zatrzymania odróżnia granicę zleceń od granicy kosztu").
             status, reason = "failed", str(err)
             return
         except AgentFailed as err:
@@ -252,6 +266,7 @@ def _agent_runner(
     catalogue: ModelCatalogue,
     registry: RunRegistry,
     guard: CostGuard,
+    trades: TradeGuard,
 ):
     async def run_one(agent: AgentDefinition, given: Sequence[tuple[str, str]]) -> str:
         entry = catalogue.get(agent.model_id)
@@ -259,7 +274,14 @@ def _agent_runner(
             step = await store.start_step(conn, run_id=run_id, agent_key=agent.key)
         registry.publish(run_id, StepStarted(agent_key=agent.key))
 
+        # The trade row written by `before_write_call`, waiting for the reply that
+        # settles it. One variable rather than a map because one agent's calls are
+        # sequential (`loop.py` walks a round's requests in order) — agents run
+        # concurrently, but each holds its own `run_one` frame and its own of these.
+        pending_trade: int | None = None
+
         async def on_tool_call(call: RecordedCall) -> None:
+            nonlocal pending_trade
             async with pool.acquire() as conn:
                 await store.record_tool_call(
                     conn,
@@ -273,7 +295,50 @@ def _agent_runner(
                     result_text=call.text,
                     duration_ms=call.duration_ms,
                 )
+                if pending_trade is not None:
+                    settlement = _read_settlement(call)
+                    await store.settle_trade(
+                        conn,
+                        trade_id=pending_trade,
+                        status=settlement.status,
+                        result_status=settlement.result_status,
+                        provider_order_id=settlement.order_id,
+                        reference=settlement.reference,
+                    )
+                    pending_trade = None
             registry.publish(run_id, ToolCalled(agent_key=agent.key, call=call))
+
+        async def before_write_call(name: str, arguments: dict) -> str | None:
+            """The order ceiling, and the row that outlives whatever happens next.
+
+            Order matters twice over: the guard is asked first, so a refused call leaves
+            no row for an order that was never sent; and the row is written before the
+            call goes out, so an order whose reply never comes back is still in the trace
+            (specs/teams-trading, "Wiersz MUST powstać przed wysłaniem wywołania").
+            """
+            nonlocal pending_trade
+            try:
+                trades.check(arguments)
+            except OrderTooLarge as err:
+                # Refused to the model as this one call; the run goes on, because a size
+                # is something the agent can correct.
+                return str(err)
+
+            async with pool.acquire() as conn:
+                row = await store.record_trade(
+                    conn,
+                    run_id=run_id,
+                    run_step_id=step["id"],
+                    agent_key=agent.key,
+                    tool_name=name,
+                    symbol=_text_arg(arguments, "symbol"),
+                    direction=_text_arg(arguments, "direction"),
+                    size=_decimal_arg(arguments, "size"),
+                    level=_decimal_arg(arguments, "level"),
+                )
+            pending_trade = row["id"]
+            trades.placing()
+            return None
 
         async def before_model_call() -> None:
             guard.check()
@@ -307,6 +372,7 @@ def _agent_runner(
             on_tool_call=on_tool_call,
             before_model_call=before_model_call,
             on_model_call=on_model_call,
+            before_write_call=before_write_call,
         )
 
         async with pool.acquire() as conn:
@@ -341,3 +407,83 @@ def _agent_runner(
         return work.text
 
     return run_one
+
+
+# --- reading a write call's own arguments and reply (specs/teams-trading) -------------
+#
+# Best effort by design, and the trace is why: `tool_calls` already holds the arguments
+# and the reply verbatim, so nothing is lost when a field cannot be read here. What this
+# produces is the *queryable* half — the columns a daily count and a terminal list are
+# built from — and a `place_order` shape that changed upstream must degrade to a row with
+# nulls rather than to no row at all.
+
+
+@dataclass(frozen=True)
+class _Settlement:
+    status: str
+    result_status: str | None = None
+    order_id: str | None = None
+    reference: str | None = None
+
+
+def _read_settlement(call: RecordedCall) -> _Settlement:
+    """What the trade row should say now that the call has come back.
+
+    `unknown` is the answer whenever the reply does not establish otherwise, and that
+    includes an outcome this module cannot parse: an order this module cannot account for
+    is exactly what the status is for (specs/teams-trading, "Wywołanie, którego skutek
+    pozostał nieznany, MUST zostać zapisane jako nieznany").
+    """
+    if call.outcome == str(ToolOutcomeKind.UNAVAILABLE):
+        # The call failed in a way that says nothing about whether it arrived — the one
+        # case the whole "row before the call" arrangement exists for.
+        return _Settlement("unknown")
+    if call.outcome == str(ToolOutcomeKind.REFUSED):
+        # The server answered no. `trading-mcp` refuses before touching the account for a
+        # bad request, and turns a provider REJECTED into a refusal too; either way
+        # nothing was placed. Its access-failure refusals are the exception, and they say
+        # so in their own words.
+        if "access failure" in call.text:
+            return _Settlement("unknown")
+        return _Settlement("refused")
+
+    try:
+        payload = json.loads(call.text)
+    except (TypeError, ValueError):
+        return _Settlement("unknown")
+    if not isinstance(payload, dict):
+        return _Settlement("unknown")
+
+    outcome = payload.get("outcome")
+    if outcome not in ("settled", "unsettled"):
+        return _Settlement("unknown")
+    return _Settlement(
+        status=outcome,
+        result_status=_as_text(payload.get("status")),
+        order_id=_as_text(payload.get("id")),
+        reference=_as_text(payload.get("reference")),
+    )
+
+
+def _as_text(value: object) -> str | None:
+    return None if value is None else str(value)
+
+
+def _text_arg(arguments: dict, key: str) -> str | None:
+    value = arguments.get(key)
+    return None if value is None else str(value)
+
+
+def _decimal_arg(arguments: dict, key: str) -> Decimal | None:
+    value = arguments.get(key)
+    if value is None:
+        return None
+    try:
+        parsed = Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return None
+    # The column refuses a non-positive size (`0004_trades.py`), and a model is free to
+    # ask for one — dropped to NULL here rather than allowed to fail the insert, which
+    # would cost the run a trace row over an argument `trading-mcp` is about to refuse
+    # anyway.
+    return parsed if key != "size" or parsed > 0 else None

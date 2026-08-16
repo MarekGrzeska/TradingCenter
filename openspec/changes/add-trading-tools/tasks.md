@@ -108,19 +108,47 @@
 
 ## 6. Granice handlowe
 
-- [ ] 6.1 Granice handlowe w `TeamDefinition` — maksymalna wielkość zlecenia, liczba zleceń na przebieg, liczba dobowa
-- [ ] 6.2 `validation.py` — odmowa zapisu rewizji z narzędziem zapisującym i bez granic, nazywająca agenta
-- [ ] 6.3 Hak w pętli agenta sprawdzający granice przed wywołaniem narzędzia zapisującego
-- [ ] 6.4 Wyczerpana liczba zleceń zatrzymuje przebieg statusem odróżnialnym od kosztu
-- [ ] 6.5 Zlecenie ponad maksymalną wielkość jako odmowa wywołania, bez zatrzymania przebiegu
-- [ ] 6.6 Sprawdzenie granicy dobowej przed utworzeniem przebiegu, liczone od północy UTC
-- [ ] 6.7 Testy: rewizja sprzed tej zmiany pozostaje uruchamialna; zespół dobijający do granicy zostawia ślad; granica dobowa odmawia przed wywołaniem kogokolwiek
+- [x] 6.1 Granice handlowe w `TeamDefinition` — maksymalna wielkość zlecenia, liczba zleceń na przebieg, liczba dobowa; każda pomijalna, pominięta znaczy „bez ograniczenia"
+- [x] 6.2 Brak granicy nigdy nie jest odmową zapisu; moduł nie podstawia wartości domyślnej ani nie trzyma sufitu w kodzie
+- [x] 6.3 Hak w pętli agenta sprawdzający granice przed wywołaniem narzędzia zapisującego
+- [x] 6.4 Wyczerpana liczba zleceń zatrzymuje przebieg statusem odróżnialnym od kosztu
+- [x] 6.5 Zlecenie ponad maksymalną wielkość jako odmowa wywołania, bez zatrzymania przebiegu
+- [x] 6.6 Sprawdzenie granicy dobowej przed utworzeniem przebiegu, liczone od północy UTC
+- [x] 6.7 Testy: rewizja sprzed tej zmiany pozostaje uruchamialna; zespół dobijający do granicy zostawia ślad; granica dobowa odmawia przed wywołaniem kogokolwiek
+
+  **Odwrócona decyzja, na polecenie operatora — i to jest najważniejsza rzecz w tej
+  grupie.** Pierwotne 6.2 brzmiało „odmowa zapisu rewizji z narzędziem zapisującym i bez
+  granic". Zostało odwrócone przed napisaniem linijki kodu: granice mają być mechanizmem,
+  którym operator dysponuje, a nie zgodą, której moduł mu udziela. Zespół, któremu
+  operator świadomie pozwala handlować całym kapitałem, zapisuje się i rusza. Poprawione:
+  `teams-catalogue` (wymóg odwrócony w „Granice handlowe są wyborem operatora, nie
+  warunkiem zapisu"), `teams-trading` (nowy wymóg „Każda granica handlowa daje się
+  wyłączyć, a moduł żadnej nie narzuca"), `proposal.md` i `design.md`.
+
+  Zasada, którą warto trzymać przy każdej następnej granicy w tym module: **liczba,
+  której operator nie może zmienić, należy do `trading-mcp`, nie do `teams`.** Tam
+  siedzi konto demo wymuszone u gatewaya, którego nie wyłącza żadne ustawienie; tutaj
+  wszystko pochodzi z rewizji i daje się z niej usunąć.
+
+  Wykrywanie, że wywołanie jest zleceniem, opiera się na `read_only is False` z
+  ogłoszenia serwera (grupa 5) — nie na nazwie narzędzia i nie na tym, z którego serwera
+  pochodzi. Narzędzie bez adnotacji jest „nieznane" i nie jest awansowane na zapisujące:
+  oba nasze serwery adnotują wszystko, co publikują, a zgadywanie za trzeci byłoby
+  trzymaniem opinii o cudzym kontrakcie.
+
+  **Części grupy 7 zrobione tutaj, bo 6.6 bez nich nie działa** — dobowa liczba zleceń
+  potrzebuje czegoś, co je liczy. Zrobione: 7.1 (rewizja `0004`, tabela `trades`), 7.2
+  (wiersz przed wysłaniem wywołania, uzupełniany po odpowiedzi) i 7.3 (skutek nieznany
+  zapisany jako `unknown`). Dla grupy 7 zostają 7.4 (`contract.py` — modele wiersza na
+  drucie), 7.5 (trasa odczytu) i 7.6 (jej testy). `TradingLimits` wylądowało w
+  `contract.py` już teraz, bo definicja jedzie na drucie — `contract.teams.generated.ts`
+  przegenerowany.
 
 ## 7. Ślad handlowy
 
-- [ ] 7.1 Rewizja Alembica w `teams` z tabelą śladu handlowego (numer rewizji brany przy implementacji — patrz nota o fazie 3 na końcu)
-- [ ] 7.2 Zapis wiersza przed wysłaniem wywołania; uzupełnienie o skutek po odpowiedzi
-- [ ] 7.3 Skutek nieznany zapisany jako nieznany, nie jako nieudany
+- [x] 7.1 Rewizja Alembica w `teams` z tabelą śladu handlowego (numer rewizji brany przy implementacji — patrz nota o fazie 3 na końcu) — `0004`, zrobione z grupą 6
+- [x] 7.2 Zapis wiersza przed wysłaniem wywołania; uzupełnienie o skutek po odpowiedzi — zrobione z grupą 6
+- [x] 7.3 Skutek nieznany zapisany jako nieznany, nie jako nieudany — zrobione z grupą 6
 - [ ] 7.4 `contract.py` — kształt wiersza śladu handlowego i granic handlowych (wyłącznie dodanie modeli)
 - [ ] 7.5 Trasa odczytu zleceń przebiegu, z filtrem właściciela jak reszta modułu
 - [ ] 7.6 Testy `-m db`: migracja od zera dochodzi do rewizji czołowej; wiersz przeżywa przerwanie przebiegu
