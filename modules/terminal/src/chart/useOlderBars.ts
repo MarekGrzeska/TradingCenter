@@ -13,6 +13,14 @@ export interface OlderBarsReader {
    *  keeps fetching until this goes false, so one drag to the edge is answered
    *  with as much history as the screen needs — not with one page per drag. */
   needsMore(): boolean;
+  /** One request ended with `needsMore()` still true: `MAX_PAGES` ran out before the
+   *  caller's appetite did.
+   *
+   *  Distinct from `"exhausted"`, and the distinction is the point: there *is* more
+   *  history, this request simply stopped asking for it. Whoever was waiting on that
+   *  history — an agent's focus reaching further back than twenty pages of it — otherwise
+   *  waits forever, because the run that gave up ends in `"idle"` like any other. */
+  stoppedShort?(): void;
 }
 
 export interface OlderBars {
@@ -120,6 +128,9 @@ export function useOlderBars(
     busyRef.current = true;
     setStatus("loading");
 
+    // Whether the appetite that started this run was met, as opposed to the page budget
+    // running out under it.
+    let satisfied = false;
     try {
       for (let page = 0; page < MAX_PAGES; page++) {
         const series = readerRef.current.readSeries();
@@ -156,8 +167,12 @@ export function useOlderBars(
           return;
         }
 
-        if (!readerRef.current.needsMore()) break;
+        if (!readerRef.current.needsMore()) {
+          satisfied = true;
+          break;
+        }
       }
+      if (!satisfied) readerRef.current.stoppedShort?.();
       setStatus("idle");
     } catch (cause: unknown) {
       if (generation !== generationRef.current || controller.signal.aborted) return;

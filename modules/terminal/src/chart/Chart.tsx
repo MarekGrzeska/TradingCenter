@@ -984,8 +984,17 @@ export function Chart({
         const focusNeedsMore = pending !== null && !reachesBack(barsRef.current, pending);
         return viewportNeedsMore || focusNeedsMore;
       },
+      // The pager gave up before the focus was reachable — twenty pages of history that
+      // each made progress and still did not reach far enough. Settled here rather than
+      // left pending: an unsettled request never tells the caller it is done, so the grid
+      // store keeps offering it until the symbol changes, and the operator is never told
+      // why the chart did not move.
+      stoppedShort: () => {
+        const pending = pendingFocusRef.current;
+        if (pending) settlePendingFocus(pending);
+      },
     }),
-    [applyOlder],
+    [applyOlder, settlePendingFocus],
   );
 
   // Changing symbol, resolution *or source* must not leave the previous

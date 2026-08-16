@@ -739,6 +739,34 @@ describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", 
     expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
   });
 
+  it("settles a focus the pager ran out of pages before reaching", async () => {
+    // Every page makes progress, so neither of `applyOlder`'s own conditions ever fires —
+    // the pager simply hits its own `MAX_PAGES` budget with the focus still out of reach.
+    // Before `stoppedShort`, the request sat in `pendingFocusRef` unsettled: the chart
+    // never moved, `onFocusRequestSettled` never fired, and the grid store went on
+    // offering the same request until the symbol changed.
+    source.historyPages = Array.from({ length: 20 }, (_, index) => [
+      bar(100 - (index + 1) * 60, 0.5),
+    ]);
+    const focus: ChartFocusRequest = {
+      from: -1_000_000,
+      to: 220,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    await waitFor(() => expect(onFocusRequestSettled).toHaveBeenCalledTimes(1));
+    // Applied against what was actually reached, not abandoned: the fragment is partly
+    // there, which is the case `overlapsSeries` exists for.
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: -1_000_000, to: 220 });
+  });
+
   it("skips a focus the archive has nothing for, leaves the view alone, and says so", async () => {
     source.historyPages = []; // every read answers empty
     const focus: ChartFocusRequest = {
