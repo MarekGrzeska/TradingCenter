@@ -65,6 +65,20 @@ class ModelOut(BaseModel):
         )
 
 
+class ToolOut(BaseModel):
+    """One tool as the tool server announces it right now (specs/teams-tool-access,
+    "Moduł nie trzyma kopii tego, co ogłasza serwer narzędzi").
+
+    Name and description, and deliberately not the input schema: a definition points at a
+    tool by name and carries nothing else about it, so the picker needs a label and a line
+    of prose. Publishing the schema would put a copy of somebody else's contract on this
+    module's wire, where it would be stale from the first argument market-mcp renames.
+    """
+
+    name: str
+    description: str
+
+
 class AgentDefinition(BaseModel):
     """One role inside a team: what it is told, which model answers for it, and which
     tools it may reach for."""

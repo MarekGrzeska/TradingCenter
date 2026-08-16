@@ -131,6 +131,24 @@ async def get_revision(
     return TeamRevisionOut.from_row(dict(row))
 
 
+@router.get("/revisions/{revision_id}")
+async def get_revision_by_id(
+    revision_id: int, request: Request, owner: str = Depends(current_principal)
+) -> TeamRevisionOut:
+    """The definition a run is working on, reached the way a run names it — by the id on
+    `runs.team_revision_id` rather than by a version the watcher would first have to look
+    up. Drawing a run against the team's *latest* revision instead would show the operator
+    a graph the run is not running (specs/teams-runs, "Przebieg odbywa się na rewizji, nie
+    na zespole")."""
+    async with request.app.state.pool.acquire() as conn:
+        row = await store.get_revision_by_id(
+            conn, revision_id=revision_id, owner_principal=owner
+        )
+    if row is None:
+        raise HTTPException(404, detail="no such revision")
+    return TeamRevisionOut.from_row(dict(row))
+
+
 @router.delete("/teams/{team_id}", status_code=204)
 async def archive_team(
     team_id: int, request: Request, owner: str = Depends(current_principal)

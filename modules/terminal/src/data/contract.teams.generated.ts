@@ -45,6 +45,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/revisions/{revision_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Revision By Id
+         * @description The definition a run is working on, reached the way a run names it — by the id on
+         *     `runs.team_revision_id` rather than by a version the watcher would first have to look
+         *     up. Drawing a run against the team's *latest* revision instead would show the operator
+         *     a graph the run is not running (specs/teams-runs, "Przebieg odbywa się na rewizji, nie
+         *     na zespole").
+         */
+        get: operations["get_revision_by_id_revisions__revision_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/runs/{run_id}": {
         parameters: {
             query?: never;
@@ -278,6 +302,23 @@ export interface paths {
          *     watches afterwards is `/runs/{id}/events`, and what survives either way is the trace.
          */
         post: operations["start_run_teams__team_id__runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tools": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Tools */
+        get: operations["list_tools_tools_get"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -526,6 +567,22 @@ export interface components {
             /** Tool Name */
             tool_name: string;
         };
+        /**
+         * ToolOut
+         * @description One tool as the tool server announces it right now (specs/teams-tool-access,
+         *     "Moduł nie trzyma kopii tego, co ogłasza serwer narzędzi").
+         *
+         *     Name and description, and deliberately not the input schema: a definition points at a
+         *     tool by name and carries nothing else about it, so the picker needs a label and a line
+         *     of prose. Publishing the schema would put a copy of somebody else's contract on this
+         *     module's wire, where it would be stale from the first argument market-mcp renames.
+         */
+        ToolOut: {
+            /** Description */
+            description: string;
+            /** Name */
+            name: string;
+        };
         /** UsageAggregateOut */
         UsageAggregateOut: {
             /** Cost */
@@ -613,6 +670,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ModelOut"][];
+                };
+            };
+        };
+    };
+    get_revision_by_id_revisions__revision_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                revision_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamRevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
                 };
             };
         };
@@ -1041,6 +1129,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_tools_tools_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ToolOut"][];
                 };
             };
         };

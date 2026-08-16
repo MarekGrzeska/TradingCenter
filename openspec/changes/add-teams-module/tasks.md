@@ -207,13 +207,13 @@
 - [x] 9.1 Zależność `@xyflow/react`; wpis w `src/app/tabs.ts`, katalog widoków zakładki
 - [x] 9.2 `VITE_TEAMS_HTTP` w `src/data/config.ts` i proxy `/teams-api` w `vite.config.ts`
 - [x] 9.3 Warstwa wywołań modułu na typach generowanych z kontraktu
-- [ ] 9.4 Widok katalogu — lista zespołów, otwarcie do edycji, uruchomienie przebiegu
+- [x] 9.4 Widok katalogu — lista zespołów, otwarcie do edycji, uruchomienie przebiegu
 - [x] 9.5 Canvas zespołu: agenci, zależności, rola i model przy każdym agencie
 - [x] 9.6 Edycja w widoku zespołu — dodanie i usunięcie agenta, poprowadzenie i usunięcie zależności
-- [ ] 9.7 Panel agenta — rola, prompt, wytyczne, wybór modelu z katalogu, wybór narzędzi z ogłaszanych
+- [x] 9.7 Panel agenta — rola, prompt, wytyczne, wybór modelu z katalogu, wybór narzędzi z ogłaszanych
 - [x] 9.8 Odmowa zapisu pokazana przy agencie albo zależności, której dotyczy
-- [ ] 9.9 Monitor przebiegu na tym samym canvasie — stan agentów, ich praca, wywołane narzędzia
-- [ ] 9.10 Odbiór postępu; zamknięcie i ponowne otwarcie widoku pokazuje stan bieżący
+- [x] 9.9 Monitor przebiegu na tym samym canvasie — stan agentów, ich praca, wywołane narzędzia
+- [x] 9.10 Odbiór postępu; zamknięcie i ponowne otwarcie widoku pokazuje stan bieżący
 - [x] 9.11 Testy: wybierak modeli i narzędzi powstaje bez identyfikatorów wpisanych w kod terminala
 - [x] 9.12 `pnpm lint`, `typecheck`, `test`, `contract:check` przechodzą
 
@@ -237,6 +237,36 @@
   okazji: `contract.teams.generated.ts` dopisany do `.gitattributes` (`eol=lf`) — bez tego
   `contract:check` na świeżym klonie pod Windows raportuje nieaktualność pliku, który jest
   aktualny.
+
+  Domknięcie grupy (PR #117), po merge'u grup 6, 7 i 8 — cztery pozycje otwarte wtedy
+  i dwie trasy, których do ich zamknięcia zabrakło:
+
+  - **`GET /tools` w module** (9.7). Serwer narzędzi był dotąd pytany tylko przy zapisie
+    definicji; teraz jest też ogłaszany. Trzy odpowiedzi, nie dwie: lista, pusta lista,
+    gdy serwera w ogóle nie skonfigurowano, i **503**, gdy skonfigurowano, a nie dało się
+    go zapytać. Zwinięcie dwóch ostatnich w `[]` mówiłoby operatorowi, że narzędzi nie ma
+    — jedyna rzecz, której akurat nie ustalono. Warstwa wywołań terminala była na tę trasę
+    gotowa z PR #113 i nie ruszyła się poza mapowaniem typu.
+  - **`GET /revisions/{id}`** (9.9). Przebieg nazywa `team_revision_id`, a nie wersję;
+    monitor rysujący najnowszą rewizję zespołu pokazywałby graf, na którym przebieg nie
+    biegnie — dokładnie to, czego zabrania `teams-runs`. Trasa oddaje tę rewizję po id,
+    z tym samym filtrem właściciela co reszta katalogu.
+  - **Jeden canvas, nie drugi rysunek** (9.9). `TeamCanvas` przyjmuje opcjonalne
+    `runStatuses` i tyle: te same węzły dostają odznakę stanu kroku, a `onConnect`/
+    `onDisconnect` po prostu nie przychodzą, bo rewizja przebiegu jest niezmienna.
+  - **Strumień jest jedynym źródłem stanu** (9.10). `useRunMonitor` nie odpytuje niczego
+    w pętli: `/runs/{id}/events` otwiera się migawką, więc wejście w połowie i powrót po
+    zamknięciu widzą to samo, co dzieje się teraz. Jedyny odczyt obok to wywołania
+    narzędzi sprzed otwarcia (migawka niesie kroki, nie wiersze pod nimi) — raz, po
+    pierwszej migawce, bo dopiero ona nazywa kroki, do których je przypiąć.
+  - **Powrót do przebiegu jest w katalogu**, nie w monitorze: „Runs" przy pozycji czyta
+    przebiegi tego zespołu na żądanie. Gdyby katalog ładował je sam, przestałby być jednym
+    żądaniem na dwadzieścia zespołów — a bez tej listy „zamknięcie widoku nie przerywa
+    przebiegu" nie miałoby jak zostać pokazane.
+  - **`runs.ts` jest bliźniakiem `agent/stream.ts`, świadomie skopiowanym.** Wspólne są
+    cztery linie dzielenia ramek; różne jest całe słownictwo (pięć rodzajów zdarzeń wobec
+    czterech, żadne o tej samej nazwie), więc wspólny parser i tak musiałby dostawać zestaw
+    do rozpoznania — czyli robiłby dokładnie to jedno.
 
 ## 10. Infrastruktura
 

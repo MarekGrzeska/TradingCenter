@@ -43,6 +43,9 @@ canvas.
 - `routers/catalogue.py` — `/teams`, its revisions, and retiring a team.
 - `routers/runs.py` — starting a run, reading its trace, watching it (`/runs/{id}/events`,
   server-sent), and interrupting it.
+- `routers/tools.py` — `GET /tools`, so a picker is built from what the server announces
+  and never from a list kept here. An unreachable server is 503 rather than an empty list:
+  "nothing is announced" and "nobody could be asked" are different facts.
 - `routers/usage.py` — `GET /usage`, broken down by agent and by model. Every number is a
   sum over costs written when their calls happened; nothing is recomputed at read time.
 - `provider.py` — OpenAI, streamed, and the only place langchain's message classes exist.
@@ -194,6 +197,8 @@ when `contract.py` does not — `pnpm contract:check` is what catches a stale ge
 | `GET /teams/{id}` · `DELETE /teams/{id}` | one entry; the delete retires it, keeping its runs |
 | `POST /teams/{id}/revisions` | appends the next revision; never touches the previous one |
 | `GET /teams/{id}/revisions/latest` · `/{version}` | a definition as it was saved |
+| `GET /revisions/{id}` | the same definition, by the id a run names it by |
+| `GET /tools` | what the tool server announces right now; `[]` when none is configured, 503 when one is and could not be asked |
 
 Every `/teams` route answers only to the identity that saved the team, and answers a team
 owned by somebody else exactly as it answers one that does not exist. `/models` is the

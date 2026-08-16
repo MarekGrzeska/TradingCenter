@@ -10,7 +10,13 @@ through market-mcp and writes nothing at all (proposal.md, "Faza 1 nie składa z
 
 from __future__ import annotations
 
-from .assignment import ToolNoLongerAnnounced, ToolPlan, announced_tool_names, plan_tools
+from .assignment import (
+    ToolNoLongerAnnounced,
+    ToolPlan,
+    announced_tool_names,
+    announced_tools,
+    plan_tools,
+)
 from .client import (
     ToolAccessError,
     ToolDescriptor,
@@ -30,5 +36,6 @@ __all__ = [
     "ToolServer",
     "ToolServerUnavailable",
     "announced_tool_names",
+    "announced_tools",
     "plan_tools",
 ]

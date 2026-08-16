@@ -1,13 +1,18 @@
 import { useState } from "react";
+import { RunMonitor } from "./RunMonitor";
 import { TeamCatalogue } from "./TeamCatalogue";
 import { TeamEditor } from "./TeamEditor";
 import { teamsApi, type TeamsApi } from "./teamsApi";
 import { useModels, useTeams, useTools } from "./useTeamsData";
 
-type Open = { kind: "catalogue" } | { kind: "team"; id: number } | { kind: "new" };
+type Open =
+  | { kind: "catalogue" }
+  | { kind: "team"; id: number }
+  | { kind: "new" }
+  | { kind: "run"; runId: number };
 
 /**
- * The teams tab: the catalogue, and one team open on the canvas.
+ * The teams tab: the catalogue, one team open on the canvas, and one run watched on it.
  *
  * The model catalogue is read here rather than inside the editor because both children
  * need it — the canvas to label a node with a model's name, the panel to offer the
@@ -48,9 +53,23 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
         error={teams.error}
         api={api}
         onOpen={(id) => setOpen({ kind: "team", id })}
+        onWatch={(runId) => setOpen({ kind: "run", runId })}
         onNew={() => setOpen({ kind: "new" })}
         onChanged={teams.reload}
         onReload={teams.reload}
+      />
+    );
+  }
+
+  if (open.kind === "run") {
+    // Leaving this view stops nothing: the monitor drops its stream, the run carries on,
+    // and the catalogue's own run list is the way back to it.
+    return (
+      <RunMonitor
+        api={api}
+        runId={open.runId}
+        models={models.value}
+        onClose={() => setOpen({ kind: "catalogue" })}
       />
     );
   }
