@@ -67,6 +67,20 @@ class Settings(BaseSettings):
     azure_client_secret: str | None = None
     azure_tenant_id: str | None = None
 
+    # How long this module waits for another process to finish migrating before it gives
+    # up and refuses to start. Twenty-five minutes, against the agent's five: the candle
+    # table is the largest thing in this system, and an index rebuilt over it takes far
+    # longer than a start. A wait shorter than the migration ahead of it turns a slow
+    # migration into a restart loop that never finishes one
+    # (`market-data-database-connection`, "Kres MUST być dłuższy niż najdłuższa
+    # migracja").
+    #
+    # Not thirty: App Service caps `WEBSITES_CONTAINER_START_TIME_LIMIT` at 1800s
+    # (`infra/app-service.tf`), and this module has to be the one that gives up first.
+    # The platform giving up first restarts the container, which starts the same
+    # migration again and says nothing about why.
+    migration_lock_wait_seconds: float = 1500.0
+
     # --- how much of the provider's allowance this module may take ---
     #
     # One backfill at a time by default. A deep read is dozens of back-to-back requests
