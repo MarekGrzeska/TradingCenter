@@ -31,6 +31,7 @@ from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
 from .openapi import require_response_fields
 from .routers import catalogue, models
+from .tools import ToolServer
 
 log = logging.getLogger(__name__)
 
@@ -64,18 +65,29 @@ async def lifespan(app: FastAPI):
             # the schema it found (`schema_version.py`).
             await schema_version.verify(conn)
 
+        # Built here, connected to nothing yet: the session opens on first use and the
+        # tool list is read then. That is what keeps market-mcp off this module's start-up
+        # path — a team assigning no tools never touches it, and the catalogue is served
+        # whether or not it answers (specs/teams-tool-access, "Moduł startuje bez serwera
+        # narzędzi"). The refusal a missing server earns belongs to starting a *run*.
+        tools = ToolServer(settings)
+
         app.state.settings = settings
         app.state.pool = pool
+        app.state.tools = tools
         # Built once, from settings that were already refused if a model carried no rate
         # or a duplicate id (`config.py`) — so nothing downstream re-checks either.
         app.state.catalogue = ModelCatalogue.from_settings(settings)
-        # What the tool server announces, checked against whenever a definition assigns
-        # an agent a tool (`validation.py`). `None` is "this module has no session with a
-        # tool server", which is a supported state and the only one there is until the
-        # session arrives — a module with no tool server still serves the catalogue
-        # (specs/teams-tool-access, "Moduł startuje bez serwera narzędzi").
-        app.state.announced_tools = None
-        yield
+        # No `app.state.announced_tools` beside those two, and that is the point of the
+        # session: what the tool server publishes is asked of it at the moment a definition
+        # is saved (`routers/catalogue._check`), never copied onto app state at start-up. A
+        # list kept here would be a second copy of somebody else's catalogue, stale from
+        # the first tool that server adds (specs/teams-tool-access, "Moduł nie trzyma kopii
+        # tego, co ogłasza serwer narzędzi").
+        try:
+            yield
+        finally:
+            await tools.aclose()
 
 
 app = FastAPI(

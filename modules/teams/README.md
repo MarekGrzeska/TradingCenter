@@ -39,8 +39,12 @@ of this one.
 - `store.py` — the only door to `teams` and `team_revisions`. The owner is part of every
   statement, and there is no UPDATE against `team_revisions` in it: a save appends.
 - `routers/catalogue.py` — `/teams`, its revisions, and retiring a team.
-- `app.py` — assembly only: lifespan and the routers mounted on it. Nothing that decides
-  anything.
+- `tools/` — the session with `market-mcp` (`client.py`, the only place `mcp` is
+  imported) and who gets which tools (`assignment.py`). Both refusals that stop a run
+  before an agent is called live in the second: a server that cannot be asked, and a tool
+  the server no longer announces. A team assigning no tools never touches either.
+- `app.py` — assembly only: the lifespan, the routers mounted on it, and the tool server
+  it builds without connecting. Nothing that decides anything.
 - `migrations/` — the schema, as the statements a deployment actually runs: the catalogue
   (`0001`), runs and their steps (`0002`), the usage ledger (`0003`).
 
@@ -52,14 +56,22 @@ uv run alembic upgrade head
 uv run uvicorn teams.app:app --reload --port 8050
 ```
 
-Needs a database: `../../compose.yaml` at the repo root starts one on
-`127.0.0.1:55432`. Until the dev scripts are taught about this module (a later change
-in this series), create the role and database by hand the way `agent`'s once needed:
+Needs a database: `../../compose.yaml` at the repo root starts one on `127.0.0.1:55432`,
+and `./scripts/dev.sh` / `./scripts/dev.ps1` create the `teams` role and database inside
+it if either is missing. By hand, if you are not using those scripts:
 
 ```sql
 CREATE ROLE teams WITH LOGIN PASSWORD 'change-me';
 CREATE DATABASE teams OWNER teams;
 ```
+
+Does not need `market-mcp` to start, and the difference from `agent` is worth knowing:
+`MARKET_MCP_URL` left unset means every team whose agents assign **no** tools runs
+normally, while a team that does assign them is refused at the moment a run starts,
+naming tool access as the reason. It is not a turn answered worse — it would be several
+agents guessing independently, each guess paid for. Pointing the URL anywhere off
+loopback needs `MARKET_MCP_SCOPE` set too, the same way a remote database needs an
+identity.
 
 `alembic upgrade head` above is the local convenience, not the mechanism: **the module
 migrates its own database at startup** (`migrate.py`, called from `app.py`'s lifespan),

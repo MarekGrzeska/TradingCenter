@@ -7,6 +7,8 @@ from teams import schema_version
 from teams.app import app
 from teams.schema_version import SchemaMismatch
 
+from .mcp_stand_in import free_port
+
 # The lifespan opens a real pool, migrates and checks the schema — needs the throwaway
 # container `migrated_url` gives.
 pytestmark = pytest.mark.db
@@ -40,6 +42,31 @@ def test_health_requires_no_identity() -> None:
     with TestClient(app) as client:
         response = client.get("/health")
     assert response.status_code == 200
+
+
+def test_the_module_starts_with_no_tool_server_configured() -> None:
+    """specs/teams-tool-access, "Moduł startuje bez serwera narzędzi". `_ENV` sets no
+    MARKET_MCP_URL, so this is the state a fresh deployment is in before the operator's
+    `terraform apply` hands it one — a supported state, not a broken one.
+
+    The catalogue routers arrive in a later change; what this asserts today is the part
+    that would break them: the lifespan finishes and the app serves.
+    """
+    with TestClient(app) as client:
+        assert client.get("/health").status_code == 200
+        assert app.state.tools.configured is False
+
+
+def test_a_tool_server_that_is_not_answering_does_not_stop_the_module(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Nothing listens on this port. The session is opened lazily, so start-up never learns
+    # that — which is the whole point: a run needing tools is refused, a module is not.
+    monkeypatch.setenv("MARKET_MCP_URL", f"http://127.0.0.1:{free_port()}")
+
+    with TestClient(app) as client:
+        assert client.get("/health").status_code == 200
+        assert app.state.tools.configured is True
 
 
 def test_a_schema_the_image_was_not_built_for_refuses_to_start(

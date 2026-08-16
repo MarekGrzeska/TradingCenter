@@ -15,6 +15,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from .. import store
 from ..auth import current_principal
 from ..contract import CreateTeamIn, SaveRevisionIn, TeamDefinition, TeamOut, TeamRevisionOut
+from ..tools import announced_tool_names
 from ..validation import DefinitionRefused, check_definition
 
 log = logging.getLogger(__name__)
@@ -22,15 +23,25 @@ log = logging.getLogger(__name__)
 router = APIRouter()
 
 
-def _check(request: Request, definition: TeamDefinition) -> None:
+async def _check(request: Request, definition: TeamDefinition) -> None:
     """The surroundings half of the save-time check — see `validation.py`. 422 rather
     than 400, so a refusal over an unknown model reads to the terminal exactly like a
-    refusal over a cycle, which FastAPI raises for itself from the same body."""
+    refusal over a cycle, which FastAPI raises for itself from the same body.
+
+    The tool names are asked of the server here rather than read from a list kept
+    anywhere: a server that reworded, added or dropped a tool since this process started
+    is answered correctly and without a restart, and there is no second copy of its
+    catalogue to drift (specs/teams-tool-access). `announced_tool_names` answers `None`
+    when the server cannot be asked at all, which `validation.py` turns into its own
+    sentence — a different refusal from "that tool is gone". The models are the other way
+    round on purpose: that catalogue is this module's own configuration, checked once at
+    start-up, so it is read from `app.state` rather than asked for again.
+    """
     try:
         check_definition(
             definition,
             model_ids=request.app.state.catalogue.ids(),
-            announced_tools=request.app.state.announced_tools,
+            announced_tools=await announced_tool_names(request.app.state.settings),
         )
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
@@ -40,7 +51,7 @@ def _check(request: Request, definition: TeamDefinition) -> None:
 async def create_team(
     body: CreateTeamIn, request: Request, owner: str = Depends(current_principal)
 ) -> TeamOut:
-    _check(request, body.definition)
+    await _check(request, body.definition)
     async with request.app.state.pool.acquire() as conn:
         team, revision = await store.create_team(
             conn,
@@ -82,7 +93,7 @@ async def save_revision(
 ) -> TeamRevisionOut:
     """Appends. The previous revision is not read, not touched and not made obsolete —
     a run already pointing at it keeps meaning what it meant."""
-    _check(request, body.definition)
+    await _check(request, body.definition)
     async with request.app.state.pool.acquire() as conn:
         row = await store.save_revision(
             conn, team_id=team_id, owner_principal=owner, definition=body.definition

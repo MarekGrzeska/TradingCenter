@@ -196,8 +196,8 @@ def test_a_model_outside_the_catalogue_is_refused_naming_the_agent(client: TestC
 
 
 def test_a_tool_no_server_announces_is_refused_naming_the_agent(client: TestClient) -> None:
-    # No tool server is configured in these tests, which is the state `app.state.
-    # announced_tools = None` stands for — the module still serves the catalogue
+    # No tool server is configured in these tests, so there is no session to ask and
+    # `announced_tool_names` answers `None` — the module still serves the catalogue
     # (specs/teams-tool-access, "Moduł startuje bez serwera narzędzi"), and refuses only
     # the definition that would need one.
     body = {
