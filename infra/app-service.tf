@@ -21,12 +21,19 @@
 # reported. The rest is the platform — four containers, four Kestrels, Easy Auth, the OS —
 # and that overhead grows with the number of apps rather than with their work. Which is
 # why the answer is memory, not a rewrite.
+# **B3 since `add-teams-mcp`, and the arithmetic is the same as the last two times.**
+# Measured 16 August 2026, right after phases 1-3 deployed: six apps, 84% of B2's 3.5 GB,
+# against an alert threshold of 92%. One more tenant costs 4-9 points at the 150-310 MB
+# this plan's own history says a module weighs — so the seventh app either fits with two
+# points to spare or trips the alert on its first night. That is not a coin worth
+# flipping, and "deploy and watch" is exactly what the two previous changes here already
+# warned against.
 resource "azurerm_service_plan" "main" {
   name                = "asp-tradingcenter"
   resource_group_name = azurerm_resource_group.main.name
   location            = azurerm_resource_group.main.location
   os_type             = "Linux"
-  sku_name            = "B2"
+  sku_name            = "B3"
 
   # Exactly one worker, on purpose — design.md, "Gateway ma dokładnie jedną instancję".
   # capital.com counts its 10 req/s limit per *account*, not per process; a second
@@ -46,6 +53,7 @@ locals {
   agent_app_name           = "app-tradingcenter-agent"
   teams_app_name           = "app-tradingcenter-teams"
   trading_mcp_app_name     = "app-tradingcenter-trading-mcp"
+  teams_mcp_app_name       = "app-tradingcenter-teams-mcp"
 
   # Deterministic App Service hostnames — used ahead of `terraform apply` (e.g. in the
   # Easy Auth redirect URI below) instead of waiting on the computed `default_hostname`,
@@ -56,6 +64,7 @@ locals {
   agent_hostname           = "${local.agent_app_name}.azurewebsites.net"
   teams_hostname           = "${local.teams_app_name}.azurewebsites.net"
   trading_mcp_hostname     = "${local.trading_mcp_app_name}.azurewebsites.net"
+  teams_mcp_hostname       = "${local.teams_mcp_app_name}.azurewebsites.net"
 
   # What `market-data` is called when it is the *resource* a token is asked for, rather
   # than the app serving a request. The terminal asks Entra for `<uri>/<scope>`; Easy
@@ -74,6 +83,13 @@ locals {
   # `teams`, presenting a client-credentials token from its managed identity. A browser
   # never asks for this one, and there is nobody to consent on whose behalf.
   trading_mcp_api_uri = "api://tradingcenter-trading-mcp"
+
+  # And once more for the tool server the agent builds teams through. Its only caller is
+  # `agent`'s managed identity, so it pairs with no delegated scope either — but note
+  # what travels *inside* a call to it: the operator's own token, in a header of its own,
+  # which is a different credential answering a different question and is not what this
+  # audience is about (add-teams-mcp design.md, D2).
+  teams_mcp_api_uri = "api://tradingcenter-teams-mcp"
 
   # The same shape for the agent's own registration (entra.tf) — see the comment there
   # for why its scope is granted to the terminal today but not yet the one the
@@ -539,6 +555,15 @@ resource "azurerm_linux_web_app" "agent" {
     MARKET_MCP_URL   = "https://${local.market_mcp_hostname}"
     MARKET_MCP_SCOPE = "${local.market_mcp_api_uri}/.default"
 
+    # The second tool server — teams, through teams-mcp. Same both-or-neither rule,
+    # checked per server since `add-teams-mcp`, and the same rollback: clearing
+    # TEAMS_MCP_URL takes the team tools away and leaves the archive ones exactly where
+    # they are. **Set last**, after teams-mcp is deployed and answering, because this is
+    # the setting that makes the tools appear — the same ordering the agent's own
+    # MARKET_MCP_URL had (Migration Plan, step 5).
+    TEAMS_MCP_URL   = "https://${local.teams_mcp_hostname}"
+    TEAMS_MCP_SCOPE = "${local.teams_mcp_api_uri}/.default"
+
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.agent_easy_auth.value
 
     REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
@@ -625,7 +650,17 @@ resource "azurerm_linux_web_app" "teams" {
         azuread_application.market_data_easy_auth.client_id,
       ]
 
-      allowed_applications = [azuread_application.terminal.client_id]
+      # Two callers now, and they arrive holding different things. The terminal presents
+      # the operator's own delegated token. `teams-mcp` presents **the same operator's
+      # token**, forwarded — it is on this list because Easy Auth checks the calling
+      # application as well as the audience, and the forwarded token's `appid` is the
+      # terminal's while the connection is teams-mcp's. Neither entry lets a service act
+      # as itself here: every request to this module still carries a person
+      # (add-teams-mcp specs/teams-mcp-authorship).
+      allowed_applications = [
+        azuread_application.terminal.client_id,
+        data.azuread_service_principal.teams_mcp_managed_identity.client_id,
+      ]
     }
 
     login {
@@ -1155,4 +1190,154 @@ resource "azurerm_key_vault_access_policy" "trading_mcp" {
 
 output "trading_mcp_hostname" {
   value = azurerm_linux_web_app.trading_mcp.default_hostname
+}
+
+# --- teams-mcp ------------------------------------------------------------------------
+#
+# The seventh module, and the second one whose tools change something. Where trading-mcp
+# acts on an account, this one acts on the *catalogue* — and, unlike every other app here,
+# it acts **in a person's name**: the operator's own token travels inside the call, in a
+# header of its own, and is what teams sees when it decides whose team this is
+# (add-teams-mcp design.md, D2). The registration below is only about the other question,
+# which is who may reach this module at all.
+resource "azuread_application" "teams_mcp_easy_auth" {
+  display_name    = "app-tradingcenter-teams-mcp-easyauth"
+  identifier_uris = [local.teams_mcp_api_uri]
+
+  # Required even with no scope inside it — see market-mcp's own comment above, and the
+  # interrupted apply of 13 August 2026 that wrote it.
+  api {
+    requested_access_token_version = 2
+  }
+
+  web {
+    redirect_uris = ["https://${local.teams_mcp_hostname}/.auth/login/aad/callback"]
+  }
+}
+
+resource "azuread_service_principal" "teams_mcp_easy_auth" {
+  client_id = azuread_application.teams_mcp_easy_auth.client_id
+}
+
+resource "azuread_application_password" "teams_mcp_easy_auth" {
+  application_id = azuread_application.teams_mcp_easy_auth.id
+  display_name   = "easy-auth"
+  end_date       = timeadd(timestamp(), "8760h")
+
+  lifecycle {
+    ignore_changes = [end_date]
+  }
+}
+
+resource "azurerm_linux_web_app" "teams_mcp" {
+  name                = local.teams_mcp_app_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  service_plan_id     = azurerm_service_plan.main.id
+  https_only          = true
+
+  # For reading its own Key Vault reference (the GHCR pull token), and for nothing else
+  # today. It is **not** how this module reaches `teams`: that call carries the
+  # operator's token, not this identity's, which is the whole of why a team created from
+  # the chat belongs to the operator and not to a service.
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    always_on = true
+    # No `cors` and no `ip_restriction`, the same omissions market-mcp and trading-mcp
+    # make: no browser calls this app, and the gate on who may reach it is Easy Auth.
+
+    application_stack {
+      # Placeholder — `deploy-teams-mcp.yml` pushes the real GHCR image after the first
+      # build; the lifecycle block below stops Terraform reverting it.
+      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
+    }
+  }
+
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = true
+    unauthenticated_action = "Return401"
+    default_provider       = "azureactivedirectory"
+
+    # The health probe and nothing else — the platform restarts the container off this
+    # response and speaks no Easy Auth (specs/teams-mcp-transport, "Jedno wejście
+    # odpowiada bez poświadczenia"). It answers with the module's own state and names
+    # nothing about the catalogue or its owners.
+    excluded_paths = ["/health"]
+
+    active_directory_v2 {
+      client_id                  = azuread_application.teams_mcp_easy_auth.client_id
+      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
+      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      allowed_audiences = [
+        local.teams_mcp_api_uri,
+        azuread_application.teams_mcp_easy_auth.client_id,
+      ]
+
+      # One caller, enumerated (specs/teams-mcp-transport, "Wołający jest jeden i jest
+      # nazwany"). The terminal is not on it and must not be: a browser talks to `agent`,
+      # and `agent` talks here. Adding an entry is adding a second thing that can create
+      # teams and start runs in somebody's name.
+      allowed_applications = [
+        data.azuread_service_principal.agent_managed_identity.client_id,
+      ]
+    }
+
+    login {
+      token_store_enabled = true
+    }
+  }
+
+  app_settings = {
+    # teams by its own hostname, over TLS. The scope below is what this module presents
+    # to *reach* it; whose request it then is arrives separately, per call.
+    TEAMS_URL   = "https://${local.teams_hostname}"
+    TEAMS_SCOPE = "${local.teams_api_uri}/.default"
+
+    # App Service's default expectation for a Linux custom container, matching the
+    # Dockerfile's own ENV.
+    TEAMS_MCP_PORT = "80"
+
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.teams_mcp_easy_auth.value
+
+    # The module checks the caller's identity itself rather than trusting that the block
+    # above is switched on — the same refusal to take the platform on faith the other two
+    # MCP modules make.
+    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+  }
+
+  lifecycle {
+    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
+  }
+}
+
+# One reference to resolve — `docker_registry_password`. Without this policy the pull
+# fails in the way market-mcp's comment describes: an unauthorized GHCR pull that reads
+# like a broken registry credential.
+resource "azurerm_key_vault_access_policy" "teams_mcp" {
+  key_vault_id = azurerm_key_vault.main.id
+  tenant_id    = data.azurerm_client_config.current.tenant_id
+  object_id    = azurerm_linux_web_app.teams_mcp.identity[0].principal_id
+
+  secret_permissions = ["Get", "List"]
+}
+
+# teams-mcp's own client id, for the list on teams' side — the same lookup the others
+# need, and for the same reason: `identity[0]` publishes an object id, not a client id.
+data "azuread_service_principal" "teams_mcp_managed_identity" {
+  object_id = azurerm_linux_web_app.teams_mcp.identity[0].principal_id
+}
+
+output "teams_mcp_hostname" {
+  value = azurerm_linux_web_app.teams_mcp.default_hostname
 }

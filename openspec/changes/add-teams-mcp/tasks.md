@@ -84,14 +84,19 @@
 
 ## 7. Infrastruktura
 
-- [ ] 7.1 SKU planu na **B3**, `apply` operatora, odczyt pamięci po zmianie zapisany w
+- [x] 7.1 SKU planu na **B3**, `apply` operatora, odczyt pamięci po zmianie zapisany w
   `review.md` — **przed** zadaniem 7.2
-- [ ] 7.2 App Service `teams-mcp`, tożsamość zarządzana, Easy Auth z `agent` jako jedynym
+
+  Kod napisany, `apply` **nie wykonany** — w tym repo `apply` jest robotą operatora, nigdy
+  CI ani agenta. `plan` przechodzi: 5 do dodania, 6 do zmiany, 0 do usunięcia. Odczyt
+  pamięci po zmianie SKU dopisze operator; kolejność „B3 przed wdrożeniem modułu" zostaje
+  w `review.md` jako pierwszy krok wdrożenia.
+- [x] 7.2 App Service `teams-mcp`, tożsamość zarządzana, Easy Auth z `agent` jako jedynym
   wołającym, `/health` poza uwierzytelnieniem
-- [ ] 7.3 Tożsamość `teams-mcp` w `allowed_applications` po stronie `teams`
-- [ ] 7.4 `TEAMS_MCP_URL` i `TEAMS_MCP_SCOPE` w ustawieniach `agent` — jako **ostatni** krok
+- [x] 7.3 Tożsamość `teams-mcp` w `allowed_applications` po stronie `teams`
+- [x] 7.4 `TEAMS_MCP_URL` i `TEAMS_MCP_SCOPE` w ustawieniach `agent` — jako **ostatni** krok
   wdrożenia (Migration Plan, punkt 5)
-- [ ] 7.5 `terraform fmt`, `validate`, `plan` bez `azuread_*` poza tym, co operator stosuje sam
+- [x] 7.5 `terraform fmt`, `validate`, `plan` bez `azuread_*` poza tym, co operator stosuje sam
 
 ## 8. CI i wdrożenie
 
