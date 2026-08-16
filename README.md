@@ -19,7 +19,8 @@ modules move here one at a time.
 | [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. | HTTP + WebSocket |
 | [market-mcp](modules/market-mcp/) | MCP tools over market-data's archive, reduced for a model rather than proxied for a chart. Read-only — no tool writes. | MCP (stdio + streamable HTTP) |
 | [agent](modules/agent/) | The operator's conversation with a model — its own database, its own OpenAI key, and read-only tools over the archive through market-mcp. | HTTP, streamed |
-| [teams](modules/teams/) | Teams of agents as **data**, not code — a graph the operator composes, versioned append-only, run against the same read-only tools. Its own database, its own OpenAI key. | HTTP + OpenAPI |
+| [teams](modules/teams/) | Teams of agents as **data**, not code — a graph the operator composes, versioned append-only, run against both tool servers. Its own database, its own OpenAI key. | HTTP + OpenAPI |
+| [trading-mcp](modules/trading-mcp/) | MCP tools over the gateway's **demo account** — positions, balance, and orders a team can actually place. Network transport only, one named caller, demo checked against the gateway rather than against a setting. | MCP (streamable HTTP) |
 | [terminal](modules/terminal/) | The operator's screen — charts in a grid, the archive's collection, the agent panel and the teams canvas. | consumes capital-gateway, market-data, agent and teams |
 
 ## Layout
@@ -54,22 +55,32 @@ convenience wrappers; no module depends on one.
 Both bring the same things up in the same order:
 
 ```
-migrations -> capital-gateway -> market-data -> market-mcp -> agent -> teams -> terminal
+migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp -> agent
+          -> teams -> terminal
 ```
 
 The order is not tidiness — every arrow in it is a real dependency. `market-data`
-subscribes to the gateway as it starts, `market-mcp` reads `market-data`, `agent` and
-`teams` both ask `market-mcp` for their tool list, and the terminal's charts read
-`market-data` too. Starting anything early fills the console with retries, or — in the
-agent's case — quietly produces a turn answered without tools, which is worse because
-nothing reports it. Each step waits for the one before it to actually answer. Ctrl+C stops
-the services.
+subscribes to the gateway as it starts, `market-mcp` reads `market-data`, `trading-mcp`
+asks the gateway whether it is bound to the demo account and refuses to open a port if it
+is not, `agent` and `teams` ask `market-mcp` for their tool list — `teams` asks
+`trading-mcp` for a second one — and the terminal's charts read `market-data` too.
+Starting anything early fills the console with retries, or — in the agent's case —
+quietly produces a turn answered without tools, which is worse because nothing reports it.
+Each step waits for the one before it to actually answer. Ctrl+C stops the services.
 
 `agent` and `teams` each need `MARKET_MCP_URL` in their own `.env` to use the tools at
-all; both `.env.example`s have it, and both scripts say so at startup if an older `.env`
-does not. The consequence differs between the two, which is why the messages do: an agent
-without a tool server answers from the model alone, while a team whose agents were
-*assigned* tools refuses to run at all rather than guess.
+all, and `teams` needs `TRADING_MCP_URL` as well for the ones that place orders; every
+`.env.example` has them, and both scripts say so at startup if an older `.env` does not.
+The consequence differs, which is why the messages do: an agent without a tool server
+answers from the model alone, while a team whose agents were *assigned* tools refuses to
+run at all rather than guess.
+
+`trading-mcp` is the one module that needs a credential even locally: the gateway checks
+its `X-Gateway-Key` on every caller, loopback included, so `CAPITAL_GATEWAY_API_KEY` there
+must be the gateway's own `GATEWAY_API_KEY`. Both scripts compare the two files and refuse
+before anything starts — a mismatch is not a failed tool call later, it is a module that
+exits during start-up, because it asks the gateway about the account before it opens a
+port.
 
 **The database is local again.** `market-data` writes to the PostgreSQL container in
 [compose.yaml](compose.yaml), which the scripts start first — so Docker is a requirement for
@@ -121,7 +132,7 @@ When it is a change:
 ### Checks
 
 Every pull request to `main`, and every push to it, runs
-[`.github/workflows/checks.yml`](.github/workflows/checks.yml): six jobs in parallel, one
+[`.github/workflows/checks.yml`](.github/workflows/checks.yml): seven jobs in parallel, one
 per module, running the same commands a developer runs — and only for the modules the
 change can have broken. A first job works out which those are from the diff; a change under
 `docs/` or `infra/` runs no module suite at all.
@@ -141,6 +152,7 @@ written for.
 | `capital-gateway` | `ruff check`, `pyright`, `pytest` |
 | `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
 | `market-mcp` | `scripts/contract.py check`, `ruff check`, `pyright`, `pytest` |
+| `trading-mcp` | the same four — its snapshot is `capital-gateway`'s document, so **any** change under that module runs this job |
 | `agent` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's; its `live` tests need a real OpenAI key and stay behind `--run-live` |
 | `teams` | `ruff check`, `pyright`, `pytest` — same again; nothing in the suite reaches OpenAI or market-mcp |
 | `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
@@ -162,11 +174,14 @@ Pushing to `main` deploys the module that changed. Each deploy ends by checking 
 actually answers, not merely that Azure accepted the request: `market-data` is probed on
 `/ws/candles`, the one path Easy Auth lets through to the container; `market-mcp` is probed
 on `/health`, excluded from Easy Auth the same way and answering a plain 200 with no trick
-needed; `agent` and `teams` ask both questions, the control plane for which image is
+needed; `trading-mcp` is probed there too, where the answer proves more than liveness —
+that process refuses to listen at all unless the gateway just told it the account is a demo
+one, so a 200 means it reached the gateway, through its firewall, with the shared key; `agent` and `teams` ask both questions, the control plane for which image is
 serving and `/health` for whether the process behind it came up; the terminal is checked on
 both `/` and a tab address, because deep links have broken here before while the root kept
-working. `capital-gateway` admits only market-data's addresses, so a runner cannot reach it
-at all, and the control plane is the only question its deploy can ask.
+working. `capital-gateway` admits only market-data's and trading-mcp's addresses, so a
+runner cannot reach it at all, and the control plane is the only question its deploy can
+ask.
 
 That second question is why the other four ask it. The control plane reports the state of
 the *site*: on 16 August 2026 it read `Running` for the better part of an hour over an
