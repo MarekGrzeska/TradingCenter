@@ -117,6 +117,7 @@ export function AgentPanel({
               />
               <span>
                 <span className="font-medium">{tool.name}</span>
+                <ToolKind readOnly={tool.readOnly} />
                 {tool.description && (
                   <span className="block text-ink-faint">{tool.description}</span>
                 )}
@@ -170,6 +171,31 @@ export function AgentPanel({
         Remove agent
       </button>
     </div>
+  );
+}
+
+/**
+ * Whether this tool moves the account, said before it is ticked rather than discovered
+ * in a run (`terminal-teams`, "Narzędzia zapisujące są rozpoznawalne przy wyborze").
+ *
+ * Three answers, not two: the flag is the server's own `readOnlyHint`, and a tool that
+ * carried no annotation is *unknown* — shown as such rather than resolved either way,
+ * because this terminal knows nothing about it that the module did not tell it
+ * (specs/trading-mcp-tools).
+ */
+function ToolKind({ readOnly }: { readOnly: boolean | null }) {
+  if (readOnly === true) return null;
+  const [label, tone] =
+    readOnly === false
+      ? ["changes the account", "text-warning"]
+      : ["unknown effect", "text-ink-muted"];
+  // The separator outside the labelled span, so the label is one node rather than text
+  // split around a bullet.
+  return (
+    <>
+      <span className="mx-1 text-ink-faint">·</span>
+      <span className={tone}>{label}</span>
+    </>
   );
 }
 

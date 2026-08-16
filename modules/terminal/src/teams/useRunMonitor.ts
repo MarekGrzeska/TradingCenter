@@ -4,6 +4,7 @@ import {
   type TeamRun,
   type TeamRunStep,
   type TeamRunToolCall,
+  type TeamRunTrade,
 } from "./runs";
 import type { TeamsApi } from "./teamsApi";
 
@@ -20,6 +21,13 @@ import type { TeamsApi } from "./teamsApi";
  * so they are fetched once, after the snapshot names the steps to attach them to. Calls
  * that happen while watching arrive on the stream and are appended.
  *
+ * **Trades are read rather than streamed, and re-read on each tool call.** The module
+ * publishes no trade event: an order *is* a tool call, and the stream frame carries the
+ * name and the outcome but not the symbol, the size or the provider's order id, which
+ * are the columns the row exists for. So the signal to re-read is the tool-call event
+ * itself — a read when something happened, not a timer — and the run's own progress
+ * never waits on it.
+ *
  * Closing the view aborts the request and nothing more: the run holds no reference to any
  * of this, which is exactly the property the module was built for.
  */
@@ -28,6 +36,9 @@ export interface RunMonitor {
   run: TeamRun | null;
   steps: TeamRunStep[];
   toolCalls: TeamRunToolCall[];
+  /** Every order this run has placed, newest read wins — see the note above on why
+   *  these are read rather than streamed. */
+  trades: TeamRunTrade[];
   error: string | null;
   /** Opens the stream again — after a dropped connection, and after the operator asked
    *  the run to stop, so the view is never left guessing. */
@@ -39,6 +50,7 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
   const [run, setRun] = useState<TeamRun | null>(null);
   const [steps, setSteps] = useState<TeamRunStep[]>([]);
   const [toolCalls, setToolCalls] = useState<TeamRunToolCall[]>([]);
+  const [trades, setTrades] = useState<TeamRunTrade[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   // Read once per connection, and only after the first snapshot: the steps it needs to
@@ -64,6 +76,7 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
             if (!recordedRead.current) {
               recordedRead.current = true;
               void readRecordedCalls(event.steps);
+              void readTrades();
             }
             break;
           case "stepStarted":
@@ -79,8 +92,13 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
             break;
           case "toolCall":
             setToolCalls((current) => [...current, event.call]);
+            // A call may have been an order, and only the row knows what it placed.
+            void readTrades();
             break;
           case "runFinished":
+            // Once more at the end: the last order's own result is written as the call
+            // resolves, which can land after the event that announced the call.
+            void readTrades();
             setRun((current) =>
               current === null
                 ? current
@@ -88,6 +106,16 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
             );
             break;
         }
+      }
+    }
+
+    async function readTrades() {
+      try {
+        const placed = await api.runTrades(runId, controller.signal);
+        if (!cancelled) setTrades(placed);
+      } catch {
+        // Same reasoning as the recorded calls below: the run's progress is what this
+        // view is for, and it is already arriving.
       }
     }
 
@@ -121,9 +149,11 @@ export function useRunMonitor(api: TeamsApi, runId: number): RunMonitor {
     run,
     steps,
     toolCalls,
+    trades,
     error,
     reload: useCallback(() => {
       setToolCalls([]);
+      setTrades([]);
       setAttempt((n) => n + 1);
     }, []),
   };

@@ -51,6 +51,7 @@ const definition: TeamDefinition = {
   ],
   dependencies: [{ from: "agent-1", to: "agent-2" }],
   limits: { runLimit: "0.5", dailyLimit: null },
+  trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
 };
 
 describe("listTeams", () => {
@@ -126,6 +127,7 @@ describe("a revision, both ways", () => {
         ],
         edges: [{ from: "agent-1", to: "agent-2" }],
         limits: { run_limit: "0.5", daily_limit: null },
+        trading: { max_order_size: null, orders_per_run: null, orders_per_day: null },
       },
     });
   });
@@ -209,7 +211,7 @@ describe("listTools", () => {
     );
 
     expect(await api().listTools(new AbortController().signal)).toEqual([
-      { name: "get_candles", description: "candles" },
+      { name: "get_candles", description: "candles", readOnly: null },
     ]);
   });
 

@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { formatInstant } from "../ui/formatTime";
 import { TeamCanvas } from "./TeamCanvas";
-import type { TeamRun, TeamRunStep, TeamRunToolCall } from "./runs";
+import type { TeamRun, TeamRunStep, TeamRunToolCall, TeamRunTrade } from "./runs";
+import { stopKind, stopLabel } from "./stopReason";
 import type { TeamDefinition, TeamsApi, TeamsModel } from "./teamsApi";
 import { useRunMonitor } from "./useRunMonitor";
 
@@ -30,7 +31,7 @@ export function RunMonitor({
   onClose(): void;
 }) {
   const monitor = useRunMonitor(api, runId);
-  const { run, steps, toolCalls } = monitor;
+  const { run, steps, toolCalls, trades } = monitor;
   const [definition, setDefinition] = useState<TeamDefinition | null>(null);
   const [version, setVersion] = useState<number | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
@@ -73,6 +74,14 @@ export function RunMonitor({
     }
     return grouped;
   }, [toolCalls]);
+
+  const tradesByAgent = useMemo(() => {
+    const grouped = new Map<string, TeamRunTrade[]>();
+    for (const trade of trades) {
+      grouped.set(trade.agentKey, [...(grouped.get(trade.agentKey) ?? []), trade]);
+    }
+    return grouped;
+  }, [trades]);
 
   const selectedStep = steps.find((step) => step.agentKey === selectedKey) ?? null;
   const working = run !== null && (run.status === "pending" || run.status === "running");
@@ -121,10 +130,13 @@ export function RunMonitor({
       </header>
 
       {/* The module's own sentence, whatever stopped it — a cost ceiling names the cost
-          (specs/teams-usage), a timeout names the limit, the operator's own interruption
-          says so. Kept above the canvas because it explains everything below it. */}
+          (specs/teams-usage), an order ceiling names the count (specs/teams-trading), a
+          timeout names the limit, the operator's own interruption says so. Kept above the
+          canvas because it explains everything below it, and carrying a label so the two
+          ceilings do not read as one thing (`terminal-teams`). */}
       {run?.stoppedReason && (
         <p className="border-b border-border px-2 py-1 text-xs text-warning">
+          <StopBadge reason={run.stoppedReason} />
           {run.stoppedReason}
         </p>
       )}
@@ -168,9 +180,10 @@ export function RunMonitor({
               step={selectedStep}
               role={definition?.agents.find((agent) => agent.key === selectedKey)?.role ?? null}
               calls={callsByAgent.get(selectedStep.agentKey) ?? []}
+              trades={tradesByAgent.get(selectedStep.agentKey) ?? []}
             />
           ) : (
-            <RunSummary run={run} steps={steps} calls={toolCalls} />
+            <RunSummary run={run} steps={steps} calls={toolCalls} trades={trades} />
           )}
         </div>
       </div>
@@ -185,10 +198,12 @@ function AgentWork({
   step,
   role,
   calls,
+  trades,
 }: {
   step: TeamRunStep;
   role: string | null;
   calls: TeamRunToolCall[];
+  trades: TeamRunTrade[];
 }) {
   return (
     <>
@@ -210,6 +225,19 @@ function AgentWork({
           </p>
         )}
       </section>
+
+      {/* Before the tool calls, not after: an operator watching a team that trades asks
+          "what has gone out" first, and an answer buried under the call list is one they
+          have to go looking for (`terminal-teams`, "Złożone zlecenia widać przy agencie,
+          który je złożył"). */}
+      {trades.length > 0 && (
+        <section className="flex flex-col gap-1">
+          <h4 className="text-xs uppercase tracking-wide text-ink-faint">Orders placed</h4>
+          {trades.map((trade) => (
+            <TradeRow key={trade.id} trade={trade} />
+          ))}
+        </section>
+      )}
 
       <section className="flex flex-col gap-1">
         <h4 className="text-xs uppercase tracking-wide text-ink-faint">Tools called</h4>
@@ -233,14 +261,47 @@ function AgentWork({
   );
 }
 
+/**
+ * One order, and what came of it.
+ *
+ * `unknown` is the status this row exists to be able to show: the order may well have
+ * reached the account and the module cannot say. It is deliberately *not* rendered as a
+ * failure — the operator's next move is to look at the account, not to assume nothing
+ * happened (`terminal-teams`, "Zlecenie bez znanego skutku").
+ */
+function TradeRow({ trade }: { trade: TeamRunTrade }) {
+  const what = [trade.direction, trade.size, trade.symbol].filter(Boolean).join(" ");
+  return (
+    <div className="flex items-baseline justify-between gap-2 text-xs" data-testid="trade">
+      <span className="text-ink">{what === "" ? trade.toolName : what}</span>
+      <span className={TRADE_TONE[trade.status] ?? "text-ink-faint"}>
+        {trade.status === "unknown" ? "unknown — check the account" : trade.status}
+        {trade.resultStatus && ` · ${trade.resultStatus}`}
+      </span>
+    </div>
+  );
+}
+
+const TRADE_TONE: Record<string, string> = {
+  settled: "text-good",
+  unsettled: "text-warning",
+  // Not `critical`: nothing was placed, which is the module working correctly.
+  refused: "text-ink-muted",
+  // Not `critical` either, and not muted — this is the one worth looking at.
+  unknown: "text-warning",
+  sent: "text-ink-muted",
+};
+
 function RunSummary({
   run,
   steps,
   calls,
+  trades,
 }: {
   run: TeamRun | null;
   steps: TeamRunStep[];
   calls: TeamRunToolCall[];
+  trades: TeamRunTrade[];
 }) {
   if (run === null) return <p className="text-xs text-ink-muted">Reading the run…</p>;
   const done = steps.filter((step) => step.status === "completed").length;
@@ -253,6 +314,7 @@ function RunSummary({
         <Row label="Status" value={run.status} />
         <Row label="Agents finished" value={`${done} of ${steps.length}`} />
         <Row label="Tool calls" value={String(calls.length)} />
+        {trades.length > 0 && <Row label="Orders placed" value={String(trades.length)} />}
         {run.finishedAt !== null && <Row label="Finished" value={formatInstant(run.finishedAt)} />}
       </dl>
     </>
@@ -265,6 +327,21 @@ function Row({ label, value }: { label: string; value: string }) {
       <dt className="text-ink-faint">{label}</dt>
       <dd>{value}</dd>
     </div>
+  );
+}
+
+/** The kind of ceiling that stopped a run, when one did — see `stopReason.ts` for why
+ *  a label is worth having beside a sentence that already says it. */
+function StopBadge({ reason }: { reason: string }) {
+  const label = stopLabel(stopKind(reason));
+  if (label === null) return null;
+  return (
+    <span
+      className="mr-2 rounded border border-warning px-1 py-0.5 uppercase tracking-wide"
+      data-testid="stop-kind"
+    >
+      {label}
+    </span>
   );
 }
 

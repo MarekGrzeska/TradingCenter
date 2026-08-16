@@ -172,13 +172,50 @@
 
 ## 8. Terminal
 
-- [ ] 8.1 `pnpm contract:generate` po zmianach w `teams/contract.py`
-- [ ] 8.2 Granice handlowe w panelu zespołu; odmowa zapisu pokazana przy agencie
-- [ ] 8.3 Narzędzia zapisujące odróżnione od czytających w wybieraku narzędzi
-- [ ] 8.4 Zlecenia przebiegu przy agencie, który je złożył — symbol, kierunek, wielkość, skutek
-- [ ] 8.5 Zlecenie o nieznanym skutku pokazane jako nieznane
-- [ ] 8.6 Granica zleceń jako przyczyna zatrzymania, odróżniona od kosztu
-- [ ] 8.7 `pnpm lint`, `typecheck`, `test`, `contract:check` przechodzą
+- [x] 8.1 `pnpm contract:generate` po zmianach w `teams/contract.py` — zrobione z grupami 6 i 7, tutaj tylko sprawdzone
+- [x] 8.2 Granice handlowe w panelu zespołu; **pole puste znaczy „bez ograniczenia" i nigdy nie blokuje zapisu**
+- [x] 8.3 Narzędzia zapisujące odróżnione od czytających w wybieraku narzędzi
+- [x] 8.4 Zlecenia przebiegu przy agencie, który je złożył — symbol, kierunek, wielkość, skutek
+- [x] 8.5 Zlecenie o nieznanym skutku pokazane jako nieznane
+- [x] 8.6 Granica zleceń jako przyczyna zatrzymania, odróżniona od kosztu
+- [x] 8.7 `pnpm lint`, `typecheck`, `test`, `contract:check` przechodzą
+
+  **Druga poprawka po odwróceniu z grupy 6.** `terminal-teams` wciąż niosło scenariusz
+  „operator przypisuje narzędzie zapisujące bez granic → terminal pokazuje odmowę przy
+  agencie" — czyli dokładnie tę regułę, którą operator kazał odwrócić. Poprawione:
+  zapis zostaje przyjęty, a terminal ani nie pokazuje odmowy, ani nie wpisuje granicy
+  sam. Dopisany wymóg, że każde pole daje się zostawić puste i że terminal nie podpowiada
+  wartości domyślnej — pole wypełnione za operatora jest granicą, której nie wybrał, a
+  wygląda jak wybrana.
+
+  **Gdzie usiadły granice zespołu:** w prawym panelu, gdy żaden agent nie jest zaznaczony
+  (`TeamLimitsPanel.tsx`) — to samo miejsce, w którym dotąd stała podpowiedź „wybierz
+  agenta". Zespół nie miał wcześniej *żadnego* własnego panelu, bo nie miał czego w nim
+  trzymać. Przy pustych granicach panel mówi wprost, że zlecenia są nieograniczone; to
+  jedyna rzecz, którą ten widok o tym mówi, i celowo nie jest ostrzeżeniem blokującym.
+
+  **Zlecenia w monitorze są odczytywane, nie strumieniowane.** Moduł nie publikuje
+  zdarzenia „zlecenie" — zlecenie *jest* wywołaniem narzędzia, a ramka strumienia niesie
+  nazwę i skutek, ale nie symbol, wielkość ani identyfikator od providera, czyli
+  dokładnie te kolumny, po które istnieje wiersz. Więc sygnałem do ponownego odczytu jest
+  samo zdarzenie `tool_call` (i `run_finished` na koniec, bo skutek ostatniego zlecenia
+  zapisuje się po ogłoszeniu wywołania). Odczyt po zdarzeniu, nie po zegarze.
+
+  **`stopReason.ts`** czyta zdanie modułu i nadaje mu etykietę (`order limit` kontra
+  `cost limit`). Sprzężenie ze zdaniami z `runner/trading.py` i `runner/cost.py` jest
+  świadome i takie samo jak w `refusal.ts`; zdanie i tak jest pokazywane w całości, więc
+  nierozpoznane wpada na `other` i zostaje bez etykiety, nie bez treści.
+
+  **`pickersComeFromTheModule.test.ts` zaostrzony, nie rozluźniony.** Strażnik „terminal
+  nie niesie własnej listy narzędzi" łapał `tool.read_only` w mapperze — pole na drucie,
+  nie nazwa narzędzia. Wzorzec szuka teraz nazwy w cudzysłowie (`"place_order"`), czyli w
+  kształcie, jaki naprawdę ma wpisana na stałe lista, i obejmuje też czasowniki
+  handlowe (`place`, `close`, `cancel`, `amend`).
+
+  Jedna asymetria do odnotowania, nie naprawiana tutaj: granice **kosztu** (`run_limit`,
+  `daily_limit`) jadą na drucie od fazy 1 i dalej nie mają w terminalu żadnego pola —
+  panel zespołu edytuje wyłącznie granice handlowe, bo tyle mówi 8.2 i tyle opisuje
+  `terminal-teams`. Dołożenie ich to zmiana wymogu, więc osobna decyzja.
 
 ## 9. Infrastruktura
 

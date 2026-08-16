@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MarketDataError } from "../data/types";
 import { AgentPanel } from "./AgentPanel";
 import { TeamCanvas } from "./TeamCanvas";
+import { TeamLimitsPanel } from "./TeamLimitsPanel";
 import { locateRefusal, type Refusal } from "./refusal";
 import {
   addAgent,
@@ -10,6 +11,7 @@ import {
   hasChanges,
   removeAgent,
   removeDependency,
+  setTradingLimits,
   updateAgent,
 } from "./teamDraft";
 import type {
@@ -238,10 +240,12 @@ export function TeamEditor({
             onDisconnect={(edge) => edit(removeDependency(draft, edge))}
           />
         ) : (
-          <p className="border-l border-border p-3 text-xs text-ink-muted">
-            Pick an agent to edit it, or drag from one agent's right edge to another's left
-            to make it wait for that one.
-          </p>
+          // Nothing selected is the team itself — where its own settings live, rather
+          // than behind a dialog the operator has to know exists.
+          <TeamLimitsPanel
+            trading={draft.trading}
+            onChange={(patch) => edit(setTradingLimits(draft, patch))}
+          />
         )}
       </div>
     </div>

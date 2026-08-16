@@ -14,6 +14,7 @@ const definition: TeamDefinition = {
     { from: "agent-2", to: "agent-10" },
   ],
   limits: { runLimit: null, dailyLimit: null },
+  trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
 };
 
 describe("locating a refusal", () => {

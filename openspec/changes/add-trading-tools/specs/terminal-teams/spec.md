@@ -22,15 +22,19 @@ Odpowiedź schowana w liście wywołań narzędzi jest odpowiedzią, której si�
 ### Requirement: Granice handlowe ustawia się w tym samym widoku co resztę zespołu
 
 Terminal MUST pozwalać ustawić granice handlowe zespołu — maksymalną wielkość zlecenia, liczbę
-zleceń na przebieg i dobową — w widoku, w którym operator składa zespół. Odmowa zapisu z powodu
-brakującej granicy MUST być pokazana przy agencie, którego dotyczy.
+zleceń na przebieg i dobową — w widoku, w którym operator składa zespół. Każde z tych pól MUST
+dać się zostawić puste, a puste MUST znaczyć „bez ograniczenia" i MUST NOT blokować zapisu.
+
+Terminal MUST NOT podpowiadać ani podstawiać żadnej wartości domyślnej: pole wypełnione za
+operatora jest granicą, której nie wybrał, a wygląda jak wybrana (`teams-trading`, "Każda
+granica handlowa daje się wyłączyć, a moduł żadnej nie narzuca").
 
 #### Scenario: Operator przypisuje narzędzie zapisujące bez granic
 
 - **WHEN** operator przypisuje agentowi narzędzie zmieniające stan rachunku i zapisuje zespół
   bez ustawionych granic handlowych
-- **THEN** terminal pokazuje odmowę przy tym agencie
-- **AND** wskazuje brakującą granicę
+- **THEN** zapis zostaje przyjęty
+- **AND** terminal nie pokazuje przy tym odmowy ani nie wpisuje granicy sam
 
 #### Scenario: Narzędzia zapisujące są rozpoznawalne przy wyborze
 

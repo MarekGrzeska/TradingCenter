@@ -39,7 +39,21 @@ export function emptyDefinition(modelId: string): TeamDefinition {
     agents: [newAgent("agent-1", modelId)],
     dependencies: [],
     limits: { runLimit: null, dailyLimit: null },
+    // Every trading limit starts unset, and unset means no limit. Not a placeholder to
+    // be filled in later: a number here would be a ceiling the operator never chose,
+    // wearing the look of one they did (`teams-trading`, "Każda granica handlowa daje
+    // się wyłączyć, a moduł żadnej nie narzuca").
+    trading: { maxOrderSize: null, ordersPerRun: null, ordersPerDay: null },
   };
+}
+
+/** One trading limit changed, the rest left alone. `null` clears it — which is the same
+ *  as never having set it, and means no limit. */
+export function setTradingLimits(
+  definition: TeamDefinition,
+  patch: Partial<TeamDefinition["trading"]>,
+): TeamDefinition {
+  return { ...definition, trading: { ...definition.trading, ...patch } };
 }
 
 function newAgent(key: string, modelId: string): TeamAgent {
