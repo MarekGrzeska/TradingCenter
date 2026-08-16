@@ -6,11 +6,11 @@ into the statement itself — the same shape `catalogue.py` and `runs.py` alread
 
 Creating or editing either one resolves the revision it would run — the pinned one, or
 the team's current latest — and runs `validation.check_unattended` against it before a
-row is ever written: a schedule or trigger over a revision whose agents carry a
-state-changing tool is refused unless it carries an explicit acknowledgement
-(specs/teams-schedules). No such tool exists yet, so every save today takes the
-unremarkable branch — the refusal is real code, exercised by one test, waiting for the
-day a tool answers it (design.md, "Punkty styku z fazą 2").
+row is ever written: a schedule or trigger over a revision whose agents carry a tool this
+module cannot confirm is read-only is refused unless it carries an explicit
+acknowledgement (specs/teams-schedules). Since phase 2 that is not a hypothetical branch —
+`trading-mcp` announces `place_order` with `readOnlyHint: false`, and a save over a
+revision carrying it is refused here unless the operator ticked the box.
 
 What is deliberately *not* here: the clock that wakes on its own and claims a due fire.
 That is `scheduler/`'s job, reading `store.claim_due_schedule` and
@@ -38,7 +38,7 @@ from ..contract import (
     TriggerIn,
     TriggerOut,
 )
-from ..tools import announced_snapshot
+from ..tools import AnnouncedSnapshot, announced_snapshot
 from ..validation import DefinitionRefused, check_trigger_tool, check_unattended
 
 router = APIRouter()
@@ -84,9 +84,25 @@ async def _resolve_definition(
     return TeamRevisionOut.from_row(dict(revision)).definition
 
 
-def _check_unattended(definition: TeamDefinition, *, unattended_ack: bool) -> None:
+async def _announced(request: Request, *, definition: TeamDefinition) -> AnnouncedSnapshot | None:
+    """What every configured server announces right now, or `None` when there is nothing
+    to ask (no server configured, or a definition assigning no tools at all — the same
+    "nobody is contacted" shortcut `assignment.plan_tools` takes, for the same reason: an
+    outage elsewhere must not stop a save that never needed either server)."""
+    if not any(agent.tools for agent in definition.agents):
+        return None
+    return await announced_snapshot(request.app.state.settings)
+
+
+def _check_unattended(
+    definition: TeamDefinition, *, unattended_ack: bool, announced: AnnouncedSnapshot | None
+) -> None:
+    # `None` — nothing was asked, so nothing is confirmed read-only. That only reaches
+    # `check_unattended` as an empty set when the definition assigns no tools either, in
+    # which case there is nothing to be unsure about.
+    read_only = frozenset() if announced is None else announced.read_only
     try:
-        check_unattended(definition, unattended_ack=unattended_ack)
+        check_unattended(definition, unattended_ack=unattended_ack, read_only_tools=read_only)
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
 
@@ -109,7 +125,8 @@ async def create_schedule(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    _check_unattended(definition, unattended_ack=body.unattended_ack)
+    announced = await _announced(request, definition=definition)
+    _check_unattended(definition, unattended_ack=body.unattended_ack, announced=announced)
 
     async with request.app.state.pool.acquire() as conn:
         row = await store.create_schedule(
@@ -164,7 +181,8 @@ async def update_schedule(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    _check_unattended(definition, unattended_ack=body.unattended_ack)
+    announced = await _announced(request, definition=definition)
+    _check_unattended(definition, unattended_ack=body.unattended_ack, announced=announced)
 
     async with request.app.state.pool.acquire() as conn:
         row = await store.update_schedule(
@@ -245,16 +263,15 @@ async def next_fires(
 # --- triggers -----------------------------------------------------------------------
 
 
-async def _check_trigger_tool(request: Request, tool_name: str) -> None:
+def _check_trigger_tool(tool_name: str, *, announced: AnnouncedSnapshot | None) -> None:
     # `announced_snapshot` answers `None` when no server is configured at all; a server
     # that is configured and could not be asked comes back inside the snapshot instead,
     # under `unreachable`. A trigger names one tool, so what this needs from either shape
     # is the set of names — a name nobody announces is refused the same way whether the
     # silence is a missing server or an unreachable one (`validation.check_trigger_tool`).
-    snapshot = await announced_snapshot(request.app.state.settings)
-    announced = None if snapshot is None else sorted(snapshot.by_name)
+    names = None if announced is None else sorted(announced.by_name)
     try:
-        check_trigger_tool(tool_name, announced_tools=announced)
+        check_trigger_tool(tool_name, announced_tools=names)
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
 
@@ -270,8 +287,11 @@ async def create_trigger(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    _check_unattended(definition, unattended_ack=body.unattended_ack)
-    await _check_trigger_tool(request, body.tool_name)
+    # One snapshot, both checks — a trigger asks the servers what they announce anyway,
+    # so the unattended check rides on that answer rather than opening a second session.
+    announced = await announced_snapshot(request.app.state.settings)
+    _check_unattended(definition, unattended_ack=body.unattended_ack, announced=announced)
+    _check_trigger_tool(body.tool_name, announced=announced)
 
     async with request.app.state.pool.acquire() as conn:
         row = await store.create_trigger(
@@ -332,8 +352,11 @@ async def update_trigger(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    _check_unattended(definition, unattended_ack=body.unattended_ack)
-    await _check_trigger_tool(request, body.tool_name)
+    # One snapshot, both checks — a trigger asks the servers what they announce anyway,
+    # so the unattended check rides on that answer rather than opening a second session.
+    announced = await announced_snapshot(request.app.state.settings)
+    _check_unattended(definition, unattended_ack=body.unattended_ack, announced=announced)
+    _check_trigger_tool(body.tool_name, announced=announced)
 
     async with request.app.state.pool.acquire() as conn:
         row = await store.update_trigger(

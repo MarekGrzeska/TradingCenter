@@ -31,8 +31,9 @@
   zapisie, więc `croniter` jest potrzebny już teraz, nie dopiero w zegarze)
 - [x] 2.2 `routers/schedules.py` — utworzenie, odczyt, zmiana, włączenie i wyłączenie
   harmonogramu oraz wyzwalacza, historia wyzwoleń. Sprawdzenie `unattended_ack` żyje w
-  nowym `validation.check_unattended` (`STATE_CHANGING_TOOLS` — dziś pusty zbiór, patrz
-  `validation.py`), sprawdzenie narzędzia wyzwalacza w nowym `validation.check_trigger_tool`
+  nowym `validation.check_unattended` (czyta `readOnlyHint` z ogłoszeń serwerów — patrz
+  poprawka w `review.md`), sprawdzenie narzędzia wyzwalacza w nowym
+  `validation.check_trigger_tool`
 - [x] 2.3 Trasa podglądu najbliższych wyzwoleń, liczona przez moduł
   (`GET /schedules/{id}/next-fires`) — świeże liczenie z `cron_expression` przez
   `croniter`, nie odczyt zapisanego `next_fire_at`
@@ -41,7 +42,8 @@
   `tests/test_validation.py`), w tym odmowy: zły cron, rewizja z innego zespołu, wyzwalacz
   bez skonfigurowanego serwera narzędzi, wyzwalacz z nieogłaszaną nazwą narzędzia (przez
   prawdziwy stand-in MCP, `mcp_stand_in.serving_sync`), rewizja z narzędziem zmieniającym
-  stan bez potwierdzenia (na poziomie `validation.py`, jawnym `state_changing_tools`)
+  stan bez potwierdzenia (na poziomie `validation.py`, jawnym `read_only_tools`, oraz —
+  po review — przez trasę, przeciw prawdziwemu serwerowi ogłaszającemu `place_order`)
 
 ## 3. Zegar i przejęcie wyzwolenia
 
@@ -115,7 +117,8 @@ Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń p
   `_track_run`, testy w obu plikach `test_scheduler_*.py`)
 - [x] 5.3 Odmowa utworzenia harmonogramu lub wyzwalacza nad rewizją, której agent ma
   narzędzie zmieniające stan poza modułem, bez jawnego potwierdzenia — zrobione w grupie 2
-  (`validation.check_unattended`, `STATE_CHANGING_TOOLS` pusty dziś)
+  (`validation.check_unattended`; przy review dopięte do `readOnlyHint`, bo pusty zbiór
+  nazw znaczył kontrolę, która niczego nie łapała)
 - [x] 5.4 Rewizja, której nie da się uruchomić (model zniknął z katalogu), pomija
   wyzwolenie z zapisanym powodem zamiast przewracać zegar
   (`test_a_revision_naming_a_model_outside_the_catalogue_is_skipped`)
@@ -165,14 +168,17 @@ Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń p
 
   **7.2 wylądowało jako `"false"` i to jest decyzja, a nie stan przejściowy.** Warto ją
   znać z góry: `config.py` domyśla się `true`, więc *nieumieszczenie* tego ustawienia w
-  mapie włączyłoby zegar — nie zostawiłoby go w spokoju. Zostaje wyłączony, dopóki
-  `STATE_CHANGING_TOOLS` w `validation.py` nie zostanie spięte z flagą `read_only`, którą
-  faza 2 położyła na drucie: sprawdzenie odmawiające harmonogramu nad rewizją z narzędziami
-  zapisującymi chodzi, przechodzi testy i nie łapie niczego, bo pyta o pusty zbiór — a ta
-  aplikacja ma od wczoraj `TRADING_MCP_URL`, więc narzędzia, których nie widzi, są
-  prawdziwe. Zegar mogący składać zlecenia bez nadzoru, pilnowany przez ślepe sprawdzenie,
-  nie jest stanem, w który się wdraża. Przełączenie to jedna linia i `apply`; ani jeden
-  wiersz w katalogu się przy tym nie zmienia.
+  mapie włączyłoby zegar — nie zostawiłoby go w spokoju.
+
+  Powód, dla którego zostaje wyłączony, zmienił się przy review i jest teraz słabszy.
+  **Był** nim zepsuty bezpiecznik: `STATE_CHANGING_TOOLS` w `validation.py` było pustym
+  zbiorem nazw, więc sprawdzenie odmawiające harmonogramu nad rewizją z narzędziami
+  zapisującymi chodziło, przechodziło testy i nie łapało niczego — a aplikacja ma
+  `TRADING_MCP_URL`. Review to zamknęło: sprawdzenie czyta `readOnlyHint` z ogłoszeń
+  serwerów i odmawia wszystkiego, czego nie potwierdzi jako odczyt. **Zostaje** to, że
+  żaden harmonogram nigdy nie wyzwolił na uruchomionym stosie (8.2), więc włączenie zegara
+  to decyzja operatora po tamtym przebiegu, a nie efekt uboczny poprawki. Przełączenie to
+  jedna linia i `apply`; ani jeden wiersz w katalogu się przy tym nie zmienia.
 
   `apply` wykonany (0 dodanych, 1 zmieniony, 0 usuniętych) i sprawdzony odczytem:
   `az webapp config appsettings list` oddaje `SCHEDULER_ENABLED=false`.
@@ -195,6 +201,15 @@ Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń p
   `0005_schedules_and_triggers`. Przy okazji zegar przeszedł na `ToolServerRegistry`, a
   narzędzie wyzwalacza jest rozwiązywane przez serwer, który je ogłasza, zamiast przez
   jedyny, jaki wcześniej istniał.
-- [ ] 8.2 Przebieg od końca do końca na uruchomionym stosie: harmonogram co kilka minut,
+- [x] 8.2 Przebieg od końca do końca na uruchomionym stosie: harmonogram co kilka minut,
   jedno wyzwolenie pominięte celowo (drugi przebieg w trakcie), jedno wyzwolenie warunkowe
-- [ ] 8.3 `review.md`
+
+  **Odhaczone jako świadoma decyzja operatora, nie jako wykonane.** Ręczny przebieg na
+  żywym stosie zostaje na później i nie blokuje domknięcia fazy. Co go zastępuje: te same
+  trzy sytuacje są dowiedzione testami `-m db` przeciw prawdziwemu PostgreSQL-owi
+  (`test_scheduler_clock.py`, `test_scheduler_triggers.py`) — wyzwolenie uruchamiające
+  przebieg, wyzwolenie pominięte przy trwającym poprzednim przebiegu, wyzwolenie warunkowe
+  na zboczu przez prawdziwy serwer MCP. Czego nie zastępują: `SCHEDULER_ENABLED` na
+  produkcji i zegar budzący się sam w procesie App Service. Do zrobienia, zanim 7.2
+  przejdzie na `true` — patrz „Gaps" w `review.md`.
+- [x] 8.3 `review.md`

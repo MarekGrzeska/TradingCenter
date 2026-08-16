@@ -690,13 +690,17 @@ resource "azurerm_linux_web_app" "teams" {
     # decision rather than a fact.** `teams/config.py` defaults it to `true`, so leaving
     # it out of this map would *enable* the clock — the opposite of leaving it alone.
     #
-    # It stays `false` until `teams/validation.py`'s `STATE_CHANGING_TOOLS` is wired to
-    # the `read_only` flag phase 2 put on the wire. Until then the check that refuses an
-    # unattended schedule over a revision carrying write tools (specs/teams-schedules)
-    # asks an empty set and refuses nothing — and this app now has `TRADING_MCP_URL`, so
-    # the tools it would be refusing are real. A clock that can place orders while
-    # nobody is watching, guarded by a check that cannot see them, is not a state to
-    # deploy into.
+    # The reason it is off has changed, and the new one is weaker. It *was* a broken
+    # guard: `teams/validation.py` consulted a hand-kept `STATE_CHANGING_TOOLS =
+    # frozenset()`, so the check refusing an unattended schedule over a revision carrying
+    # write tools (specs/teams-schedules) asked an empty set and refused nothing, while
+    # this app already had `TRADING_MCP_URL`. That is closed — the check now reads each
+    # server's own `readOnlyHint` at save time and refuses anything it cannot confirm is
+    # a read.
+    #
+    # What is left is that no schedule has ever fired on a running stack (task 8.2 of
+    # `add-teams-schedules-and-triggers`). Turning the clock on here is the operator's
+    # call after that pass, not something to slip in with a code change.
     #
     # Flipping it is one line here plus an `apply`; every schedule and trigger already
     # in the catalogue stays exactly where it is either way, and a run started by hand

@@ -206,6 +206,24 @@ describe("creating and editing a schedule", () => {
     expect(api.disableSchedule).toHaveBeenCalledWith(SCHEDULE.id, expect.anything());
     expect(await screen.findByText(/3 kolejne przebiegi zakończone niepowodzeniem/)).toBeInTheDocument();
   });
+
+  it("shows the module's own words when enabling is refused", async () => {
+    // Without this the rejected call was invisible: the button went back to saying
+    // "Enable" and the operator was left with a schedule that had not changed and no
+    // reason why (`terminal-teams-schedules`, "Odmowa modułu jest pokazana słowami
+    // modułu").
+    const api = fakeApi({
+      listSchedules: vi.fn(async () => [{ ...SCHEDULE, enabled: false, disabledReason: null }]),
+      enableSchedule: vi.fn(async () => {
+        throw new MarketDataError("refused", "agent 'trader' carries tool(s) ['place_order']");
+      }),
+    });
+    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+
+    await userEvent.click(within(await scheduleRow()).getByRole("button", { name: "Enable" }));
+
+    expect(await screen.findByText(/place_order/)).toBeInTheDocument();
+  });
 });
 
 describe("fire history", () => {

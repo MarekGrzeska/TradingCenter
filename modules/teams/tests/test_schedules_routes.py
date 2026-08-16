@@ -366,3 +366,79 @@ def test_a_fire_that_started_nothing_shows_up_in_the_triggers_history(
     assert len(rows) == 1
     assert rows[0]["outcome"] == "unavailable"
     assert rows[0]["run_id"] is None
+
+
+# --- specs/teams-schedules, "Harmonogram nad rewizją z narzędziami zapisującymi wymaga
+# jawnego potwierdzenia" — over HTTP, against a server that really announces a write tool.
+# The check used to consult a hand-kept list of dangerous names that was empty for the
+# whole of phase 2, so these three are what stop it going quiet again.
+
+
+def test_a_schedule_over_a_revision_carrying_a_write_tool_is_refused_without_the_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with serving_sync(tools=("place_order",)) as url:
+        monkeypatch.setenv("TRADING_MCP_URL", url)
+        with TestClient(app) as started:
+            team_id, revision_id = _team(started, tools=["place_order"])
+            response = started.post(
+                f"/teams/{team_id}/schedules", json=_schedule_body(revision_id), headers=OWNER
+            )
+
+    assert response.status_code == 422, response.text
+    assert "place_order" in response.text
+    assert "unattended_ack" in response.text
+
+
+def test_the_same_schedule_is_accepted_when_the_operator_acknowledges_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with serving_sync(tools=("place_order",)) as url:
+        monkeypatch.setenv("TRADING_MCP_URL", url)
+        with TestClient(app) as started:
+            team_id, revision_id = _team(started, tools=["place_order"])
+            response = started.post(
+                f"/teams/{team_id}/schedules",
+                json=_schedule_body(revision_id) | {"unattended_ack": True},
+                headers=OWNER,
+            )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["unattended_ack"] is True
+
+
+def test_a_schedule_over_a_revision_carrying_only_read_tools_needs_no_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with serving_sync(tools=("read_indicators",)) as url:
+        monkeypatch.setenv("MARKET_MCP_URL", url)
+        with TestClient(app) as started:
+            team_id, revision_id = _team(started, tools=["read_indicators"])
+            response = started.post(
+                f"/teams/{team_id}/schedules", json=_schedule_body(revision_id), headers=OWNER
+            )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["unattended_ack"] is False
+
+
+def test_a_trigger_over_a_revision_carrying_a_write_tool_is_refused_without_the_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The trigger half of the same rule (specs/teams-triggers, "Wyzwalacz podlega tym
+    samym granicom co harmonogram") — one snapshot answers both checks, and the condition's
+    own tool being a read one does not excuse what the *revision* carries."""
+    with (
+        serving_sync(tools=("read_indicators",)) as market_url,
+        serving_sync(tools=("place_order",)) as trading_url,
+    ):
+        monkeypatch.setenv("MARKET_MCP_URL", market_url)
+        monkeypatch.setenv("TRADING_MCP_URL", trading_url)
+        with TestClient(app) as started:
+            team_id, revision_id = _team(started, tools=["place_order"])
+            response = started.post(
+                f"/teams/{team_id}/triggers", json=_trigger_body(revision_id), headers=OWNER
+            )
+
+    assert response.status_code == 422, response.text
+    assert "place_order" in response.text

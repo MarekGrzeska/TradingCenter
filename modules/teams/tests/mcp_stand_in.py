@@ -28,6 +28,12 @@ from pydantic import BaseModel
 
 from teams.config import Settings
 
+# What market-mcp puts on every one of its tools (`market_mcp/tools/_shared.py`). The
+# stand-in carries it for the same reason it is a real server rather than a mock: a check
+# that reads annotations (`validation.check_unattended`) would otherwise be tested against
+# a catalogue nothing in production resembles.
+READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True)
+
 ONE_MODEL = [
     {
         "id": "gpt-5.6-luna",
@@ -66,7 +72,9 @@ def _register(mcp: FastMCP, name: str) -> None:
     """The stand-in's catalogue, keyed by name so a test can serve a subset — which is
     how "the server stopped announcing a tool" is reproduced without a second file."""
     if name == "get_last_price":
-
+        # Deliberately unannotated, and the only one here that is: `read_only=None` is a
+        # third answer market-mcp could give (a tool added without the hint), and
+        # `test_tools_route.py` pins that it travels as "unknown" rather than as a guess.
         @mcp.tool(name=name, description="Returns the last price for a symbol, in UTC, bid side.")
         def get_last_price(symbol: str) -> str:
             if symbol != "US100":
@@ -78,7 +86,11 @@ def _register(mcp: FastMCP, name: str) -> None:
 
     elif name == "list_tracked_pairs":
 
-        @mcp.tool(name=name, description="Lists the pairs the archive collects. At most 50.")
+        @mcp.tool(
+            name=name,
+            description="Lists the pairs the archive collects. At most 50.",
+            annotations=READ_ONLY,
+        )
         def list_tracked_pairs() -> list[_PairOut]:
             # Typed list return on purpose: the SDK splits it into one content block per
             # item, which is the shape that broke `agent`'s client in production.
@@ -89,7 +101,11 @@ def _register(mcp: FastMCP, name: str) -> None:
 
     elif name == "read_indicators":
 
-        @mcp.tool(name=name, description="Reads indicator values for a symbol.")
+        @mcp.tool(
+            name=name,
+            description="Reads indicator values for a symbol.",
+            annotations=READ_ONLY,
+        )
         def read_indicators(symbol: str) -> str:
             return f"{symbol}: RSI 61, ATR 42"
 

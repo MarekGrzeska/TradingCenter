@@ -18,10 +18,18 @@
 --         user=<entra-admin-upn> sslmode=require" \
 --        -v role=app-tradingcenter-agent -f scripts/grant-schema-ownership.sql
 --
---   ... and again with dbname=market_data, role=app-tradingcenter-market-data.
+--   ... and again with dbname=market_data, role=app-tradingcenter-market-data,
+--   and with dbname=teams,       role=app-tradingcenter-teams.
 --
--- The two databases are `agent` and `market_data` (infra/database.tf). `tradingcenter`
--- is the *server*, not a database on it, and asking for it by that name is a FATAL.
+-- The three databases are `agent`, `market_data` and `teams` (infra/database.tf).
+-- `tradingcenter` is the *server*, not a database on it, and asking for it by that name
+-- is a FATAL.
+--
+-- **A brand-new, empty database still needs this**, and that is the case `teams` is in:
+-- Terraform creates it owned by the administrator, and `CREATE ON SCHEMA public` has not
+-- been granted to PUBLIC since PostgreSQL 15 — so the module's first migration fails on
+-- its first `CREATE TABLE`, at startup, before it serves anything. Nothing here needs the
+-- database to have objects in it; the loop below simply finds none.
 --
 -- The password is an Entra access token:
 --   az account get-access-token --resource https://ossrdbms-aad.database.windows.net \

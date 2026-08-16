@@ -19,7 +19,7 @@ import asyncpg
 import pytest
 
 from teams import store
-from teams.contract import AgentDefinition, CostLimits, TeamDefinition
+from teams.contract import AgentDefinition, CostLimits, TeamDefinition, TradingLimits
 from teams.models_catalogue import ModelCatalogue
 from teams.runner import RunRegistry
 from teams.scheduler.clock import Clock, _fire_schedule, _next_fire_and_skipped
@@ -44,10 +44,16 @@ def _past() -> datetime:
 FUTURE = datetime.now(UTC) + timedelta(hours=1)
 
 
-def _definition(*, model_id: str = MODEL_ID, daily_limit: str | None = None) -> TeamDefinition:
+def _definition(
+    *,
+    model_id: str = MODEL_ID,
+    daily_limit: str | None = None,
+    orders_per_day: int | None = None,
+) -> TeamDefinition:
     return TeamDefinition(
         agents=[AgentDefinition(key="scout", role="scout", prompt="read the market", model_id=model_id)],
         limits=CostLimits(daily_limit=daily_limit),
+        trading=TradingLimits(orders_per_day=orders_per_day),
     )
 
 
@@ -311,3 +317,72 @@ async def test_a_disabled_clock_never_starts_a_background_task(pool: asyncpg.Poo
     clock.start()
 
     assert clock._task is None
+
+
+async def test_the_daily_order_limit_stops_a_schedule_and_leaves_a_row_rather_than_a_traceback(
+    pool: asyncpg.Pool,
+) -> None:
+    """Phase 2 added a second daily ceiling to `start_run_on_revision` and the clock kept
+    catching only the first, so this fire used to raise out of `tick()`: no row in the
+    history, and every schedule and trigger after it in the same wake silently skipped.
+    """
+    team_id, revision_id = await _team_and_revision(pool, _definition(orders_per_day=1))
+
+    async with pool.acquire() as conn:
+        earlier_run, steps = await store.create_run(
+            conn, team_revision_id=revision_id, owner_principal=OWNER, agent_keys=["scout"]
+        )
+        await store.record_trade(
+            conn,
+            run_id=earlier_run["id"],
+            run_step_id=steps[0]["id"],
+            agent_key="scout",
+            tool_name="place_order",
+            symbol="US100",
+            direction="BUY",
+            size=Decimal(1),
+            level=None,
+        )
+
+    schedule = await _schedule(pool, team_id=team_id, revision_id=revision_id, next_fire_at=_past())
+
+    clock = _clock(pool, provider=ScriptedProvider(default=says("done")))
+    await asyncio.gather(*await clock.tick())
+
+    fires = await _fires(pool, schedule_id=schedule["id"])
+    assert len(fires) == 1
+    assert fires[0]["outcome"] == "skipped"
+    assert "order" in fires[0]["reason"]
+    assert fires[0]["run_id"] is None
+
+
+async def test_one_schedule_failing_does_not_silence_the_others_in_the_same_wake(
+    pool: asyncpg.Pool, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The wake works every operator's schedules, so an exception escaping one of them
+    must not take the rest of the list with it — `Clock._attempt`."""
+    team_id, revision_id = await _team_and_revision(pool, _definition())
+    first = await _schedule(pool, team_id=team_id, revision_id=revision_id, next_fire_at=_past())
+    second = await _schedule(pool, team_id=team_id, revision_id=revision_id, next_fire_at=_past())
+
+    from teams.scheduler import clock as clock_module
+
+    real = clock_module._fire_schedule
+    exploded: list[int] = []
+
+    async def _explode_on_the_first(pool_, schedule, **kwargs):
+        if schedule["id"] == first["id"]:
+            exploded.append(schedule["id"])
+            raise RuntimeError("the database went away mid-fire")
+        return await real(pool_, schedule, **kwargs)
+
+    monkeypatch.setattr(clock_module, "_fire_schedule", _explode_on_the_first)
+
+    clock = _clock(pool, provider=ScriptedProvider(default=says("done")))
+    await asyncio.gather(*await clock.tick())
+
+    assert exploded == [first["id"]]
+    assert await _fires(pool, schedule_id=first["id"]) == []
+    survivors = await _fires(pool, schedule_id=second["id"])
+    assert len(survivors) == 1
+    assert survivors[0]["outcome"] == "started"

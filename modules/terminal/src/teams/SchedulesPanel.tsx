@@ -221,28 +221,44 @@ function ScheduleSection({
   );
 }
 
+/**
+ * The one control here that changes something without a form around it — so it carries
+ * its own refusal, in the module's words, the same way `ScheduleForm.save` does
+ * (`terminal-teams-schedules`, "Odmowa modułu jest pokazana słowami modułu"). Without
+ * this the failed call was invisible: the button simply went back to saying what it said
+ * before, and the rejection went to the console.
+ */
 function EnableToggle({
   enabled,
   onEnable,
   onDisable,
 }: {
   enabled: boolean;
-  onEnable(): void;
-  onDisable(): void;
+  onEnable(): Promise<unknown>;
+  onDisable(): Promise<unknown>;
 }) {
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   return (
-    <button
-      type="button"
-      disabled={busy}
-      onClick={() => {
-        setBusy(true);
-        Promise.resolve(enabled ? onDisable() : onEnable()).finally(() => setBusy(false));
-      }}
-      className={`${BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
-    >
-      {enabled ? "Disable" : "Enable"}
-    </button>
+    <div className="flex flex-col items-end gap-1">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          setBusy(true);
+          setError(null);
+          Promise.resolve(enabled ? onDisable() : onEnable())
+            .catch((cause: unknown) =>
+              setError(refusalMessage(cause, enabled ? "could not disable it" : "could not enable it")),
+            )
+            .finally(() => setBusy(false));
+        }}
+        className={`${BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
+      >
+        {enabled ? "Disable" : "Enable"}
+      </button>
+      {error && <span className="text-right text-xs text-critical">{error}</span>}
+    </div>
   );
 }
 

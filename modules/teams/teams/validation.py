@@ -124,39 +124,42 @@ def _every_assigned_tool_is_announced(
         )
 
 
-# Names of tools that change state outside this module. Empty today — market-mcp serves
-# nothing but reads in this phase (proposal.md, "Faza 1 nie składa zleceń") — and this is
-# where the first one is registered the day phase 2 adds it, rather than a check
-# discovered only once an unattended team has already placed an order
-# (specs/teams-schedules, "Harmonogram nad rewizją z narzędziami zapisującymi wymaga
-# jawnego potwierdzenia"). A frozenset rather than a `Settings` field: this is a fact
-# about market-mcp's own catalogue, not something an operator's `.env` should be able to
-# quietly turn off.
-STATE_CHANGING_TOOLS: frozenset[str] = frozenset()
-
-
 def check_unattended(
     definition: TeamDefinition,
     *,
     unattended_ack: bool,
-    state_changing_tools: Collection[str] = STATE_CHANGING_TOOLS,
+    read_only_tools: Collection[str],
 ) -> None:
     """Raises `DefinitionRefused` naming the agent and the tool, unless `unattended_ack`
     is set — the check a schedule or trigger runs against the revision it would put to
     work without an operator watching (specs/teams-schedules).
 
-    `state_changing_tools` takes the module default so a test can prove the refusal path
-    exists without market-mcp ever having announced such a tool for real.
+    **`read_only_tools` is the positive set, and that inversion is the whole safety
+    property.** It holds the names every configured server just announced with
+    `readOnlyHint: true` (`tools.AnnouncedSnapshot.read_only`), so anything an agent
+    carries that is *not* in it needs the acknowledgement: a declared write
+    (`place_order`), a tool with no annotation at all, and a tool nobody could be asked
+    about are three different reasons to be unsure and one decision. The earlier shape —
+    a hand-kept `STATE_CHANGING_TOOLS` list of dangerous names — was a list that read
+    empty for the whole of phase 2, which is to say a check that passed everything while
+    `trading-mcp` was already on the wire.
+
+    A tool server that was down at save time is the case the inversion is really for. Its
+    tools cannot be confirmed harmless now, and the schedule outlives the outage: refusing
+    without the ack is the only answer that does not depend on *when* the operator
+    happened to press save.
     """
     if unattended_ack:
         return
-    risky = set(state_changing_tools)
+    confirmed = set(read_only_tools)
     for agent in definition.agents:
-        named = sorted(tool for tool in agent.tools if tool in risky)
-        if named:
+        unconfirmed = sorted(tool for tool in agent.tools if tool not in confirmed)
+        if unconfirmed:
             raise DefinitionRefused(
-                f"agent {agent.key!r} carries state-changing tool(s) {named} — unattended "
-                "work over this revision (a schedule or a trigger) needs an explicit "
+                f"agent {agent.key!r} carries tool(s) {unconfirmed} that this module "
+                "cannot confirm are read-only — they change state outside it, carry no "
+                "annotation, or their server could not be asked. Unattended work over "
+                "this revision (a schedule or a trigger) needs an explicit "
                 "acknowledgement (unattended_ack)"
             )
 

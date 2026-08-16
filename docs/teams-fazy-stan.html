@@ -236,17 +236,16 @@
 
 <h4>Co zostało</h4>
 <ul>
-  <li>Ustawienia <code>SCHEDULER_*</code> w konfiguracji modułu i w <code>infra/app-service.tf</code> — razem z lewarkiem wyłączającym zegar.</li>
-  <li><code>modules/teams/README.md</code> — harmonogramy i wyzwalacze nie są tam jeszcze opisane.</li>
-  <li>Przebieg od końca do końca na uruchomionym stosie i <code>review.md</code>.</li>
+  <li>Nic w kodzie. Ustawienia <code>SCHEDULER_*</code>, <code>README.md</code> i <code>review.md</code> są zrobione; review znalazło i naprawiło trzy rzeczy na szwie z fazą 2 (patrz niżej).</li>
+  <li>Przebieg od końca do końca na uruchomionym stosie — <strong>odhaczony jako decyzja operatora, nie jako wykonany</strong>. To jedyna rzecz stojąca dziś między fazą 3 a <code>SCHEDULER_ENABLED = "true"</code> na produkcji.</li>
 </ul>
 
 <h2>Co wypadło między fazy</h2>
 
-<div class="callout bad">
-  <span class="tag">Dziura w bezpieczniku, nie kosmetyka</span>
-  <p>Faza 3 ma w <code>validation.py</code> stałą <code>STATE_CHANGING_TOOLS = frozenset()</code> z komentarzem „pusty, dopóki faza 2 nie doda pierwszego". Faza 2 właśnie dodała <code>place_order</code> — i oznacza swoje narzędzia flagą <code>read_only</code> na drucie, czyli niesie już informację, której tamta stała miała pilnować ręcznie.</p>
-  <p>Dopóki te dwie rzeczy nie zostaną spięte, <strong>harmonogram uruchomi zespół z narzędziami zapisującymi bez jawnego potwierdzenia</strong>, którego wymaga <code>teams-schedules</code> („Harmonogram nad rewizją z narzędziami zapisującymi wymaga jawnego potwierdzenia"). Sprawdzenie istnieje, przechodzi testy i nie łapie niczego, bo pyta o pusty zbiór.</p>
+<div class="callout">
+  <span class="tag">Dziura w bezpieczniku — zamknięta w review fazy 3</span>
+  <p>Faza 3 miała w <code>validation.py</code> stałą <code>STATE_CHANGING_TOOLS = frozenset()</code> z komentarzem „pusty, dopóki faza 2 nie doda pierwszego". Faza 2 dodała <code>place_order</code> i nie dopisała nic do tej listy, bo nic jej o niej nie mówiło — więc sprawdzenie wymagane przez <code>teams-schedules</code> chodziło, przechodziło testy i nie łapało niczego.</p>
+  <p>Review odwróciło je: moduł czyta <code>readOnlyHint</code> z ogłoszeń serwerów przy zapisie i wymaga potwierdzenia dla <strong>wszystkiego, czego nie potwierdzi jako odczyt</strong> — zapisu, narzędzia bez adnotacji i narzędzia z serwera, którego nie dało się zapytać. To ostatnie zamyka wariant „serwer był chwilowo padnięty, więc harmonogram przeszedł". Szczegóły w <code>openspec/changes/add-teams-schedules-and-triggers/review.md</code>.</p>
 </div>
 
 <p>Poza tym trzy razy pod rząd zderzyły się migracje Alembica — dwie gałęzie dopisywały <code>0004</code> na <code>0003</code>. Za każdym razem objaw jest ten sam (<code>alembic upgrade head</code> odmawia z <code>MultipleHeads</code>, wszystkie testy <code>db</code> czerwienieją), a zasada jest już zapisana: kto scala drugi, przepina <code>down_revision</code>. Dziś łańcuch to <code>0004</code> układ agentów → <code>0005</code> harmonogramy → <code>0006</code> transakcje. Przy gałęzi bazowej, do której wszystko wpada, ten punkt styku będzie wracał przy każdej fazie dotykającej schematu.</p>
@@ -254,7 +253,6 @@
 <h2>Co dalej, w kolejności</h2>
 
 <ol>
-  <li><strong>Spiąć <code>read_only</code> z <code>STATE_CHANGING_TOOLS</code></strong> — jedyna rzecz na tej liście, która jest luką w ochronie, a nie brakiem funkcji.</li>
   <li><strong>Wypchnąć obrazy teams i trading-mcp do Azure</strong> — gałąź w filtrze <code>push:</code>, workflow, smoke check na <code>/health</code>, filtr z powrotem. Dwa moduły, jedna droga, i dopiero po niej „moduł stoi" jest prawdziwe. Przy <code>trading-mcp</code> ta sonda mówi więcej niż zwykle: proces nie otwiera portu, dopóki gateway nie potwierdzi konta demo, więc 200 znaczy „dotarł, przez zaporę, właściwym kluczem, i to jest demo".</li>
   <li><strong>Przebieg od końca do końca</strong> — jeden prawdziwy przebieg powie to, czego nie powie żaden test: ile kosztuje i czy odpowiedzi składają się w cokolwiek. Zamyka 14.2 fazy 1 i 8.2 fazy 3.</li>
   <li><strong>Faza 3: konfiguracja, README, przegląd</strong> — plus przykładowy zespół i przebieg od końca do końca, które faza 2 zostawiła jej świadomie.</li>

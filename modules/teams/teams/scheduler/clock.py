@@ -37,7 +37,8 @@ from ..config import Settings
 from ..models_catalogue import ModelCatalogue
 from ..provider import ModelProvider
 from ..runner import RunRegistry, start_run_on_revision
-from ..runner.cost import DailyCostLimitReached
+from ..runner.cost import CostLimitReached
+from ..runner.trading import TradeLimitReached
 from ..tools import ToolOutcomeKind, ToolServer, ToolServerRegistry, ToolServerUnavailable
 from ..validation import DefinitionRefused
 
@@ -117,14 +118,8 @@ class Clock:
         async with self._pool.acquire() as conn:
             due_schedules = await store.list_due_schedules(conn)
         for schedule in due_schedules:
-            task = await _fire_schedule(
-                self._pool,
-                dict(schedule),
-                catalogue=self._catalogue,
-                provider=self._provider,
-                tool_registry=self._tool_registry,
-                settings=self._settings,
-                registry=self._registry,
+            task = await self._attempt(
+                _fire_schedule, dict(schedule), what=f"schedule {schedule['id']}"
             )
             if task is not None:
                 tasks.append(task)
@@ -132,18 +127,41 @@ class Clock:
         async with self._pool.acquire() as conn:
             due_triggers = await store.list_due_triggers(conn)
         for trigger in due_triggers:
-            task = await _check_trigger(
+            task = await self._attempt(
+                _check_trigger, dict(trigger), what=f"trigger {trigger['id']}"
+            )
+            if task is not None:
+                tasks.append(task)
+        return tasks
+
+    async def _attempt(
+        self,
+        handler: Callable[..., Any],
+        row: dict[str, Any],
+        *,
+        what: str,
+    ) -> asyncio.Task[None] | None:
+        """One row's turn, with its own failure contained to itself.
+
+        The wake works every operator's schedules, so an exception escaping one of them
+        would silence all the ones after it in the same list — and silently, since the
+        row that failed never reaches `record_fire` either. `_run_forever` still catches
+        whatever gets past this; that outer net is for the wake itself (the two `SELECT`s
+        above), not for one row.
+        """
+        try:
+            return await handler(
                 self._pool,
-                dict(trigger),
+                row,
                 catalogue=self._catalogue,
                 provider=self._provider,
                 tool_registry=self._tool_registry,
                 settings=self._settings,
                 registry=self._registry,
             )
-            if task is not None:
-                tasks.append(task)
-        return tasks
+        except Exception:
+            log.exception("%s failed this wake — the rest of the wake carries on", what)
+            return None
 
 
 # --- shared by both -------------------------------------------------------------------
@@ -192,7 +210,13 @@ async def _start_from(
             settings=settings,
             registry=registry,
         )
-    except (DefinitionRefused, DailyCostLimitReached) as err:
+    # The ceilings are caught by their *base* classes, not by the two daily ones
+    # `routers/runs.py` names. A route may enumerate: an uncaught ceiling there is one
+    # 500 for one operator who is watching. Here it would leave the fire with no row at
+    # all and take the rest of the wake down with it — which is how `DailyOrderLimitReached`,
+    # added by phase 2 to the very function this calls, went unhandled for a whole phase.
+    # A ceiling added later is caught by this on the day it is written.
+    except (DefinitionRefused, CostLimitReached, TradeLimitReached) as err:
         return str(err)
 
 
@@ -349,7 +373,10 @@ async def _evaluate_condition(
     reason text is what tells the two apart on the way to `schedule_fires`."""
     configured = tool_registry.configured()
     if not configured:
-        return None, "no tool server is configured (MARKET_MCP_URL is unset)"
+        return None, (
+            "no tool server is configured (neither MARKET_MCP_URL nor TRADING_MCP_URL "
+            "is set), so the condition could not be read"
+        )
 
     arguments = trigger["arguments"]
     if isinstance(arguments, str):

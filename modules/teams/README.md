@@ -138,21 +138,26 @@ has to be able to tell apart. `GET /schedules/{id}/fires` is that history.
 **Working unattended has its own safeguards**, and they are the reason this is not simply
 a cron entry:
 
-- a schedule or trigger over a revision that carries a **state-changing tool** requires an
-  explicit acknowledgement (`unattended_ack`), refused by name at every write;
+- a schedule or trigger over a revision that carries a tool this module cannot **confirm
+  is read-only** requires an explicit acknowledgement (`unattended_ack`), refused by name
+  at every write. The set is read from the servers' own `readOnlyHint` at save time and it
+  is the *positive* one: a declared write (`place_order`), a tool with no annotation, and a
+  tool whose server could not be asked are three reasons to be unsure and one refusal —
+  which is what stops an outage at save time from quietly widening what runs unattended;
 - after `SCHEDULER_FAILURE_THRESHOLD` **consecutive** failed runs it disables itself and
   records why — enough failures that one bad model response is not mistaken for a broken
   schedule, few enough that a genuinely broken one does not bill through the night;
 - `GET /schedules/{id}/next-fires` answers when it fires next. The terminal never computes
   that itself: the row's own `next_fire_at` reflects the last *claim*, not a forecast.
 
-> **Known gap, and it is the one to close first.** `validation.py`'s
-> `STATE_CHANGING_TOOLS` is still `frozenset()`, from before `trading-mcp` existed. The
-> acknowledgement check above runs, passes its tests, and catches nothing, because it asks
-> an empty set — while `trading-mcp` already marks every write tool with `read_only` on
-> the wire. Until the two are wired together, a schedule over a trading team is accepted
-> without the acknowledgement its own specification requires. This is why
-> `SCHEDULER_ENABLED` is `false` in `infra/app-service.tf`.
+> **`SCHEDULER_ENABLED` is `false` in `infra/app-service.tf`, and that is now a decision
+> rather than a blocker.** It was a blocker: the acknowledgement check used to consult a
+> hand-kept `STATE_CHANGING_TOOLS = frozenset()`, so it ran, passed its tests, and caught
+> nothing for the whole of phase 2 — while `trading-mcp` was already announcing
+> `place_order`. The check now reads the servers' own annotations (above), so the clock can
+> be turned on with one setting and an `apply`; nothing in the catalogue changes when it
+> is. What has never happened is the end-to-end pass on a running stack (task 8.2), and
+> that is the reason to leave it off until somebody has watched it fire.
 
 ### The lever
 

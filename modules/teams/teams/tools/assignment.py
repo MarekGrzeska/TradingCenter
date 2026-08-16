@@ -204,6 +204,13 @@ class AnnouncedSnapshot:
     by_name: dict[str, list[str]]
     # labels of configured servers that could not be asked.
     unreachable: list[str]
+    # Names every announcement of which carried `readOnlyHint: true`. Deliberately the
+    # *positive* set: a name missing here is one this module could not confirm is
+    # harmless — because it announced itself as a write (trading-mcp's `place_order`),
+    # because it carried no annotation, or because nobody answered — and unattended work
+    # over any of those needs the operator to say so (specs/teams-schedules, "Harmonogram
+    # nad rewizją z narzędziami zapisującymi wymaga jawnego potwierdzenia").
+    read_only: frozenset[str] = frozenset()
 
 
 async def announced_snapshot(settings: Settings) -> AnnouncedSnapshot | None:
@@ -228,6 +235,14 @@ async def announced_snapshot(settings: Settings) -> AnnouncedSnapshot | None:
         return AnnouncedSnapshot(
             by_name={name: [label for label, _ in hits] for name, hits in resolution.by_name.items()},
             unreachable=sorted(resolution.failed),
+            # `all(...)` rather than `any(...)`: a name two servers disagree about is not
+            # confirmed read-only by anybody. (It is also a collision, refused elsewhere —
+            # but this set is read on its own, so it does not lean on that.)
+            read_only=frozenset(
+                name
+                for name, hits in resolution.by_name.items()
+                if all(tool.read_only is True for _label, tool in hits)
+            ),
         )
     finally:
         await registry.aclose()
