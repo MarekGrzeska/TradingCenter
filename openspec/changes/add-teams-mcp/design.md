@@ -167,10 +167,21 @@ implementacji. Punkt wyjścia, do dopracowania przy pisaniu opisów:
 | `schedule_team` | harmonogram albo wyzwalacz nad wskazaną rewizją |
 | `list_schedules` | co jest ustawione, co wyzwoliło, co pominięte i dlaczego |
 
-Katalog modeli i katalog narzędzi `teams` **nie** dostają własnych narzędzi: ich zawartość
-jedzie w opisie `create_team` i `revise_team` jako to, co wolno wpisać, bo model i tak musi je
-znać w chwili pisania definicji, a osobne wywołanie byłoby rundą w tę i z powrotem przed każdym
-zapisem.
+**Poprawione przy implementacji: katalog modeli i katalog narzędzi dostają jednak własne
+narzędzia** (`list_models`, `list_tools`), więc jest ich dwanaście, nie dziewięć. Pierwotny
+zapis — „ich zawartość jedzie w opisie `create_team`" — okazał się niewykonalny, i to nie z
+powodu wygody: opis narzędzia jest stałym łańcuchem znaków pisanym w kodzie, a katalog modeli
+jest ustawieniem *tamtego* modułu, czytanym z jego konfiguracji w czasie działania. Opis nie ma
+jak go nieść, a wpisanie go na stałe byłoby dokładnie tą kopią cudzego katalogu, której cała ta
+architektura zabrania.
+
+Runda w tę i z powrotem zostaje, i jest tańsza niż odmowa: `create_team` z modelem spoza
+katalogu jest odrzucany w całości, więc model i tak wykonuje dwa wywołania, tyle że drugie po
+nieudanym pierwszym.
+
+Dodatkowo `schedule_team` rozpadło się na `schedule_team` (cron) i `trigger_team` (warunek
+rynkowy). Jedno narzędzie z dwoma rozłącznymi kompletami argumentów — pięć pól warunku albo
+jedno pole cron — jest kształtem, w którym model wypełnia oba naraz.
 
 ## Risks / Trade-offs
 

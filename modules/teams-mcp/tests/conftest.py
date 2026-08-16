@@ -44,3 +44,15 @@ def server(settings: Settings, teams: TeamsClient):
     """The server and the client it was built with, so a test can mock the exact base
     URL it will call — same shape as both other MCP modules' own `server` fixture."""
     return build_server(settings, teams), teams
+
+
+@pytest.fixture
+def signed_in(monkeypatch: pytest.MonkeyPatch):
+    """Every tool asks `operator.operator_token` for the caller's credential before it
+    touches the network. Calling a tool through `mcp.call_tool` has no HTTP request
+    behind it, so the token is supplied here — the extraction itself is what
+    `test_operator.py` checks, and stubbing it there would leave nothing tested."""
+    monkeypatch.setattr(
+        "teams_mcp.tools._shared.operator_token", lambda _context: OPERATOR_TOKEN
+    )
+    return OPERATOR_TOKEN

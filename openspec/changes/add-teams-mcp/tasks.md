@@ -40,32 +40,32 @@
 
 ## 4. Katalog narzędzi
 
-- [ ] 4.1 Narzędzia czytające: `list_teams`, `read_team`, `list_runs`, `read_run`,
+- [x] 4.1 Narzędzia czytające: `list_teams`, `read_team`, `list_runs`, `read_run`,
   `list_schedules` — oznaczone jako czytające
-- [ ] 4.2 Narzędzia zapisujące: `create_team`, `revise_team`, `run_team`, `schedule_team` —
+- [x] 4.2 Narzędzia zapisujące: `create_team`, `revise_team`, `run_team`, `schedule_team` —
   oznaczone jako zmieniające stan
-- [ ] 4.3 `create_team` zakłada zespół wraz z pierwszą rewizją jednym wywołaniem
-- [ ] 4.4 `revise_team` przyjmuje poprawkę bez przepisywania niezmienionych ról
-- [ ] 4.5 `read_run` odpowiada także dla przebiegu trwającego, mówiąc że nie jest zakończony
-- [ ] 4.6 `schedule_team` **nie** przyjmuje `unattended_ack` jako argumentu (D4)
-- [ ] 4.7 `schedule_team` mówi, gdy zegar `teams` jest wyłączony ustawieniem, i mimo to zapisuje
-- [ ] 4.8 Opisy narzędzi niosą warunki odmowy — granicę dobową kosztu i granice handlowe —
+- [x] 4.3 `create_team` zakłada zespół wraz z pierwszą rewizją jednym wywołaniem
+- [x] 4.4 `revise_team` przyjmuje poprawkę bez przepisywania niezmienionych ról
+- [x] 4.5 `read_run` odpowiada także dla przebiegu trwającego, mówiąc że nie jest zakończony
+- [x] 4.6 `schedule_team` **nie** przyjmuje `unattended_ack` jako argumentu (D4)
+- [x] 4.7 `schedule_team` mówi, gdy zegar `teams` jest wyłączony ustawieniem, i mimo to zapisuje
+- [x] 4.8 Opisy narzędzi niosą warunki odmowy — granicę dobową kosztu i granice handlowe —
   oraz katalog modeli i nazwy narzędzi, które wolno wpisać w definicję
-- [ ] 4.9 Testy: każde narzędzie ma test odpowiedzi i test odmowy; katalog rozróżnia odczyt
+- [x] 4.9 Testy: każde narzędzie ma test odpowiedzi i test odmowy; katalog rozróżnia odczyt
   od zapisu
 
 ## 5. Tożsamość operatora
 
-- [ ] 5.1 Przyjęcie przeniesionego tokenu operatora osobnym nagłówkiem i przedstawienie go
+- [x] 5.1 Przyjęcie przeniesionego tokenu operatora osobnym nagłówkiem i przedstawienie go
   jako `Authorization` w wywołaniu do `teams`
-- [ ] 5.2 Odmowa każdego narzędzia — czytającego i zapisującego — gdy tożsamości operatora
+- [x] 5.2 Odmowa każdego narzędzia — czytającego i zapisującego — gdy tożsamości operatora
   nie da się ustalić, z powodem nazywającym ten brak
-- [ ] 5.3 Tożsamość z argumentu narzędzia zignorowana albo odrzucona; nigdy użyta
+- [x] 5.3 Tożsamość z argumentu narzędzia zignorowana albo odrzucona; nigdy użyta
 - [ ] 5.4 Token operatora nie trafia do logu, do śladu narzędzia ani do treści oddawanej
   modelowi — test przy `LOG_LEVEL=DEBUG`
 - [ ] 5.5 Wygasły token operatora daje niedostępność nazywającą wygasłe poświadczenie, nie
   puste odpowiedzi
-- [ ] 5.6 Testy `teams-mcp-authorship`: zespół powstaje na tożsamości operatora, cudzy jest
+- [x] 5.6 Testy `teams-mcp-authorship`: zespół powstaje na tożsamości operatora, cudzy jest
   nieodróżnialny od nieistniejącego, odmowa `teams` dociera jego słowami
 
 ## 6. `agent` uczy się drugiego serwera

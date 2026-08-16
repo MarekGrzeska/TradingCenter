@@ -45,7 +45,13 @@ def operator_token(context: Any) -> str:
     """The operator's own credential for this one call, or `ToolRefusal` naming its
     absence. Refuses for reads exactly as for writes: without an identity there is no
     catalogue to read, only somebody else's (specs/teams-mcp-authorship)."""
-    request = getattr(getattr(context, "request_context", None), "request", None)
+    try:
+        # `Context.request_context` raises rather than answering `None` when a tool runs
+        # outside a request, so this cannot be a `getattr` with a default.
+        request = context.request_context.request
+    except (ValueError, AttributeError):
+        raise ToolRefusal(_MISSING) from None
+
     headers = getattr(request, "headers", None)
     if headers is None:
         raise ToolRefusal(_MISSING)
