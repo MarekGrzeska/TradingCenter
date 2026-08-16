@@ -95,6 +95,14 @@ jobs:
           # and the agent's Easy Auth accepts that audience on purpose
           # (infra/app-service.tf, "Both audiences, deliberately").
           VITE_AGENT_HTTP: https://app-tradingcenter-agent.azurewebsites.net
+          # The same trap one module further on, and the comment above is its whole
+          # explanation: unset, the Teams tab falls back to `/teams-api`, which the
+          # Static Web App answers with its own 404 page. Nothing reaches teams, so its
+          # log stays quiet and healthy while the tab says the catalogue cannot be read.
+          # Added before this module's first deployment rather than after diagnosing it
+          # a second time. One scope again, market-data's, accepted by teams' Easy Auth
+          # for the same reason the agent's accepts it.
+          VITE_TEAMS_HTTP: https://app-tradingcenter-teams.azurewebsites.net
           VITE_ENTRA_CLIENT_ID: ${{ vars.TERMINAL_ENTRA_CLIENT_ID }}
           VITE_ENTRA_TENANT_ID: ${{ vars.TERMINAL_ENTRA_TENANT_ID }}
           VITE_ENTRA_SCOPE: ${{ vars.TERMINAL_ENTRA_SCOPE }}
