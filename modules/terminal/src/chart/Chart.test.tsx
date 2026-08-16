@@ -13,7 +13,7 @@ import {
   indicatorResult,
   makeFakeChart,
 } from "./testDoubles";
-import type { Bar, IndicatorSelection } from "../data/types";
+import type { Bar, ChartFocusRequest, IndicatorSelection, Resolution } from "../data/types";
 import { indicatorColorFromToken, readChartColors } from "./theme";
 import { Toaster } from "../ui/Toaster";
 import { toastStore } from "../ui/toastStore";
@@ -39,6 +39,8 @@ vi.mock("lightweight-charts", () => ({
 }));
 
 const { Chart } = await import("./Chart");
+type ChartDrawings = import("./Chart").ChartDrawings;
+type AgentChartDrawing = import("../agent/agentApi").AgentChartDrawing;
 
 // The store is a module singleton; a toast left behind would show up in the next test's
 // document as if that test had raised it.
@@ -48,13 +50,19 @@ function renderChart(
   source: ControllableSource,
   props?: Partial<{
     symbol: string;
-    resolution: "MINUTE_5" | "HOUR";
+    resolution: Resolution;
     indicatorSource: FakeIndicatorSource;
     initialIndicatorSelections: IndicatorSelection[];
     onIndicatorSelectionsChange: (selections: IndicatorSelection[]) => void;
+    focusRequest: ChartFocusRequest | null;
+    onFocusRequestSettled: () => void;
+    onVisibleRangeChange: (range: { from: number; to: number } | null) => void;
+    drawings: ChartDrawings;
   }>,
 ) {
   const onResolutionChange = vi.fn();
+  const onFocusRequestSettled = props?.onFocusRequestSettled ?? vi.fn();
+  const onVisibleRangeChange = props?.onVisibleRangeChange ?? vi.fn();
   const view = render(
     <Chart
       source={source}
@@ -64,9 +72,13 @@ function renderChart(
       onResolutionChange={onResolutionChange}
       initialIndicatorSelections={props?.initialIndicatorSelections}
       onIndicatorSelectionsChange={props?.onIndicatorSelectionsChange}
+      focusRequest={props?.focusRequest}
+      onFocusRequestSettled={onFocusRequestSettled}
+      onVisibleRangeChange={onVisibleRangeChange}
+      drawings={props?.drawings}
     />,
   );
-  return { ...view, onResolutionChange };
+  return { ...view, onResolutionChange, onFocusRequestSettled, onVisibleRangeChange };
 }
 
 let source: ControllableSource;
@@ -545,6 +557,459 @@ describe("Chart — older history (terminal-chart spec)", () => {
 
     expect(stub.latest().fitContentCalls).toBe(fittedOnce);
     expect(stub.latest().series[0].data().at(-1)?.time).toBe(280);
+  });
+});
+
+describe("Chart — resolution change keeps the frame (terminal-chart spec, agent-chart-navigation)", () => {
+  function series(count: number, periodSeconds: number): Bar[] {
+    return Array.from({ length: count }, (_, index) => bar(index * periodSeconds, index + 1));
+  }
+
+  it("keeps the same stretch of time, converted to the new interval's own candle count", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, { resolution: "MINUTE_5" });
+    await act(async () => {
+      source.snapshot(series(400, 300)); // 400 five-minute candles
+    });
+    await act(async () => {
+      // 240 candles wide (indices 50..290), 72 000 seconds — nowhere near either edge.
+      stub.latest().pan({ from: 50, to: 290 });
+    });
+
+    rerender(
+      <Chart source={source} symbol="US100" resolution="HOUR" onResolutionChange={onResolutionChange} />,
+    );
+    await act(async () => {
+      source.snapshot(series(100, 3600)); // 100 hourly candles
+    });
+
+    // 72 000 seconds at an hour a candle is 20; the old midpoint (51 000s) sits nearest
+    // hourly candle 14 (50 400s) — from 4 to 23 is candle 14 centred in a span of 20.
+    expect(stub.latest().rangesSet.at(-1)).toEqual({ from: 4, to: 23 });
+  });
+
+  it("keeps standing at the live edge, on the new interval's own newest candle", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, { resolution: "MINUTE_5" });
+    await act(async () => {
+      source.snapshot(series(400, 300));
+    });
+    await act(async () => {
+      stub.latest().pan({ from: 350, to: 399 }); // the newest candle is in view
+    });
+
+    rerender(
+      <Chart source={source} symbol="US100" resolution="HOUR" onResolutionChange={onResolutionChange} />,
+    );
+    await act(async () => {
+      source.snapshot(series(50, 3600));
+    });
+
+    // Clamped to the floor (14 700 seconds is under four hourly candles), anchored on
+    // the newest of the fifty hourly candles rather than its own span's centre.
+    expect(stub.latest().rangesSet.at(-1)).toEqual({ from: 40, to: 49 });
+  });
+
+  it("floors an interval mismatch too small to read at, instead of showing one or two candles", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, { resolution: "MINUTE" });
+    await act(async () => {
+      source.snapshot(series(100, 60));
+    });
+    await act(async () => {
+      stub.latest().pan({ from: 40, to: 45 }); // five minutes, nowhere near either edge
+    });
+
+    rerender(
+      <Chart source={source} symbol="US100" resolution="DAY" onResolutionChange={onResolutionChange} />,
+    );
+    await act(async () => {
+      source.snapshot(series(20, 86_400));
+    });
+
+    // Five minutes of DAY candles rounds to zero; floored to ten, centred on the nearest
+    // of the twenty daily candles to the old span's midpoint (candle 0, the closest one).
+    expect(stub.latest().rangesSet.at(-1)).toEqual({ from: -5, to: 4 });
+  });
+
+  it("still fits the whole series on a slot's very first draw — nothing to keep yet", async () => {
+    renderChart(source, { resolution: "MINUTE_5" });
+
+    await act(async () => {
+      source.snapshot(series(10, 300));
+    });
+
+    expect(stub.latest().fitContentCalls).toBeGreaterThan(0);
+    expect(stub.latest().rangesSet).toHaveLength(0);
+  });
+
+  it("does not touch the frame when the symbol changes instead of the resolution", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, { resolution: "MINUTE_5" });
+    await act(async () => {
+      source.snapshot(series(400, 300));
+    });
+    await act(async () => {
+      stub.latest().pan({ from: 50, to: 290 });
+    });
+
+    rerender(
+      <Chart source={source} symbol="GOLD" resolution="MINUTE_5" onResolutionChange={onResolutionChange} />,
+    );
+    await act(async () => {
+      source.snapshot(series(10, 300));
+    });
+
+    // A different instrument's old window means nothing here — the fresh series is
+    // simply fitted, the same as any symbol shown for the first time.
+    expect(stub.latest().fitContentCalls).toBeGreaterThan(0);
+  });
+});
+
+describe("Chart — agent focus (terminal-chart spec, agent-chart-navigation)", () => {
+  const drawn = [bar(100, 1), bar(160, 2), bar(220, 3)];
+
+  function olderPage(count: number): Bar[] {
+    return Array.from({ length: count }, (_, index) => bar(100 - (count - index) * 60, 0.5));
+  }
+
+  it("applies a from/to focus already covered by the drawn series, reading nothing more", async () => {
+    const focus: ChartFocusRequest = { from: 100, to: 220, around: null, bars: null, lastBars: null };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: 100, to: 220 });
+    expect(source.historyCalls).toHaveLength(0);
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows the newest N candles for a last-bars focus, by logical range", async () => {
+    // Sixty candles, not three: a series this short would itself sit inside the pager's
+    // own left-edge margin (`OLDER_MARGIN_BARS`) the moment the logical range narrows to
+    // the newest two, which would fetch more history for a reason that has nothing to do
+    // with this test.
+    const long = Array.from({ length: 60 }, (_, i) => bar(1000 + i * 60, i + 1));
+    const focus: ChartFocusRequest = { from: null, to: null, around: null, bars: null, lastBars: 2 };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(long);
+    });
+
+    expect(stub.latest().rangesSet).toContainEqual({ from: 58, to: 59 });
+    expect(source.historyCalls).toHaveLength(0);
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("centres an around/bars focus on the nearest drawn candle, by logical range", async () => {
+    // A hundred candles, well clear of the pager's own left-edge margin — see the
+    // last-bars test above for why a three-candle series would confuse this one.
+    const long = Array.from({ length: 100 }, (_, i) => bar(1000 + i * 60, i + 1));
+    const focus: ChartFocusRequest = {
+      from: null,
+      to: null,
+      around: 1000 + 70 * 60,
+      bars: 2,
+      lastBars: null,
+    };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(long);
+    });
+
+    // `around` lands exactly on candle 70; `bars: 2` must show exactly two candles, not
+    // three — a range of {69, 71} would be three (69, 70, 71).
+    expect(stub.latest().rangesSet).toContainEqual({ from: 69, to: 70 });
+    expect(source.historyCalls).toHaveLength(0);
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("pages older history to reach a from/to focus, then applies it", async () => {
+    source.historyPages = [olderPage(60)];
+    const focus: ChartFocusRequest = { from: -20, to: 220, around: null, bars: null, lastBars: null };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    // One page reaches back to -3500 — far past -20 — so the pager stops there.
+    expect(source.historyCalls).toHaveLength(1);
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: -20, to: 220 });
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+  });
+
+  it("asks for the whole window to a distant focus in one read, not a page at a time", async () => {
+    // The bug this exists for: the pager walks about a day of calendar per page on
+    // MINUTE_5 and stops after twenty of them, so a focus five months back was never
+    // reached — the chart landed on wherever the walk had got to and looked like it had
+    // moved on purpose. A named moment is asked for once, by name.
+    source.historyPages = [olderPage(60)];
+    const focus: ChartFocusRequest = {
+      from: -1_000_000,
+      to: 220,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    expect(source.historyCalls).toHaveLength(1);
+    // The window between the moment asked for and the oldest bar drawn — not a page-sized
+    // step back from the drawn edge.
+    expect(source.historyCalls[0]).toMatchObject({ from: -1_000_000, to: 100 });
+  });
+
+  it("reads back past an around/bars focus by the half of it that sits before the moment", async () => {
+    // A centred frame needs candles on both sides. Reading only as far back as `around`
+    // puts it on the series' first bar, and the frame the operator asked for comes out
+    // shifted half a screen to the right.
+    const focus: ChartFocusRequest = {
+      from: null,
+      to: null,
+      around: -50_000,
+      bars: 100,
+      lastBars: null,
+    };
+    source.historyPages = [olderPage(60)];
+    renderChart(source, { focusRequest: focus, resolution: "MINUTE_5" });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    // 50 candles of MINUTE_5 before the moment named: 50 * 300 seconds.
+    expect(source.historyCalls[0]).toMatchObject({ from: -50_000 - 15_000, to: 100 });
+  });
+
+  it("applies a focus that arrives in the same breath as a resolution change", async () => {
+    // One `set_chart` carrying both is one commit here: the slot's resolution and its
+    // focus request land together. Reported from a live session — the interval changed
+    // and the chart stayed where it was, and only a second, focus-only request moved it.
+    const { rerender, onResolutionChange, onFocusRequestSettled } = renderChart(source, {
+      resolution: "MINUTE_5",
+    });
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    const focus: ChartFocusRequest = { from: 100, to: 220, around: null, bars: null, lastBars: null };
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="HOUR"
+        onResolutionChange={onResolutionChange}
+        focusRequest={focus}
+        onFocusRequestSettled={onFocusRequestSettled}
+      />,
+    );
+    // The new interval's own series, which is what the focus has to be applied against.
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    await waitFor(() => expect(onFocusRequestSettled).toHaveBeenCalledTimes(1));
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: 100, to: 220 });
+  });
+
+  it("applies a distant focus that arrives with a resolution change, not only the change", async () => {
+    // The shape the live session actually sent: one `set_chart` with a symbol, an
+    // interval, indicators and a focus months back. The interval changed and the chart
+    // did not move; a second, focus-only request moved it.
+    source.historyPages = [olderPage(60), olderPage(60)];
+    const { rerender, onResolutionChange, onFocusRequestSettled } = renderChart(source, {
+      resolution: "HOUR",
+    });
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    const focus: ChartFocusRequest = {
+      from: -2_000,
+      to: -1_000,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        focusRequest={focus}
+        onFocusRequestSettled={onFocusRequestSettled}
+      />,
+    );
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    await waitFor(() => expect(onFocusRequestSettled).toHaveBeenCalledTimes(1));
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: -2_000, to: -1_000 });
+  });
+
+  it("does not lose a new focus to the abandoning of the one before it", async () => {
+    // The live sequence: a focus was asked for and could not be reached, so it sat
+    // pending; the next command carried a new focus *and* a new interval. The interval
+    // change abandons whatever was pending — and telling the caller so clears the request
+    // the store is holding, which by then is the new one.
+    source.historyPages = []; // nothing older, so the first focus stays out of reach
+    const first: ChartFocusRequest = {
+      from: -9_000_000,
+      to: -8_999_000,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    const { rerender, onResolutionChange, onFocusRequestSettled } = renderChart(source, {
+      resolution: "HOUR",
+      focusRequest: first,
+    });
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    const second: ChartFocusRequest = { from: 100, to: 220, around: null, bars: null, lastBars: null };
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        focusRequest={second}
+        onFocusRequestSettled={onFocusRequestSettled}
+      />,
+    );
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    await waitFor(() => expect(stub.latest().timeRangesSet).toContainEqual({ from: 100, to: 220 }));
+  });
+
+  it("settles a focus the archive has no candles far enough back for", async () => {
+    // One read is the whole attempt, so the wait ends either way. Before `stoppedShort`
+    // the request sat in `pendingFocusRef` unsettled: the chart never moved,
+    // `onFocusRequestSettled` never fired, and the grid store went on offering the same
+    // request until the symbol changed.
+    source.historyPages = [olderPage(60)]; // reaches -3500, nowhere near the target
+    const focus: ChartFocusRequest = {
+      from: -1_000_000,
+      to: 220,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    await waitFor(() => expect(onFocusRequestSettled).toHaveBeenCalledTimes(1));
+    // Applied against what was actually reached, not abandoned: the fragment is partly
+    // there, which is the case `overlapsSeries` exists for.
+    expect(stub.latest().timeRangesSet).toContainEqual({ from: -1_000_000, to: 220 });
+  });
+
+  it("skips a focus the archive has nothing for, leaves the view alone, and says so", async () => {
+    source.historyPages = []; // every read answers empty
+    const focus: ChartFocusRequest = {
+      from: -1_000_000,
+      to: -999_000,
+      around: null,
+      bars: null,
+      lastBars: null,
+    };
+    const { onFocusRequestSettled } = renderChart(source, { focusRequest: focus });
+    render(<Toaster />);
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    expect(stub.latest().timeRangesSet).toHaveLength(0);
+    expect(onFocusRequestSettled).toHaveBeenCalledTimes(1);
+    const toast = await screen.findByRole("alert");
+    expect(toast).toHaveTextContent("US100");
+    expect(toast).toHaveTextContent(/outside the archive/i);
+  });
+
+  it("does not pursue a focus that was never given", async () => {
+    renderChart(source, { focusRequest: null });
+
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+
+    expect(stub.latest().timeRangesSet).toHaveLength(0);
+    expect(source.historyCalls).toHaveLength(0);
+  });
+
+  it("lets the operator pan freely after a focus applies, without snapping back", async () => {
+    // `pan()` is what a drag looks like from the library's side: it moves the range and
+    // notifies subscribers, the same as `setVisibleLogicalRange` — but it is not a call
+    // `Chart.tsx` itself made, so it never lands in `rangesSet`, which only records what
+    // this component wrote. A focus that kept re-asserting itself would show up there as
+    // a second write; one that behaved would not.
+    const focus: ChartFocusRequest = { from: null, to: null, around: null, bars: null, lastBars: 2 };
+    renderChart(source, { focusRequest: focus });
+    await act(async () => {
+      source.snapshot(drawn);
+    });
+    const rangesWrittenByTheFocus = stub.latest().rangesSet.length;
+
+    await act(async () => {
+      stub.latest().pan({ from: 0, to: 2 });
+    });
+
+    expect(stub.latest().rangesSet.length).toBe(rangesWrittenByTheFocus);
+    expect(stub.latest().visibleRange).toEqual({ from: 0, to: 2 });
+  });
+});
+
+describe("Chart — reports the visible range (terminal-agent-chat spec, agent-chart-navigation)", () => {
+  it("reports the drawn bars' own times at the visible logical range, on a pan", async () => {
+    const { onVisibleRangeChange } = renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(160, 2), bar(220, 3), bar(280, 4)]);
+    });
+
+    await act(async () => {
+      stub.latest().pan({ from: 1, to: 2 });
+    });
+
+    expect(onVisibleRangeChange).toHaveBeenLastCalledWith({ from: 160, to: 220 });
+  });
+
+  it("reports null while nothing is drawn yet", async () => {
+    const { onVisibleRangeChange } = renderChart(source);
+
+    await act(async () => {
+      stub.latest().pan({ from: 0, to: 1 });
+    });
+
+    expect(onVisibleRangeChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("reports null once the chart is torn down", async () => {
+    const { unmount, onVisibleRangeChange } = renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 1), bar(160, 2), bar(220, 3)]);
+    });
+    await act(async () => {
+      stub.latest().pan({ from: 0, to: 2 });
+    });
+
+    unmount();
+
+    expect(onVisibleRangeChange).toHaveBeenLastCalledWith(null);
   });
 });
 
@@ -2378,5 +2843,460 @@ describe("Chart — live indicators (terminal-chart spec, task 6.1/6.2/6.4)", ()
     // `indicatorsState.results` before the new series has even loaded — the
     // previous symbol's zone primitive must not linger through that gap.
     await waitFor(() => expect(priceSeries().primitives).toHaveLength(0));
+  });
+});
+
+describe("Chart — objects drawn on the instrument (terminal-chart spec, agent-chart-drawings)", () => {
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  function drawing(
+    id: number,
+    geometry: AgentChartDrawing["geometry"],
+    hidden = false,
+  ): AgentChartDrawing {
+    return {
+      id,
+      symbol: "US100",
+      geometry,
+      label: null,
+      color: null,
+      hidden,
+      createdAt: 1767398400,
+      updatedAt: 1767398400,
+    };
+  }
+
+  function chartDrawings(items: AgentChartDrawing[]): ChartDrawings {
+    return {
+      items,
+      status: "ready",
+      error: null,
+      remove: async () => null,
+      patch: async () => null,
+    };
+  }
+
+  const THREE_SHAPES = [
+    drawing(1, { kind: "level", price: 110, at: null }),
+    drawing(2, { kind: "zone", top: 120, bottom: 115, from: null, to: null }),
+    drawing(3, {
+      kind: "trendline",
+      a: { time: 100, price: 90 },
+      b: { time: 200, price: 130 },
+    }),
+  ];
+
+  it("attaches one primitive per drawing, for all three shapes", async () => {
+    renderChart(source, { drawings: chartDrawings(THREE_SHAPES) });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(3));
+  });
+
+  it("keeps the objects through a resolution change", async () => {
+    // The one thing that separates a drawing from an indicator: it belongs to the
+    // instrument, not to the view, so the interval changing must not take it off
+    // (`terminal-chart` spec, "Zmiana rozdzielczości MUST zachować narysowane obiekty").
+    const items = chartDrawings(THREE_SHAPES);
+    const { rerender, onResolutionChange } = renderChart(source, { drawings: items });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(3));
+    const attached = [...priceSeries().primitives];
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="HOUR"
+        onResolutionChange={onResolutionChange}
+        drawings={items}
+      />,
+    );
+    await act(async () => {
+      source.snapshot([bar(200, 1)]);
+    });
+
+    // The same instances, not merely the same count: rebuilding them would be a redraw
+    // the operator sees as a flicker, and a new instance is how a shared map with the
+    // indicators would have shown up.
+    expect(priceSeries().primitives).toEqual(attached);
+  });
+
+  it("replaces them when the symbol changes", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings(THREE_SHAPES),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(3));
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="GOLD"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([drawing(9, { kind: "level", price: 2400, at: null })])}
+      />,
+    );
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("takes a removed object off without touching the others", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings(THREE_SHAPES),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(3));
+    const kept = priceSeries().primitives[0];
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([THREE_SHAPES[0]])}
+      />,
+    );
+
+    await waitFor(() => expect(priceSeries().primitives).toEqual([kept]));
+  });
+
+  it("draws nothing and offers no list when the caller passes none", async () => {
+    renderChart(source);
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    expect(priceSeries().primitives).toHaveLength(0);
+    expect(screen.queryByLabelText("Drawn objects")).toBeNull();
+  });
+});
+
+describe("Chart — picking an object out of the chart (terminal-chart-objects spec)", () => {
+  function drawing(
+    id: number,
+    geometry: AgentChartDrawing["geometry"],
+    hidden = false,
+  ): AgentChartDrawing {
+    return {
+      id,
+      symbol: "US100",
+      geometry,
+      label: "weekly high",
+      color: null,
+      hidden,
+      createdAt: 1767398400,
+      updatedAt: 1767398400,
+    };
+  }
+
+  const A_LEVEL = drawing(1, { kind: "level", price: 110, at: null });
+  const A_ZONE = drawing(2, { kind: "zone", top: 120, bottom: 115, from: null, to: null });
+
+  function chartDrawings(items: AgentChartDrawing[], overrides: Partial<ChartDrawings> = {}): ChartDrawings {
+    return {
+      items,
+      status: "ready",
+      error: null,
+      remove: vi.fn(async () => null),
+      patch: vi.fn(async () => null),
+      ...overrides,
+    };
+  }
+
+  async function drawn(items: AgentChartDrawing[] = [A_LEVEL, A_ZONE]) {
+    const drawings = chartDrawings(items);
+    const view = renderChart(source, { drawings });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    return { ...view, drawings };
+  }
+
+  /** What the real chart hands a click subscriber: whatever the primitives' own
+   *  `hitTest` answered on those coordinates, already resolved to an id. */
+  async function clickChart(hoveredObjectId?: string) {
+    await act(async () => {
+      stub.latest().click({ hoveredObjectId, point: { x: 120, y: 90 } });
+    });
+  }
+
+  it("picks out the object clicked, and says what it is beside it", async () => {
+    await drawn();
+
+    await clickChart("1");
+
+    const card = await screen.findByTestId("drawing-card-1");
+    expect(card).toHaveTextContent("level");
+    expect(card).toHaveTextContent("110");
+    expect(card).toHaveTextContent("weekly high");
+    expect(card).toHaveTextContent(/drawn/);
+  });
+
+  it("puts the selection down on a click into empty space", async () => {
+    await drawn();
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+
+    // No `hoveredObjectId`: nothing was under the pointer.
+    await clickChart(undefined);
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-1")).toBeNull());
+  });
+
+  it("puts the selection down on Escape", async () => {
+    await drawn();
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-1")).toBeNull());
+  });
+
+  it("carries no selection across a symbol change", async () => {
+    // The previous instrument's objects are not on the chart, so none of them can be
+    // pointed at (`terminal-chart-objects` spec, "Zmiana symbolu przy wskazanym obiekcie").
+    const drawings = chartDrawings([A_LEVEL, A_ZONE]);
+    const { rerender, onResolutionChange } = renderChart(source, { drawings });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="GOLD"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([drawing(9, { kind: "level", price: 2400, at: null })])}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-1")).toBeNull());
+    expect(screen.queryByTestId("drawing-card-9")).toBeNull();
+  });
+
+  it("picking an object out is not a change to it", async () => {
+    // `terminal-chart-objects` spec, "Wskazanie nie jest zmianą obiektu": it moves
+    // nothing, and writes nothing.
+    const { drawings } = await drawn();
+
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+    await userEvent.keyboard("{Escape}");
+
+    expect(drawings.patch).not.toHaveBeenCalled();
+    expect(drawings.remove).not.toHaveBeenCalled();
+    expect(drawings.items[0].geometry).toEqual({ kind: "level", price: 110, at: null });
+    expect(drawings.items[0].color).toBeNull();
+  });
+
+  it("shows the object picked on the chart marked out on the list too", async () => {
+    await drawn();
+    await clickChart("2");
+
+    await userEvent.click(screen.getByLabelText("Drawn objects"));
+
+    expect(screen.getByTestId("drawing-2")).toHaveAttribute("aria-current", "true");
+    expect(screen.getByTestId("drawing-1")).toHaveAttribute("aria-current", "false");
+  });
+
+  it("picks out on the chart what was chosen from the list", async () => {
+    await drawn();
+
+    await userEvent.click(screen.getByLabelText("Drawn objects"));
+    await userEvent.click(within(screen.getByTestId("drawing-2")).getByRole("button", { name: "Edit" }));
+
+    expect(await screen.findByTestId("drawing-card-2")).toBeInTheDocument();
+  });
+
+  it("lets go of an object that stops being there", async () => {
+    // Removed from the card, from the list, or by the agent's own next turn — what is
+    // gone cannot stay pointed at.
+    const drawings = chartDrawings([A_LEVEL, A_ZONE]);
+    const { rerender, onResolutionChange } = renderChart(source, { drawings });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await clickChart("1");
+    await screen.findByTestId("drawing-card-1");
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([A_ZONE])}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-1")).toBeNull());
+  });
+});
+
+describe("Chart — a hidden object is not drawn (terminal-chart spec)", () => {
+  function drawing(
+    id: number,
+    geometry: AgentChartDrawing["geometry"],
+    hidden = false,
+  ): AgentChartDrawing {
+    return {
+      id,
+      symbol: "US100",
+      geometry,
+      label: "weekly high",
+      color: null,
+      hidden,
+      createdAt: 1767398400,
+      updatedAt: 1767398400,
+    };
+  }
+
+  function chartDrawings(items: AgentChartDrawing[]): ChartDrawings {
+    return {
+      items,
+      status: "ready",
+      error: null,
+      remove: vi.fn(async () => null),
+      patch: vi.fn(async () => null),
+    };
+  }
+
+  function priceSeries() {
+    return stub.latest().series.find((s) => s.type === "Candlestick")!;
+  }
+
+  const LIT = drawing(1, { kind: "level", price: 110, at: null });
+  const DARK = drawing(2, { kind: "level", price: 120, at: null }, true);
+
+  it("gives a hidden object no primitive at all", async () => {
+    // As absent from the canvas as one that was removed: it occludes no candles and puts
+    // nothing on the price axis (`terminal-chart` spec, "Zgaszony obiekt nie jest
+    // rysowany").
+    renderChart(source, { drawings: chartDrawings([LIT, DARK]) });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(1));
+  });
+
+  it("takes the primitive off when an object is hidden, and gives it back on show", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings([LIT, drawing(2, { kind: "level", price: 120, at: null })]),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(2));
+    const kept = priceSeries().primitives[0];
+
+    const shown = (
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([LIT, DARK])}
+      />
+    );
+    rerender(shown);
+    // The object beside it is untouched — same instance, so its colour cannot have moved
+    // either (`terminal-chart` spec, "Kolor obiektu po zgaszeniu innego").
+    await waitFor(() => expect(priceSeries().primitives).toEqual([kept]));
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([LIT, drawing(2, { kind: "level", price: 120, at: null })])}
+      />,
+    );
+    await waitFor(() => expect(priceSeries().primitives).toHaveLength(2));
+  });
+
+  it("keeps the picked object's card open when it is hidden", async () => {
+    // Hiding is undoable, so the nearest way back stays where the action happened
+    // (`terminal-chart-objects` spec, "Zgaszenie z opisu").
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings([LIT, drawing(2, { kind: "level", price: 120, at: null })]),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await act(async () => {
+      stub.latest().click({ hoveredObjectId: "2", point: { x: 120, y: 90 } });
+    });
+    await screen.findByTestId("drawing-card-2");
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([LIT, DARK])}
+      />,
+    );
+
+    const card = await screen.findByTestId("drawing-card-2");
+    expect(card).toHaveTextContent(/hidden/i);
+    // Named by its aria-label, which carries the id — the visible word is "Show".
+    expect(within(card).getByLabelText("Show drawing 2")).toBeInTheDocument();
+  });
+
+  it("still lets go of an object that is removed while picked", async () => {
+    const { rerender, onResolutionChange } = renderChart(source, {
+      drawings: chartDrawings([LIT, drawing(2, { kind: "level", price: 120, at: null })]),
+    });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+    await act(async () => {
+      stub.latest().click({ hoveredObjectId: "2", point: { x: 120, y: 90 } });
+    });
+    await screen.findByTestId("drawing-card-2");
+
+    rerender(
+      <Chart
+        source={source}
+        symbol="US100"
+        resolution="MINUTE_5"
+        onResolutionChange={onResolutionChange}
+        drawings={chartDrawings([LIT])}
+      />,
+    );
+
+    await waitFor(() => expect(screen.queryByTestId("drawing-card-2")).toBeNull());
+  });
+
+  it("shows a hidden object on the list, so there is a way back to it", async () => {
+    renderChart(source, { drawings: chartDrawings([LIT, DARK]) });
+    await act(async () => {
+      source.snapshot([bar(100, 1)]);
+    });
+
+    await userEvent.click(screen.getByLabelText("Drawn objects"));
+
+    expect(screen.getByTestId("drawing-2")).toHaveAttribute("data-hidden", "true");
+    expect(screen.getByLabelText("Show drawing 2")).toBeInTheDocument();
   });
 });

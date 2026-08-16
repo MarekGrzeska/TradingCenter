@@ -57,7 +57,7 @@ function fakePairs(pairs: TrackedPair[] = [pair("US100", "MINUTE_5"), pair("US10
 }
 
 function command(over: Partial<AgentChartCommand> = {}): AgentChartCommand {
-  return { sequence: 7, symbol: null, resolution: null, indicators: null, ...over };
+  return { sequence: 7, symbol: null, resolution: null, indicators: null, focus: null, ...over };
 }
 
 describe("syncAgentChart", () => {
@@ -222,9 +222,65 @@ describe("syncAgentChart", () => {
       storage,
     });
 
-    expect(result).toBeNull();
+    // Said, not swallowed: the agent has told the operator the chart changed, and a chart
+    // that did not change owes them a reason.
+    expect(result?.applied).toEqual([]);
+    expect(result?.skipped.join(" ")).toContain("could not say what it collects");
     // The cursor stays put, so the command is applied once the archive answers again.
     expect(storage.raw.has(CHART_CURSOR_KEY)).toBe(false);
+  });
+
+  it("passes a range focus through to the active slot", async () => {
+    const active = grid.getSnapshot().activeSlot;
+
+    const result = await syncAgentChart({
+      api: fakeApi(
+        command({ focus: { from: 100, to: 200, around: null, bars: null, lastBars: null } }),
+      ),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    expect(grid.getFocusRequest(active)).toEqual({
+      from: 100,
+      to: 200,
+      around: null,
+      bars: null,
+      lastBars: null,
+    });
+    expect(result?.applied).toEqual([
+      "focus 1970-01-01T00:01:40.000Z to 1970-01-01T00:03:20.000Z",
+    ]);
+  });
+
+  it("passes a last-bars focus through, described by candle count", async () => {
+    const active = grid.getSnapshot().activeSlot;
+
+    const result = await syncAgentChart({
+      api: fakeApi(
+        command({ focus: { from: null, to: null, around: null, bars: null, lastBars: 100 } }),
+      ),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    expect(grid.getFocusRequest(active)?.lastBars).toBe(100);
+    expect(result?.applied).toEqual(["focus the newest 100 candles"]);
+  });
+
+  it("leaves the focus request alone when the command carries none", async () => {
+    const active = grid.getSnapshot().activeSlot;
+
+    await syncAgentChart({
+      api: fakeApi(command({ symbol: "US100" })),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    expect(grid.getFocusRequest(active)).toBeNull();
   });
 
   it("says nothing when the agent set nothing", async () => {
@@ -254,7 +310,33 @@ describe("activeChartSnapshot", () => {
       symbol: "US100",
       resolution: "HOUR",
       indicators: [{ id: "ema", params: { period: 200 }, color: "--color-accent" }],
+      visibleFrom: null,
+      visibleTo: null,
     });
+  });
+
+  it("carries the active slot's visible range when the chart has reported one", () => {
+    const grid = createGridStore(memoryStorage());
+    grid.setActiveSlot("s1");
+    grid.setSlotSymbol("s1", "US100");
+    grid.setVisibleRange("s1", { from: 100, to: 200 });
+
+    const snapshot = activeChartSnapshot(grid);
+
+    expect(snapshot?.visibleFrom).toBe(100);
+    expect(snapshot?.visibleTo).toBe(200);
+  });
+
+  it("carries no visible range for a slot the active one just became", () => {
+    const grid = createGridStore(memoryStorage());
+    grid.setActiveSlot("s1");
+    grid.setSlotSymbol("s1", "US100");
+    grid.setVisibleRange("s2", { from: 100, to: 200 }); // a different slot's
+
+    const snapshot = activeChartSnapshot(grid);
+
+    expect(snapshot?.visibleFrom).toBeNull();
+    expect(snapshot?.visibleTo).toBeNull();
   });
 
   it("sends nothing at all for a slot with no instrument", () => {
@@ -263,5 +345,69 @@ describe("activeChartSnapshot", () => {
     grid.clearSlotSymbol("s5");
 
     expect(activeChartSnapshot(grid)).toBeNull();
+  });
+});
+
+describe("syncAgentChart — a command carrying more than one thing at once", () => {
+  let grid: ReturnType<typeof createGridStore>;
+  let storage: ReturnType<typeof memoryStorage>;
+
+  beforeEach(() => {
+    storage = memoryStorage();
+    grid = createGridStore(memoryStorage());
+  });
+
+  /** Reported from a live session: one `set_chart` with a symbol, an interval, indicators
+   *  and a focus changed the interval and did not move the chart; a second, focus-only
+   *  request moved it. */
+  it("applies the focus as well as the interval when one command carries both", async () => {
+    const focus = { from: null, to: null, around: 1_770_000_000, bars: 100, lastBars: null };
+    const result = await syncAgentChart({
+      api: fakeApi(command({ symbol: "US100", resolution: "MINUTE_5", focus })),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    const slotId = grid.getSnapshot().activeSlot;
+    expect(grid.getSnapshot().slots[slotId].resolution).toBe("MINUTE_5");
+    expect(grid.getFocusRequest(slotId)).toEqual(focus);
+    expect(result?.applied).toContain("interval MINUTE_5");
+  });
+
+  it("applies the focus even when the interval beside it is refused", async () => {
+    // Half a command is not a reason to drop the other half: the interval names something
+    // the archive does not collect, the focus names a moment, and the moment is fine.
+    const focus = { from: null, to: null, around: 1_770_000_000, bars: 100, lastBars: null };
+    const result = await syncAgentChart({
+      api: fakeApi(command({ resolution: "WEEK", focus })),
+      grid,
+      pairs: fakePairs(),
+      storage,
+    });
+
+    const slotId = grid.getSnapshot().activeSlot;
+    expect(grid.getFocusRequest(slotId)).toEqual(focus);
+    expect(result?.skipped.join(" ")).toContain("WEEK");
+  });
+
+  it("keeps the focus when the archive cannot say what it collects", async () => {
+    // The pair read is what the symbol and the interval need. A focus needs nothing from
+    // it — it names a moment, and moments are not collected.
+    const focus = { from: null, to: null, around: 1_770_000_000, bars: 100, lastBars: null };
+    const failing = {
+      listPairs: async () => {
+        throw new Error("archive unreachable");
+      },
+    } as unknown as ArchiveAdmin;
+
+    await syncAgentChart({
+      api: fakeApi(command({ symbol: "US100", resolution: "MINUTE_5", focus })),
+      grid,
+      pairs: failing,
+      storage,
+    });
+
+    expect(grid.getFocusRequest(grid.getSnapshot().activeSlot)).toEqual(focus);
   });
 });

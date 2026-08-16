@@ -1,4 +1,4 @@
-import type { AgentApi, AgentChartCommand, AgentChartSnapshot } from "./agentApi";
+import type { AgentApi, AgentChartCommand, AgentChartFocus, AgentChartSnapshot } from "./agentApi";
 import { agentApi } from "./agentApi";
 import { archive } from "../data/marketData";
 import type { ArchiveAdmin } from "../data/source";
@@ -71,6 +71,17 @@ function describeIndicators(command: AgentChartCommand): string {
     .join(", ");
 }
 
+function describeFocus(focus: AgentChartFocus): string {
+  if (focus.lastBars !== null) return `the newest ${focus.lastBars} candles`;
+  if (focus.around !== null && focus.bars !== null) {
+    return `${focus.bars} candles around ${new Date(focus.around * 1000).toISOString()}`;
+  }
+  if (focus.from !== null && focus.to !== null) {
+    return `${new Date(focus.from * 1000).toISOString()} to ${new Date(focus.to * 1000).toISOString()}`;
+  }
+  return "an unrecognised span"; // unreachable if the module wrote this focus
+}
+
 function toSelections(command: AgentChartCommand): IndicatorSelection[] {
   return (command.indicators ?? []).map((indicator) => ({
     // The key is the terminal's to hand out: the agent names what to draw, not which
@@ -117,20 +128,33 @@ export async function syncAgentChart(
   let symbol = command.symbol;
   let resolution = command.resolution;
 
+  // Whether the pair half could not even be checked. Kept rather than returned on:
+  // a focus needs nothing from the archive — it names a moment, and moments are not
+  // collected — and throwing the whole command away over the half that does need it left
+  // the operator told the chart had moved while it sat still, with nothing said about why.
+  let pairsUnknown = false;
+  const allowed = new Map<string, Resolution[]>();
+
   if (symbol !== null || resolution !== null) {
-    let allowed: Map<string, Resolution[]>;
     try {
       const pairs = await deps.pairs.listPairs(new AbortController().signal);
-      allowed = new Map();
       for (const pair of pairs) {
         allowed.set(pair.symbol, [...(allowed.get(pair.symbol) ?? []), pair.resolution]);
       }
     } catch {
-      // The archive could not say what it collects. Applying blind is what would put an
-      // empty chart on screen, so the pair half of the command waits for the operator.
-      return null;
+      // Applying blind is what would put an empty chart on screen, so the pair half waits
+      // — and the cursor stays put below, so it is tried again rather than lost.
+      pairsUnknown = true;
+      skipped.push(
+        `${[symbol, resolution].filter((part) => part !== null).join(" / ")} — the archive ` +
+          "could not say what it collects",
+      );
+      symbol = null;
+      resolution = null;
     }
+  }
 
+  if (!pairsUnknown && (symbol !== null || resolution !== null)) {
     const targetSymbol = symbol ?? slot.symbol;
     const resolutions = targetSymbol === null ? undefined : allowed.get(targetSymbol);
 
@@ -173,8 +197,16 @@ export async function syncAgentChart(
     deps.grid.setSlotIndicators(slotId, toSelections(command));
     applied.push(describeIndicators(command));
   }
+  if (command.focus !== null) {
+    deps.grid.setFocusRequest(slotId, command.focus);
+    applied.push(`focus ${describeFocus(command.focus)}`);
+  }
 
-  writeCursor(deps.storage, command.sequence);
+  // Not moved when the pair half never got to be checked: that half is still owed, and
+  // the next successful sync is what pays it. Everything already applied above reapplies
+  // with it, which for a focus is the same jump twice and for the rest is a no-op — a
+  // smaller price than a symbol the operator asked for and never got.
+  if (!pairsUnknown) writeCursor(deps.storage, command.sequence);
   return { applied, skipped };
 }
 
@@ -202,6 +234,7 @@ export function activeChartSnapshot(grid: GridStore = gridStore): AgentChartSnap
   const config = grid.getSnapshot();
   const slot = config.slots[config.activeSlot];
   if (slot.symbol === null) return null;
+  const visible = grid.getVisibleRange(config.activeSlot);
   return {
     symbol: slot.symbol,
     resolution: slot.resolution,
@@ -210,5 +243,7 @@ export function activeChartSnapshot(grid: GridStore = gridStore): AgentChartSnap
       params: selection.params,
       color: selection.color,
     })),
+    visibleFrom: visible?.from ?? null,
+    visibleTo: visible?.to ?? null,
   };
 }

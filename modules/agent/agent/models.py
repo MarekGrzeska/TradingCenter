@@ -6,6 +6,7 @@ from __future__ import annotations
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from typing import Literal
 
 from pydantic import BaseModel
 
@@ -110,6 +111,11 @@ class ChartSnapshot(BaseModel):
     symbol: str | None = None
     resolution: str | None = None
     indicators: list[ChartIndicator] = []
+    # The visible span, each half optional on its own: a consumer that draws but cannot
+    # say what is on screen still sends the rest (specs/agent-chat, "Tura wie, co terminal
+    # właśnie rysuje").
+    visible_from: datetime | None = None
+    visible_to: datetime | None = None
 
     def as_context(self) -> str:
         """One line for the system prompt. Written for a model to read, so it names the
@@ -130,7 +136,36 @@ class ChartSnapshot(BaseModel):
             f"interval {self.resolution}" if self.resolution else "no interval",
             f"indicators {drawn}" if drawn else "no indicators",
         ]
-        return "The operator's chart currently shows: " + "; ".join(parts) + "."
+        sentence = "The operator's chart currently shows: " + "; ".join(parts) + "."
+        if self.visible_from is not None and self.visible_to is not None:
+            sentence += (
+                f" The visible time span runs from {self.visible_from.isoformat()} "
+                f"to {self.visible_to.isoformat()}."
+            )
+        return sentence
+
+
+class ChartFocus(BaseModel):
+    """Which fragment of the time axis the chart should show. Exactly one of the three
+    shapes this carries MUST be filled: `from_`/`to` (a range), `around`/`bars` (a point
+    and a span around it), or `last_bars` (the newest N candles) — checked by the tool
+    that builds this, not here (specs/agent-chart-control, "Narzędzie ustawia zawartość
+    aktywnego slotu").
+
+    Absolute time on the wire, not relative to the moment the command is read: a command
+    sitting in the log for an hour must mean the same thing it meant when it was issued.
+    `last_bars` is the one named exception — it means "the end of the series", whatever
+    that is at the moment it is applied.
+    """
+
+    # No wire alias here — this shape is only ever read back by this module's own store,
+    # never by another module. The "from" alias a caller actually sends and sees lives on
+    # `ChartFocusOut` and the tool's own parsing, where the wire is what matters.
+    from_: datetime | None = None
+    to: datetime | None = None
+    around: datetime | None = None
+    bars: int | None = None
+    last_bars: int | None = None
 
 
 class ChartCommand(BaseModel):
@@ -138,7 +173,8 @@ class ChartCommand(BaseModel):
     that as it is", never "clear it" — a model asked to add an average must not be able
     to blank the symbol by omission (specs/agent-chart-control, "Narzędzie ustawia
     zawartość aktywnego slotu"). An empty `indicators` list is the one way to say "draw
-    none", and it is a list, not a None.
+    none", and it is a list, not a None. A missing `focus` means "leave the operator
+    looking where they are".
 
     `sequence` is the row's own id: rising across the whole module, not per session, so a
     consumer holding one number knows what it has already applied.
@@ -149,6 +185,7 @@ class ChartCommand(BaseModel):
     symbol: str | None
     resolution: str | None
     indicators: list[ChartIndicator] | None
+    focus: ChartFocus | None
     created_at: datetime
 
     def merged_with(self, later: ChartCommand) -> ChartCommand:
@@ -164,8 +201,79 @@ class ChartCommand(BaseModel):
             symbol=later.symbol if later.symbol is not None else self.symbol,
             resolution=later.resolution if later.resolution is not None else self.resolution,
             indicators=later.indicators if later.indicators is not None else self.indicators,
+            focus=later.focus if later.focus is not None else self.focus,
             created_at=later.created_at,
         )
+
+
+class ChartLevel(BaseModel):
+    """A single price, optionally in effect only from a moment on — support, resistance,
+    a level the operator or the agent wants to keep looking at. `kind` is what the
+    store's four-column geometry (`design.md`, "Zapis: cztery kolumny geometrii i CHECK
+    per kształt") discriminates on; `at` fills `time_a`, `price` fills `price_a`, and
+    `time_b`/`price_b` stay null — the shape the database's own `chart_drawings_level_
+    shape` check enforces independently of this class ever agreeing."""
+
+    kind: Literal["level"] = "level"
+    price: float
+    at: datetime | None = None
+    label: str | None = None
+    color: str | None = None
+
+
+class ChartZone(BaseModel):
+    """A price band, optionally bounded in time. `bottom` fills `price_a`, `top` fills
+    `price_b` and must exceed it — checked here for an early refusal, and by
+    `chart_drawings_zone_shape` regardless."""
+
+    kind: Literal["zone"] = "zone"
+    top: float
+    bottom: float
+    from_: datetime | None = None
+    to: datetime | None = None
+    label: str | None = None
+    color: str | None = None
+
+
+class ChartTrendlinePoint(BaseModel):
+    time: datetime
+    price: float
+
+
+class ChartTrendline(BaseModel):
+    """Two points, `a` and `b` — never `from`/`to`, which `ChartZone` already uses for a
+    pair of moments alone; a trend line's pair is a moment *and* a price each. `a.time`
+    fills `time_a`, `b.time` fills `time_b` and must be later."""
+
+    kind: Literal["trendline"] = "trendline"
+    a: ChartTrendlinePoint
+    b: ChartTrendlinePoint
+    label: str | None = None
+    color: str | None = None
+
+
+# What `draw_on_chart`'s `add` carries in, and what `store.add_drawings` takes — the
+# shape alone, without the identity the database hands out on insert.
+ChartDrawingGeometry = ChartLevel | ChartZone | ChartTrendline
+
+
+class ChartDrawing(BaseModel):
+    """One drawing as stored: `geometry`'s own `kind` says which of the three shapes it
+    is, and carries that shape's fields plus the label and colour every shape takes the
+    same way (specs/agent-chart-drawings, "Rysunek należy do instrumentu, nie do
+    widoku"). `session_id` is nullable — a drawing outlives the session that made it."""
+
+    id: int
+    symbol: str
+    session_id: int | None
+    geometry: ChartDrawingGeometry
+    # Whether the chart draws it. Beside `created_at` rather than inside `geometry` on
+    # purpose: `label` and `color` say how the drawing looks, this says whether it is
+    # drawn at all, and at a change of shape it would have nowhere to go
+    # (specs/agent-chart-drawings, "Rysunki są trwałe i mają własną tożsamość").
+    hidden: bool
+    created_at: datetime
+    updated_at: datetime
 
 
 class PromptRevision(BaseModel):

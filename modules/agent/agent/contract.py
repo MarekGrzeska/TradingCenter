@@ -6,15 +6,21 @@ sides rather than wired into `pnpm contract:generate`, which is market-data's al
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from datetime import datetime
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 from .models import (
     ChartCommand,
+    ChartDrawing,
+    ChartFocus,
     ChartIndicator,
+    ChartLevel,
     ChartSnapshot,
+    ChartZone,
     Message,
     PromptRevision,
     RecordedCall,
@@ -24,15 +30,16 @@ from .models import (
 )
 from .models_catalogue import ModelCatalogueEntry
 from .tools.chart import CHART_TOOL_NAME
+from .tools.drawings import DRAW_TOOL_NAME, LIST_DRAWINGS_TOOL_NAME
 
 # A name the operator types, not one derived from the first question — so it may be longer
 # than `store.derive_title`'s 60, but not unbounded: the conversation list is a narrow
 # column that truncates, and a title past this is one nothing can show.
 TITLE_MAX_CHARS = 120
 
-# Tools this module runs itself. Imported rather than spelled again: the tool's name is
+# Tools this module runs itself. Imported rather than spelled again: a tool's name is
 # decided where the tool is written.
-MODULE_TOOL_NAMES = frozenset({CHART_TOOL_NAME})
+MODULE_TOOL_NAMES = frozenset({CHART_TOOL_NAME, DRAW_TOOL_NAME, LIST_DRAWINGS_TOOL_NAME})
 
 
 class ModelOut(BaseModel):
@@ -219,6 +226,8 @@ class ChartSnapshotIn(BaseModel):
     symbol: str | None = None
     resolution: str | None = None
     indicators: list[ChartIndicatorIn] = Field(default_factory=list)
+    visible_from: datetime | None = None
+    visible_to: datetime | None = None
 
     def to_snapshot(self) -> ChartSnapshot:
         return ChartSnapshot(
@@ -227,6 +236,8 @@ class ChartSnapshotIn(BaseModel):
             indicators=[
                 ChartIndicator(id=i.id, params=i.params, color=i.color) for i in self.indicators
             ],
+            visible_from=self.visible_from,
+            visible_to=self.visible_to,
         )
 
 
@@ -245,6 +256,24 @@ class ChartIndicatorOut(BaseModel):
     color: str | None
 
 
+class ChartFocusOut(BaseModel):
+    from_: datetime | None = Field(default=None, serialization_alias="from")
+    to: datetime | None = None
+    around: datetime | None = None
+    bars: int | None = None
+    last_bars: int | None = None
+
+    @classmethod
+    def from_focus(cls, focus: ChartFocus) -> ChartFocusOut:
+        return cls(
+            from_=focus.from_,
+            to=focus.to,
+            around=focus.around,
+            bars=focus.bars,
+            last_bars=focus.last_bars,
+        )
+
+
 class ChartCommandOut(BaseModel):
     """What the chart should show now, and the sequence number that says so.
 
@@ -257,6 +286,7 @@ class ChartCommandOut(BaseModel):
     symbol: str | None
     resolution: str | None
     indicators: list[ChartIndicatorOut] | None
+    focus: ChartFocusOut | None
     created_at: datetime
 
     @classmethod
@@ -271,8 +301,154 @@ class ChartCommandOut(BaseModel):
                 ChartIndicatorOut(id=i.id, params=i.params, color=i.color)
                 for i in command.indicators
             ],
+            focus=None if command.focus is None else ChartFocusOut.from_focus(command.focus),
             created_at=command.created_at,
         )
+
+
+class ChartLevelOut(BaseModel):
+    kind: Literal["level"] = "level"
+    price: float
+    at: datetime | None
+
+
+class ChartZoneOut(BaseModel):
+    kind: Literal["zone"] = "zone"
+    top: float
+    bottom: float
+    from_: datetime | None = Field(default=None, serialization_alias="from")
+    to: datetime | None
+
+
+class ChartPointOut(BaseModel):
+    time: datetime
+    price: float
+
+
+class ChartTrendlineOut(BaseModel):
+    kind: Literal["trendline"] = "trendline"
+    a: ChartPointOut
+    b: ChartPointOut
+
+
+ChartGeometryOut = Annotated[
+    ChartLevelOut | ChartZoneOut | ChartTrendlineOut, Field(discriminator="kind")
+]
+
+
+class ChartDrawingOut(BaseModel):
+    """One object standing on an instrument's chart.
+
+    The geometry is a union discriminated by `kind`, with each shape's fields named for
+    what they are — a consumer reading `top` and `bottom` cannot mix them up the way one
+    reading the storage's `price_a`/`price_b` could (design.md, "Zapis: cztery kolumny
+    geometrii i CHECK per kształt; druty: unia po `kind`").
+
+    No `sequence` and no cursor: this is the instrument's state, read whole and replaced
+    whole, not a log a consumer catches up with (`ChartCommandOut` is the other one).
+    """
+
+    id: int
+    symbol: str
+    geometry: ChartGeometryOut
+    label: str | None
+    color: str | None
+    # Whether the chart draws it. A hidden drawing is published like any other — the list
+    # in the terminal is the only way back to it, and a read that left it out would hide
+    # it for good (specs/terminal-chart, "Operator zarządza naniesionymi obiektami
+    # z listy").
+    hidden: bool
+    created_at: datetime
+    updated_at: datetime
+
+    @classmethod
+    def from_drawing(cls, drawing: ChartDrawing) -> ChartDrawingOut:
+        geometry = drawing.geometry
+        shape: ChartGeometryOut
+        if isinstance(geometry, ChartLevel):
+            shape = ChartLevelOut(price=geometry.price, at=geometry.at)
+        elif isinstance(geometry, ChartZone):
+            shape = ChartZoneOut(
+                top=geometry.top, bottom=geometry.bottom, from_=geometry.from_, to=geometry.to
+            )
+        else:
+            shape = ChartTrendlineOut(
+                a=ChartPointOut(time=geometry.a.time, price=geometry.a.price),
+                b=ChartPointOut(time=geometry.b.time, price=geometry.b.price),
+            )
+        return cls(
+            id=drawing.id,
+            symbol=drawing.symbol,
+            geometry=shape,
+            label=geometry.label,
+            color=geometry.color,
+            hidden=drawing.hidden,
+            created_at=drawing.created_at,
+            updated_at=drawing.updated_at,
+        )
+
+
+class PatchDrawingIn(BaseModel):
+    """What the operator may correct by hand: the prices and the caption.
+
+    Not `kind` and not `symbol` — a level that became a zone, or a drawing that moved to
+    another instrument, is a different drawing and should be made as one
+    (specs/agent-chart-drawings, "Poprawienie MUST zachować tożsamość rysunku").
+
+    One field per price *role*, not per column: which of them a request may carry depends
+    on the drawing's `kind`, and the route refuses the ones that do not belong to it
+    rather than silently writing into a column that means something else there.
+    """
+
+    price: float | None = Field(default=None, description="a level's price")
+    top: float | None = Field(default=None, description="a zone's upper price")
+    bottom: float | None = Field(default=None, description="a zone's lower price")
+    a_price: float | None = Field(default=None, description="a trend line's first price")
+    b_price: float | None = Field(default=None, description="a trend line's second price")
+    label: str | None = None
+    # Hiding is a correction of the drawing like any other, so it rides this route rather
+    # than one of its own — and `None` keeps meaning "leave it", which is what lets a
+    # price correction travel without saying anything about visibility.
+    hidden: bool | None = None
+
+    @field_validator("price", "top", "bottom", "a_price", "b_price")
+    @classmethod
+    def _is_a_price(cls, value: float | None, info: ValidationInfo) -> float | None:
+        if value is None:
+            return None
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError(f"{info.field_name} must be a price above zero")
+        return value
+
+    @field_validator("label")
+    @classmethod
+    def _label_is_a_caption(cls, value: str | None) -> str | None:
+        # Blank refused rather than taken as "clear it", the same way `PatchSessionIn`
+        # treats a blank title: a request that means to erase should say so in a way a
+        # dropped field cannot be mistaken for.
+        if value is None:
+            return None
+        collapsed = " ".join(value.split())
+        if not collapsed:
+            raise ValueError("label is blank — send the text it should read instead")
+        return collapsed
+
+    @model_validator(mode="after")
+    def _asks_for_something(self) -> PatchDrawingIn:
+        if all(
+            field is None
+            for field in (
+                self.price,
+                self.top,
+                self.bottom,
+                self.a_price,
+                self.b_price,
+                self.label,
+                self.hidden,
+            )
+        ):
+            raise ValueError("this request changes nothing")
+        return self
 
 
 class UsageAggregateOut(BaseModel):

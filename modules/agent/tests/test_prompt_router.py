@@ -31,7 +31,7 @@ def test_get_prompt_reads_the_seeded_revision() -> None:
 
     assert response.status_code == 200
     body = response.json()
-    assert body["version"] == "v5"
+    assert body["version"] == "v9"
     assert body["with_tools"] != body["without_tools"]
 
 
@@ -43,7 +43,7 @@ def test_put_prompt_creates_a_new_version_and_get_reflects_it() -> None:
         get_response = client.get("/prompt")
 
     assert put_response.status_code == 200
-    assert put_response.json()["version"] == "v6"
+    assert put_response.json()["version"] == "v10"
     assert put_response.json()["with_tools"] == "new with tools"
     assert get_response.json() == put_response.json()
 
@@ -54,7 +54,7 @@ def test_put_prompt_refuses_a_blank_variant() -> None:
         unchanged = client.get("/prompt")
 
     assert response.status_code == 422
-    assert unchanged.json()["version"] == "v5"
+    assert unchanged.json()["version"] == "v9"
 
 
 def test_prompt_routes_refuse_an_unauthenticated_request(monkeypatch: pytest.MonkeyPatch) -> None:

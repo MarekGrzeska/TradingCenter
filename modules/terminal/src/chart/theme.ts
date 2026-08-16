@@ -23,6 +23,10 @@ const FALLBACKS: Record<string, string> = {
   "--color-indicator-5": "#d55181",
   "--color-indicator-6": "#008300",
   "--color-indicator-7": "#9085e9",
+  "--color-drawing-1": "#009fb4",
+  "--color-drawing-2": "#8f5ada",
+  "--color-drawing-3": "#7f9422",
+  "--color-drawing-4": "#d14f72",
 };
 
 function token(styles: CSSStyleDeclaration | null, name: string): string {
@@ -54,6 +58,27 @@ export function isIndicatorColorToken(value: unknown): value is IndicatorColorTo
   return typeof value === "string" && (INDICATOR_LINE_TOKENS as readonly string[]).includes(value);
 }
 
+/**
+ * The objects an operator draws, in four hues none of the eight above uses — an object
+ * that cannot be told from an indicator line is the reason this list exists at all
+ * (`agent-chart-drawings` spec, "Paleta rysunków MUST być odrębna"). Four is not a
+ * shortage: a drawing's colour is a function of its own id, so any two hues can meet on
+ * one chart, and four is where the palette validator's all-pairs list still clears every
+ * gate on this surface. See `index.css` for the measurements.
+ */
+export const DRAWING_LINE_TOKENS = [
+  "--color-drawing-1",
+  "--color-drawing-2",
+  "--color-drawing-3",
+  "--color-drawing-4",
+] as const;
+
+export type DrawingColorToken = (typeof DRAWING_LINE_TOKENS)[number];
+
+export function isDrawingColorToken(value: unknown): value is DrawingColorToken {
+  return typeof value === "string" && (DRAWING_LINE_TOKENS as readonly string[]).includes(value);
+}
+
 export interface ChartColors {
   surface: string;
   ink: string;
@@ -68,6 +93,10 @@ export interface ChartColors {
    *  appearance is the entity, since a line has no identity a legend names). Cycles
    *  past the eighth concurrent line rather than inventing a ninth hue. */
   indicatorLines: readonly string[];
+  /** Fixed order, indexed by the drawing's own id rather than by anything about the
+   *  chart it stands on — which is the whole difference from `indicatorLines` above
+   *  (`terminal-chart` spec, "Kolor obiektu po usunięciu innego"). */
+  drawingLines: readonly string[];
 }
 
 export function readChartColors(): ChartColors {
@@ -82,6 +111,7 @@ export function readChartColors(): ChartColors {
     up: token(styles, "--color-up"),
     down: token(styles, "--color-down"),
     indicatorLines: INDICATOR_LINE_TOKENS.map((name) => token(styles, name)),
+    drawingLines: DRAWING_LINE_TOKENS.map((name) => token(styles, name)),
   };
 }
 
@@ -118,4 +148,38 @@ export function indicatorColorFromToken(colors: ChartColors, token: string | nul
   if (token === null) return null;
   const index = INDICATOR_LINE_TOKENS.indexOf(token as IndicatorColorToken);
   return index === -1 ? null : colors.indicatorLines[index];
+}
+
+/**
+ * A drawing's colour from whatever token it was saved with — its own palette first, and
+ * the indicator one after it.
+ *
+ * The second half is not a courtesy: drawings were put on instruments before the drawing
+ * palette existed, and every one of them carries an indicator token. The tool stopped
+ * offering those (`agent/tools/drawings.py`), so nothing new arrives in one; forgetting
+ * the old ones here would blank objects the operator never touched (design.md, "Paleta
+ * rysunków dokłada tokeny, nie odbiera starych").
+ */
+export function drawingColorFromToken(colors: ChartColors, token: string | null): string | null {
+  if (token === null) return null;
+  const index = DRAWING_LINE_TOKENS.indexOf(token as DrawingColorToken);
+  if (index !== -1) return colors.drawingLines[index];
+  return indicatorColorFromToken(colors, token);
+}
+
+/**
+ * The colour the chart gives a drawing that named none — a function of the drawing's own
+ * id, so it is the same in every slot, after every reload, and after the object beside it
+ * is deleted (`terminal-chart` spec, "Kolor obiektu po usunięciu innego"). The old
+ * position-in-the-list cycle repainted every drawing after the one removed.
+ *
+ * Ids are consecutive, so objects drawn in one sitting land on different hues, which is
+ * the case that matters. Two objects far apart in id can share one; with a hundred
+ * objects allowed on an instrument that is unavoidable for any finite palette, and the
+ * alternative — handing out the next free colour — is a state that depends on the
+ * neighbours again (design.md, "Kolor przypisywany po identyfikatorze, nie po pozycji").
+ */
+export function drawingColorFor(id: number, colors: ChartColors): string {
+  const palette = colors.drawingLines;
+  return palette[Math.abs(Math.trunc(id)) % palette.length];
 }

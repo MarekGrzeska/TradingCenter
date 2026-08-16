@@ -29,6 +29,12 @@ import {
   syncAgentChart,
   type ChartControlResult,
 } from "./chartControl";
+import {
+  describeDrawingsChange,
+  drawingsStore,
+  type DrawingsChange,
+  type DrawingsStore,
+} from "./drawingsStore";
 import type { AgentStreamEvent } from "./stream";
 
 export type { ChatRole };
@@ -175,6 +181,10 @@ export function createAgentChatStore(
   // What the terminal is drawing as the question is asked. Read at send time, not at
   // construction: the operator may have changed slots since the panel opened.
   chartSnapshot: () => AgentChartSnapshot | null = activeChartSnapshot,
+  // The objects the agent leaves on an instrument. Read the same way and at the same
+  // moments as its chart commands, and said in the same sentence — one channel, not two
+  // (`terminal-agent-chat` spec, "tą samą drogą i w tej samej chwili").
+  drawings: DrawingsStore = drawingsStore,
 ): AgentChatStore {
   let state: AgentChatState = {
     expanded: loadExpanded(storage),
@@ -346,8 +356,22 @@ export function createAgentChatStore(
     if (chartSyncInFlight) return;
     chartSyncInFlight = true;
     try {
-      const notice = describeChartControl(await syncChart());
-      if (notice === null) return;
+      // Both reads, then one sentence. The drawing read is not conditional on the
+      // command read having found anything: the agent may have drawn without setting the
+      // chart at all, and a failed read of either answers "nothing" rather than throwing
+      // (`terminal-agent-chat` spec, "Nieudany odczyt poleceń MUST NOT przerywać
+      // rozmowy"; the same applies to objects).
+      let change: DrawingsChange = { added: 0, removed: 0 };
+      const [command] = await Promise.all([
+        syncChart(),
+        drawings.refreshAll().then((result) => {
+          change = result;
+        }),
+      ]);
+      const notice = [describeChartControl(command), describeDrawingsChange(change)]
+        .filter((sentence): sentence is string => sentence !== null)
+        .join(" ");
+      if (notice === "") return;
       commit({ ...state, chartNotice: notice });
     } finally {
       chartSyncInFlight = false;

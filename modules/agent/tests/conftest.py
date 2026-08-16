@@ -22,8 +22,8 @@ MODULE_ROOT = Path(__file__).resolve().parent.parent
 os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 # Children before parents: `tool_calls` and `usage` both reference `messages`, and
-# `chart_commands` references `sessions`.
-TABLES = ("chart_commands", "tool_calls", "usage", "messages", "sessions")
+# `chart_commands` and `chart_drawings` reference `sessions`.
+TABLES = ("chart_drawings", "chart_commands", "tool_calls", "usage", "messages", "sessions")
 
 DOCKER_PING_TIMEOUT = 15
 

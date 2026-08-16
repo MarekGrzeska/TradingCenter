@@ -13,9 +13,9 @@ pytestmark = pytest.mark.db
 
 async def test_migration_seeds_the_current_text(db) -> None:
     revision = await store.latest_prompt_revision(db)
-    # `v5` names the chart tool; `v4` is still in the table below it, which is what a
-    # transcript stamped `"v4"` reads back against.
-    assert revision.version == "v5"
+    # `v9` names hiding; every revision under it is still in the table, which is what a
+    # transcript stamped `"v7"` or `"v8"` reads back against.
+    assert revision.version == "v9"
     assert revision.with_tools_body != revision.without_tools_body
 
 
@@ -95,7 +95,7 @@ async def test_create_prompt_revision_bumps_the_version(db) -> None:
     updated = await store.create_prompt_revision(
         db, with_tools_body="new with-tools text", without_tools_body="new without-tools text"
     )
-    assert updated.version == "v6"
+    assert updated.version == "v10"
     assert updated.with_tools_body == "new with-tools text"
     assert updated.without_tools_body == "new without-tools text"
 
@@ -114,7 +114,7 @@ async def test_create_prompt_revision_is_append_only(db) -> None:
 async def test_repeated_edits_keep_incrementing(db) -> None:
     await store.create_prompt_revision(db, with_tools_body="a1", without_tools_body="b1")
     second = await store.create_prompt_revision(db, with_tools_body="a2", without_tools_body="b2")
-    assert second.version == "v7"
+    assert second.version == "v11"
 
 
 async def test_both_seeded_texts_name_the_chart_tool(db) -> None:
@@ -123,3 +123,65 @@ async def test_both_seeded_texts_name_the_chart_tool(db) -> None:
     revision = await store.latest_prompt_revision(db)
     for body in (revision.with_tools_body, revision.without_tools_body):
         assert "set_chart" in body
+
+
+async def test_both_seeded_texts_name_the_focus_field(db) -> None:
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        lowered = body.lower()
+        assert "focus" in lowered
+        assert "last_bars" in lowered
+
+
+async def test_both_seeded_texts_name_the_drawing_tools(db) -> None:
+    # Both variants, because `list_chart_drawings` reads this module's own table and
+    # `draw_on_chart` says for itself when it cannot check a symbol — neither one goes
+    # away with the archive (specs/agent-tools, "Brak serwera narzędzi").
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        assert "draw_on_chart" in body
+        assert "list_chart_drawings" in body
+
+
+async def test_the_drawing_paragraph_tells_a_drawing_apart_from_a_computed_level(db) -> None:
+    # The one confusion the paragraph exists to prevent: `levels_near_price` computes
+    # support and resistance from the archive on every call, and a drawing is what the
+    # operator asked to keep. A model that conflates them reads one when asked about the
+    # other (design.md, "Prompt dostaje rewizję i jedno zdanie o rozróżnieniu").
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        assert "levels_near_price" in body
+
+
+async def test_the_drawing_paragraph_says_it_is_incremental(db) -> None:
+    # The inversion of set_chart's rule, and the one a model carries over by habit if the
+    # prompt does not say otherwise (specs/agent-chart-drawings, "Agent nie kasuje przez
+    # pominięcie").
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        lowered = body.lower()
+        assert "incremental, not declarative" in lowered
+        assert "remove" in lowered
+
+
+async def test_the_drawing_paragraph_no_longer_promises_the_indicator_palette(db) -> None:
+    # `draw_on_chart` stopped accepting indicator tokens, so a prompt still pointing at
+    # "the same palette set_chart's indicators use" sends the model to pick a colour it
+    # will then be refused (specs/agent-chart-drawings, "Paleta rysunków MUST być
+    # odrębna").
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        assert "same palette set_chart" not in body
+        assert "drawing palette" in body
+
+
+async def test_the_drawing_paragraph_says_hiding_is_undoable_and_removing_is_not(db) -> None:
+    # A model that does not know hiding exists deletes to clear the chart, which is the
+    # loss this whole change exists to prevent (specs/agent-chart-drawings, "Agent gasi
+    # rysunek zamiast go kasować").
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        lowered = body.lower()
+        assert "`hide`" in lowered
+        assert "`show`" in lowered
+        assert "undoable" in lowered

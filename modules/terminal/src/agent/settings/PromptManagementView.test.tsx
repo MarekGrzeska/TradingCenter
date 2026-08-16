@@ -45,6 +45,11 @@ function fakeApi(overrides: Partial<AgentApi> = {}): AgentApi {
     getPrompt: async () => promptFixture(),
     updatePrompt: async () => promptFixture(),
     chartCommand: async () => null,
+    listDrawings: async () => [],
+    patchDrawing: async () => {
+      throw new Error("not used in this test");
+    },
+    deleteDrawing: async () => {},
     ...overrides,
   };
 }

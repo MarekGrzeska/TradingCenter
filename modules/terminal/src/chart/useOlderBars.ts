@@ -13,6 +13,14 @@ export interface OlderBarsReader {
    *  keeps fetching until this goes false, so one drag to the edge is answered
    *  with as much history as the screen needs — not with one page per drag. */
   needsMore(): boolean;
+  /** One request ended with `needsMore()` still true: `MAX_PAGES` ran out before the
+   *  caller's appetite did.
+   *
+   *  Distinct from `"exhausted"`, and the distinction is the point: there *is* more
+   *  history, this request simply stopped asking for it. Whoever was waiting on that
+   *  history — an agent's focus reaching further back than twenty pages of it — otherwise
+   *  waits forever, because the run that gave up ends in `"idle"` like any other. */
+  stoppedShort?(): void;
 }
 
 export interface OlderBars {
@@ -22,6 +30,18 @@ export interface OlderBars {
    *  flight, after the archive ran out, and after a failure — a failure waits
    *  for `retry`, so a pan against a dead archive is not a request loop. */
   requestOlder(): void;
+  /** Everything between `target` and the oldest drawn bar, in **one** read.
+   *
+   *  `requestOlder` walks: a page is the span the oldest 300 drawn bars occupy, which on
+   *  MINUTE_5 is about a day of calendar, and `MAX_PAGES` caps one run at twenty of them.
+   *  That is the right shape for a drag to the left edge and the wrong shape entirely for
+   *  "show me the middle of March": reaching five months back would take some 145 pages,
+   *  so the run gave up three weeks in, twenty sequential requests later, and the chart
+   *  landed on wherever it had stopped rather than on what was asked for.
+   *
+   *  A named moment is not a walk — the window is known before the first request, so it
+   *  is asked for once. Ignored when the series already reaches back that far. */
+  reachBack(target: number): void;
   retry(): void;
 }
 
@@ -120,6 +140,9 @@ export function useOlderBars(
     busyRef.current = true;
     setStatus("loading");
 
+    // Whether the appetite that started this run was met, as opposed to the page budget
+    // running out under it.
+    let satisfied = false;
     try {
       for (let page = 0; page < MAX_PAGES; page++) {
         const series = readerRef.current.readSeries();
@@ -156,8 +179,12 @@ export function useOlderBars(
           return;
         }
 
-        if (!readerRef.current.needsMore()) break;
+        if (!readerRef.current.needsMore()) {
+          satisfied = true;
+          break;
+        }
       }
+      if (!satisfied) readerRef.current.stoppedShort?.();
       setStatus("idle");
     } catch (cause: unknown) {
       if (generation !== generationRef.current || controller.signal.aborted) return;
@@ -169,11 +196,66 @@ export function useOlderBars(
     }
   }, [source, symbol, resolution]);
 
+  const reach = useCallback(
+    async (target: number) => {
+      if (busyRef.current || blockedRef.current) return;
+      const series = readerRef.current.readSeries();
+      if (series.length === 0) return;
+      const oldest = series[0].time;
+      // Already covered: the pursuit has nothing to wait for, and a read of an empty
+      // window would answer "no candles" and be taken for the end of the archive.
+      if (target >= oldest) return;
+
+      const generation = generationRef.current;
+      const controller = (abortRef.current ??= new AbortController());
+      busyRef.current = true;
+      setStatus("loading");
+
+      try {
+        const bars = await source.history(
+          { symbol, resolution, from: target, to: oldest },
+          controller.signal,
+        );
+        if (generation !== generationRef.current) return;
+
+        if (bars.length === 0) {
+          // Nothing in a window that was asked for by name. Unlike the walk above, there
+          // is no "maybe the next window" to try: this *was* the window.
+          blockedRef.current = true;
+          setStatus("exhausted");
+          return;
+        }
+
+        readerRef.current.deliver(bars);
+        // One read is the whole attempt, so the wait is over either way — reached, or
+        // reached as far as the archive goes. Without this a target the archive starts
+        // after (March asked of a February-onwards archive) would leave whoever was
+        // waiting waiting, since a page that made *some* progress settles nothing.
+        if (readerRef.current.needsMore()) readerRef.current.stoppedShort?.();
+        setStatus("idle");
+      } catch (cause: unknown) {
+        if (generation !== generationRef.current || controller.signal.aborted) return;
+        blockedRef.current = true;
+        setError(cause instanceof Error ? cause.message : "could not read older candles");
+        setStatus("error");
+      } finally {
+        if (generation === generationRef.current) busyRef.current = false;
+      }
+    },
+    [source, symbol, resolution],
+  );
+
   const loadRef = useRef(load);
   loadRef.current = load;
+  const reachRef = useRef(reach);
+  reachRef.current = reach;
 
   const requestOlder = useCallback(() => {
     void loadRef.current();
+  }, []);
+
+  const reachBack = useCallback((target: number) => {
+    void reachRef.current(target);
   }, []);
 
   const retry = useCallback(() => {
@@ -187,5 +269,5 @@ export function useOlderBars(
     void loadRef.current();
   }, [status]);
 
-  return { status, error, requestOlder, retry };
+  return { status, error, requestOlder, reachBack, retry };
 }

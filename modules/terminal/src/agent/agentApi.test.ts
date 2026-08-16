@@ -271,6 +271,73 @@ describe("agentApi.sendMessage", () => {
     ]);
   });
 
+  function emptyCompleteStream() {
+    return new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('event: complete\ndata: {"incomplete":false}\n\n'));
+        controller.close();
+      },
+    });
+  }
+
+  it("sends the visible span as ISO instants when both halves are known", async () => {
+    let body: unknown;
+    server.use(
+      http.post(`${HTTP_BASE}/sessions/7/messages`, async ({ request }) => {
+        body = await request.json();
+        return new Response(emptyCompleteStream(), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }),
+    );
+
+    await api().sendMessage(7, "what do you see", new AbortController().signal, {
+      symbol: "US100",
+      resolution: "MINUTE_5",
+      indicators: [],
+      visibleFrom: 1767398400,
+      visibleTo: 1767484800,
+    });
+
+    expect(body).toEqual({
+      content: "what do you see",
+      chart: {
+        symbol: "US100",
+        resolution: "MINUTE_5",
+        indicators: [],
+        visible_from: "2026-01-03T00:00:00.000Z",
+        visible_to: "2026-01-04T00:00:00.000Z",
+      },
+    });
+  });
+
+  it("sends neither half of the visible span when only one is known", async () => {
+    let body: unknown;
+    server.use(
+      http.post(`${HTTP_BASE}/sessions/7/messages`, async ({ request }) => {
+        body = await request.json();
+        return new Response(emptyCompleteStream(), {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        });
+      }),
+    );
+
+    await api().sendMessage(7, "what do you see", new AbortController().signal, {
+      symbol: "US100",
+      resolution: "MINUTE_5",
+      indicators: [],
+      visibleFrom: 1767398400,
+      visibleTo: null,
+    });
+
+    expect(body).toEqual({
+      content: "what do you see",
+      chart: { symbol: "US100", resolution: "MINUTE_5", indicators: [] },
+    });
+  });
+
   it("rejects before yielding anything when the session is missing", async () => {
     server.use(
       http.post(`${HTTP_BASE}/sessions/9/messages`, () =>
@@ -332,6 +399,77 @@ describe("agentApi.usage", () => {
   });
 });
 
+describe("agentApi.chartCommand", () => {
+  it("maps a null focus through untouched", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/chart`, () =>
+        HttpResponse.json({
+          sequence: 3,
+          symbol: "US100",
+          resolution: null,
+          indicators: null,
+          focus: null,
+        }),
+      ),
+    );
+
+    const command = await api().chartCommand(0, new AbortController().signal);
+    expect(command?.focus).toBeNull();
+  });
+
+  it("maps a range focus from ISO instants to epoch seconds", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/chart`, () =>
+        HttpResponse.json({
+          sequence: 3,
+          symbol: null,
+          resolution: null,
+          indicators: null,
+          focus: {
+            from: "2026-01-03T00:00:00Z",
+            to: "2026-01-04T00:00:00Z",
+            around: null,
+            bars: null,
+            last_bars: null,
+          },
+        }),
+      ),
+    );
+
+    const command = await api().chartCommand(0, new AbortController().signal);
+    expect(command?.focus).toEqual({
+      from: 1767398400,
+      to: 1767484800,
+      around: null,
+      bars: null,
+      lastBars: null,
+    });
+  });
+
+  it("maps a last-bars focus, its number kept as a number", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/chart`, () =>
+        HttpResponse.json({
+          sequence: 3,
+          symbol: null,
+          resolution: null,
+          indicators: null,
+          focus: { from: null, to: null, around: null, bars: null, last_bars: 100 },
+        }),
+      ),
+    );
+
+    const command = await api().chartCommand(0, new AbortController().signal);
+    expect(command?.focus).toEqual({
+      from: null,
+      to: null,
+      around: null,
+      bars: null,
+      lastBars: 100,
+    });
+  });
+});
+
 describe("agentApi.getPrompt", () => {
   it("maps the current revision, both variants and the version", async () => {
     server.use(
@@ -388,5 +526,116 @@ describe("agentApi.updatePrompt", () => {
 
     const call = api().updatePrompt("   ", "fine", new AbortController().signal);
     await expect(call).rejects.toMatchObject({ kind: "refused", message: "with_tools is blank" });
+  });
+});
+
+describe("agentApi drawings", () => {
+  function raw(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 7,
+      symbol: "US100",
+      geometry: { kind: "level", price: 21500, at: null },
+      label: "weekly high",
+      color: "--color-up",
+      created_at: "2026-01-03T00:00:00Z",
+      updated_at: "2026-01-03T00:00:00Z",
+      ...overrides,
+    };
+  }
+
+  it("maps a level, its moments as epoch seconds", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/drawings`, () =>
+        HttpResponse.json([raw({ geometry: { kind: "level", price: 21500, at: "2026-01-03T09:00:00Z" } })]),
+      ),
+    );
+
+    const drawings = await api().listDrawings("US100", new AbortController().signal);
+    expect(drawings).toEqual([
+      {
+        id: 7,
+        symbol: "US100",
+        geometry: { kind: "level", price: 21500, at: 1767430800 },
+        label: "weekly high",
+        color: "--color-up",
+        hidden: false,
+        createdAt: 1767398400,
+        updatedAt: 1767398400,
+      },
+    ]);
+  });
+
+  it("maps a zone, keeping `top` and `bottom` apart", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/drawings`, () =>
+        HttpResponse.json([
+          raw({ geometry: { kind: "zone", top: 21600, bottom: 21550, from: null, to: null } }),
+        ]),
+      ),
+    );
+
+    const [drawing] = await api().listDrawings("US100", new AbortController().signal);
+    expect(drawing.geometry).toEqual({ kind: "zone", top: 21600, bottom: 21550, from: null, to: null });
+  });
+
+  it("maps a trend line's two points", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/drawings`, () =>
+        HttpResponse.json([
+          raw({
+            geometry: {
+              kind: "trendline",
+              a: { time: "2026-01-03T00:00:00Z", price: 21000 },
+              b: { time: "2026-01-04T00:00:00Z", price: 21400 },
+            },
+          }),
+        ]),
+      ),
+    );
+
+    const [drawing] = await api().listDrawings("US100", new AbortController().signal);
+    expect(drawing.geometry).toEqual({
+      kind: "trendline",
+      a: { time: 1767398400, price: 21000 },
+      b: { time: 1767484800, price: 21400 },
+    });
+  });
+
+  it("skips a kind it has no shape for rather than dropping the whole read", async () => {
+    // A module deployed ahead of this terminal may publish a fourth shape. The objects
+    // this terminal *can* draw must survive it.
+    server.use(
+      http.get(`${HTTP_BASE}/drawings`, () =>
+        HttpResponse.json([raw({ id: 8, geometry: { kind: "fibonacci", levels: [] } }), raw()]),
+      ),
+    );
+
+    const drawings = await api().listDrawings("US100", new AbortController().signal);
+    expect(drawings.map((drawing) => drawing.id)).toEqual([7]);
+  });
+
+  it("sends only the price roles the caller named, in the module's own names", async () => {
+    let body: unknown;
+    server.use(
+      http.patch(`${HTTP_BASE}/drawings/7`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(raw());
+      }),
+    );
+
+    await api().patchDrawing(7, { aPrice: 21000, label: "trend" }, new AbortController().signal);
+    expect(body).toEqual({ a_price: 21000, label: "trend" });
+  });
+
+  it("turns a 404 on removal into a not-found error rather than a silent success", async () => {
+    server.use(
+      http.delete(`${HTTP_BASE}/drawings/7`, () =>
+        HttpResponse.json({ detail: "no drawing #7" }, { status: 404 }),
+      ),
+    );
+
+    await expect(api().deleteDrawing(7, new AbortController().signal)).rejects.toBeInstanceOf(
+      MarketDataError,
+    );
   });
 });

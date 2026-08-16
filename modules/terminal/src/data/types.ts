@@ -401,6 +401,26 @@ export interface IndicatorSelection {
   color: string | null;
 }
 
+/** A one-off request to show a fragment of a chart's time axis — epoch seconds,
+ *  exactly one of the three shapes filled: a `from`/`to` range, an `around`/`bars`
+ *  point, or `lastBars` alone. Not part of a saved selection — it is what the chart
+ *  should be shown next, not something it remembers having. */
+export interface ChartFocusRequest {
+  from: number | null;
+  to: number | null;
+  around: number | null;
+  bars: number | null;
+  lastBars: number | null;
+}
+
+/** The visible span, in the drawn series' own bar times (epoch seconds) — what a caller
+ *  needing to know "what is the operator looking at" reads, without touching the chart
+ *  library itself. */
+export interface VisibleTimeRange {
+  from: number;
+  to: number;
+}
+
 let fallbackKeys = 0;
 
 /** A fresh instance identity. `randomUUID` where there is one; a counter where there is

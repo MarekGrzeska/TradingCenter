@@ -16,9 +16,14 @@ function fakeContext() {
     lineTo: vi.fn(),
     stroke: vi.fn(),
     fillText: vi.fn(),
+    fillRect: vi.fn(),
+    // A width proportional to the text, so a chip's own geometry is predictable in a
+    // test the way it is not in a real font metric.
+    measureText: vi.fn((text: string) => ({ width: text.length * 6 })),
     setLineDash: vi.fn(),
     strokeStyle: "",
     lineWidth: 0,
+    globalAlpha: 1,
     fillStyle: "",
     font: "",
     textBaseline: "",
@@ -126,7 +131,11 @@ describe("RayPrimitive — drawing", () => {
     expect(ctx.moveTo).toHaveBeenCalledWith(40, 90.5);
     expect(ctx.lineTo).toHaveBeenCalledWith(200, 90.5);
     expect(ctx.stroke).toHaveBeenCalledTimes(1);
-    expect(ctx.fillText).toHaveBeenCalledWith("PDH", 44, 86.5);
+    // On a plate rather than straight on the chart: the caption sits above the line, and
+    // the plate under it is what keeps it readable over the wicks (`terminal-chart` spec,
+    // "Etykieta MUST być czytelna nad świecami").
+    expect(ctx.fillRect).toHaveBeenCalledWith(40, 73.5, 26, 14);
+    expect(ctx.fillText).toHaveBeenCalledWith("PDH", 44, 80.5);
   });
 
   it("clamps a level whose moment sits left of the visible area to the pane's edge", () => {
@@ -149,5 +158,113 @@ describe("RayPrimitive — drawing", () => {
     ray.paneViews()[0]?.renderer()?.draw(target);
 
     expect(ctx.moveTo).not.toHaveBeenCalled();
+  });
+});
+
+describe("RayPrimitive — who drew it (terminal-chart spec, terminal-chart-objects)", () => {
+  it("draws an operator's level heavier and unbroken, an indicator's thin and dashed", () => {
+    // Weight is what carries authorship, because a chart with eight hues on it gives
+    // nobody a way to remember which belong to which group (design.md, "Rysunek cięższy
+    // od wskaźnika").
+    const drawn = new RayPrimitive("#abc", { weight: "drawing", objectId: "3" });
+    attach(drawn, 40, 90);
+    drawn.setLevels([{ time: 100 as Time, price: 21000, label: null }]);
+    const drawnTarget = fakeTarget(200);
+    drawn.paneViews()[0]?.renderer()?.draw(drawnTarget.target);
+    expect(drawnTarget.ctx.lineWidth).toBe(2);
+    expect(drawnTarget.ctx.setLineDash).toHaveBeenCalledWith([]);
+
+    const computed = new RayPrimitive("#abc");
+    attach(computed, 40, 90);
+    computed.setLevels([{ time: 100 as Time, price: 21000, label: null }]);
+    const computedTarget = fakeTarget(200);
+    computed.paneViews()[0]?.renderer()?.draw(computedTarget.target);
+    expect(computedTarget.ctx.lineWidth).toBe(1);
+    expect(computedTarget.ctx.setLineDash).toHaveBeenCalledWith([4, 4]);
+  });
+
+  it("keeps the caption on screen for a level starting off the left edge", () => {
+    // `terminal-chart` spec, "Obiekt zaczynający się poza widokiem": a line crossing the
+    // screen with no caption is a stroke nothing is known about.
+    const ray = new RayPrimitive("#abc", { weight: "drawing", objectId: "3" });
+    attach(ray, -500, 90);
+    ray.setLevels([{ time: 1 as Time, price: 21000, label: "PDH" }]);
+
+    const { target, ctx } = fakeTarget(200);
+    ray.paneViews()[0]?.renderer()?.draw(target);
+
+    expect(ctx.fillText).toHaveBeenCalledWith("PDH", 4, 80.5);
+  });
+});
+
+describe("RayPrimitive — the price at the axis (terminal-chart spec)", () => {
+  function drawnRay(price: number, currentPrice: number | null) {
+    const ray = new RayPrimitive("#abc", {
+      weight: "drawing",
+      objectId: "3",
+      palette: { onFill: "#000", support: "#up", resistance: "#down" },
+    });
+    attach(ray, 40, 90);
+    ray.setLevels([{ time: 100 as Time, price, label: null }]);
+    ray.setCurrentPrice(currentPrice);
+    return ray;
+  }
+
+  it("says the price, coloured by the side of the market it sits on", () => {
+    // The line says which object this is; the label says what it is (design.md, "Kolor:
+    // linia z palety rysunków, etykieta przy osi kolorowana rolą").
+    expect(drawnRay(21000, 21500).priceAxisViews()[0].backColor()).toBe("#up");
+    expect(drawnRay(21900, 21500).priceAxisViews()[0].backColor()).toBe("#down");
+    expect(drawnRay(21000, 21500).priceAxisViews()[0].text()).toBe("21000");
+  });
+
+  it("takes the line's own colour when the chart has drawn no candle yet", () => {
+    // Nothing to be above or below, so no side to claim.
+    expect(drawnRay(21000, null).priceAxisViews()[0].backColor()).toBe("#abc");
+  });
+
+  it("leaves the axis alone for an indicator's own levels", () => {
+    // `level_clusters` on this chart would otherwise be an axis of nothing else.
+    const computed = new RayPrimitive("#abc");
+    attach(computed, 40, 90);
+    computed.setLevels([{ time: 100 as Time, price: 21000, label: null }]);
+    expect(computed.priceAxisViews()).toEqual([]);
+  });
+});
+
+describe("RayPrimitive — clicking into it (terminal-chart-objects spec)", () => {
+  function drawnRay() {
+    const ray = new RayPrimitive("#abc", { weight: "drawing", objectId: "42" });
+    attach(ray, 40, 90);
+    ray.setLevels([{ time: 100 as Time, price: 21000, label: null }]);
+    return ray;
+  }
+
+  it("answers with the drawing's own id, and asks for a pointer", () => {
+    expect(drawnRay().hitTest(120, 90)).toEqual({
+      externalId: "42",
+      zOrder: "normal",
+      cursorStyle: "pointer",
+    });
+  });
+
+  it("counts a click a few pixels off the line as a click into it", () => {
+    expect(drawnRay().hitTest(120, 93)?.externalId).toBe("42");
+  });
+
+  it("does not answer for a click further away than the tolerance", () => {
+    expect(drawnRay().hitTest(120, 110)).toBeNull();
+  });
+
+  it("does not answer left of where the level starts", () => {
+    expect(drawnRay().hitTest(10, 90)).toBeNull();
+  });
+
+  it("never answers for an indicator's own level", () => {
+    // What a click picks out is an object somebody drew, not a reading.
+    const computed = new RayPrimitive("#abc");
+    attach(computed, 40, 90);
+    computed.setLevels([{ time: 100 as Time, price: 21000, label: null }]);
+    expect(computed.hitTest(120, 90)).toBeNull();
   });
 });

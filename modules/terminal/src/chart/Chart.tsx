@@ -24,15 +24,19 @@ import {
   type UTCTimestamp,
   type WhitespaceData,
 } from "lightweight-charts";
+import type { AgentChartDrawing, AgentDrawingPatch } from "../agent/agentApi";
+import type { DrawingsStatus } from "../agent/drawingsStore";
 import { findBar, mergeBar, mergeSeries } from "../data/merge";
 import type { IndicatorSource } from "../data/source";
 import {
   RESOLUTIONS,
   type Bar,
+  type ChartFocusRequest,
   type IndicatorCatalogueEntry,
   type IndicatorResult,
   type IndicatorSelection,
   type Resolution,
+  type VisibleTimeRange,
 } from "../data/types";
 import type { MarketDataSource } from "../data/source";
 import { formatCrosshairTime, formatInstant, formatTickMark } from "../ui/formatTime";
@@ -40,11 +44,16 @@ import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { showToast } from "../ui/toastStore";
 import {
   candlestickColors,
+  drawingColorFor,
+  drawingColorFromToken,
   indicatorColorFromToken,
   indicatorLineColor,
   readChartColors,
   type ChartColors,
 } from "./theme";
+import type { Emphasis, MarkPalette } from "./drawingStyle";
+import { DrawingCard } from "./DrawingCard";
+import { DrawingList } from "./DrawingList";
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
 import { type BarsRange, useIndicators } from "./indicators/useIndicators";
 import { useIndicatorCatalogue } from "./indicators/useIndicatorCatalogue";
@@ -52,6 +61,7 @@ import { RayPrimitive } from "./RayPrimitive";
 import { TimeProfilePrimitive, type ProfileBar } from "./TimeProfilePrimitive";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
+import { TrendlinePrimitive, type DrawnTrendline } from "./TrendlinePrimitive";
 import { ZonePrimitive, type DrawnZone } from "./ZonePrimitive";
 
 export interface ChartProps {
@@ -80,6 +90,44 @@ export interface ChartProps {
    *  nothing here needs the reverse (an external reset mid-session). */
   initialIndicatorSelections?: IndicatorSelection[];
   onIndicatorSelectionsChange?(selections: IndicatorSelection[]): void;
+  /** A one-off "show this fragment of the axis" — omitted, the chart never jumps on its
+   *  own. A new object (not a mutation of the previous one) is what triggers a pursuit;
+   *  the same reference twice is a no-op, which is what lets the caller pass its own
+   *  stored value on every render without refiring anything (`terminal-chart` spec,
+   *  "Wykres przyjmuje kadr z zewnątrz"). */
+  focusRequest?: ChartFocusRequest | null;
+  /** Called once `focusRequest` has been either applied or given up on — never both, and
+   *  never left uncalled for a request the chart accepted. The caller's cue to stop
+   *  offering it again (`terminal-chart` spec, "Kadr MUST być żądaniem jednorazowym"). */
+  onFocusRequestSettled?(): void;
+  /** Fired whenever the visible span changes — panning, zooming, a resolution change's
+   *  own repositioning, or `focusRequest` landing — and with `null` when there is
+   *  nothing to report (no series drawn yet, or the chart is going away). Never read
+   *  back by this component; it exists for a caller keeping its own record of what the
+   *  operator is looking at (`terminal-agent-chat` spec, "Panel wysyła migawkę tego, co
+   *  rysuje aktywny slot"). Not a controlled value — there is no prop that sets it. */
+  onVisibleRangeChange?(range: VisibleTimeRange | null): void;
+  /** Objects drawn on this instrument — levels, zones and trend lines the agent and the
+   *  operator left on it — together with the operator's own hand on them. Not indicators
+   *  and not on the same lifecycle: they are not computed from candles and they survive a
+   *  resolution change, because they belong to the instrument rather than to the view
+   *  (`terminal-chart` spec, "Wykres rysuje obiekty naniesione na instrument"). Omitted,
+   *  the chart draws none and offers no list — a caller with nowhere to read them from
+   *  simply does not pass any. */
+  drawings?: ChartDrawings;
+}
+
+/** What the chart needs to draw the objects on an instrument and let the operator manage
+ *  them: the list, how the last read went, and the two writes. `remove` and `patch`
+ *  answer null on success and the sentence to show on failure — the list keeps whatever
+ *  it had rather than guessing (`terminal-chart` spec, "Nieudane usunięcie albo nieudana
+ *  poprawka"). */
+export interface ChartDrawings {
+  items: readonly AgentChartDrawing[];
+  status: DrawingsStatus;
+  error: string | null;
+  remove(id: number): Promise<string | null>;
+  patch(id: number, patch: AgentDrawingPatch): Promise<string | null>;
 }
 
 /** Price-pane overlays, own-pane oscillators, price-pane markers, price-pane
@@ -182,6 +230,10 @@ function assignLineColors(
  *  height — `lightweight-charts`' default (equal stretch for every pane) reads
  *  as "RSI is as important as the candles" the moment a second pane exists. */
 const PRICE_PANE_STRETCH = 4;
+
+/** One shared empty array for a chart with no drawings, so "none" is the same reference
+ *  on every render and never restarts the sync effect that watches it. */
+const EMPTY_DRAWINGS: readonly AgentChartDrawing[] = [];
 const OWN_PANE_STRETCH = 1;
 
 function toCandlestick(bar: Bar): CandlestickData<Time> {
@@ -194,10 +246,136 @@ function toCandlestick(bar: Bar): CandlestickData<Time> {
   };
 }
 
+/** Index of the drawn bar closest to `time` — the anchor for an `around`+`bars` focus,
+ *  which names a moment rather than a bar that necessarily exists at it (a session gap,
+ *  most often). `findBar` (`data/merge.ts`) only ever answers an exact match, which this
+ *  is deliberately not. */
+function nearestBarIndex(series: readonly Bar[], time: number): number {
+  let lo = 0;
+  let hi = series.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >>> 1;
+    if (series[mid].time < time) lo = mid + 1;
+    else hi = mid;
+  }
+  if (lo > 0 && Math.abs(series[lo - 1].time - time) <= Math.abs(series[lo].time - time)) {
+    return lo - 1;
+  }
+  return lo;
+}
+
+/** Whether the drawn series already reaches back far enough to show `focus` in full —
+ *  the condition that lets a focus apply immediately, without waiting on the pager. */
+function reachesBack(series: readonly Bar[], focus: ChartFocusRequest): boolean {
+  if (series.length === 0) return false;
+  if (focus.lastBars !== null) return series.length >= focus.lastBars;
+  const target = focus.from ?? focus.around;
+  return target !== null && series[0].time <= target;
+}
+
+/** The window indicators are computed over: what is on screen, widened by a margin, and
+ *  never wider than `MAX_INDICATOR_SPAN_BARS` of the resolution's own candles.
+ *
+ *  Follows the viewport rather than the drawn series, and that is the whole point. The
+ *  series after a focus jump runs from March to the live edge with a five-month hole in
+ *  the middle; asking for indicators over *that* prices a request nobody wants and gets a
+ *  refusal for it. What the operator is looking at is a screenful either way.
+ *
+ *  `visible` is null before the chart has a frame — the first draw, and every draw where
+ *  the library has not answered yet. The newest candles are the honest guess there: it is
+ *  where an unfocused chart opens. */
+function indicatorWindow(
+  series: readonly Bar[],
+  visible: LogicalRange | null,
+  resolution: Resolution,
+): BarsRange | null {
+  if (series.length === 0) return null;
+  const lastIndex = series.length - 1;
+  const rawFrom = visible === null ? lastIndex - MAX_INDICATOR_SPAN_BARS : Math.floor(visible.from);
+  const rawTo = visible === null ? lastIndex : Math.ceil(visible.to);
+
+  const fromIndex = Math.max(0, Math.min(lastIndex, rawFrom - INDICATOR_MARGIN_BARS));
+  let toIndex = Math.max(fromIndex, Math.min(lastIndex, rawTo + INDICATOR_MARGIN_BARS));
+  // Never the forming candle. A window ending on it would move with every tick, and
+  // moving the window is what asks the archive for a new answer — the one thing this
+  // must not do while a candle is still being built ("na żywo" is a later stage; see
+  // `useIndicators`). Ending on the bar that last settled is what `applyBar` always did.
+  if (series[toIndex].forming && toIndex > fromIndex) toIndex -= 1;
+
+  const to = series[toIndex].time;
+  // Clamped in time, not in candle count: the count is what the module prices, and it
+  // prices it as periods between two moments — so a window straddling the hole a jump
+  // leaves in the series is enormous however few candles are actually in it.
+  const floor = to - MAX_INDICATOR_SPAN_BARS * RESOLUTION_SECONDS[resolution];
+  return { from: Math.max(series[fromIndex].time, floor), to };
+}
+
+/** Whether `window` still covers what is on screen, margins excluded — the test for
+ *  leaving a computed answer alone. Panning inside the margin changes the window this
+ *  function is not asked about; panning out of it is what earns a new read. */
+function windowStillCovers(
+  window: BarsRange,
+  series: readonly Bar[],
+  visible: LogicalRange | null,
+): boolean {
+  if (visible === null || series.length === 0) return true;
+  const lastIndex = series.length - 1;
+  const from = series[Math.max(0, Math.min(lastIndex, Math.floor(visible.from)))].time;
+  const to = series[Math.max(0, Math.min(lastIndex, Math.ceil(visible.to)))].time;
+  return from >= window.from && to <= window.to;
+}
+
+/** The earliest moment a focus needs drawn before it can be shown in full, or null for
+ *  one that names no moment at all (`lastBars`, which is always at the newest end and can
+ *  only ever want *more* of what is already there).
+ *
+ *  Not simply `focus.from ?? focus.around`, which is what `reachesBack` asks: an
+ *  `around`+`bars` focus is centred, so half its candles sit *before* the moment it names.
+ *  Reading only as far back as `around` puts the target on the series' first bar, and a
+ *  frame centred there is the one the operator asked for shifted half a screen right.
+ *  Sized with `RESOLUTION_SECONDS`, which is an approximation — a generous one here, since
+ *  reading a little too far back costs candles nobody looks at and reading too little
+ *  costs the frame. */
+function focusNeedsBackTo(focus: ChartFocusRequest, resolution: Resolution): number | null {
+  if (focus.from !== null) return focus.from;
+  if (focus.around !== null && focus.bars !== null) {
+    return focus.around - Math.ceil(focus.bars / 2) * RESOLUTION_SECONDS[resolution];
+  }
+  return null;
+}
+
+/** Whether the drawn series has *any* candle the requested fragment could show — the
+ *  weaker condition checked once the pager has given up, since a fragment only partly
+ *  reached is still a fragment worth showing (`terminal-chart` spec, "Kadr na fragment
+ *  już narysowany" is the applied case; "Kadr na okres, którego archiwum nie ma" is the
+ *  one this returns `false` for). */
+function overlapsSeries(series: readonly Bar[], focus: ChartFocusRequest): boolean {
+  if (series.length === 0) return false;
+  if (focus.lastBars !== null) return true;
+  const oldest = series[0].time;
+  const newest = series[series.length - 1].time;
+  if (focus.from !== null && focus.to !== null) return newest >= focus.from && oldest <= focus.to;
+  if (focus.around !== null) return newest >= focus.around;
+  return false;
+}
+
 interface Readout {
   bar: Bar;
   /** True when this is the hovered bar rather than the latest one. */
   hovered: boolean;
+}
+
+/** What the outgoing series' viewport looked like, captured the moment a resolution
+ *  change is about to clear it — everything `redraw` needs to put the incoming series'
+ *  first draw over the same stretch of time instead of the whole thing
+ *  (`terminal-chart` spec, "Rozdzielczość zmienia się bez przeładowania"). */
+interface PendingResolutionFrame {
+  from: number;
+  to: number;
+  /** Whether the outgoing view reached (within `RIGHT_EDGE_SLACK_BARS`) the newest drawn
+   *  bar — the anchor a chart standing at the live edge keeps, rather than the span's own
+   *  midpoint. */
+  atRightEdge: boolean;
 }
 
 /** How few candles may be left to the viewport's left before older ones are
@@ -205,6 +383,56 @@ interface Readout {
  *  keeps going until the viewport has at least this much history behind it, so
  *  one drag to the edge is answered with a screenful rather than a page. */
 const OLDER_MARGIN_BARS = 50;
+
+/** How many candles either side of what is on screen the indicators are computed for.
+ *  Ordinary panning then moves inside an answer already in hand rather than asking the
+ *  archive for a new one on every drag. */
+const INDICATOR_MARGIN_BARS = 300;
+
+/** The widest span, in candles, one indicator request may cover.
+ *
+ *  Indicators used to be computed over the whole drawn series, which was fine while the
+ *  series was whatever the operator had panned through. It stopped being fine when a
+ *  focus could jump five months back: market-data prices a request as
+ *  candles×indicators against a ceiling of 200,000, and six months of MINUTE_5 with four
+ *  averages on it asks for 211,000 — a 422, and a chart that draws candles with no
+ *  indicators on them at all.
+ *
+ *  Chosen against that ceiling with room for the instances an operator actually stacks:
+ *  five thousand candles carries forty of them and still fits. It is not a copy of the
+ *  module's number — the module refuses for its own reasons and this is the terminal not
+ *  asking absurd questions in the first place. */
+const MAX_INDICATOR_SPAN_BARS = 5_000;
+
+/** How near the newest drawn bar counts as "standing at the live edge" — a resolution
+ *  change on a chart sitting there keeps sitting there, rather than being nudged into
+ *  history by however many bars a pan or a redraw happened to leave short of the exact
+ *  last index. */
+const RIGHT_EDGE_SLACK_BARS = 3;
+
+/** How many candles a resolution change shows, floor and ceiling — the same reasoning
+ *  `agent-chart-navigation`'s `MIN_FOCUS_BARS`/`MAX_FOCUS_BARS` used for a chart focus:
+ *  below the floor there is nothing readable, above the ceiling a mismatch between the
+ *  old and the new interval (WEEK's month of candles read as MINUTE_5) would ask for a
+ *  screen no operator can use anyway. */
+const MIN_VISIBLE_BARS = 10;
+const MAX_VISIBLE_BARS = 500;
+
+/** A candle's nominal length, seconds — an approximation good enough to size a viewport
+ *  around, never a claim about when a real session opens (`useOlderBars.ts` refuses to
+ *  keep a table like this for that reason, and does not need to: it measures the window
+ *  it asks for from the drawn series' own timestamps instead). This one only decides how
+ *  many candles roughly fill the span the operator was looking at. */
+const RESOLUTION_SECONDS: Record<Resolution, number> = {
+  MINUTE: 60,
+  MINUTE_5: 300,
+  MINUTE_15: 900,
+  MINUTE_30: 1800,
+  HOUR: 3600,
+  HOUR_4: 14400,
+  DAY: 86400,
+  WEEK: 604800,
+};
 
 /**
  * One candlestick chart, defined entirely by `symbol` + `resolution` — the same
@@ -225,6 +453,10 @@ export function Chart({
   indicatorSource,
   initialIndicatorSelections,
   onIndicatorSelectionsChange,
+  focusRequest = null,
+  onFocusRequestSettled,
+  onVisibleRangeChange,
+  drawings,
 }: ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -233,6 +465,9 @@ export function Chart({
   // The pan handler is attached once, with the chart; the pager it calls is
   // recreated whenever symbol, resolution or source change.
   const requestOlderRef = useRef<() => void>(() => {});
+  // The pager's other door: one read straight to a named moment, for a focus that would
+  // otherwise be walked to a page at a time (`useOlderBars`, `reachBack`).
+  const reachBackRef = useRef<(target: number) => void>(() => {});
   // The current price, drawn as a line with its own axis label — see
   // `syncPriceLine` for why the series' built-in one does not do.
   const priceLineRef = useRef<IPriceLine | null>(null);
@@ -269,6 +504,78 @@ export function Chart({
   // `levels` with `render.style === "histogram"` — `time_profile`, the one
   // entry that draws a histogram rather than reference rays (task 5.4).
   const timeProfilePrimitivesRef = useRef<Map<string, TimeProfilePrimitive>>(new Map());
+  // The drawings' own three primitives, in their own refs — deliberately not the maps
+  // above. Sharing them would be one line of code and one bug that looks like supports
+  // vanishing: the indicator cleanup detaches whatever it does not recognise as an
+  // active instance, and a resolution change empties `indicatorsState.results` on
+  // purpose (design.md, "Rysunki i wskaźniki dzielą prymitywy, ale nie cykl życia").
+  // Keyed by the drawing's own id, one primitive each: `RayPrimitive` and `ZonePrimitive`
+  // hold one colour for everything they draw, and every drawing carries its own.
+  const drawingPrimitivesRef = useRef<
+    Map<number, RayPrimitive | ZonePrimitive | TrendlinePrimitive>
+  >(new Map());
+  // The newest close, for a primitive built after the last candle arrived — the effect
+  // that pushes it to the others runs on a different trigger than the one that builds them.
+  const currentPriceRef = useRef<number | null>(null);
+
+  // The array alone, not the whole prop: a caller that rebuilds the object every render
+  // (the grid slot does) must not make the sync effect below run every render with it.
+  const allObjects = drawings?.items ?? EMPTY_DRAWINGS;
+  // What the chart draws, against what the instrument carries — two different questions.
+  // A hidden object is as absent from the canvas as one that was removed: it occludes no
+  // candles, puts nothing on the price axis and cannot be clicked (`terminal-chart` spec,
+  // "Zgaszony obiekt nie jest rysowany"). The list below gets `allObjects`, because it is
+  // the only way back to a hidden one.
+  const drawnObjects = useMemo(
+    () => (allObjects.some((drawing) => drawing.hidden) ? allObjects.filter((d) => !d.hidden) : allObjects),
+    [allObjects],
+  );
+
+  // --- the object the operator picked out, by its own id.
+  //
+  // State of the *screen*, and of this slot's screen alone — not of the instrument, which
+  // is what `drawingsStore` holds. Two slots showing US100 show the same objects, and the
+  // operator points at one of them in one of the slots (design.md, "Zaznaczenie mieszka
+  // w `Chart`, nie w `drawingsStore`"). The list in the header is rendered from here too,
+  // so one piece of state answers both and no channel between them is needed.
+  const [selected, setSelected] = useState<{ id: number; at: { x: number; y: number } | null } | null>(
+    null,
+  );
+  const selectedId = selected?.id ?? null;
+  // From the whole list, not from what is drawn: hiding the picked object leaves its card
+  // open with the button flipped to bring it back, because the nearest way to undo has to
+  // be where the action happened (design.md, "Zaznaczenie wskazuje obiekt z zapisu, nie
+  // z płótna").
+  const selectedDrawing = allObjects.find((drawing) => drawing.id === selectedId) ?? null;
+
+  // The objects of the previous instrument are not on the chart any more, so nothing of
+  // theirs can be picked out (`terminal-chart-objects` spec, "Zmiana symbolu przy
+  // wskazanym obiekcie").
+  useEffect(() => {
+    setSelected(null);
+  }, [symbol]);
+
+  // An object removed while picked — by the card, by the list, or by the agent's own next
+  // turn — takes the selection with it: what is not there cannot be pointed at. Hiding is
+  // deliberately not that: the object is still on the instrument, so it can still be the
+  // one being looked at.
+  useEffect(() => {
+    setSelected((current) =>
+      current === null || allObjects.some((drawing) => drawing.id === current.id) ? current : null,
+    );
+  }, [allObjects]);
+
+  useEffect(() => {
+    if (selectedId === null) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelected(null);
+    };
+    // On the document rather than on the chart's own element: `Escape` has to reach the
+    // selection wherever the focus happens to be, which is the reason it exists beside
+    // clicking on empty space (`terminal-chart-objects` spec, "Odznaczenie klawiszem").
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [selectedId]);
 
   const [readout, setReadout] = useState<Readout | null>(null);
   // The newest bar, mirrored into state on purpose. Reading `barsRef` during
@@ -310,6 +617,32 @@ export function Chart({
   // from every live tick, so an indicator does not refetch on each forming-candle update
   // (design.md's "na żywo" is a later stage; see `useIndicators`).
   const [barsRange, setBarsRange] = useState<BarsRange | null>(null);
+  // What was last asked for, so a pan inside it costs nothing. State cannot answer this:
+  // the range handler runs on every frame the library reports, long before a render.
+  const heldIndicatorWindowRef = useRef<BarsRange | null>(null);
+
+  /** Points the indicator window at what is on screen now, if what is on screen has left
+   *  the window already computed. `force` for the structural changes that invalidate an
+   *  answer whatever the frame is doing: a new period at the live edge, a series that
+   *  just grew at the front. */
+  const syncIndicatorWindow = useCallback(
+    (force = false) => {
+      const series = barsRef.current;
+      const visible = chartRef.current?.timeScale().getVisibleLogicalRange() ?? null;
+      const held = heldIndicatorWindowRef.current;
+      if (!force && held !== null && windowStillCovers(held, series, visible)) return;
+      // A forced sync always hands over a fresh object, even for an unchanged window, and
+      // that is load-bearing rather than sloppy: `useIndicators` watches `range` by
+      // reference, and a candle closing has to be recomputed over exactly the window that
+      // was already asked for. Equal values, different answer.
+      const next = indicatorWindow(series, visible, resolution);
+      heldIndicatorWindowRef.current = next;
+      setBarsRange(next);
+    },
+    [resolution],
+  );
+  const syncIndicatorWindowRef = useRef(syncIndicatorWindow);
+  syncIndicatorWindowRef.current = syncIndicatorWindow;
 
   const catalogue = useIndicatorCatalogue(indicatorSource);
   const catalogueById = useMemo(
@@ -462,6 +795,18 @@ export function Chart({
     // filled, which is what stops it looping on its own frame correction.
     const onRangeChange = (range: LogicalRange | null) => {
       if (range && range.from < OLDER_MARGIN_BARS) requestOlderRef.current();
+      // Panning off the computed window is what asks for a new one — the operator who
+      // jumped to March needs indicators over March, not over the whole series behind it.
+      syncIndicatorWindowRef.current();
+
+      const series = barsRef.current;
+      const fromIndex = range ? Math.max(0, Math.round(range.from)) : -1;
+      const toIndex = range ? Math.min(series.length - 1, Math.round(range.to)) : -1;
+      const fromTime = series[fromIndex]?.time;
+      const toTime = series[toIndex]?.time;
+      onVisibleRangeChangeRef.current?.(
+        fromTime !== undefined && toTime !== undefined ? { from: fromTime, to: toTime } : null,
+      );
     };
     chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange);
 
@@ -484,6 +829,7 @@ export function Chart({
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
       chart.remove();
+      onVisibleRangeChangeRef.current?.(null);
       chartRef.current = null;
       seriesRef.current = null;
       // The line belonged to the series that just went away with the chart.
@@ -589,6 +935,124 @@ export function Chart({
     };
   }, []);
 
+  // --- picking an object out of the chart ---
+  //
+  // `hoveredObjectId` is whatever the primitives' own `hitTest` answered on these very
+  // coordinates, so the geometry a click is measured against is the geometry the object
+  // was drawn with — one description of the shape, not a second one kept in step by hand
+  // (design.md, "Trafianie natywnym `hitTest`").
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+
+    const onClick = (param: MouseEventParams<Time>) => {
+      const hovered = param.hoveredObjectId;
+      const id = typeof hovered === "string" ? Number(hovered) : NaN;
+      // Empty space is an answer, not a missing one: it puts the selection down
+      // (`terminal-chart-objects` spec, "Kliknięcie w puste miejsce").
+      if (!Number.isFinite(id)) {
+        setSelected(null);
+        return;
+      }
+      setSelected({ id, at: param.point ? { x: param.point.x, y: param.point.y } : null });
+    };
+
+    chart.subscribeClick(onClick);
+    return () => chart.unsubscribeClick(onClick);
+  }, []);
+
+  // --- focus: a one-off "show this fragment" from outside ---
+  // What is currently being pursued — set the moment a request cannot be shown yet,
+  // cleared the moment it settles one way or the other. Read by `needsMore` below, which
+  // is how a single `requestOlder()` call ends up paging until this is satisfied or the
+  // pager gives up on its own (design.md, "Dociąganie pod kadr przez istniejący pager").
+  const pendingFocusRef = useRef<ChartFocusRequest | null>(null);
+  const onFocusRequestSettledRef = useRef(onFocusRequestSettled);
+  onFocusRequestSettledRef.current = onFocusRequestSettled;
+  const onVisibleRangeChangeRef = useRef(onVisibleRangeChange);
+  onVisibleRangeChangeRef.current = onVisibleRangeChange;
+
+  // --- resolution change: the viewport it leaves behind, for the incoming series' first
+  // draw to stand over instead of `fitContent()`'s whole-series view ---
+  const pendingResolutionFrameRef = useRef<PendingResolutionFrame | null>(null);
+  const previousParamsRef = useRef({ source, symbol, resolution });
+
+  const applyFocusToView = useCallback((focus: ChartFocusRequest): boolean => {
+    const chart = chartRef.current;
+    const series = barsRef.current;
+    if (!chart || !overlapsSeries(series, focus)) return false;
+    const timeScale = chart.timeScale();
+    if (focus.lastBars !== null) {
+      const shown = Math.min(focus.lastBars, series.length);
+      timeScale.setVisibleLogicalRange({ from: series.length - shown, to: series.length - 1 });
+      return true;
+    }
+    if (focus.from !== null && focus.to !== null) {
+      timeScale.setVisibleRange({ from: focus.from as Time, to: focus.to as Time });
+      return true;
+    }
+    // The one shape left: `around` + `bars`, checked exactly one way by the module that
+    // wrote this request — `around` and `bars` are never null here.
+    const index = nearestBarIndex(series, focus.around as number);
+    const bars = focus.bars as number;
+    const from = index - Math.floor(bars / 2);
+    timeScale.setVisibleLogicalRange({ from, to: from + bars - 1 });
+    return true;
+  }, []);
+
+  /** The one place a pursuit ends, however it ends: applies `focus` against whatever is
+   *  now drawn (which may be all of it, some of it, or — if nothing overlaps — none),
+   *  clears it as the pending one, and always tells the caller it is done. An application
+   *  that touched nothing is reported the way an unreadable indicator already is
+   *  (`terminal-chart` spec, "say it, do not hide it" — the same rule this file already
+   *  follows for indicators it could not compute). */
+  const settlePendingFocus = useCallback(
+    (focus: ChartFocusRequest) => {
+      pendingFocusRef.current = null;
+      const applied = applyFocusToView(focus);
+      onFocusRequestSettledRef.current?.();
+      if (!applied) {
+        showToast({
+          key: `focus:${symbol}:${resolution}`,
+          severity: "error",
+          title: `${symbol} · requested focus is outside the archive`,
+          detail: "The archive has no candles there right now.",
+        });
+      }
+    },
+    [applyFocusToView, symbol, resolution],
+  );
+
+  /** Applies `focus` now if the series already reaches back far enough; otherwise asks
+   *  the archive for what is missing and waits.
+   *
+   *  A focus that names a moment is fetched in one read of exactly the window between
+   *  that moment and the oldest drawn bar (`reachBack`) — not walked to by the pager,
+   *  which moves about a day of calendar per page on MINUTE_5 and stops after twenty of
+   *  them. Walking is right for a drag to the left edge, where the destination is "a bit
+   *  more"; it is wrong for "the middle of March", where the destination is known before
+   *  the first request and five months away.
+   *
+   *  `lastBars` names no moment and keeps the walk: it wants more of the newest end, which
+   *  is what the pager's own margin is already for. */
+  const pursueFocus = useCallback(
+    (focus: ChartFocusRequest) => {
+      if (reachesBack(barsRef.current, focus)) {
+        settlePendingFocus(focus);
+        return;
+      }
+      pendingFocusRef.current = focus;
+      const target = focusNeedsBackTo(focus, resolution);
+      if (target === null) requestOlderRef.current();
+      else reachBackRef.current(target);
+    },
+    [settlePendingFocus, resolution],
+  );
+
+  useEffect(() => {
+    if (focusRequest) pursueFocus(focusRequest);
+  }, [focusRequest, pursueFocus]);
+
   /**
    * Redraw the whole series, keeping the operator looking at the same candles.
    *
@@ -603,11 +1067,34 @@ export function Chart({
     const range = timeScale?.getVisibleLogicalRange() ?? null;
 
     seriesRef.current?.setData(merged.map(toCandlestick));
-    // Structural change to what is drawn — recompute indicators over the new span.
-    // Not on every live tick: `applyBar`'s hot path never calls `redraw`.
-    setBarsRange(merged.length > 0 ? { from: merged[0].time, to: merged.at(-1)!.time } : null);
 
+    // Wrapped so the indicator window is pointed at the frame this leaves behind, not the
+    // one it found: every branch below either sets a frame or corrects one, and reading
+    // the viewport before that lands would compute indicators for where the chart was.
+    const reframe = () => {
     if (previousFirstTime === undefined) {
+      // A resolution change leaves a viewport behind for exactly this moment — the
+      // series' first draw — to stand over, instead of the whole-series view
+      // `fitContent()` gives a slot that never had anything on screen before.
+      const pendingFrame = pendingResolutionFrameRef.current;
+      pendingResolutionFrameRef.current = null;
+      if (pendingFrame && merged.length > 0) {
+        const periodSeconds = RESOLUTION_SECONDS[resolution];
+        const span = Math.round((pendingFrame.to - pendingFrame.from) / periodSeconds);
+        const bars = Math.min(MAX_VISIBLE_BARS, Math.max(MIN_VISIBLE_BARS, span));
+        let from: number;
+        let to: number;
+        if (pendingFrame.atRightEdge) {
+          to = merged.length - 1;
+          from = to - bars + 1;
+        } else {
+          const centerIndex = nearestBarIndex(merged, (pendingFrame.from + pendingFrame.to) / 2);
+          from = centerIndex - Math.floor(bars / 2);
+          to = from + bars - 1;
+        }
+        timeScale?.setVisibleLogicalRange({ from, to });
+        return;
+      }
       timeScale?.fitContent();
       return;
     }
@@ -618,7 +1105,12 @@ export function Chart({
         to: range.to + prepended,
       });
     }
-  }, []);
+    };
+    reframe();
+    // Structural change to what is drawn — recompute, whatever the frame did.
+    // Not on every live tick: `applyBar`'s hot path never calls `redraw`.
+    syncIndicatorWindowRef.current(true);
+  }, [resolution]);
 
   // --- the feed writes straight into the series ---
   const applyHistory = useCallback(
@@ -639,8 +1131,12 @@ export function Chart({
       redraw(merged, previousFirstTime);
       setLatestBar(merged.at(-1) ?? null);
       setReadout(null);
+      // The first attempt at a pending focus often finds too short a series to even
+      // start the pager (`useOlderBars`'s own "at least two bars" floor) — retried here
+      // now that the deep read has landed.
+      if (pendingFocusRef.current) pursueFocus(pendingFocusRef.current);
     },
-    [redraw],
+    [redraw, pursueFocus],
   );
 
   /** A page of candles older than everything drawn. Merged rather than
@@ -652,8 +1148,23 @@ export function Chart({
       const merged = mergeSeries(barsRef.current, bars);
       barsRef.current = merged;
       redraw(merged, previousFirstTime);
+
+      // Checked here rather than by watching `older.status`: a `"loading"` render is not
+      // guaranteed to ever commit on its own — React is free to batch it away with the
+      // `"idle"` that follows a fast enough answer, which a mocked source in a test
+      // reliably is and a fast real one occasionally is too. A page landing is a plain
+      // function call, not a render, so it cannot be skipped the same way.
+      const pending = pendingFocusRef.current;
+      if (pending) {
+        const reached = reachesBack(merged, pending);
+        // The exact condition `useOlderBars` itself uses to call the archive out of
+        // history: a page that left the series starting where it started is a page of
+        // candles already drawn, and no later page will do better.
+        const noProgress = (merged[0]?.time ?? previousFirstTime) >= (previousFirstTime ?? -Infinity);
+        if (reached || noProgress) settlePendingFocus(pending);
+      }
     },
-    [redraw],
+    [redraw, settlePendingFocus],
   );
 
   const applyBar = useCallback((bar: Bar) => {
@@ -671,7 +1182,7 @@ export function Chart({
         // new (task 6.1). Still not on every tick: `bar.time === last.time`
         // above (the forming candle itself moving) never reaches here, which
         // is what keeps task 6.2 true.
-        setBarsRange(previous.length > 0 ? { from: previous[0].time, to: last.time } : null);
+        syncIndicatorWindowRef.current(true);
       }
     } else {
       // Older than what is drawn — a reconnect's gap fill. `update()` rejects
@@ -695,10 +1206,22 @@ export function Chart({
       deliver: applyOlder,
       needsMore: () => {
         const range = chartRef.current?.timeScale().getVisibleLogicalRange();
-        return range ? range.from < OLDER_MARGIN_BARS : false;
+        const viewportNeedsMore = range ? range.from < OLDER_MARGIN_BARS : false;
+        const pending = pendingFocusRef.current;
+        const focusNeedsMore = pending !== null && !reachesBack(barsRef.current, pending);
+        return viewportNeedsMore || focusNeedsMore;
+      },
+      // The pager gave up before the focus was reachable — twenty pages of history that
+      // each made progress and still did not reach far enough. Settled here rather than
+      // left pending: an unsettled request never tells the caller it is done, so the grid
+      // store keeps offering it until the symbol changes, and the operator is never told
+      // why the chart did not move.
+      stoppedShort: () => {
+        const pending = pendingFocusRef.current;
+        if (pending) settlePendingFocus(pending);
       },
     }),
-    [applyOlder],
+    [applyOlder, settlePendingFocus],
   );
 
   // Changing symbol, resolution *or source* must not leave the previous
@@ -707,6 +1230,35 @@ export function Chart({
   // under a "gateway" label for the seconds a deep read takes, which is not a
   // stale chart but a wrong one.
   useEffect(() => {
+    // `barsRef` still holds the outgoing series at this point — nothing has cleared it
+    // yet — so a resolution change (and only a resolution change: switching symbol or
+    // source is a different instrument or a different pipe, whose old window means
+    // nothing on the new one) captures its viewport here, before the lines below clear
+    // it. The comparison needs the *previous* render's params, which is exactly what a
+    // ref updated at the top of this same body, every time, keeps holding until now.
+    const previous = previousParamsRef.current;
+    previousParamsRef.current = { source, symbol, resolution };
+    const onlyResolutionChanged =
+      previous.source === source && previous.symbol === symbol && previous.resolution !== resolution;
+
+    if (onlyResolutionChanged) {
+      const range = chartRef.current?.timeScale().getVisibleLogicalRange();
+      const series = barsRef.current;
+      if (range && series.length > 0) {
+        const fromIndex = Math.max(0, Math.round(range.from));
+        const toIndex = Math.min(series.length - 1, Math.round(range.to));
+        const fromTime = series[fromIndex]?.time;
+        const toTime = series[toIndex]?.time;
+        if (fromTime !== undefined && toTime !== undefined) {
+          pendingResolutionFrameRef.current = {
+            from: fromTime,
+            to: toTime,
+            atRightEdge: toIndex >= series.length - 1 - RIGHT_EDGE_SLACK_BARS,
+          };
+        }
+      }
+    }
+
     barsRef.current = [];
     seriesRef.current?.setData([]);
     setReadout(null);
@@ -714,7 +1266,21 @@ export function Chart({
     // An indicator computed for the previous series has no business staying on screen
     // while the new one loads — `barsRange` going null empties `indicatorsState.results`
     // (`useIndicators`), which the sync effect below reads as "remove every line".
+    heldIndicatorWindowRef.current = null;
     setBarsRange(null);
+    // The cleanup, not the body: a cleanup runs only when `source`/`symbol`/`resolution`
+    // are *about to change* — never on the initial mount, which is what a focus supplied
+    // as a starting prop needs, since the "pursue on prop change" effect below runs in
+    // the same commit and must not have what it just set undone by this one.
+    return () => {
+      // A focus pursued for the series that is about to be cleared cannot be honoured
+      // against whatever loads next — abandoned rather than retried, and told to the
+      // caller the same as any other settled request.
+      if (pendingFocusRef.current) {
+        pendingFocusRef.current = null;
+        onFocusRequestSettledRef.current?.();
+      }
+    };
   }, [source, symbol, resolution]);
 
   // --- indicators: one Line series per (instance, line key), synced to what the archive
@@ -1013,9 +1579,147 @@ export function Chart({
     catalogueById,
   ]);
 
+  // --- drawings: the objects standing on this instrument, on their own primitives and
+  // their own lifecycle. Keyed on `drawings` alone, so a resolution change leaves them
+  // exactly where they were — the effect above cannot reach them, and this one has no
+  // reason to run (`terminal-chart` spec, "Zmiana rozdzielczości MUST zachować narysowane
+  // obiekty"). A symbol change replaces them because the caller reads a different
+  // instrument's list and hands over a different array.
+  useEffect(() => {
+    const chart = chartRef.current;
+    const priceSeries = seriesRef.current;
+    if (!chart || !priceSeries) return;
+    const colors = colorsRef.current ?? readChartColors();
+    const standing = drawnObjects;
+    const live = new Set<number>();
+
+    const palette: MarkPalette = {
+      onFill: colors.surface,
+      support: colors.up,
+      resistance: colors.down,
+    };
+    const currentPrice = currentPriceRef.current;
+
+    standing.forEach((drawing) => {
+      live.add(drawing.id);
+      // The drawing's own colour, or one the chart derives from its id — never from where
+      // it stands in this array, so removing the object beside it repaints nothing
+      // (`terminal-chart` spec, "Kolor obiektu po usunięciu innego").
+      const color = drawingColorFromToken(colors, drawing.color) ?? drawingColorFor(drawing.id, colors);
+      const marks = { weight: "drawing" as const, objectId: String(drawing.id), palette };
+      const existing = drawingPrimitivesRef.current.get(drawing.id);
+      const geometry = drawing.geometry;
+
+      if (geometry.kind === "level") {
+        const ray = existing instanceof RayPrimitive ? existing : new RayPrimitive(color, marks);
+        if (ray !== existing) {
+          if (existing) priceSeries.detachPrimitive(existing);
+          priceSeries.attachPrimitive(ray);
+          drawingPrimitivesRef.current.set(drawing.id, ray);
+        }
+        ray.setColor(color);
+        ray.setCurrentPrice(currentPrice);
+        // A null `at` means the level has always been in effect. Sent as epoch 0 rather
+        // than as the oldest drawn bar's own time: `timeToX` snaps a moment with no bar
+        // to the nearest one, so this resolves to the left edge of whatever is loaded and
+        // keeps doing so as the pager reaches further back — where a time read once here
+        // would freeze at whichever bar happened to be oldest at the time.
+        const from = geometry.at ?? 0;
+        ray.setLevels([{ time: from as UTCTimestamp, price: geometry.price, label: drawing.label }]);
+        return;
+      }
+
+      if (geometry.kind === "zone") {
+        const zoneColors = { bullish: color, bearish: color, neutral: color };
+        const zone =
+          existing instanceof ZonePrimitive ? existing : new ZonePrimitive(zoneColors, marks);
+        if (zone !== existing) {
+          if (existing) priceSeries.detachPrimitive(existing);
+          priceSeries.attachPrimitive(zone);
+          drawingPrimitivesRef.current.set(drawing.id, zone);
+        }
+        // One colour in all three slots: a drawn zone has no direction to colour by, the
+        // way an indicator's does — it is the operator's band, not a bullish or bearish
+        // reading of one.
+        zone.setColors(zoneColors);
+        zone.setCurrentPrice(currentPrice);
+        zone.setZones([
+          {
+            from: (geometry.from ?? 0) as UTCTimestamp,
+            to: geometry.to === null ? null : (geometry.to as UTCTimestamp),
+            top: geometry.top,
+            bottom: geometry.bottom,
+            direction: null,
+            label: drawing.label,
+          },
+        ]);
+        return;
+      }
+
+      const line =
+        existing instanceof TrendlinePrimitive ? existing : new TrendlinePrimitive(color, marks);
+      if (line !== existing) {
+        if (existing) priceSeries.detachPrimitive(existing);
+        priceSeries.attachPrimitive(line);
+        drawingPrimitivesRef.current.set(drawing.id, line);
+      }
+      line.setColor(color);
+      line.setCurrentPrice(currentPrice);
+      const drawn: DrawnTrendline = {
+        from: geometry.a.time as UTCTimestamp,
+        to: geometry.b.time as UTCTimestamp,
+        fromPrice: geometry.a.price,
+        toPrice: geometry.b.price,
+        label: drawing.label,
+        color: null,
+      };
+      line.setLines([drawn]);
+    });
+
+    for (const [id, primitive] of drawingPrimitivesRef.current) {
+      if (live.has(id)) continue;
+      priceSeries.detachPrimitive(primitive);
+      drawingPrimitivesRef.current.delete(id);
+    }
+  }, [drawnObjects]);
+
+  // The role its price-axis label announces is read off the newest candle, so it follows
+  // the market on its own: a level the price breaks through stops calling itself
+  // resistance (design.md, "Rola przelicza się z ostatniej świecy"). Its own effect
+  // rather than a dependency of the one above — a forming candle must not rebuild
+  // anything, only hand over a number.
+  useEffect(() => {
+    const price = latestBar?.close ?? null;
+    currentPriceRef.current = price;
+    for (const primitive of drawingPrimitivesRef.current.values()) primitive.setCurrentPrice(price);
+  }, [latestBar]);
+
+  // Picked out, or standing back for whatever is (`terminal-chart-objects` spec, "Wskazany
+  // obiekt widać, że jest wskazany"). Nothing here touches what the object *is* — only
+  // how heavily it is drawn.
+  useEffect(() => {
+    for (const [id, primitive] of drawingPrimitivesRef.current) {
+      const emphasis: Emphasis =
+        selectedId === null ? "normal" : id === selectedId ? "selected" : "dimmed";
+      primitive.setEmphasis(emphasis);
+    }
+  }, [selectedId, drawnObjects]);
+
   const feed = useBarFeed(source, symbol, resolution, sink);
   const older = useOlderBars(source, symbol, resolution, olderReader);
   requestOlderRef.current = older.requestOlder;
+  reachBackRef.current = older.reachBack;
+
+  /** The rare case `applyOlder`'s own check cannot see: the pager walked every empty
+   *  window and delivered nothing at all, or failed outright, so no page ever arrived to
+   *  trigger that check. `"exhausted"`/`"error"` are never the initial value — unlike
+   *  `"idle"`, seeing either one is on its own proof that a real attempt just ended, so
+   *  this needs no transition tracking the way a check keyed on `"idle"` would (`"idle"`
+   *  is also what the very first render reads, before anything has run at all). */
+  useEffect(() => {
+    if (older.status !== "exhausted" && older.status !== "error") return;
+    if (pendingFocusRef.current) settlePendingFocus(pendingFocusRef.current);
+  }, [older.status, settlePendingFocus]);
 
   const shown: Readout | null =
     readout ?? (latestBar ? { bar: latestBar, hovered: false } : null);
@@ -1063,6 +1767,20 @@ export function Chart({
               setIndicatorSelections([...stillUnknown, ...next]);
             }}
             canDraw={canDrawIndicator}
+          />
+        )}
+
+        {/* Beside the indicator picker, and for the same reason it is there rather than
+            in the agent panel: this is the one place the operator undoes what the agent
+            drew, and it has to be reachable without a conversation (`agent-tools` spec,
+            "Zapis MUST być odwracalny ręką operatora"). */}
+        {drawings && (
+          <DrawingList
+            drawings={drawings}
+            selectedId={selectedId}
+            // Picked from the list, so there is no click on the chart to sit beside — the
+            // card takes its own corner (`DrawingCard.cardPosition`).
+            onSelect={(id) => setSelected(id === null ? null : { id, at: null })}
           />
         )}
 
@@ -1146,6 +1864,14 @@ export function Chart({
               )}
             />
           </div>
+        )}
+        {drawings && selectedDrawing && (
+          <DrawingCard
+            drawing={selectedDrawing}
+            drawings={drawings}
+            at={selected?.at ?? null}
+            onClose={() => setSelected(null)}
+          />
         )}
         <FeedOverlay feed={feed} symbol={symbol} resolution={resolution} />
       </div>

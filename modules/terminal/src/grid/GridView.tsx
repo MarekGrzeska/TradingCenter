@@ -1,6 +1,7 @@
-import { useMemo, useSyncExternalStore } from "react";
+import { useEffect, useMemo, useSyncExternalStore } from "react";
 import { Link } from "react-router";
-import { Chart } from "../chart/Chart";
+import { Chart, type ChartDrawings } from "../chart/Chart";
+import { drawingsStore } from "../agent/drawingsStore";
 import { archive, indicators, marketData } from "../data/marketData";
 import type { Resolution, TrackedPair } from "../data/types";
 import { useTrackedPairs } from "../instruments/useTrackedPairs";
@@ -88,6 +89,29 @@ export function GridView() {
   );
 }
 
+/** What is drawn on a slot's instrument, ready for the chart — by symbol, not by slot, so
+ *  two slots showing the same instrument read the same entry and show the same objects
+ *  (`agent-chart-drawings` spec, "Ten sam poziom w dwóch slotach"). Null while the slot
+ *  has no instrument: there is nothing to have objects on.
+ *
+ *  The store, not a hook-local fetch: the agent panel re-reads every loaded symbol after
+ *  a turn, and a per-slot fetch would leave the chart showing the list from before it. */
+function useSlotDrawings(symbol: string | null): ChartDrawings | null {
+  const snapshot = useSyncExternalStore(drawingsStore.subscribe, drawingsStore.getSnapshot);
+  useEffect(() => {
+    if (symbol !== null) drawingsStore.ensureLoaded(symbol);
+  }, [symbol]);
+  if (symbol === null) return null;
+  const entry = snapshot[symbol];
+  return {
+    items: entry?.drawings ?? [],
+    status: entry?.status ?? "loading",
+    error: entry?.error ?? null,
+    remove: (id) => drawingsStore.remove(id),
+    patch: (id, patch) => drawingsStore.patch(id, patch),
+  };
+}
+
 /** What every picker in the grid draws from — one read of `/pairs`, shared. */
 interface PickerSource {
   symbols: string[];
@@ -112,6 +136,13 @@ function Slot({
   const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
   const slot = config.slots[slotId];
   const allowedResolutions = slot.symbol ? resolutionsBySymbol.get(slot.symbol) : undefined;
+  // A separate subscription from the config above: setting a focus request must not
+  // re-render every slot watching the persisted layout, only the one it is for
+  // (`gridStore`, "Kadr musi obudzić Chart... jako pole przejściowe").
+  const focusRequest = useSyncExternalStore(gridStore.subscribeFocusRequest, () =>
+    gridStore.getFocusRequest(slotId),
+  );
+  const drawings = useSlotDrawings(slot.symbol);
 
   // Only a definite "no" — a fetch that actually finished and came back
   // without this pair — counts as stale. `unreachable` must never read as
@@ -160,6 +191,10 @@ function Slot({
           onResolutionChange={(resolution) => gridStore.setSlotResolution(slotId, resolution)}
           initialIndicatorSelections={slot.indicators}
           onIndicatorSelectionsChange={(next) => gridStore.setSlotIndicators(slotId, next)}
+          focusRequest={focusRequest}
+          onFocusRequestSettled={() => gridStore.clearFocusRequest(slotId)}
+          onVisibleRangeChange={(range) => gridStore.setVisibleRange(slotId, range)}
+          drawings={drawings ?? undefined}
           headerLeft={
             <SymbolField
               label={`Symbol for slot ${slotId}`}
