@@ -134,8 +134,8 @@
     <tr>
       <td><strong>2 · narzędzia handlowe</strong><br><span class="dim">add-trading-tools</span></td>
       <td>moduł <code>trading-mcp</code>, dwa serwery narzędzi, limity handlowe, ślad zleceń</td>
-      <td class="num">44 / 64</td>
-      <td><span class="pill warn">back end gotowy</span><br><span class="dim">terminal i infrastruktura przed nią</span></td>
+      <td class="num">50 / 64</td>
+      <td><span class="pill warn">back end i terminal</span><br><span class="dim">zostaje infrastruktura, CI, domknięcie</span></td>
     </tr>
     <tr>
       <td><strong>3 · harmonogramy</strong><br><span class="dim">add-teams-schedules-and-triggers</span></td>
@@ -194,11 +194,18 @@
 
 <p>Back end jest. Osobny moduł <code>trading-mcp</code> ze szkieletem, dostępem do <code>capital-gateway</code>, narzędziami rachunku i składaniem zleceń; w <code>teams</code> rejestr dwóch serwerów narzędzi zamiast jednego, limity handlowe (żaden nieobowiązkowy), ślad transakcji na drucie i migracja <code>0006_trades</code>.</p>
 
+<p><strong>Terminal domknięty</strong> (<a href="https://github.com/MarekGrzeska/TradingCenter/pull/132">PR #132</a>, otwarty do <code>feat/teams-platform</code>): granice handlowe dostały własny panel zespołu w edytorze — ten sam pas, w którym siedzi panel agenta, tyle że należący do zespołu, a nie do żadnego z nich. Wybierak narzędzi oznacza te, które ruszają rachunek, czytając <code>read_only</code> prosto z ogłoszenia serwera; narzędzie bez adnotacji zostaje nieopisane, zamiast awansować na „tylko czyta". Zlecenia przebiegu widać przy agencie, który je złożył, i w podsumowaniu przebiegu — z symbolem, kierunkiem, wielkością i skutkiem, a zlecenie o skutku nieznanym jest pokazane jako nieznane. Przyczyna zatrzymania niesie zdanie modułu i nagłówek nazywający granicę: <code>Order limit</code> osobno od <code>Cost limit</code>.</p>
+
+<div class="callout">
+  <span class="tag">Ostatni ślad odwróconej decyzji</span>
+  <p>Nie był w kodzie, tylko w delcie <code>terminal-teams</code> tej zmiany: dalej wymagała „odmowy zapisu z powodu brakującej granicy, pokazanej przy agencie" — czyli dokładnie tego, co grupa 6 odwróciła na polecenie operatora, zanim padła pierwsza linijka. Poprawione razem z terminalem, z zapisanym powodem. Warto to widzieć jako regułę: <strong>odwrócona decyzja zostawia ślady w tylu artefaktach, ile ich opisywało</strong>, a znajduje się je przy okazji implementacji, nie przy okazji odwracania.</p>
+</div>
+
 <h4>Co zostało</h4>
 <ul>
-  <li><strong>Grupa 8 — terminal, w całości.</strong> Granice handlowe w panelu zespołu, odróżnienie narzędzi zapisujących od czytających w wybieraku, zlecenia przebiegu pokazane przy agencie, który je złożył, i granica zleceń jako przyczyna zatrzymania, odróżniona od kosztu.</li>
   <li><strong>Grupa 9 — infrastruktura, w całości.</strong> <code>trading-mcp</code> nie ma ani rejestracji Entra, ani App Service'u, ani reguł w zaporze gateway. Moduł istnieje w repozytorium i nigdzie indziej.</li>
   <li>Grupy 10 i 11 — CI, wdrożenie, domknięcie.</li>
+  <li>Poza grupami, zauważone przy okazji: <strong>granice kosztu nadal nie mają w terminalu żadnego wybieraka.</strong> Jadą na drucie od fazy 1 i nigdy go nie miały — dołożenie ich przy granicach handlowych rozszerzyłoby tę zmianę o cudzy brak, więc jest to zapisane jako dziura, nie zrobione po cichu.</li>
 </ul>
 
 <h2>Faza 3 — harmonogramy i wyzwalacze</h2>
@@ -228,14 +235,15 @@
   <li><strong>Spiąć <code>read_only</code> z <code>STATE_CHANGING_TOOLS</code></strong> — jedyna rzecz na tej liście, która jest luką w ochronie, a nie brakiem funkcji.</li>
   <li><strong>Wypchnąć obraz teams do Azure</strong> — gałąź w filtrze <code>push:</code>, workflow, smoke check na <code>/health</code>, filtr z powrotem. Dopiero wtedy „moduł stoi" jest prawdziwe.</li>
   <li><strong>Przebieg od końca do końca</strong> — jeden prawdziwy przebieg powie to, czego nie powie żaden test: ile kosztuje i czy odpowiedzi składają się w cokolwiek. Zamyka 14.2 fazy 1 i 8.2 fazy 3.</li>
-  <li><strong>Faza 2: terminal i infrastruktura</strong> — bez grupy 9 <code>trading-mcp</code> nie istnieje poza repozytorium.</li>
+  <li><strong>Faza 2: infrastruktura</strong> — terminal domknięty, ale bez grupy 9 <code>trading-mcp</code> nie istnieje poza repozytorium.</li>
   <li><strong>Faza 3: konfiguracja, README, przegląd.</strong></li>
   <li><strong>Jeden merge <code>feat/teams-platform</code> → <code>main</code></strong>, gdy fazy są domknięte — i dopiero wtedy <code>deploy-*.yml</code> oraz <code>terraform plan</code> na <code>main</code> zaczynają mówić prawdę.</li>
 </ol>
 
 <footer>
   Stan wynika z <code>tasks.md</code> trzech zmian OpenSpec, odczytu Azure przez <code>az</code> i przebiegów testów na
-  <code>feat/teams-platform</code>: <code>teams</code> 337 zielonych, <code>trading-mcp</code> 58, terminal 840.
+  <code>feat/teams-platform</code>: <code>teams</code> 337 zielonych, <code>trading-mcp</code> 58, terminal 853
+  (840 przed grupą 8).
   Dokument opisuje jeden dzień i zestarzeje się jak każdy raport — jeśli nie zgadza się z <code>tasks.md</code>, to
   <code>tasks.md</code> ma rację.
 </footer>
