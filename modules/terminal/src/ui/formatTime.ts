@@ -41,6 +41,14 @@ export function formatInstant(epochSeconds: number): string {
   return `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")} ${part("timeZoneName")}`;
 }
 
+/** `2026-08-16 20:05 UTC` — the instant exactly as a schedule or a trigger stores and
+ *  answers it, shown beside `formatInstant`'s own reading of the same second in the
+ *  terminal's usual zone (specs/teams-schedules, "Moment wyzwolenia MUST być pokazany w
+ *  UTC"; specs/terminal-teams-schedules, "…oraz w czasie lokalnym…"). */
+export function formatUtcInstant(epochSeconds: number): string {
+  return `${new Date(epochSeconds * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+}
+
 /** An approximation, same as the number it describes (`market-data-jobs`
  *  spec, "Zlecenie da się wycenić przed jego uruchomieniem") — one decimal is
  *  enough precision for a number the operator is not meant to trust exactly. */

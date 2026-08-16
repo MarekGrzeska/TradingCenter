@@ -423,6 +423,10 @@ export interface paths {
          *     201 with the run, not the run's result: a team takes minutes, and a request held open
          *     for it would be a request that fails whenever the network does. What the operator
          *     watches afterwards is `/runs/{id}/events`, and what survives either way is the trace.
+         *
+         *     The checks and the start itself are `runner.start_run_on_revision` — the same
+         *     function the schedule/trigger clock calls once it has resolved its own revision
+         *     (design.md, "Uruchomienie przebiegu tą samą drogą co router").
          */
         post: operations["start_run_teams__team_id__runs_post"];
         delete?: never;

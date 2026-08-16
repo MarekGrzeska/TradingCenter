@@ -44,6 +44,12 @@ type RawLayout = Wire["TeamLayoutOut"];
 type RawRun = Wire["RunOut"];
 type RawStep = Wire["RunStepOut"];
 type RawToolCall = Wire["ToolCallOut"];
+type RawSchedule = Wire["ScheduleOut"];
+type RawScheduleIn = Wire["ScheduleIn"];
+type RawTrigger = Wire["TriggerOut"];
+type RawTriggerIn = Wire["TriggerIn"];
+type RawFire = Wire["ScheduleFireOut"];
+type RawNextFires = Wire["NextFiresOut"];
 
 /** One entry of the catalogue — everything the list needs, and no definition: reading
  *  the list must not pull down every team's graph (specs/teams-catalogue). */
@@ -101,6 +107,98 @@ export interface TeamRevision {
   version: number;
   definition: TeamDefinition;
   createdAt: number;
+}
+
+/** `pinned` names a revision, `latest` follows whatever the team's newest one is at the
+ *  moment of each fire — an explicit choice, never the default (specs/teams-schedules,
+ *  "tryb «najnowsza» jest jawnym wyborem"). */
+export type RevisionMode = "pinned" | "latest";
+
+export type TriggerComparison = "gt" | "gte" | "lt" | "lte" | "eq";
+
+/** A team's own clock. Every field the module keeps, including the ones this terminal
+ *  only displays — `nextFireAt` chiefly, which the module computes and this side never
+ *  recomputes (`terminal-teams-schedules`, "Terminal nie liczy czasu wyzwolenia sam"). */
+export interface Schedule {
+  id: number;
+  teamId: number;
+  revisionMode: RevisionMode;
+  pinnedRevisionId: number | null;
+  cronExpression: string;
+  nextFireAt: number;
+  enabled: boolean;
+  disabledReason: string | null;
+  consecutiveFailures: number;
+  unattendedAck: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/** What an operator submits to create or edit a schedule — everything `Schedule` carries
+ *  except what only the module ever writes (`id`, `nextFireAt`, `enabled`, the failure
+ *  streak). */
+export interface ScheduleDraft {
+  revisionMode: RevisionMode;
+  pinnedRevisionId: number | null;
+  cronExpression: string;
+  unattendedAck: boolean;
+}
+
+/** A market condition, expressed as a call to a tool this module already reads through —
+ *  never a locally computed indicator (specs/teams-triggers, "Warunek jest czytany
+ *  narzędziami serwera narzędzi"). `lastResult` is `null` until the first check, and
+ *  `null` again whenever the tool server could not be asked — a third value, not a
+ *  `false` (specs/teams-triggers, "Niedostępność serwera narzędzi to nie jest
+ *  niespełniony warunek"). */
+export interface Trigger {
+  id: number;
+  teamId: number;
+  revisionMode: RevisionMode;
+  pinnedRevisionId: number | null;
+  toolName: string;
+  arguments: Record<string, unknown>;
+  fieldPath: string;
+  comparison: TriggerComparison;
+  threshold: string;
+  cooldownSeconds: number;
+  pollIntervalSeconds: number;
+  nextCheckAt: number;
+  lastResult: boolean | null;
+  lastCheckedAt: number | null;
+  lastFiredAt: number | null;
+  enabled: boolean;
+  disabledReason: string | null;
+  consecutiveFailures: number;
+  unattendedAck: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface TriggerDraft {
+  revisionMode: RevisionMode;
+  pinnedRevisionId: number | null;
+  toolName: string;
+  arguments: Record<string, unknown>;
+  fieldPath: string;
+  comparison: TriggerComparison;
+  threshold: string;
+  cooldownSeconds: number;
+  pollIntervalSeconds: number;
+  unattendedAck: boolean;
+}
+
+/** One fire attempt from a schedule or a trigger — including one that started nothing.
+ *  Exactly one of `scheduleId`/`triggerId` is set (specs/teams-schedules, "Wyzwolenie
+ *  bez przebiegu zostawia zapisany powód"). */
+export interface ScheduleFire {
+  id: number;
+  scheduleId: number | null;
+  triggerId: number | null;
+  firedAt: number;
+  outcome: string;
+  reason: string | null;
+  runId: number | null;
+  skippedCount: number;
 }
 
 export interface TeamsModel {
@@ -181,6 +279,29 @@ export interface TeamsApi {
    *  the connection — closing the view, aborting the signal — unsubscribes and nothing
    *  else: the run does not know anyone was watching (specs/teams-runs). */
   watchRun(runId: number, signal: AbortSignal): Promise<AsyncGenerator<RunStreamEvent>>;
+
+  /** A team's schedules — its own clock, not a run's. */
+  listSchedules(teamId: number, signal: AbortSignal): Promise<Schedule[]>;
+  /** Rejects `"refused"` when the pinned or latest revision cannot be run unattended —
+   *  a model outside the catalogue, or a state-changing tool with no acknowledgement. */
+  createSchedule(teamId: number, draft: ScheduleDraft, signal: AbortSignal): Promise<Schedule>;
+  updateSchedule(id: number, draft: ScheduleDraft, signal: AbortSignal): Promise<Schedule>;
+  enableSchedule(id: number, signal: AbortSignal): Promise<Schedule>;
+  disableSchedule(id: number, signal: AbortSignal): Promise<Schedule>;
+  /** Every fire this schedule has had, newest first — including ones that started
+   *  nothing (`terminal-teams-schedules`, "Historia pokazuje także to, co się nie
+   *  wydarzyło"). */
+  scheduleFires(id: number, signal: AbortSignal): Promise<ScheduleFire[]>;
+  /** The module's own answer to "when does this fire next" — never computed here
+   *  (`terminal-teams-schedules`, "Terminal nie liczy czasu wyzwolenia sam"). */
+  nextFires(id: number, count: number, signal: AbortSignal): Promise<number[]>;
+
+  listTriggers(teamId: number, signal: AbortSignal): Promise<Trigger[]>;
+  createTrigger(teamId: number, draft: TriggerDraft, signal: AbortSignal): Promise<Trigger>;
+  updateTrigger(id: number, draft: TriggerDraft, signal: AbortSignal): Promise<Trigger>;
+  enableTrigger(id: number, signal: AbortSignal): Promise<Trigger>;
+  disableTrigger(id: number, signal: AbortSignal): Promise<Trigger>;
+  triggerFires(id: number, signal: AbortSignal): Promise<ScheduleFire[]>;
 }
 
 function mapTeam(raw: RawTeam): TeamSummary {
@@ -253,6 +374,86 @@ function mapModel(raw: RawModel): TeamsModel {
     costRank: raw.cost_rank,
     inputRatePer1M: raw.input_rate_per_1m,
     outputRatePer1M: raw.output_rate_per_1m,
+  };
+}
+
+function mapSchedule(raw: RawSchedule): Schedule {
+  return {
+    id: raw.id,
+    teamId: raw.team_id,
+    revisionMode: raw.revision_mode as RevisionMode,
+    pinnedRevisionId: raw.pinned_revision_id,
+    cronExpression: raw.cron_expression,
+    nextFireAt: parseIsoToEpochSeconds(raw.next_fire_at),
+    enabled: raw.enabled,
+    disabledReason: raw.disabled_reason,
+    consecutiveFailures: raw.consecutive_failures,
+    unattendedAck: raw.unattended_ack,
+    createdAt: parseIsoToEpochSeconds(raw.created_at),
+    updatedAt: parseIsoToEpochSeconds(raw.updated_at),
+  };
+}
+
+function scheduleDraftToWire(draft: ScheduleDraft): RawScheduleIn {
+  return {
+    revision_mode: draft.revisionMode,
+    pinned_revision_id: draft.pinnedRevisionId,
+    cron_expression: draft.cronExpression,
+    unattended_ack: draft.unattendedAck,
+  };
+}
+
+function mapTrigger(raw: RawTrigger): Trigger {
+  return {
+    id: raw.id,
+    teamId: raw.team_id,
+    revisionMode: raw.revision_mode as RevisionMode,
+    pinnedRevisionId: raw.pinned_revision_id,
+    toolName: raw.tool_name,
+    arguments: raw.arguments,
+    fieldPath: raw.field_path,
+    comparison: raw.comparison as TriggerComparison,
+    threshold: raw.threshold,
+    cooldownSeconds: raw.cooldown_seconds,
+    pollIntervalSeconds: raw.poll_interval_seconds,
+    nextCheckAt: parseIsoToEpochSeconds(raw.next_check_at),
+    lastResult: raw.last_result,
+    lastCheckedAt: raw.last_checked_at === null ? null : parseIsoToEpochSeconds(raw.last_checked_at),
+    lastFiredAt: raw.last_fired_at === null ? null : parseIsoToEpochSeconds(raw.last_fired_at),
+    enabled: raw.enabled,
+    disabledReason: raw.disabled_reason,
+    consecutiveFailures: raw.consecutive_failures,
+    unattendedAck: raw.unattended_ack,
+    createdAt: parseIsoToEpochSeconds(raw.created_at),
+    updatedAt: parseIsoToEpochSeconds(raw.updated_at),
+  };
+}
+
+function triggerDraftToWire(draft: TriggerDraft): RawTriggerIn {
+  return {
+    revision_mode: draft.revisionMode,
+    pinned_revision_id: draft.pinnedRevisionId,
+    tool_name: draft.toolName,
+    arguments: draft.arguments,
+    field_path: draft.fieldPath,
+    comparison: draft.comparison,
+    threshold: draft.threshold,
+    cooldown_seconds: draft.cooldownSeconds,
+    poll_interval_seconds: draft.pollIntervalSeconds,
+    unattended_ack: draft.unattendedAck,
+  };
+}
+
+function mapFire(raw: RawFire): ScheduleFire {
+  return {
+    id: raw.id,
+    scheduleId: raw.schedule_id,
+    triggerId: raw.trigger_id,
+    firedAt: parseIsoToEpochSeconds(raw.fired_at),
+    outcome: raw.outcome,
+    reason: raw.reason,
+    runId: raw.run_id,
+    skippedCount: raw.skipped_count,
   };
 }
 
@@ -402,6 +603,106 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
         throw new MarketDataError("unknown", "teams sent no progress stream");
       }
       return readRunStream(response.body);
+    },
+
+    async listSchedules(teamId, signal) {
+      const raw = await http.json<RawSchedule[]>(`${httpBase}/teams/${teamId}/schedules`, {
+        signal,
+      });
+      return raw.map(mapSchedule);
+    },
+
+    async createSchedule(teamId, draft, signal) {
+      const raw = await http.json<RawSchedule>(`${httpBase}/teams/${teamId}/schedules`, {
+        method: "POST",
+        body: scheduleDraftToWire(draft),
+        signal,
+      });
+      return mapSchedule(raw);
+    },
+
+    async updateSchedule(id, draft, signal) {
+      const raw = await http.json<RawSchedule>(`${httpBase}/schedules/${id}`, {
+        method: "PUT",
+        body: scheduleDraftToWire(draft),
+        signal,
+      });
+      return mapSchedule(raw);
+    },
+
+    async enableSchedule(id, signal) {
+      const raw = await http.json<RawSchedule>(`${httpBase}/schedules/${id}/enable`, {
+        method: "POST",
+        signal,
+      });
+      return mapSchedule(raw);
+    },
+
+    async disableSchedule(id, signal) {
+      const raw = await http.json<RawSchedule>(`${httpBase}/schedules/${id}/disable`, {
+        method: "POST",
+        signal,
+      });
+      return mapSchedule(raw);
+    },
+
+    async scheduleFires(id, signal) {
+      const raw = await http.json<RawFire[]>(`${httpBase}/schedules/${id}/fires`, { signal });
+      return raw.map(mapFire);
+    },
+
+    async nextFires(id, count, signal) {
+      const raw = await http.json<RawNextFires>(
+        `${httpBase}/schedules/${id}/next-fires?count=${count}`,
+        { signal },
+      );
+      return raw.times.map(parseIsoToEpochSeconds);
+    },
+
+    async listTriggers(teamId, signal) {
+      const raw = await http.json<RawTrigger[]>(`${httpBase}/teams/${teamId}/triggers`, {
+        signal,
+      });
+      return raw.map(mapTrigger);
+    },
+
+    async createTrigger(teamId, draft, signal) {
+      const raw = await http.json<RawTrigger>(`${httpBase}/teams/${teamId}/triggers`, {
+        method: "POST",
+        body: triggerDraftToWire(draft),
+        signal,
+      });
+      return mapTrigger(raw);
+    },
+
+    async updateTrigger(id, draft, signal) {
+      const raw = await http.json<RawTrigger>(`${httpBase}/triggers/${id}`, {
+        method: "PUT",
+        body: triggerDraftToWire(draft),
+        signal,
+      });
+      return mapTrigger(raw);
+    },
+
+    async enableTrigger(id, signal) {
+      const raw = await http.json<RawTrigger>(`${httpBase}/triggers/${id}/enable`, {
+        method: "POST",
+        signal,
+      });
+      return mapTrigger(raw);
+    },
+
+    async disableTrigger(id, signal) {
+      const raw = await http.json<RawTrigger>(`${httpBase}/triggers/${id}/disable`, {
+        method: "POST",
+        signal,
+      });
+      return mapTrigger(raw);
+    },
+
+    async triggerFires(id, signal) {
+      const raw = await http.json<RawFire[]>(`${httpBase}/triggers/${id}/fires`, { signal });
+      return raw.map(mapFire);
     },
   };
 }

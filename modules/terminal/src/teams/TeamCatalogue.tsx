@@ -24,6 +24,7 @@ export function TeamCatalogue({
   onOpen,
   onWatch,
   onNew,
+  onSchedules,
   onChanged,
   onReload,
 }: {
@@ -35,6 +36,7 @@ export function TeamCatalogue({
   /** A run to watch — the one just started, or one picked out of a team's history. */
   onWatch(runId: number): void;
   onNew(): void;
+  onSchedules(id: number, name: string): void;
   onChanged(): void;
   onReload(): void;
 }) {
@@ -119,6 +121,13 @@ export function TeamCatalogue({
                   className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
                 >
                   Runs
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onSchedules(team.id, team.name)}
+                  className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
+                >
+                  Schedules
                 </button>
                 <button
                   type="button"

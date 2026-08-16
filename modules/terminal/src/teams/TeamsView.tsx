@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { RunMonitor } from "./RunMonitor";
+import { SchedulesPanel } from "./SchedulesPanel";
 import { TeamCatalogue } from "./TeamCatalogue";
 import { TeamEditor } from "./TeamEditor";
 import { teamsApi, type TeamsApi } from "./teamsApi";
@@ -9,7 +10,8 @@ type Open =
   | { kind: "catalogue" }
   | { kind: "team"; id: number }
   | { kind: "new" }
-  | { kind: "run"; runId: number };
+  | { kind: "run"; runId: number }
+  | { kind: "schedules"; teamId: number; teamName: string };
 
 /**
  * The teams tab: the catalogue, one team open on the canvas, and one run watched on it.
@@ -55,6 +57,7 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
         onOpen={(id) => setOpen({ kind: "team", id })}
         onWatch={(runId) => setOpen({ kind: "run", runId })}
         onNew={() => setOpen({ kind: "new" })}
+        onSchedules={(id, name) => setOpen({ kind: "schedules", teamId: id, teamName: name })}
         onChanged={teams.reload}
         onReload={teams.reload}
       />
@@ -70,6 +73,19 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
         runId={open.runId}
         models={models.value}
         onClose={() => setOpen({ kind: "catalogue" })}
+      />
+    );
+  }
+
+  if (open.kind === "schedules") {
+    return (
+      <SchedulesPanel
+        api={api}
+        teamId={open.teamId}
+        teamName={open.teamName}
+        tools={tools.value}
+        onClose={() => setOpen({ kind: "catalogue" })}
+        onWatchRun={(runId) => setOpen({ kind: "run", runId })}
       />
     );
   }

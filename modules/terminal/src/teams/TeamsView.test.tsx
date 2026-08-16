@@ -108,6 +108,35 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     runToolCalls: vi.fn(async () => []),
     cancelRun: vi.fn(async () => RUN),
     watchRun: vi.fn(async () => streamOf([{ kind: "snapshot", run: RUN, steps: MIDWAY }])),
+    listSchedules: vi.fn(async () => []),
+    createSchedule: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
+    updateSchedule: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
+    enableSchedule: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
+    disableSchedule: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
+    scheduleFires: vi.fn(async () => []),
+    nextFires: vi.fn(async () => []),
+    listTriggers: vi.fn(async () => []),
+    createTrigger: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
+    updateTrigger: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
+    enableTrigger: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
+    disableTrigger: vi.fn(async () => {
+      throw new Error("not stubbed");
+    }),
+    triggerFires: vi.fn(async () => []),
     ...overrides,
   };
 }
