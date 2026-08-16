@@ -145,7 +145,7 @@
 - [x] 9.11 Testy: wybierak modeli i narzędzi powstaje bez identyfikatorów wpisanych w kod terminala
 - [x] 9.12 `pnpm lint`, `typecheck`, `test`, `contract:check` przechodzą
 
-  Grupa zrobiona w części, która nie czeka na grupę 7 — katalog, canvas, edycja, panel,
+  PR #113. Grupa zrobiona w części, która nie czeka na grupę 7 — katalog, canvas, edycja, panel,
   odmowa. Trzy pozycje zostają otwarte i każda z konkretnego powodu:
 
   - **9.4 bez uruchomienia przebiegu.** Moduł nie ma jeszcze trasy `POST /runs`; przycisk,
