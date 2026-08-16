@@ -67,13 +67,44 @@
 
 ## 5. Dwa serwery narzędzi w `teams`
 
-- [ ] 5.1 `config.py` — `TRADING_MCP_URL` i `TRADING_MCP_SCOPE` obok istniejących, każdy ze swoim sprawdzeniem trybu
-- [ ] 5.2 Rejestr serwerów w miejsce jednego `ToolServer`; sesja i `list_tools()` per serwer
-- [ ] 5.3 `plan_tools()` rozwiązujący przypisania wobec sumy ogłoszeń, z zapamiętaniem, z którego serwera pochodzi narzędzie
-- [ ] 5.4 Odmowa przy kolizji nazw — przy zapisie rewizji i przy uruchomieniu przebiegu, z nazwami obu serwerów
-- [ ] 5.5 Pytany jest tylko ten serwer, z którego ktokolwiek w definicji ma narzędzie
-- [ ] 5.6 `GET /tools` ogłaszające narzędzia obu serwerów wraz z oznaczeniem zapisujących
-- [ ] 5.7 Testy: niespójna konfiguracja drugiego serwera odmawia startu; nieosiągalny serwer zapisu nie zatrzymuje zespołu bez zapisu; kolizja nazw odmawia w obu miejscach
+- [x] 5.1 `config.py` — `TRADING_MCP_URL` i `TRADING_MCP_SCOPE` obok istniejących, każdy ze swoim sprawdzeniem trybu
+- [x] 5.2 Rejestr serwerów w miejsce jednego `ToolServer`; sesja i `list_tools()` per serwer
+- [x] 5.3 `plan_tools()` rozwiązujący przypisania wobec sumy ogłoszeń, z zapamiętaniem, z którego serwera pochodzi narzędzie
+- [x] 5.4 Odmowa przy kolizji nazw — przy zapisie rewizji i przy uruchomieniu przebiegu, z nazwami obu serwerów
+- [x] 5.5 Pytany jest tylko ten serwer, z którego ktokolwiek w definicji ma narzędzie
+- [x] 5.6 `GET /tools` ogłaszające narzędzia obu serwerów wraz z oznaczeniem zapisujących
+- [x] 5.7 Testy: niespójna konfiguracja drugiego serwera odmawia startu; nieosiągalny serwer zapisu nie zatrzymuje zespołu bez zapisu; kolizja nazw odmawia w obu miejscach
+
+  Jedna korekta wobec litery 5.5, znaleziona przy pisaniu `plan_tools()`: „pytany jest
+  tylko serwer, z którego ktokolwiek ma narzędzie" nie da się pogodzić z niezawodnym
+  wykrywaniem kolizji (5.4) bez wiedzy, którego serwera nazwa dotyczy — a tej wiedzy
+  nie ma, dopóki się nie zapyta. Rozwiązanie: każdy *skonfigurowany* serwer jest pytany
+  współbieżnie (`asyncio.gather`), a jego awaria jest składana na bok, dopóki jakaś
+  przypisana nazwa nie zostanie bez wyjaśnienia — dokładnie wtedy i tylko wtedy
+  nieosiągalność tego serwera zatrzymuje przebieg. Zespół, którego żadna przypisana
+  nazwa nie brakuje po stronie serwerów, które odpowiedziały, rusza — nieosiągalny
+  serwer *jest* pytany, ale jego porażka nigdy nie dociera do wywołującego, gdy nikt
+  jej nie potrzebuje. `teams-tool-access`'s scenariusz „nieosiągalny serwer nie jest w
+  ogóle pytany" poprawiony na „jego nieosiągalność nie wpływa na wynik" — literalne
+  niepytanie złamałoby 5.4 w drugą stronę: kolizja na serwerze, który nigdy nie został
+  zapytany, przeszłaby bez odmowy.
+
+  `ToolServer.__init__` dostał parametr `prefix` (domyślnie `"market_mcp"`) zamiast
+  nowej sygnatury biorącej `url`/`scope`/`timeout` wprost — każde dotychczasowe
+  wywołanie `ToolServer(settings)` w kodzie i w testach zostaje dokładnie tym, czym
+  było, a drugi serwer to `ToolServer(settings, prefix="trading_mcp")`. `ToolPlan`
+  niesie teraz `server_by_name` obok `per_agent` i własną metodę `call()` —
+  `runner/engine.py` przestał przekazywać `tool_server` do węzła agenta osobno, bo
+  `plan.call` już wie, gdzie wysłać każde wywołanie.
+
+  `announced_tool_names`/`announced_tools` (pojedynczy serwer) zastąpione przez
+  `announced_snapshot` (zapis — nazwa → serwery, plus lista nieosiągalnych) i
+  `announced_tools_by_server` (`GET /tools` — pełne deskryptory, 503 gdy którykolwiek
+  skonfigurowany serwer nie odpowiedział). `ToolDescriptor` dostał pole `read_only`
+  czytane z `readOnlyHint` narzędzia; `teams/contract.py`'s `ToolOut` to samo pole
+  publikuje na drucie — `contract.teams.generated.ts` przegenerowany
+  (`pnpm contract:generate`), `contract:check` i `pnpm typecheck` przechodzą. Terminal
+  poza tym nietknięty — wpięcie `read_only` w wybierak narzędzi zostaje zadaniem 8.3.
 
 ## 6. Granice handlowe
 

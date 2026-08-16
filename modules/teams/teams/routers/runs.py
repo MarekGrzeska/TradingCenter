@@ -94,7 +94,7 @@ async def start_run(
             run_id=run["id"],
             definition=definition,
             provider=request.app.state.provider,
-            tool_server=request.app.state.tools,
+            tool_registry=request.app.state.tools,
             catalogue=request.app.state.catalogue,
             settings=request.app.state.settings,
             registry=registry,

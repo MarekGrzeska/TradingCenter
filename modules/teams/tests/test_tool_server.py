@@ -146,7 +146,7 @@ async def test_an_unreachable_server_makes_a_call_unavailable_not_a_refusal() ->
         await client.aclose()
 
     assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
-    assert "says nothing about the archive" in outcome.text
+    assert "says nothing about what the tool would have answered" in outcome.text
     assert "TaskGroup" not in outcome.text
 
 

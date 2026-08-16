@@ -14,7 +14,7 @@ from teams.contract import AgentDefinition, TeamDefinition, TeamEdge
 from teams.models_catalogue import ModelCatalogue
 from teams.provider import ProviderChunk, TextDelta, UsageReport
 from teams.runner import RunRegistry, StepFinished, StepStarted, ToolCalled, execute_run
-from teams.tools import ToolDescriptor, ToolServer
+from teams.tools import ToolDescriptor, ToolServer, ToolServerRegistry
 
 from .mcp_stand_in import settings_for
 from .scripted_provider import ScriptedProvider, asks_for_tool, breaks, says
@@ -47,7 +47,7 @@ async def _run_it(
     definition: TeamDefinition,
     *,
     provider,
-    tool_server: ToolServer | None = None,
+    tool_registry: ToolServerRegistry | None = None,
     timeout: float = 30.0,
     registry: RunRegistry | None = None,
 ) -> int:
@@ -65,7 +65,7 @@ async def _run_it(
         run_id=run["id"],
         definition=definition,
         provider=provider,
-        tool_server=tool_server or ToolServer(settings),
+        tool_registry=tool_registry or ToolServerRegistry.from_settings(settings),
         catalogue=ModelCatalogue.from_settings(settings),
         settings=settings,
         registry=registry or RunRegistry(),
@@ -170,6 +170,12 @@ async def test_a_tool_call_is_written_as_it_resolves(pool: asyncpg.Pool) -> None
         def __init__(self) -> None:
             super().__init__(settings_for(None))
 
+        @property
+        def configured(self) -> bool:
+            # The base class reads this off MARKET_MCP_URL, which this stub has none
+            # of — it answers directly instead of opening a session.
+            return True
+
         async def list_tools(self) -> list[ToolDescriptor]:
             return [
                 ToolDescriptor(
@@ -183,7 +189,12 @@ async def test_a_tool_call_is_written_as_it_resolves(pool: asyncpg.Pool) -> None
             del name, arguments
             return ToolOutcome(ToolOutcomeKind.OK, "21000.5", 7)
 
-    run_id = await _run_it(pool, definition, provider=provider, tool_server=OneTool())
+    run_id = await _run_it(
+        pool,
+        definition,
+        provider=provider,
+        tool_registry=ToolServerRegistry({"market-mcp": OneTool()}),
+    )
     run, steps, calls, usage = await _trace(pool, run_id)
 
     assert run["status"] == "completed"
@@ -282,7 +293,7 @@ async def test_an_interrupted_run_keeps_the_work_that_finished(pool: asyncpg.Poo
             run_id=run["id"],
             definition=definition,
             provider=TwoScripts(),
-            tool_server=ToolServer(settings),
+            tool_registry=ToolServerRegistry.from_settings(settings),
             catalogue=ModelCatalogue.from_settings(settings),
             settings=settings,
             registry=registry,
@@ -329,7 +340,7 @@ async def test_a_watcher_sees_the_run_as_it_happens(pool: asyncpg.Pool) -> None:
         run_id=run["id"],
         definition=definition,
         provider=provider,
-        tool_server=ToolServer(settings),
+        tool_registry=ToolServerRegistry.from_settings(settings),
         catalogue=ModelCatalogue.from_settings(settings),
         settings=settings,
         registry=registry,
@@ -369,7 +380,7 @@ async def test_a_watcher_that_goes_away_does_not_stop_the_run(pool: asyncpg.Pool
         run_id=run["id"],
         definition=definition,
         provider=provider,
-        tool_server=ToolServer(settings),
+        tool_registry=ToolServerRegistry.from_settings(settings),
         catalogue=ModelCatalogue.from_settings(settings),
         settings=settings,
         registry=registry,
