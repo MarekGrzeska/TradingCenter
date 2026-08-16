@@ -39,6 +39,7 @@ zdąży dociągnąć w limicie `MAX_PAGES=20` — **została zamknięta** przy o
 |---|---|---|---|
 | Medium | `modules/terminal/src/chart/Chart.tsx`, `applyFocusToView` (`around`+`bars` gałąź) | `{from: index - half, to: index + half}` dla `half = floor(bars/2)` daje `bars+1` świec dla każdego parzystego `bars` (np. `bars=2` pokazywał 3 świece: `index-1, index, index+1`), niespójnie z `redraw`'s własną formułą `{from, to: from + bars - 1}` używaną do tego samego problemu przy zachowaniu kadru na zmianie interwału. | **FIXED** w `fbc5322` — ujednolicone do `from = index - floor(bars/2); to = from + bars - 1`; test `"centres an around/bars focus..."` poprawiony, żeby złapać ten błąd (`bars: 2` → oczekiwane `{from:69,to:70}`, nie `{from:69,to:71}`). |
 | Medium | `modules/terminal/src/chart/useOlderBars.ts` + `Chart.tsx`, `olderReader` | Bieg pagera, który wyczerpał `MAX_PAGES=20` stron, z których każda coś wniosła, kończy się statusem `"idle"` jak każdy inny — a efekt rozliczający kadr nasłuchuje tylko `"exhausted"`/`"error"`. Kadr zostawał w `pendingFocusRef`: wykres się nie ruszał, `onFocusRequestSettled` nie padało, a `gridStore` oferował to samo żądanie aż do zmiany symbolu. Pierwotnie zapisane niżej jako Gap. | **FIXED** w `5921e8d` — `OlderBarsReader.stoppedShort?()`, wołane, gdy bieg kończy się z `needsMore()` wciąż prawdziwym. Świadomie **nie** `"exhausted"`, które twierdziłoby, że archiwum nie ma nic starszego, a tu ma. `Chart` rozlicza kadr wobec tego, co faktycznie dociągnął — przypadek, dla którego istnieje `overlapsSeries`. Test `"settles a focus the pager ran out of pages before reaching"` sprawdzony jako czerwony bez poprawki. |
+| High | `modules/terminal/src/chart/Chart.tsx`, `pursueFocus` + `useOlderBars` | Kadr nazywający odległy moment był **dochodzony pieszo**: strona pagera to rozpiętość, jaką zajmuje 300 najstarszych narysowanych świec — na MINUTE_5 zmierzone 1,04 dnia kalendarza — a `MAX_PAGES=20` domyka bieg na ~21 dniach, w dwudziestu kolejnych żądaniach HTTP. Do połowy marca z żywej krawędzi trzeba ~145 stron. Po wyczerpaniu budżetu `applyFocusToView` liczyło `nearestBarIndex` dla momentu starszego niż cokolwiek narysowane → indeks 0 → wykres pokazywał najstarsze dociągnięte świece, wyglądając na udany ruch. Zgłoszone przez operatora jako „proszę o połowę marca, przenosi na połowę kwietnia, i dane długo się dociągają" — jeden mechanizm, oba objawy. Model był bez winy: `tool_calls` niesie `around: 2026-03-15T12:00:00Z`. | **FIXED** w `43756d9` — `OlderBarsReader.reachBack(target)`: jeden odczyt okna `[cel, najstarsza narysowana]` zamiast wędrówki. `lastBars` zostaje przy pagerze, bo nie nazywa momentu. Kadr `around`+`bars` sięga o połowę swoich świec przed nazwany moment, inaczej wychodzi przesunięty o pół ekranu. Test `"asks for the whole window to a distant focus in one read"` sprawdzony jako czerwony bez poprawki (9 odczytów zamiast 1). |
 
 Poza tym: żadnych innych ustaleń. Przejrzano cały diff `06acb0f..81db4e6` (backend:
 `models.py`, `store.py`, `contract.py`, `tools/chart.py`, migracja `0006`; terminal:
@@ -111,6 +112,9 @@ review — patrz Findings).
 - ~~**Kadr `from`/`to` poza budżetem pagera**~~ — **zamknięte** w `5921e8d`; przeniesione do
   Findings. Bieg, który wyczerpał budżet stron z niezaspokojonym `needsMore()`, mówi to
   teraz wprost (`stoppedShort`), a `Chart` rozlicza kadr wobec dociągniętego fragmentu.
-- **Task 9.3, ręczne przejście na żywym stacku** — w toku poza tym dokumentem; pierwszy
-  wynik operatora (przed potwierdzonym restartem stacku) opisany w Verdict, nie jest
-  jeszcze rozstrzygnięty jako pomyślny.
+- **Task 9.3, ręczne przejście na żywym stacku** — w toku poza tym dokumentem. Pierwszy
+  wynik operatora (przed potwierdzonym restartem stacku) opisany w Verdict. Drugi przebieg
+  znalazł to, czego żaden test nie znalazł: kadr na odległy miesiąc lądował w złym miejscu
+  (Findings, wiersz trzeci) — czyli dokładnie to, po co ten task istnieje, i powód, żeby
+  nie zamykać go z pamięci. Po poprawce `43756d9` wymaga powtórzenia: „pokaż połowę marca
+  na M5", potem powrót na żywą krawędź i zmiana interwału nad tym samym miejscem.
