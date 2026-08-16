@@ -116,7 +116,8 @@
 - [x] 10.6 Tożsamość modułu w `allowed_applications` serwera narzędzi
 - [x] 10.7 Instrukcja dla operatora: `apply -target`, pełny `apply`, `grant-schema-ownership.sql`
 
-  Kod napisany, `terraform validate` przechodzi; `apply` pozostaje robotą operatora, więc
+  PR #107. Kod napisany, `terraform validate` przechodzi; `apply` pozostaje robotą
+  operatora, więc
   w Azure nie stoi jeszcze nic. Cztery rzeczy warte odnotowania:
 
   - **Katalog modeli i klucz są osobne od `agent`.** `var.teams_models` obok
