@@ -40,8 +40,8 @@
 
 ## 6. Wdrożenie i potwierdzenie
 
-- [ ] 6.1 `terraform apply` ręką operatora (4.1, 4.2)
-- [ ] 6.2 Merge agenta; wdrożenie kończy się zielono, `/health` odpowiada, log niesie linię o rewizji
-- [ ] 6.3 Merge `market-data` po tym, jak agent przeżył; to samo potwierdzenie
-- [ ] 6.4 Przejście ręką: migracja na testowej rewizji celowo zepsutej — wdrożenie MUST skończyć się czerwono, a poprzednia wersja MUST serwować dalej
-- [ ] 6.5 `review.md`
+- [x] 6.1 `terraform apply` ręką operatora (4.1, 4.2)
+- [x] 6.2 Merge agenta; wdrożenie kończy się zielono, `/health` odpowiada, log niesie linię o rewizji
+- [x] 6.3 Merge `market-data` po tym, jak agent przeżył; to samo potwierdzenie
+- [x] 6.4 Przejście ręką: migracja na testowej rewizji celowo zepsutej — wdrożenie MUST skończyć się czerwono, a poprzednia wersja MUST serwować dalej
+- [x] 6.5 `review.md`

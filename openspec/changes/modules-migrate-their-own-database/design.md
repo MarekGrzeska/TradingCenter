@@ -153,10 +153,22 @@ to, co i tak wynika z faktu odpowiadania).
 ## Risks / Trade-offs
 
 - **Zła migracja zatrzymuje moduł, zamiast zepsuć jedną trasę** → to jest wybrane
-  zachowanie, nie skutek uboczny (`proposal.md`, decyzja o porażce wdrożenia). Poprzedni
-  kontener serwuje dalej, dopóki nowy nie przejdzie probe'a, więc produkcja nie ciemnieje
-  — pod warunkiem, że migracja jest **testowana na bazie integracyjnej w CI**, co oba
-  moduły już robią przez `pytest -m db`.
+  zachowanie, nie skutek uboczny (`proposal.md`, decyzja o porażce wdrożenia). Łagodzi to
+  fakt, że migracja jest **testowana na bazie integracyjnej w CI** — oba moduły robią to
+  przez `pytest -m db`, i to właśnie zatrzymało celowo zepsutą migracją z zadania 6.4,
+  zanim dotknęła produkcji.
+
+  **Poprawione po zadaniu 6.4 — pierwotnie napisano tu, że poprzedni kontener serwuje
+  dalej i produkcja nie ciemnieje. To nieprawda.** App Service bez slotów wdrożeniowych
+  podmienia obraz i restartuje kontener w miejscu; nie ma poprzedniej wersji, która by
+  serwowała. Zmierzone na produkcji: dziewięć minut `503`. Nieudana migracja jest więc
+  **przestojem**, nie tylko czerwonym jobem, i to jest prawdziwa cena tej decyzji.
+
+  Dźwignia ratunkowa, też zmierzona: `az webapp config container set` na poprzedni tag
+  obrazu przywraca ruch w **~40 sekund** — szybciej niż revert przez repozytorium, który
+  musi jeszcze zbudować obraz. Slotów wdrożeniowych ten plan App Service nie ma; gdyby
+  przestój tej długości kiedyś przestał być akceptowalny, to jest ta zmiana, którą trzeba
+  by rozważyć.
 - **Migracja dłuższa niż warm-up probe App Service** → probe ma własny limit, niezależny od
   naszego kresu blokady. Długa migracja skończy się „site startup probe failed" mimo
   poprawnego przebiegu. Łagodzenie: `WEBSITES_CONTAINER_START_TIME_LIMIT` podniesione dla
