@@ -23,12 +23,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from croniter import croniter
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
 from .. import store
 from ..auth import current_principal
 from ..contract import (
+    NextFiresIn,
     NextFiresOut,
     ScheduleFireOut,
     ScheduleIn,
@@ -38,6 +38,7 @@ from ..contract import (
     TriggerIn,
     TriggerOut,
 )
+from ..scheduler.timing import fires_after, next_fire_after
 from ..tools import AnnouncedSnapshot, announced_snapshot
 from ..validation import DefinitionRefused, check_trigger_tool, check_unattended
 
@@ -108,7 +109,7 @@ def _check_unattended(
 
 
 def _first_fire_at(cron_expression: str) -> datetime:
-    return croniter(cron_expression, datetime.now(UTC)).get_next(datetime)
+    return next_fire_after(cron_expression, datetime.now(UTC))
 
 
 # --- schedules --------------------------------------------------------------------
@@ -135,8 +136,8 @@ async def create_schedule(
             owner_principal=owner,
             revision_mode=body.revision_mode,
             pinned_revision_id=body.pinned_revision_id,
-            cron_expression=body.cron_expression,
-            next_fire_at=_first_fire_at(body.cron_expression),
+            cron_expression=body.cron(),
+            next_fire_at=_first_fire_at(body.cron()),
             unattended_ack=body.unattended_ack,
         )
     return ScheduleOut.from_row(dict(row))
@@ -191,8 +192,8 @@ async def update_schedule(
             owner_principal=owner,
             revision_mode=body.revision_mode,
             pinned_revision_id=body.pinned_revision_id,
-            cron_expression=body.cron_expression,
-            next_fire_at=_first_fire_at(body.cron_expression),
+            cron_expression=body.cron(),
+            next_fire_at=_first_fire_at(body.cron()),
             unattended_ack=body.unattended_ack,
         )
     if row is None:
@@ -255,9 +256,27 @@ async def next_fires(
     if row is None:
         raise HTTPException(404, detail="no such schedule")
 
-    iterator = croniter(row["cron_expression"], datetime.now(UTC))
-    times = [iterator.get_next(datetime) for _ in range(count)]
-    return NextFiresOut(times=times)
+    return NextFiresOut(times=_take(row["cron_expression"], count))
+
+
+@router.post("/schedules/next-fires")
+async def preview_next_fires(body: NextFiresIn, _: str = Depends(current_principal)) -> NextFiresOut:
+    """The same answer for a timing nobody has saved (specs/teams-schedules, "Moduł liczy
+    najbliższe wyzwolenia także dla opisu, którego nie zapisano").
+
+    It touches no row, so it takes no team and no ownership check beyond being signed in —
+    what it answers about is the operator's own draft, and a cron expression is not
+    somebody's data. `NextFiresIn` is `ScheduleIn`'s own timing half, so a draft that
+    previews here is a draft the save will accept.
+    """
+    if not 1 <= body.count <= _MAX_NEXT_FIRES:
+        raise HTTPException(422, detail=f"count must be between 1 and {_MAX_NEXT_FIRES}")
+    return NextFiresOut(times=_take(body.cron(), body.count))
+
+
+def _take(cron_expression: str, count: int) -> list[datetime]:
+    fires = fires_after(cron_expression, datetime.now(UTC))
+    return [next(fires) for _ in range(count)]
 
 
 # --- triggers -----------------------------------------------------------------------

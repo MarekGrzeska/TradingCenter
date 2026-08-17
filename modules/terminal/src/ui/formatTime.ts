@@ -41,12 +41,31 @@ export function formatInstant(epochSeconds: number): string {
   return `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")} ${part("timeZoneName")}`;
 }
 
-/** `2026-08-16 20:05 UTC` — the instant exactly as a schedule or a trigger stores and
- *  answers it, shown beside `formatInstant`'s own reading of the same second in the
- *  terminal's usual zone (specs/teams-schedules, "Moment wyzwolenia MUST być pokazany w
- *  UTC"; specs/terminal-teams-schedules, "…oraz w czasie lokalnym…"). */
-export function formatUtcInstant(epochSeconds: number): string {
-  return `${new Date(epochSeconds * 1000).toISOString().slice(0, 16).replace("T", " ")} UTC`;
+/** Whether the browser is somewhere other than the zone every time here is shown in.
+ *  Read once, at module load: a browser does not move zone mid-session, and a schedule
+ *  panel asking per render would ask hundreds of times for one answer. */
+const BROWSER_ZONE = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+export function browserIsInScheduleZone(): boolean {
+  return BROWSER_ZONE === TIME_ZONE;
+}
+
+const BROWSER_FORMAT = new Intl.DateTimeFormat(ZONE_LOCALE, {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+  timeZoneName: "short",
+});
+
+/** The same second in whatever zone the browser is in — shown *beside* `formatInstant`,
+ *  and only for an operator outside Polish time (specs/terminal-teams-schedules, "Czas
+ *  jest pokazany tak, żeby nie trzeba było go przeliczać"). */
+export function formatBrowserInstant(epochSeconds: number): string {
+  const part = partsOf(BROWSER_FORMAT, epochSeconds * 1000);
+  return `${part("year")}-${part("month")}-${part("day")} ${part("hour")}:${part("minute")} ${part("timeZoneName")}`;
 }
 
 /** An approximation, same as the number it describes (`market-data-jobs`

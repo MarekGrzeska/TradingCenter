@@ -169,6 +169,39 @@
         "title": "ModelOut",
         "type": "object"
       },
+      "NextFiresIn": {
+        "description": "A timing the operator has not saved \u2014 what the preview asks about\n(specs/teams-schedules, \"Modu\u0142 liczy najbli\u017csze wyzwolenia tak\u017ce dla opisu, kt\u00f3rego\nnie zapisano\").",
+        "properties": {
+          "count": {
+            "default": 5,
+            "title": "Count",
+            "type": "integer"
+          },
+          "cron_expression": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron Expression"
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recurrence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "NextFiresIn",
+        "type": "object"
+      },
       "NextFiresOut": {
         "description": "specs/terminal-teams-schedules, \"Terminal nie liczy czasu wyzwolenia sam\" \u2014 the\nmodule's own answer to \"when does this schedule fire next\", computed fresh from\n`cron_expression` rather than read off the row's own `next_fire_at` \u2014 which reflects\nthe last *claim*, not a live forecast, and goes stale the moment a schedule is\ndisabled.",
         "properties": {
@@ -185,6 +218,93 @@
           "times"
         ],
         "title": "NextFiresOut",
+        "type": "object"
+      },
+      "Recurrence": {
+        "description": "One rhythm, in the operator's own words. `kind` decides which of the other fields\ncarry a value \u2014 see `_FIELDS`.",
+        "properties": {
+          "day_of_month": {
+            "anyOf": [
+              {
+                "maximum": 31.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Day Of Month"
+          },
+          "hour": {
+            "anyOf": [
+              {
+                "maximum": 23.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hour"
+          },
+          "kind": {
+            "enum": [
+              "every_minutes",
+              "hourly",
+              "daily",
+              "weekly",
+              "monthly"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "minute": {
+            "anyOf": [
+              {
+                "maximum": 59.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minute"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "maximum": 59.0,
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
+          },
+          "weekdays": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weekdays"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "Recurrence",
         "type": "object"
       },
       "RunOut": {
@@ -436,8 +556,15 @@
         "description": "What an operator submits to create or edit a schedule.",
         "properties": {
           "cron_expression": {
-            "title": "Cron Expression",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cron Expression"
           },
           "pinned_revision_id": {
             "anyOf": [
@@ -449,6 +576,16 @@
               }
             ],
             "title": "Pinned Revision Id"
+          },
+          "recurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recurrence"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "revision_mode": {
             "default": "pinned",
@@ -465,9 +602,6 @@
             "type": "boolean"
           }
         },
-        "required": [
-          "cron_expression"
-        ],
         "title": "ScheduleIn",
         "type": "object"
       },
@@ -521,6 +655,16 @@
             ],
             "title": "Pinned Revision Id"
           },
+          "recurrence": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Recurrence"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "revision_mode": {
             "title": "Revision Mode",
             "type": "string"
@@ -548,6 +692,7 @@
           "id",
           "next_fire_at",
           "pinned_revision_id",
+          "recurrence",
           "revision_mode",
           "team_id",
           "unattended_ack",
@@ -1646,6 +1791,45 @@
           }
         },
         "summary": "Get Run Trades"
+      }
+    },
+    "/schedules/next-fires": {
+      "post": {
+        "description": "The same answer for a timing nobody has saved (specs/teams-schedules, \"Modu\u0142 liczy\nnajbli\u017csze wyzwolenia tak\u017ce dla opisu, kt\u00f3rego nie zapisano\").\n\nIt touches no row, so it takes no team and no ownership check beyond being signed in \u2014\nwhat it answers about is the operator's own draft, and a cron expression is not\nsomebody's data. `NextFiresIn` is `ScheduleIn`'s own timing half, so a draft that\npreviews here is a draft the save will accept.",
+        "operationId": "preview_next_fires_schedules_next_fires_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NextFiresIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextFiresOut"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview Next Fires"
       }
     },
     "/schedules/{schedule_id}": {

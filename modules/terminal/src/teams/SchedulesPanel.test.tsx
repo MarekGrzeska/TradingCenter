@@ -1,11 +1,30 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { agentActivity } from "../agent/agentActivity";
 import { MarketDataError } from "../data/types";
-import { formatInstant, formatUtcInstant } from "../ui/formatTime";
+import { formatInstant } from "../ui/formatTime";
 import { SchedulesPanel } from "./SchedulesPanel";
 import type { Schedule, ScheduleFire, TeamRevision, TeamsApi, Trigger } from "./teamsApi";
+
+/** Where the operator's browser is, which the panel reads once per render and a test
+ *  cannot set by moving the machine. The zone the schedule itself is written in is not in
+ *  question — that one is Poland's, always. */
+const zone = vi.hoisted(() => ({ outsidePoland: false }));
+
+vi.mock("../ui/formatTime", async () => {
+  const actual = await vi.importActual<typeof import("../ui/formatTime")>("../ui/formatTime");
+  return {
+    ...actual,
+    browserIsInScheduleZone: () => !zone.outsidePoland,
+    formatBrowserInstant: (epochSeconds: number) =>
+      `${actual.formatInstant(epochSeconds)} in the operator's own zone`,
+  };
+});
+
+beforeEach(() => {
+  zone.outsidePoland = false;
+});
 
 const REVISION: TeamRevision = {
   id: 9,
@@ -26,6 +45,7 @@ const SCHEDULE: Schedule = {
   revisionMode: "pinned",
   pinnedRevisionId: 9,
   cronExpression: "*/5 * * * *",
+  recurrence: { kind: "every_minutes", minutes: 5, minute: null, hour: null, weekdays: null, dayOfMonth: null },
   nextFireAt: 1_755_374_700, // 2025-08-16T20:05:00Z
   enabled: true,
   disabledReason: null,
@@ -62,8 +82,8 @@ const TRIGGER: Trigger = {
 /** The schedule row's own `<li>` — both sections render an "Edit"/"Disable"/"History"
  *  button, so a test after the schedule specifically has to scope to it. */
 async function scheduleRow(): Promise<HTMLElement> {
-  const cron = await screen.findByText(SCHEDULE.cronExpression);
-  const li = cron.closest("li");
+  const rhythm = await screen.findByText(/Every 5 minutes/);
+  const li = rhythm.closest("li");
   if (li === null) throw new Error("schedule row not found");
   return li;
 }
@@ -111,6 +131,7 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     disableSchedule: vi.fn(async () => ({ ...SCHEDULE, enabled: false })),
     scheduleFires: vi.fn(async () => []),
     nextFires: vi.fn(async () => []),
+    previewNextFires: vi.fn(async () => []),
     listTriggers: vi.fn(async () => [TRIGGER]),
     createTrigger: vi.fn(async () => TRIGGER),
     updateTrigger: vi.fn(async () => TRIGGER),
@@ -122,29 +143,63 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
 }
 
 describe("a schedule's next fire", () => {
-  it("shows the module's own timestamp in UTC and in the terminal's local time — never recomputed", async () => {
+  it("shows the module's own timestamp in Polish time — never recomputed", async () => {
     const api = fakeApi();
     render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
 
-    // Both readings of the exact same instant the module answered with — nothing here
-    // parses `*/5 * * * *` to produce them.
-    expect(await screen.findByText(new RegExp(formatUtcInstant(SCHEDULE.nextFireAt)))).toBeInTheDocument();
-    expect(screen.getByText(new RegExp(formatInstant(SCHEDULE.nextFireAt)))).toBeInTheDocument();
+    // The exact instant the module answered with — nothing here parses `*/5 * * * *`
+    // to produce it.
+    expect(await screen.findByText(new RegExp(formatInstant(SCHEDULE.nextFireAt)))).toBeInTheDocument();
   });
 
-  it("previews the next several fires from the module when a schedule is opened, not from a local parser", async () => {
-    // Deliberately not slots `*/5 * * * *` would ever land on, so a passing test proves
-    // the value came from `nextFires` and not from a parser reimplemented here.
+  it("previews a draft's next fires from the module, not from a local parser", async () => {
+    // Deliberately not slots any rhythm in the form would land on, so a passing test
+    // proves the value came from `previewNextFires` and not from a parser here.
     const oddTimes = [1_755_000_037, 1_755_000_911];
-    const api = fakeApi({ nextFires: vi.fn(async () => oddTimes) });
+    const api = fakeApi({ previewNextFires: vi.fn(async () => oddTimes) });
     render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
 
     await userEvent.click(within(await scheduleRow()).getByRole("button", { name: "Edit" }));
 
-    await waitFor(() => expect(api.nextFires).toHaveBeenCalledWith(SCHEDULE.id, 5, expect.anything()));
+    await waitFor(() =>
+      expect(api.previewNextFires).toHaveBeenCalledWith(
+        expect.objectContaining({ recurrence: expect.objectContaining({ kind: "every_minutes" }) }),
+        3,
+        expect.anything(),
+      ),
+    );
     for (const t of oddTimes) {
-      expect(await screen.findByText(new RegExp(formatUtcInstant(t)))).toBeInTheDocument();
+      expect(await screen.findByText(new RegExp(formatInstant(t)))).toBeInTheDocument();
     }
+  });
+
+  it("asks the module again when the operator changes the time, before anything is saved", async () => {
+    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
+    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
+    fireEvent.change(screen.getByLabelText("Time of day"), { target: { value: "06:45" } });
+
+    await waitFor(() =>
+      expect(api.previewNextFires).toHaveBeenCalledWith(
+        expect.objectContaining({ recurrence: expect.objectContaining({ hour: 6, minute: 45 }) }),
+        3,
+        expect.anything(),
+      ),
+    );
+    expect(api.createSchedule).not.toHaveBeenCalled();
+  });
+
+  it("shows the browser's own zone beside Polish time for an operator outside Poland", async () => {
+    zone.outsidePoland = true;
+    const api = fakeApi({ previewNextFires: vi.fn(async () => [SCHEDULE.nextFireAt]) });
+    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+
+    await userEvent.click(within(await scheduleRow()).getByRole("button", { name: "Edit" }));
+
+    // Both readings of the same second: the zone the schedule is written in, and the one
+    // the operator is sitting in.
+    expect(await screen.findByText(/in the operator's own zone/)).toBeInTheDocument();
   });
 });
 
@@ -155,7 +210,7 @@ describe("what the chat changed", () => {
     const listSchedules = vi
       .fn()
       .mockResolvedValueOnce([])
-      .mockResolvedValue([{ ...SCHEDULE, cronExpression: "30 8 * * 1-5" }]);
+      .mockResolvedValue([{ ...SCHEDULE, cronExpression: "30 8 * * 1-5", recurrence: null }]);
     render(
       <SchedulesPanel
         api={fakeApi({ listSchedules })}
@@ -175,25 +230,52 @@ describe("what the chat changed", () => {
 });
 
 describe("creating and editing a schedule", () => {
-  it("posts the draft and reloads the list", async () => {
+  it("posts a rhythm the operator chose, with no cron expression typed anywhere", async () => {
     const api = fakeApi({ listSchedules: vi.fn(async () => []) });
     render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
-    const cron = screen.getByLabelText("Cron");
-    await userEvent.clear(cron);
-    await userEvent.type(cron, "0 9 * * MON-FRI");
+    await userEvent.click(screen.getByText("On chosen weekdays"));
+    fireEvent.change(screen.getByLabelText("Time of day"), { target: { value: "08:30" } });
+    await userEvent.click(screen.getByRole("button", { name: "Sat" }));
     await userEvent.click(screen.getByRole("button", { name: "Create schedule" }));
 
     await waitFor(() =>
       expect(api.createSchedule).toHaveBeenCalledWith(
         1,
-        expect.objectContaining({ cronExpression: "0 9 * * MON-FRI", revisionMode: "pinned" }),
+        expect.objectContaining({
+          revisionMode: "pinned",
+          cronExpression: null,
+          recurrence: expect.objectContaining({
+            kind: "weekly",
+            hour: 8,
+            minute: 30,
+            weekdays: [1, 2, 3, 4, 5, 6],
+          }),
+        }),
         expect.anything(),
       ),
     );
     // The list is asked again rather than the panel guessing what changed.
     expect((api.listSchedules as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
+  });
+
+  it("opens a schedule the wizard has no rhythm for on its own expression, and saves it unchanged", async () => {
+    const written = { ...SCHEDULE, cronExpression: "0 9 * * MON-FRI", recurrence: null };
+    const api = fakeApi({ listSchedules: vi.fn(async () => [written]) });
+    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+
+    const row = (await screen.findByText("0 9 * * MON-FRI")).closest("li")!;
+    await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
+    await userEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    await waitFor(() =>
+      expect(api.updateSchedule).toHaveBeenCalledWith(
+        written.id,
+        expect.objectContaining({ cronExpression: "0 9 * * MON-FRI", recurrence: null }),
+        expect.anything(),
+      ),
+    );
   });
 
   it("shows the module's own refusal, unchanged", async () => {

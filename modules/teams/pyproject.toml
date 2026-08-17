@@ -42,6 +42,11 @@ dependencies = [
     # seed `next_fire_at` and by the clock itself to advance it after a claim
     # (design.md, "Wyrażenie cron w UTC, rozwijane przez croniter").
     "croniter>=3.0",
+    # The IANA database `ZoneInfo("Europe/Warsaw")` reads. Named explicitly because the
+    # platform is not a reliable source of it: Windows ships none at all, and a slim
+    # container image usually ships none either — a schedule that cannot be expressed in
+    # the operator's own clock is this module refusing to start (`scheduler/timing.py`).
+    "tzdata>=2024.1",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
