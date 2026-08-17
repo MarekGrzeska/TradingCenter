@@ -124,6 +124,34 @@ letter, and the two tool servers are separate deployables with separate identiti
 "which module may move the account" is answered by a list of callers rather than by a flag
 inside one that reads.
 
+**A seventh, and this one points the other way.** `teams-mcp` puts the *catalogue* behind
+MCP tools so that `agent` can build and correct a team from the chat — the same shape one
+level up, one named caller, its own identity:
+
+```
+        ┌──────────────────────────────┐
+        │  teams                       │  the catalogue, the runs, the money
+        └──────────────▲───────────────┘
+                       │ HTTP · Authorization = **the operator's own token**, forwarded
+        ┌──────────────┴───────────────┐
+        │  teams-mcp                   │
+        │  MCP tools · build · run     │
+        └──────────────▲───────────────┘
+                       │ MCP · exactly one named caller
+                       │ X-Operator-Authorization carries the person
+        ┌──────────────┴───────────────┐
+        │  agent                       │
+        └──────────────────────────────┘
+```
+
+The arrow into `teams` is the one worth reading twice. Every other edge in this system is a
+module proving *itself* to the next one; this one carries the credential of the person who
+asked, taken off the request `agent` is serving and passed no further. That is not a
+detail of the transport: `teams` filters every statement by owner, so a module acting on
+its own identity would create teams nobody can see — existing, costing money, impossible to
+open in the terminal. The two credentials never merge, and they travel in two headers for
+exactly that reason.
+
 The demo-only guarantee lives here and nowhere else that can be turned off: `trading-mcp`
 asks `capital-gateway` what environment it is bound to and refuses to open a port unless
 the answer is the demo one. It is not a setting of its own — a module that decided this

@@ -22,7 +22,8 @@ import asyncio
 import json
 import logging
 import time
-from contextlib import AsyncExitStack
+from collections.abc import AsyncIterator
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
@@ -40,6 +41,12 @@ log = logging.getLogger(__name__)
 # FastMCP's own default, and market-mcp does not override it (`server.py`, which builds
 # `streamable_http_app()` and wraps it without touching the route).
 MCP_PATH = "/mcp"
+
+# Where the operator's own credential rides — never `Authorization`, which carries this
+# module's identity to whatever authenticator stands in front of the server. The name
+# matches what teams-mcp reads (`teams_mcp/operator.py`); it is one contract in two
+# repositories' worth of modules and there is no shared constant to import.
+OPERATOR_TOKEN_HEADER = "X-Operator-Authorization"
 
 
 @dataclass(frozen=True)
@@ -96,10 +103,34 @@ class _ManagedIdentityAuth(httpx.Auth):
 
 
 class ToolServer:
-    def __init__(self, settings: Settings) -> None:
-        self._url = settings.market_mcp_url
-        self._scope = settings.market_mcp_scope
-        self._timeout = settings.market_mcp_request_timeout_seconds
+    """One MCP session over one server, named by which triplet of `Settings` fields it
+    reads.
+
+    `prefix` selects the field group — `"market_mcp"` reads `market_mcp_url` and its
+    two neighbours, `"teams_mcp"` the same shape one catalogue over. The default carries
+    the whole of this module's history: every call site that predates the second server
+    keeps constructing a bare `ToolServer(settings)` and gets exactly the market-mcp
+    instance it always did.
+
+    `forwards_operator_token` marks the one server that acts **for a person** rather
+    than merely on this module's behalf. Its tools create teams and spend money in an
+    operator's name, so a call to it carries their credential; market-mcp reads a shared
+    archive and has no use for one (design.md, D2).
+    """
+
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        prefix: str = "market_mcp",
+        forwards_operator_token: bool = False,
+    ) -> None:
+        self.label = prefix.replace("_", "-")
+        self._env_prefix = prefix.upper()
+        self.forwards_operator_token = forwards_operator_token
+        self._url: str | None = getattr(settings, f"{prefix}_url")
+        self._scope: str | None = getattr(settings, f"{prefix}_scope")
+        self._timeout: float = getattr(settings, f"{prefix}_request_timeout_seconds")
         self._credential = DefaultAzureCredential() if self._scope else None
 
         self._stack: AsyncExitStack | None = None
@@ -110,10 +141,11 @@ class ToolServer:
         self._lock = asyncio.Lock()
 
         if self._url is None:
-            log.info("no tool server configured — the agent runs without tools")
+            log.info("%s: not configured — the agent runs without its tools", self.label)
         else:
             log.info(
-                "tool server at %s, authenticating with a managed identity: %s",
+                "%s: tool server at %s, authenticating with a managed identity: %s",
+                self.label,
                 self._url,
                 f"scope={self._scope}" if self._scope else "no (loopback)",
             )
@@ -127,7 +159,7 @@ class ToolServer:
         if self._credential is not None:
             await self._credential.close()
 
-    async def list_tools(self) -> list[ToolDescriptor]:
+    async def list_tools(self, operator_token: str | None = None) -> list[ToolDescriptor]:
         """What the model may call this turn. An empty list is the answer whenever the
         server is not configured or not reachable — the caller's job is to run the turn
         without tools, not to fail it (specs/agent-tool-access, "Brak serwera narzędzi
@@ -137,10 +169,15 @@ class ToolServer:
         if self._tools is not None:
             return self._tools
         try:
-            session = await self._connected_session()
-            result = await asyncio.wait_for(session.list_tools(), timeout=self._timeout)
+            async with self._session_for(operator_token) as session:
+                result = await asyncio.wait_for(session.list_tools(), timeout=self._timeout)
         except Exception as err:  # noqa: BLE001 - every failure here means "no tools"
-            log.warning("could not read the tool list from %s: %s", self._url, _describe(err))
+            log.warning(
+                "%s: could not read the tool list from %s: %s",
+                self.label,
+                self._url,
+                _describe(err),
+            )
             await self._disconnect()
             return []
         self._tools = [
@@ -151,10 +188,12 @@ class ToolServer:
             )
             for tool in result.tools
         ]
-        log.info("tool server published %d tools", len(self._tools))
+        log.info("%s: published %d tools", self.label, len(self._tools))
         return self._tools
 
-    async def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
+    async def call(
+        self, name: str, arguments: dict[str, Any], operator_token: str | None = None
+    ) -> ToolOutcome:
         started = time.monotonic()
 
         def elapsed() -> int:
@@ -163,14 +202,14 @@ class ToolServer:
         if self._url is None:
             return ToolOutcome(
                 ToolOutcomeKind.UNAVAILABLE,
-                "no tool server is configured, so this call was not made",
+                f"the {self.label} tool server is not configured, so this call was not made",
                 elapsed(),
             )
         try:
-            session = await self._connected_session()
-            result = await asyncio.wait_for(
-                session.call_tool(name, arguments), timeout=self._timeout
-            )
+            async with self._session_for(operator_token) as session:
+                result = await asyncio.wait_for(
+                    session.call_tool(name, arguments), timeout=self._timeout
+                )
         except TimeoutError:
             await self._disconnect()
             return ToolOutcome(
@@ -208,42 +247,95 @@ class ToolServer:
         text = json.dumps(result.structuredContent) if result.structuredContent is not None else _text_of(result.content)
         return ToolOutcome(ToolOutcomeKind.OK, text, elapsed())
 
+    @asynccontextmanager
+    async def _session_for(self, operator_token: str | None) -> AsyncIterator[ClientSession]:
+        """A session to work through, and the reason there are two ways of getting one.
+
+        **A server that acts only on this module's behalf keeps one session** for the
+        life of the process: the credential never varies, so a connection can be paid
+        for once. That is market-mcp, and it is what this class did before there was
+        anything else.
+
+        **A server that acts for a *person* cannot.** Its credential is that person's,
+        it arrives per call, and the streamable-http transport fixes its headers when
+        the connection opens — so a shared session would carry whichever operator
+        happened to open it. A ContextVar does not rescue this either: the transport
+        sends from its own anyio task, which copied the context when it was created and
+        never sees a value set later. So a session per call, opened and closed inside
+        this one coroutine.
+
+        Closing it here is what makes that safe. A session left open by a task that then
+        returns strands anyio's cancel scopes on that task's stack, and the next scope
+        exit raises "Attempted to exit a cancel scope that isn't the current task's
+        current cancel scope" nowhere near the cause. `teams`' own save-time check opens
+        and closes one the same way, for the same reason.
+
+        The cost is one connection per tool call against that one server. An operator
+        typing in a chat is not a rate worth optimising for, and the alternative is
+        acting in the wrong person's name.
+        """
+        if not self.forwards_operator_token:
+            yield await self._connected_session()
+            return
+
+        assert self._url is not None
+        stack = AsyncExitStack()
+        try:
+            session = await self._open(stack, operator_token=operator_token)
+            yield session
+        finally:
+            try:
+                await stack.aclose()
+            except Exception as err:  # noqa: BLE001 - closing a broken stream often raises
+                log.debug("%s: closing the per-call session raised: %s", self.label, err)
+
     async def _connected_session(self) -> ClientSession:
         if self._session is not None:
             return self._session
         async with self._lock:
             if self._session is not None:
                 return self._session
-            assert self._url is not None
             stack = AsyncExitStack()
             try:
-                auth = (
-                    _ManagedIdentityAuth(self._credential, self._scope)
-                    if self._credential is not None and self._scope is not None
-                    else None
-                )
-                # `create_mcp_http_client` rather than a bare `httpx.AsyncClient`: the
-                # transport relies on defaults it sets (redirects, in particular), and
-                # a client built by hand here would be a second place to keep them.
-                # `read` is left long — the connection carries the session's own event
-                # stream and is meant to stay open between calls; per-call time is
-                # bounded by `asyncio.wait_for` at the call sites instead.
-                http_client = await stack.enter_async_context(
-                    create_mcp_http_client(
-                        timeout=httpx.Timeout(self._timeout, read=None), auth=auth
-                    )
-                )
-                read, write, _ = await stack.enter_async_context(
-                    streamable_http_client(f"{self._url}{MCP_PATH}", http_client=http_client)
-                )
-                session = await stack.enter_async_context(ClientSession(read, write))
-                await asyncio.wait_for(session.initialize(), timeout=self._timeout)
+                session = await self._open(stack, operator_token=None)
             except BaseException:
                 await stack.aclose()
                 raise
             self._stack = stack
             self._session = session
             return session
+
+    async def _open(self, stack: AsyncExitStack, *, operator_token: str | None) -> ClientSession:
+        assert self._url is not None
+        auth = (
+            _ManagedIdentityAuth(self._credential, self._scope)
+            if self._credential is not None and self._scope is not None
+            else None
+        )
+        # Two credentials answering two questions, and they travel in two headers:
+        # `Authorization` (this module's identity, added by `auth` above) says who is
+        # calling, and this one says in whose name (design.md, D2). Never merged.
+        headers = (
+            {OPERATOR_TOKEN_HEADER: operator_token}
+            if self.forwards_operator_token and operator_token
+            else None
+        )
+        # `create_mcp_http_client` rather than a bare `httpx.AsyncClient`: the transport
+        # relies on defaults it sets (redirects, in particular), and a client built by
+        # hand here would be a second place to keep them. `read` is left long — the
+        # connection carries the session's own event stream; per-call time is bounded by
+        # `asyncio.wait_for` at the call sites instead.
+        http_client = await stack.enter_async_context(
+            create_mcp_http_client(
+                headers=headers, timeout=httpx.Timeout(self._timeout, read=None), auth=auth
+            )
+        )
+        read, write, _ = await stack.enter_async_context(
+            streamable_http_client(f"{self._url}{MCP_PATH}", http_client=http_client)
+        )
+        session = await stack.enter_async_context(ClientSession(read, write))
+        await asyncio.wait_for(session.initialize(), timeout=self._timeout)
+        return session
 
     async def _disconnect(self) -> None:
         """Drops the session so the next call opens a fresh one. The tool list goes with

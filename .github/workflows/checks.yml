@@ -40,6 +40,7 @@ jobs:
       market-data: ${{ steps.filter.outputs.market-data }}
       market-mcp: ${{ steps.filter.outputs.market-mcp }}
       trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
+      teams-mcp: ${{ steps.filter.outputs.teams-mcp }}
       agent: ${{ steps.filter.outputs.agent }}
       teams: ${{ steps.filter.outputs.teams }}
       terminal: ${{ steps.filter.outputs.terminal }}
@@ -104,15 +105,22 @@ jobs:
           # stale. The gateway's *whole* directory, not one file: that document is built
           # from its routes as well as its DTOs, so there is no narrower honest filter.
           trading='^modules/trading-mcp/|^modules/capital-gateway/'
+          # And once more, one module further in: teams-mcp keeps a committed snapshot of
+          # teams' OpenAPI document (`contract/teams.openapi.json`). Narrower than
+          # trading-mcp's filter and honestly so — teams *prints* its document from
+          # `contract.py`'s models (`python -m teams.openapi`), so that one file is where
+          # a drift can come from, the way market-data's is.
+          teamsmcp='^modules/teams-mcp/|^modules/teams/teams/contract\.py$'
           # The archive-shape check, plus the script that is the shape.
           specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
 
-          for name in capital-gateway market-data market-mcp trading-mcp agent teams terminal openspec; do
+          for name in capital-gateway market-data market-mcp trading-mcp teams-mcp agent teams terminal openspec; do
             case "$name" in
               capital-gateway) pattern="$gateway" ;;
               market-data)     pattern="$archive" ;;
               market-mcp)      pattern="$mcp" ;;
               trading-mcp)     pattern="$trading" ;;
+              teams-mcp)       pattern="$teamsmcp" ;;
               agent)           pattern="$agent" ;;
               teams)           pattern="$teams" ;;
               terminal)        pattern="$terminal" ;;
@@ -216,6 +224,31 @@ jobs:
       # Nothing here reaches capital.com or a running gateway: every test doubles the
       # upstream. The demo-only guard is exercised against that double, which is the only
       # place it can be exercised without an account to refuse.
+      - run: uv run pytest -q
+
+  teams-mcp:
+    name: teams-mcp
+    needs: changes
+    if: needs.changes.outputs.teams-mcp == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/teams-mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      # Before the tests, same as both other MCP modules': `scripts/contract.py` runs
+      # `python -m teams.openapi` in `../teams` from this same checkout, which needs no
+      # database, no OpenAI key and no market-mcp — that module builds its Settings inside
+      # `lifespan` rather than at import.
+      - run: uv run python scripts/contract.py check
+      - run: uv run ruff check .
+      - run: uv run pyright
+      # Nothing here reaches a running teams: every test doubles it. What cannot be
+      # doubled — whether Easy Auth passes the operator's token through — is not a test,
+      # it is the deployment check in this change's review.md.
       - run: uv run pytest -q
 
   agent:

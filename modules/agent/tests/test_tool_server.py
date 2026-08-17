@@ -247,7 +247,10 @@ async def test_no_configured_server_means_no_tools_and_no_calls() -> None:
         await client.aclose()
 
     assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
-    assert "no tool server is configured" in outcome.text
+    # The message names which server, because there is more than one now and "the tool
+    # server" stopped being unambiguous.
+    assert "market-mcp" in outcome.text
+    assert "not configured" in outcome.text
 
 
 def test_describe_unwraps_nested_task_groups() -> None:

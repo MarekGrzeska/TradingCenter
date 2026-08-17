@@ -91,6 +91,7 @@ def build_graph(
     provider: ModelProvider,
     tool_server: ToolServer | None = None,
     local_tools: Mapping[str, LocalTool] | None = None,
+    operator_token: str | None = None,
 ):
     async def call_model(state: ConversationState) -> dict:
         parts: list[str] = []
@@ -184,7 +185,9 @@ def build_graph(
                         0,
                     )
             elif tool_server is not None:
-                outcome = await tool_server.call(request.name, request.arguments)
+                outcome = await tool_server.call(
+                    request.name, request.arguments, operator_token
+                )
             else:
                 outcome = None
             made += 1

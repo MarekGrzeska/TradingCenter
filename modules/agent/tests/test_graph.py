@@ -59,9 +59,15 @@ class FakeToolServer:
     def __init__(self, outcomes: dict[str, ToolOutcome] | None = None) -> None:
         self._outcomes = outcomes or {}
         self.seen: list[tuple[str, dict]] = []
+        self.tokens: list[str | None] = []
 
-    async def call(self, name: str, arguments: dict) -> ToolOutcome:
+    async def call(
+        self, name: str, arguments: dict, operator_token: str | None = None
+    ) -> ToolOutcome:
+        # The token is accepted and recorded rather than ignored: the graph forwards it,
+        # and a fake that could not take it would let that forwarding rot unnoticed.
         self.seen.append((name, arguments))
+        self.tokens.append(operator_token)
         return self._outcomes.get(
             name, ToolOutcome(ToolOutcomeKind.OK, f"{name} says 21000.5", 4)
         )

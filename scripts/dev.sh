@@ -3,8 +3,8 @@
 # Everything the terminal needs, in the order it needs it — the macOS and Linux
 # counterpart of dev.ps1.
 #
-#   migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp -> agent
-#   -> teams -> terminal
+#   migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp -> teams
+#   -> teams-mcp -> agent -> terminal
 #
 # The order is not tidiness, and every arrow in it is now a real dependency.
 # market-data opens a subscription per tracked pair the moment it starts, so a gateway
@@ -50,6 +50,7 @@ MCP_DIR="$REPO_ROOT/modules/market-mcp"
 TRADING_DIR="$REPO_ROOT/modules/trading-mcp"
 AGENT_DIR="$REPO_ROOT/modules/agent"
 TEAMS_DIR="$REPO_ROOT/modules/teams"
+TEAMS_MCP_DIR="$REPO_ROOT/modules/teams-mcp"
 TERMINAL_DIR="$REPO_ROOT/modules/terminal"
 
 GATEWAY_PORT=8010
@@ -58,6 +59,7 @@ AGENT_PORT=8030
 MCP_PORT=8040
 TEAMS_PORT=8050
 TRADING_PORT=8060
+TEAMS_MCP_PORT=8070
 TERMINAL_PORT=5173
 
 # 127.0.0.1 rather than "localhost": uvicorn binds IPv4 loopback, and on a machine
@@ -68,6 +70,7 @@ AGENT_URL="http://127.0.0.1:$AGENT_PORT"
 MCP_URL="http://127.0.0.1:$MCP_PORT"
 TEAMS_URL="http://127.0.0.1:$TEAMS_PORT"
 TRADING_URL="http://127.0.0.1:$TRADING_PORT"
+TEAMS_MCP_URL="http://127.0.0.1:$TEAMS_MCP_PORT"
 
 START_TERMINAL=1
 WAIT_SECONDS=120
@@ -87,6 +90,9 @@ BRIGHT_BLUE=$'\033[94m'
 # And bright green for trading-mcp, deliberately a shade of market-mcp's own: the two
 # tool servers read as a pair in the log, which is what they are.
 BRIGHT_GREEN=$'\033[92m'
+# And bright magenta for teams-mcp — the third tool server, and the only one that carries
+# somebody's own credential rather than a module's.
+BRIGHT_MAGENTA=$'\033[95m'
 
 say()  { printf '%s%s%s\n' "$CYAN" "$1" "$RESET"; }
 ok()   { printf '%s%s%s\n' "$GREEN" "$1" "$RESET"; }
@@ -154,7 +160,7 @@ port_owner() {
   printf ' by %s (pid %s)' "$(ps -p "$pid" -o comm= 2>/dev/null || echo process)" "$pid"
 }
 
-ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$MCP_PORT" "$TRADING_PORT" "$AGENT_PORT" "$TEAMS_PORT")
+ports=("$GATEWAY_PORT" "$ARCHIVE_PORT" "$MCP_PORT" "$TRADING_PORT" "$TEAMS_MCP_PORT" "$AGENT_PORT" "$TEAMS_PORT")
 (( START_TERMINAL )) && ports+=("$TERMINAL_PORT")
 for port in "${ports[@]}"; do
   port_in_use "$port" || continue
@@ -228,6 +234,16 @@ fi
 if ! grep -qs '^TRADING_MCP_URL=..*' "$TEAMS_DIR/.env"; then
   note "modules/teams/.env has no TRADING_MCP_URL — teams will have no order tools, and one assigning them refuses to run."
   note "  Add TRADING_MCP_URL=$TRADING_URL to give it trading-mcp's, as .env.example does."
+fi
+
+# The agent's second tool server. Its absence is a supported state exactly like
+# MARKET_MCP_URL's — the agent works and simply has no team tools — but the symptom is
+# confusing enough to be worth a line: the operator asks for a team, and the agent
+# explains that it cannot do that, which reads like a missing feature rather than a
+# missing setting.
+if ! grep -qs '^TEAMS_MCP_URL=..*' "$AGENT_DIR/.env"; then
+  note "modules/agent/.env has no TEAMS_MCP_URL — the agent will have no tools for building or running teams."
+  note "  Add TEAMS_MCP_URL=$TEAMS_MCP_URL to give it teams-mcp's, as .env.example does."
 fi
 
 # --- shutting everything down -------------------------------------------------
@@ -412,6 +428,21 @@ say "Starting teams on port $TEAMS_PORT..."
 run_service "teams   " "$BRIGHT_BLUE" "$TEAMS_DIR" uv run uvicorn teams.app:app --reload --port "$TEAMS_PORT"
 wait_for_http "$TEAMS_URL/health" "teams" || exit 1
 ok "teams is answering."
+
+# --- teams-mcp --------------------------------------------------------------------
+#
+# After teams, because its tools are teams' catalogue — though it starts happily without
+# it and reports the outage per call rather than refusing to run, which is market-mcp's
+# shape and not trading-mcp's.
+#
+# Before nothing in particular: the agent asks it for its tool list on the first turn that
+# wants one, not at start-up, so the order below is for a readable log rather than for
+# correctness.
+
+say "Starting teams-mcp on port $TEAMS_MCP_PORT..."
+run_service "teamsmcp" "$BRIGHT_MAGENTA" "$TEAMS_MCP_DIR" uv run python -m teams_mcp
+wait_for_http "$TEAMS_MCP_URL/health" "teams-mcp" || exit 1
+ok "teams-mcp is answering."
 
 # --- the terminal -------------------------------------------------------------
 

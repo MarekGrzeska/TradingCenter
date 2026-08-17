@@ -17,6 +17,7 @@ from decimal import Decimal
 
 import asyncpg
 import pytest
+from croniter import croniter
 
 from teams import store
 from teams.contract import AgentDefinition, CostLimits, TeamDefinition, TradingLimits
@@ -33,12 +34,31 @@ pytestmark = pytest.mark.db
 OWNER = "operator-1"
 MODEL_ID = "gpt-5.6-luna"
 
-def _past() -> datetime:
-    # A function, not a module-level constant: this suite's slower tests (spinning up a
-    # real uvicorn stand-in) can push wall-clock time far enough that a constant fixed
-    # at import time drifts across a `*/5 * * * *` boundary, turning a "no slots missed"
-    # schedule into one that looks like it missed a fire it never had.
-    return datetime.now(UTC) - timedelta(minutes=1)
+CRON = "*/5 * * * *"
+
+
+def _past(cron: str = CRON) -> datetime:
+    """A moment that is already due and has missed nothing — the schedule's own most
+    recent slot.
+
+    **Anchored to the cron grid, not to "a minute ago", and the difference is 20% of all
+    wall-clock times.** `now - 1 minute` puts a `*/5` boundary between the due moment and
+    now whenever the suite runs in the first minute after :00, :05, :10 … — so
+    `_next_fire_and_skipped` correctly reports one folded slot and
+    `test_a_due_schedule_starts_a_run_and_records_the_fire` correctly fails. It failed in
+    CI at 05:15 for exactly this reason, having passed every local run that happened not
+    to start on a boundary.
+
+    Reading back from the grid removes the window rather than narrowing it: no slot lies
+    between the last one and now, by construction.
+
+    The second added before asking is what closes the last hole. `get_prev` is strict, so
+    asked at exactly :05:00 it answers :00:00 — leaving the :05:00 slot between the due
+    moment and now, and one folded slot again. Asking from a second later makes it "the
+    last slot at or before now", which is the moment actually wanted.
+    """
+    now = datetime.now(UTC)
+    return croniter(cron, now + timedelta(seconds=1)).get_prev(datetime)
 
 
 FUTURE = datetime.now(UTC) + timedelta(hours=1)

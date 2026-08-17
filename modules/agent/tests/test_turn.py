@@ -123,7 +123,7 @@ async def test_a_reply_keeps_its_version_after_the_prompt_is_later_edited(pool, 
     await run_turn(pool, session_id=session_id, model_entry=LUNA, provider=provider, queue=RecordingQueue())
 
     first_reply = (await store.get_messages(db, session_id=session_id))[-1]
-    assert first_reply.prompt_version == "v9"
+    assert first_reply.prompt_version == "v10"
 
     await store.create_prompt_revision(db, with_tools_body="edited", without_tools_body="edited")
 
@@ -133,10 +133,10 @@ async def test_a_reply_keeps_its_version_after_the_prompt_is_later_edited(pool, 
 
     messages = await store.get_messages(db, session_id=session_id)
     second_reply = messages[-1]
-    assert second_reply.prompt_version == "v10"
+    assert second_reply.prompt_version == "v11"
 
     first_reply_reread = next(m for m in messages if m.id == first_reply.id)
-    assert first_reply_reread.prompt_version == "v9"
+    assert first_reply_reread.prompt_version == "v10"
 
 
 async def test_usage_reported_before_a_failure_is_still_recorded(pool, db) -> None:

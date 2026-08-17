@@ -28,7 +28,7 @@ from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
 from .provider import OpenAIProvider
 from .routers import chart, drawings, models, prompt, sessions, usage
-from .tools import ToolServer
+from .tools import ToolServerRegistry
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ async def lifespan(app: FastAPI):
     # Constructed, not connected: the session opens on the first turn that wants a tool.
     # Reaching market-mcp at startup would make this module's health depend on another
     # module's, and its whole answer to that module being down is to run without tools.
-    tool_server = ToolServer(settings)
+    tool_server = ToolServerRegistry.from_settings(settings)
     async with make_pool(
         settings.database_url,
         user=settings.database_user,

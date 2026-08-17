@@ -4,6 +4,7 @@
 
 .DESCRIPTION
     migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp ->
+    teams -> teams-mcp ->
     agent -> teams -> terminal
 
     The order is not tidiness, and every arrow in it is now a real dependency.
@@ -65,6 +66,7 @@ $gatewayDir = Join-Path $repoRoot "modules\capital-gateway"
 $archiveDir = Join-Path $repoRoot "modules\market-data"
 $mcpDir = Join-Path $repoRoot "modules\market-mcp"
 $tradingDir = Join-Path $repoRoot "modules\trading-mcp"
+$teamsMcpDir = Join-Path $repoRoot "modules\teams-mcp"
 $agentDir = Join-Path $repoRoot "modules\agent"
 $teamsDir = Join-Path $repoRoot "modules\teams"
 $terminalDir = Join-Path $repoRoot "modules\terminal"
@@ -75,6 +77,7 @@ $agentPort = 8030
 $mcpPort = 8040
 $teamsPort = 8050
 $tradingPort = 8060
+$teamsMcpPort = 8070
 $terminalPort = 5173
 # 127.0.0.1, not "localhost": uvicorn binds IPv4 loopback, while "localhost" can
 # resolve to ::1 first on Windows.
@@ -84,6 +87,7 @@ $agentUrl = "http://127.0.0.1:$agentPort"
 $mcpUrl = "http://127.0.0.1:$mcpPort"
 $teamsUrl = "http://127.0.0.1:$teamsPort"
 $tradingUrl = "http://127.0.0.1:$tradingPort"
+$teamsMcpUrl = "http://127.0.0.1:$teamsMcpPort"
 $terminalUrl = "http://localhost:$terminalPort"
 
 Write-Host "Checking prerequisites..." -ForegroundColor Cyan
@@ -171,7 +175,7 @@ function Get-PortOwner {
     return "$($proc.ProcessName) (pid $($proc.Id))"
 }
 
-$ports = @($gatewayPort, $archivePort, $mcpPort, $tradingPort, $agentPort, $teamsPort)
+$ports = @($gatewayPort, $archivePort, $mcpPort, $tradingPort, $teamsMcpPort, $agentPort, $teamsPort)
 if (-not $NoTerminal) { $ports += $terminalPort }
 foreach ($port in $ports) {
     $owner = Get-PortOwner -Port $port
@@ -253,6 +257,14 @@ if ((Test-Path $teamsEnv) -and
     -not (Select-String -Path $teamsEnv -Pattern '^TRADING_MCP_URL=.+' -Quiet)) {
     Write-Host "modules\teams\.env has no TRADING_MCP_URL - teams will have no order tools, and one assigning them refuses to run." -ForegroundColor DarkGray
     Write-Host "  Add TRADING_MCP_URL=$tradingUrl to give it trading-mcp's, as .env.example does." -ForegroundColor DarkGray
+}
+
+# The agent's second tool server. Its absence is supported, like MARKET_MCP_URL's, but
+# the symptom reads like a missing feature rather than a missing setting: the operator
+# asks for a team and the agent explains that it cannot do that.
+if (-not (Select-String -Path (Join-Path $agentDir ".env") -Pattern '^TEAMS_MCP_URL=..*' -Quiet -ErrorAction SilentlyContinue)) {
+    Write-Host "modules\agent\.env has no TEAMS_MCP_URL - the agent will have no tools for building or running teams." -ForegroundColor DarkGray
+    Write-Host "  Add TEAMS_MCP_URL=$teamsMcpUrl to give it teams-mcp's, as .env.example does." -ForegroundColor DarkGray
 }
 
 $gatewayJob = $null
@@ -481,6 +493,27 @@ try {
     }
     Write-Host "trading-mcp is answering." -ForegroundColor Green
 
+    # --- teams-mcp ---
+    #
+    # After teams, because its tools are teams' catalogue - though unlike trading-mcp it
+    # starts without it and reports the outage per call, which is market-mcp's shape.
+    #
+    # No `--reload`, same as the other two MCP modules: the ASGI app is built in Python.
+
+    Write-Host "Starting teams-mcp on port $teamsMcpPort..." -ForegroundColor Cyan
+    $teamsMcpJob = Start-Job -Name "teamsmcp" -ScriptBlock {
+        param($dir)
+        Set-Location $dir
+        uv run python -m teams_mcp 2>&1
+    } -ArgumentList $teamsMcpDir
+
+    if (-not (Wait-ForHttp -Url "$teamsMcpUrl/health" -Label "teams-mcp" `
+                -Job $teamsMcpJob -Prefix "teamsmcp" -Color Magenta)) {
+        Write-Prefixed -Prefix "teamsmcp" -Color Yellow -Lines (Receive-Job $teamsMcpJob)
+        exit 1
+    }
+    Write-Host "teams-mcp is answering." -ForegroundColor Green
+
     # --- agent ---
     #
     # Last among the back ends: nothing else calls it, so nothing else waits on it -
@@ -592,7 +625,7 @@ finally {
     # Start-Job's child process tree (uv -> uvicorn, pnpm -> vite) can outlive the
     # job object itself, which is what actually leaves a process squatting on the
     # port - so processes bound to the ports we used are swept explicitly too.
-    $sweep = @($gatewayPort, $archivePort, $mcpPort, $tradingPort, $agentPort, $teamsPort)
+    $sweep = @($gatewayPort, $archivePort, $mcpPort, $tradingPort, $teamsMcpPort, $agentPort, $teamsPort)
     if (-not $NoTerminal) { $sweep += $terminalPort }
     foreach ($port in $sweep) {
         Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue |
