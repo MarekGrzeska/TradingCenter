@@ -11,8 +11,8 @@ import type { TeamsApi, TeamSummary } from "./teamsApi";
  * of twenty teams is one request.
  *
  * A run starts from here and a team is opened from here (`terminal-teams`, "z każdej
- * pozycji może otworzyć zespół albo uruchomić przebieg") — opening by double-click, since
- * that is the thing done to a row most often and it used to be a button among five. The
+ * pozycji może otworzyć zespół albo uruchomić przebieg") — opening by clicking the row,
+ * since that is the thing done to a row most often and it used to be a button among five. The
  * runs themselves are read in `TeamRunsView`, never here: a catalogue that listed every
  * team's runs would be one request per row.
  */
@@ -99,7 +99,7 @@ export function TeamCatalogue({
       {refusal && <p className="text-xs text-critical">{refusal}</p>}
 
       {status === "ready" && teams.length > 0 && (
-        <p className="text-xs text-ink-faint">Double-click a team to open it.</p>
+        <p className="text-xs text-ink-faint">Click a team to open it.</p>
       )}
 
       <ul className="flex flex-col gap-2">
@@ -109,11 +109,17 @@ export function TeamCatalogue({
             // The way in, replacing the `Open` button that used to sit among four others —
             // opening a team is the one thing done to a row far more often than everything
             // else on it, and it had the same weight as `Retire`. `Enter` does the same for
-            // a keyboard: a double-click is not reachable from one, and this row is the
-            // only affordance left.
+            // a keyboard, which no pointer gesture is reachable from.
             tabIndex={0}
-            title="Double-click to open"
-            onDoubleClick={() => onOpen(team.id)}
+            title="Click to open"
+            // A single click, and the guard is what makes that safe: the row still carries
+            // four buttons, and a click that started on one of them is that button's, not
+            // the row's. `closest` rather than a direct target check because a button's own
+            // text node is what the click actually lands on.
+            onClick={(event) => {
+              if (event.target instanceof Element && event.target.closest("button")) return;
+              onOpen(team.id);
+            }}
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;
               if (event.target !== event.currentTarget) return;
@@ -133,7 +139,7 @@ export function TeamCatalogue({
                       the markup rather than mounted on hover, so nothing shifts as it
                       appears and a keyboard focus can show it too. */}
                   <span className="shrink-0 text-xs text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                    double-click to open
+                    click to open
                   </span>
                 </div>
                 <div className="truncate text-xs text-ink-muted">{team.description}</div>

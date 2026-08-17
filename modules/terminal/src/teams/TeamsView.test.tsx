@@ -177,9 +177,9 @@ function nodeElement(testId: string): HTMLElement {
 
 async function openTheTeam(api: TeamsApi) {
   render(<TeamsView api={api} />);
-  // Double-click on the row, which is what opening a team is since the `Open` button was
-  // dropped — it was one of five on a row where opening is the common case.
-  await userEvent.dblClick(await screen.findByText("Morning desk"));
+  // A click on the row, which is what opening a team is since the `Open` button was dropped
+  // — it was one of five on a row where opening is the common case.
+  await userEvent.click(await screen.findByText("Morning desk"));
   return screen.findByTestId("agent-node-Scout");
 }
 
@@ -203,24 +203,36 @@ async function closeAgentSettings() {
 }
 
 describe("the catalogue's own affordances", () => {
-  it("opens a team on a double-click, and offers no Open button to do it with", async () => {
+  it("opens a team on a click, and offers no Open button to do it with", async () => {
     render(<TeamsView api={fakeApi()} />);
 
-    await userEvent.dblClick(await screen.findByText("Morning desk"));
+    await userEvent.click(await screen.findByText("Morning desk"));
 
     expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
   });
 
-  it("says so, because a double-click is not visible the way a button was", async () => {
+  it("leaves a click that landed on one of the row's buttons to that button", async () => {
+    // The row is the way in and it carries four buttons: `Schedules` must open schedules,
+    // not the editor underneath the pointer.
+    render(<TeamsView api={fakeApi()} />);
+    await screen.findByText("Morning desk");
+
+    await userEvent.click(screen.getByRole("button", { name: "Schedules" }));
+
+    expect(await screen.findByRole("button", { name: "New schedule" })).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-node-Scout")).not.toBeInTheDocument();
+  });
+
+  it("says so, because a click on a row is not visible the way a button was", async () => {
     render(<TeamsView api={fakeApi()} />);
 
-    expect(await screen.findByText(/Double-click a team to open it/)).toBeInTheDocument();
+    expect(await screen.findByText(/Click a team to open it/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
     // And on the row itself, which is what a pointer lands on. Its visibility is the
     // stylesheet's job — that it is there to be revealed is this file's.
     const row = (await screen.findByText("Morning desk")).closest("li") as HTMLElement;
-    expect(within(row).getByText("double-click to open")).toBeInTheDocument();
-    expect(row).toHaveAttribute("title", "Double-click to open");
+    expect(within(row).getByText("click to open")).toBeInTheDocument();
+    expect(row).toHaveAttribute("title", "Click to open");
   });
 
   it("opens it from the keyboard too, which a double-click cannot", async () => {
