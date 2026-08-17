@@ -23,6 +23,7 @@ from .dtos import (
     Capabilities,
     Instrument,
     InstrumentPage,
+    InstrumentTerms,
     Order,
     OrderStatus,
     OrderType,
@@ -146,6 +147,17 @@ class CapitalAdapter:
         return InstrumentPage(
             instruments=out, count=len(out), truncated=truncated, nodes_visited=visited
         )
+
+    async def get_instrument_terms(self, symbol: str) -> InstrumentTerms:
+        """The deposit and size rules the provider applies to one instrument.
+
+        The same `GET /markets/{epic}` `_market_open` already calls — this reads the rest
+        of that answer, which until now was discarded.
+        """
+        resp = await self._c.market(symbol)
+        if resp.status_code == 404:
+            raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
+        return mapping.instrument_terms_from_details(symbol, self._json_ok(resp))
 
     async def _market_open(self, symbol: str) -> bool:
         """Whether the venue is trading this instrument right now.

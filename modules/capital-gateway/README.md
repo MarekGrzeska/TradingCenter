@@ -73,6 +73,7 @@ HTTP, described by OpenAPI at `/docs`.
 | GET | `/instruments` | `InstrumentPage` — deduped, with a `truncated` flag |
 | GET | `/instruments?asset_class=` | the same, narrowed to one class |
 | GET | `/instruments/search?q=` | `Instrument[]` |
+| GET | `/instruments/{symbol}/terms` | `InstrumentTerms` — the deposit the provider requires and the sizes it accepts; no price |
 | GET | `/instruments/{symbol}/candles` | `Candle[]` — one request, at most 1000 |
 | GET | `/instruments/{symbol}/history` | `CandleHistory` — paged, with its cost |
 | GET | `/instruments/{symbol}/history?before=` | the same, reaching back from a past instant instead of now |

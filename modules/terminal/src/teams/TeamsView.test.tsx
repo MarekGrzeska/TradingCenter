@@ -838,6 +838,7 @@ describe("watching a run", () => {
           toolName: "get_candles",
           outcome: "ok",
           durationMs: 42,
+          detail: { arguments: { symbol: "US100" }, resultText: "12 candles" },
         },
       ]),
     });
@@ -1033,6 +1034,7 @@ describe("watching a run", () => {
           toolName: "get_candles",
           outcome: "ok",
           durationMs: 42,
+          detail: { arguments: { symbol: "US100" }, resultText: "12 candles" },
         },
       ]),
     });
@@ -1045,6 +1047,88 @@ describe("watching a run", () => {
     expect(within(dialog).getByText("US100 is trending")).toBeInTheDocument();
     expect(within(dialog).getByText("get_candles")).toBeInTheDocument();
     expect(within(dialog).getByText(/ok · 42 ms/)).toBeInTheDocument();
+  });
+
+  it("keeps a call collapsed until the operator opens it, then shows both halves", async () => {
+    const api = fakeApi({
+      runToolCalls: vi.fn(async () => [
+        {
+          runStepId: 1,
+          roundIndex: 0,
+          position: 0,
+          toolName: "get_candles",
+          outcome: "ok",
+          durationMs: 42,
+          detail: { arguments: { symbol: "US100" }, resultText: "12 candles" },
+        },
+      ]),
+    });
+    await watch(api);
+    await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Scout/ }));
+
+    expect(within(dialog).queryByText("12 candles")).not.toBeInTheDocument();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: /Expand get_candles/ }));
+
+    expect(within(dialog).getByText(/"symbol": ?"US100"/)).toBeInTheDocument();
+    expect(within(dialog).getByText("12 candles")).toBeInTheDocument();
+  });
+
+  it("labels a refused call's body as the reason it gave", async () => {
+    const api = fakeApi({
+      runToolCalls: vi.fn(async () => [
+        {
+          runStepId: 1,
+          roundIndex: 0,
+          position: 0,
+          toolName: "place_order",
+          outcome: "refused",
+          durationMs: 7,
+          detail: { arguments: { size: 9 }, resultText: "refused: over the team's limit" },
+        },
+      ]),
+    });
+    await watch(api);
+    await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Scout/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /Expand place_order/ }));
+
+    expect(within(dialog).getByText("reason")).toBeInTheDocument();
+    expect(within(dialog).getByText("refused: over the team's limit")).toBeInTheDocument();
+  });
+
+  it("says a call watched live has not been read rather than showing it empty", async () => {
+    // The stream frame carries the name and the outcome and no body — see `runs.ts`. An
+    // empty result here would read as a tool that answered nothing.
+    const api = fakeApi({
+      watchRun: vi.fn(async () =>
+        streamOf([
+          { kind: "snapshot", run: RUN, steps: MIDWAY },
+          {
+            kind: "toolCall",
+            call: {
+              agentKey: "agent-1",
+              roundIndex: 0,
+              position: 0,
+              toolName: "get_balance",
+              outcome: "ok",
+              durationMs: 9,
+            },
+          },
+        ]),
+      ),
+    });
+    await watch(api);
+    await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Scout/ }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /Expand get_balance/ }));
+
+    expect(within(dialog).getByText(/have not been read yet/)).toBeInTheDocument();
+    expect(within(dialog).queryByText("arguments")).not.toBeInTheDocument();
   });
 
   it("closes the outputs window on Escape", async () => {

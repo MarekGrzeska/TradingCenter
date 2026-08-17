@@ -42,6 +42,7 @@ from .dtos import (
     Capabilities,
     Instrument,
     InstrumentPage,
+    InstrumentTerms,
     Order,
     PlaceOrderRequest,
     Position,
@@ -305,6 +306,16 @@ async def search_instruments(
     a: CapitalAdapter = Depends(adapter),
 ):
     return await a.search_instruments(q)
+
+
+@app.get("/instruments/{symbol}/terms", tags=["market-data"], response_model=InstrumentTerms)
+async def instrument_terms(
+    symbol: str,
+    a: CapitalAdapter = Depends(adapter),
+):
+    """The deposit and size rules for one instrument — no price; that is `/search` and
+    `/candles`. A field the provider omits comes back null rather than as a default."""
+    return await a.get_instrument_terms(symbol)
 
 
 @app.get("/instruments/{symbol}/candles", tags=["market-data"], response_model=list[Candle])

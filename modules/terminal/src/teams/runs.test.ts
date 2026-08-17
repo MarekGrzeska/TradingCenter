@@ -165,12 +165,13 @@ describe("stopCause", () => {
 });
 
 describe("attachAgentKeys", () => {
+  const detail = { arguments: { symbol: "US100" }, resultText: "12 candles" };
   const calls = [
-    { runStepId: 1, roundIndex: 0, position: 0, toolName: "candles", outcome: "ok", durationMs: 5 },
-    { runStepId: 99, roundIndex: 0, position: 0, toolName: "candles", outcome: "ok", durationMs: 5 },
+    { runStepId: 1, roundIndex: 0, position: 0, toolName: "candles", outcome: "ok", durationMs: 5, detail },
+    { runStepId: 99, roundIndex: 0, position: 0, toolName: "candles", outcome: "ok", durationMs: 5, detail },
   ];
 
-  it("names the agent whose step made the call", () => {
+  it("names the agent whose step made the call, and keeps what it was given and answered", () => {
     expect(attachAgentKeys(calls, [step(1, "scout")])).toEqual([
       // The call under a step nobody handed in is dropped rather than shown under an
       // invented name — the two reads crossed a step being created, and the next
@@ -182,6 +183,7 @@ describe("attachAgentKeys", () => {
         toolName: "candles",
         outcome: "ok",
         durationMs: 5,
+        detail,
       },
     ]);
   });

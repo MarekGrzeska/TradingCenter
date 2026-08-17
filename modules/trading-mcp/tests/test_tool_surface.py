@@ -4,7 +4,13 @@ does — read vs write annotations, and the absence of a market tool.
 
 from __future__ import annotations
 
-READ_TOOLS = {"get_positions", "get_working_orders", "get_balance"}
+READ_TOOLS = {
+    "get_positions",
+    "get_working_orders",
+    "get_balance",
+    "get_instrument_terms",
+    "size_for_margin",
+}
 WRITE_TOOLS = {"place_order", "close_position", "amend_stops", "cancel_working_order"}
 
 
