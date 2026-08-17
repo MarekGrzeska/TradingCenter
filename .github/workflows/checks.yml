@@ -90,11 +90,13 @@ jobs:
           # generatora") — the terminal's hand-written DTOs in `agentApi.ts` are the
           # check for *that* contract, and they only run if this job does.
           #
-          # `teams/contract.py` is the third, and it is the generated kind: from the
-          # add-teams-module change on, `contract:generate` reads two schema sources and
-          # writes a file per source, so a change here leaves the terminal's committed
-          # types stale exactly the way market-data's would.
-          terminal='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/agent/agent/contract\.py$|^modules/teams/teams/contract\.py$'
+          # `teams` is the third, and it is the generated kind: from the add-teams-module
+          # change on, `contract:generate` reads two schema sources and writes a file per
+          # source, so a change there leaves the terminal's committed types stale exactly
+          # the way market-data's would. The whole module rather than its `contract.py`,
+          # for the reason written out at `teamsmcp` below — that file imports models it
+          # does not define, and one of them going stale is a thing that has happened.
+          terminal='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/agent/agent/contract\.py$|^modules/teams/'
           # Same reasoning as the terminal's own filter, one line up: market-mcp keeps a
           # committed snapshot of the same contract (`contract/market-data.openapi.json`),
           # and `test_contract.py` is the check that catches it going stale.
@@ -106,11 +108,17 @@ jobs:
           # from its routes as well as its DTOs, so there is no narrower honest filter.
           trading='^modules/trading-mcp/|^modules/capital-gateway/'
           # And once more, one module further in: teams-mcp keeps a committed snapshot of
-          # teams' OpenAPI document (`contract/teams.openapi.json`). Narrower than
-          # trading-mcp's filter and honestly so — teams *prints* its document from
-          # `contract.py`'s models (`python -m teams.openapi`), so that one file is where
-          # a drift can come from, the way market-data's is.
-          teamsmcp='^modules/teams-mcp/|^modules/teams/teams/contract\.py$'
+          # teams' OpenAPI document (`contract/teams.openapi.json`).
+          #
+          # This used to watch `teams/teams/contract.py` alone, on the theory that teams
+          # prints its document from that file's models and so nowhere else can move it.
+          # Measured wrong on 17 August 2026: `weekdays-on-the-shorter-rhythms` touched
+          # only `recurrence.py`, whose `Recurrence` docstring *is* a description in the
+          # schema — the snapshot went stale, this job never ran, and the PR merged green.
+          # `contract.py` imports its models rather than defining them all, and the
+          # document is built from routes as well, so the whole module is the only honest
+          # filter — the same conclusion trading-mcp's reached one line up.
+          teamsmcp='^modules/teams-mcp/|^modules/teams/'
           # The archive-shape check, plus the script that is the shape.
           specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
 
