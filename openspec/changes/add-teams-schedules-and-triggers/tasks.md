@@ -183,6 +183,14 @@ Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń p
   `apply` wykonany (0 dodanych, 1 zmieniony, 0 usuniętych) i sprawdzony odczytem:
   `az webapp config appsettings list` oddaje `SCHEDULER_ENABLED=false`.
 
+  **17 sierpnia 2026 przełączone na `"true"` decyzją operatora**, bez czekania na 8.2 —
+  operator zgłosił, że harmonogram `35 * * * *` zapisany na produkcji nie wyzwolił, i tym
+  właśnie było: zegar nie startował. `plan` `0 to add, 4 to change, 0 to destroy` (trzy
+  aplikacje to znane `allowed_applications` → `(known after apply)`), `apply` `0 added,
+  1 changed, 0 destroyed`, odczyt z Azure oddaje `SCHEDULER_ENABLED=true`, `GET /health`
+  na `teams` wraca **200** po restarcie. Pierwsze wyzwolenie w produkcji jest więc
+  jednocześnie przebiegiem z 8.2 — bez nadzoru, z definicji.
+
   7.3 przy okazji odświeżyło sekcję „What", która stała na fazie 1: `config.py` ma trzy
   przełączniki trybu, nie dwa; `tools/` to rejestr dwóch serwerów, nie jedna sesja; doszły
   `scheduler/clock.py` i `routers/schedules.py`, `runner/trading.py` obok `cost.py`, a lista
@@ -212,4 +220,15 @@ Zrobione jako efekt uboczny grup 3–4, nie osobno — oba źródła wyzwoleń p
   na zboczu przez prawdziwy serwer MCP. Czego nie zastępują: `SCHEDULER_ENABLED` na
   produkcji i zegar budzący się sam w procesie App Service. Do zrobienia, zanim 7.2
   przejdzie na `true` — patrz „Gaps" w `review.md`.
+
+  **Kolejność wyszła odwrotna: 7.2 przeszło na `true` 17 sierpnia 2026, zanim ten przebieg
+  się odbył.** Zapisane tak, jak było, a nie odhaczone wstecz — pierwsze wyzwolenie na
+  produkcji jest tym przebiegiem i nikt przy nim nie stoi. Co przy tej okazji wyszło i
+  zostaje otwarte: `check_unattended` jest wołane **wyłącznie** z `routers/schedules.py`,
+  czyli przy zapisie. Ścieżka wyzwolenia (`scheduler/clock.py` → `runner/`) nie pyta o nie
+  ani razu, a `_resolve_revision` przy `revision_mode='latest'` bierze rewizję **z chwili
+  wyzwolenia**. Harmonogram zapisany nad zespołem bez narzędzi zapisujących — więc z
+  `unattended_ack = false`, całkiem legalnie — dalej wyzwala sam po tym, jak operator doda
+  do zespołu `place_order`. Zabezpieczenie nie jest zepsute; jest w jednym miejscu, a
+  potrzebne w dwóch. Harmonogram `pinned` tego nie ma, bo jego rewizja jest ustalona.
 - [x] 8.3 `review.md`
