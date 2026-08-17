@@ -733,26 +733,34 @@ resource "azurerm_linux_web_app" "teams" {
     # get past Easy Auth, and would put the schedule in Terraform, which is to say back
     # in the operator's hands rather than in the catalogue where they set it.
     #
-    # **Off, deliberately, and this is the one setting in this file whose value is a
-    # decision rather than a fact.** `teams/config.py` defaults it to `true`, so leaving
-    # it out of this map would *enable* the clock — the opposite of leaving it alone.
+    # **On, and this is the one setting in this file whose value is a decision rather
+    # than a fact.** `teams/config.py` defaults it to `true`, so this line does not turn
+    # the clock on so much as state that it is meant to be on: deleting it would leave the
+    # clock running and say nothing about whether anyone chose that.
     #
-    # The reason it is off has changed, and the new one is weaker. It *was* a broken
-    # guard: `teams/validation.py` consulted a hand-kept `STATE_CHANGING_TOOLS =
+    # It was `"false"` from `add-teams-schedules-and-triggers` until 17 August 2026, first
+    # over a broken guard and then over a missing measurement. The guard is the part worth
+    # keeping: `teams/validation.py` consulted a hand-kept `STATE_CHANGING_TOOLS =
     # frozenset()`, so the check refusing an unattended schedule over a revision carrying
     # write tools (specs/teams-schedules) asked an empty set and refused nothing, while
     # this app already had `TRADING_MCP_URL`. That is closed — the check now reads each
     # server's own `readOnlyHint` at save time and refuses anything it cannot confirm is
-    # a read.
+    # a read, and `unattended_ack` is reachable only from the terminal, never from a tool
+    # (`teams-mcp/tools/schedules.py`).
     #
-    # What is left is that no schedule has ever fired on a running stack (task 8.2 of
-    # `add-teams-schedules-and-triggers`). Turning the clock on here is the operator's
-    # call after that pass, not something to slip in with a code change.
+    # What was never done is task 8.2 of that change: no schedule has fired on a running
+    # stack, and the operator turned the clock on anyway rather than wait for it. So the
+    # first fire in production **is** that pass, and it is unattended by definition — the
+    # thing to watch is `runs`, not this file.
     #
-    # Flipping it is one line here plus an `apply`; every schedule and trigger already
-    # in the catalogue stays exactly where it is either way, and a run started by hand
-    # works with the clock off (specs/teams-schedules, "Budzenie wyłączone ustawieniem").
-    SCHEDULER_ENABLED = "false"
+    # Two properties make that survivable rather than reckless, and both were read out of
+    # the code rather than assumed: overdue slots collapse into **one** fire
+    # (`_next_fire_and_skipped` in `scheduler/clock.py`), so nothing stampedes on start-up;
+    # and the switch is module-wide, so it starts every schedule and trigger in the
+    # catalogue at once, not only the newest one. Back to `"false"` is one line and an
+    # `apply`, and it leaves the catalogue untouched — a run started by hand works either
+    # way (specs/teams-schedules, "Budzenie wyłączone ustawieniem").
+    SCHEDULER_ENABLED = "true"
 
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.teams_easy_auth.value
 
