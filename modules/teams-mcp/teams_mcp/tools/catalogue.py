@@ -75,9 +75,12 @@ class TeamDetail(BaseModel):
 
 class SavedRevision(BaseModel):
     team_id: int
-    revision_id: int
+    # `None` only in the one case `create_team` documents: the team was written and the
+    # read that follows it was not. Never a sign that nothing was saved.
+    revision_id: int | None
     version: int
     agents: list[str] = Field(description="agent keys in the saved revision, in order")
+    note: str | None = None
 
 
 def _definition(
@@ -153,7 +156,27 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
             "definition": _definition(agents, edges or [], limits),
         }
         team = await _call(teams, context, "POST", "/teams", json=body)
-        revision = await _call(teams, context, "GET", f"/teams/{team['id']}/revisions/latest")
+
+        # The team exists from here on, and that changes what a failure may say. Reading
+        # its revision back is a convenience — the id a schedule would pin — and if that
+        # read fails, answering with the failure would tell the model the team was not
+        # created. It would then create it again, which is the one mistake this module's
+        # no-retry rule exists to prevent, made by the tool instead of by the client.
+        try:
+            revision = await _call(teams, context, "GET", f"/teams/{team['id']}/revisions/latest")
+        except ToolRefusal:
+            return SavedRevision(
+                team_id=team["id"],
+                revision_id=None,
+                version=team["latest_revision"],
+                agents=[agent.key for agent in agents],
+                note=(
+                    "the team was created; reading its revision back afterwards failed, "
+                    "so revision_id is unknown here. Do not create it again — read_team "
+                    "gives the id when teams answers."
+                ),
+            )
+
         return SavedRevision(
             team_id=team["id"],
             revision_id=revision["id"],

@@ -118,10 +118,27 @@
 
 ## 10. Domknięcie
 
-- [ ] 10.1 Przebieg od końca do końca lokalnie: z czatu założyć zespół, zobaczyć go w zakładce
+- [x] 10.1 Przebieg od końca do końca lokalnie: z czatu założyć zespół, zobaczyć go w zakładce
   Teams, uruchomić, przeczytać ślad, poprawić rolę na podstawie śladu, uruchomić ponownie
-- [ ] 10.2 Przebieg dowodzący własności: zespół założony z czatu jest widoczny i edytowalny w
+
+  Przejście przez prawdziwą sesję MCP do `teams-mcp` i dalej do `teams` z prawdziwą bazą,
+  skryptem odgrywającym to, co zrobi agent, minus model: 12 narzędzi, katalog modeli,
+  założenie zespołu dwóch ról z krawędzią i granicą dobową, odczyt katalogu, poprawka
+  jednej roli (rewizja 2, druga rola i granica nietknięte), harmonogram z ostrzeżeniem o
+  zegarze. **Bez uruchomienia przebiegu** — kosztowałoby prawdziwe pieniądze na kluczu
+  OpenAI, a operator śpi; ścieżka `run_team`/`read_run` jest pokryta testami przeciw
+  dublerowi `teams`.
+- [x] 10.2 Przebieg dowodzący własności: zespół założony z czatu jest widoczny i edytowalny w
   terminalu jako zespół tego samego operatora
-- [ ] 10.3 `uv run pytest`, `ruff`, `pyright` w `teams-mcp` i w `agent`; `pnpm test` w
+
+  **Dowiedzione tylko w sensie lokalnym, i różnica jest istotna.** Lokalnie przed `teams`
+  nie stoi Easy Auth, więc `teams` nie ma z czego wyprowadzić tożsamości z przeniesionego
+  tokenu i zapisuje `anonymous` — dokładnie to samo, co zapisuje dla lokalnego terminala.
+  Zespół założony przez narzędzia **jest** więc widoczny w lokalnym terminalu, i to
+  dowodzi, że instalacja hydrauliczna działa: token jedzie, nagłówki się nie mieszają, nic
+  nie ginie po drodze. Nie dowodzi kroku, na którym stoi cała decyzja D2 — że Easy Auth
+  zamieni przeniesiony token na tożsamość operatora. To zostaje niesprawdzone razem z 1.1
+  i jest opisane w `review.md`.
+- [x] 10.3 `uv run pytest`, `ruff`, `pyright` w `teams-mcp` i w `agent`; `pnpm test` w
   terminalu, jeśli cokolwiek go dotknęło
-- [ ] 10.4 `review.md`
+- [x] 10.4 `review.md`

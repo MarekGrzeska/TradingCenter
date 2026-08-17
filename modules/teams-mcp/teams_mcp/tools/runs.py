@@ -8,6 +8,7 @@ of it, and that only works if the trace arrives in a shape a model can reason ab
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -83,10 +84,14 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         whatever exists so far. A partial trace is not a result, and answering the
         operator as though it were is the one mistake to avoid here.
         """
-        run = await _call(teams, context, "GET", f"/runs/{run_id}")
-        steps = await _call(teams, context, "GET", f"/runs/{run_id}/steps")
-        calls = await _call(teams, context, "GET", f"/runs/{run_id}/tool-calls")
-        usage = await _call(teams, context, "GET", "/usage", params={"run_id": run_id})
+        # Four reads of the same run, asked together: they do not depend on each other,
+        # and one after another they are four ceilings deep inside one tool call.
+        run, steps, calls, usage = await asyncio.gather(
+            _call(teams, context, "GET", f"/runs/{run_id}"),
+            _call(teams, context, "GET", f"/runs/{run_id}/steps"),
+            _call(teams, context, "GET", f"/runs/{run_id}/tool-calls"),
+            _call(teams, context, "GET", "/usage", params={"run_id": run_id}),
+        )
 
         per_step: dict[int, int] = {}
         for call in calls:

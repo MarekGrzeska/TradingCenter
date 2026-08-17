@@ -11,6 +11,7 @@ they are agreeing to.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Literal
 
 from mcp.server.fastmcp import Context, FastMCP
@@ -159,37 +160,47 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         one that is quiet because it keeps hitting the daily ceiling look identical
         without it. A schedule the module disabled itself carries the reason it did.
         """
-        schedules = await _call(teams, context, "GET", f"/teams/{team_id}/schedules")
-        triggers = await _call(teams, context, "GET", f"/teams/{team_id}/triggers")
+        schedules, triggers = await asyncio.gather(
+            _call(teams, context, "GET", f"/teams/{team_id}/schedules"),
+            _call(teams, context, "GET", f"/teams/{team_id}/triggers"),
+        )
 
-        out: list[ScheduleSummary] = []
-        for row in schedules:
-            fires = await _call(teams, context, "GET", f"/schedules/{row['id']}/fires")
-            out.append(
-                ScheduleSummary(
-                    kind="schedule",
-                    id=row["id"],
-                    describes=f"cron {row['cron_expression']} (UTC), next {row['next_fire_at']}",
-                    enabled=row["enabled"],
-                    disabled_reason=row["disabled_reason"],
-                    recent_fires=_recent(fires),
-                )
+        # One history read per row, asked all at once rather than in a queue. Sequentially
+        # this is the only tool here whose cost grows with the catalogue: ten schedules
+        # would be twenty-one round trips one after another, each with its own ceiling,
+        # inside a single tool call the operator is waiting on.
+        histories = await asyncio.gather(
+            *(_call(teams, context, "GET", f"/schedules/{row['id']}/fires") for row in schedules),
+            *(_call(teams, context, "GET", f"/triggers/{row['id']}/fires") for row in triggers),
+        )
+        schedule_fires = histories[: len(schedules)]
+        trigger_fires = histories[len(schedules) :]
+
+        out: list[ScheduleSummary] = [
+            ScheduleSummary(
+                kind="schedule",
+                id=row["id"],
+                describes=f"cron {row['cron_expression']} (UTC), next {row['next_fire_at']}",
+                enabled=row["enabled"],
+                disabled_reason=row["disabled_reason"],
+                recent_fires=_recent(fires),
             )
-        for row in triggers:
-            fires = await _call(teams, context, "GET", f"/triggers/{row['id']}/fires")
-            out.append(
-                ScheduleSummary(
-                    kind="trigger",
-                    id=row["id"],
-                    describes=(
-                        f"{row['tool_name']}.{row['field_path']} {row['comparison']} "
-                        f"{row['threshold']}"
-                    ),
-                    enabled=row["enabled"],
-                    disabled_reason=row["disabled_reason"],
-                    recent_fires=_recent(fires),
-                )
+            for row, fires in zip(schedules, schedule_fires, strict=True)
+        ]
+        out.extend(
+            ScheduleSummary(
+                kind="trigger",
+                id=row["id"],
+                describes=(
+                    f"{row['tool_name']}.{row['field_path']} {row['comparison']} "
+                    f"{row['threshold']}"
+                ),
+                enabled=row["enabled"],
+                disabled_reason=row["disabled_reason"],
+                recent_fires=_recent(fires),
             )
+            for row, fires in zip(triggers, trigger_fires, strict=True)
+        )
         return out
 
 

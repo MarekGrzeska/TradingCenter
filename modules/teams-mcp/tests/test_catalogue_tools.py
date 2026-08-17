@@ -282,3 +282,36 @@ async def test_somebody_elses_team_reads_as_one_that_does_not_exist(server) -> N
 
     assert "somebody else" in str(err.value)
     await teams.aclose()
+
+
+@respx.mock
+async def test_a_created_team_is_reported_as_created_even_if_reading_it_back_fails(
+    server,
+) -> None:
+    """The team exists the moment teams answers the POST. If the follow-up read fails and
+    this tool reports a failure, the model creates the team again — the exact duplicate
+    the no-retry rule exists to prevent, committed by the tool rather than the client."""
+    mcp, teams = server
+    created = respx.post(f"{BASE}/teams").mock(
+        return_value=httpx.Response(
+            201,
+            json={
+                "id": 4,
+                "name": "desk",
+                "description": "",
+                "latest_revision": 1,
+                "created_at": "2026-08-17T00:00:00Z",
+                "updated_at": "2026-08-17T00:00:00Z",
+            },
+        )
+    )
+    respx.get(f"{BASE}/teams/4/revisions/latest").mock(return_value=httpx.Response(503))
+
+    _content, structured = await mcp.call_tool("create_team", {"name": "desk", "agents": [_AGENT]})
+
+    assert created.call_count == 1
+    assert structured["team_id"] == 4
+    assert structured["revision_id"] is None
+    assert "Do not create it again" in structured["note"]
+    assert structured["agents"] == ["scout"]
+    await teams.aclose()
