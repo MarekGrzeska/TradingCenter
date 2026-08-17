@@ -13,6 +13,7 @@ from pathlib import Path
 import asyncpg
 import pytest
 
+from teams.config import Settings
 from teams.db import asyncpg_dsn, sqlalchemy_url
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent
@@ -82,36 +83,30 @@ def _docker_is_installed() -> bool:
     )
 
 
-# Settings whose *absence* a test can depend on, and which a developer's `.env` supplies.
-# Blank rather than deleted, because deleting is what does not work: `Settings` reads
-# `.env` through pydantic-settings, and an environment variable removed from the process
-# uncovers the file's value instead of hiding it — `monkeypatch.delenv` there makes a test
-# read the developer's own market-mcp. An empty value is a value, it wins over the file,
-# and `config.py` already reads a blank optional setting as unset
-# (`test_config.py::test_a_blank_tool_server_url_means_unset`). CI has no `.env` at all,
-# so this is the difference between a suite that is green there and green anywhere.
-_BLANK_LOCALLY = ("MARKET_MCP_URL", "MARKET_MCP_SCOPE", "DATABASE_USER")
-
-# The Entra triple is the exception, and it is the other consumer that makes it one:
-# `DefaultAzureCredential` reads these out of the process environment itself, and it reads
-# an empty `AZURE_CLIENT_ID` as a broken one rather than as an absent one
-# (`ValueError: client_id should be the id of a Microsoft Entra application`). Deleted, not
-# blanked — and deletion is enough here, because what must not see them is azure-identity,
-# which never looks at `.env`.
-_DELETED_LOCALLY = ("AZURE_CLIENT_ID", "AZURE_CLIENT_SECRET", "AZURE_TENANT_ID")
-
-
 @pytest.fixture(autouse=True)
 def _no_developer_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The module's own `.env`, kept out of every test that builds `Settings()` itself —
-    which is every test going through `TestClient(app)`, since the lifespan is where the
-    settings are read. A test wanting one of these sets it with `monkeypatch.setenv`,
-    which wins over both this and the file."""
-    for name in _BLANK_LOCALLY:
-        monkeypatch.setenv(name, "")
-    for name in _DELETED_LOCALLY:
-        monkeypatch.delenv(name, raising=False)
-    monkeypatch.setenv("REQUIRE_AUTHENTICATED_PRINCIPAL", "false")
+    """Every source of settings a developer's machine has and CI does not, taken away
+    from each test that builds `Settings()` itself — which is every test going through
+    `TestClient(app)`, since the lifespan is where the settings are read. A test wanting
+    one of them sets it with `monkeypatch.setenv`, which is read after this.
+
+    Two sources, and neither is covered by handling the other:
+
+    * the module's `.env`, switched off at the class rather than name by name. An earlier
+      version of this fixture blanked a list of names instead, and the list went stale the
+      moment `TRADING_MCP_URL` was added — six tests that assert "no tool server
+      configured" passed in CI and failed on a machine with an `.env`. Blanking was itself
+      a workaround for `delenv` uncovering the file's value; with the file out of the
+      picture there is nothing left to uncover, so deletion works and no list is needed.
+    * the process environment, which is the shell's and not the file's. `Settings` fields
+      map one-to-one onto variable names here (no `env_prefix`), so deleting all of them
+      needs no list either — and it is what keeps `AZURE_CLIENT_ID` away from
+      `DefaultAzureCredential`, the one consumer that reads the environment itself and
+      would take a blank value for a broken one rather than an absent one.
+    """
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    for field in Settings.model_fields:
+        monkeypatch.delenv(field.upper(), raising=False)
 
 
 @pytest.fixture(scope="session")
