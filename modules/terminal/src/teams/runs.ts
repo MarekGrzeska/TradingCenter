@@ -60,9 +60,6 @@ export interface TeamRunStep {
   finishedAt: number | null;
 }
 
-/** One tool call, keyed by the agent that made it — which is how the monitor groups
- *  them. The stream says the agent outright; a recorded call names its step, and
- *  `attachAgentKeys` is where that becomes the same thing. */
 /** What a call was given and what it answered — the two halves that explain an output.
  *
  *  Its own type because its *absence* means something: the stream announces a call
@@ -75,6 +72,9 @@ export interface ToolCallDetail {
   resultText: string;
 }
 
+/** One tool call, keyed by the agent that made it — which is how the monitor groups
+ *  them. The stream says the agent outright; a recorded call names its step, and
+ *  `attachAgentKeys` is where that becomes the same thing. */
 export interface TeamRunToolCall {
   agentKey: string;
   roundIndex: number;

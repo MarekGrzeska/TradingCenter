@@ -53,6 +53,6 @@
 
 ## 4. Domknięcie
 
-- [ ] 4.1 README `capital-gateway` i `trading-mcp` — nowa trasa i dwa narzędzia
-- [ ] 4.2 `openspec validate size-orders-by-margin --strict`
-- [ ] 4.3 `review.md`
+- [x] 4.1 README `capital-gateway` i `trading-mcp` — nowa trasa i dwa narzędzia
+- [x] 4.2 `openspec validate size-orders-by-margin --strict`
+- [x] 4.3 `review.md`
