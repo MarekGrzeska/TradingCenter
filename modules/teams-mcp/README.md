@@ -99,20 +99,32 @@ routes.
 | `run_team`, `read_run`, `list_runs` | start one, read what it did and what it cost |
 | `schedule_team`, `trigger_team` | on a clock, or on a market condition |
 | `list_schedules` | what is set, what fired, and what was skipped and why |
+| `pause_schedule`, `pause_trigger` | stop one without losing it, and start it again |
+| `edit_schedule`, `edit_trigger` | change the timing or the condition, keeping the row |
+| `delete_schedule`, `delete_trigger` | gone, with its fire history — marked destructive |
 
 `read_run` answers for a run that is still working and says that it is — a partial trace
 presented as a result is the mistake worth avoiding here.
 
-**`unattended_ack` is not a parameter and must not become one.** `teams` refuses a
-schedule over a revision carrying a tool it cannot confirm is a read, unless that
-acknowledgement is present. Offered as a field, a model would set it the moment a refusal
-was in its way, and a safeguard would disappear without a line of code changing. The
-operator ticks that box in the terminal, where they can see what they are agreeing to.
+**Editing is its own tool, not delete-and-recreate.** A schedule corrected through
+`delete_schedule` + `schedule_team` is a different row with an empty history and a number
+the operator was not talking about, so `edit_schedule` keeps the one that exists.
+
+**Deleting and pausing are two tools rather than one with a flag**, because they differ in
+what cannot be undone: pausing keeps the row and the fire history, deleting takes the
+history for good and leaves only the runs it started. The two `delete_*` tools are the only
+ones here marked `destructiveHint`, so a client that asks before destructive calls has
+something to ask about.
+
+An `unattended_ack` parameter was conspicuously absent here until 17 August 2026, so that a
+model could not fill in a safeguard the moment a refusal blocked it. That safeguard no
+longer exists in `teams` at all — it was checked at save time and never at fire time
+(`manage-schedules-and-drop-the-acknowledgement`).
 
 ## What this module does not do
 
-- **No limits of its own.** Daily cost, order ceilings, unattended-work refusals — all of
-  them are `teams`', checked on the same path a click in the terminal takes. A new door
+- **No limits of its own.** Daily cost and order ceilings are `teams`', checked on the
+  same path a click in the terminal takes. A new door
   into a module is not a new policy for it.
 - **No market data.** That is `market-mcp`, which the agent reaches separately.
 - **No retry on a write.** A repeated `create_team` is a second team and a repeated
