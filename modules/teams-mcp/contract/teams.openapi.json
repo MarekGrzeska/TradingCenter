@@ -221,7 +221,7 @@
         "type": "object"
       },
       "Recurrence": {
-        "description": "One rhythm, in the operator's own words. `kind` decides which of the other fields\ncarry a value \u2014 see `_FIELDS`.",
+        "description": "One rhythm, in the operator's own words.\n\n`kind` decides which of the other fields carry a value: each needs its own (`_REQUIRED`)\nand the two that repeat within a day may also carry `weekdays` (`_ALLOWED`). Anything\nelse is refused rather than ignored. Weekdays are ISO \u2014 1 Monday \u2026 7 Sunday \u2014 and their\nabsence means every day.",
         "properties": {
           "day_of_month": {
             "anyOf": [
