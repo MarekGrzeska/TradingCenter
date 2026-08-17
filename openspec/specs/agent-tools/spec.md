@@ -145,21 +145,31 @@ się ustawić względem siebie bez sięgania po ich czas zapisu.
 - **AND** MUST NOT dać się jej pomylić z wypowiedzią, przy której wywołania odpadły po
   drodze
 
-### Requirement: Agent zapisuje wyłącznie w widoku terminala
+### Requirement: Agent zapisuje w widoku terminala i na rachunku demonstracyjnym
 
 Zmianami stanu, jakie moduł MUST umieć wykonać przez narzędzie, są: ustawienie tego, co
-terminal rysuje — zestawu wskaźników, symbolu i interwału aktywnego slotu — oraz
-postawienie i skasowanie rysunków na wykresie instrumentu (`agent-chart-drawings`).
+terminal rysuje — zestawu wskaźników, symbolu i interwału aktywnego slotu — postawienie i
+skasowanie rysunków na wykresie instrumentu (`agent-chart-drawings`) oraz zmiana stanu
+rachunku demonstracyjnego: złożenie zlecenia, zamknięcie pozycji, zmiana poziomów
+zabezpieczających i anulowanie zlecenia oczekującego.
 
 Moduł MUST NOT wykonywać przez narzędzia żadnej innej zmiany stanu: nie rozpoczyna
-zbierania pary, nie kasuje danych, nie składa zlecenia, nie zmienia konfiguracji żadnego
-modułu i nie pisze do archiwum. Serwer narzędzi MUST pozostać czytający — zapis nie jedzie
-przez niego.
+zbierania pary, nie kasuje danych, nie zmienia konfiguracji żadnego modułu i nie pisze do
+archiwum.
 
-Zapis MUST być odwracalny ręką operatora, bez rozmowy i bez modelu: zawartość slotu tym
-samym wybierakiem, którym operator ustawia wykres sam, a rysunek listą, z której operator
-go usuwa. Narzędzie, którego skutku operator nie umie cofnąć bez agenta, jest poza tym
-wymaganiem.
+Zapis w widoku terminala MUST być odwracalny ręką operatora, bez rozmowy i bez modelu:
+zawartość slotu tym samym wybierakiem, którym operator ustawia wykres sam, a rysunek listą,
+z której operator go usuwa. Narzędzie zmieniające widok, którego skutku operator nie umie
+cofnąć bez agenta, jest poza tym wymaganiem.
+
+Zapis na rachunku MUST NOT być objęty warunkiem odwracalności, bo objąć się nie da:
+zlecenia wykonanego nikt nie cofa wybierakiem, a terminal nie ma dziś ekranu pozycji, więc
+jedyną drogą wewnątrz tej platformy jest poprosić agenta jeszcze raz. Na miejscu
+odwracalności stoją trzy rzeczy i żadna z nich nie jest liczbą wpisaną w ten moduł:
+rachunek demonstracyjny wymuszony u gatewaya (`capital-trading`, „Handel dotyka wyłącznie
+konta demo"), imienna lista wołających u serwera narzędzi zapisujących
+(`trading-mcp-transport`) oraz ślad każdego wywołania ruszającego rachunek
+(`agent-trading`).
 
 #### Scenario: Operator prosi o pokazanie wskaźnika
 
@@ -171,9 +181,16 @@ wymaganiem.
 - **WHEN** operator prosi agenta, żeby naniósł opór na wskazanej cenie
 - **THEN** agent ma narzędzie, którym to robi, i wykres to pokazuje
 
+#### Scenario: Operator prosi o złożenie zlecenia
+
+- **WHEN** operator prosi agenta, żeby złożył zlecenie na wskazanym instrumencie
+- **THEN** agent ma narzędzie, którym to robi, i zlecenie zostaje złożone na rachunku
+  demonstracyjnym
+- **AND** MUST NOT odpowiedzieć, że jest to poza jego zakresem
+
 #### Scenario: Operator prosi o wykonanie akcji poza wykresem
 
-- **WHEN** operator prosi agenta, żeby zaczął zbierać parę albo złożył zlecenie
+- **WHEN** operator prosi agenta, żeby zaczął zbierać parę albo skasował dane z archiwum
 - **THEN** agent nie ma narzędzia, którym mógłby to zrobić
 - **AND** odpowiada, że to jest poza jego zakresem, zamiast zgłaszać chwilową awarię
 

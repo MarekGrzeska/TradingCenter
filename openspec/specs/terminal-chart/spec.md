@@ -567,8 +567,8 @@ obiekty nowego instrumentu.
 
 Terminal MUST pokazywać listę obiektów naniesionych na instrument aktywnego slotu: kształt,
 ceny, etykietę i to, kiedy powstały. Lista jest jedyną drogą, którą operator cofa to, co
-narysował agent (`agent-tools`, „Agent zapisuje wyłącznie w widoku terminala"), więc MUST
-być dostępna bez rozmowy z agentem.
+narysował agent (`agent-tools`, „Agent zapisuje w widoku terminala i na rachunku
+demonstracyjnym"), więc MUST być dostępna bez rozmowy z agentem.
 
 Operator MUST móc z listy usunąć pojedynczy obiekt oraz poprawić jego ceny i etykietę.
 Skutek MUST być widoczny na wykresie od razu, bez przeładowania strony.

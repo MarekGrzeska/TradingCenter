@@ -1,11 +1,11 @@
+# agent-trading Specification
+
 ## Purpose
 
 Na jakich warunkach rozmowa rusza rachunek: czego ten moduł nie narzuca, co zostaje w
 śladzie po każdym wywołaniu zmieniającym stan rachunku, i czego agent nie ma prawa
 operatorowi powiedzieć o zleceniu, którego skutku nie zna.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Moduł nie narzuca własnych granic handlowych
 
 Moduł MUST NOT nieść własnej granicy wielkości zlecenia, liczby zleceń w turze, w rozmowie
