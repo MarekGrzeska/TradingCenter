@@ -30,5 +30,5 @@
 
 - [x] 5.1 `modules/teams-mcp/README.md`: sekcja o tym, czyim imieniem moduł woła i co znaczy uruchomienie lokalne
 - [ ] 5.2 Sprawdzić na uruchomionym stosie: `list_models` z czatu odpowiada, zespół założony z czatu jest w zakładce Teams tego samego terminala
-- [ ] 5.3 `review.md` po implementacji, przed archiwizacją
+- [x] 5.3 `review.md` po implementacji, przed archiwizacją
 - [ ] 5.4 Zarchiwizować **po** `add-teams-mcp` — inaczej `MODIFIED` nie ma czego zmieniać (`design.md`, Migration Plan)

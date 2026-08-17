@@ -45,7 +45,14 @@ class TeamsClient:
         # Read here so the tool seam can ask without `tools.register` growing a `Settings`
         # parameter to carry one bool to where an object built from those settings already
         # stands (design.md, "Decyzja zostaje w operator.py, a warunek dojeżdża klientem").
-        self.operator_identity_optional = settings.operator_identity_optional
+        # Behind a property because it is the switch that decides whether a call may go out
+        # with no identity: settings are validated at startup, and a plain attribute would
+        # let anything holding the client widen that afterwards.
+        self._operator_identity_optional = settings.operator_identity_optional
+
+    @property
+    def operator_identity_optional(self) -> bool:
+        return self._operator_identity_optional
 
     async def aclose(self) -> None:
         await self._http.aclose()
