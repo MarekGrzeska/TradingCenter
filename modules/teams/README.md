@@ -57,9 +57,9 @@ canvas.
   wakes on `SCHEDULER_POLL_INTERVAL_SECONDS`, claims what is due, and starts it through
   `start_run_on_revision` — the same function the terminal's button calls, so a run
   nobody watched went through the same checks as one somebody did.
-- `routers/schedules.py` — schedules, triggers and their fire history. Every write here
-  runs `validation.check_unattended` against the revision that would be put to work
-  without an operator watching.
+- `routers/schedules.py` — schedules, triggers and their fire history: created, edited,
+  paused, resumed and deleted. Deleting takes the fire history with it and leaves the runs
+  it started, which is the whole difference between it and pausing.
 - `runner/` — how a run happens, split by what each part may know. `graph.py` compiles the
   definition to a LangGraph — one node per agent, the operator's edges, and the narrowing
   that gives each agent only its predecessors' work. `loop.py` is one agent's own
@@ -153,12 +153,14 @@ has to be able to tell apart. `GET /schedules/{id}/fires` is that history.
 **Working unattended has its own safeguards**, and they are the reason this is not simply
 a cron entry:
 
-- a schedule or trigger over a revision that carries a tool this module cannot **confirm
-  is read-only** requires an explicit acknowledgement (`unattended_ack`), refused by name
-  at every write. The set is read from the servers' own `readOnlyHint` at save time and it
-  is the *positive* one: a declared write (`place_order`), a tool with no annotation, and a
-  tool whose server could not be asked are three reasons to be unsure and one refusal —
-  which is what stops an outage at save time from quietly widening what runs unattended;
+- **there is no consent gate, and its absence is deliberate.** An `unattended_ack` field
+  used to be required over a revision carrying tools nobody confirmed were reads. It was
+  checked when a schedule was saved and never when one fired, so a schedule saved legally
+  over a read-only revision kept firing by itself once the team gained `place_order` — it
+  stopped the operator asking in the chat and not the case it was written for
+  (`manage-schedules-and-drop-the-acknowledgement`). What stops an irreversible order is
+  the demo account the gateway enforces, the revision's own trading limits, the daily
+  ceiling and the trade row written before the order goes out;
 - after `SCHEDULER_FAILURE_THRESHOLD` **consecutive** failed runs it disables itself and
   records why — enough failures that one bad model response is not mistaken for a broken
   schedule, few enough that a genuinely broken one does not bill through the night;
@@ -269,12 +271,11 @@ The order below is forced by dependencies, not by preference:
    App Service control plane instead proves the site runs the right *image*, which reported
    green over a crash-looping container on 16 August 2026.
 
-**The clock arrives off.** `SCHEDULER_ENABLED` is `"false"` in `infra/app-service.tf`, and
-that is a decision rather than an oversight: `config.py` defaults it to `true`, so leaving
-it out of the app settings would *enable* it. It stays off until the gap in the "Schedules
-and triggers" section above is closed — a clock that can place orders unattended, guarded
-by a check that cannot see the tools it is guarding against, is not a state to deploy into.
-Flipping it is one line and an `apply`; nothing in the catalogue changes either way.
+**The clock is on.** `SCHEDULER_ENABLED` is `"true"` in `infra/app-service.tf` since
+17 August 2026, and it is a decision either way: `config.py` defaults it to `true`, so
+leaving the setting out would enable it without anyone choosing that. Turning it back off
+is one line and an `apply`; nothing in the catalogue changes either way, and a run started
+by hand works with the clock stopped.
 
 **Rollback.** Nothing depends on this module, so withdrawing it touches none of the other
 four. Clearing `MARKET_MCP_URL` and restarting takes the tools away and leaves the module

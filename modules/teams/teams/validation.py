@@ -124,46 +124,6 @@ def _every_assigned_tool_is_announced(
         )
 
 
-def check_unattended(
-    definition: TeamDefinition,
-    *,
-    unattended_ack: bool,
-    read_only_tools: Collection[str],
-) -> None:
-    """Raises `DefinitionRefused` naming the agent and the tool, unless `unattended_ack`
-    is set — the check a schedule or trigger runs against the revision it would put to
-    work without an operator watching (specs/teams-schedules).
-
-    **`read_only_tools` is the positive set, and that inversion is the whole safety
-    property.** It holds the names every configured server just announced with
-    `readOnlyHint: true` (`tools.AnnouncedSnapshot.read_only`), so anything an agent
-    carries that is *not* in it needs the acknowledgement: a declared write
-    (`place_order`), a tool with no annotation at all, and a tool nobody could be asked
-    about are three different reasons to be unsure and one decision. The earlier shape —
-    a hand-kept `STATE_CHANGING_TOOLS` list of dangerous names — was a list that read
-    empty for the whole of phase 2, which is to say a check that passed everything while
-    `trading-mcp` was already on the wire.
-
-    A tool server that was down at save time is the case the inversion is really for. Its
-    tools cannot be confirmed harmless now, and the schedule outlives the outage: refusing
-    without the ack is the only answer that does not depend on *when* the operator
-    happened to press save.
-    """
-    if unattended_ack:
-        return
-    confirmed = set(read_only_tools)
-    for agent in definition.agents:
-        unconfirmed = sorted(tool for tool in agent.tools if tool not in confirmed)
-        if unconfirmed:
-            raise DefinitionRefused(
-                f"agent {agent.key!r} carries tool(s) {unconfirmed} that this module "
-                "cannot confirm are read-only — they change state outside it, carry no "
-                "annotation, or their server could not be asked. Unattended work over "
-                "this revision (a schedule or a trigger) needs an explicit "
-                "acknowledgement (unattended_ack)"
-            )
-
-
 def check_trigger_tool(tool_name: str, *, announced_tools: Collection[str] | None) -> None:
     """The same shape of check `_every_assigned_tool_is_announced` runs for a team's own
     agents, run instead for the one tool a trigger's condition calls

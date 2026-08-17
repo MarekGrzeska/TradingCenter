@@ -237,7 +237,16 @@ export interface paths {
         /** Update Schedule */
         put: operations["update_schedule_schedules__schedule_id__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete Schedule
+         * @description Gone, with its fire history. Disabling is the other thing and stays the other thing:
+         *     a disabled schedule keeps its row and its reason and can be switched back on
+         *     (specs/teams-schedules, "Harmonogram i wyzwalacz dają się usunąć").
+         *
+         *     The runs it started are not touched, and nothing here has to arrange that — no column
+         *     in `runs` points at a schedule.
+         */
+        delete: operations["delete_schedule_schedules__schedule_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -552,7 +561,11 @@ export interface paths {
         /** Update Trigger */
         put: operations["update_trigger_triggers__trigger_id__put"];
         post?: never;
-        delete?: never;
+        /**
+         * Delete Trigger
+         * @description The same as deleting a schedule, for the other half of the pair.
+         */
+        delete: operations["delete_trigger_triggers__trigger_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -880,11 +893,6 @@ export interface components {
              * @enum {string}
              */
             revision_mode: "pinned" | "latest";
-            /**
-             * Unattended Ack
-             * @default false
-             */
-            unattended_ack: boolean;
         };
         /** ScheduleOut */
         ScheduleOut: {
@@ -915,8 +923,6 @@ export interface components {
             revision_mode: string;
             /** Team Id */
             team_id: number;
-            /** Unattended Ack */
-            unattended_ack: boolean;
             /**
              * Updated At
              * Format: date-time
@@ -1193,11 +1199,6 @@ export interface components {
             threshold: string;
             /** Tool Name */
             tool_name: string;
-            /**
-             * Unattended Ack
-             * @default false
-             */
-            unattended_ack: boolean;
         };
         /** TriggerOut */
         TriggerOut: {
@@ -1247,8 +1248,6 @@ export interface components {
             threshold: string;
             /** Tool Name */
             tool_name: string;
-            /** Unattended Ack */
-            unattended_ack: boolean;
             /**
              * Updated At
              * Format: date-time
@@ -1650,6 +1649,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ScheduleOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_schedule_schedules__schedule_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                schedule_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -2333,6 +2361,35 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TriggerOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_trigger_triggers__trigger_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                trigger_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
