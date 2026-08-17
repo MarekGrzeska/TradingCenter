@@ -25,6 +25,17 @@ from pydantic import ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def points_at_loopback(url: str) -> bool:
+    """Whether this address is on the machine the module runs on.
+
+    Out of the upstream-mode validator and into its own function because a second reader
+    needs the same fact: `operator_identity_optional` below asks it about `teams_url` to
+    decide whether an operator's identity could have existed at all.
+    """
+    host = (urlparse(url).hostname or "").lower()
+    return host == "localhost" or host.startswith("127.") or host == "::1"
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -74,10 +85,28 @@ class Settings(BaseSettings):
             raise ValueError(f"TEAMS_REQUEST_TIMEOUT_SECONDS must be positive, got {value}")
         return value
 
+    @property
+    def operator_identity_optional(self) -> bool:
+        """Whether a call may proceed with no operator identity behind it — true only on a
+        machine where no layer could have issued one (specs/teams-mcp-authorship, "Brak
+        tożsamości operatora zatrzymuje zapis, nie podstawia zastępczej").
+
+        **Both conditions, and they are about different hops.** The flag is about what
+        stands in front of *this* module; the address is about the `teams` that would
+        validate the forwarded token and attribute the rows. Either one alone is a
+        plausible misconfiguration — an instance with the flag off pointed at a remote
+        `teams` through a tunnel would write to the real catalogue as whatever that
+        instance's `teams` calls an unauthenticated caller — so the carve-out asks for the
+        whole local shape (design.md, "Dwa warunki, nie jeden").
+
+        Azure is on the refusing side of both: `REQUIRE_AUTHENTICATED_PRINCIPAL = "true"`
+        and a remote `TEAMS_URL` (`infra/app-service.tf`).
+        """
+        return not self.require_authenticated_principal and points_at_loopback(self.teams_url)
+
     @model_validator(mode="after")
     def _upstream_mode_is_coherent(self) -> Settings:
-        host = (urlparse(self.teams_url).hostname or "").lower()
-        is_loopback = host == "localhost" or host.startswith("127.") or host == "::1"
+        is_loopback = points_at_loopback(self.teams_url)
 
         if self.teams_scope is not None:
             if is_loopback:
@@ -91,7 +120,8 @@ class Settings(BaseSettings):
 
         if not is_loopback:
             raise ValueError(
-                f"TEAMS_URL points at {host!r} with no TEAMS_SCOPE set. Without a scope "
+                f"TEAMS_URL points at {(urlparse(self.teams_url).hostname or '').lower()!r} "
+                "with no TEAMS_SCOPE set. Without a scope "
                 "this module only connects to a teams on this machine's loopback — a "
                 "remote one needs TEAMS_SCOPE and the managed identity it is requested for."
             )
