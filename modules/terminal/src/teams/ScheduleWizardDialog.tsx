@@ -142,15 +142,6 @@ export function ScheduleWizardDialog({
           )}
         </label>
 
-        <label className="flex items-center gap-2 text-xs text-ink-muted">
-          <input
-            type="checkbox"
-            checked={draft.unattendedAck}
-            onChange={(event) => setDraft({ ...draft, unattendedAck: event.target.checked })}
-          />
-          I understand this runs without an operator watching
-        </label>
-
         <details open={draft.recurrence === null} className="rounded border border-border p-2">
           <summary className="cursor-pointer text-xs text-ink-muted">Advanced (cron)</summary>
           <div className="mt-2 flex flex-col gap-2">

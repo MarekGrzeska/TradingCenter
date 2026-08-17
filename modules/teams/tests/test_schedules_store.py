@@ -57,7 +57,6 @@ async def _schedule(
         pinned_revision_id=revision_id,
         cron_expression="*/5 * * * *",
         next_fire_at=next_fire_at,
-        unattended_ack=False,
     )
 
 
@@ -86,7 +85,6 @@ async def _trigger(
         cooldown_seconds=900,
         poll_interval_seconds=300,
         next_check_at=next_check_at,
-        unattended_ack=False,
     )
 
 
@@ -119,7 +117,6 @@ async def test_a_stranger_cannot_list_or_update_or_toggle_somebody_elses_schedul
             pinned_revision_id=None,
             cron_expression="0 * * * *",
             next_fire_at=FUTURE,
-            unattended_ack=False,
         )
         is None
     )
@@ -142,7 +139,6 @@ async def test_updating_a_schedule_switches_it_to_tracking_latest(db: asyncpg.Co
         pinned_revision_id=None,
         cron_expression="0 9 * * MON-FRI",
         next_fire_at=FUTURE,
-        unattended_ack=False,
     )
 
     assert updated is not None
@@ -301,7 +297,6 @@ async def test_updating_a_trigger_changes_its_condition(db: asyncpg.Connection) 
         threshold=Decimal("0.85"),
         cooldown_seconds=1800,
         poll_interval_seconds=60,
-        unattended_ack=False,
     )
 
     assert updated is not None

@@ -75,8 +75,12 @@ zdaniem operatora, który wie, jak brzmi cudzy identyfikator.
 
 Zestaw narzędzi MUST NOT pozwolić operatorowi zrobić niczego, czego nie mógłby zrobić sam w
 terminalu. Każda odmowa modułu `teams` — cudzy zespół, wyczerpana granica dobowa, rewizja
-nie do uruchomienia, brak potwierdzenia pracy bez nadzoru — MUST obowiązywać tak samo, gdy o
-to samo prosi model.
+nie do uruchomienia — MUST obowiązywać tak samo, gdy o to samo prosi model.
+
+Zdanie działa też w drugą stronę i to jest ta strona, której brakowało: czego operator może
+dokonać w terminalu, tego MUST móc dokonać przez model. Zestaw, który zakłada harmonogram, a
+zatrzymać go każe iść do terminala, jest polityką dostępu zapisaną tutaj, a nie w `teams` —
+tyle że napisaną przez pominięcie.
 
 Nowa droga do modułu nie jest nową polityką dostępu. Gdyby była, każda decyzja zapisana w
 `teams` musiałaby być zapisana drugi raz tutaj — i rozjechałaby się przy pierwszej poprawce.
@@ -93,3 +97,8 @@ Nowa droga do modułu nie jest nową polityką dostępu. Gdyby była, każda dec
 - **THEN** ten sam powód MUST dotrzeć do modelu
 - **AND** MUST NOT zostać zastąpiony komunikatem ogólnym
 
+#### Scenario: Czynność dostępna w terminalu jest dostępna z czatu
+
+- **WHEN** operator może wykonać czynność na swoim harmonogramie w terminalu
+- **THEN** zestaw narzędzi ma czynność, którą model robi to samo
+- **AND** odmowa, jeśli padnie, pochodzi z `teams`, a nie z braku narzędzia

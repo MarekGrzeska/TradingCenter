@@ -115,29 +115,6 @@ i MUST dać się włączyć z powrotem przez operatora.
 - **THEN** harmonogram przestaje wyzwalać
 - **AND** operator widzi, że został wyłączony, i widzi dlaczego
 
-### Requirement: Harmonogram nad rewizją z narzędziami zapisującymi wymaga jawnego potwierdzenia
-
-Jeśli rewizja przypisuje któremukolwiek agentowi narzędzie zmieniające stan poza modułem,
-utworzenie harmonogramu lub wyzwalacza dla tej rewizji MUST zostać odmówione, chyba że
-harmonogram niesie jawne potwierdzenie operatora dla pracy bez nadzoru. Odmowa MUST nazywać
-narzędzie, którego dotyczy.
-
-Wymaganie jest dziś spełnione w próżni — narzędzia modułu są wyłącznie odczytem. Zapisane
-teraz, obowiązuje w chwili, w której pojawi się pierwsze narzędzie zapisujące, zamiast być
-odkrywane wtedy, gdy zespół bez nadzoru zrobi coś nieodwracalnego.
-
-#### Scenario: Rewizja z samym odczytem rynku
-
-- **WHEN** operator zapisuje harmonogram dla rewizji, której agenci mają wyłącznie narzędzia
-  odczytu
-- **THEN** harmonogram zostaje zapisany bez dodatkowego potwierdzenia
-
-#### Scenario: Rewizja z narzędziem zmieniającym stan
-
-- **WHEN** operator zapisuje harmonogram dla rewizji, której agent ma narzędzie zmieniające
-  stan poza modułem, i nie niesie potwierdzenia
-- **THEN** zapis zostaje odrzucony z powodem nazywającym to narzędzie
-
 ### Requirement: Moduł ma jeden zegar i sam publikuje najbliższe wyzwolenia
 
 Czas wyzwolenia MUST być liczony w strefie `Europe/Warsaw` i MUST być publikowany w UTC.
@@ -226,3 +203,39 @@ jedną decyzję.
 - **WHEN** operator pyta o najbliższe wyzwolenia dla opisu niepoprawnego
 - **THEN** moduł odmawia z powodem nazywającym, co jest w tym opisie nie tak
 
+### Requirement: Harmonogram i wyzwalacz dają się usunąć
+
+Moduł MUST pozwalać właścicielowi usunąć harmonogram i wyzwalacz. Usunięcie MUST być
+odróżnialne od wyłączenia: wyłączony wpis zostaje w katalogu ze swoim powodem i daje się
+włączyć z powrotem, usunięty przestaje istnieć.
+
+Usunięcie MUST zabrać ze sobą historię wyzwoleń tego wpisu i MUST NOT ruszyć przebiegów,
+które z niej wystartowały. Historia wskazuje wpis, który ją wytworzył, i bez niego nie ma
+jak istnieć; przebieg jest zapisem tego, co się wydarzyło — jego koszt i jego ślad handlowy
+przeżywają usunięcie harmonogramu, który go zamówił.
+
+Usunięcie cudzego wpisu MUST być nieodróżnialne od usunięcia nieistniejącego.
+
+#### Scenario: Operator usuwa harmonogram
+
+- **WHEN** właściciel usuwa swój harmonogram
+- **THEN** harmonogram znika z katalogu i przestaje się wyzwalać
+- **AND** przebiegi, które z niego wystartowały, zostają wraz ze swoim kosztem
+
+#### Scenario: Usunięcie zabiera historię wyzwoleń
+
+- **WHEN** właściciel usuwa harmonogram, który wyzwalał się wcześniej
+- **THEN** zapisy jego wyzwoleń znikają razem z nim
+- **AND** usunięcie nie zostaje odrzucone z powodu ich istnienia
+
+#### Scenario: Wyłączenie to nie usunięcie
+
+- **WHEN** operator wyłącza harmonogram, zamiast go usunąć
+- **THEN** harmonogram zostaje w katalogu ze swoim powodem wyłączenia
+- **AND** daje się włączyć z powrotem
+
+#### Scenario: Cudzy harmonogram
+
+- **WHEN** ktoś inny niż właściciel usuwa harmonogram
+- **THEN** odpowiedź jest taka sama jak dla harmonogramu, którego nie ma
+- **AND** harmonogram zostaje nietknięty

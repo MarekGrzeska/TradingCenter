@@ -1,9 +1,11 @@
-"""schedule_team, trigger_team, list_schedules — and the argument that is deliberately
-absent.
+"""The schedule tools: creating, listing, pausing, editing and deleting.
 
-design.md D4: `unattended_ack` is not a parameter and must never become one. A safeguard
-offered to a model as a fillable field is a safeguard that gets filled in the moment a
-refusal is in the way.
+`unattended_ack` used to be the point of this file — a parameter deliberately absent, so
+that a model could not fill in a safeguard the moment a refusal was in its way. The
+safeguard is gone (`manage-schedules-and-drop-the-acknowledgement`), so what is held here
+now is the other half of the same worry: that a model reaching for the destructive tool
+gets a different tool from the reversible one, and that editing does not go through
+delete-and-recreate.
 """
 
 from __future__ import annotations
@@ -39,7 +41,6 @@ def _schedule(**overrides):
         "enabled": True,
         "disabled_reason": None,
         "consecutive_failures": 0,
-        "unattended_ack": False,
         "created_at": "2026-08-17T00:00:00Z",
         "updated_at": "2026-08-17T00:00:00Z",
         **overrides,
@@ -66,37 +67,10 @@ def _trigger(**overrides):
         "enabled": True,
         "disabled_reason": None,
         "consecutive_failures": 0,
-        "unattended_ack": False,
         "created_at": "2026-08-17T00:00:00Z",
         "updated_at": "2026-08-17T00:00:00Z",
         **overrides,
     }
-
-
-@respx.mock
-async def test_schedule_team_never_sends_an_acknowledgement(server) -> None:
-    mcp, teams = server
-    respx.get(f"{BASE}/teams/1/revisions/latest").mock(
-        return_value=httpx.Response(200, json=_REVISION)
-    )
-    saved = respx.post(f"{BASE}/teams/1/schedules").mock(
-        return_value=httpx.Response(201, json=_schedule())
-    )
-
-    await mcp.call_tool("schedule_team", {"team_id": 1, "cron_expression": "0 7 * * 1-5"})
-
-    body = json.loads(saved.calls.last.request.read())
-    assert "unattended_ack" not in body
-    await teams.aclose()
-
-
-async def test_the_schedule_tools_publish_no_acknowledgement_parameter(server) -> None:
-    mcp, teams = server
-    published = {tool.name: tool.inputSchema for tool in await mcp.list_tools()}
-
-    for name in ("schedule_team", "trigger_team"):
-        assert "unattended_ack" not in json.dumps(published[name])
-    await teams.aclose()
 
 
 @respx.mock
@@ -137,27 +111,6 @@ async def test_saving_a_schedule_warns_that_the_clock_may_be_off(server) -> None
     )
 
     assert "SCHEDULER_ENABLED" in structured["note"]
-    await teams.aclose()
-
-
-@respx.mock
-async def test_an_unattended_write_tool_refusal_reaches_the_model_unedited(server) -> None:
-    mcp, teams = server
-    respx.get(f"{BASE}/teams/1/revisions/latest").mock(
-        return_value=httpx.Response(200, json=_REVISION)
-    )
-    respx.post(f"{BASE}/teams/1/schedules").mock(
-        return_value=httpx.Response(
-            422,
-            json={"detail": "agent 'trader' carries tool(s) ['place_order'] that this module cannot confirm are read-only"},
-        )
-    )
-
-    with pytest.raises(ToolError) as err:
-        await mcp.call_tool("schedule_team", {"team_id": 1, "cron_expression": "0 7 * * *"})
-
-    assert "trader" in str(err.value)
-    assert "place_order" in str(err.value)
     await teams.aclose()
 
 
@@ -205,7 +158,6 @@ async def test_trigger_team_sends_the_condition_teams_expects(server) -> None:
     body = json.loads(saved.calls.last.request.read())
     assert body["tool_name"] == "read_indicators"
     assert body["arguments"] == {"symbol": "US100"}
-    assert "unattended_ack" not in body
     assert structured["trigger_id"] == 21
     await teams.aclose()
 
@@ -242,4 +194,130 @@ async def test_list_schedules_shows_fires_that_started_nothing_and_why(server) -
     assert "niepowodzeniem" in row["disabled_reason"]
     assert row["recent_fires"][0]["outcome"] == "skipped"
     assert "daily cost limit" in row["recent_fires"][0]["reason"]
+    await teams.aclose()
+
+
+# --- managing what is already there ---------------------------------------------------
+
+
+async def test_the_published_set_covers_the_whole_life_of_a_schedule(server) -> None:
+    """Creating without managing is the shape this change was opened over: the operator
+    sets a schedule with a sentence and is sent to the terminal for every change after."""
+    mcp, teams = server
+    names = {tool.name for tool in await mcp.list_tools()}
+
+    assert {
+        "schedule_team",
+        "trigger_team",
+        "list_schedules",
+        "pause_schedule",
+        "pause_trigger",
+        "edit_schedule",
+        "edit_trigger",
+        "delete_schedule",
+        "delete_trigger",
+    } <= names
+    await teams.aclose()
+
+
+async def test_only_the_two_deleting_tools_are_marked_destructive(server) -> None:
+    """A client that asks before a destructive call has nothing but the annotation to go
+    on, and `delete_schedule` must not look like `schedule_team` to it."""
+    mcp, teams = server
+    destructive = {
+        tool.name
+        for tool in await mcp.list_tools()
+        if tool.annotations and tool.annotations.destructiveHint
+    }
+
+    assert destructive == {"delete_schedule", "delete_trigger"}
+    await teams.aclose()
+
+
+@respx.mock
+async def test_pausing_disables_and_resuming_enables(server) -> None:
+    mcp, teams = server
+    paused = respx.post(f"{BASE}/schedules/11/disable").mock(
+        return_value=httpx.Response(200, json=_schedule(enabled=False))
+    )
+    resumed = respx.post(f"{BASE}/schedules/11/enable").mock(
+        return_value=httpx.Response(200, json=_schedule(enabled=True))
+    )
+
+    _content, off = await mcp.call_tool("pause_schedule", {"schedule_id": 11})
+    _content, on = await mcp.call_tool("pause_schedule", {"schedule_id": 11, "resume": True})
+
+    assert paused.called and resumed.called
+    assert "paused" in off["result"]
+    assert "enabled" in on["result"]
+    await teams.aclose()
+
+
+@respx.mock
+async def test_editing_a_schedule_keeps_the_row_it_edits(server) -> None:
+    """The whole reason `edit_schedule` exists rather than delete-and-recreate: the
+    identifier and the history are what the operator is talking about."""
+    mcp, teams = server
+    respx.get(f"{BASE}/schedules/11").mock(return_value=httpx.Response(200, json=_schedule()))
+    saved = respx.put(f"{BASE}/schedules/11").mock(
+        return_value=httpx.Response(200, json=_schedule(cron_expression="35 * * * 1,2,3,4,5"))
+    )
+    deleted = respx.delete(f"{BASE}/schedules/11").mock(return_value=httpx.Response(204))
+
+    _content, structured = await mcp.call_tool(
+        "edit_schedule", {"schedule_id": 11, "cron_expression": "35 * * * 1,2,3,4,5"}
+    )
+
+    body = json.loads(saved.calls.last.request.read())
+    assert body["cron_expression"] == "35 * * * 1,2,3,4,5"
+    # The revision the schedule already ran stays put when none is named.
+    assert body["pinned_revision_id"] == 9
+    assert structured["schedule_id"] == 11
+    assert not deleted.called
+    await teams.aclose()
+
+
+@respx.mock
+async def test_editing_a_trigger_changes_only_what_was_named(server) -> None:
+    mcp, teams = server
+    respx.get(f"{BASE}/triggers/21").mock(return_value=httpx.Response(200, json=_trigger()))
+    saved = respx.put(f"{BASE}/triggers/21").mock(
+        return_value=httpx.Response(200, json=_trigger(threshold="80.00000000"))
+    )
+
+    await mcp.call_tool("edit_trigger", {"trigger_id": 21, "threshold": "80"})
+
+    body = json.loads(saved.calls.last.request.read())
+    assert body["threshold"] == "80"
+    assert body["field_path"] == "rsi"
+    assert body["comparison"] == "gt"
+    assert body["cooldown_seconds"] == 900
+    await teams.aclose()
+
+
+@respx.mock
+async def test_deleting_says_what_it_took_and_what_it_left(server) -> None:
+    mcp, teams = server
+    removed = respx.delete(f"{BASE}/schedules/11").mock(return_value=httpx.Response(204))
+
+    _content, structured = await mcp.call_tool("delete_schedule", {"schedule_id": 11})
+
+    assert removed.called
+    said = structured["result"]
+    assert "fire history" in said
+    assert "runs it started are untouched" in said
+    await teams.aclose()
+
+
+@respx.mock
+async def test_deleting_a_schedule_that_is_not_there_refuses_rather_than_pretending(
+    server,
+) -> None:
+    mcp, teams = server
+    respx.delete(f"{BASE}/schedules/11").mock(return_value=httpx.Response(404))
+
+    with pytest.raises(ToolError) as err:
+        await mcp.call_tool("delete_schedule", {"schedule_id": 11})
+
+    assert "nothing at" in str(err.value)
     await teams.aclose()
