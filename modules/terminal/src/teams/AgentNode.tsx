@@ -17,6 +17,9 @@ export type AgentNodeData = {
    *  node draws both, because it is the same graph (`terminal-teams`, "Przebieg widać na
    *  obrazie zespołu"). */
   runStatus?: string;
+  /** Opens this agent's settings. Absent while a run is watched: that revision is saved
+   *  and immutable, and a gear that opens fields nothing will keep is a gear that lies. */
+  onOpenSettings?: () => void;
   [key: string]: unknown;
 };
 
@@ -49,14 +52,32 @@ export function AgentNode({ data, selected }: NodeProps<AgentFlowNode>) {
 
   return (
     <div
-      className={`min-w-44 rounded border ${border} bg-panel px-3 py-2 text-left shadow-sm`}
+      className={`relative min-w-48 rounded border ${border} bg-panel px-3 py-2 text-left shadow-sm`}
       data-testid={`agent-node-${data.role}`}
     >
       {/* Both handles always present: an agent with no dependency today is one an edge
           can be drawn to tomorrow, and a handle that appears on hover is a handle nobody
           finds. */}
       <Handle type="target" position={Position.Left} />
-      <div className="text-sm font-semibold text-ink">{data.role}</div>
+      {data.onOpenSettings && (
+        /* `nodrag nopan` are React Flow's own opt-outs: without them a press here starts
+           dragging the node instead of pressing a button, and the click never lands. The
+           gear is always visible for the same reason both handles are — one that appears
+           on hover is one nobody finds. */
+        <button
+          type="button"
+          aria-label={`Settings for ${data.role}`}
+          title="Agent settings"
+          onClick={(event) => {
+            event.stopPropagation();
+            data.onOpenSettings?.();
+          }}
+          className="nodrag nopan absolute right-1 top-1 cursor-pointer rounded border border-transparent p-1 text-ink-faint hover:border-border hover:bg-panel-strong hover:text-ink"
+        >
+          <GearIcon />
+        </button>
+      )}
+      <div className="pr-6 text-sm font-semibold text-ink">{data.role}</div>
       <div className="text-xs text-ink-muted">{data.modelLabel}</div>
       <div className="text-xs text-ink-faint">
         {data.toolCount === 0 ? "no tools" : `${data.toolCount} tool${data.toolCount === 1 ? "" : "s"}`}
@@ -69,5 +90,19 @@ export function AgentNode({ data, selected }: NodeProps<AgentFlowNode>) {
       {data.refused && <div className="mt-1 text-xs text-critical">refused</div>}
       <Handle type="source" position={Position.Right} />
     </div>
+  );
+}
+
+/** Drawn from primitives rather than pulled from an icon set: this terminal has no icon
+ *  dependency, and one added for a single glyph is a dependency to keep for a single
+ *  glyph. */
+function GearIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" focusable="false">
+      <g fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round">
+        <circle cx="8" cy="8" r="3" />
+        <path d="M8 1v1.6M8 13.4V15M1 8h1.6M13.4 8H15M3.05 3.05l1.13 1.13M11.82 11.82l1.13 1.13M12.95 3.05l-1.13 1.13M4.18 11.82l-1.13 1.13" />
+      </g>
+    </svg>
   );
 }

@@ -1,9 +1,14 @@
 import type { TeamTradingLimits } from "./teamsApi";
 
 /**
- * The team itself, edited beside the agents that make it up — the panel the right-hand
- * column shows when no agent is selected (specs/terminal-teams, "Granice handlowe ustawia
- * się w tym samym widoku co resztę zespołu").
+ * The team itself, edited beside the agents that make it up — the whole of the right-hand
+ * column, always (specs/terminal-teams, "Granice handlowe ustawia się w tym samym widoku co
+ * resztę zespołu").
+ *
+ * It used to share that column with whichever agent was selected, which meant the three
+ * numbers below were reachable only through a button that deselected one. Agents have their
+ * own dialog now, so nothing takes this panel's place and nothing has to be dismissed to
+ * find a ceiling.
  *
  * Every field here may be left empty, and an empty one is not an omission to be corrected:
  * it is "no limit", the module saves it, and a team the operator deliberately lets trade
@@ -25,8 +30,8 @@ export function TeamPanel({
   return (
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto border-l border-border p-3">
       <p className="text-xs text-ink-muted">
-        Pick an agent to edit it, or drag from one agent's right edge to another's left to
-        make it wait for that one.
+        Open an agent with the gear on its box, or drag from one agent's right edge to
+        another's left to make it wait for that one.
       </p>
 
       <fieldset className="flex flex-col gap-3">

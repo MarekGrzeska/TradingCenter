@@ -181,6 +181,25 @@ async function openTheTeam(api: TeamsApi) {
   return screen.findByTestId("agent-node-Scout");
 }
 
+/** An agent's fields live in a dialog now, opened by the gear on its own box.
+ *
+ *  `fireEvent` for the same reason the node clicks below use it: a pointer press on the
+ *  canvas wakes d3-zoom, which reaches for a `document` jsdom has already torn down. And
+ *  by label rather than by role, because React Flow keeps a node `visibility: hidden`
+ *  until it has measured it — which never happens in jsdom, so nothing on this canvas is
+ *  in the accessibility tree a `ByRole` query walks. */
+async function openAgentSettings(role: string) {
+  fireEvent.click(
+    within(screen.getByTestId(`agent-node-${role}`)).getByLabelText(`Settings for ${role}`),
+  );
+  return screen.findByRole("dialog");
+}
+
+async function closeAgentSettings() {
+  await userEvent.click(screen.getByRole("button", { name: "Done" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+}
+
 describe("the catalogue", () => {
   it("lists what the module published, without reading any definition", async () => {
     const api = fakeApi();
@@ -265,15 +284,18 @@ describe("taking the last change back", () => {
 
   it("undoes a removed dependency, which is what puts the line back", async () => {
     await openTheTeam(fakeApi());
+    await openAgentSettings("Scout");
 
     await userEvent.click(await screen.findByRole("button", { name: /Remove dependency/ }));
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: /Remove dependency/ })).not.toBeInTheDocument(),
     );
+    await closeAgentSettings();
     expect(screen.getByText("unsaved changes")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Undo" }));
 
+    await openAgentSettings("Scout");
     expect(await screen.findByRole("button", { name: /Remove dependency/ })).toBeInTheDocument();
     // And back to nothing to save: the draft is the saved revision again, which is the
     // whole of what "take it back" means here.
@@ -297,6 +319,7 @@ describe("taking the last change back", () => {
     // revert the whole agent instead would be the worse trade.
     await openTheTeam(fakeApi());
     await userEvent.click(screen.getByRole("button", { name: "Add agent" }));
+    await openAgentSettings("Scout");
     const prompt = await screen.findByLabelText("Prompt");
 
     fireEvent.keyDown(prompt, { key: "z", ctrlKey: true });
@@ -314,21 +337,61 @@ describe("taking the last change back", () => {
     // `edit` runs per keystroke; one undo gives back what was there before the typing
     // started rather than the word minus its last letter.
     await openTheTeam(fakeApi());
+    await openAgentSettings("Scout");
 
     await userEvent.type(await screen.findByLabelText("Role"), "ing");
     expect(await screen.findByTestId("agent-node-Scouting")).toBeInTheDocument();
 
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Undo" }));
 
     expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
   });
 });
 
-describe("the agent panel", () => {
+describe("the agent settings dialog", () => {
+  it("opens from the gear on the agent's own box, and closes again", async () => {
+    // The narrow column this replaced was always on screen; a dialog has to be asked for,
+    // so the asking is what the operator has to be able to find and undo.
+    await openTheTeam(fakeApi());
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await openAgentSettings("Judge");
+
+    expect(screen.getByRole("dialog")).toHaveAccessibleName("Agent: Judge");
+    expect((screen.getByLabelText("Role") as HTMLInputElement).value).toBe("Judge");
+
+    await closeAgentSettings();
+  });
+
+  it("closes on Escape without touching the draft", async () => {
+    await openTheTeam(fakeApi());
+    await openAgentSettings("Scout");
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByText("unsaved changes")).not.toBeInTheDocument();
+  });
+
+  it("offers no gear on a run being watched", async () => {
+    // That revision is saved and immutable — a gear opening fields nothing will keep is a
+    // gear that lies.
+    render(<TeamsView api={fakeApi()} />);
+    await screen.findByText("Morning desk");
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Watch" }));
+    await screen.findByTestId("agent-node-Scout");
+
+    expect(screen.queryByLabelText(/^Settings for/)).not.toBeInTheDocument();
+  });
+
   it("offers the models the module published and nothing else", async () => {
     // The requirement `terminal-teams` states twice: the picker is built from the
     // catalogue, and this terminal knows no model by name.
     await openTheTeam(fakeApi());
+    await openAgentSettings("Scout");
 
     const picker = await screen.findByLabelText("Model");
     expect([...(picker as HTMLSelectElement).options].map((option) => option.textContent)).toEqual([
@@ -340,8 +403,10 @@ describe("the agent panel", () => {
   it("offers the tools the module announces, and saves the one that was ticked", async () => {
     const api = fakeApi();
     await openTheTeam(api);
+    await openAgentSettings("Scout");
 
     await userEvent.click(await screen.findByLabelText(/get_candles/));
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
 
     await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
@@ -351,23 +416,23 @@ describe("the agent panel", () => {
 
   it("says why the tool list is empty rather than showing an empty box", async () => {
     await openTheTeam(fakeApi({ listTools: vi.fn(async () => []) }));
+    await openAgentSettings("Scout");
 
     expect(await screen.findByText("the module announces no tools")).toBeInTheDocument();
   });
 
   it("makes an agent wait for another one without dragging anything", async () => {
-    // The canvas keeps its handles; this is the same edge drawn from the panel, and it is
+    // The canvas keeps its handles; this is the same edge drawn from the dialog, and it is
     // the path a test can walk — jsdom has no layout, so a drag between two handles is not
     // something this suite can prove either way.
     const loose: TeamDefinition = { ...DEFINITION, dependencies: [] };
     const api = fakeApi({ latestRevision: vi.fn(async () => revision(loose)) });
     await openTheTeam(api);
+    await openAgentSettings("Judge");
 
-    // `fireEvent` for the same reason as the run tests below: a pointer press on the
-    // canvas wakes d3-zoom, which reaches for a `document` jsdom has already torn down.
-    fireEvent.click(screen.getByTestId("agent-node-Judge"));
     await userEvent.selectOptions(await screen.findByLabelText("Waits for"), "agent-1");
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
 
     await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
@@ -379,8 +444,8 @@ describe("the agent panel", () => {
     // The default team is two agents with one edge between them, so the judge's only
     // candidate is the scout it already waits for — and itself, which is never a candidate.
     await openTheTeam(fakeApi());
+    await openAgentSettings("Judge");
 
-    fireEvent.click(screen.getByTestId("agent-node-Judge"));
     expect(await screen.findByText(/waits for Scout/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Waits for")).not.toBeInTheDocument();
   });
@@ -388,8 +453,10 @@ describe("the agent panel", () => {
   it("removes a dependency from the agent it belongs to", async () => {
     const api = fakeApi();
     await openTheTeam(api);
+    await openAgentSettings("Scout");
 
     await userEvent.click(await screen.findByRole("button", { name: /Remove dependency/ }));
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
 
     await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
@@ -401,11 +468,12 @@ describe("the agent panel", () => {
 describe("the trading limits", () => {
   it("sets them in the same view the team is composed in", async () => {
     // specs/terminal-teams, "Granice handlowe ustawia się w tym samym widoku co resztę
-    // zespołu" — the panel beside the canvas, on the team rather than on any one agent.
+    // zespołu" — the panel beside the canvas, on the team rather than on any one agent, and
+    // since the agents moved into a dialog it is the whole of that panel and needs no button
+    // to reach.
     const api = fakeApi();
     await openTheTeam(api);
 
-    await userEvent.click(screen.getByRole("button", { name: "Team" }));
     await userEvent.type(await screen.findByLabelText("Largest order size"), "1.5");
     await userEvent.type(screen.getByLabelText("Orders per run"), "2");
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
@@ -429,8 +497,10 @@ describe("the trading limits", () => {
       ]),
     });
     await openTheTeam(api);
+    await openAgentSettings("Scout");
 
     await userEvent.click(await screen.findByLabelText(/place_order/));
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
 
     await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
@@ -445,7 +515,6 @@ describe("the trading limits", () => {
   it("takes a limit back like any other change", async () => {
     await openTheTeam(fakeApi());
 
-    await userEvent.click(screen.getByRole("button", { name: "Team" }));
     await userEvent.type(await screen.findByLabelText("Orders per day"), "5");
     expect(screen.getByText("unsaved changes")).toBeInTheDocument();
 
@@ -468,6 +537,7 @@ describe("the trading limits", () => {
       ]),
     });
     await openTheTeam(api);
+    await openAgentSettings("Scout");
 
     const writes = (await screen.findByText("place_order")).closest("label");
     expect(within(writes as HTMLElement).getByText("moves the account")).toBeInTheDocument();
@@ -729,7 +799,7 @@ describe("watching a run", () => {
 describe("a refused save", () => {
   it("shows the module's reason and opens the agent it names", async () => {
     // `terminal-teams`, "Zapis odrzucony przez moduł jest pokazany przy miejscu, którego
-    // dotyczy" — the message names agent-2, so the panel is on agent-2 and its node is
+    // dotyczy" — the message names agent-2, so its settings are what opens and its node is
     // marked, rather than a general "invalid" somewhere on the page.
     const refusal = new MarketDataError(
       "refused",
@@ -747,6 +817,22 @@ describe("a refused save", () => {
 
     expect(await screen.findAllByText(refusal.message)).not.toHaveLength(0);
     expect(within(screen.getByTestId("agent-node-Judge")).getByText("refused")).toBeInTheDocument();
+    expect(await screen.findByRole("dialog")).toHaveAccessibleName("Agent: Judge");
     expect((screen.getByLabelText("Role") as HTMLInputElement).value).toBe("Judge");
+  });
+});
+
+describe("removing an agent", () => {
+  it("takes its settings dialog with it", async () => {
+    // The dialog reads the agent out of the draft rather than holding a copy, so the one
+    // action inside it that can make its own subject disappear leaves nothing behind.
+    await openTheTeam(fakeApi());
+    await openAgentSettings("Judge");
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove agent" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("agent-node-Judge")).not.toBeInTheDocument();
+    expect(screen.getByText("unsaved changes")).toBeInTheDocument();
   });
 });
