@@ -260,6 +260,81 @@ describe("creating and editing a schedule", () => {
     expect((api.listSchedules as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
   });
 
+  it("turns the weekend off on an hourly rhythm, without a cron expression", async () => {
+    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
+    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
+    await userEvent.click(screen.getByText("Every hour"));
+    fireEvent.change(screen.getByLabelText("Minute of the hour"), { target: { value: "35" } });
+    await userEvent.click(screen.getByRole("button", { name: "Sat" }));
+    await userEvent.click(screen.getByRole("button", { name: "Sun" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create schedule" }));
+
+    await waitFor(() =>
+      expect(api.createSchedule).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          cronExpression: null,
+          recurrence: expect.objectContaining({
+            kind: "hourly",
+            minute: 35,
+            weekdays: [1, 2, 3, 4, 5],
+          }),
+        }),
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("sends every day as no days at all, so one trigger has one shape", async () => {
+    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
+    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
+    await userEvent.click(screen.getByText("Every hour"));
+    // Off and straight back on: the form must end where it started, not on seven days.
+    await userEvent.click(screen.getByRole("button", { name: "Sat" }));
+    await userEvent.click(screen.getByRole("button", { name: "Sat" }));
+    await userEvent.click(screen.getByRole("button", { name: "Create schedule" }));
+
+    await waitFor(() =>
+      expect(api.createSchedule).toHaveBeenCalledWith(
+        1,
+        expect.objectContaining({
+          recurrence: expect.objectContaining({ kind: "hourly", weekdays: null }),
+        }),
+        expect.anything(),
+      ),
+    );
+  });
+
+  it("offers no days at all under the daily rhythm", async () => {
+    // Daily on chosen days is `weekly`, and the module refuses the second spelling — so the
+    // wizard must not be able to build it.
+    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
+    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
+    await userEvent.click(screen.getByText("Every day"));
+
+    expect(screen.queryByRole("button", { name: "Sat" })).not.toBeInTheDocument();
+    expect(screen.queryByText("On which days?")).not.toBeInTheDocument();
+  });
+
+  it("keeps the last day rather than letting a schedule fire on none", async () => {
+    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
+    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
+    await userEvent.click(screen.getByText("Every hour"));
+    for (const day of ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"]) {
+      await userEvent.click(screen.getByRole("button", { name: day }));
+    }
+
+    expect(screen.getByRole("button", { name: "Mon" })).toHaveAttribute("aria-pressed", "true");
+  });
+
   it("opens a schedule the wizard has no rhythm for on its own expression, and saves it unchanged", async () => {
     const written = { ...SCHEDULE, cronExpression: "0 9 * * MON-FRI", recurrence: null };
     const api = fakeApi({ listSchedules: vi.fn(async () => [written]) });

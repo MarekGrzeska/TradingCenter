@@ -14,6 +14,8 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Iterator
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 import asyncpg
 import pytest
@@ -240,6 +242,70 @@ def test_a_schedule_saved_as_a_rhythm_comes_back_as_the_same_rhythm(client: Test
         "weekdays": None,
         "day_of_month": None,
     }
+
+
+def test_an_hourly_rhythm_carries_the_days_it_was_saved_with(client: TestClient) -> None:
+    """What the operator asked for: every hour on the days the market is open."""
+    team_id, revision_id = _team(client)
+
+    created = client.post(
+        f"/teams/{team_id}/schedules",
+        json={
+            "revision_mode": "pinned",
+            "pinned_revision_id": revision_id,
+            "recurrence": {"kind": "hourly", "minute": 35, "weekdays": [1, 2, 3, 4, 5]},
+        },
+        headers=OWNER,
+    )
+
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["cron_expression"] == "35 * * * 1,2,3,4,5"
+    assert body["recurrence"]["kind"] == "hourly"
+    assert body["recurrence"]["weekdays"] == [1, 2, 3, 4, 5]
+
+
+def test_a_daily_rhythm_with_weekdays_is_refused(client: TestClient) -> None:
+    """It is `weekly`'s own expression, and one expression may only have one rhythm."""
+    team_id, revision_id = _team(client)
+
+    refused = client.post(
+        f"/teams/{team_id}/schedules",
+        json={
+            "revision_mode": "pinned",
+            "pinned_revision_id": revision_id,
+            "recurrence": {"kind": "daily", "hour": 9, "minute": 0, "weekdays": [1, 2, 3, 4, 5]},
+        },
+        headers=OWNER,
+    )
+
+    assert refused.status_code == 422
+    assert "weekly" in refused.text
+
+
+def test_a_rhythm_with_weekdays_can_be_previewed_before_it_is_saved(client: TestClient) -> None:
+    """That the days survive the draft route. The weekend itself is proven where the
+    arithmetic lives (`test_schedule_timing.py`) — this preview caps at 20 fires, which for
+    an hourly rhythm need not reach a Saturday at all."""
+    preview = client.post(
+        "/schedules/next-fires",
+        json={
+            "recurrence": {"kind": "hourly", "minute": 35, "weekdays": [1, 2, 3, 4, 5]},
+            "count": 20,
+        },
+        headers=OWNER,
+    )
+
+    assert preview.status_code == 200, preview.text
+    times = preview.json()["times"]
+    assert len(times) == 20
+    # Read as the Polish wall clock the operator set them in, not as UTC: a Saturday moment
+    # is a Saturday to them whichever side of midnight UTC it falls on.
+    days = {
+        datetime.fromisoformat(time).astimezone(ZoneInfo("Europe/Warsaw")).isoweekday()
+        for time in times
+    }
+    assert days <= {1, 2, 3, 4, 5}
 
 
 def test_a_schedule_saved_as_an_expression_outside_the_rhythms_carries_no_rhythm(
