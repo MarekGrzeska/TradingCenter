@@ -17,9 +17,9 @@ need one, the change is wrong, not the rule.
 modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
 modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway.
 modules/market-mcp        Python · MCP tools over market-data, reduced for a model. Read-only — no tool writes. Depends on market-data.
-modules/agent             Python · the operator's conversation with a model. Own database, own OpenAI key. Reads the archive through market-mcp's tools.
-modules/teams             Python · teams of agents as data — a graph the operator composes, revisions, runs and their cost. Own database, own OpenAI key. Same market-mcp tools as agent, plus trading-mcp's; no edge to agent itself.
-modules/trading-mcp       Python · MCP tools over the gateway's demo account: positions, balance, orders. Network transport only, one named caller (teams). Demo checked against the gateway, not against a setting.
+modules/agent             Python · the operator's conversation with a model. Own database, own OpenAI key. Reads the archive through market-mcp's tools, builds teams through teams-mcp's, and moves the demo account through trading-mcp's.
+modules/teams             Python · teams of agents as data — a graph the operator composes, revisions, runs and their cost. Own database, own OpenAI key. Same market-mcp and trading-mcp tools as agent; no edge to agent itself.
+modules/trading-mcp       Python · MCP tools over the gateway's demo account: positions, balance, orders. Network transport only, two named callers (teams, agent). Demo checked against the gateway, not against a setting.
 modules/teams-mcp         Python · MCP tools over teams' catalogue, so the agent can build and correct a team by talking. One named caller (agent). Every tool acts in the operator's name — their token travels with the call, in its own header.
 modules/terminal          React+TS · the operator's screen. Consumes the gateway, market-data, agent and teams. Publishes nothing.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
@@ -128,11 +128,15 @@ That key has no managed-identity alternative the way the database does — OpenA
 Entra — so production reads the same value from Key Vault (`openai-api-key`) and
 `config.py` refuses to start without it. `MARKET_MCP_URL` is the one setting whose
 *absence* is a working configuration rather than a mistake: without it the agent has no
-tools, which is what it was before it had any. Since `add-teams-mcp` there is a second of
-the same shape, `TEAMS_MCP_URL`, and the two are checked independently — clearing one
-takes its tools away and leaves the other's exactly where they are. An `.env` copied before this change is the
-usual reason a local agent answers from memory while market-mcp sits there idle —
-`dev.sh`/`dev.ps1` say so at startup rather than leave it to be discovered.
+tools, which is what it was before it had any. There are three of that shape now —
+`TEAMS_MCP_URL` since `add-teams-mcp`, `TRADING_MCP_URL` since
+`agent-gets-the-trading-tools` — and all three are checked independently: clearing one
+takes its tools away and leaves the other two exactly where they are. The third is the one
+whose absence reads least like a setting: the operator asks about their positions and the
+agent says it cannot see them, which sounds like the account being unreachable. An `.env`
+copied before either change is the usual reason a local agent answers from memory while
+market-mcp sits there idle — `dev.sh`/`dev.ps1` say so at startup rather than leave it to
+be discovered.
 
 `teams` needs the same three — `DATABASE_URL`, `OPENAI_API_KEY`, `MODELS` — and none of
 them are agent's: a **separate** OpenAI key (`teams-openai-api-key` in Key Vault, so the
@@ -169,6 +173,11 @@ one its own tests walk, not a broken one. The tools appear only after the operat
 `market-mcp`'s `allowed_applications`, and after the agent restarts. Rolling back is the
 same lever: clear `MARKET_MCP_URL`, restart, and the module is what it was, with the rows
 in `tool_calls` still recording what happened while it had them.
+
+The same pairing now holds for the account: an `agent` image that can send orders sends
+none until `TRADING_MCP_URL` is set *and* the agent's managed identity is in
+`trading-mcp`'s own `allowed_applications`. Either one alone gives a module that asks and
+is refused at the door, which is the intended half-state rather than a broken one.
 
 ## Migrations are never the operator's job
 

@@ -68,6 +68,11 @@ class RecordedCall(BaseModel):
     outcome: str
     text: str
     duration_ms: int
+    # Set only for a call that could change the account: its row was written before the
+    # call was sent, so this one already exists and is not to be inserted again — only
+    # joined to the reply (specs/agent-trading). `None` is every other call, and the
+    # sentence above it describes those.
+    row_id: int | None = None
 
 
 class ToolCall(BaseModel):
@@ -76,13 +81,16 @@ class ToolCall(BaseModel):
     Not a `Message`, on purpose: the transcript is the conversation, and this is how the
     agent got to its half of it (specs/agent-tools, "Wywołanie narzędzia zostawia ślad").
 
-    `outcome` distinguishes three answers that must never be collapsed into two — see
+    `outcome` distinguishes four answers that must never be collapsed into fewer — see
     `ToolOutcomeKind` in `tools/client.py`, which is where they are decided.
+
+    `message_id` is `None` for a call that outlived its turn: it was written before being
+    sent, and the reply it would have hung off never came (specs/agent-trading).
     """
 
     id: int
     session_id: int
-    message_id: int
+    message_id: int | None
     round_index: int
     position: int
     tool_name: str

@@ -16,21 +16,28 @@ const OUTCOME_LABEL: Record<ToolOutcome, string> = {
   ok: "ok",
   refused: "refused",
   unavailable: "no answer",
-  unknown: "unknown",
+  unknown: "outcome unknown",
+  unrecognised: "unrecognised",
 };
 
 /**
- * The three the module distinguishes never collapse into two, and the colours carry that:
+ * The four the module distinguishes never collapse into fewer, and the colours carry that:
  * a refusal is the archive answering "not like that" — worth noticing, not an alarm — while
  * an unreachable server means nothing was asked and nothing is known either way. Reading
  * the second as the first is how "the archive has no data" gets said about data the
  * archive has.
+ *
+ * `unknown` is the loudest of the four, and it is not an outage: it means a call that could
+ * have changed the account went out and nobody knows whether it landed (`agent-trading`
+ * spec). An operator scanning this column has to stop on it, so it gets the alarm colour
+ * and a label that reads as a question rather than a status.
  */
 const OUTCOME_STYLE: Record<ToolOutcome, string> = {
   ok: "text-ink-muted",
   refused: "text-warning",
   unavailable: "text-critical",
-  unknown: "text-ink-muted",
+  unknown: "text-critical",
+  unrecognised: "text-ink-muted",
 };
 
 export function ToolCallEntry({ call }: { call: AgentToolCall }) {

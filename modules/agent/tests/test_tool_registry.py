@@ -38,16 +38,27 @@ def _settings(**overrides) -> Settings:
 class _Server:
     """A stand-in for one `ToolServer`, with the same four members the registry uses."""
 
-    def __init__(self, label: str, tools: list[str], *, configured: bool = True) -> None:
+    def __init__(
+        self,
+        label: str,
+        tools: list[str],
+        *,
+        configured: bool = True,
+        account_tools: frozenset[str] = frozenset(),
+    ) -> None:
         self.label = label
         self.configured = configured
         self.forwards_operator_token = label == "teams-mcp"
         self._tools = tools
+        self._account_tools = account_tools
         self.calls: list[tuple[str, str | None]] = []
         self.closed = False
 
     async def list_tools(self, operator_token: str | None = None) -> list[ToolDescriptor]:
         return [ToolDescriptor(name=name, description="", input_schema={}) for name in self._tools]
+
+    def moves_the_account(self, name: str) -> bool:
+        return name in self._account_tools
 
     async def call(self, name, arguments, operator_token=None) -> ToolOutcome:
         self.calls.append((name, operator_token))
@@ -65,14 +76,47 @@ class _UnreachableServer(_Server):
         return []
 
 
-def test_from_settings_builds_both_servers_and_only_one_forwards_the_operators_token() -> None:
+def test_from_settings_builds_three_servers_and_only_one_forwards_the_operators_token() -> None:
     registry = ToolServerRegistry.from_settings(_settings())
-    # Reaching inside on purpose: which servers get built, and which one carries a
-    # person's credential, is the arrangement this test exists to pin.
+    # Reaching inside on purpose: which servers get built, which one carries a person's
+    # credential, and which one can move the account is the arrangement this test pins.
     servers = registry._servers
 
     labels = {server.label: server.forwards_operator_token for server in servers}
-    assert labels == {"market-mcp": False, "teams-mcp": True}
+    assert labels == {"market-mcp": False, "teams-mcp": True, "trading-mcp": False}
+
+
+def test_only_trading_mcp_is_built_as_a_server_that_can_move_the_account() -> None:
+    registry = ToolServerRegistry.from_settings(_settings())
+
+    moving = {
+        server.label for server in registry._servers if server.can_move_the_account
+    }
+
+    assert moving == {"trading-mcp"}
+
+
+async def test_whether_a_name_moves_the_account_is_answered_by_its_own_server() -> None:
+    # specs/agent-trading, "Wywołanie ruszające rachunek zostawia ślad przed wysłaniem" —
+    # the registry has to route this question the same way it routes the call itself.
+    market = _Server("market-mcp", ["get_candles"])
+    trading = _Server(
+        "trading-mcp", ["get_positions", "place_order"], account_tools=frozenset({"place_order"})
+    )
+    registry = ToolServerRegistry([market, trading])
+    await registry.list_tools()
+
+    assert registry.moves_the_account("place_order") is True
+    assert registry.moves_the_account("get_positions") is False
+    assert registry.moves_the_account("get_candles") is False
+
+
+async def test_a_name_nobody_announced_does_not_move_the_account() -> None:
+    # `call` refuses it without sending anything, so there is nothing to trace.
+    registry = ToolServerRegistry([_Server("trading-mcp", [], account_tools=frozenset({"x"}))])
+    await registry.list_tools()
+
+    assert registry.moves_the_account("place_order") is False
 
 
 def test_nothing_configured_means_no_tools_rather_than_an_error() -> None:
@@ -161,6 +205,9 @@ async def test_closing_the_registry_closes_every_server() -> None:
         ("TEAMS_MCP", "https://teams.example.com", None, "TEAMS_MCP_SCOPE"),
         ("TEAMS_MCP", "http://127.0.0.1:8070", "api://teams/.default", "loopback"),
         ("MARKET_MCP", "https://market.example.com", None, "MARKET_MCP_SCOPE"),
+        ("TRADING_MCP", "https://trading.example.com", None, "TRADING_MCP_SCOPE"),
+        ("TRADING_MCP", "http://127.0.0.1:8060", "api://trading/.default", "loopback"),
+        ("TRADING_MCP", None, "api://trading/.default", "TRADING_MCP_URL"),
     ],
 )
 def test_each_servers_mode_is_refused_on_its_own_terms(prefix, url, scope, expected) -> None:
@@ -173,8 +220,28 @@ def test_each_servers_mode_is_refused_on_its_own_terms(prefix, url, scope, expec
     assert expected in str(err.value)
 
 
-def test_one_server_configured_and_the_other_absent_is_a_working_configuration() -> None:
+def test_one_server_configured_and_the_others_absent_is_a_working_configuration() -> None:
     settings = _settings(teams_mcp_url="http://127.0.0.1:8070")
 
     assert settings.teams_mcp_url == "http://127.0.0.1:8070"
     assert settings.market_mcp_url is None
+    assert settings.trading_mcp_url is None
+
+
+def test_the_trading_server_is_configured_without_touching_the_other_two() -> None:
+    settings = _settings(trading_mcp_url="http://127.0.0.1:8060/")
+
+    # The trailing slash goes, the same as market-mcp's, so nothing downstream builds `//mcp`.
+    assert settings.trading_mcp_url == "http://127.0.0.1:8060"
+    assert settings.market_mcp_url is None
+    assert settings.teams_mcp_url is None
+
+
+def test_a_blank_trading_server_url_means_unset() -> None:
+    assert _settings(trading_mcp_url="  ").trading_mcp_url is None
+
+
+def test_the_trading_servers_ceiling_matches_what_trading_mcp_waits_for() -> None:
+    """trading-mcp waits on the gateway for up to 30s. A lower ceiling here would time out
+    this side of an order that had already been sent (design.md, D4)."""
+    assert _settings().trading_mcp_request_timeout_seconds >= 30.0

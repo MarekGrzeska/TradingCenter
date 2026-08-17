@@ -267,6 +267,14 @@ if (-not (Select-String -Path (Join-Path $agentDir ".env") -Pattern '^TEAMS_MCP_
     Write-Host "  Add TEAMS_MCP_URL=$teamsMcpUrl to give it teams-mcp's, as .env.example does." -ForegroundColor DarkGray
 }
 
+# The agent's third, and the one whose absence is hardest to read from the chat: the
+# operator asks what their positions are, and the agent says it cannot see them - which
+# sounds like the account being unreachable rather than a line missing from a file.
+if (-not (Select-String -Path (Join-Path $agentDir ".env") -Pattern '^TRADING_MCP_URL=..*' -Quiet -ErrorAction SilentlyContinue)) {
+    Write-Host "modules\agent\.env has no TRADING_MCP_URL - the agent will not see positions and cannot send an order." -ForegroundColor DarkGray
+    Write-Host "  Add TRADING_MCP_URL=$tradingUrl to give it trading-mcp's, as .env.example does." -ForegroundColor DarkGray
+}
+
 $gatewayJob = $null
 $archiveJob = $null
 $mcpJob = $null

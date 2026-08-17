@@ -306,12 +306,49 @@ _SELECT_TOOL_CALLS = f"""
 """
 
 # `message_id` leads the ordering so the grouping below builds each message's list in the
-# order the turn made the calls, in one pass and without sorting afterwards.
+# order the turn made the calls, in one pass and without sorting afterwards. A row whose
+# `message_id` is still NULL is not in this read: it belongs to a turn that never produced
+# the reply this grouping is keyed by, and it comes back from its own query below.
 _SELECT_SESSION_TOOL_CALLS = f"""
     SELECT {_TOOL_CALL_COLUMNS}
       FROM tool_calls
-     WHERE session_id = $1
+     WHERE session_id = $1 AND message_id IS NOT NULL
      ORDER BY message_id, round_index, position, id
+"""
+
+# The calls that outlived their turn — sent, and never joined to a reply, because there
+# was none (specs/agent-trading, "Wywołanie ruszające rachunek zostawia ślad przed
+# wysłaniem"). Ordered oldest first, by the only thing they have: when they were made.
+_SELECT_SESSION_ORPHAN_TOOL_CALLS = f"""
+    SELECT {_TOOL_CALL_COLUMNS}
+      FROM tool_calls
+     WHERE session_id = $1 AND message_id IS NULL
+     ORDER BY id
+"""
+
+# Written before the call is sent: no message yet, no outcome yet, and a duration of zero
+# that `settle_tool_call` replaces with the real one.
+_BEGIN_TOOL_CALL = """
+    INSERT INTO tool_calls (
+        session_id, message_id, round_index, position,
+        tool_name, arguments, outcome, result_text, duration_ms
+    )
+    VALUES ($1, NULL, $2, $3, $4, $5::jsonb, 'unknown', $6, 0)
+    RETURNING id
+"""
+
+_SETTLE_TOOL_CALL = """
+    UPDATE tool_calls
+       SET outcome = $2, result_text = $3, duration_ms = $4
+     WHERE id = $1
+"""
+
+# Only rows still waiting for one. A row already carrying a `message_id` is somebody
+# else's, and `id = ANY($2)` on its own would happily move it.
+_ATTACH_TOOL_CALLS = """
+    UPDATE tool_calls
+       SET message_id = $1
+     WHERE id = ANY($2::bigint[]) AND message_id IS NULL
 """
 
 
@@ -323,6 +360,64 @@ def _tool_call_from_row(row: asyncpg.Record) -> ToolCall:
         data["arguments"]
     )
     return ToolCall(**data)
+
+
+async def begin_tool_call(
+    conn: Conn,
+    *,
+    session_id: int,
+    round_index: int,
+    position: int,
+    tool_name: str,
+    arguments: dict,
+    result_text: str,
+) -> int:
+    """A row for a call that is about to be sent, returning its id.
+
+    Only for calls that can change the account. Everything else is written once, after the
+    turn, by `record_tool_calls` — a read that vanished with its turn left nothing behind
+    to reconcile, so paying two round trips for it would buy nothing.
+
+    `position` is the caller's here, unlike in `record_tool_calls`: the row exists before
+    the round is finished, so there is no loop to derive it from. `graph.py` counts within
+    the round and hands the same number to both.
+    """
+    row = await fetch_one(
+        conn,
+        _BEGIN_TOOL_CALL,
+        session_id,
+        round_index,
+        position,
+        tool_name,
+        json.dumps(arguments),
+        result_text,
+    )
+    return int(row["id"])
+
+
+async def settle_tool_call(
+    conn: Conn, *, tool_call_id: int, outcome: str, result_text: str, duration_ms: int
+) -> None:
+    """The second half of `begin_tool_call`: what came back, once it did.
+
+    A call that never comes back is never settled, and that is the point — the row keeps
+    the `unknown` it was written with, rather than being deleted or turned into a failure.
+    """
+    await conn.execute(_SETTLE_TOOL_CALL, tool_call_id, outcome, result_text, duration_ms)
+
+
+async def attach_tool_calls_to_message(
+    conn: Conn, *, tool_call_ids: Sequence[int], message_id: int
+) -> None:
+    """Joins rows written before the reply existed to the reply, once it does.
+
+    In the ordinary case this is what makes a pre-written row indistinguishable from one
+    `record_tool_calls` wrote: same `message_id`, same ordering, same read. A row this
+    never reaches is a turn that died mid-call.
+    """
+    if not tool_call_ids:
+        return
+    await conn.execute(_ATTACH_TOOL_CALLS, message_id, list(tool_call_ids))
 
 
 async def record_tool_calls(
@@ -337,13 +432,17 @@ async def record_tool_calls(
 
     `position` comes from the loop rather than the caller — several calls in one round
     are dispatched in the same millisecond, so a timestamp cannot order them and the
-    caller should not have to think about it.
+    caller should not have to think about it. A call that already has a row is counted by
+    that loop and not inserted again: it took its position when it was begun, and skipping
+    it here without counting would shift every later call in its round.
     """
     written: list[ToolCall] = []
     position_in_round: dict[int, int] = {}
     for call in calls:
         position = position_in_round.get(call.round_index, 0)
         position_in_round[call.round_index] = position + 1
+        if call.row_id is not None:
+            continue
         row = await fetch_one(
             conn,
             _INSERT_TOOL_CALL,
@@ -378,8 +477,20 @@ async def get_session_tool_calls(conn: Conn, *, session_id: int) -> dict[int, li
     grouped: dict[int, list[ToolCall]] = {}
     for row in rows:
         call = _tool_call_from_row(row)
+        assert call.message_id is not None  # the query excludes NULLs
         grouped.setdefault(call.message_id, []).append(call)
     return grouped
+
+
+async def get_session_orphan_tool_calls(conn: Conn, *, session_id: int) -> list[ToolCall]:
+    """The calls in this session that no reply ever claimed.
+
+    Read separately rather than folded into the grouping above, because there is no
+    message to fold them under — and dropping them would hide the one row this whole
+    mechanism exists to keep: an order whose outcome nobody knows.
+    """
+    rows = await conn.fetch(_SELECT_SESSION_ORPHAN_TOOL_CALLS, session_id)
+    return [_tool_call_from_row(row) for row in rows]
 
 
 # --- zbiorczy odczyt zużycia (specs/agent-usage, "Zużycie da się odczytać zbiorczo") ---

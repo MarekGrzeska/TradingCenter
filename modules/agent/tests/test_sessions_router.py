@@ -301,6 +301,9 @@ class _FakeToolServer:
             )
         ]
 
+    def moves_the_account(self, name: str) -> bool:
+        return False
+
     async def call(
         self, name: str, arguments: dict, operator_token: str | None = None
     ) -> ToolOutcome:
@@ -383,6 +386,66 @@ def test_the_transcript_hands_back_what_the_stream_sent() -> None:
     # specs/agent-tools, "Wypowiedź bez narzędzi" — the operator's own message says so
     # with an empty list, not by omitting the field.
     assert messages[0]["tool_calls"] == []
+
+
+def test_unclaimed_tool_calls_are_empty_for_a_turn_that_reached_its_reply() -> None:
+    """The ordinary answer, and the one that must not be confused with the interesting one:
+    nothing here means every call this session made is attached to a reply."""
+    with TestClient(app) as client:
+        app.state.provider = _ScriptedProvider(
+            [
+                [ToolCallRequest("c1", "get_last_price", {"symbol": "US100"}), UsageReport(1, 1, None, None)],
+                [TextDelta("21000.5"), UsageReport(1, 1, None, None)],
+            ]
+        )
+        app.state.tool_server = _FakeToolServer()
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(f"/sessions/{session_id}/messages", json={"content": "how is it"})
+        unclaimed = client.get(f"/sessions/{session_id}/unclaimed-tool-calls")
+
+    assert unclaimed.status_code == 200
+    assert unclaimed.json() == []
+
+
+def test_an_order_that_outlived_its_turn_reaches_the_wire() -> None:
+    """specs/agent-trading — the row survives a turn that never reached a reply, and the
+    operator can read it. Published in the same shape as every other call, so a panel needs
+    one branch rather than a second renderer."""
+
+    class _DyingTradingServer(_FakeToolServer):
+        def moves_the_account(self, name: str) -> bool:
+            return name == "place_order"
+
+        async def call(self, name: str, arguments: dict, operator_token: str | None = None):
+            if name == "place_order":
+                # Stands in for the process going away with the order in flight — a real
+                # `ToolServer.call` answers with a `ToolOutcome` instead of raising.
+                raise RuntimeError("gone")
+            return await super().call(name, arguments, operator_token)
+
+    with TestClient(app) as client:
+        app.state.provider = _ScriptedProvider(
+            [
+                [
+                    ToolCallRequest("o1", "place_order", {"symbol": "US100", "size": 1}),
+                    UsageReport(1, 1, None, None),
+                ],
+                [TextDelta("sent"), UsageReport(1, 1, None, None)],
+            ]
+        )
+        app.state.tool_server = _DyingTradingServer()
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(f"/sessions/{session_id}/messages", json={"content": "buy one US100"})
+        unclaimed = client.get(f"/sessions/{session_id}/unclaimed-tool-calls").json()
+        messages = client.get(f"/sessions/{session_id}/messages").json()
+
+    assert len(unclaimed) == 1
+    assert unclaimed[0]["tool_name"] == "place_order"
+    assert unclaimed[0]["outcome"] == "unknown"
+    assert unclaimed[0]["arguments"] == {"symbol": "US100", "size": 1}
+    assert unclaimed[0]["source"] == "server"
+    # And it hangs off nobody's reply, which is the whole reason for the route.
+    assert all(m["tool_calls"] == [] for m in messages)
 
 
 def test_a_turn_without_tools_leaves_the_list_empty() -> None:

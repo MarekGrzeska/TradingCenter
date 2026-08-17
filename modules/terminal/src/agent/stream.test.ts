@@ -95,9 +95,10 @@ describe("parseSseFrame", () => {
     });
   });
 
-  it("keeps an outcome it has no name for out of the three it does", () => {
-    // A fourth kind rendered as one of the three would say something the module did not:
-    // an unreachable server shown as a refusal reads as "the archive says no".
+  it("keeps an outcome it has no name for out of the four it does", () => {
+    // A fifth kind rendered as one of the four would say something the module did not:
+    // an unreachable server shown as a refusal reads as "the archive says no". And it must
+    // not land on `unknown` either — that one now means an order may be on the account.
     const frame =
       "event: tool_call\ndata: " +
       JSON.stringify({
@@ -108,6 +109,26 @@ describe("parseSseFrame", () => {
         outcome: "throttled",
         result_text: "slow down",
         duration_ms: 1,
+      });
+
+    const event = parseSseFrame(frame);
+
+    expect(event).toMatchObject({ kind: "toolCall", call: { outcome: "unrecognised" } });
+  });
+
+  it("carries an unknown outcome through as itself", () => {
+    // `agent-trading` spec: the call may have landed. Softening this into "unavailable"
+    // would tell the operator nothing happened, which is the one thing nobody knows.
+    const frame =
+      "event: tool_call\ndata: " +
+      JSON.stringify({
+        round_index: 0,
+        position: 0,
+        tool_name: "place_order",
+        arguments: { symbol: "US100" },
+        outcome: "unknown",
+        result_text: "may have gone through",
+        duration_ms: 31000,
       });
 
     const event = parseSseFrame(frame);

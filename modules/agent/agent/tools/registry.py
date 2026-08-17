@@ -11,9 +11,9 @@ or slow costs the model that server's tools and nothing else. A turn keeps whate
 answered.
 
 A name announced by two servers is refused rather than resolved by picking one. It cannot
-happen with the two that exist — one reads candles, the other builds teams — and if it
-ever does, guessing would send an operator's "run it" to whichever server happened to be
-first in a dictionary.
+happen with the three that exist — one reads candles, one builds teams, one moves the
+account — and if it ever does, guessing would send an operator's "run it" to whichever
+server happened to be first in a dictionary.
 """
 
 from __future__ import annotations
@@ -39,6 +39,10 @@ class ToolServerRegistry:
                 ToolServer(settings, prefix="market_mcp"),
                 # The one that acts for a person rather than for this module.
                 ToolServer(settings, prefix="teams_mcp", forwards_operator_token=True),
+                # The one whose writes land on the account. No operator token: the account
+                # is one and shared, there is nobody in whose name it could be moved
+                # differently, and trading-mcp reads no such header (design.md, D3).
+                ToolServer(settings, prefix="trading_mcp", can_move_the_account=True),
             ]
         )
 
@@ -81,6 +85,17 @@ class ToolServerRegistry:
                 self._owner[tool.name] = server
                 tools.append(tool)
         return tools
+
+    def moves_the_account(self, name: str) -> bool:
+        """Whether this name belongs to a tool that could change the account. Answered
+        from the descriptors `list_tools` already read, so the caller can write the trace
+        before dispatching (specs/agent-trading).
+
+        A name nobody announced is not account-moving: `call` will refuse it without
+        sending anything, so there is nothing to leave a trace of.
+        """
+        server = self._owner.get(name)
+        return server is not None and server.moves_the_account(name)
 
     async def call(
         self, name: str, arguments: dict, operator_token: str | None = None

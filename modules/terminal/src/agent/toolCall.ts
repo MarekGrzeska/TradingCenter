@@ -8,11 +8,16 @@
  * "what the stream showed" and "what the transcript holds" the same object here too.
  */
 
-/** The three the module distinguishes (`ToolOutcomeKind` in `agent/tools/client.py`),
- *  plus a name for one it does not yet. A fourth kind arriving must not be silently
- *  rendered as one of the three — an unreachable server shown as a refusal reads as "the
- *  archive says no", which is the confusion this whole panel exists to prevent. */
-export type ToolOutcome = "ok" | "refused" | "unavailable" | "unknown";
+/** The four the module distinguishes (`ToolOutcomeKind` in `agent/tools/client.py`), plus
+ *  a name for one it does not yet. A kind arriving that this build has never heard of must
+ *  not be silently rendered as one of the four — an unreachable server shown as a refusal
+ *  reads as "the archive says no", which is the confusion this whole panel exists to
+ *  prevent.
+ *
+ *  `unknown` used to be that catch-all and is now a real answer: the call may have gone
+ *  through and nobody knows (`agent-trading` spec). The catch-all is `unrecognised`, so the
+ *  two never get the same badge. */
+export type ToolOutcome = "ok" | "refused" | "unavailable" | "unknown" | "unrecognised";
 
 /** Which one ran the call — the module's own `set_chart`, or one market-mcp announced
  *  (`agent/contract.py`, `ToolCallOut.source`; `agent-tools` spec, "ślad wywołania mówi,
@@ -64,9 +69,10 @@ function mapOutcome(outcome: string): ToolOutcome {
     case "ok":
     case "refused":
     case "unavailable":
+    case "unknown":
       return outcome;
     default:
-      return "unknown";
+      return "unrecognised";
   }
 }
 

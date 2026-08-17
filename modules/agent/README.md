@@ -5,12 +5,22 @@ sessions and their transcripts, in this module's own database, with every model 
 priced at the moment it happens rather than recomputed later against whatever the
 cennik says today.
 
-**Tools, all of them reads.** The model can ask `market-mcp` for candles, coverage,
-indicators and levels mid-answer and carry on with what comes back — at most eight calls
-per turn, a number in the code rather than a setting. Nothing here reaches
-`capital-gateway`, and nothing writes anywhere: `market-mcp` publishes no tool that
-changes state, and this module adds none of its own. With `MARKET_MCP_URL` unset, or the
-server down, the agent answers from the model alone and says so.
+**Three tool servers, and one of them writes.** The model can ask `market-mcp` for
+candles, coverage, indicators and levels mid-answer, build and run teams through
+`teams-mcp`, and read *and move* the demo account through `trading-mcp` — positions,
+balance and working orders on the reading side, orders sent, closed, amended and
+cancelled on the other. At most eight calls per turn, a number in the code rather than a
+setting. Each server is configured and fails on its own: one being absent or unreachable
+costs the model that server's tools and nothing else, and with all three unset the agent
+answers from the model alone and says so.
+
+`trading-mcp`'s four writing tools are the reason two things here look different from the
+rest of the module. Their trace is written **before** the call is sent and settled after
+it, so a turn that dies mid-order still leaves the row — with the outcome recorded as
+`unknown`, which is neither a failure nor an absence (`specs/agent-trading`). And nothing
+in this module caps an order's size or counts orders: the account is a demo one, enforced
+by `trading-mcp` against the gateway before it opens a port, and that is the guard rather
+than a number nobody can raise.
 
 ## What
 
@@ -69,10 +79,12 @@ migration cannot fix: an upgrade that reported success without arriving, and an 
 older than the schema it found — the second being a rollback that moved the code back and
 left the database where it was.
 
-Does not need `market-mcp`: `MARKET_MCP_URL` left unset means no tools, and a server
-configured but not answering means the same thing for that turn. Pointing the URL
-anywhere off loopback needs `MARKET_MCP_SCOPE` set too — the module refuses to start
-otherwise, the same way it refuses a remote database with no identity.
+Needs none of the three tool servers: `MARKET_MCP_URL`, `TEAMS_MCP_URL` and
+`TRADING_MCP_URL` left unset each mean no tools from that one, and a server configured but
+not answering means the same thing for that turn. Pointing any of the three off loopback
+needs its own `*_SCOPE` set too — the module refuses to start otherwise, the same way it
+refuses a remote database with no identity, and the message names which server it is
+about.
 
 ## Test
 

@@ -246,6 +246,14 @@ if ! grep -qs '^TEAMS_MCP_URL=..*' "$AGENT_DIR/.env"; then
   note "  Add TEAMS_MCP_URL=$TEAMS_MCP_URL to give it teams-mcp's, as .env.example does."
 fi
 
+# The agent's third, and the one whose absence is hardest to read from the chat: the
+# operator asks what their positions are, and the agent says it cannot see them — which
+# sounds like the account being unreachable rather than a line missing from a file.
+if ! grep -qs '^TRADING_MCP_URL=..*' "$AGENT_DIR/.env"; then
+  note "modules/agent/.env has no TRADING_MCP_URL — the agent will not see positions and cannot send an order."
+  note "  Add TRADING_MCP_URL=$TRADING_URL to give it trading-mcp's, as .env.example does."
+fi
+
 # --- shutting everything down -------------------------------------------------
 
 # Two lists. `SERVICE_PIDS` is what has to stay alive; `ALL_PIDS` adds the log

@@ -119,6 +119,52 @@ async def test_a_database_already_at_head_is_left_alone(migrated_url: str) -> No
 
 
 @pytest.mark.db
+async def test_the_account_trace_migration_comes_back_down_over_a_row_it_forbids(
+    empty_database_url: str,
+) -> None:
+    """`0011`'s downgrade is the one that cannot simply undo itself: it puts `NOT NULL` back
+    on a column it allowed nulls into, and `unknown` out of a `CHECK` a row may be sitting
+    on. Both are impossible while such a row exists, so the downgrade deletes them first —
+    a real loss, named in the migration, and untested until here."""
+    from alembic import command
+
+    from agent.migrate import alembic_config
+
+    # The same Config the module's own startup upgrade builds, so this walks the real
+    # chain. In a thread because alembic's env.py drives its async engine with
+    # `asyncio.run`, which refuses to nest inside this test's own loop.
+    config = alembic_config(sqlalchemy_url(empty_database_url))
+    await asyncio.to_thread(command.upgrade, config, "head")
+
+    conn = await asyncpg.connect(asyncpg_dsn(empty_database_url))
+    try:
+        session_id = await conn.fetchval(
+            "INSERT INTO sessions (owner_principal, current_model_id) "
+            "VALUES ('op-1', 'm') RETURNING id"
+        )
+        await conn.execute(
+            "INSERT INTO tool_calls (session_id, message_id, round_index, position, "
+            "tool_name, arguments, outcome, result_text, duration_ms) "
+            "VALUES ($1, NULL, 0, 0, 'place_order', '{}'::jsonb, 'unknown', 'sent', 0)",
+            session_id,
+        )
+
+        await asyncio.to_thread(command.downgrade, config, "0010")
+
+        assert await conn.fetchval("SELECT count(*) FROM tool_calls") == 0
+        assert await conn.fetchval(
+            "SELECT is_nullable FROM information_schema.columns "
+            "WHERE table_name = 'tool_calls' AND column_name = 'message_id'"
+        ) == "NO"
+
+        # And back up again, because a downgrade nobody can reverse is a one-way door.
+        await asyncio.to_thread(command.upgrade, config, "head")
+        assert await applied_heads(conn) == expected_heads()
+    finally:
+        await conn.close()
+
+
+@pytest.mark.db
 async def test_only_one_of_two_processes_migrates(empty_database_url: str) -> None:
     """Two starts against one empty database, racing the way two App Service instances do.
 

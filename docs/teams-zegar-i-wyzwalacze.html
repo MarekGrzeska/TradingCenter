@@ -385,7 +385,7 @@ RETURNING …</code></pre>
 <table>
   <thead><tr><th>Warstwa</th><th>Co powstało</th></tr></thead>
   <tbody>
-    <tr><td>Azure</td><td><code>app-tradingcenter-trading-mcp</code>, kształtem jak <code>market-mcp</code>, a nie jak <code>market-data</code>: jedynym wołającym jest usługa z tożsamością zarządzaną, więc <strong>nie ma ani zakresu delegowanego, ani ekranu zgody</strong></td></tr>
+    <tr><td>Azure</td><td><code>app-tradingcenter-trading-mcp</code>, kształtem jak <code>market-mcp</code>, a nie jak <code>market-data</code>: wołają wyłącznie usługi z tożsamością zarządzaną — <code>teams</code>, a od <code>agent-gets-the-trading-tools</code> także <code>agent</code> — więc <strong>nie ma ani zakresu delegowanego, ani ekranu zgody</strong></td></tr>
     <tr><td>Entra</td><td>rejestracja przy samej aplikacji, a nie w <code>entra.tf</code> — tam mieszka to, do czego loguje się <em>człowiek</em>. <code>allowed_applications</code> ma <strong>dokładnie jeden wpis</strong>: tożsamość <code>teams</code>. Nie terminal — przeglądarka rozmawia z <code>teams</code>, a <code>teams</code> rozmawia tutaj</td></tr>
     <tr><td>Gateway</td><td>własny blok reguł <code>AllowTradingMcp-*</code> w zaporze <code>capital-gateway</code>, nazwany modułem, żeby dał się usunąć razem z nim — a nie poszerzenie reguł <code>market-data</code></td></tr>
     <tr><td>Key Vault</td><td>polityka odczytu dla nowej tożsamości. <strong>Nowego sekretu nie ma</strong>: moduł czyta <code>gateway-api-key</code>, ten sam, który gateway sprawdza, a <code>market-data</code> przedstawia</td></tr>

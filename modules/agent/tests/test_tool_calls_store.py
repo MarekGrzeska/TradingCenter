@@ -22,6 +22,7 @@ from agent.tools import (
     CHART_TOOL_NAME,
     DRAW_TOOL_NAME,
     LIST_DRAWINGS_TOOL_NAME,
+    ToolDescriptor,
     ToolOutcome,
     ToolOutcomeKind,
 )
@@ -55,6 +56,50 @@ class ServerWithTools(FakeToolServer):
 
     async def list_tools(self, operator_token: str | None = None):
         return [PRICE_TOOL]
+
+
+ORDER_TOOL = ToolDescriptor(
+    name="place_order",
+    description="Sends an order.",
+    input_schema={"type": "object", "properties": {"symbol": {"type": "string"}}},
+    read_only=False,
+)
+
+
+class TradingServer(ServerWithTools):
+    """The same, plus a tool that moves the account — so its calls must leave a row before
+    they are sent (specs/agent-trading)."""
+
+    def __init__(self, outcomes: dict[str, ToolOutcome] | None = None) -> None:
+        super().__init__(outcomes, account_tools=frozenset({"place_order"}))
+
+    async def list_tools(self, operator_token: str | None = None):
+        return [PRICE_TOOL, ORDER_TOOL]
+
+
+class TradingServerThatDiesMidOrder(TradingServer):
+    """Stands in for the process going away with an order in flight.
+
+    A real `ToolServer.call` never raises — every failure comes back as a `ToolOutcome` —
+    so an exception here is not a server failure being modelled. It is the one thing this
+    module cannot catch: the call went out and nothing on this side lived to write down
+    what came back.
+    """
+
+    async def call(self, name: str, arguments: dict, operator_token: str | None = None):
+        if name == "place_order":
+            raise RuntimeError("the process went away with the order in flight")
+        return await super().call(name, arguments, operator_token)
+
+
+class QueueThatDiesOnTheFirstCall(RecordingQueue):
+    """The same death one step later: `on_tool_call` runs inside the graph, after the call
+    was sent *and* settled, so raising there kills the turn before any reply exists."""
+
+    def put_nowait(self, event) -> None:
+        if type(event) is ToolCalled:
+            raise RuntimeError("the turn died right here")
+        super().put_nowait(event)
 
 
 async def _new_session(conn) -> int:
@@ -391,3 +436,181 @@ async def test_a_turn_with_tools_runs_the_prompt_that_says_that(pool, db) -> Non
         LIST_DRAWINGS_TOOL_NAME,
     ]
     assert provider.calls[0]["system_prompt"] == revision.with_tools_body
+
+
+# --- wywołania ruszające rachunek (specs/agent-trading) ---
+
+
+async def _order_turn(pool, session_id, *, server, queue=None):
+    provider = FakeProvider(
+        [
+            [
+                ToolCallRequest("o1", "place_order", {"symbol": "US100"}),
+                UsageReport(10, 5, None, None),
+            ],
+            [TextDelta("sent"), UsageReport(20, 5, None, None)],
+        ]
+    )
+    await run_turn(
+        pool,
+        session_id=session_id,
+        model_entry=LUNA,
+        provider=provider,
+        queue=queue or RecordingQueue(),
+        tool_server=server,
+    )
+
+
+async def test_an_order_that_answered_reads_back_like_any_other_call(pool, db) -> None:
+    """The whole point of settling and attaching: in the ordinary case a row written before
+    the call is indistinguishable from one written after the turn."""
+    session_id = await _new_session(db)
+
+    await _order_turn(pool, session_id, server=TradingServer())
+
+    reply = (await store.get_messages(db, session_id=session_id))[-1]
+    calls = await store.get_tool_calls(db, message_id=reply.id)
+    assert [(call.tool_name, call.outcome, call.position) for call in calls] == [
+        ("place_order", "ok", 0)
+    ]
+    assert calls[0].arguments == {"symbol": "US100"}
+    assert await store.get_session_orphan_tool_calls(db, session_id=session_id) == []
+
+
+async def test_an_order_whose_answer_never_came_is_recorded_as_unknown(pool, db) -> None:
+    session_id = await _new_session(db)
+    unknown = ToolOutcome(ToolOutcomeKind.UNKNOWN, "may have gone through", 31000)
+
+    await _order_turn(pool, session_id, server=TradingServer({"place_order": unknown}))
+
+    reply = (await store.get_messages(db, session_id=session_id))[-1]
+    calls = await store.get_tool_calls(db, message_id=reply.id)
+    # Not a failure, and not absent: those are the two readings the fourth outcome exists
+    # to prevent.
+    assert [call.outcome for call in calls] == ["unknown"]
+    assert "may have gone through" in calls[0].result_text
+
+
+async def test_a_turn_that_dies_with_the_order_in_flight_still_leaves_it_unknown(
+    pool, db
+) -> None:
+    # specs/agent-trading, "Tura umiera po złożeniu zlecenia"
+    session_id = await _new_session(db)
+
+    await _order_turn(pool, session_id, server=TradingServerThatDiesMidOrder())
+
+    orphans = await store.get_session_orphan_tool_calls(db, session_id=session_id)
+    assert [(call.tool_name, call.outcome) for call in orphans] == [("place_order", "unknown")]
+    assert orphans[0].message_id is None
+    assert orphans[0].session_id == session_id
+    # The reply exists and is marked incomplete, but it claims none of this — the row is
+    # what survives, not the sentence.
+    reply = (await store.get_messages(db, session_id=session_id))[-1]
+    assert await store.get_tool_calls(db, message_id=reply.id) == []
+
+
+async def test_a_turn_that_dies_after_the_order_settled_keeps_the_settled_row(pool, db) -> None:
+    """One step later than the test above: the outcome came back and was written, and only
+    then did the turn die. The row keeps what it learned rather than reverting to unknown."""
+    session_id = await _new_session(db)
+
+    await _order_turn(
+        pool, session_id, server=TradingServer(), queue=QueueThatDiesOnTheFirstCall()
+    )
+
+    orphans = await store.get_session_orphan_tool_calls(db, session_id=session_id)
+    assert [(call.tool_name, call.outcome) for call in orphans] == [("place_order", "ok")]
+
+
+async def test_a_read_beside_an_order_keeps_its_place_in_the_round(pool, db) -> None:
+    """Two calls in one round, written by two different paths — the pre-written row takes
+    its position when it is begun, and the batch that follows must not reuse it."""
+    session_id = await _new_session(db)
+    provider = FakeProvider(
+        [
+            [
+                ToolCallRequest("o1", "place_order", {"symbol": "US100"}),
+                ToolCallRequest("r1", "get_last_price", {"symbol": "US100"}),
+                UsageReport(10, 5, None, None),
+            ],
+            [TextDelta("done"), UsageReport(20, 5, None, None)],
+        ]
+    )
+
+    await run_turn(
+        pool,
+        session_id=session_id,
+        model_entry=LUNA,
+        provider=provider,
+        queue=RecordingQueue(),
+        tool_server=TradingServer(),
+    )
+
+    reply = (await store.get_messages(db, session_id=session_id))[-1]
+    calls = await store.get_tool_calls(db, message_id=reply.id)
+    assert [(call.tool_name, call.position) for call in calls] == [
+        ("place_order", 0),
+        ("get_last_price", 1),
+    ]
+
+
+async def test_settling_replaces_the_placeholder_the_row_was_begun_with(pool, db) -> None:
+    session_id = await _new_session(db)
+    async with pool.acquire() as conn:
+        row_id = await store.begin_tool_call(
+            conn,
+            session_id=session_id,
+            round_index=0,
+            position=0,
+            tool_name="place_order",
+            arguments={},
+            result_text="no answer yet",
+        )
+        begun = (await store.get_session_orphan_tool_calls(conn, session_id=session_id))[0]
+        assert (begun.outcome, begun.duration_ms) == ("unknown", 0)
+
+        await store.settle_tool_call(
+            conn, tool_call_id=row_id, outcome="ok", result_text="filled", duration_ms=412
+        )
+
+    settled = (await store.get_session_orphan_tool_calls(db, session_id=session_id))[0]
+    assert (settled.outcome, settled.result_text, settled.duration_ms) == ("ok", "filled", 412)
+
+
+async def test_attaching_never_claims_a_row_that_already_belongs_to_a_reply(pool, db) -> None:
+    session_id = await _new_session(db)
+    async with pool.acquire() as conn:
+        row_id = await store.begin_tool_call(
+            conn,
+            session_id=session_id,
+            round_index=0,
+            position=0,
+            tool_name="place_order",
+            arguments={"symbol": "US100"},
+            result_text="sent",
+        )
+        first = await store.append_agent_message(
+            conn,
+            session_id=session_id,
+            content="one",
+            model_id=LUNA.id,
+            prompt_version="v1",
+            incomplete=False,
+        )
+        second = await store.append_agent_message(
+            conn,
+            session_id=session_id,
+            content="two",
+            model_id=LUNA.id,
+            prompt_version="v1",
+            incomplete=False,
+        )
+        await store.attach_tool_calls_to_message(
+            conn, tool_call_ids=[row_id], message_id=first.id
+        )
+        await store.attach_tool_calls_to_message(
+            conn, tool_call_ids=[row_id], message_id=second.id
+        )
+
+    assert [call.id for call in await store.get_tool_calls(db, message_id=first.id)] == [row_id]
+    assert await store.get_tool_calls(db, message_id=second.id) == []

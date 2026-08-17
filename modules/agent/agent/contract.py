@@ -105,10 +105,12 @@ class ToolCallOut(BaseModel):
     position: int
     tool_name: str
     arguments: dict
-    # ok, refused, or unavailable — `ToolOutcomeKind` in `tools/client.py`, and the three
-    # never collapse into two (specs/agent-tools, "Odmowa narzędzia jest wynikiem, nie
-    # awarią tury").
-    outcome: str
+    # ok, refused, unavailable or unknown — `ToolOutcomeKind` in `tools/client.py`, and the
+    # four never collapse into fewer (specs/agent-tools, "Odmowa narzędzia jest wynikiem,
+    # nie awarią tury"). `unknown` is the one only a call that can move the account ever
+    # gets, and the one a reader must not soften: it means an order may be sitting there
+    # (specs/agent-trading).
+    outcome: str = Field(examples=["ok", "refused", "unavailable", "unknown"])
     # The text the model itself received, not a summary of it. A caller shown a summary
     # cannot tell that the model was handed something else, which is the whole reason
     # this is published (design.md, "Wynik w całości, bez własnego sufitu").

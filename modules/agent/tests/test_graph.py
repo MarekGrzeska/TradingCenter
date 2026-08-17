@@ -56,10 +56,18 @@ class FakeProvider:
 
 
 class FakeToolServer:
-    def __init__(self, outcomes: dict[str, ToolOutcome] | None = None) -> None:
+    def __init__(
+        self,
+        outcomes: dict[str, ToolOutcome] | None = None,
+        account_tools: frozenset[str] = frozenset(),
+    ) -> None:
         self._outcomes = outcomes or {}
+        self._account_tools = account_tools
         self.seen: list[tuple[str, dict]] = []
         self.tokens: list[str | None] = []
+
+    def moves_the_account(self, name: str) -> bool:
+        return name in self._account_tools
 
     async def call(
         self, name: str, arguments: dict, operator_token: str | None = None
@@ -73,7 +81,38 @@ class FakeToolServer:
         )
 
 
-async def _run(provider, tool_server=None, *, tools=(PRICE_TOOL,), announced=None, local_tools=None):
+class RecordingAccountTrace:
+    """The trace the graph writes for a call that can move the account, without a database.
+
+    `settled` holds only the rows that were settled, so a test can tell "written and then
+    answered for" from "written and left as it was" — the difference the whole mechanism
+    exists to keep (specs/agent-trading).
+    """
+
+    def __init__(self, *, fails_to_begin: bool = False) -> None:
+        self.begun: list[tuple[int, int, str, dict]] = []
+        self.settled: list[tuple[int, str]] = []
+        self._fails = fails_to_begin
+
+    async def begin(self, *, round_index: int, position: int, name: str, arguments: dict) -> int:
+        if self._fails:
+            raise RuntimeError("the database is gone")
+        self.begun.append((round_index, position, name, arguments))
+        return len(self.begun)
+
+    async def settle(self, *, row_id: int, outcome: str, text: str, duration_ms: int) -> None:
+        self.settled.append((row_id, outcome))
+
+
+async def _run(
+    provider,
+    tool_server=None,
+    *,
+    tools=(PRICE_TOOL,),
+    announced=None,
+    local_tools=None,
+    account_trace=None,
+):
     """`announced` collects `(call, position)` for every tool call the graph announced —
     the events a caller watching the turn sees, as opposed to `result["calls"]`, which is
     what the turn hands back at the end. A test passing a list is asking about the first;
@@ -87,7 +126,7 @@ async def _run(provider, tool_server=None, *, tools=(PRICE_TOOL,), announced=Non
     async def on_tool_call(call: RecordedCall, position: int) -> None:
         announced_here.append((call, position))
 
-    graph = build_graph(provider, tool_server, local_tools)  # pyright: ignore[reportArgumentType]
+    graph = build_graph(provider, tool_server, local_tools, None, account_trace)  # pyright: ignore[reportArgumentType]
     result = await graph.ainvoke(
         initial_state(
             system_prompt="be helpful",
@@ -466,3 +505,81 @@ async def test_a_local_tool_that_raises_is_a_result_not_a_failed_turn() -> None:
     [call] = result["calls"]
     assert call.outcome == "unavailable"
     assert "connection reset" in call.text
+
+
+# --- ślad wywołań ruszających rachunek (specs/agent-trading) ---
+
+ORDER_TOOL = ToolDescriptor(
+    name="place_order",
+    description="Sends an order.",
+    input_schema={"type": "object", "properties": {"symbol": {"type": "string"}}},
+    read_only=False,
+)
+
+
+def _one_order(name: str = "place_order") -> FakeProvider:
+    return FakeProvider(
+        [
+            [ToolCallRequest("o1", name, {"symbol": "US100"}), UsageReport(1, 1, None, None)],
+            [TextDelta("sent"), UsageReport(1, 1, None, None)],
+        ]
+    )
+
+
+async def test_an_order_is_traced_before_it_is_sent_and_settled_after() -> None:
+    trace = RecordingAccountTrace()
+    server = FakeToolServer(account_tools=frozenset({"place_order"}))
+
+    result, _ = await _run(
+        _one_order(), server, tools=(ORDER_TOOL,), account_trace=trace
+    )
+
+    assert trace.begun == [(0, 0, "place_order", {"symbol": "US100"})]
+    assert trace.settled == [(1, "ok")]
+    # The row the graph wrote travels back on the call, so the turn joins it to the reply
+    # instead of inserting a second one.
+    [call] = result["calls"]
+    assert call.row_id == 1
+
+
+async def test_a_read_gets_no_trace_of_its_own() -> None:
+    trace = RecordingAccountTrace()
+    server = FakeToolServer(account_tools=frozenset({"place_order"}))
+
+    result, _ = await _run(
+        _one_order("get_last_price"), server, account_trace=trace
+    )
+
+    assert trace.begun == []
+    [call] = result["calls"]
+    assert call.row_id is None
+
+
+async def test_an_order_whose_trace_cannot_be_written_is_not_sent() -> None:
+    """A call that moves the account is never sent without a record of it. The model is
+    told, the turn carries on, and the server is not asked."""
+    trace = RecordingAccountTrace(fails_to_begin=True)
+    server = FakeToolServer(account_tools=frozenset({"place_order"}))
+
+    result, _ = await _run(
+        _one_order(), server, tools=(ORDER_TOOL,), account_trace=trace
+    )
+
+    assert server.seen == []
+    assert result["failed"] is False
+    [call] = result["calls"]
+    assert call.outcome == "unavailable"
+    assert call.row_id is None
+    assert "was not sent" in call.text
+
+
+async def test_without_a_trace_at_all_the_graph_still_runs_orders() -> None:
+    """`account_trace` is optional, and a graph built without one is the shape every test
+    written before this mechanism existed still uses."""
+    server = FakeToolServer(account_tools=frozenset({"place_order"}))
+
+    result, _ = await _run(_one_order(), server, tools=(ORDER_TOOL,))
+
+    assert server.seen == [("place_order", {"symbol": "US100"})]
+    [call] = result["calls"]
+    assert call.row_id is None

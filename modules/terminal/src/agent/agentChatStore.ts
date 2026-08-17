@@ -92,6 +92,11 @@ export interface AgentChatState {
   activeSessionId: number | null;
   messages: ChatMessage[];
   transcriptStatus: LoadStatus;
+  /** Calls this conversation made that no reply claimed — a turn that died with something
+   *  in flight. Almost always empty; when it is not, it is the only place on screen that an
+   *  order of unknown outcome appears (`agent-trading` spec). Shown at the end of the
+   *  transcript rather than beside a reply, because there is no reply they belong to. */
+  unclaimedToolCalls: AgentToolCall[];
   turn: TurnState | null;
   models: AgentModel[];
   modelsStatus: LoadStatus;
@@ -198,6 +203,7 @@ export function createAgentChatStore(
     sessionsStatus: "loading",
     activeSessionId: loadActiveSessionId(storage),
     messages: [],
+    unclaimedToolCalls: [],
     transcriptStatus: "ready",
     turn: null,
     models: [],
@@ -272,14 +278,35 @@ export function createAgentChatStore(
     }
   }
 
+  /** Read alongside the transcript, and never allowed to fail it: a conversation whose
+   *  unclaimed calls could not be read is still a conversation worth showing. An empty
+   *  list is both "there are none" and "we could not tell", which is acceptable only
+   *  because the ordinary answer is empty — the row itself lives in the module either
+   *  way, and the next reload asks again. */
+  async function readUnclaimed(id: number): Promise<AgentToolCall[]> {
+    try {
+      return await api.getUnclaimedToolCalls(id, new AbortController().signal);
+    } catch {
+      return [];
+    }
+  }
+
   async function loadMessages(id: number): Promise<void> {
     const seq = ++transcriptSeq;
     transcriptFor = id;
-    commit({ ...state, messages: [], transcriptStatus: "loading" });
+    commit({ ...state, messages: [], unclaimedToolCalls: [], transcriptStatus: "loading" });
     try {
-      const raw = await api.getMessages(id, new AbortController().signal);
+      const [raw, unclaimed] = await Promise.all([
+        api.getMessages(id, new AbortController().signal),
+        readUnclaimed(id),
+      ]);
       if (seq !== transcriptSeq || id !== state.activeSessionId) return;
-      commit({ ...state, messages: raw.map(toChatMessage), transcriptStatus: "ready" });
+      commit({
+        ...state,
+        messages: raw.map(toChatMessage),
+        unclaimedToolCalls: unclaimed,
+        transcriptStatus: "ready",
+      });
     } catch {
       transcriptFor = null; // so a retry is possible — this one showed nothing
       if (seq !== transcriptSeq || id !== state.activeSessionId) return;
@@ -311,6 +338,9 @@ export function createAgentChatStore(
 
     const seq = ++transcriptSeq;
     let messages: ChatMessage[] | null = null;
+    // A turn that broke is exactly when a call can be left unclaimed, so this reload is
+    // the one that matters most for it.
+    const unclaimed = await readUnclaimed(sessionId);
     try {
       const raw = await api.getMessages(sessionId, new AbortController().signal);
       messages = raw.map(toChatMessage);
@@ -335,7 +365,13 @@ export function createAgentChatStore(
         },
       ];
     }
-    commit({ ...state, messages, transcriptStatus: "ready", turn: null });
+    commit({
+      ...state,
+      messages,
+      unclaimedToolCalls: unclaimed,
+      transcriptStatus: "ready",
+      turn: null,
+    });
     void loadSessions();
     if (errorMessage) {
       // Said once, at the moment of the break — the bubble's own `incomplete` flag is
@@ -445,6 +481,7 @@ export function createAgentChatStore(
       ...state,
       activeSessionId: null,
       messages: [],
+      unclaimedToolCalls: [],
       transcriptStatus: "ready",
       turn: null,
       selectedModelId: state.models[0]?.id ?? state.selectedModelId,
@@ -504,6 +541,7 @@ export function createAgentChatStore(
           ? {
               activeSessionId: null,
               messages: [],
+              unclaimedToolCalls: [],
               transcriptStatus: "ready" as const,
               turn: null,
             }
