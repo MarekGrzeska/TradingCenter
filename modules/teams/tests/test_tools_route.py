@@ -34,8 +34,8 @@ _ENV = {
 def _env(db: asyncpg.Connection, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("DATABASE_URL", migrated_url)
     # Neither MARKET_MCP_URL nor TRADING_MCP_URL here on purpose — `conftest`'s
-    # `_no_developer_env` is what keeps both unset, and it does it with a blank value
-    # rather than a deletion (see the note there).
+    # `_no_developer_env` is what keeps both unset, on a machine with an `.env` as much
+    # as in CI (see the note there).
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 
