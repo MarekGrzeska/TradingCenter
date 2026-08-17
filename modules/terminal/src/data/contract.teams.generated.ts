@@ -761,8 +761,12 @@ export interface components {
         };
         /**
          * Recurrence
-         * @description One rhythm, in the operator's own words. `kind` decides which of the other fields
-         *     carry a value — see `_FIELDS`.
+         * @description One rhythm, in the operator's own words.
+         *
+         *     `kind` decides which of the other fields carry a value: each needs its own (`_REQUIRED`)
+         *     and the two that repeat within a day may also carry `weekdays` (`_ALLOWED`). Anything
+         *     else is refused rather than ignored. Weekdays are ISO — 1 Monday … 7 Sunday — and their
+         *     absence means every day.
          */
         Recurrence: {
             /** Day Of Month */

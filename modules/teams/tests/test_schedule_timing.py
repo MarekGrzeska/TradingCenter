@@ -72,3 +72,24 @@ def test_folding_rolls_a_daily_schedule_forward_in_polish_time() -> None:
 
     assert next_fire_at == _utc("2026-07-03T07:00:00")
     assert skipped == 1  # 2 July
+
+
+def test_an_hourly_expression_with_weekdays_steps_over_the_weekend() -> None:
+    """The rhythm the operator wanted: every hour at :35, Monday to Friday. Friday's last
+    fire is followed by Monday's first, with nothing in between.
+
+    2026-08-21 is a Friday; times are UTC, so 21:35 Polish summer time is 19:35 here.
+    """
+    friday_last = next_fire_after("35 * * * 1,2,3,4,5", _utc("2026-08-21T21:00:00"))
+    assert friday_last == _utc("2026-08-21T21:35:00")
+
+    after_friday = next_fire_after("35 * * * 1,2,3,4,5", friday_last)
+    # 2026-08-24 is the Monday; 00:35 in Poland is 22:35 UTC on the Sunday.
+    assert after_friday == _utc("2026-08-23T22:35:00")
+    assert after_friday.astimezone(SCHEDULE_TIMEZONE).isoweekday() == 1
+
+
+def test_a_week_of_an_hourly_weekday_rhythm_never_lands_on_a_weekend() -> None:
+    fires = fires_after("35 * * * 1,2,3,4,5", _utc("2026-08-17T00:00:00"))
+    days = {next(fires).astimezone(SCHEDULE_TIMEZONE).isoweekday() for _ in range(200)}
+    assert days == {1, 2, 3, 4, 5}

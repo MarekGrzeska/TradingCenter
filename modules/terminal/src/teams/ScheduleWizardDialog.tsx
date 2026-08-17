@@ -4,13 +4,16 @@ import { ModalShell } from "../ui/ModalShell";
 import { browserIsInScheduleZone, formatBrowserInstant, formatInstant } from "../ui/formatTime";
 import {
   RECURRENCE_KINDS,
+  RECURRENCE_KINDS_WITH_WEEKDAYS,
   RECURRENCE_KIND_LABELS,
   WEEKDAYS,
+  chosenWeekdays,
   emptyScheduleDraft,
   draftFromSchedule,
   recurrenceOfKind,
   withRevisionMode,
   withTiming,
+  withWeekdayToggled,
 } from "./scheduleDraft";
 import type {
   Recurrence,
@@ -263,18 +266,18 @@ function RhythmFields({
         </label>
       )}
 
-      {recurrence.kind === "weekly" && (
+      {RECURRENCE_KINDS_WITH_WEEKDAYS.includes(recurrence.kind) && (
         <fieldset className="flex flex-col gap-1">
           <legend className="mb-1 text-xs text-ink-muted">On which days?</legend>
           <div className="flex flex-wrap gap-1">
             {WEEKDAYS.map(({ day, label }) => {
-              const chosen = (recurrence.weekdays ?? []).includes(day);
+              const chosen = chosenWeekdays(recurrence).includes(day);
               return (
                 <button
                   key={day}
                   type="button"
                   aria-pressed={chosen}
-                  onClick={() => onChange({ ...recurrence, weekdays: toggle(recurrence.weekdays, day) })}
+                  onClick={() => onChange(withWeekdayToggled(recurrence, day))}
                   className={`cursor-pointer rounded border px-2 py-1 text-xs ${
                     chosen
                       ? "border-primary bg-primary-soft text-ink"
@@ -318,16 +321,6 @@ function readClock(value: string): { hour: number; minute: number } | Record<str
   const [hour, minute] = value.split(":");
   if (hour === undefined || minute === undefined) return {};
   return { hour: Number(hour), minute: Number(minute) };
-}
-
-function toggle(weekdays: number[] | null, day: number): number[] {
-  const chosen = weekdays ?? [];
-  // The last day cannot be taken away: a weekly rhythm with no day is one the module
-  // refuses, and the refusal would arrive on save with the form already looking finished.
-  if (chosen.includes(day)) {
-    return chosen.length === 1 ? chosen : chosen.filter((each) => each !== day);
-  }
-  return [...chosen, day].sort((a, b) => a - b);
 }
 
 /**

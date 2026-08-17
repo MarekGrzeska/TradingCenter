@@ -133,7 +133,10 @@ anything in Azure (design.md, "Zegar w procesie modułu, nie w Azure"):
   revision or "whatever is latest at the moment of each fire", which is an explicit choice
   and never the default. A save names its timing exactly one of those two ways; a read
   publishes both, with `recurrence` empty for an expression no rhythm describes
-  (`recurrence.py`);
+  (`recurrence.py`). The two rhythms that repeat within a day may name weekdays as well —
+  the market is shut two days in seven — and every day named is stored as none named, so
+  one trigger keeps one spelling. `daily` may not name them: `daily` on chosen days is
+  `weekly`, and the second spelling is refused rather than stored;
 - a **trigger** — a market condition, expressed as a call to a tool this module already
   has a session for, with a field path, a comparison and a threshold. Never a locally
   computed indicator: the condition is read with the same tools an agent would use.

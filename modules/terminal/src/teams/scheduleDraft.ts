@@ -51,6 +51,15 @@ export const RECURRENCE_KIND_LABELS: Record<RecurrenceKind, string> = {
   monthly: "Once a month",
 };
 
+/** Which rhythms carry days at all. `weekly` needs them; the two that repeat within a day
+ *  may have them, because the market is shut two days in seven. `daily` may not: daily on
+ *  chosen days is `weekly`, and the module refuses the second way of saying it. */
+export const RECURRENCE_KINDS_WITH_WEEKDAYS: readonly RecurrenceKind[] = [
+  "every_minutes",
+  "hourly",
+  "weekly",
+];
+
 /** ISO days, the way the module numbers them: 1 is Monday, 7 is Sunday. */
 export const WEEKDAYS: readonly { day: number; label: string }[] = [
   { day: 1, label: "Mon" },
@@ -80,18 +89,49 @@ export function recurrenceOfKind(kind: RecurrenceKind, previous: Recurrence | nu
     weekdays: null,
     dayOfMonth: null,
   };
+  // Days carry the same way the hour does, between the three rhythms that have them: an
+  // operator narrowing "Mon–Fri at 9:00" to "every hour" keeps their week.
+  const weekdays = previous?.weekdays ?? null;
   switch (kind) {
     case "every_minutes":
-      return { ...base, minutes: previous?.minutes ?? 15 };
+      return { ...base, minutes: previous?.minutes ?? 15, weekdays };
     case "hourly":
-      return { ...base, minute };
+      return { ...base, minute, weekdays };
     case "daily":
       return { ...base, hour, minute };
     case "weekly":
-      return { ...base, hour, minute, weekdays: previous?.weekdays ?? [1, 2, 3, 4, 5] };
+      return { ...base, hour, minute, weekdays: weekdays ?? [1, 2, 3, 4, 5] };
     case "monthly":
       return { ...base, hour, minute, dayOfMonth: previous?.dayOfMonth ?? 1 };
   }
+}
+
+/** The days a rhythm actually fires on, spelled out. No days named means every one of
+ *  them, and the toggles show that rather than seven empty boxes. */
+export function chosenWeekdays(recurrence: Recurrence): number[] {
+  return recurrence.weekdays ?? WEEKDAYS.map(({ day }) => day);
+}
+
+/**
+ * One day switched on or off, in the shape the module stores.
+ *
+ * Every day chosen is written as no days at all, exactly as the module normalises it — so
+ * the form never holds two states for one trigger and the operator cannot wonder which of
+ * them they saved. `weekly` is the exception: its days are required, so seven days stay
+ * seven days there and remain their own expression.
+ *
+ * The last day cannot be taken away. A rhythm that fires on no day is one the module
+ * refuses, and the refusal would arrive on save with the form already looking finished.
+ */
+export function withWeekdayToggled(recurrence: Recurrence, day: number): Recurrence {
+  const chosen = chosenWeekdays(recurrence);
+  const next = chosen.includes(day)
+    ? chosen.length === 1
+      ? chosen
+      : chosen.filter((each) => each !== day)
+    : [...chosen, day].sort((a, b) => a - b);
+  const everyDay = next.length === WEEKDAYS.length && recurrence.kind !== "weekly";
+  return { ...recurrence, weekdays: everyDay ? null : next };
 }
 
 /** Switching between the wizard and the expression underneath it. Exactly one of the two
@@ -109,22 +149,30 @@ function clock(hour: number | null, minute: number | null): string {
   return `${String(hour ?? 0).padStart(2, "0")}:${String(minute ?? 0).padStart(2, "0")}`;
 }
 
+function dayLabels(weekdays: readonly number[]): string {
+  return weekdays
+    .map((day) => WEEKDAYS.find((weekday) => weekday.day === day)?.label ?? day)
+    .join(", ");
+}
+
+/** The days clause of a rhythm that need not have one — empty when it fires on all of
+ *  them, because "every hour, Mon to Sun" is a longer way of saying "every hour". */
+function onDays(recurrence: Recurrence): string {
+  return recurrence.weekdays === null ? "" : `, ${dayLabels(recurrence.weekdays)}`;
+}
+
 /** What a rhythm says, in a line. A label, not a calculation: when the schedule actually
  *  fires is the module's answer and is read from it (`previewNextFires`). */
 export function describeRecurrence(recurrence: Recurrence): string {
   switch (recurrence.kind) {
     case "every_minutes":
-      return `Every ${recurrence.minutes} minutes`;
+      return `Every ${recurrence.minutes} minutes${onDays(recurrence)}`;
     case "hourly":
-      return `Every hour at :${String(recurrence.minute ?? 0).padStart(2, "0")}`;
+      return `Every hour at :${String(recurrence.minute ?? 0).padStart(2, "0")}${onDays(recurrence)}`;
     case "daily":
       return `Every day at ${clock(recurrence.hour, recurrence.minute)}`;
-    case "weekly": {
-      const days = (recurrence.weekdays ?? [])
-        .map((day) => WEEKDAYS.find((weekday) => weekday.day === day)?.label ?? day)
-        .join(", ");
-      return `${days} at ${clock(recurrence.hour, recurrence.minute)}`;
-    }
+    case "weekly":
+      return `${dayLabels(recurrence.weekdays ?? [])} at ${clock(recurrence.hour, recurrence.minute)}`;
     case "monthly":
       return `Day ${recurrence.dayOfMonth} of the month at ${clock(recurrence.hour, recurrence.minute)}`;
   }
