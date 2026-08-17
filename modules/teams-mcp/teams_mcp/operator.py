@@ -20,6 +20,17 @@ sequence the terminal already produces when the operator clicks something.
 an identity that can be written is an identity that can be borrowed — from the chat, in one
 sentence, by anyone who knows how somebody else's principal reads
 (specs/teams-mcp-authorship, "Tożsamość operatora jest przenoszona, a nie odgadywana").
+That holds in every configuration, including the one below.
+
+**The refusal is bounded, not absolute, and the boundary is "could an identity have
+existed".** Behind an authenticator, or against a remote `teams`, a missing token is a
+broken chain and every tool refuses — reads as flatly as writes. On a machine where
+neither holds, no layer could have issued a token at all, and refusing there buys nothing:
+it takes the whole tool surface away from a desk (`config.py`,
+`Settings.operator_identity_optional`). Then the call proceeds carrying **no identity**,
+and `teams` attributes it to the principal it assigns any unauthenticated request — which
+is the same one the local terminal gets, so what the chat creates lands on the list the
+operator is already looking at. This module still chooses nothing and sends nothing.
 
 **It is never logged, stored or handed back to the model.** `redacted()` exists so that a
 diagnostic can say whether a token was there without saying what it was.
@@ -41,25 +52,41 @@ _MISSING = (
 )
 
 
-def operator_token(context: Any) -> str:
-    """The operator's own credential for this one call, or `ToolRefusal` naming its
-    absence. Refuses for reads exactly as for writes: without an identity there is no
-    catalogue to read, only somebody else's (specs/teams-mcp-authorship)."""
+def operator_token(context: Any, *, optional: bool = False) -> str | None:
+    """The operator's own credential for this one call.
+
+    `ToolRefusal` naming the absence when there is none and one could have existed, which
+    is the default and the only behaviour anywhere but a developer's machine. Refuses for
+    reads exactly as for writes: without an identity there is no catalogue to read, only
+    somebody else's (specs/teams-mcp-authorship).
+
+    `optional=True` — passed only from `Settings.operator_identity_optional`, never decided
+    here and never by a caller's judgement — answers `None` instead, which the client turns
+    into a request with no `Authorization` at all rather than an empty or invented one.
+    """
     try:
         # `Context.request_context` raises rather than answering `None` when a tool runs
         # outside a request, so this cannot be a `getattr` with a default.
         request = context.request_context.request
     except (ValueError, AttributeError):
-        raise ToolRefusal(_MISSING) from None
+        return _absent(optional)
 
     headers = getattr(request, "headers", None)
     if headers is None:
-        raise ToolRefusal(_MISSING)
+        return _absent(optional)
 
     value = (headers.get(OPERATOR_TOKEN_HEADER) or "").strip()
     if not value:
-        raise ToolRefusal(_MISSING)
+        return _absent(optional)
     return value
+
+
+def _absent(optional: bool) -> None:
+    """One place decides what an absence means, so the three ways of arriving at one — no
+    request, no headers, a blank header — cannot drift apart."""
+    if optional:
+        return
+    raise ToolRefusal(_MISSING)
 
 
 def redacted(token: str | None) -> str:

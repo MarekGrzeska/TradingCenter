@@ -42,20 +42,31 @@ class TeamsClient:
             timeout=settings.teams_request_timeout_seconds,
         )
         self._timeout_seconds = settings.teams_request_timeout_seconds
+        # Read here so the tool seam can ask without `tools.register` growing a `Settings`
+        # parameter to carry one bool to where an object built from those settings already
+        # stands (design.md, "Decyzja zostaje w operator.py, a warunek dojeżdża klientem").
+        # Behind a property because it is the switch that decides whether a call may go out
+        # with no identity: settings are validated at startup, and a plain attribute would
+        # let anything holding the client widen that afterwards.
+        self._operator_identity_optional = settings.operator_identity_optional
+
+    @property
+    def operator_identity_optional(self) -> bool:
+        return self._operator_identity_optional
 
     async def aclose(self) -> None:
         await self._http.aclose()
 
-    async def get(self, path: str, *, token: str, params: dict | None = None) -> Any:
+    async def get(self, path: str, *, token: str | None, params: dict | None = None) -> Any:
         return await self._request("GET", path, token=token, params=params)
 
-    async def post(self, path: str, *, token: str, json: dict | None = None) -> Any:
+    async def post(self, path: str, *, token: str | None, json: dict | None = None) -> Any:
         return await self._request("POST", path, token=token, json=json)
 
-    async def put(self, path: str, *, token: str, json: dict | None = None) -> Any:
+    async def put(self, path: str, *, token: str | None, json: dict | None = None) -> Any:
         return await self._request("PUT", path, token=token, json=json)
 
-    async def _request(self, method: str, path: str, *, token: str, **kwargs) -> Any:
+    async def _request(self, method: str, path: str, *, token: str | None, **kwargs) -> Any:
         is_write = method in _WRITE_METHODS
         response = await self._send(method, path, token=token, **kwargs)
 
@@ -68,9 +79,15 @@ class TeamsClient:
 
         return self._read(response, method=method, path=path, is_write=is_write)
 
-    async def _send(self, method: str, path: str, *, token: str, **kwargs) -> httpx.Response:
-        # The operator's token, not this module's. See this file's docstring.
-        headers = {**kwargs.pop("headers", {}), "Authorization": f"Bearer {token}"}
+    async def _send(self, method: str, path: str, *, token: str | None, **kwargs) -> httpx.Response:
+        # The operator's token, not this module's. See this file's docstring. `None` means
+        # the local shape, where nobody could have issued one: then the header is **left
+        # off** rather than sent empty or invented — `teams` reads no `Authorization`
+        # locally anyway, and a fabricated `Bearer` would start behaving differently the
+        # day it did (design.md, "Brak nagłówka, nie udawany token").
+        headers = {**kwargs.pop("headers", {})}
+        if token is not None:
+            headers["Authorization"] = f"Bearer {token}"
         try:
             return await self._http.request(method, path, headers=headers, **kwargs)
         except httpx.TimeoutException as err:

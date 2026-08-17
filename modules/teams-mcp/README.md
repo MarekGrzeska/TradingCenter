@@ -37,11 +37,31 @@ Without that token every tool refuses and says so. It is never read from a tool 
 a model writes whatever it finds plausible, and an identity that can be written is an
 identity that can be borrowed.
 
+**Except on a desk, where nothing can issue one.** The refusal is about a *broken chain*,
+and locally there is no chain to break: nothing authenticates the terminal, so `agent` has
+no token to forward. When both of these hold at once —
+
+- `REQUIRE_AUTHENTICATED_PRINCIPAL=false`, so no authenticator stands in front of this
+  module, and
+- `TEAMS_URL` points at this machine's loopback —
+
+then a call proceeds **carrying no identity at all**: no `Authorization` header, not an
+invented one. `teams` then assigns the principal it gives any unauthenticated request,
+which is the same one the local terminal gets, so a team created from the local chat lands
+on the same local list as one composed by hand.
+
+Both conditions are required because they are about different hops — the flag about what
+stands in front of this module, the address about the `teams` that would attribute the rows
+— and either alone is a plausible misconfiguration. In Azure both are on the refusing side
+(`infra/app-service.tf`), so nothing there changes. The module says which of the two states
+it came up in, once, at startup; and `REQUIRE_AUTHENTICATED_PRINCIPAL=true` in a local
+`.env` puts the refusal back without touching code.
+
 ## Commands
 
 ```
 uv run python -m teams_mcp          # port 8070, one transport, no stdio to choose
-uv run pytest                       # 61 tests
+uv run pytest                       # 82 tests
 uv run ruff check .
 uv run pyright
 uv run python scripts/contract.py check     # the committed snapshot of teams' wire
@@ -61,7 +81,9 @@ Copy `.env.example`. Locally nothing is required: the defaults reach `teams` on 
 | `REQUIRE_AUTHENTICATED_PRINCIPAL` | false locally, true in Azure |
 
 There is no setting for the operator's credential, and there will not be one: it arrives
-per call or the call is refused.
+per call, or the call is refused — unless nobody could have issued one, which is the local
+shape described above and is decided by the two settings in this table rather than by a
+third one of its own.
 
 ## The tools
 

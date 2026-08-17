@@ -71,6 +71,33 @@ def test_the_modules_own_authorization_header_is_not_mistaken_for_the_operators(
         operator_token(context)
 
 
+def test_an_absent_operator_answers_nothing_when_nobody_could_have_issued_one() -> None:
+    """The local carve-out: `None`, not a substituted identity and not a refusal
+    (specs/teams-mcp-authorship, "Maszyna deweloperska, gdzie nikt nie może być
+    uwierzytelniony")."""
+    assert operator_token(_Context(_Request({})), optional=True) is None
+
+
+def test_the_three_ways_of_arriving_at_an_absence_answer_the_same() -> None:
+    assert operator_token(_Context(_Request({OPERATOR_TOKEN_HEADER: "  "})), optional=True) is None
+    assert operator_token(_ContextOutsideARequest(), optional=True) is None
+
+
+def test_a_present_token_is_still_carried_when_an_absent_one_would_be_tolerated() -> None:
+    """The carve-out tolerates an absence; it does not stop reading a token that is there,
+    which is what would quietly turn a signed-in local operator into an anonymous one."""
+    context = _Context(_Request({OPERATOR_TOKEN_HEADER: "operator-token"}))
+
+    assert operator_token(context, optional=True) == "operator-token"
+
+
+def test_requiring_an_operator_is_what_happens_by_default() -> None:
+    # The keyword exists for exactly one caller, and nothing reaches this function's
+    # tolerant branch by forgetting to pass anything.
+    with pytest.raises(ToolRefusal):
+        operator_token(_Context(_Request({})))
+
+
 def test_redacted_says_whether_there_was_one_and_nothing_else() -> None:
     assert redacted("a-real-looking-token") == "present"
     assert redacted(None) == "absent"
