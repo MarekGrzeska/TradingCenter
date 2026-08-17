@@ -26,6 +26,7 @@ export function TeamRunsView({
   models,
   initialRunId,
   onClose,
+  onEdit,
 }: {
   api: TeamsApi;
   teamId: number;
@@ -35,6 +36,9 @@ export function TeamRunsView({
    *  the operator to pick, which is the ordinary case of coming here to look around. */
   initialRunId: number | null;
   onClose(): void;
+  /** Back into the editor for this team — the other direction of the same short loop the
+   *  editor's own `Runs →` opens (`TeamRunsStrip`). */
+  onEdit(): void;
 }) {
   const [runs, setRuns] = useState<TeamRun[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,6 +86,13 @@ export function TeamRunsView({
         <span className="text-sm text-ink">
           {teamName} <span className="text-xs text-ink-faint">· runs</span>
         </span>
+        <button
+          type="button"
+          onClick={onEdit}
+          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
+        >
+          ← Edit team
+        </button>
         {runs !== null && (
           <span className="text-xs text-ink-faint">
             {runs.length} recorded{runs.length > 0 && ", newest first"}

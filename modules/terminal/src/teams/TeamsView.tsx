@@ -93,6 +93,7 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
         models={models.value}
         initialRunId={open.runId}
         onClose={() => setOpen({ kind: "catalogue" })}
+        onEdit={() => setOpen({ kind: "team", id: open.teamId })}
       />
     );
   }
@@ -130,6 +131,10 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
       onCreated={(team) => {
         teams.reload();
         setOpen({ kind: "team", id: team.id });
+      }}
+      onRuns={(runId, teamName) => {
+        if (open.kind !== "team") return;
+        setOpen({ kind: "runs", teamId: open.id, teamName, runId });
       }}
     />
   );

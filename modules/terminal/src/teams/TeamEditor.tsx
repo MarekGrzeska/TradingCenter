@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { MarketDataError } from "../data/types";
 import { AgentSettingsDialog } from "./AgentSettingsDialog";
 import { TeamCanvas } from "./TeamCanvas";
+import { TeamRunsStrip } from "./TeamRunsStrip";
 import { TeamPanel } from "./TeamPanel";
 import { NO_HISTORY, kindForPatch, remember, undo, type EditHistory } from "./editHistory";
 import { locateRefusal, type Refusal } from "./refusal";
@@ -52,6 +53,7 @@ export function TeamEditor({
   toolsNote,
   onClose,
   onCreated,
+  onRuns,
 }: {
   api: TeamsApi;
   /** `null` opens a team that does not exist yet — saving it is what creates it. */
@@ -61,6 +63,11 @@ export function TeamEditor({
   toolsNote: string | null;
   onClose(): void;
   onCreated(team: TeamSummary): void;
+  /** Leaves editing for the runs of this team — a run id to open that one, `null` for the
+   *  list. The name travels with it: this editor read it from the module and the runs view
+   *  puts it in its own header, so nothing has to look it up a second time. Never called
+   *  for a team that does not exist yet — it has no runs to look at. */
+  onRuns(runId: number | null, teamName: string): void;
 }) {
   // The cheapest model in the catalogue is what a new agent starts on — the module
   // publishes the order, so the terminal picks a position in it rather than a name
@@ -279,6 +286,17 @@ export function TeamEditor({
           </span>
         )}
 
+        {/* The other half of the loop this view is one half of: change something, run it,
+            read what came out. It used to go through the catalogue every time it turned. */}
+        {teamId !== null && (
+          <button
+            type="button"
+            onClick={() => onRuns(null, name)}
+            className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
+          >
+            Runs →
+          </button>
+        )}
         <button
           type="button"
           onClick={takeBack}
@@ -307,6 +325,10 @@ export function TeamEditor({
         </button>
         {dirty && !saving && <span className="text-xs text-ink-faint">unsaved changes</span>}
       </header>
+
+      {teamId !== null && (
+        <TeamRunsStrip api={api} teamId={teamId} onOpen={(runId) => onRuns(runId, name)} />
+      )}
 
       {error && <p className="border-b border-border px-2 py-1 text-xs text-critical">{error}</p>}
       {/* Also shown here, and not only on the node: a refusal naming an agent the canvas

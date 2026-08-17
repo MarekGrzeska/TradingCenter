@@ -293,6 +293,49 @@ describe("a team's runs, as a view of their own", () => {
   });
 });
 
+describe("the loop between editing and reading a run", () => {
+  it("shows the team's last runs while it is being edited", async () => {
+    const older = { ...RUN, id: 5, status: "completed", finishedAt: 1_760_000_900 };
+    await openTheTeam(fakeApi({ listRuns: vi.fn(async () => [RUN, older]) }));
+
+    const strip = (await screen.findByText("Runs")).closest("div") as HTMLElement;
+    expect(within(strip).getByRole("button", { name: /^7/ })).toBeInTheDocument();
+    expect(within(strip).getByRole("button", { name: /^5/ })).toBeInTheDocument();
+  });
+
+  it("opens one of them straight from the editor, without the catalogue in between", async () => {
+    const api = fakeApi({ listRuns: vi.fn(async () => [RUN]) });
+    await openTheTeam(api);
+
+    const strip = (await screen.findByText("Runs")).closest("div") as HTMLElement;
+    await userEvent.click(within(strip).getByRole("button", { name: /^7/ }));
+
+    await waitFor(() => expect(api.watchRun).toHaveBeenCalledWith(RUN.id, expect.anything()));
+    expect(await screen.findByTestId("run-status")).toBeInTheDocument();
+    // And on the team the editor was open on, named without looking it up again.
+    expect(screen.getByText(/Morning desk/)).toBeInTheDocument();
+  });
+
+  it("switches back to editing from the runs view", async () => {
+    await openTheTeam(fakeApi({ listRuns: vi.fn(async () => [RUN]) }));
+    await userEvent.click(await screen.findByRole("button", { name: "Runs →" }));
+    await screen.findByTestId("run-status");
+
+    await userEvent.click(screen.getByRole("button", { name: "← Edit team" }));
+
+    // The canvas is editable again: the gear is back on the boxes.
+    expect(await screen.findByLabelText("Settings for Scout")).toBeInTheDocument();
+  });
+
+  it("offers no runs for a team that does not exist yet", async () => {
+    render(<TeamsView api={fakeApi()} />);
+    await userEvent.click(await screen.findByRole("button", { name: "New team" }));
+
+    expect(await screen.findByRole("button", { name: "Create team" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Runs →" })).not.toBeInTheDocument();
+  });
+});
+
 describe("what the chat changed", () => {
   it("shows a team the model created, without the operator reloading the page", async () => {
     // Reported from a running stack on 17 August 2026: `create_team` from the chat
