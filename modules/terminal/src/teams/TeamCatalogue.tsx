@@ -112,17 +112,30 @@ export function TeamCatalogue({
             // a keyboard: a double-click is not reachable from one, and this row is the
             // only affordance left.
             tabIndex={0}
+            title="Double-click to open"
             onDoubleClick={() => onOpen(team.id)}
             onKeyDown={(event) => {
               if (event.key !== "Enter") return;
               if (event.target !== event.currentTarget) return;
               onOpen(team.id);
             }}
-            className="cursor-pointer rounded border border-border bg-panel px-3 py-2 focus-visible:border-primary-line focus-visible:outline-none"
+            // `group` so the row's own hover can light up the hint beside the name. The
+            // border and the ground both move, because a cursor alone is a poor signal on a
+            // row that also carries four buttons — the whole row has to read as the target,
+            // not just the pointer over it.
+            className="group cursor-pointer rounded border border-border bg-panel px-3 py-2 transition-colors hover:border-primary-line hover:bg-panel-strong focus-visible:border-primary-line focus-visible:outline-none"
           >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate text-sm text-ink">{team.name}</div>
+                <div className="flex items-baseline gap-2">
+                  <span className="truncate text-sm text-ink">{team.name}</span>
+                  {/* Says what the row does, at the moment the pointer is on it. Present in
+                      the markup rather than mounted on hover, so nothing shifts as it
+                      appears and a keyboard focus can show it too. */}
+                  <span className="shrink-0 text-xs text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    double-click to open
+                  </span>
+                </div>
                 <div className="truncate text-xs text-ink-muted">{team.description}</div>
                 <div className="text-xs text-ink-faint">
                   revision {team.latestRevision} · changed {formatInstant(team.updatedAt)}

@@ -216,6 +216,11 @@ describe("the catalogue's own affordances", () => {
 
     expect(await screen.findByText(/Double-click a team to open it/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+    // And on the row itself, which is what a pointer lands on. Its visibility is the
+    // stylesheet's job — that it is there to be revealed is this file's.
+    const row = (await screen.findByText("Morning desk")).closest("li") as HTMLElement;
+    expect(within(row).getByText("double-click to open")).toBeInTheDocument();
+    expect(row).toHaveAttribute("title", "Double-click to open");
   });
 
   it("opens it from the keyboard too, which a double-click cannot", async () => {
