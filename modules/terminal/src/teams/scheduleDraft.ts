@@ -18,6 +18,7 @@ export function emptyScheduleDraft(revisionId: number | null): ScheduleDraft {
     pinnedRevisionId: revisionId,
     recurrence: recurrenceOfKind("daily", null),
     cronExpression: null,
+    unattendedAck: false,
   };
 }
 
@@ -30,6 +31,7 @@ export function draftFromSchedule(schedule: Schedule): ScheduleDraft {
     pinnedRevisionId: schedule.pinnedRevisionId,
     recurrence: schedule.recurrence,
     cronExpression: schedule.recurrence === null ? schedule.cronExpression : null,
+    unattendedAck: schedule.unattendedAck,
   };
 }
 
@@ -195,6 +197,7 @@ export function emptyTriggerDraft(revisionId: number | null): TriggerDraft {
     threshold: "",
     cooldownSeconds: 900,
     pollIntervalSeconds: 300,
+    unattendedAck: false,
   };
 }
 

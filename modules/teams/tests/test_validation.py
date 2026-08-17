@@ -16,6 +16,7 @@ from teams.validation import (
     DefinitionRefused,
     check_definition,
     check_trigger_tool,
+    check_unattended,
 )
 
 MODELS = ("gpt-5.6-luna", "gpt-5.6-mini")
@@ -108,6 +109,50 @@ def test_a_tool_not_confirmed_because_a_server_was_unreachable_says_so() -> None
     assert "place_order" in str(err.value)
     assert "trading-mcp" in str(err.value)
     assert "could not be reached" in str(err.value)
+
+
+# --- specs/teams-schedules, "Harmonogram nad rewizją z narzędziami zapisującymi wymaga
+# jawnego potwierdzenia". `read_only_tools` is the *positive* set — what every configured
+# server just announced as read-only — so these tests are also what pins the inversion
+# down: the three ways a tool can fail to be confirmed harmless (announced as a write, no
+# annotation, nobody answered) all end in the same refusal.
+
+
+def test_a_revision_carrying_only_confirmed_read_only_tools_needs_no_acknowledgement() -> None:
+    definition = TeamDefinition(agents=[_agent("scout", tools=["get_candles"])])
+    check_unattended(definition, unattended_ack=False, read_only_tools={"get_candles"})
+
+
+def test_a_revision_carrying_no_tools_at_all_needs_no_acknowledgement() -> None:
+    definition = TeamDefinition(agents=[_agent("scout")])
+    check_unattended(definition, unattended_ack=False, read_only_tools=frozenset())
+
+
+def test_a_revision_naming_a_state_changing_tool_is_refused_without_acknowledgement() -> None:
+    definition = TeamDefinition(agents=[_agent("trader", tools=["place_order"])])
+
+    with pytest.raises(DefinitionRefused) as err:
+        check_unattended(definition, unattended_ack=False, read_only_tools={"get_candles"})
+
+    assert "trader" in str(err.value)
+    assert "place_order" in str(err.value)
+
+
+def test_a_tool_nobody_could_be_asked_about_is_refused_the_same_way() -> None:
+    """The case the inversion exists for: `trading-mcp` down at save time used to make its
+    write tools invisible, so the schedule saved without an acknowledgement — and started
+    placing orders unattended the moment that server came back."""
+    definition = TeamDefinition(agents=[_agent("trader", tools=["place_order"])])
+
+    with pytest.raises(DefinitionRefused) as err:
+        check_unattended(definition, unattended_ack=False, read_only_tools=frozenset())
+
+    assert "place_order" in str(err.value)
+
+
+def test_the_same_revision_is_accepted_with_an_explicit_acknowledgement() -> None:
+    definition = TeamDefinition(agents=[_agent("trader", tools=["place_order"])])
+    check_unattended(definition, unattended_ack=True, read_only_tools=frozenset())
 
 
 def test_a_trigger_naming_an_announced_tool_passes() -> None:

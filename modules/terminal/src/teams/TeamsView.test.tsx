@@ -147,8 +147,6 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     disableSchedule: vi.fn(async () => {
       throw new Error("not stubbed");
     }),
-    deleteSchedule: vi.fn(async () => undefined),
-    deleteTrigger: vi.fn(async () => undefined),
     scheduleFires: vi.fn(async () => []),
     nextFires: vi.fn(async () => []),
     previewNextFires: vi.fn(async () => []),

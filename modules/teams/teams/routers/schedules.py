@@ -4,16 +4,13 @@ Every route takes `current_principal` and hands it to the store, which puts the 
 into the statement itself — the same shape `catalogue.py` and `runs.py` already carry
 (specs/teams-schedules, "Harmonogram należy do operatora, który go zapisał").
 
-Creating or editing either one resolves the revision it would run — the pinned one, or the
-team's current latest — before a row is ever written, so a schedule can never point at a
-revision that is not there to point at.
-
-There is no consent check here any more, and its absence is a decision rather than an
-omission: it ran on this path alone while the firing path never asked, so a schedule saved
-over a read-only revision kept firing by itself once the team gained an order-placing tool
-(`manage-schedules-and-drop-the-acknowledgement`). What stops an irreversible order is the
-demo account the gateway enforces, the revision's own trading limits, the team's daily
-ceiling, and the trace written before each order goes out.
+Creating or editing either one resolves the revision it would run — the pinned one, or
+the team's current latest — and runs `validation.check_unattended` against it before a
+row is ever written: a schedule or trigger over a revision whose agents carry a tool this
+module cannot confirm is read-only is refused unless it carries an explicit
+acknowledgement (specs/teams-schedules). Since phase 2 that is not a hypothetical branch —
+`trading-mcp` announces `place_order` with `readOnlyHint: false`, and a save over a
+revision carrying it is refused here unless the operator ticked the box.
 
 What is deliberately *not* here: the clock that wakes on its own and claims a due fire.
 That is `scheduler/`'s job, reading `store.claim_due_schedule` and
@@ -36,12 +33,14 @@ from ..contract import (
     ScheduleFireOut,
     ScheduleIn,
     ScheduleOut,
+    TeamDefinition,
+    TeamRevisionOut,
     TriggerIn,
     TriggerOut,
 )
 from ..scheduler.timing import fires_after, next_fire_after
 from ..tools import AnnouncedSnapshot, announced_snapshot
-from ..validation import DefinitionRefused, check_trigger_tool
+from ..validation import DefinitionRefused, check_trigger_tool, check_unattended
 
 router = APIRouter()
 
@@ -51,21 +50,17 @@ router = APIRouter()
 _MAX_NEXT_FIRES = 20
 
 
-async def _revision_must_be_there(
+async def _resolve_definition(
     request: Request,
     *,
     team_id: int,
     owner: str,
     revision_mode: str,
     pinned_revision_id: int | None,
-) -> None:
-    """Refuses every way the revision a schedule or trigger would run might not be there
-    to point at — a team that is not the caller's, a pinned revision belonging to another
-    team, a `latest` mode over a team with no revision at all.
-
-    Called for its refusals and nothing else. It used to hand back the definition too, for
-    the consent check that read the agents' tools; that check is gone, and a resolver whose
-    answer nobody reads is a resolver pretending to be one.
+) -> TeamDefinition:
+    """The definition a schedule or trigger would put to work — the pinned revision, or
+    the team's latest right now for `revision_mode='latest'`. Raises `HTTPException` for
+    every way that revision might not be there to point at.
     """
     async with request.app.state.pool.acquire() as conn:
         team = await store.get_team(conn, team_id=team_id, owner_principal=owner)
@@ -87,6 +82,31 @@ async def _revision_must_be_there(
             if revision is None:
                 raise HTTPException(404, detail="no such team")
 
+    return TeamRevisionOut.from_row(dict(revision)).definition
+
+
+async def _announced(request: Request, *, definition: TeamDefinition) -> AnnouncedSnapshot | None:
+    """What every configured server announces right now, or `None` when there is nothing
+    to ask (no server configured, or a definition assigning no tools at all — the same
+    "nobody is contacted" shortcut `assignment.plan_tools` takes, for the same reason: an
+    outage elsewhere must not stop a save that never needed either server)."""
+    if not any(agent.tools for agent in definition.agents):
+        return None
+    return await announced_snapshot(request.app.state.settings)
+
+
+def _check_unattended(
+    definition: TeamDefinition, *, unattended_ack: bool, announced: AnnouncedSnapshot | None
+) -> None:
+    # `None` — nothing was asked, so nothing is confirmed read-only. That only reaches
+    # `check_unattended` as an empty set when the definition assigns no tools either, in
+    # which case there is nothing to be unsure about.
+    read_only = frozenset() if announced is None else announced.read_only
+    try:
+        check_unattended(definition, unattended_ack=unattended_ack, read_only_tools=read_only)
+    except DefinitionRefused as err:
+        raise HTTPException(422, detail=str(err)) from err
+
 
 def _first_fire_at(cron_expression: str) -> datetime:
     return next_fire_after(cron_expression, datetime.now(UTC))
@@ -99,13 +119,16 @@ def _first_fire_at(cron_expression: str) -> datetime:
 async def create_schedule(
     team_id: int, body: ScheduleIn, request: Request, owner: str = Depends(current_principal)
 ) -> ScheduleOut:
-    await _revision_must_be_there(
+    definition = await _resolve_definition(
         request,
         team_id=team_id,
         owner=owner,
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
+    announced = await _announced(request, definition=definition)
+    _check_unattended(definition, unattended_ack=body.unattended_ack, announced=announced)
+
     async with request.app.state.pool.acquire() as conn:
         row = await store.create_schedule(
             conn,
@@ -115,6 +138,7 @@ async def create_schedule(
             pinned_revision_id=body.pinned_revision_id,
             cron_expression=body.cron(),
             next_fire_at=_first_fire_at(body.cron()),
+            unattended_ack=body.unattended_ack,
         )
     return ScheduleOut.from_row(dict(row))
 
@@ -151,13 +175,16 @@ async def update_schedule(
     if existing is None:
         raise HTTPException(404, detail="no such schedule")
 
-    await _revision_must_be_there(
+    definition = await _resolve_definition(
         request,
         team_id=existing["team_id"],
         owner=owner,
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
+    announced = await _announced(request, definition=definition)
+    _check_unattended(definition, unattended_ack=body.unattended_ack, announced=announced)
+
     async with request.app.state.pool.acquire() as conn:
         row = await store.update_schedule(
             conn,
@@ -167,6 +194,7 @@ async def update_schedule(
             pinned_revision_id=body.pinned_revision_id,
             cron_expression=body.cron(),
             next_fire_at=_first_fire_at(body.cron()),
+            unattended_ack=body.unattended_ack,
         )
     if row is None:
         raise HTTPException(404, detail="no such schedule")
@@ -197,25 +225,6 @@ async def disable_schedule(
     if row is None:
         raise HTTPException(404, detail="no such schedule")
     return ScheduleOut.from_row(dict(row))
-
-
-@router.delete("/schedules/{schedule_id}", status_code=204)
-async def delete_schedule(
-    schedule_id: int, request: Request, owner: str = Depends(current_principal)
-) -> None:
-    """Gone, with its fire history. Disabling is the other thing and stays the other thing:
-    a disabled schedule keeps its row and its reason and can be switched back on
-    (specs/teams-schedules, "Harmonogram i wyzwalacz dają się usunąć").
-
-    The runs it started are not touched, and nothing here has to arrange that — no column
-    in `runs` points at a schedule.
-    """
-    async with request.app.state.pool.acquire() as conn:
-        deleted = await store.delete_schedule(
-            conn, schedule_id=schedule_id, owner_principal=owner
-        )
-    if not deleted:
-        raise HTTPException(404, detail="no such schedule")
 
 
 @router.get("/schedules/{schedule_id}/fires")
@@ -251,9 +260,7 @@ async def next_fires(
 
 
 @router.post("/schedules/next-fires")
-async def preview_next_fires(
-    body: NextFiresIn, _: str = Depends(current_principal)
-) -> NextFiresOut:
+async def preview_next_fires(body: NextFiresIn, _: str = Depends(current_principal)) -> NextFiresOut:
     """The same answer for a timing nobody has saved (specs/teams-schedules, "Moduł liczy
     najbliższe wyzwolenia także dla opisu, którego nie zapisano").
 
@@ -292,14 +299,17 @@ def _check_trigger_tool(tool_name: str, *, announced: AnnouncedSnapshot | None) 
 async def create_trigger(
     team_id: int, body: TriggerIn, request: Request, owner: str = Depends(current_principal)
 ) -> TriggerOut:
-    await _revision_must_be_there(
+    definition = await _resolve_definition(
         request,
         team_id=team_id,
         owner=owner,
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
+    # One snapshot, both checks — a trigger asks the servers what they announce anyway,
+    # so the unattended check rides on that answer rather than opening a second session.
     announced = await announced_snapshot(request.app.state.settings)
+    _check_unattended(definition, unattended_ack=body.unattended_ack, announced=announced)
     _check_trigger_tool(body.tool_name, announced=announced)
 
     async with request.app.state.pool.acquire() as conn:
@@ -317,6 +327,7 @@ async def create_trigger(
             cooldown_seconds=body.cooldown_seconds,
             poll_interval_seconds=body.poll_interval_seconds,
             next_check_at=datetime.now(UTC),
+            unattended_ack=body.unattended_ack,
         )
     return TriggerOut.from_row(dict(row))
 
@@ -353,14 +364,17 @@ async def update_trigger(
     if existing is None:
         raise HTTPException(404, detail="no such trigger")
 
-    await _revision_must_be_there(
+    definition = await _resolve_definition(
         request,
         team_id=existing["team_id"],
         owner=owner,
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
+    # One snapshot, both checks — a trigger asks the servers what they announce anyway,
+    # so the unattended check rides on that answer rather than opening a second session.
     announced = await announced_snapshot(request.app.state.settings)
+    _check_unattended(definition, unattended_ack=body.unattended_ack, announced=announced)
     _check_trigger_tool(body.tool_name, announced=announced)
 
     async with request.app.state.pool.acquire() as conn:
@@ -377,6 +391,7 @@ async def update_trigger(
             threshold=Decimal(body.threshold),
             cooldown_seconds=body.cooldown_seconds,
             poll_interval_seconds=body.poll_interval_seconds,
+            unattended_ack=body.unattended_ack,
         )
     if row is None:
         raise HTTPException(404, detail="no such trigger")
@@ -407,17 +422,6 @@ async def disable_trigger(
     if row is None:
         raise HTTPException(404, detail="no such trigger")
     return TriggerOut.from_row(dict(row))
-
-
-@router.delete("/triggers/{trigger_id}", status_code=204)
-async def delete_trigger(
-    trigger_id: int, request: Request, owner: str = Depends(current_principal)
-) -> None:
-    """The same as deleting a schedule, for the other half of the pair."""
-    async with request.app.state.pool.acquire() as conn:
-        deleted = await store.delete_trigger(conn, trigger_id=trigger_id, owner_principal=owner)
-    if not deleted:
-        raise HTTPException(404, detail="no such trigger")
 
 
 @router.get("/triggers/{trigger_id}/fires")

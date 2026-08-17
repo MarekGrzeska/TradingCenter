@@ -164,6 +164,7 @@ export interface Schedule {
   enabled: boolean;
   disabledReason: string | null;
   consecutiveFailures: number;
+  unattendedAck: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -182,6 +183,7 @@ export interface ScheduleTiming {
 export interface ScheduleDraft extends ScheduleTiming {
   revisionMode: RevisionMode;
   pinnedRevisionId: number | null;
+  unattendedAck: boolean;
 }
 
 /** A market condition, expressed as a call to a tool this module already reads through —
@@ -209,6 +211,7 @@ export interface Trigger {
   enabled: boolean;
   disabledReason: string | null;
   consecutiveFailures: number;
+  unattendedAck: boolean;
   createdAt: number;
   updatedAt: number;
 }
@@ -223,6 +226,7 @@ export interface TriggerDraft {
   threshold: string;
   cooldownSeconds: number;
   pollIntervalSeconds: number;
+  unattendedAck: boolean;
 }
 
 /** One fire attempt from a schedule or a trigger — including one that started nothing.
@@ -331,15 +335,12 @@ export interface TeamsApi {
 
   /** A team's schedules — its own clock, not a run's. */
   listSchedules(teamId: number, signal: AbortSignal): Promise<Schedule[]>;
-  /** Rejects `"refused"` when the pinned or latest revision cannot be run at all — a
-   *  model outside the catalogue, or a revision that is not this team's. */
+  /** Rejects `"refused"` when the pinned or latest revision cannot be run unattended —
+   *  a model outside the catalogue, or a state-changing tool with no acknowledgement. */
   createSchedule(teamId: number, draft: ScheduleDraft, signal: AbortSignal): Promise<Schedule>;
   updateSchedule(id: number, draft: ScheduleDraft, signal: AbortSignal): Promise<Schedule>;
   enableSchedule(id: number, signal: AbortSignal): Promise<Schedule>;
   disableSchedule(id: number, signal: AbortSignal): Promise<Schedule>;
-  /** Gone, with its fire history — the runs it started stay. Disabling is the reversible
-   *  one and stays a separate call (`terminal-teams-schedules`). */
-  deleteSchedule(id: number, signal: AbortSignal): Promise<void>;
   /** Every fire this schedule has had, newest first — including ones that started
    *  nothing (`terminal-teams-schedules`, "Historia pokazuje także to, co się nie
    *  wydarzyło"). */
@@ -358,8 +359,6 @@ export interface TeamsApi {
   updateTrigger(id: number, draft: TriggerDraft, signal: AbortSignal): Promise<Trigger>;
   enableTrigger(id: number, signal: AbortSignal): Promise<Trigger>;
   disableTrigger(id: number, signal: AbortSignal): Promise<Trigger>;
-  /** The trigger half of `deleteSchedule`, with the same finality. */
-  deleteTrigger(id: number, signal: AbortSignal): Promise<void>;
   triggerFires(id: number, signal: AbortSignal): Promise<ScheduleFire[]>;
 }
 
@@ -463,6 +462,7 @@ function mapSchedule(raw: RawSchedule): Schedule {
     enabled: raw.enabled,
     disabledReason: raw.disabled_reason,
     consecutiveFailures: raw.consecutive_failures,
+    unattendedAck: raw.unattended_ack,
     createdAt: parseIsoToEpochSeconds(raw.created_at),
     updatedAt: parseIsoToEpochSeconds(raw.updated_at),
   };
@@ -500,6 +500,7 @@ function scheduleDraftToWire(draft: ScheduleDraft): RawScheduleIn {
   return {
     revision_mode: draft.revisionMode,
     pinned_revision_id: draft.pinnedRevisionId,
+    unattended_ack: draft.unattendedAck,
     ...timingToWire(draft),
   };
 }
@@ -524,6 +525,7 @@ function mapTrigger(raw: RawTrigger): Trigger {
     enabled: raw.enabled,
     disabledReason: raw.disabled_reason,
     consecutiveFailures: raw.consecutive_failures,
+    unattendedAck: raw.unattended_ack,
     createdAt: parseIsoToEpochSeconds(raw.created_at),
     updatedAt: parseIsoToEpochSeconds(raw.updated_at),
   };
@@ -540,6 +542,7 @@ function triggerDraftToWire(draft: TriggerDraft): RawTriggerIn {
     threshold: draft.threshold,
     cooldown_seconds: draft.cooldownSeconds,
     poll_interval_seconds: draft.pollIntervalSeconds,
+    unattended_ack: draft.unattendedAck,
   };
 }
 
@@ -758,10 +761,6 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
       return mapSchedule(raw);
     },
 
-    async deleteSchedule(id, signal) {
-      await http.send(`${httpBase}/schedules/${id}`, { method: "DELETE", signal });
-    },
-
     async scheduleFires(id, signal) {
       const raw = await http.json<RawFire[]>(`${httpBase}/schedules/${id}/fires`, { signal });
       return raw.map(mapFire);
@@ -823,10 +822,6 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
         signal,
       });
       return mapTrigger(raw);
-    },
-
-    async deleteTrigger(id, signal) {
-      await http.send(`${httpBase}/triggers/${id}`, { method: "DELETE", signal });
     },
 
     async triggerFires(id, signal) {

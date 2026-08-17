@@ -514,15 +514,13 @@ def test_a_fire_that_started_nothing_shows_up_in_the_triggers_history(
     assert rows[0]["run_id"] is None
 
 
-# --- what the removed acknowledgement left behind -------------------------------------
-#
-# Four tests stood here, holding a schedule over an order-placing revision to a consent
-# field. The requirement is withdrawn (`manage-schedules-and-drop-the-acknowledgement`),
-# so what is held now is the opposite: the same save goes through, against a server that
-# really announces a write tool rather than against a stub that pretends to.
+# --- specs/teams-schedules, "Harmonogram nad rewizją z narzędziami zapisującymi wymaga
+# jawnego potwierdzenia" — over HTTP, against a server that really announces a write tool.
+# The check used to consult a hand-kept list of dangerous names that was empty for the
+# whole of phase 2, so these three are what stop it going quiet again.
 
 
-def test_a_schedule_over_order_placing_tools_is_written_without_any_consent(
+def test_a_schedule_over_a_revision_carrying_a_write_tool_is_refused_without_the_ack(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     with serving_sync(tools=("place_order",)) as url:
@@ -533,13 +531,49 @@ def test_a_schedule_over_order_placing_tools_is_written_without_any_consent(
                 f"/teams/{team_id}/schedules", json=_schedule_body(revision_id), headers=OWNER
             )
 
-    assert response.status_code == 201, response.text
-    assert "unattended_ack" not in response.json()
+    assert response.status_code == 422, response.text
+    assert "place_order" in response.text
+    assert "unattended_ack" in response.text
 
 
-def test_a_trigger_over_order_placing_tools_is_written_too(
+def test_the_same_schedule_is_accepted_when_the_operator_acknowledges_it(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    with serving_sync(tools=("place_order",)) as url:
+        monkeypatch.setenv("TRADING_MCP_URL", url)
+        with TestClient(app) as started:
+            team_id, revision_id = _team(started, tools=["place_order"])
+            response = started.post(
+                f"/teams/{team_id}/schedules",
+                json=_schedule_body(revision_id) | {"unattended_ack": True},
+                headers=OWNER,
+            )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["unattended_ack"] is True
+
+
+def test_a_schedule_over_a_revision_carrying_only_read_tools_needs_no_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    with serving_sync(tools=("read_indicators",)) as url:
+        monkeypatch.setenv("MARKET_MCP_URL", url)
+        with TestClient(app) as started:
+            team_id, revision_id = _team(started, tools=["read_indicators"])
+            response = started.post(
+                f"/teams/{team_id}/schedules", json=_schedule_body(revision_id), headers=OWNER
+            )
+
+    assert response.status_code == 201, response.text
+    assert response.json()["unattended_ack"] is False
+
+
+def test_a_trigger_over_a_revision_carrying_a_write_tool_is_refused_without_the_ack(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The trigger half of the same rule (specs/teams-triggers, "Wyzwalacz podlega tym
+    samym granicom co harmonogram") — one snapshot answers both checks, and the condition's
+    own tool being a read one does not excuse what the *revision* carries."""
     with (
         serving_sync(tools=("read_indicators",)) as market_url,
         serving_sync(tools=("place_order",)) as trading_url,
@@ -552,112 +586,5 @@ def test_a_trigger_over_order_placing_tools_is_written_too(
                 f"/teams/{team_id}/triggers", json=_trigger_body(revision_id), headers=OWNER
             )
 
-    assert response.status_code == 201, response.text
-
-
-def test_an_acknowledgement_field_from_an_older_terminal_is_ignored(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """The window between deploying this module and deploying the terminal. A terminal
-    built before this change still sends `unattended_ack`; the module must drop it on the
-    floor rather than refuse the save, or that window is one where no schedule can be
-    written at all."""
-    with serving_sync(tools=("place_order",)) as url:
-        monkeypatch.setenv("TRADING_MCP_URL", url)
-        with TestClient(app) as started:
-            team_id, revision_id = _team(started, tools=["place_order"])
-            response = started.post(
-                f"/teams/{team_id}/schedules",
-                json=_schedule_body(revision_id) | {"unattended_ack": False},
-                headers=OWNER,
-            )
-
-    assert response.status_code == 201, response.text
-    assert "unattended_ack" not in response.json()
-
-
-# --- deleting, and what it takes with it ---------------------------------------------
-
-
-def test_a_deleted_schedule_is_gone_from_the_catalogue(client: TestClient) -> None:
-    team_id, revision_id = _team(client)
-    schedule_id = client.post(
-        f"/teams/{team_id}/schedules", json=_schedule_body(revision_id), headers=OWNER
-    ).json()["id"]
-
-    removed = client.delete(f"/schedules/{schedule_id}", headers=OWNER)
-
-    assert removed.status_code == 204
-    assert client.get(f"/schedules/{schedule_id}", headers=OWNER).status_code == 404
-    assert client.get(f"/teams/{team_id}/schedules", headers=OWNER).json() == []
-    # Twice is not an error the second time round, it is the same 404 as never having
-    # existed — there is no third state to report.
-    assert client.delete(f"/schedules/{schedule_id}", headers=OWNER).status_code == 404
-
-
-def test_deleting_a_schedule_takes_its_fire_history(client: TestClient, migrated_url: str) -> None:
-    """The cascade from `0007`, seen from the route: without it this delete fails outright
-    against the foreign key, because a fire row may name neither a schedule nor a trigger."""
-    team_id, revision_id = _team(client)
-    schedule_id = client.post(
-        f"/teams/{team_id}/schedules", json=_schedule_body(revision_id), headers=OWNER
-    ).json()["id"]
-    _record_fire(
-        migrated_url,
-        schedule_id=schedule_id,
-        outcome="skipped",
-        reason="the previous run is still working",
-    )
-    assert len(client.get(f"/schedules/{schedule_id}/fires", headers=OWNER).json()) == 1
-
-    assert client.delete(f"/schedules/{schedule_id}", headers=OWNER).status_code == 204
-
-    assert client.get(f"/schedules/{schedule_id}/fires", headers=OWNER).status_code == 404
-
-
-def test_a_strangers_schedule_is_neither_deleted_nor_admitted_to(client: TestClient) -> None:
-    team_id, revision_id = _team(client)
-    schedule_id = client.post(
-        f"/teams/{team_id}/schedules", json=_schedule_body(revision_id), headers=OWNER
-    ).json()["id"]
-
-    assert client.delete(f"/schedules/{schedule_id}", headers=STRANGER).status_code == 404
-    assert client.get(f"/schedules/{schedule_id}", headers=OWNER).status_code == 200
-
-
-def test_disabling_is_not_deleting(client: TestClient) -> None:
-    """Two words for two things, and the list is where the difference shows: a disabled
-    schedule is still there, with its reason, and comes back on."""
-    team_id, revision_id = _team(client)
-    schedule_id = client.post(
-        f"/teams/{team_id}/schedules", json=_schedule_body(revision_id), headers=OWNER
-    ).json()["id"]
-
-    assert client.post(f"/schedules/{schedule_id}/disable", headers=OWNER).status_code == 200
-
-    assert client.get(f"/schedules/{schedule_id}", headers=OWNER).json()["enabled"] is False
-    assert len(client.get(f"/teams/{team_id}/schedules", headers=OWNER).json()) == 1
-    assert client.post(f"/schedules/{schedule_id}/enable", headers=OWNER).json()["enabled"] is True
-
-
-def test_a_deleted_trigger_is_gone_with_its_history(
-    monkeypatch: pytest.MonkeyPatch, migrated_url: str
-) -> None:
-    """A trigger needs a server that announces its condition's tool, so this one builds its
-    own rather than borrowing the shared client."""
-    with serving_sync(tools=("read_indicators",)) as url:
-        monkeypatch.setenv("MARKET_MCP_URL", url)
-        with TestClient(app) as started:
-            team_id, revision_id = _team(started, tools=["read_indicators"])
-            trigger_id = started.post(
-                f"/teams/{team_id}/triggers", json=_trigger_body(revision_id), headers=OWNER
-            ).json()["id"]
-            _record_fire(
-                migrated_url, trigger_id=trigger_id, outcome="skipped", reason="cooling down"
-            )
-
-            assert started.delete(f"/triggers/{trigger_id}", headers=STRANGER).status_code == 404
-            assert started.delete(f"/triggers/{trigger_id}", headers=OWNER).status_code == 204
-            assert started.get(f"/triggers/{trigger_id}", headers=OWNER).status_code == 404
-
-
+    assert response.status_code == 422, response.text
+    assert "place_order" in response.text
