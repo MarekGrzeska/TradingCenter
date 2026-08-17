@@ -58,6 +58,11 @@ class ToolDescriptor:
     name: str
     description: str
     input_schema: dict[str, Any]
+    # From the server's own `readOnlyHint`. `None` means the tool carried no annotation
+    # at all, which is not the same as "reads" — see `ToolServer.moves_the_account`,
+    # where the difference decides whether a call that never answered is recorded as
+    # unknown or as unavailable.
+    read_only: bool | None = None
 
 
 class ToolOutcomeKind(StrEnum):
@@ -68,6 +73,13 @@ class ToolOutcomeKind(StrEnum):
     # The server did not answer at all — unreachable, timed out, refused the identity.
     # Nothing was asked, so nothing about the archive is known either way.
     UNAVAILABLE = "unavailable"
+    # The server did not answer *and* the call may have landed anyway. Only ever produced
+    # for a call that can change the account, where "nothing was asked" is a claim this
+    # module cannot make: a `place_order` that timed out is either no position or one
+    # nobody knows about (specs/agent-trading, "Wywołanie ruszające rachunek zostawia
+    # ślad przed wysłaniem"). Kept apart from UNAVAILABLE because the two carry opposite
+    # advice — retry the read, never the order.
+    UNKNOWN = "unknown"
 
 
 @dataclass(frozen=True)
@@ -116,6 +128,10 @@ class ToolServer:
     than merely on this module's behalf. Its tools create teams and spend money in an
     operator's name, so a call to it carries their credential; market-mcp reads a shared
     archive and has no use for one (design.md, D2).
+
+    `can_move_the_account` marks the one server whose writes land somewhere this module
+    cannot look afterwards. It decides nothing about how a call is made and everything
+    about how a call that did not answer is recorded.
     """
 
     def __init__(
@@ -124,10 +140,12 @@ class ToolServer:
         *,
         prefix: str = "market_mcp",
         forwards_operator_token: bool = False,
+        can_move_the_account: bool = False,
     ) -> None:
         self.label = prefix.replace("_", "-")
         self._env_prefix = prefix.upper()
         self.forwards_operator_token = forwards_operator_token
+        self.can_move_the_account = can_move_the_account
         self._url: str | None = getattr(settings, f"{prefix}_url")
         self._scope: str | None = getattr(settings, f"{prefix}_scope")
         self._timeout: float = getattr(settings, f"{prefix}_request_timeout_seconds")
@@ -185,11 +203,28 @@ class ToolServer:
                 name=tool.name,
                 description=tool.description or "",
                 input_schema=tool.inputSchema or {},
+                read_only=tool.annotations.readOnlyHint if tool.annotations else None,
             )
             for tool in result.tools
         ]
         log.info("%s: published %d tools", self.label, len(self._tools))
         return self._tools
+
+    def moves_the_account(self, name: str) -> bool:
+        """Whether a call to `name` could leave the account changed even if nothing comes
+        back. Asked *before* the call, because the answer decides that the trace is
+        written first.
+
+        A tool this server announced but we hold no descriptor for counts as moving the
+        account: the list is dropped whenever a session breaks, so the honest reading of
+        "we cannot tell" is the one that writes a row too many rather than none.
+        """
+        if not self.can_move_the_account:
+            return False
+        for tool in self._tools or ():
+            if tool.name == name:
+                return tool.read_only is not True
+        return True
 
     async def call(
         self, name: str, arguments: dict[str, Any], operator_token: str | None = None
@@ -205,6 +240,9 @@ class ToolServer:
                 f"the {self.label} tool server is not configured, so this call was not made",
                 elapsed(),
             )
+        # Asked before anything is dispatched, because `_disconnect()` below drops the
+        # tool list and with it the only thing that could answer this afterwards.
+        may_have_landed = self.moves_the_account(name)
         try:
             async with self._session_for(operator_token) as session:
                 result = await asyncio.wait_for(
@@ -212,6 +250,14 @@ class ToolServer:
                 )
         except TimeoutError:
             await self._disconnect()
+            if may_have_landed:
+                return ToolOutcome(
+                    ToolOutcomeKind.UNKNOWN,
+                    f"the tool server did not answer within {self._timeout:g}s. The call "
+                    "may have gone through — do not send it again. Tell the operator the "
+                    "outcome is unknown and that they should check the account.",
+                    elapsed(),
+                )
             return ToolOutcome(
                 ToolOutcomeKind.UNAVAILABLE,
                 f"the tool server did not answer within {self._timeout:g}s. The call was "
@@ -221,6 +267,14 @@ class ToolServer:
         except Exception as err:  # noqa: BLE001 - a broken session is not a broken turn
             log.warning("tool call %s failed against %s: %s", name, self._url, _describe(err))
             await self._disconnect()
+            if may_have_landed:
+                return ToolOutcome(
+                    ToolOutcomeKind.UNKNOWN,
+                    f"the tool server could not be reached: {_describe(err)}. The call may "
+                    "have gone through — do not send it again. Tell the operator the "
+                    "outcome is unknown and that they should check the account.",
+                    elapsed(),
+                )
             return ToolOutcome(
                 ToolOutcomeKind.UNAVAILABLE,
                 f"the tool server could not be reached: {_describe(err)}. The call was not "

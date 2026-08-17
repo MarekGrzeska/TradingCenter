@@ -148,7 +148,40 @@ async def run_turn(
     }
     tools = [*server_tools, CHART_TOOL, DRAW_TOOL, LIST_DRAWINGS_TOOL]
 
-    graph = build_graph(provider, tool_server, local_tools, operator_token)
+    # Its own connection per half, not one held for the turn: a turn spends most of its
+    # time waiting on a model, and a pooled connection parked across that is a connection
+    # nobody else can have. Both halves are short.
+    class PoolAccountTrace:
+        async def begin(
+            self, *, round_index: int, position: int, name: str, arguments: dict
+        ) -> int:
+            async with pool.acquire() as conn:
+                return await store.begin_tool_call(
+                    conn,
+                    session_id=session_id,
+                    round_index=round_index,
+                    position=position,
+                    tool_name=name,
+                    arguments=arguments,
+                    result_text=(
+                        "sent; no answer had come back when this was written. If it stays "
+                        "this way, the outcome of this call is unknown."
+                    ),
+                )
+
+        async def settle(
+            self, *, row_id: int, outcome: str, text: str, duration_ms: int
+        ) -> None:
+            async with pool.acquire() as conn:
+                await store.settle_tool_call(
+                    conn,
+                    tool_call_id=row_id,
+                    outcome=outcome,
+                    result_text=text,
+                    duration_ms=duration_ms,
+                )
+
+    graph = build_graph(provider, tool_server, local_tools, operator_token, PoolAccountTrace())
     try:
         result = await graph.ainvoke(
             initial_state(
@@ -204,6 +237,14 @@ async def run_turn(
                 input_rate_per_1m=model_entry.input_rate_per_1m,
                 output_rate_per_1m=model_entry.output_rate_per_1m,
             )
+        # Two halves, because a turn can now hold both kinds: the calls whose rows were
+        # written before they were sent are only joined to this reply, and everything else
+        # is inserted here as it always was (design.md, D1).
+        await store.attach_tool_calls_to_message(
+            conn,
+            tool_call_ids=[call.row_id for call in calls if call.row_id is not None],
+            message_id=reply.id,
+        )
         await store.record_tool_calls(
             conn, session_id=session_id, message_id=reply.id, calls=calls
         )

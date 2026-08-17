@@ -13,6 +13,9 @@ file exists to avoid:
 - the tool **server** could not be reached — nothing was asked, so nothing is known
   about the archive either way. Also back to the model, worded so it does not read as
   missing data.
+- the server could not be reached **and the call could have landed** — only possible for
+  a tool that moves the account, and the one outcome the model must not retry on
+  (specs/agent-trading). Its row was written before the call went out.
 - the **provider** broke — nothing more will be generated. The turn ends with whatever
   text arrived, marked incomplete.
 """
@@ -21,7 +24,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Awaitable, Callable, Mapping, Sequence
-from typing import TypedDict
+from typing import Protocol, TypedDict
 
 from langgraph.graph import END, StateGraph
 
@@ -44,6 +47,25 @@ log = logging.getLogger(__name__)
 # and the three outcomes stay one mechanism for both kinds (specs/agent-tools, "Zestaw
 # narzędzi pochodzi z serwera, nie z tego modułu").
 LocalTool = Callable[[dict], Awaitable[ToolOutcome]]
+
+
+class AccountTrace(Protocol):
+    """The two halves of the trace a call that can move the account leaves behind: a row
+    before it is sent, and its outcome once one is known (specs/agent-trading, "Wywołanie
+    ruszające rachunek zostawia ślad przed wysłaniem").
+
+    A Protocol rather than the pool, because this file holds no connection and never has —
+    `turn.py` binds both halves to one. A call that is never settled keeps the `unknown`
+    it was begun with, which is the whole reason the row is written first.
+    """
+
+    async def begin(
+        self, *, round_index: int, position: int, name: str, arguments: dict
+    ) -> int: ...
+
+    async def settle(
+        self, *, row_id: int, outcome: str, text: str, duration_ms: int
+    ) -> None: ...
 
 # A number in the code, not a setting — the same choice market-mcp made for its own
 # ceilings, and for the same reason: a safety ceiling in configuration is an invitation
@@ -92,6 +114,7 @@ def build_graph(
     tool_server: ToolServer | None = None,
     local_tools: Mapping[str, LocalTool] | None = None,
     operator_token: str | None = None,
+    account_trace: AccountTrace | None = None,
 ):
     async def call_model(state: ConversationState) -> dict:
         parts: list[str] = []
@@ -150,6 +173,56 @@ def build_graph(
         results: list[ToolCallResult] = []
         recorded: list[RecordedCall] = []
 
+        async def through_the_server(
+            request: ToolCallRequest, position: int
+        ) -> tuple[ToolOutcome, int | None]:
+            """One call to a tool server, with the trace it needs if it can move the
+            account. Returns the outcome and the row already written for it, if any.
+
+            The row comes first and the outcome second, so a process that dies between
+            them leaves the `unknown` behind rather than nothing. A trace that cannot be
+            written stops the call: an order nobody can prove was sent is worse than an
+            order that was never sent.
+            """
+            assert tool_server is not None
+            if account_trace is None or not tool_server.moves_the_account(request.name):
+                return (
+                    await tool_server.call(request.name, request.arguments, operator_token),
+                    None,
+                )
+            try:
+                row_id = await account_trace.begin(
+                    round_index=round_index,
+                    position=position,
+                    name=request.name,
+                    arguments=request.arguments,
+                )
+            except Exception:
+                log.exception("no trace could be written for %s, so it was not sent", request.name)
+                return (
+                    ToolOutcome(
+                        ToolOutcomeKind.UNAVAILABLE,
+                        "this call was not sent: its record could not be written, and a "
+                        "call that can change the account is never sent without one. Tell "
+                        "the operator that rather than trying again.",
+                        0,
+                    ),
+                    None,
+                )
+            outcome = await tool_server.call(request.name, request.arguments, operator_token)
+            try:
+                await account_trace.settle(
+                    row_id=row_id,
+                    outcome=str(outcome.kind),
+                    text=outcome.text,
+                    duration_ms=outcome.duration_ms,
+                )
+            except Exception:
+                # The row stays `unknown`, which is the honest reading of what this process
+                # can now say: the call was made and its outcome is not written down.
+                log.exception("the trace for %s (row %d) could not be settled", request.name, row_id)
+            return outcome, row_id
+
         for request in state["pending"]:
             if made >= TOOL_CALL_CEILING:
                 # Not executed, so neither recorded nor announced — nothing was asked of
@@ -169,6 +242,7 @@ def build_graph(
                 )
                 continue
 
+            row_id: int | None = None
             local = (local_tools or {}).get(request.name)
             if local is not None:
                 try:
@@ -185,9 +259,7 @@ def build_graph(
                         0,
                     )
             elif tool_server is not None:
-                outcome = await tool_server.call(
-                    request.name, request.arguments, operator_token
-                )
+                outcome, row_id = await through_the_server(request, len(recorded))
             else:
                 outcome = None
             made += 1
@@ -204,6 +276,7 @@ def build_graph(
                 outcome=str(kind),
                 text=text,
                 duration_ms=duration,
+                row_id=row_id,
             )
             recorded.append(call)
             # Announced before the loop moves on, so a round of three calls reaches the

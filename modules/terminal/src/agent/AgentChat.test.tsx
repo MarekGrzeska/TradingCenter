@@ -62,6 +62,9 @@ function controllableEvents() {
 interface FakeApi extends AgentApi {
   sessions: AgentSession[];
   transcripts: Map<number, AgentMessage[]>;
+  /** Calls the module kept that no reply claimed, per session — empty for every session a
+   *  test does not put something here for, which is what the module answers too. */
+  unclaimed: Map<number, AgentToolCall[]>;
   nextId: number;
   seed(title: string, modelId: string, messages?: AgentMessage[]): AgentSession;
   /** What the module itself would have persisted for a turn — the same write
@@ -81,6 +84,7 @@ function createFakeApi(): FakeApi {
   const api: FakeApi = {
     sessions: [],
     transcripts: new Map(),
+    unclaimed: new Map(),
     nextId: 1,
 
     seed(title, modelId, messages = []) {
@@ -136,6 +140,9 @@ function createFakeApi(): FakeApi {
       if (index === -1) throw new Error("no such session");
       api.sessions.splice(index, 1);
       api.transcripts.delete(id);
+    },
+    async getUnclaimedToolCalls(id: number) {
+      return api.unclaimed.get(id) ?? [];
     },
     async getMessages(id) {
       return api.transcripts.get(id) ?? [];
@@ -376,6 +383,80 @@ describe("AgentChat", () => {
     expect(screen.getByText("no answer")).toHaveClass("text-critical");
     // And none of it makes the reply itself incomplete.
     expect(screen.queryByText(/incomplete/i)).not.toBeInTheDocument();
+  });
+
+  it("shows an unknown outcome as the loudest of the four, not as an outage", async () => {
+    // `agent-trading` spec: the call may have landed. An operator scanning this column has
+    // to stop on it, so it cannot share the muted style an unrecognised value gets.
+    const api = createFakeApi();
+    const session = api.seed("older chat", "luna");
+    api.recordExchange(session.id, "buy one US100", "I do not know whether it went", false, [
+      toolCall({ name: "place_order", outcome: "unknown", resultText: "may have gone through" }),
+    ]);
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+    await user.click(await screen.findByRole("button", { name: /^older chat$/i }));
+
+    await screen.findByText("place_order");
+    expect(screen.getByText("outcome unknown")).toHaveClass("text-critical");
+  });
+
+  it("shows the calls no reply claimed, and says what they are", async () => {
+    // The one place on screen an order of unknown outcome appears when the turn that sent
+    // it never got to say anything (`agent-trading` spec).
+    const api = createFakeApi();
+    const session = api.seed("older chat", "luna");
+    api.recordExchange(session.id, "buy one US100", "", true);
+    api.unclaimed.set(session.id, [
+      toolCall({ name: "place_order", outcome: "unknown", resultText: "sent; no answer" }),
+    ]);
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+    await user.click(await screen.findByRole("button", { name: /^older chat$/i }));
+
+    await screen.findByText("place_order");
+    expect(screen.getByText(/left without a\s+reply/)).toBeInTheDocument();
+    expect(screen.getByText(/check the account before asking again/i)).toBeInTheDocument();
+  });
+
+  it("says nothing about unclaimed calls when there are none", async () => {
+    const api = createFakeApi();
+    const session = api.seed("older chat", "luna");
+    api.recordExchange(session.id, "hello", "hello back", false);
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+    await user.click(await screen.findByRole("button", { name: /^older chat$/i }));
+
+    await screen.findByText("hello back");
+    expect(screen.queryByText(/left without a/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the transcript when the unclaimed read is the thing that fails", async () => {
+    // A conversation whose unclaimed calls could not be read is still a conversation worth
+    // showing — the row stays in the module either way and the next reload asks again.
+    const api = createFakeApi();
+    const session = api.seed("older chat", "luna");
+    api.recordExchange(session.id, "hello", "hello back", false);
+    api.getUnclaimedToolCalls = async () => {
+      throw new Error("gone");
+    };
+    const user = userEvent.setup();
+    renderChat(api);
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+    await screen.findByLabelText("Model");
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+    await user.click(await screen.findByRole("button", { name: /^older chat$/i }));
+
+    expect(await screen.findByText("hello back")).toBeInTheDocument();
   });
 
   it("shows no entries for a turn that asked for nothing", async () => {

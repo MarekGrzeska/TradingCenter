@@ -186,6 +186,15 @@ export interface AgentApi {
    *  already gone answers 404, indistinguishable from one that never existed. */
   deleteSession(id: number, signal: AbortSignal): Promise<void>;
   getMessages(id: number, signal: AbortSignal): Promise<AgentMessage[]>;
+  /** The calls this conversation made that no reply ever claimed — a turn that died with
+   *  something in flight (`agent-trading` spec). Empty for almost every conversation, and
+   *  a row here is the record of an order whose fate nobody knows, so it is read and shown
+   *  rather than left in the database.
+   *
+   *  Its own route rather than a field on the transcript: that one publishes a list, and a
+   *  field would have meant an object, which a terminal deployed before the module would
+   *  have called `map` on. */
+  getUnclaimedToolCalls(id: number, signal: AbortSignal): Promise<AgentToolCall[]>;
   /** Posts the operator's turn and hands back its reply as typed events — the raw
    *  `fetch`/`ReadableStream` plumbing lives entirely in `stream.ts` and in the one
    *  await below. Rejecting here (before any event is produced) means nothing was
@@ -548,6 +557,14 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
     async getMessages(id, signal) {
       const raw = await http.json<RawMessage[]>(`${httpBase}/sessions/${id}/messages`, { signal });
       return raw.map(mapMessage);
+    },
+
+    async getUnclaimedToolCalls(id, signal) {
+      const raw = await http.json<RawToolCall[]>(
+        `${httpBase}/sessions/${id}/unclaimed-tool-calls`,
+        { signal },
+      );
+      return raw.map(mapToolCall);
     },
 
     async sendMessage(id, content, signal, chart = null) {

@@ -13,9 +13,9 @@ pytestmark = pytest.mark.db
 
 async def test_migration_seeds_the_current_text(db) -> None:
     revision = await store.latest_prompt_revision(db)
-    # `v9` names hiding; every revision under it is still in the table, which is what a
-    # transcript stamped `"v7"` or `"v8"` reads back against.
-    assert revision.version == "v10"
+    # `v11` names the trading tools; every revision under it is still in the table, which
+    # is what a transcript stamped `"v7"` or `"v8"` reads back against.
+    assert revision.version == "v11"
     assert revision.with_tools_body != revision.without_tools_body
 
 
@@ -40,11 +40,21 @@ async def test_with_tools_names_the_easy_over_readings(db) -> None:
     assert "not reliable" in lowered
 
 
-async def test_with_tools_says_the_tools_change_nothing(db) -> None:
+async def test_with_tools_says_the_archive_tools_change_nothing(db) -> None:
     revision = await store.latest_prompt_revision(db)
     lowered = revision.with_tools_body.lower()
     assert "read-only" in lowered
-    assert "place an order" in lowered
+    assert "cannot start collecting a pair" in lowered
+
+
+async def test_no_seeded_text_still_claims_the_agent_cannot_place_an_order(db) -> None:
+    """Every prompt from `v4` to `v10` said the model could not place an order. It can now,
+    and a prompt asserting otherwise makes it refuse a request it has the tool for."""
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        lowered = body.lower()
+        assert "or place an order" not in lowered
+        assert "you cannot start collecting a pair, delete data, or place an order" not in lowered
 
 
 async def test_without_tools_says_the_archive_is_out_of_reach(db) -> None:
@@ -95,7 +105,7 @@ async def test_create_prompt_revision_bumps_the_version(db) -> None:
     updated = await store.create_prompt_revision(
         db, with_tools_body="new with-tools text", without_tools_body="new without-tools text"
     )
-    assert updated.version == "v11"
+    assert updated.version == "v12"
     assert updated.with_tools_body == "new with-tools text"
     assert updated.without_tools_body == "new without-tools text"
 
@@ -114,7 +124,7 @@ async def test_create_prompt_revision_is_append_only(db) -> None:
 async def test_repeated_edits_keep_incrementing(db) -> None:
     await store.create_prompt_revision(db, with_tools_body="a1", without_tools_body="b1")
     second = await store.create_prompt_revision(db, with_tools_body="a2", without_tools_body="b2")
-    assert second.version == "v12"
+    assert second.version == "v13"
 
 
 async def test_both_seeded_texts_name_the_chart_tool(db) -> None:
@@ -185,3 +195,30 @@ async def test_the_drawing_paragraph_says_hiding_is_undoable_and_removing_is_not
         assert "`hide`" in lowered
         assert "`show`" in lowered
         assert "undoable" in lowered
+
+
+async def test_both_seeded_texts_name_the_trading_tools(db) -> None:
+    # A tool the prompt does not mention is a tool the model does not reach for. Both
+    # variants, for the reason `0012` gives: the three tool servers fail independently, so
+    # an unreachable archive says nothing about whether the account can be reached.
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        for tool in ("get_positions", "get_balance", "place_order", "close_position"):
+            assert tool in body
+
+
+async def test_both_seeded_texts_forbid_resending_a_call_of_unknown_outcome(db) -> None:
+    # specs/agent-trading, "Agent nie potwierdza zlecenia, którego skutku nie zna" — the
+    # one failure this paragraph is really written for: a retry is a second position.
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        lowered = body.lower()
+        assert "outcome is unknown" in lowered
+        assert "never send it again" in lowered
+        assert "second position, not a retry" in lowered
+
+
+async def test_both_seeded_texts_say_the_account_is_a_demo_one(db) -> None:
+    revision = await store.latest_prompt_revision(db)
+    for body in (revision.with_tools_body, revision.without_tools_body):
+        assert "demo account" in body.lower()

@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
+import type { AgentToolCall } from "./agentApi";
 import { agentChatStore, type AgentChatState, type AgentChatStore, type ChatMessage } from "./agentChatStore";
 import { MessageBody } from "./MessageBody";
 import { ToolCallEntry } from "./ToolCallEntry";
@@ -118,7 +119,11 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
         />
       ) : (
         <>
-          <Transcript messages={state.messages} turn={state.turn} />
+          <Transcript
+            messages={state.messages}
+            turn={state.turn}
+            unclaimedToolCalls={state.unclaimedToolCalls}
+          />
           {state.chartNotice !== null && (
             // Above the composer rather than inside the transcript: the agent changed the
             // chart, it did not say something — a bubble here would put words in its
@@ -380,9 +385,11 @@ function ConversationRow({
 function Transcript({
   messages,
   turn,
+  unclaimedToolCalls,
 }: {
   messages: readonly ChatMessage[];
   turn: AgentChatState["turn"];
+  unclaimedToolCalls: readonly AgentToolCall[];
 }) {
   const listRef = useRef<HTMLDivElement>(null);
 
@@ -414,6 +421,7 @@ function Transcript({
           <Bubble message={message} />
         </Fragment>
       ))}
+      {unclaimedToolCalls.length > 0 && <UnclaimedCalls calls={unclaimedToolCalls} />}
       {/* Before the first fragment the panel already says something happened — a
           message that vanished into a silent, unchanged screen is indistinguishable
           from one that was never sent (`terminal-agent-chat` spec, "Widać, że
@@ -441,6 +449,34 @@ function Transcript({
           the agent module is not reachable — {turn.message}
         </p>
       )}
+    </div>
+  );
+}
+
+/**
+ * Calls the module kept that no reply claimed — a turn that died with something in flight
+ * (`agent-trading` spec). At the end of the transcript and under a heading that says what
+ * they are, because they belong to no exchange: putting them beside the last reply would
+ * say that reply made them.
+ *
+ * Rare enough that most operators will never see this block, and the rare case is exactly
+ * the reason it exists — one of these can be an order sitting on the account that no
+ * sentence anywhere mentions.
+ */
+function UnclaimedCalls({ calls }: { calls: readonly AgentToolCall[] }) {
+  return (
+    <div className="flex flex-col gap-2 rounded border border-critical/40 bg-critical/5 p-2">
+      <p className="text-[11px] text-critical">
+        {calls.length === 1 ? "One call was" : `${calls.length} calls were`} left without a
+        reply — the agent sent {calls.length === 1 ? "it" : "them"} and the turn ended before an
+        answer was recorded. Check the account before asking again.
+      </p>
+      {calls.map((call) => (
+        <ToolCallEntry
+          key={`unclaimed-${call.roundIndex}-${call.position}-${call.name}`}
+          call={call}
+        />
+      ))}
     </div>
   );
 }

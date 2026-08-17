@@ -22,10 +22,11 @@ from collections.abc import AsyncIterator
 import pytest
 import uvicorn
 from mcp.server.fastmcp import FastMCP
+from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
 from agent.config import Settings
-from agent.tools import ToolOutcomeKind, ToolServer
+from agent.tools import ToolDescriptor, ToolOutcomeKind, ToolServer
 
 ONE_MODEL = [
     {
@@ -251,6 +252,190 @@ async def test_no_configured_server_means_no_tools_and_no_calls() -> None:
     # server" stopped being unambiguous.
     assert "market-mcp" in outcome.text
     assert "not configured" in outcome.text
+
+
+# --- a server whose writes land on the account (specs/agent-trading) ---
+
+
+def _trading_stand_in(port: int) -> FastMCP:
+    """trading-mcp's own annotations, on trading-mcp's own three shapes: a read, a write,
+    and one carrying no annotation at all — the case that must not be read as a read."""
+    mcp = FastMCP("trading-stand-in", host="127.0.0.1", port=port)
+
+    @mcp.tool(
+        description="Open positions.",
+        annotations=ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True),
+    )
+    def get_positions() -> str:
+        return "none"
+
+    @mcp.tool(
+        description="Sends an order.",
+        annotations=ToolAnnotations(
+            readOnlyHint=False, destructiveHint=True, idempotentHint=False
+        ),
+    )
+    def place_order(symbol: str) -> str:
+        return f"sent for {symbol}"
+
+    @mcp.tool(description="Nobody annotated this one.")
+    def unannotated() -> str:
+        return "ok"
+
+    return mcp
+
+
+def _serve(app, port: int) -> tuple[uvicorn.Server, threading.Thread]:
+    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
+    server = uvicorn.Server(config)
+    thread = threading.Thread(target=server.run, daemon=True)
+    thread.start()
+    return server, thread
+
+
+@pytest.fixture
+async def trading_server() -> AsyncIterator[ToolServer]:
+    port = _free_port()
+    server, thread = _serve(_trading_stand_in(port).streamable_http_app(), port)
+    for _ in range(100):
+        if server.started:
+            break
+        await asyncio.sleep(0.05)
+    else:  # pragma: no cover - only reached if the stand-in never comes up
+        raise RuntimeError("the trading stand-in did not start in time")
+
+    client = ToolServer(
+        settings_for(None, trading_mcp_url=f"http://127.0.0.1:{port}"),
+        prefix="trading_mcp",
+        can_move_the_account=True,
+    )
+    try:
+        yield client
+    finally:
+        await client.aclose()
+        server.should_exit = True
+        thread.join(timeout=5)
+
+
+async def test_the_read_only_hint_comes_from_the_server(trading_server: ToolServer) -> None:
+    hints = {tool.name: tool.read_only for tool in await trading_server.list_tools()}
+
+    assert hints == {"get_positions": True, "place_order": False, "unannotated": None}
+
+
+async def test_an_unannotated_tool_counts_as_moving_the_account(
+    trading_server: ToolServer,
+) -> None:
+    """`None` is "nobody said", not "it reads". Counting it as a write writes one row too
+    many; counting it as a read loses the only record of an order."""
+    await trading_server.list_tools()
+
+    assert trading_server.moves_the_account("unannotated") is True
+    assert trading_server.moves_the_account("place_order") is True
+    assert trading_server.moves_the_account("get_positions") is False
+
+
+async def test_a_name_this_server_never_described_counts_as_moving_the_account(
+    trading_server: ToolServer,
+) -> None:
+    # The list is dropped whenever a session breaks, so "we cannot tell" resolves the
+    # cautious way.
+    assert trading_server.moves_the_account("place_order") is True
+
+
+async def test_an_unreachable_write_is_unknown_rather_than_unavailable() -> None:
+    """The difference the fourth outcome exists for: an order that never answered is
+    either no position or one nobody knows about, and "the call was not made" is a claim
+    this module cannot make about it (specs/agent-trading)."""
+    client = ToolServer(
+        settings_for(None, trading_mcp_url=f"http://127.0.0.1:{_free_port()}"),
+        prefix="trading_mcp",
+        can_move_the_account=True,
+    )
+    try:
+        outcome = await client.call("place_order", {"symbol": "US100"})
+    finally:
+        await client.aclose()
+
+    assert outcome.kind is ToolOutcomeKind.UNKNOWN
+    assert "may have gone through" in outcome.text
+    assert "do not send it again" in outcome.text
+    assert "was not made" not in outcome.text
+
+
+async def test_a_read_on_the_same_server_is_still_unavailable() -> None:
+    """Reading positions is a read even on the server that can write: it changes nothing,
+    so a failed one carries the same "nothing happened" market-mcp's does."""
+    client = ToolServer(
+        settings_for(None, trading_mcp_url=f"http://127.0.0.1:{_free_port()}"),
+        prefix="trading_mcp",
+        can_move_the_account=True,
+    )
+    # Seeded rather than read from a live server, because this client's port is dead on
+    # purpose — the descriptor is what decides, and here it says "reads".
+    client._tools = [
+        ToolDescriptor(name="get_positions", description="", input_schema={}, read_only=True)
+    ]
+    try:
+        outcome = await client.call("get_positions", {})
+    finally:
+        await client.aclose()
+
+    assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
+    assert "says nothing about the archive" in outcome.text
+
+
+async def test_a_server_that_cannot_move_the_account_never_answers_unknown() -> None:
+    """market-mcp's own client, unchanged: every failure there is still `unavailable`,
+    whatever a tool's annotation says."""
+    client = ToolServer(settings_for(f"http://127.0.0.1:{_free_port()}"))
+    try:
+        assert client.moves_the_account("place_order") is False
+        outcome = await client.call("place_order", {})
+    finally:
+        await client.aclose()
+
+    assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
+
+
+async def test_a_slow_write_times_out_as_unknown() -> None:
+    port = _free_port()
+    mcp = FastMCP("slow-trading", host="127.0.0.1", port=port)
+
+    @mcp.tool(
+        description="Sends an order and never says whether it landed.",
+        annotations=ToolAnnotations(readOnlyHint=False),
+    )
+    async def place_order(symbol: str) -> str:
+        await asyncio.sleep(30)
+        return "never"
+
+    server, thread = _serve(mcp.streamable_http_app(), port)
+    for _ in range(100):
+        if server.started:
+            break
+        await asyncio.sleep(0.05)
+
+    client = ToolServer(
+        settings_for(
+            None,
+            trading_mcp_url=f"http://127.0.0.1:{port}",
+            trading_mcp_request_timeout_seconds=1.0,
+        ),
+        prefix="trading_mcp",
+        can_move_the_account=True,
+    )
+    try:
+        await client.list_tools()
+        outcome = await client.call("place_order", {"symbol": "US100"})
+    finally:
+        await client.aclose()
+        server.should_exit = True
+        thread.join(timeout=5)
+
+    assert outcome.kind is ToolOutcomeKind.UNKNOWN
+    assert "did not answer within" in outcome.text
+    assert "may have gone through" in outcome.text
 
 
 def test_describe_unwraps_nested_task_groups() -> None:

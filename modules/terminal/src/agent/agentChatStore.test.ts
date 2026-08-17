@@ -167,6 +167,9 @@ function createFakeApi(): FakeApi {
       api.sessions.splice(index, 1);
       api.transcripts.delete(id);
     },
+    async getUnclaimedToolCalls() {
+      return [];
+    },
     async getMessages(id) {
       if (api.failGetMessages) throw new Error("agent is not reachable");
       return api.transcripts.get(id) ?? [];

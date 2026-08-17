@@ -20,6 +20,7 @@ function fakeApi(overrides: Partial<AgentApi> = {}): AgentApi {
   return {
     listModels: async () => [],
     listSessions: async () => [],
+    getUnclaimedToolCalls: async () => [],
     getSession: async () => {
       throw new Error("not used");
     },

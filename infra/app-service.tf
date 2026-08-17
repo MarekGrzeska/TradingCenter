@@ -564,6 +564,18 @@ resource "azurerm_linux_web_app" "agent" {
     TEAMS_MCP_URL   = "https://${local.teams_mcp_hostname}"
     TEAMS_MCP_SCOPE = "${local.teams_mcp_api_uri}/.default"
 
+    # The third tool server — the demo account, through trading-mcp. Same both-or-neither
+    # rule, checked per server, and the same rollback shape: clearing TRADING_MCP_URL takes
+    # the account tools away and leaves the other two exactly where they are, with the rows
+    # in `tool_calls` still recording what happened while it had them.
+    #
+    # This is the setting with the largest consequence of the three, because four of the
+    # tools behind it change the account rather than read it. It only works alongside the
+    # entry in trading-mcp's own `allowed_applications` below: without that, the module
+    # starts, asks, and is refused at the door.
+    TRADING_MCP_URL   = "https://${local.trading_mcp_hostname}"
+    TRADING_MCP_SCOPE = "${local.trading_mcp_api_uri}/.default"
+
     MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.agent_easy_auth.value
 
     REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
@@ -1121,15 +1133,19 @@ resource "azurerm_linux_web_app" "trading_mcp" {
         azuread_application.trading_mcp_easy_auth.client_id,
       ]
 
-      # **One caller, and it is a list of one on purpose** (specs/trading-mcp-transport,
+      # **Two callers, and it is a list of two on purpose** (specs/trading-mcp-transport,
       # "Wołający jest wskazany imiennie" — an enumerated list, never "anyone authenticated
-      # in the directory"). market-mcp's list has two entries
-      # because two modules read the archive; nothing but `teams` has any business placing
-      # an order, and the terminal least of all — a browser talks to `teams`, and `teams`
-      # talks here. Adding an entry to this list is the single largest change anyone can
-      # make to what this platform can do to the account.
+      # in the directory"). The terminal is still not one of them and never will be: a
+      # browser talks to `teams` or to `agent`, and those talk here.
+      #
+      # `teams` was the only entry until `agent-gets-the-trading-tools`, when the operator
+      # decided the chat should reach the account too — deliberately, and on the full set
+      # including the four tools that write. The spec asks for exactly that: "dopisanie
+      # kolejnego ma być decyzją, nie skutkiem ubocznym". Each name here is one more thing
+      # that can move the account, and this list is still the largest lever in this file.
       allowed_applications = [
         data.azuread_service_principal.teams_managed_identity.client_id,
+        data.azuread_service_principal.agent_managed_identity.client_id,
       ]
     }
 

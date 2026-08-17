@@ -139,6 +139,21 @@ class Settings(BaseSettings):
     # model would be told nothing about a team that now exists.
     teams_mcp_request_timeout_seconds: float = 35.0
 
+    # --- trading-mcp, the tool server that moves the demo account ---
+    #
+    # Unset means the same as the two above, with the sharpest consequence of the three:
+    # the module runs, reads the archive, builds teams, and cannot see a position or send
+    # an order. That is a supported state and the one this module was in until this
+    # change (specs/agent-tools, "Agent zapisuje w widoku terminala i na rachunku
+    # demonstracyjnym").
+    trading_mcp_url: str | None = None
+    trading_mcp_scope: str | None = None
+    # trading-mcp waits on the gateway for up to 30s (`trading_mcp/config.py`), and a
+    # ceiling below that would time out this side of an order that had already been sent
+    # — the one failure shape the module must never produce silently. teams uses the same
+    # number against the same server for the same reason.
+    trading_mcp_request_timeout_seconds: float = 35.0
+
     # --- who may call this module from a browser ---
     #
     # Mirrors market-data's own field and its own reasoning: a request without an
@@ -161,6 +176,8 @@ class Settings(BaseSettings):
         "market_mcp_scope",
         "teams_mcp_url",
         "teams_mcp_scope",
+        "trading_mcp_url",
+        "trading_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -211,7 +228,7 @@ class Settings(BaseSettings):
         (specs/agent-tool-access, "Tryb połączenia z serwerem narzędzi jest wybrany
         jednoznacznie").
 
-        Run once per server rather than once, because the module has two of them now and
+        Run once per server rather than once, because the module has three of them now and
         they are configured independently — and every message names the one it is about,
         since "the tool server" stopped being unambiguous.
         """
@@ -219,6 +236,9 @@ class Settings(BaseSettings):
             "MARKET_MCP", self.market_mcp_url, self.market_mcp_scope
         )
         self.teams_mcp_url = _checked_server("TEAMS_MCP", self.teams_mcp_url, self.teams_mcp_scope)
+        self.trading_mcp_url = _checked_server(
+            "TRADING_MCP", self.trading_mcp_url, self.trading_mcp_scope
+        )
         return self
 
     @model_validator(mode="after")

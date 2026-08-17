@@ -79,6 +79,29 @@ async def get_messages(
     return [MessageOut.from_message(m, calls.get(m.id, ())) for m in messages]
 
 
+@router.get("/sessions/{session_id}/unclaimed-tool-calls")
+async def get_unclaimed_tool_calls(
+    session_id: int, request: Request, owner: str = Depends(current_principal)
+) -> list[ToolCallOut]:
+    """The calls in this session that no reply ever claimed — sent, and never answered for
+    by a turn that reached its own end (specs/agent-trading).
+
+    A route of its own rather than a field on the transcript above, and the reason is the
+    transcript's shape: it publishes a list, so a field would mean publishing an object
+    instead, and a terminal build from before that change calls `map` on it. The terminal
+    is deployed separately from this module, so that window is real (design.md, D1).
+
+    Empty for almost every session, and that is the point — a row here is the record of an
+    order whose fate nobody knows.
+    """
+    async with request.app.state.pool.acquire() as conn:
+        session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
+        if session is None:
+            raise HTTPException(404, detail="no such session")
+        calls = await store.get_session_orphan_tool_calls(conn, session_id=session_id)
+    return [ToolCallOut.from_tool_call(call) for call in calls]
+
+
 @router.patch("/sessions/{session_id}")
 async def patch_session(
     session_id: int, body: PatchSessionIn, request: Request, owner: str = Depends(current_principal)
