@@ -175,5 +175,19 @@ Z `design.md`, „Migration Plan", z jedną rzeczą dopisaną po implementacji:
 3. **merge do `main`** — wdroży `teams-mcp` i `agent`;
 4. **sprawdzić tożsamość** (luka wyżej, punkt 2) — założyć zespół z czatu i zajrzeć do
    `owner_principal`. Dopiero to potwierdza, że zmiana robi to, po co powstała;
-5. `TEAMS_MCP_URL` w ustawieniach `agent` jest **ostatnie** i jest momentem, w którym
-   narzędzia się pojawiają. Wycofanie to wyczyszczenie tej jednej zmiennej i restart.
+**`TEAMS_MCP_URL` nie da się ustawić „na końcu", wbrew temu, co mówi `design.md`.** Siedzi
+w tym samym `app-service.tf`, więc krok 1 ustawia je razem z resztą — i to jest w porządku,
+pod warunkiem że się wie, co dzieje się w oknie między krokiem 1 a 3: agent ma adres do
+modułu serwującego placeholder, pyta go o listę narzędzi, dostaje ciszę, zapisuje
+ostrzeżenie i pracuje dalej z narzędziami `market-mcp`. Dokładnie ta niezależność, której
+wymaga `agent-tool-access` i którą pokrywa
+`test_one_server_being_unreachable_leaves_the_others_tools_in_place`.
+
+Restart agenta po kroku 3 nie jest potrzebny: nieudany odczyt listy narzędzi nie jest
+cache'owany, więc pierwsza tura po wdrożeniu ją podniesie. Wycofanie całości to
+wyczyszczenie tej jednej zmiennej i restart — narzędzia znikają, zespoły założone po drodze
+zostają, bo są zwykłymi zespołami operatora.
+
+**Kolejności nie da się odwrócić**, i to jest twardsze niż preferencja: `deploy-teams-mcp.yml`
+woła `azure/webapps-deploy` po nazwie `app-tradingcenter-teams-mcp`. Merge przed `apply`
+zbuduje obraz, wypchnie go do GHCR i padnie na wdrożeniu do aplikacji, która nie istnieje.
