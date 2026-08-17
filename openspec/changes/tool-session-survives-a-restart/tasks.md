@@ -34,5 +34,5 @@
 ## 3. Domknięcie
 
 - [x] 3.1 README `teams` — kiedy moduł ponawia wywołanie i dlaczego tylko wtedy
-- [ ] 3.2 `openspec validate tool-session-survives-a-restart --strict`
-- [ ] 3.3 `review.md`
+- [x] 3.2 `openspec validate tool-session-survives-a-restart --strict`
+- [x] 3.3 `review.md`
