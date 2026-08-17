@@ -757,16 +757,16 @@ async def fail_unfinished_runs(conn: Conn, *, reason: str) -> list[int]:
 
 _SCHEDULE_COLUMNS = """
     id, team_id, owner_principal, revision_mode, pinned_revision_id, cron_expression,
-    next_fire_at, enabled, disabled_reason, consecutive_failures,
+    next_fire_at, enabled, disabled_reason, consecutive_failures, unattended_ack,
     created_at, updated_at
 """
 
 _INSERT_SCHEDULE = f"""
     INSERT INTO schedules (
         team_id, owner_principal, revision_mode, pinned_revision_id,
-        cron_expression, next_fire_at
+        cron_expression, next_fire_at, unattended_ack
     )
-    VALUES ($1, $2, $3, $4, $5, $6)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
     RETURNING {_SCHEDULE_COLUMNS}
 """
 
@@ -783,7 +783,7 @@ _SELECT_SCHEDULES_FOR_TEAM = f"""
 _UPDATE_SCHEDULE = f"""
     UPDATE schedules
        SET revision_mode = $3, pinned_revision_id = $4, cron_expression = $5,
-           next_fire_at = $6, updated_at = now()
+           next_fire_at = $6, unattended_ack = $7, updated_at = now()
      WHERE id = $1 AND owner_principal = $2
     RETURNING {_SCHEDULE_COLUMNS}
 """
@@ -800,13 +800,6 @@ _SET_SCHEDULE_ENABLED = f"""
            updated_at = now()
      WHERE id = $1 AND owner_principal = $2
     RETURNING {_SCHEDULE_COLUMNS}
-"""
-
-# The owner rides in the WHERE rather than being checked after the read, so "not yours"
-# and "not there" are one statement and one answer — a route that could tell them apart
-# would be telling a stranger that the row exists.
-_DELETE_SCHEDULE = """
-    DELETE FROM schedules WHERE id = $1 AND owner_principal = $2 RETURNING id
 """
 
 # System-initiated — no owner filter, because the caller is the clock loop acting on a
@@ -854,6 +847,7 @@ async def create_schedule(
     pinned_revision_id: int | None,
     cron_expression: str,
     next_fire_at: datetime,
+    unattended_ack: bool,
 ) -> asyncpg.Record:
     return await fetch_one(
         conn,
@@ -864,6 +858,7 @@ async def create_schedule(
         pinned_revision_id,
         cron_expression,
         next_fire_at,
+        unattended_ack,
     )
 
 
@@ -888,6 +883,7 @@ async def update_schedule(
     pinned_revision_id: int | None,
     cron_expression: str,
     next_fire_at: datetime,
+    unattended_ack: bool,
 ) -> asyncpg.Record | None:
     return await conn.fetchrow(
         _UPDATE_SCHEDULE,
@@ -897,6 +893,7 @@ async def update_schedule(
         pinned_revision_id,
         cron_expression,
         next_fire_at,
+        unattended_ack,
     )
 
 
@@ -904,20 +901,6 @@ async def set_schedule_enabled(
     conn: Conn, *, schedule_id: int, owner_principal: str, enabled: bool
 ) -> asyncpg.Record | None:
     return await conn.fetchrow(_SET_SCHEDULE_ENABLED, schedule_id, owner_principal, enabled)
-
-
-async def delete_schedule(conn: Conn, *, schedule_id: int, owner_principal: str) -> bool:
-    """Whether a row was deleted — `False` covers both "not there" and "not yours", which
-    the owner filter inside the statement makes the same answer.
-
-    The fire history goes with it, by `ON DELETE CASCADE` in migration `0007` rather than
-    by a second statement here: the same rule written twice drifts the first time a caller
-    forgets half of it. Runs are untouched — nothing in `runs` points at a schedule, it is
-    the fire rows that point at runs (specs/teams-schedules, "Harmonogram i wyzwalacz dają
-    się usunąć").
-    """
-    row = await conn.fetchrow(_DELETE_SCHEDULE, schedule_id, owner_principal)
-    return row is not None
 
 
 async def disable_schedule_for_failures(
@@ -952,16 +935,16 @@ _TRIGGER_COLUMNS = """
     id, team_id, owner_principal, revision_mode, pinned_revision_id, tool_name,
     arguments, field_path, comparison, threshold, cooldown_seconds,
     poll_interval_seconds, next_check_at, last_result, last_checked_at, last_fired_at,
-    enabled, disabled_reason, consecutive_failures, created_at, updated_at
+    enabled, disabled_reason, consecutive_failures, unattended_ack, created_at, updated_at
 """
 
 _INSERT_TRIGGER = f"""
     INSERT INTO triggers (
         team_id, owner_principal, revision_mode, pinned_revision_id,
         tool_name, arguments, field_path, comparison, threshold,
-        cooldown_seconds, poll_interval_seconds, next_check_at
+        cooldown_seconds, poll_interval_seconds, next_check_at, unattended_ack
     )
-    VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12)
+    VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12, $13)
     RETURNING {_TRIGGER_COLUMNS}
 """
 
@@ -979,7 +962,7 @@ _UPDATE_TRIGGER = f"""
     UPDATE triggers
        SET revision_mode = $3, pinned_revision_id = $4, tool_name = $5,
            arguments = $6::jsonb, field_path = $7, comparison = $8, threshold = $9,
-           cooldown_seconds = $10, poll_interval_seconds = $11,
+           cooldown_seconds = $10, poll_interval_seconds = $11, unattended_ack = $12,
            updated_at = now()
      WHERE id = $1 AND owner_principal = $2
     RETURNING {_TRIGGER_COLUMNS}
@@ -993,10 +976,6 @@ _SET_TRIGGER_ENABLED = f"""
            updated_at = now()
      WHERE id = $1 AND owner_principal = $2
     RETURNING {_TRIGGER_COLUMNS}
-"""
-
-_DELETE_TRIGGER = """
-    DELETE FROM triggers WHERE id = $1 AND owner_principal = $2 RETURNING id
 """
 
 _DISABLE_TRIGGER_FOR_FAILURES = f"""
@@ -1058,6 +1037,7 @@ async def create_trigger(
     cooldown_seconds: int,
     poll_interval_seconds: int,
     next_check_at: datetime,
+    unattended_ack: bool,
 ) -> asyncpg.Record:
     return await fetch_one(
         conn,
@@ -1074,6 +1054,7 @@ async def create_trigger(
         cooldown_seconds,
         poll_interval_seconds,
         next_check_at,
+        unattended_ack,
     )
 
 
@@ -1103,6 +1084,7 @@ async def update_trigger(
     threshold: Decimal,
     cooldown_seconds: int,
     poll_interval_seconds: int,
+    unattended_ack: bool,
 ) -> asyncpg.Record | None:
     return await conn.fetchrow(
         _UPDATE_TRIGGER,
@@ -1117,6 +1099,7 @@ async def update_trigger(
         threshold,
         cooldown_seconds,
         poll_interval_seconds,
+        unattended_ack,
     )
 
 
@@ -1124,13 +1107,6 @@ async def set_trigger_enabled(
     conn: Conn, *, trigger_id: int, owner_principal: str, enabled: bool
 ) -> asyncpg.Record | None:
     return await conn.fetchrow(_SET_TRIGGER_ENABLED, trigger_id, owner_principal, enabled)
-
-
-async def delete_trigger(conn: Conn, *, trigger_id: int, owner_principal: str) -> bool:
-    """The same as `delete_schedule`, for the other half of the pair — including the fire
-    history going with it and the runs staying."""
-    row = await conn.fetchrow(_DELETE_TRIGGER, trigger_id, owner_principal)
-    return row is not None
 
 
 async def disable_trigger_for_failures(

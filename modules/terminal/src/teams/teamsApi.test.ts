@@ -445,6 +445,7 @@ const wireSchedule = {
   enabled: true,
   disabled_reason: null,
   consecutive_failures: 0,
+  unattended_ack: false,
   created_at: "2026-08-16T09:00:00Z",
   updated_at: "2026-08-16T09:00:00Z",
 };
@@ -472,6 +473,7 @@ describe("schedules", () => {
         enabled: true,
         disabledReason: null,
         consecutiveFailures: 0,
+        unattendedAck: false,
         createdAt: Date.parse("2026-08-16T09:00:00Z") / 1000,
         updatedAt: Date.parse("2026-08-16T09:00:00Z") / 1000,
       },
@@ -494,6 +496,7 @@ describe("schedules", () => {
         pinnedRevisionId: 3,
         cronExpression: "*/5 * * * *",
         recurrence: null,
+        unattendedAck: false,
       },
       new AbortController().signal,
     );
@@ -503,6 +506,7 @@ describe("schedules", () => {
       pinned_revision_id: 3,
       cron_expression: "*/5 * * * *",
       recurrence: null,
+      unattended_ack: false,
     });
   });
 
@@ -529,6 +533,7 @@ describe("schedules", () => {
           weekdays: [1, 5],
           dayOfMonth: null,
         },
+        unattendedAck: false,
       },
       new AbortController().signal,
     );
@@ -545,6 +550,7 @@ describe("schedules", () => {
         weekdays: [1, 5],
         day_of_month: null,
       },
+      unattended_ack: false,
     });
   });
 
@@ -595,6 +601,7 @@ describe("schedules", () => {
           pinnedRevisionId: 3,
           cronExpression: "not a cron",
           recurrence: null,
+          unattendedAck: false,
         },
         new AbortController().signal,
       ),
@@ -685,6 +692,7 @@ const wireTrigger = {
   enabled: true,
   disabled_reason: null,
   consecutive_failures: 0,
+  unattended_ack: false,
   created_at: "2026-08-16T09:00:00Z",
   updated_at: "2026-08-16T09:00:00Z",
 };
@@ -715,6 +723,7 @@ describe("triggers", () => {
         enabled: true,
         disabledReason: null,
         consecutiveFailures: 0,
+        unattendedAck: false,
         createdAt: Date.parse("2026-08-16T09:00:00Z") / 1000,
         updatedAt: Date.parse("2026-08-16T09:00:00Z") / 1000,
       },
@@ -742,6 +751,7 @@ describe("triggers", () => {
         threshold: "70",
         cooldownSeconds: 900,
         pollIntervalSeconds: 300,
+        unattendedAck: false,
       },
       new AbortController().signal,
     );
@@ -756,6 +766,7 @@ describe("triggers", () => {
       threshold: "70",
       cooldown_seconds: 900,
       poll_interval_seconds: 300,
+      unattended_ack: false,
     });
   });
 

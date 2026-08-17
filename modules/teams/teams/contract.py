@@ -682,6 +682,12 @@ class ScheduleIn(ScheduleTiming):
 
     revision_mode: Literal["pinned", "latest"] = "pinned"
     pinned_revision_id: int | None = None
+    # Refused unless true, the day the pinned or latest revision's agents carry a
+    # state-changing tool — `validation.check_unattended` is where that is enforced,
+    # because it needs the revision's own definition, which this model does not carry
+    # (specs/teams-schedules, "Harmonogram nad rewizją z narzędziami zapisującymi wymaga
+    # jawnego potwierdzenia").
+    unattended_ack: bool = False
 
     @model_validator(mode="after")
     def _revision_selection(self) -> ScheduleIn:
@@ -715,6 +721,7 @@ class ScheduleOut(BaseModel):
     enabled: bool
     disabled_reason: str | None
     consecutive_failures: int
+    unattended_ack: bool
     created_at: datetime
     updated_at: datetime
 
@@ -731,6 +738,7 @@ class ScheduleOut(BaseModel):
             enabled=row["enabled"],
             disabled_reason=row["disabled_reason"],
             consecutive_failures=row["consecutive_failures"],
+            unattended_ack=row["unattended_ack"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
@@ -762,6 +770,7 @@ class TriggerIn(BaseModel):
     threshold: str
     cooldown_seconds: int = 900
     poll_interval_seconds: int = 300
+    unattended_ack: bool = False
 
     @field_validator("tool_name", "field_path")
     @classmethod
@@ -814,6 +823,7 @@ class TriggerOut(BaseModel):
     enabled: bool
     disabled_reason: str | None
     consecutive_failures: int
+    unattended_ack: bool
     created_at: datetime
     updated_at: datetime
 
@@ -838,6 +848,7 @@ class TriggerOut(BaseModel):
             enabled=row["enabled"],
             disabled_reason=row["disabled_reason"],
             consecutive_failures=row["consecutive_failures"],
+            unattended_ack=row["unattended_ack"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )

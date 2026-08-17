@@ -50,6 +50,7 @@ const SCHEDULE: Schedule = {
   enabled: true,
   disabledReason: null,
   consecutiveFailures: 0,
+  unattendedAck: false,
   createdAt: 1_760_000_000,
   updatedAt: 1_760_000_000,
 };
@@ -73,6 +74,7 @@ const TRIGGER: Trigger = {
   enabled: true,
   disabledReason: null,
   consecutiveFailures: 0,
+  unattendedAck: false,
   createdAt: 1_760_000_000,
   updatedAt: 1_760_000_000,
 };
@@ -127,8 +129,6 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     updateSchedule: vi.fn(async () => SCHEDULE),
     enableSchedule: vi.fn(async () => ({ ...SCHEDULE, enabled: true, disabledReason: null })),
     disableSchedule: vi.fn(async () => ({ ...SCHEDULE, enabled: false })),
-    deleteSchedule: vi.fn(async () => undefined),
-    deleteTrigger: vi.fn(async () => undefined),
     scheduleFires: vi.fn(async () => []),
     nextFires: vi.fn(async () => []),
     previewNextFires: vi.fn(async () => []),
@@ -500,61 +500,5 @@ describe("triggers", () => {
     fireEvent.change(args, { target: { value: "{not json" } });
 
     expect(screen.getByRole("button", { name: "Create trigger" })).toBeDisabled();
-  });
-});
-
-describe("deleting a schedule", () => {
-  it("deletes after the confirmation and re-reads the list", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => [SCHEDULE]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    // Two rows carry a "Delete", and the dialog adds a third: the schedule's own is the
-    // first, and the confirming one lives inside the dialog.
-    await userEvent.click((await screen.findAllByRole("button", { name: "Delete" }))[0]);
-    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }));
-
-    await waitFor(() => expect(api.deleteSchedule).toHaveBeenCalledWith(SCHEDULE.id, expect.anything()));
-    expect((api.listSchedules as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
-  });
-
-  it("says what the delete takes and what it leaves, before it is done", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => [SCHEDULE]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click((await screen.findAllByRole("button", { name: "Delete" }))[0]);
-
-    expect(screen.getByText(/fire history goes with it/)).toBeInTheDocument();
-    expect(screen.getByText(/runs it started stay/)).toBeInTheDocument();
-    expect(api.deleteSchedule).not.toHaveBeenCalled();
-  });
-
-  it("leaves the schedule alone when the operator backs out", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => [SCHEDULE]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click((await screen.findAllByRole("button", { name: "Delete" }))[0]);
-    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
-
-    expect(api.deleteSchedule).not.toHaveBeenCalled();
-    expect(await screen.findByText(/Every 5 minutes/)).toBeInTheDocument();
-  });
-
-  it("keeps disabling as its own, reversible action", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => [SCHEDULE]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click((await screen.findAllByRole("button", { name: "Disable" }))[0]);
-
-    expect(api.disableSchedule).toHaveBeenCalled();
-    expect(api.deleteSchedule).not.toHaveBeenCalled();
-  });
-
-  it("has no consent box left in the form", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
-
-    expect(screen.queryByText(/without an operator watching/)).not.toBeInTheDocument();
   });
 });

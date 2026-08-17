@@ -97,6 +97,7 @@ async def _schedule(
             pinned_revision_id=revision_id,
             cron_expression=cron,
             next_fire_at=next_fire_at,
+            unattended_ack=False,
         )
 
 

@@ -595,6 +595,11 @@
             ],
             "title": "Revision Mode",
             "type": "string"
+          },
+          "unattended_ack": {
+            "default": false,
+            "title": "Unattended Ack",
+            "type": "boolean"
           }
         },
         "title": "ScheduleIn",
@@ -668,6 +673,10 @@
             "title": "Team Id",
             "type": "integer"
           },
+          "unattended_ack": {
+            "title": "Unattended Ack",
+            "type": "boolean"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -686,6 +695,7 @@
           "recurrence",
           "revision_mode",
           "team_id",
+          "unattended_ack",
           "updated_at"
         ],
         "title": "ScheduleOut",
@@ -1167,6 +1177,11 @@
           "tool_name": {
             "title": "Tool Name",
             "type": "string"
+          },
+          "unattended_ack": {
+            "default": false,
+            "title": "Unattended Ack",
+            "type": "boolean"
           }
         },
         "required": [
@@ -1296,6 +1311,10 @@
             "title": "Tool Name",
             "type": "string"
           },
+          "unattended_ack": {
+            "title": "Unattended Ack",
+            "type": "boolean"
+          },
           "updated_at": {
             "format": "date-time",
             "title": "Updated At",
@@ -1322,6 +1341,7 @@
           "team_id",
           "threshold",
           "tool_name",
+          "unattended_ack",
           "updated_at"
         ],
         "title": "TriggerOut",
@@ -1813,37 +1833,6 @@
       }
     },
     "/schedules/{schedule_id}": {
-      "delete": {
-        "description": "Gone, with its fire history. Disabling is the other thing and stays the other thing:\na disabled schedule keeps its row and its reason and can be switched back on\n(specs/teams-schedules, \"Harmonogram i wyzwalacz daj\u0105 si\u0119 usun\u0105\u0107\").\n\nThe runs it started are not touched, and nothing here has to arrange that \u2014 no column\nin `runs` points at a schedule.",
-        "operationId": "delete_schedule_schedules__schedule_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "schedule_id",
-            "required": true,
-            "schema": {
-              "title": "Schedule Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Delete Schedule"
-      },
       "get": {
         "operationId": "get_schedule_schedules__schedule_id__get",
         "parameters": [
@@ -2743,37 +2732,6 @@
       }
     },
     "/triggers/{trigger_id}": {
-      "delete": {
-        "description": "The same as deleting a schedule, for the other half of the pair.",
-        "operationId": "delete_trigger_triggers__trigger_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "trigger_id",
-            "required": true,
-            "schema": {
-              "title": "Trigger Id",
-              "type": "integer"
-            }
-          }
-        ],
-        "responses": {
-          "204": {
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Delete Trigger"
-      },
       "get": {
         "operationId": "get_trigger_triggers__trigger_id__get",
         "parameters": [

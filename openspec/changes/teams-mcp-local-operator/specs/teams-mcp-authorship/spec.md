@@ -27,14 +27,14 @@ Moduł MUST powiedzieć przy starcie, w którym z tych dwóch stanów jest — s
 narzędzia działają bez tożsamości, MUST NOT być stanem, o którym dowiaduje się z braku
 odmowy.
 
-#### Scenario: Żądanie zapisujące bez tożsamości za warstwą uwierzytelniającą
+#### Scenario: Żądanie bez tożsamości operatora
 
 - **WHEN** wywołanie narzędzia zapisującego dociera bez ustalonej tożsamości operatora, a
   przed modułem stoi warstwa uwierzytelniająca
 - **THEN** MUST zostać odmówione z powodem nazywającym brak tożsamości
 - **AND** żaden wiersz MUST NOT powstać
 
-#### Scenario: Odczyt bez tożsamości za warstwą uwierzytelniającą
+#### Scenario: Odczyt bez tożsamości operatora
 
 - **WHEN** wywołanie narzędzia czytającego dociera bez ustalonej tożsamości operatora, a
   przed modułem stoi warstwa uwierzytelniająca

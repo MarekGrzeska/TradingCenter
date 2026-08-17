@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAgentTurns } from "../agent/useAgentTurns";
 import { MarketDataError } from "../data/types";
-import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { formatInstant } from "../ui/formatTime";
 import { FireHistoryList } from "./FireHistoryList";
 import { ScheduleWizardDialog } from "./ScheduleWizardDialog";
@@ -149,7 +148,6 @@ function ScheduleSection({
 }) {
   const [editing, setEditing] = useState<"new" | Schedule | null>(null);
   const [historyFor, setHistoryFor] = useState<number | null>(null);
-  const [deleting, setDeleting] = useState<Schedule | null>(null);
 
   return (
     <section className="mb-6">
@@ -201,9 +199,6 @@ function ScheduleSection({
                 >
                   History
                 </button>
-                <button type="button" onClick={() => setDeleting(schedule)} className={BUTTON}>
-                  Delete
-                </button>
               </div>
             </div>
             {historyFor === schedule.id && (
@@ -227,30 +222,6 @@ function ScheduleSection({
             onChanged();
           }}
         />
-      )}
-
-      {deleting && (
-        <ConfirmDialog
-          title="Delete this schedule?"
-          confirmLabel="Delete"
-          busyLabel="Deleting…"
-          tone="danger"
-          fallbackError="the schedule could not be deleted"
-          onConfirm={async () => {
-            await api.deleteSchedule(deleting.id, new AbortController().signal);
-            onChanged();
-          }}
-          onClose={() => setDeleting(null)}
-        >
-          <p className="text-sm text-ink">{describeSchedule(deleting)}</p>
-          <p className="mt-2 text-sm text-ink">
-            Its fire history goes with it and does not come back. The runs it started stay,
-            with what they cost and anything they traded.
-          </p>
-          <p className="mt-2 text-xs text-ink-muted">
-            To stop it from firing without losing any of that, disable it instead.
-          </p>
-        </ConfirmDialog>
       )}
     </section>
   );
@@ -343,6 +314,21 @@ function RevisionModeFields({
       {revisionMode === "pinned" && pinnedRevisionId !== null && (
         <span> (pinned to revision id {pinnedRevisionId})</span>
       )}
+    </label>
+  );
+}
+
+function UnattendedAckField({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange(next: boolean): void;
+}) {
+  return (
+    <label className="flex items-center gap-1 text-xs text-ink-muted">
+      <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+      I understand this runs without an operator watching
     </label>
   );
 }
@@ -627,6 +613,11 @@ function TriggerForm({
           onChangeMode={(mode) => setDraft(withRevisionMode(draft, mode, latestRevisionId))}
         />
       </div>
+
+      <UnattendedAckField
+        checked={draft.unattendedAck}
+        onChange={(unattendedAck) => setDraft({ ...draft, unattendedAck })}
+      />
 
       {error && <p className="text-xs text-critical">{error}</p>}
 
