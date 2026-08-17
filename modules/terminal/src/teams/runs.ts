@@ -63,6 +63,18 @@ export interface TeamRunStep {
 /** One tool call, keyed by the agent that made it — which is how the monitor groups
  *  them. The stream says the agent outright; a recorded call names its step, and
  *  `attachAgentKeys` is where that becomes the same thing. */
+/** What a call was given and what it answered — the two halves that explain an output.
+ *
+ *  Its own type because its *absence* means something: the stream announces a call
+ *  without a body, so a call watched live has no detail until the recorded rows are read.
+ *  Folded into the call as two optional fields, "no arguments" and "not read yet" would
+ *  be the same shape. */
+export interface ToolCallDetail {
+  arguments: Record<string, unknown>;
+  /** The tool's answer, or the reason it refused — the module puts both in one column. */
+  resultText: string;
+}
+
 export interface TeamRunToolCall {
   agentKey: string;
   roundIndex: number;
@@ -72,12 +84,17 @@ export interface TeamRunToolCall {
    *  refusal and an outage are not one entry (specs/teams-tool-access). */
   outcome: string;
   durationMs: number;
+  /** Absent on a call that arrived on the stream. The frame carries the name and the
+   *  outcome only, deliberately: an archive read's answer is kilobytes, and every
+   *  watching terminal would be sent all of it. */
+  detail?: ToolCallDetail;
 }
 
 /** A call read back from `/runs/{id}/tool-calls`, which names the step rather than the
- *  agent — the row's own shape. */
+ *  agent — the row's own shape. Always carries its detail; that is what the route is for. */
 export interface RecordedToolCall extends Omit<TeamRunToolCall, "agentKey"> {
   runStepId: number;
+  detail: ToolCallDetail;
 }
 
 /** One thing a run did to the account, read from `/runs/{id}/trades` — the same event as
@@ -152,6 +169,7 @@ export function mapRecordedToolCall(raw: RawToolCall): RecordedToolCall {
     toolName: raw.tool_name,
     outcome: raw.outcome,
     durationMs: raw.duration_ms,
+    detail: { arguments: raw.arguments, resultText: raw.result_text },
   };
 }
 

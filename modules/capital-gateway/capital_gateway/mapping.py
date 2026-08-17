@@ -12,6 +12,7 @@ from .dtos import (
     Candle,
     Direction,
     Instrument,
+    InstrumentTerms,
     Order,
     OrderStatus,
     OrderType,
@@ -44,6 +45,37 @@ def instrument_from_market(m: dict) -> Instrument:
         ask=m.get("offer"),
         lot_size=m.get("lotSize"),
     )
+
+
+def instrument_terms_from_details(symbol: str, m: dict) -> InstrumentTerms:
+    """From the detail of one market — `GET /markets/{epic}`, not the flat dict above.
+
+    `dealingRules` states every rule as `{unit, value}`. Only the value is carried: the
+    unit on a size rule is the provider's own word for "instrument units" (it sends
+    `POINTS` for a size, which it is not), and passing that along would invite a caller to
+    read it as something to convert by. The one unit that does mean something is the
+    margin factor's, which travels beside it untouched.
+
+    A missing field stays missing. `dealingRules` absent entirely is the same answer as
+    every rule inside it absent, so no branch distinguishes them.
+    """
+    instrument = m.get("instrument") or {}
+    rules = m.get("dealingRules") or {}
+    return InstrumentTerms(
+        symbol=symbol,
+        currency=instrument.get("currency"),
+        lot_size=instrument.get("lotSize"),
+        margin_factor=instrument.get("marginFactor"),
+        margin_factor_unit=instrument.get("marginFactorUnit"),
+        min_deal_size=_rule_value(rules, "minDealSize"),
+        max_deal_size=_rule_value(rules, "maxDealSize"),
+        size_increment=_rule_value(rules, "minSizeIncrement"),
+    )
+
+
+def _rule_value(rules: dict, name: str) -> float | None:
+    rule = rules.get(name)
+    return rule.get("value") if isinstance(rule, dict) else None
 
 
 def _bid(price: dict | None) -> float | None:

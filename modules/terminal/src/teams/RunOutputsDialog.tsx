@@ -183,18 +183,82 @@ function Called({ calls }: { calls: TeamRunToolCall[] }) {
         <p className="text-xs text-ink-muted">none</p>
       ) : (
         calls.map((call) => (
-          <div
-            key={`${call.roundIndex}-${call.position}-${call.toolName}`}
-            className="flex max-w-4xl items-baseline justify-between gap-2 text-xs"
-          >
-            <span className="text-ink">{call.toolName}</span>
-            <span className={call.outcome === "ok" ? "text-ink-faint" : "text-warning"}>
-              {call.outcome} · {call.durationMs} ms
-            </span>
-          </div>
+          <OneCall key={`${call.roundIndex}-${call.position}-${call.toolName}`} call={call} />
         ))
       )}
     </section>
+  );
+}
+
+/** One call, collapsed until asked — the same bargain the chat transcript strikes.
+ *
+ *  A tool's answer is what the agent's output was built from, and a row saying only `ok`
+ *  asks the reader to take that output on trust. It is worth more here than in the chat:
+ *  a team is several agents deep, and one agent's tool result is often the whole of what
+ *  the next one had to work with.
+ *
+ *  Collapsed by default, and each one independently: a run of six agents can hold dozens
+ *  of calls, and opening them all would bury the outputs this window exists for. */
+function OneCall({ call }: { call: TeamRunToolCall }) {
+  const [expanded, setExpanded] = useState(false);
+  const summary = `${call.toolName} — ${call.outcome}`;
+
+  return (
+    <div className="max-w-4xl rounded border border-border bg-panel/60 text-xs">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        aria-expanded={expanded}
+        aria-label={expanded ? `Collapse ${summary}` : `Expand ${summary}`}
+        className="flex w-full cursor-pointer items-baseline gap-1.5 px-2 py-1 text-left hover:bg-panel-strong"
+      >
+        <span aria-hidden className="text-ink-faint">
+          {expanded ? "▾" : "▸"}
+        </span>
+        <span className="truncate font-mono text-ink">{call.toolName}</span>
+        <span
+          className={`ml-auto shrink-0 ${call.outcome === "ok" ? "text-ink-faint" : "text-warning"}`}
+        >
+          {call.outcome} · {call.durationMs} ms
+        </span>
+      </button>
+      {expanded && (
+        <div className="border-t border-border px-2 py-1.5">
+          {call.detail === undefined ? (
+            // Said outright rather than drawn as an empty box: this call arrived on the
+            // stream, which carries no body, and the recorded rows were read before it
+            // happened. An empty `arguments` and an empty result would read as a tool
+            // that was given nothing and answered nothing.
+            <p className="text-ink-muted">
+              This call arrived while the run was being watched — its arguments and answer
+              have not been read yet. Reopen the run to read them.
+            </p>
+          ) : (
+            <>
+              <CallDetail label="arguments" body={JSON.stringify(call.detail.arguments)} />
+              <CallDetail
+                label={call.outcome === "ok" ? "result" : "reason"}
+                body={call.detail.resultText}
+              />
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** `<pre>`, for the reason the chat's own detail gives: a tool answers JSON often enough
+ *  that collapsed whitespace makes it unreadable, and long enough that an unwrapped line
+ *  would set this window's width. Rendered as text, never as markup. */
+function CallDetail({ label, body }: { label: string; body: string }) {
+  return (
+    <div className="mt-1 first:mt-0">
+      <div className="text-[10px] tracking-wide text-ink-faint uppercase">{label}</div>
+      <pre className="max-h-64 overflow-auto font-mono text-[11px] whitespace-pre-wrap text-ink-secondary wrap-break-word">
+        {body}
+      </pre>
+    </div>
   );
 }
 

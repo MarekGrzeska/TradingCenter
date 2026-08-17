@@ -356,6 +356,102 @@
         "title": "InstrumentPage",
         "type": "object"
       },
+      "InstrumentTerms": {
+        "description": "What the provider will let a caller do with one instrument, and at what deposit.\n\nDeliberately not fields on `Instrument`: the provider carries none of this in the flat\nmarket dict that search and marketnavigation return, only in the detail of a single\ninstrument. Hanging them off the catalogue would mean one request per row.\n\nNo price here. It is already in `Instrument` and in `Candle`, and a third place for it\nis a third answer that can be from a different moment.\n\nEvery field but `symbol` may be absent: the provider omits some of them for some\ninstruments, and a missing rule is not a rule of zero.",
+        "properties": {
+          "currency": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Currency"
+          },
+          "lot_size": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Lot Size"
+          },
+          "margin_factor": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Factor"
+          },
+          "margin_factor_unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Margin Factor Unit"
+          },
+          "max_deal_size": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Deal Size"
+          },
+          "min_deal_size": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min Deal Size"
+          },
+          "provider": {
+            "default": "capital.com",
+            "title": "Provider",
+            "type": "string"
+          },
+          "size_increment": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Size Increment"
+          },
+          "symbol": {
+            "title": "Symbol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "symbol"
+        ],
+        "title": "InstrumentTerms",
+        "type": "object"
+      },
       "Order": {
         "properties": {
           "direction": {
@@ -1217,6 +1313,49 @@
           }
         },
         "summary": "History",
+        "tags": [
+          "market-data"
+        ]
+      }
+    },
+    "/instruments/{symbol}/terms": {
+      "get": {
+        "description": "The deposit and size rules for one instrument \u2014 no price; that is `/search` and\n`/candles`. A field the provider omits comes back null rather than as a default.",
+        "operationId": "instrument_terms_instruments__symbol__terms_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "symbol",
+            "required": true,
+            "schema": {
+              "title": "Symbol",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InstrumentTerms"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Instrument Terms",
         "tags": [
           "market-data"
         ]

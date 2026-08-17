@@ -69,6 +69,34 @@ class Instrument(BaseModel):
     provider: str = "capital.com"
 
 
+class InstrumentTerms(BaseModel):
+    """What the provider will let a caller do with one instrument, and at what deposit.
+
+    Deliberately not fields on `Instrument`: the provider carries none of this in the flat
+    market dict that search and marketnavigation return, only in the detail of a single
+    instrument. Hanging them off the catalogue would mean one request per row.
+
+    No price here. It is already in `Instrument` and in `Candle`, and a third place for it
+    is a third answer that can be from a different moment.
+
+    Every field but `symbol` may be absent: the provider omits some of them for some
+    instruments, and a missing rule is not a rule of zero.
+    """
+
+    symbol: str
+    currency: str | None = None
+    lot_size: float | None = None
+    # The unit travels with the number and is never folded into it — a bare 5 could be a
+    # 5% deposit or a 20x multiplier, and this module has no way to tell which the
+    # provider meant. `PERCENTAGE` is what capital.com has been observed to send.
+    margin_factor: float | None = None
+    margin_factor_unit: str | None = None
+    min_deal_size: float | None = None
+    max_deal_size: float | None = None
+    size_increment: float | None = None
+    provider: str = "capital.com"
+
+
 class InstrumentPage(BaseModel):
     """Result of enumerating instruments — carries the truncation signal, so a partial
     catalogue is never mistaken for a complete one."""

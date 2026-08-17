@@ -31,6 +31,15 @@ to mean something (specs/trading-mcp-transport).
 - `server.py` / `__main__.py` — the FastMCP instance and its one transport.
 - `tools/account.py` — `get_positions`, `get_working_orders`, `get_balance`: reads,
   annotated `readOnlyHint=True`.
+- `tools/instruments.py` — `get_instrument_terms` and `size_for_margin`: reads, and the
+  only arithmetic in the module. The terms are the provider's own — the deposit it
+  requires, the smallest and largest order it takes, the step sizes move in — none of
+  which a model can derive from anything else it sees. `size_for_margin` turns a deposit
+  into a size, rounded **down** to that step, and takes the price as an argument rather
+  than reading one: the size then rests on the same number from the archive that the
+  decision did, and the trace shows which. Measured reason for both: an agent sizing 2%
+  of an account into US100 sent the deposit divided by the price, which at a 5% margin
+  requirement committed a twentieth of what it meant to.
 - `tools/orders.py` — `place_order`, `close_position`, `amend_stops`,
   `cancel_working_order`: writes, annotated as changing state, never retried by this
   module on its own failure. What each one decides for itself is only what its own

@@ -67,6 +67,7 @@ def test_every_route_appears_in_the_published_schema(client: TestClient) -> None
         "/instruments/search",
         "/instruments/{symbol}/candles",
         "/instruments/{symbol}/history",
+        "/instruments/{symbol}/terms",
         "/positions",
         "/orders",
         "/positions/{position_id}",
@@ -209,6 +210,41 @@ def test_a_provider_refusal_becomes_a_stated_status_not_a_stack_trace(
 
     with client:
         response = client.get("/instruments/NOPE/candles")
+
+    assert response.status_code == 404
+    assert "NOPE" in response.json()["detail"]
+
+
+@respx.mock
+def test_instrument_terms_come_from_the_market_detail(client: TestClient) -> None:
+    mock_login()
+    market = respx.get(f"{API}/markets/GOLD")
+    market.mock(return_value=httpx.Response(200, json=load_fixture("market_gold.json")))
+
+    with client:
+        response = client.get("/instruments/GOLD/terms")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["margin_factor"] == 100
+    assert body["margin_factor_unit"] == "PERCENTAGE"
+    assert body["size_increment"] == 0.01
+    # One request, the same one `_market_open` makes — this route reads the rest of an
+    # answer the module was already paying for.
+    assert market.call_count == 1
+
+
+@respx.mock
+def test_terms_for_an_instrument_the_provider_does_not_know_name_the_symbol(
+    client: TestClient,
+) -> None:
+    mock_login()
+    respx.get(f"{API}/markets/NOPE").mock(
+        return_value=httpx.Response(404, json={"errorCode": "error.not-found.epic"})
+    )
+
+    with client:
+        response = client.get("/instruments/NOPE/terms")
 
     assert response.status_code == 404
     assert "NOPE" in response.json()["detail"]

@@ -17,6 +17,39 @@ def test_a_market_becomes_an_instrument() -> None:
     assert i.ask == gold["offer"]
 
 
+def test_market_details_carry_the_deposit_and_the_size_rules() -> None:
+    terms = mapping.instrument_terms_from_details("GOLD", load_fixture("market_gold.json"))
+    assert terms.symbol == "GOLD"
+    assert terms.currency == "USD"
+    assert terms.lot_size == 1
+    # The number and its unit travel together — 100 alone says nothing about whether it
+    # is a percentage of the contract or a multiplier over it.
+    assert terms.margin_factor == 100
+    assert terms.margin_factor_unit == "PERCENTAGE"
+    assert (terms.min_deal_size, terms.max_deal_size, terms.size_increment) == (0.01, 50000, 0.01)
+
+
+def test_market_details_carry_no_price() -> None:
+    terms = mapping.instrument_terms_from_details("GOLD", load_fixture("market_gold.json"))
+    assert not any(field.endswith(("bid", "ask", "price")) for field in terms.model_dump())
+
+
+def test_a_rule_the_provider_omits_stays_missing_rather_than_becoming_zero() -> None:
+    terms = mapping.instrument_terms_from_details("SPARSE", load_fixture("market_sparse.json"))
+    assert terms.min_deal_size == 0.1
+    assert terms.max_deal_size is None
+    assert terms.size_increment is None
+    assert terms.margin_factor is None
+    assert terms.margin_factor_unit is None
+    assert terms.lot_size is None
+
+
+def test_market_details_without_dealing_rules_at_all() -> None:
+    terms = mapping.instrument_terms_from_details("X", {"instrument": {"currency": "USD"}})
+    assert terms.currency == "USD"
+    assert terms.min_deal_size is None
+
+
 def test_an_unknown_instrument_type_is_other_not_a_crash() -> None:
     assert mapping.asset_class("BONDS_THE_PROVIDER_ADDED_LATER") is AssetClass.OTHER
     assert mapping.asset_class(None) is AssetClass.OTHER

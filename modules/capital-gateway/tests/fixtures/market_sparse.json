@@ -1,0 +1,19 @@
+{
+  "instrument": {
+    "epic": "SPARSE",
+    "name": "An instrument the provider describes thinly",
+    "type": "INDICES",
+    "currency": "USD"
+  },
+  "dealingRules": {
+    "minDealSize": {
+      "unit": "POINTS",
+      "value": 0.1
+    }
+  },
+  "snapshot": {
+    "marketStatus": "TRADEABLE",
+    "bid": 100.0,
+    "offer": 100.2
+  }
+}
