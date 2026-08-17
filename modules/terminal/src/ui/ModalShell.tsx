@@ -27,10 +27,13 @@ const FOCUSABLE =
 
 /** `question` is the width a sentence and two buttons want. `wide` is for a modal that
  *  exists *because* the panel it replaced was too narrow — it also takes a fixed height,
- *  so the columns inside it have something to scroll against. */
+ *  so the columns inside it have something to scroll against. `reading` is for the one job
+ *  that is neither: several pages of a model's prose, where the limit on how much fits is
+ *  the screen and nothing else. */
 const SIZES = {
   question: "max-h-[85vh] w-full max-w-2xl",
   wide: "h-[85vh] w-full max-w-6xl",
+  reading: "h-[94vh] w-full max-w-[110rem]",
 } as const;
 
 export function ModalShell({
@@ -126,12 +129,12 @@ export function ModalShell({
           )}
         </div>
 
-        {/* A question scrolls as one thing; a wide modal hands its own columns the
+        {/* A question scrolls as one thing; the taller sizes hand their own columns the
             scrolling, because two of them scrolling together is what made the panel this
             replaced hard to work in. */}
         <div
           className={`flex min-h-0 flex-1 flex-col px-4 pb-4 pt-3 ${
-            size === "wide" ? "overflow-hidden" : "overflow-auto"
+            size === "question" ? "overflow-auto" : "overflow-hidden"
           }`}
         >
           {children}

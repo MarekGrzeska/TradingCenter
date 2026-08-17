@@ -177,8 +177,9 @@ function nodeElement(testId: string): HTMLElement {
 
 async function openTheTeam(api: TeamsApi) {
   render(<TeamsView api={api} />);
-  await screen.findByText("Morning desk");
-  await userEvent.click(screen.getByRole("button", { name: "Open" }));
+  // Double-click on the row, which is what opening a team is since the `Open` button was
+  // dropped — it was one of five on a row where opening is the common case.
+  await userEvent.dblClick(await screen.findByText("Morning desk"));
   return screen.findByTestId("agent-node-Scout");
 }
 
@@ -200,6 +201,92 @@ async function closeAgentSettings() {
   await userEvent.click(screen.getByRole("button", { name: "Done" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 }
+
+describe("the catalogue's own affordances", () => {
+  it("opens a team on a double-click, and offers no Open button to do it with", async () => {
+    render(<TeamsView api={fakeApi()} />);
+
+    await userEvent.dblClick(await screen.findByText("Morning desk"));
+
+    expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
+  });
+
+  it("says so, because a double-click is not visible the way a button was", async () => {
+    render(<TeamsView api={fakeApi()} />);
+
+    expect(await screen.findByText(/Double-click a team to open it/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+  });
+
+  it("opens it from the keyboard too, which a double-click cannot", async () => {
+    render(<TeamsView api={fakeApi()} />);
+    const row = (await screen.findByText("Morning desk")).closest("li") as HTMLElement;
+
+    row.focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
+  });
+});
+
+describe("a team's runs, as a view of their own", () => {
+  it("goes to the runs and opens the newest, rather than unfolding a list to click twice", async () => {
+    const older = { ...RUN, id: 5, status: "completed", finishedAt: 1_760_000_900 };
+    const api = fakeApi({ listRuns: vi.fn(async () => [RUN, older]) });
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+
+    // Every run of the team is on screen, and the newest is the one drawn underneath.
+    expect(await screen.findByRole("button", { name: /Run 7/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Run 5/ })).toBeInTheDocument();
+    expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Watch" })).not.toBeInTheDocument();
+  });
+
+  it("switches the picture to another run without leaving the list", async () => {
+    // The whole reason this stopped being a drawer inside the catalogue: comparing two runs
+    // used to mean walking back out and in again.
+    const older = { ...RUN, id: 5, status: "completed", finishedAt: 1_760_000_900 };
+    const api = fakeApi({
+      listRuns: vi.fn(async () => [RUN, older]),
+      getRun: vi.fn(async (id: number) => (id === 5 ? older : RUN)),
+      watchRun: vi.fn(async (id: number) =>
+        streamOf([
+          {
+            kind: "snapshot",
+            run: id === 5 ? older : RUN,
+            steps: id === 5 ? [step(1, "agent-1", "failed")] : MIDWAY,
+          },
+        ]),
+      ),
+    });
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+    await screen.findByTestId("agent-node-Scout");
+
+    await userEvent.click(screen.getByRole("button", { name: /Run 5/ }));
+
+    await waitFor(() => expect(api.watchRun).toHaveBeenCalledWith(5, expect.anything()));
+    await waitFor(() =>
+      expect(within(screen.getByTestId("agent-node-Scout")).getByText("failed")).toBeInTheDocument(),
+    );
+    // Still the list: both runs are pickable from where the operator already is.
+    expect(screen.getByRole("button", { name: /Run 7/ })).toBeInTheDocument();
+  });
+
+  it("says there is nothing rather than showing an empty canvas", async () => {
+    render(<TeamsView api={fakeApi({ listRuns: vi.fn(async () => []) })} />);
+    await screen.findByText("Morning desk");
+
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+
+    expect(await screen.findByText(/No runs yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Pick a run/)).toBeInTheDocument();
+  });
+});
 
 describe("what the chat changed", () => {
   it("shows a team the model created, without the operator reloading the page", async () => {
@@ -431,7 +518,6 @@ describe("the agent settings dialog", () => {
     render(<TeamsView api={fakeApi()} />);
     await screen.findByText("Morning desk");
     await userEvent.click(screen.getByRole("button", { name: "Runs" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Watch" }));
     await screen.findByTestId("agent-node-Scout");
 
     expect(screen.queryByLabelText(/^Settings for/)).not.toBeInTheDocument();
@@ -612,7 +698,10 @@ describe("starting a run", () => {
     await startFrom(api);
 
     await waitFor(() => expect(api.startRun).toHaveBeenCalledWith(TEAM.id, expect.anything()));
-    expect(await screen.findByText("Run 7")).toBeInTheDocument();
+    // The run is named twice now, and both are the point: once in the team's run list and
+    // once on the monitor underneath it.
+    expect(await screen.findAllByText(/Run 7/)).not.toHaveLength(0);
+    expect(await screen.findByTestId("run-status")).toBeInTheDocument();
     expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
   });
 
@@ -646,8 +735,9 @@ describe("watching a run", () => {
   async function watch(api: TeamsApi) {
     render(<TeamsView api={api} />);
     await screen.findByText("Morning desk");
+    // One click now: `Runs` is a view of its own and it opens on the newest run rather
+    // than unfolding a list that then needs a second click on `Watch`.
     await userEvent.click(screen.getByRole("button", { name: "Runs" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Watch" }));
     return screen.findByTestId("agent-node-Scout");
   }
 
@@ -729,7 +819,6 @@ describe("watching a run", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "← Catalogue" }));
     await userEvent.click(await screen.findByRole("button", { name: "Runs" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Watch" }));
 
     await waitFor(() =>
       expect(within(screen.getByTestId("agent-node-Scribe")).getByText("done")).toBeInTheDocument(),

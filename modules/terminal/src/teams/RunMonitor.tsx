@@ -29,7 +29,9 @@ export function RunMonitor({
   api: TeamsApi;
   runId: number;
   models: TeamsModel[];
-  onClose(): void;
+  /** Absent inside `TeamRunsView`, which has a header and a way back of its own — two
+   *  "← Catalogue" buttons one above the other are one too many. */
+  onClose?(): void;
 }) {
   const monitor = useRunMonitor(api, runId);
   const { run, steps, toolCalls, trades } = monitor;
@@ -114,13 +116,15 @@ export function RunMonitor({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-2 border-b border-border p-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-        >
-          ← Catalogue
-        </button>
+        {onClose && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
+          >
+            ← Catalogue
+          </button>
+        )}
         <span className="text-sm text-ink">
           Run {runId}
           {version !== null && <span className="text-xs text-ink-faint"> · revision {version}</span>}
@@ -265,7 +269,11 @@ function AgentWork({
         </p>
       </div>
 
-      <section className="flex min-h-0 flex-col gap-1">
+      {/* No `min-h-0` here, and that is the fix for a real overlap: with it, this section
+          was allowed to shrink below its own content while the rendered output kept its
+          height, so a long analyst report drew straight through the "Tools called" list
+          underneath it. The column scrolls; the sections inside it keep their height. */}
+      <section className="flex flex-col gap-1">
         <h4 className="text-xs uppercase tracking-wide text-ink-faint">Output</h4>
         {step.output ? (
           // The same renderer the chat uses, for the same reason: this is model prose, and

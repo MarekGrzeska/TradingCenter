@@ -49,7 +49,9 @@ export function RunOutputsDialog({
   return (
     <ModalShell
       title={`Run ${runId} — what the agents wrote`}
-      size="wide"
+      // `reading`, not `wide`: this is the one window whose whole job is several pages of
+      // prose, so it takes the screen rather than a comfortable dialog's worth of it.
+      size="reading"
       showCloseButton
       onClose={onClose}
       footer={
@@ -147,8 +149,9 @@ function PickerButton({
  *  punctuation noise until something interprets them. Reusing it also inherits the reason
  *  it is safe — no `rehype-raw`, so raw HTML in an output is never rendered at all.
  *
- *  `max-w-prose` because a line of text 64rem wide is as hard to read as one 20rem wide,
- *  for the opposite reason. */
+ *  Capped at `max-w-4xl` rather than filling the window: a line of text 90rem wide is as
+ *  hard to read as one 20rem wide, for the opposite reason. Wider than `max-w-prose`
+ *  because the window is now the screen and the extra width is there to be used. */
 function OneOutput({ step, role }: { step: TeamRunStep; role: string }) {
   return (
     <section className="flex flex-col gap-1">
@@ -160,7 +163,7 @@ function OneOutput({ step, role }: { step: TeamRunStep; role: string }) {
         </span>
       </h3>
       {step.output ? (
-        <div className="max-w-prose text-sm leading-relaxed text-ink">
+        <div className="max-w-4xl text-sm leading-relaxed text-ink">
           <MessageBody text={step.output} />
         </div>
       ) : (
@@ -182,7 +185,7 @@ function Called({ calls }: { calls: TeamRunToolCall[] }) {
         calls.map((call) => (
           <div
             key={`${call.roundIndex}-${call.position}-${call.toolName}`}
-            className="flex max-w-prose items-baseline justify-between gap-2 text-xs"
+            className="flex max-w-4xl items-baseline justify-between gap-2 text-xs"
           >
             <span className="text-ink">{call.toolName}</span>
             <span className={call.outcome === "ok" ? "text-ink-faint" : "text-warning"}>
@@ -207,7 +210,7 @@ function Placed({ trades, runOver }: { trades: TeamTrade[]; runOver: boolean }) 
         return (
           <div
             key={trade.id}
-            className="flex max-w-prose items-baseline justify-between gap-2 text-xs"
+            className="flex max-w-4xl items-baseline justify-between gap-2 text-xs"
           >
             <span className="text-ink">
               {trade.symbol ?? trade.toolName}

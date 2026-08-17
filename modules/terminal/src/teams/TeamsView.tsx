@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useAgentTurns } from "../agent/useAgentTurns";
-import { RunMonitor } from "./RunMonitor";
 import { SchedulesPanel } from "./SchedulesPanel";
 import { TeamCatalogue } from "./TeamCatalogue";
 import { TeamEditor } from "./TeamEditor";
+import { TeamRunsView } from "./TeamRunsView";
 import { teamsApi, type TeamsApi } from "./teamsApi";
 import { useModels, useTeams, useTools } from "./useTeamsData";
 
@@ -11,7 +11,10 @@ type Open =
   | { kind: "catalogue" }
   | { kind: "team"; id: number }
   | { kind: "new" }
-  | { kind: "run"; runId: number }
+  /** A team's runs, with one of them open underneath the list. `runId` is set when the
+   *  operator arrived by starting a run or by following one from a schedule's history;
+   *  `null` lets the view open the newest, which is what "show me the runs" means. */
+  | { kind: "runs"; teamId: number; teamName: string; runId: number | null }
   | { kind: "schedules"; teamId: number; teamName: string };
 
 /**
@@ -67,7 +70,10 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
         error={teams.error}
         api={api}
         onOpen={(id) => setOpen({ kind: "team", id })}
-        onWatch={(runId) => setOpen({ kind: "run", runId })}
+        onWatch={(runId, teamId, teamName) =>
+          setOpen({ kind: "runs", teamId, teamName, runId })
+        }
+        onRuns={(teamId, teamName) => setOpen({ kind: "runs", teamId, teamName, runId: null })}
         onNew={() => setOpen({ kind: "new" })}
         onSchedules={(id, name) => setOpen({ kind: "schedules", teamId: id, teamName: name })}
         onChanged={teams.reload}
@@ -76,14 +82,16 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
     );
   }
 
-  if (open.kind === "run") {
+  if (open.kind === "runs") {
     // Leaving this view stops nothing: the monitor drops its stream, the run carries on,
-    // and the catalogue's own run list is the way back to it.
+    // and this list is the way back to it.
     return (
-      <RunMonitor
+      <TeamRunsView
         api={api}
-        runId={open.runId}
+        teamId={open.teamId}
+        teamName={open.teamName}
         models={models.value}
+        initialRunId={open.runId}
         onClose={() => setOpen({ kind: "catalogue" })}
       />
     );
@@ -97,7 +105,9 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
         teamName={open.teamName}
         tools={tools.value}
         onClose={() => setOpen({ kind: "catalogue" })}
-        onWatchRun={(runId) => setOpen({ kind: "run", runId })}
+        onWatchRun={(runId) =>
+          setOpen({ kind: "runs", teamId: open.teamId, teamName: open.teamName, runId })
+        }
       />
     );
   }
