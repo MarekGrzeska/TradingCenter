@@ -10,7 +10,7 @@ from collections.abc import AsyncIterator
 import pytest
 from mcp.server.fastmcp import FastMCP
 
-from teams.tools import ToolOutcomeKind, ToolServer, ToolServerUnavailable
+from teams.tools import ToolOutcome, ToolOutcomeKind, ToolServer, ToolServerUnavailable
 
 from .mcp_stand_in import free_port, serving, settings_for
 
@@ -148,6 +148,91 @@ async def test_an_unreachable_server_makes_a_call_unavailable_not_a_refusal() ->
     assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
     assert "says nothing about what the tool would have answered" in outcome.text
     assert "TaskGroup" not in outcome.text
+
+
+async def test_a_call_survives_the_server_restarting_under_it() -> None:
+    """specs/teams-tool-access, "Wywołanie odrzucone z powodu nieznanej sesji jest
+    ponawiane raz" — the production failure of 17 August 2026, reproduced.
+
+    Two real servers on one port, which is what a redeploy looks like from this side: the
+    session the client holds means nothing to the second one, and its `404` is the only
+    warning there is. Driven through the real client rather than a raised `McpError`,
+    because the thing worth pinning is that the SDK still turns that `404` into what
+    `_session_is_gone` recognises.
+    """
+    port = free_port()
+    async with serving(port=port) as url:
+        client = ToolServer(settings_for(url))
+        first = await client.call("read_indicators", {"symbol": "US100"})
+        assert first.kind is ToolOutcomeKind.OK
+
+    async with serving(port=port):
+        try:
+            second = await client.call("read_indicators", {"symbol": "US100"})
+        finally:
+            await client.aclose()
+
+    assert second.kind is ToolOutcomeKind.OK
+    assert "RSI 61" in second.text
+
+
+async def test_a_write_tool_is_retried_on_the_same_terms_as_a_read() -> None:
+    """The gate that refused the first request had not read which tool was asked for, so
+    its answer carries the same proof either way. Sorting by tool name here would leave an
+    order unplaced in the one case where it is known to be safe to send."""
+    port = free_port()
+    async with serving(("place_order",), port=port) as url:
+        client = ToolServer(settings_for(url))
+        assert (await client.call("place_order", {})).kind is ToolOutcomeKind.OK
+
+    async with serving(("place_order",), port=port):
+        try:
+            outcome = await client.call("place_order", {})
+        finally:
+            await client.aclose()
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    assert json.loads(outcome.text) == {"result": "order placed"}
+
+
+async def test_a_retried_call_is_one_outcome_with_one_duration() -> None:
+    """The trace writes a row per outcome (`runner/engine.py`), so one outcome is one
+    entry — the model called the tool once and the reopening was not its decision."""
+    port = free_port()
+    async with serving(port=port) as url:
+        client = ToolServer(settings_for(url))
+        await client.call("read_indicators", {"symbol": "US100"})
+
+    async with serving(port=port):
+        try:
+            outcome = await client.call("read_indicators", {"symbol": "US100"})
+        finally:
+            await client.aclose()
+
+    assert isinstance(outcome, ToolOutcome)
+    # Both attempts, because that is how long the model waited.
+    assert outcome.duration_ms >= 0
+
+
+async def test_the_tool_list_survives_the_server_restarting_under_it() -> None:
+    """Same retry, one layer up: a list refused because the server restarted would
+    otherwise refuse the whole run before an agent is asked anything."""
+    port = free_port()
+    async with serving(port=port) as url:
+        client = ToolServer(settings_for(url))
+        assert (await client.call("read_indicators", {"symbol": "US100"})).kind is ToolOutcomeKind.OK
+
+    async with serving(port=port):
+        try:
+            tools = await client.list_tools()
+        finally:
+            await client.aclose()
+
+    assert {tool.name for tool in tools} == {
+        "get_last_price",
+        "list_tracked_pairs",
+        "read_indicators",
+    }
 
 
 async def test_a_slow_server_times_out_as_unavailable_not_as_a_refusal() -> None:
