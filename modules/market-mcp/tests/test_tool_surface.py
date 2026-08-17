@@ -37,6 +37,7 @@ TIME_TOOLS = {
 }
 
 EXPECTED_TOOL_NAMES = {
+    "list_tracked_symbols",
     "list_tracked_pairs",
     "get_candles",
     "get_last_price",
