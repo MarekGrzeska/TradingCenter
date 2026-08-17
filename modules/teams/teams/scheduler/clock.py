@@ -30,7 +30,6 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import asyncpg
-from croniter import croniter
 
 from .. import store
 from ..config import Settings
@@ -41,6 +40,7 @@ from ..runner.cost import CostLimitReached
 from ..runner.trading import TradeLimitReached
 from ..tools import ToolOutcomeKind, ToolServer, ToolServerRegistry, ToolServerUnavailable
 from ..validation import DefinitionRefused
+from .timing import fires_after
 
 log = logging.getLogger(__name__)
 
@@ -230,14 +230,13 @@ def _next_fire_and_skipped(
     and how many slots between `due_at` (the row's own value at claim time, itself
     already due) and `now` were folded into this one fire
     (specs/teams-schedules, "Pominięte wyzwolenia zwijają się do jednego")."""
-    iterator = croniter(cron_expression, due_at)
     skipped = 0
-    while True:
-        candidate = iterator.get_next(datetime)
+    for candidate in fires_after(cron_expression, due_at):
         if candidate <= now:
             skipped += 1
         else:
             return candidate, skipped
+    raise AssertionError("fires_after never runs out")
 
 
 async def _fire_schedule(

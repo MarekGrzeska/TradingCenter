@@ -1,4 +1,4 @@
-import { formatInstant, formatUtcInstant } from "../ui/formatTime";
+import { formatInstant } from "../ui/formatTime";
 import type { ScheduleFire } from "./teamsApi";
 
 /**
@@ -27,7 +27,7 @@ export function FireHistoryList({
           className="flex items-center justify-between gap-2 rounded border border-border px-2 py-1 text-xs"
         >
           <span className="min-w-0 truncate text-ink-muted">
-            {formatUtcInstant(fire.firedAt)} · local {formatInstant(fire.firedAt)} ·{" "}
+            {formatInstant(fire.firedAt)} ·{" "}
             <span className={fire.outcome === "started" ? "text-ink" : "text-ink-faint"}>
               {fire.outcome}
             </span>

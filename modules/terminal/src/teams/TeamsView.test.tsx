@@ -149,6 +149,7 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
     }),
     scheduleFires: vi.fn(async () => []),
     nextFires: vi.fn(async () => []),
+    previewNextFires: vi.fn(async () => []),
     listTriggers: vi.fn(async () => []),
     createTrigger: vi.fn(async () => {
       throw new Error("not stubbed");
@@ -302,6 +303,56 @@ describe("a team's runs, as a view of their own", () => {
 
     expect(await screen.findByText(/No runs yet/)).toBeInTheDocument();
     expect(screen.getByText(/Pick a run/)).toBeInTheDocument();
+  });
+
+  it("starts a run from here, once the question naming the revision is answered", async () => {
+    const started = { ...RUN, id: 9, status: "pending" };
+    const api = fakeApi({ listRuns: vi.fn(async () => []), startRun: vi.fn(async () => started) });
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+
+    await userEvent.click(await screen.findByRole("button", { name: /Run now/ }));
+    // The revision is named before the question is answered — a run costs tokens and,
+    // for a team with the order tools, places demo orders.
+    expect(await screen.findByRole("dialog", { name: "Run now" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText(/the team's latest/)).toBeInTheDocument());
+    await userEvent.click(screen.getByRole("button", { name: "Start the run" }));
+
+    await waitFor(() => expect(api.startRun).toHaveBeenCalledWith(1, expect.anything()));
+    // And the run just started is the one being watched.
+    await waitFor(() => expect(api.watchRun).toHaveBeenCalledWith(9, expect.anything()));
+  });
+
+  it("starts nothing when the question is dismissed", async () => {
+    const api = fakeApi({ listRuns: vi.fn(async () => []) });
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+
+    await userEvent.click(await screen.findByRole("button", { name: /Run now/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(api.startRun).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Run now" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the refusal beside the question, in the module's own words", async () => {
+    const api = fakeApi({
+      listRuns: vi.fn(async () => []),
+      startRun: vi.fn(async () => {
+        throw new MarketDataError("refused", "the team has spent its daily cost limit");
+      }),
+    });
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+
+    await userEvent.click(await screen.findByRole("button", { name: /Run now/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Start the run" }));
+
+    expect(await screen.findByText("the team has spent its daily cost limit")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Run now" })).toBeInTheDocument();
   });
 });
 

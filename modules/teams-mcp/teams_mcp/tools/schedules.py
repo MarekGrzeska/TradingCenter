@@ -65,13 +65,20 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         context: Context,
         team_id: int,
         cron_expression: str = Field(
-            description="five-field cron, in UTC — for example '0 7 * * 1-5' for 07:00 on weekdays"
+            description=(
+                "five-field cron, read as a wall clock in Poland (Europe/Warsaw) — for "
+                "example '0 7 * * 1-5' for 07:00 on weekdays, the same 07:00 in summer "
+                "and in winter"
+            )
         ),
         pinned_revision_id: int | None = None,
     ) -> SavedSchedule:
         """Run this team on a clock, unattended.
 
-        Times are UTC, always. By default the schedule is **pinned** to the revision
+        Times are Polish wall-clock times, always — teams rolls the expression forward in
+        `Europe/Warsaw`, so 07:00 stays 07:00 across a clock change, and the moment it
+        answers with (`next_fire_at`) is that same moment in UTC. By default the schedule
+        is **pinned** to the revision
         given (or the current one), so editing the team later does not silently change
         what the robot does at seven in the morning; pass `pinned_revision_id` from
         `read_team` to pin an older one deliberately.
@@ -180,7 +187,10 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
             ScheduleSummary(
                 kind="schedule",
                 id=row["id"],
-                describes=f"cron {row['cron_expression']} (UTC), next {row['next_fire_at']}",
+                describes=(
+                    f"cron {row['cron_expression']} (Europe/Warsaw), "
+                    f"next {row['next_fire_at']} (UTC)"
+                ),
                 enabled=row["enabled"],
                 disabled_reason=row["disabled_reason"],
                 recent_fires=_recent(fires),

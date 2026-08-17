@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import { useAgentTurns } from "../agent/useAgentTurns";
 import { MarketDataError } from "../data/types";
-import { formatInstant, formatUtcInstant } from "../ui/formatTime";
+import { formatInstant } from "../ui/formatTime";
 import { FireHistoryList } from "./FireHistoryList";
+import { ScheduleWizardDialog } from "./ScheduleWizardDialog";
 import {
   COMPARISON_LABELS,
   TRIGGER_COMPARISONS,
-  emptyScheduleDraft,
+  describeSchedule,
   emptyTriggerDraft,
   withRevisionMode,
 } from "./scheduleDraft";
 import type {
   RevisionMode,
   Schedule,
-  ScheduleDraft,
   ScheduleFire,
   TeamsApi,
   TeamsTool,
@@ -169,14 +169,13 @@ function ScheduleSection({
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
                 <div className="truncate text-sm text-ink">
-                  <code>{schedule.cronExpression}</code>{" "}
+                  {describeSchedule(schedule)}{" "}
                   <span className="text-xs text-ink-faint">
                     ({schedule.revisionMode === "pinned" ? `revision pinned` : "tracks latest"})
                   </span>
                 </div>
                 <div className="text-xs text-ink-muted">
-                  next fire {formatUtcInstant(schedule.nextFireAt)} · local{" "}
-                  {formatInstant(schedule.nextFireAt)}
+                  next fire {formatInstant(schedule.nextFireAt)}
                 </div>
                 {!schedule.enabled && (
                   <div className="text-xs text-critical">
@@ -212,7 +211,7 @@ function ScheduleSection({
       </ul>
 
       {editing !== null && (
-        <ScheduleForm
+        <ScheduleWizardDialog
           api={api}
           teamId={teamId}
           schedule={editing === "new" ? null : editing}
@@ -293,108 +292,6 @@ function ScheduleHistory({
   }, [api, scheduleId]);
 
   return <FireHistoryList fires={fires} onWatchRun={onWatchRun} />;
-}
-
-function ScheduleForm({
-  api,
-  teamId,
-  schedule,
-  latestRevisionId,
-  onClose,
-  onSaved,
-}: {
-  api: TeamsApi;
-  teamId: number;
-  /** `null` creates a new schedule. */
-  schedule: Schedule | null;
-  latestRevisionId: number | null;
-  onClose(): void;
-  onSaved(): void;
-}) {
-  const [draft, setDraft] = useState<ScheduleDraft>(
-    schedule ?? emptyScheduleDraft(latestRevisionId),
-  );
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [nextFires, setNextFires] = useState<number[] | null>(null);
-
-  useEffect(() => {
-    if (schedule === null) return;
-    let cancelled = false;
-    const controller = new AbortController();
-    api
-      .nextFires(schedule.id, 5, controller.signal)
-      .then((times) => !cancelled && setNextFires(times))
-      .catch(() => !cancelled && setNextFires(null));
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-    // Re-read only when the row this form opened on changes — not on every keystroke,
-    // since the preview is the *saved* schedule's own next fires, not the draft's.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, schedule?.id]);
-
-  async function save() {
-    setSaving(true);
-    setError(null);
-    try {
-      if (schedule === null) {
-        await api.createSchedule(teamId, draft, new AbortController().signal);
-      } else {
-        await api.updateSchedule(schedule.id, draft, new AbortController().signal);
-      }
-      onSaved();
-    } catch (cause) {
-      setError(refusalMessage(cause, "could not save the schedule"));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="mt-3 flex flex-col gap-2 rounded border border-border bg-panel-strong p-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <label className="text-xs text-ink-muted" htmlFor="schedule-cron">
-          Cron
-        </label>
-        <input
-          id="schedule-cron"
-          value={draft.cronExpression}
-          onChange={(event) => setDraft({ ...draft, cronExpression: event.target.value })}
-          placeholder="*/5 * * * *"
-          className={`${INPUT} font-mono`}
-        />
-        <RevisionModeFields
-          revisionMode={draft.revisionMode}
-          pinnedRevisionId={draft.pinnedRevisionId}
-          onChangeMode={(mode) => setDraft(withRevisionMode(draft, mode, latestRevisionId))}
-        />
-      </div>
-
-      <UnattendedAckField
-        checked={draft.unattendedAck}
-        onChange={(unattendedAck) => setDraft({ ...draft, unattendedAck })}
-      />
-
-      {nextFires !== null && nextFires.length > 0 && (
-        <div className="text-xs text-ink-muted">
-          Next: {nextFires.map((t) => formatUtcInstant(t)).join(" · ")}
-        </div>
-      )}
-
-      {error && <p className="text-xs text-critical">{error}</p>}
-
-      <div className="flex gap-2">
-        <button type="button" onClick={save} disabled={saving} className={PRIMARY_BUTTON}>
-          {saving ? "Saving…" : schedule === null ? "Create schedule" : "Save schedule"}
-        </button>
-        <button type="button" onClick={onClose} className={BUTTON}>
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
 }
 
 function RevisionModeFields({

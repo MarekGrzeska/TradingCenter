@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useAgentTurns } from "../agent/useAgentTurns";
+import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { formatInstant } from "../ui/formatTime";
 import { RunMonitor } from "./RunMonitor";
 import type { TeamRun } from "./runs";
-import type { TeamsApi, TeamsModel } from "./teamsApi";
+import type { TeamRevision, TeamsApi, TeamsModel } from "./teamsApi";
 
 /**
  * One team's runs: the list, and the run picked out of it drawn underneath.
@@ -44,6 +45,7 @@ export function TeamRunsView({
   const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState<number | null>(initialRunId);
   const [attempt, setAttempt] = useState(0);
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,12 +95,32 @@ export function TeamRunsView({
         >
           ← Edit team
         </button>
+        <button
+          type="button"
+          onClick={() => setStarting(true)}
+          className="cursor-pointer rounded border border-primary bg-primary-soft px-2 py-1 text-xs text-ink hover:bg-primary-strong hover:text-ink-inverse"
+        >
+          ▶ Run now
+        </button>
         {runs !== null && (
           <span className="text-xs text-ink-faint">
             {runs.length} recorded{runs.length > 0 && ", newest first"}
           </span>
         )}
       </header>
+
+      {starting && (
+        <StartRunDialog
+          api={api}
+          teamId={teamId}
+          teamName={teamName}
+          onClose={() => setStarting(false)}
+          onStarted={(run) => {
+            setWatching(run.id);
+            setAttempt((n) => n + 1);
+          }}
+        />
+      )}
 
       <div className="max-h-[30vh] shrink-0 overflow-auto border-b border-border">
         {error && (
@@ -160,6 +182,71 @@ export function TeamRunsView({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Starting a run from where the runs are read — the operator's most common next move after
+ * comparing two of them (specs/terminal-teams, "Przebieg da się uruchomić z widoku
+ * przebiegów zespołu").
+ *
+ * The question names the revision before it is answered, which is the whole reason this is
+ * a dialog rather than a button that just fires: a run costs tokens and, for a team with
+ * the order tools, places demo orders. Which revision runs is not a choice here — the
+ * module runs the latest, the same as the catalogue's own Run button — so it is read and
+ * shown rather than picked.
+ */
+function StartRunDialog({
+  api,
+  teamId,
+  teamName,
+  onClose,
+  onStarted,
+}: {
+  api: TeamsApi;
+  teamId: number;
+  teamName: string;
+  onClose(): void;
+  onStarted(run: TeamRun): void;
+}) {
+  const [revision, setRevision] = useState<TeamRevision | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const controller = new AbortController();
+    api
+      .latestRevision(teamId, controller.signal)
+      .then((answer) => !cancelled && setRevision(answer))
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+      controller.abort();
+    };
+  }, [api, teamId]);
+
+  return (
+    <ConfirmDialog
+      title="Run now"
+      confirmLabel="Start the run"
+      busyLabel="Starting…"
+      fallbackError="the run could not be started"
+      onConfirm={async () => {
+        onStarted(await api.startRun(teamId, new AbortController().signal));
+      }}
+      onClose={onClose}
+    >
+      <p>
+        Start <span className="text-ink">{teamName}</span> on{" "}
+        {revision === null ? (
+          "its latest revision"
+        ) : (
+          <>
+            revision <span className="text-ink">{revision.version}</span> — the team's latest
+          </>
+        )}
+        . It runs the same way a schedule would: the same limits, the same trace.
+      </p>
+    </ConfirmDialog>
   );
 }
 

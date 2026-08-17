@@ -128,8 +128,12 @@ the database exists.
 A team can start itself. Two ways, both rows in this module's own database rather than
 anything in Azure (design.md, "Zegar w procesie modułu, nie w Azure"):
 
-- a **schedule** — a cron expression, and either a pinned revision or "whatever is latest
-  at the moment of each fire", which is an explicit choice and never the default;
+- a **schedule** — a rhythm (`recurrence`: every N minutes, hourly, daily, on named
+  weekdays, on a day of the month) or the cron expression it becomes, and either a pinned
+  revision or "whatever is latest at the moment of each fire", which is an explicit choice
+  and never the default. A save names its timing exactly one of those two ways; a read
+  publishes both, with `recurrence` empty for an expression no rhythm describes
+  (`recurrence.py`);
 - a **trigger** — a market condition, expressed as a call to a tool this module already
   has a session for, with a field path, a comparison and a threshold. Never a locally
   computed indicator: the condition is read with the same tools an agent would use.
@@ -155,8 +159,20 @@ a cron entry:
 - after `SCHEDULER_FAILURE_THRESHOLD` **consecutive** failed runs it disables itself and
   records why — enough failures that one bad model response is not mistaken for a broken
   schedule, few enough that a genuinely broken one does not bill through the night;
-- `GET /schedules/{id}/next-fires` answers when it fires next. The terminal never computes
-  that itself: the row's own `next_fire_at` reflects the last *claim*, not a forecast.
+- `GET /schedules/{id}/next-fires` answers when it fires next, and `POST
+  /schedules/next-fires` answers the same for a timing nobody has saved yet. The terminal
+  never computes that itself: the row's own `next_fire_at` reflects the last *claim*, not a
+  forecast.
+
+**A schedule's hours are Polish wall-clock hours.** The expression is rolled forward in
+`Europe/Warsaw` (`scheduler/timing.py`) and every moment leaves this module in UTC, so
+`0 9 * * *` is 09:00 in Poland in July and in January both — the UTC moment is what moves
+at the clock change, not the operator's morning. Two consequences worth knowing: the daily
+cost ceiling still resets at UTC midnight, so the gap between that reset and a morning fire
+changes by an hour twice a year; and the two nights where a wall-clock moment does not
+exist or exists twice are resolved by `croniter`, with what it actually does recorded in
+`tests/test_schedule_timing.py`. The zone is a constant, not a column — one operator, one
+zone (design.md of `set-a-schedule-without-cron`).
 
 > **`SCHEDULER_ENABLED` is `false` in `infra/app-service.tf`, and that is now a decision
 > rather than a blocker.** It was a blocker: the acknowledgement check used to consult a

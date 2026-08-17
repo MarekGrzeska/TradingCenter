@@ -131,6 +131,23 @@ export type RevisionMode = "pinned" | "latest";
 
 export type TriggerComparison = "gt" | "gte" | "lt" | "lte" | "eq";
 
+export type RecurrenceKind = "every_minutes" | "hourly" | "daily" | "weekly" | "monthly";
+
+/** A schedule's rhythm, in the shape the module publishes it — `kind` decides which of
+ *  the others carry a value. `weekdays` are ISO days: 1 is Monday, 7 is Sunday.
+ *
+ *  Nothing here is translated into a cron expression on this side: the module owns that
+ *  translation both ways (`terminal-teams-schedules`, "Terminal nie liczy czasu
+ *  wyzwolenia sam"). */
+export interface Recurrence {
+  kind: RecurrenceKind;
+  minutes: number | null;
+  minute: number | null;
+  hour: number | null;
+  weekdays: number[] | null;
+  dayOfMonth: number | null;
+}
+
 /** A team's own clock. Every field the module keeps, including the ones this terminal
  *  only displays — `nextFireAt` chiefly, which the module computes and this side never
  *  recomputes (`terminal-teams-schedules`, "Terminal nie liczy czasu wyzwolenia sam"). */
@@ -140,6 +157,9 @@ export interface Schedule {
   revisionMode: RevisionMode;
   pinnedRevisionId: number | null;
   cronExpression: string;
+  /** The same schedule as a rhythm, or `null` for an expression no rhythm describes —
+   *  read back by the module, never derived here. */
+  recurrence: Recurrence | null;
   nextFireAt: number;
   enabled: boolean;
   disabledReason: string | null;
@@ -149,13 +169,20 @@ export interface Schedule {
   updatedAt: number;
 }
 
+/** When a schedule fires, said one way or the other — a rhythm, or the cron expression
+ *  the module runs. Exactly one of the two is set, which is what the module's own wire
+ *  demands and what `scheduleDraft.ts` keeps true while a form is being filled in. */
+export interface ScheduleTiming {
+  recurrence: Recurrence | null;
+  cronExpression: string | null;
+}
+
 /** What an operator submits to create or edit a schedule — everything `Schedule` carries
  *  except what only the module ever writes (`id`, `nextFireAt`, `enabled`, the failure
  *  streak). */
-export interface ScheduleDraft {
+export interface ScheduleDraft extends ScheduleTiming {
   revisionMode: RevisionMode;
   pinnedRevisionId: number | null;
-  cronExpression: string;
   unattendedAck: boolean;
 }
 
@@ -321,6 +348,11 @@ export interface TeamsApi {
   /** The module's own answer to "when does this fire next" — never computed here
    *  (`terminal-teams-schedules`, "Terminal nie liczy czasu wyzwolenia sam"). */
   nextFires(id: number, count: number, signal: AbortSignal): Promise<number[]>;
+  /** The same answer for a timing that has not been saved — what the wizard's preview
+   *  reads while the operator is still choosing (`terminal-teams-schedules`, "Operator
+   *  widzi skutek harmonogramu przed zapisaniem go"). Rejects `"refused"` for a timing
+   *  the module cannot run. */
+  previewNextFires(timing: ScheduleTiming, count: number, signal: AbortSignal): Promise<number[]>;
 
   listTriggers(teamId: number, signal: AbortSignal): Promise<Trigger[]>;
   createTrigger(teamId: number, draft: TriggerDraft, signal: AbortSignal): Promise<Trigger>;
@@ -423,6 +455,9 @@ function mapSchedule(raw: RawSchedule): Schedule {
     revisionMode: raw.revision_mode as RevisionMode,
     pinnedRevisionId: raw.pinned_revision_id,
     cronExpression: raw.cron_expression,
+    recurrence: raw.recurrence === null || raw.recurrence === undefined
+      ? null
+      : mapRecurrence(raw.recurrence),
     nextFireAt: parseIsoToEpochSeconds(raw.next_fire_at),
     enabled: raw.enabled,
     disabledReason: raw.disabled_reason,
@@ -433,12 +468,40 @@ function mapSchedule(raw: RawSchedule): Schedule {
   };
 }
 
+function mapRecurrence(raw: NonNullable<RawSchedule["recurrence"]>): Recurrence {
+  return {
+    kind: raw.kind,
+    minutes: raw.minutes ?? null,
+    minute: raw.minute ?? null,
+    hour: raw.hour ?? null,
+    weekdays: raw.weekdays ?? null,
+    dayOfMonth: raw.day_of_month ?? null,
+  };
+}
+
+function timingToWire(timing: ScheduleTiming) {
+  return {
+    cron_expression: timing.cronExpression,
+    recurrence:
+      timing.recurrence === null
+        ? null
+        : {
+            kind: timing.recurrence.kind,
+            minutes: timing.recurrence.minutes,
+            minute: timing.recurrence.minute,
+            hour: timing.recurrence.hour,
+            weekdays: timing.recurrence.weekdays,
+            day_of_month: timing.recurrence.dayOfMonth,
+          },
+  };
+}
+
 function scheduleDraftToWire(draft: ScheduleDraft): RawScheduleIn {
   return {
     revision_mode: draft.revisionMode,
     pinned_revision_id: draft.pinnedRevisionId,
-    cron_expression: draft.cronExpression,
     unattended_ack: draft.unattendedAck,
+    ...timingToWire(draft),
   };
 }
 
@@ -708,6 +771,15 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
         `${httpBase}/schedules/${id}/next-fires?count=${count}`,
         { signal },
       );
+      return raw.times.map(parseIsoToEpochSeconds);
+    },
+
+    async previewNextFires(timing, count, signal) {
+      const raw = await http.json<RawNextFires>(`${httpBase}/schedules/next-fires`, {
+        method: "POST",
+        body: { ...timingToWire(timing), count },
+        signal,
+      });
       return raw.times.map(parseIsoToEpochSeconds);
     },
 

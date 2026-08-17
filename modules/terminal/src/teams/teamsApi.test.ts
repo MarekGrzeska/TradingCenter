@@ -433,6 +433,14 @@ const wireSchedule = {
   revision_mode: "pinned",
   pinned_revision_id: 3,
   cron_expression: "*/5 * * * *",
+  recurrence: {
+    kind: "every_minutes",
+    minutes: 5,
+    minute: null,
+    hour: null,
+    weekdays: null,
+    day_of_month: null,
+  },
   next_fire_at: "2026-08-16T20:05:00Z",
   enabled: true,
   disabled_reason: null,
@@ -453,6 +461,14 @@ describe("schedules", () => {
         revisionMode: "pinned",
         pinnedRevisionId: 3,
         cronExpression: "*/5 * * * *",
+        recurrence: {
+          kind: "every_minutes",
+          minutes: 5,
+          minute: null,
+          hour: null,
+          weekdays: null,
+          dayOfMonth: null,
+        },
         nextFireAt: Date.parse("2026-08-16T20:05:00Z") / 1000,
         enabled: true,
         disabledReason: null,
@@ -475,7 +491,13 @@ describe("schedules", () => {
 
     await api().createSchedule(
       1,
-      { revisionMode: "pinned", pinnedRevisionId: 3, cronExpression: "*/5 * * * *", unattendedAck: false },
+      {
+        revisionMode: "pinned",
+        pinnedRevisionId: 3,
+        cronExpression: "*/5 * * * *",
+        recurrence: null,
+        unattendedAck: false,
+      },
       new AbortController().signal,
     );
 
@@ -483,8 +505,85 @@ describe("schedules", () => {
       revision_mode: "pinned",
       pinned_revision_id: 3,
       cron_expression: "*/5 * * * *",
+      recurrence: null,
       unattended_ack: false,
     });
+  });
+
+  it("posts a rhythm in the module's own spelling, snake_case and all", async () => {
+    let body: unknown;
+    server.use(
+      http.post(`${HTTP_BASE}/teams/1/schedules`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json(wireSchedule, { status: 201 });
+      }),
+    );
+
+    await api().createSchedule(
+      1,
+      {
+        revisionMode: "pinned",
+        pinnedRevisionId: 3,
+        cronExpression: null,
+        recurrence: {
+          kind: "weekly",
+          minutes: null,
+          minute: 30,
+          hour: 8,
+          weekdays: [1, 5],
+          dayOfMonth: null,
+        },
+        unattendedAck: false,
+      },
+      new AbortController().signal,
+    );
+
+    expect(body).toEqual({
+      revision_mode: "pinned",
+      pinned_revision_id: 3,
+      cron_expression: null,
+      recurrence: {
+        kind: "weekly",
+        minutes: null,
+        minute: 30,
+        hour: 8,
+        weekdays: [1, 5],
+        day_of_month: null,
+      },
+      unattended_ack: false,
+    });
+  });
+
+  it("previews a draft's next fires without saving it", async () => {
+    let body: unknown;
+    server.use(
+      http.post(`${HTTP_BASE}/schedules/next-fires`, async ({ request }) => {
+        body = await request.json();
+        return HttpResponse.json({ times: ["2026-08-17T07:00:00Z", "2026-08-18T07:00:00Z"] });
+      }),
+    );
+
+    const times = await api().previewNextFires(
+      {
+        cronExpression: null,
+        recurrence: {
+          kind: "daily",
+          minutes: null,
+          minute: 0,
+          hour: 9,
+          weekdays: null,
+          dayOfMonth: null,
+        },
+      },
+      2,
+      new AbortController().signal,
+    );
+
+    expect(times).toEqual([
+      Date.parse("2026-08-17T07:00:00Z") / 1000,
+      Date.parse("2026-08-18T07:00:00Z") / 1000,
+    ]);
+    expect(body).toMatchObject({ count: 2, recurrence: { kind: "daily", hour: 9 } });
   });
 
   it("carries a refusal through as the module wrote it", async () => {
@@ -497,7 +596,13 @@ describe("schedules", () => {
     await expect(
       api().createSchedule(
         1,
-        { revisionMode: "pinned", pinnedRevisionId: 3, cronExpression: "not a cron", unattendedAck: false },
+        {
+          revisionMode: "pinned",
+          pinnedRevisionId: 3,
+          cronExpression: "not a cron",
+          recurrence: null,
+          unattendedAck: false,
+        },
         new AbortController().signal,
       ),
     ).rejects.toMatchObject({ kind: "refused", message: "not a valid five-field cron expression" });

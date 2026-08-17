@@ -199,6 +199,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/schedules/next-fires": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview Next Fires
+         * @description The same answer for a timing nobody has saved (specs/teams-schedules, "Moduł liczy
+         *     najbliższe wyzwolenia także dla opisu, którego nie zapisano").
+         *
+         *     It touches no row, so it takes no team and no ownership check beyond being signed in —
+         *     what it answers about is the operator's own draft, and a cron expression is not
+         *     somebody's data. `NextFiresIn` is `ScheduleIn`'s own timing half, so a draft that
+         *     previews here is a draft the save will accept.
+         */
+        post: operations["preview_next_fires_schedules_next_fires_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/schedules/{schedule_id}": {
         parameters: {
             query?: never;
@@ -706,6 +732,22 @@ export interface components {
             output_rate_per_1m: string;
         };
         /**
+         * NextFiresIn
+         * @description A timing the operator has not saved — what the preview asks about
+         *     (specs/teams-schedules, "Moduł liczy najbliższe wyzwolenia także dla opisu, którego
+         *     nie zapisano").
+         */
+        NextFiresIn: {
+            /**
+             * Count
+             * @default 5
+             */
+            count: number;
+            /** Cron Expression */
+            cron_expression?: string | null;
+            recurrence?: components["schemas"]["Recurrence"] | null;
+        };
+        /**
          * NextFiresOut
          * @description specs/terminal-teams-schedules, "Terminal nie liczy czasu wyzwolenia sam" — the
          *     module's own answer to "when does this schedule fire next", computed fresh from
@@ -716,6 +758,28 @@ export interface components {
         NextFiresOut: {
             /** Times */
             times: string[];
+        };
+        /**
+         * Recurrence
+         * @description One rhythm, in the operator's own words. `kind` decides which of the other fields
+         *     carry a value — see `_FIELDS`.
+         */
+        Recurrence: {
+            /** Day Of Month */
+            day_of_month?: number | null;
+            /** Hour */
+            hour?: number | null;
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "every_minutes" | "hourly" | "daily" | "weekly" | "monthly";
+            /** Minute */
+            minute?: number | null;
+            /** Minutes */
+            minutes?: number | null;
+            /** Weekdays */
+            weekdays?: number[] | null;
         };
         /** RunOut */
         RunOut: {
@@ -802,9 +866,10 @@ export interface components {
          */
         ScheduleIn: {
             /** Cron Expression */
-            cron_expression: string;
+            cron_expression?: string | null;
             /** Pinned Revision Id */
             pinned_revision_id?: number | null;
+            recurrence?: components["schemas"]["Recurrence"] | null;
             /**
              * Revision Mode
              * @default pinned
@@ -841,6 +906,7 @@ export interface components {
             next_fire_at: string;
             /** Pinned Revision Id */
             pinned_revision_id: number | null;
+            recurrence: components["schemas"]["Recurrence"] | null;
             /** Revision Mode */
             revision_mode: string;
             /** Team Id */
@@ -1480,6 +1546,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TradeOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    preview_next_fires_schedules_next_fires_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["NextFiresIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NextFiresOut"];
                 };
             };
             /** @description Validation Error */

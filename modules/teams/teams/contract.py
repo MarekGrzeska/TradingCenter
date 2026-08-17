@@ -32,6 +32,7 @@ from croniter import croniter
 from pydantic import BaseModel, Field, ValidationInfo, field_validator, model_validator
 
 from .config import ModelCatalogueEntry
+from .recurrence import Recurrence, from_cron, to_cron
 
 
 def _parse_jsonb(value: object) -> Any:
@@ -637,12 +638,50 @@ def _revision_selection_is_coherent(revision_mode: str, pinned_revision_id: int 
         raise ValueError("revision_mode 'latest' must not carry pinned_revision_id")
 
 
-class ScheduleIn(BaseModel):
+class ScheduleTiming(BaseModel):
+    """When a schedule fires, said either way: as a rhythm, or as the cron expression the
+    clock runs (specs/teams-schedules, "Harmonogram da się opisać rytmem"). Exactly one of
+    the two — a body carrying both would leave the module choosing which one the operator
+    meant, and one carrying neither says nothing at all.
+
+    Shared by `ScheduleIn` and `NextFiresIn` so that a preview and the save that follows it
+    are refused by the same validator, rather than a draft previewing happily and then
+    failing on save.
+    """
+
+    cron_expression: str | None = None
+    recurrence: Recurrence | None = None
+
+    @field_validator("cron_expression")
+    @classmethod
+    def _cron_is_well_formed(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        if not croniter.is_valid(stripped):
+            raise ValueError(f"{stripped!r} is not a valid five-field cron expression")
+        return stripped
+
+    @model_validator(mode="after")
+    def _one_way_of_saying_it(self) -> ScheduleTiming:
+        if (self.cron_expression is None) == (self.recurrence is None):
+            raise ValueError("name the schedule's timing either by recurrence or by cron_expression")
+        return self
+
+    def cron(self) -> str:
+        """The expression this timing runs as — the translation lives in `recurrence.py`,
+        and this is the only place a route asks for it."""
+        if self.cron_expression is not None:
+            return self.cron_expression
+        assert self.recurrence is not None  # enforced by `_one_way_of_saying_it`
+        return to_cron(self.recurrence)
+
+
+class ScheduleIn(ScheduleTiming):
     """What an operator submits to create or edit a schedule."""
 
     revision_mode: Literal["pinned", "latest"] = "pinned"
     pinned_revision_id: int | None = None
-    cron_expression: str
     # Refused unless true, the day the pinned or latest revision's agents carry a
     # state-changing tool — `validation.check_unattended` is where that is enforced,
     # because it needs the revision's own definition, which this model does not carry
@@ -650,18 +689,18 @@ class ScheduleIn(BaseModel):
     # jawnego potwierdzenia").
     unattended_ack: bool = False
 
-    @field_validator("cron_expression")
-    @classmethod
-    def _cron_is_well_formed(cls, value: str) -> str:
-        stripped = value.strip()
-        if not croniter.is_valid(stripped):
-            raise ValueError(f"{stripped!r} is not a valid five-field cron expression")
-        return stripped
-
     @model_validator(mode="after")
     def _revision_selection(self) -> ScheduleIn:
         _revision_selection_is_coherent(self.revision_mode, self.pinned_revision_id)
         return self
+
+
+class NextFiresIn(ScheduleTiming):
+    """A timing the operator has not saved — what the preview asks about
+    (specs/teams-schedules, "Moduł liczy najbliższe wyzwolenia także dla opisu, którego
+    nie zapisano")."""
+
+    count: int = 5
 
 
 class ScheduleOut(BaseModel):
@@ -670,6 +709,11 @@ class ScheduleOut(BaseModel):
     revision_mode: str
     pinned_revision_id: int | None
     cron_expression: str
+    # The same expression as a rhythm, or `None` when it is not one of them — read back
+    # here rather than stored, so the row keeps one description of itself and an operator
+    # who wrote their own expression gets it back unchanged (design.md, "Rytm jest na
+    # drucie, wyrażenie czasowe zostaje zapisem wykonawczym").
+    recurrence: Recurrence | None
     # Set at creation and after every claim — never read by a caller to decide anything,
     # only shown; the module is the one clock (specs/teams-schedules, "Moduł ma jeden
     # zegar i sam publikuje najbliższe wyzwolenia").
@@ -689,6 +733,7 @@ class ScheduleOut(BaseModel):
             revision_mode=row["revision_mode"],
             pinned_revision_id=row["pinned_revision_id"],
             cron_expression=row["cron_expression"],
+            recurrence=from_cron(row["cron_expression"]),
             next_fire_at=row["next_fire_at"],
             enabled=row["enabled"],
             disabled_reason=row["disabled_reason"],

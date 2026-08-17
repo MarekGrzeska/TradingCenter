@@ -216,6 +216,86 @@ def test_next_fires_preview_returns_the_requested_count_in_order(client: TestCli
     assert times == sorted(times)
 
 
+def test_a_schedule_saved_as_a_rhythm_comes_back_as_the_same_rhythm(client: TestClient) -> None:
+    team_id, revision_id = _team(client)
+
+    created = client.post(
+        f"/teams/{team_id}/schedules",
+        json={
+            "revision_mode": "pinned",
+            "pinned_revision_id": revision_id,
+            "recurrence": {"kind": "daily", "hour": 9, "minute": 0},
+        },
+        headers=OWNER,
+    )
+
+    assert created.status_code == 201, created.text
+    body = created.json()
+    assert body["cron_expression"] == "0 9 * * *"
+    assert body["recurrence"] == {
+        "kind": "daily",
+        "hour": 9,
+        "minute": 0,
+        "minutes": None,
+        "weekdays": None,
+        "day_of_month": None,
+    }
+
+
+def test_a_schedule_saved_as_an_expression_outside_the_rhythms_carries_no_rhythm(
+    client: TestClient,
+) -> None:
+    team_id, revision_id = _team(client)
+
+    created = client.post(
+        f"/teams/{team_id}/schedules",
+        json=_schedule_body(revision_id, cron="0 9 * * MON-FRI"),
+        headers=OWNER,
+    )
+
+    assert created.status_code == 201, created.text
+    assert created.json()["recurrence"] is None
+
+
+def test_a_schedule_must_name_its_timing_exactly_once(client: TestClient) -> None:
+    team_id, revision_id = _team(client)
+    both = {
+        "revision_mode": "pinned",
+        "pinned_revision_id": revision_id,
+        "cron_expression": "0 9 * * *",
+        "recurrence": {"kind": "daily", "hour": 9, "minute": 0},
+    }
+    neither = {"revision_mode": "pinned", "pinned_revision_id": revision_id}
+
+    assert client.post(f"/teams/{team_id}/schedules", json=both, headers=OWNER).status_code == 422
+    assert client.post(f"/teams/{team_id}/schedules", json=neither, headers=OWNER).status_code == 422
+
+
+def test_next_fires_are_previewed_for_a_draft_nobody_saved(client: TestClient) -> None:
+    preview = client.post(
+        "/schedules/next-fires",
+        json={"recurrence": {"kind": "daily", "hour": 9, "minute": 0}, "count": 3},
+        headers=OWNER,
+    )
+
+    assert preview.status_code == 200, preview.text
+    times = preview.json()["times"]
+    assert len(times) == 3
+    assert times == sorted(times)
+    # 9:00 in Poland — 07:00 UTC in summer, 08:00 in winter, and nothing else.
+    assert {time[11:16] for time in times} <= {"07:00", "08:00"}
+
+
+def test_a_draft_that_cannot_be_run_is_refused_rather_than_previewed(client: TestClient) -> None:
+    refused = client.post(
+        "/schedules/next-fires",
+        json={"cron_expression": "not a cron expression"},
+        headers=OWNER,
+    )
+
+    assert refused.status_code == 422
+
+
 def test_a_stranger_gets_404_for_a_schedule_that_is_not_theirs(client: TestClient) -> None:
     team_id, revision_id = _team(client)
     schedule_id = client.post(
