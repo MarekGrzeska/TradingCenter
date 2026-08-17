@@ -111,7 +111,8 @@ document is a property of `market_data/contract.py`'s Pydantic models.
 
 | Tool | Answers | Reads |
 |------|---------|-------|
-| `list_tracked_pairs` | Which pairs the archive is collecting, and whether collection is happening — the first thing to check before asking about a symbol. | `GET /pairs` |
+| `list_tracked_symbols` | Which symbols the archive follows at all — one row each, no resolutions, with the least healthy collection state among them. The cheap answer to "what do we trade". | `GET /pairs` |
+| `list_tracked_pairs` | The same reading per symbol *and* resolution, with candle counts and the age of the newest one — worth its ~7 rows per symbol when the timeframe or the data's age is part of the question. | `GET /pairs` |
 | `get_candles` | OHLC candles over a time range, aggregated to ~200 buckets above the ceiling, refused above ~2000. | `GET /candles/{symbol}` |
 | `get_last_price` | The most recent candle, with its age — a price is not trustworthy without knowing how old it is. | `GET /candles/{symbol}` |
 | `summarize_range` | A window's shape in a dozen numbers: change, choppiness, biggest move — instead of its candles. | `GET /candles/{symbol}` |

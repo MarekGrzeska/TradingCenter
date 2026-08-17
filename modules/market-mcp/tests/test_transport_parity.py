@@ -19,6 +19,7 @@ import uvicorn
 from mcp import ClientSession
 from mcp.client.stdio import StdioServerParameters, stdio_client
 from mcp.client.streamable_http import streamable_http_client
+from test_tool_surface import EXPECTED_TOOL_NAMES
 
 from market_mcp.client import UpstreamClient
 from market_mcp.config import Settings
@@ -84,4 +85,7 @@ async def test_stdio_and_streamable_http_publish_the_same_tools() -> None:
     http_names = await _http_tool_names(_free_port())
 
     assert stdio_names == http_names
-    assert len(stdio_names) == 10
+    # Against the one list that names them, rather than a number here: this test is about
+    # the two doors agreeing, and a literal count made adding a tool fail in a file that
+    # has nothing to say about the tool set.
+    assert stdio_names == EXPECTED_TOOL_NAMES
