@@ -1,0 +1,431 @@
+<title>Zegar modułu teams</title>
+<style>
+  :root {
+    --bg: #fbfaf8; --surface: #ffffff; --surface-2: #f3f1ed;
+    --text: #1c1a17; --text-dim: #5f5952; --border: #e2ded7;
+    --accent: #9a5b2c; --accent-soft: #f5e9df;
+    --good: #2f6b4f; --good-soft: #e4f0e9;
+    --warn: #8a5a12; --warn-soft: #f8eedb;
+    --bad: #94362f; --bad-soft: #f8e6e4;
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+      --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+      --accent: #d99a63; --accent-soft: #2e241b;
+      --good: #7cc39d; --good-soft: #1d2a23;
+      --warn: #d9ac63; --warn-soft: #2c2519;
+      --bad: #e0837a; --bad-soft: #2e1e1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #171614; --surface: #1f1e1b; --surface-2: #262421;
+    --text: #ece8e2; --text-dim: #a29b92; --border: #35322e;
+    --accent: #d99a63; --accent-soft: #2e241b;
+    --good: #7cc39d; --good-soft: #1d2a23;
+    --warn: #d9ac63; --warn-soft: #2c2519;
+    --bad: #e0837a; --bad-soft: #2e1e1c;
+  }
+
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+    line-height: 1.68; margin: 0; padding: 3rem 1.25rem 6rem; font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  main { max-width: 56rem; margin: 0 auto; }
+
+  h1 { font-size: clamp(1.6rem, 4.2vw, 2.1rem); line-height: 1.15; letter-spacing: -0.02em; margin: 0 0 0.5rem; font-weight: 650; text-wrap: balance; }
+  h2 { font-size: clamp(1.15rem, 2.4vw, 1.4rem); letter-spacing: -0.01em; margin: 3rem 0 0.25rem; font-weight: 620; padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1rem; margin: 1.9rem 0 0.5rem; font-weight: 620; }
+  h4 { font-size: 0.9rem; margin: 1.5rem 0 0.4rem; font-weight: 620; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+  p { margin: 0.9rem 0; }
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  .lede { color: var(--text-dim); font-size: 1.04rem; margin-bottom: 0.35rem; }
+  .meta { color: var(--text-dim); font-size: 0.83rem; font-family: var(--mono); border-top: 1px solid var(--border); padding-top: 0.9rem; margin-top: 1.5rem; }
+
+  .callout { background: var(--surface); border: 1px solid var(--border); border-left: 3px solid var(--accent); border-radius: 6px; padding: 1.1rem 1.3rem; margin: 1.75rem 0; }
+  .callout.good { border-left-color: var(--good); background: var(--good-soft); }
+  .callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+  .callout.bad  { border-left-color: var(--bad);  background: var(--bad-soft); }
+  .callout > :first-child { margin-top: 0; }
+  .callout > :last-child { margin-bottom: 0; }
+  .callout .tag { display: block; font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.09em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.4rem; }
+
+  .scroll { overflow-x: auto; margin: 1.4rem 0; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 32rem; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: var(--surface-2); font-weight: 600; font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-dim); white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  .dim { color: var(--text-dim); }
+  td.field { font-family: var(--mono); font-size: 0.82rem; }
+  td.num { font-family: var(--mono); font-size: 0.82rem; white-space: nowrap; color: var(--text-dim); font-variant-numeric: tabular-nums; }
+
+  code { font-family: var(--mono); font-size: 0.87em; background: var(--surface-2); border: 1px solid var(--border); border-radius: 4px; padding: 0.08em 0.35em; }
+  pre { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 1rem 1.15rem; overflow-x: auto; font-family: var(--mono); font-size: 0.79rem; line-height: 1.6; margin: 1.2rem 0; }
+  pre code { background: none; border: none; padding: 0; font-size: inherit; }
+
+  ul, ol { padding-left: 1.3rem; }
+  li { margin: 0.45rem 0; }
+
+  .pill { display: inline-block; font-family: var(--mono); font-size: 0.7rem; padding: 0.12em 0.5em; border-radius: 999px; border: 1px solid var(--border); background: var(--surface-2); color: var(--text-dim); white-space: nowrap; }
+  .pill.good { color: var(--good); border-color: var(--good); background: var(--good-soft); }
+  .pill.warn { color: var(--warn); border-color: var(--warn); background: var(--warn-soft); }
+  .pill.bad  { color: var(--bad);  border-color: var(--bad);  background: var(--bad-soft); }
+
+  figure { margin: 1.6rem 0; }
+  figure svg { display: block; width: 100%; height: auto; }
+  figcaption { color: var(--text-dim); font-size: 0.82rem; margin-top: 0.6rem; }
+  .fig-box { fill: var(--surface); stroke: var(--border); }
+  .fig-box.accent { fill: var(--accent-soft); stroke: var(--accent); }
+  .fig-box.lane { fill: none; stroke: var(--border); stroke-dasharray: 4 3; }
+  .fig-t { fill: var(--text); font-family: var(--mono); font-size: 11.5px; }
+  .fig-t.dim { fill: var(--text-dim); font-size: 10px; letter-spacing: 0.08em; }
+  .fig-arrow { stroke: var(--text-dim); stroke-width: 1.2; fill: none; }
+  .fig-head { fill: var(--text-dim); }
+
+  footer { margin-top: 3.5rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--text-dim); font-size: 0.87rem; }
+</style>
+
+<main>
+
+<h1>Zegar modułu <code>teams</code> — harmonogramy, wyzwalacze i to, co pod nimi stanęło</h1>
+<p class="lede">Zespół uruchamiany bez człowieka: harmonogram rozwijany z wyrażenia cron i wyzwalacz reagujący na zbocze warunku rynkowego. Jedno zadanie <code>asyncio</code>, przejmowanie wyzwoleń warunkowym <code>UPDATE</code>, i historia, z której widać także wyzwolenia, które nie uruchomiły niczego. Druga połowa dokumentu podsumowuje infrastrukturę, jaka powstała przez trzy fazy pracy nad tym modułem.</p>
+<p class="meta">
+  Stan na: <strong>17 sierpnia 2026</strong><br>
+  Kod: <code>modules/teams/teams/scheduler/clock.py</code>, <code>store.py</code>, <code>routers/schedules.py</code>, <code>migrations/versions/0005_schedules_and_triggers.py</code><br>
+  Zmiany OpenSpec: <code>add-teams-module</code>, <code>add-trading-tools</code>, <code>add-teams-schedules-and-triggers</code><br>
+  Stan wdrożenia opisuje siostrzany dokument <a href="teams-fazy-stan.html">Fazy modułu teams — gdzie co stoi</a>
+</p>
+
+<h2>Dwa mechanizmy, jeden zegar</h2>
+
+<p>Do fazy 3 przebieg mógł powstać tylko z żądania HTTP: <code>POST /teams/{id}/runs</code>. Faza 3 nie zmienia niczego w tym, jak przebieg pracuje po starcie — dokłada <strong>drugi sposób, w jaki może się zacząć</strong>, a ściślej dwa sposoby, które kończą się tak samo:</p>
+
+<ul>
+  <li><strong>Harmonogram</strong> — pięciopolowe wyrażenie cron w UTC. „Co wtorek 8:30" jest faktem o zegarze i nie pyta rynku o nic.</li>
+  <li><strong>Wyzwalacz</strong> — wywołanie narzędzia serwera MCP, jedna wartość wyjęta z odpowiedzi, porównanie z progiem. „Kiedy ATR na US100 przekroczy 25" jest faktem o rynku i nie ma godziny.</li>
+</ul>
+
+<p>Oba dzielą jedno budzenie, nie dwa zadania. <code>_fire_schedule</code> i <code>_check_trigger</code> są osobnymi funkcjami, bo różni je jedno pytanie — „czy to już należne" — a nie potrzeba osobnego zegara: wspólne mają sprawdzenie nakładania się przebiegów, odmowę przy granicach, liczenie serii niepowodzeń i tę samą drogę do uruchomienia, czyli <code>start_run_on_revision</code>. Tę samą funkcję woła router, kiedy operator klika w terminalu.</p>
+
+<div class="callout">
+  <span class="tag">Decyzja: zegar w procesie modułu, nie w Azure</span>
+  <p>Jedno zadanie <code>asyncio</code>, startujące i gasnące w <code>lifespan</code> aplikacji, obok istniejącego <code>RunRegistry</code>. Rozważone i odrzucone: <strong>Logic App albo Function z zegarem</strong>, wołająca <code>POST /teams/{id}/runs</code> — moduł stoi za Easy Auth, więc wołający potrzebuje własnej rejestracji Entra, wpisu w <code>allowed_audiences</code> i tożsamości, a sam harmonogram żyłby w Terraformie, czyli u operatora, a nie w bazie modułu. <strong>WebJob</strong> — to samo plus drugi artefakt wdrożeniowy dla tego samego obrazu. Precedens za zegarem w procesie jest w repozytorium: <code>market-data</code> trzyma swój <code>Ingest</code> i runner zadań we własnym <code>lifespan</code>.</p>
+  <p>Koszt jest jeden i przyjęty: <strong>zegar umiera razem z procesem.</strong> Odpowiedzią jest zwijanie pominiętych wyzwoleń do jednego i licznik pominięć w historii, a nie druga instancja — plan ma jednego workera świadomie.</p>
+</div>
+
+<h2>Jedno budzenie, krok po kroku</h2>
+
+<figure>
+<svg viewBox="0 0 720 424" role="img" aria-labelledby="tickTitle">
+  <title id="tickTitle">Przebieg jednego budzenia zegara: dwa tory, wspólne bramki, jedno uruchomienie i jeden wiersz historii</title>
+  <rect class="fig-box accent" x="0.5" y="0.5" width="719" height="33" rx="5"/>
+  <text class="fig-t" x="360" y="21" text-anchor="middle">Clock._run_forever — budzi się co SCHEDULER_POLL_INTERVAL_SECONDS (15 s)</text>
+
+  <line class="fig-arrow" x1="180" y1="34" x2="180" y2="60"/>
+  <polygon class="fig-head" points="176,60 184,60 180,66"/>
+  <line class="fig-arrow" x1="540" y1="34" x2="540" y2="60"/>
+  <polygon class="fig-head" points="536,60 544,60 540,66"/>
+
+  <rect class="fig-box lane" x="15.5" y="70.5" width="330" height="140" rx="5"/>
+  <rect class="fig-box lane" x="374.5" y="70.5" width="330" height="140" rx="5"/>
+  <text class="fig-t dim" x="30" y="88">HARMONOGRAMY</text>
+  <text class="fig-t dim" x="389" y="88">WYZWALACZE</text>
+
+  <rect class="fig-box" x="30.5" y="98.5" width="300" height="26" rx="4"/>
+  <text class="fig-t" x="42" y="115">SELECT … next_fire_at &lt;= now()</text>
+  <rect class="fig-box" x="30.5" y="132.5" width="300" height="26" rx="4"/>
+  <text class="fig-t" x="42" y="149">croniter → następne + pominięte</text>
+  <rect class="fig-box" x="30.5" y="166.5" width="300" height="26" rx="4"/>
+  <text class="fig-t" x="42" y="183">UPDATE … RETURNING — przejęcie</text>
+
+  <rect class="fig-box" x="389.5" y="98.5" width="300" height="26" rx="4"/>
+  <text class="fig-t" x="401" y="115">SELECT … next_check_at &lt;= now()</text>
+  <rect class="fig-box" x="389.5" y="132.5" width="300" height="26" rx="4"/>
+  <text class="fig-t" x="401" y="149">UPDATE … — przejęcie sprawdzenia</text>
+  <rect class="fig-box" x="389.5" y="166.5" width="300" height="26" rx="4"/>
+  <text class="fig-t" x="401" y="183">narzędzie → field_path → zbocze?</text>
+
+  <line class="fig-arrow" x1="180" y1="210" x2="180" y2="238"/>
+  <polygon class="fig-head" points="176,238 184,238 180,244"/>
+  <line class="fig-arrow" x1="540" y1="210" x2="540" y2="238"/>
+  <polygon class="fig-head" points="536,238 544,238 540,244"/>
+
+  <rect class="fig-box" x="0.5" y="248.5" width="719" height="33" rx="5"/>
+  <text class="fig-t" x="360" y="269" text-anchor="middle">wspólne bramki: poprzedni przebieg trwa? · granica dobowa · granice handlowe</text>
+
+  <line class="fig-arrow" x1="360" y1="282" x2="360" y2="300"/>
+  <polygon class="fig-head" points="356,300 364,300 360,306"/>
+
+  <rect class="fig-box accent" x="0.5" y="308.5" width="719" height="29" rx="5"/>
+  <text class="fig-t" x="360" y="327" text-anchor="middle">start_run_on_revision — ta sama funkcja, którą woła klik w terminalu</text>
+
+  <line class="fig-arrow" x1="360" y1="338" x2="360" y2="354"/>
+  <polygon class="fig-head" points="356,354 364,354 360,360"/>
+
+  <rect class="fig-box" x="0.5" y="362.5" width="719" height="29" rx="5"/>
+  <text class="fig-t" x="360" y="381" text-anchor="middle">schedule_fires: started · skipped · unavailable</text>
+
+  <line class="fig-arrow" x1="360" y1="392" x2="360" y2="404"/>
+  <polygon class="fig-head" points="356,404 364,404 360,410"/>
+
+  <text class="fig-t dim" x="360" y="420" text-anchor="middle">_TRACK_RUN — SERIA NIEPOWODZEŃ → SAMOCZYNNE WYŁĄCZENIE</text>
+</svg>
+<figcaption>Jedno budzenie obsługuje najpierw wszystkie należne harmonogramy, potem wszystkie należne wyzwalacze. Od momentu przejęcia wiersza droga jest wspólna.</figcaption>
+</figure>
+
+<p><code>Clock.tick()</code> jest publiczne po to, żeby test mógł je pociągnąć bez czekania 15 sekund, i zwraca listę zadań pilnujących skutku każdego uruchomionego przebiegu. Produkcja tę listę wyrzuca — nic nie czeka na koniec budzenia. Każdy wiersz idzie przez <code>_attempt</code>, które <strong>zamyka wyjątek do jednego wiersza</strong>: budzenie obsługuje harmonogramy wszystkich operatorów, więc wyjątek wypuszczony z jednego uciszyłby po cichu wszystkie następne w tej liście.</p>
+
+<h2>Harmonogram: cron w UTC</h2>
+
+<p><code>next_fire_at</code> jest liczone dwa razy — przy zapisie (<code>_first_fire_at</code>) i przy każdym przejęciu — a nie trzymane jako plan na przyszłość. Rozwijaniem zajmuje się <code>croniter</code>: jedna mała zależność bez tranzytywnych, schowana za własną funkcją.</p>
+
+<pre><code>def _next_fire_and_skipped(cron_expression, due_at, now):
+    iterator = croniter(cron_expression, due_at)
+    skipped = 0
+    while True:
+        candidate = iterator.get_next(datetime)
+        if candidate &lt;= now:
+            skipped += 1          # slot, którego nikt nie widział
+        else:
+            return candidate, skipped</code></pre>
+
+<p>To jest cała odpowiedź na „zegar umiera z procesem". Moduł nieobecny przez sześć godzin przy harmonogramie co 30 minut nie uruchamia dwunastu przebiegów pod rząd: uruchamia <strong>jeden</strong>, z <code>skipped_count = 11</code> w wierszu historii. Zaległość jest widoczna, a nie odrobiona.</p>
+
+<p>Strefy czasowe odrzucone w tej fazie świadomie: moduł ma jeden zegar, dobowa granica kosztu resetuje się o północy UTC, a harmonogram w czasie lokalnym oznaczałby budżet i wyzwolenia przesuwające się względem siebie dwa razy w roku. Cena jest zapłacona po stronie wyświetlania — terminal pokazuje obie godziny obok siebie.</p>
+
+<h2>Wyzwalacz: zbocze, nie stan</h2>
+
+<p>Warunek to <strong>wywołanie narzędzia</strong>, nie własny wskaźnik. Wiersz niesie <code>tool_name</code>, <code>arguments</code> (JSONB), <code>field_path</code>, <code>comparison</code> i <code>threshold</code>. Który serwer ogłasza tę nazwę, pytane jest przy każdej ocenie, a nie zakładane: od fazy 2 jest ich dwa, a wyzwalacz nazywa narzędzie, nie właściciela. Lista narzędzi jest czytana raz na sesję i buforowana w kliencie, więc kosztuje jedno okrążenie po restarcie i nic potem.</p>
+
+<p>Ocena warunku <strong>nie woła modelu</strong>. Wyzwalacz sprawdzany co pięć minut nie kosztuje ani jednego tokena, dopóki nie wystrzeli. Narzędzia czytają archiwum <code>market-data</code>, a nie dostawcę, więc nie zjadają też budżetu 10 żądań na sekundę, który capital.com liczy na konto. Kosztem jest świeżość — i to właściwy kompromis, bo uruchomiony zespół zobaczy dokładnie to samo źródło.</p>
+
+<h3>Trzy wartości, nie dwie</h3>
+
+<p><code>triggers.last_result</code> jest <code>BOOLEAN NULL</code>, a <code>NULL</code> jest wartością trzecią, nie „fałszem". Wszystkie poniższe są jednym faktem z siedzenia wyzwalacza — <em>nie dowiedziałem się, co robi rynek</em> — więc żaden nie jest zboczem w żadną stronę:</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Co się stało</th><th><code>last_result</code></th><th>Wpis w historii</th></tr></thead>
+  <tbody>
+    <tr><td>Warunek spełniony, poprzednio nie</td><td class="field">true</td><td><span class="pill good">started</span> — przebieg ruszył</td></tr>
+    <tr><td>Warunek spełniony, poprzednio też</td><td class="field">true</td><td class="dim">brak wpisu — to nie zbocze</td></tr>
+    <tr><td>Warunek niespełniony</td><td class="field">false</td><td class="dim">brak wpisu</td></tr>
+    <tr><td>Żaden serwer narzędzi nie jest skonfigurowany</td><td class="field">NULL</td><td><span class="pill warn">unavailable</span> + powód</td></tr>
+    <tr><td>Serwera nie dało się zapytać / odmówił</td><td class="field">NULL</td><td><span class="pill warn">unavailable</span> + powód</td></tr>
+    <tr><td>Odpowiedź nie jest danymi, które <code>field_path</code> czyta</td><td class="field">NULL</td><td><span class="pill warn">unavailable</span> + powód</td></tr>
+    <tr><td><code>field_path</code> nie trafił w liczbę</td><td class="field">NULL</td><td><span class="pill warn">unavailable</span> + powód</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Bez tej trzeciej wartości harmonogram po cichu nie działa, a operator widzi spokojny rynek. Dlatego <code>_walk</code> zwraca <code>None</code> dla każdego kroku, który się nie rozwiązał, a wartość musi być liczbą i nie może być <code>bool</code> — <code>True</code> jest w Pythonie liczbą 1 i przeszłoby porównanie z progiem.</p>
+
+<h3>Dwie kadencje, które łatwo pomylić</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Pole</th><th>Domyślnie</th><th>Co odmierza</th></tr></thead>
+  <tbody>
+    <tr><td class="field">poll_interval_seconds</td><td class="num">300 s</td><td>jak często warunek jest <strong>pytany</strong>. Ustawia <code>next_check_at</code> przy każdym przejęciu.</td></tr>
+    <tr><td class="field">cooldown_seconds</td><td class="num">900 s</td><td>czas martwy po <strong>wystrzale</strong>. Zbocze stłumione cooldownem nie przesuwa <code>last_fired_at</code> — inaczej warunek migający szybciej niż cooldown nigdy by go nie wyczyścił.</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h2>Przejęcie: jedno zdanie SQL zamiast blokady</h2>
+
+<p>Wyzwolenie nie jest posiadane przez proces — jest przejmowane w bazie, warunkowym <code>UPDATE</code>. Kto dostał wiersz, ten wyzwala; kto dostał <code>None</code>, ten nie robi nic więcej.</p>
+
+<pre><code>UPDATE schedules SET next_fire_at = $2, updated_at = now()
+ WHERE id = $1 AND enabled AND next_fire_at &lt;= now()
+RETURNING …
+
+UPDATE triggers  SET next_check_at = $2, updated_at = now()
+ WHERE id = $1 AND enabled AND next_check_at &lt;= now()
+RETURNING …</code></pre>
+
+<p><code>enabled</code> jedzie w <code>WHERE</code>, a nie jest filtrowane w Pythonie — dzięki temu na oba <code>SELECT</code>-y należnych wierszy odpowiada indeks częściowy <code>(next_fire_at) WHERE enabled</code> z migracji <code>0005</code>, a nie skan tabeli. Te dwa <code>SELECT</code>-y są jedynym miejscem w module, które celowo <strong>nie filtruje po właścicielu</strong>: zegar obsługuje harmonogramy wszystkich operatorów naraz.</p>
+
+<div class="callout">
+  <span class="tag">Dlaczego nie advisory lock i dlaczego nie „nic"</span>
+  <p><strong>Advisory lock na cały zegar</strong> — czyli jeden proces „liderem" — odrzucony, bo lider trzyma blokadę do końca sesji, a wdrożenie daje kilkadziesiąt sekund, w których nowy proces nie robi nic, a stary zaraz zniknie. Przejęcie per wiersz nie ma tego stanu pośredniego.</p>
+  <p><strong>Nic</strong>, bo plan i tak ma jednego workera — odrzucone, bo <em>jeden worker nie znaczy jeden proces</em>: wdrożenie jest momentem, w którym są dwa, i dokładnie wtedy podwójny przebieg kosztuje podwójnie.</p>
+</div>
+
+<h2>Trzy bezpieczniki pracy bez nadzoru</h2>
+
+<h4>1 · Nakładanie się i granice</h4>
+<p>Przed uruchomieniem: jeśli ostatni przebieg tego harmonogramu ma status <code>pending</code> albo <code>running</code>, wyzwolenie zostaje <span class="pill">skipped</span> z powodem. Kolejki nie ma — przebieg nakładający się jest pomijany, a nie odkładany. Granice fazy 1 i 2 są łapane <strong>przez klasy bazowe</strong> (<code>DefinitionRefused</code>, <code>CostLimitReached</code>, <code>TradeLimitReached</code>), a nie przez wyliczenie konkretnych wyjątków:</p>
+<div class="callout warn">
+  <span class="tag">Powód, dla którego to ma znaczenie</span>
+  <p>Router może wyliczać — niezłapany sufit to jedno 500 dla operatora, który patrzy. Tutaj zostawiłby wyzwolenie bez żadnego wiersza i zabrał resztę budzenia. Tak właśnie <code>DailyOrderLimitReached</code>, dodany przez fazę 2 do tej samej funkcji, przeleżał całą fazę bez obsługi. Sufit dodany później jest łapany od dnia, w którym go napisano.</p>
+</div>
+
+<h4>2 · Seria niepowodzeń wyłącza harmonogram sam</h4>
+<p><code>_track_run</code> czeka na przebieg, który ten zegar uruchomił, i przesuwa licznik: <code>completed</code> zeruje, <code>failed</code> zwiększa, a przy <code>SCHEDULER_FAILURE_THRESHOLD</code> (domyślnie 3) wpisuje <code>enabled = false</code> i powód do <code>disabled_reason</code>. <code>cancelled</code> — przerwanie ręką operatora — nie rusza licznika w żadną stronę: to nadzorowany wybór, nie sygnał o zdrowiu harmonogramu.</p>
+
+<h4>3 · Potwierdzenie dla rewizji, której nie da się potwierdzić jako czytającej</h4>
+<p><code>check_unattended</code> dostaje <strong>zbiór dodatni</strong> — nazwy, które serwery właśnie ogłosiły z <code>readOnlyHint: true</code> — i wymaga <code>unattended_ack</code> dla wszystkiego, czego w tym zbiorze nie ma. To odwrócenie jest całą własnością bezpieczeństwa: zadeklarowany zapis (<code>place_order</code>), narzędzie bez adnotacji i narzędzie z serwera, którego nie dało się zapytać, to trzy różne powody niepewności i jedna decyzja.</p>
+<div class="callout bad">
+  <span class="tag">Dziura, którą to zamknęło</span>
+  <p>Pierwotnie sprawdzenie czytało ręcznie utrzymywaną stałą <code>STATE_CHANGING_TOOLS = frozenset()</code>, z komentarzem „pusty, dopóki faza 2 nie doda pierwszego". Faza 2 dodała <code>place_order</code> i nic jej o tej liście nie mówiło. Sprawdzenie chodziło, przechodziło testy i nie łapało niczego — a aplikacja miała już <code>TRADING_MCP_URL</code>. Odwrócone w przeglądzie fazy 3.</p>
+</div>
+
+<h2>Historia: wyzwolenie bez przebiegu też ma wiersz</h2>
+
+<p><code>schedule_fires</code> to jeden wiersz na próbę wyzwolenia — <strong>także tę, która nie uruchomiła niczego</strong>. Harmonogram cichy, bo nic nie jest należne, wygląda identycznie jak cichy, bo od tygodnia trafia w dobową granicę, chyba że różnica jest zapisana. Dlatego <code>runs</code> nie dostaje kolumny <code>schedule_id</code> ani <code>origin</code>: wyzwolenie bez przebiegu nie ma wiersza, na którym miałoby usiąść.</p>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>outcome</th><th>run_id</th><th>reason</th><th>Kiedy</th></tr></thead>
+  <tbody>
+    <tr><td><span class="pill good">started</span></td><td class="field">wymagany</td><td class="field">NULL</td><td>przebieg ruszył</td></tr>
+    <tr><td><span class="pill">skipped</span></td><td class="field">NULL</td><td class="field">wymagany</td><td>poprzedni przebieg trwa, granica, cooldown, rewizja już nie istnieje</td></tr>
+    <tr><td><span class="pill warn">unavailable</span></td><td class="field">NULL</td><td class="field">wymagany</td><td>warunku wyzwalacza nie dało się przeczytać</td></tr>
+  </tbody>
+</table>
+</div>
+
+<p>Ta spójność jest wymuszona <code>CHECK</code>-iem w schemacie, nie umową w kodzie — razem z „dokładnie jedno źródło" (<code>schedule_id</code> albo <code>trigger_id</code>, nigdy oba i nigdy żadne).</p>
+
+<h2>Schemat: trzy tabele, zero zmian w tabelach fazy 1</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Tabela</th><th>Co niesie</th><th>Indeksy</th></tr></thead>
+  <tbody>
+    <tr>
+      <td class="field">schedules</td>
+      <td>wybór rewizji (<code>pinned</code>/<code>latest</code>), <code>cron_expression</code>, <code>next_fire_at</code>, bezpieczniki, <code>owner_principal</code></td>
+      <td class="dim">częściowy na <code>next_fire_at WHERE enabled</code>, właściciel, zespół</td>
+    </tr>
+    <tr>
+      <td class="field">triggers</td>
+      <td>ten sam wybór rewizji i te same bezpieczniki, plus warunek, dwie kadencje i stan trójwartościowy</td>
+      <td class="dim">częściowy na <code>next_check_at WHERE enabled</code>, właściciel, zespół</td>
+    </tr>
+    <tr>
+      <td class="field">schedule_fires</td>
+      <td>jeden wiersz na próbę: źródło, <code>outcome</code>, <code>reason</code>, <code>run_id</code>, <code>skipped_count</code></td>
+      <td class="dim"><code>(schedule_id, fired_at DESC)</code> i to samo dla <code>trigger_id</code></td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+<p><code>schedules</code> i <code>triggers</code> rymują się (ten sam blok wyboru rewizji, ten sam blok bezpieczników), ale nie są jedną tabelą: wyzwalacz nie jest „harmonogramem z warunkiem zamiast crona" — ma własną kadencję i własny stan trójwartościowy, więc wspólna tabela potrzebowałaby nullowalnych kolumn dla tej połowy, która nie stosuje się nigdy.</p>
+
+<p>Migracja jest wyłącznie dokładająca, i to było też decyzją organizacyjną: faza 2 powstawała <strong>równolegle</strong>, z tego samego przodka. Dwie migracje tworzące rozłączne tabele są przemienne — ta scalona jako druga przenumerowuje tylko własną rewizję. Dziś łańcuch to <code>0004</code> układ agentów → <code>0005</code> harmonogramy → <code>0006</code> transakcje, a numer <code>0005</code> jest właśnie efektem takiego przenumerowania.</p>
+
+<h2>Powierzchnia HTTP i ustawienia</h2>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Trasa</th><th>Uwaga</th></tr></thead>
+  <tbody>
+    <tr><td class="field">POST /teams/{id}/schedules · /triggers</td><td>sprawdza rewizję, ogłoszenia serwerów i <code>unattended_ack</code>; liczy pierwsze <code>next_fire_at</code></td></tr>
+    <tr><td class="field">GET /teams/{id}/schedules · /triggers</td><td>filtrowane po właścicielu, jak wszystko w fazie 1</td></tr>
+    <tr><td class="field">GET · PUT /schedules/{id} · /triggers/{id}</td><td>zmiana crona przelicza należność</td></tr>
+    <tr><td class="field">POST …/enable · …/disable</td><td>ręczne wyłączenie zostawia <code>disabled_reason</code> pusty — operator nie musi tłumaczyć własnej decyzji</td></tr>
+    <tr><td class="field">GET …/fires</td><td>historia z powodami</td></tr>
+    <tr><td class="field">GET /schedules/{id}/next-fires</td><td><strong>moduł liczy, terminal nie.</strong> Każda godzina rozwinięta od teraz, nie ze <code>next_fire_at</code> wiersza, który mówi tylko o ostatnim przejęciu</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Ustawienie</th><th>Domyślnie</th><th>Na produkcji</th><th>Znaczenie</th></tr></thead>
+  <tbody>
+    <tr><td class="field">SCHEDULER_ENABLED</td><td class="num">true</td><td class="num">false</td><td>zegar w ogóle się budzi</td></tr>
+    <tr><td class="field">SCHEDULER_POLL_INTERVAL_SECONDS</td><td class="num">15</td><td class="num">15</td><td>przerwa między budzeniami</td></tr>
+    <tr><td class="field">SCHEDULER_FAILURE_THRESHOLD</td><td class="num">3</td><td class="num">3</td><td>ile niepowodzeń pod rząd wyłącza</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout warn">
+  <span class="tag">Jedyne ustawienie w app-service.tf, którego wartość jest decyzją, a nie faktem</span>
+  <p><code>SCHEDULER_ENABLED = "false"</code> jest wpisane <strong>jawnie</strong>, bo <code>config.py</code> domyśla się <code>true</code> — pominięcie tej linii w mapie ustawień <em>włączyłoby</em> zegar, a nie zostawiło go w spokoju.</p>
+  <p>Powód, dla którego jest wyłączony, zmienił się i jest dziś słabszy: dziura w bezpieczniku jest zamknięta, ale <strong>żaden harmonogram nigdy nie wystrzelił na uruchomionym stosie</strong> (zadanie 8.2). Włączenie to jedna linia plus <code>apply</code> — i jest decyzją operatora po tym przebiegu, nie czymś do wsunięcia razem ze zmianą w kodzie.</p>
+  <p>Ta sama linia jest pierwszym leverem wycofania: <code>false</code> zatrzymuje budzenie bez wdrażania czegokolwiek, harmonogramy zostają w bazie, a przebiegi ręczne działają dalej.</p>
+</div>
+
+<h2>Infrastruktura, jaka powstała przez trzy fazy</h2>
+
+<p>Trzy fazy dołożyły do Azure <strong>dwie aplikacje, jedną bazę logiczną, dwie rejestracje Entra, jeden sekret i dokładnie jedno ustawienie</strong>. Rozkład jest bardzo nierówny i to jest w tym najciekawsze: faza 1 zbudowała cały dom, faza 2 dobudowała skrzydło, faza 3 nie dodała ani jednego zasobu.</p>
+
+<h3>Faza 1 · <code>add-teams-module</code> — piąta aplikacja</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Warstwa</th><th>Co powstało</th></tr></thead>
+  <tbody>
+    <tr><td>Azure</td><td><code>app-tradingcenter-teams</code> na wspólnym planie, kształtem jak <code>agent</code>: Easy Auth na wszystkim poza <code>/health</code>, tożsamość zarządzana jako to, co moduł przedstawia bazie i <code>market-mcp</code></td></tr>
+    <tr><td>Entra</td><td>rejestracja <code>app-tradingcenter-teams-easyauth</code> z własnym <code>identifier_uri</code>, zakresem <code>access_as_user</code>, service principalem, hasłem i pre-autoryzacją terminala. <code>allowed_audiences</code> przyjmuje też audience <code>market-data</code>, bo terminal trzyma dziś jeden token</td></tr>
+    <tr><td>Baza</td><td>trzecia baza logiczna <code>teams</code> na <code>psql-tradingcenter</code>, rola o nazwie aplikacji, po jednej regule zapory na adres wyjściowy aplikacji</td></tr>
+    <tr><td>Key Vault</td><td>sekret <code>teams-openai-api-key</code> — <strong>osobny od agenta świadomie</strong>, żeby koszt eksperymentów miał własną linię na rachunku OpenAI — plus polityka odczytu dla tożsamości modułu</td></tr>
+    <tr><td>Terraform</td><td><code>var.teams_models</code>: katalog modeli bez <code>DEFAULT_MODEL_ID</code>, bo każdy agent w rewizji nazywa swój własny</td></tr>
+    <tr><td>Sąsiedzi</td><td><code>market-mcp</code> dostaje <strong>drugiego wołającego</strong> — wpis w <code>allowed_applications</code>, nie zmianę w tamtym module</td></tr>
+    <tr><td>CI i wdrożenie</td><td><code>deploy-teams.yml</code> (bliźniak <code>deploy-agent.yml</code>, z oboma pytaniami: płaszczyzna sterowania o obraz, <code>/health</code> o proces), job <code>teams</code> w <code>checks.yml</code> plus filtr, terminal w filtrze na <code>teams/contract.py</code></td></tr>
+    <tr><td>Stos deweloperski</td><td>port <strong>8050</strong> po agencie w obu skryptach, tworzenie bazy i roli, gdy brak, odmowa dla <code>DATABASE_URL</code> spoza loopbacku; tworzenie bazy logicznej wyjęte do helpera, bo trzecia kopia tego bloku była jedną za dużo</td></tr>
+    <tr><td>Schemat</td><td>migracje <code>0001</code>–<code>0003</code> (zespoły i rewizje, przebiegi i kroki, zużycie), potem <code>0004</code> układ agentów</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Faza 2 · <code>add-trading-tools</code> — szósta aplikacja, pierwsza pisząca</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Warstwa</th><th>Co powstało</th></tr></thead>
+  <tbody>
+    <tr><td>Azure</td><td><code>app-tradingcenter-trading-mcp</code>, kształtem jak <code>market-mcp</code>, a nie jak <code>market-data</code>: jedynym wołającym jest usługa z tożsamością zarządzaną, więc <strong>nie ma ani zakresu delegowanego, ani ekranu zgody</strong></td></tr>
+    <tr><td>Entra</td><td>rejestracja przy samej aplikacji, a nie w <code>entra.tf</code> — tam mieszka to, do czego loguje się <em>człowiek</em>. <code>allowed_applications</code> ma <strong>dokładnie jeden wpis</strong>: tożsamość <code>teams</code>. Nie terminal — przeglądarka rozmawia z <code>teams</code>, a <code>teams</code> rozmawia tutaj</td></tr>
+    <tr><td>Gateway</td><td>własny blok reguł <code>AllowTradingMcp-*</code> w zaporze <code>capital-gateway</code>, nazwany modułem, żeby dał się usunąć razem z nim — a nie poszerzenie reguł <code>market-data</code></td></tr>
+    <tr><td>Key Vault</td><td>polityka odczytu dla nowej tożsamości. <strong>Nowego sekretu nie ma</strong>: moduł czyta <code>gateway-api-key</code>, ten sam, który gateway sprawdza, a <code>market-data</code> przedstawia</td></tr>
+    <tr><td>Ustawienia <code>teams</code></td><td><code>TRADING_MCP_URL</code> i <code>TRADING_MCP_SCOPE</code> — <strong>niezależnie opcjonalne</strong> od pary <code>MARKET_MCP_*</code>: skasowanie ich zabiera narzędzia <em>piszące</em> i zostawia czytające tam, gdzie były, czyli w stanie z całej fazy 1</td></tr>
+    <tr><td>CI i wdrożenie</td><td><code>deploy-trading-mcp.yml</code> z sondą <code>/health</code>, która dowodzi trzech rzeczy naraz — proces nie otwiera portu, dopóki gateway nie potwierdzi konta <code>demo</code>, więc 200 znaczy „dotarł, przez zaporę, właściwym kluczem, i to jest demo". Filtr w <code>checks.yml</code> obejmuje <strong>cały</strong> <code>modules/capital-gateway/</code>, bo ten moduł trzyma migawkę całego dokumentu OpenAPI gatewaya</td></tr>
+    <tr><td>Stos deweloperski</td><td>port <strong>8060</strong> po <code>market-mcp</code>, wymagany własny <code>.env</code>, i porównanie <code>CAPITAL_GATEWAY_API_KEY</code> z <code>GATEWAY_API_KEY</code> gatewaya <em>przed</em> startem — bo niezgodność to nie nieudane wywołanie później, tylko wyjście procesu, które ubija cały stos komunikatem „a service exited"</td></tr>
+    <tr><td>Schemat</td><td>migracja <code>0006_trades</code> — ślad zleceń</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Faza 3 · <code>add-teams-schedules-and-triggers</code> — jedno ustawienie</h3>
+
+<div class="scroll">
+<table>
+  <thead><tr><th>Warstwa</th><th>Co powstało</th></tr></thead>
+  <tbody>
+    <tr><td>Azure</td><td><span class="pill">nic</span> — żadnej aplikacji, żadnej rejestracji, żadnego zasobu. To jest <strong>skutek</strong> decyzji „zegar w procesie modułu": harmonogram w Logic Appie znaczyłby nową rejestrację Entra i harmonogram trzymany w Terraformie</td></tr>
+    <tr><td>Terraform</td><td><strong>jedna linia</strong>: <code>SCHEDULER_ENABLED = "false"</code> w mapie ustawień <code>teams</code> (0 dodanych, 1 zmieniony, 0 usuniętych)</td></tr>
+    <tr><td>Schemat</td><td><code>0005_schedules_and_triggers</code> — trzy tabele, pięć indeksów, zero <code>ALTER</code> na tabelach fazy 1</td></tr>
+    <tr><td>Zależności</td><td><code>croniter&gt;=3.0</code> — jedna mała zależność bez tranzytywnych, użyta w jednym miejscu</td></tr>
+    <tr><td>Moduł</td><td><code>scheduler/clock.py</code>, <code>routers/schedules.py</code> (15 tras), <code>SCHEDULER_*</code> na końcu klasy ustawień, trzy walidatory</td></tr>
+    <tr><td>Terminal</td><td><code>SchedulesPanel.tsx</code>, <code>FireHistoryList.tsx</code>, <code>scheduleDraft.ts</code>, rozszerzone <code>teamsApi.ts</code> — godziny UTC i lokalne obok siebie, historia z powodami</td></tr>
+  </tbody>
+</table>
+</div>
+
+<div class="callout">
+  <span class="tag">Poza trzema fazami, dla porządku</span>
+  <p>Po fazie 3 doszła czwarta zmiana, <code>add-teams-mcp</code>: <strong>siódma aplikacja</strong> (<code>app-tradingcenter-teams-mcp</code>, serwer MCP, którym <code>agent</code> zakłada i poprawia zespoły z czatu) i <strong>plan podniesiony z B2 do B3</strong> — sześć aplikacji siedziało na 84% pamięci B2 przy alercie na 92%, a tenant kosztuje 4 do 9 punktów. Historia planu to więc B1 → B2 (15 sierpnia) → B3. Ta infrastruktura jest napisana i zaplanowana, ale <code>apply</code> należy do operatora i nie został wykonany.</p>
+  <p>Jedna rzecz w niej jest warta zapamiętania, bo łamie zwyczaj: tożsamość zarządzana <code>teams-mcp</code> istnieje <strong>tylko</strong> po to, żeby odczytać referencję z Key Vaulta. Do <code>teams</code> ten moduł idzie z <em>tokenem operatora</em> — dlatego zespół założony z czatu należy do człowieka, który o niego poprosił, a nie do usługi. W liście wołających <code>teams</code> muszą być wtedy dwa wpisy, bo <code>appid</code> przekazanego tokena jest terminala, a połączenie jest <code>teams-mcp</code>.</p>
+</div>
+
+<footer>
+  Mechanizm odczytany z <code>modules/teams/teams/scheduler/clock.py</code>, <code>store.py</code>,
+  <code>routers/schedules.py</code>, <code>validation.py</code> i migracji <code>0005</code>; uzasadnienia
+  z <code>openspec/changes/add-teams-schedules-and-triggers/design.md</code>. Podsumowanie infrastruktury
+  z <code>infra/*.tf</code> i z opisów commitów, które ją wprowadziły. Wartości domyślne to te z kodu,
+  a produkcyjne to te z <code>infra/app-service.tf</code> — nie odczyt z Azure.
+  Jeśli dokument nie zgadza się z kodem, rację ma kod.
+</footer>
+
+</main>
