@@ -13,6 +13,7 @@ from pathlib import Path
 import asyncpg
 import pytest
 
+from agent.config import Settings
 from agent.db import asyncpg_dsn, sqlalchemy_url
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent
@@ -80,6 +81,36 @@ def _docker_is_installed() -> bool:
     return bool(os.environ.get("DOCKER_HOST")) or any(
         socket.exists() for socket in DOCKER_SOCKETS
     )
+
+
+@pytest.fixture(autouse=True)
+def _no_developer_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Every source of settings a developer's machine has and CI does not, taken away
+    from each test that builds `Settings()` itself — which is every test going through
+    `TestClient(app)`, since the lifespan is where the settings are read. A test wanting
+    one of them sets it with `monkeypatch.setenv`, which is read after this.
+
+    Without this the suite is green in CI, which has no `.env`, and *hangs* on a machine
+    that has one: a `MARKET_MCP_URL` or `TEAMS_MCP_URL` naming a tool server nobody is
+    serving leaves `test_send_message_streams_fragments_then_completes` waiting inside its
+    POST rather than failing (measured 17 August 2026 — 5 seconds without the file, no
+    end with it).
+
+    Two sources, and neither is covered by handling the other:
+
+    * the module's `.env`, switched off at the class rather than name by name — a list of
+      names is what goes stale the next time a setting is added, which is how `teams`'
+      twin of this fixture came to miss `TRADING_MCP_URL`. Deleting the variables is
+      enough only because the file is gone; while it is read, a deleted variable uncovers
+      the file's value instead of hiding it.
+    * the process environment, which is the shell's and not the file's. `Settings` fields
+      map one-to-one onto variable names here (no `env_prefix`), so deleting all of them
+      needs no list either — and it is what keeps `AZURE_CLIENT_ID` away from
+      `DefaultAzureCredential`, the one consumer that reads the environment itself.
+    """
+    monkeypatch.setitem(Settings.model_config, "env_file", None)
+    for field in Settings.model_fields:
+        monkeypatch.delenv(field.upper(), raising=False)
 
 
 @pytest.fixture(scope="session")
