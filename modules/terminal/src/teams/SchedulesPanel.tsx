@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useAgentTurns } from "../agent/useAgentTurns";
 import { MarketDataError } from "../data/types";
 import { formatInstant, formatUtcInstant } from "../ui/formatTime";
 import { FireHistoryList } from "./FireHistoryList";
@@ -81,6 +82,12 @@ export function SchedulesPanel({
       controller.abort();
     };
   }, [api, teamId, reloadCount]);
+
+  // `schedule_team` and `trigger_team` are chat tools too, and nothing about them reaches
+  // this panel — the same staleness the catalogue had (`agentActivity.ts`). Everything on
+  // screen here is a read of the module's own rows, so re-reading costs nothing but the
+  // three requests above; the form being filled in is local state and is left alone.
+  useAgentTurns(reload);
 
   return (
     <div className="flex h-full min-h-0 flex-col">

@@ -13,6 +13,7 @@
  * conversation was open — is this store's to keep.
  */
 
+import { agentActivity, type AgentActivityStore } from "./agentActivity";
 import {
   agentApi,
   type AgentApi,
@@ -185,6 +186,11 @@ export function createAgentChatStore(
   // moments as its chart commands, and said in the same sentence — one channel, not two
   // (`terminal-agent-chat` spec, "tą samą drogą i w tej samej chwili").
   drawings: DrawingsStore = drawingsStore,
+  // Everything else a turn may have changed, in a module this store knows nothing about.
+  // Since `teams-mcp` a chat can create a team, revise it and run it, and none of that
+  // passes through `agent` — so the tab showing it is told a turn ended and re-reads what
+  // it owns (`agentActivity.ts`).
+  activity: AgentActivityStore = agentActivity,
 ): AgentChatStore {
   let state: AgentChatState = {
     expanded: loadExpanded(storage),
@@ -296,6 +302,12 @@ export function createAgentChatStore(
     // happens here rather than on a timer. Not awaited by the transcript reload below:
     // the two are independent, and neither should hold the other up.
     void syncChartCommands();
+    // And the same moment for everything the agent may have written *outside* this
+    // module, which this store cannot read and must not try to: it says a turn ended and
+    // whoever is showing such state re-reads it (`agentActivity.ts`). Announced before
+    // the transcript reload below and not awaited, for the same reason — a tab refreshing
+    // itself is nobody's turn to wait for.
+    activity.turnFinished();
 
     const seq = ++transcriptSeq;
     let messages: ChatMessage[] | null = null;

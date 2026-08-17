@@ -30,6 +30,29 @@ async def test_a_read_carries_the_operators_token_not_the_modules_own(
 
 
 @respx.mock
+async def test_no_token_means_no_authorization_header_at_all(teams: TeamsClient) -> None:
+    """Not an empty `Bearer`, not an invented one — the header is absent, and `teams`
+    then assigns the principal it gives any unauthenticated request (design.md, "Brak
+    nagłówka, nie udawany token")."""
+    route = respx.get(f"{BASE}/teams").mock(return_value=httpx.Response(200, json=[]))
+
+    await teams.get("/teams", token=None)
+
+    assert route.called
+    assert "authorization" not in route.calls.last.request.headers
+
+
+@respx.mock
+async def test_a_write_with_no_token_carries_no_authorization_either(teams: TeamsClient) -> None:
+    route = respx.post(f"{BASE}/teams").mock(return_value=httpx.Response(201, json={"id": 1}))
+
+    await teams.post("/teams", token=None, json={"name": "morning desk"})
+
+    assert route.called
+    assert "authorization" not in route.calls.last.request.headers
+
+
+@respx.mock
 async def test_a_refusal_travels_with_teams_own_words(teams: TeamsClient) -> None:
     respx.post(f"{BASE}/teams").mock(
         return_value=httpx.Response(

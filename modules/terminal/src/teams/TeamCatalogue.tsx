@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { formatInstant } from "../ui/formatTime";
-import type { TeamRun } from "./runs";
 import type { TeamsApi, TeamSummary } from "./teamsApi";
 
 /**
@@ -11,10 +10,11 @@ import type { TeamsApi, TeamSummary } from "./teamsApi";
  * "lista powstaje bez pobierania definicji"). No definition is read here, so a catalogue
  * of twenty teams is one request.
  *
- * A run starts from here and is watched from here (`terminal-teams`, "z każdej pozycji
- * może otworzyć zespół albo uruchomić przebieg"). The runs of a team are read only when
- * the operator asks for them, which is what keeps the property above: a catalogue that
- * listed every team's runs would be one request per row.
+ * A run starts from here and a team is opened from here (`terminal-teams`, "z każdej
+ * pozycji może otworzyć zespół albo uruchomić przebieg") — opening by clicking the row,
+ * since that is the thing done to a row most often and it used to be a button among five. The
+ * runs themselves are read in `TeamRunsView`, never here: a catalogue that listed every
+ * team's runs would be one request per row.
  */
 export function TeamCatalogue({
   teams,
@@ -23,6 +23,7 @@ export function TeamCatalogue({
   api,
   onOpen,
   onWatch,
+  onRuns,
   onNew,
   onSchedules,
   onChanged,
@@ -33,15 +34,16 @@ export function TeamCatalogue({
   error: string | null;
   api: TeamsApi;
   onOpen(id: number): void;
-  /** A run to watch — the one just started, or one picked out of a team's history. */
-  onWatch(runId: number): void;
+  /** The run just started, and the team it belongs to — the runs view opens on both. */
+  onWatch(runId: number, teamId: number, teamName: string): void;
+  /** The team's runs, as a view of their own. */
+  onRuns(id: number, name: string): void;
   onNew(): void;
   onSchedules(id: number, name: string): void;
   onChanged(): void;
   onReload(): void;
 }) {
   const [retiring, setRetiring] = useState<TeamSummary | null>(null);
-  const [showingRuns, setShowingRuns] = useState<number | null>(null);
   const [starting, setStarting] = useState<number | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
 
@@ -49,9 +51,10 @@ export function TeamCatalogue({
     setStarting(team.id);
     setRefusal(null);
     try {
-      // Straight into the monitor: the module answers with the run, not with its result,
-      // and what the operator asked for was to watch it.
-      onWatch((await api.startRun(team.id, new AbortController().signal)).id);
+      // Straight into the runs view with this run selected: the module answers with the
+      // run, not with its result, and what the operator asked for was to watch it.
+      const started = await api.startRun(team.id, new AbortController().signal);
+      onWatch(started.id, team.id, team.name);
     } catch (cause) {
       // A refusal here is the module's own sentence — a withdrawn model, a tool it no
       // longer announces, a daily budget already spent — and it is the whole lead.
@@ -95,12 +98,50 @@ export function TeamCatalogue({
 
       {refusal && <p className="text-xs text-critical">{refusal}</p>}
 
+      {status === "ready" && teams.length > 0 && (
+        <p className="text-xs text-ink-faint">Click a team to open it.</p>
+      )}
+
       <ul className="flex flex-col gap-2">
         {teams.map((team) => (
-          <li key={team.id} className="rounded border border-border bg-panel px-3 py-2">
+          <li
+            key={team.id}
+            // The way in, replacing the `Open` button that used to sit among four others —
+            // opening a team is the one thing done to a row far more often than everything
+            // else on it, and it had the same weight as `Retire`. `Enter` does the same for
+            // a keyboard, which no pointer gesture is reachable from.
+            tabIndex={0}
+            title="Click to open"
+            // A single click, and the guard is what makes that safe: the row still carries
+            // four buttons, and a click that started on one of them is that button's, not
+            // the row's. `closest` rather than a direct target check because a button's own
+            // text node is what the click actually lands on.
+            onClick={(event) => {
+              if (event.target instanceof Element && event.target.closest("button")) return;
+              onOpen(team.id);
+            }}
+            onKeyDown={(event) => {
+              if (event.key !== "Enter") return;
+              if (event.target !== event.currentTarget) return;
+              onOpen(team.id);
+            }}
+            // `group` so the row's own hover can light up the hint beside the name. The
+            // border and the ground both move, because a cursor alone is a poor signal on a
+            // row that also carries four buttons — the whole row has to read as the target,
+            // not just the pointer over it.
+            className="group cursor-pointer rounded border border-border bg-panel px-3 py-2 transition-colors hover:border-primary-line hover:bg-panel-strong focus-visible:border-primary-line focus-visible:outline-none"
+          >
             <div className="flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="truncate text-sm text-ink">{team.name}</div>
+                <div className="flex items-baseline gap-2">
+                  <span className="truncate text-sm text-ink">{team.name}</span>
+                  {/* Says what the row does, at the moment the pointer is on it. Present in
+                      the markup rather than mounted on hover, so nothing shifts as it
+                      appears and a keyboard focus can show it too. */}
+                  <span className="shrink-0 text-xs text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+                    click to open
+                  </span>
+                </div>
                 <div className="truncate text-xs text-ink-muted">{team.description}</div>
                 <div className="text-xs text-ink-faint">
                   revision {team.latestRevision} · changed {formatInstant(team.updatedAt)}
@@ -115,9 +156,13 @@ export function TeamCatalogue({
                 >
                   {starting === team.id ? "Starting…" : "Run"}
                 </button>
+                {/* A door, not a drawer. This used to unfold the run list inside the row,
+                    which meant picking a run took two clicks and then read the run on a
+                    canvas that had to be opened separately. It now goes to the view where
+                    the list and the picture of the run stand together. */}
                 <button
                   type="button"
-                  onClick={() => setShowingRuns(showingRuns === team.id ? null : team.id)}
+                  onClick={() => onRuns(team.id, team.name)}
                   className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
                 >
                   Runs
@@ -131,13 +176,6 @@ export function TeamCatalogue({
                 </button>
                 <button
                   type="button"
-                  onClick={() => onOpen(team.id)}
-                  className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-                >
-                  Open
-                </button>
-                <button
-                  type="button"
                   onClick={() => setRetiring(team)}
                   className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink-muted hover:bg-panel-strong"
                 >
@@ -145,9 +183,6 @@ export function TeamCatalogue({
                 </button>
               </div>
             </div>
-            {showingRuns === team.id && (
-              <TeamRuns api={api} teamId={team.id} onWatch={onWatch} />
-            )}
           </li>
         ))}
       </ul>
@@ -172,68 +207,5 @@ export function TeamCatalogue({
         </ConfirmDialog>
       )}
     </div>
-  );
-}
-
-/**
- * A team's runs, newest first, read when the row is opened and not before.
- *
- * This is the way back into a run the operator walked away from — closing the monitor
- * stops nothing, and the run has to be findable again for that to be worth anything
- * (specs/teams-runs, "Zerwanie połączenia odbierającego postęp MUST NOT przerwać
- * przebiegu"). Runs of revisions since replaced are in the list too: that is what makes
- * two of them comparable.
- */
-function TeamRuns({
-  api,
-  teamId,
-  onWatch,
-}: {
-  api: TeamsApi;
-  teamId: number;
-  onWatch(runId: number): void;
-}) {
-  const [runs, setRuns] = useState<TeamRun[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    api
-      .listRuns(teamId, controller.signal)
-      .then((answer) => !cancelled && setRuns(answer))
-      .catch((cause: unknown) => {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "the runs could not be read");
-        }
-      });
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [api, teamId]);
-
-  if (error) return <p className="mt-2 text-xs text-critical">{error}</p>;
-  if (runs === null) return <p className="mt-2 text-xs text-ink-muted">Reading the runs…</p>;
-  if (runs.length === 0) return <p className="mt-2 text-xs text-ink-muted">No runs yet.</p>;
-
-  return (
-    <ul className="mt-2 flex flex-col gap-1 border-t border-border pt-2">
-      {runs.map((run) => (
-        <li key={run.id} className="flex items-center justify-between gap-2 text-xs">
-          <span className="text-ink-muted">
-            run {run.id} · {run.status}
-            {run.startedAt !== null && ` · ${formatInstant(run.startedAt)}`}
-          </span>
-          <button
-            type="button"
-            onClick={() => onWatch(run.id)}
-            className="cursor-pointer rounded border border-border px-2 py-0.5 text-ink hover:bg-panel-strong"
-          >
-            Watch
-          </button>
-        </li>
-      ))}
-    </ul>
   );
 }

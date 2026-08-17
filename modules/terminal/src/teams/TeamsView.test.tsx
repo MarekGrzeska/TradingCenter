@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { agentActivity } from "../agent/agentActivity";
 import { MarketDataError } from "../data/types";
 import { TeamsView } from "./TeamsView";
 import type { RunStreamEvent, TeamRun, TeamRunStep, TeamTrade } from "./runs";
@@ -176,10 +177,225 @@ function nodeElement(testId: string): HTMLElement {
 
 async function openTheTeam(api: TeamsApi) {
   render(<TeamsView api={api} />);
-  await screen.findByText("Morning desk");
-  await userEvent.click(screen.getByRole("button", { name: "Open" }));
+  // A click on the row, which is what opening a team is since the `Open` button was dropped
+  // — it was one of five on a row where opening is the common case.
+  await userEvent.click(await screen.findByText("Morning desk"));
   return screen.findByTestId("agent-node-Scout");
 }
+
+/** An agent's fields live in a dialog now, opened by the gear on its own box.
+ *
+ *  `fireEvent` for the same reason the node clicks below use it: a pointer press on the
+ *  canvas wakes d3-zoom, which reaches for a `document` jsdom has already torn down. And
+ *  by label rather than by role, because React Flow keeps a node `visibility: hidden`
+ *  until it has measured it — which never happens in jsdom, so nothing on this canvas is
+ *  in the accessibility tree a `ByRole` query walks. */
+async function openAgentSettings(role: string) {
+  fireEvent.click(
+    within(screen.getByTestId(`agent-node-${role}`)).getByLabelText(`Settings for ${role}`),
+  );
+  return screen.findByRole("dialog");
+}
+
+async function closeAgentSettings() {
+  await userEvent.click(screen.getByRole("button", { name: "Done" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+}
+
+describe("the catalogue's own affordances", () => {
+  it("opens a team on a click, and offers no Open button to do it with", async () => {
+    render(<TeamsView api={fakeApi()} />);
+
+    await userEvent.click(await screen.findByText("Morning desk"));
+
+    expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
+  });
+
+  it("leaves a click that landed on one of the row's buttons to that button", async () => {
+    // The row is the way in and it carries four buttons: `Schedules` must open schedules,
+    // not the editor underneath the pointer.
+    render(<TeamsView api={fakeApi()} />);
+    await screen.findByText("Morning desk");
+
+    await userEvent.click(screen.getByRole("button", { name: "Schedules" }));
+
+    expect(await screen.findByRole("button", { name: "New schedule" })).toBeInTheDocument();
+    expect(screen.queryByTestId("agent-node-Scout")).not.toBeInTheDocument();
+  });
+
+  it("says so, because a click on a row is not visible the way a button was", async () => {
+    render(<TeamsView api={fakeApi()} />);
+
+    expect(await screen.findByText(/Click a team to open it/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open" })).not.toBeInTheDocument();
+    // And on the row itself, which is what a pointer lands on. Its visibility is the
+    // stylesheet's job — that it is there to be revealed is this file's.
+    const row = (await screen.findByText("Morning desk")).closest("li") as HTMLElement;
+    expect(within(row).getByText("click to open")).toBeInTheDocument();
+    expect(row).toHaveAttribute("title", "Click to open");
+  });
+
+  it("opens it from the keyboard too, which a double-click cannot", async () => {
+    render(<TeamsView api={fakeApi()} />);
+    const row = (await screen.findByText("Morning desk")).closest("li") as HTMLElement;
+
+    row.focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
+  });
+});
+
+describe("a team's runs, as a view of their own", () => {
+  it("goes to the runs and opens the newest, rather than unfolding a list to click twice", async () => {
+    const older = { ...RUN, id: 5, status: "completed", finishedAt: 1_760_000_900 };
+    const api = fakeApi({ listRuns: vi.fn(async () => [RUN, older]) });
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+
+    // Every run of the team is on screen, and the newest is the one drawn underneath.
+    expect(await screen.findByRole("button", { name: /Run 7/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Run 5/ })).toBeInTheDocument();
+    expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Watch" })).not.toBeInTheDocument();
+  });
+
+  it("switches the picture to another run without leaving the list", async () => {
+    // The whole reason this stopped being a drawer inside the catalogue: comparing two runs
+    // used to mean walking back out and in again.
+    const older = { ...RUN, id: 5, status: "completed", finishedAt: 1_760_000_900 };
+    const api = fakeApi({
+      listRuns: vi.fn(async () => [RUN, older]),
+      getRun: vi.fn(async (id: number) => (id === 5 ? older : RUN)),
+      watchRun: vi.fn(async (id: number) =>
+        streamOf([
+          {
+            kind: "snapshot",
+            run: id === 5 ? older : RUN,
+            steps: id === 5 ? [step(1, "agent-1", "failed")] : MIDWAY,
+          },
+        ]),
+      ),
+    });
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+    await screen.findByTestId("agent-node-Scout");
+
+    await userEvent.click(screen.getByRole("button", { name: /Run 5/ }));
+
+    await waitFor(() => expect(api.watchRun).toHaveBeenCalledWith(5, expect.anything()));
+    await waitFor(() =>
+      expect(within(screen.getByTestId("agent-node-Scout")).getByText("failed")).toBeInTheDocument(),
+    );
+    // Still the list: both runs are pickable from where the operator already is.
+    expect(screen.getByRole("button", { name: /Run 7/ })).toBeInTheDocument();
+  });
+
+  it("says there is nothing rather than showing an empty canvas", async () => {
+    render(<TeamsView api={fakeApi({ listRuns: vi.fn(async () => []) })} />);
+    await screen.findByText("Morning desk");
+
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+
+    expect(await screen.findByText(/No runs yet/)).toBeInTheDocument();
+    expect(screen.getByText(/Pick a run/)).toBeInTheDocument();
+  });
+});
+
+describe("the loop between editing and reading a run", () => {
+  it("shows the team's last runs while it is being edited", async () => {
+    const older = { ...RUN, id: 5, status: "completed", finishedAt: 1_760_000_900 };
+    await openTheTeam(fakeApi({ listRuns: vi.fn(async () => [RUN, older]) }));
+
+    const strip = (await screen.findByText("Runs")).closest("div") as HTMLElement;
+    expect(within(strip).getByRole("button", { name: /^7/ })).toBeInTheDocument();
+    expect(within(strip).getByRole("button", { name: /^5/ })).toBeInTheDocument();
+  });
+
+  it("opens one of them straight from the editor, without the catalogue in between", async () => {
+    const api = fakeApi({ listRuns: vi.fn(async () => [RUN]) });
+    await openTheTeam(api);
+
+    const strip = (await screen.findByText("Runs")).closest("div") as HTMLElement;
+    await userEvent.click(within(strip).getByRole("button", { name: /^7/ }));
+
+    await waitFor(() => expect(api.watchRun).toHaveBeenCalledWith(RUN.id, expect.anything()));
+    expect(await screen.findByTestId("run-status")).toBeInTheDocument();
+    // And on the team the editor was open on, named without looking it up again.
+    expect(screen.getByText(/Morning desk/)).toBeInTheDocument();
+  });
+
+  it("switches back to editing from the runs view", async () => {
+    await openTheTeam(fakeApi({ listRuns: vi.fn(async () => [RUN]) }));
+    await userEvent.click(await screen.findByRole("button", { name: "Runs →" }));
+    await screen.findByTestId("run-status");
+
+    await userEvent.click(screen.getByRole("button", { name: "← Edit team" }));
+
+    // The canvas is editable again: the gear is back on the boxes.
+    expect(await screen.findByLabelText("Settings for Scout")).toBeInTheDocument();
+  });
+
+  it("offers no runs for a team that does not exist yet", async () => {
+    render(<TeamsView api={fakeApi()} />);
+    await userEvent.click(await screen.findByRole("button", { name: "New team" }));
+
+    expect(await screen.findByRole("button", { name: "Create team" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Runs →" })).not.toBeInTheDocument();
+  });
+});
+
+describe("what the chat changed", () => {
+  it("shows a team the model created, without the operator reloading the page", async () => {
+    // Reported from a running stack on 17 August 2026: `create_team` from the chat
+    // succeeded, the team was in the module, and the tab kept showing the list it read on
+    // mount. `teams-mcp`'s writes never pass through this tab, so nothing invalidated it.
+    const listTeams = vi
+      .fn()
+      .mockResolvedValueOnce([TEAM])
+      .mockResolvedValue([TEAM, { ...TEAM, id: 2, name: "Built from the chat" }]);
+    render(<TeamsView api={fakeApi({ listTeams })} />);
+    await screen.findByText("Morning desk");
+    expect(screen.queryByText("Built from the chat")).not.toBeInTheDocument();
+
+    agentActivity.turnFinished();
+
+    expect(await screen.findByText("Built from the chat")).toBeInTheDocument();
+  });
+
+  it("does not re-read the catalogue on its own between turns", async () => {
+    // The refresh is tied to a turn ending, not to a timer: a tab that polls is a tab
+    // that spends requests on nothing for as long as it is open.
+    const api = fakeApi();
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+
+    expect(api.listTeams).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a team open on the canvas alone", async () => {
+    // A draft is what the operator is typing into. Re-reading it here would replace their
+    // unsaved edit with a revision they did not ask for — the catalogue is a read, an open
+    // editor is not.
+    const api = fakeApi();
+    await openTheTeam(api);
+    await openAgentSettings("Scout");
+    await userEvent.type(screen.getByLabelText("Role"), "ing");
+    expect(await screen.findByTestId("agent-node-Scouting")).toBeInTheDocument();
+    const readsBefore = (api.latestRevision as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    agentActivity.turnFinished();
+
+    // Still the operator's text, and the editor asked the module nothing.
+    expect((screen.getByLabelText("Role") as HTMLInputElement).value).toBe("Scouting");
+    expect((api.latestRevision as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
+      readsBefore,
+    );
+  });
+});
 
 describe("the catalogue", () => {
   it("lists what the module published, without reading any definition", async () => {
@@ -265,15 +481,18 @@ describe("taking the last change back", () => {
 
   it("undoes a removed dependency, which is what puts the line back", async () => {
     await openTheTeam(fakeApi());
+    await openAgentSettings("Scout");
 
     await userEvent.click(await screen.findByRole("button", { name: /Remove dependency/ }));
     await waitFor(() =>
       expect(screen.queryByRole("button", { name: /Remove dependency/ })).not.toBeInTheDocument(),
     );
+    await closeAgentSettings();
     expect(screen.getByText("unsaved changes")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Undo" }));
 
+    await openAgentSettings("Scout");
     expect(await screen.findByRole("button", { name: /Remove dependency/ })).toBeInTheDocument();
     // And back to nothing to save: the draft is the saved revision again, which is the
     // whole of what "take it back" means here.
@@ -297,6 +516,7 @@ describe("taking the last change back", () => {
     // revert the whole agent instead would be the worse trade.
     await openTheTeam(fakeApi());
     await userEvent.click(screen.getByRole("button", { name: "Add agent" }));
+    await openAgentSettings("Scout");
     const prompt = await screen.findByLabelText("Prompt");
 
     fireEvent.keyDown(prompt, { key: "z", ctrlKey: true });
@@ -314,21 +534,60 @@ describe("taking the last change back", () => {
     // `edit` runs per keystroke; one undo gives back what was there before the typing
     // started rather than the word minus its last letter.
     await openTheTeam(fakeApi());
+    await openAgentSettings("Scout");
 
     await userEvent.type(await screen.findByLabelText("Role"), "ing");
     expect(await screen.findByTestId("agent-node-Scouting")).toBeInTheDocument();
 
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Undo" }));
 
     expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
   });
 });
 
-describe("the agent panel", () => {
+describe("the agent settings dialog", () => {
+  it("opens from the gear on the agent's own box, and closes again", async () => {
+    // The narrow column this replaced was always on screen; a dialog has to be asked for,
+    // so the asking is what the operator has to be able to find and undo.
+    await openTheTeam(fakeApi());
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+
+    await openAgentSettings("Judge");
+
+    expect(screen.getByRole("dialog")).toHaveAccessibleName("Agent: Judge");
+    expect((screen.getByLabelText("Role") as HTMLInputElement).value).toBe("Judge");
+
+    await closeAgentSettings();
+  });
+
+  it("closes on Escape without touching the draft", async () => {
+    await openTheTeam(fakeApi());
+    await openAgentSettings("Scout");
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByText("unsaved changes")).not.toBeInTheDocument();
+  });
+
+  it("offers no gear on a run being watched", async () => {
+    // That revision is saved and immutable — a gear opening fields nothing will keep is a
+    // gear that lies.
+    render(<TeamsView api={fakeApi()} />);
+    await screen.findByText("Morning desk");
+    await userEvent.click(screen.getByRole("button", { name: "Runs" }));
+    await screen.findByTestId("agent-node-Scout");
+
+    expect(screen.queryByLabelText(/^Settings for/)).not.toBeInTheDocument();
+  });
+
   it("offers the models the module published and nothing else", async () => {
     // The requirement `terminal-teams` states twice: the picker is built from the
     // catalogue, and this terminal knows no model by name.
     await openTheTeam(fakeApi());
+    await openAgentSettings("Scout");
 
     const picker = await screen.findByLabelText("Model");
     expect([...(picker as HTMLSelectElement).options].map((option) => option.textContent)).toEqual([
@@ -340,8 +599,10 @@ describe("the agent panel", () => {
   it("offers the tools the module announces, and saves the one that was ticked", async () => {
     const api = fakeApi();
     await openTheTeam(api);
+    await openAgentSettings("Scout");
 
     await userEvent.click(await screen.findByLabelText(/get_candles/));
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
 
     await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
@@ -351,23 +612,23 @@ describe("the agent panel", () => {
 
   it("says why the tool list is empty rather than showing an empty box", async () => {
     await openTheTeam(fakeApi({ listTools: vi.fn(async () => []) }));
+    await openAgentSettings("Scout");
 
     expect(await screen.findByText("the module announces no tools")).toBeInTheDocument();
   });
 
   it("makes an agent wait for another one without dragging anything", async () => {
-    // The canvas keeps its handles; this is the same edge drawn from the panel, and it is
+    // The canvas keeps its handles; this is the same edge drawn from the dialog, and it is
     // the path a test can walk — jsdom has no layout, so a drag between two handles is not
     // something this suite can prove either way.
     const loose: TeamDefinition = { ...DEFINITION, dependencies: [] };
     const api = fakeApi({ latestRevision: vi.fn(async () => revision(loose)) });
     await openTheTeam(api);
+    await openAgentSettings("Judge");
 
-    // `fireEvent` for the same reason as the run tests below: a pointer press on the
-    // canvas wakes d3-zoom, which reaches for a `document` jsdom has already torn down.
-    fireEvent.click(screen.getByTestId("agent-node-Judge"));
     await userEvent.selectOptions(await screen.findByLabelText("Waits for"), "agent-1");
     await userEvent.click(screen.getByRole("button", { name: "Add" }));
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
 
     await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
@@ -379,8 +640,8 @@ describe("the agent panel", () => {
     // The default team is two agents with one edge between them, so the judge's only
     // candidate is the scout it already waits for — and itself, which is never a candidate.
     await openTheTeam(fakeApi());
+    await openAgentSettings("Judge");
 
-    fireEvent.click(screen.getByTestId("agent-node-Judge"));
     expect(await screen.findByText(/waits for Scout/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Waits for")).not.toBeInTheDocument();
   });
@@ -388,8 +649,10 @@ describe("the agent panel", () => {
   it("removes a dependency from the agent it belongs to", async () => {
     const api = fakeApi();
     await openTheTeam(api);
+    await openAgentSettings("Scout");
 
     await userEvent.click(await screen.findByRole("button", { name: /Remove dependency/ }));
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
 
     await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
@@ -401,11 +664,12 @@ describe("the agent panel", () => {
 describe("the trading limits", () => {
   it("sets them in the same view the team is composed in", async () => {
     // specs/terminal-teams, "Granice handlowe ustawia się w tym samym widoku co resztę
-    // zespołu" — the panel beside the canvas, on the team rather than on any one agent.
+    // zespołu" — the panel beside the canvas, on the team rather than on any one agent, and
+    // since the agents moved into a dialog it is the whole of that panel and needs no button
+    // to reach.
     const api = fakeApi();
     await openTheTeam(api);
 
-    await userEvent.click(screen.getByRole("button", { name: "Team" }));
     await userEvent.type(await screen.findByLabelText("Largest order size"), "1.5");
     await userEvent.type(screen.getByLabelText("Orders per run"), "2");
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
@@ -429,8 +693,10 @@ describe("the trading limits", () => {
       ]),
     });
     await openTheTeam(api);
+    await openAgentSettings("Scout");
 
     await userEvent.click(await screen.findByLabelText(/place_order/));
+    await closeAgentSettings();
     await userEvent.click(screen.getByRole("button", { name: "Save revision" }));
 
     await waitFor(() => expect(api.saveRevision).toHaveBeenCalled());
@@ -445,7 +711,6 @@ describe("the trading limits", () => {
   it("takes a limit back like any other change", async () => {
     await openTheTeam(fakeApi());
 
-    await userEvent.click(screen.getByRole("button", { name: "Team" }));
     await userEvent.type(await screen.findByLabelText("Orders per day"), "5");
     expect(screen.getByText("unsaved changes")).toBeInTheDocument();
 
@@ -468,6 +733,7 @@ describe("the trading limits", () => {
       ]),
     });
     await openTheTeam(api);
+    await openAgentSettings("Scout");
 
     const writes = (await screen.findByText("place_order")).closest("label");
     expect(within(writes as HTMLElement).getByText("moves the account")).toBeInTheDocument();
@@ -492,7 +758,10 @@ describe("starting a run", () => {
     await startFrom(api);
 
     await waitFor(() => expect(api.startRun).toHaveBeenCalledWith(TEAM.id, expect.anything()));
-    expect(await screen.findByText("Run 7")).toBeInTheDocument();
+    // The run is named twice now, and both are the point: once in the team's run list and
+    // once on the monitor underneath it.
+    expect(await screen.findAllByText(/Run 7/)).not.toHaveLength(0);
+    expect(await screen.findByTestId("run-status")).toBeInTheDocument();
     expect(await screen.findByTestId("agent-node-Scout")).toBeInTheDocument();
   });
 
@@ -526,8 +795,9 @@ describe("watching a run", () => {
   async function watch(api: TeamsApi) {
     render(<TeamsView api={api} />);
     await screen.findByText("Morning desk");
+    // One click now: `Runs` is a view of its own and it opens on the newest run rather
+    // than unfolding a list that then needs a second click on `Watch`.
     await userEvent.click(screen.getByRole("button", { name: "Runs" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Watch" }));
     return screen.findByTestId("agent-node-Scout");
   }
 
@@ -609,7 +879,6 @@ describe("watching a run", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "← Catalogue" }));
     await userEvent.click(await screen.findByRole("button", { name: "Runs" }));
-    await userEvent.click(await screen.findByRole("button", { name: "Watch" }));
 
     await waitFor(() =>
       expect(within(screen.getByTestId("agent-node-Scribe")).getByText("done")).toBeInTheDocument(),
@@ -716,6 +985,78 @@ describe("watching a run", () => {
     expect(await screen.findByText("Orders placed (1)")).toBeInTheDocument();
   });
 
+  it("reads every agent's output in a window of its own, formatted as the model wrote it", async () => {
+    // The 20rem column is shaped for "is anything stuck"; reading what the agents said is
+    // a different job, and the raw `**` was the other half of the complaint.
+    const api = fakeApi({
+      runSteps: vi.fn(async () => [
+        step(1, "agent-1", "completed", "**US100** is trending\n\n- higher highs\n- volume flat"),
+        step(2, "agent-2", "completed", "I would wait"),
+        step(3, "agent-3", "pending"),
+      ]),
+      watchRun: vi.fn(async () =>
+        streamOf([
+          {
+            kind: "snapshot",
+            run: { ...RUN, status: "completed", finishedAt: 1_760_001_000 },
+            steps: [
+              step(1, "agent-1", "completed", "**US100** is trending\n\n- higher highs\n- volume flat"),
+              step(2, "agent-2", "completed", "I would wait"),
+              step(3, "agent-3", "pending"),
+            ],
+          },
+        ]),
+      ),
+    });
+    await watch(api);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Outputs (2)" }));
+
+    const dialog = await screen.findByRole("dialog");
+    // Every agent at once, which is how a finished run is read — in order, seams included.
+    expect(within(dialog).getByText("is trending")).toBeInTheDocument();
+    expect(within(dialog).getByText("I would wait")).toBeInTheDocument();
+    // Markdown, not the punctuation the model typed: bold is an element and the list is a
+    // list (`MessageBody`, the same renderer the chat uses).
+    expect(within(dialog).getByText("US100").tagName).toBe("STRONG");
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(dialog).queryByText(/\*\*/)).not.toBeInTheDocument();
+  });
+
+  it("narrows to one agent, with what it called beside what it wrote", async () => {
+    const api = fakeApi({
+      runToolCalls: vi.fn(async () => [
+        {
+          runStepId: 1,
+          roundIndex: 0,
+          position: 0,
+          toolName: "get_candles",
+          outcome: "ok",
+          durationMs: 42,
+        },
+      ]),
+    });
+    await watch(api);
+    await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));
+    const dialog = await screen.findByRole("dialog");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: /Scout/ }));
+
+    expect(within(dialog).getByText("US100 is trending")).toBeInTheDocument();
+    expect(within(dialog).getByText("get_candles")).toBeInTheDocument();
+    expect(within(dialog).getByText(/ok · 42 ms/)).toBeInTheDocument();
+  });
+
+  it("closes the outputs window on Escape", async () => {
+    await watch(fakeApi());
+    await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));
+    await screen.findByRole("dialog");
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
   it("asks the module to stop a run the operator interrupts", async () => {
     const api = fakeApi();
     await watch(api);
@@ -729,7 +1070,7 @@ describe("watching a run", () => {
 describe("a refused save", () => {
   it("shows the module's reason and opens the agent it names", async () => {
     // `terminal-teams`, "Zapis odrzucony przez moduł jest pokazany przy miejscu, którego
-    // dotyczy" — the message names agent-2, so the panel is on agent-2 and its node is
+    // dotyczy" — the message names agent-2, so its settings are what opens and its node is
     // marked, rather than a general "invalid" somewhere on the page.
     const refusal = new MarketDataError(
       "refused",
@@ -747,6 +1088,22 @@ describe("a refused save", () => {
 
     expect(await screen.findAllByText(refusal.message)).not.toHaveLength(0);
     expect(within(screen.getByTestId("agent-node-Judge")).getByText("refused")).toBeInTheDocument();
+    expect(await screen.findByRole("dialog")).toHaveAccessibleName("Agent: Judge");
     expect((screen.getByLabelText("Role") as HTMLInputElement).value).toBe("Judge");
+  });
+});
+
+describe("removing an agent", () => {
+  it("takes its settings dialog with it", async () => {
+    // The dialog reads the agent out of the draft rather than holding a copy, so the one
+    // action inside it that can make its own subject disappear leaves nothing behind.
+    await openTheTeam(fakeApi());
+    await openAgentSettings("Judge");
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove agent" }));
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("agent-node-Judge")).not.toBeInTheDocument();
+    expect(screen.getByText("unsaved changes")).toBeInTheDocument();
   });
 });

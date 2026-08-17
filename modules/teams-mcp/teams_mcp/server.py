@@ -12,6 +12,8 @@ restarts the container on a failed probe does not speak MCP.
 
 from __future__ import annotations
 
+import logging
+
 from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
@@ -21,6 +23,8 @@ from . import tools
 from .client import TeamsClient
 from .config import Settings
 from .network_identity import RequireCallerIdentity
+
+log = logging.getLogger(__name__)
 
 INSTRUCTIONS = (
     "Tools over the operator's own team catalogue: list and read teams, create one, "
@@ -53,7 +57,36 @@ def build_server(settings: Settings, teams: TeamsClient) -> FastMCP:
 
 
 def build_http_app(settings: Settings, teams: TeamsClient) -> ASGIApp:
+    _say_whose_name_the_tools_act_in(settings)
     mcp = build_server(settings, teams)
     return RequireCallerIdentity(
         mcp.streamable_http_app(), settings.require_authenticated_principal
+    )
+
+
+def _say_whose_name_the_tools_act_in(settings: Settings) -> None:
+    """Which of the two states this process came up in, said once, at startup.
+
+    The state where tools work without an operator behind them MUST NOT be one an operator
+    infers from an absence of refusals (specs/teams-mcp-authorship, "Moduł mówi, w którym
+    stanie wstał"). Said in a log line rather than appended to every tool answer: a
+    sentence in each result is paid for in model tokens on every call, and it would make a
+    local answer differ in content from the deployed one — the one thing a local run exists
+    to compare (design.md, "Jedna linia przy starcie").
+    """
+    if settings.operator_identity_optional:
+        log.info(
+            "no authenticator stands in front of this module "
+            "(REQUIRE_AUTHENTICATED_PRINCIPAL=false) and teams is on this machine (%s), so "
+            "no layer could issue an operator token: tools act carrying no identity, and "
+            "what they create belongs to whatever principal teams gives an unauthenticated "
+            "request",
+            settings.teams_url,
+        )
+        return
+    log.info(
+        "tools act in the operator's own name, carried per call: a call reaching this "
+        "module without one is refused (teams at %s, authenticator in front: %s)",
+        settings.teams_url,
+        settings.require_authenticated_principal,
     )

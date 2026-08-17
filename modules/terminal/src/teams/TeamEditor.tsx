@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { MarketDataError } from "../data/types";
-import { AgentPanel } from "./AgentPanel";
+import { AgentSettingsDialog } from "./AgentSettingsDialog";
 import { TeamCanvas } from "./TeamCanvas";
+import { TeamRunsStrip } from "./TeamRunsStrip";
 import { TeamPanel } from "./TeamPanel";
 import { NO_HISTORY, kindForPatch, remember, undo, type EditHistory } from "./editHistory";
 import { locateRefusal, type Refusal } from "./refusal";
@@ -26,7 +27,14 @@ import type {
 } from "./teamsApi";
 
 /**
- * One team, on the canvas and in the panel beside it.
+ * One team, on the canvas, with the team's own limits in the panel beside it and each
+ * agent's settings in a dialog over it.
+ *
+ * The agents used to share that 20rem panel, one at a time. They no longer do: an agent has
+ * a prompt, a guidance note, a tool list and its dependencies, and a column that narrow
+ * made all four small at once. The gear on each box opens them in a wide dialog instead,
+ * which leaves the panel to the one thing that belongs to the team rather than to any agent
+ * — its trading limits, which are now always where they were rather than behind a button.
  *
  * `saved` is only ever set from something the module answered with — never from what is
  * being typed — so a refused save leaves the last confirmed revision to compare against
@@ -45,6 +53,7 @@ export function TeamEditor({
   toolsNote,
   onClose,
   onCreated,
+  onRuns,
 }: {
   api: TeamsApi;
   /** `null` opens a team that does not exist yet — saving it is what creates it. */
@@ -54,6 +63,11 @@ export function TeamEditor({
   toolsNote: string | null;
   onClose(): void;
   onCreated(team: TeamSummary): void;
+  /** Leaves editing for the runs of this team — a run id to open that one, `null` for the
+   *  list. The name travels with it: this editor read it from the module and the runs view
+   *  puts it in its own header, so nothing has to look it up a second time. Never called
+   *  for a team that does not exist yet — it has no runs to look at. */
+  onRuns(runId: number | null, teamName: string): void;
 }) {
   // The cheapest model in the catalogue is what a new agent starts on — the module
   // publishes the order, so the terminal picks a position in it rather than a name
@@ -67,6 +81,9 @@ export function TeamEditor({
   const [saved, setSaved] = useState<TeamDefinition | null>(null);
   const [draft, setDraft] = useState<TeamDefinition | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // Which agent's settings are open, which is not the same as which one is selected: the
+  // canvas marks a selection, and closing the dialog leaves that mark where it was.
+  const [settingsKey, setSettingsKey] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<Refusal | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -88,6 +105,7 @@ export function TeamEditor({
       setPlaces(new Map());
       setHistory(NO_HISTORY);
       setSelectedKey(fresh.agents[0]?.key ?? null);
+      setSettingsKey(null);
       return;
     }
     let cancelled = false;
@@ -111,6 +129,7 @@ export function TeamEditor({
         setPlaces(layout);
         setHistory(NO_HISTORY);
         setSelectedKey(revision.definition.agents[0]?.key ?? null);
+        setSettingsKey(null);
       })
       .catch((cause: unknown) => {
         if (cancelled) return;
@@ -206,10 +225,12 @@ export function TeamEditor({
       if (cause instanceof MarketDataError && cause.kind === "refused") {
         const located = locateRefusal(cause.message, draft);
         setRefusal(located);
-        // Open the panel on the agent the module named, so the reason is next to the
-        // thing it is about rather than in a corner of the screen.
-        if (located.agents.length > 0) setSelectedKey(located.agents[0]);
-        else setError(cause.message);
+        // Open the settings of the agent the module named, so the reason is next to the
+        // fields it is about rather than in a corner of the screen.
+        if (located.agents.length > 0) {
+          setSelectedKey(located.agents[0]);
+          setSettingsKey(located.agents[0]);
+        } else setError(cause.message);
       } else {
         setError(cause instanceof Error ? cause.message : "could not save the team");
       }
@@ -226,7 +247,10 @@ export function TeamEditor({
     );
   }
 
-  const selected = draft.agents.find((agent) => agent.key === selectedKey) ?? null;
+  // Looked up in the draft rather than trusted from state: an agent removed by `Undo` while
+  // its settings are open takes the dialog with it, instead of leaving one over fields that
+  // edit an agent the definition no longer has.
+  const settingsAgent = draft.agents.find((agent) => agent.key === settingsKey) ?? null;
   const dirty = saved === null || hasChanges(draft, saved);
 
   return (
@@ -262,6 +286,17 @@ export function TeamEditor({
           </span>
         )}
 
+        {/* The other half of the loop this view is one half of: change something, run it,
+            read what came out. It used to go through the catalogue every time it turned. */}
+        {teamId !== null && (
+          <button
+            type="button"
+            onClick={() => onRuns(null, name)}
+            className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
+          >
+            Runs →
+          </button>
+        )}
         <button
           type="button"
           onClick={takeBack}
@@ -271,16 +306,8 @@ export function TeamEditor({
         >
           Undo
         </button>
-        {/* The way back to the team itself once an agent is open — the panel it opens is
-            the one the right-hand column starts on, and the only door to the trading
-            limits when every agent is worth looking at instead. */}
-        <button
-          type="button"
-          onClick={() => setSelectedKey(null)}
-          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-        >
-          Team
-        </button>
+        {/* No "Team" button any more: the right-hand column is the team's, always, so
+            there is nothing to come back from. */}
         <button
           type="button"
           onClick={() => edit(addAgent(draft, defaultModelId))}
@@ -299,6 +326,10 @@ export function TeamEditor({
         {dirty && !saving && <span className="text-xs text-ink-faint">unsaved changes</span>}
       </header>
 
+      {teamId !== null && (
+        <TeamRunsStrip api={api} teamId={teamId} onOpen={(runId) => onRuns(runId, name)} />
+      )}
+
       {error && <p className="border-b border-border px-2 py-1 text-xs text-critical">{error}</p>}
       {/* Also shown here, and not only on the node: a refusal naming an agent the canvas
           has scrolled away from is a refusal nobody reads. */}
@@ -314,35 +345,41 @@ export function TeamEditor({
           refusal={refusal}
           places={places}
           onSelect={setSelectedKey}
+          onOpenSettings={setSettingsKey}
           onMove={move}
           onConnect={(edge: TeamDependency) => edit(addDependency(draft, edge))}
           onDisconnect={(edge: TeamDependency) => edit(removeDependency(draft, edge))}
         />
-        {selected ? (
-          <AgentPanel
-            agent={selected}
-            definition={draft}
-            models={models}
-            tools={tools}
-            toolsNote={toolsNote}
-            refusal={refusal}
-            onChange={(patch) =>
-              edit(updateAgent(draft, selected.key, patch), kindForPatch(selected.key, patch))
-            }
-            onConnect={(edge) => edit(addDependency(draft, edge))}
-            onRemove={() => {
-              edit(removeAgent(draft, selected.key));
-              setSelectedKey(null);
-            }}
-            onDisconnect={(edge) => edit(removeDependency(draft, edge))}
-          />
-        ) : (
-          <TeamPanel
-            trading={draft.trading}
-            onChange={(patch, kind) => edit(setTradingLimit(draft, patch), kind)}
-          />
-        )}
+        <TeamPanel
+          trading={draft.trading}
+          onChange={(patch, kind) => edit(setTradingLimit(draft, patch), kind)}
+        />
       </div>
+
+      {settingsAgent && (
+        <AgentSettingsDialog
+          agent={settingsAgent}
+          definition={draft}
+          models={models}
+          tools={tools}
+          toolsNote={toolsNote}
+          refusal={refusal}
+          onChange={(patch) =>
+            edit(
+              updateAgent(draft, settingsAgent.key, patch),
+              kindForPatch(settingsAgent.key, patch),
+            )
+          }
+          onClose={() => setSettingsKey(null)}
+          onRemove={() => {
+            edit(removeAgent(draft, settingsAgent.key));
+            setSettingsKey(null);
+            if (selectedKey === settingsAgent.key) setSelectedKey(null);
+          }}
+          onConnect={(edge) => edit(addDependency(draft, edge))}
+          onDisconnect={(edge) => edit(removeDependency(draft, edge))}
+        />
+      )}
     </div>
   );
 }

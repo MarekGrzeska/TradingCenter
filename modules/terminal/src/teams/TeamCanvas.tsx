@@ -39,6 +39,7 @@ export function TeamCanvas({
   runStatuses,
   places,
   onSelect,
+  onOpenSettings,
   onMove,
   onConnect,
   onDisconnect,
@@ -57,6 +58,10 @@ export function TeamCanvas({
    *  drawing of it (`terminal-teams`). */
   runStatuses?: Map<string, string>;
   onSelect(key: string | null): void;
+  /** Puts a gear on every box, which is how an agent's settings are opened
+   *  (`AgentSettingsDialog`). Left out while a run is watched — that revision is saved,
+   *  and there is nothing on that picture to edit. */
+  onOpenSettings?(agentKey: string): void;
   /** Called once, when the node is let go — not on every frame of the drag. Left out
    *  while a run is watched: nothing there is the operator's to rearrange mid-run. */
   onMove?(agentKey: string, at: { x: number; y: number }): void;
@@ -88,9 +93,10 @@ export function TeamCanvas({
         toolCount: agent.tools.length,
         refused: refusedAgents.has(agent.key),
         runStatus: runStatuses?.get(agent.key),
+        onOpenSettings: onOpenSettings ? () => onOpenSettings(agent.key) : undefined,
       },
     }));
-  }, [definition, modelLabels, places, refusedAgents, runStatuses, selectedKey]);
+  }, [definition, modelLabels, onOpenSettings, places, refusedAgents, runStatuses, selectedKey]);
 
   const edges: DependencyFlowEdge[] = useMemo(
     () =>
@@ -105,6 +111,9 @@ export function TeamCanvas({
   );
 
   const handleNodeClick: NodeMouseHandler = (_event, node) => onSelect(node.id);
+  // The gear on the box is the way that is visible; this is the way that gets guessed.
+  // Both open the same dialog, so neither has to be the one an operator finds.
+  const handleNodeDoubleClick: NodeMouseHandler = (_event, node) => onOpenSettings?.(node.id);
 
   return (
     /* `teams-canvas` is where the library's chrome is given this terminal's tokens
@@ -121,6 +130,7 @@ export function TeamCanvas({
         edgesReconnectable={false}
         fitView
         onNodeClick={handleNodeClick}
+        onNodeDoubleClick={handleNodeDoubleClick}
         onNodeDragStop={(_event, node) => onMove?.(node.id, node.position)}
         onPaneClick={() => onSelect(null)}
         onConnect={(connection: Connection) => {
