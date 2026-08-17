@@ -91,10 +91,11 @@ Trzy rzeczy warte zapisania, żeby nie sprawdzać ich drugi raz:
 - **5.6 niewykonane.** Na produkcji nikt nie założył z czatu harmonogramu nad zespołem z
   narzędziami handlowymi ani nie usunął go z terminala. To jest ten sam przebieg, którym
   operator dwa razy zderzył się z odmową, i pierwsza rzecz do zrobienia po wdrożeniu.
-- **Migracja `0007` nie szła po produkcyjnych danych.** W kontenerze testowym tabele są
-  puste albo świeże; na produkcji `drop_column` i wymiana dwóch kluczy obcych pójdą po
-  wierszach, które tam są. Operacje są krótkie i nie przepisują danych, ale to jest
-  rozumowanie, nie pomiar.
+- ~~**Migracja `0007` nie szła po produkcyjnych danych.**~~ **Zamknięte tego samego dnia:**
+  wdrożenie `1d5a199` weszło, a `teams` odpowiada 200 na `/health`. Migracja idzie w
+  `lifespan` przed obsługą ruchu, więc odpowiadający proces **jest** dowodem, że
+  `drop_column` i wymiana obu kluczy obcych przeszły po wierszach, które tam były. Czego to
+  nie mierzy: jak długo trwały.
 - **„Przebiegi zostają" jest własnością schematu, nie testu** — patrz tabela wyżej.
 - **Opisy narzędzi nie mają testu na treść.** Wymaganie żąda, żeby opis narzędzia
   usuwającego nazywał, co znika bezpowrotnie; sprawdzam to w odpowiedzi narzędzia, nie w

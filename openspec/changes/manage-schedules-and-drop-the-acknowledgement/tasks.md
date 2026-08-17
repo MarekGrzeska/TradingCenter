@@ -53,7 +53,11 @@
 - [x] 5.3 `modules/terminal`: `pnpm test`, `pnpm lint`, `pnpm typecheck`,
       `pnpm contract:check`
 - [x] 5.4 `openspec validate manage-schedules-and-drop-the-acknowledgement --strict`
-- [ ] 5.5 Wdrożenie w kolejności: `teams`, potem `teams-mcp` i terminal
+- [x] 5.5 Wdrożenie w kolejności: `teams`, potem `teams-mcp` i terminal
+
+      Wdrożone 17 sierpnia 2026 z `1d5a199`. `teams` i `teams-mcp` odpowiadają 200 na
+      `/health`, a że migracja idzie w `lifespan` przed obsługą ruchu, odpowiedź jest
+      jednocześnie dowodem, że `0007` przeszła na produkcyjnej bazie.
 - [ ] 5.6 Na produkcji: założyć harmonogram z czatu nad zespołem z narzędziami handlowymi —
       ten, którego dotąd nie dało się założyć — i usunąć go z terminala
 - [x] 5.7 `review.md`
