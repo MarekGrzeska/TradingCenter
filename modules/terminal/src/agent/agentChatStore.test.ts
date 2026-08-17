@@ -841,4 +841,55 @@ describe("createAgentChatStore — the chart the agent can set", () => {
     await waitFor(() => expect(drawings.calls).toBeGreaterThanOrEqual(1));
     expect(store.getSnapshot().chartNotice).toBeNull();
   });
+
+  it("says a turn ended, for whatever is showing state this store cannot read", async () => {
+    // Since `teams-mcp` a chat writes into another module — a team created, revised, put
+    // on a schedule — and none of it passes through `agent`. The tab showing it re-reads
+    // on this, which is why the announcement carries no payload and no tool names
+    // (`agentActivity.ts`).
+    const api = createFakeApi();
+    const heard: number[] = [];
+    const activity = {
+      subscribe: () => () => {},
+      turnFinished: () => heard.push(1),
+    };
+    const store = createAgentChatStore(
+      null,
+      api,
+      async () => null,
+      () => null,
+      fakeDrawings(),
+      activity,
+    );
+
+    store.send("build me a team of two");
+
+    await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
+    expect(heard).toHaveLength(1);
+  });
+
+  it("says it even when the turn broke, because a tool may have written before it did", async () => {
+    const api = createFakeApi();
+    api.script = [
+      { kind: "fragment", text: "half a th" },
+      { kind: "error", message: "the stream broke" },
+    ];
+    const heard: number[] = [];
+    const activity = {
+      subscribe: () => () => {},
+      turnFinished: () => heard.push(1),
+    };
+    const store = createAgentChatStore(
+      null,
+      api,
+      async () => null,
+      () => null,
+      fakeDrawings(),
+      activity,
+    );
+
+    store.send("create the team and then fall over");
+
+    await waitFor(() => expect(heard).toHaveLength(1));
+  });
 });

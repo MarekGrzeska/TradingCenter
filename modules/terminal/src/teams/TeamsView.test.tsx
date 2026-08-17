@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { agentActivity } from "../agent/agentActivity";
 import { MarketDataError } from "../data/types";
 import { TeamsView } from "./TeamsView";
 import type { RunStreamEvent, TeamRun, TeamRunStep, TeamTrade } from "./runs";
@@ -199,6 +200,55 @@ async function closeAgentSettings() {
   await userEvent.click(screen.getByRole("button", { name: "Done" }));
   await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
 }
+
+describe("what the chat changed", () => {
+  it("shows a team the model created, without the operator reloading the page", async () => {
+    // Reported from a running stack on 17 August 2026: `create_team` from the chat
+    // succeeded, the team was in the module, and the tab kept showing the list it read on
+    // mount. `teams-mcp`'s writes never pass through this tab, so nothing invalidated it.
+    const listTeams = vi
+      .fn()
+      .mockResolvedValueOnce([TEAM])
+      .mockResolvedValue([TEAM, { ...TEAM, id: 2, name: "Built from the chat" }]);
+    render(<TeamsView api={fakeApi({ listTeams })} />);
+    await screen.findByText("Morning desk");
+    expect(screen.queryByText("Built from the chat")).not.toBeInTheDocument();
+
+    agentActivity.turnFinished();
+
+    expect(await screen.findByText("Built from the chat")).toBeInTheDocument();
+  });
+
+  it("does not re-read the catalogue on its own between turns", async () => {
+    // The refresh is tied to a turn ending, not to a timer: a tab that polls is a tab
+    // that spends requests on nothing for as long as it is open.
+    const api = fakeApi();
+    render(<TeamsView api={api} />);
+    await screen.findByText("Morning desk");
+
+    expect(api.listTeams).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves a team open on the canvas alone", async () => {
+    // A draft is what the operator is typing into. Re-reading it here would replace their
+    // unsaved edit with a revision they did not ask for — the catalogue is a read, an open
+    // editor is not.
+    const api = fakeApi();
+    await openTheTeam(api);
+    await openAgentSettings("Scout");
+    await userEvent.type(screen.getByLabelText("Role"), "ing");
+    expect(await screen.findByTestId("agent-node-Scouting")).toBeInTheDocument();
+    const readsBefore = (api.latestRevision as ReturnType<typeof vi.fn>).mock.calls.length;
+
+    agentActivity.turnFinished();
+
+    // Still the operator's text, and the editor asked the module nothing.
+    expect((screen.getByLabelText("Role") as HTMLInputElement).value).toBe("Scouting");
+    expect((api.latestRevision as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(
+      readsBefore,
+    );
+  });
+});
 
 describe("the catalogue", () => {
   it("lists what the module published, without reading any definition", async () => {

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useAgentTurns } from "../agent/useAgentTurns";
 import { RunMonitor } from "./RunMonitor";
 import { SchedulesPanel } from "./SchedulesPanel";
 import { TeamCatalogue } from "./TeamCatalogue";
@@ -26,6 +27,17 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
   const models = useModels(api);
   const tools = useTools(api);
   const [open, setOpen] = useState<Open>({ kind: "catalogue" });
+
+  // A chat can create and revise teams since `teams-mcp`, and that write never passes
+  // through this tab — so a team the model made existed everywhere except on screen until
+  // the operator reloaded the page. The catalogue is a read and re-reads freely
+  // (`agentActivity.ts`).
+  //
+  // Only the catalogue. A team open on the canvas is a draft the operator may be typing
+  // into, and re-reading it here would throw that away to show a revision they did not ask
+  // for — the editor keeps its own rule that `saved` only ever comes from something the
+  // module answered *this* editor with.
+  useAgentTurns(teams.reload);
 
   if (models.status === "loading") {
     return <p className="p-4 text-sm text-ink-muted">Reading the model catalogue…</p>;

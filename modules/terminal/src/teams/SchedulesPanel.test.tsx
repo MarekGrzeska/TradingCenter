@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { agentActivity } from "../agent/agentActivity";
 import { MarketDataError } from "../data/types";
 import { formatInstant, formatUtcInstant } from "../ui/formatTime";
 import { SchedulesPanel } from "./SchedulesPanel";
@@ -144,6 +145,32 @@ describe("a schedule's next fire", () => {
     for (const t of oddTimes) {
       expect(await screen.findByText(new RegExp(formatUtcInstant(t)))).toBeInTheDocument();
     }
+  });
+});
+
+describe("what the chat changed", () => {
+  it("re-reads after an agent turn, because schedule_team is a chat tool too", async () => {
+    // The same staleness the catalogue had: `schedule_team` and `trigger_team` write in
+    // the module and nothing about them reaches this panel (`agentActivity.ts`).
+    const listSchedules = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValue([{ ...SCHEDULE, cronExpression: "30 8 * * 1-5" }]);
+    render(
+      <SchedulesPanel
+        api={fakeApi({ listSchedules })}
+        teamId={1}
+        teamName="Morning desk"
+        tools={[]}
+        onClose={vi.fn()}
+        onWatchRun={vi.fn()}
+      />,
+    );
+    await waitFor(() => expect(listSchedules).toHaveBeenCalledTimes(1));
+
+    agentActivity.turnFinished();
+
+    expect(await screen.findByText(/30 8 \* \* 1-5/)).toBeInTheDocument();
   });
 });
 
