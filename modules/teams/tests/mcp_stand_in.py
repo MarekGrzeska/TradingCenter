@@ -161,9 +161,14 @@ async def serving(
     tools: tuple[str, ...] = DEFAULT_TOOLS,
     *,
     build: Callable[[FastMCP], None] | None = None,
+    port: int | None = None,
 ) -> AsyncIterator[str]:
-    """A stand-in server on a free port for the duration of the block. Yields its URL."""
-    port = free_port()
+    """A stand-in server on a free port for the duration of the block. Yields its URL.
+
+    `port` pins it, which is how a restart is reproduced: the same URL served by a second
+    server that never heard of the first one's sessions.
+    """
+    port = free_port() if port is None else port
     mcp = FastMCP("stand-in", host="127.0.0.1", port=port)
     if build is not None:
         build(mcp)

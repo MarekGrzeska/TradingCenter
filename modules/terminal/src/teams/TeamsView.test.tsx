@@ -1131,6 +1131,89 @@ describe("watching a run", () => {
     expect(within(dialog).queryByText("arguments")).not.toBeInTheDocument();
   });
 
+  it("reads the body of a call it watched arrive, once the run is over", async () => {
+    // specs/terminal-teams, "Zakończony przebieg pokazuje treść każdego wywołania": the
+    // frame carries no body, so until the run ends there is nothing to show. When it ends
+    // the recorded rows are complete, and they are read again.
+    const streamed = {
+      agentKey: "agent-1",
+      roundIndex: 0,
+      position: 0,
+      toolName: "place_order",
+      outcome: "unavailable",
+      durationMs: 85,
+    };
+    const api = fakeApi({
+      watchRun: vi.fn(async () =>
+        streamOf([
+          { kind: "snapshot", run: RUN, steps: MIDWAY },
+          { kind: "toolCall", call: streamed },
+          { kind: "runFinished", status: "completed", stoppedReason: null },
+        ]),
+      ),
+      runToolCalls: vi.fn(async () => [
+        {
+          runStepId: 1,
+          roundIndex: 0,
+          position: 0,
+          toolName: "place_order",
+          outcome: "unavailable",
+          durationMs: 85,
+          detail: {
+            arguments: { symbol: "US100", size: 5 },
+            resultText: "the trading-mcp tool server could not be reached",
+          },
+        },
+      ]),
+    });
+    await watch(api);
+    await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Scout/ }));
+
+    // One entry, not two: the stream's copy and the recorded row are the same call.
+    const entries = within(dialog).getAllByRole("button", { name: /place_order/ });
+    expect(entries).toHaveLength(1);
+
+    await userEvent.click(entries[0]);
+    expect(within(dialog).getByText(/"size": ?5/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByText("the trading-mcp tool server could not be reached"),
+    ).toBeInTheDocument();
+    expect(within(dialog).queryByText(/have not been read yet/)).not.toBeInTheDocument();
+  });
+
+  it("keeps the calls it has when the read at the end of a run fails", async () => {
+    const api = fakeApi({
+      watchRun: vi.fn(async () =>
+        streamOf([
+          { kind: "snapshot", run: RUN, steps: MIDWAY },
+          {
+            kind: "toolCall",
+            call: {
+              agentKey: "agent-1",
+              roundIndex: 0,
+              position: 0,
+              toolName: "get_balance",
+              outcome: "ok",
+              durationMs: 12,
+            },
+          },
+          { kind: "runFinished", status: "completed", stoppedReason: null },
+        ]),
+      ),
+      runToolCalls: vi.fn(async () => {
+        throw new Error("the module did not answer");
+      }),
+    });
+    await watch(api);
+    await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: /Scout/ }));
+
+    expect(within(dialog).getByRole("button", { name: /get_balance/ })).toBeInTheDocument();
+  });
+
   it("closes the outputs window on Escape", async () => {
     await watch(fakeApi());
     await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));

@@ -50,10 +50,21 @@ from azure.identity.aio import DefaultAzureCredential
 from mcp import ClientSession
 from mcp.client.streamable_http import streamable_http_client
 from mcp.shared._httpx_utils import create_mcp_http_client
+from mcp.shared.exceptions import McpError
 
 from ..config import Settings
 
 log = logging.getLogger(__name__)
+
+# What the SDK turns a `404` on `POST /mcp` into. The status never reaches this file:
+# `streamable_http.py` sees it, synthesizes this JSON-RPC error into the response stream,
+# and `ClientSession` raises it as an `McpError` — so the string is the only handle there
+# is. Matching a string from somebody else's library is brittle on purpose rather than by
+# accident: `test_tool_server.py` drives a real client against a real server that has
+# forgotten the session, so an SDK upgrade that reworded this fails a test instead of
+# quietly turning the retry off.
+_SESSION_GONE_CODE = 32600
+_SESSION_GONE_MESSAGE = "Session terminated"
 
 # FastMCP's own default, and market-mcp does not override it (`server.py`, which builds
 # `streamable_http_app()` and wraps it without touching the route).
@@ -189,8 +200,7 @@ class ToolServer:
         if self._tools is not None:
             return self._tools
         try:
-            session = await self._connected_session()
-            result = await asyncio.wait_for(session.list_tools(), timeout=self._timeout)
+            result = await self._listed()
         except TimeoutError as err:
             await self._disconnect()
             raise ToolServerUnavailable(
@@ -199,12 +209,25 @@ class ToolServer:
             ) from err
         except Exception as err:
             # Every failure here means the same thing to a caller — the server could not
-            # be asked — so they are narrowed into one type rather than sorted.
+            # be asked — so they are narrowed into one type rather than sorted. The one
+            # exception is the session the server has forgotten, which is worth one
+            # reopening: otherwise a server restarted since the last read refuses the run
+            # before an agent has been asked anything.
             await self._disconnect()
-            raise ToolServerUnavailable(
-                f"the {self.label} tool server at {self._url} could not be reached: "
-                f"{_describe(err)}"
-            ) from err
+            if not _session_is_gone(err):
+                raise ToolServerUnavailable(
+                    f"the {self.label} tool server at {self._url} could not be reached: "
+                    f"{_describe(err)}"
+                ) from err
+            log.info("%s: the tool list was refused as an unknown session — reopening", self.label)
+            try:
+                result = await self._listed()
+            except Exception as second:
+                await self._disconnect()
+                raise ToolServerUnavailable(
+                    f"the {self.label} tool server at {self._url} could not be reached "
+                    f"after reopening the session: {_describe(second)}"
+                ) from second
         self._tools = [
             ToolDescriptor(
                 name=tool.name,
@@ -218,6 +241,21 @@ class ToolServer:
         return self._tools
 
     async def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
+        """One logical call, and at most two requests.
+
+        The second request happens only when the server rejected the first as belonging to
+        a session it does not know — which it answers **before** looking at which tool was
+        asked for, so it proves the call was not handled. That is the whole of the
+        licence: a timeout leaves the effect unknown and is never repeated, and the
+        distinction is drawn on the server's answer rather than on the tool's name,
+        because the gate that produced the answer had not read the name either
+        (specs/teams-tool-access, "Wywołanie odrzucone z powodu nieznanej sesji jest
+        ponawiane raz").
+
+        A restart on the other side is the ordinary way this happens, and it happened in
+        production on 17 August 2026: `trading-mcp` was redeployed, and the first call
+        after it — an order — died against a session that no longer existed.
+        """
         started = time.monotonic()
 
         def elapsed() -> int:
@@ -230,29 +268,38 @@ class ToolServer:
                 elapsed(),
             )
         try:
-            session = await self._connected_session()
-            result = await asyncio.wait_for(
-                session.call_tool(name, arguments), timeout=self._timeout
-            )
+            result = await self._send(name, arguments)
         except TimeoutError:
             await self._disconnect()
-            return ToolOutcome(
-                ToolOutcomeKind.UNAVAILABLE,
-                f"the {self.label} tool server did not answer within {self._timeout:g}s. "
-                "The call was not made — this says nothing about what the tool would "
-                "have answered.",
-                elapsed(),
-            )
+            return ToolOutcome(ToolOutcomeKind.UNAVAILABLE, self._timed_out(), elapsed())
         except Exception as err:  # noqa: BLE001 - a broken session is not a broken run
-            log.warning("tool call %s failed against %s: %s", name, self._url, _describe(err))
             await self._disconnect()
-            return ToolOutcome(
-                ToolOutcomeKind.UNAVAILABLE,
-                f"the {self.label} tool server could not be reached: {_describe(err)}. "
-                "The call was not made — this says nothing about what the tool would "
-                "have answered.",
-                elapsed(),
+            if not _session_is_gone(err):
+                log.warning("tool call %s failed against %s: %s", name, self._url, _describe(err))
+                return ToolOutcome(
+                    ToolOutcomeKind.UNAVAILABLE, self._unreachable(err), elapsed()
+                )
+            log.info(
+                "%s: %s was refused as an unknown session — reopening and sending it once more",
+                self.label,
+                name,
             )
+            try:
+                result = await self._send(name, arguments)
+            except TimeoutError:
+                await self._disconnect()
+                return ToolOutcome(ToolOutcomeKind.UNAVAILABLE, self._timed_out(), elapsed())
+            except Exception as second:  # noqa: BLE001 - same reason as above
+                log.warning(
+                    "tool call %s failed against %s after reopening the session: %s",
+                    name,
+                    self._url,
+                    _describe(second),
+                )
+                await self._disconnect()
+                return ToolOutcome(
+                    ToolOutcomeKind.UNAVAILABLE, self._unreachable(second), elapsed()
+                )
 
         if result.isError:
             # market-mcp's refusals are written for a reader who can act on them, so its
@@ -271,6 +318,30 @@ class ToolServer:
             else _text_of(result.content)
         )
         return ToolOutcome(ToolOutcomeKind.OK, text, elapsed())
+
+    async def _listed(self):
+        """One `tools/list`, on whatever session is open — reopening one if none is."""
+        session = await self._connected_session()
+        return await asyncio.wait_for(session.list_tools(), timeout=self._timeout)
+
+    async def _send(self, name: str, arguments: dict[str, Any]):
+        """One request, on whatever session is open — reopening one if none is."""
+        session = await self._connected_session()
+        return await asyncio.wait_for(session.call_tool(name, arguments), timeout=self._timeout)
+
+    def _timed_out(self) -> str:
+        return (
+            f"the {self.label} tool server did not answer within {self._timeout:g}s. "
+            "The call was not made — this says nothing about what the tool would "
+            "have answered."
+        )
+
+    def _unreachable(self, err: BaseException) -> str:
+        return (
+            f"the {self.label} tool server could not be reached: {_describe(err)}. "
+            "The call was not made — this says nothing about what the tool would "
+            "have answered."
+        )
 
     async def _connected_session(self) -> ClientSession:
         if self._session is not None:
@@ -372,6 +443,21 @@ def _describe(err: BaseException) -> str:
             return "; ".join(unique)
     text = str(err).strip()
     return text or type(err).__name__
+
+
+def _session_is_gone(err: BaseException) -> bool:
+    """Whether the server refused this request as belonging to a session it does not know.
+
+    Recurses into groups for `_describe`'s reason: the transport runs its halves in anyio
+    task groups, so what reaches a caller is often the error wrapped in one.
+    """
+    if isinstance(err, BaseExceptionGroup):
+        return any(_session_is_gone(sub) for sub in err.exceptions)
+    return (
+        isinstance(err, McpError)
+        and err.error.code == _SESSION_GONE_CODE
+        and err.error.message == _SESSION_GONE_MESSAGE
+    )
 
 
 def _text_of(content: list[Any]) -> str:

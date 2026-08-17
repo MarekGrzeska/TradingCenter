@@ -76,6 +76,14 @@ canvas.
   before an agent is called live in `assignment.py`: a server that cannot be asked *and
   is needed*, and a tool no server announces. A team assigning no tools never touches
   either, and an unreachable server nobody has a tool from never reaches the caller.
+  A session lives between calls, so a tool server that restarts leaves this module holding
+  one the server has forgotten — and the first call after it is refused as an unknown
+  session. `client.py` reopens and sends that one call again, **once**, and only for that
+  refusal: the server answers it at the session gate, before reading which tool was asked
+  for, so it proves the call was not handled. A timeout is never repeated — after one, the
+  effect is unknown, and a repeated write would be a second order rather than a confirmed
+  first. Written from the failure: `trading-mcp` was redeployed on 17 August 2026, and the
+  first call after it was an order that never went.
 - `app.py` — assembly only: the lifespan, the routers mounted on it, and the tool server
   it builds without connecting. Nothing that decides anything.
 - `migrations/` — the schema, as the statements a deployment actually runs: the catalogue
