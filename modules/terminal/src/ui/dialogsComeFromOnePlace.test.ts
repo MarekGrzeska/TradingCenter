@@ -11,9 +11,14 @@ import { describe, expect, it } from "vitest";
  * here while quietly missing the focus trap, or `Escape`, or the error that has to stay
  * with its decision.
  *
- * So this reads the source, crudely on purpose. The two cheap ways around `ConfirmDialog`
- * — announcing `role="dialog"` by hand, or the browser's own `confirm()` — are named here
- * so taking either fails out loud rather than at review, or not at all.
+ * So this reads the source, crudely on purpose. The two cheap ways around the shared
+ * shell — announcing `role="dialog"` by hand, or the browser's own `confirm()` — are named
+ * here so taking either fails out loud rather than at review, or not at all.
+ *
+ * The one place is `ModalShell`, not `ConfirmDialog`: a modal that is a form rather than a
+ * question (an agent's settings) has no consent to gather and no work to hold, so it is
+ * built on the shell directly. What the spec asks for is that the *behaviours* come from
+ * one place, and they do — `ConfirmDialog` is itself now one of the shell's callers.
  */
 
 // Vitest runs from the module root. The first test below checks that this found
@@ -21,7 +26,7 @@ import { describe, expect, it } from "vitest";
 const SRC = join(process.cwd(), "src");
 
 /** The component allowed to be a dialog, relative to `src/`. */
-const THE_ONE = join("ui", "ConfirmDialog.tsx");
+const THE_ONE = join("ui", "ModalShell.tsx");
 
 function sourceFiles(dir: string, prefix = ""): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -50,6 +55,16 @@ describe("every dialog in the terminal comes from ConfirmDialog", () => {
   it("has no second component announcing itself as a dialog", () => {
     const offenders = sourceFiles(SRC).filter(
       (file) => file !== THE_ONE && contents(file).includes('role="dialog"'),
+    );
+
+    expect(offenders).toEqual([]);
+  });
+
+  it("has no second component taking the keyboard for itself", () => {
+    // The other half of announcing a dialog, and the half a reader is likelier to copy
+    // without the focus trap that has to come with it.
+    const offenders = sourceFiles(SRC).filter(
+      (file) => file !== THE_ONE && contents(file).includes('aria-modal="true"'),
     );
 
     expect(offenders).toEqual([]);
