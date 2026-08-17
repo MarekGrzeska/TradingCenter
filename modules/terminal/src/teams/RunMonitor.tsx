@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { MessageBody } from "../agent/MessageBody";
 import { formatInstant } from "../ui/formatTime";
+import { RunOutputsDialog } from "./RunOutputsDialog";
 import { TeamCanvas } from "./TeamCanvas";
 import { outcomeOf, stopCause, type TeamRun, type TeamRunStep, type TeamRunToolCall, type TeamTrade } from "./runs";
 import type { TeamDefinition, TeamLayout, TeamsApi, TeamsModel } from "./teamsApi";
@@ -35,6 +37,10 @@ export function RunMonitor({
   const [places, setPlaces] = useState<TeamLayout>(new Map());
   const [version, setVersion] = useState<number | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  // Reading what the agents wrote is a different job from watching whether they are
+  // working, and the 20rem column beside the canvas is shaped for the second one
+  // (`RunOutputsDialog`).
+  const [readingOutputs, setReadingOutputs] = useState(false);
   const [stopping, setStopping] = useState(false);
   const [stopError, setStopError] = useState<string | null>(null);
 
@@ -120,6 +126,18 @@ export function RunMonitor({
           {version !== null && <span className="text-xs text-ink-faint"> · revision {version}</span>}
         </span>
         {run && <RunBadge status={run.status} />}
+        {/* Enabled while the run still works, deliberately: what has already been written
+            is worth reading before the rest arrives, and the dialog renders whatever the
+            stream has delivered so far. The count is on the button because it is the
+            question the button answers — is there anything in there yet. */}
+        <button
+          type="button"
+          onClick={() => setReadingOutputs(true)}
+          disabled={steps.length === 0}
+          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Outputs ({steps.filter((step) => step.output).length})
+        </button>
         {working && (
           <button
             type="button"
@@ -203,6 +221,20 @@ export function RunMonitor({
           )}
         </div>
       </div>
+
+      {readingOutputs && (
+        <RunOutputsDialog
+          runId={runId}
+          steps={steps}
+          roleOf={(agentKey) =>
+            definition?.agents.find((agent) => agent.key === agentKey)?.role ?? null
+          }
+          callsByAgent={callsByAgent}
+          tradesByAgent={tradesByAgent}
+          runOver={run !== null && !working}
+          onClose={() => setReadingOutputs(false)}
+        />
+      )}
     </div>
   );
 }
@@ -236,7 +268,13 @@ function AgentWork({
       <section className="flex min-h-0 flex-col gap-1">
         <h4 className="text-xs uppercase tracking-wide text-ink-faint">Output</h4>
         {step.output ? (
-          <p className="whitespace-pre-wrap text-xs text-ink">{step.output}</p>
+          // The same renderer the chat uses, for the same reason: this is model prose, and
+          // as raw text it reads as `**` and `-` rather than as emphasis and a list. The
+          // full-width version of this is `RunOutputsDialog`, which is where an output
+          // longer than a paragraph belongs.
+          <div className="text-xs text-ink">
+            <MessageBody text={step.output} />
+          </div>
         ) : (
           <p className="text-xs text-ink-muted">
             {step.status === "pending" ? "waiting for its predecessors" : "nothing yet"}

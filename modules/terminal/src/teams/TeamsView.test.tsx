@@ -836,6 +836,78 @@ describe("watching a run", () => {
     expect(await screen.findByText("Orders placed (1)")).toBeInTheDocument();
   });
 
+  it("reads every agent's output in a window of its own, formatted as the model wrote it", async () => {
+    // The 20rem column is shaped for "is anything stuck"; reading what the agents said is
+    // a different job, and the raw `**` was the other half of the complaint.
+    const api = fakeApi({
+      runSteps: vi.fn(async () => [
+        step(1, "agent-1", "completed", "**US100** is trending\n\n- higher highs\n- volume flat"),
+        step(2, "agent-2", "completed", "I would wait"),
+        step(3, "agent-3", "pending"),
+      ]),
+      watchRun: vi.fn(async () =>
+        streamOf([
+          {
+            kind: "snapshot",
+            run: { ...RUN, status: "completed", finishedAt: 1_760_001_000 },
+            steps: [
+              step(1, "agent-1", "completed", "**US100** is trending\n\n- higher highs\n- volume flat"),
+              step(2, "agent-2", "completed", "I would wait"),
+              step(3, "agent-3", "pending"),
+            ],
+          },
+        ]),
+      ),
+    });
+    await watch(api);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Outputs (2)" }));
+
+    const dialog = await screen.findByRole("dialog");
+    // Every agent at once, which is how a finished run is read — in order, seams included.
+    expect(within(dialog).getByText("is trending")).toBeInTheDocument();
+    expect(within(dialog).getByText("I would wait")).toBeInTheDocument();
+    // Markdown, not the punctuation the model typed: bold is an element and the list is a
+    // list (`MessageBody`, the same renderer the chat uses).
+    expect(within(dialog).getByText("US100").tagName).toBe("STRONG");
+    expect(within(dialog).getAllByRole("listitem")).toHaveLength(2);
+    expect(within(dialog).queryByText(/\*\*/)).not.toBeInTheDocument();
+  });
+
+  it("narrows to one agent, with what it called beside what it wrote", async () => {
+    const api = fakeApi({
+      runToolCalls: vi.fn(async () => [
+        {
+          runStepId: 1,
+          roundIndex: 0,
+          position: 0,
+          toolName: "get_candles",
+          outcome: "ok",
+          durationMs: 42,
+        },
+      ]),
+    });
+    await watch(api);
+    await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));
+    const dialog = await screen.findByRole("dialog");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: /Scout/ }));
+
+    expect(within(dialog).getByText("US100 is trending")).toBeInTheDocument();
+    expect(within(dialog).getByText("get_candles")).toBeInTheDocument();
+    expect(within(dialog).getByText(/ok · 42 ms/)).toBeInTheDocument();
+  });
+
+  it("closes the outputs window on Escape", async () => {
+    await watch(fakeApi());
+    await userEvent.click(await screen.findByRole("button", { name: /^Outputs/ }));
+    await screen.findByRole("dialog");
+
+    await userEvent.keyboard("{Escape}");
+
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+  });
+
   it("asks the module to stop a run the operator interrupts", async () => {
     const api = fakeApi();
     await watch(api);

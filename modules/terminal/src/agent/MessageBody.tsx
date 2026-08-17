@@ -4,9 +4,14 @@ import remarkGfm from "remark-gfm";
 import remend from "remend";
 
 /**
- * An agent reply, rendered as the Markdown the model actually writes rather than as the
+ * Model prose, rendered as the Markdown the model actually writes rather than as the
  * literal `**` it used to show. The operator's own messages are not rendered this way —
  * what they typed is what they meant, and reinterpreting it would be a surprise.
+ *
+ * Two callers, and it lives here because the chat was the first: an agent's reply in the
+ * panel, and what a team's agent produced in a run (`teams/RunOutputsDialog.tsx` and the
+ * monitor's own column). One renderer rather than two, so the safety argument below is
+ * made once.
  *
  * **No `rehype-raw`, on purpose.** Without it `react-markdown` builds React elements and
  * never touches `dangerouslySetInnerHTML`, so raw HTML in a model's reply is not rendered
