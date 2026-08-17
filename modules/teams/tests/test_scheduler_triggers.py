@@ -96,7 +96,6 @@ async def _trigger(
             cooldown_seconds=cooldown_seconds,
             poll_interval_seconds=300,
             next_check_at=PAST,
-            unattended_ack=False,
         )
 
 

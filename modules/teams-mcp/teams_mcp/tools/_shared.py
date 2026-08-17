@@ -20,9 +20,11 @@ from ..errors import ToolRefusal, UpstreamUnavailable
 from ..operator import operator_token
 
 # Applied to every read tool — a structural claim an MCP client can act on without
-# reading this module's source. `teams` reads exactly this annotation when deciding
-# whether a revision may run unattended, so it is load-bearing rather than decorative
-# (specs/teams-mcp-tools, "Narzędzie zapisujące jest oznaczone jako zmieniające stan").
+# reading this module's source (specs/teams-mcp-tools, "Narzędzie zapisujące jest
+# oznaczone jako zmieniające stan"). `teams` used to read this same annotation when
+# deciding whether a revision could run unattended; that check is gone
+# (`manage-schedules-and-drop-the-acknowledgement`), so the annotation is now a claim to
+# the client rather than an input to a refusal.
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True)
 
 # Applied to every tool that changes the catalogue. `idempotentHint=False` because none
@@ -30,6 +32,13 @@ READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotent
 # second bill. `destructiveHint=False` is the honest half — revisions are append-only, so
 # nothing here overwrites what was there before.
 WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False)
+
+# Applied to the two tools that take something away for good. `destructiveHint=True` is
+# the whole point of having a third annotation: an MCP client that asks the operator
+# before a destructive call has no way to tell `delete_schedule` from `create_team`
+# otherwise. `idempotentHint=True` because a second call removes nothing further — the
+# row is already gone and the answer is that it is not there.
+DESTRUCTIVE = ToolAnnotations(readOnlyHint=False, destructiveHint=True, idempotentHint=True)
 
 
 async def _call(
@@ -59,6 +68,8 @@ async def _call(
             return await teams.post(path, token=token, json=json)
         if method == "PUT":
             return await teams.put(path, token=token, json=json)
+        if method == "DELETE":
+            return await teams.delete(path, token=token)
         raise ValueError(f"unsupported method {method}")  # pragma: no cover - programming error
     except UpstreamUnavailable as err:
         raise ToolRefusal(f"access failure: {err}") from err
