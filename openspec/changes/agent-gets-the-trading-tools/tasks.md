@@ -57,9 +57,17 @@
   `allowed_applications` `trading-mcp` i przepisać komentarz o jednym wołającym
 - [x] 6.2 W `infra/app-service.tf` dołożyć `TRADING_MCP_URL` i `TRADING_MCP_SCOPE` do
   `app_settings` agenta
-- [ ] 6.3 `terraform plan` na PR, `terraform apply` ręką operatora, potem restart agenta
+- [ ] 6.3 `terraform plan` na PR, `terraform apply` ręką operatora, potem restart agenta.
+  Plan mówi `0 to add, 6 to change, 0 to destroy`, a zmiany tego diffa są dwie — pozostałe
+  cztery aplikacje (`market_data`, `market_mcp`, `teams`, `teams_mcp`) mają
+  `allowed_applications` → `(known after apply)`, bo każda z tych list nazywa client id
+  agenta przez źródło czytające `azurerm_linux_web_app.agent.identity[0].principal_id`,
+  a agent jest w tym planie zmieniany. Wartości wracają te same; sprzężenie jest starsze
+  niż ta zmiana. Plan nie rusza żadnego `azuread_*`, więc `terraform-apply.yml` go nie
+  odrzuci
 - [ ] 6.4 Po `apply` sprawdzić odczytem z Azure, nie ze stanu Terraforma: dwa wpisy w
-  `allowedApplications` `trading-mcp` i `TRADING_MCP_*` w ustawieniach agenta
+  `allowedApplications` `trading-mcp`, `TRADING_MCP_*` w ustawieniach agenta, oraz że
+  cztery listy z 6.3 wróciły na to, co miały
 
 ## 7. Skrypty i dokumentacja
 
