@@ -8,94 +8,33 @@ on:
     paths:
       - "modules/teams/**"
       - ".github/workflows/deploy-teams.yml"
+      - ".github/workflows/_deploy-app-service.yml"
+      - "scripts/deploy_probe.py"
   workflow_dispatch: {}
 
+# Declared on the caller, and this is where it has to be: a reusable workflow can only
+# *narrow* the caller's GITHUB_TOKEN, never widen it. This repository's default workflow
+# permission is `read`, and `id-token` is never granted by default at all — so a caller
+# without this block hands the shared workflow a token that cannot push to GHCR and cannot
+# exchange an OIDC assertion, and every deploy fails at `azure/login`.
 permissions:
   contents: read
   id-token: write # azure/login's OIDC exchange
   packages: write # docker push to GHCR
 
-concurrency:
-  group: deploy-teams
-  cancel-in-progress: false # never cancel a deploy mid-flight
-
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      # Lowercased for the same reason as the other four deploy workflows — a Docker
-      # reference cannot carry the capitals in `github.repository`.
-      - id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/teams" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Same reasoning as the others: buildx starts cold every run otherwise.
-      - uses: docker/setup-buildx-action@v3
-
-      # Tagged with the commit, never `latest` — same reasoning as the other deploys: a
-      # rollback has to name a specific image, and `latest` names whichever one moved
-      # last.
-      - uses: docker/build-push-action@v6
-        with:
-          # The repository root, not the module: `tc-runtime` is a path dependency and
-          # uv resolves it while installing the lock, so it has to be inside the context
-          # (packages-replace-the-hand-copies). `.dockerignore` at the root keeps that
-          # from meaning "upload every virtualenv in the tree".
-          context: .
-          file: modules/teams/Dockerfile
-          push: true
-          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
-          cache-from: type=gha,scope=teams
-          cache-to: type=gha,scope=teams,mode=max
-
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - uses: azure/webapps-deploy@v3
-        with:
-          app-name: app-tradingcenter-teams
-          images: ${{ steps.image.outputs.name }}:${{ github.sha }}
-
-      # Two questions, and `deploy-agent.yml` is where the second one was learned.
-      #
-      # The control plane says which image App Service will serve. It does not say
-      # whether the process inside came up: `state` is the state of the *site*, and on
-      # 16 August 2026 it read `Running` for the better part of an hour while the agent's
-      # container exited with code 3 on every restart.
-      #
-      # `/health` answers the second question and answers it completely. It is excluded
-      # from Easy Auth (infra/app-service.tf) so a caller with no token reaches the
-      # container rather than the platform's 401 — and because this module's lifespan
-      # does not finish until its migrations do (`teams/migrate.py`, under the advisory
-      # lock), a process answering here is a process whose database is at the revision
-      # this image was built for.
-      - name: Confirm this commit's image is the one serving
-        run: |
-          set -euo pipefail
-          expected="${{ steps.image.outputs.name }}:${{ github.sha }}"
-          url="https://app-tradingcenter-teams.azurewebsites.net/health"
-          for attempt in $(seq 1 20); do
-            image=$(az webapp config container show --name app-tradingcenter-teams \
-              --resource-group rg-tradingcenter \
-              --query "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value | [0]" -o tsv)
-            code=$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$url" || echo "000")
-            echo "attempt $attempt: image=${image:-none} health=$code"
-            if [ "${image#DOCKER|}" = "$expected" ] && [ "$code" = "200" ]; then
-              echo "serving: $expected"
-              exit 0
-            fi
-            sleep 15
-          done
-          echo "::error::app-tradingcenter-teams is not serving $expected — image=${image:-none} health=$code"
-          exit 1
+    uses: ./.github/workflows/_deploy-app-service.yml
+    with:
+      module: teams
+      app_name: app-tradingcenter-teams
+      # Same shape as agent's, and learned there: `/health` is excluded from Easy Auth
+      # (infra/app-service.tf), so a caller with no token reaches the container rather than
+      # the platform's 401 — and because this module's lifespan does not finish until its
+      # migrations do (`teams/migrate.py`, under the advisory lock), a process answering
+      # here is a process whose database is at the revision this image was built for.
+      probe_path: /health
+      expected_status: 200
+      body_contains: '"status"'
+      # Five minutes, for agent's reason: the lifespan blocks on the migration.
+      attempts: 20

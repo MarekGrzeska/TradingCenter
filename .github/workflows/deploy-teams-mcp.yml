@@ -1,111 +1,49 @@
 name: deploy-teams-mcp
 
+# Only a push to `main` deploys — the pull_request federated credential (github-oidc.tf)
+# cannot even authenticate to Azure, so this cannot run from a fork's PR by construction.
 on:
   push:
     branches: [main]
     paths:
       - "modules/teams-mcp/**"
       - ".github/workflows/deploy-teams-mcp.yml"
+      - ".github/workflows/_deploy-app-service.yml"
+      - "scripts/deploy_probe.py"
   workflow_dispatch: {}
 
+# Declared on the caller, and this is where it has to be: a reusable workflow can only
+# *narrow* the caller's GITHUB_TOKEN, never widen it. This repository's default workflow
+# permission is `read`, and `id-token` is never granted by default at all — so a caller
+# without this block hands the shared workflow a token that cannot push to GHCR and cannot
+# exchange an OIDC assertion, and every deploy fails at `azure/login`.
 permissions:
   contents: read
   id-token: write # azure/login's OIDC exchange
   packages: write # docker push to GHCR
 
-concurrency:
-  group: deploy-teams-mcp
-  cancel-in-progress: false # never cancel a deploy mid-flight
-
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      # Lowercased for the same reason as the other deploy workflows — a Docker
-      # reference cannot carry the capitals in `github.repository`.
-      - id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/teams-mcp" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Same reasoning as the other deploy workflows: buildx starts cold otherwise.
-      - uses: docker/setup-buildx-action@v3
-
-      # Tagged with the commit, never `latest` — same reasoning as the other deploy
-      # workflows.
-      - uses: docker/build-push-action@v6
-        with:
-          # The repository root, not the module: `tc-runtime` is a path dependency and
-          # uv resolves it while installing the lock, so it has to be inside the context
-          # (packages-replace-the-hand-copies). `.dockerignore` at the root keeps that
-          # from meaning "upload every virtualenv in the tree".
-          context: .
-          file: modules/teams-mcp/Dockerfile
-          push: true
-          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
-          cache-from: type=gha,scope=teams-mcp
-          cache-to: type=gha,scope=teams-mcp,mode=max
-
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - uses: azure/webapps-deploy@v3
-        with:
-          app-name: app-tradingcenter-teams-mcp
-          images: ${{ steps.image.outputs.name }}:${{ github.sha }}
-
-      # "Deployed" has meant "the request was accepted" up to here — the same gap every
-      # other deploy workflow closes with its own smoke check, and the one the control
-      # plane reported green over a crash-looping container on 16 August 2026.
-      #
-      # `/health` is the probe: excluded from Easy Auth (infra/app-service.tf,
-      # `excluded_paths`) and answering a plain 200 with a JSON body
-      # (specs/teams-mcp-transport, "Zdrowie modułu da się sprawdzić bez sesji MCP").
+    uses: ./.github/workflows/_deploy-app-service.yml
+    with:
+      module: teams-mcp
+      app_name: app-tradingcenter-teams-mcp
+      # `/health` is excluded from Easy Auth (infra/app-service.tf, `excluded_paths`) and
+      # answers a plain 200 with a JSON body (specs/teams-mcp-transport, "Zdrowie modułu da
+      # się sprawdzić bez sesji MCP").
       #
       # This probe proves less than trading-mcp's, and the difference is worth knowing
       # rather than copying over. That module refuses to open a port until the gateway
       # confirms a demo account, so its 200 carries a whole chain with it. This one has
-      # nothing about `teams` worth refusing to start over — an unreachable teams is a
-      # tool call that says so, not a process that will not run — so a 200 here means the
-      # container came up and is serving, and nothing more. Whether it can reach teams,
-      # and whether the operator's token survives the trip, is the first tool call, not
-      # this check.
-      #
-      # The image is asked for alongside, and that half was missing until 18 August 2026.
-      # Swapping a container in App Service is not instantaneous: for a minute or so after
-      # `webapps-deploy` returns, the *previous* container is still answering — so a probe
-      # that only reads HTTP passes on the image being replaced and the job goes green
-      # over an image that may never come up. market-data was the most exposed of the
-      # four, since its own signal is a 404 the old container returns identically.
-      # `deploy-agent.yml` and `deploy-gateway.yml` already asked this question; this is
-      # the same two lines, not a new idea.
-      - name: Smoke-check the deployed module
-        run: |
-          set -euo pipefail
-          url="https://app-tradingcenter-teams-mcp.azurewebsites.net/health"
-          expected="${{ steps.image.outputs.name }}:${{ github.sha }}"
-          for attempt in $(seq 1 12); do
-            image=$(az webapp config container show --name app-tradingcenter-teams-mcp \
-              --resource-group rg-tradingcenter \
-              --query "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value | [0]" -o tsv)
-            code=$(curl -s -o /tmp/probe -w '%{http_code}' --max-time 20 "$url" || echo 000)
-            body=$(head -c 200 /tmp/probe 2>/dev/null || true)
-            echo "attempt $attempt: image=${image:-none} HTTP $code ${body}"
-            if [ "${image#DOCKER|}" = "$expected" ] && [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"status"'; then
-              echo "teams-mcp is answering from its container"
-              exit 0
-            fi
-            sleep 15
-          done
-          echo "::error::teams-mcp did not answer from its container after ~3 minutes (last HTTP $code). Its start-up reaches nothing but its own settings, so a failure here is the settings or the image — the container log says which. — serving image=${image:-none}, expected $expected"
-          exit 1
+      # nothing about `teams` worth refusing to start over — an unreachable teams is a tool
+      # call that says so, not a process that will not run — so a 200 here means the
+      # container came up and is serving, and nothing more. Whether it can reach teams, and
+      # whether the operator's token survives the trip, is the first tool call, not this
+      # check.
+      probe_path: /health
+      expected_status: 200
+      body_contains: '"status"'
+      attempts: 12
+      failure_hint: >-
+        Its start-up reaches nothing but its own settings, so a failure here is the settings
+        or the image — the container log says which.

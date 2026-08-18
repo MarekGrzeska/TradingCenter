@@ -1,0 +1,153 @@
+name: deploy-app-service
+
+# The one deployment path for all seven App Service modules. Before this, seven copies of
+# it differed by the same handful of substitutions, and nothing checked that they agreed:
+# the lesson of 16 August 2026 — the control plane reports `Running` over a container that
+# exits on every restart — reached two of the seven, and the other five got it by hand in a
+# later pass. A change to the OIDC block or the buildx version was seven edits.
+#
+# What stays with the callers is what actually differs: the trigger, the path filter, the
+# probe's four parameters, and the incident comments. Those comments are the most valuable
+# content in a deploy workflow and there is nowhere in a shared file to put them.
+#
+# `deploy-terminal.yml` is not a caller — a Static Web App is deployed by a different
+# action with no image and no container to probe.
+on:
+  workflow_call:
+    inputs:
+      module:
+        description: The directory under modules/. Also the image suffix and the buildx cache scope — those three have never differed.
+        required: true
+        type: string
+      app_name:
+        description: The App Service name. Not derivable — capital-gateway's app is `app-tradingcenter-gateway`.
+        required: true
+        type: string
+      build_context:
+        description: >-
+          The repository root for every module taking a package as a path dependency, since
+          uv resolves it while installing the lock (packages-replace-the-hand-copies).
+          capital-gateway takes none, and its Dockerfile copies `pyproject.toml` from the
+          context root, so its context is still its own directory.
+        required: false
+        default: "."
+        type: string
+      probe_path:
+        description: >-
+          Empty for capital-gateway, and not because nothing was chosen: it admits only
+          market-data's and trading-mcp's addresses, so a runner cannot reach it at all and
+          the control plane is the only question its deploy can ask.
+        required: false
+        default: ""
+        type: string
+      expected_status:
+        description: 200 for a health endpoint; 404 for market-data, whose only excluded path is a WebSocket route.
+        required: false
+        default: 200
+        type: number
+      body_contains:
+        description: A key the module's own handler returns, so a 200 from anything in front of the container cannot pass.
+        required: false
+        default: ""
+        type: string
+      attempts:
+        description: 15 s apart. Longer for agent and teams, whose lifespan blocks on their migrations before they serve.
+        required: false
+        default: 12
+        type: number
+      failure_hint:
+        description: What the operator should look at first when this module fails to come up.
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: read
+  id-token: write # azure/login's OIDC exchange
+  packages: write # docker push to GHCR
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Not only an approval gate: the federated credential in `github-oidc.tf` has
+    # `:environment:production` in its subject, so a job without this cannot authenticate to
+    # Azure at all. The AZURE_* values themselves are repository variables.
+    environment: production
+    # One deploy of a given module at a time, and never cancelled mid-flight — a cancelled
+    # `webapps-deploy` leaves the site pointing at an image whose push may not have finished.
+    concurrency:
+      group: deploy-${{ inputs.module }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+
+      # Lowercased because a Docker reference cannot carry the capitals in
+      # `github.repository`.
+      - id: image
+        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/${MODULE}" >> "$GITHUB_OUTPUT"
+        env:
+          MODULE: ${{ inputs.module }}
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Otherwise buildx starts cold on every run.
+      - uses: docker/setup-buildx-action@v3
+
+      # Tagged with the commit, never `latest`: the probe below asserts that this exact
+      # reference is the one App Service is serving, which `latest` makes unanswerable.
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ inputs.build_context }}
+          # Relative to the workspace, not to the context — the same path for all seven.
+          file: modules/${{ inputs.module }}/Dockerfile
+          push: true
+          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ inputs.module }}
+          cache-to: type=gha,scope=${{ inputs.module }},mode=max
+
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ inputs.app_name }}
+          images: ${{ steps.image.outputs.name }}:${{ github.sha }}
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      # Two questions, and the second used to go unasked. `scripts/deploy_probe.py` carries
+      # the reasoning and — unlike the loop that lived here — a test of the failure mode it
+      # exists for.
+      # Every input arrives through `env`, not through `${{ }}` inside the shell line, and
+      # that is load-bearing rather than stylistic: `body_contains` is `"status"` — quotes
+      # included, because a bare `status` also matches a platform sign-in page. Interpolated
+      # into a quoted argument it would collapse to `status` and silently weaken the check
+      # the step exists for.
+      - name: Confirm this commit's image is the one serving
+        working-directory: scripts
+        env:
+          APP_NAME: ${{ inputs.app_name }}
+          EXPECTED_IMAGE: ${{ steps.image.outputs.name }}:${{ github.sha }}
+          PROBE_PATH: ${{ inputs.probe_path }}
+          EXPECTED_STATUS: ${{ inputs.expected_status }}
+          BODY_CONTAINS: ${{ inputs.body_contains }}
+          ATTEMPTS: ${{ inputs.attempts }}
+          FAILURE_HINT: ${{ inputs.failure_hint }}
+        run: |
+          uv run python deploy_probe.py \
+            --app-name "$APP_NAME" \
+            --expected-image "$EXPECTED_IMAGE" \
+            --probe-path "$PROBE_PATH" \
+            --expected-status "$EXPECTED_STATUS" \
+            --body-contains "$BODY_CONTAINS" \
+            --attempts "$ATTEMPTS" \
+            --failure-hint "$FAILURE_HINT"

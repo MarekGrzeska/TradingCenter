@@ -1,120 +1,54 @@
 name: deploy-market-data
 
+# Only a push to `main` deploys — the pull_request federated credential (github-oidc.tf)
+# cannot even authenticate to Azure, so this cannot run from a fork's PR by construction.
 on:
   push:
     branches: [main]
     paths:
       - "modules/market-data/**"
       - ".github/workflows/deploy-market-data.yml"
+      - ".github/workflows/_deploy-app-service.yml"
+      - "scripts/deploy_probe.py"
   workflow_dispatch: {}
 
+# Declared on the caller, and this is where it has to be: a reusable workflow can only
+# *narrow* the caller's GITHUB_TOKEN, never widen it. This repository's default workflow
+# permission is `read`, and `id-token` is never granted by default at all — so a caller
+# without this block hands the shared workflow a token that cannot push to GHCR and cannot
+# exchange an OIDC assertion, and every deploy fails at `azure/login`.
 permissions:
   contents: read
   id-token: write # azure/login's OIDC exchange
   packages: write # docker push to GHCR
 
-concurrency:
-  group: deploy-market-data
-  cancel-in-progress: false # never cancel a deploy mid-flight
-
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      # Lowercased for the same reason as deploy-gateway.yml — a Docker reference cannot
-      # carry the capitals in `github.repository`.
-      - id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/market-data" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Same reasoning as deploy-gateway.yml: buildx starts cold every run otherwise.
-      - uses: docker/setup-buildx-action@v3
-
-      # Tagged with the commit, never `latest` — same reasoning as deploy-gateway.yml.
-      - uses: docker/build-push-action@v6
-        with:
-          # The repository root, not the module: `tc-runtime` is a path dependency and
-          # uv resolves it while installing the lock, so it has to be inside the context
-          # (packages-replace-the-hand-copies). `.dockerignore` at the root keeps that
-          # from meaning "upload every virtualenv in the tree".
-          context: .
-          file: modules/market-data/Dockerfile
-          push: true
-          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
-          cache-from: type=gha,scope=market-data
-          cache-to: type=gha,scope=market-data,mode=max
-
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - uses: azure/webapps-deploy@v3
-        with:
-          app-name: app-tradingcenter-market-data
-          images: ${{ steps.image.outputs.name }}:${{ github.sha }}
-
-      # "Deployed" has meant "the request was accepted" up to here — and a container that
-      # will not start looks exactly like a successful deploy until someone opens the
-      # terminal hours later.
-      #
-      # `/ws/candles` is the probe, which needs explaining: every other path answers 401
-      # from Easy Auth *before* the request reaches the container, so a dead process and a
+    uses: ./.github/workflows/_deploy-app-service.yml
+    with:
+      module: market-data
+      app_name: app-tradingcenter-market-data
+      # `/ws/candles` and a 404, which needs explaining. Every other path answers 401 from
+      # Easy Auth *before* the request reaches the container, so a dead process and a
       # healthy one are indistinguishable there. This one path is excluded from Easy Auth
-      # (infra/app-service.tf, `excluded_paths`) because a browser cannot put a header on
-      # a WebSocket handshake — so a plain GET travels all the way to the app, where the
-      # router has no GET handler for a WebSocket route and FastAPI answers 404 with a
-      # JSON body. That JSON is the signal: it can only have come from the running
+      # (infra/app-service.tf, `excluded_paths`) because a browser cannot put a header on a
+      # WebSocket handshake — so a plain unauthenticated GET travels all the way to the app,
+      # where the router has no GET handler for a WebSocket route and FastAPI answers 404
+      # with a JSON body. That JSON is the signal: it can only have come from the running
       # module. A stopped container gives App Service's own 5xx HTML instead.
       #
       # Sending no ticket is deliberate: the point is to reach the app, not to open a
-      # stream, and an unauthenticated GET is the cheapest way to prove the process is
-      # answering.
+      # stream.
       #
       # This probe also carries the schema, which is not obvious from the path it calls.
       # The module compares the database's revision with the one its image ships and
-      # refuses to start when they differ (`market_data/schema.py`), so a deploy landing
-      # on an unmigrated database has no container to answer this GET, and the loop below
-      # runs out and fails the job. That pairing is deliberate: probing a route that reads
-      # the schema directly is impossible from here, because Easy Auth answers 401 in
-      # front of every path but this one (infra/app-service.tf, `excluded_paths`).
+      # refuses to start when they differ (`market_data/schema.py`), so a deploy landing on
+      # an unmigrated database has no container to answer this GET and the probe runs out.
       #
-      # The image is asked for alongside, and that half was missing until 18 August 2026.
-      # Swapping a container in App Service is not instantaneous: for a minute or so after
-      # `webapps-deploy` returns, the *previous* container is still answering — so a probe
-      # that only reads HTTP passes on the image being replaced and the job goes green
-      # over an image that may never come up. market-data was the most exposed of the
-      # four, since its own signal is a 404 the old container returns identically.
-      # `deploy-agent.yml` and `deploy-gateway.yml` already asked this question; this is
-      # the same two lines, not a new idea.
-      - name: Smoke-check the deployed module
-        run: |
-          set -euo pipefail
-          url="https://app-tradingcenter-market-data.azurewebsites.net/ws/candles"
-          expected="${{ steps.image.outputs.name }}:${{ github.sha }}"
-          for attempt in $(seq 1 12); do
-            image=$(az webapp config container show --name app-tradingcenter-market-data \
-              --resource-group rg-tradingcenter \
-              --query "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value | [0]" -o tsv)
-            code=$(curl -s -o /tmp/probe -w '%{http_code}' --max-time 20 "$url" || echo 000)
-            body=$(head -c 200 /tmp/probe 2>/dev/null || true)
-            echo "attempt $attempt: image=${image:-none} HTTP $code ${body}"
-            # 404 with FastAPI's JSON means the module itself answered. Anything 5xx, or
-            # a body that is not the app's, means the container is not serving yet.
-            if [ "${image#DOCKER|}" = "$expected" ] && [ "$code" = "404" ] && printf '%s' "$body" | grep -q '"detail"'; then
-              echo "market-data is answering"
-              exit 0
-            fi
-            sleep 15
-          done
-          echo "::error::market-data did not answer from its container after ~3 minutes (last HTTP $code) — serving image=${image:-none}, expected $expected"
-          exit 1
+      # This module was the most exposed of the four the image assertion was added to on
+      # 18 August 2026, since its own signal is a 404 the previous container returns
+      # identically.
+      probe_path: /ws/candles
+      expected_status: 404
+      body_contains: '"detail"'
+      attempts: 12

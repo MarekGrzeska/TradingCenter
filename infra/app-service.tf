@@ -1,6 +1,7 @@
-# One Linux App Service Plan, six apps (capital-gateway, market-data, market-mcp, agent,
-# teams, trading-mcp — design.md, "App Service, nie Container Apps"): all of them run
-# non-stop, so one shared plan is cheaper than as many Container Apps billed by CPU-second.
+# One Linux App Service Plan and every app in `local.web_app_names` — seven of them today
+# (design.md, "App Service, nie Container Apps"): all run non-stop, so one shared plan is
+# cheaper than as many Container Apps billed by CPU-second. The list is that local rather
+# than a sentence here, because a sentence here is what said "six apps" at seven.
 #
 # The fifth and sixth apps arrive after the measurement below was taken against four, and
 # the shape of that measurement says what to expect: most of the plan's memory is platform
@@ -47,6 +48,20 @@ resource "azurerm_service_plan" "main" {
 }
 
 locals {
+  # The seven App Service apps, once. Everything that used to carry a hand-typed numeral —
+  # the memory alert's own text, the headings below — counts this instead, because a
+  # numeral in a message is a fact that goes stale silently: on 18 August 2026 the alert
+  # the SKU decision stands on still said "all four apps" at seven.
+  web_app_names = {
+    "capital-gateway" = local.capital_gateway_app_name
+    "market-data"     = local.market_data_app_name
+    "market-mcp"      = local.market_mcp_app_name
+    "agent"           = local.agent_app_name
+    "teams"           = local.teams_app_name
+    "trading-mcp"     = local.trading_mcp_app_name
+    "teams-mcp"       = local.teams_mcp_app_name
+  }
+
   capital_gateway_app_name = "app-tradingcenter-gateway"
   market_data_app_name     = "app-tradingcenter-market-data"
   market_mcp_app_name      = "app-tradingcenter-market-mcp"
@@ -116,8 +131,8 @@ locals {
 
   # GHCR is private, because the repository is, so App Service needs a credential to pull
   # at all — without these the container never starts and the site answers 503 with
-  # `ImagePullUnauthorizedFailure` in the docker log. Identical for both apps, so said
-  # once here rather than twice below.
+  # `ImagePullUnauthorizedFailure` in the docker log. Identical for every app, so said
+  # once here rather than seven times below.
   #
   # These belong in `application_stack`, not `app_settings`: the provider owns the three
   # DOCKER_REGISTRY_SERVER_* settings and refuses them by name in app_settings ("cannot
@@ -229,58 +244,23 @@ resource "azurerm_linux_web_app" "capital_gateway" {
 # because which is the client and which is the resource is the whole content of the
 # arrangement — market-data is an API for however many consumers arrive, and the terminal
 # is the first of them.
-resource "azuread_application" "market_data_easy_auth" {
-  display_name = "app-tradingcenter-market-data-easyauth"
-
-  # A static name, not `api://<client-id>`: the client id is computed by this very
-  # resource, and a resource cannot refer to itself.
-  identifier_uris = [local.market_data_api_uri]
-
-  api {
-    # v2 tokens, matching the `/v2.0` tenant endpoint Easy Auth is configured with below.
-    # A v1 token against a v2 endpoint is rejected for its `iss` claim, and the error
-    # says nothing about versions.
-    requested_access_token_version = 2
-
-    # The one scope this API exposes. `User` — consented by the signing-in operator, not
-    # requiring an admin — because that is exactly what it is: the operator reaching
-    # their own archive through their own terminal.
-    oauth2_permission_scope {
-      id                         = random_uuid.market_data_scope.result
-      value                      = local.market_data_api_scope
-      type                       = "User"
-      enabled                    = true
-      admin_consent_display_name = "Read and manage the candle archive"
-      admin_consent_description  = "Allows the app to reach market-data as the signed-in operator."
-      user_consent_display_name  = "Read and manage your candle archive"
-      user_consent_description   = "Allows the app to reach market-data as you."
-    }
-  }
-
-  web {
-    redirect_uris = ["https://${local.market_data_hostname}/.auth/login/aad/callback"]
-
-    implicit_grant {
-      id_token_issuance_enabled = true
-    }
-  }
-}
-
 # Generated once and kept in state. A scope id must be a stable GUID: regenerating it
 # would revoke the terminal's permission and re-grant a different one on every apply.
-resource "random_uuid" "market_data_scope" {}
+module "market_data_easy_auth" {
+  source = "./modules/easy-auth-app"
 
-resource "azuread_service_principal" "market_data_easy_auth" {
-  client_id = azuread_application.market_data_easy_auth.client_id
-}
+  display_name   = "app-tradingcenter-market-data-easyauth"
+  identifier_uri = local.market_data_api_uri
+  redirect_uri   = "https://${local.market_data_hostname}/.auth/login/aad/callback"
 
-resource "azuread_application_password" "market_data_easy_auth" {
-  application_id = azuread_application.market_data_easy_auth.id
-  display_name   = "easy-auth"
-  end_date       = timeadd(timestamp(), "8760h")
+  id_token_issuance_enabled = true
 
-  lifecycle {
-    ignore_changes = [end_date]
+  scope = {
+    value                      = local.market_data_api_scope
+    admin_consent_display_name = "Read and manage the candle archive"
+    admin_consent_description  = "Allows the app to reach market-data as the signed-in operator."
+    user_consent_display_name  = "Read and manage your candle archive"
+    user_consent_description   = "Allows the app to reach market-data as you."
   }
 }
 
@@ -361,7 +341,7 @@ resource "azurerm_linux_web_app" "market_data" {
     excluded_paths = ["/ws/candles", "/ping"]
 
     active_directory_v2 {
-      client_id                  = azuread_application.market_data_easy_auth.client_id
+      client_id                  = module.market_data_easy_auth.client_id
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
 
@@ -371,7 +351,7 @@ resource "azurerm_linux_web_app" "market_data" {
       # silent 401 later.
       allowed_audiences = [
         local.market_data_api_uri,
-        azuread_application.market_data_easy_auth.client_id,
+        module.market_data_easy_auth.client_id,
       ]
 
       # Which clients may present a token at all. The terminal (a user's own delegated
@@ -412,7 +392,7 @@ resource "azurerm_linux_web_app" "market_data" {
     # same migration again and explains nothing.
     WEBSITES_CONTAINER_START_TIME_LIMIT = "1800"
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.market_data_easy_auth.value
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.market_data_easy_auth.password
 
     # Something *is* in front of this app, so the module refuses to hand out stream
     # tickets to a request Easy Auth did not identify. It does not take that on trust:
@@ -491,19 +471,19 @@ resource "azurerm_linux_web_app" "agent" {
     excluded_paths = ["/health"]
 
     active_directory_v2 {
-      client_id                  = azuread_application.agent_easy_auth.client_id
+      client_id                  = module.agent_easy_auth.client_id
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
 
-      # Both audiences, deliberately — see the long comment on `agent_easy_auth` in
+      # Both audiences, deliberately — see the long comment on `module.agent_easy_auth` in
       # entra.tf. The terminal's existing token (asked for by market-data's scope)
       # carries market-data's audience; a future terminal asking for the agent's own
       # scope by name carries this application's instead. Either is accepted.
       allowed_audiences = [
         local.agent_api_uri,
-        azuread_application.agent_easy_auth.client_id,
+        module.agent_easy_auth.client_id,
         local.market_data_api_uri,
-        azuread_application.market_data_easy_auth.client_id,
+        module.market_data_easy_auth.client_id,
       ]
 
       allowed_applications = [azuread_application.terminal.client_id]
@@ -576,7 +556,7 @@ resource "azurerm_linux_web_app" "agent" {
     TRADING_MCP_URL   = "https://${local.trading_mcp_hostname}"
     TRADING_MCP_SCOPE = "${local.trading_mcp_api_uri}/.default"
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.agent_easy_auth.value
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.agent_easy_auth.password
 
     REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
 
@@ -647,19 +627,19 @@ resource "azurerm_linux_web_app" "teams" {
     excluded_paths = ["/health"]
 
     active_directory_v2 {
-      client_id                  = azuread_application.teams_easy_auth.client_id
+      client_id                  = module.teams_easy_auth.client_id
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
 
       # Both spellings of this module's own audience, plus market-data's — see the comment
-      # on `teams_easy_auth` (entra.tf). The terminal holds one token today, asked for by
+      # on `module.teams_easy_auth` (entra.tf). The terminal holds one token today, asked for by
       # market-data's scope; the scope of this module's own stands pre-authorized for
       # whenever the terminal asks for it by name.
       allowed_audiences = [
         local.teams_api_uri,
-        azuread_application.teams_easy_auth.client_id,
+        module.teams_easy_auth.client_id,
         local.market_data_api_uri,
-        azuread_application.market_data_easy_auth.client_id,
+        module.market_data_easy_auth.client_id,
       ]
 
       # Two callers now, and they arrive holding different things. The terminal presents
@@ -762,7 +742,7 @@ resource "azurerm_linux_web_app" "teams" {
     # way (specs/teams-schedules, "Budzenie wyłączone ustawieniem").
     SCHEDULER_ENABLED = "true"
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.teams_easy_auth.value
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.teams_easy_auth.password
 
     REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
 
@@ -775,62 +755,46 @@ resource "azurerm_linux_web_app" "teams" {
 }
 
 # Secret-read access only — Set/Delete/Purge stays with the operator (key-vault.tf).
-resource "azurerm_key_vault_access_policy" "capital_gateway" {
-  key_vault_id = azurerm_key_vault.main.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.capital_gateway.identity[0].principal_id
-
-  secret_permissions = ["Get", "List"]
+# Keyed the same as `local.web_app_names`, so the grant above and every count below read
+# the same list of apps. A new module appears in both or in neither.
+locals {
+  web_app_principal_ids = {
+    "capital-gateway" = azurerm_linux_web_app.capital_gateway.identity[0].principal_id
+    "market-data"     = azurerm_linux_web_app.market_data.identity[0].principal_id
+    "market-mcp"      = azurerm_linux_web_app.market_mcp.identity[0].principal_id
+    "agent"           = azurerm_linux_web_app.agent.identity[0].principal_id
+    "teams"           = azurerm_linux_web_app.teams.identity[0].principal_id
+    "trading-mcp"     = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
+    "teams-mcp"       = azurerm_linux_web_app.teams_mcp.identity[0].principal_id
+  }
 }
 
-resource "azurerm_key_vault_access_policy" "market_data" {
-  key_vault_id = azurerm_key_vault.main.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.market_data.identity[0].principal_id
-
-  secret_permissions = ["Get", "List"]
-}
-
-# Secret-read only, same as the other two: this app resolves the
-# `@Microsoft.KeyVault(...)` references on its `docker_registry_password` and its
-# `OPENAI_API_KEY`. Writing those values stays with the operator (key-vault.tf).
-resource "azurerm_key_vault_access_policy" "agent" {
-  key_vault_id = azurerm_key_vault.main.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.agent.identity[0].principal_id
-
-  secret_permissions = ["Get", "List"]
-}
-
-# Two references to resolve here, not one: `docker_registry_password` and this module's
-# own `teams-openai-api-key`. Without this policy neither resolves, and the failure is the
-# quiet kind market-mcp's comment below documents — a reference the app cannot read
-# resolves to nothing rather than to an error.
-resource "azurerm_key_vault_access_policy" "teams" {
-  key_vault_id = azurerm_key_vault.main.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.teams.identity[0].principal_id
-
-  secret_permissions = ["Get", "List"]
-}
-
-# The same read-only grant, and market-mcp went to production without it on 13 August
-# 2026. It holds no application secret of its own — market-data is reached with a managed
-# identity and there is no OpenAI key here — so the resource looked unnecessary and was
-# never written. It is not: `docker_registry_password` is a `@Microsoft.KeyVault(...)`
-# reference like everybody else's, and a reference the app cannot resolve does not fail
-# loudly. It resolves to nothing, and the pull that follows reports the only thing it can
-# see:
+# One grant, seven apps. Every one of them is the same three lines with a different managed
+# identity, and writing them out seven times is how market-mcp reached production on
+# 13 August 2026 without one at all: it holds no application secret of its own, so the
+# resource looked unnecessary and was simply never written. It was not unnecessary.
+# `docker_registry_password` is a `@Microsoft.KeyVault(...)` reference like everybody
+# else's, and a reference the app cannot resolve does not fail loudly — it resolves to
+# nothing, and the image pull that follows reports the only thing it can see:
 #
 #   DockerApiException: Head "https://ghcr.io/v2/.../market-mcp/manifests/<sha>":
 #   unauthorized
 #
-# — which reads as a broken registry credential, and sent the first hour of diagnosis at
-# GHCR. The same token, read out of this vault by hand, pulls that exact manifest.
-resource "azurerm_key_vault_access_policy" "market_mcp" {
+# which reads as a broken registry credential and sent the first hour of diagnosis to GHCR.
+# The same token, read out of this vault by hand, pulls that exact manifest. A `for_each`
+# over the app list cannot leave one out.
+#
+# Two of the seven have more than the registry token to resolve, and neither reference is
+# optional: `teams` reads `teams-openai-api-key`, and `trading-mcp` reads
+# `CAPITAL_GATEWAY_API_KEY` and refuses to start with a blank one.
+#
+# Read-only in every case. Writing the values stays with the operator (key-vault.tf).
+resource "azurerm_key_vault_access_policy" "apps" {
+  for_each = local.web_app_principal_ids
+
   key_vault_id = azurerm_key_vault.main.id
   tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.market_mcp.identity[0].principal_id
+  object_id    = each.value
 
   secret_permissions = ["Get", "List"]
 }
@@ -885,45 +849,14 @@ data "azuread_service_principal" "teams_managed_identity" {
 # this one), authenticating with a managed identity rather than a signed-in user. That is why
 # this registration carries no `api { oauth2_permission_scope {...} }` block the way
 # market-data's does: there is no delegated consent flow here, only client-credentials.
-resource "azuread_application" "market_mcp_easy_auth" {
-  display_name    = "app-tradingcenter-market-mcp-easyauth"
-  identifier_uris = [local.market_mcp_api_uri]
+module "market_mcp_easy_auth" {
+  source = "./modules/easy-auth-app"
 
-  # No `oauth2_permission_scope` (see above) but the `api` block still has to be here, and
-  # leaving it out cost an interrupted `apply` on 13 August 2026. Two failures, one cause:
-  #
-  #   1. Entra refused the registration outright — "InvalidUniqueTenantIdentifierAsPerAppPolicy:
-  #      all newly added URIs must contain a tenant verified domain, tenant ID, or app ID".
-  #      The tenant policy exempts applications asking for v2 tokens, which is why
-  #      `api://tradingcenter-market-data` was accepted when it was created and
-  #      `api://tradingcenter-market-mcp` was not.
-  #   2. Had it been accepted, the agent's token would have been rejected on arrival: this
-  #      app's own Easy Auth is configured against the `/v2.0` tenant endpoint below, and a
-  #      v1 token there fails on its `iss` claim with an error naming no versions at all.
-  #
-  # The default is 1. Every other registration here sets 2 inside a block it needed for a
-  # scope; this one needs the block for nothing else, which is exactly how it went missing.
-  api {
-    requested_access_token_version = 2
-  }
+  display_name   = "app-tradingcenter-market-mcp-easyauth"
+  identifier_uri = local.market_mcp_api_uri
+  redirect_uri   = "https://${local.market_mcp_hostname}/.auth/login/aad/callback"
 
-  web {
-    redirect_uris = ["https://${local.market_mcp_hostname}/.auth/login/aad/callback"]
-  }
-}
-
-resource "azuread_service_principal" "market_mcp_easy_auth" {
-  client_id = azuread_application.market_mcp_easy_auth.client_id
-}
-
-resource "azuread_application_password" "market_mcp_easy_auth" {
-  application_id = azuread_application.market_mcp_easy_auth.id
-  display_name   = "easy-auth"
-  end_date       = timeadd(timestamp(), "8760h")
-
-  lifecycle {
-    ignore_changes = [end_date]
-  }
+  # No scope, and no implicit grant: nothing signs in to this one through a browser.
 }
 
 resource "azurerm_linux_web_app" "market_mcp" {
@@ -973,13 +906,13 @@ resource "azurerm_linux_web_app" "market_mcp" {
     excluded_paths = ["/health"]
 
     active_directory_v2 {
-      client_id                  = azuread_application.market_mcp_easy_auth.client_id
+      client_id                  = module.market_mcp_easy_auth.client_id
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
 
       allowed_audiences = [
         local.market_mcp_api_uri,
-        azuread_application.market_mcp_easy_auth.client_id,
+        module.market_mcp_easy_auth.client_id,
       ]
 
       # The real caller, replacing the placeholder this app was created with: the
@@ -1013,11 +946,10 @@ resource "azurerm_linux_web_app" "market_mcp" {
 
     # Matches the port `Dockerfile`'s CMD binds to via `FastMCP(port=...)` reading this
     # setting through `config.py`'s `mcp_http_port` — App Service's own default
-    # expectation for a Linux custom container (no WEBSITES_PORT override, same as the
-    # other two apps).
+    # expectation for a Linux custom container: no app here overrides WEBSITES_PORT.
     MCP_HTTP_PORT = "80"
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.market_mcp_easy_auth.value
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.market_mcp_easy_auth.password
 
     # Same reasoning as market-data's own setting of the same name: the module does not
     # take on trust that Easy Auth above is actually configured correctly, and checks
@@ -1055,36 +987,14 @@ output "market_mcp_hostname" {
 # this one places orders on a live broker connection, which is why every gate below is
 # written as narrow as it can be: one caller in `allowed_applications`, one exempt path,
 # and a credential the app resolves from Key Vault rather than one this root ever holds.
-resource "azuread_application" "trading_mcp_easy_auth" {
-  display_name    = "app-tradingcenter-trading-mcp-easyauth"
-  identifier_uris = [local.trading_mcp_api_uri]
+module "trading_mcp_easy_auth" {
+  source = "./modules/easy-auth-app"
 
-  # Required even with no scope inside it — see market-mcp's own comment above, and the
-  # interrupted apply of 13 August 2026 that wrote it: the tenant policy on identifier
-  # URIs exempts applications asking for v2 tokens, and Easy Auth below is configured
-  # against the `/v2.0` endpoint. The default is 1, and both failures it causes name
-  # something other than the version.
-  api {
-    requested_access_token_version = 2
-  }
+  display_name   = "app-tradingcenter-trading-mcp-easyauth"
+  identifier_uri = local.trading_mcp_api_uri
+  redirect_uri   = "https://${local.trading_mcp_hostname}/.auth/login/aad/callback"
 
-  web {
-    redirect_uris = ["https://${local.trading_mcp_hostname}/.auth/login/aad/callback"]
-  }
-}
-
-resource "azuread_service_principal" "trading_mcp_easy_auth" {
-  client_id = azuread_application.trading_mcp_easy_auth.client_id
-}
-
-resource "azuread_application_password" "trading_mcp_easy_auth" {
-  application_id = azuread_application.trading_mcp_easy_auth.id
-  display_name   = "easy-auth"
-  end_date       = timeadd(timestamp(), "8760h")
-
-  lifecycle {
-    ignore_changes = [end_date]
-  }
+  # No scope, for market-mcp's reason: client credentials only, no consent screen.
 }
 
 resource "azurerm_linux_web_app" "trading_mcp" {
@@ -1097,7 +1007,7 @@ resource "azurerm_linux_web_app" "trading_mcp" {
   # Not for reaching capital-gateway — that is a static key in a header, checked by the
   # gateway on every caller including this one. This identity exists so the app can read
   # its own Key Vault references (the GHCR pull token and that very key), which is the
-  # grant `azurerm_key_vault_access_policy.trading_mcp` below makes.
+  # grant `azurerm_key_vault_access_policy.apps["trading-mcp"]` makes.
   identity {
     type = "SystemAssigned"
   }
@@ -1132,13 +1042,13 @@ resource "azurerm_linux_web_app" "trading_mcp" {
     excluded_paths = ["/health"]
 
     active_directory_v2 {
-      client_id                  = azuread_application.trading_mcp_easy_auth.client_id
+      client_id                  = module.trading_mcp_easy_auth.client_id
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
 
       allowed_audiences = [
         local.trading_mcp_api_uri,
-        azuread_application.trading_mcp_easy_auth.client_id,
+        module.trading_mcp_easy_auth.client_id,
       ]
 
       # **Two callers, and it is a list of two on purpose** (specs/trading-mcp-transport,
@@ -1182,7 +1092,7 @@ resource "azurerm_linux_web_app" "trading_mcp" {
     # sees the number the other one uses (no WEBSITES_PORT override, like the other five).
     TRADING_MCP_PORT = "80"
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.trading_mcp_easy_auth.value
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.trading_mcp_easy_auth.password
 
     # The module checks the caller's identity itself rather than trusting that the block
     # above is switched on — the same refusal to take the platform on faith that
@@ -1200,18 +1110,6 @@ resource "azurerm_linux_web_app" "trading_mcp" {
   }
 }
 
-# Two references to resolve, and neither is optional: `docker_registry_password` and
-# `CAPITAL_GATEWAY_API_KEY`. Without this policy the first fails the way market-mcp's
-# comment above describes — an unauthorized GHCR pull that reads like a broken registry
-# credential — and the second would leave the module refusing to start with a blank key.
-resource "azurerm_key_vault_access_policy" "trading_mcp" {
-  key_vault_id = azurerm_key_vault.main.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
-
-  secret_permissions = ["Get", "List"]
-}
-
 output "trading_mcp_hostname" {
   value = azurerm_linux_web_app.trading_mcp.default_hostname
 }
@@ -1224,33 +1122,16 @@ output "trading_mcp_hostname" {
 # header of its own, and is what teams sees when it decides whose team this is
 # (add-teams-mcp design.md, D2). The registration below is only about the other question,
 # which is who may reach this module at all.
-resource "azuread_application" "teams_mcp_easy_auth" {
-  display_name    = "app-tradingcenter-teams-mcp-easyauth"
-  identifier_uris = [local.teams_mcp_api_uri]
+module "teams_mcp_easy_auth" {
+  source = "./modules/easy-auth-app"
 
-  # Required even with no scope inside it — see market-mcp's own comment above, and the
-  # interrupted apply of 13 August 2026 that wrote it.
-  api {
-    requested_access_token_version = 2
-  }
+  display_name   = "app-tradingcenter-teams-mcp-easyauth"
+  identifier_uri = local.teams_mcp_api_uri
+  redirect_uri   = "https://${local.teams_mcp_hostname}/.auth/login/aad/callback"
 
-  web {
-    redirect_uris = ["https://${local.teams_mcp_hostname}/.auth/login/aad/callback"]
-  }
-}
-
-resource "azuread_service_principal" "teams_mcp_easy_auth" {
-  client_id = azuread_application.teams_mcp_easy_auth.client_id
-}
-
-resource "azuread_application_password" "teams_mcp_easy_auth" {
-  application_id = azuread_application.teams_mcp_easy_auth.id
-  display_name   = "easy-auth"
-  end_date       = timeadd(timestamp(), "8760h")
-
-  lifecycle {
-    ignore_changes = [end_date]
-  }
+  # No scope, same as the other two tool servers. The operator's own token travels *inside*
+  # the call here, in a header of its own (add-teams-mcp design.md, D2) — this registration
+  # is only about who may reach the module at all.
 }
 
 resource "azurerm_linux_web_app" "teams_mcp" {
@@ -1297,13 +1178,13 @@ resource "azurerm_linux_web_app" "teams_mcp" {
     excluded_paths = ["/health"]
 
     active_directory_v2 {
-      client_id                  = azuread_application.teams_mcp_easy_auth.client_id
+      client_id                  = module.teams_mcp_easy_auth.client_id
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
 
       allowed_audiences = [
         local.teams_mcp_api_uri,
-        azuread_application.teams_mcp_easy_auth.client_id,
+        module.teams_mcp_easy_auth.client_id,
       ]
 
       # One caller, enumerated (specs/teams-mcp-transport, "Wołający jest jeden i jest
@@ -1330,7 +1211,7 @@ resource "azurerm_linux_web_app" "teams_mcp" {
     # Dockerfile's own ENV.
     TEAMS_MCP_PORT = "80"
 
-    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = azuread_application_password.teams_mcp_easy_auth.value
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.teams_mcp_easy_auth.password
 
     # The module checks the caller's identity itself rather than trusting that the block
     # above is switched on — the same refusal to take the platform on faith the other two
@@ -1348,14 +1229,6 @@ resource "azurerm_linux_web_app" "teams_mcp" {
 # One reference to resolve — `docker_registry_password`. Without this policy the pull
 # fails in the way market-mcp's comment describes: an unauthorized GHCR pull that reads
 # like a broken registry credential.
-resource "azurerm_key_vault_access_policy" "teams_mcp" {
-  key_vault_id = azurerm_key_vault.main.id
-  tenant_id    = data.azurerm_client_config.current.tenant_id
-  object_id    = azurerm_linux_web_app.teams_mcp.identity[0].principal_id
-
-  secret_permissions = ["Get", "List"]
-}
-
 # teams-mcp's own client id, for the list on teams' side — the same lookup the others
 # need, and for the same reason: `identity[0]` publishes an object id, not a client id.
 data "azuread_service_principal" "teams_mcp_managed_identity" {
