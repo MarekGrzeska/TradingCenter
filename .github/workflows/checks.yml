@@ -46,6 +46,13 @@ jobs:
       terminal: ${{ steps.filter.outputs.terminal }}
       openspec: ${{ steps.filter.outputs.openspec }}
       packages: ${{ steps.filter.outputs.packages }}
+      # The matrix the `packages` job runs, read off the directory rather than typed
+      # out. A hand-written list plus a `^packages/` filter is a job that goes green
+      # having tested somebody else's package: the filter fires for a package the
+      # matrix never names. Same shape as the deploy probes that passed on the
+      # previous container until iteration 0 — a mechanism reporting success without
+      # having checked the thing it exists for.
+      package-list: ${{ steps.packages.outputs.list }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -154,6 +161,13 @@ jobs:
           done
           echo "--- decisions ---"
           cat "$GITHUB_OUTPUT"
+      - id: packages
+        name: Which packages exist
+        run: |
+          set -euo pipefail
+          list=$(ls -1 packages | jq -R . | jq -sc .)
+          echo "packages: $list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
 
   capital-gateway:
     name: capital-gateway
@@ -277,9 +291,12 @@ jobs:
     if: needs.changes.outputs.packages == 'true'
     runs-on: ubuntu-latest
     strategy:
-      # One job per package rather than a loop, so a failure names which one.
+      # One job per package rather than a loop, so a failure names which one — and the
+      # list comes from `changes`, which reads `packages/`, so adding a package cannot
+      # leave it untested while the job reports green.
+      fail-fast: false
       matrix:
-        package: [tc-runtime, tc-openai]
+        package: ${{ fromJSON(needs.changes.outputs.package-list) }}
     defaults:
       run:
         working-directory: packages/${{ matrix.package }}

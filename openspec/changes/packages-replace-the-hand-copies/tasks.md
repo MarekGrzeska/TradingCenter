@@ -89,5 +89,5 @@ dojdzie drugi moduł. Po niej `agent` bierze `tc-runtime`, a reszta repo stoi ni
 - [x] 6.3 Przejrzeć README modułów pod kątem zdań tłumaczących duplikację regułą, która już
       nie obowiązuje
 - [x] 6.4 Zbudować wszystkie siedem obrazów lokalnie i potwierdzić, że każdy wstaje
-- [ ] 6.5 Zdecydować o `review.md` (od 18 sierpnia 2026 opcjonalny) i zapisać decyzję —
+- [x] 6.5 Zdecydować o `review.md` (od 18 sierpnia 2026 opcjonalny) i zapisać decyzję —
       `proposal.md` wskazuje tę zmianę jako kandydata, który go zasługuje

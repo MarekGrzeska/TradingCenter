@@ -96,6 +96,14 @@ and here it is counting two files that say the same thing about different module
 that number zero would mean deleting the seam, which would mean the package reading a key
 of its own.
 
+## Adding a third package
+
+Nothing to remember. The `packages` job in `checks.yml` reads its matrix off this
+directory, so a new package is tested the moment it exists. What *does* need a line is the
+other direction: a module taking it declares the path dependency in its own
+`pyproject.toml`, and that package's pattern goes into the filter beside `tc_runtime` and
+`tc_openai` so the module's own job runs when the package changes.
+
 ## The one thing this package cannot know
 
 Which advisory-lock key a module's migrations take, and where its migrations live. Both
