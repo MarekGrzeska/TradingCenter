@@ -36,6 +36,17 @@ _INDICATOR_COMPUTE_PATH = re.compile(r"^/indicators/[^/]+$")
 # `indicator_concurrency` gate uses on its side of this same seam.
 MAX_CONCURRENT_UPSTREAM_REQUESTS = 8
 
+# `/pairs` is read two and three times inside a single tool call — once to check the pair
+# is tracked, once to find which resolutions it is tracked at, once more to say so in a
+# refusal — and capital.com's 10 requests/second are counted against the *account*, so a
+# request market-data does not have to serve is budget left for the archive itself.
+#
+# The memo is a duration rather than the length of one tool call, because a tool call has
+# no handle a client can hold. Two seconds is the oldest answer this module will give
+# about what is being collected; a tool call takes milliseconds, so in practice this
+# folds the repeats within one call and almost never joins two.
+PAIRS_MEMO_SECONDS = 2.0
+
 
 class UpstreamWriteRejected(Exception):
     """Raised before any request leaves the process. Not an HTTP error — market-data
@@ -50,6 +61,8 @@ class UpstreamClient:
         )
         self._timeout_seconds = settings.market_data_request_timeout_seconds
         self._gate = asyncio.Semaphore(MAX_CONCURRENT_UPSTREAM_REQUESTS)
+        self._pairs_lock = asyncio.Lock()
+        self._pairs_memo: tuple[float, httpx.Response] | None = None
 
         self._scope = settings.market_data_scope
         self._credential = DefaultAzureCredential() if self._scope else None
@@ -74,6 +87,23 @@ class UpstreamClient:
 
     async def get(self, path: str, params: dict | None = None) -> httpx.Response:
         return await self._request("GET", path, params=params)
+
+    async def pairs(self) -> httpx.Response:
+        """`GET /pairs`, at most once every `PAIRS_MEMO_SECONDS`.
+
+        Only a successful answer is remembered: a refusal is what the caller has to see
+        and act on, and remembering one would keep answering with it after market-data
+        recovered.
+        """
+        async with self._pairs_lock:
+            now = asyncio.get_running_loop().time()
+            if self._pairs_memo is not None and now - self._pairs_memo[0] < PAIRS_MEMO_SECONDS:
+                return self._pairs_memo[1]
+
+            response = await self.get("/pairs")
+            if not response.is_error:
+                self._pairs_memo = (now, response)
+            return response
 
     async def compute_indicators(self, symbol: str, body: dict) -> httpx.Response:
         return await self._request("POST", f"/indicators/{symbol}", json=body)

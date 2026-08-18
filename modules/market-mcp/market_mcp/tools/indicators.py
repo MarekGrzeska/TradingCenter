@@ -517,17 +517,15 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         from_iso: str | None = None,
         to_iso: str | None = None,
     ) -> ComputeIndicatorsOut:
-        """Compute one or more named indicators on one shared time axis. Most
-        questions need 1-3; refuses above 10 in one call. `from_iso`/`to_iso`
-        (mode="series" only) are UTC, ISO-8601. Distances are measured against the
-        last **bid** close, the only side the archive holds.
+        """Compute one or more named indicators on one shared time axis. Most questions
+        need 1-3; above 10 in one call it refuses. `from_iso`/`to_iso` (mode="series"
+        only) are UTC, ISO-8601. Distances are measured against the last **bid** close.
 
-        mode="latest" (default): each line's current value, its slope over the
-        trailing bars, its distance from the last close, and how many bars since it
-        last crossed price. mode="series": the requested window's full series,
-        thinned to at most 200 points per line. Indicators whose output is not
-        `lines` (markers/zones/levels) ignore `mode` and come back as the freshest
-        20 entries either way.
+        mode="latest" (default): each line's current value, its slope over the trailing
+        bars, its distance from the last close and how many bars since it last crossed
+        price. mode="series": the window's full series, thinned to at most 200 points per
+        line. Indicators whose output is not `lines` (markers/zones/levels) ignore `mode`
+        and come back as the freshest 20 entries either way.
         """
         if len(specs) > INDICATOR_HARD_LIMIT:
             raise ToolRefusal(

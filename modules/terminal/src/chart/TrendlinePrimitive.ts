@@ -1,21 +1,13 @@
 import type { CanvasRenderingTarget2D } from "fancy-canvas";
 import type {
-  IChartApi,
   IPrimitivePaneRenderer,
   IPrimitivePaneView,
-  ISeriesApi,
-  ISeriesPrimitive,
-  ISeriesPrimitiveAxisView,
   PrimitiveHoveredItem,
-  SeriesAttachedParameter,
-  SeriesType,
   Time,
 } from "lightweight-charts";
 
 import {
-  DrawingPriceAxisView,
   HIT_TOLERANCE,
-  defaultMarkPalette,
   distanceToSegment,
   drawChip,
   strokeSpec,
@@ -24,6 +16,7 @@ import {
   type MarkPalette,
   type MarkWeight,
 } from "./drawingStyle";
+import { MarkPrimitive } from "./MarkPrimitive";
 import { timeToX } from "./timeCoordinates";
 
 /**
@@ -136,26 +129,14 @@ class TrendlinePaneView implements IPrimitivePaneView {
   }
 }
 
-export class TrendlinePrimitive implements ISeriesPrimitive<Time> {
+export class TrendlinePrimitive extends MarkPrimitive<TrendlineRenderItem> {
   private lines: readonly DrawnTrendline[] = [];
   private color: string;
-  private chart: IChartApi | null = null;
-  private series: ISeriesApi<SeriesType, Time> | null = null;
-  private currentPrice: number | null = null;
-  private requestUpdate: (() => void) | null = null;
-  private axisViews: readonly ISeriesPrimitiveAxisView[] = [];
-  private readonly views: readonly IPrimitivePaneView[] = [new TrendlinePaneView(this)];
-
-  readonly markWeight: MarkWeight;
-  readonly objectId: string | null;
-  readonly palette: MarkPalette;
-  emphasis: Emphasis = "normal";
+  protected readonly views: readonly IPrimitivePaneView[] = [new TrendlinePaneView(this)];
 
   constructor(color: string, options: MarkOptions = {}) {
+    super(options);
     this.color = color;
-    this.markWeight = options.weight ?? "indicator";
-    this.objectId = options.objectId ?? null;
-    this.palette = options.palette ?? defaultMarkPalette();
   }
 
   setLines(lines: readonly DrawnTrendline[]): void {
@@ -165,36 +146,6 @@ export class TrendlinePrimitive implements ISeriesPrimitive<Time> {
 
   setColor(color: string): void {
     this.color = color;
-  }
-
-  setCurrentPrice(price: number | null): void {
-    this.currentPrice = price;
-  }
-
-  setEmphasis(emphasis: Emphasis): void {
-    if (this.emphasis === emphasis) return;
-    this.emphasis = emphasis;
-    this.requestUpdate?.();
-  }
-
-  attached({ chart, series, requestUpdate }: SeriesAttachedParameter<Time>): void {
-    this.chart = chart;
-    this.series = series;
-    this.requestUpdate = requestUpdate;
-  }
-
-  detached(): void {
-    this.chart = null;
-    this.series = null;
-    this.requestUpdate = null;
-  }
-
-  paneViews(): readonly IPrimitivePaneView[] {
-    return this.views;
-  }
-
-  priceAxisViews(): readonly ISeriesPrimitiveAxisView[] {
-    return this.axisViews;
   }
 
   /** The tolerance band around the segment itself, not around the whole line it lies on:
@@ -210,7 +161,6 @@ export class TrendlinePrimitive implements ISeriesPrimitive<Time> {
     return null;
   }
 
-  /** Package-visible for `TrendlinePaneView`, not the public API of this class. */
   renderItems(): TrendlineRenderItem[] {
     const chart = this.chart;
     const series = this.series;
@@ -230,25 +180,12 @@ export class TrendlinePrimitive implements ISeriesPrimitive<Time> {
   }
 
   /** Both ends, the same two prices the object list shows for a trend line. */
-  private rebuildAxisViews(): void {
-    if (this.objectId === null) {
-      this.axisViews = [];
-      return;
-    }
-    const views: ISeriesPrimitiveAxisView[] = [];
-    for (const line of this.lines) {
-      for (const price of [line.fromPrice, line.toPrice]) {
-        views.push(
-          new DrawingPriceAxisView(() => ({
-            coordinate: this.series?.priceToCoordinate(price) ?? null,
-            price,
-            color: line.color ?? this.color,
-            currentPrice: this.currentPrice,
-            palette: this.palette,
-          })),
-        );
-      }
-    }
-    this.axisViews = views;
+  protected axisEntries() {
+    return this.lines.flatMap((line) =>
+      [line.fromPrice, line.toPrice].map((price) => ({
+        price,
+        color: () => line.color ?? this.color,
+      })),
+    );
   }
 }

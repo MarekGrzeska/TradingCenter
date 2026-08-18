@@ -1,4 +1,7 @@
 import "@testing-library/jest-dom/vitest";
+import { afterEach } from "vitest";
+import { notifyManager } from "@tanstack/react-query";
+import { queryClient } from "../data/query";
 
 // Node takes Intl's default locale from the operating system and, on Windows, from
 // nothing else — LANG and LC_ALL are both ignored there. So `12431.toLocaleString()`
@@ -71,3 +74,19 @@ if (typeof globalThis.localStorage?.clear !== "function") {
     });
   }
 }
+
+// Every read in the terminal goes through one cache (`data/query.ts`), so a test
+// starting with what the previous one left there would be answering from a fake
+// archive that has since been thrown away. Cleared per test, and retries turned off:
+// a test asserting "unreachable" would otherwise wait out a real backoff.
+queryClient.setDefaultOptions({ queries: { retry: false } });
+
+// TanStack batches its notifications behind a scheduler of its own, so a re-read that
+// has already resolved lands one macrotask after the timer that asked for it. A test
+// advancing fake timers by exactly the poll interval then asserts against the previous
+// answer. Flushed on the spot here: the batching is a rendering optimisation, and every
+// assertion in this suite is already inside `act`.
+notifyManager.setScheduler((flush) => flush());
+afterEach(() => {
+  queryClient.clear();
+});

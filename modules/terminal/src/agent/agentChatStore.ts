@@ -13,6 +13,7 @@
  * conversation was open — is this store's to keep.
  */
 
+import { safeLocalStorage } from "../data/storage";
 import { agentActivity, type AgentActivityStore } from "./agentActivity";
 import {
   agentApi,
@@ -688,14 +689,6 @@ export function createAgentChatStore(
       void send(text);
     },
   };
-}
-
-function safeLocalStorage(): Storage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
 }
 
 export const agentChatStore = createAgentChatStore();

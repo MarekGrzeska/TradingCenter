@@ -8,6 +8,6 @@ dependency tree — `alembic`, `sqlalchemy`, `asyncpg`, `azure-identity`, `aioht
 and the measurement that forced it. `README.md` carries the rest.
 """
 
-from . import detail, network_identity
+from . import detail, network_identity, tool_schemas
 
-__all__ = ["detail", "network_identity"]
+__all__ = ["detail", "network_identity", "tool_schemas"]

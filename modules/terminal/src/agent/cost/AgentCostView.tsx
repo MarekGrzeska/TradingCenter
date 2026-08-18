@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { UnreachableNotice } from "../../ui/UnreachableNotice";
 import { agentApi, type AgentApi, type AgentUsageAggregate } from "../agentApi";
 import { agentChatStore, type AgentChatStore } from "../agentChatStore";
 import { defaultDateRangeInputs, toUsageRange, type DateRangeInputs } from "./dateRange";
@@ -108,17 +109,10 @@ function UsageBody({
 
   if (usage.status === "unreachable") {
     return (
-      <p className="text-sm text-critical">
+      <UnreachableNotice onRetry={usage.reload}>
         the agent module is not reachable, so usage for this range is unknown — this is
         not a zero. {usage.error}
-        <button
-          type="button"
-          onClick={usage.reload}
-          className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
-        >
-          Retry
-        </button>
-      </p>
+      </UnreachableNotice>
     );
   }
 

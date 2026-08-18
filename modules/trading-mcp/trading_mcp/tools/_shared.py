@@ -11,7 +11,7 @@ from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
 from ..client import GatewayClient
-from ..errors import GatewayRefused, GatewayUnavailable, NotDemoEnvironment, ToolRefusal
+from ..errors import GatewayRefused, GatewayUnavailable, ToolRefusal
 
 # Applied to every read tool — a structural claim an MCP client can act on without
 # reading this module's source (specs/trading-mcp-tools, "Narzędzie zapisujące jest
@@ -71,7 +71,7 @@ async def _read(gateway: GatewayClient, path: str) -> Any:
 async def _write(
     gateway: GatewayClient, method: str, path: str, json: dict | None = None
 ) -> OrderResultOut:
-    """Confirm the account is a demo one, send the write, and translate what came back.
+    """Send the write, and translate what came back.
 
     See `trading-mcp-execution` and `trading-mcp-tools`'s "Odmowa narzędzia jest
     odróżnialna od awarii dostępu" for the three outcomes this collapses into two: a
@@ -82,32 +82,13 @@ async def _write(
     here: a `5xx` can happen after the provider already saw the request, and a `401`
     means nobody looked at it at all, and only one of those two is the caller's to fix.
 
-    **The demo check belongs inside this seam, not in front of it.** Every write tool
-    used to call `ensure_demo_environment()` itself, one line above `_write`, which left
-    its `GatewayError`s as the only ones in the module reaching a caller unwrapped —
-    without the wording every other failure here carries, and looking like a refusal of
-    the order rather than a check that never got to ask. Its failures are their own
-    sentence: at that point **nothing has been sent**, which is the one thing an agent
-    needs to know before deciding what to do next.
+    **The demo check is not here.** It runs once, before the port opens (`__main__`), so
+    by the time a tool is reachable at all the gateway has already named its environment.
+    It used to run again in front of every write, which cost a second round trip on every
+    write after any error the gateway had ever returned — and proved only that the gateway
+    was answering, since the field it read was a literal until the gateway learned to
+    derive it (`openspec/changes/hot-paths-stop-paying-twice/design.md`, D4).
     """
-    try:
-        await gateway.ensure_demo_environment()
-    except NotDemoEnvironment as err:
-        raise ToolRefusal(
-            f"refused: {err} Nothing was sent — this module places orders on the demo "
-            "account and on no other."
-        ) from err
-    except GatewayUnavailable as err:
-        raise ToolRefusal(
-            f"access failure: could not reach capital-gateway to confirm the account is "
-            f"a demo one ({err}). Nothing was sent."
-        ) from err
-    except GatewayRefused as err:
-        raise ToolRefusal(
-            f"access failure: capital-gateway answered {err.status_code} ({err.detail}) "
-            "when asked to confirm the account is a demo one. Nothing was sent."
-        ) from err
-
     try:
         payload = await gateway.write(method, path, json=json)
     except GatewayUnavailable as err:

@@ -1,7 +1,7 @@
 import { noIdentity, type Identity } from "../auth/identity";
 import { resolveEndpoints } from "../data/config";
 import type { components } from "../data/contract.teams.generated";
-import { jsonClient } from "../data/http";
+import { jsonClient, statusMapper } from "../data/http";
 import { identity } from "../data/marketData";
 import { parseIsoToEpochSeconds } from "../data/time";
 import { MarketDataError } from "../data/types";
@@ -556,14 +556,10 @@ function mapFire(raw: RawFire): ScheduleFire {
   };
 }
 
-function mapStatus(status: number, detail: string): MarketDataError {
-  if (status === 404) return new MarketDataError("not-found", detail);
-  // The module understood the definition and declined it: a cycle, an agent wired to
-  // nothing, a model outside its catalogue, a tool it does not announce. The message is
-  // the operator's whole lead, so it travels intact.
-  if (status === 422) return new MarketDataError("refused", detail);
-  return new MarketDataError("unknown", detail);
-}
+// 422: the module understood the definition and declined it — a cycle, an agent wired to
+// nothing, a model outside its catalogue, a tool it does not announce. The message is the
+// operator's whole lead, so it travels intact.
+const mapStatus = statusMapper({ 404: "not-found", 422: "refused" });
 
 export function createTeamsApi(httpBase: string, identity: Identity = noIdentity): TeamsApi {
   const http = jsonClient("teams", mapStatus, identity);

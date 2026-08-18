@@ -8,14 +8,14 @@
  * so the monitor cannot be shown two different versions of one run depending on whether
  * it was watching when the step finished.
  *
- * `splitSseFrames` and the reader are a deliberate twin of `agent/stream.ts` rather than
- * a shared helper. What the two tabs share is six lines of string splitting; what they do
- * not share is the vocabulary — four event kinds there, five here, none with the same
- * name — and a common parser would have to be told which set to expect, which is the
- * whole of what it would be doing.
+ * The reading itself is `data/sseStream.ts`, shared with the agent's turn stream; the
+ * vocabulary is not, and deliberately so — four event kinds there, five here, none with
+ * the same name. A common *parser* would have to be told which set to expect, which is
+ * the whole of what it would be doing; a common *reader* is told nothing.
  */
 
 import type { components } from "../data/contract.teams.generated";
+import { readSseStream } from "../data/sseStream";
 import { parseIsoToEpochSeconds } from "../data/time";
 
 type Wire = components["schemas"];
@@ -260,17 +260,6 @@ export function attachAgentKeys(
 }
 
 /**
- * Buffers raw SSE bytes and splits them on the blank line every frame ends with. The
- * last, possibly incomplete, piece comes back as `remainder` for the caller to prepend
- * to the next chunk — a `data:` line has no reason to land inside one network read.
- */
-export function splitSseFrames(buffer: string): { frames: string[]; remainder: string } {
-  const parts = buffer.split("\n\n");
-  const remainder = parts.pop() ?? "";
-  return { frames: parts, remainder };
-}
-
-/**
  * One frame to a typed event, or `null` for a keepalive comment (`: ping`, sent every 15s
  * so App Service does not drop a connection an agent's thinking left quiet), a blank
  * frame, or an event name this terminal has no use for.
@@ -339,27 +328,9 @@ export function parseRunFrame(frame: string): RunStreamEvent | null {
  * It closes it itself once the run is over — and immediately, with nothing but the
  * snapshot, for a run that was already over when the view opened. A body that ends
  * without `run_finished` is a dropped connection; the caller is where that becomes
- * something the operator sees, since only it knows what arrived before the drop.
+ * something the operator sees, since only it knows what arrived before the drop. Nothing
+ * is terminal here for that reason: the module's own close is the end of the read.
  */
-export async function* readRunStream(
-  body: ReadableStream<Uint8Array>,
-): AsyncGenerator<RunStreamEvent> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const { frames, remainder } = splitSseFrames(buffer);
-      buffer = remainder;
-      for (const frame of frames) {
-        const event = parseRunFrame(frame);
-        if (event !== null) yield event;
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
+export function readRunStream(body: ReadableStream<Uint8Array>): AsyncGenerator<RunStreamEvent> {
+  return readSseStream(body, parseRunFrame);
 }

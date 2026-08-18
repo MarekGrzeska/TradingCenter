@@ -83,7 +83,7 @@ async def tracked_pair(
     """The archive's own row for this pair, or None when it collects no such pair. Carries
     `latest_candle`, which is the only way to reach a candle older than a window without
     guessing how much older."""
-    response = await upstream.get("/pairs")
+    response = await upstream.pairs()
     await raise_for_status(response)
     return next(
         (
@@ -106,7 +106,7 @@ async def tracked_resolutions(upstream: UpstreamClient, symbol: str) -> list[str
     DAY answers nothing at MINUTE, and guessing the default is how a question about a
     tracked pair comes back empty.
     """
-    response = await upstream.get("/pairs")
+    response = await upstream.pairs()
     await raise_for_status(response)
     found = [row["resolution"] for row in response.json() if row["symbol"] == symbol]
     return sorted(found, key=lambda r: PERIOD_SECONDS.get(r, 0))

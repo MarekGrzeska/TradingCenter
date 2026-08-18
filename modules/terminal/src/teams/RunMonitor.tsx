@@ -1,11 +1,19 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { Button } from "../ui/Button";
+import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { MessageBody } from "../agent/MessageBody";
+import { useRead } from "../data/query";
 import { formatInstant } from "../ui/formatTime";
 import { RunOutputsDialog } from "./RunOutputsDialog";
 import { TeamCanvas } from "./TeamCanvas";
 import { outcomeOf, stopCause, type TeamRun, type TeamRunStep, type TeamRunToolCall, type TeamTrade } from "./runs";
 import type { TeamDefinition, TeamLayout, TeamsApi, TeamsModel } from "./teamsApi";
 import { useRunMonitor } from "./useRunMonitor";
+
+/** Before the revision has been read, and after a read that failed: no graph, and the
+ *  version unknown. */
+const NO_GRAPH: { definition: TeamDefinition | null; version: number | null; places: TeamLayout } =
+  { definition: null, version: null, places: new Map() };
 
 /**
  * A run, watched on the picture of the team it is running.
@@ -35,9 +43,6 @@ export function RunMonitor({
 }) {
   const monitor = useRunMonitor(api, runId);
   const { run, steps, toolCalls, trades } = monitor;
-  const [definition, setDefinition] = useState<TeamDefinition | null>(null);
-  const [places, setPlaces] = useState<TeamLayout>(new Map());
-  const [version, setVersion] = useState<number | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   // Reading what the agents wrote is a different job from watching whether they are
   // working, and the 20rem column beside the canvas is shaped for the second one
@@ -47,35 +52,28 @@ export function RunMonitor({
   const [stopError, setStopError] = useState<string | null>(null);
 
   const revisionId = run?.teamRevisionId ?? null;
-  useEffect(() => {
-    if (revisionId === null) return;
-    let cancelled = false;
-    const controller = new AbortController();
-
-    api
-      .revisionById(revisionId, controller.signal)
-      .then(async (revision) => {
-        if (cancelled) return;
-        setDefinition(revision.definition);
-        setVersion(revision.version);
-        // The team's arrangement, so a run is watched on the picture the operator built
-        // rather than on a second one laid out from scratch. It belongs to the team and
-        // this revision may be older than it — an agent it does not name falls back to
-        // `layout()` inside the canvas, which is the case the spec names.
-        const layout = await api.layout(revision.teamId, controller.signal).catch(() => new Map());
-        if (!cancelled) setPlaces(layout);
-      })
-      .catch(() => {
-        // The stream is still the run's own state and keeps arriving; what is missing is
-        // the graph to draw it on, which the body below says outright.
-        if (!cancelled) setDefinition(null);
-      });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [api, revisionId]);
+  // The revision and the team's arrangement, so a run is watched on the picture the
+  // operator built rather than on a second one laid out from scratch. The layout belongs
+  // to the team and this revision may be older than it — an agent it does not name falls
+  // back to `layout()` inside the canvas, which is the case the spec names, and a layout
+  // that cannot be read is not worth failing the graph over.
+  //
+  // `onFailure: "forget"`: a revision that cannot be read leaves no graph to draw the run
+  // on, and the body below says that outright. The stream is still the run's own state
+  // and keeps arriving either way.
+  const graph = useRead({
+    key: ["teams", "revision", revisionId],
+    read: async (signal) => {
+      const revision = await api.revisionById(revisionId!, signal);
+      const places = await api.layout(revision.teamId, signal).catch(() => new Map<string, { x: number; y: number }>());
+      return { definition: revision.definition, version: revision.version, places };
+    },
+    initial: NO_GRAPH,
+    fallbackMessage: "the team's revision could not be read",
+    enabled: revisionId !== null,
+    onFailure: "forget",
+  });
+  const { definition, version, places } = graph.value;
 
   const runStatuses = useMemo(
     () => new Map(steps.map((step) => [step.agentKey, step.status])),
@@ -117,13 +115,9 @@ export function RunMonitor({
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-2 border-b border-border p-2">
         {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-          >
+          <Button onClick={onClose}>
             ← Catalogue
-          </button>
+          </Button>
         )}
         <span className="text-sm text-ink">
           Run {runId}
@@ -174,16 +168,13 @@ export function RunMonitor({
         <p className="border-b border-border px-2 py-1 text-xs text-critical">{stopError}</p>
       )}
       {monitor.status === "error" && (
-        <p className="border-b border-border px-2 py-1 text-xs text-critical">
+        <UnreachableNotice
+          className="border-b border-border px-2 py-1 text-xs text-critical"
+          onRetry={monitor.reload}
+          retryLabel="Watch again"
+        >
           {monitor.error}
-          <button
-            type="button"
-            onClick={monitor.reload}
-            className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
-          >
-            Watch again
-          </button>
-        </p>
+        </UnreachableNotice>
       )}
 
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_20rem]">

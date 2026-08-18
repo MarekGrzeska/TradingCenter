@@ -159,9 +159,17 @@ def _read_error(payload: dict) -> FeedFailure:
     return FeedFailure(message=str(payload["message"]))
 
 
+# `quote` is deliberately absent, and it is the busiest kind on the feed: about five a
+# second per pair, times the pairs this module tracks. Nothing here consumes one —
+# `ingest/live.py`'s listener has a branch for a candle, a status and a failure, and none
+# for a quote — so parsing them built hundreds of objects a second for the garbage
+# collector. `read_message` answers `None` for a kind this module does not consume, which
+# is the same thing it already did for the orderbook.
+#
+# `_read_quote` and `Quote` stay: they describe a frame the gateway still sends, and the
+# reader is one line from being wanted again the day something here needs a tick.
 _READERS = {
     "candle": _read_candle,
-    "quote": _read_quote,
     "status": _read_status,
     "error": _read_error,
 }

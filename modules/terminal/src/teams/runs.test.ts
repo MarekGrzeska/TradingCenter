@@ -1,9 +1,9 @@
+import { splitSseFrames } from "../data/sseStream";
 import { describe, expect, it } from "vitest";
 import {
   attachAgentKeys,
   outcomeOf,
   parseRunFrame,
-  splitSseFrames,
   stopCause,
   type TeamRunStep,
   type TeamTrade,

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { UnreachableNotice } from "../../ui/UnreachableNotice";
 import { agentApi, type AgentApi, type AgentPrompt } from "../agentApi";
 import { usePrompt } from "./usePrompt";
 
@@ -57,17 +58,10 @@ export function PromptManagementView({ api = agentApi }: { api?: AgentApi } = {}
 
   if (state.status === "unreachable" && !current) {
     return (
-      <p className="text-sm text-critical">
+      <UnreachableNotice onRetry={state.reload}>
         the agent module is not reachable, so the prompt is unknown — this is not
         empty. {state.error}
-        <button
-          type="button"
-          onClick={state.reload}
-          className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
-        >
-          Retry
-        </button>
-      </p>
+      </UnreachableNotice>
     );
   }
 
