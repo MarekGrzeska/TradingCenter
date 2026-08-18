@@ -1,0 +1,6 @@
+schema: spec-driven-reviewed
+created: 2026-08-18
+# Bez delty: ta zmiana nie zmienia żadnego wymagania — przenosi wdrożenie i runner dev
+# do jednej implementacji, bez zmiany zachowania modułów. Kwalifikuje się przez kategorię 3
+# wyzwalacza (infrastruktura, infra/**), patrz proposal.md.
+skip_specs: true

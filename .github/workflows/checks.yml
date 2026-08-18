@@ -46,6 +46,7 @@ jobs:
       terminal: ${{ steps.filter.outputs.terminal }}
       openspec: ${{ steps.filter.outputs.openspec }}
       packages: ${{ steps.filter.outputs.packages }}
+      scripts: ${{ steps.filter.outputs.scripts }}
       # The matrix the `packages` job runs, read off the directory rather than typed
       # out. A hand-written list plus a `^packages/` filter is a job that goes green
       # having tested somebody else's package: the filter fires for a package the
@@ -140,8 +141,11 @@ jobs:
           # The archive-shape check, plus the script that is the shape.
           specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
           packages='^packages/'
+          # Repository tooling with tests of its own since one-deploy-path-one-dev-runner:
+          # the dev-stack runner and the probe every deploy workflow ends in.
+          scripts='^scripts/'
 
-          for name in capital-gateway market-data market-mcp trading-mcp teams-mcp agent teams terminal openspec packages; do
+          for name in capital-gateway market-data market-mcp trading-mcp teams-mcp agent teams terminal openspec packages scripts; do
             case "$name" in
               capital-gateway) pattern="$gateway" ;;
               market-data)     pattern="$archive" ;;
@@ -153,6 +157,7 @@ jobs:
               terminal)        pattern="$terminal" ;;
               openspec)        pattern="$specs" ;;
               packages)        pattern="$packages" ;;
+              scripts)         pattern="$scripts" ;;
             esac
             if matches "$pattern|$self"; then
               echo "$name=true" >> "$GITHUB_OUTPUT"
@@ -395,6 +400,28 @@ jobs:
       - run: pnpm lint
       - run: pnpm typecheck
       - run: pnpm test
+
+  # The dev-stack runner and the deploy probe. Both were shell with no tests until
+  # one-deploy-path-one-dev-runner, and both are defences: the runner refuses a mismatched
+  # gateway key and a non-loopback database before it starts anything, and the probe is what
+  # stood over a crash-looping container on 16 August 2026 reporting green. The same three
+  # commands every module runs, so a rule that passes in a module passes here.
+  scripts:
+    name: scripts
+    needs: changes
+    if: needs.changes.outputs.scripts == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scripts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      - run: uv run pyright
+      - run: uv run pytest -q
 
   # An archived change keeps proposal, design and review. Its delta specs were merged into
   # `openspec/specs/` by the archive itself and its ticked `tasks.md` is a worse account of

@@ -1,0 +1,39 @@
+[project]
+name = "tc-scripts"
+version = "0.1.0"
+description = "Repository tooling — the dev-stack runner and the deploy probe, with the tests neither had while it was shell"
+requires-python = ">=3.12"
+dependencies = [
+    # The only runtime dependency, and both scripts want it: the dev runner waits for
+    # each service to actually answer, and the deploy probe asks a deployed app the same
+    # kind of question. `curl` did this while these were shell, and a subprocess per
+    # attempt is the one thing that would make the probe's failure mode untestable.
+    "httpx>=0.27",
+]
+
+# Not a library and not published — nothing imports it, `uv run` invokes it. Without this
+# uv would look for a build backend and a package directory that do not exist.
+[tool.uv]
+package = false
+
+# Tool versions pinned to the same values every module pins, so a rule that passes here
+# passes there.
+[tool.ruff]
+line-length = 100
+
+[tool.pyright]
+# The directory, not a list of file names: a hand-maintained list of what to check is the
+# thing that goes stale, which is the class of bug this whole change exists to close.
+include = ["."]
+typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.411",
+    "pytest>=8.3",
+    "ruff==0.16.2",
+]
