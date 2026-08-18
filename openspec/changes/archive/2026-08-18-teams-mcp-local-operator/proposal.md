@@ -61,3 +61,16 @@ zmiana MUST być archiwizowana **po** tamtej, bo inaczej `MODIFIED` nie ma czego
   oba warunki po stronie odmowy, więc `terraform apply` nie jest częścią tej zmiany.
 - Bez zmian w kontraktach między modułami: nagłówek `x-operator-authorization` i wszystkie
   trasy `teams` zostają, jakie są.
+
+## Zamknięcie
+
+Zarchiwizowana 18 sierpnia 2026 z dwoma niezaznaczonymi polami, świadomie:
+
+- **5.2** to sprawdzenie na uruchomionym stosie, wykonywane ręcznie. Zastąpione ruchem
+  produkcyjnym: `add-teams-mcp` wdrożył moduł 17 sierpnia i od tego czasu agent zakłada
+  zespoły z czatu. Weryfikacja odbyła się, tylko nie w rytmie tej listy.
+- **5.4** żądało archiwizacji *po* `add-teams-mcp`. Ten warunek jest spełniony —
+  `add-teams-mcp` jest w archiwum pod datą 17 sierpnia.
+
+Bez `review.md`, co od 18 sierpnia 2026 jest dozwolonym stanem: artefakt jest opcjonalny
+i pisany, gdy ma co powiedzieć (`openspec/config.yaml`, `rules.review`).

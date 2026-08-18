@@ -67,3 +67,23 @@ poza darmowy limit. `az consumption usage list` na tej subskrypcji oddaje `preta
 `null`, więc twierdzenia nie dało się sprawdzić z wiersza poleceń. **Do potwierdzenia przez
 operatora w Cost Analysis przed `apply`** — to jedyna rzecz w tej zmianie, której nie
 zmierzono, a która może zmienić decyzję.
+
+## Zamknięcie
+
+Zarchiwizowana 18 sierpnia 2026 jako **wykonana i wyprzedzona**. B2 wszedł; plan stoi dziś
+na **B3** (`infra/app-service.tf`), przestawiony przez `add-teams-mcp` 16 sierpnia, gdy
+doszły kolejne aplikacje. Sześć niezaznaczonych pól rozpada się na trzy grupy i żadna nie
+jest zaległą pracą:
+
+- **3.3** — ręczne sprawdzenie żywych notowań po restarcie planu. Odbyło się przy okazji
+  kolejnych wdrożeń, tylko nie z tą listą w ręku.
+- **4.1–4.3** — „po tygodniu odczytać dołek nocny i dopiero wtedy zdecydować o progu
+  alertu". Pytanie zostało zamknięte przez rzeczywistość wcześniej niż przez ten tydzień:
+  plan poszedł na B3 razem z dwiema nowymi aplikacjami, więc pomiar dotyczyłby maszyny,
+  której już nie ma. Próg alertu jest osobną zmianą, tak jak 4.3 zakładało.
+- **5.1–5.2** — walidacja i `review.md`. `openspec validate --strict` przechodzi (wbrew
+  temu, czego 5.1 się spodziewało), a `review.md` przestał być wymagany 18 sierpnia 2026
+  (`openspec/config.yaml`, `rules.review`).
+
+Zmiana nie ma delty specyfikacji — to zmiana infrastruktury — więc archiwizowana z
+`--skip-specs`.

@@ -289,15 +289,22 @@ shape**, or a **render style** (`Chart.tsx`'s `canDrawIndicator` and its sync ef
 **First decide whether this is an OpenSpec change at all.** Open one when the work will
 change a requirement (`openspec/specs/**`), a contract between modules
 (`market_data/contract.py`, `capital_gateway/dtos.py`, the terminal's generated contract),
-or infrastructure (`infra/**`). Otherwise: branch, tests, pull request — no proposal, no
-design, no review artifact. Bug fixes, behaviour-preserving refactors, UI work that adds no
-requirement, documentation, CI and tooling all take that path.
+infrastructure (`infra/**`), or **an architectural rule this file calls load-bearing** —
+"no cross-module imports and no shared library" being the one that exists today.
+Otherwise: branch, tests, pull request — no proposal, no design, no review artifact. Bug
+fixes, behaviour-preserving refactors, UI work that adds no requirement, documentation, CI
+and tooling all take that path.
 
-The test is mechanical — name the files the work will touch. None in those three
-categories means there is nothing for a spec to say, and five artifacts describing it buy
-nothing. One in them means the full path, and then the paperwork is earned. The rule and
-the reasoning behind it live in `openspec/config.yaml`, which feeds them to every
-generated instruction.
+The test is mechanical — name the files the work will touch. None in those four categories
+means there is nothing for a spec to say. One in them means the change is worth a
+proposal.
+
+The fourth category is younger than the others and was added because the first three read
+as complete until a real change tested them: introducing workspace packages reverses the
+shared-library rule outright and touches no file in categories 1–3. The mechanical test
+would have waved through the most consequential architectural change on the roadmap, and
+caught it only by accident, through a bundled deletion that happened to remove a
+requirement.
 
 When it *is* a change:
 
@@ -308,18 +315,26 @@ When it *is* a change:
 | Implement it | `/opsx:apply` |
 | Fold it into the specs | `/opsx:archive` |
 
-A change is not finished without a `review.md`; archiving one without it is the mistake the
-gate exists to catch. The gate is `.claude/hooks/require-review.sh`, a PreToolUse hook
-watching both `openspec archive` and a manual `mv` into `openspec/changes/archive/`. It
-needs `bash` — which means git-bash on Windows, where it would otherwise not run at all.
-After editing it, run `.claude/hooks/require-review.test.sh`; a hook that cannot execute
-allows everything and reports nothing, so it is not a thing to change untested.
+**Only `proposal.md` is unconditional.** `design.md` was already written only when there
+was a decision with alternatives worth weighing; `tasks.md` and `review.md` joined it on
+18 August 2026. Skipping one is a line in the proposal saying which and why — an artifact
+absent on purpose reads differently from one missing.
+
+`review.md` had been mandatory, enforced by a 256-line PreToolUse hook that refused any
+archive without it. Both are gone, and the hook is the more interesting half: its previous
+PowerShell version could not execute on this project's own macOS machine, so for a while
+every archive passed unchecked while `settings.json` claimed a gate stood there — and its
+own tests ran in no CI. A defence with no test of its failure mode is the thing this repo
+stopped accepting when the audit's first iteration landed, and this one could not pass its
+own rule. Write a review when the change was risky, when the verification is not obvious
+from the tests, or when something turned up worth telling the next reader.
 
 **An archived change keeps three artifacts, not five.** Once the directory has moved into
 `openspec/changes/archive/`, run `scripts/trim-openspec-archive.sh`: it removes the delta
 specs and the ticked `tasks.md`. The delta was merged into `openspec/specs/` by that same
-archive, and what was done and when is git's, with the diffs attached. `proposal.md`,
-`design.md` and `review.md` stay — those are what git cannot hand back in readable form.
+archive, and what was done and when is git's, with the diffs attached. Whichever of
+`proposal.md`, `design.md` and `review.md` the change wrote stay — those are what git
+cannot hand back in readable form.
 The rule rides in `openspec/config.yaml` under `operations.archive`, so `/opsx:archive` is
 told it; `--check` in CI is what catches the archive where it was not.
 

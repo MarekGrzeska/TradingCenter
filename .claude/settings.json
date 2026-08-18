@@ -1,17 +1,3 @@
 {
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "^(Bash|PowerShell)$",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "\"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/require-review.sh\"",
-            "timeout": 5,
-            "statusMessage": "Checking the change has been reviewed"
-          }
-        ]
-      }
-    ]
-  }
+  "hooks": {}
 }

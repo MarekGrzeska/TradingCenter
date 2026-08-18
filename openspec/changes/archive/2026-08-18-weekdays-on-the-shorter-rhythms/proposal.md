@@ -58,3 +58,14 @@ szczegółem.
 - Bez migracji: harmonogram trzyma w bazie wyrażenie czasowe, a rytm jest z niego
   wyliczany przy odczycie.
 - Bez zmian w `scheduler/` — zegar dostaje wyrażenie i o rytmach nie wie.
+
+## Zamknięcie
+
+Zarchiwizowana 18 sierpnia 2026 z jednym niezaznaczonym polem, świadomie:
+
+- **4.5** — „przestawić istniejący harmonogram `35 * * * *` na dni handlowe" — to czynność
+  operatora na produkcji, a nie praca do wykonania w repozytorium. Kod, który na to
+  pozwala, jest wdrożony i pokryty testami; kiedy operator z tego skorzysta, jest jego
+  decyzją i nie jest warunkiem domknięcia zmiany.
+
+`review.md` jest na miejscu i zostaje.
