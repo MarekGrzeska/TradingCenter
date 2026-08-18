@@ -111,19 +111,15 @@ class FakeInstrumentsBySymbol:
 
 
 class FakeIngest:
-    """Stands in for the supervisor: reconciles, and remembers what a fill did."""
+    """Stands in for the supervisor: reconciles, and says what it is running."""
 
-    def __init__(self, last_fill=None) -> None:
+    def __init__(self) -> None:
         self.syncs = 0
         self.running: set = set()
         self.started_at = NOW
-        self._last_fill = last_fill
 
     async def sync(self) -> None:
         self.syncs += 1
-
-    def last_fill(self, symbol: str, resolution: Resolution):
-        return self._last_fill
 
 
 class FakeJobRunner:

@@ -430,68 +430,6 @@
         "title": "EstimateRequest",
         "type": "object"
       },
-      "FillOut": {
-        "description": "What this pair's most recent backfill did, and what it cost.\n\nA fill can run for tens of minutes and fail on one pair while the others carry on, so\nwhere it got to is part of what is being asked when somebody asks what is collected —\nnot something to go and read a log for. `summary` is the same one line the module\nlogs, so an operator comparing the two is comparing one sentence with itself.",
-        "properties": {
-          "failure": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "why it failed, named; null when it did not",
-            "title": "Failure"
-          },
-          "finished_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "when this fill ended; null while it is still running",
-            "title": "Finished At"
-          },
-          "requested": {
-            "description": "candles asked of the gateway; 0 means nothing was asked",
-            "title": "Requested",
-            "type": "integer"
-          },
-          "requests": {
-            "default": 0,
-            "description": "provider calls the gateway made behind that one request",
-            "title": "Requests",
-            "type": "integer"
-          },
-          "summary": {
-            "description": "the whole outcome as one line, for a person",
-            "title": "Summary",
-            "type": "string"
-          },
-          "written": {
-            "default": 0,
-            "description": "rows the archive took, which is not always how many arrived — a streamed value never displaces a stored history one",
-            "title": "Written",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "failure",
-          "finished_at",
-          "requested",
-          "requests",
-          "summary",
-          "written"
-        ],
-        "title": "FillOut",
-        "type": "object"
-      },
       "FormingCandleOut": {
         "description": "The period being built right now, read rather than subscribed to.\n\nThe candle is the same one a subscription's snapshot would carry this instant, and it\nis not stored anywhere: it changes with every quote and understates its own range until\nthe period closes. A consumer treating `high`/`low` here as the period's range will be\nwrong before the period ends — which is why `state` says `forming` in words rather than\nleaving it to be inferred from a field being present.",
         "properties": {
@@ -632,8 +570,7 @@
           "warmup_kind": {
             "enum": [
               "fixed",
-              "decay",
-              "anchored"
+              "decay"
             ],
             "title": "Warmup Kind",
             "type": "string"
@@ -881,19 +818,6 @@
       "IndicatorResultOut": {
         "description": "One requested indicator's answer. Exactly one of `lines`, `markers`, `zones`,\n`levels` is set — the one its catalogue entry's `output` names — or none of them\nand `error` instead (`market-data-indicators` spec, \"Wynik ma jeden z czterech\nkształtów\").",
         "properties": {
-          "anchored_at": {
-            "anyOf": [
-              {
-                "format": "date-time",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "set instead of warmup_bars for an indicator with state rather than decay",
-            "title": "Anchored At"
-          },
           "error": {
             "anyOf": [
               {
@@ -984,7 +908,7 @@
                 "type": "null"
               }
             ],
-            "description": "how many bars before the requested range were read for warmup; null for an anchored indicator, which carries anchored_at instead, and for one that carries an error instead of an answer",
+            "description": "how many bars before the requested range were read for warmup; null for one that carries an error instead of an answer",
             "title": "Warmup Bars"
           },
           "zones": {
@@ -1003,7 +927,6 @@
           }
         },
         "required": [
-          "anchored_at",
           "error",
           "id",
           "levels",
@@ -1864,17 +1787,6 @@
             "title": "Estimated Bytes",
             "type": "integer"
           },
-          "last_fill": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/FillOut"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "the pair's most recent backfill, or null if none has run since the module started — fills live in memory and do not survive a restart"
-          },
           "latest_candle": {
             "anyOf": [
               {
@@ -1903,7 +1815,6 @@
           "collection",
           "earliest_candle",
           "estimated_bytes",
-          "last_fill",
           "latest_candle",
           "resolution",
           "symbol"

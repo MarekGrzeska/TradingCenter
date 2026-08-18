@@ -228,7 +228,6 @@ function mapIndicatorResult(raw: RawIndicatorResult): IndicatorResult {
     id: raw.id,
     params: raw.params,
     warmupBars: raw.warmup_bars,
-    anchoredAt: raw.anchored_at === null ? null : parseIsoToEpochSeconds(raw.anchored_at),
     settled: raw.settled,
     error: raw.error,
     lines: raw.lines,

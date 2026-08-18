@@ -361,7 +361,7 @@ export interface IndicatorRender {
 }
 
 export type IndicatorOutputShape = "lines" | "markers" | "zones" | "levels";
-export type IndicatorWarmupKind = "fixed" | "decay" | "anchored";
+export type IndicatorWarmupKind = "fixed" | "decay";
 
 /** One row of the catalogue — everything the picker needs to offer this indicator and
  *  everything the chart needs to draw it, without either knowing it by name. */
@@ -464,9 +464,8 @@ export interface IndicatorResult {
   /** Resolved params — defaults filled in, so a chart reading this back never has to
    *  consult the catalogue to know what it is drawing. */
   params: Record<string, number>;
-  /** Null for an anchored indicator, which carries `anchoredAt` instead. */
+  /** Null for a result carrying an error instead of an answer. */
   warmupBars: number | null;
-  anchoredAt: number | null;
   /** False when the archive did not hold enough history before the requested range
    *  for this result to be trusted yet. Says nothing about `error` — an unsettled
    *  value is still a value. */

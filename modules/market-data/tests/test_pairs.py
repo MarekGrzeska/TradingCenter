@@ -13,7 +13,6 @@ import pytest
 from fakes import (
     LIMIT,
     NOW,
-    FakeIngest,
     FakeInstruments,
     at,
     candle,
@@ -22,7 +21,6 @@ from fakes import (
 from market_data.config import Settings
 from market_data.coverage import earliest_reachable, record_coverage
 from market_data.errors import GatewayRefused, GatewayUnreachable
-from market_data.ingest.backfill import FillOutcome
 from market_data.models import ESTIMATED_BYTES_PER_CANDLE, Resolution
 from market_data.store import read_candles, write_candles
 from market_data.tracking import track
@@ -282,60 +280,6 @@ async def test_a_market_that_was_just_asked_about_is_not_asked_again(app, api, p
         assert (await api.get("/pairs")).json()[0]["collection"] == "market_closed"
 
     assert instruments.asked == ["US100"]
-
-
-async def test_the_list_says_what_the_last_fill_did(app, api, pool) -> None:
-    """Progress leaves the log. The spec asks for what is in flight, what succeeded and
-    what failed and why, `zamiast pozostawiać to w logach` — and `Ingest` recorded all of
-    it into a report with no caller."""
-    outcome = FillOutcome(
-        symbol="US100",
-        resolution=Resolution.MINUTE,
-        requested=31,
-        written=29,
-        requests=1,
-        finished_at=NOW,
-    )
-    app.state.ingest = FakeIngest(last_fill=outcome)
-    async with pool.acquire() as conn:
-        await track(conn, "US100", Resolution.MINUTE, LIMIT)
-
-    [listed] = (await api.get("/pairs")).json()
-
-    assert listed["last_fill"]["written"] == 29
-    assert listed["last_fill"]["requests"] == 1
-    assert listed["last_fill"]["failure"] is None
-    assert "wrote 29" in listed["last_fill"]["summary"]
-
-
-async def test_a_failed_fill_reaches_the_list_with_its_reason(app, api, pool) -> None:
-    app.state.ingest = FakeIngest(
-        last_fill=FillOutcome(
-            symbol="NOPE",
-            resolution=Resolution.MINUTE,
-            requested=100,
-            failure="the gateway refused with 404: unknown symbol 'NOPE'",
-            finished_at=NOW,
-        )
-    )
-    async with pool.acquire() as conn:
-        await track(conn, "NOPE", Resolution.MINUTE, LIMIT)
-
-    [listed] = (await api.get("/pairs")).json()
-
-    assert "unknown symbol" in listed["last_fill"]["failure"]
-    assert "fill failed" in listed["last_fill"]["summary"]
-
-
-async def test_a_pair_whose_fill_has_not_run_says_so_rather_than_inventing_one(
-    api, pool
-) -> None:
-    async with pool.acquire() as conn:
-        await track(conn, "US100", Resolution.MINUTE, LIMIT)
-
-    [listed] = (await api.get("/pairs")).json()
-
-    assert listed["last_fill"] is None
 
 
 async def test_a_pair_can_be_deleted_over_the_contract(api, pool) -> None:

@@ -990,49 +990,6 @@ async def test_an_untracked_pair_stops_being_collected(pool) -> None:
         await ingest.stop()
 
 
-@pytest.mark.db
-async def test_the_supervisor_reports_what_each_fill_did(pool) -> None:
-    """7.7."""
-    # `_tracked` (not a bare `track`) deliberately: `collect_from` left to its own
-    # default is computed from the real wall clock, and drifts a little further past
-    # `NOW` every day this suite is run — it caught up with `minute_candle`'s fixed
-    # offsets from `NOW` and started filtering out all four candles, `within` came back
-    # empty, and `written` read 0. `DEEP` decouples the pair's clamp from today's date,
-    # same as everywhere else in this file that fills against fixed candles.
-    await _tracked(pool)
-    history = FakeHistory([minute_candle(m) for m in range(1, 5)])
-
-    ingest = Ingest(
-        pool,
-        history,
-        "ws://gateway.test/ws/stream",
-        default_bars=100,
-        subscribe_to=_never_ending_feed,
-        sleep=_no_sleep,
-        gateway_api_key="test-gateway-key",
-    )
-    await ingest.start()
-    try:
-        # Waited for rather than slept past: the fill crosses a real database, and a
-        # fixed 100ms raced it often enough to fail about one run in four once the file
-        # grew.
-        outcome = None
-        for _ in range(200):
-            outcome = ingest.last_fill("US100", Resolution.MINUTE)
-            if outcome is not None:
-                break
-            await asyncio.sleep(0.02)
-    finally:
-        await ingest.stop()
-
-    assert outcome is not None
-    assert outcome.written == 4
-    assert "wrote 4" in outcome.describe()
-
-
-# --- helpers -------------------------------------------------------------------------
-
-
 def tracked_until_opened(feed, times: int):
     """A `still_tracked` that keeps the loop going until the feed has been opened `times`.
 
