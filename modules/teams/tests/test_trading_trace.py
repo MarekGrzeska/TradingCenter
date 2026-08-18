@@ -21,7 +21,7 @@ from teams.contract import AgentDefinition, TeamDefinition, TradingLimits
 from teams.models_catalogue import ModelCatalogue
 from teams.provider import ProviderChunk, TextDelta, ToolCallRequest, UsageReport
 from teams.runner import RunRegistry, execute_run
-from teams.tools import ToolOutcomeKind, ToolServer, ToolServerRegistry
+from teams.tools import ToolDescriptor, ToolOutcomeKind, ToolServer, ToolServerRegistry
 
 from .mcp_stand_in import settings_for
 from .scripted_provider import Ask, ScriptedProvider
@@ -125,6 +125,73 @@ async def test_a_read_tool_leaves_no_trade_row(pool: asyncpg.Pool) -> None:
         return [TextDelta("nothing open"), UsageReport(10, 2, None, None)]
 
     run_id = await _run(pool, definition, ScriptedProvider(default=reads))
+
+    assert await _trades(pool, run_id) == []
+
+
+async def test_a_tool_with_no_annotation_on_the_order_server_counts_as_an_order(
+    pool: asyncpg.Pool,
+) -> None:
+    """The gap an audit found on 18 August 2026: this module read a missing
+    `readOnlyHint` as "not a write", `agent` read the same absence as "a write", and the
+    two were deciding the same question about the same trading-mcp.
+
+    Read as teams read it, the first tool trading-mcp ever publishes unannotated travels
+    with no row in `trades` and no charge against `TradingLimits` — an order the operator
+    cannot see, and one the daily count never stopped. So: unannotated on a server that
+    can reach the account is an order. `agent`'s half is pinned by
+    `test_an_unannotated_tool_counts_as_moving_the_account`.
+    """
+
+    class Unannotated(WriteServer):
+        async def list_tools(self) -> list[ToolDescriptor]:
+            return [
+                ToolDescriptor(
+                    name="place_order",
+                    description="places an order, and nobody annotated it",
+                    input_schema={},
+                    read_only=None,
+                )
+            ]
+
+    definition = TeamDefinition(agents=[a_trader()])
+
+    run_id = await _run(
+        pool, definition, ScriptedProvider(default=places_orders(1)), server=Unannotated()
+    )
+    trades = await _trades(pool, run_id)
+
+    assert len(trades) == 1
+    assert trades[0]["tool_name"] == "place_order"
+
+
+async def test_a_tool_with_no_annotation_on_a_reading_server_is_still_not_an_order(
+    pool: asyncpg.Pool,
+) -> None:
+    """The other half of that reading, and the reason the conservatism is gated on the
+    server rather than applied everywhere: market-mcp cannot reach an account, so an
+    unannotated tool of its own is what it looks like."""
+
+    class ReadingServer(WriteServer):
+        def __init__(self) -> None:
+            super().__init__()
+            self.can_move_the_account = False
+
+        async def list_tools(self) -> list[ToolDescriptor]:
+            return [
+                ToolDescriptor(
+                    name="place_order",
+                    description="a name market-mcp would never publish, unannotated",
+                    input_schema={},
+                    read_only=None,
+                )
+            ]
+
+    definition = TeamDefinition(agents=[a_trader()])
+
+    run_id = await _run(
+        pool, definition, ScriptedProvider(default=places_orders(1)), server=ReadingServer()
+    )
 
     assert await _trades(pool, run_id) == []
 

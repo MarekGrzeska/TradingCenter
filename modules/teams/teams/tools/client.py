@@ -148,10 +148,22 @@ class ToolServer:
     market-mcp instance it always did — the default carries the whole of that history so
     nothing already calling it had to change (specs/teams-tool-access, "Moduł MAY być
     skonfigurowany z więcej niż jednym serwerem narzędzi").
+
+    `can_move_the_account` marks the one server whose writes land somewhere this module
+    cannot look afterwards. It decides nothing about how a call is made and everything
+    about whether a call is an order — the trade row, and the daily count that stops the
+    next one. Same field, same name, same meaning as `agent/tools/client.py`'s.
     """
 
-    def __init__(self, settings: Settings, *, prefix: str = "market_mcp") -> None:
+    def __init__(
+        self,
+        settings: Settings,
+        *,
+        prefix: str = "market_mcp",
+        can_move_the_account: bool = False,
+    ) -> None:
         self.label = prefix.replace("_", "-")
+        self.can_move_the_account = can_move_the_account
         self._env_prefix = prefix.upper()
         self._url: str | None = getattr(settings, f"{prefix}_url")
         self._scope: str | None = getattr(settings, f"{prefix}_scope")
@@ -414,7 +426,9 @@ class ToolServerRegistry:
         return cls(
             {
                 "market-mcp": ToolServer(settings, prefix="market_mcp"),
-                "trading-mcp": ToolServer(settings, prefix="trading_mcp"),
+                "trading-mcp": ToolServer(
+                    settings, prefix="trading_mcp", can_move_the_account=True
+                ),
             }
         )
 

@@ -74,6 +74,9 @@ class ToolPlan:
 
     per_agent: dict[str, tuple[ToolDescriptor, ...]]
     server_by_name: dict[str, ToolServer] = field(default_factory=dict)
+    # tool name -> whether calling it could leave the account changed. Decided once here
+    # rather than per call, off the same resolution the run was admitted on.
+    writes_by_name: dict[str, bool] = field(default_factory=dict)
 
     def for_agent(self, key: str) -> tuple[ToolDescriptor, ...]:
         """Exactly what the definition assigned this agent, in the order it named them.
@@ -90,6 +93,23 @@ class ToolPlan:
         construction, since `plan_tools` refuses a run before this method exists for a
         name two servers both claim."""
         return await self.server_by_name[name].call(name, arguments)
+
+    def moves_the_account(self, name: str) -> bool:
+        """Whether calling `name` could leave the account changed — the question a trade
+        row and the daily count are both written from.
+
+        A name the plan does not know answers `False`: `call` cannot reach any server
+        with it, so nothing can land. That is the one place this differs from
+        `agent/tools/client.py`'s method of the same name, which answers `True` there —
+        and the difference is real rather than drift: agent asks a live session whose
+        tool list is dropped every time the connection breaks, so its "unknown name"
+        genuinely means "cannot tell right now". A plan is resolved once, before the run
+        is admitted, and never dropped.
+
+        Everything else about the two is deliberately identical, including the reading
+        that made them differ until 18 August 2026 — see `_moves_the_account` below.
+        """
+        return self.writes_by_name.get(name, False)
 
 
 @dataclass(frozen=True)
@@ -190,7 +210,30 @@ async def plan_tools(definition: TeamDefinition, registry: ToolServerRegistry) -
         agent.key: tuple(resolution.by_name[name][0][1] for name in agent.tools)
         for agent in definition.agents
     }
-    return ToolPlan(per_agent, server_by_name)
+    writes_by_name = {
+        name: _moves_the_account(server_by_name[name], hits[0][1])
+        for name, hits in resolution.by_name.items()
+    }
+    return ToolPlan(per_agent, server_by_name, writes_by_name)
+
+
+def _moves_the_account(server: ToolServer, tool: ToolDescriptor) -> bool:
+    """The rule, in one place and written the conservative way.
+
+    `read_only is not True`, not `read_only is False`. A tool carrying no annotation at
+    all is *unknown*, and unknown on a server that can send orders has to read as an
+    order: otherwise the first tool trading-mcp publishes without one travels with no row
+    in `trades` and no charge against `TradingLimits` — a silent way round `TradeGuard`
+    rather than a missing feature. This module read it the other way until 18 August
+    2026, when an audit found `agent` deciding the same question from the same
+    `readOnlyHint` and answering the opposite. They are kept identical on purpose; the
+    twin is `ToolServer.moves_the_account` in `agent/tools/client.py`.
+
+    The server gate is what keeps that conservatism from spreading: an unannotated tool
+    on market-mcp still reads as what it is, because nothing market-mcp publishes can
+    reach the account (specs/teams-trading).
+    """
+    return server.can_move_the_account and tool.read_only is not True
 
 
 @dataclass(frozen=True)

@@ -373,6 +373,7 @@ def _agent_runner(
             before_model_call=before_model_call,
             on_model_call=on_model_call,
             before_write_call=before_write_call,
+            moves_the_account=plan.moves_the_account,
         )
 
         async with pool.acquire() as conn:
