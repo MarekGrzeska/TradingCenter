@@ -161,54 +161,6 @@ class PairCoverageOut(BaseModel):
     )
 
 
-class FillOut(BaseModel):
-    """What this pair's most recent backfill did, and what it cost.
-
-    A fill can run for tens of minutes and fail on one pair while the others carry on, so
-    where it got to is part of what is being asked when somebody asks what is collected —
-    not something to go and read a log for. `summary` is the same one line the module
-    logs, so an operator comparing the two is comparing one sentence with itself.
-    """
-
-    finished_at: datetime | None = Field(
-        default=None, description="when this fill ended; null while it is still running"
-    )
-    requested: int = Field(description="candles asked of the gateway; 0 means nothing was asked")
-    written: int = Field(
-        default=0,
-        description="rows the archive took, which is not always how many arrived — a "
-        "streamed value never displaces a stored history one",
-    )
-    requests: int = Field(
-        default=0, description="provider calls the gateway made behind that one request"
-    )
-    failure: str | None = Field(
-        default=None, description="why it failed, named; null when it did not"
-    )
-    summary: str = Field(description="the whole outcome as one line, for a person")
-
-    @classmethod
-    def of(cls, outcome) -> FillOut | None:
-        """The last fill for one pair, or `None` when none has run.
-
-        `None` is not an absence of information — it says no fill has run since the module
-        started. The record is in memory, so a restart empties it.
-
-        Untyped on purpose: the outcome comes from `ingest`, and `ingest` reaches for these
-        models, so naming its type here would close a cycle for the sake of a hint.
-        """
-        if outcome is None:
-            return None
-        return cls(
-            finished_at=outcome.finished_at,
-            requested=outcome.requested,
-            written=outcome.written,
-            requests=outcome.requests,
-            failure=outcome.failure,
-            summary=outcome.describe(),
-        )
-
-
 class TrackedPairOut(BaseModel):
     symbol: str
     resolution: Resolution
@@ -226,11 +178,6 @@ class TrackedPairOut(BaseModel):
     )
     collection: CollectionState = Field(
         description="whether data is actually arriving, as far as the archive can tell"
-    )
-    last_fill: FillOut | None = Field(
-        default=None,
-        description="the pair's most recent backfill, or null if none has run since the "
-        "module started — fills live in memory and do not survive a restart",
     )
     candle_count: int = Field(description="how many candles are collected for this pair")
     estimated_bytes: int = Field(
@@ -595,7 +542,10 @@ class IndicatorCatalogueEntryOut(BaseModel):
     params: list[IndicatorParamOut]
     lines: list[IndicatorLineSpecOut] = Field(default_factory=list)
     render: IndicatorRenderOut
-    warmup_kind: Literal["fixed", "decay", "anchored"]
+    # Exactly the kinds the catalogue can produce, and a test holds the two lists
+    # together (`test_indicators_catalogue.py`). A third, "anchored", was declared here
+    # and by no entry — a state the wire promised and no producer could reach.
+    warmup_kind: Literal["fixed", "decay"]
 
 
 class IndicatorsCatalogueOut(BaseModel):
@@ -662,12 +612,7 @@ class IndicatorResultOut(BaseModel):
     warmup_bars: int | None = Field(
         default=None,
         description="how many bars before the requested range were read for warmup; "
-        "null for an anchored indicator, which carries anchored_at instead, and for "
-        "one that carries an error instead of an answer",
-    )
-    anchored_at: datetime | None = Field(
-        default=None,
-        description="set instead of warmup_bars for an indicator with state rather than decay",
+        "null for one that carries an error instead of an answer",
     )
     settled: bool = Field(
         description="false when the archive did not hold enough history before the "

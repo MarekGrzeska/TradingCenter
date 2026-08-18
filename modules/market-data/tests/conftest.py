@@ -13,12 +13,20 @@ from __future__ import annotations
 
 import os
 from collections.abc import AsyncIterator, Iterator
+from datetime import timedelta
 from pathlib import Path
 
 import asyncpg
+import httpx
 import pytest
+from fakes import FakeIngest, FakeInstruments, FakeJobRunner
 
+from market_data.app import create_app
+from market_data.config import Settings
 from market_data.db import asyncpg_dsn, sqlalchemy_url
+from market_data.hub import Hub
+from market_data.market_status import MarketStatus
+from market_data.tickets import TicketStore
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent
 
@@ -155,3 +163,59 @@ async def db(migrated_url: str) -> AsyncIterator[asyncpg.Connection]:
         yield conn
     finally:
         await conn.close()
+
+
+@pytest.fixture
+def app():
+    """A fresh application per test.
+
+    A fixture rather than an import, and `market_data.app`'s module-level `app` is
+    deliberately out of scope in the suites: while it was in scope, a test that forgot to
+    ask for this one still found something to mutate, and twenty of them reassigned
+    `app.state.*` mid-test with every assignment surviving into whatever ran next. Now
+    that mistake is a `NameError` instead of a leak.
+    """
+    return create_app()
+
+
+@pytest.fixture
+async def pool(migrated_url: str):
+    from market_data.db import pool as make_pool
+
+    async with make_pool(migrated_url, max_size=5) as created:
+        async with created.acquire() as conn:
+            await conn.execute(f"TRUNCATE {', '.join(TABLES)}")
+        yield created
+
+
+@pytest.fixture
+async def api(app, pool, migrated_url: str):
+    """The app wired to a real database, with the two things that reach outward faked.
+
+    The lifespan is bypassed rather than run: it would start ingest, which would try to
+    reach a gateway that is not there. What is under test here is the contract.
+    """
+    app.state.pool = pool
+    app.state.hub = Hub()
+    app.state.settings = Settings(
+        # Metadata only — the pool above is what actually reaches the database. A
+        # throwaway value that satisfies Settings' own rules (TLS required, no embedded
+        # credential) rather than `migrated_url`, which as testcontainers hands it out
+        # is neither.
+        database_url="postgresql://localhost:5432/test?sslmode=require",
+        database_user="test-user",
+        gateway_api_key="test-gateway-key",
+        _env_file=None,
+    )
+    app.state.instruments = FakeInstruments()
+    app.state.ingest = FakeIngest()
+    app.state.market_status = MarketStatus()
+    app.state.job_runner = FakeJobRunner()
+    app.state.tickets = TicketStore(timedelta(seconds=30))
+
+    # `raise_app_exceptions=False` so the app's own error handling is what the test sees.
+    # With the default, the transport re-raises whatever the app raised and the 500 the
+    # handler produced — the thing under test in 8.7 — never reaches the response.
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://archive.test") as client:
+        yield client

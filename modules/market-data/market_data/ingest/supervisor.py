@@ -20,7 +20,6 @@ from datetime import UTC, datetime
 from ..gateway import GatewayHistory
 from ..models import Resolution
 from ..tracking import is_tracked, read_tracked
-from .backfill import FillOutcome
 from .live import Backoff, PairIngest
 
 log = logging.getLogger(__name__)
@@ -69,23 +68,11 @@ class Ingest:
         # Held so a revival in flight is not garbage-collected mid-sleep, and so
         # `stop()` can cancel one rather than leave it starting a pair after shutdown.
         self._revivals: set[asyncio.Task] = set()
-        self._fills: dict[Pair, FillOutcome] = {}
         self.started_at: datetime | None = None
 
     @property
     def running(self) -> set[Pair]:
         return set(self._tasks)
-
-    def last_fill(self, symbol: str, resolution: Resolution) -> FillOutcome | None:
-        """What the most recent fill for this pair did. `None` if it has not run yet."""
-        return self._fills.get((symbol, resolution))
-
-    def fills(self) -> dict[Pair, FillOutcome]:
-        return dict(self._fills)
-
-    def report(self) -> list[str]:
-        """One readable line per pair, for an operator rather than a dashboard."""
-        return [outcome.describe() for outcome in self._fills.values()]
 
     async def start(self) -> None:
         """Begin collecting every pair the operator has decided on.
@@ -143,7 +130,6 @@ class Ingest:
             default_bars=self._default_bars,
             still_tracked=still_tracked,
             limiter=self._limiter,
-            on_fill=self._record_fill,
             backoff=self._backoff or Backoff(),
             **self._pair_options,
         )
@@ -229,6 +215,3 @@ class Ingest:
             pass
         except Exception:
             log.exception("ingest for %s %s ended badly", pair[0], pair[1].value)
-
-    def _record_fill(self, outcome: FillOutcome) -> None:
-        self._fills[(outcome.symbol, outcome.resolution)] = outcome

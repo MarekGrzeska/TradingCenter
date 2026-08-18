@@ -480,7 +480,6 @@ export function indicatorResult(overrides: Partial<IndicatorResult> = {}): Indic
     id: "ema",
     params: { period: 20 },
     warmupBars: 210,
-    anchoredAt: null,
     settled: true,
     error: null,
     lines: { ema: [] },

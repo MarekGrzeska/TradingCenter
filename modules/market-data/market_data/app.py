@@ -190,49 +190,6 @@ async def lifespan(app: FastAPI):
             await job_runner.stop()
             await ingest.stop()
 
-app = FastAPI(
-    title="TradingCenter · market-data",
-    description=(
-        "The candle archive. Reads a range with the parts it never collected marked, "
-        "serves a subscription whose first message is a snapshot, and manages which pairs "
-        "are collected. Candles are built from the **bid** side, matching capital-gateway. "
-        "The WebSocket at /ws/candles has no path here — OpenAPI has no place for one — "
-        "but the messages it sends are published as the `Snapshot` and `CandleChange` "
-        "schemas, so a consumer can be generated against them."
-    ),
-    version="0.1.0",
-    lifespan=lifespan,
-)
-
-# No CORS middleware here, and adding one would break the browser rather than help it.
-#
-# The terminal calls this module across origins, so every request carrying an
-# `Authorization` header is preceded by an `OPTIONS` preflight — which by definition
-# carries no credential of any kind. Easy Auth, set to `Return401`, would answer that
-# preflight with a 401 before the application ever saw it, so CORS has to be answered by
-# something standing in front of Easy Auth: App Service's own, configured in
-# `infra/app-service.tf`. Two layers both appending `Access-Control-Allow-Origin` produce
-# a doubled header, and a browser rejects a response carrying two.
-#
-# Locally the question does not arise: Vite proxies this module under the page's own
-# origin, so nothing is cross-origin to begin with.
-
-# The subscription's message shapes, hung on the document FastAPI builds from the routes.
-# Wrapping rather than replacing keeps FastAPI's own construction untouched, and mutating
-# the dict it caches means the served `/openapi.json` and the dumped one are the same
-# bytes — a generator reading one and a human reading the other must never see two
-# different contracts (`openapi.py`).
-_routes_openapi = app.openapi
-
-
-def _openapi_with_stream() -> dict:
-    return require_response_fields(add_stream_messages(_routes_openapi()))
-
-
-app.openapi = _openapi_with_stream  # type: ignore[method-assign]
-
-
-@app.exception_handler(TrackingRefused)
 async def _tracking_refused(request: Request, exc: TrackingRefused) -> JSONResponse:
     # 409 rather than 400: nothing about the request was malformed, the archive is simply
     # not in a state where it can be honoured.
@@ -240,7 +197,6 @@ async def _tracking_refused(request: Request, exc: TrackingRefused) -> JSONRespo
     return JSONResponse(status_code=status, content={"detail": str(exc)})
 
 
-@app.exception_handler(FutureRequest)
 async def _future_request(request: Request, exc: FutureRequest) -> JSONResponse:
     # 422 and the reason in full: a start date after now is a request the module will
     # never be able to honour, and the caller's next move is to pick a different date —
@@ -250,7 +206,6 @@ async def _future_request(request: Request, exc: FutureRequest) -> JSONResponse:
     return JSONResponse(status_code=422, content={"detail": str(exc)})
 
 
-@app.exception_handler(GatewayError)
 async def _gateway_error(request: Request, exc: GatewayError) -> JSONResponse:
     # 502/504: the failure is upstream, and saying so keeps a consumer from retrying the
     # archive as though the archive were at fault.
@@ -258,7 +213,6 @@ async def _gateway_error(request: Request, exc: GatewayError) -> JSONResponse:
     return JSONResponse(status_code=status, content={"detail": str(exc)})
 
 
-@app.exception_handler(Exception)
 async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
     # Nothing raw reaches a consumer. A database error names tables and columns, which is
     # more than a caller can use and more than a log should carry; the detail goes to the
@@ -270,8 +224,72 @@ async def _unhandled(request: Request, exc: Exception) -> JSONResponse:
     )
 
 
-# Order matches the single module these came out of, so the published document lists its
-# paths exactly where it always did. `instruments` and `indicators` are newer than the
-# rest and go last, after everything this module owned before them.
-for area in (meta, candles, pairs, jobs, stream, instruments, indicators):
-    app.include_router(area.router)
+def create_app() -> FastAPI:
+    """One assembled application, owning nothing that outlives it.
+
+    A factory rather than a module-level object because `app.state` is where every
+    dependency is held, and a single shared instance makes that state a global one test
+    hands to the next: twenty tests reassigned `app.state.*` mid-test and every one of
+    those assignments survived into whatever ran after it. The three MCP modules already
+    build theirs this way (`build_http_app`); this is the same seam, arriving late.
+
+    `telemetry.configure()` is deliberately *not* here — it must run before this module's
+    `from fastapi import FastAPI`, which the comment at the top of the file explains, and
+    calling it per application would register the meters more than once.
+    """
+    app = FastAPI(
+        title="TradingCenter · market-data",
+        description=(
+            "The candle archive. Reads a range with the parts it never collected marked, "
+            "serves a subscription whose first message is a snapshot, and manages which pairs "
+            "are collected. Candles are built from the **bid** side, matching capital-gateway. "
+            "The WebSocket at /ws/candles has no path here — OpenAPI has no place for one — "
+            "but the messages it sends are published as the `Snapshot` and `CandleChange` "
+            "schemas, so a consumer can be generated against them."
+        ),
+        version="0.1.0",
+        lifespan=lifespan,
+    )
+
+    # No CORS middleware here, and adding one would break the browser rather than help it.
+    #
+    # The terminal calls this module across origins, so every request carrying an
+    # `Authorization` header is preceded by an `OPTIONS` preflight — which by definition
+    # carries no credential of any kind. Easy Auth, set to `Return401`, would answer that
+    # preflight with a 401 before the application ever saw it, so CORS has to be answered by
+    # something standing in front of Easy Auth: App Service's own, configured in
+    # `infra/app-service.tf`. Two layers both appending `Access-Control-Allow-Origin` produce
+    # a doubled header, and a browser rejects a response carrying two.
+    #
+    # Locally the question does not arise: Vite proxies this module under the page's own
+    # origin, so nothing is cross-origin to begin with.
+
+    # The subscription's message shapes, hung on the document FastAPI builds from the routes.
+    # Wrapping rather than replacing keeps FastAPI's own construction untouched, and mutating
+    # the dict it caches means the served `/openapi.json` and the dumped one are the same
+    # bytes — a generator reading one and a human reading the other must never see two
+    # different contracts (`openapi.py`).
+    routes_openapi = app.openapi
+
+    def openapi_with_stream() -> dict:
+        return require_response_fields(add_stream_messages(routes_openapi()))
+
+    app.openapi = openapi_with_stream  # type: ignore[method-assign]
+
+    app.add_exception_handler(TrackingRefused, _tracking_refused)  # type: ignore[arg-type]
+    app.add_exception_handler(FutureRequest, _future_request)  # type: ignore[arg-type]
+    app.add_exception_handler(GatewayError, _gateway_error)  # type: ignore[arg-type]
+    app.add_exception_handler(Exception, _unhandled)  # type: ignore[arg-type]
+
+    # Order matches the single module these came out of, so the published document lists its
+    # paths exactly where it always did. `instruments` and `indicators` are newer than the
+    # rest and go last, after everything this module owned before them.
+    for area in (meta, candles, pairs, jobs, stream, instruments, indicators):
+        app.include_router(area.router)
+
+    return app
+
+
+# The ASGI entrypoint every deployment names — `uvicorn market_data.app:app` in the
+# Dockerfile, in `scripts/dev.py` and in the README.
+app = create_app()

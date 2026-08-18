@@ -596,49 +596,6 @@ export interface components {
             pairs: components["schemas"]["PairRequest"][];
         };
         /**
-         * FillOut
-         * @description What this pair's most recent backfill did, and what it cost.
-         *
-         *     A fill can run for tens of minutes and fail on one pair while the others carry on, so
-         *     where it got to is part of what is being asked when somebody asks what is collected —
-         *     not something to go and read a log for. `summary` is the same one line the module
-         *     logs, so an operator comparing the two is comparing one sentence with itself.
-         */
-        FillOut: {
-            /**
-             * Failure
-             * @description why it failed, named; null when it did not
-             */
-            failure: string | null;
-            /**
-             * Finished At
-             * @description when this fill ended; null while it is still running
-             */
-            finished_at: string | null;
-            /**
-             * Requested
-             * @description candles asked of the gateway; 0 means nothing was asked
-             */
-            requested: number;
-            /**
-             * Requests
-             * @description provider calls the gateway made behind that one request
-             * @default 0
-             */
-            requests: number;
-            /**
-             * Summary
-             * @description the whole outcome as one line, for a person
-             */
-            summary: string;
-            /**
-             * Written
-             * @description rows the archive took, which is not always how many arrived — a streamed value never displaces a stored history one
-             * @default 0
-             */
-            written: number;
-        };
-        /**
          * FormingCandleOut
          * @description The period being built right now, read rather than subscribed to.
          *
@@ -712,7 +669,7 @@ export interface components {
              * Warmup Kind
              * @enum {string}
              */
-            warmup_kind: "fixed" | "decay" | "anchored";
+            warmup_kind: "fixed" | "decay";
         };
         /** IndicatorLevelOut */
         IndicatorLevelOut: {
@@ -818,11 +775,6 @@ export interface components {
          */
         IndicatorResultOut: {
             /**
-             * Anchored At
-             * @description set instead of warmup_bars for an indicator with state rather than decay
-             */
-            anchored_at: string | null;
-            /**
              * Error
              * @description why this one indicator could not be computed, when the reason is something the archive does not hold — the series it needs at a resolution nobody collects. Set instead of a shape, never beside one: an empty `zones` means the range held none, which is not the same claim. A request the module refuses outright (unknown indicator, parameter out of range, reversed range, over the ceiling) is a 422 carrying Problem, not a result carrying this
              */
@@ -851,7 +803,7 @@ export interface components {
             settled: boolean;
             /**
              * Warmup Bars
-             * @description how many bars before the requested range were read for warmup; null for an anchored indicator, which carries anchored_at instead, and for one that carries an error instead of an answer
+             * @description how many bars before the requested range were read for warmup; null for one that carries an error instead of an answer
              */
             warmup_bars: number | null;
             /** Zones */
@@ -1284,8 +1236,6 @@ export interface components {
              * @description a rough estimate of how much storage those candles take, derived from `candle_count` the same way a job's price is
              */
             estimated_bytes: number;
-            /** @description the pair's most recent backfill, or null if none has run since the module started — fills live in memory and do not survive a restart */
-            last_fill: components["schemas"]["FillOut"] | null;
             /**
              * Latest Candle
              * @description the newest period collected, or null if none yet

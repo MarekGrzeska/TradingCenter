@@ -27,6 +27,7 @@ from itertools import combinations
 from typing import Any
 
 import asyncpg
+from tc_runtime.db import Conn
 
 from .. import store
 from ..models import (
@@ -394,7 +395,7 @@ def _geometry_text(geometry: ChartDrawingGeometry) -> str:
     return body + (f" ({geometry.label})" if geometry.label else "")
 
 
-async def _switch(conn: store.Conn, symbol: str, ids: list[int], *, hidden: bool) -> list[int]:
+async def _switch(conn: Conn, symbol: str, ids: list[int], *, hidden: bool) -> list[int]:
     """Hide or show, refusing the whole call over an id that is not on this instrument —
     the same contract `remove` has, and deliberately so: a model told "two of the three
     were hidden" has to work out which, where a refusal names it."""

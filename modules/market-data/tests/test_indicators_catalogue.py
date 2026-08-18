@@ -171,3 +171,43 @@ class TestCatalogueGoldenFile:
                     assert math.isnan(value), (entry.id, line.key)
                 else:
                     assert value == pytest.approx(want, rel=1e-7, abs=1e-7), (entry.id, line.key)
+
+
+class TestWarmupKindsAgree:
+    """The wire declares exactly the warmup kinds the catalogue can produce.
+
+    Written from a real divergence rather than from symmetry: `warmup_kind` carried a
+    third variant, `"anchored"`, that no entry produced and nothing set — the wire, the
+    generated types and the terminal all handled a state no producer could reach.
+    Nothing failed, because a `Literal` wider than reality refuses nothing.
+
+    Both directions matter, and they fail differently. A variant on the wire that the
+    catalogue cannot produce is dead weight every consumer must still branch on. A kind
+    the catalogue produces that the wire does not declare is worse: that one is a
+    response the module cannot validate, which is the failure `outputSchema` caught for
+    real in the MCP modules.
+    """
+
+    @staticmethod
+    def declared() -> set[str]:
+        from typing import get_args
+
+        from market_data.contract import IndicatorCatalogueEntryOut
+
+        return set(get_args(IndicatorCatalogueEntryOut.model_fields["warmup_kind"].annotation))
+
+    def test_every_declared_kind_is_producible_by_some_entry(self) -> None:
+        produced = {entry.warmup.kind for entry in CATALOGUE}
+
+        assert self.declared() <= produced, (
+            f"the wire declares {sorted(self.declared() - produced)}, which no catalogue "
+            "entry produces"
+        )
+
+    def test_every_kind_the_catalogue_produces_is_declared(self) -> None:
+        produced = {entry.warmup.kind for entry in CATALOGUE}
+
+        assert produced <= self.declared(), (
+            f"the catalogue produces {sorted(produced - self.declared())}, which the wire "
+            "does not declare — a response the module cannot validate"
+        )

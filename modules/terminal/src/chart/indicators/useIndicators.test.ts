@@ -26,7 +26,6 @@ function answerFor(specs: IndicatorSelection[]): IndicatorsResult {
       id: spec.id,
       params: spec.params,
       warmupBars: 0,
-      anchoredAt: null,
       settled: true,
       error: null,
       lines: { ema: [spec.params.period] },

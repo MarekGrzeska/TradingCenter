@@ -1,0 +1,6 @@
+schema: spec-driven-reviewed
+created: 2026-08-18
+# Bez delty: obie usuwane rzeczy są *nieopisane* w żadnym wymaganiu — to jest cały
+# powód, dla którego wolno je usunąć. Zmiana kwalifikuje się przez drugą kategorię
+# wyzwalacza (kontrakt między modułami), patrz proposal.md.
+skip_specs: true

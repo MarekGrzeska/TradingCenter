@@ -14,7 +14,6 @@ from fastapi import (
 )
 
 from ..contract import (
-    FillOut,
     PairDeletionOut,
     Problem,
     TrackedPairOut,
@@ -24,7 +23,6 @@ from ..contract import (
 )
 from ..coverage import clear_history_boundary, earliest_reachable
 from ..deletion import close_for_deletion, delete_pair_data, read_deletions
-from ..ingest import Ingest
 from ..jobs import (
     FutureRequest,
     create_job,
@@ -60,7 +58,6 @@ async def pairs(request: Request, db=Depends(pool)) -> list[TrackedPairOut]:
     decided = await decide_late_pairs(
         request.app.state.instruments, request.app.state.market_status, statuses, moment
     )
-    ingest: Ingest = request.app.state.ingest
 
     return [
         TrackedPairOut(
@@ -71,7 +68,6 @@ async def pairs(request: Request, db=Depends(pool)) -> list[TrackedPairOut]:
             earliest_candle=status.earliest_candle,
             latest_candle=status.latest_candle,
             collection=collection,
-            last_fill=FillOut.of(ingest.last_fill(status.symbol, status.resolution)),
             candle_count=status.candle_count,
             estimated_bytes=status.candle_count * ESTIMATED_BYTES_PER_CANDLE,
         )

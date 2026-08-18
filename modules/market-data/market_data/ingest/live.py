@@ -71,7 +71,6 @@ class PairIngest:
     still_tracked: Callable[[], Awaitable[bool]]
     gateway_api_key: str
     limiter: object | None = None
-    on_fill: Callable[[FillOutcome], None] | None = None
     # Where candles go instead of straight to storage. The contract layer supplies one
     # that publishes to subscribers and stores inside the same hold, so a candle can never
     # be both in a subscriber's snapshot and in the change that follows it.
@@ -96,9 +95,7 @@ class PairIngest:
         """
         while await self.still_tracked():
             try:
-                outcome = await self._close_gap()
-                if self.on_fill is not None:
-                    self.on_fill(outcome)
+                await self._close_gap()
 
                 await self._listen()
             except GatewayError as err:
@@ -162,9 +159,7 @@ class PairIngest:
                         self.resolution.value,
                         message.message,
                     )
-                    outcome = await self._close_gap()
-                    if self.on_fill is not None:
-                        self.on_fill(outcome)
+                    await self._close_gap()
 
                 if not await self.still_tracked():
                     return

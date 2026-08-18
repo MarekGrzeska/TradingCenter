@@ -295,6 +295,11 @@ class PromptRevision(BaseModel):
     with_tools_body: str
     without_tools_body: str
     created_at: datetime
+    # Where the row came from: a deployment's migration, or a person. Not on the wire —
+    # it exists so the module can refuse to let a seed cover an operator's save
+    # (specs/agent-prompt-management, "Zasiew z wdrożenia nie przykrywa tego, co
+    # zapisał operator"), not so anybody reads it.
+    source: Literal["seed", "operator"] = "operator"
 
 
 class UsageAggregate(BaseModel):
