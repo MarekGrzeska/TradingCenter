@@ -4,24 +4,14 @@ import {
   ColorType,
   CrosshairMode,
   createChart,
-  createSeriesMarkers,
-  type HistogramData,
-  HistogramSeries,
-  type ISeriesMarkersPluginApi,
-  type LineData,
-  LineSeries,
   LineStyle,
   type IChartApi,
-  type IPaneApi,
   type IPriceLine,
   type ISeriesApi,
   type LogicalRange,
   type MouseEventParams,
-  type SeriesMarker,
   type Time,
   type TickMarkType,
-  type UTCTimestamp,
-  type WhitespaceData,
 } from "lightweight-charts";
 import type { AgentChartDrawing, AgentDrawingPatch } from "../agent/agentApi";
 import type { DrawingsStatus } from "../agent/drawingsStore";
@@ -41,12 +31,9 @@ import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { showToast } from "../ui/toastStore";
 import {
   candlestickColors,
-  drawingColorFor,
-  drawingColorFromToken,
   readChartColors,
   type ChartColors,
 } from "./theme";
-import type { Emphasis, MarkPalette } from "./drawingStyle";
 import { DrawingCard } from "./DrawingCard";
 import { DrawingList } from "./DrawingList";
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
@@ -70,12 +57,10 @@ import {
 } from "./chartWindow";
 import { FeedOverlay, OhlcReadout, OlderHistoryState } from "./ChartReadout";
 import { activeIndicatorReadout, type Readout } from "./indicatorReadout";
-import { RayPrimitive } from "./RayPrimitive";
-import { TimeProfilePrimitive, type ProfileBar } from "./TimeProfilePrimitive";
+import { useDrawingLayers } from "./useDrawingLayers";
+import { useIndicatorLayers } from "./useIndicatorLayers";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
-import { TrendlinePrimitive, type DrawnTrendline } from "./TrendlinePrimitive";
-import { ZonePrimitive, type DrawnZone } from "./ZonePrimitive";
 
 export interface ChartProps {
   source: MarketDataSource;
@@ -155,7 +140,6 @@ const EMPTY_DRAWINGS: readonly AgentChartDrawing[] = [];
 /** Asked for while the catalogue has not answered yet — one identity, so waiting for it
  *  costs no render of its own. */
 const NO_SELECTIONS: IndicatorSelection[] = [];
-const OWN_PANE_STRETCH = 1;
 
 /**
  * One candlestick chart, defined entirely by `symbol` + `resolution` — the same
@@ -195,51 +179,6 @@ export function Chart({
   // `syncPriceLine` for why the series' built-in one does not do.
   const priceLineRef = useRef<IPriceLine | null>(null);
   const colorsRef = useRef<ChartColors | null>(null);
-  // One series per (indicator, params, line key) — Line unless the line asks for
-  // a histogram (MACD's, so far) — see the sync effect below.
-  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(
-    new Map(),
-  );
-  // One pane per (indicator, params) whose `render.pane` is "own" — RSI and MACD
-  // each get their own row, the way every other charting platform draws them,
-  // rather than sharing one oscillator pane between indicators that disagree
-  // about scale.
-  const ownPanesRef = useRef<Map<string, IPaneApi<Time>>>(new Map());
-  // The catalogue's reference-level hint (RSI's 30/70, …) drawn once per
-  // (indicator, params) rather than recomputed every render — the levels never
-  // change while the selection is active, only the lines they sit behind do.
-  const levelLinesRef = useRef<
-    Map<string, { series: ISeriesApi<"Line"> | ISeriesApi<"Histogram">; lines: IPriceLine[] }>
-  >(new Map());
-  // One `createSeriesMarkers` plugin per (indicator, params) whose output is
-  // `markers` — `swing_points`, so far — attached to the price series, since
-  // `canDrawIndicator` only offers markers/levels entries drawn on it.
-  const markerPluginsRef = useRef<Map<string, ISeriesMarkersPluginApi<Time>>>(new Map());
-  // One `RayPrimitive` per (indicator, params) whose output is `levels` and
-  // whose `render.style` is not `"histogram"` — `htf_levels_*`, `pivots_*`,
-  // `level_clusters` — replacing its levels wholesale on every recompute
-  // rather than being torn down and rebuilt.
-  const rayPrimitivesRef = useRef<Map<string, RayPrimitive>>(new Map());
-  // One `ZonePrimitive` per (indicator, params) whose output is `zones` —
-  // `range_gap`, `body_gap`, `session_range_*`, `opening_range` (task 4.7).
-  const zonePrimitivesRef = useRef<Map<string, ZonePrimitive>>(new Map());
-  // One `TimeProfilePrimitive` per (indicator, params) whose output is
-  // `levels` with `render.style === "histogram"` — `time_profile`, the one
-  // entry that draws a histogram rather than reference rays (task 5.4).
-  const timeProfilePrimitivesRef = useRef<Map<string, TimeProfilePrimitive>>(new Map());
-  // The drawings' own three primitives, in their own refs — deliberately not the maps
-  // above. Sharing them would be one line of code and one bug that looks like supports
-  // vanishing: the indicator cleanup detaches whatever it does not recognise as an
-  // active instance, and a resolution change empties `indicatorsState.results` on
-  // purpose (design.md, "Rysunki i wskaźniki dzielą prymitywy, ale nie cykl życia").
-  // Keyed by the drawing's own id, one primitive each: `RayPrimitive` and `ZonePrimitive`
-  // hold one colour for everything they draw, and every drawing carries its own.
-  const drawingPrimitivesRef = useRef<
-    Map<number, RayPrimitive | ZonePrimitive | TrendlinePrimitive>
-  >(new Map());
-  // The newest close, for a primitive built after the last candle arrived — the effect
-  // that pushes it to the others runs on a different trigger than the one that builds them.
-  const currentPriceRef = useRef<number | null>(null);
 
   // The array alone, not the whole prop: a caller that rebuilds the object every render
   // (the grid slot does) must not make the sync effect below run every render with it.
@@ -548,13 +487,7 @@ export function Chart({
     });
     observer.observe(container);
 
-    const indicatorSeries = indicatorSeriesRef.current;
-    const ownPanes = ownPanesRef.current;
-    const levelLines = levelLinesRef.current;
-    const markerPlugins = markerPluginsRef.current;
-    const rayPrimitives = rayPrimitivesRef.current;
-    const zonePrimitives = zonePrimitivesRef.current;
-    const timeProfilePrimitives = timeProfilePrimitivesRef.current;
+    const forgetIndicatorLayers = clearIndicatorLayers;
     return () => {
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
@@ -566,16 +499,14 @@ export function Chart({
       priceLineRef.current = null;
       // Every indicator series, pane, reference level, marker plugin and
       // primitive belonged to it too — `chart.remove()` already freed them,
-      // this only stops the sync effect below from reaching for one that is
-      // gone.
-      indicatorSeries.clear();
-      ownPanes.clear();
-      levelLines.clear();
-      markerPlugins.clear();
-      rayPrimitives.clear();
-      zonePrimitives.clear();
-      timeProfilePrimitives.clear();
+      // this only stops the sync effect from reaching for one that is gone.
+      forgetIndicatorLayers();
     };
+    // Empty, and `clearIndicatorLayers` deliberately not listed: it is a stable callback
+    // from a hook declared *below* this effect — because that hook's own effect has to
+    // run after this one has created the chart — so naming it here would read it before
+    // it exists. The cleanup closure runs long after the render that assigns it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const publishLatestBar = useCallback(() => {
@@ -1013,427 +944,21 @@ export function Chart({
     };
   }, [source, symbol, resolution]);
 
-  // --- indicators: one Line series per (instance, line key), synced to what the archive
-  // last answered. A price-pane entry draws on the candles' own pane; an own-pane entry
-  // (RSI, ATR, MACD, …) gets a pane of its own, one per instance rather than one shared
-  // by every oscillator — see `canDrawIndicator`. Keyed by the instance, so the same
-  // entry chosen twice draws twice and changing one instance's period moves its own line
-  // rather than tearing a series down and building it again.
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    const colors = colorsRef.current ?? readChartColors();
-
-    const active = new Set<string>();
-    const activeOwnPanes = new Set<string>();
-    const activeResults = new Set<string>();
-
-    // The snapshot's own pairing: `results[i]` answers `selections[i]`
-    // (`market-data-indicators` spec, "Kolejność wyników"). Nothing else binds the two —
-    // two instances of one entry with the same params are identical on the wire.
-    const drawable = drawnInstances(
-      indicatorsState.selections,
-      indicatorsState.results,
-      catalogueById,
-    );
-    const lineColors = assignLineColors(drawable, colors, instanceColors);
-
-    for (const { selection, result, entry } of drawable) {
-      const ownPaneKey = selection.key;
-      const colorsForInstance = lineColors.get(selection.key) ?? colors.indicatorLines;
-
-      if (entry.output === "markers") {
-        if (!result.markers) continue;
-        activeResults.add(ownPaneKey);
-        const priceSeries = seriesRef.current;
-        if (!priceSeries) continue;
-        const color = colorsForInstance[0];
-        const markers: SeriesMarker<Time>[] = result.markers.map((point) =>
-          point.price === null
-            ? { time: point.time as UTCTimestamp, position: "inBar", shape: "circle", color, text: point.label }
-            : {
-                time: point.time as UTCTimestamp,
-                position: "atPriceMiddle",
-                price: point.price,
-                shape: "circle",
-                color,
-                text: point.label,
-              },
-        );
-        let plugin = markerPluginsRef.current.get(ownPaneKey);
-        if (!plugin) {
-          plugin = createSeriesMarkers(priceSeries, []);
-          markerPluginsRef.current.set(ownPaneKey, plugin);
-        }
-        plugin.setMarkers(markers);
-        continue;
-      }
-
-      if (entry.output === "levels" && entry.render.style === "histogram") {
-        // `time_profile`, so far the only entry that pairs the two — a
-        // histogram panel instead of the reference rays every other `levels`
-        // entry draws (task 5.4).
-        if (!result.levels) continue;
-        activeResults.add(ownPaneKey);
-        const priceSeries = seriesRef.current;
-        if (!priceSeries) continue;
-        // `indicatorLines[0]` is `--color-accent` — the categorical palette's
-        // first slot (`theme.ts`), reused here rather than drawing from the
-        // per-line cycle: the point of control is one highlight, not a series
-        // of same-role lines that need to stay distinguishable from each other.
-        const profileColors = { bar: colors.inkMuted, pointOfControl: colors.indicatorLines[0] };
-        let profile = timeProfilePrimitivesRef.current.get(ownPaneKey);
-        if (!profile) {
-          profile = new TimeProfilePrimitive(profileColors);
-          priceSeries.attachPrimitive(profile);
-          timeProfilePrimitivesRef.current.set(ownPaneKey, profile);
-        }
-        profile.setColors(profileColors);
-        // `VAH`/`VAL` carry `count: null` — summary edges, not buckets, and
-        // the histogram itself has nothing to draw for them (`ProfileBar`'s
-        // own doc).
-        const bars: ProfileBar[] = result.levels
-          .filter((level) => level.count !== null)
-          .map((level) => ({
-            price: level.price,
-            count: level.count as number,
-            isPointOfControl: level.label === "POC",
-          }));
-        profile.setBars(bars);
-        continue;
-      }
-
-      if (entry.output === "levels") {
-        if (!result.levels) continue;
-        activeResults.add(ownPaneKey);
-        const priceSeries = seriesRef.current;
-        if (!priceSeries) continue;
-        const color = colorsForInstance[0];
-        let ray = rayPrimitivesRef.current.get(ownPaneKey);
-        if (!ray) {
-          ray = new RayPrimitive(color);
-          priceSeries.attachPrimitive(ray);
-          rayPrimitivesRef.current.set(ownPaneKey, ray);
-        }
-        ray.setColor(color);
-        ray.setLevels(
-          result.levels.map((level) => ({
-            time: level.from as UTCTimestamp,
-            price: level.price,
-            label: level.label,
-          })),
-        );
-        continue;
-      }
-
-      if (entry.output === "zones") {
-        if (!result.zones) continue;
-        activeResults.add(ownPaneKey);
-        const priceSeries = seriesRef.current;
-        if (!priceSeries) continue;
-        let zonePrimitive = zonePrimitivesRef.current.get(ownPaneKey);
-        if (!zonePrimitive) {
-          zonePrimitive = new ZonePrimitive({ bullish: colors.up, bearish: colors.down, neutral: colors.inkMuted });
-          priceSeries.attachPrimitive(zonePrimitive);
-          zonePrimitivesRef.current.set(ownPaneKey, zonePrimitive);
-        }
-        zonePrimitive.setColors({ bullish: colors.up, bearish: colors.down, neutral: colors.inkMuted });
-        const zones: DrawnZone[] = result.zones.map((zone) => ({
-          from: zone.from as UTCTimestamp,
-          to: zone.to === null ? null : (zone.to as UTCTimestamp),
-          top: zone.top,
-          bottom: zone.bottom,
-          direction: zone.direction,
-        }));
-        zonePrimitive.setZones(zones);
-        continue;
-      }
-
-      // entry.output === "lines" from here on — `canDrawIndicator` refuses
-      // every other combination.
-      if (!result.lines) continue;
-      activeResults.add(ownPaneKey);
-
-      let paneIndex: number | undefined;
-      if (entry.render.pane === "own") {
-        activeOwnPanes.add(ownPaneKey);
-        let pane = ownPanesRef.current.get(ownPaneKey);
-        if (!pane) {
-          // `preserveEmptyPane: true` — without it, the chart removes a pane
-          // on its own the moment its last series does (`IPaneApi.
-          // preserveEmptyPane` docs), racing the explicit `chart.removePane`
-          // below: deselecting one of two own-pane indicators left the other's
-          // pane index stale and threw. This keeps removal singly-owned, by
-          // the cleanup loop, which already knows to look up a live index.
-          pane = chart.addPane(true);
-          pane.setStretchFactor(OWN_PANE_STRETCH);
-          ownPanesRef.current.set(ownPaneKey, pane);
-        }
-        paneIndex = pane.paneIndex();
-      }
-
-      let firstLine: ISeriesApi<"Line"> | ISeriesApi<"Histogram"> | undefined;
-      const lines = result.lines;
-
-      entry.lines.forEach((lineSpec, lineIndex) => {
-        const key = `${selection.key}|${lineSpec.key}`;
-        active.add(key);
-        const values = lines[lineSpec.key] ?? [];
-        // A line overrides the entry's own style for itself alone — MACD's
-        // histogram sitting beside two ordinary lines in the same entry.
-        const style = lineSpec.style ?? entry.render.style;
-
-        let series = indicatorSeriesRef.current.get(key);
-        if (style === "histogram") {
-          const points: (HistogramData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
-            (time, i) => {
-              const value = values[i];
-              return value === null || value === undefined
-                ? { time: time as UTCTimestamp }
-                : { time: time as UTCTimestamp, value, color: value >= 0 ? colors.up : colors.down };
-            },
-          );
-          if (!series) {
-            series = chart.addSeries(
-              HistogramSeries,
-              {
-                lastValueVisible: false,
-                priceLineVisible: false,
-                ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
-              },
-              paneIndex,
-            );
-            indicatorSeriesRef.current.set(key, series);
-          }
-          series.setData(points);
-        } else {
-          const points: (LineData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
-            (time, i) => {
-              const value = values[i];
-              return value === null || value === undefined
-                ? { time: time as UTCTimestamp }
-                : { time: time as UTCTimestamp, value };
-            },
-          );
-          if (!series) {
-            series = chart.addSeries(
-              LineSeries,
-              {
-                color: colorsForInstance[lineIndex],
-                lineWidth: 1,
-                lastValueVisible: false,
-                priceLineVisible: false,
-                ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
-              },
-              paneIndex,
-            );
-            indicatorSeriesRef.current.set(key, series);
-          } else {
-            // Recolouring an instance is not a recompute: the operator picks a swatch and
-            // the line it stands for changes on the spot, without another read.
-            series.applyOptions({ color: colorsForInstance[lineIndex] });
-          }
-          series.setData(points);
-        }
-        firstLine ??= series;
-      });
-
-      // Reference levels (RSI's 30/70, …) — drawn once per instance on whichever
-      // line happens to be first, since every line an entry declares shares that
-      // pane's one price scale.
-      const anchor = firstLine;
-      if (entry.render.levels.length > 0 && anchor && !levelLinesRef.current.has(ownPaneKey)) {
-        const priceLines = entry.render.levels.map((level) =>
-          anchor.createPriceLine({
-            price: level,
-            color: colors.inkMuted,
-            lineWidth: 1,
-            lineStyle: LineStyle.Dashed,
-            axisLabelVisible: true,
-            title: "",
-          }),
-        );
-        levelLinesRef.current.set(ownPaneKey, { series: anchor, lines: priceLines });
-      }
-    }
-
-    for (const [key, line] of indicatorSeriesRef.current) {
-      if (active.has(key)) continue;
-      chart.removeSeries(line);
-      indicatorSeriesRef.current.delete(key);
-    }
-
-    for (const [ownPaneKey, pane] of ownPanesRef.current) {
-      if (activeOwnPanes.has(ownPaneKey)) continue;
-      // Belt and braces alongside `preserveEmptyPane: true` above: a pane
-      // already gone (by whatever path) must not be handed to `removePane`
-      // again — that is what actually threw.
-      if (chart.panes().includes(pane)) chart.removePane(pane.paneIndex());
-      ownPanesRef.current.delete(ownPaneKey);
-    }
-
-    for (const [key, { series, lines }] of levelLinesRef.current) {
-      if (activeResults.has(key)) continue;
-      for (const priceLine of lines) series.removePriceLine(priceLine);
-      levelLinesRef.current.delete(key);
-    }
-
-    for (const [key, plugin] of markerPluginsRef.current) {
-      if (activeResults.has(key)) continue;
-      plugin.detach();
-      markerPluginsRef.current.delete(key);
-    }
-
-    for (const [key, ray] of rayPrimitivesRef.current) {
-      if (activeResults.has(key)) continue;
-      seriesRef.current?.detachPrimitive(ray);
-      rayPrimitivesRef.current.delete(key);
-    }
-
-    for (const [key, zonePrimitive] of zonePrimitivesRef.current) {
-      if (activeResults.has(key)) continue;
-      seriesRef.current?.detachPrimitive(zonePrimitive);
-      zonePrimitivesRef.current.delete(key);
-    }
-
-    for (const [key, profile] of timeProfilePrimitivesRef.current) {
-      if (activeResults.has(key)) continue;
-      seriesRef.current?.detachPrimitive(profile);
-      timeProfilePrimitivesRef.current.delete(key);
-    }
-  }, [
-    indicatorsState.results,
-    indicatorsState.times,
-    indicatorsState.selections,
-    instanceColors,
+  // Declared here rather than higher up on purpose: effects run in the order they were
+  // declared, and this one has to find a chart that the instance effect above has already
+  // created. Its own maps and its own cleanup live in the hook.
+  const { clear: clearIndicatorLayers } = useIndicatorLayers({
+    chartRef,
+    seriesRef,
+    colorsRef,
+    indicatorsState,
     catalogueById,
-  ]);
+    instanceColors,
+  });
 
-  // --- drawings: the objects standing on this instrument, on their own primitives and
-  // their own lifecycle. Keyed on `drawings` alone, so a resolution change leaves them
-  // exactly where they were — the effect above cannot reach them, and this one has no
-  // reason to run (`terminal-chart` spec, "Zmiana rozdzielczości MUST zachować narysowane
-  // obiekty"). A symbol change replaces them because the caller reads a different
-  // instrument's list and hands over a different array.
-  useEffect(() => {
-    const chart = chartRef.current;
-    const priceSeries = seriesRef.current;
-    if (!chart || !priceSeries) return;
-    const colors = colorsRef.current ?? readChartColors();
-    const standing = drawnObjects;
-    const live = new Set<number>();
-
-    const palette: MarkPalette = {
-      onFill: colors.surface,
-      support: colors.up,
-      resistance: colors.down,
-    };
-    const currentPrice = currentPriceRef.current;
-
-    standing.forEach((drawing) => {
-      live.add(drawing.id);
-      // The drawing's own colour, or one the chart derives from its id — never from where
-      // it stands in this array, so removing the object beside it repaints nothing
-      // (`terminal-chart` spec, "Kolor obiektu po usunięciu innego").
-      const color = drawingColorFromToken(colors, drawing.color) ?? drawingColorFor(drawing.id, colors);
-      const marks = { weight: "drawing" as const, objectId: String(drawing.id), palette };
-      const existing = drawingPrimitivesRef.current.get(drawing.id);
-      const geometry = drawing.geometry;
-
-      if (geometry.kind === "level") {
-        const ray = existing instanceof RayPrimitive ? existing : new RayPrimitive(color, marks);
-        if (ray !== existing) {
-          if (existing) priceSeries.detachPrimitive(existing);
-          priceSeries.attachPrimitive(ray);
-          drawingPrimitivesRef.current.set(drawing.id, ray);
-        }
-        ray.setColor(color);
-        ray.setCurrentPrice(currentPrice);
-        // A null `at` means the level has always been in effect. Sent as epoch 0 rather
-        // than as the oldest drawn bar's own time: `timeToX` snaps a moment with no bar
-        // to the nearest one, so this resolves to the left edge of whatever is loaded and
-        // keeps doing so as the pager reaches further back — where a time read once here
-        // would freeze at whichever bar happened to be oldest at the time.
-        const from = geometry.at ?? 0;
-        ray.setLevels([{ time: from as UTCTimestamp, price: geometry.price, label: drawing.label }]);
-        return;
-      }
-
-      if (geometry.kind === "zone") {
-        const zoneColors = { bullish: color, bearish: color, neutral: color };
-        const zone =
-          existing instanceof ZonePrimitive ? existing : new ZonePrimitive(zoneColors, marks);
-        if (zone !== existing) {
-          if (existing) priceSeries.detachPrimitive(existing);
-          priceSeries.attachPrimitive(zone);
-          drawingPrimitivesRef.current.set(drawing.id, zone);
-        }
-        // One colour in all three slots: a drawn zone has no direction to colour by, the
-        // way an indicator's does — it is the operator's band, not a bullish or bearish
-        // reading of one.
-        zone.setColors(zoneColors);
-        zone.setCurrentPrice(currentPrice);
-        zone.setZones([
-          {
-            from: (geometry.from ?? 0) as UTCTimestamp,
-            to: geometry.to === null ? null : (geometry.to as UTCTimestamp),
-            top: geometry.top,
-            bottom: geometry.bottom,
-            direction: null,
-            label: drawing.label,
-          },
-        ]);
-        return;
-      }
-
-      const line =
-        existing instanceof TrendlinePrimitive ? existing : new TrendlinePrimitive(color, marks);
-      if (line !== existing) {
-        if (existing) priceSeries.detachPrimitive(existing);
-        priceSeries.attachPrimitive(line);
-        drawingPrimitivesRef.current.set(drawing.id, line);
-      }
-      line.setColor(color);
-      line.setCurrentPrice(currentPrice);
-      const drawn: DrawnTrendline = {
-        from: geometry.a.time as UTCTimestamp,
-        to: geometry.b.time as UTCTimestamp,
-        fromPrice: geometry.a.price,
-        toPrice: geometry.b.price,
-        label: drawing.label,
-        color: null,
-      };
-      line.setLines([drawn]);
-    });
-
-    for (const [id, primitive] of drawingPrimitivesRef.current) {
-      if (live.has(id)) continue;
-      priceSeries.detachPrimitive(primitive);
-      drawingPrimitivesRef.current.delete(id);
-    }
-  }, [drawnObjects]);
-
-  // The role its price-axis label announces is read off the newest candle, so it follows
-  // the market on its own: a level the price breaks through stops calling itself
-  // resistance (design.md, "Rola przelicza się z ostatniej świecy"). Its own effect
-  // rather than a dependency of the one above — a forming candle must not rebuild
-  // anything, only hand over a number.
-  useEffect(() => {
-    const price = latestBar?.close ?? null;
-    currentPriceRef.current = price;
-    for (const primitive of drawingPrimitivesRef.current.values()) primitive.setCurrentPrice(price);
-  }, [latestBar]);
-
-  // Picked out, or standing back for whatever is (`terminal-chart-objects` spec, "Wskazany
-  // obiekt widać, że jest wskazany"). Nothing here touches what the object *is* — only
-  // how heavily it is drawn.
-  useEffect(() => {
-    for (const [id, primitive] of drawingPrimitivesRef.current) {
-      const emphasis: Emphasis =
-        selectedId === null ? "normal" : id === selectedId ? "selected" : "dimmed";
-      primitive.setEmphasis(emphasis);
-    }
-  }, [selectedId, drawnObjects]);
+  // Below the chart instance effect for the same reason the indicator layers are: their
+  // effects have to find a chart that has already been created.
+  useDrawingLayers({ chartRef, seriesRef, colorsRef, drawnObjects, latestBar, selectedId });
 
   const feed = useBarFeed(source, symbol, resolution, sink);
   const older = useOlderBars(source, symbol, resolution, olderReader);
