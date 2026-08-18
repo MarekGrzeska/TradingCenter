@@ -1,0 +1,18 @@
+# The build context is the repository root since packages/ became a path dependency of
+# the modules that consume it (packages-replace-the-hand-copies). Without this file that
+# would upload every virtualenv and node_modules in the tree on every build.
+.git
+**/.venv
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+**/dist
+**/.env
+# Not part of any image: planning artifacts, prose, infrastructure and the dev scripts.
+openspec
+docs
+infra
+scripts
+.github

@@ -45,6 +45,7 @@ jobs:
       teams: ${{ steps.filter.outputs.teams }}
       terminal: ${{ steps.filter.outputs.terminal }}
       openspec: ${{ steps.filter.outputs.openspec }}
+      packages: ${{ steps.filter.outputs.packages }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -78,7 +79,13 @@ jobs:
 
           gateway='^modules/capital-gateway/'
           archive='^modules/market-data/'
-          agent='^modules/agent/'
+          # A module's own directory, plus every package it takes as a path dependency:
+          # `tc-runtime` is compiled into this module's image, so a change there can break
+          # it exactly the way a change in its own tree can. This is the whole price of
+          # sharing source, and it is paid in CI rather than in production
+          # (packages-replace-the-hand-copies/design.md, D5).
+          tc_runtime='^packages/tc-runtime/'
+          agent="^modules/agent/|$tc_runtime"
           teams='^modules/teams/'
           # The terminal's `contract:check` compares its generated types against the
           # schema market-data builds from `contract.py`. Filtering the terminal on its
@@ -121,8 +128,9 @@ jobs:
           teamsmcp='^modules/teams-mcp/|^modules/teams/'
           # The archive-shape check, plus the script that is the shape.
           specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
+          packages='^packages/'
 
-          for name in capital-gateway market-data market-mcp trading-mcp teams-mcp agent teams terminal openspec; do
+          for name in capital-gateway market-data market-mcp trading-mcp teams-mcp agent teams terminal openspec packages; do
             case "$name" in
               capital-gateway) pattern="$gateway" ;;
               market-data)     pattern="$archive" ;;
@@ -133,6 +141,7 @@ jobs:
               teams)           pattern="$teams" ;;
               terminal)        pattern="$terminal" ;;
               openspec)        pattern="$specs" ;;
+              packages)        pattern="$packages" ;;
             esac
             if matches "$pattern|$self"; then
               echo "$name=true" >> "$GITHUB_OUTPUT"
@@ -257,6 +266,26 @@ jobs:
       # Nothing here reaches a running teams: every test doubles it. What cannot be
       # doubled — whether Easy Auth passes the operator's token through — is not a test,
       # it is the deployment check in this change's review.md.
+      - run: uv run pytest -q
+
+  packages:
+    name: packages
+    needs: changes
+    if: needs.changes.outputs.packages == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/tc-runtime
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      - run: uv run pyright
+      # The package's own tests only. What proves a package change is safe for its
+      # consumers is that *their* jobs run too — the filter above adds every module that
+      # takes the package as a path dependency, so this job never stands alone.
       - run: uv run pytest -q
 
   agent:

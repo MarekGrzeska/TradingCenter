@@ -1,3 +1,7 @@
+"""The connection string, the credential and the pool — moved here with the code they
+test, from `modules/agent/tests/test_db.py`, where they had been asserting nothing about
+agent in particular."""
+
 from __future__ import annotations
 
 import logging
@@ -6,8 +10,8 @@ from typing import Self
 import pytest
 from azure.identity.aio import ClientSecretCredential, DefaultAzureCredential
 
-from agent import db
-from agent.db import (
+from tc_runtime import db
+from tc_runtime.db import (
     _connection_target,
     _credential,
     _TokenProvider,
@@ -16,7 +20,7 @@ from agent.db import (
     sqlalchemy_url,
 )
 
-PLAIN = "postgresql://agent:secret@db.internal:5432/agent"
+PLAIN = "postgresql://someone:secret@db.internal:5432/agent"
 NO_CREDENTIAL_URL = "postgresql://db.internal:5432/agent?sslmode=require"
 
 
@@ -26,24 +30,13 @@ def test_asyncpg_gets_a_scheme_without_a_driver() -> None:
 
 
 def test_sqlalchemy_gets_the_driver_named() -> None:
-    assert sqlalchemy_url(PLAIN) == "postgresql+asyncpg://agent:secret@db.internal:5432/agent"
+    assert sqlalchemy_url(PLAIN) == "postgresql+asyncpg://someone:secret@db.internal:5432/agent"
 
 
 @pytest.mark.parametrize("url", ["", "not-a-url-at-all"])
 def test_a_connection_string_without_a_scheme_names_itself(url: str) -> None:
     with pytest.raises(ValueError, match="not a usable connection string"):
         asyncpg_dsn(url)
-
-
-@pytest.mark.db
-async def test_the_test_database_is_reachable(postgres_url: str) -> None:
-    import asyncpg as _asyncpg
-
-    conn = await _asyncpg.connect(asyncpg_dsn(postgres_url))
-    try:
-        assert await conn.fetchval("SELECT 1") == 1
-    finally:
-        await conn.close()
 
 
 def test_connection_target_names_host_port_and_database_never_a_credential() -> None:

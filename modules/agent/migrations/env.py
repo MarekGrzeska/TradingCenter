@@ -10,8 +10,7 @@ from urllib.parse import parse_qs, urlparse, urlunparse
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
-
-from agent.db import Credential, sqlalchemy_url
+from tc_runtime.db import Credential, sqlalchemy_url
 
 config = context.config
 
@@ -36,8 +35,9 @@ def _database_url() -> str:
 def _identity_connect_args() -> tuple[dict, Credential | None]:
     if config.get_main_option("sqlalchemy.url", None):
         return {}, None
+    from tc_runtime.db import identity_connect_args
+
     from agent.config import Settings
-    from agent.db import identity_connect_args
 
     settings = Settings()  # type: ignore[call-arg]
     if settings.database_user is None:

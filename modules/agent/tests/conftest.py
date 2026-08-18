@@ -12,9 +12,9 @@ from pathlib import Path
 
 import asyncpg
 import pytest
+from tc_runtime.db import asyncpg_dsn, sqlalchemy_url
 
 from agent.config import Settings
-from agent.db import asyncpg_dsn, sqlalchemy_url
 
 MODULE_ROOT = Path(__file__).resolve().parent.parent
 
@@ -127,9 +127,11 @@ def migrated_url(postgres_url: str) -> str:
     """The same database with the module's migrations applied — through the same
     function the module runs at startup, so the schema under test is the one a
     deployment actually applies rather than a second arrangement that resembles it."""
-    from agent.migrate import upgrade_to_head
+    from tc_runtime.migrate import upgrade_to_head
 
-    upgrade_to_head(sqlalchemy_url(postgres_url))
+    from agent.runtime import MIGRATIONS
+
+    upgrade_to_head(MIGRATIONS, sqlalchemy_url(postgres_url))
     return postgres_url
 
 

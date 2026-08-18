@@ -30,11 +30,20 @@ dependencies = [
     # all — they speak to each other, and this is the one contract in the repository
     # with no committed snapshot to catch a drift.
     "mcp==1.27.0",
+    # Runtime plumbing this module shares with the other modules that own a database.
+    # A path dependency, not a workspace member and not a published artifact: the
+    # package is resolved into *this* module's own lock and baked into its image at
+    # build time, so the module still deploys, tests and rolls back on its own
+    # (packages-replace-the-hand-copies/design.md, D3).
+    "tc-runtime",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+tc-runtime = { path = "../../packages/tc-runtime", editable = true }
 
 [tool.ruff]
 line-length = 100
