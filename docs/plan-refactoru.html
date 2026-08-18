@@ -131,7 +131,7 @@
     <span><b>Kryteria:</b> wydajność · złożoność · koszt nowego modułu · reuse</span>
     <span><b>Kontekst:</b> projekt osobisty, edukacyjno-eksperymentalny, konto demo</span>
     <span><b>Horyzont:</b> 6 iteracji, każda domknięta i wartościowa osobno</span>
-    <span><b>Stan:</b> iteracje 0, 1 i 4 zamknięte · następna: 2</span>
+    <span><b>Stan:</b> iteracje 0, 1 i 4 zamknięte, 3 w części · następna: 2</span>
   </div>
 </header>
 
@@ -468,27 +468,88 @@
     tryplet z modułu, wpis w tabeli dev); dryf skryptów dev znika konstrukcyjnie.</p>
   </div>
 
-  <div class="iter">
+  <div class="iter done">
     <div class="iter-head"><span class="iter-num">3</span>
     <h4>Terminal: kupujemy commodity, tniemy molocha</h4>
-    <span class="horizon">~2 tyg.</span></div>
-    <ul>
-      <li><b>TanStack Query</b> — zastępuje 21 ręcznych efektów fetch i 3 hooki pollingu
-      (~-500 linii); cache, deduplikacja i retry za darmo; niespójne guardy abortu znikają.</li>
-      <li><b>Zustand</b> — 5 ręcznych store'ów (API już zbieżne); <code>safeLocalStorage</code>
-      raz, przez middleware persist. <code>agentChatStore</code> przy okazji: mapa
-      AbortControllerów zamiast flag+sekwencji (701 → ~450 linii).</li>
-      <li><b>Chart.tsx</b> 2 124 → ~600: cztery hooki (<code>useChartInstance</code>,
-      <code>useIndicatorLayers</code> z generycznym reconcile <code>Map&lt;string, Layer&gt;</code>,
-      <code>useDrawingLayers</code>, <code>useChartFocus</code>) + <code>ChartReadout.tsx</code>;
-      <b><code>MarkPrimitive</code></b> ścina ~215 linii z trzech prymitywów.</li>
-      <li><b>Mini UI-kit</b>: <code>Button</code>, <code>Input</code>,
-      <code>UnreachableNotice</code>; <code>readSseStream&lt;T&gt;</code>;
-      <code>makeStatusMapper</code>; generyczne <code>RuleSection</code>/<code>FireHistory</code>
-      w SchedulesPanel; trasy zagnieżdżone w Teams (runy dostają linki).</li>
+    <span class="status-pill">Zrobione w części · 18.08 · PR&nbsp;#161</span>
+    <span class="status-pill next">Reszta otwarta</span>
+    <span class="horizon">8 commitów · 53 pliki</span></div>
+    <p>Kupione zostało jedno commodity z dwóch — <b>TanStack Query</b> na odczyt danych.
+    <b>Zustand nie wszedł</b>, i to jest wynik pomiaru, nie zaniechania. Moloch zszedł o
+    połowę, nie do ~600 linii, bo ostatni hook czekał na rzecz, która okazała się pułapką
+    kolejności efektów (niżej).</p>
+    <ul class="shipped">
+      <li><b><code>data/query.ts</code></b> — jeden klient, jeden <code>useRead</code> i dwie
+      <i>nazwane</i> polityki porażki zamiast szesnastu przepisanych: <code>keep</code> dla
+      wierszy, które nadal warto czytać, <code>forget</code> dla zakładki kosztów, której
+      specyfikacja zabrania pokazywać liczb sprzed awarii jako bieżących. Przepiętych
+      <b>16 odczytów</b> — siedem hooków i dziewięć efektów w komponentach,</li>
+      <li><code>ScheduleHistory</code> i <code>TriggerHistory</code> to jedno
+      <code>FireHistory</code> z przekazanym odczytem; strip runów i widok runów dzielą
+      klucz cache, więc otwarcie runów z edytora nie pyta modułu drugi raz,</li>
+      <li><b><code>Chart.tsx</code> 2 124 → 1 135</b>: <code>chartLines.ts</code>,
+      <code>chartWindow.ts</code>, <code>indicatorReadout.ts</code>,
+      <code>ChartReadout.tsx</code>, a potem <code>useIndicatorLayers</code> i
+      <code>useDrawingLayers</code> — każdy z własnymi mapami, których nikt inny nie
+      dotyka,</li>
+      <li><b><code>MarkPrimitive</code></b> pod ray, zone i trendline: 800 linii → 601 plus
+      130 linii bazy,</li>
+      <li><code>readSseStream&lt;T&gt;</code> (dwa czytniki strumienia), <code>statusMapper</code>
+      (cztery <code>mapStatus</code> → cztery tabele), jeden
+      <code>safeLocalStorage</code> zamiast trzech kopii, <code>Button</code> i
+      <code>UnreachableNotice</code> w miejscu 8× i 12× wklejonego <code>className</code>,</li>
+      <li><b>subskrypcje zwężone do tego, co czytają</b> — i to jedyna pozycja z własnym
+      testem: sześć wykresów siatki przerysowywało się przy zmianie jednego slotu,
+      <code>slotsRenderIndependently.test.tsx</code> liczy rendery i czerwienieje na starym
+      kodzie.</li>
     </ul>
-    <p class="gain-line">~1 500 linii mniej, cztery klasy dryfu zamknięte, największy plik repo
-    przestaje być największym ryzykiem każdego merge'a.</p>
+    <p class="gain-line">jedna droga odczytu zamiast szesnastu ręcznych guardów; największy
+    plik produkcyjny repo 2 124 → 1 135; cztery klasy kopii zamknięte (SSE, mapowanie
+    statusów, prymitywy, przyciski); siatka sześciu wykresów przerysowuje ten slot, który
+    się zmienił.</p>
+
+    <div class="aside">
+      <h5>Co wyszło inaczej, niż zakładał plan</h5>
+      <p><b>Zustand nie wchodzi.</b> Szkielet, który miał zniknąć — zbiór listenerów, pętla
+      powiadomień, <code>getSnapshot</code> — to ~34 linie na cztery store'y. Reszta jest
+      domeną: dedup toastów po kluczu z własnymi zegarami, wersjonowany config z walidującym
+      parserem, dwa <i>celowo</i> rozdzielne kanały powiadomień. Do tego <code>persist</code>
+      musiałby odczytać wpis, który już leży w przeglądarce operatora, a jego koperta jest
+      inna niż to, co tam zapisano. Zysk, po który się szło — selektory — wziął
+      <code>useSyncExternalStore</code>, bez zależności.</p>
+      <p><b><code>agentChatStore</code>: przesłanka planu jest fałszywa.</b> „Mapa
+      AbortControllerów zamiast flag+sekwencji" opisuje kod, którego tam nie ma — nie ma ani
+      tych flag, ani licznika sekwencji, a każde wywołanie podaje świeży, <i>nigdy</i>
+      nieprzerywany <code>new AbortController().signal</code>. Ta pozycja wraca do
+      przemyślenia, nie do zrobienia. Trzecia taka liczba w tym planie, po trzech z iteracji
+      1 i dwóch z iteracji 4.</p>
+      <p><b><code>MarkPrimitive</code> ścina ~150 linii, nie ~215.</b> Szacunek liczył kod
+      rysujący kształty jako wspólny, a on wspólny nie jest — wspólny jest cykl życia.</p>
+      <p><b>Linie produkcyjne wyszły płasko: 21 093 → 21 170</b>, zamiast −1 500. Cięcia
+      poszły w duplikacie i w największym pliku, a wróciły w komentarzach niosących powód i
+      w nowych komponentach. Zapowiadane −1 500 zakładało trzy rzeczy, których w tej porcji
+      nie ma: Zustanda, <code>Chart.tsx</code> do ~600 i pełny przemiał UI-kitu.</p>
+      <h5>Pułapka, która to zatrzymała</h5>
+      <p>Efekty biegną w kolejności deklaracji, więc oba hooki warstw muszą stać <i>pod</i>
+      efektem tworzącym wykres — inaczej przy montażu nie zastaną czego rysować. To z kolei
+      znaczy, że tablica zależności efektu wyżej nie może wymienić
+      <code>clearIndicatorLayers</code>: tablica jest czytana w trakcie renderu, a stała z
+      hooka niżej wtedy jeszcze nie istnieje. Wpisanie jej — zgodnie z podpowiedzią
+      <code>react-hooks/exhaustive-deps</code> — wywróciło wszystkie 121 testów wykresu
+      naraz. Stąd <code>useChartInstance</code> zostaje na później: to ten sam węzeł,
+      rozwiązywany w drugą stronę.</p>
+      <h5>Jedna zmiana zachowania, celowa</h5>
+      <p>Wykres nie liczy wskaźników, dopóki katalog nie odpowie. Wcześniej wygrywał ten
+      wyścig o jeden tick i po przejściu na TanStack zaczął go przegrywać — a przegrana
+      strona pyta archiwum o id, którego katalog już nie oferuje. Katalog, który
+      <i>padł</i>, działa jak dotąd: selekcje przechodzą niefiltrowane, żeby chwiejny odczyt
+      nigdy nie czytał się jako „archiwum skasowało wszystko".</p>
+      <h5>Co z tej iteracji zostaje</h5>
+      <p><code>useChartInstance</code> (<code>Chart.tsx</code> → ~960), reszta przemiału
+      UI-kitu (~70 dalszych dosłownych <code>className</code>), trasy zagnieżdżone w Teams
+      (runy dostają linki) i <code>agentChatStore</code> — ten ostatni dopiero po
+      przeplanowaniu.</p>
+    </div>
   </div>
 
   <div class="iter done">
@@ -600,37 +661,38 @@
 
   <h2 id="metryki">Jak poznamy, że się udało</h2>
   <div class="table-wrap"><table>
-    <thead><tr><th>Metryka</th><th>Audyt 18.08</th><th>Po iter. 0</th><th>Po iter. 1</th><th>Po iter. 4</th><th>Cel</th></tr></thead>
+    <thead><tr><th>Metryka</th><th>Audyt 18.08</th><th>Po iter. 0</th><th>Po iter. 1</th><th>Po iter. 3</th><th>Po iter. 4</th><th>Cel</th></tr></thead>
     <tbody>
       <tr><td>Miejsca do edycji przy poprawce wspólnej logiki Pythona</td>
         <td class="num">2–7 kopii</td><td class="num">2–7 kopii</td>
-        <td class="num hit">1 pakiet ✓</td><td class="num hit">1 pakiet ✓</td><td class="num">1 pakiet</td></tr>
+        <td class="num hit">1 pakiet ✓</td><td class="num hit">1 pakiet ✓</td><td class="num hit">1 pakiet ✓</td><td class="num">1 pakiet</td></tr>
       <tr><td>Ręcznie kopiowane linie Pythona ponad pierwszy egzemplarz (pary ≥70%)</td>
         <td class="num">959</td><td class="num miss">+80</td>
-        <td class="num hit">74 ✓</td><td class="num hit">74 ✓</td><td class="num">&lt; 200</td></tr>
+        <td class="num hit">74 ✓</td><td class="num hit">74 ✓</td><td class="num hit">74 ✓</td><td class="num">&lt; 200</td></tr>
       <tr><td>Tokeny powierzchni narzędzi na turę agenta</td>
         <td class="num">15 134</td><td class="num">15 134</td>
-        <td class="num">15 134</td><td class="num miss">11 704</td><td class="num">&lt; 10 000</td></tr>
+        <td class="num">15 134</td><td class="num">15 134</td><td class="num miss">11 704</td><td class="num">&lt; 10 000</td></tr>
       <tr><td>Requesty upstream na wywołanie narzędzia z /pairs</td>
         <td class="num">3–4</td><td class="num">3–4</td>
-        <td class="num">3–4</td><td class="num hit">1 ✓</td><td class="num">1–2</td></tr>
+        <td class="num">3–4</td><td class="num">3–4</td><td class="num hit">1 ✓</td><td class="num">1–2</td></tr>
       <tr><td>Czas dodania nowego modułu (kod → produkcja)</td>
         <td class="num">~2 dni</td><td class="num">~2 dni</td>
-        <td class="num">niezmierzone</td><td class="num">niezmierzone</td><td class="num">&lt; 0,5 dnia</td></tr>
+        <td class="num">niezmierzone</td><td class="num">niezmierzone</td><td class="num">niezmierzone</td><td class="num">&lt; 0,5 dnia</td></tr>
       <tr><td>Linie workflow deploy</td>
         <td class="num">436</td><td class="num miss">452</td>
-        <td class="num miss">458</td><td class="num miss">458</td><td class="num">~175</td></tr>
+        <td class="num miss">458</td><td class="num miss">458</td><td class="num miss">458</td><td class="num">~175</td></tr>
       <tr><td>Największy plik w repo</td>
         <td class="num">3 302 (test) / 2 124 (prod)</td><td class="num">bez zmian</td>
-        <td class="num">bez zmian</td><td class="num">bez zmian</td><td class="num">&lt; 1 000</td></tr>
+        <td class="num">bez zmian</td><td class="num">3 302 / 1 135</td><td class="num">bez zmian</td>
+        <td class="num">&lt; 1 000</td></tr>
       <tr><td>Sondy mogące przejść na starym kontenerze</td>
         <td class="num">4 z 7</td><td class="num hit">0 ✓</td>
-        <td class="num hit">0 ✓</td><td class="num hit">0 ✓</td><td class="num">0</td></tr>
+        <td class="num hit">0 ✓</td><td class="num hit">0 ✓</td><td class="num hit">0 ✓</td><td class="num">0</td></tr>
     </tbody>
   </table></div>
 
-  <p><b>Po trzech iteracjach cztery metryki są na celu, dwie stoją, jedna rośnie, jedna
-  ruszyła i nie doszła.</b> Iteracja 0 była naprawcza i dwie liczby poszły w niej w górę — to
+  <p><b>Po czterech iteracjach cztery metryki są na celu, jedna stoi, jedna rośnie, dwie
+  ruszyły i nie doszły.</b> Iteracja 0 była naprawcza i dwie liczby poszły w niej w górę — to
   normalny jej kształt. Iteracja 1 spłaciła jedną z nich z nawiązką: ~80 linii świadomie
   zrównanych kopii <code>_detail</code> zamieniło się w jeden egzemplarz, a razem z nimi
   zeszła cała reszta, 959 → 74.</p>
@@ -641,6 +703,16 @@
   <code>outputSchema</code> to kolejne 5,2 tys. tokenów i jednocześnie jedyna obrona, która
   w tym repo wykryła realną awarię odpowiedzi narzędzia. Ten wiersz zostaje otwarty
   świadomie — zamknie go decyzja o <i>zakresie</i> zestawu, nie kolejna o jego formacie.</p>
+  <p><b>Największy plik produkcyjny zszedł o połowę i wciąż nie jest na celu:</b> 2 124 →
+  1 135. Cztery moduły wyszły z <code>Chart.tsx</code> jako pliki, które nie dotykają
+  <code>lightweight-charts</code>, a dwa jako hooki trzymające mapy obiektów wykresu.
+  Ostatni z planowanych, <code>useChartInstance</code>, zabrałby go do ~960 i został
+  odłożony świadomie: hooki warstw muszą być zadeklarowane <i>pod</i> efektem tworzącym
+  wykres, więc przeniesienie samego tworzenia rozwiązuje ten sam węzeł kolejności efektów w
+  drugą stronę i chce osobnego podejścia. Wiersz z testem, 3 302, zostaje — to
+  <code>Chart.test.tsx</code>, a jego cięcie jest osobną robotą od cięcia kodu, który
+  testuje.</p>
+
   <p>Rosną wciąż <b>wiersze workflow deploy</b>: 436 → 452 → 458, bo najpierw doszła asercja
   tagu obrazu, a potem <code>file:</code> obok nowego kontekstu w sześciu plikach. To jest
   dokładnie ten dług, który iteracja 2 spłaca reusable workflow — a przy okazji rachunek
