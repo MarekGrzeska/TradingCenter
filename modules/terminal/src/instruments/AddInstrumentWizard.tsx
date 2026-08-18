@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { archive, instruments } from "../data/marketData";
+import { useRead } from "../data/query";
 import { Autocomplete } from "../ui/Autocomplete";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { assetClassSource, instrumentInClassSource } from "../ui/autocompleteSources";
@@ -264,47 +265,31 @@ function AcceptanceDialog({
   onClose(): void;
   onAccepted(): void;
 }) {
-  const [estimate, setEstimate] = useState<JobEstimate | null>(null);
-  const [estimateError, setEstimateError] = useState<string | null>(null);
   const [result, setResult] = useState<TrackPairsResult | null>(null);
 
-  // One mount per request — the caller keys this component on it — so the
-  // request is fixed for this dialog's whole lifetime. Held in a ref only
-  // because `pairs` is a fresh array every render: listing it as a dependency
-  // would re-price on every render rather than once.
-  const requestRef = useRef({ pairs, collectFrom });
-  requestRef.current = { pairs, collectFrom };
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    setEstimate(null);
-    setEstimateError(null);
-
-    archive
-      .estimateJob(requestRef.current.pairs, requestRef.current.collectFrom, controller.signal)
-      .then((priced) => {
-        if (!cancelled) setEstimate(priced);
-      })
-      .catch((cause: unknown) => {
-        if (cancelled || controller.signal.aborted) return;
-        setEstimateError(cause instanceof Error ? cause.message : "could not price this job");
-      });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, []);
+  // One mount per request — the caller keys this component on it — so the request is
+  // fixed for this dialog's whole lifetime, and the price is asked for once. The request
+  // itself is the cache key rather than `pairs`, which is a fresh array every render:
+  // keying on the identity would re-price on every one of them.
+  const priced = useRead({
+    key: ["archive", "estimate", requestKey(pairs, String(collectFrom))],
+    read: (signal: AbortSignal) => archive.estimateJob(pairs, collectFrom, signal),
+    initial: null as JobEstimate | null,
+    fallbackMessage: "could not price this job",
+    onFailure: "forget",
+  });
+  const estimate = priced.value;
+  const estimateError = priced.error;
 
   const accept = useCallback(async () => {
-    const outcome = await archive.trackPairs(
-      requestRef.current.pairs,
-      requestRef.current.collectFrom,
-      new AbortController().signal,
-    );
+    // The pairs and the moment this dialog was opened with — fixed for its whole
+    // lifetime, because the caller mounts a new one per request.
+    const outcome = await archive.trackPairs(pairs, collectFrom, new AbortController().signal);
     setResult(outcome);
-  }, []);
+    // `pairs` is a fresh array every render while the request behind it never changes —
+    // the caller mounts one dialog per request, keyed on `requestKey`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collectFrom]);
 
   // Accepting does not close this: what came back is the answer to the question,
   // and refusals in particular have to be read where the decision was made. So

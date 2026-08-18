@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import type { QueryKey } from "@tanstack/react-query";
 import { useAgentTurns } from "../agent/useAgentTurns";
+import { useRead } from "../data/query";
 import { MarketDataError } from "../data/types";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { formatInstant } from "../ui/formatTime";
@@ -21,6 +23,15 @@ import type {
   Trigger,
   TriggerDraft,
 } from "./teamsApi";
+
+/** Before the first answer: no revision to pin to, and neither list read yet — which the
+ *  sections below draw as "loading", not as "this team has no rules". */
+const NOT_READ_YET: {
+  latestRevisionId: number | null;
+  schedules: Schedule[] | null;
+  triggers: Trigger[] | null;
+} = { latestRevisionId: null, schedules: null, triggers: null };
+const NO_FIRES: ScheduleFire[] = [];
 
 const INPUT = "rounded border border-border bg-panel px-2 py-1 text-sm text-ink";
 const BUTTON = "cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong";
@@ -52,37 +63,25 @@ export function SchedulesPanel({
   onClose(): void;
   onWatchRun(runId: number): void;
 }) {
-  const [latestRevisionId, setLatestRevisionId] = useState<number | null>(null);
-  const [schedules, setSchedules] = useState<Schedule[] | null>(null);
-  const [triggers, setTriggers] = useState<Trigger[] | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [reloadCount, setReloadCount] = useState(0);
-  const reload = () => setReloadCount((n) => n + 1);
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    Promise.all([
-      api.latestRevision(teamId, controller.signal),
-      api.listSchedules(teamId, controller.signal),
-      api.listTriggers(teamId, controller.signal),
-    ])
-      .then(([revision, scheduleList, triggerList]) => {
-        if (cancelled) return;
-        setLatestRevisionId(revision.id);
-        setSchedules(scheduleList);
-        setTriggers(triggerList);
-      })
-      .catch((cause: unknown) => {
-        if (!cancelled) {
-          setLoadError(cause instanceof Error ? cause.message : "could not read schedules and triggers");
-        }
-      });
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [api, teamId, reloadCount]);
+  // One read over all three, because the panel has one loading state and one failure:
+  // a rule list without the revision it may pin to is not half a panel, it is a panel
+  // that cannot say which revision "latest" means.
+  const rules = useRead({
+    key: ["teams", teamId, "rules"],
+    read: async (signal) => {
+      const [revision, schedules, triggers] = await Promise.all([
+        api.latestRevision(teamId, signal),
+        api.listSchedules(teamId, signal),
+        api.listTriggers(teamId, signal),
+      ]);
+      return { latestRevisionId: revision.id, schedules, triggers };
+    },
+    initial: NOT_READ_YET,
+    fallbackMessage: "could not read schedules and triggers",
+  });
+  const { latestRevisionId, schedules, triggers } = rules.value;
+  const loadError = rules.error;
+  const reload = rules.reload;
 
   // `schedule_team` and `trigger_team` are chat tools too, and nothing about them reaches
   // this panel — the same staleness the catalogue had (`agentActivity.ts`). Everything on
@@ -208,7 +207,11 @@ function ScheduleSection({
             </div>
             {historyFor === schedule.id && (
               <div className="mt-2 border-t border-border pt-2">
-                <ScheduleHistory api={api} scheduleId={schedule.id} onWatchRun={onWatchRun} />
+                <FireHistory
+                  ruleKey={["teams", "schedule", schedule.id, "fires"]}
+                  read={(signal) => api.scheduleFires(schedule.id, signal)}
+                  onWatchRun={onWatchRun}
+                />
               </div>
             )}
           </li>
@@ -297,30 +300,37 @@ function EnableToggle({
   );
 }
 
-function ScheduleHistory({
-  api,
-  scheduleId,
+/**
+ * What a rule has done so far. A schedule's fires and a trigger's are the same rows read
+ * through two routes, so they are one component with the read passed in — the shape they
+ * always had, minus the second copy of the guard around it.
+ *
+ * A history that cannot be read renders as an empty one: the rule above it is the point
+ * of the row, and its own failure is already reported at the top of the panel.
+ */
+function FireHistory({
+  ruleKey,
+  read,
   onWatchRun,
 }: {
-  api: TeamsApi;
-  scheduleId: number;
+  /** What tells this rule's history from every other one in the cache. */
+  ruleKey: QueryKey;
+  read(signal: AbortSignal): Promise<ScheduleFire[]>;
   onWatchRun(runId: number): void;
 }) {
-  const [fires, setFires] = useState<ScheduleFire[] | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    api
-      .scheduleFires(scheduleId, controller.signal)
-      .then((answer) => !cancelled && setFires(answer))
-      .catch(() => !cancelled && setFires([]));
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [api, scheduleId]);
+  const history = useRead({
+    key: ruleKey,
+    read,
+    initial: NO_FIRES,
+    fallbackMessage: "could not read the fire history",
+  });
 
-  return <FireHistoryList fires={fires} onWatchRun={onWatchRun} />;
+  return (
+    <FireHistoryList
+      fires={history.status === "loading" ? null : history.value}
+      onWatchRun={onWatchRun}
+    />
+  );
 }
 
 function RevisionModeFields({
@@ -427,7 +437,11 @@ function TriggerSection({
             </div>
             {historyFor === trigger.id && (
               <div className="mt-2 border-t border-border pt-2">
-                <TriggerHistory api={api} triggerId={trigger.id} onWatchRun={onWatchRun} />
+                <FireHistory
+                  ruleKey={["teams", "trigger", trigger.id, "fires"]}
+                  read={(signal) => api.triggerFires(trigger.id, signal)}
+                  onWatchRun={onWatchRun}
+                />
               </div>
             )}
           </li>
@@ -450,32 +464,6 @@ function TriggerSection({
       )}
     </section>
   );
-}
-
-function TriggerHistory({
-  api,
-  triggerId,
-  onWatchRun,
-}: {
-  api: TeamsApi;
-  triggerId: number;
-  onWatchRun(runId: number): void;
-}) {
-  const [fires, setFires] = useState<ScheduleFire[] | null>(null);
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    api
-      .triggerFires(triggerId, controller.signal)
-      .then((answer) => !cancelled && setFires(answer))
-      .catch(() => !cancelled && setFires([]));
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [api, triggerId]);
-
-  return <FireHistoryList fires={fires} onWatchRun={onWatchRun} />;
 }
 
 function TriggerForm({

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link } from "react-router";
 import { archive } from "../data/marketData";
+import { useRead } from "../data/query";
 import { RESOLUTIONS } from "../data/types";
 import type { CollectionState, PairCoverage, Resolution, TrackedPair } from "../data/types";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -399,31 +400,18 @@ function IntervalCoverage({
   onChanged(): void;
   onDeleted(notice: DeletionNotice): void;
 }) {
-  const [coverage, setCoverage] = useState<PairCoverage | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    setCoverage(null);
-    setError(null);
-
-    archive
-      .coverage(pair.symbol, pair.resolution, controller.signal)
-      .then((result) => {
-        if (!cancelled) setCoverage(result);
-      })
-      .catch((cause: unknown) => {
-        if (cancelled || controller.signal.aborted) return;
-        setError(cause instanceof Error ? cause.message : "could not read coverage");
-      });
-
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [pair.symbol, pair.resolution]);
+  // One entry per pair, so a row folded shut and opened again draws what the archive
+  // already answered while it re-reads behind it.
+  const read = useRead({
+    key: ["archive", "coverage", pair.symbol, pair.resolution],
+    read: (signal: AbortSignal) => archive.coverage(pair.symbol, pair.resolution, signal),
+    initial: null as PairCoverage | null,
+    fallbackMessage: "could not read coverage",
+    onFailure: "forget",
+  });
+  const coverage = read.value;
+  const error = read.error;
 
   const deleteInterval = useCallback(async () => {
     // A rejection here is the dialog's to show — it stays open, names the

@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
 import { useAgentTurns } from "../agent/useAgentTurns";
+import { useRead } from "../data/query";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { formatInstant } from "../ui/formatTime";
 import { RunMonitor } from "./RunMonitor";
 import type { TeamRun } from "./runs";
+import { NO_RUNS, runsKey } from "./runsRead";
 import type { TeamRevision, TeamsApi, TeamsModel } from "./teamsApi";
 
 /**
@@ -41,39 +43,28 @@ export function TeamRunsView({
    *  editor's own `Runs →` opens (`TeamRunsStrip`). */
   onEdit(): void;
 }) {
-  const [runs, setRuns] = useState<TeamRun[] | null>(null);
-  const [error, setError] = useState<string | null>(null);
   const [watching, setWatching] = useState<number | null>(initialRunId);
-  const [attempt, setAttempt] = useState(0);
   const [starting, setStarting] = useState(false);
 
+  const runList = useRead({
+    key: runsKey(teamId),
+    read: (signal) => api.listRuns(teamId, signal),
+    initial: NO_RUNS,
+    fallbackMessage: "the runs could not be read",
+  });
+  const runs = runList.status === "loading" ? null : runList.value;
+  const error = runList.error;
+
+  // Newest first is the module's order, and the newest run is what somebody arriving here
+  // almost always means. Only when nothing is being watched yet: a reload must not move
+  // the operator off the run they were reading.
   useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    api
-      .listRuns(teamId, controller.signal)
-      .then((answer) => {
-        if (cancelled) return;
-        setRuns(answer);
-        // Newest first is the module's order, and the newest run is what somebody arriving
-        // here almost always means. Only when nothing is being watched yet: a reload must
-        // not move the operator off the run they were reading.
-        setWatching((current) => current ?? answer[0]?.id ?? null);
-      })
-      .catch((cause: unknown) => {
-        if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : "the runs could not be read");
-        }
-      });
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [api, teamId, attempt]);
+    setWatching((current) => current ?? runList.value[0]?.id ?? null);
+  }, [runList.value]);
 
   // `run_team` is a chat tool, so a run can appear while this view is open and nothing
   // about it passes through here (`agentActivity.ts`).
-  useAgentTurns(() => setAttempt((n) => n + 1));
+  useAgentTurns(runList.reload);
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -117,7 +108,7 @@ export function TeamRunsView({
           onClose={() => setStarting(false)}
           onStarted={(run) => {
             setWatching(run.id);
-            setAttempt((n) => n + 1);
+            runList.reload();
           }}
         />
       )}
@@ -128,7 +119,7 @@ export function TeamRunsView({
             {error}
             <button
               type="button"
-              onClick={() => setAttempt((n) => n + 1)}
+              onClick={runList.reload}
               className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
             >
               Retry
