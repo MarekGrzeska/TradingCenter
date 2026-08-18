@@ -135,7 +135,7 @@
         "type": "object"
       },
       "CandleHistory": {
-        "description": "A deep read, with what it cost.\n\nThe provider serves at most 1000 candles per request, so a deep read is many\nrequests and can take tens of seconds. ``requests`` makes that visible instead of\nleaving a caller to guess why a read was slow, and ``history_ended`` distinguishes\n\"the instrument has no more data\" from \"we stopped early\" \u2014 both of which otherwise\nlook identical: a series shorter than the one asked for.",
+        "description": "A deep read, with what it cost.\n\nThe provider serves at most 1000 candles per request, so a deep read is many\nrequests and can take tens of seconds. ``requests`` makes that visible instead of\nleaving a caller to guess why a read was slow, and ``history_ended`` distinguishes\n\"the instrument has no more data\" from \"we stopped early\" — both of which otherwise\nlook identical: a series shorter than the one asked for.",
         "properties": {
           "candles": {
             "items": {
@@ -325,7 +325,7 @@
         "type": "object"
       },
       "InstrumentPage": {
-        "description": "Result of enumerating instruments \u2014 carries the truncation signal, so a partial\ncatalogue is never mistaken for a complete one.",
+        "description": "Result of enumerating instruments — carries the truncation signal, so a partial\ncatalogue is never mistaken for a complete one.",
         "properties": {
           "count": {
             "title": "Count",
@@ -591,7 +591,7 @@
                 "type": "null"
               }
             ],
-            "description": "target price \u2014 required for LIMIT/STOP",
+            "description": "target price — required for LIMIT/STOP",
             "title": "Level"
           },
           "order_type": {
@@ -713,7 +713,7 @@
         "type": "object"
       },
       "Resolution": {
-        "description": "Candle time frame. One vocabulary serves REST and streaming alike \u2014\n``GET /prices/{epic}?resolution=`` and ``OHLCMarketData.subscribe`` take the\nsame spellings.",
+        "description": "Candle time frame. One vocabulary serves REST and streaming alike —\n``GET /prices/{epic}?resolution=`` and ``OHLCMarketData.subscribe`` take the\nsame spellings.",
         "enum": [
           "MINUTE",
           "MINUTE_5",
@@ -877,15 +877,15 @@
     }
   },
   "info": {
-    "description": "capital.com gateway \u2014 trading, deep history and a live stream behind one contract. Demo environment only. Endpoints return neutral DTOs; provider quirks (session tokens, the instrument tree, asynchronous settlement) stay inside the adapter. The WebSocket at /ws/stream is not described by this schema \u2014 see the module README.",
-    "title": "TradingCenter \u00b7 capital-gateway",
+    "description": "capital.com gateway — trading, deep history and a live stream behind one contract. Demo environment only. Endpoints return neutral DTOs; provider quirks (session tokens, the instrument tree, asynchronous settlement) stay inside the adapter. The WebSocket at /ws/stream is not described by this schema — see the module README.",
+    "title": "TradingCenter · capital-gateway",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
     "/": {
       "get": {
-        "description": "The health probe. The one route reachable with no caller key, so it MUST NOT\nsay anything beyond \"this process is up\" \u2014 no account, no session state, no route\nlist, nothing a caller couldn't already have inferred by finding the module.",
+        "description": "The health probe. The one route reachable with no caller key, so it MUST NOT\nsay anything beyond \"this process is up\" — no account, no session state, no route\nlist, nothing a caller couldn't already have inferred by finding the module.",
         "operationId": "root__get",
         "responses": {
           "200": {
@@ -976,7 +976,7 @@
     },
     "/asset-classes": {
       "get": {
-        "description": "The classes this module describes instruments with.\n\nPublished so a consumer offering a choice of class does not carry its own copy of\nthe list \u2014 a copy is a thing that drifts, and it drifts silently.",
+        "description": "The classes this module describes instruments with.\n\nPublished so a consumer offering a choice of class does not carry its own copy of\nthe list — a copy is a thing that drifts, and it drifts silently.",
         "operationId": "asset_classes_asset_classes_get",
         "responses": {
           "200": {
@@ -1216,7 +1216,7 @@
     },
     "/instruments/{symbol}/history": {
       "get": {
-        "description": "Candles paged past the provider's per-request ceiling.\n\nThis is a long request by design \u2014 20 000 five-minute candles measured at 30 provider\ncalls and 26 seconds. The response says how many requests it took, and paging stops\nearly if the client disconnects.",
+        "description": "Candles paged past the provider's per-request ceiling.\n\nThis is a long request by design — 20 000 five-minute candles measured at 30 provider\ncalls and 26 seconds. The response says how many requests it took, and paging stops\nearly if the client disconnects.",
         "operationId": "history_instruments__symbol__history_get",
         "parameters": [
           {
@@ -1271,7 +1271,7 @@
             }
           },
           {
-            "description": "stop here: no candle older than this is fetched or returned. `bars` counts candles, so for an instrument that is not open around the clock it spans more calendar time than it looks \u2014 this is the only way to name a lower bound in time rather than in candles",
+            "description": "stop here: no candle older than this is fetched or returned. `bars` counts candles, so for an instrument that is not open around the clock it spans more calendar time than it looks — this is the only way to name a lower bound in time rather than in candles",
             "in": "query",
             "name": "after",
             "required": false,
@@ -1285,7 +1285,7 @@
                   "type": "null"
                 }
               ],
-              "description": "stop here: no candle older than this is fetched or returned. `bars` counts candles, so for an instrument that is not open around the clock it spans more calendar time than it looks \u2014 this is the only way to name a lower bound in time rather than in candles",
+              "description": "stop here: no candle older than this is fetched or returned. `bars` counts candles, so for an instrument that is not open around the clock it spans more calendar time than it looks — this is the only way to name a lower bound in time rather than in candles",
               "title": "After"
             }
           }
@@ -1320,7 +1320,7 @@
     },
     "/instruments/{symbol}/terms": {
       "get": {
-        "description": "The deposit and size rules for one instrument \u2014 no price; that is `/search` and\n`/candles`. A field the provider omits comes back null rather than as a default.",
+        "description": "The deposit and size rules for one instrument — no price; that is `/search` and\n`/candles`. A field the provider omits comes back null rather than as a default.",
         "operationId": "instrument_terms_instruments__symbol__terms_get",
         "parameters": [
           {
@@ -1363,7 +1363,7 @@
     },
     "/orders": {
       "post": {
-        "description": "Place an order. MARKET fills now (FILLED); LIMIT and STOP rest (WORKING).\n\nThe answer is settled, not acknowledged. A deal the provider has not resolved comes\nback PENDING with its reference \u2014 never FILLED.",
+        "description": "Place an order. MARKET fills now (FILLED); LIMIT and STOP rest (WORKING).\n\nThe answer is settled, not acknowledged. A deal the provider has not resolved comes\nback PENDING with its reference — never FILLED.",
         "operationId": "place_order_orders_post",
         "requestBody": {
           "content": {
@@ -1470,7 +1470,7 @@
         ]
       },
       "put": {
-        "description": "Set or remove stops. A number sets, `null` removes, an omitted field is left\nalone \u2014 so amending one stop cannot clear the other.",
+        "description": "Set or remove stops. A number sets, `null` removes, an omitted field is left\nalone — so amending one stop cannot clear the other.",
         "operationId": "update_position_positions__position_id__put",
         "parameters": [
           {
