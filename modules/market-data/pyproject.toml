@@ -40,11 +40,18 @@ dependencies = [
     # metric calls succeed against OpenTelemetry's default no-op provider instead of
     # failing, which is why telemetry.py never checks for the variable itself.
     "azure-monitor-opentelemetry>=1.6",
+    # Runtime plumbing this module shares with agent and teams. Taken partially: this
+    # module keeps its own `db.py`, which is 56.2% identical to the package's rather than
+    # a copy of it (packages-replace-the-hand-copies/design.md, D4).
+    "tc-runtime",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+tc-runtime = { path = "../../packages/tc-runtime", editable = true }
 
 [tool.ruff]
 line-length = 100

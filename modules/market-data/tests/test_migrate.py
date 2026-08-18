@@ -9,6 +9,8 @@ from urllib.parse import urlparse, urlunparse
 
 import asyncpg
 import pytest
+from tc_runtime.migrate import run
+from tc_runtime.schema_version import applied_heads, expected_heads
 
 from market_data.db import (
     MIGRATION_LOCK_KEY,
@@ -18,8 +20,7 @@ from market_data.db import (
     sqlalchemy_url,
 )
 from market_data.db import pool as make_pool
-from market_data.migrate import run
-from market_data.schema_version import applied_heads, expected_heads
+from market_data.runtime import MIGRATIONS
 
 
 class FakeConnection:
@@ -108,9 +109,9 @@ async def test_an_empty_database_is_brought_to_head(empty_database_url: str) -> 
     try:
         assert await applied_heads(conn) == set()
 
-        await run(sqlalchemy_url(empty_database_url))
+        await run(MIGRATIONS, sqlalchemy_url(empty_database_url))
 
-        assert await applied_heads(conn) == expected_heads()
+        assert await applied_heads(conn) == expected_heads(MIGRATIONS)
     finally:
         await conn.close()
 
@@ -121,7 +122,7 @@ async def test_a_database_already_at_head_is_left_alone(migrated_url: str) -> No
     try:
         before = await conn.fetchval("SELECT version_num FROM alembic_version")
 
-        await run(sqlalchemy_url(migrated_url))
+        await run(MIGRATIONS, sqlalchemy_url(migrated_url))
 
         assert await conn.fetchval("SELECT version_num FROM alembic_version") == before
         assert await conn.fetchval("SELECT count(*) FROM alembic_version") == 1
@@ -144,8 +145,8 @@ async def test_only_one_of_two_processes_migrates(empty_database_url: str) -> No
             pool.acquire() as conn,
             advisory_lock(conn, MIGRATION_LOCK_KEY, wait=60.0, poll=0.05),
         ):
-            if await applied_heads(conn) != expected_heads():
-                await run(sqlalchemy_url(empty_database_url))
+            if await applied_heads(conn) != expected_heads(MIGRATIONS):
+                await run(MIGRATIONS, sqlalchemy_url(empty_database_url))
                 migrated.append(name)
 
     await asyncio.gather(start("first"), start("second"))
@@ -154,7 +155,7 @@ async def test_only_one_of_two_processes_migrates(empty_database_url: str) -> No
 
     conn = await asyncpg.connect(asyncpg_dsn(empty_database_url))
     try:
-        assert await applied_heads(conn) == expected_heads()
+        assert await applied_heads(conn) == expected_heads(MIGRATIONS)
         assert await conn.fetchval("SELECT count(*) FROM alembic_version") == 1
     finally:
         await conn.close()

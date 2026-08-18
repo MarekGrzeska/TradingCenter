@@ -47,11 +47,11 @@ dojdzie drugi moduł. Po niej `agent` bierze `tc-runtime`, a reszta repo stoi ni
 
 ## 3. `market-data` dochodzi częściowo
 
-- [ ] 3.1 `market_data/migrate.py` i `market_data/schema_version.py` zastąpione pakietem
-- [ ] 3.2 `market_data/db.py` **zostaje u siebie** (`design.md`, D4); w jego docstringu
+- [x] 3.1 `market_data/migrate.py` i `market_data/schema_version.py` zastąpione pakietem
+- [x] 3.2 `market_data/db.py` **zostaje u siebie** (`design.md`, D4); w jego docstringu
       wskazać, czym różni się od pakietowego i dlaczego — trzydziestominutowe okno migracji
-- [ ] 3.3 `market-data`: pyproject, Dockerfile, filtr CI; pełne `pytest -m db` zielone
-- [ ] 3.4 Odpowiedzieć na pytanie otwarte z `design.md`: czy okno migracji da się wyrazić
+- [x] 3.3 `market-data`: pyproject, Dockerfile, filtr CI; pełne `pytest -m db` zielone
+- [x] 3.4 Odpowiedzieć na pytanie otwarte z `design.md`: czy okno migracji da się wyrazić
       parametrem. Odpowiedź „nie" jest wynikiem, nie porażką — zapisać ją w README pakietu
 
 ## 4. `tc-openai`

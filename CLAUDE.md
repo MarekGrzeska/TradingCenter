@@ -217,8 +217,9 @@ and, in `market-data`, before it writes a single candle. Two properties carry it
 
 - **A Postgres advisory lock** (`db.py`, `MIGRATION_LOCK_KEY`) rather than a rule against
   migrating at startup. Two instances starting together give one migration and one waiter.
-  The wait is bounded and deliberately uneven: five minutes for `agent`, thirty for
-  `market-data`, whose candle table is the largest thing here. A lock held by a process that
+  The wait is bounded and deliberately uneven: five minutes for `agent`, twenty-five for
+  `market-data`, whose candle table is the largest thing here (`migration_lock_wait_seconds`,
+  300 s against 1500 s — this file said thirty until the numbers were read on 18 August 2026). A lock held by a process that
   died needs no timeout — it is session scoped and dies with the connection.
 - **The module's own identity**, not the server administrator's. A table created by the app
   role belongs to it, so nothing has to be granted afterwards. This is what closed the

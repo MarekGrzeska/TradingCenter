@@ -78,7 +78,7 @@ jobs:
           self='^\.github/workflows/checks\.yml$'
 
           gateway='^modules/capital-gateway/'
-          archive='^modules/market-data/'
+          archive="^modules/market-data/|$tc_runtime"
           # A module's own directory, plus every package it takes as a path dependency:
           # `tc-runtime` is compiled into this module's image, so a change there can break
           # it exactly the way a change in its own tree can. This is the whole price of

@@ -30,7 +30,7 @@ I to, co bliźniakiem **nie** jest, choć plan tak zakładał:
 Dwie liczby z planu wymagają sprostowania: `provider.py` jest identyczny w 79,4%, nie 95%, a
 suma ręcznych kopii ponad pierwszy egzemplarz to **~959 linii**, nie ~2000+. Trzecia rzecz
 jest ważniejsza od obu: `db.py` jest bliźniakiem **wyłącznie** agent ↔ teams. `market-data`
-ma własny, 299-linijkowy, zbieżny w 56% — z trzydziestominutowym oknem na migrację największej
+ma własny, 299-linijkowy, zbieżny w 56% — z dłuższym oknem na migrację największej
 tabeli w repo. To nie jest kopia, która się rozjechała; to jest inny plik.
 
 ## Goals / Non-Goals
@@ -194,8 +194,11 @@ zawartości.
 
 ## Open Questions
 
-- Czy `market-data` docelowo bierze też wspólny `db.py`. Odpowiedź wymaga rozstrzygnięcia, czy
-  trzydziestominutowe okno migracji da się wyrazić parametrem, czy jest własnością tego modułu
-  — a to widać dopiero, gdy `tc-runtime/db.py` obsłuży dwóch konsumentów. Odłożone bezpiecznie:
-  D4 mówi, że `market-data` bierze pakiet częściowo, więc odpowiedź „nie" nie zmienia niczego
-  w zadaniach.
+- ~~Czy `market-data` docelowo bierze też wspólny `db.py`.~~ **Odpowiedziane przy wdrożeniu
+  grupy 3, i przesłanka pytania była błędna.** Okno migracji nigdy nie było własnością pliku:
+  to ustawienie `migration_lock_wait_seconds` każdego modułu (1500 s w market-data, 300 s w
+  agencie i teams), podawane do `advisory_lock` w miejscu wywołania. Sam `advisory_lock`
+  okazał się więc czystą kopią i wszedł do pakietu; `market_data/db.py` zostaje z powodu,
+  którego pytanie nie wymieniało — ma `connect()`, którego nie ma nikt inny, oraz własne
+  domyślne rozmiary puli. Przy okazji: „trzydzieści minut" to liczba powtórzona za
+  `CLAUDE.md` i nieprawdziwa — 1500 s to dwadzieścia pięć.

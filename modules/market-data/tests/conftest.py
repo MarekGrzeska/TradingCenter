@@ -138,9 +138,11 @@ def migrated_url(postgres_url: str) -> str:
     a thread with no loop already running. A sync fixture is such a thread; an async one
     is not.
     """
-    from market_data.migrate import upgrade_to_head
+    from tc_runtime.migrate import upgrade_to_head
 
-    upgrade_to_head(sqlalchemy_url(postgres_url))
+    from market_data.runtime import MIGRATIONS
+
+    upgrade_to_head(MIGRATIONS, sqlalchemy_url(postgres_url))
     return postgres_url
 
 

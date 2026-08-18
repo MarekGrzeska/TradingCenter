@@ -15,15 +15,21 @@ call site.
 
 from __future__ import annotations
 
-import asyncio
 import logging
-import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from urllib.parse import urlparse
 
 import asyncpg
 from azure.identity.aio import ClientSecretCredential, DefaultAzureCredential
+
+# The lock protocol itself is one copy, in the package: it is the piece of this file that
+# was genuinely identical to agent's and teams'. What stays below is what is not — this
+# module's own `connect`, its own pool sizing, and the wait it allows, which is thirty
+# minutes rather than five because the candle table is the largest thing in the system and
+# an index rebuilt over it outlasts several ordinary starts
+# (packages-replace-the-hand-copies/design.md, D4).
+from tc_runtime.db import LockNotAcquired, advisory_lock
 
 log = logging.getLogger(__name__)
 
@@ -44,45 +50,10 @@ Credential = ClientSecretCredential | DefaultAzureCredential
 # database and this module has its own, so the value only has to be stable — it carries
 # the module's port so a log line naming it says which module took it. `agent/db.py`'s
 # twin carries 8030 for the same reason.
+# Re-exported so this module's own callers keep one import for its database plumbing.
+__all__ = ["MIGRATION_LOCK_KEY", "LockNotAcquired", "advisory_lock"]
+
 MIGRATION_LOCK_KEY = 8020
-
-
-class LockNotAcquired(RuntimeError):
-    """The lock did not free up within the wait this module allows."""
-
-
-@asynccontextmanager
-async def advisory_lock(
-    conn: asyncpg.Connection, key: int, *, wait: float, poll: float = 1.0
-) -> AsyncIterator[None]:
-    """Holds a session-level advisory lock on `conn`, or refuses.
-
-    `pg_try_advisory_lock` in a loop rather than the blocking `pg_advisory_lock`, because
-    the blocking form has nowhere to put a deadline: it returns when it returns. A wait
-    with no end is how a module that will never start looks exactly like one that is
-    starting slowly.
-
-    A lock left behind by a process that died needs no timeout to clear — it is session
-    scoped, so Postgres drops it with the connection. `wait` is therefore sized for the
-    slow case, and in this module the slow case is genuinely slow: the candle table is
-    the largest thing in the system and an index rebuilt over it outlasts several
-    ordinary starts.
-    """
-    deadline = time.monotonic() + wait
-    while not await conn.fetchval("SELECT pg_try_advisory_lock($1)", key):
-        if time.monotonic() >= deadline:
-            raise LockNotAcquired(
-                f"another process has held the migration lock ({key}) for longer than "
-                f"{wait:.0f}s. It is either still migrating or its connection is still "
-                f"open; this process will not migrate behind it."
-            )
-        await asyncio.sleep(poll)
-    try:
-        yield
-    finally:
-        # Unlocks on the same connection that locked — a session lock belongs to its
-        # session, and this one is held open for exactly that reason.
-        await conn.fetchval("SELECT pg_advisory_unlock($1)", key)
 
 
 def asyncpg_dsn(database_url: str) -> str:

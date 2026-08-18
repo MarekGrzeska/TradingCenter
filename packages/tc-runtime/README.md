@@ -26,12 +26,20 @@ regression you could not, unless every consumer is exercised.
 |---|---|
 | `agent` | `db`, `migrate`, `schema_version`, `auth`, `routers.models_router` |
 | `teams` | `db`, `migrate`, `schema_version`, `auth`, `routers.models_router` |
-| `market-data` | `migrate`, `schema_version` |
+| `market-data` | `migrate`, `schema_version`, `db.advisory_lock` |
 | `market-mcp`, `teams-mcp`, `trading-mcp` | `network_identity`, `detail` |
 
-`market-data` takes the package **partially**, on purpose. Its `db.py` is 56.2% identical
-to this one — 299 lines with a thirty-minute migration window for the largest table in the
-repository — so it is a different file, not a copy that drifted, and it stays in the module.
+`market-data` takes the package **partially**, on purpose. Its `db.py` stays in the module
+at 56.2% identical to this one; what it does take from here is `advisory_lock`, which was
+the part of that file that genuinely was a copy.
+
+**What keeps the rest of it there, and it is not what the design predicted.** The design
+asked whether market-data's long migration window could be expressed as a parameter and
+left it open. The answer is yes, and it always was: the wait is `migration_lock_wait_seconds`
+in each module's own settings — 1500 s for market-data against 300 s for agent and teams —
+passed to `advisory_lock` at the call site. It was never a property of the file. What is
+actually market-data's own is `connect()`, which no other module has, plus its own pool
+defaults and the prose explaining both.
 
 ## What is in here, and why exactly this
 
@@ -59,7 +67,7 @@ does not repeat the measurement to reach the same answer:
 
 | Candidate | Best pair | Why not |
 |---|---|---|
-| `market_data/db.py` | 56.2% vs this one | A different file. Its migration window is a property of the largest table here, not a parameter. |
+| `market_data/db.py` | 56.2% vs this one | A different file: it has `connect()`, which nothing else does. Its long migration window turned out **not** to be the reason — that is a setting, and the lock helper it feeds now comes from here. |
 | `server.py` (3× MCP) | 58.2% | Below the threshold, and the differences are what each server *is*. |
 | `config.py` (7 modules) | 48.9% | Everything can be parameterised; the result would be one switch per consumer, which is condition 2 failing rather than passing. |
 | `client.py` (3× MCP) | 32.1% | Three genuinely different upstreams. Only the `detail` helper inside them was a copy, and only that came here. |
