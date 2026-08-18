@@ -19,6 +19,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 from tc_mcp_kit.network_identity import RequireCallerIdentity
+from tc_mcp_kit.tool_schemas import slim_tool_schemas
 
 from . import tools
 from .client import TeamsClient
@@ -52,6 +53,13 @@ def build_server(settings: Settings, teams: TeamsClient) -> FastMCP:
         return JSONResponse({"status": "ok"})
 
     tools.register(mcp, teams)
+
+    # Every tool's schema, minus what pydantic writes for its own sake: field titles
+    # repeating field names, an `anyOf` of bare types where a type list says the same, and
+    # defaults on a reply nobody constructs. 22,6% of what this process announces in every
+    # turn of a conversation, and not one field, type or `required` entry with it
+    # (specs/teams-mcp-tools, "Powierzchnia narzędzi ma zapisany sufit").
+    slim_tool_schemas(mcp)
 
     return mcp
 

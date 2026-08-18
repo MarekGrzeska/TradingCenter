@@ -11,10 +11,10 @@
 
 ## 2. Sufit powierzchni w trzech modułach
 
-- [ ] 2.1 `market-mcp`, `teams-mcp`, `trading-mcp`: `slim_tool_schemas(mcp)` w `build_server`
-- [ ] 2.2 Test sufitu w każdym z trzech modułów: zserializowany `list_tools()` poniżej
+- [x] 2.1 `market-mcp`, `teams-mcp`, `trading-mcp`: `slim_tool_schemas(mcp)` w `build_server`
+- [x] 2.2 Test sufitu w każdym z trzech modułów: zserializowany `list_tools()` poniżej
       zapisanej stałej, komunikat podaje zmierzoną wielkość i sufit
-- [ ] 2.3 Test w każdym z trzech modułów: schemat nie niesie `title` ani `default` w wyjściu,
+- [x] 2.3 Test w każdym z trzech modułów: schemat nie niesie `title` ani `default` w wyjściu,
       a niesie każde pole, jego typ i `required` (to jest scenariusz „Schemat bez rusztowania")
 - [ ] 2.4 Zmierzyć po zmianie i ustawić sufity na wartość + ~5%
 
