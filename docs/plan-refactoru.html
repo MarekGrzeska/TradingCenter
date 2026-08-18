@@ -494,8 +494,8 @@
   <div class="iter done">
     <div class="iter-head"><span class="iter-num">4</span>
     <h4>Wydajność gorących ścieżek</h4>
-    <span class="status-pill">Zrobione · 18.08 · gałąź perf/hot-paths</span>
-    <span class="horizon">6 commitów · 5 modułów + pakiet</span></div>
+    <span class="status-pill">Zrobione · 18.08 · PR&nbsp;#160 + #162</span>
+    <span class="horizon">8 commitów · 5 modułów + pakiet</span></div>
     <p>Powierzchnia narzędzi <b>15 134 → 11 704 tokenów</b> na turę (−22,7%), zmierzone
     tokenizerem <code>cl100k_base</code> na zserializowanym <code>list_tools()</code> trzech
     serwerów. <b>Cel &lt; 10 tys. nie został osiągnięty</b> — i niżej jest, dlaczego nie da
@@ -535,6 +535,14 @@
       opisy <b>urosły</b> celowo: żadne narzędzie zapisujące nie mówiło, w czym wyrażony jest
       <code>size</code>, a to jednostka, której pomyłka jest zleceniem innej wielkości
       złożonym bez błędu.</p>
+      <h5>Co z tego zostało w specyfikacjach</h5>
+      <p>Pięć delt wtopionych przy archiwizacji (PR&nbsp;#162). Trzy moduły MCP mają odtąd
+      wymaganie <i>„Powierzchnia narzędzi ma zapisany sufit"</i> — rozmiar zestawu jest
+      kosztem płaconym w każdej turze, a podniesienie sufitu ma być edycją testu, nie
+      skutkiem ubocznym dodania narzędzia. <code>trading-mcp</code> dostał przy okazji
+      <i>„Opis narzędzia jest częścią kontraktu"</i>, którego nie miał, a
+      <code>trading-mcp-upstream-access</code> stracił scenariusz, dla którego istniał
+      re-check per zapis.</p>
       <p><b>Czego nie da się kupić.</b> Zejście poniżej 10 tys. wymaga usunięcia
       <code>outputSchema</code> (zmierzone: 6 512 tokenów, −57%) — a to jedyny mechanizm, który
       w tym repo wykrył realną awarię odpowiedzi narzędzia, bo serwer lowlevel waliduje nim
