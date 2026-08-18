@@ -22,12 +22,13 @@
 
 - [x] 3.1 `market-mcp`: docstringi 11 narzędzi do jednego kształtu (co odpowiada -> sufity ->
       jednostki, strefa, strona ceny); istniejące testy treści opisu zostają zielone
-- [ ] 3.2 `teams-mcp`: to samo dla 18 narzędzi, z granicami odmowy, których wymaga jego spec
+- [x] 3.2 `teams-mcp`: zmierzone tool po toolu i **zostawione bez zmian** — jego długie
+      opisy niosą granice odmowy, których wymaga od nich jego własny spec (patrz `review.md`)
 - [x] 3.3 `trading-mcp`: to samo dla 9 narzędzi; jednostka rozmiaru nazwana w każdym
       narzędziu zapisującym
 - [x] 3.4 Test opisu w `trading-mcp` (jego spec dotąd go nie miał): opis, typowane parametry,
       nazwana jednostka rozmiaru
-- [ ] 3.5 Zmierzyć sumę trzech powierzchni tokenizerem i zapisać wynik w `review.md`
+- [x] 3.5 Zmierzyć sumę trzech powierzchni tokenizerem i zapisać wynik w `review.md`
 
 ## 4. Gorące ścieżki upstreamu
 
@@ -52,8 +53,8 @@
 
 ## 6. Domknięcie
 
-- [ ] 6.1 `uv run pytest`, `ruff check .`, `pyright` w pakiecie i w pięciu dotkniętych modułach
-- [ ] 6.2 `uv run python scripts/contract.py check` w trzech modułach MCP
-- [ ] 6.3 `docs/plan-refactoru.html`: karta iteracji 4 na „zrobione", metryki tokenów i
+- [x] 6.1 `uv run pytest`, `ruff check .`, `pyright` w pakiecie i w pięciu dotkniętych modułach
+- [x] 6.2 `uv run python scripts/contract.py check` w trzech modułach MCP
+- [x] 6.3 `docs/plan-refactoru.html`: karta iteracji 4 na „zrobione", metryki tokenów i
       requestów upstream, akapit „co wyszło inaczej" (D3 i D4)
-- [ ] 6.4 `review.md`: zmierzone przed/po, co nie weszło i dlaczego
+- [x] 6.4 `review.md`: zmierzone przed/po, co nie weszło i dlaczego
