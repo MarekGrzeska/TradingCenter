@@ -7,12 +7,12 @@
 
 ## 2. Sonda wdrożenia
 
-- [ ] 2.1 `scripts/deploy_probe.py` — pętla przyjmująca `current_image()` i `probe()` jako argumenty; parametry `app_name`, `expected_image`, `probe_path`, `expected_status`, `body_contains`, `attempts`, `sleep_seconds`
-- [ ] 2.2 `main()` podstawia `az webapp config container show` i `httpx`; kod wyjścia 1 i komunikat `::error::` nazywający, który warunek nie został spełniony
-- [ ] 2.3 Test trybu awarii z 16 sierpnia: `current_image()` zwraca stary SHA, `probe()` zwraca 200 z poprawnym ciałem → sonda MUSI nie przejść
-- [ ] 2.4 Test drugiego trybu: poprawny SHA, 200 z ciałem bez `body_contains` (odpowiedź nie z kontenera) → sonda MUSI nie przejść
-- [ ] 2.5 Test wariantu control-plane (`probe_path` puste): sam zgodny SHA wystarcza, `probe()` nie jest wołane ani razu
-- [ ] 2.6 Test szczęśliwej ścieżki i test wyczerpania prób: dokładnie `attempts` wywołań, potem kod 1
+- [x] 2.1 `scripts/deploy_probe.py` — pętla przyjmująca `current_image()` i `probe()` jako argumenty; parametry `app_name`, `expected_image`, `probe_path`, `expected_status`, `body_contains`, `attempts`, `sleep_seconds`
+- [x] 2.2 `main()` podstawia `az webapp config container show` i `httpx`; kod wyjścia 1 i komunikat `::error::` nazywający, który warunek nie został spełniony
+- [x] 2.3 Test trybu awarii z 16 sierpnia: `current_image()` zwraca stary SHA, `probe()` zwraca 200 z poprawnym ciałem → sonda MUSI nie przejść
+- [x] 2.4 Test drugiego trybu: poprawny SHA, 200 z ciałem bez `body_contains` (odpowiedź nie z kontenera) → sonda MUSI nie przejść
+- [x] 2.5 Test wariantu control-plane (`probe_path` puste): sam zgodny SHA wystarcza, `probe()` nie jest wołane ani razu
+- [x] 2.6 Test szczęśliwej ścieżki i test wyczerpania prób: dokładnie `attempts` wywołań, potem kod 1
 
 ## 3. Reusable workflow i pierwszy wywołujący
 
