@@ -75,19 +75,32 @@ jobs:
       # container came up and is serving, and nothing more. Whether it can reach teams,
       # and whether the operator's token survives the trip, is the first tool call, not
       # this check.
+      #
+      # The image is asked for alongside, and that half was missing until 18 August 2026.
+      # Swapping a container in App Service is not instantaneous: for a minute or so after
+      # `webapps-deploy` returns, the *previous* container is still answering — so a probe
+      # that only reads HTTP passes on the image being replaced and the job goes green
+      # over an image that may never come up. market-data was the most exposed of the
+      # four, since its own signal is a 404 the old container returns identically.
+      # `deploy-agent.yml` and `deploy-gateway.yml` already asked this question; this is
+      # the same two lines, not a new idea.
       - name: Smoke-check the deployed module
         run: |
           set -euo pipefail
           url="https://app-tradingcenter-teams-mcp.azurewebsites.net/health"
+          expected="${{ steps.image.outputs.name }}:${{ github.sha }}"
           for attempt in $(seq 1 12); do
+            image=$(az webapp config container show --name app-tradingcenter-teams-mcp \
+              --resource-group rg-tradingcenter \
+              --query "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value | [0]" -o tsv)
             code=$(curl -s -o /tmp/probe -w '%{http_code}' --max-time 20 "$url" || echo 000)
             body=$(head -c 200 /tmp/probe 2>/dev/null || true)
-            echo "attempt $attempt: HTTP $code ${body}"
-            if [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"status"'; then
+            echo "attempt $attempt: image=${image:-none} HTTP $code ${body}"
+            if [ "${image#DOCKER|}" = "$expected" ] && [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"status"'; then
               echo "teams-mcp is answering from its container"
               exit 0
             fi
             sleep 15
           done
-          echo "::error::teams-mcp did not answer from its container after ~3 minutes (last HTTP $code). Its start-up reaches nothing but its own settings, so a failure here is the settings or the image — the container log says which."
+          echo "::error::teams-mcp did not answer from its container after ~3 minutes (last HTTP $code). Its start-up reaches nothing but its own settings, so a failure here is the settings or the image — the container log says which. — serving image=${image:-none}, expected $expected"
           exit 1
