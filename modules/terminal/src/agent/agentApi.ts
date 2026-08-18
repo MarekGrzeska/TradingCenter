@@ -1,6 +1,6 @@
 import { noIdentity, type Identity } from "../auth/identity";
 import { resolveEndpoints } from "../data/config";
-import { jsonClient } from "../data/http";
+import { jsonClient, statusMapper } from "../data/http";
 import { identity } from "../data/marketData";
 import { parseIsoToEpochSeconds } from "../data/time";
 import { MarketDataError } from "../data/types";
@@ -495,14 +495,10 @@ function mapPrompt(raw: RawPrompt): AgentPrompt {
   };
 }
 
-function mapStatus(status: number, detail: string): MarketDataError {
-  if (status === 404) return new MarketDataError("not-found", detail);
-  // A model id the catalogue does not know, or a patch with none at all — the module
-  // understood the request and declined it, same as a resolution the archive will not
-  // take on.
-  if (status === 422) return new MarketDataError("refused", detail);
-  return new MarketDataError("unknown", detail);
-}
+// 422: a model id the catalogue does not know, or a patch with none at all — the module
+// understood the request and declined it, same as a resolution the archive will not take
+// on.
+const mapStatus = statusMapper({ 404: "not-found", 422: "refused" });
 
 export function createAgentApi(httpBase: string, identity: Identity = noIdentity): AgentApi {
   const http = jsonClient("agent", mapStatus, identity);

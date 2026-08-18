@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { Button } from "../ui/Button";
+import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { formatInstant } from "../ui/formatTime";
 import type { TeamsApi, TeamSummary } from "./teamsApi";
@@ -79,16 +81,7 @@ export function TeamCatalogue({
 
       {status === "loading" && <p className="text-sm text-ink-muted">Reading the catalogue…</p>}
       {status === "error" && (
-        <p className="text-sm text-critical">
-          {error}
-          <button
-            type="button"
-            onClick={onReload}
-            className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
-          >
-            Retry
-          </button>
-        </p>
+        <UnreachableNotice onRetry={onReload}>{error}</UnreachableNotice>
       )}
       {status === "ready" && teams.length === 0 && (
         <p className="text-sm text-ink-muted">
@@ -160,20 +153,12 @@ export function TeamCatalogue({
                     which meant picking a run took two clicks and then read the run on a
                     canvas that had to be opened separately. It now goes to the view where
                     the list and the picture of the run stand together. */}
-                <button
-                  type="button"
-                  onClick={() => onRuns(team.id, team.name)}
-                  className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-                >
+                <Button onClick={() => onRuns(team.id, team.name)}>
                   Runs
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onSchedules(team.id, team.name)}
-                  className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-                >
+                </Button>
+                <Button onClick={() => onSchedules(team.id, team.name)}>
                   Schedules
-                </button>
+                </Button>
                 <button
                   type="button"
                   onClick={() => setRetiring(team)}

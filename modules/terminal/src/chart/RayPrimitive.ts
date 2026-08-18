@@ -1,21 +1,13 @@
 import type { CanvasRenderingTarget2D } from "fancy-canvas";
 import type {
-  IChartApi,
   IPrimitivePaneRenderer,
   IPrimitivePaneView,
-  ISeriesApi,
-  ISeriesPrimitive,
-  ISeriesPrimitiveAxisView,
   PrimitiveHoveredItem,
-  SeriesAttachedParameter,
-  SeriesType,
   Time,
 } from "lightweight-charts";
 
 import {
-  DrawingPriceAxisView,
   HIT_TOLERANCE,
-  defaultMarkPalette,
   drawChip,
   strokeSpec,
   type Emphasis,
@@ -23,6 +15,7 @@ import {
   type MarkPalette,
   type MarkWeight,
 } from "./drawingStyle";
+import { MarkPrimitive } from "./MarkPrimitive";
 import { timeToX } from "./timeCoordinates";
 
 /**
@@ -127,26 +120,14 @@ class RayPaneView implements IPrimitivePaneView {
  * levels list this holds is short enough (a handful of pivots or PDH/PDL rays)
  * that recomputing costs nothing worth caching against.
  */
-export class RayPrimitive implements ISeriesPrimitive<Time> {
+export class RayPrimitive extends MarkPrimitive<RayRenderItem> {
   private levels: readonly RayLevel[] = [];
   private color: string;
-  private chart: IChartApi | null = null;
-  private series: ISeriesApi<SeriesType, Time> | null = null;
-  private currentPrice: number | null = null;
-  private requestUpdate: (() => void) | null = null;
-  private axisViews: readonly ISeriesPrimitiveAxisView[] = [];
-  private readonly views: readonly IPrimitivePaneView[] = [new RayPaneView(this)];
-
-  readonly markWeight: MarkWeight;
-  readonly objectId: string | null;
-  readonly palette: MarkPalette;
-  emphasis: Emphasis = "normal";
+  protected readonly views: readonly IPrimitivePaneView[] = [new RayPaneView(this)];
 
   constructor(color: string, options: MarkOptions = {}) {
+    super(options);
     this.color = color;
-    this.markWeight = options.weight ?? "indicator";
-    this.objectId = options.objectId ?? null;
-    this.palette = options.palette ?? defaultMarkPalette();
   }
 
   setLevels(levels: readonly RayLevel[]): void {
@@ -158,45 +139,8 @@ export class RayPrimitive implements ISeriesPrimitive<Time> {
     this.color = color;
   }
 
-  /** The newest close, for the axis label's role. Null while the chart has drawn no
-   *  candle — see `roleColor`. */
-  setCurrentPrice(price: number | null): void {
-    this.currentPrice = price;
-  }
-
-  setEmphasis(emphasis: Emphasis): void {
-    if (this.emphasis === emphasis) return;
-    this.emphasis = emphasis;
-    this.requestUpdate?.();
-  }
-
-  attached({ chart, series, requestUpdate }: SeriesAttachedParameter<Time>): void {
-    this.chart = chart;
-    this.series = series;
-    this.requestUpdate = requestUpdate;
-  }
-
-  detached(): void {
-    this.chart = null;
-    this.series = null;
-    this.requestUpdate = null;
-  }
-
-  paneViews(): readonly IPrimitivePaneView[] {
-    return this.views;
-  }
-
-  /** Only an operator's object announces its price at the axis. Every level a `levels`
-   *  indicator answers with would announce one too, and a chart with `level_clusters` on
-   *  it would have an axis of nothing else. */
-  priceAxisViews(): readonly ISeriesPrimitiveAxisView[] {
-    return this.axisViews;
-  }
-
   /**
-   * A band around the ray, from the moment it starts to the right edge. Null for an
-   * indicator's own primitive: what a click picks out is an object somebody drew, not a
-   * reading (`terminal-chart-objects` spec, "Operator wskazuje obiekt na wykresie").
+   * A band around the ray, from the moment it starts to the right edge.
    */
   hitTest(x: number, y: number): PrimitiveHoveredItem | null {
     const id = this.objectId;
@@ -210,7 +154,6 @@ export class RayPrimitive implements ISeriesPrimitive<Time> {
     return null;
   }
 
-  /** Package-visible for `RayPaneView`, not the public API of this class. */
   renderItems(): RayRenderItem[] {
     const chart = this.chart;
     const series = this.series;
@@ -228,22 +171,7 @@ export class RayPrimitive implements ISeriesPrimitive<Time> {
     }));
   }
 
-  /** A fresh array only when the set of labels changed — the library caches these by
-   *  reference and rebuilding one per repaint would defeat that. */
-  private rebuildAxisViews(): void {
-    if (this.objectId === null) {
-      this.axisViews = [];
-      return;
-    }
-    this.axisViews = this.levels.map(
-      (level) =>
-        new DrawingPriceAxisView(() => ({
-          coordinate: this.series?.priceToCoordinate(level.price) ?? null,
-          price: level.price,
-          color: this.color,
-          currentPrice: this.currentPrice,
-          palette: this.palette,
-        })),
-    );
+  protected axisEntries() {
+    return this.levels.map((level) => ({ price: level.price, color: () => this.color }));
   }
 }

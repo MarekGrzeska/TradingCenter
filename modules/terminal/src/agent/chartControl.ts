@@ -1,6 +1,7 @@
 import type { AgentApi, AgentChartCommand, AgentChartFocus, AgentChartSnapshot } from "./agentApi";
 import { agentApi } from "./agentApi";
 import { archive } from "../data/marketData";
+import { safeLocalStorage } from "../data/storage";
 import type { ArchiveAdmin } from "../data/source";
 import { newIndicatorSelectionKey, type IndicatorSelection, type Resolution } from "../data/types";
 import { gridStore, type GridStore } from "../grid/gridStore";
@@ -26,14 +27,6 @@ const DEFAULTS: ChartControlDeps = {
   pairs: archive,
   storage: safeLocalStorage(),
 };
-
-function safeLocalStorage(): Storage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
-}
 
 function readCursor(storage: Storage | null): number {
   const raw = storage?.getItem(CHART_CURSOR_KEY);
@@ -223,7 +216,6 @@ export function describeChartControl(result: ChartControlResult | null): string 
   }
   return parts.join(" ");
 }
-
 
 /**
  * What the active slot is drawing, for the model to read as it answers. Null when the

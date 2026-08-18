@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Button } from "../ui/Button";
 import { MarketDataError } from "../data/types";
 import { AgentSettingsDialog } from "./AgentSettingsDialog";
 import { TeamCanvas } from "./TeamCanvas";
@@ -256,13 +257,9 @@ export function TeamEditor({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-2 border-b border-border p-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-        >
+        <Button onClick={onClose}>
           ← Catalogue
-        </button>
+        </Button>
         {teamId === null ? (
           <>
             <input
@@ -289,13 +286,9 @@ export function TeamEditor({
         {/* The other half of the loop this view is one half of: change something, run it,
             read what came out. It used to go through the catalogue every time it turned. */}
         {teamId !== null && (
-          <button
-            type="button"
-            onClick={() => onRuns(null, name)}
-            className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-          >
+          <Button onClick={() => onRuns(null, name)}>
             Runs →
-          </button>
+          </Button>
         )}
         <button
           type="button"
@@ -308,13 +301,9 @@ export function TeamEditor({
         </button>
         {/* No "Team" button any more: the right-hand column is the team's, always, so
             there is nothing to come back from. */}
-        <button
-          type="button"
-          onClick={() => edit(addAgent(draft, defaultModelId))}
-          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-        >
+        <Button onClick={() => edit(addAgent(draft, defaultModelId))}>
           Add agent
-        </button>
+        </Button>
         <button
           type="button"
           onClick={save}

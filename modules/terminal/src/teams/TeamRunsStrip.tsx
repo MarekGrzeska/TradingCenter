@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
 import { useAgentTurns } from "../agent/useAgentTurns";
+import { useRead } from "../data/query";
 import { formatInstant } from "../ui/formatTime";
-import type { TeamRun } from "./runs";
+import { NO_RUNS, runsKey } from "./runsRead";
 import type { TeamsApi } from "./teamsApi";
 
 /** How many fit on one line before the strip starts hiding things. Six because that is
@@ -30,34 +30,27 @@ export function TeamRunsStrip({
   /** A run to open, or `null` for the whole list. */
   onOpen(runId: number | null): void;
 }) {
-  const [runs, setRuns] = useState<TeamRun[] | null>(null);
-  const [attempt, setAttempt] = useState(0);
-
-  useEffect(() => {
-    let cancelled = false;
-    const controller = new AbortController();
-    api
-      .listRuns(teamId, controller.signal)
-      // A strip that cannot be read says nothing rather than taking a corner of the editor
-      // for an error about something nobody asked for yet. The run view says it properly.
-      .then((answer) => !cancelled && setRuns(answer))
-      .catch(() => !cancelled && setRuns([]));
-    return () => {
-      cancelled = true;
-      controller.abort();
-    };
-  }, [api, teamId, attempt]);
+  // The same cache entry `TeamRunsView` reads, so opening the runs from here draws the
+  // list that is already in hand and asks the module once for both.
+  const runs = useRead({
+    key: runsKey(teamId),
+    read: (signal) => api.listRuns(teamId, signal),
+    initial: NO_RUNS,
+    fallbackMessage: "the runs could not be read",
+  });
 
   // A run started from the chat belongs on this line the moment it exists
   // (`agentActivity.ts`).
-  useAgentTurns(() => setAttempt((n) => n + 1));
+  useAgentTurns(runs.reload);
 
-  if (runs === null || runs.length === 0) return null;
+  // A strip that cannot be read says nothing rather than taking a corner of the editor for
+  // an error about something nobody asked for yet. The run view says it properly.
+  if (runs.status !== "ready" || runs.value.length === 0) return null;
 
   return (
     <div className="flex items-center gap-2 overflow-x-auto border-b border-border px-2 py-1">
       <span className="shrink-0 text-xs uppercase tracking-wide text-ink-faint">Runs</span>
-      {runs.slice(0, SHOWN).map((run) => (
+      {runs.value.slice(0, SHOWN).map((run) => (
         <button
           key={run.id}
           type="button"
@@ -80,7 +73,7 @@ export function TeamRunsStrip({
         onClick={() => onOpen(null)}
         className="shrink-0 cursor-pointer rounded border border-transparent px-2 py-0.5 text-xs text-ink-muted underline underline-offset-2 hover:text-ink"
       >
-        {runs.length > SHOWN ? `all ${runs.length} runs →` : "open runs →"}
+        {runs.value.length > SHOWN ? `all ${runs.value.length} runs →` : "open runs →"}
       </button>
     </div>
   );

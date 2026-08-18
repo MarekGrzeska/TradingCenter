@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { parseSseFrame, readAgentStream, splitSseFrames } from "./stream";
+import { splitSseFrames } from "../data/sseStream";
+import { parseSseFrame, readAgentStream } from "./stream";
 
 function byteStream(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder();

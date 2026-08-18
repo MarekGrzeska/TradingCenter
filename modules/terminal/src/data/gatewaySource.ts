@@ -1,6 +1,5 @@
 import { noIdentity, type Identity } from "../auth/identity";
-import { jsonClient } from "./http";
-import { MarketDataError } from "./types";
+import { jsonClient, statusMapper } from "./http";
 import type { AssetClass, Instrument, InstrumentPage } from "./types";
 import type { InstrumentSource } from "./source";
 
@@ -53,11 +52,7 @@ function mapInstrumentPage(raw: RawInstrumentPage): InstrumentPage {
   };
 }
 
-function mapStatus(status: number, detail: string): MarketDataError {
-  if (status === 404) return new MarketDataError("not-found", detail);
-  if (status === 422) return new MarketDataError("unsupported-resolution", detail);
-  return new MarketDataError("unknown", detail);
-}
+const mapStatus = statusMapper({ 404: "not-found", 422: "unsupported-resolution" });
 
 export function createGatewaySource(
   httpBase: string,

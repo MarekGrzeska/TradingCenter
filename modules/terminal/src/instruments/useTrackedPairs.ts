@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useRead } from "../data/query";
 import type { ArchiveAdmin } from "../data/source";
 import type { TrackedPair } from "../data/types";
 
@@ -6,6 +6,10 @@ import type { TrackedPair } from "../data/types";
  *  can die without a sound, and a panel that only refreshed on demand would
  *  show a pair as healthy for as long as nobody thought to look again. */
 const POLL_MS = 15_000;
+
+/** Rendered until the first answer. A module-level constant, so "no pairs yet"
+ *  is one identity rather than a new array per render. */
+const NONE: TrackedPair[] = [];
 
 export type PairsStatus = "loading" | "ready" | "unreachable";
 
@@ -24,48 +28,22 @@ export interface TrackedPairsState {
  * nie odpowiada").
  *
  * A failed poll does not blank rows already on screen; the failure is reported beside
- * them. Slightly stale rows beat an error where real data was.
+ * them. Slightly stale rows beat an error where real data was. Both properties are
+ * `useRead`'s now, shared with every other read in the terminal.
  */
 export function useTrackedPairs(admin: ArchiveAdmin): TrackedPairsState {
-  const [pairs, setPairs] = useState<TrackedPair[]>([]);
-  const [status, setStatus] = useState<PairsStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
+  const read = useRead<TrackedPair[]>({
+    key: ["archive", "pairs"],
+    read: (signal) => admin.listPairs(signal),
+    initial: NONE,
+    fallbackMessage: "could not read the archive",
+    pollMs: POLL_MS,
+  });
 
-  const reload = useCallback(() => setAttempt((n) => n + 1), []);
-
-  useEffect(() => {
-    let cancelled = false;
-    let inFlight: AbortController | null = null;
-
-    function read() {
-      inFlight?.abort();
-      const controller = new AbortController();
-      inFlight = controller;
-      admin
-        .listPairs(controller.signal)
-        .then((next) => {
-          if (cancelled) return;
-          setPairs(next);
-          setStatus("ready");
-          setError(null);
-        })
-        .catch((cause: unknown) => {
-          if (cancelled || controller.signal.aborted) return;
-          setError(cause instanceof Error ? cause.message : "could not read the archive");
-          setStatus((current) => (current === "ready" ? "ready" : "unreachable"));
-        });
-    }
-
-    read();
-    const interval = setInterval(read, POLL_MS);
-
-    return () => {
-      cancelled = true;
-      inFlight?.abort();
-      clearInterval(interval);
-    };
-  }, [admin, attempt]);
-
-  return { status, pairs, error, reload };
+  return {
+    status: read.status === "error" ? "unreachable" : read.status,
+    pairs: read.value,
+    error: read.error,
+    reload: read.reload,
+  };
 }

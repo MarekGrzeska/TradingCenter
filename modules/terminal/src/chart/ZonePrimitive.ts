@@ -1,20 +1,12 @@
 import type { CanvasRenderingTarget2D } from "fancy-canvas";
 import type {
-  IChartApi,
   IPrimitivePaneRenderer,
   IPrimitivePaneView,
-  ISeriesApi,
-  ISeriesPrimitive,
-  ISeriesPrimitiveAxisView,
   PrimitiveHoveredItem,
-  SeriesAttachedParameter,
-  SeriesType,
   Time,
 } from "lightweight-charts";
 
 import {
-  DrawingPriceAxisView,
-  defaultMarkPalette,
   drawChip,
   strokeSpec,
   type Emphasis,
@@ -22,6 +14,7 @@ import {
   type MarkPalette,
   type MarkWeight,
 } from "./drawingStyle";
+import { MarkPrimitive } from "./MarkPrimitive";
 import { timeToX } from "./timeCoordinates";
 
 /**
@@ -163,26 +156,14 @@ function colorFor(direction: DrawnZone["direction"], colors: ZoneColors): string
  * avoid, before a single `timeToCoordinate` call is spent on one that is not
  * on screen.
  */
-export class ZonePrimitive implements ISeriesPrimitive<Time> {
+export class ZonePrimitive extends MarkPrimitive<ZoneRenderItem> {
   private zones: readonly DrawnZone[] = [];
   private colors: ZoneColors;
-  private chart: IChartApi | null = null;
-  private series: ISeriesApi<SeriesType, Time> | null = null;
-  private currentPrice: number | null = null;
-  private requestUpdate: (() => void) | null = null;
-  private axisViews: readonly ISeriesPrimitiveAxisView[] = [];
-  private readonly views: readonly IPrimitivePaneView[] = [new ZonePaneView(this)];
-
-  readonly markWeight: MarkWeight;
-  readonly objectId: string | null;
-  readonly palette: MarkPalette;
-  emphasis: Emphasis = "normal";
+  protected readonly views: readonly IPrimitivePaneView[] = [new ZonePaneView(this)];
 
   constructor(colors: ZoneColors, options: MarkOptions = {}) {
+    super(options);
     this.colors = colors;
-    this.markWeight = options.weight ?? "indicator";
-    this.objectId = options.objectId ?? null;
-    this.palette = options.palette ?? defaultMarkPalette();
   }
 
   setZones(zones: readonly DrawnZone[]): void {
@@ -194,39 +175,8 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
     this.colors = colors;
   }
 
-  setCurrentPrice(price: number | null): void {
-    this.currentPrice = price;
-  }
-
-  setEmphasis(emphasis: Emphasis): void {
-    if (this.emphasis === emphasis) return;
-    this.emphasis = emphasis;
-    this.requestUpdate?.();
-  }
-
-  attached({ chart, series, requestUpdate }: SeriesAttachedParameter<Time>): void {
-    this.chart = chart;
-    this.series = series;
-    this.requestUpdate = requestUpdate;
-  }
-
-  detached(): void {
-    this.chart = null;
-    this.series = null;
-    this.requestUpdate = null;
-  }
-
-  paneViews(): readonly IPrimitivePaneView[] {
-    return this.views;
-  }
-
-  priceAxisViews(): readonly ISeriesPrimitiveAxisView[] {
-    return this.axisViews;
-  }
-
   /** The band's own rectangle is the tolerance — a shape with an area needs no margin
-   *  around it the way a line does (design.md, "Tolerancja trafienia mieszka w `hitTest`
-   *  każdego prymitywu, bo każdy kształt ma swoją"). */
+   *  around it the way a line does. */
   hitTest(x: number, y: number): PrimitiveHoveredItem | null {
     const id = this.objectId;
     if (id === null) return null;
@@ -243,7 +193,6 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
     return null;
   }
 
-  /** Package-visible for `ZonePaneView`, not the public API of this class. */
   renderItems(): ZoneRenderItem[] {
     const chart = this.chart;
     const series = this.series;
@@ -273,25 +222,12 @@ export class ZonePrimitive implements ISeriesPrimitive<Time> {
   }
 
   /** Both edges, the same two prices the object list shows for a zone. */
-  private rebuildAxisViews(): void {
-    if (this.objectId === null) {
-      this.axisViews = [];
-      return;
-    }
-    const views: ISeriesPrimitiveAxisView[] = [];
-    for (const zone of this.zones) {
-      for (const price of [zone.top, zone.bottom]) {
-        views.push(
-          new DrawingPriceAxisView(() => ({
-            coordinate: this.series?.priceToCoordinate(price) ?? null,
-            price,
-            color: colorFor(zone.direction, this.colors),
-            currentPrice: this.currentPrice,
-            palette: this.palette,
-          })),
-        );
-      }
-    }
-    this.axisViews = views;
+  protected axisEntries() {
+    return this.zones.flatMap((zone) =>
+      [zone.top, zone.bottom].map((price) => ({
+        price,
+        color: () => colorFor(zone.direction, this.colors),
+      })),
+    );
   }
 }

@@ -4,25 +4,14 @@ import {
   ColorType,
   CrosshairMode,
   createChart,
-  createSeriesMarkers,
-  type CandlestickData,
-  type HistogramData,
-  HistogramSeries,
-  type ISeriesMarkersPluginApi,
-  type LineData,
-  LineSeries,
   LineStyle,
   type IChartApi,
-  type IPaneApi,
   type IPriceLine,
   type ISeriesApi,
   type LogicalRange,
   type MouseEventParams,
-  type SeriesMarker,
   type Time,
   type TickMarkType,
-  type UTCTimestamp,
-  type WhitespaceData,
 } from "lightweight-charts";
 import type { AgentChartDrawing, AgentDrawingPatch } from "../agent/agentApi";
 import type { DrawingsStatus } from "../agent/drawingsStore";
@@ -32,37 +21,46 @@ import {
   RESOLUTIONS,
   type Bar,
   type ChartFocusRequest,
-  type IndicatorCatalogueEntry,
-  type IndicatorResult,
   type IndicatorSelection,
   type Resolution,
   type VisibleTimeRange,
 } from "../data/types";
 import type { MarketDataSource } from "../data/source";
-import { formatCrosshairTime, formatInstant, formatTickMark } from "../ui/formatTime";
+import { formatCrosshairTime, formatTickMark } from "../ui/formatTime";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { showToast } from "../ui/toastStore";
 import {
   candlestickColors,
-  drawingColorFor,
-  drawingColorFromToken,
-  indicatorColorFromToken,
-  indicatorLineColor,
   readChartColors,
   type ChartColors,
 } from "./theme";
-import type { Emphasis, MarkPalette } from "./drawingStyle";
 import { DrawingCard } from "./DrawingCard";
 import { DrawingList } from "./DrawingList";
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
 import { type BarsRange, useIndicators } from "./indicators/useIndicators";
 import { useIndicatorCatalogue } from "./indicators/useIndicatorCatalogue";
-import { RayPrimitive } from "./RayPrimitive";
-import { TimeProfilePrimitive, type ProfileBar } from "./TimeProfilePrimitive";
+import { assignLineColors, canDrawIndicator, drawnInstances } from "./chartLines";
+import {
+  MAX_VISIBLE_BARS,
+  MIN_VISIBLE_BARS,
+  OLDER_MARGIN_BARS,
+  RESOLUTION_SECONDS,
+  RIGHT_EDGE_SLACK_BARS,
+  focusNeedsBackTo,
+  indicatorWindow,
+  nearestBarIndex,
+  overlapsSeries,
+  reachesBack,
+  toCandlestick,
+  windowStillCovers,
+  type PendingResolutionFrame,
+} from "./chartWindow";
+import { FeedOverlay, OhlcReadout, OlderHistoryState } from "./ChartReadout";
+import { activeIndicatorReadout, type Readout } from "./indicatorReadout";
+import { useDrawingLayers } from "./useDrawingLayers";
+import { useIndicatorLayers } from "./useIndicatorLayers";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
-import { TrendlinePrimitive, type DrawnTrendline } from "./TrendlinePrimitive";
-import { ZonePrimitive, type DrawnZone } from "./ZonePrimitive";
 
 export interface ChartProps {
   source: MarketDataSource;
@@ -130,101 +128,6 @@ export interface ChartDrawings {
   patch(id: number, patch: AgentDrawingPatch): Promise<string | null>;
 }
 
-/** Price-pane overlays, own-pane oscillators, price-pane markers, price-pane
- *  levels and price-pane zones all draw today. Every one of them is
- *  price-pane only because every entry the catalogue offers in those shapes
- *  draws on the candles, not in a pane of its own — `render.style ===
- *  "histogram"` on a `levels` entry (`time_profile`) still routes to
- *  `TimeProfilePrimitive` rather than `RayPrimitive` further down, but it is
- *  a *drawing* choice, not a *drawable* one, so it does not belong here.
- *  Kept as a predicate rather than a filter on the catalogue itself: the
- *  picker still lists every indicator the archive offers, this only decides
- *  which of them the operator may currently pick. */
-function canDrawIndicator(entry: IndicatorCatalogueEntry): boolean {
-  if (entry.output === "lines") {
-    return entry.render.pane === "price" || entry.render.pane === "own";
-  }
-  if (entry.output === "markers" || entry.output === "levels" || entry.output === "zones") {
-    return entry.render.pane === "price";
-  }
-  return false;
-}
-
-/** One chosen instance beside the answer it got. The pairing is positional — the archive
- *  answers specs in the order they were asked for — because nothing on the wire tells two
- *  instances of one entry apart when their params agree. */
-interface DrawnInstance {
-  selection: IndicatorSelection;
-  result: IndicatorResult;
-  entry: IndicatorCatalogueEntry;
-}
-
-/** The instances this chart can actually draw right now, zipped with their answers.
- *  A result carrying a reason carries no shape and is dropped here rather than at each
- *  branch below: "drew nothing" and "had nothing to draw" arriving at the same place by
- *  accident is how the next shape added quietly draws an empty one. */
-function drawnInstances(
-  selections: IndicatorSelection[],
-  results: IndicatorResult[],
-  catalogueById: Map<string, IndicatorCatalogueEntry>,
-): DrawnInstance[] {
-  const drawn: DrawnInstance[] = [];
-  selections.forEach((selection, index) => {
-    const result = results[index];
-    if (!result || result.error !== null) return;
-    const entry = catalogueById.get(selection.id);
-    if (!entry || !canDrawIndicator(entry)) return;
-    drawn.push({ selection, result, entry });
-  });
-  return drawn;
-}
-
-/**
- * A colour per line of every drawn instance, in one pass. An instance the operator gave a
- * colour spends it on its first line; its remaining lines (MACD's signal and histogram)
- * keep taking from the cycle, since three same-coloured lines in one pane say less than
- * three different ones.
- *
- * The cycle index is fixed by draw order alone, never by which colours are already claimed
- * by hand — matching `indicatorLines`' own invariant (theme.ts, "indexed by how many
- * indicator lines are already drawn — never by which one a line is"). Choosing a colour for
- * one instance can therefore only repaint that instance's own lines; it may occasionally
- * land on a hue a still-auto line already cycled onto, which a legend disambiguates.
- * Instances beyond the palette's eight repeat it, the way they always did.
- */
-function assignLineColors(
-  drawn: DrawnInstance[],
-  colors: ChartColors,
-  chosenByKey: Map<string, string | null>,
-): Map<string, string[]> {
-  const chosen = new Map<string, string | null>();
-  for (const { selection } of drawn) {
-    // `has`, not `??`: null is the operator choosing *no* colour, and falling through to
-    // the snapshot's own on null would make "Auto" a no-op for an instance restored with
-    // a colour — it would keep painting the old one until the next recompute.
-    const token = chosenByKey.has(selection.key)
-      ? (chosenByKey.get(selection.key) ?? null)
-      : selection.color;
-    chosen.set(selection.key, indicatorColorFromToken(colors, token));
-  }
-
-  const byKey = new Map<string, string[]>();
-  let cycle = 0;
-  for (const { selection, entry } of drawn) {
-    const own = chosen.get(selection.key) ?? null;
-    // A markers/levels/zones entry declares no lines and still needs one colour.
-    const lineCount = Math.max(entry.lines.length, 1);
-    const assigned: string[] = [];
-    for (let index = 0; index < lineCount; index += 1) {
-      const cycled = indicatorLineColor(colors, cycle);
-      cycle += 1;
-      assigned.push(index === 0 && own !== null ? own : cycled);
-    }
-    byKey.set(selection.key, assigned);
-  }
-  return byKey;
-}
-
 /** The price pane's own stretch factor, set once at chart creation so an
  *  own-pane oscillator added later does not grow to the price chart's own
  *  height — `lightweight-charts`' default (equal stretch for every pane) reads
@@ -234,205 +137,9 @@ const PRICE_PANE_STRETCH = 4;
 /** One shared empty array for a chart with no drawings, so "none" is the same reference
  *  on every render and never restarts the sync effect that watches it. */
 const EMPTY_DRAWINGS: readonly AgentChartDrawing[] = [];
-const OWN_PANE_STRETCH = 1;
-
-function toCandlestick(bar: Bar): CandlestickData<Time> {
-  return {
-    time: bar.time as UTCTimestamp,
-    open: bar.open,
-    high: bar.high,
-    low: bar.low,
-    close: bar.close,
-  };
-}
-
-/** Index of the drawn bar closest to `time` — the anchor for an `around`+`bars` focus,
- *  which names a moment rather than a bar that necessarily exists at it (a session gap,
- *  most often). `findBar` (`data/merge.ts`) only ever answers an exact match, which this
- *  is deliberately not. */
-function nearestBarIndex(series: readonly Bar[], time: number): number {
-  let lo = 0;
-  let hi = series.length - 1;
-  while (lo < hi) {
-    const mid = (lo + hi) >>> 1;
-    if (series[mid].time < time) lo = mid + 1;
-    else hi = mid;
-  }
-  if (lo > 0 && Math.abs(series[lo - 1].time - time) <= Math.abs(series[lo].time - time)) {
-    return lo - 1;
-  }
-  return lo;
-}
-
-/** Whether the drawn series already reaches back far enough to show `focus` in full —
- *  the condition that lets a focus apply immediately, without waiting on the pager. */
-function reachesBack(series: readonly Bar[], focus: ChartFocusRequest): boolean {
-  if (series.length === 0) return false;
-  if (focus.lastBars !== null) return series.length >= focus.lastBars;
-  const target = focus.from ?? focus.around;
-  return target !== null && series[0].time <= target;
-}
-
-/** The window indicators are computed over: what is on screen, widened by a margin, and
- *  never wider than `MAX_INDICATOR_SPAN_BARS` of the resolution's own candles.
- *
- *  Follows the viewport rather than the drawn series, and that is the whole point. The
- *  series after a focus jump runs from March to the live edge with a five-month hole in
- *  the middle; asking for indicators over *that* prices a request nobody wants and gets a
- *  refusal for it. What the operator is looking at is a screenful either way.
- *
- *  `visible` is null before the chart has a frame — the first draw, and every draw where
- *  the library has not answered yet. The newest candles are the honest guess there: it is
- *  where an unfocused chart opens. */
-function indicatorWindow(
-  series: readonly Bar[],
-  visible: LogicalRange | null,
-  resolution: Resolution,
-): BarsRange | null {
-  if (series.length === 0) return null;
-  const lastIndex = series.length - 1;
-  const rawFrom = visible === null ? lastIndex - MAX_INDICATOR_SPAN_BARS : Math.floor(visible.from);
-  const rawTo = visible === null ? lastIndex : Math.ceil(visible.to);
-
-  const fromIndex = Math.max(0, Math.min(lastIndex, rawFrom - INDICATOR_MARGIN_BARS));
-  let toIndex = Math.max(fromIndex, Math.min(lastIndex, rawTo + INDICATOR_MARGIN_BARS));
-  // Never the forming candle. A window ending on it would move with every tick, and
-  // moving the window is what asks the archive for a new answer — the one thing this
-  // must not do while a candle is still being built ("na żywo" is a later stage; see
-  // `useIndicators`). Ending on the bar that last settled is what `applyBar` always did.
-  if (series[toIndex].forming && toIndex > fromIndex) toIndex -= 1;
-
-  const to = series[toIndex].time;
-  // Clamped in time, not in candle count: the count is what the module prices, and it
-  // prices it as periods between two moments — so a window straddling the hole a jump
-  // leaves in the series is enormous however few candles are actually in it.
-  const floor = to - MAX_INDICATOR_SPAN_BARS * RESOLUTION_SECONDS[resolution];
-  return { from: Math.max(series[fromIndex].time, floor), to };
-}
-
-/** Whether `window` still covers what is on screen, margins excluded — the test for
- *  leaving a computed answer alone. Panning inside the margin changes the window this
- *  function is not asked about; panning out of it is what earns a new read. */
-function windowStillCovers(
-  window: BarsRange,
-  series: readonly Bar[],
-  visible: LogicalRange | null,
-): boolean {
-  if (visible === null || series.length === 0) return true;
-  const lastIndex = series.length - 1;
-  const from = series[Math.max(0, Math.min(lastIndex, Math.floor(visible.from)))].time;
-  const to = series[Math.max(0, Math.min(lastIndex, Math.ceil(visible.to)))].time;
-  return from >= window.from && to <= window.to;
-}
-
-/** The earliest moment a focus needs drawn before it can be shown in full, or null for
- *  one that names no moment at all (`lastBars`, which is always at the newest end and can
- *  only ever want *more* of what is already there).
- *
- *  Not simply `focus.from ?? focus.around`, which is what `reachesBack` asks: an
- *  `around`+`bars` focus is centred, so half its candles sit *before* the moment it names.
- *  Reading only as far back as `around` puts the target on the series' first bar, and a
- *  frame centred there is the one the operator asked for shifted half a screen right.
- *  Sized with `RESOLUTION_SECONDS`, which is an approximation — a generous one here, since
- *  reading a little too far back costs candles nobody looks at and reading too little
- *  costs the frame. */
-function focusNeedsBackTo(focus: ChartFocusRequest, resolution: Resolution): number | null {
-  if (focus.from !== null) return focus.from;
-  if (focus.around !== null && focus.bars !== null) {
-    return focus.around - Math.ceil(focus.bars / 2) * RESOLUTION_SECONDS[resolution];
-  }
-  return null;
-}
-
-/** Whether the drawn series has *any* candle the requested fragment could show — the
- *  weaker condition checked once the pager has given up, since a fragment only partly
- *  reached is still a fragment worth showing (`terminal-chart` spec, "Kadr na fragment
- *  już narysowany" is the applied case; "Kadr na okres, którego archiwum nie ma" is the
- *  one this returns `false` for). */
-function overlapsSeries(series: readonly Bar[], focus: ChartFocusRequest): boolean {
-  if (series.length === 0) return false;
-  if (focus.lastBars !== null) return true;
-  const oldest = series[0].time;
-  const newest = series[series.length - 1].time;
-  if (focus.from !== null && focus.to !== null) return newest >= focus.from && oldest <= focus.to;
-  if (focus.around !== null) return newest >= focus.around;
-  return false;
-}
-
-interface Readout {
-  bar: Bar;
-  /** True when this is the hovered bar rather than the latest one. */
-  hovered: boolean;
-}
-
-/** What the outgoing series' viewport looked like, captured the moment a resolution
- *  change is about to clear it — everything `redraw` needs to put the incoming series'
- *  first draw over the same stretch of time instead of the whole thing
- *  (`terminal-chart` spec, "Rozdzielczość zmienia się bez przeładowania"). */
-interface PendingResolutionFrame {
-  from: number;
-  to: number;
-  /** Whether the outgoing view reached (within `RIGHT_EDGE_SLACK_BARS`) the newest drawn
-   *  bar — the anchor a chart standing at the live edge keeps, rather than the span's own
-   *  midpoint. */
-  atRightEdge: boolean;
-}
-
-/** How few candles may be left to the viewport's left before older ones are
- *  fetched, counted in bars. It is both the trigger and the target: the pager
- *  keeps going until the viewport has at least this much history behind it, so
- *  one drag to the edge is answered with a screenful rather than a page. */
-const OLDER_MARGIN_BARS = 50;
-
-/** How many candles either side of what is on screen the indicators are computed for.
- *  Ordinary panning then moves inside an answer already in hand rather than asking the
- *  archive for a new one on every drag. */
-const INDICATOR_MARGIN_BARS = 300;
-
-/** The widest span, in candles, one indicator request may cover.
- *
- *  Indicators used to be computed over the whole drawn series, which was fine while the
- *  series was whatever the operator had panned through. It stopped being fine when a
- *  focus could jump five months back: market-data prices a request as
- *  candles×indicators against a ceiling of 200,000, and six months of MINUTE_5 with four
- *  averages on it asks for 211,000 — a 422, and a chart that draws candles with no
- *  indicators on them at all.
- *
- *  Chosen against that ceiling with room for the instances an operator actually stacks:
- *  five thousand candles carries forty of them and still fits. It is not a copy of the
- *  module's number — the module refuses for its own reasons and this is the terminal not
- *  asking absurd questions in the first place. */
-const MAX_INDICATOR_SPAN_BARS = 5_000;
-
-/** How near the newest drawn bar counts as "standing at the live edge" — a resolution
- *  change on a chart sitting there keeps sitting there, rather than being nudged into
- *  history by however many bars a pan or a redraw happened to leave short of the exact
- *  last index. */
-const RIGHT_EDGE_SLACK_BARS = 3;
-
-/** How many candles a resolution change shows, floor and ceiling — the same reasoning
- *  `agent-chart-navigation`'s `MIN_FOCUS_BARS`/`MAX_FOCUS_BARS` used for a chart focus:
- *  below the floor there is nothing readable, above the ceiling a mismatch between the
- *  old and the new interval (WEEK's month of candles read as MINUTE_5) would ask for a
- *  screen no operator can use anyway. */
-const MIN_VISIBLE_BARS = 10;
-const MAX_VISIBLE_BARS = 500;
-
-/** A candle's nominal length, seconds — an approximation good enough to size a viewport
- *  around, never a claim about when a real session opens (`useOlderBars.ts` refuses to
- *  keep a table like this for that reason, and does not need to: it measures the window
- *  it asks for from the drawn series' own timestamps instead). This one only decides how
- *  many candles roughly fill the span the operator was looking at. */
-const RESOLUTION_SECONDS: Record<Resolution, number> = {
-  MINUTE: 60,
-  MINUTE_5: 300,
-  MINUTE_15: 900,
-  MINUTE_30: 1800,
-  HOUR: 3600,
-  HOUR_4: 14400,
-  DAY: 86400,
-  WEEK: 604800,
-};
+/** Asked for while the catalogue has not answered yet — one identity, so waiting for it
+ *  costs no render of its own. */
+const NO_SELECTIONS: IndicatorSelection[] = [];
 
 /**
  * One candlestick chart, defined entirely by `symbol` + `resolution` — the same
@@ -472,51 +179,6 @@ export function Chart({
   // `syncPriceLine` for why the series' built-in one does not do.
   const priceLineRef = useRef<IPriceLine | null>(null);
   const colorsRef = useRef<ChartColors | null>(null);
-  // One series per (indicator, params, line key) — Line unless the line asks for
-  // a histogram (MACD's, so far) — see the sync effect below.
-  const indicatorSeriesRef = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(
-    new Map(),
-  );
-  // One pane per (indicator, params) whose `render.pane` is "own" — RSI and MACD
-  // each get their own row, the way every other charting platform draws them,
-  // rather than sharing one oscillator pane between indicators that disagree
-  // about scale.
-  const ownPanesRef = useRef<Map<string, IPaneApi<Time>>>(new Map());
-  // The catalogue's reference-level hint (RSI's 30/70, …) drawn once per
-  // (indicator, params) rather than recomputed every render — the levels never
-  // change while the selection is active, only the lines they sit behind do.
-  const levelLinesRef = useRef<
-    Map<string, { series: ISeriesApi<"Line"> | ISeriesApi<"Histogram">; lines: IPriceLine[] }>
-  >(new Map());
-  // One `createSeriesMarkers` plugin per (indicator, params) whose output is
-  // `markers` — `swing_points`, so far — attached to the price series, since
-  // `canDrawIndicator` only offers markers/levels entries drawn on it.
-  const markerPluginsRef = useRef<Map<string, ISeriesMarkersPluginApi<Time>>>(new Map());
-  // One `RayPrimitive` per (indicator, params) whose output is `levels` and
-  // whose `render.style` is not `"histogram"` — `htf_levels_*`, `pivots_*`,
-  // `level_clusters` — replacing its levels wholesale on every recompute
-  // rather than being torn down and rebuilt.
-  const rayPrimitivesRef = useRef<Map<string, RayPrimitive>>(new Map());
-  // One `ZonePrimitive` per (indicator, params) whose output is `zones` —
-  // `range_gap`, `body_gap`, `session_range_*`, `opening_range` (task 4.7).
-  const zonePrimitivesRef = useRef<Map<string, ZonePrimitive>>(new Map());
-  // One `TimeProfilePrimitive` per (indicator, params) whose output is
-  // `levels` with `render.style === "histogram"` — `time_profile`, the one
-  // entry that draws a histogram rather than reference rays (task 5.4).
-  const timeProfilePrimitivesRef = useRef<Map<string, TimeProfilePrimitive>>(new Map());
-  // The drawings' own three primitives, in their own refs — deliberately not the maps
-  // above. Sharing them would be one line of code and one bug that looks like supports
-  // vanishing: the indicator cleanup detaches whatever it does not recognise as an
-  // active instance, and a resolution change empties `indicatorsState.results` on
-  // purpose (design.md, "Rysunki i wskaźniki dzielą prymitywy, ale nie cykl życia").
-  // Keyed by the drawing's own id, one primitive each: `RayPrimitive` and `ZonePrimitive`
-  // hold one colour for everything they draw, and every drawing carries its own.
-  const drawingPrimitivesRef = useRef<
-    Map<number, RayPrimitive | ZonePrimitive | TrendlinePrimitive>
-  >(new Map());
-  // The newest close, for a primitive built after the last candle arrived — the effect
-  // that pushes it to the others runs on a different trigger than the one that builds them.
-  const currentPriceRef = useRef<number | null>(null);
 
   // The array alone, not the whole prop: a caller that rebuilds the object every render
   // (the grid slot does) must not make the sync effect below run every render with it.
@@ -654,11 +316,18 @@ export function Chart({
   // different one). Dropped from what actually computes and draws — surfaced
   // in the header instead — but never rewritten in the caller's storage on its
   // own: only an explicit change through the picker does that (terminal-grid
-  // spec, "wpis nieznany katalogowi pomijany z komunikatem"). Skipped entirely
-  // while the catalogue is still loading or failed to load, so a slow or
-  // flaky read never reads as "the archive removed everything".
+  // spec, "wpis nieznany katalogowi pomijany z komunikatem").
+  //
+  // The two not-ready states are not the same state. Still loading: nothing is asked
+  // for yet, because a compute for an id the catalogue no longer offers is a read the
+  // archive refuses, and the answer that would have filtered it is one tick away.
+  // Failed: the selections pass through unfiltered, so a flaky read never reads as
+  // "the archive removed everything".
   const { knownIndicatorSelections, unknownIndicatorIds } = useMemo(() => {
-    if (catalogue.status !== "ready") {
+    if (catalogue.status === "loading") {
+      return { knownIndicatorSelections: NO_SELECTIONS, unknownIndicatorIds: [] as string[] };
+    }
+    if (catalogue.status === "error") {
       return { knownIndicatorSelections: indicatorSelections, unknownIndicatorIds: [] as string[] };
     }
     const known: IndicatorSelection[] = [];
@@ -818,13 +487,7 @@ export function Chart({
     });
     observer.observe(container);
 
-    const indicatorSeries = indicatorSeriesRef.current;
-    const ownPanes = ownPanesRef.current;
-    const levelLines = levelLinesRef.current;
-    const markerPlugins = markerPluginsRef.current;
-    const rayPrimitives = rayPrimitivesRef.current;
-    const zonePrimitives = zonePrimitivesRef.current;
-    const timeProfilePrimitives = timeProfilePrimitivesRef.current;
+    const forgetIndicatorLayers = clearIndicatorLayers;
     return () => {
       observer.disconnect();
       chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
@@ -836,16 +499,14 @@ export function Chart({
       priceLineRef.current = null;
       // Every indicator series, pane, reference level, marker plugin and
       // primitive belonged to it too — `chart.remove()` already freed them,
-      // this only stops the sync effect below from reaching for one that is
-      // gone.
-      indicatorSeries.clear();
-      ownPanes.clear();
-      levelLines.clear();
-      markerPlugins.clear();
-      rayPrimitives.clear();
-      zonePrimitives.clear();
-      timeProfilePrimitives.clear();
+      // this only stops the sync effect from reaching for one that is gone.
+      forgetIndicatorLayers();
     };
+    // Empty, and `clearIndicatorLayers` deliberately not listed: it is a stable callback
+    // from a hook declared *below* this effect — because that hook's own effect has to
+    // run after this one has created the chart — so naming it here would read it before
+    // it exists. The cleanup closure runs long after the render that assigns it.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const publishLatestBar = useCallback(() => {
@@ -1283,427 +944,21 @@ export function Chart({
     };
   }, [source, symbol, resolution]);
 
-  // --- indicators: one Line series per (instance, line key), synced to what the archive
-  // last answered. A price-pane entry draws on the candles' own pane; an own-pane entry
-  // (RSI, ATR, MACD, …) gets a pane of its own, one per instance rather than one shared
-  // by every oscillator — see `canDrawIndicator`. Keyed by the instance, so the same
-  // entry chosen twice draws twice and changing one instance's period moves its own line
-  // rather than tearing a series down and building it again.
-  useEffect(() => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    const colors = colorsRef.current ?? readChartColors();
-
-    const active = new Set<string>();
-    const activeOwnPanes = new Set<string>();
-    const activeResults = new Set<string>();
-
-    // The snapshot's own pairing: `results[i]` answers `selections[i]`
-    // (`market-data-indicators` spec, "Kolejność wyników"). Nothing else binds the two —
-    // two instances of one entry with the same params are identical on the wire.
-    const drawable = drawnInstances(
-      indicatorsState.selections,
-      indicatorsState.results,
-      catalogueById,
-    );
-    const lineColors = assignLineColors(drawable, colors, instanceColors);
-
-    for (const { selection, result, entry } of drawable) {
-      const ownPaneKey = selection.key;
-      const colorsForInstance = lineColors.get(selection.key) ?? colors.indicatorLines;
-
-      if (entry.output === "markers") {
-        if (!result.markers) continue;
-        activeResults.add(ownPaneKey);
-        const priceSeries = seriesRef.current;
-        if (!priceSeries) continue;
-        const color = colorsForInstance[0];
-        const markers: SeriesMarker<Time>[] = result.markers.map((point) =>
-          point.price === null
-            ? { time: point.time as UTCTimestamp, position: "inBar", shape: "circle", color, text: point.label }
-            : {
-                time: point.time as UTCTimestamp,
-                position: "atPriceMiddle",
-                price: point.price,
-                shape: "circle",
-                color,
-                text: point.label,
-              },
-        );
-        let plugin = markerPluginsRef.current.get(ownPaneKey);
-        if (!plugin) {
-          plugin = createSeriesMarkers(priceSeries, []);
-          markerPluginsRef.current.set(ownPaneKey, plugin);
-        }
-        plugin.setMarkers(markers);
-        continue;
-      }
-
-      if (entry.output === "levels" && entry.render.style === "histogram") {
-        // `time_profile`, so far the only entry that pairs the two — a
-        // histogram panel instead of the reference rays every other `levels`
-        // entry draws (task 5.4).
-        if (!result.levels) continue;
-        activeResults.add(ownPaneKey);
-        const priceSeries = seriesRef.current;
-        if (!priceSeries) continue;
-        // `indicatorLines[0]` is `--color-accent` — the categorical palette's
-        // first slot (`theme.ts`), reused here rather than drawing from the
-        // per-line cycle: the point of control is one highlight, not a series
-        // of same-role lines that need to stay distinguishable from each other.
-        const profileColors = { bar: colors.inkMuted, pointOfControl: colors.indicatorLines[0] };
-        let profile = timeProfilePrimitivesRef.current.get(ownPaneKey);
-        if (!profile) {
-          profile = new TimeProfilePrimitive(profileColors);
-          priceSeries.attachPrimitive(profile);
-          timeProfilePrimitivesRef.current.set(ownPaneKey, profile);
-        }
-        profile.setColors(profileColors);
-        // `VAH`/`VAL` carry `count: null` — summary edges, not buckets, and
-        // the histogram itself has nothing to draw for them (`ProfileBar`'s
-        // own doc).
-        const bars: ProfileBar[] = result.levels
-          .filter((level) => level.count !== null)
-          .map((level) => ({
-            price: level.price,
-            count: level.count as number,
-            isPointOfControl: level.label === "POC",
-          }));
-        profile.setBars(bars);
-        continue;
-      }
-
-      if (entry.output === "levels") {
-        if (!result.levels) continue;
-        activeResults.add(ownPaneKey);
-        const priceSeries = seriesRef.current;
-        if (!priceSeries) continue;
-        const color = colorsForInstance[0];
-        let ray = rayPrimitivesRef.current.get(ownPaneKey);
-        if (!ray) {
-          ray = new RayPrimitive(color);
-          priceSeries.attachPrimitive(ray);
-          rayPrimitivesRef.current.set(ownPaneKey, ray);
-        }
-        ray.setColor(color);
-        ray.setLevels(
-          result.levels.map((level) => ({
-            time: level.from as UTCTimestamp,
-            price: level.price,
-            label: level.label,
-          })),
-        );
-        continue;
-      }
-
-      if (entry.output === "zones") {
-        if (!result.zones) continue;
-        activeResults.add(ownPaneKey);
-        const priceSeries = seriesRef.current;
-        if (!priceSeries) continue;
-        let zonePrimitive = zonePrimitivesRef.current.get(ownPaneKey);
-        if (!zonePrimitive) {
-          zonePrimitive = new ZonePrimitive({ bullish: colors.up, bearish: colors.down, neutral: colors.inkMuted });
-          priceSeries.attachPrimitive(zonePrimitive);
-          zonePrimitivesRef.current.set(ownPaneKey, zonePrimitive);
-        }
-        zonePrimitive.setColors({ bullish: colors.up, bearish: colors.down, neutral: colors.inkMuted });
-        const zones: DrawnZone[] = result.zones.map((zone) => ({
-          from: zone.from as UTCTimestamp,
-          to: zone.to === null ? null : (zone.to as UTCTimestamp),
-          top: zone.top,
-          bottom: zone.bottom,
-          direction: zone.direction,
-        }));
-        zonePrimitive.setZones(zones);
-        continue;
-      }
-
-      // entry.output === "lines" from here on — `canDrawIndicator` refuses
-      // every other combination.
-      if (!result.lines) continue;
-      activeResults.add(ownPaneKey);
-
-      let paneIndex: number | undefined;
-      if (entry.render.pane === "own") {
-        activeOwnPanes.add(ownPaneKey);
-        let pane = ownPanesRef.current.get(ownPaneKey);
-        if (!pane) {
-          // `preserveEmptyPane: true` — without it, the chart removes a pane
-          // on its own the moment its last series does (`IPaneApi.
-          // preserveEmptyPane` docs), racing the explicit `chart.removePane`
-          // below: deselecting one of two own-pane indicators left the other's
-          // pane index stale and threw. This keeps removal singly-owned, by
-          // the cleanup loop, which already knows to look up a live index.
-          pane = chart.addPane(true);
-          pane.setStretchFactor(OWN_PANE_STRETCH);
-          ownPanesRef.current.set(ownPaneKey, pane);
-        }
-        paneIndex = pane.paneIndex();
-      }
-
-      let firstLine: ISeriesApi<"Line"> | ISeriesApi<"Histogram"> | undefined;
-      const lines = result.lines;
-
-      entry.lines.forEach((lineSpec, lineIndex) => {
-        const key = `${selection.key}|${lineSpec.key}`;
-        active.add(key);
-        const values = lines[lineSpec.key] ?? [];
-        // A line overrides the entry's own style for itself alone — MACD's
-        // histogram sitting beside two ordinary lines in the same entry.
-        const style = lineSpec.style ?? entry.render.style;
-
-        let series = indicatorSeriesRef.current.get(key);
-        if (style === "histogram") {
-          const points: (HistogramData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
-            (time, i) => {
-              const value = values[i];
-              return value === null || value === undefined
-                ? { time: time as UTCTimestamp }
-                : { time: time as UTCTimestamp, value, color: value >= 0 ? colors.up : colors.down };
-            },
-          );
-          if (!series) {
-            series = chart.addSeries(
-              HistogramSeries,
-              {
-                lastValueVisible: false,
-                priceLineVisible: false,
-                ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
-              },
-              paneIndex,
-            );
-            indicatorSeriesRef.current.set(key, series);
-          }
-          series.setData(points);
-        } else {
-          const points: (LineData<Time> | WhitespaceData<Time>)[] = indicatorsState.times.map(
-            (time, i) => {
-              const value = values[i];
-              return value === null || value === undefined
-                ? { time: time as UTCTimestamp }
-                : { time: time as UTCTimestamp, value };
-            },
-          );
-          if (!series) {
-            series = chart.addSeries(
-              LineSeries,
-              {
-                color: colorsForInstance[lineIndex],
-                lineWidth: 1,
-                lastValueVisible: false,
-                priceLineVisible: false,
-                ...(entry.render.autoscale ? {} : { autoscaleInfoProvider: () => null }),
-              },
-              paneIndex,
-            );
-            indicatorSeriesRef.current.set(key, series);
-          } else {
-            // Recolouring an instance is not a recompute: the operator picks a swatch and
-            // the line it stands for changes on the spot, without another read.
-            series.applyOptions({ color: colorsForInstance[lineIndex] });
-          }
-          series.setData(points);
-        }
-        firstLine ??= series;
-      });
-
-      // Reference levels (RSI's 30/70, …) — drawn once per instance on whichever
-      // line happens to be first, since every line an entry declares shares that
-      // pane's one price scale.
-      const anchor = firstLine;
-      if (entry.render.levels.length > 0 && anchor && !levelLinesRef.current.has(ownPaneKey)) {
-        const priceLines = entry.render.levels.map((level) =>
-          anchor.createPriceLine({
-            price: level,
-            color: colors.inkMuted,
-            lineWidth: 1,
-            lineStyle: LineStyle.Dashed,
-            axisLabelVisible: true,
-            title: "",
-          }),
-        );
-        levelLinesRef.current.set(ownPaneKey, { series: anchor, lines: priceLines });
-      }
-    }
-
-    for (const [key, line] of indicatorSeriesRef.current) {
-      if (active.has(key)) continue;
-      chart.removeSeries(line);
-      indicatorSeriesRef.current.delete(key);
-    }
-
-    for (const [ownPaneKey, pane] of ownPanesRef.current) {
-      if (activeOwnPanes.has(ownPaneKey)) continue;
-      // Belt and braces alongside `preserveEmptyPane: true` above: a pane
-      // already gone (by whatever path) must not be handed to `removePane`
-      // again — that is what actually threw.
-      if (chart.panes().includes(pane)) chart.removePane(pane.paneIndex());
-      ownPanesRef.current.delete(ownPaneKey);
-    }
-
-    for (const [key, { series, lines }] of levelLinesRef.current) {
-      if (activeResults.has(key)) continue;
-      for (const priceLine of lines) series.removePriceLine(priceLine);
-      levelLinesRef.current.delete(key);
-    }
-
-    for (const [key, plugin] of markerPluginsRef.current) {
-      if (activeResults.has(key)) continue;
-      plugin.detach();
-      markerPluginsRef.current.delete(key);
-    }
-
-    for (const [key, ray] of rayPrimitivesRef.current) {
-      if (activeResults.has(key)) continue;
-      seriesRef.current?.detachPrimitive(ray);
-      rayPrimitivesRef.current.delete(key);
-    }
-
-    for (const [key, zonePrimitive] of zonePrimitivesRef.current) {
-      if (activeResults.has(key)) continue;
-      seriesRef.current?.detachPrimitive(zonePrimitive);
-      zonePrimitivesRef.current.delete(key);
-    }
-
-    for (const [key, profile] of timeProfilePrimitivesRef.current) {
-      if (activeResults.has(key)) continue;
-      seriesRef.current?.detachPrimitive(profile);
-      timeProfilePrimitivesRef.current.delete(key);
-    }
-  }, [
-    indicatorsState.results,
-    indicatorsState.times,
-    indicatorsState.selections,
-    instanceColors,
+  // Declared here rather than higher up on purpose: effects run in the order they were
+  // declared, and this one has to find a chart that the instance effect above has already
+  // created. Its own maps and its own cleanup live in the hook.
+  const { clear: clearIndicatorLayers } = useIndicatorLayers({
+    chartRef,
+    seriesRef,
+    colorsRef,
+    indicatorsState,
     catalogueById,
-  ]);
+    instanceColors,
+  });
 
-  // --- drawings: the objects standing on this instrument, on their own primitives and
-  // their own lifecycle. Keyed on `drawings` alone, so a resolution change leaves them
-  // exactly where they were — the effect above cannot reach them, and this one has no
-  // reason to run (`terminal-chart` spec, "Zmiana rozdzielczości MUST zachować narysowane
-  // obiekty"). A symbol change replaces them because the caller reads a different
-  // instrument's list and hands over a different array.
-  useEffect(() => {
-    const chart = chartRef.current;
-    const priceSeries = seriesRef.current;
-    if (!chart || !priceSeries) return;
-    const colors = colorsRef.current ?? readChartColors();
-    const standing = drawnObjects;
-    const live = new Set<number>();
-
-    const palette: MarkPalette = {
-      onFill: colors.surface,
-      support: colors.up,
-      resistance: colors.down,
-    };
-    const currentPrice = currentPriceRef.current;
-
-    standing.forEach((drawing) => {
-      live.add(drawing.id);
-      // The drawing's own colour, or one the chart derives from its id — never from where
-      // it stands in this array, so removing the object beside it repaints nothing
-      // (`terminal-chart` spec, "Kolor obiektu po usunięciu innego").
-      const color = drawingColorFromToken(colors, drawing.color) ?? drawingColorFor(drawing.id, colors);
-      const marks = { weight: "drawing" as const, objectId: String(drawing.id), palette };
-      const existing = drawingPrimitivesRef.current.get(drawing.id);
-      const geometry = drawing.geometry;
-
-      if (geometry.kind === "level") {
-        const ray = existing instanceof RayPrimitive ? existing : new RayPrimitive(color, marks);
-        if (ray !== existing) {
-          if (existing) priceSeries.detachPrimitive(existing);
-          priceSeries.attachPrimitive(ray);
-          drawingPrimitivesRef.current.set(drawing.id, ray);
-        }
-        ray.setColor(color);
-        ray.setCurrentPrice(currentPrice);
-        // A null `at` means the level has always been in effect. Sent as epoch 0 rather
-        // than as the oldest drawn bar's own time: `timeToX` snaps a moment with no bar
-        // to the nearest one, so this resolves to the left edge of whatever is loaded and
-        // keeps doing so as the pager reaches further back — where a time read once here
-        // would freeze at whichever bar happened to be oldest at the time.
-        const from = geometry.at ?? 0;
-        ray.setLevels([{ time: from as UTCTimestamp, price: geometry.price, label: drawing.label }]);
-        return;
-      }
-
-      if (geometry.kind === "zone") {
-        const zoneColors = { bullish: color, bearish: color, neutral: color };
-        const zone =
-          existing instanceof ZonePrimitive ? existing : new ZonePrimitive(zoneColors, marks);
-        if (zone !== existing) {
-          if (existing) priceSeries.detachPrimitive(existing);
-          priceSeries.attachPrimitive(zone);
-          drawingPrimitivesRef.current.set(drawing.id, zone);
-        }
-        // One colour in all three slots: a drawn zone has no direction to colour by, the
-        // way an indicator's does — it is the operator's band, not a bullish or bearish
-        // reading of one.
-        zone.setColors(zoneColors);
-        zone.setCurrentPrice(currentPrice);
-        zone.setZones([
-          {
-            from: (geometry.from ?? 0) as UTCTimestamp,
-            to: geometry.to === null ? null : (geometry.to as UTCTimestamp),
-            top: geometry.top,
-            bottom: geometry.bottom,
-            direction: null,
-            label: drawing.label,
-          },
-        ]);
-        return;
-      }
-
-      const line =
-        existing instanceof TrendlinePrimitive ? existing : new TrendlinePrimitive(color, marks);
-      if (line !== existing) {
-        if (existing) priceSeries.detachPrimitive(existing);
-        priceSeries.attachPrimitive(line);
-        drawingPrimitivesRef.current.set(drawing.id, line);
-      }
-      line.setColor(color);
-      line.setCurrentPrice(currentPrice);
-      const drawn: DrawnTrendline = {
-        from: geometry.a.time as UTCTimestamp,
-        to: geometry.b.time as UTCTimestamp,
-        fromPrice: geometry.a.price,
-        toPrice: geometry.b.price,
-        label: drawing.label,
-        color: null,
-      };
-      line.setLines([drawn]);
-    });
-
-    for (const [id, primitive] of drawingPrimitivesRef.current) {
-      if (live.has(id)) continue;
-      priceSeries.detachPrimitive(primitive);
-      drawingPrimitivesRef.current.delete(id);
-    }
-  }, [drawnObjects]);
-
-  // The role its price-axis label announces is read off the newest candle, so it follows
-  // the market on its own: a level the price breaks through stops calling itself
-  // resistance (design.md, "Rola przelicza się z ostatniej świecy"). Its own effect
-  // rather than a dependency of the one above — a forming candle must not rebuild
-  // anything, only hand over a number.
-  useEffect(() => {
-    const price = latestBar?.close ?? null;
-    currentPriceRef.current = price;
-    for (const primitive of drawingPrimitivesRef.current.values()) primitive.setCurrentPrice(price);
-  }, [latestBar]);
-
-  // Picked out, or standing back for whatever is (`terminal-chart-objects` spec, "Wskazany
-  // obiekt widać, że jest wskazany"). Nothing here touches what the object *is* — only
-  // how heavily it is drawn.
-  useEffect(() => {
-    for (const [id, primitive] of drawingPrimitivesRef.current) {
-      const emphasis: Emphasis =
-        selectedId === null ? "normal" : id === selectedId ? "selected" : "dimmed";
-      primitive.setEmphasis(emphasis);
-    }
-  }, [selectedId, drawnObjects]);
+  // Below the chart instance effect for the same reason the indicator layers are: their
+  // effects have to find a chart that has already been created.
+  useDrawingLayers({ chartRef, seriesRef, colorsRef, drawnObjects, latestBar, selectedId });
 
   const feed = useBarFeed(source, symbol, resolution, sink);
   const older = useOlderBars(source, symbol, resolution, olderReader);
@@ -1876,249 +1131,5 @@ export function Chart({
         <FeedOverlay feed={feed} symbol={symbol} resolution={resolution} />
       </div>
     </section>
-  );
-}
-
-/**
- * What paging back through the archive is doing, said in the header rather than over the
- * candles: a chart that is dragging in older history is still a chart worth reading, and
- * a failed page must not hide the series that did arrive (terminal-chart spec, "Wykres
- * mówi, co się dzieje ze starszą historią").
- */
-function OlderHistoryState({ older }: { older: ReturnType<typeof useOlderBars> }) {
-  if (older.status === "loading") {
-    return (
-      <span className="rounded border border-border px-1.5 py-0.5 text-[10px] tracking-wide text-ink-muted uppercase">
-        loading older…
-      </span>
-    );
-  }
-
-  if (older.status === "exhausted") {
-    return (
-      <span
-        title="The archive has nothing older for this pair and resolution."
-        className="rounded border border-border px-1.5 py-0.5 text-[10px] tracking-wide text-ink-muted uppercase"
-      >
-        start of history
-      </span>
-    );
-  }
-
-  if (older.status === "error") {
-    return (
-      <span className="flex items-center gap-1">
-        <span
-          title={older.error ?? undefined}
-          className="rounded border border-critical/40 px-1.5 py-0.5 text-[10px] tracking-wide text-critical uppercase"
-        >
-          older history failed
-        </span>
-        <button
-          type="button"
-          onClick={older.retry}
-          className="rounded border border-border px-1.5 py-0.5 text-[10px] text-ink hover:bg-panel-strong"
-        >
-          Retry
-        </button>
-      </span>
-    );
-  }
-
-  return null;
-}
-
-interface IndicatorReadoutEntry {
-  key: string;
-  /** The catalogue id this line belongs to (`sma`, `macd`, …) — several instances of
-   *  one id are grouped onto one row; a different id always starts a row of its own. */
-  id: string;
-  label: string;
-  value: number | null;
-  /** The colour the line is drawn in. Two instances of one entry with the same params
-   *  carry the same label, and then the swatch is the only thing that says which line a
-   *  number came from (`terminal-chart` spec, "Wykres podaje wartości wskaźników spod
-   *  kursora"). */
-  color: string;
-}
-
-/**
- * The indicator values for whichever bar `OhlcReadout` is already showing — the same
- * bar the OHLC fields answer for, found by matching time rather than index, since a
- * indicator's own axis can start later than the candle series (`warmup_from`).
- *
- * Not hovering falls back to the newest bar (`shown.hovered` false — see `shown`'s own
- * computation), which is very often the one still forming: indicators are computed over
- * `redraw`'s own range and do not refetch on every live tick, so the exact instant just
- * traded is routinely a beat ahead of what the archive has answered for. Reading the
- * newest *answered* instant instead of returning nothing here is what keeps this text
- * matching the line already drawn on the chart, rather than blinking out every time the
- * pointer leaves it — a bar the operator is deliberately pointing at gets no such
- * fallback: an indicator with nothing to say about it says so.
- *
- * `drawn`/`lineColors` come in precomputed (memoized on the selections/results/colours
- * that actually change them) rather than recomputed here — `shown` moves on every
- * crosshair pixel, and neither `drawnInstances` nor `assignLineColors` needs to run
- * that often.
- */
-function activeIndicatorReadout(
-  shown: Readout,
-  times: number[],
-  drawn: DrawnInstance[],
-  lineColors: Map<string, string[]>,
-  colors: ChartColors,
-): IndicatorReadoutEntry[] {
-  let index = times.indexOf(shown.bar.time);
-  if (index === -1) {
-    if (shown.hovered) return [];
-    index = times.length - 1;
-  }
-  if (index === -1) return [];
-
-  const entries: IndicatorReadoutEntry[] = [];
-  for (const { selection, result, entry } of drawn) {
-    if (!result.lines) continue;
-    const assigned = lineColors.get(selection.key) ?? colors.indicatorLines;
-    entry.lines.forEach((lineSpec, lineIndex) => {
-      entries.push({
-        key: `${selection.key}|${lineSpec.key}`,
-        id: selection.id,
-        label: fillLabelTemplate(lineSpec.label, result.params),
-        value: result.lines?.[lineSpec.key]?.[index] ?? null,
-        color: assigned[lineIndex],
-      });
-    });
-  }
-  return entries;
-}
-
-/** One row per catalogue id, in the order its first instance was drawn — several SMAs
- *  belong on one row together, a different indicator always starts its own. */
-function groupReadoutByIndicator(entries: IndicatorReadoutEntry[]): IndicatorReadoutEntry[][] {
-  const byId = new Map<string, IndicatorReadoutEntry[]>();
-  for (const entry of entries) {
-    const group = byId.get(entry.id);
-    if (group) group.push(entry);
-    else byId.set(entry.id, [entry]);
-  }
-  return [...byId.values()];
-}
-
-function fillLabelTemplate(template: string, params: Record<string, number>): string {
-  return template.replace(/\{(\w+)\}/g, (match, name: string) =>
-    name in params ? String(params[name]) : match,
-  );
-}
-
-function OhlcReadout({ bar, indicators }: { bar: Bar; indicators: IndicatorReadoutEntry[] }) {
-  return (
-    // `tabular-nums` throughout: proportional digits make every value its own width, so
-    // a price ticking 9.50 -> 21000.00 slid the swatch and the label after it sideways on
-    // each frame of a pan. Fixed-width figures hold the whole row still.
-    // `w-fit` so the panel-tinted background hugs the text rather than running the width
-    // of the chart, and the candles stay readable a centimetre to the right of it.
-    <span className="flex w-fit flex-col gap-0.5 rounded bg-panel/75 px-1.5 py-1 text-xs text-ink-secondary tabular-nums">
-      <span className="flex flex-wrap items-center gap-2">
-        <Field label="O" value={bar.open} />
-        <Field label="H" value={bar.high} />
-        <Field label="L" value={bar.low} />
-        <Field label="C" value={bar.close} />
-        <time className="text-ink-muted">{formatInstant(bar.time)}</time>
-      </span>
-      {/* One row per indicator *kind*, under the OHLC row: several SMAs sit beside each
-          other on the row their id owns, and a different indicator always gets a row of
-          its own rather than every instance stacking one below another. */}
-      {groupReadoutByIndicator(indicators).map((group) => (
-        <span
-          key={group[0].key}
-          data-testid="indicator-readout-row"
-          className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-ink-muted"
-        >
-          {group.map((entry) => (
-            <span key={entry.key} className="flex items-center gap-1">
-              <span
-                aria-hidden
-                style={{ backgroundColor: entry.color }}
-                className="inline-block h-2 w-2 rounded-sm"
-              />
-              {entry.label}{" "}
-              <span className="text-ink">{entry.value === null ? "…" : entry.value.toFixed(2)}</span>
-            </span>
-          ))}
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function Field({ label, value }: { label: string; value: number }) {
-  return (
-    <span className="text-ink-muted">
-      {label} <span className="text-ink">{value}</span>
-    </span>
-  );
-}
-
-function FeedOverlay({
-  feed,
-  symbol,
-  resolution,
-}: {
-  feed: ReturnType<typeof useBarFeed>;
-  symbol: string;
-  resolution: Resolution;
-}) {
-  if (feed.status === "loading") {
-    return (
-      <Veil>
-        <span className="text-sm text-ink-muted">Loading {symbol} history…</span>
-      </Veil>
-    );
-  }
-
-  if (feed.status === "empty") {
-    return (
-      <Veil>
-        <span className="text-sm text-ink-muted">
-          No candles for {symbol} at {RESOLUTION_LABEL[resolution]}.
-        </span>
-      </Veil>
-    );
-  }
-
-  if (feed.status === "error") {
-    return (
-      <Veil>
-        <div className="text-center">
-          <p className="text-sm text-critical">Could not load {symbol}.</p>
-          <p className="mt-1 max-w-xs text-xs text-ink-muted">{feed.error}</p>
-          <button
-            type="button"
-            onClick={feed.retry}
-            className="mt-3 rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-          >
-            Retry
-          </button>
-        </div>
-      </Veil>
-    );
-  }
-
-  return null;
-}
-
-/**
- * Everything the chart has to say when it cannot draw: loading, empty, refused.
- *
- * `z-10` is load-bearing. Lightweight-charts mounts its canvases at `z-index` 1 and 2 in
- * a container that opens no stacking context, so they compete with this overlay
- * directly. At the default level the veil loses, and every message renders into the DOM,
- * passes its test, and is painted over by an empty canvas.
- */
-function Veil({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="absolute inset-0 z-10 flex items-center justify-center bg-panel/80">
-      {children}
-    </div>
   );
 }
