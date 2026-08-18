@@ -21,7 +21,15 @@ function groupResolutionsBySymbol(pairs: TrackedPair[]): Map<string, Resolution[
 }
 
 export function GridView() {
-  const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
+  // The layout and the active slot, not the whole config. Six charts hang off this
+  // component, and reading the config whole re-rendered all six every time one slot's
+  // symbol, resolution or indicators changed — a subscription is per value, so the
+  // narrowest one that answers the question is the one to take.
+  const layout = useSyncExternalStore(gridStore.subscribe, () => gridStore.getSnapshot().layout);
+  const activeSlot = useSyncExternalStore(
+    gridStore.subscribe,
+    () => gridStore.getSnapshot().activeSlot,
+  );
   // Read once and shared by every slot, rather than one poll per slot — six
   // slots asking independently would be six requests for the same list.
   const archived = useTrackedPairs(archive);
@@ -36,8 +44,8 @@ export function GridView() {
     [resolutionsBySymbol],
   );
 
-  const visible = visibleSlotIds(config.layout);
-  const { cols, rows } = LAYOUTS[config.layout];
+  const visible = visibleSlotIds(layout);
+  const { cols, rows } = LAYOUTS[layout];
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -48,10 +56,10 @@ export function GridView() {
             <button
               key={id}
               type="button"
-              aria-pressed={config.layout === id}
+              aria-pressed={layout === id}
               onClick={() => gridStore.setLayout(id)}
               className={`rounded border px-2 py-0.5 text-xs transition-colors ${
-                config.layout === id
+                layout === id
                   ? "border-primary text-ink"
                   : "border-border text-ink-muted hover:text-ink"
               }`}
@@ -73,7 +81,7 @@ export function GridView() {
           <Slot
             key={slotId}
             slotId={slotId}
-            active={config.activeSlot === slotId}
+            active={activeSlot === slotId}
             archivedStatus={archived.status}
             resolutionsBySymbol={resolutionsBySymbol}
             picker={{
@@ -97,12 +105,16 @@ export function GridView() {
  *  The store, not a hook-local fetch: the agent panel re-reads every loaded symbol after
  *  a turn, and a per-slot fetch would leave the chart showing the list from before it. */
 function useSlotDrawings(symbol: string | null): ChartDrawings | null {
-  const snapshot = useSyncExternalStore(drawingsStore.subscribe, drawingsStore.getSnapshot);
+  // This symbol's entry, not the whole snapshot: the agent re-reads every loaded symbol
+  // after a turn, and a slot watching all of them re-rendered its chart for an
+  // instrument it is not showing.
+  const entry = useSyncExternalStore(drawingsStore.subscribe, () =>
+    symbol === null ? undefined : drawingsStore.getSnapshot()[symbol],
+  );
   useEffect(() => {
     if (symbol !== null) drawingsStore.ensureLoaded(symbol);
   }, [symbol]);
   if (symbol === null) return null;
-  const entry = snapshot[symbol];
   return {
     items: entry?.drawings ?? [],
     status: entry?.status ?? "loading",
@@ -133,8 +145,12 @@ function Slot({
   resolutionsBySymbol: Map<string, Resolution[]>;
   picker: PickerSource;
 }) {
-  const config = useSyncExternalStore(gridStore.subscribe, gridStore.getSnapshot);
-  const slot = config.slots[slotId];
+  // This slot's own configuration. `updateSlot` replaces the slot it touches and leaves
+  // the others as they were, so a change to another slot does not wake this one.
+  const slot = useSyncExternalStore(
+    gridStore.subscribe,
+    () => gridStore.getSnapshot().slots[slotId],
+  );
   const allowedResolutions = slot.symbol ? resolutionsBySymbol.get(slot.symbol) : undefined;
   // A separate subscription from the config above: setting a focus request must not
   // re-render every slot watching the persisted layout, only the one it is for

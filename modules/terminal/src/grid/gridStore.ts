@@ -1,3 +1,4 @@
+import { safeLocalStorage } from "../data/storage";
 import {
   defaultGridConfig,
   parseGridConfig,
@@ -130,14 +131,6 @@ export function createGridStore(storage: Storage | null = safeLocalStorage()): G
       else visibleRanges.set(slot, range);
     },
   };
-}
-
-function safeLocalStorage(): Storage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
 }
 
 export const gridStore = createGridStore();
