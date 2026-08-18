@@ -40,6 +40,12 @@ resolved tree.
   health probe is exempt by path, in every module, unconditionally.
 - `detail.detail` — one upstream refusal, however FastAPI spelled it (a `detail` string or
   its own list of validation objects), flattened to one sentence a model can act on.
+- `tool_schemas.slim_tool_schemas` — the published tool surface without the scaffolding
+  pydantic emits: `title` repeating the field's own name, `anyOf` of bare types where a
+  type list says the same, and defaults on a reply nobody constructs. 22,6% of what the
+  three servers announce in every turn, and not one field, type or `required` entry with
+  it. This is the one file here that was **not** measured as a copy first — see
+  `docs/architecture.md`, condition 1's second route.
 
 ## What it does not do
 

@@ -1,12 +1,12 @@
 ## 1. Odchudzanie schematu w pakiecie
 
-- [ ] 1.1 `packages/tc-mcp-kit/tc_mcp_kit/tool_schemas.py`: `slim_schema()` (czysta
+- [x] 1.1 `packages/tc-mcp-kit/tc_mcp_kit/tool_schemas.py`: `slim_schema()` (czysta
       transformacja słownika: bez `title`, `anyOf` samych typów -> lista typów, opcjonalnie
       bez `default`) i `slim_tool_schemas(mcp)` nakładający ją na zarejestrowane narzędzia
-- [ ] 1.2 Zależność `mcp` w `pyproject.toml` pakietu; README pakietu wymienia nowy moduł
-- [ ] 1.3 Testy pakietu: zagnieżdżone `$defs`, `anyOf` z gałęzią niosącą więcej niż `type`
+- [x] 1.2 Zależność `mcp` w `pyproject.toml` pakietu; README pakietu wymienia nowy moduł
+- [x] 1.3 Testy pakietu: zagnieżdżone `$defs`, `anyOf` z gałęzią niosącą więcej niż `type`
       (nietykana), `format` zachowany, `required` zachowane, wejście zachowuje `default`
-- [ ] 1.4 `docs/architecture.md`: warunek nr 1 dostaje drugą drogę spełnienia (kod nowy,
+- [x] 1.4 `docs/architecture.md`: warunek nr 1 dostaje drugą drogę spełnienia (kod nowy,
       identyczny u konsumentów od pierwszego dnia); `CLAUDE.md` w zdaniu o trzech warunkach
 
 ## 2. Sufit powierzchni w trzech modułach
