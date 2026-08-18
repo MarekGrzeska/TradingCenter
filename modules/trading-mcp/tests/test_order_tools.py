@@ -417,21 +417,6 @@ async def test_setting_both_stops_sends_both(server) -> None:
 # --- the demo guard is re-checked before every write ---
 
 
-@respx.mock
-async def test_write_refuses_when_the_gateway_is_not_demo(server) -> None:
-    mcp, gateway = server
-    respx.get(f"{BASE}/capabilities").mock(
-        return_value=httpx.Response(200, json={"environment": "live"})
-    )
-    order_route = respx.post(f"{BASE}/orders")
-
-    with pytest.raises(ToolError, match="demo"):
-        await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
-
-    assert order_route.calls.call_count == 0
-    await gateway.aclose()
-
-
 # --- the boundary between "your request was wrong" and "I could not ask" ---
 
 
@@ -532,46 +517,32 @@ async def test_a_market_order_with_good_till_is_refused_and_names_it(server) -> 
 
 
 @respx.mock
-async def test_an_unreachable_gateway_during_the_demo_check_says_nothing_was_sent(server) -> None:
+async def test_a_write_costs_one_round_trip(server) -> None:
+    """The demo check ran in front of every write until 18 August 2026, behind a cache
+    any error invalidated — so one 503 made every later write cost two rounds for the
+    life of the process. It runs once now, before the port opens
+    (specs/trading-mcp-upstream-access, "Moduł pracuje wyłącznie na rachunku
+    demonstracyjnym")."""
     mcp, gateway = server
-    respx.get(f"{BASE}/capabilities").mock(side_effect=httpx.ConnectError("dropped"))
-    order_route = respx.post(f"{BASE}/orders")
-
-    with pytest.raises(ToolError, match="access failure") as excinfo:
-        await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
-
-    assert "Nothing was sent" in str(excinfo.value)
-    assert order_route.calls.call_count == 0
-    await gateway.aclose()
-
-
-@respx.mock
-async def test_a_refused_demo_check_is_an_access_failure_not_an_order_refusal(server) -> None:
-    mcp, gateway = server
-    respx.get(f"{BASE}/capabilities").mock(
-        return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
+    capabilities = respx.get(f"{BASE}/capabilities")
+    respx.post(f"{BASE}/orders").mock(
+        return_value=httpx.Response(
+            200,
+            json={
+                "status": "FILLED",
+                "id": "o9",
+                "reference": "ref9",
+                "symbol": "GOLD",
+                "direction": "BUY",
+                "size": 0.1,
+                "level": 2400.0,
+                "reason": None,
+            },
+        )
     )
-    order_route = respx.post(f"{BASE}/orders")
 
-    with pytest.raises(ToolError, match="access failure") as excinfo:
-        await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
+    await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
+    await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
 
-    assert "Nothing was sent" in str(excinfo.value)
-    assert order_route.calls.call_count == 0
-    await gateway.aclose()
-
-
-@respx.mock
-async def test_a_live_account_is_refused_with_nothing_sent(server) -> None:
-    mcp, gateway = server
-    respx.get(f"{BASE}/capabilities").mock(
-        return_value=httpx.Response(200, json={"environment": "live"})
-    )
-    order_route = respx.post(f"{BASE}/orders")
-
-    with pytest.raises(ToolError, match="refused") as excinfo:
-        await mcp.call_tool("place_order", {"symbol": "GOLD", "direction": "BUY", "size": 0.1})
-
-    assert "Nothing was sent" in str(excinfo.value)
-    assert order_route.calls.call_count == 0
+    assert capabilities.calls.call_count == 0
     await gateway.aclose()

@@ -3,7 +3,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from capital_gateway.config import DEMO_BASE_URL, DEMO_STREAM_URL, Settings
+from capital_gateway.config import (
+    DEMO_BASE_URL,
+    DEMO_STREAM_URL,
+    Settings,
+    environment_of,
+)
 
 CREDS = {
     "capital_api_key": "k",
@@ -68,3 +73,18 @@ def test_a_blank_credential_names_itself(field: str) -> None:
     with pytest.raises(ValidationError) as err:
         settings(**{field: "   "})
     assert field.upper() in str(err.value)
+
+
+# --- the environment a consumer reads is the host this module is bound to ------------
+
+
+def test_the_demo_host_is_the_demo_environment() -> None:
+    assert environment_of(DEMO_BASE_URL) == "demo"
+    assert environment_of(f"{DEMO_BASE_URL}/") == "demo"
+
+
+def test_any_other_host_is_not() -> None:
+    """`Settings` refuses to start on one, so this cannot happen in a running process —
+    which is exactly why the value has to be derived rather than declared: the field
+    `trading-mcp` reads before it opens a port has to be able to come out differently."""
+    assert environment_of("https://api-capital.backend-capital.com") == "live"

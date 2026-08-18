@@ -33,21 +33,27 @@ class GatewayClient:
             headers={GATEWAY_KEY_HEADER: settings.capital_gateway_api_key},
         )
         self._timeout_seconds = settings.capital_gateway_request_timeout_seconds
-        # `None` until the first check; `False` after any failed call to the gateway,
-        # so the next write forces a fresh read of `/capabilities` instead of trusting
-        # one taken before the connection dropped (specs/trading-mcp-upstream-access,
-        # "Gateway zmienia środowisko przy odzyskanym połączeniu").
-        self._demo_verified: bool | None = None
 
     async def aclose(self) -> None:
         await self._http.aclose()
 
     async def ensure_demo_environment(self) -> None:
-        """Refuse to proceed unless the gateway just confirmed it is bound to the demo
-        account. Cached only for as long as nothing has gone wrong since — see
-        `_demo_verified`'s docstring."""
-        if self._demo_verified:
-            return
+        """Refuse to proceed unless the gateway confirms it is bound to the demo account.
+
+        Asked once, before the port opens (`__main__`), and not again. It used to be
+        re-asked before every write, behind a three-state cache invalidated by every
+        error the gateway ever returned — which cost a second round trip on every write
+        after any 503, for as long as the process lived, and could not detect what it
+        was there for: the field it compares was a literal in the gateway's own source
+        until 18 August 2026, so it only ever proved the gateway was answering.
+
+        What stands in its place is two things that can each come out differently: the
+        gateway derives `environment` from the host it is bound to and refuses to start
+        on any host but the demo one, and this module refuses to open a port until it
+        has read that answer. What is no longer covered is a gateway swapped underneath
+        a running process for one reporting another environment — see
+        `openspec/changes/hot-paths-stop-paying-twice/design.md`, D4.
+        """
         payload = await self.get("/capabilities")
         environment = payload.get("environment")
         if environment != DEMO_ENVIRONMENT:
@@ -55,7 +61,6 @@ class GatewayClient:
                 f"capital-gateway reports environment {environment!r}, not "
                 f"{DEMO_ENVIRONMENT!r} — this module never touches a live account."
             )
-        self._demo_verified = True
 
     async def get(self, path: str, params: dict | None = None) -> dict:
         """A read. Retried once on a `5xx` before this module gives up on it."""
@@ -74,27 +79,13 @@ class GatewayClient:
         try:
             response = await self._http.request(method, path, **kwargs)
         except httpx.TimeoutException as err:
-            self._demo_verified = False
             raise GatewayUnavailable(
                 f"the gateway did not respond to {method} {path} within "
                 f"{self._timeout_seconds:g}s"
             ) from err
         except httpx.RequestError as err:
-            self._demo_verified = False
             raise GatewayUnavailable(f"the gateway is unreachable: {err}") from err
 
-        # An error *response* is a failed call too, and forgetting that is how the
-        # re-check came to skip the case it exists for: a gateway restarted behind App
-        # Service answers 503, not a `RequestError`, so a connection that dropped and
-        # came back would have kept using an environment answer taken before it did
-        # (specs/trading-mcp-upstream-access, "Gateway zmienia środowisko przy
-        # odzyskanym połączeniu").
-        #
-        # Every error status, not only the ones `is_access_failure` names: this is a
-        # cache being invalidated, not a caller being told something, and the cost of
-        # being wrong is one extra `/capabilities` read before the next write.
-        if response.is_error:
-            self._demo_verified = False
         return response
 
 

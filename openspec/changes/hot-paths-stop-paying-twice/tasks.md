@@ -42,11 +42,11 @@
 
 ## 5. Demo-guard
 
-- [ ] 5.1 `capital-gateway`: `capabilities()` liczy `environment` z `capital_base_url`; test,
+- [x] 5.1 `capital-gateway`: `capabilities()` liczy `environment` z `capital_base_url`; test,
       że wartość wynika z ustawienia, a nie ze stałej
-- [ ] 5.2 `trading-mcp`: usunięcie `_demo_verified`, inwalidacji w `_send` i re-checku w
+- [x] 5.2 `trading-mcp`: usunięcie `_demo_verified`, inwalidacji w `_send` i re-checku w
       `_write`; `ensure_demo_environment()` zostaje w ścieżce startowej
-- [ ] 5.3 Testy trading-mcp: start odmawia przy środowisku innym niż demo i przy nieosiągalnej
+- [x] 5.3 Testy trading-mcp: start odmawia przy środowisku innym niż demo i przy nieosiągalnej
       bramie; zapis po błędzie kosztuje jedną rundę, nie dwie; usunięcie testów wymagania,
       które znika
 

@@ -21,7 +21,9 @@ to mean something (specs/trading-mcp-transport).
 - `client.py` — the one seam every call to the gateway passes through. Reads retry
   once on a `5xx`; writes never retry, because the gateway takes no idempotency key.
   Also the demo-only guard: `ensure_demo_environment()` reads `GET /capabilities` and
-  refuses to proceed unless it names `"demo"`, re-checked after any failed call.
+  refuses to proceed unless it names `"demo"`. Asked once, before the port opens — a
+  process that never listens cannot be reached, and the gateway derives that field from
+  the host it is bound to rather than declaring it.
 - `errors.py` — `GatewayUnavailable`, `GatewayRefused` and `NotDemoEnvironment`, the
   three ways a call to the gateway can fail, kept apart because only one of them is
   worth retrying and only one of them is this module's own guard rather than the

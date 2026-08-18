@@ -15,6 +15,7 @@ import httpx
 
 from . import history, mapping
 from .client import CapitalClient
+from .config import environment_of
 from .dtos import (
     Account,
     AssetClass,
@@ -358,9 +359,18 @@ class CapitalAdapter:
     # --- meta ---
 
     def capabilities(self) -> Capabilities:
+        """What this module serves, and which host it is bound to.
+
+        `environment` is derived rather than declared, and that is the whole point of the
+        field: `trading-mcp` refuses to open a port until it has read it, and a constant
+        that cannot come out any other way answers "yes" to a question it never asked
+        (specs/capital-session, "Wyłącznie środowisko demo"). `Settings` still refuses
+        any host but the demo one at startup, so today this can only say `demo` — the
+        difference is that it says it because of where the module is pointed.
+        """
         return Capabilities(
             provider="capital.com",
-            environment="demo",
+            environment=environment_of(self._c.base_url),
             has_positions=True,
             has_streaming=True,
             has_working_orders=True,
