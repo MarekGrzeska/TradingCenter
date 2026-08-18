@@ -86,7 +86,7 @@ jobs:
           # (packages-replace-the-hand-copies/design.md, D5).
           tc_runtime='^packages/tc-runtime/'
           agent="^modules/agent/|$tc_runtime"
-          teams='^modules/teams/'
+          teams="^modules/teams/|$tc_runtime"
           # The terminal's `contract:check` compares its generated types against the
           # schema market-data builds from `contract.py`. Filtering the terminal on its
           # own directory alone would let a contract change land with the check that

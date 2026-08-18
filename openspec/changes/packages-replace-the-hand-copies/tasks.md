@@ -35,14 +35,14 @@ dojdzie drugi moduł. Po niej `agent` bierze `tc-runtime`, a reszta repo stoi ni
 
 ## 2. `teams` dochodzi do `tc-runtime`
 
-- [ ] 2.1 `teams/db.py` zastąpione pakietem; klucz **8050** przekazywany z modułu, z testem
+- [x] 2.1 `teams/db.py` zastąpione pakietem; klucz **8050** przekazywany z modułu, z testem
       regresyjnym jak 1.7
-- [ ] 2.2 `teams/migrate.py`, `teams/schema_version.py` zastąpione pakietem — **wersja teams
+- [x] 2.2 `teams/migrate.py`, `teams/schema_version.py` zastąpione pakietem — **wersja teams
       jest tą, która została przeniesiona w 1.4**, więc agent dostaje przy okazji jej fix na
       puste `heads`; potwierdzić testem, że komunikat agenta nie jest już urwany
-- [ ] 2.3 `teams/auth.py` i `teams/routers/models.py` zastąpione pakietem
-- [ ] 2.4 `teams/pyproject.toml`, `modules/teams/Dockerfile` i filtr w `checks.yml` jak w 1.8–1.10
-- [ ] 2.5 Testy `teams` i `tc-runtime` zielone; różnice, których nie dało się sparametryzować,
+- [x] 2.3 `teams/auth.py` i `teams/routers/models.py` zastąpione pakietem
+- [x] 2.4 `teams/pyproject.toml`, `modules/teams/Dockerfile` i filtr w `checks.yml` jak w 1.8–1.10
+- [x] 2.5 Testy `teams` i `tc-runtime` zielone; różnice, których nie dało się sparametryzować,
       wypisane w `review.md` albo w README pakietu
 
 ## 3. `market-data` dochodzi częściowo

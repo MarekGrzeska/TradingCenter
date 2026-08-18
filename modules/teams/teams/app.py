@@ -23,17 +23,19 @@ logging.basicConfig(
 )
 
 from fastapi import FastAPI
+from tc_runtime import migrate, schema_version
+from tc_runtime.db import advisory_lock
+from tc_runtime.db import pool as make_pool
 
-from . import migrate, schema_version, store
+from . import store
 from .config import Settings
-from .db import MIGRATION_LOCK_KEY, advisory_lock
-from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
 from .openapi import require_response_fields
 from .provider import OpenAIProvider
 from .routers import catalogue, models, runs, schedules, usage
 from .routers import tools as tools_router
 from .runner import RunRegistry
+from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 from .scheduler import Clock
 from .tools import ToolServerRegistry
 
@@ -63,11 +65,11 @@ async def lifespan(app: FastAPI):
             async with advisory_lock(
                 conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds
             ):
-                await migrate.run()
+                await migrate.run(MIGRATIONS)
             # Still checked, and now for a narrower pair of accidents than before: a
             # migration that reported success without arriving, and an image older than
             # the schema it found (`schema_version.py`).
-            await schema_version.verify(conn)
+            await schema_version.verify(conn, MIGRATIONS)
 
             # A run lives in the process that started it, so anything still `running` in
             # the database belongs to a process that is gone — closed here, before a route

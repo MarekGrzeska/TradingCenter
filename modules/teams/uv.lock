@@ -2201,6 +2201,38 @@ wheels = [
 ]
 
 [[package]]
+name = "tc-runtime"
+version = "0.1.0"
+source = { editable = "../../packages/tc-runtime" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "azure-identity" },
+    { name = "fastapi" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.10" },
+    { name = "alembic", specifier = ">=1.14" },
+    { name = "asyncpg", specifier = ">=0.30" },
+    { name = "azure-identity", specifier = ">=1.19" },
+    { name = "fastapi", specifier = ">=0.110" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "pyright", specifier = "==1.1.411" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "ruff", specifier = "==0.16.2" },
+]
+
+[[package]]
 name = "teams"
 version = "0.1.0"
 source = { virtual = "." }
@@ -2217,6 +2249,7 @@ dependencies = [
     { name = "mcp" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "tc-runtime" },
     { name = "tzdata" },
     { name = "uvicorn", extra = ["standard"] },
 ]
@@ -2244,6 +2277,7 @@ requires-dist = [
     { name = "mcp", specifier = "==1.27.0" },
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
+    { name = "tc-runtime", editable = "../../packages/tc-runtime" },
     { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
 ]

@@ -20,10 +20,10 @@ from zoneinfo import ZoneInfo
 import asyncpg
 import pytest
 from fastapi.testclient import TestClient
+from tc_runtime.db import asyncpg_dsn
 
 from teams import store
 from teams.app import app
-from teams.db import asyncpg_dsn
 
 from .mcp_stand_in import serving_sync
 
