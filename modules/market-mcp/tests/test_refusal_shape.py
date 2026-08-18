@@ -10,6 +10,8 @@ import pytest
 import respx
 from mcp.server.fastmcp.exceptions import ToolError
 
+from market_mcp import client
+
 BASE = "http://127.0.0.1:8020"
 
 
@@ -105,10 +107,16 @@ async def test_reason_three_the_archive_did_not_respond(server) -> None:
 
 
 @respx.mock
-async def test_the_three_reasons_read_differently(server) -> None:
+async def test_the_three_reasons_read_differently(
+    server, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """The point of task 4.2 in one assertion: none of the three sentences are
     interchangeable — a caller reading one must not confuse it for another."""
     mcp, upstream = server
+    # This test changes what `/pairs` answers between two calls a millisecond apart, which
+    # is exactly what the memo exists to collapse. Turned off here rather than worked
+    # around: the memo has its own tests, and this one is about the wording.
+    monkeypatch.setattr(client, "PAIRS_MEMO_SECONDS", 0)
 
     respx.get(f"{BASE}/candles/US100").mock(return_value=_candles_response([]))
     respx.get(f"{BASE}/pairs").mock(return_value=httpx.Response(200, json=[]))

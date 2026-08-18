@@ -39,10 +39,22 @@ _TREE_CONCURRENCY = 5  # parallel marketnavigation requests, under the rate gate
 _CONFIRM_ATTEMPTS = 5
 _CONFIRM_DELAY = 0.4  # seconds between confirm polls; after the attempts run out -> PENDING
 
+# How long an answer about whether a venue is trading stays good enough to reuse. One read
+# of DAY or WEEK candles asks `GET /markets/{epic}` through `mark_forming`, and a caller
+# reading a period boundary asks for the same instrument again a moment later — against a
+# 10 requests/second budget capital.com counts per *account*, not per process.
+#
+# Bounded by the mistake it can make: a market that shuts inside the window has its newest
+# candle marked as still forming for up to this long. A forming candle is not stored as a
+# settled one, so that error is undone by the next read; the opposite error, a settled
+# candle called forming, is not one this memo can produce.
+_MARKET_STATUS_MEMO_SECONDS = 5.0
+
 
 class CapitalAdapter:
     def __init__(self, client: CapitalClient) -> None:
         self._c = client
+        self._market_open_memo: dict[str, tuple[float, bool]] = {}
 
     async def aclose(self) -> None:
         await self._c.aclose()
@@ -54,6 +66,24 @@ class CapitalAdapter:
         if not resp.is_success:
             raise GatewayError(f"capital.com {resp.status_code}: {resp.text[:200]}")
         return resp.json()
+
+    @staticmethod
+    def _write_json(resp: httpx.Response) -> dict:
+        """Parse what came back from a write.
+
+        Deliberately not `_json_ok`: the provider's own JSON refusal of an order is an
+        answer about the order, and it travels on to `_settle` to become a REJECTED
+        `Order` the caller can read. What does not travel on is a body that is not JSON
+        at all — App Service's HTML 502, an empty 504 — which used to leave here as a
+        `JSONDecodeError` and reach the caller as an unhandled 500 with a stack trace.
+        """
+        try:
+            return resp.json()
+        except ValueError as err:
+            raise GatewayError(
+                f"capital.com answered {resp.status_code} with a body that is not JSON: "
+                f"{resp.text[:200]!r}"
+            ) from err
 
     # --- accounts ---
 
@@ -164,13 +194,25 @@ class CapitalAdapter:
 
         The only thing that knows where a daily period ends is the provider, so this is
         what stands in for a boundary this module refuses to compute. Called lazily —
-        `history.mark_forming` awaits it only when nothing cheaper can decide.
+        `history.mark_forming` awaits it only when nothing cheaper can decide — and
+        remembered for `_MARKET_STATUS_MEMO_SECONDS`, which is what stops one operator
+        question about DAY candles from spending two of the account's requests.
+
+        A 404 is not remembered: an unknown instrument is a refusal the caller has to
+        see, and it costs nothing to raise it from the answer rather than from a memo.
         """
+        now = asyncio.get_running_loop().time()
+        remembered = self._market_open_memo.get(symbol)
+        if remembered is not None and now - remembered[0] < _MARKET_STATUS_MEMO_SECONDS:
+            return remembered[1]
+
         resp = await self._c.market(symbol)
         if resp.status_code == 404:
             raise GatewayError(f"unknown instrument {symbol!r}", status_code=404)
         snapshot = self._json_ok(resp).get("snapshot") or {}
-        return snapshot.get("marketStatus") == "TRADEABLE"
+        is_open = snapshot.get("marketStatus") == "TRADEABLE"
+        self._market_open_memo[symbol] = (now, is_open)
+        return is_open
 
     async def get_candles(self, symbol: str, resolution: Resolution, limit: int) -> list[Candle]:
         resp = await self._c.prices(symbol, resolution.value, limit)
@@ -250,7 +292,7 @@ class CapitalAdapter:
 
         if req.order_type == OrderType.MARKET:
             body.update(req.provider_params or {})
-            created = (await self._c.create_position(body)).json()
+            created = self._write_json(await self._c.create_position(body))
             return await self._settle(created, accepted=OrderStatus.FILLED)
 
         body["type"] = req.order_type.value
@@ -258,11 +300,11 @@ class CapitalAdapter:
         if req.good_till is not None:
             body["goodTillDate"] = req.good_till
         body.update(req.provider_params or {})
-        created = (await self._c.create_working_order(body)).json()
+        created = self._write_json(await self._c.create_working_order(body))
         return await self._settle(created, accepted=OrderStatus.WORKING)
 
     async def close_position(self, position_id: str) -> Order:
-        closed = (await self._c.close_position(position_id)).json()
+        closed = self._write_json(await self._c.close_position(position_id))
         return await self._settle(closed, accepted=OrderStatus.CLOSED)
 
     async def update_position(self, position_id: str, req: UpdatePositionRequest) -> Order:
@@ -274,7 +316,7 @@ class CapitalAdapter:
             body["stopLevel"] = req.stop_loss
         if "take_profit" in req.model_fields_set:
             body["profitLevel"] = req.take_profit
-        updated = (await self._c.update_position(position_id, body)).json()
+        updated = self._write_json(await self._c.update_position(position_id, body))
         return await self._settle(updated, accepted=OrderStatus.UPDATED)
 
     async def list_working_orders(self) -> list[WorkingOrder]:
@@ -282,7 +324,7 @@ class CapitalAdapter:
         return [mapping.working_order_from_raw(row) for row in data.get("workingOrders", [])]
 
     async def cancel_working_order(self, order_id: str) -> Order:
-        cancelled = (await self._c.delete_working_order(order_id)).json()
+        cancelled = self._write_json(await self._c.delete_working_order(order_id))
         return await self._settle(cancelled, accepted=OrderStatus.CANCELLED)
 
     async def _settle(self, created: dict, accepted: OrderStatus = OrderStatus.FILLED) -> Order:

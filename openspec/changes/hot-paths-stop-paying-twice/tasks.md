@@ -31,13 +31,13 @@
 
 ## 4. Gorące ścieżki upstreamu
 
-- [ ] 4.1 `market-data`: `_READERS` bez `"quote"`; test, że `read_message` zwraca `None` dla
+- [x] 4.1 `market-data`: `_READERS` bez `"quote"`; test, że `read_message` zwraca `None` dla
       ramki `quote` i że pozostałe trzy rodzaje czyta bez zmian
-- [ ] 4.2 `market-mcp`: memo z TTL na `/pairs` w kliencie; test, że dwa odczyty w jednym
+- [x] 4.2 `market-mcp`: memo z TTL na `/pairs` w kliencie; test, że dwa odczyty w jednym
       wywołaniu narzędzia dają jeden request, i że po TTL leci kolejny
-- [ ] 4.3 `capital-gateway`: memo z TTL na `_market_open`; test, że odczyt świec DAY nie pyta
+- [x] 4.3 `capital-gateway`: memo z TTL na `_market_open`; test, że odczyt świec DAY nie pyta
       `GET /markets/{epic}` dwa razy
-- [ ] 4.4 `capital-gateway`: `_write_json()` dla pięciu zapisów; test, że nie-JSON-owe 502
+- [x] 4.4 `capital-gateway`: `_write_json()` dla pięciu zapisów; test, że nie-JSON-owe 502
       wychodzi jako `GatewayError`, a nie jako nieobsłużony wyjątek
 
 ## 5. Demo-guard

@@ -39,7 +39,7 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
     @mcp.resource("market://pairs", mime_type="application/json")
     async def tracked_pairs() -> list:
         """Which pairs the archive is collecting right now."""
-        response = await upstream.get("/pairs")
+        response = await upstream.pairs()
         await raise_for_status(response)
         return response.json()
 

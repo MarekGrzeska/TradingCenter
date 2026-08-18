@@ -89,7 +89,7 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         state among that symbol's resolutions, so a symbol shown as collecting is
         collecting everywhere.
         """
-        response = await upstream.get("/pairs")
+        response = await upstream.pairs()
         await raise_for_status(response)
         by_symbol: dict[str, list[str]] = {}
         for row in response.json():
@@ -109,6 +109,6 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         Seven rows per symbol; `list_tracked_symbols` is the one-row-per-symbol answer
         when only the list of symbols is the point.
         """
-        response = await upstream.get("/pairs")
+        response = await upstream.pairs()
         await raise_for_status(response)
         return [_pair_out(row) for row in response.json()]
