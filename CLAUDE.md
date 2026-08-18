@@ -69,11 +69,21 @@ Test flags that matter:
 - `--run-live-trading` (gateway only) **writes**: it opens, amends and closes demo positions.
 
 The whole stack: `./scripts/dev.sh` on macOS and Linux, `./scripts/dev.ps1` on Windows —
-the same script twice (`--no-terminal` / `-NoTerminal` for back end only). It starts things
-in dependency order — migrations → gateway → market-data → market-mcp → trading-mcp →
-teams → teams-mcp → agent → terminal — waiting for each to actually answer. Ports are
-fixed: **8010** gateway, **8020** market-data, **8030** agent, **8040** market-mcp,
-**8050** teams, **8060** trading-mcp, **8070** teams-mcp, **5173** terminal.
+both wrappers of about a dozen lines over `scripts/dev.py`, which is the implementation
+(`--no-terminal` / `-NoTerminal` for back end only; either spelling works on either
+platform). It starts things in dependency order — migrations → gateway → market-data →
+market-mcp → trading-mcp → teams → teams-mcp → agent → terminal — waiting for each to
+actually answer. Ports are fixed: **8010** gateway, **8020** market-data, **8030** agent,
+**8040** market-mcp, **8050** teams, **8060** trading-mcp, **8070** teams-mcp,
+**5173** terminal.
+
+That order, those ports and the reason each service sits where it does are one table at
+the top of `dev.py`, and `uv run python scripts/dev.py --explain` prints it. It used to be
+two hand-written scripts of 496 and 647 lines, and all three of their documented drifts
+were a difference between that table and itself — the last one left `dev.ps1` starting
+`teams-mcp` and then forgetting it, so its log went nowhere and its death went unnoticed
+(`one-deploy-path-one-dev-runner`). `scripts/` is a uv project with its own tests now;
+the refusals below each have one.
 
 `trading-mcp` is the one module that will not start on a wish: `CAPITAL_GATEWAY_API_KEY` in
 its `.env` must be the gateway's own `GATEWAY_API_KEY` (the gateway checks the header on
@@ -87,7 +97,7 @@ symptom is the whole stack going down with "a service exited".
 PostgreSQL on `127.0.0.1:55432`, which the dev scripts start first — Docker is required to
 run the stack, not only to test it. Leaving `DATABASE_USER` unset is what selects this
 local mode, and it narrows the module to loopback: a `DATABASE_URL` pointing at any remote
-host (production included) is refused at startup, by `dev.sh` and by `config.py` both.
+host (production included) is refused at startup, by `dev.py` and by `config.py` both.
 Production connects with an Entra identity instead — `DATABASE_USER` set in
 `infra/app-service.tf` — and that path is not for local use. (Do not "restore" the brief
 arrangement where dev ran on the Azure server; it was reversed the same day it was made —
@@ -148,7 +158,7 @@ takes its tools away and leaves the other two exactly where they are. The third 
 whose absence reads least like a setting: the operator asks about their positions and the
 agent says it cannot see them, which sounds like the account being unreachable. An `.env`
 copied before either change is the usual reason a local agent answers from memory while
-market-mcp sits there idle — `dev.sh`/`dev.ps1` say so at startup rather than leave it to
+market-mcp sits there idle — `dev.py` says so at startup rather than leave it to
 be discovered.
 
 `teams` needs the same three — `DATABASE_URL`, `OPENAI_API_KEY`, `MODELS` — and none of
@@ -394,19 +404,40 @@ have it — so a skipped job blocks nothing. If that changes, the filter needs s
 or a required check will sit pending forever.
 
 Seven `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
-the matching module, each ending in a smoke check of the deployed thing — they differ in
-how they can reach it: market-data has one path excluded from Easy Auth, market-mcp and
-trading-mcp answer `/health` outright, and agent and teams have `/health` excluded and ask
-the control plane which image is serving on top of it. trading-mcp's probe is the one that
-proves the most for its length: that module refuses to open a port unless the gateway just
-confirmed a demo account, so a 200 there means it reached the gateway, through its
-firewall, with the shared key. capital-gateway is the one that cannot be probed at all — it
-admits only market-data's and trading-mcp's addresses, so the control plane is the only
-question its deploy can ask, which is the weaker one: it reported `Running` over a
-crash-looping container on 16 August 2026.
+the matching module. Since `one-deploy-path-one-dev-runner` each is about twenty lines
+calling `_deploy-app-service.yml`, and what stays with the caller is what actually differs:
+the trigger, the path filter, the probe's four parameters, and the incident comments —
+which are the most valuable content in a deploy workflow and have nowhere to live in a
+shared file. `deploy-terminal.yml` is not a caller: a Static Web App has no image and no
+container to probe.
+
+Every one ends in `scripts/deploy_probe.py`, which asks two questions — is this commit's
+image the one App Service will serve, and did the process inside it come up. The second is
+the one that used to go unasked, and the probe is now a function with a test of exactly
+that failure: the previous container answering 200 with the right body while the image tag
+is still the old one. Four inputs cover all seven: `probe_path`, `expected_status`,
+`body_contains`, `attempts`. market-data probes `/ws/candles` for a 404 with a `"detail"`
+body, because that is its only path excluded from Easy Auth; the three MCP modules and
+agent and teams probe `/health` for a 200 with `"status"`; agent and teams get twenty
+attempts rather than twelve, because their lifespan blocks on their own migration.
+trading-mcp's probe proves the most for its length: that module refuses to open a port
+unless the gateway just confirmed a demo account, so a 200 there means it reached the
+gateway, through its firewall, with the shared key. capital-gateway is the one that cannot
+be probed at all — it admits only market-data's and trading-mcp's addresses, so
+`probe_path` is empty and the control plane is the only question its deploy can ask, which
+is the weaker one: it reported `Running` over a crash-looping container on 16 August 2026.
 `terraform.yml` plans on infra PRs; `terraform-apply.yml` is a manual `workflow_dispatch`
 that applies — and refuses any plan touching `azuread_*`, because CI holds
-`Application.Read.All` and not write. Entra changes are applied locally by the operator.
+`Application.Read.All` and not write. Entra changes are applied locally by the operator,
+and `infra/modules/easy-auth-app/` is entirely `azuread_*`, so anything touching it is
+the operator's apply by construction.
+
+`checks.yml` has two jobs that are not a module: `scripts`, running the same three
+commands every module runs against `scripts/`, and `infra`, running `terraform fmt -check`
+and `validate` against both roots. The second closed a real hole — `terraform.yml` fires
+on `pull_request` only, so a push straight to `main` with infrastructure in it passed
+through nothing at all, and `infra/bootstrap/` was outside every check. Neither needs a
+credential: `init -backend=false` downloads the providers and stops.
 
 Parallel work: use `git worktree` rather than a second clone — but the dev database
 container (one `compose.yaml` project, one volume), the Capital session and the fixed ports

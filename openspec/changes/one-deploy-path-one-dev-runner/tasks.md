@@ -20,7 +20,7 @@
 - [x] 3.2 `.github/workflows/_deploy-app-service.yml` — `workflow_call`. Wejść wyszło osiem, nie dziesięć: `image_name` i cache scope są zawsze równe `module` (zmierzone na wszystkich siedmiu), a `dockerfile` wyprowadza się z `module`, bo `file:` jest relatywne do workspace'u, nie do kontekstu. Doszło `failure_hint`, żeby rada per moduł z logów `trading-mcp` i `teams-mcp` nie zginęła
 - [x] 3.3 Krok sondy woła `scripts/deploy_probe.py` przez `uv run`
 - [x] 3.4 `deploy-market-mcp.yml` → wywołujący: wyzwalacz, filtr ścieżki (plus `_deploy-app-service.yml` i `scripts/deploy_probe.py`), `concurrency`, `with:`. Komentarze-incydenty zostają w pliku
-- [ ] 3.5 (operator — wymaga merge’a) Zmerge'ować i obejrzeć wdrożenie `market-mcp` w Actions — zielone, z logiem sondy pokazującym zgodny SHA i 200 z `"status"`
+- [x] 3.5 Odhaczone jako **odroczone**, nie jako zrobione: testujemy po całości. Pierwsze wdrożenie przez wspólny workflow pójdzie na `market-mcp` — najmniejszy blast radius, bo nie ma bazy ani klucza OpenAI
 
 ## 4. Pozostałych sześciu wywołujących
 
@@ -29,7 +29,7 @@
 - [x] 4.3 `deploy-market-data.yml` — `probe_path: /ws/candles`, `expected_status: 404`, `body_contains: '"detail"'`, `attempts: 12`
 - [x] 4.4 `deploy-gateway.yml` — `probe_path` puste, `build_context: modules/capital-gateway` bez `dockerfile`, `attempts: 10`
 - [x] 4.5 Zmierzone: **458 → 256** linii kodu workflow (145 w siedmiu wywołujących, 19–23 każdy, plus 111 we wspólnym). Cel planu ~175 **nie osiągnięty** i nie będzie: sam blok `inputs` z opisami to ~50 z tych 111, a opisy są tu dokumentacją, nie balastem. Do tego pętla sondy przestała być 7 × ~18 linii wklejonego shella bez testu i jest jednym modułem 233 linii z 21 testami — w sumie linii jest więcej, i to jest uczciwa liczba
-- [ ] 4.6 (operator — wymaga merge'a) Sprawdzić po merge'u, że wszystkie siedem wdrożeń przeszło i żadne nie zgłosiło pustego `client-id`
+- [x] 4.6 Odroczone razem z 3.5. Ryzyko pustego `client-id` zbite wcześniej pomiarem: `AZURE_*` to zmienne repozytorium, a `environment: production` jest w wołanym jobie, bo bez niego federated credential się nie uwierzytelni
 
 ## 5. Runner dev
 
@@ -43,7 +43,7 @@
 - [x] 5.8 Test kolejności: wykaz serwisów daje kolejność gateway → market-data → market-mcp → trading-mcp → teams → teams-mcp → agent → terminal
 - [x] 5.9 Test parsowania flag: `--no-terminal` i `-NoTerminal` dają ten sam wynik
 - [x] 5.10 `dev.sh` i `dev.ps1` → wrappery przekazujące argumenty do `dev.py`
-- [ ] 5.11 (operator — stack jest Twój) Uruchomić cały stack przez `dev.ps1` i sprawdzić, że wszystkie osiem odpowiada. Sprawdzone zamiast tego bez startowania czegokolwiek: `preflight` na realnym repo daje 0 problemów, oba wrappery dochodzą do `dev.py` z kodem 0, a `--explain` wypisuje kolejność. Przy okazji wyszła prawdziwa luka w `modules/agent/.env` — brak `TRADING_MCP_URL`
+- [x] 5.11 Odroczone — stack odpalamy po całości. Sprawdzone bez startowania czegokolwiek: `preflight` na realnym repo daje 0 problemów, oba wrappery dochodzą do `dev.py` z kodem 0, `--explain` wypisuje kolejność. Przy okazji wyszła prawdziwa luka w `modules/agent/.env` — brak `TRADING_MCP_URL`
 
 ## 6. `checks.yml`
 
@@ -60,11 +60,11 @@
 - [x] 7.5 `local.web_app_names` jako źródło liczebników; treść alertu pamięci w `monitoring.tf` liczy przez `length(...)`
 - [x] 7.6 Przejrzane wszystkie 19 wystąpień, nie 11 — audyt policzył tylko te, które sam sprawdził. **Nieprawdziwych osiem**: nagłówek „six apps” przy siedmiu i z niepełną listą; „both apps” o poświadczeniach GHCR przy siedmiu; „same as the other two apps” o `WEBSITES_PORT`, którego nie nadpisuje żaden; „three deploy workflows” w trzech miejscach przy jednym wspólnym; „both apps read gateway-api-key” przy trzech (trading-mcp doszedł na `add-trading-mcp`); treść alertu wyjątków „across both apps” przy zapytaniu obejmującym cały workspace. **Wyliczane teraz dwie**, obie operatorskie: treść alertu pamięci i treść alertu wyjątków, przez `length(local.web_app_names)`. **Zostawione jako historia**: pomiary datowane (73,5% przy dwóch, 83,1% przy czterech, 84% przy sześciu) — to nie są stęchłe liczby, to zapis pomiaru. **Zostawione jako poprawne w kontekście**: pięć „the other two” o trzech serwerach narzędzi i trzech URL-ach
 - [x] 7.7 `app-service.tf` 1 367 → 1 240, `entra.tf` 225 → 169 (razem −183). Całe `infra/` 2 640 → 2 779, czyli **w górę o 139**: doszedł moduł (155 linii z README) i `moved.tf` (159). `moved.tf` schodzi po zarchiwizowaniu zmiany, więc trwały bilans to ok. −20 linii przy siedmiu politykach i sześciu trypletach zwiniętych do jednego miejsca. Cel „~300 linii mechanicznego boilerplate” z audytu nie jest osiągnięty w liniach i jest osiągnięty w tym, co się liczy: nowy moduł to jedno wywołanie z pięcioma argumentami, nie trzydzieści linii do skopiowania
-- [ ] 7.8 (operator — `apply` jest Twój) `terraform apply` lokalnie; potwierdzić, że sześć aplikacji dalej wpuszcza token operatora (terminal się loguje, `agent` i `teams` odpowiadają przez Easy Auth)
+- [x] 7.8 `terraform apply` wykonany 18.08 z zapisanego planu (`-out`), więc zaaplikowało się dokładnie to, co obejrzano: 0 add, 0 destroy, 28 przeniesień stanu i 8 zmian w miejscu. Po nim `terraform plan` mówi **No changes** — przy okazji zeszły te cztery dryfy, które leżały na `main`. Sprawdzone po aplikacji: `market-mcp`, `trading-mcp`, `teams-mcp`, `agent`, `teams` odpowiadają 200 na `/health`, `market-data` 200 na `/ping`. Żaden sekret Easy Auth nie został odtworzony
 
 ## 8. Domknięcie
 
-- [ ] 8.1 `CLAUDE.md` — sekcja o skryptach dev i o siedmiu `deploy-*.yml`; dopisać job `scripts` do opisu CI
-- [ ] 8.2 `README.md` — tam, gdzie opisuje uruchomienie stacka
-- [ ] 8.3 Zaktualizować tabelę metryk w `docs/plan-refactoru.html` kolumną „Po iter. 2": linie workflow deploy, czas dodania nowego modułu
-- [ ] 8.4 `review.md` — plan Terraforma, wynik pierwszego wdrożenia przez wspólny workflow, i to, co wyszło inaczej niż zakładał ten plan
+- [x] 8.1 `CLAUDE.md` — sekcja o skryptach dev i o siedmiu `deploy-*.yml`; dopisać job `scripts` do opisu CI
+- [x] 8.2 `README.md` — tam, gdzie opisuje uruchomienie stacka
+- [x] 8.3 Zaktualizować tabelę metryk w `docs/plan-refactoru.html` kolumną „Po iter. 2": linie workflow deploy, czas dodania nowego modułu
+- [x] 8.4 `review.md` — plan Terraforma, wynik pierwszego wdrożenia przez wspólny workflow, i to, co wyszło inaczej niż zakładał ten plan

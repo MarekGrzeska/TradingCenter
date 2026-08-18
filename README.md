@@ -51,6 +51,10 @@ convenience wrappers; no module depends on one.
 ```bash
 ./scripts/dev.sh              # macOS and Linux
 ./scripts/dev.ps1             # Windows
+
+# Both are wrappers over one implementation. `--explain` prints the start order
+# and why each service sits where it does, without starting anything.
+uv run python scripts/dev.py --explain
 ```
 
 Both bring the same things up in the same order:

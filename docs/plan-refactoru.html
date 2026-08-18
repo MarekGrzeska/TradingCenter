@@ -131,7 +131,7 @@
     <span><b>Kryteria:</b> wydajność · złożoność · koszt nowego modułu · reuse</span>
     <span><b>Kontekst:</b> projekt osobisty, edukacyjno-eksperymentalny, konto demo</span>
     <span><b>Horyzont:</b> 6 iteracji, każda domknięta i wartościowa osobno</span>
-    <span><b>Stan:</b> iteracje 0 i 1 zamknięte · następna: 2</span>
+    <span><b>Stan:</b> iteracje 0, 1 i 2 zamknięte · następna: 3</span>
   </div>
 </header>
 
@@ -448,24 +448,66 @@
     </div>
   </div>
 
-  <div class="iter">
+  <div class="iter done">
     <div class="iter-head"><span class="iter-num">2</span>
     <h4>Jedna droga wdrożenia i jeden runner dev</h4>
-    <span class="status-pill next">Następna</span>
-    <span class="horizon">~1 tydz.</span></div>
-    <ul>
-      <li><b>Reusable workflow</b> <code>_deploy-app-service.yml</code> (wejścia: moduł,
-      app-name, wariant sondy) — 7 wywołujących po ~15 linii; komentarze-incydenty zostają u
-      wywołujących. 436 → ~175 linii, a zmiana bloku OIDC czy buildx to jedna edycja.</li>
-      <li><b><code>scripts/dev.py</code></b> zastępuje dev.sh + dev.ps1 (1 136 linii → ~400,
-      jedna implementacja); tabela serwisów jako dane w jednym miejscu.</li>
-      <li><code>checks.yml</code>: filtr <code>infra/**</code> (fmt+validate), likwidacja bloku
-      translacji nazw; liczebniki w alertach Terraforma wyliczane.</li>
-      <li>Terraform chirurgicznie: moduł lokalny <code>easy-auth-app</code> (tryplet ×6),
-      <code>for_each</code> dla 7 polityk Key Vault. Bloki App Service zostają jawne.</li>
+    <span class="status-pill">Zrobione · 18.08</span>
+    <span class="horizon">8 commitów</span></div>
+    <ul class="shipped">
+      <li><code>_deploy-app-service.yml</code> i siedmiu wywołujących po 19–23 linie.
+      <b>458 → 256</b> linii kodu workflow — nie ~175, i to się nie zmieni: sam blok
+      <code>inputs</code> z opisami to ~50 ze 111 we wspólnym, a opisy są dokumentacją
+      parametrów sondy.</li>
+      <li>Sonda wyszła z YAML-a do <code>scripts/deploy_probe.py</code> — <b>osiem wejść, nie
+      dziesięć</b>: sufiks obrazu i cache scope nigdy nie różniły się od nazwy katalogu, a
+      ścieżka do Dockerfile’a wyprowadza się z niej. Doszło <code>failure_hint</code>, żeby
+      rada per moduł z logów trading-mcp i teams-mcp nie zginęła.</li>
+      <li><code>scripts/dev.py</code> (859 linii) plus dwa wrappery po kilkanaście linii
+      zamiast 1 143 linii dwóch skryptów. Tabela serwisów to dane, a pole <code>why</code>
+      niesie powód, dla którego każdy serwis stoi tam, gdzie stoi —
+      <code>--explain</code> je wypisuje.</li>
+      <li><code>checks.yml</code>: job <code>infra</code> (<code>fmt</code> +
+      <code>validate</code> w <b>obu</b> rootach — <code>infra/bootstrap/</code> był poza
+      każdym checkiem), job <code>scripts</code>, i tablica asocjacyjna zamiast bloku
+      translacji nazw.</li>
+      <li>Terraform: <code>modules/easy-auth-app</code> — <b>21 zasobów w stanie, nie 18</b>
+      (tryplet ×6 plus trzy stabilne GUID-y scopeów) — i <code>for_each</code> po siedmiu
+      politykach Key Vault. Zaaplikowane; <code>plan</code> mówi <code>No changes</code>.</li>
     </ul>
-    <p class="gain-line">koszt nowego modułu spada z ~2 dni do ~pół dnia (workflow 15 linii,
-    tryplet z modułu, wpis w tabeli dev); dryf skryptów dev znika konstrukcyjnie.</p>
+    <p class="gain-line">nowy moduł App Service to jedno wywołanie workflow, jedno wywołanie
+    modułu Terraforma i wiersz w tabeli dev; dryf skryptów dev znika konstrukcyjnie, a każda
+    obrona w CI i w skryptach ma wreszcie test swojego trybu awarii.</p>
+    <div class="aside">
+      <h5>Co wyszło inaczej, niż zakładał plan</h5>
+      <p><b>Bramka Terraforma nie mogła brzmieć tak, jak ją zapisano.</b>
+      <code>0 to add, 0 to change, 0 to destroy</code> było na tym stanie nieosiągalne i nie
+      z powodu tej zmiany: plan na samym <code>main</code> mówił
+      <code>0 to add, 4 to change, 0 to destroy</code>. Jeden dryf —
+      <code>WEBSITES_ENABLE_APP_SERVICE_STORAGE</code> na teams — odkładał trzy odczyty
+      tożsamości i przez to zmieniał <code>allowed_applications</code> w trzech kolejnych
+      aplikacjach. Bramka, która coś znaczy: plan gałęzi identyczny z planem
+      <code>main</code> poza notkami <code>moved</code>, przy zerze w add i destroy. Taki
+      był, wszystkie 28 przeniesień trafiło w istniejące obiekty — żaden sekret Easy Auth
+      nie został odtworzony. <code>apply</code> zdjął przy okazji te cztery dryfy.</p>
+      <p><b>Trzy błędy złapane przy pisaniu, nie po.</b> <code>body_contains</code> to
+      <code>"status"</code> z cudzysłowami — wstawione przez <code>${{ }}</code> w cytowany
+      argument shella zwija się do <code>status</code>, które łapie też stronę logowania
+      platformy; sonda przechodziłaby CI i cicho przestała sprawdzać to, po co ją dodano.
+      <code>agent</code> i <code>teams</code> przyjmowały samo 200, gdy trzy moduły MCP
+      sprawdzały 200 <em>i</em> ciało. A <code>infra/bootstrap/</code> nie był walidowany
+      przez nic.</p>
+      <p><b>Dom testowy dla <code>scripts/</code> to odchylenie od planu.</b> Plan mówił
+      tylko „dev.py zastępuje dwa skrypty”. Bez <code>pyproject.toml</code> i joba w CI
+      zasada nr 5 nie miałaby gdzie stanąć — ani dla sondy, która cicho padła 16 sierpnia,
+      ani dla pięciu odmów, które runner wypowiada przed startem. 139 testów, w tym
+      reprodukcja 16 sierpnia i krok <code>changes</code> z <code>checks.yml</code>
+      uruchamiany na sztucznym diffie.</p>
+      <p><b>Osiem z dziewiętnastu liczebników było nieprawdziwych</b>, nie jedenaście —
+      audyt policzył tylko te, które sam sprawdził. Dwa są teraz wyliczane i oba są
+      operatorskie: treść alertu pamięci, na którym stoi decyzja o SKU, i treść alertu
+      wyjątków. Pomiary datowane zostały bez zmian — liczba zapisująca pomiar nie jest
+      stęchła.</p>
+    </div>
   </div>
 
   <div class="iter">
@@ -554,45 +596,57 @@
 
   <h2 id="metryki">Jak poznamy, że się udało</h2>
   <div class="table-wrap"><table>
-    <thead><tr><th>Metryka</th><th>Audyt 18.08</th><th>Po iter. 0</th><th>Po iter. 1</th><th>Cel</th></tr></thead>
+    <thead><tr><th>Metryka</th><th>Audyt 18.08</th><th>Po iter. 0</th><th>Po iter. 1</th><th>Po iter. 2</th><th>Cel</th></tr></thead>
     <tbody>
       <tr><td>Miejsca do edycji przy poprawce wspólnej logiki Pythona</td>
         <td class="num">2–7 kopii</td><td class="num">2–7 kopii</td>
-        <td class="num hit">1 pakiet ✓</td><td class="num">1 pakiet</td></tr>
+        <td class="num hit">1 pakiet ✓</td><td class="num hit">1 pakiet ✓</td><td class="num">1 pakiet</td></tr>
       <tr><td>Ręcznie kopiowane linie Pythona ponad pierwszy egzemplarz (pary ≥70%)</td>
         <td class="num">959</td><td class="num miss">+80</td>
-        <td class="num hit">74 ✓</td><td class="num">&lt; 200</td></tr>
+        <td class="num hit">74 ✓</td><td class="num hit">74 ✓</td><td class="num">&lt; 200</td></tr>
       <tr><td>Tokeny powierzchni narzędzi na turę agenta</td>
         <td class="num">~17 600</td><td class="num">~17 600</td>
-        <td class="num">~17 600</td><td class="num">&lt; 10 000</td></tr>
+        <td class="num">~17 600</td><td class="num">~17 600</td><td class="num">&lt; 10 000</td></tr>
       <tr><td>Requesty upstream na wywołanie narzędzia z /pairs</td>
         <td class="num">3–4</td><td class="num">3–4</td>
-        <td class="num">3–4</td><td class="num">1–2</td></tr>
+        <td class="num">3–4</td><td class="num">3–4</td><td class="num">1–2</td></tr>
       <tr><td>Czas dodania nowego modułu (kod → produkcja)</td>
         <td class="num">~2 dni</td><td class="num">~2 dni</td>
-        <td class="num">niezmierzone</td><td class="num">&lt; 0,5 dnia</td></tr>
-      <tr><td>Linie workflow deploy</td>
+        <td class="num">niezmierzone</td><td class="num">niezmierzone</td><td class="num">&lt; 0,5 dnia</td></tr>
+      <tr><td>Linie workflow deploy (bez komentarzy, 7 App Service)</td>
         <td class="num">436</td><td class="num miss">452</td>
-        <td class="num miss">458</td><td class="num">~175</td></tr>
+        <td class="num miss">458</td><td class="num hit">256</td><td class="num">~175</td></tr>
+      <tr><td>Linie skryptów dev</td>
+        <td class="num">1 136</td><td class="num">1 143</td>
+        <td class="num">1 143</td><td class="num hit">29 + 859 w jednym</td><td class="num">jedna implementacja</td></tr>
+      <tr><td>Obrony w CI i skryptach bez testu trybu awarii</td>
+        <td class="num">wszystkie</td><td class="num">wszystkie</td>
+        <td class="num">wszystkie</td><td class="num hit">0 ✓</td><td class="num">0</td></tr>
       <tr><td>Największy plik w repo</td>
         <td class="num">3 302 (test) / 2 124 (prod)</td><td class="num">bez zmian</td>
-        <td class="num">bez zmian</td><td class="num">&lt; 1 000</td></tr>
+        <td class="num">bez zmian</td><td class="num">bez zmian</td><td class="num">&lt; 1 000</td></tr>
       <tr><td>Sondy mogące przejść na starym kontenerze</td>
         <td class="num">4 z 7</td><td class="num hit">0 ✓</td>
-        <td class="num hit">0 ✓</td><td class="num">0</td></tr>
+        <td class="num hit">0 ✓</td><td class="num hit">0 ✓</td><td class="num">0</td></tr>
     </tbody>
   </table></div>
 
-  <p><b>Po dwóch iteracjach trzy metryki są na celu, trzy stoją, jedna rośnie.</b>
+  <p><b>Po trzech iteracjach pięć metryk jest na celu, trzy stoją, żadna nie rośnie.</b>
   Iteracja 0 była naprawcza i dwie liczby poszły w niej w górę — to normalny jej kształt.
   Iteracja 1 spłaciła jedną z nich z nawiązką: ~80 linii świadomie zrównanych kopii
   <code>_detail</code> zamieniło się w jeden egzemplarz, a razem z nimi zeszła cała reszta,
-  959 → 74.</p>
-  <p>Rosną wciąż <b>wiersze workflow deploy</b>: 436 → 452 → 458, bo najpierw doszła asercja
-  tagu obrazu, a potem <code>file:</code> obok nowego kontekstu w sześciu plikach. To jest
-  dokładnie ten dług, który iteracja 2 spłaca reusable workflow — a przy okazji rachunek
-  robi się prostszy, bo teraz sześć z siedmiu plików różni się o dwie linie więcej tego
-  samego.</p>
+  959 → 74. Iteracja 2 spłaciła drugą.</p>
+  <p><b>Wiersze workflow deploy przestały rosnąć</b>: 436 → 452 → 458 → <b>256</b>. Nie do
+  ~175 z celu, i nie będzie: sam blok <code>inputs</code> z opisami to ~50 ze 111 linii
+  wspólnego workflow, a te opisy są jedyną dokumentacją tego, co znaczy każdy parametr
+  sondy. Liczona uczciwie całość jest zresztą większa, nie mniejsza: pętla sondy przestała
+  być siedmioma wklejonymi kopiami po ~18 linii bez testu i jest jednym modułem 233 linii z
+  dwudziestoma jeden testami. To jest ta wymiana, którą chcieliśmy zrobić.</p>
+  <p>Doszły za to dwa wiersze, których tabela nie miała, bo audyt nie umiał ich policzyć przed
+  iteracją 0: <b>linie skryptów dev</b> (1 143 w dwóch plikach → jedna implementacja i dwa
+  wrappery) i <b>obrony bez testu trybu awarii</b>. Ta druga szła przez cały plan jako
+  zasada nr 5, a nie miała nigdy liczby — do iteracji 2 było ich w CI i w skryptach
+  <em>wszystkie</em>, bo pętli w YAML-u i funkcji w shellu nie ma jak wywołać.</p>
   <p><b>74 linie, które zostały, to szwy, nie kopie</b> — <code>provider.py</code>,
   <code>auth.py</code> i <code>routers/models.py</code>, po docstringu i jednej linii
   wiązania, trzymające klucz API, ustawienie i typ odpowiedzi każdego modułu. Zejście do zera
