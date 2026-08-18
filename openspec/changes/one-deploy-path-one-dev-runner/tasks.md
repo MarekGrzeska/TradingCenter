@@ -33,17 +33,17 @@
 
 ## 5. Runner dev
 
-- [ ] 5.1 `scripts/dev.py` — tabela serwisów jako lista zamrożonych dataclass (`name`, `directory`, `port`, `command`, `health_path`, `log_prefix`, `color`, `why`); proza kolejności startu przeniesiona do pola `why`
-- [ ] 5.2 Kontrole przed startem: Docker obecny, porty wolne, `CAPITAL_GATEWAY_API_KEY` == `GATEWAY_API_KEY`, `DATABASE_URL` na loopbacku, `OPENAI_API_KEY` obecny w `agent` i `teams`
-- [ ] 5.3 Ostrzeżenia bez odmowy: brak `MARKET_MCP_URL`, `TRADING_MCP_URL`, `TEAMS_MCP_URL` — każde nazwane osobno
-- [ ] 5.4 Baza: start kontenera `compose.yaml`, utworzenie brakujących roli i baz `agent` oraz `teams`, oczekiwanie na gotowość
-- [ ] 5.5 Nadzór i sprzątanie: wszystkie osiem procesów w jednym wykazie, log prefiksowany, śmierć któregokolwiek kończy całość, `finally` zabija wszystko, co uruchomił ten proces
-- [ ] 5.6 Flaga wyłączająca terminal przyjmowana w obu pisowniach (`--no-terminal`, `-NoTerminal`)
-- [ ] 5.7 Testy odmów — po jednym na każdą z 5.2, każdy wywołujący dokładnie ten scenariusz i sprawdzający, że runner odmawia przed uruchomieniem czegokolwiek
-- [ ] 5.8 Test kolejności: wykaz serwisów daje kolejność gateway → market-data → market-mcp → trading-mcp → teams → teams-mcp → agent → terminal
-- [ ] 5.9 Test parsowania flag: `--no-terminal` i `-NoTerminal` dają ten sam wynik
-- [ ] 5.10 `dev.sh` i `dev.ps1` → wrappery przekazujące argumenty do `dev.py`
-- [ ] 5.11 Uruchomić cały stack przez `dev.ps1` i sprawdzić, że wszystkie osiem odpowiada; zatrzymać po sobie
+- [x] 5.1 `scripts/dev.py` — tabela serwisów jako lista zamrożonych dataclass (`name`, `directory`, `port`, `command`, `health_path`, `log_prefix`, `color`, `why`); proza kolejności startu przeniesiona do pola `why`
+- [x] 5.2 Kontrole przed startem: Docker obecny, porty wolne, `CAPITAL_GATEWAY_API_KEY` == `GATEWAY_API_KEY`, `DATABASE_URL` na loopbacku, `OPENAI_API_KEY` obecny w `agent` i `teams`
+- [x] 5.3 Ostrzeżenia bez odmowy: brak `MARKET_MCP_URL`, `TRADING_MCP_URL`, `TEAMS_MCP_URL` — każde nazwane osobno
+- [x] 5.4 Baza: start kontenera `compose.yaml`, utworzenie brakujących roli i baz `agent` oraz `teams`, oczekiwanie na gotowość
+- [x] 5.5 Nadzór i sprzątanie: wszystkie osiem procesów w jednym wykazie, log prefiksowany, śmierć któregokolwiek kończy całość, `finally` zabija wszystko, co uruchomił ten proces
+- [x] 5.6 Flaga wyłączająca terminal przyjmowana w obu pisowniach (`--no-terminal`, `-NoTerminal`)
+- [x] 5.7 Testy odmów — po jednym na każdą z 5.2, każdy wywołujący dokładnie ten scenariusz i sprawdzający, że runner odmawia przed uruchomieniem czegokolwiek
+- [x] 5.8 Test kolejności: wykaz serwisów daje kolejność gateway → market-data → market-mcp → trading-mcp → teams → teams-mcp → agent → terminal
+- [x] 5.9 Test parsowania flag: `--no-terminal` i `-NoTerminal` dają ten sam wynik
+- [x] 5.10 `dev.sh` i `dev.ps1` → wrappery przekazujące argumenty do `dev.py`
+- [ ] 5.11 (operator — stack jest Twój) Uruchomić cały stack przez `dev.ps1` i sprawdzić, że wszystkie osiem odpowiada. Sprawdzone zamiast tego bez startowania czegokolwiek: `preflight` na realnym repo daje 0 problemów, oba wrappery dochodzą do `dev.py` z kodem 0, a `--explain` wypisuje kolejność. Przy okazji wyszła prawdziwa luka w `modules/agent/.env` — brak `TRADING_MCP_URL`
 
 ## 6. `checks.yml`
 
