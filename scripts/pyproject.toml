@@ -35,5 +35,7 @@ testpaths = ["tests"]
 dev = [
     "pyright==1.1.411",
     "pytest>=8.3",
+    "pyyaml>=6.0.3",
     "ruff==0.16.2",
+    "types-pyyaml>=6.0.12.20260815",
 ]

@@ -16,11 +16,11 @@
 
 ## 3. Reusable workflow i pierwszy wywołujący
 
-- [ ] 3.1 Odczytać z ustawień repozytorium, czy `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID` są zmiennymi repo czy środowiska `production` (design.md, Open Questions)
-- [ ] 3.2 `.github/workflows/_deploy-app-service.yml` — `workflow_call` z wejściami `module`, `image_name`, `app_name`, `build_context`, `dockerfile`, `probe_path`, `expected_status`, `body_contains`, `attempts`; job deklaruje `environment: production` i `permissions` (contents/id-token/packages)
-- [ ] 3.3 Krok sondy woła `scripts/deploy_probe.py` przez `uv run`
-- [ ] 3.4 `deploy-market-mcp.yml` → wywołujący: wyzwalacz, filtr ścieżki (plus `_deploy-app-service.yml` i `scripts/deploy_probe.py`), `concurrency`, `with:`. Komentarze-incydenty zostają w pliku
-- [ ] 3.5 Zmerge'ować i obejrzeć wdrożenie `market-mcp` w Actions — zielone, z logiem sondy pokazującym zgodny SHA i 200 z `"status"`
+- [x] 3.1 Odczytane: `AZURE_*` to zmienne **repozytorium**, środowisko `production` nie ma własnych. `environment: production` zostaje i tak — federated credential ma w subject `:environment:production`, więc bez tego nie ma uwierzytelnienia do Azure
+- [x] 3.2 `.github/workflows/_deploy-app-service.yml` — `workflow_call`. Wejść wyszło osiem, nie dziesięć: `image_name` i cache scope są zawsze równe `module` (zmierzone na wszystkich siedmiu), a `dockerfile` wyprowadza się z `module`, bo `file:` jest relatywne do workspace'u, nie do kontekstu. Doszło `failure_hint`, żeby rada per moduł z logów `trading-mcp` i `teams-mcp` nie zginęła
+- [x] 3.3 Krok sondy woła `scripts/deploy_probe.py` przez `uv run`
+- [x] 3.4 `deploy-market-mcp.yml` → wywołujący: wyzwalacz, filtr ścieżki (plus `_deploy-app-service.yml` i `scripts/deploy_probe.py`), `concurrency`, `with:`. Komentarze-incydenty zostają w pliku
+- [ ] 3.5 (operator — wymaga merge’a) Zmerge'ować i obejrzeć wdrożenie `market-mcp` w Actions — zielone, z logiem sondy pokazującym zgodny SHA i 200 z `"status"`
 
 ## 4. Pozostałych sześciu wywołujących
 

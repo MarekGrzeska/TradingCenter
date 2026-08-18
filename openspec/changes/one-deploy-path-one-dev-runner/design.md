@@ -193,7 +193,10 @@ siedem `deploy-*.yml`; rebase po niej jest trywialny, przed nią nie.
 
 ## Open Questions
 
-- Czy `vars.AZURE_CLIENT_ID`, `AZURE_TENANT_ID` i `AZURE_SUBSCRIPTION_ID` są zmiennymi
-  repozytorium, czy środowiska `production`? Odpowiedź zmienia jedną linię wołanego joba i
-  jest czytana z ustawień GitHuba przy pierwszym zadaniu, nie zgadywana. Nie zmienia ani
-  podejścia, ani rozbicia zadań — stąd tutaj, a nie w decyzjach.
+Brak otwartych. Jedyne pytanie tego designu — zakres zmiennych `AZURE_*` — zostało
+odczytane z ustawień repozytorium przy zadaniu 3.1: to **zmienne repozytorium**, a
+środowisko `production` nie ma własnych. Odpowiedź nie zniosła jednak deklaracji
+`environment: production` w wołanym jobie, i to z ostrzejszego powodu, niż zakładało
+pytanie: federated credential w `github-oidc.tf` ma w subject `:environment:production`,
+więc job bez tej deklaracji nie uwierzytelni się do Azure wcale — niezależnie od tego,
+skąd czyta zmienne.
