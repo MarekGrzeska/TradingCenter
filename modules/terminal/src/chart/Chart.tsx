@@ -234,6 +234,9 @@ const PRICE_PANE_STRETCH = 4;
 /** One shared empty array for a chart with no drawings, so "none" is the same reference
  *  on every render and never restarts the sync effect that watches it. */
 const EMPTY_DRAWINGS: readonly AgentChartDrawing[] = [];
+/** Asked for while the catalogue has not answered yet — one identity, so waiting for it
+ *  costs no render of its own. */
+const NO_SELECTIONS: IndicatorSelection[] = [];
 const OWN_PANE_STRETCH = 1;
 
 function toCandlestick(bar: Bar): CandlestickData<Time> {
@@ -654,11 +657,18 @@ export function Chart({
   // different one). Dropped from what actually computes and draws — surfaced
   // in the header instead — but never rewritten in the caller's storage on its
   // own: only an explicit change through the picker does that (terminal-grid
-  // spec, "wpis nieznany katalogowi pomijany z komunikatem"). Skipped entirely
-  // while the catalogue is still loading or failed to load, so a slow or
-  // flaky read never reads as "the archive removed everything".
+  // spec, "wpis nieznany katalogowi pomijany z komunikatem").
+  //
+  // The two not-ready states are not the same state. Still loading: nothing is asked
+  // for yet, because a compute for an id the catalogue no longer offers is a read the
+  // archive refuses, and the answer that would have filtered it is one tick away.
+  // Failed: the selections pass through unfiltered, so a flaky read never reads as
+  // "the archive removed everything".
   const { knownIndicatorSelections, unknownIndicatorIds } = useMemo(() => {
-    if (catalogue.status !== "ready") {
+    if (catalogue.status === "loading") {
+      return { knownIndicatorSelections: NO_SELECTIONS, unknownIndicatorIds: [] as string[] };
+    }
+    if (catalogue.status === "error") {
       return { knownIndicatorSelections: indicatorSelections, unknownIndicatorIds: [] as string[] };
     }
     const known: IndicatorSelection[] = [];

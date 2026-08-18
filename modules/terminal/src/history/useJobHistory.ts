@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useRead } from "../data/query";
 import type { ArchiveAdmin } from "../data/source";
 import type { JobPairView, PairDeletion } from "../data/types";
 
@@ -11,6 +11,14 @@ import type { JobPairView, PairDeletion } from "../data/types";
  *  chunk settles every few tens of seconds, so thirty was slow enough to make a
  *  working job look stalled. */
 const POLL_MS = 10_000;
+
+interface Both {
+  rows: JobPairView[];
+  deletions: PairDeletion[];
+}
+
+/** Rendered until the first answer — one identity, not a pair of fresh arrays per render. */
+const NONE: Both = { rows: [], deletions: [] };
 
 export type JobHistoryStatus = "loading" | "ready" | "unreachable";
 
@@ -36,52 +44,29 @@ export interface JobHistoryState {
  *
  * The two reads land together or not at all: a deletion cutting a pair's history short
  * is what this tab exists to show, so "jobs refreshed, deletions did not" is not a state
- * worth telling apart from a failed poll.
+ * worth telling apart from a failed poll. That is why this is one query over both and
+ * not two — one cache entry, one status, one failure.
  */
 export function useJobHistory(admin: ArchiveAdmin): JobHistoryState {
-  const [rows, setRows] = useState<JobPairView[]>([]);
-  const [deletions, setDeletions] = useState<PairDeletion[]>([]);
-  const [status, setStatus] = useState<JobHistoryStatus>("loading");
-  const [error, setError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
+  const read = useRead<Both>({
+    key: ["archive", "collection-history"],
+    read: async (signal) => {
+      const [rows, deletions] = await Promise.all([
+        admin.listJobs(null, null, signal),
+        admin.listDeletions(null, null, signal),
+      ]);
+      return { rows, deletions };
+    },
+    initial: NONE,
+    fallbackMessage: "could not read collection history",
+    pollMs: POLL_MS,
+  });
 
-  const reload = useCallback(() => setAttempt((n) => n + 1), []);
-
-  useEffect(() => {
-    let cancelled = false;
-    let inFlight: AbortController | null = null;
-
-    function read() {
-      inFlight?.abort();
-      const controller = new AbortController();
-      inFlight = controller;
-      Promise.all([
-        admin.listJobs(null, null, controller.signal),
-        admin.listDeletions(null, null, controller.signal),
-      ])
-        .then(([nextRows, nextDeletions]) => {
-          if (cancelled) return;
-          setRows(nextRows);
-          setDeletions(nextDeletions);
-          setStatus("ready");
-          setError(null);
-        })
-        .catch((cause: unknown) => {
-          if (cancelled || controller.signal.aborted) return;
-          setError(cause instanceof Error ? cause.message : "could not read collection history");
-          setStatus((current) => (current === "ready" ? "ready" : "unreachable"));
-        });
-    }
-
-    read();
-    const interval = setInterval(read, POLL_MS);
-
-    return () => {
-      cancelled = true;
-      inFlight?.abort();
-      clearInterval(interval);
-    };
-  }, [admin, attempt]);
-
-  return { status, rows, deletions, error, reload };
+  return {
+    status: read.status === "error" ? "unreachable" : read.status,
+    rows: read.value.rows,
+    deletions: read.value.deletions,
+    error: read.error,
+    reload: read.reload,
+  };
 }

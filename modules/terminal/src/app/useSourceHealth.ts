@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { useQueries } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { queryClient } from "../data/query";
 import type { SourcePart } from "../data/source";
 import { MarketDataError } from "../data/types";
 
@@ -22,47 +24,35 @@ const POLL_MS = 15_000;
  *  the top bar reflects the sources themselves, not one chart's luck.
  *  terminal-shell spec, "Stan źródła danych jest widoczny globalnie".
  *
- *  One state per part, because they fail separately and mean different things:
+ *  One query per part, because they fail separately and mean different things:
  *  the archive down empties the charts, the gateway down stops the search, and
  *  reporting either as "the source is unreachable" would send an operator
  *  looking in the wrong place (design.md, Risks). */
 export function useSourceHealth(parts: readonly SourcePart[]): Record<string, SourceHealth> {
-  const [health, setHealth] = useState<Record<string, SourceHealth>>(() =>
-    Object.fromEntries(parts.map((part) => [part.id, "checking" as SourceHealth])),
+  const results = useQueries(
+    {
+      queries: parts.map((part) => ({
+        queryKey: ["source-health", part.id],
+        queryFn: async ({ signal }: { signal: AbortSignal }) => {
+          await part.ping(signal);
+          return "reachable" as const;
+        },
+        refetchInterval: POLL_MS,
+      })),
+    },
+    queryClient,
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    let inFlight: AbortController | null = null;
-    setHealth(Object.fromEntries(parts.map((part) => [part.id, "checking" as SourceHealth])));
+  const health = parts.map((part, index): [string, SourceHealth] => {
+    const result = results[index];
+    if (result.isSuccess) return [part.id, "reachable"];
+    if (result.isError) return [part.id, healthFromFailure(result.error)];
+    return [part.id, "checking"];
+  });
 
-    function check() {
-      inFlight?.abort();
-      const controller = new AbortController();
-      inFlight = controller;
-      for (const part of parts) {
-        part
-          .ping(controller.signal)
-          .then(() => {
-            if (!cancelled) setHealth((prev) => ({ ...prev, [part.id]: "reachable" }));
-          })
-          .catch((cause: unknown) => {
-            if (!cancelled && !controller.signal.aborted) {
-              setHealth((prev) => ({ ...prev, [part.id]: healthFromFailure(cause) }));
-            }
-          });
-      }
-    }
-
-    check();
-    const interval = setInterval(check, POLL_MS);
-
-    return () => {
-      cancelled = true;
-      inFlight?.abort();
-      clearInterval(interval);
-    };
-  }, [parts]);
-
-  return health;
+  // Keyed on the values, not on the array `useQueries` rebuilds every render: the top
+  // bar re-renders on every parent render either way, but a new record identity would
+  // also restart any effect downstream that watches this.
+  const signature = health.map(([id, state]) => `${id}:${state}`).join("|");
+  return useMemo(() => Object.fromEntries(health), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
 }
