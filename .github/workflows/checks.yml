@@ -110,13 +110,13 @@ jobs:
           # Same reasoning as the terminal's own filter, one line up: market-mcp keeps a
           # committed snapshot of the same contract (`contract/market-data.openapi.json`),
           # and `test_contract.py` is the check that catches it going stale.
-          mcp='^modules/market-mcp/|^modules/market-data/market_data/contract\.py$'
+          mcp="^modules/market-mcp/|^modules/market-data/market_data/contract\.py$|$tc_runtime"
           # The same rule again, one module along: trading-mcp keeps a committed snapshot
           # of capital-gateway's whole OpenAPI document (`contract/capital-gateway.
           # openapi.json`), and `scripts/contract.py check` is what catches it going
           # stale. The gateway's *whole* directory, not one file: that document is built
           # from its routes as well as its DTOs, so there is no narrower honest filter.
-          trading='^modules/trading-mcp/|^modules/capital-gateway/'
+          trading="^modules/trading-mcp/|^modules/capital-gateway/|$tc_runtime"
           # And once more, one module further in: teams-mcp keeps a committed snapshot of
           # teams' OpenAPI document (`contract/teams.openapi.json`).
           #
@@ -128,7 +128,7 @@ jobs:
           # `contract.py` imports its models rather than defining them all, and the
           # document is built from routes as well, so the whole module is the only honest
           # filter — the same conclusion trading-mcp's reached one line up.
-          teamsmcp='^modules/teams-mcp/|^modules/teams/'
+          teamsmcp="^modules/teams-mcp/|^modules/teams/|$tc_runtime"
           # The archive-shape check, plus the script that is the shape.
           specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
           packages='^packages/'

@@ -15,11 +15,18 @@ dependencies = [
     # Only for this module's own outbound identity to teams. The operator's token
     # travels separately and is never fetched here.
     "azure-identity>=1.17",
+    # The caller-identity middleware and the upstream-refusal helper, one copy each
+    # (packages-replace-the-hand-copies). Everything else in this module stays here:
+    # its server, its client, its settings and its error taxonomy are not copies.
+    "tc-runtime",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+tc-runtime = { path = "../../packages/tc-runtime", editable = true }
 
 [tool.ruff]
 line-length = 100

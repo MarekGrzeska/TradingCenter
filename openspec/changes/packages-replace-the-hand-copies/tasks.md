@@ -69,15 +69,15 @@ dojdzie drugi moduł. Po niej `agent` bierze `tc-runtime`, a reszta repo stoi ni
 
 ## 5. Trzy moduły MCP biorą to, co u nich jest kopią
 
-- [ ] 5.1 `network_identity.py` do `tc_runtime` jako pod-moduł; różnice trzech kopii
+- [x] 5.1 `network_identity.py` do `tc_runtime` jako pod-moduł; różnice trzech kopii
       (76,9–86,2%) wyrażone parametrami, nie gałęziami
-- [ ] 5.2 Wspólny `_detail` ze spłaszczaniem listy walidacyjnej do `tc_runtime`; trzy kopie
+- [x] 5.2 Wspólny `_detail` ze spłaszczaniem listy walidacyjnej do `tc_runtime`; trzy kopie
       są od iteracji 0 identyczne modulo dwie stałe, więc obie stałe stają się argumentami
-- [ ] 5.3 `market-mcp`, `teams-mcp`, `trading-mcp`: pyproject, Dockerfile, filtr CI
-- [ ] 5.4 `server.py`, `client.py`, `config.py`, `errors.py` **zostają nietknięte** — w README
+- [x] 5.3 `market-mcp`, `teams-mcp`, `trading-mcp`: pyproject, Dockerfile, filtr CI
+- [x] 5.4 `server.py`, `client.py`, `config.py`, `errors.py` **zostają nietknięte** — w README
       `tc-runtime` zapisać, dlaczego, z liczbami (`design.md`, D1), żeby następny czytelnik nie
       zaczynał tej analizy od zera
-- [ ] 5.5 Trzy zestawy testów zielone, w tym `scripts/contract.py check` w każdym z trzech
+- [x] 5.5 Trzy zestawy testów zielone, w tym `scripts/contract.py check` w każdym z trzech
 
 ## 6. Domknięcie
 

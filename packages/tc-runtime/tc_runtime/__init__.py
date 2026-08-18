@@ -7,6 +7,14 @@ module is calling (`openspec/changes/archive/…-packages-replace-the-hand-copie
 D2). `README.md` carries the measurements and the files that were considered and refused.
 """
 
-from . import auth, db, migrate, routers, schema_version
+from . import auth, db, detail, migrate, network_identity, routers, schema_version
 
-__all__ = ["auth", "db", "migrate", "routers", "schema_version"]
+__all__ = [
+    "auth",
+    "db",
+    "detail",
+    "migrate",
+    "network_identity",
+    "routers",
+    "schema_version",
+]
