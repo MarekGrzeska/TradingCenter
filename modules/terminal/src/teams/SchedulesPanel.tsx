@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Button } from "../ui/Button";
 import type { QueryKey } from "@tanstack/react-query";
 import { useAgentTurns } from "../agent/useAgentTurns";
 import { useRead } from "../data/query";
@@ -34,9 +35,6 @@ const NOT_READ_YET: {
 const NO_FIRES: ScheduleFire[] = [];
 
 const INPUT = "rounded border border-border bg-panel px-2 py-1 text-sm text-ink";
-const BUTTON = "cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong";
-const PRIMARY_BUTTON =
-  "cursor-pointer rounded border border-primary-line bg-primary-soft px-3 py-1 text-xs text-ink hover:bg-primary-strong hover:text-ink-inverse disabled:cursor-not-allowed disabled:opacity-40";
 
 /**
  * A team's own clock: the schedules that fire it on time, and the triggers that fire it
@@ -92,9 +90,9 @@ export function SchedulesPanel({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex items-center gap-2 border-b border-border p-2">
-        <button type="button" onClick={onClose} className={BUTTON}>
+        <Button onClick={onClose}>
           ← {teamName}
-        </button>
+        </Button>
         <h2 className="text-sm font-semibold text-ink">Schedules and triggers</h2>
       </header>
 
@@ -154,9 +152,9 @@ function ScheduleSection({
     <section className="mb-6">
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-sm font-medium text-ink">Schedules</h3>
-        <button type="button" onClick={() => setEditing("new")} className={BUTTON}>
+        <Button onClick={() => setEditing("new")}>
           New schedule
-        </button>
+        </Button>
       </div>
 
       {schedules === null && <p className="text-xs text-ink-muted">Reading schedules…</p>}
@@ -190,19 +188,15 @@ function ScheduleSection({
                   onEnable={() => api.enableSchedule(schedule.id, new AbortController().signal).then(onChanged)}
                   onDisable={() => api.disableSchedule(schedule.id, new AbortController().signal).then(onChanged)}
                 />
-                <button type="button" onClick={() => setEditing(schedule)} className={BUTTON}>
+                <Button onClick={() => setEditing(schedule)}>
                   Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHistoryFor(historyFor === schedule.id ? null : schedule.id)}
-                  className={BUTTON}
-                >
+                </Button>
+                <Button onClick={() => setHistoryFor(historyFor === schedule.id ? null : schedule.id)}>
                   History
-                </button>
-                <button type="button" onClick={() => setDeleting(schedule)} className={BUTTON}>
+                </Button>
+                <Button onClick={() => setDeleting(schedule)}>
                   Delete
-                </button>
+                </Button>
               </div>
             </div>
             {historyFor === schedule.id && (
@@ -279,22 +273,9 @@ function EnableToggle({
   const [error, setError] = useState<string | null>(null);
   return (
     <div className="flex flex-col items-end gap-1">
-      <button
-        type="button"
-        disabled={busy}
-        onClick={() => {
-          setBusy(true);
-          setError(null);
-          Promise.resolve(enabled ? onDisable() : onEnable())
-            .catch((cause: unknown) =>
-              setError(refusalMessage(cause, enabled ? "could not disable it" : "could not enable it")),
-            )
-            .finally(() => setBusy(false));
-        }}
-        className={`${BUTTON} disabled:cursor-not-allowed disabled:opacity-40`}
-      >
+      <Button disabled={busy} onClick={() => { setBusy(true); setError(null); Promise.resolve(enabled ? onDisable() : onEnable()) .catch((cause: unknown) => setError(refusalMessage(cause, enabled ? "could not disable it" : "could not enable it")), ) .finally(() => setBusy(false)); }}>
         {enabled ? "Disable" : "Enable"}
-      </button>
+      </Button>
       {error && <span className="text-right text-xs text-critical">{error}</span>}
     </div>
   );
@@ -383,9 +364,9 @@ function TriggerSection({
     <section>
       <div className="mb-2 flex items-center gap-2">
         <h3 className="text-sm font-medium text-ink">Triggers</h3>
-        <button type="button" onClick={() => setEditing("new")} className={BUTTON}>
+        <Button onClick={() => setEditing("new")}>
           New trigger
-        </button>
+        </Button>
       </div>
 
       {triggers === null && <p className="text-xs text-ink-muted">Reading triggers…</p>}
@@ -423,16 +404,12 @@ function TriggerSection({
                   onEnable={() => api.enableTrigger(trigger.id, new AbortController().signal).then(onChanged)}
                   onDisable={() => api.disableTrigger(trigger.id, new AbortController().signal).then(onChanged)}
                 />
-                <button type="button" onClick={() => setEditing(trigger)} className={BUTTON}>
+                <Button onClick={() => setEditing(trigger)}>
                   Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setHistoryFor(historyFor === trigger.id ? null : trigger.id)}
-                  className={BUTTON}
-                >
+                </Button>
+                <Button onClick={() => setHistoryFor(historyFor === trigger.id ? null : trigger.id)}>
                   History
-                </button>
+                </Button>
               </div>
             </div>
             {historyFor === trigger.id && (
@@ -619,17 +596,12 @@ function TriggerForm({
       {error && <p className="text-xs text-critical">{error}</p>}
 
       <div className="flex gap-2">
-        <button
-          type="button"
-          onClick={save}
-          disabled={saving || argumentsError !== null || draft.toolName === ""}
-          className={PRIMARY_BUTTON}
-        >
+        <Button tone="primary" onClick={save} disabled={saving || argumentsError !== null || draft.toolName === ""}>
           {saving ? "Saving…" : trigger === null ? "Create trigger" : "Save trigger"}
-        </button>
-        <button type="button" onClick={onClose} className={BUTTON}>
+        </Button>
+        <Button onClick={onClose}>
           Cancel
-        </button>
+        </Button>
       </div>
     </div>
   );

@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { Link } from "react-router";
 import { archive } from "../data/marketData";
 import { RESOLUTIONS } from "../data/types";
@@ -192,17 +193,10 @@ function HistoryList({
   // only one of them means nothing has ever been pulled.
   if (history.status === "unreachable") {
     return (
-      <p className="px-4 py-6 text-sm text-critical">
+      <UnreachableNotice className="px-4 py-6 text-sm text-critical" onRetry={history.reload}>
         The archive is not reachable, so collection history is unknown — this is not an empty
         list. {history.error}
-        <button
-          type="button"
-          onClick={history.reload}
-          className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
-        >
-          Retry
-        </button>
-      </p>
+      </UnreachableNotice>
     );
   }
 

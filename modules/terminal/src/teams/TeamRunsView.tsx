@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Button } from "../ui/Button";
+import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { useAgentTurns } from "../agent/useAgentTurns";
 import { useRead } from "../data/query";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
@@ -69,23 +71,15 @@ export function TeamRunsView({
   return (
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-2 border-b border-border p-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-        >
+        <Button onClick={onClose}>
           ← Catalogue
-        </button>
+        </Button>
         <span className="text-sm text-ink">
           {teamName} <span className="text-xs text-ink-faint">· runs</span>
         </span>
-        <button
-          type="button"
-          onClick={onEdit}
-          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-        >
+        <Button onClick={onEdit}>
           ← Edit team
-        </button>
+        </Button>
         <button
           type="button"
           onClick={() => setStarting(true)}
@@ -115,16 +109,9 @@ export function TeamRunsView({
 
       <div className="max-h-[30vh] shrink-0 overflow-auto border-b border-border">
         {error && (
-          <p className="px-2 py-1 text-xs text-critical">
+          <UnreachableNotice className="px-2 py-1 text-xs text-critical" onRetry={runList.reload}>
             {error}
-            <button
-              type="button"
-              onClick={runList.reload}
-              className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
-            >
-              Retry
-            </button>
-          </p>
+          </UnreachableNotice>
         )}
         {runs === null && !error && <p className="px-2 py-2 text-xs text-ink-muted">Reading the runs…</p>}
         {runs !== null && runs.length === 0 && (

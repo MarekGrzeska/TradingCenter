@@ -1,4 +1,6 @@
 import { useMemo, useState } from "react";
+import { Button } from "../ui/Button";
+import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { MessageBody } from "../agent/MessageBody";
 import { useRead } from "../data/query";
 import { formatInstant } from "../ui/formatTime";
@@ -113,13 +115,9 @@ export function RunMonitor({
     <div className="flex h-full min-h-0 flex-col">
       <header className="flex flex-wrap items-center gap-2 border-b border-border p-2">
         {onClose && (
-          <button
-            type="button"
-            onClick={onClose}
-            className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
-          >
+          <Button onClick={onClose}>
             ← Catalogue
-          </button>
+          </Button>
         )}
         <span className="text-sm text-ink">
           Run {runId}
@@ -170,16 +168,13 @@ export function RunMonitor({
         <p className="border-b border-border px-2 py-1 text-xs text-critical">{stopError}</p>
       )}
       {monitor.status === "error" && (
-        <p className="border-b border-border px-2 py-1 text-xs text-critical">
+        <UnreachableNotice
+          className="border-b border-border px-2 py-1 text-xs text-critical"
+          onRetry={monitor.reload}
+          retryLabel="Watch again"
+        >
           {monitor.error}
-          <button
-            type="button"
-            onClick={monitor.reload}
-            className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
-          >
-            Watch again
-          </button>
-        </p>
+        </UnreachableNotice>
       )}
 
       <div className="grid min-h-0 flex-1 grid-cols-[1fr_20rem]">

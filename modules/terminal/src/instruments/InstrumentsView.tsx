@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from "react";
+import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { Link } from "react-router";
 import { archive } from "../data/marketData";
 import { useRead } from "../data/query";
@@ -183,17 +184,10 @@ function InstrumentList({
   // only one of them means the operator has nothing set up.
   if (list.status === "unreachable") {
     return (
-      <p className="px-4 py-6 text-sm text-critical">
+      <UnreachableNotice className="px-4 py-6 text-sm text-critical" onRetry={list.reload}>
         The archive is not reachable, so what it is collecting is unknown — this is not an
         empty list. {list.error}
-        <button
-          type="button"
-          onClick={list.reload}
-          className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
-        >
-          Retry
-        </button>
-      </p>
+      </UnreachableNotice>
     );
   }
 

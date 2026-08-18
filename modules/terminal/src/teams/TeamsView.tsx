@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { useAgentTurns } from "../agent/useAgentTurns";
 import { SchedulesPanel } from "./SchedulesPanel";
 import { TeamCatalogue } from "./TeamCatalogue";
@@ -49,16 +50,9 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
     // Without it nothing here can be edited, so this is the whole tab's failure rather
     // than a corner of it.
     return (
-      <p className="p-4 text-sm text-critical">
+      <UnreachableNotice className="p-4 text-sm text-critical" onRetry={models.reload}>
         {models.error}
-        <button
-          type="button"
-          onClick={models.reload}
-          className="ml-3 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
-        >
-          Retry
-        </button>
-      </p>
+      </UnreachableNotice>
     );
   }
 
