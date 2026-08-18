@@ -33,11 +33,22 @@ context: |
   CLI, or typed events) — no cross-module imports.
 
   NOT EVERY CHANGE IS AN OPENSPEC CHANGE. Open one when the work will change any
-  of these three, and otherwise do not:
+  of these four, and otherwise do not:
     1. a requirement — anything under openspec/specs/
     2. a contract between modules — market_data/contract.py, capital_gateway/dtos.py,
        or the terminal's generated contract
     3. infrastructure — infra/**
+    4. an architectural rule — one docs/architecture.md states and CLAUDE.md calls
+       load-bearing, such as "no cross-module imports and no shared library"
+
+  The fourth was added on 18 August 2026, and the reason is worth keeping because the
+  first three read as complete until they were tested against a real change. The plan
+  to introduce workspace packages reverses the shared-library rule outright — the most
+  consequential architectural change on the roadmap — and touches none of files 1-3.
+  The mechanical test would have waved it through as a branch and a pull request, while
+  catching it only by accident, through a piece of dead-code removal bundled alongside
+  that happened to delete a requirement. A rule the repository calls load-bearing is
+  exactly the kind of decision the archive exists to explain later.
 
   Everything else is a branch, its tests, and a pull request: bug fixes, refactors
   that keep behaviour, UI work that adds no requirement, documentation, CI, tooling.
@@ -45,8 +56,9 @@ context: |
   not spec work, and wrapping them in five artifacts buys nothing.
 
   The test is mechanical on purpose: name the files the work will touch, and if none
-  of them is in the three categories above, there is nothing for a spec to say. If
-  one is, the full path applies and the change is worth its paperwork.
+  of them is in the four categories above, there is nothing for a spec to say. If
+  one is, the change is worth a proposal — though not necessarily all four artifacts;
+  see the per-artifact rules below, where only proposal.md is unconditional.
 
   Why this rule exists, in numbers measured on 10 August 2026: openspec/ held 13,699
   lines, of which 3,292 were specs — the truth every change reads — and 10,239 were
@@ -59,10 +71,18 @@ context: |
 #
 # Budgets, not style. Each of these exists because the artifact it names had grown
 # into a place where the same thing gets said a second time.
+#
+# **Only proposal.md is unconditional.** The other three are written when they have
+# something to say and skipped, in one line, when they do not. That was already true of
+# design.md and became true of review.md on 18 August 2026 — see the note under `review`.
+# Skipping is a decision the change records, not a step it omits silently: say which
+# artifact is absent and why, in proposal.md, where the next reader will look.
 rules:
   proposal:
     - One page. Why, what changes, which capabilities, impact — nothing else.
     - Do not restate a requirement the delta spec is about to state properly.
+    - When design.md, tasks.md or review.md is being skipped, say so here in one line
+      with the reason. An artifact absent on purpose reads differently from one missing.
   design:
     - Write it only when there is a real decision with alternatives that were
       genuinely considered. A design.md that narrates the implementation is the
@@ -72,7 +92,20 @@ rules:
   tasks:
     - The work, not the reasoning. If a task needs a paragraph to justify it, that
       paragraph belongs in design.md and the task belongs in one line.
+    - Skip it for a change small enough that the list would be one line long. A
+      checklist of one is a checkbox, not a plan.
   review:
+    - 'Optional since 18 August 2026, and the reason is a measurement rather than a
+      preference. It had been mandatory, enforced by a 256-line PreToolUse hook that
+      refused any archive without it. The hook itself had failed silently once already —
+      its previous PowerShell version could not execute on this project''s macOS machine,
+      so every archive passed unchecked while the settings file claimed a gate — and its
+      own tests ran in no CI. A gate with no test of its failure mode is exactly what
+      this repository stopped accepting when iteration 0 landed. Gate and requirement
+      both removed; what stays is the artifact, for the changes that earn one.'
+    - Write it when the change was risky, when the verification is not obvious from the
+      tests, or when something was found worth telling the next reader. A change whose
+      tests speak for themselves does not need a second document saying they passed.
     - 'A finding-free review is a legitimate result: do not pad the table.'
     - Name the test that proves each scenario, file::test_name. A scenario with no
       test is a gap and is listed as one.
@@ -87,8 +120,10 @@ operations:
     guidance:
       - After the change directory has been moved into openspec/changes/archive/, run
         scripts/trim-openspec-archive.sh from the repository root. It removes the delta
-        specs and the ticked tasks.md from every archived change, and keeps proposal.md,
-        design.md, review.md and .openspec.yaml.
+        specs and the ticked tasks.md from every archived change, and keeps whichever of
+        proposal.md, design.md and review.md the change actually wrote, plus
+        .openspec.yaml. Only the first of those is unconditional - see the per-artifact
+        rules above.
       - The reason, so the step is not cargo-cult. This very archive merged the delta into
         openspec/specs/, which makes the copy left behind a frozen version of the truth,
         and a checklist with every box ticked says less about what was done than the
