@@ -1,0 +1,39 @@
+[project]
+name = "tc-mcp-kit"
+version = "0.1.0"
+description = "The caller-identity middleware and upstream-refusal helper shared by the three MCP modules"
+requires-python = ">=3.12"
+dependencies = [
+    # `network_identity` is raw ASGI and needs Starlette's own types rather than
+    # FastAPI's wrapper of them; `detail` reads an upstream's refusal off an `httpx`
+    # response. Nothing else — no database driver, no Azure credential, no FastAPI.
+    "httpx>=0.27",
+    "starlette>=0.37",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["tc_mcp_kit"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.pyright]
+include = ["tc_mcp_kit"]
+typeCheckingMode = "basic"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+pythonpath = ["."]
+testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "pyright==1.1.411",
+    "pytest>=8.3",
+    "pytest-asyncio>=0.24",
+    "ruff==0.16.2",
+]

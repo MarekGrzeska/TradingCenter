@@ -27,7 +27,10 @@ regression you could not, unless every consumer is exercised.
 | `agent` | `db`, `migrate`, `schema_version`, `auth`, `routers.models_router` |
 | `teams` | `db`, `migrate`, `schema_version`, `auth`, `routers.models_router` |
 | `market-data` | `migrate`, `schema_version`, `db.advisory_lock` |
-| `market-mcp`, `teams-mcp`, `trading-mcp` | `network_identity`, `detail` |
+
+The three MCP modules (`market-mcp`, `teams-mcp`, `trading-mcp`) took `network_identity`
+and `detail` from here until 18 August 2026, when both moved to `packages/tc-mcp-kit` — see
+"What moved out", below. None of them is a consumer of this package any more.
 
 `market-data` takes the package **partially**, on purpose. Its `db.py` stays in the module
 at 56.2% identical to this one; what it does take from here is `advisory_lock`, which was
@@ -52,8 +55,11 @@ Condition 1 of the sharing rule is a number, so here are the numbers. Measured o
 | `routers/models.py` | agent ↔ teams | 93.8% |
 | `migrate.py` | agent ↔ teams | 91.8% |
 | `auth.py` | agent ↔ teams | 86.4% |
-| `network_identity.py` | teams-mcp ↔ trading-mcp | 86.2% |
 | `schema_version.py` | agent ↔ teams | 83.8% |
+
+`network_identity.py` (teams-mcp ↔ trading-mcp, 86.2%) was measured the same day and
+belongs to this table's history, not its present — it lived here until it moved to
+`tc-mcp-kit`; see "What moved out".
 
 Where two copies disagreed, the better one came here and the reason is in the file:
 `schema_version.py` is teams' (it names the case where the *image* ships no revision;
@@ -70,7 +76,7 @@ does not repeat the measurement to reach the same answer:
 | `market_data/db.py` | 56.2% vs this one | A different file: it has `connect()`, which nothing else does. Its long migration window turned out **not** to be the reason — that is a setting, and the lock helper it feeds now comes from here. |
 | `server.py` (3× MCP) | 58.2% | Below the threshold, and the differences are what each server *is*. |
 | `config.py` (7 modules) | 48.9% | Everything can be parameterised; the result would be one switch per consumer, which is condition 2 failing rather than passing. |
-| `client.py` (3× MCP) | 32.1% | Three genuinely different upstreams. Only the `detail` helper inside them was a copy, and only that came here. |
+| `client.py` (3× MCP) | 32.1% | Three genuinely different upstreams. Only the `detail` helper inside them was a copy, and it went to `tc-mcp-kit`, not here. |
 | `errors.py` (3× MCP) | 25.0% | `trading-mcp` has 86 lines because it distinguishes a provider's refusal from an access failure; `market-mcp` has 13 because its refusal has one shape. |
 | `telemetry.py` | 236 vs 70 lines | Two files with the same name. |
 
@@ -88,6 +94,10 @@ source and 418 of tests. The arithmetic does not balance to zero and should not:
 copies collapsing into one removes two, and the tests that came with them were spread
 across module suites that each ran only their own.
 
+("The two packages" is 18 August's own count, before `tc-mcp-kit` split off this one —
+the line totals above are unchanged by that split, since it relocated `network_identity.py`
+and `detail.py` rather than rewriting them.)
+
 **The 74 that remain are seams, not copies.** They are `provider.py` (46 + 47 lines),
 `auth.py` (28 + 28) and `routers/models.py` (14 + 14) — each of them now a docstring and
 one binding line, holding the thing the package must not: this module's API key, this
@@ -96,13 +106,25 @@ and here it is counting two files that say the same thing about different module
 that number zero would mean deleting the seam, which would mean the package reading a key
 of its own.
 
+## What moved out
+
+`network_identity.py` and `detail.py` lived here from this package's own first commit
+until 18 August 2026, when they moved to `packages/tc-mcp-kit`. The reason was not that
+they stopped being copies — they still are, at the same measured percentages above — but
+that their only consumers, the three MCP modules, have no database and were installing
+this package's whole tree (`alembic`, `sqlalchemy`, `asyncpg`, `azure-identity`, `aiohttp`,
+`fastapi`) for two imports.
+`openspec/changes/packages-replace-the-hand-copies/design.md`, D1, carries the original
+(wrong) reasoning against a third package and the correction that reversed it.
+
 ## Adding a third package
 
-Nothing to remember. The `packages` job in `checks.yml` reads its matrix off this
-directory, so a new package is tested the moment it exists. What *does* need a line is the
-other direction: a module taking it declares the path dependency in its own
-`pyproject.toml`, and that package's pattern goes into the filter beside `tc_runtime` and
-`tc_openai` so the module's own job runs when the package changes.
+Nothing to remember about the `packages` job itself: `checks.yml` reads its matrix off
+this directory, so a new package is tested the moment it exists — `tc-mcp-kit` is the
+proof, added exactly this way. What *does* need a line is the other direction: a module
+taking a package declares the path dependency in its own `pyproject.toml`, and that
+package's pattern goes into the filter beside `tc_runtime`, `tc_openai` and now
+`tc_mcp_kit`, so the module's own job runs when the package it actually takes changes.
 
 ## The one thing this package cannot know
 

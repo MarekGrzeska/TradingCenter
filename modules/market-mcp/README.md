@@ -140,7 +140,7 @@ indicators, then naming what is still not known.
 This module does not import `market_data` — no module imports another module, and that
 half of the rule has not moved. (Source *is* shared at build time now, through
 `packages/`, under the conditions in `docs/architecture.md`; this module takes
-`tc-runtime` for its caller-identity middleware. A contract between two modules is a
+`tc-mcp-kit` for its caller-identity middleware. A contract between two modules is a
 different thing entirely and is still the only way one reaches the other.) What it reads is checked against a committed
 OpenAPI snapshot (`contract/market-data.openapi.json`), the same mechanism the terminal
 uses for its generated types. `tests/test_contract.py` asserts every field a tool or

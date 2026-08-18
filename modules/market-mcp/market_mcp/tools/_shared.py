@@ -10,7 +10,7 @@ from typing import Any
 import httpx
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, ConfigDict, Field
-from tc_runtime.detail import detail
+from tc_mcp_kit.detail import detail
 
 from ..client import UpstreamClient
 from ..errors import ToolRefusal

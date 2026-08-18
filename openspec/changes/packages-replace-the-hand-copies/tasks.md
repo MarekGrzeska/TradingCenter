@@ -91,3 +91,44 @@ dojdzie drugi moduł. Po niej `agent` bierze `tc-runtime`, a reszta repo stoi ni
 - [x] 6.4 Zbudować wszystkie siedem obrazów lokalnie i potwierdzić, że każdy wstaje
 - [x] 6.5 Zdecydować o `review.md` (od 18 sierpnia 2026 opcjonalny) i zapisać decyzję —
       `proposal.md` wskazuje tę zmianę jako kandydata, który go zasługuje
+
+## 7. Poprawka D1: `tc-mcp-kit` powstaje
+
+Cel tej grupy: cofnąć wyłącznie tę część D1, która okazała się błędem pomiaru — zaciąganie
+przez trzy moduły MCP całego drzewa `tc-runtime` za dwa importy. Znalezione po zamknięciu
+grupy 5, przy pytaniu o rozmiar diffu trzech kolejnych scaleń, nie przez `review.md` tego
+PR-a. Szczegóły i liczby w `design.md`, D1, „Poprawione 18 sierpnia 2026".
+
+- [x] 7.1 Utworzyć `packages/tc-mcp-kit/` — `network_identity.py` i `detail.py` przeniesione
+      z `tc-runtime`, bez zmiany treści; zależności wyłącznie `httpx` i `starlette`
+- [x] 7.2 Testy jednostkowe pakietu (`tests/test_detail.py`, `tests/test_network_identity.py`)
+      — pierwsze miejsce, w którym te dwa pliki są testowane same, a nie przez serwer
+      jednego z trzech modułów
+- [x] 7.3 `tc-runtime`: usunąć oba pod-moduły, `__init__.py`, `pyproject.toml` (zdjąć
+      `httpx`/`starlette`) i `README.md` zaktualizowane — sekcja „What moved out"
+- [x] 7.4 `market-mcp`, `trading-mcp`, `teams-mcp`: `pyproject.toml` i `[tool.uv.sources]`
+      przestawione z `tc-runtime` na `tc-mcp-kit`; importy w `server.py`/`client.py`/
+      `tools/_shared.py`; nazwa loggera w testach (`tc_runtime.network_identity` →
+      `tc_mcp_kit.network_identity`); README każdego modułu
+- [x] 7.5 `checks.yml`: wzorzec `tc_mcp_kit` obok `tc_runtime`/`tc_openai`; filtry `mcp`,
+      `trading`, `teamsmcp` przestawione z `$tc_runtime` na `$tc_mcp_kit` — żaden z trzech
+      modułów MCP nie deklaruje już zależności od `tc-runtime`, więc stary wzorzec
+      przestałby cokolwiek łapać
+- [x] 7.6 `CLAUDE.md`: wpis `packages/tc-mcp-kit` w mapie repozytorium; opis `tc-runtime`
+      poprawiony (już nie „caller identity")
+- [x] 7.7 Zmierzyć ponownie pakiety w locku: `trading-mcp` 70 → 48 (punkt wyjścia sprzed
+      `tc-runtime`: 47), `teams-mcp` 70 → 55, `market-mcp` 70 → 62 (zostaje z
+      `azure-identity`/`aiohttp` z własnego powodu, nie z `tc-runtime`)
+- [x] 7.8 `uv run pytest` · `ruff check .` · `pyright` zielone w `tc-runtime`, `tc-mcp-kit` i
+      wszystkich trzech modułach MCP; `scripts/contract.py check` zielony w każdym; liczby
+      testów niezmienione względem `review.md` (132 / 85 / 88)
+- [x] 7.8a `tc-runtime` stracił `httpx`/`starlette` z własnego `pyproject.toml` — `uv lock`
+      ponownie w `agent`, `teams`, `market-data`, jedynych pozostałych konsumentach, bo
+      `uv.lock` osadza metadane wziętego pakietu. Kod żadnego z trzech nie zmienia się;
+      testy zielone bez zmiany liczby (354 / 395 / 1029+7 skipped)
+- [x] 7.9 Trzy obrazy (`market-mcp`, `trading-mcp`, `teams-mcp`) zbudowane lokalnie z nowym
+      kontekstem i zaimportowane — `agent`, `teams`, `market-data` nietknięte przez tę
+      grupę, więc nie przebudowane
+- [x] 7.10 `design.md` D1 i `proposal.md` poprawione, nie przepisane — pierwotne
+      uzasadnienie zostaje czytelne jako to, co było wiadomo 18 sierpnia 2026, z jawną
+      poprawką obok. `review.md` dostaje odpowiedni wpis w „Findings"
