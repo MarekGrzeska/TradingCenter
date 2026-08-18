@@ -74,6 +74,28 @@ does not repeat the measurement to reach the same answer:
 | `errors.py` (3× MCP) | 25.0% | `trading-mcp` has 86 lines because it distinguishes a provider's refusal from an access failure; `market-mcp` has 13 because its refusal has one shape. |
 | `telemetry.py` | 236 vs 70 lines | Two files with the same name. |
 
+## What it came to, measured
+
+`scripts/measure-duplication.py`, before and after:
+
+| | Before | After |
+|---|---|---|
+| Pairs at or above 70% | 7 | 3 |
+| Lines living only as a copy | **959** | **74** |
+
+Modules lost 2 269 lines of Python and gained 344; the two packages hold 867 lines of
+source and 418 of tests. The arithmetic does not balance to zero and should not: three
+copies collapsing into one removes two, and the tests that came with them were spread
+across module suites that each ran only their own.
+
+**The 74 that remain are seams, not copies.** They are `provider.py` (46 + 47 lines),
+`auth.py` (28 + 28) and `routers/models.py` (14 + 14) — each of them now a docstring and
+one binding line, holding the thing the package must not: this module's API key, this
+module's setting, this module's response type. The measurement counts prose deliberately,
+and here it is counting two files that say the same thing about different modules. Making
+that number zero would mean deleting the seam, which would mean the package reading a key
+of its own.
+
 ## The one thing this package cannot know
 
 Which advisory-lock key a module's migrations take, and where its migrations live. Both

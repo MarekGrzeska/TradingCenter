@@ -91,6 +91,12 @@ canvas.
   left each agent on the canvas (`0004`), schedules and triggers (`0005`), and the trade
   trace (`0006`).
 
+## Packages it takes
+
+`tc-runtime` (database, migrations, schema check, Easy Auth principal, `GET /models`) and
+`tc-openai` (the streamed call, given a `Briefing` rather than a conversation). Both are
+**build-time** path dependencies compiled into this module's image.
+
 ## Run
 
 ```bash

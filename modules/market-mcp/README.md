@@ -26,7 +26,7 @@ built from the same `market_mcp/server.py`.
   other than `GET` is rejected before a socket opens; the one named exception is
   `POST /indicators/{symbol}`, a computation, not a write.
 - `upstream.py` — narrow pydantic models for the shapes this module actually reads off
-  market-data's wire. Not `market_data.contract` — no shared library between modules.
+  market-data's wire. Not `market_data.contract` — no module imports another module.
 - `reduce.py` — the one place aggregation and truncation happen: bucket a candle series
   down to a target count, or take the first N of a list, always saying what was cut.
 - `uncertainty.py` — the sentences every candle/coverage tool builds from `uncovered`,
@@ -137,8 +137,11 @@ indicators, then naming what is still not known.
 
 ## Contract with market-data
 
-This module does not import `market_data` — no shared library between modules, same rule
-every module in this repository follows. What it reads is checked against a committed
+This module does not import `market_data` — no module imports another module, and that
+half of the rule has not moved. (Source *is* shared at build time now, through
+`packages/`, under the conditions in `docs/architecture.md`; this module takes
+`tc-runtime` for its caller-identity middleware. A contract between two modules is a
+different thing entirely and is still the only way one reaches the other.) What it reads is checked against a committed
 OpenAPI snapshot (`contract/market-data.openapi.json`), the same mechanism the terminal
 uses for its generated types. `tests/test_contract.py` asserts every field a tool or
 resource reads is still published; regenerate the snapshot with `scripts/contract.py`.

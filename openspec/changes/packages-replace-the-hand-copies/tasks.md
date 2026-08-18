@@ -84,10 +84,10 @@ dojdzie drugi moduł. Po niej `agent` bierze `tc-runtime`, a reszta repo stoi ni
 - [x] 6.1 Wstawić do repo skrypt pomiaru identyczności — **zrobione w grupie 1**, bo
       `docs/architecture.md` powołuje się na niego jako na sposób sprawdzenia warunku 1,
       a dokument nie może wskazywać pliku, którego nie ma (`scripts/measure-duplication.py`)
-- [ ] 6.2 Zmierzyć ponownie: ile linii ręcznej kopii zostało. Cel to znaczący spadek z ~959;
+- [x] 6.2 Zmierzyć ponownie: ile linii ręcznej kopii zostało. Cel to znaczący spadek z ~959;
       liczba końcowa wchodzi do `review.md` albo do README pakietu
-- [ ] 6.3 Przejrzeć README modułów pod kątem zdań tłumaczących duplikację regułą, która już
+- [x] 6.3 Przejrzeć README modułów pod kątem zdań tłumaczących duplikację regułą, która już
       nie obowiązuje
-- [ ] 6.4 Zbudować wszystkie siedem obrazów lokalnie i potwierdzić, że każdy wstaje
+- [x] 6.4 Zbudować wszystkie siedem obrazów lokalnie i potwierdzić, że każdy wstaje
 - [ ] 6.5 Zdecydować o `review.md` (od 18 sierpnia 2026 opcjonalny) i zapisać decyzję —
       `proposal.md` wskazuje tę zmianę jako kandydata, który go zasługuje

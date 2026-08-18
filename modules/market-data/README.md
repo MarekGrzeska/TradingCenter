@@ -55,6 +55,12 @@ stamps `untracked_at` rather than deleting, because an archive that drops data w
 configuration changes is not an archive. **`coverage_ranges`** is the stretch of time the
 archive has actually verified.
 
+## Packages it takes
+
+`tc-runtime`, partially: `migrate`, `schema_version` and the advisory-lock helper. This
+module keeps its own `db.py` — it has `connect()`, which nothing else does, and its own
+pool defaults (`packages/tc-runtime/README.md`).
+
 ## Run
 
 ```bash
