@@ -5,16 +5,23 @@ import json
 import logging
 from datetime import UTC, datetime, timedelta
 
-import httpx
 import pytest
+from fakes import (
+    LIMIT,
+    NOW,
+    WINDOW,
+    FakeIngest,
+    FakeInstruments,
+    FakeInstrumentsBySymbol,
+    candle,
+)
 
-from market_data.app import app, candle_sink
+from market_data.app import candle_sink
 from market_data.config import Settings
 from market_data.coverage import earliest_reachable, record_coverage
 from market_data.errors import GatewayRefused, GatewayUnreachable
 from market_data.hub import CandleChange, Hub, Snapshot
 from market_data.ingest.backfill import FillOutcome
-from market_data.market_status import MarketStatus
 from market_data.models import ESTIMATED_BYTES_PER_CANDLE, Candle, CandleSource, Resolution
 from market_data.rollups import refresh_all
 from market_data.store import read_candles, write_candles
@@ -22,176 +29,6 @@ from market_data.tickets import TicketStore
 from market_data.tracking import track
 
 pytestmark = pytest.mark.db
-
-NOW = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
-LIMIT = 20
-
-# Every read of a range says which range, and this is why.
-#
-# `/candles` defaults to the last day *of the real clock*, so a test that writes candles
-# around a fixed `NOW` and then omits the window is only asserting anything while the wall
-# clock happens to be within a day of that constant. Two tests did, and they began failing
-# at noon on 2026-08-08 — a day after `NOW`, having passed every run before it, for no
-# reason connected to the code.
-WINDOW = {
-    "from": (NOW - timedelta(hours=1)).isoformat(),
-    "to": (NOW + timedelta(minutes=1)).isoformat(),
-}
-
-
-def candle(offset: int = 0, **overrides) -> Candle:
-    return Candle(
-        **{
-            "symbol": "US100",
-            "resolution": Resolution.MINUTE,
-            "period_start": NOW - timedelta(minutes=offset),
-            "open": 100.0,
-            "high": 101.0,
-            "low": 99.0,
-            "close": 100.5,
-            "volume": 10.0,
-            "source": CandleSource.HISTORY,
-            **overrides,
-        }
-    )
-
-
-class FakeInstruments:
-    def __init__(
-        self,
-        collectable: bool = True,
-        error: Exception | None = None,
-        market_open: bool | None = None,
-    ):
-        self.collectable = collectable
-        self.error = error
-        # What the gateway would say about the instrument's session. `None` is the
-        # default because it is the honest one for a fake: no answer, so `UNKNOWN`.
-        self.market_open = market_open
-        self.asked: list[str] = []
-
-    async def is_collectable(self, symbol: str, resolution: Resolution) -> bool:
-        if self.error is not None:
-            raise self.error
-        return self.collectable
-
-    async def is_market_open(self, symbol: str) -> bool | None:
-        self.asked.append(symbol)
-        if self.error is not None:
-            raise self.error
-        return self.market_open
-
-    # --- specs/market-data-api: the catalogue proxy ------------------------------
-
-    async def catalogue(self, max_nodes: int | None, asset_class: str | None) -> dict:
-        if self.error is not None:
-            raise self.error
-        return {
-            "instruments": [],
-            "count": 0,
-            "truncated": False,
-            "max_nodes": max_nodes,
-            "asset_class": asset_class,
-        }
-
-    async def search(self, q: str) -> list:
-        if self.error is not None:
-            raise self.error
-        return [{"symbol": q.upper(), "name": q, "asset_class": "CRYPTO", "tradeable": True}]
-
-    async def asset_classes(self) -> list:
-        if self.error is not None:
-            raise self.error
-        return ["CRYPTO", "SHARES"]
-
-
-class FakeInstrumentsBySymbol:
-    """Like `FakeInstruments`, but collectability varies per symbol — for a multi-pair
-    request where one symbol is refused and the others are not."""
-
-    def __init__(self, collectable: dict[str, bool]) -> None:
-        self._collectable = collectable
-
-    async def is_collectable(self, symbol: str, resolution: Resolution) -> bool:
-        return self._collectable.get(symbol, False)
-
-    async def is_market_open(self, symbol: str) -> bool | None:
-        return None
-
-
-class FakeIngest:
-    """Stands in for the supervisor: reconciles, and remembers what a fill did."""
-
-    def __init__(self, last_fill=None) -> None:
-        self.syncs = 0
-        self.running: set = set()
-        self.started_at = NOW
-        self._last_fill = last_fill
-
-    async def sync(self) -> None:
-        self.syncs += 1
-
-    def last_fill(self, symbol: str, resolution: Resolution):
-        return self._last_fill
-
-
-class FakeJobRunner:
-    """Stands in for the runner: real chunks still get worked, but by whatever executes
-    them directly in a test — `notify()` here is just observed, never acted on."""
-
-    def __init__(self) -> None:
-        self.notifications = 0
-
-    def notify(self) -> None:
-        self.notifications += 1
-
-
-@pytest.fixture
-async def pool(migrated_url: str):
-    from market_data.db import pool as make_pool
-
-    async with make_pool(migrated_url, max_size=5) as created:
-        async with created.acquire() as conn:
-            await conn.execute(
-                "TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges, "
-                "collection_jobs, collection_job_chunks, pair_deletions"
-            )
-        yield created
-
-
-@pytest.fixture
-async def api(pool, migrated_url: str):
-    """The app wired to a real database, with the two things that reach outward faked.
-
-    The lifespan is bypassed rather than run: it would start ingest, which would try to
-    reach a gateway that is not there. What is under test here is the contract.
-    """
-    app.state.pool = pool
-    app.state.hub = Hub()
-    app.state.settings = Settings(
-        # Metadata only — the pool above is what actually reaches the database. A
-        # throwaway value that satisfies Settings' own rules (TLS required, no embedded
-        # credential) rather than `migrated_url`, which as testcontainers hands it out
-        # is neither.
-        database_url="postgresql://localhost:5432/test?sslmode=require",
-        database_user="test-user",
-        gateway_api_key="test-gateway-key",
-        _env_file=None,
-    )
-    app.state.instruments = FakeInstruments()
-    app.state.ingest = FakeIngest()
-    # Replaces the autouse fixture that used to clear a module-level dict: the cache is an
-    # object now, so a fresh app gets a fresh one and no test inherits another's answer.
-    app.state.market_status = MarketStatus()
-    app.state.job_runner = FakeJobRunner()
-    app.state.tickets = TicketStore(timedelta(seconds=30))
-
-    # `raise_app_exceptions=False` so the app's own error handling is what the test sees.
-    # With the default, the transport re-raises whatever the app raised and the 500 the
-    # handler produced — the thing under test in 8.7 — never reaches the response.
-    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
-    async with httpx.AsyncClient(transport=transport, base_url="http://archive.test") as client:
-        yield client
 
 
 # --- 8.1: reading a range ------------------------------------------------------------
@@ -498,7 +335,7 @@ async def test_pricing_the_same_request_leaves_the_boundary_alone(api, pool) -> 
         assert await earliest_reachable(conn, "US100", Resolution.MINUTE) == boundary
 
 
-async def test_taking_a_pair_on_starts_collecting_it_without_a_restart(api) -> None:
+async def test_taking_a_pair_on_starts_collecting_it_without_a_restart(app, api) -> None:
     await api.post("/pairs", json={"symbol": "US100", "resolution": "MINUTE"})
 
     assert app.state.ingest.syncs == 1
@@ -553,7 +390,7 @@ async def test_a_pair_with_nothing_collected_reports_zero_candles(api, pool) -> 
     assert listed["estimated_bytes"] == 0
 
 
-async def test_a_late_pair_with_the_market_open_is_reported_stalled(api, pool) -> None:
+async def test_a_late_pair_with_the_market_open_is_reported_stalled(app, api, pool) -> None:
     """The state the panel exists to show, reaching the panel at last.
 
     `collection_state` could always tell `STALLED` from `MARKET_CLOSED`, and was tested
@@ -571,7 +408,7 @@ async def test_a_late_pair_with_the_market_open_is_reported_stalled(api, pool) -
     assert listed["collection"] == "stalled"
 
 
-async def test_the_same_lateness_with_the_market_shut_is_not_a_fault(api, pool) -> None:
+async def test_the_same_lateness_with_the_market_shut_is_not_a_fault(app, api, pool) -> None:
     app.state.instruments = FakeInstruments(market_open=False)
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
@@ -582,7 +419,7 @@ async def test_the_same_lateness_with_the_market_shut_is_not_a_fault(api, pool) 
     assert listed["collection"] == "market_closed"
 
 
-async def test_a_gateway_that_cannot_say_leaves_the_pair_unknown(api, pool) -> None:
+async def test_a_gateway_that_cannot_say_leaves_the_pair_unknown(app, api, pool) -> None:
     """Not a failure of the read. The list is the archive's own, and not knowing why one
     pair is late is not a reason to refuse all of them."""
     app.state.instruments = FakeInstruments(error=GatewayUnreachable("the gateway is down"))
@@ -596,7 +433,7 @@ async def test_a_gateway_that_cannot_say_leaves_the_pair_unknown(api, pool) -> N
     assert response.json()[0]["collection"] == "unknown"
 
 
-async def test_a_fresh_pair_costs_the_gateway_nothing(api, pool) -> None:
+async def test_a_fresh_pair_costs_the_gateway_nothing(app, api, pool) -> None:
     """The budget rule. A pair whose newest candle is fresh is `COLLECTING` whatever the
     market is doing, so asking about it would spend the shared allowance to learn nothing
     that changes an answer."""
@@ -612,7 +449,7 @@ async def test_a_fresh_pair_costs_the_gateway_nothing(api, pool) -> None:
     assert instruments.asked == []
 
 
-async def test_one_symbol_at_two_resolutions_is_one_question(api, pool) -> None:
+async def test_one_symbol_at_two_resolutions_is_one_question(app, api, pool) -> None:
     """A market is a property of the instrument, not of the resolution it is sampled at."""
     instruments = FakeInstruments(market_open=False)
     app.state.instruments = instruments
@@ -627,7 +464,7 @@ async def test_one_symbol_at_two_resolutions_is_one_question(api, pool) -> None:
     assert instruments.asked == ["US100"]
 
 
-async def test_a_market_that_was_just_asked_about_is_not_asked_again(api, pool) -> None:
+async def test_a_market_that_was_just_asked_about_is_not_asked_again(app, api, pool) -> None:
     """A shut market is permanently late, so without remembering the answer every read of
     the list spends a request per closed pair. Measured on a live weekend before this
     existed: 74 requests about one instrument that had been shut since Friday."""
@@ -643,7 +480,7 @@ async def test_a_market_that_was_just_asked_about_is_not_asked_again(api, pool) 
     assert instruments.asked == ["US100"]
 
 
-async def test_the_list_says_what_the_last_fill_did(api, pool) -> None:
+async def test_the_list_says_what_the_last_fill_did(app, api, pool) -> None:
     """Progress leaves the log. The spec asks for what is in flight, what succeeded and
     what failed and why, `zamiast pozostawiać to w logach` — and `Ingest` recorded all of
     it into a report with no caller."""
@@ -667,7 +504,7 @@ async def test_the_list_says_what_the_last_fill_did(api, pool) -> None:
     assert "wrote 29" in listed["last_fill"]["summary"]
 
 
-async def test_a_failed_fill_reaches_the_list_with_its_reason(api, pool) -> None:
+async def test_a_failed_fill_reaches_the_list_with_its_reason(app, api, pool) -> None:
     app.state.ingest = FakeIngest(
         last_fill=FillOutcome(
             symbol="NOPE",
@@ -764,7 +601,7 @@ async def test_reading_deletions_with_none_recorded_is_an_empty_list(api) -> Non
 # --- 8.7: refusals that name themselves -----------------------------------------------
 
 
-async def test_going_over_the_ceiling_is_refused_with_the_reason(api, pool) -> None:
+async def test_going_over_the_ceiling_is_refused_with_the_reason(app, api, pool) -> None:
     app.state.settings = Settings(
         database_url="postgresql://h:5432/d?sslmode=require",
         database_user="test-user",
@@ -780,7 +617,7 @@ async def test_going_over_the_ceiling_is_refused_with_the_reason(api, pool) -> N
     assert "ceiling of 1" in response.json()["detail"]
 
 
-async def test_a_symbol_the_gateway_will_not_serve_is_refused_with_the_reason(api) -> None:
+async def test_a_symbol_the_gateway_will_not_serve_is_refused_with_the_reason(app, api) -> None:
     app.state.instruments = FakeInstruments(collectable=False)
 
     response = await api.post("/pairs", json={"symbol": "NOPE", "resolution": "MINUTE"})
@@ -789,7 +626,7 @@ async def test_a_symbol_the_gateway_will_not_serve_is_refused_with_the_reason(ap
     assert "archive nothing" in response.json()["detail"]
 
 
-async def test_a_gateway_that_is_down_is_reported_as_upstream(api) -> None:
+async def test_a_gateway_that_is_down_is_reported_as_upstream(app, api) -> None:
     app.state.instruments = FakeInstruments(error=GatewayUnreachable("connection refused"))
 
     response = await api.post("/pairs", json={"symbol": "US100", "resolution": "MINUTE"})
@@ -855,7 +692,7 @@ async def test_asset_classes_are_the_gateways_own_list(api) -> None:
     assert response.json() == ["CRYPTO", "SHARES"]
 
 
-async def test_a_gateway_refusal_on_the_catalogue_is_not_an_empty_result(api) -> None:
+async def test_a_gateway_refusal_on_the_catalogue_is_not_an_empty_result(app, api) -> None:
     """specs/market-data-api: an odmowa (the gateway's 401 for a missing or wrong caller
     key, or any other refusal) must be distinguishable from an honest empty search — never
     silently turned into one."""
@@ -867,7 +704,7 @@ async def test_a_gateway_refusal_on_the_catalogue_is_not_an_empty_result(api) ->
     assert response.status_code != 200
 
 
-async def test_a_gateway_refusal_on_asset_classes_is_reported_not_hidden(api) -> None:
+async def test_a_gateway_refusal_on_asset_classes_is_reported_not_hidden(app, api) -> None:
     app.state.instruments = FakeInstruments(error=GatewayRefused(401, "missing or invalid caller key"))
 
     response = await api.get("/asset-classes")
@@ -878,7 +715,7 @@ async def test_a_gateway_refusal_on_asset_classes_is_reported_not_hidden(api) ->
 # --- 9: collection jobs, over the contract ----------------------------------------------
 
 
-async def test_adding_several_pairs_is_one_decision_with_one_job(api) -> None:
+async def test_adding_several_pairs_is_one_decision_with_one_job(app, api) -> None:
     response = await api.post(
         "/pairs",
         json={
@@ -898,7 +735,7 @@ async def test_adding_several_pairs_is_one_decision_with_one_job(api) -> None:
     assert app.state.job_runner.notifications == 1
 
 
-async def test_a_multi_pair_request_refuses_one_without_losing_the_others(api) -> None:
+async def test_a_multi_pair_request_refuses_one_without_losing_the_others(app, api) -> None:
     app.state.instruments = FakeInstrumentsBySymbol({"US100": True, "NOPE": False})
 
     response = await api.post(
@@ -951,7 +788,7 @@ async def test_estimating_prices_pairs_without_creating_anything(api, pool) -> N
     assert (await api.get("/pairs")).json() == []
 
 
-async def test_estimating_names_a_symbol_the_gateway_does_not_know(api) -> None:
+async def test_estimating_names_a_symbol_the_gateway_does_not_know(app, api) -> None:
     app.state.instruments = FakeInstruments(collectable=False)
 
     response = await api.post(
@@ -1066,7 +903,7 @@ async def test_listing_jobs_filtered_to_one_pair(api, pool) -> None:
     assert rows[0]["resolution"] == "MINUTE"
 
 
-async def test_retrying_wakes_the_runner_and_is_refused_with_nothing_to_retry(api, pool) -> None:
+async def test_retrying_wakes_the_runner_and_is_refused_with_nothing_to_retry(app, api, pool) -> None:
     created = await api.post(
         "/pairs",
         json={"symbol": "US100", "resolution": "MINUTE", "collect_from": (NOW - timedelta(days=2)).isoformat()},
@@ -1161,7 +998,7 @@ async def test_reading_a_partly_failed_job_says_partial_and_names_each_failure(a
     assert all(chunk["failure"] for chunk in failed), "and name why each one did"
 
 
-async def test_retrying_a_failed_job_resets_only_it_and_wakes_the_runner(api, pool) -> None:
+async def test_retrying_a_failed_job_resets_only_it_and_wakes_the_runner(app, api, pool) -> None:
     """The success path through the contract: what comes back is the job as it will now be
     worked, and the runner is told rather than left to find it on its next poll."""
     job_id = await _deep_job(api)
@@ -1454,7 +1291,7 @@ async def _tracked(pool, *resolutions: Resolution) -> None:
             await track(conn, "US100", resolution, LIMIT)
 
 
-async def test_the_forming_candle_is_readable_without_a_subscription(api, pool) -> None:
+async def test_the_forming_candle_is_readable_without_a_subscription(app, api, pool) -> None:
     await _tracked(pool, Resolution.MINUTE)
     await app.state.hub.publish("US100", Resolution.MINUTE, candle(0, forming=True, close=101.25))
 
@@ -1466,7 +1303,7 @@ async def test_the_forming_candle_is_readable_without_a_subscription(api, pool) 
     assert body["price_side"] == "bid"
 
 
-async def test_without_a_resolution_the_archive_answers_from_the_finest_live_one(
+async def test_without_a_resolution_the_archive_answers_from_the_finest_live_one(app, 
     api, pool
 ) -> None:
     await _tracked(pool, Resolution.MINUTE, Resolution.HOUR)
@@ -1481,7 +1318,7 @@ async def test_without_a_resolution_the_archive_answers_from_the_finest_live_one
     assert body["candle"]["close"] == 101.0
 
 
-async def test_a_stalled_finer_feed_does_not_hide_a_coarser_price(api, pool) -> None:
+async def test_a_stalled_finer_feed_does_not_hide_a_coarser_price(app, api, pool) -> None:
     """The reason the pick is "finest that has one" rather than "finest tracked". A pair
     tracked at MINUTE and HOUR whose minute feed has stopped still has a price."""
     await _tracked(pool, Resolution.MINUTE, Resolution.HOUR)
@@ -1495,7 +1332,7 @@ async def test_a_stalled_finer_feed_does_not_hide_a_coarser_price(api, pool) -> 
     assert body["candle"]["close"] == 200.0
 
 
-async def test_a_named_resolution_is_honoured_over_the_finer_one(api, pool) -> None:
+async def test_a_named_resolution_is_honoured_over_the_finer_one(app, api, pool) -> None:
     await _tracked(pool, Resolution.MINUTE, Resolution.HOUR)
     await app.state.hub.publish("US100", Resolution.MINUTE, candle(0, forming=True, close=101.0))
     await app.state.hub.publish(
@@ -1508,7 +1345,7 @@ async def test_a_named_resolution_is_honoured_over_the_finer_one(api, pool) -> N
     assert body["candle"]["close"] == 200.0
 
 
-async def test_a_shut_market_says_so_rather_than_reading_as_missing_data(api, pool) -> None:
+async def test_a_shut_market_says_so_rather_than_reading_as_missing_data(app, api, pool) -> None:
     await _tracked(pool, Resolution.MINUTE)
     app.state.instruments = FakeInstruments(market_open=False)
 
@@ -1519,7 +1356,7 @@ async def test_a_shut_market_says_so_rather_than_reading_as_missing_data(api, po
     assert body["candle"] is None
 
 
-async def test_an_open_market_with_nothing_arriving_is_a_collection_failure(api, pool) -> None:
+async def test_an_open_market_with_nothing_arriving_is_a_collection_failure(app, api, pool) -> None:
     # The one empty answer that needs somebody to go and look, and the one that would
     # otherwise be indistinguishable from a quiet weekend.
     await _tracked(pool, Resolution.MINUTE)
@@ -1531,7 +1368,7 @@ async def test_an_open_market_with_nothing_arriving_is_a_collection_failure(api,
     assert body["market_open"] is True
 
 
-async def test_a_gateway_that_will_not_answer_is_not_a_shut_market(api, pool) -> None:
+async def test_a_gateway_that_will_not_answer_is_not_a_shut_market(app, api, pool) -> None:
     await _tracked(pool, Resolution.MINUTE)
     app.state.instruments = FakeInstruments(market_open=None)
 
@@ -1550,7 +1387,7 @@ async def test_an_untracked_symbol_says_nobody_collects_it(api) -> None:
     assert body["candle"] is None
 
 
-async def test_reading_the_forming_candle_stores_nothing(api, pool) -> None:
+async def test_reading_the_forming_candle_stores_nothing(app, api, pool) -> None:
     await _tracked(pool, Resolution.MINUTE)
     await app.state.hub.publish("US100", Resolution.MINUTE, candle(0, forming=True))
 
@@ -1563,7 +1400,7 @@ async def test_reading_the_forming_candle_stores_nothing(api, pool) -> None:
     assert stored == []
 
 
-async def test_reading_does_not_leave_a_room_behind(api) -> None:
+async def test_reading_does_not_leave_a_room_behind(app, api) -> None:
     """A read that created rooms would leave one per symbol anybody ever asked about, and
     `unsubscribe` only collects rooms it finds — one nobody subscribed to is never
     reached."""
@@ -1585,7 +1422,7 @@ class FakeWebSocket:
     runs the app on its own event loop and the database pool belongs to this one.
     """
 
-    def __init__(self, **params):
+    def __init__(self, app, **params):
         self.query_params = params
         self.app = app
         self.accepted = False
@@ -1607,7 +1444,7 @@ class FakeWebSocket:
         raise WebSocketDisconnect(1000)
 
 
-def a_ticket() -> str:
+def a_ticket(app) -> str:
     """A live ticket, from the store the app is actually running with.
 
     Spelled out at every call site rather than defaulted inside `FakeWebSocket`, because
@@ -1616,12 +1453,12 @@ def a_ticket() -> str:
     return app.state.tickets.issue("test-principal").value
 
 
-async def test_subscribing_to_a_pair_nobody_collects_is_refused(api, pool) -> None:
+async def test_subscribing_to_a_pair_nobody_collects_is_refused(app, api, pool) -> None:
     """8.9. Subscribing must not quietly start collecting either — that is the decision
     the ceiling exists to keep deliberate."""
     from market_data.routers.stream import candle_feed
 
-    socket = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=a_ticket())
+    socket = FakeWebSocket(app, symbol="US100", resolution="MINUTE", ticket=a_ticket(app))
 
     await candle_feed(socket, app.state.hub)
 
@@ -1632,13 +1469,13 @@ async def test_subscribing_to_a_pair_nobody_collects_is_refused(api, pool) -> No
         assert await conn.fetchval("SELECT count(*) FROM tracked_pairs") == 0
 
 
-async def test_subscribing_to_a_collected_pair_is_accepted(api, pool) -> None:
+async def test_subscribing_to_a_collected_pair_is_accepted(app, api, pool) -> None:
     from market_data.routers.stream import candle_feed
 
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
         await write_candles(conn, [candle(0)])
-    socket = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=a_ticket())
+    socket = FakeWebSocket(app, symbol="US100", resolution="MINUTE", ticket=a_ticket(app))
 
     await candle_feed(socket, app.state.hub)
 
@@ -1647,7 +1484,7 @@ async def test_subscribing_to_a_collected_pair_is_accepted(api, pool) -> None:
     assert len(socket.sent[0]["candles"]) == 1
 
 
-async def test_a_subscription_is_accepted_through_the_router_too(api, pool) -> None:
+async def test_a_subscription_is_accepted_through_the_router_too(app, api, pool) -> None:
     """The tests around this one call the handler themselves, which is how the handshake
     stayed broken while they all passed: the `hub` dependency asked for a `Request`, and a
     WebSocket connection is not one, so FastAPI had nothing to pass and every subscription
@@ -1657,16 +1494,16 @@ async def test_a_subscription_is_accepted_through_the_router_too(api, pool) -> N
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
         await write_candles(conn, [candle(0)])
 
-    sent = await _handshake(f"symbol=US100&resolution=MINUTE&ticket={a_ticket()}")
+    sent = await _handshake(app, f"symbol=US100&resolution=MINUTE&ticket={a_ticket(app)}")
 
     assert sent[0]["type"] == "websocket.accept"
     assert json.loads(sent[1]["text"])["kind"] == "snapshot"
 
 
-async def test_a_subscription_without_a_symbol_is_refused_before_the_handshake(api) -> None:
+async def test_a_subscription_without_a_symbol_is_refused_before_the_handshake(app, api) -> None:
     from market_data.routers.stream import candle_feed
 
-    socket = FakeWebSocket(resolution="MINUTE", ticket=a_ticket())
+    socket = FakeWebSocket(app, resolution="MINUTE", ticket=a_ticket(app))
 
     await candle_feed(socket, app.state.hub)
 
@@ -1674,10 +1511,10 @@ async def test_a_subscription_without_a_symbol_is_refused_before_the_handshake(a
     assert socket.closed[1] == "symbol is required"
 
 
-async def test_a_subscription_with_an_unknown_resolution_is_refused(api) -> None:
+async def test_a_subscription_with_an_unknown_resolution_is_refused(app, api) -> None:
     from market_data.routers.stream import candle_feed
 
-    socket = FakeWebSocket(symbol="US100", resolution="MINUTE_2", ticket=a_ticket())
+    socket = FakeWebSocket(app, symbol="US100", resolution="MINUTE_2", ticket=a_ticket(app))
 
     await candle_feed(socket, app.state.hub)
 
@@ -1697,14 +1534,14 @@ async def test_a_ticket_is_issued_with_the_time_it_stays_good_for(api) -> None:
     assert body["expires_in_seconds"] == 30
 
 
-async def test_a_ticket_records_the_principal_the_platform_identified(api) -> None:
+async def test_a_ticket_records_the_principal_the_platform_identified(app, api) -> None:
     await api.post("/stream-tickets", headers={"X-MS-CLIENT-PRINCIPAL-ID": "operator-object-id"})
 
     (ticket,) = app.state.tickets._issued.values()
     assert ticket.issued_to == "operator-object-id"
 
 
-async def test_a_ticket_is_refused_when_the_platform_identified_nobody(api) -> None:
+async def test_a_ticket_is_refused_when_the_platform_identified_nobody(app, api) -> None:
     """The module does not take it on trust that the layer in front is doing its job.
     Configured to stand behind one, a request arriving with no identity means that layer
     is not there — and the answer is to stop minting keys, not to mint one anyway."""
@@ -1718,7 +1555,7 @@ async def test_a_ticket_is_refused_when_the_platform_identified_nobody(api) -> N
     assert len(app.state.tickets) == 0
 
 
-async def test_a_ticket_is_issued_without_a_principal_when_nothing_stands_in_front(api) -> None:
+async def test_a_ticket_is_issued_without_a_principal_when_nothing_stands_in_front(app, api) -> None:
     """Local development: nothing is in front, so there is no identity to have — and the
     handshake still demands a ticket, so it is the same code path either way."""
     assert app.state.settings.require_authenticated_principal is False
@@ -1738,12 +1575,12 @@ async def test_the_ticket_route_is_not_under_the_path_exempted_from_easy_auth(ap
     assert not any(path.startswith("/ws") for path in schema["paths"])
 
 
-async def test_a_handshake_without_a_ticket_is_refused(api, pool) -> None:
+async def test_a_handshake_without_a_ticket_is_refused(app, api, pool) -> None:
     from market_data.routers.stream import candle_feed
 
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
-    socket = FakeWebSocket(symbol="US100", resolution="MINUTE")
+    socket = FakeWebSocket(app, symbol="US100", resolution="MINUTE")
 
     await candle_feed(socket, app.state.hub)
 
@@ -1751,10 +1588,10 @@ async def test_a_handshake_without_a_ticket_is_refused(api, pool) -> None:
     assert "ticket" in socket.closed[1]
 
 
-async def test_a_handshake_with_a_ticket_the_archive_never_issued_is_refused(api) -> None:
+async def test_a_handshake_with_a_ticket_the_archive_never_issued_is_refused(app, api) -> None:
     from market_data.routers.stream import candle_feed
 
-    socket = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket="not-one-of-ours")
+    socket = FakeWebSocket(app, symbol="US100", resolution="MINUTE", ticket="not-one-of-ours")
 
     await candle_feed(socket, app.state.hub)
 
@@ -1762,7 +1599,7 @@ async def test_a_handshake_with_a_ticket_the_archive_never_issued_is_refused(api
     assert "ticket" in socket.closed[1]
 
 
-async def test_a_ticket_works_once_and_the_first_connection_survives_the_second_try(
+async def test_a_ticket_works_once_and_the_first_connection_survives_the_second_try(app, 
     api, pool
 ) -> None:
     from market_data.routers.stream import candle_feed
@@ -1770,11 +1607,11 @@ async def test_a_ticket_works_once_and_the_first_connection_survives_the_second_
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
         await write_candles(conn, [candle(0)])
-    ticket = a_ticket()
+    ticket = a_ticket(app)
 
-    first = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=ticket)
+    first = FakeWebSocket(app, symbol="US100", resolution="MINUTE", ticket=ticket)
     await candle_feed(first, app.state.hub)
-    second = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=ticket)
+    second = FakeWebSocket(app, symbol="US100", resolution="MINUTE", ticket=ticket)
     await candle_feed(second, app.state.hub)
 
     assert first.accepted is True
@@ -1783,7 +1620,7 @@ async def test_a_ticket_works_once_and_the_first_connection_survives_the_second_
     assert "ticket" in second.closed[1]
 
 
-async def test_a_handshake_with_an_expired_ticket_is_refused(api, pool) -> None:
+async def test_a_handshake_with_an_expired_ticket_is_refused(app, api, pool) -> None:
     from market_data.routers.stream import candle_feed
 
     clock = [datetime(2026, 8, 9, 12, 0, tzinfo=UTC)]
@@ -1793,14 +1630,14 @@ async def test_a_handshake_with_an_expired_ticket_is_refused(api, pool) -> None:
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
 
-    socket = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=ticket)
+    socket = FakeWebSocket(app, symbol="US100", resolution="MINUTE", ticket=ticket)
     await candle_feed(socket, app.state.hub)
 
     assert socket.accepted is False
     assert "ticket" in socket.closed[1]
 
 
-async def test_the_two_reasons_a_handshake_is_refused_are_told_apart(api, pool) -> None:
+async def test_the_two_reasons_a_handshake_is_refused_are_told_apart(app, api, pool) -> None:
     """One is fixed by authenticating again, the other only by collecting the pair. A
     consumer that cannot tell them apart retries the wrong one forever."""
     from market_data.routers.stream import candle_feed
@@ -1808,9 +1645,9 @@ async def test_the_two_reasons_a_handshake_is_refused_are_told_apart(api, pool) 
     async with pool.acquire() as conn:
         await track(conn, "US100", Resolution.MINUTE, LIMIT)
 
-    no_ticket = FakeWebSocket(symbol="US100", resolution="MINUTE")
+    no_ticket = FakeWebSocket(app, symbol="US100", resolution="MINUTE")
     await candle_feed(no_ticket, app.state.hub)
-    untracked = FakeWebSocket(symbol="EURUSD", resolution="MINUTE", ticket=a_ticket())
+    untracked = FakeWebSocket(app, symbol="EURUSD", resolution="MINUTE", ticket=a_ticket(app))
     await candle_feed(untracked, app.state.hub)
 
     assert no_ticket.closed[1] != untracked.closed[1]
@@ -1818,7 +1655,7 @@ async def test_the_two_reasons_a_handshake_is_refused_are_told_apart(api, pool) 
     assert "not being collected" in untracked.closed[1]
 
 
-async def test_no_ticket_value_reaches_the_logs(api, pool, caplog) -> None:
+async def test_no_ticket_value_reaches_the_logs(app, api, pool, caplog) -> None:
     from market_data.routers.stream import candle_feed
 
     async with pool.acquire() as conn:
@@ -1831,9 +1668,9 @@ async def test_no_ticket_value_reaches_the_logs(api, pool, caplog) -> None:
                 "/stream-tickets", headers={"X-MS-CLIENT-PRINCIPAL-ID": "operator-object-id"}
             )
         ).json()["ticket"]
-        accepted = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=issued)
+        accepted = FakeWebSocket(app, symbol="US100", resolution="MINUTE", ticket=issued)
         await candle_feed(accepted, app.state.hub)
-        refused = FakeWebSocket(symbol="US100", resolution="MINUTE", ticket=issued)
+        refused = FakeWebSocket(app, symbol="US100", resolution="MINUTE", ticket=issued)
         await candle_feed(refused, app.state.hub)
 
     assert accepted.accepted is True
@@ -1853,7 +1690,7 @@ def _at(stamp: str) -> datetime:
     return datetime.fromisoformat(stamp)
 
 
-async def _handshake(query: str) -> list[dict]:
+async def _handshake(app, query: str) -> list[dict]:
     """Connect to /ws/candles through the app itself, and answer with what it sent back.
 
     httpx's ASGI transport speaks HTTP only, so the connection is made at the ASGI level:

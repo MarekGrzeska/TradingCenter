@@ -10,7 +10,6 @@ import httpx
 import pytest
 from pydantic import ValidationError
 
-from market_data.app import app
 from market_data.contract import IndicatorResultOut
 from market_data.models import Candle, CandleSource, Resolution
 from market_data.store import write_candles
@@ -75,7 +74,7 @@ class TestResultShapeOrError:
 
 
 @pytest.fixture
-async def catalogue_client():
+async def catalogue_client(app):
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://archive.test") as client:
         yield client
@@ -110,21 +109,11 @@ async def test_catalogue_carries_no_volume_entry(catalogue_client) -> None:
 pytestmark = pytest.mark.db
 
 
+# `pool` comes from conftest. This `api` deliberately does not: the suite computes over
+# the archive and touches nothing that reaches outward, so it wires the two pieces the
+# router actually reads rather than the full set the contract suites need.
 @pytest.fixture
-async def pool(migrated_url: str):
-    from market_data.db import pool as make_pool
-
-    async with make_pool(migrated_url, max_size=5) as created:
-        async with created.acquire() as conn:
-            await conn.execute(
-                "TRUNCATE candles, derived_candles, tracked_pairs, coverage_ranges, "
-                "collection_jobs, collection_job_chunks, pair_deletions"
-            )
-        yield created
-
-
-@pytest.fixture
-async def api(pool):
+async def api(app, pool):
     app.state.pool = pool
     app.state.indicator_limiter = asyncio.Semaphore(4)
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)

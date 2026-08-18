@@ -1,0 +1,137 @@
+"""The doubles every suite over the app shares, and the clock they agree on.
+
+Here rather than in `conftest.py` because these are imported by name, not injected:
+`candle(...)` takes arguments at ninety-odd call sites and a fixture wrapping it would
+buy nothing. `conftest.py` next door holds the things pytest hands out instead.
+
+The two things that reach outward — the gateway's instruments and the ingest supervisor —
+are faked because what the suites test is the contract, not the upstream.
+"""
+
+from __future__ import annotations
+
+from datetime import UTC, datetime, timedelta
+
+from market_data.models import Candle, CandleSource, Resolution
+
+NOW = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
+LIMIT = 20
+
+# Every read of a range says which range, and this is why.
+#
+# `/candles` defaults to the last day *of the real clock*, so a test that writes candles
+# around a fixed `NOW` and then omits the window is only asserting anything while the wall
+# clock happens to be within a day of that constant. Two tests did, and they began failing
+# at noon on 2026-08-08 — a day after `NOW`, having passed every run before it, for no
+# reason connected to the code.
+WINDOW = {
+    "from": (NOW - timedelta(hours=1)).isoformat(),
+    "to": (NOW + timedelta(minutes=1)).isoformat(),
+}
+
+
+def candle(offset: int = 0, **overrides) -> Candle:
+    return Candle(
+        **{
+            "symbol": "US100",
+            "resolution": Resolution.MINUTE,
+            "period_start": NOW - timedelta(minutes=offset),
+            "open": 100.0,
+            "high": 101.0,
+            "low": 99.0,
+            "close": 100.5,
+            "volume": 10.0,
+            "source": CandleSource.HISTORY,
+            **overrides,
+        }
+    )
+
+
+class FakeInstruments:
+    def __init__(
+        self,
+        collectable: bool = True,
+        error: Exception | None = None,
+        market_open: bool | None = None,
+    ):
+        self.collectable = collectable
+        self.error = error
+        # What the gateway would say about the instrument's session. `None` is the
+        # default because it is the honest one for a fake: no answer, so `UNKNOWN`.
+        self.market_open = market_open
+        self.asked: list[str] = []
+
+    async def is_collectable(self, symbol: str, resolution: Resolution) -> bool:
+        if self.error is not None:
+            raise self.error
+        return self.collectable
+
+    async def is_market_open(self, symbol: str) -> bool | None:
+        self.asked.append(symbol)
+        if self.error is not None:
+            raise self.error
+        return self.market_open
+
+    # --- specs/market-data-api: the catalogue proxy ------------------------------
+
+    async def catalogue(self, max_nodes: int | None, asset_class: str | None) -> dict:
+        if self.error is not None:
+            raise self.error
+        return {
+            "instruments": [],
+            "count": 0,
+            "truncated": False,
+            "max_nodes": max_nodes,
+            "asset_class": asset_class,
+        }
+
+    async def search(self, q: str) -> list:
+        if self.error is not None:
+            raise self.error
+        return [{"symbol": q.upper(), "name": q, "asset_class": "CRYPTO", "tradeable": True}]
+
+    async def asset_classes(self) -> list:
+        if self.error is not None:
+            raise self.error
+        return ["CRYPTO", "SHARES"]
+
+
+class FakeInstrumentsBySymbol:
+    """Like `FakeInstruments`, but collectability varies per symbol — for a multi-pair
+    request where one symbol is refused and the others are not."""
+
+    def __init__(self, collectable: dict[str, bool]) -> None:
+        self._collectable = collectable
+
+    async def is_collectable(self, symbol: str, resolution: Resolution) -> bool:
+        return self._collectable.get(symbol, False)
+
+    async def is_market_open(self, symbol: str) -> bool | None:
+        return None
+
+
+class FakeIngest:
+    """Stands in for the supervisor: reconciles, and remembers what a fill did."""
+
+    def __init__(self, last_fill=None) -> None:
+        self.syncs = 0
+        self.running: set = set()
+        self.started_at = NOW
+        self._last_fill = last_fill
+
+    async def sync(self) -> None:
+        self.syncs += 1
+
+    def last_fill(self, symbol: str, resolution: Resolution):
+        return self._last_fill
+
+
+class FakeJobRunner:
+    """Stands in for the runner: real chunks still get worked, but by whatever executes
+    them directly in a test — `notify()` here is just observed, never acted on."""
+
+    def __init__(self) -> None:
+        self.notifications = 0
+
+    def notify(self) -> None:
+        self.notifications += 1
