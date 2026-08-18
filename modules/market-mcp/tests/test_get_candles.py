@@ -184,3 +184,51 @@ async def test_archive_refusal_detail_reaches_the_caller(server) -> None:
     with pytest.raises(ToolError, match="is before"):
         await mcp.call_tool("get_candles", {"symbol": "US100"})
     await upstream.aclose()
+
+
+@respx.mock
+async def test_a_validation_list_is_flattened_rather_than_dropped(server) -> None:
+    """FastAPI's *other* refusal shape, and the one this module handed over raw until
+    18 August 2026: the repr of a list of dicts, `url` to pydantic's error docs and all.
+
+    A refusal here MUST say what to change (specs/market-mcp-answers), so the field's own
+    name travels with the message — `msg` alone is "Field required", which names nothing.
+    """
+    mcp, upstream = server
+    respx.get(f"{BASE}/candles/US100").mock(
+        return_value=httpx.Response(
+            422,
+            json={
+                "detail": [
+                    {
+                        "type": "missing",
+                        "loc": ["query", "resolution"],
+                        "msg": "Field required",
+                        "url": "https://errors.pydantic.dev/2.11/v/missing",
+                    }
+                ]
+            },
+        )
+    )
+
+    with pytest.raises(ToolError) as err:
+        await mcp.call_tool("get_candles", {"symbol": "US100"})
+
+    assert "resolution: Field required" in str(err.value)
+    assert "pydantic.dev" not in str(err.value), "the repr of the list must not travel"
+    await upstream.aclose()
+
+
+@respx.mock
+async def test_a_json_body_that_is_not_an_object_is_still_a_refusal(server) -> None:
+    """`.get()` on a JSON list raised `AttributeError`, which the `except ValueError`
+    around it never caught — so a refusal shaped like this reached the turn as a crash
+    rather than as an answer."""
+    mcp, upstream = server
+    respx.get(f"{BASE}/candles/US100").mock(return_value=httpx.Response(500, json=["boom"]))
+
+    with pytest.raises(ToolError) as err:
+        await mcp.call_tool("get_candles", {"symbol": "US100"})
+
+    assert "AttributeError" not in str(err.value)
+    await upstream.aclose()

@@ -268,7 +268,9 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         current = await _call(teams, context, "GET", f"/schedules/{schedule_id}")
         body = {
             "revision_mode": current["revision_mode"],
-            "pinned_revision_id": pinned_revision_id or current["pinned_revision_id"],
+            "pinned_revision_id": pinned_revision_id
+            if pinned_revision_id is not None
+            else current["pinned_revision_id"],
             "cron_expression": cron_expression,
         }
         saved = await _call(teams, context, "PUT", f"/schedules/{schedule_id}", json=body)
@@ -295,6 +297,13 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
         editable here on purpose: a trigger watching a different number is a different
         trigger, and deserves to be created as one.
         """
+        # `is not None`, not `or`. Zero is falsy and every one of these is a number or a
+        # string the caller could reasonably send as zero or empty — `cooldown_seconds=0`
+        # most of all, which reads as "fire every time". Under `or` it kept the old value
+        # and answered with a success naming it, so the operator was told an impossible
+        # request had been carried out. teams refuses a non-positive cooldown with a
+        # sentence (`contract.py`, `_positive`); forwarding the value is what lets that
+        # refusal reach whoever asked.
         current = await _call(teams, context, "GET", f"/triggers/{trigger_id}")
         body = {
             "revision_mode": current["revision_mode"],
@@ -302,10 +311,14 @@ def register(mcp: FastMCP, teams: TeamsClient) -> None:
             "tool_name": current["tool_name"],
             "arguments": current["arguments"],
             "field_path": current["field_path"],
-            "comparison": comparison or current["comparison"],
-            "threshold": threshold or current["threshold"],
-            "cooldown_seconds": cooldown_seconds or current["cooldown_seconds"],
-            "poll_interval_seconds": poll_interval_seconds or current["poll_interval_seconds"],
+            "comparison": comparison if comparison is not None else current["comparison"],
+            "threshold": threshold if threshold is not None else current["threshold"],
+            "cooldown_seconds": cooldown_seconds
+            if cooldown_seconds is not None
+            else current["cooldown_seconds"],
+            "poll_interval_seconds": poll_interval_seconds
+            if poll_interval_seconds is not None
+            else current["poll_interval_seconds"],
         }
         saved = await _call(teams, context, "PUT", f"/triggers/{trigger_id}", json=body)
         return SavedTrigger(

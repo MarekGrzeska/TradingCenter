@@ -91,6 +91,50 @@ async def test_a_4xx_is_a_refusal_naming_the_detail(client: GatewayClient) -> No
 
 
 @respx.mock
+async def test_a_validation_list_is_flattened_rather_than_dropped(
+    client: GatewayClient,
+) -> None:
+    """The gateway's other refusal shape. Handed over raw it reaches the model as the
+    repr of a list of dicts; flattened, it names the field the order got wrong — which is
+    the only form a caller can act on."""
+    respx.post(f"{BASE}/orders").mock(
+        return_value=httpx.Response(
+            422,
+            json={
+                "detail": [
+                    {
+                        "type": "missing",
+                        "loc": ["body", "size"],
+                        "msg": "Field required",
+                        "url": "https://errors.pydantic.dev/2.11/v/missing",
+                    }
+                ]
+            },
+        )
+    )
+
+    with pytest.raises(GatewayRefused) as err:
+        await client.write("POST", "/orders", json={"symbol": "GOLD"})
+
+    assert "size: Field required" in str(err.value)
+    assert "pydantic.dev" not in str(err.value)
+    await client.aclose()
+
+
+@respx.mock
+async def test_a_json_body_that_is_not_an_object_is_still_a_refusal(
+    client: GatewayClient,
+) -> None:
+    respx.get(f"{BASE}/positions").mock(return_value=httpx.Response(500, json=["boom"]))
+
+    with pytest.raises(GatewayRefused) as err:
+        await client.get("/positions")
+
+    assert "AttributeError" not in str(err.value)
+    await client.aclose()
+
+
+@respx.mock
 async def test_timeout_is_a_gateway_unavailable(client: GatewayClient) -> None:
     respx.get(f"{BASE}/positions").mock(side_effect=httpx.ReadTimeout("timed out"))
 

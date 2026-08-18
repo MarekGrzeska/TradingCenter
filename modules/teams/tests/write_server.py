@@ -2,8 +2,10 @@
 
 Shared by the two files that need a run to place a real order — the trace tests and the
 route tests. The session itself is `test_tool_server.py`'s subject; what matters here is
-`read_only=False`, which is the whole of how the runner knows a call is an order
-(specs/trading-mcp-tools, "Narzędzie zapisujące jest oznaczone jako zmieniające stan").
+the pair the runner reads a call as an order from: `read_only=False` on the tool, and
+`can_move_the_account` on the server it came from (specs/trading-mcp-tools, "Narzędzie
+zapisujące jest oznaczone jako zmieniające stan"). Both, because the tool's annotation
+alone says nothing about whether it can reach an account.
 """
 
 from __future__ import annotations
@@ -33,7 +35,7 @@ FILLED = json.dumps(
 
 class WriteServer(ToolServer):
     def __init__(self, reply: str = FILLED, kind: ToolOutcomeKind = ToolOutcomeKind.OK) -> None:
-        super().__init__(settings_for(None))
+        super().__init__(settings_for(None), can_move_the_account=True)
         self._reply = reply
         self._kind = kind
         self.calls = 0

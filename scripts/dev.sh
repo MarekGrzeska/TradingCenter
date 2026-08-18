@@ -6,6 +6,9 @@
 #   migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp -> teams
 #   -> teams-mcp -> agent -> terminal
 #
+# That is the order below, and it had drifted from it three times before 18 August 2026 —
+# each time in one script and not the other. Nothing here starts before what it calls.
+#
 # The order is not tidiness, and every arrow in it is now a real dependency.
 # market-data opens a subscription per tracked pair the moment it starts, so a gateway
 # that is not listening yet costs it a round of backoff; market-mcp reads market-data's
@@ -414,23 +417,11 @@ run_service "trading " "$BRIGHT_GREEN" "$TRADING_DIR" uv run python -m trading_m
 wait_for_http "$TRADING_URL/health" "trading-mcp" || exit 1
 ok "trading-mcp is answering."
 
-# --- agent ----------------------------------------------------------------------
-#
-# Last among the back ends: nothing else calls it, so nothing else waits on it —
-# unlike the gateway, which market-data subscribes to as it starts. It does call
-# market-mcp, which is why it starts after it: the tool list is read on the first
-# turn, and a market-mcp still coming up would mean a turn answered without tools.
-
-say "Starting agent on port $AGENT_PORT..."
-run_service "agent   " "$YELLOW" "$AGENT_DIR" uv run uvicorn agent.app:app --reload --port "$AGENT_PORT"
-wait_for_http "$AGENT_URL/health" "agent" || exit 1
-ok "agent is answering."
-
 # --- teams ------------------------------------------------------------------------
 #
-# After market-mcp for the same reason the agent is, and after the agent for no reason
-# at all beyond a fixed order: nothing calls teams, and teams calls nobody the agent
-# does not. The two are siblings, not a chain.
+# After market-mcp and trading-mcp, whose tools its runs assign — and before teams-mcp,
+# whose tools *are* teams' catalogue. Not before the agent for any reason of its own: the
+# two are siblings, and what puts teams first is teams-mcp standing between them.
 
 say "Starting teams on port $TEAMS_PORT..."
 run_service "teams   " "$BRIGHT_BLUE" "$TEAMS_DIR" uv run uvicorn teams.app:app --reload --port "$TEAMS_PORT"
@@ -443,14 +434,27 @@ ok "teams is answering."
 # it and reports the outage per call rather than refusing to run, which is market-mcp's
 # shape and not trading-mcp's.
 #
-# Before nothing in particular: the agent asks it for its tool list on the first turn that
-# wants one, not at start-up, so the order below is for a readable log rather than for
-# correctness.
+# Before the agent, which mounts its tools: the agent asks for the tool list on the first
+# turn that wants one rather than at start-up, so this is for a log that reads in the
+# direction the arrows point rather than for correctness.
 
 say "Starting teams-mcp on port $TEAMS_MCP_PORT..."
 run_service "teamsmcp" "$BRIGHT_MAGENTA" "$TEAMS_MCP_DIR" uv run python -m teams_mcp
 wait_for_http "$TEAMS_MCP_URL/health" "teams-mcp" || exit 1
 ok "teams-mcp is answering."
+
+# --- agent ----------------------------------------------------------------------
+#
+# Last among the back ends: nothing else calls it, so nothing else waits on it —
+# unlike the gateway, which market-data subscribes to as it starts. It calls all three
+# tool servers, which is why it starts after all three: each tool list is read on the
+# first turn that wants one, and a server still coming up would mean a turn answered
+# without those tools rather than an error anyone would notice.
+
+say "Starting agent on port $AGENT_PORT..."
+run_service "agent   " "$YELLOW" "$AGENT_DIR" uv run uvicorn agent.app:app --reload --port "$AGENT_PORT"
+wait_for_http "$AGENT_URL/health" "agent" || exit 1
+ok "agent is answering."
 
 # --- the terminal -------------------------------------------------------------
 

@@ -4,8 +4,7 @@
 
 .DESCRIPTION
     migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp ->
-    teams -> teams-mcp ->
-    agent -> teams -> terminal
+    teams -> teams-mcp -> agent -> terminal
 
     The order is not tidiness, and every arrow in it is now a real dependency.
     market-data opens a subscription per tracked pair as it starts, so a gateway
@@ -279,6 +278,7 @@ $gatewayJob = $null
 $archiveJob = $null
 $mcpJob = $null
 $tradingJob = $null
+$teamsMcpJob = $null
 $agentJob = $null
 $teamsJob = $null
 $terminalJob = $null
@@ -501,6 +501,27 @@ try {
     }
     Write-Host "trading-mcp is answering." -ForegroundColor Green
 
+    # --- teams ---
+    #
+    # After market-mcp and trading-mcp, whose tools its runs assign - and before
+    # teams-mcp, whose tools *are* teams' catalogue. Not before the agent for any reason
+    # of its own: the two are siblings, and what puts teams first is teams-mcp standing
+    # between them.
+
+    Write-Host "Starting teams on port $teamsPort..." -ForegroundColor Cyan
+    $teamsJob = Start-Job -Name "teams" -ScriptBlock {
+        param($dir, $port)
+        Set-Location $dir
+        uv run uvicorn teams.app:app --reload --port $port 2>&1
+    } -ArgumentList $teamsDir, $teamsPort
+
+    if (-not (Wait-ForHttp -Url "$teamsUrl/health" -Label "teams" `
+                -Job $teamsJob -Prefix "teams   " -Color DarkCyan)) {
+        Write-Prefixed -Prefix "teams   " -Color Yellow -Lines (Receive-Job $teamsJob)
+        exit 1
+    }
+    Write-Host "teams is answering." -ForegroundColor Green
+
     # --- teams-mcp ---
     #
     # After teams, because its tools are teams' catalogue - though unlike trading-mcp it
@@ -525,9 +546,10 @@ try {
     # --- agent ---
     #
     # Last among the back ends: nothing else calls it, so nothing else waits on it -
-    # unlike the gateway, which market-data subscribes to as it starts. It does call
-    # market-mcp, which is why it starts after it: the tool list is read on the first
-    # turn, and a market-mcp still coming up would mean a turn answered without tools.
+    # unlike the gateway, which market-data subscribes to as it starts. It calls three
+    # tool servers and starts after all of them: each tool list is read on the first turn
+    # that wants one, and a server still coming up would mean a turn answered without
+    # those tools rather than an error anyone would notice.
 
     Write-Host "Starting agent on port $agentPort..." -ForegroundColor Cyan
     $agentJob = Start-Job -Name "agent" -ScriptBlock {
@@ -542,26 +564,6 @@ try {
         exit 1
     }
     Write-Host "agent is answering." -ForegroundColor Green
-
-    # --- teams ---
-    #
-    # After market-mcp for the same reason the agent is, and after the agent for no
-    # reason at all beyond a fixed order: nothing calls teams, and teams calls nobody the
-    # agent does not. The two are siblings, not a chain.
-
-    Write-Host "Starting teams on port $teamsPort..." -ForegroundColor Cyan
-    $teamsJob = Start-Job -Name "teams" -ScriptBlock {
-        param($dir, $port)
-        Set-Location $dir
-        uv run uvicorn teams.app:app --reload --port $port 2>&1
-    } -ArgumentList $teamsDir, $teamsPort
-
-    if (-not (Wait-ForHttp -Url "$teamsUrl/health" -Label "teams" `
-                -Job $teamsJob -Prefix "teams   " -Color DarkCyan)) {
-        Write-Prefixed -Prefix "teams   " -Color Yellow -Lines (Receive-Job $teamsJob)
-        exit 1
-    }
-    Write-Host "teams is answering." -ForegroundColor Green
 
     # --- the terminal ---
 
@@ -601,6 +603,7 @@ try {
         @{ Job = $archiveJob; Label = "market-data"; Prefix = "archive "; Color = "Magenta" },
         @{ Job = $mcpJob; Label = "market-mcp"; Prefix = "mcp     "; Color = "Green" },
         @{ Job = $tradingJob; Label = "trading-mcp"; Prefix = "trading "; Color = "DarkGreen" },
+        @{ Job = $teamsMcpJob; Label = "teams-mcp"; Prefix = "teamsmcp"; Color = "Magenta" },
         @{ Job = $agentJob; Label = "agent"; Prefix = "agent   "; Color = "Yellow" },
         @{ Job = $teamsJob; Label = "teams"; Prefix = "teams   "; Color = "DarkCyan" }
     )
@@ -624,7 +627,7 @@ try {
 finally {
     Write-Host ""
     Write-Host "Stopping..." -ForegroundColor Cyan
-    foreach ($job in @($gatewayJob, $archiveJob, $mcpJob, $tradingJob, $agentJob, $teamsJob, $terminalJob)) {
+    foreach ($job in @($gatewayJob, $archiveJob, $mcpJob, $tradingJob, $teamsMcpJob, $agentJob, $teamsJob, $terminalJob)) {
         if ($null -ne $job) {
             Stop-Job $job -ErrorAction SilentlyContinue | Out-Null
             Remove-Job $job -Force -ErrorAction SilentlyContinue | Out-Null

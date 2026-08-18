@@ -81,8 +81,22 @@ async def stream_tokens_for(client: CapitalClient) -> tuple[str, str]:
     by the time this returns the tokens are ones the provider has just accepted. One
     extra request per connection, and a connection is rare — the loop that would need
     this often is exactly the loop it exists to break.
+
+    And the answer is *read*, which it was not until 18 August 2026. The call was made and
+    the response dropped on the floor, so a login that fails for good — a rotated key, a
+    provider outage, an account locked — left the old tokens in place and let the caller
+    subscribe with them. That is the same endless reconnect loop this function exists to
+    prevent, moved one level down: `request()` retries the 401 once, gives up, and the
+    stream took the corpse anyway. Raising is what makes `Upstream` back off instead.
     """
-    await client.session_details()
+    resp = await client.session_details()
+    if not resp.is_success:
+        raise GatewayError(
+            "capital.com would not confirm the session the stream borrows "
+            f"(HTTP {resp.status_code}); refusing to subscribe with tokens it has "
+            "not just accepted",
+            status_code=502,
+        )
     return client.stream_tokens()
 
 

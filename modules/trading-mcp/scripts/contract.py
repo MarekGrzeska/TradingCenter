@@ -62,11 +62,15 @@ def schema_text() -> str:
                 file=sys.stderr,
             )
             raise SystemExit(1) from err
-    # Reformatted rather than the raw stdout: two `uv run` invocations resolving the
-    # same lockfile can still print in a different key order between runs, which
-    # would make `check` flap on nothing. `sort_keys` makes the snapshot a function
-    # of the schema alone.
-    return json.dumps(json.loads(result.stdout), indent=2, sort_keys=True) + "\n"
+    # Reformatted rather than the raw stdout: two `uv run` invocations resolving the same
+    # lockfile can still print in a different key order between runs, which would make
+    # `check` flap on nothing. `sort_keys` makes the snapshot a function of the schema
+    # alone.
+    #
+    # `ensure_ascii=False` because the whole worth of a committed snapshot is a readable
+    # diff, and this document is mostly Polish prose: escaped, one reworded sentence
+    # arrives as a wall of `\uXXXX` nobody reads. The file is written as UTF-8 either way.
+    return json.dumps(json.loads(result.stdout), indent=2, sort_keys=True, ensure_ascii=False) + "\n"
 
 
 def generate() -> str:

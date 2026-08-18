@@ -82,21 +82,34 @@ jobs:
       # runs out and fails the job. That pairing is deliberate: probing a route that reads
       # the schema directly is impossible from here, because Easy Auth answers 401 in
       # front of every path but this one (infra/app-service.tf, `excluded_paths`).
+      #
+      # The image is asked for alongside, and that half was missing until 18 August 2026.
+      # Swapping a container in App Service is not instantaneous: for a minute or so after
+      # `webapps-deploy` returns, the *previous* container is still answering — so a probe
+      # that only reads HTTP passes on the image being replaced and the job goes green
+      # over an image that may never come up. market-data was the most exposed of the
+      # four, since its own signal is a 404 the old container returns identically.
+      # `deploy-agent.yml` and `deploy-gateway.yml` already asked this question; this is
+      # the same two lines, not a new idea.
       - name: Smoke-check the deployed module
         run: |
           set -euo pipefail
           url="https://app-tradingcenter-market-data.azurewebsites.net/ws/candles"
+          expected="${{ steps.image.outputs.name }}:${{ github.sha }}"
           for attempt in $(seq 1 12); do
+            image=$(az webapp config container show --name app-tradingcenter-market-data \
+              --resource-group rg-tradingcenter \
+              --query "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value | [0]" -o tsv)
             code=$(curl -s -o /tmp/probe -w '%{http_code}' --max-time 20 "$url" || echo 000)
             body=$(head -c 200 /tmp/probe 2>/dev/null || true)
-            echo "attempt $attempt: HTTP $code ${body}"
+            echo "attempt $attempt: image=${image:-none} HTTP $code ${body}"
             # 404 with FastAPI's JSON means the module itself answered. Anything 5xx, or
             # a body that is not the app's, means the container is not serving yet.
-            if [ "$code" = "404" ] && printf '%s' "$body" | grep -q '"detail"'; then
+            if [ "${image#DOCKER|}" = "$expected" ] && [ "$code" = "404" ] && printf '%s' "$body" | grep -q '"detail"'; then
               echo "market-data is answering"
               exit 0
             fi
             sleep 15
           done
-          echo "::error::market-data did not answer from its container after ~3 minutes (last HTTP $code)"
+          echo "::error::market-data did not answer from its container after ~3 minutes (last HTTP $code) — serving image=${image:-none}, expected $expected"
           exit 1

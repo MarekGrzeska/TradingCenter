@@ -107,6 +107,12 @@ OnModelCall = Callable[[UsageReport | None], Awaitable[None]]
 # and by then its row exists).
 BeforeWriteCall = Callable[[str, dict[str, Any]], Awaitable[str | None]]
 
+# Whether a tool name could leave the account changed. Answered by `ToolPlan`, which
+# resolved it off the same announcement the run was admitted on — never re-derived here
+# from a descriptor, which is how this module and `agent` came to read the same
+# `readOnlyHint` in opposite directions until 18 August 2026.
+MovesTheAccount = Callable[[str], bool]
+
 
 def system_prompt_for(agent: AgentDefinition, *, has_tools: bool) -> str:
     """The agent's own role and prompt, plus its guidance and one line about tools.
@@ -159,6 +165,7 @@ async def run_agent(
     before_model_call: BeforeModelCall | None = None,
     on_model_call: OnModelCall | None = None,
     before_write_call: BeforeWriteCall | None = None,
+    moves_the_account: MovesTheAccount | None = None,
 ) -> AgentWork:
     """Model → tools → model, until the model stops asking or the ceiling is reached.
 
@@ -231,16 +238,11 @@ async def run_agent(
             return work
 
         results: list[ToolCallResult] = []
-        by_name = {tool.name: tool for tool in tools}
         for position, request in enumerate(requests):
-            # A write is a tool whose own server said so. `read_only is False` and not
-            # `not read_only`: a tool carrying no annotation at all is unknown, and this
-            # module does not promote unknown to "changes the account" — the servers it
-            # is built against annotate every tool they publish, and inventing a reading
-            # for a third one would be this module holding an opinion about somebody
-            # else's contract (specs/trading-mcp-tools).
-            descriptor = by_name.get(request.name)
-            writes = descriptor is not None and descriptor.read_only is False
+            # Not decided here. The plan holds both the announcement and which server it
+            # came from, and answers conservatively: unannotated on a server that can
+            # send orders reads as an order (`tools/assignment.py`, `_moves_the_account`).
+            writes = moves_the_account(request.name) if moves_the_account is not None else False
 
             refusal: str | None = None
             if writes and before_write_call is not None:

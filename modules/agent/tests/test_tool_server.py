@@ -18,6 +18,7 @@ import json
 import socket
 import threading
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import pytest
 import uvicorn
@@ -436,6 +437,91 @@ async def test_a_slow_write_times_out_as_unknown() -> None:
     assert outcome.kind is ToolOutcomeKind.UNKNOWN
     assert "did not answer within" in outcome.text
     assert "may have gone through" in outcome.text
+
+
+# --- the server restarting under a call (the production failure of 17 August 2026) ---
+
+
+@asynccontextmanager
+async def _serving(app, port: int) -> AsyncIterator[None]:
+    """One stand-in, started and stopped on a port of the caller's choosing — so the same
+    port can be served twice, which is what a redeploy looks like from this side."""
+    server, thread = _serve(app, port)
+    for _ in range(100):
+        if server.started:
+            break
+        await asyncio.sleep(0.05)
+    else:  # pragma: no cover - only reached if the stand-in never comes up
+        raise RuntimeError("the stand-in did not start in time")
+    try:
+        yield
+    finally:
+        server.should_exit = True
+        thread.join(timeout=5)
+
+
+async def test_a_call_survives_the_server_restarting_under_it() -> None:
+    """Two real servers on one port. The session the client holds means nothing to the
+    second one, and the `404` it answers with is the only warning there is — driven
+    through the real client rather than a raised `McpError`, because the thing worth
+    pinning is that the SDK still turns that `404` into what `_session_is_gone` reads."""
+    port = _free_port()
+    async with _serving(_stand_in_server(port).streamable_http_app(), port):
+        client = ToolServer(settings_for(f"http://127.0.0.1:{port}"))
+        assert (await client.call("list_tracked_pairs", {})).kind is ToolOutcomeKind.OK
+
+    async with _serving(_stand_in_server(port).streamable_http_app(), port):
+        try:
+            outcome = await client.call("list_tracked_pairs", {})
+        finally:
+            await client.aclose()
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    assert "US100" in outcome.text
+
+
+async def test_a_write_refused_as_an_unknown_session_is_retried_rather_than_left_unknown() -> None:
+    """The one this was written for. `trading-mcp` was redeployed on 17 August 2026 and
+    the first order after it died against a session that no longer existed — which this
+    module used to answer with `UNKNOWN` and a note sending the operator to check an
+    account nothing had been sent to.
+
+    The retry is safe for a write for the same reason it is safe for a read: the gate
+    that produced the refusal had not yet read which tool was asked for, so its answer
+    proves the call was not handled. Sorting by tool name here would leave an order
+    unplaced in the one case where sending it again is known to be safe."""
+    port = _free_port()
+    trading_settings = settings_for(None, trading_mcp_url=f"http://127.0.0.1:{port}")
+    async with _serving(_trading_stand_in(port).streamable_http_app(), port):
+        client = ToolServer(trading_settings, prefix="trading_mcp", can_move_the_account=True)
+        assert client.moves_the_account("place_order") is True
+        assert (await client.call("place_order", {"symbol": "US100"})).kind is ToolOutcomeKind.OK
+
+    async with _serving(_trading_stand_in(port).streamable_http_app(), port):
+        try:
+            outcome = await client.call("place_order", {"symbol": "US100"})
+        finally:
+            await client.aclose()
+
+    assert outcome.kind is ToolOutcomeKind.OK
+    assert "sent for US100" in outcome.text
+
+
+async def test_a_retried_call_is_one_outcome_the_turn_can_record() -> None:
+    """`tool_calls` writes a row per outcome, so one outcome is one row — the model called
+    the tool once and the reopening was not its decision."""
+    port = _free_port()
+    async with _serving(_stand_in_server(port).streamable_http_app(), port):
+        client = ToolServer(settings_for(f"http://127.0.0.1:{port}"))
+        await client.call("list_tracked_pairs", {})
+
+    async with _serving(_stand_in_server(port).streamable_http_app(), port):
+        try:
+            outcome = await client.call("list_tracked_pairs", {})
+        finally:
+            await client.aclose()
+
+    assert outcome.duration_ms >= 0
 
 
 def test_describe_unwraps_nested_task_groups() -> None:
