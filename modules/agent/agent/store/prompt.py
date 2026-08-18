@@ -15,16 +15,19 @@ from tc_runtime.db import Conn, fetch_one
 from ..models import PromptRevision
 
 _SELECT_LATEST_PROMPT_REVISION = """
-    SELECT version, with_tools_body, without_tools_body, created_at
+    SELECT version, with_tools_body, without_tools_body, created_at, source
       FROM prompt_revisions
      ORDER BY id DESC
      LIMIT 1
 """
 
+# `source` stated rather than left to the column default: a migration seeding through
+# `prompt_seed.seed_prompt` writes `'seed'` here, and the two writers of this table have
+# to be told apart by what they say, not by which of them remembered to say it.
 _INSERT_PROMPT_REVISION = """
-    INSERT INTO prompt_revisions (version, with_tools_body, without_tools_body)
-    VALUES ($1, $2, $3)
-    RETURNING version, with_tools_body, without_tools_body, created_at
+    INSERT INTO prompt_revisions (version, with_tools_body, without_tools_body, source)
+    VALUES ($1, $2, $3, 'operator')
+    RETURNING version, with_tools_body, without_tools_body, created_at, source
 """
 
 

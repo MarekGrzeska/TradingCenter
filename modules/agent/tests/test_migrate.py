@@ -156,3 +156,63 @@ def test_this_modules_lock_key_is_still_its_own() -> None:
     would be a start-up that hangs with no failing query to find it by.
     """
     assert MIGRATION_LOCK_KEY == 8030
+
+
+@pytest.mark.db
+async def test_the_prompt_source_migration_backfills_a_collision_the_way_it_claims(
+    empty_database_url: str,
+) -> None:
+    """`0013`'s backfill is a rule about rows it did not write, so it is worth walking.
+
+    The state it is written for is the one the bug produced: an operator's save and a
+    seeding migration under one version, the seed later. The rule says the newer row of
+    such a pair is the migration's — which is the only way the pair arises — and the
+    older is the person's, who keeps the text and gives up only the number, because the
+    number is what a seeding `downgrade()` aims at.
+    """
+    from alembic import command
+    from tc_runtime.migrate import alembic_config
+
+    config = alembic_config(MIGRATIONS, sqlalchemy_url(empty_database_url))
+    await asyncio.to_thread(command.upgrade, config, "0012")
+
+    conn = await asyncpg.connect(asyncpg_dsn(empty_database_url))
+    try:
+        # An operator's save that landed on the version `0012` was about to seed. At
+        # `0012` there is no `source` column yet — which is the whole reason the backfill
+        # has to infer this.
+        await conn.execute(
+            "DELETE FROM prompt_revisions WHERE version = 'v11'",
+        )
+        mine = await conn.fetchval(
+            "INSERT INTO prompt_revisions (version, with_tools_body, without_tools_body) "
+            "VALUES ('v11', 'what I wrote', 'what I wrote') RETURNING id"
+        )
+        seeded = await conn.fetchval(
+            "INSERT INTO prompt_revisions (version, with_tools_body, without_tools_body) "
+            "VALUES ('v11', 'the seed', 'the seed') RETURNING id"
+        )
+        assert seeded > mine
+
+        await asyncio.to_thread(command.upgrade, config, "head")
+
+        rows = {
+            row["id"]: row
+            for row in await conn.fetch("SELECT id, version, source FROM prompt_revisions")
+        }
+        assert rows[seeded]["source"] == "seed"
+        assert rows[seeded]["version"] == "v11"
+        # Kept, readable, and out of the way of `0012`'s downgrade.
+        assert rows[mine]["source"] == "operator"
+        assert rows[mine]["version"] == f"v11+operator{mine}"
+
+        # And back down, because a downgrade nobody can reverse is a one-way door.
+        await asyncio.to_thread(command.downgrade, config, "0012")
+        assert await conn.fetchval(
+            "SELECT count(*) FROM information_schema.columns "
+            "WHERE table_name = 'prompt_revisions' AND column_name = 'source'"
+        ) == 0
+        await asyncio.to_thread(command.upgrade, config, "head")
+        assert await applied_heads(conn) == expected_heads(MIGRATIONS)
+    finally:
+        await conn.close()
