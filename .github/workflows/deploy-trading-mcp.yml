@@ -1,111 +1,38 @@
 name: deploy-trading-mcp
 
+# Only a push to `main` deploys — the pull_request federated credential (github-oidc.tf)
+# cannot even authenticate to Azure, so this cannot run from a fork's PR by construction.
 on:
   push:
     branches: [main]
     paths:
       - "modules/trading-mcp/**"
       - ".github/workflows/deploy-trading-mcp.yml"
+      - ".github/workflows/_deploy-app-service.yml"
+      - "scripts/deploy_probe.py"
   workflow_dispatch: {}
-
-permissions:
-  contents: read
-  id-token: write # azure/login's OIDC exchange
-  packages: write # docker push to GHCR
-
-concurrency:
-  group: deploy-trading-mcp
-  cancel-in-progress: false # never cancel a deploy mid-flight
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
-    environment: production
-    steps:
-      - uses: actions/checkout@v4
-
-      # Lowercased for the same reason as the other deploy workflows — a Docker
-      # reference cannot carry the capitals in `github.repository`.
-      - id: image
-        run: echo "name=ghcr.io/${GITHUB_REPOSITORY,,}/trading-mcp" >> "$GITHUB_OUTPUT"
-
-      - uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      # Same reasoning as the other deploy workflows: buildx starts cold otherwise.
-      - uses: docker/setup-buildx-action@v3
-
-      # Tagged with the commit, never `latest` — same reasoning as the other deploy
-      # workflows.
-      - uses: docker/build-push-action@v6
-        with:
-          # The repository root, not the module: `tc-runtime` is a path dependency and
-          # uv resolves it while installing the lock, so it has to be inside the context
-          # (packages-replace-the-hand-copies). `.dockerignore` at the root keeps that
-          # from meaning "upload every virtualenv in the tree".
-          context: .
-          file: modules/trading-mcp/Dockerfile
-          push: true
-          tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
-          cache-from: type=gha,scope=trading-mcp
-          cache-to: type=gha,scope=trading-mcp,mode=max
-
-      - uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
-      - uses: azure/webapps-deploy@v3
-        with:
-          app-name: app-tradingcenter-trading-mcp
-          images: ${{ steps.image.outputs.name }}:${{ github.sha }}
-
-      # "Deployed" has meant "the request was accepted" up to here — the same gap every
-      # other deploy workflow closes with its own smoke check, and the one the control
-      # plane reported green over a crash-looping container on 16 August 2026.
+    uses: ./.github/workflows/_deploy-app-service.yml
+    with:
+      module: trading-mcp
+      app_name: app-tradingcenter-trading-mcp
+      # `/health` is excluded from Easy Auth (infra/app-service.tf, `excluded_paths`) and
+      # answers a plain 200 with a JSON body (specs/trading-mcp-transport, "Zdrowie modułu
+      # da się sprawdzić bez sesji MCP").
       #
-      # `/health` is the probe: excluded from Easy Auth (infra/app-service.tf,
-      # `excluded_paths`) and answering a plain 200 with a JSON body
-      # (specs/trading-mcp-transport, "Zdrowie modułu da się sprawdzić bez sesji MCP").
-      #
-      # For this module the probe proves more than liveness, and that is why it is worth
-      # the three minutes: `__main__.py` asks capital-gateway `GET /capabilities` and
-      # refuses to open a port at all unless the answer says `demo`
-      # (specs/trading-mcp-upstream-access). A process answering here has therefore
-      # already reached the gateway with the shared key, through its firewall, and been
-      # told it is a demo session. A container that could not do any of those three never
-      # listens, and this check is what turns that into a failed deploy rather than a
-      # silent one.
-      #
-      # The image is asked for alongside, and that half was missing until 18 August 2026.
-      # Swapping a container in App Service is not instantaneous: for a minute or so after
-      # `webapps-deploy` returns, the *previous* container is still answering — so a probe
-      # that only reads HTTP passes on the image being replaced and the job goes green
-      # over an image that may never come up. market-data was the most exposed of the
-      # four, since its own signal is a 404 the old container returns identically.
-      # `deploy-agent.yml` and `deploy-gateway.yml` already asked this question; this is
-      # the same two lines, not a new idea.
-      - name: Smoke-check the deployed module
-        run: |
-          set -euo pipefail
-          url="https://app-tradingcenter-trading-mcp.azurewebsites.net/health"
-          expected="${{ steps.image.outputs.name }}:${{ github.sha }}"
-          for attempt in $(seq 1 12); do
-            image=$(az webapp config container show --name app-tradingcenter-trading-mcp \
-              --resource-group rg-tradingcenter \
-              --query "[?name=='DOCKER_CUSTOM_IMAGE_NAME'].value | [0]" -o tsv)
-            code=$(curl -s -o /tmp/probe -w '%{http_code}' --max-time 20 "$url" || echo 000)
-            body=$(head -c 200 /tmp/probe 2>/dev/null || true)
-            echo "attempt $attempt: image=${image:-none} HTTP $code ${body}"
-            if [ "${image#DOCKER|}" = "$expected" ] && [ "$code" = "200" ] && printf '%s' "$body" | grep -q '"status"'; then
-              echo "trading-mcp is answering — and it only answers from a demo session"
-              exit 0
-            fi
-            sleep 15
-          done
-          echo "::error::trading-mcp did not answer from its container after ~3 minutes (last HTTP $code). Its own start-up refuses a non-demo gateway, an unreachable one, and a rejected key — the container log says which. — serving image=${image:-none}, expected $expected"
-          exit 1
+      # For this module the probe proves more than liveness, and that is why it is worth the
+      # three minutes: `__main__.py` asks capital-gateway `GET /capabilities` and refuses to
+      # open a port at all unless the answer says `demo`
+      # (specs/trading-mcp-upstream-access). A process answering here has therefore already
+      # reached the gateway with the shared key, through its firewall, and been told it is a
+      # demo session. A container that could not do any of those three never listens, and
+      # this check is what turns that into a failed deploy rather than a silent one.
+      probe_path: /health
+      expected_status: 200
+      body_contains: '"status"'
+      attempts: 12
+      failure_hint: >-
+        Its own start-up refuses a non-demo gateway, an unreachable one, and a rejected
+        key — the container log says which.

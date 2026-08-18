@@ -24,12 +24,12 @@
 
 ## 4. Pozostałych sześciu wywołujących
 
-- [ ] 4.1 `deploy-agent.yml` i `deploy-teams.yml` — `probe_path: /health`, `expected_status: 200`, `body_contains: '"status"'` (zaostrzenie), `attempts: 20`
-- [ ] 4.2 `deploy-trading-mcp.yml` i `deploy-teams-mcp.yml` — jak market-mcp, `attempts: 12`
-- [ ] 4.3 `deploy-market-data.yml` — `probe_path: /ws/candles`, `expected_status: 404`, `body_contains: '"detail"'`, `attempts: 12`
-- [ ] 4.4 `deploy-gateway.yml` — `probe_path` puste, `build_context: modules/capital-gateway` bez `dockerfile`, `attempts: 10`
-- [ ] 4.5 Zmierzyć: suma linii kodu (bez komentarzy) siedmiu wywołujących plus wspólnego, przeciw dzisiejszym 458
-- [ ] 4.6 Sprawdzić po merge'u, że wszystkie siedem wdrożeń przeszło i żadne nie zgłosiło pustego `client-id`
+- [x] 4.1 `deploy-agent.yml` i `deploy-teams.yml` — `probe_path: /health`, `expected_status: 200`, `body_contains: '"status"'` (zaostrzenie), `attempts: 20`
+- [x] 4.2 `deploy-trading-mcp.yml` i `deploy-teams-mcp.yml` — jak market-mcp, `attempts: 12`
+- [x] 4.3 `deploy-market-data.yml` — `probe_path: /ws/candles`, `expected_status: 404`, `body_contains: '"detail"'`, `attempts: 12`
+- [x] 4.4 `deploy-gateway.yml` — `probe_path` puste, `build_context: modules/capital-gateway` bez `dockerfile`, `attempts: 10`
+- [x] 4.5 Zmierzone: **458 → 256** linii kodu workflow (145 w siedmiu wywołujących, 19–23 każdy, plus 111 we wspólnym). Cel planu ~175 **nie osiągnięty** i nie będzie: sam blok `inputs` z opisami to ~50 z tych 111, a opisy są tu dokumentacją, nie balastem. Do tego pętla sondy przestała być 7 × ~18 linii wklejonego shella bez testu i jest jednym modułem 233 linii z 21 testami — w sumie linii jest więcej, i to jest uczciwa liczba
+- [ ] 4.6 (operator — wymaga merge'a) Sprawdzić po merge'u, że wszystkie siedem wdrożeń przeszło i żadne nie zgłosiło pustego `client-id`
 
 ## 5. Runner dev
 

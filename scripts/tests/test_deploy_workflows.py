@@ -138,3 +138,25 @@ class TestSharedWorkflow:
     def test_the_probe_runs_from_the_scripts_project(self) -> None:
         """`uv run` outside `scripts/` resolves no lock, so httpx would be missing."""
         assert probe_step()["working-directory"] == "scripts"
+
+
+def test_every_app_service_module_deploys_through_the_shared_workflow() -> None:
+    """Read off `modules/`, not from a list here — a typed list is what goes stale.
+
+    The same shape as the `packages` matrix in `checks.yml`: a hand-written list beside a
+    directory is a check that reports green having tested something else. `terminal` is the
+    one module excluded, and it is excluded because it is a Static Web App with no image.
+    """
+    repo = Path(__file__).resolve().parents[2]
+    app_service_modules = {
+        path.name for path in (repo / "modules").iterdir() if path.is_dir()
+    } - {"terminal"}
+
+    deploying = {
+        job["with"]["module"]
+        for path in callers()
+        for job in load(path)["jobs"].values()
+        if job.get("uses") == SHARED_REF
+    }
+
+    assert deploying == app_service_modules
