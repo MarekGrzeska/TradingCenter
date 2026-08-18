@@ -11,9 +11,9 @@ import json
 # Characters of the serialized `list_tools()`, which is what an MCP client reads before
 # every turn. In characters rather than tokens so the test needs no tokenizer: the ratio
 # measured on this material with `cl100k_base` is a steady 4,2, so the ceiling below is
-# ~4 900 tokens. Raising it is a deliberate edit of this line, never a side effect of
+# ~5 000 tokens. Raising it is a deliberate edit of this line, never a side effect of
 # adding a tool — that is the whole point of writing it down.
-SURFACE_CEILING_CHARS = 20500
+SURFACE_CEILING_CHARS = 21100
 
 
 def _surface(tools) -> str:

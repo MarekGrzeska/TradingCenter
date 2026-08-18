@@ -71,9 +71,9 @@ async def test_every_tool_has_a_description(server) -> None:
 # Characters of the serialized `list_tools()`, which is what an MCP client reads before
 # every turn. In characters rather than tokens so the test needs no tokenizer: the ratio
 # measured on this material with `cl100k_base` is a steady 4,2, so the ceiling below is
-# ~2 600 tokens. Raising it is a deliberate edit of this line, never a side effect of
+# ~2 800 tokens. Raising it is a deliberate edit of this line, never a side effect of
 # adding a tool — that is the whole point of writing it down.
-SURFACE_CEILING_CHARS = 11000
+SURFACE_CEILING_CHARS = 11600
 
 
 def _surface(tools) -> str:
@@ -133,4 +133,29 @@ async def test_the_schema_still_says_what_a_reply_holds(server) -> None:
     assert output is not None
     assert output["required"]
     assert all("type" in p or "anyOf" in p or "$ref" in p for p in output["properties"].values())
+    await gateway.aclose()
+
+
+async def test_every_write_tool_has_a_description(server) -> None:
+    mcp, gateway = server
+    by_name = {t.name: t for t in await mcp.list_tools()}
+    for name in WRITE_TOOLS:
+        description = by_name[name].description or ""
+        assert len(description.strip()) > 20, name
+    await gateway.aclose()
+
+
+async def test_a_tool_taking_a_size_says_what_a_size_is(server) -> None:
+    """The unit a model has to guess is the one that changes how much money moves:
+    `size` read as lots rather than as units of the instrument is a different order,
+    placed without an error (specs/trading-mcp-tools, "Opis narzędzia jest częścią
+    kontraktu")."""
+    mcp, gateway = server
+    for tool in await mcp.list_tools():
+        properties = (tool.inputSchema or {}).get("properties", {})
+        if "size" not in properties:
+            continue
+        description = tool.description or ""
+        assert "unit" in description.lower(), tool.name
+        assert "size_for_margin" in description or tool.name == "size_for_margin", tool.name
     await gateway.aclose()

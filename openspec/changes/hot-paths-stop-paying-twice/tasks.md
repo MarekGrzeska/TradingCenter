@@ -16,16 +16,16 @@
       zapisanej stałej, komunikat podaje zmierzoną wielkość i sufit
 - [x] 2.3 Test w każdym z trzech modułów: schemat nie niesie `title` ani `default` w wyjściu,
       a niesie każde pole, jego typ i `required` (to jest scenariusz „Schemat bez rusztowania")
-- [ ] 2.4 Zmierzyć po zmianie i ustawić sufity na wartość + ~5%
+- [x] 2.4 Zmierzyć po zmianie i ustawić sufity na wartość + ~5%
 
 ## 3. Opisy narzędzi
 
-- [ ] 3.1 `market-mcp`: docstringi 11 narzędzi do jednego kształtu (co odpowiada -> sufity ->
+- [x] 3.1 `market-mcp`: docstringi 11 narzędzi do jednego kształtu (co odpowiada -> sufity ->
       jednostki, strefa, strona ceny); istniejące testy treści opisu zostają zielone
 - [ ] 3.2 `teams-mcp`: to samo dla 18 narzędzi, z granicami odmowy, których wymaga jego spec
-- [ ] 3.3 `trading-mcp`: to samo dla 9 narzędzi; jednostka rozmiaru nazwana w każdym
+- [x] 3.3 `trading-mcp`: to samo dla 9 narzędzi; jednostka rozmiaru nazwana w każdym
       narzędziu zapisującym
-- [ ] 3.4 Test opisu w `trading-mcp` (jego spec dotąd go nie miał): opis, typowane parametry,
+- [x] 3.4 Test opisu w `trading-mcp` (jego spec dotąd go nie miał): opis, typowane parametry,
       nazwana jednostka rozmiaru
 - [ ] 3.5 Zmierzyć sumę trzech powierzchni tokenizerem i zapisać wynik w `review.md`
 
