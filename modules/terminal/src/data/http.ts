@@ -1,5 +1,5 @@
 import { noIdentity, SignedOut, SIGNED_OUT_MESSAGE, type Identity } from "../auth/identity";
-import { MarketDataError } from "./types";
+import { MarketDataError, type MarketDataErrorKind } from "./types";
 
 /**
  * The one place an HTTP failure becomes something an operator can read.
@@ -19,6 +19,22 @@ export interface JsonRequest {
 }
 
 export type StatusMapper = (status: number, detail: string) => MarketDataError;
+
+/**
+ * A back end's refusals, as a table.
+ *
+ * Every adapter here answered the same question with the same four lines of `if` — which
+ * status means what — and the differences between them are the whole content: the
+ * archive calls a 409 a refusal and a 502 an upstream failure, the gateway calls a 422 an
+ * unsupported resolution, the two module APIs call it a refusal. A status nobody listed
+ * is `unknown`, which is what each of them ended on anyway.
+ *
+ * 401 is not listed by anyone and cannot be: it means the same thing whichever back end
+ * answered it, and `jsonClient` handles it before this is reached.
+ */
+export function statusMapper(kinds: Partial<Record<number, MarketDataErrorKind>>): StatusMapper {
+  return (status, detail) => new MarketDataError(kinds[status] ?? "unknown", detail);
+}
 
 async function parseErrorDetail(response: Response): Promise<string> {
   try {

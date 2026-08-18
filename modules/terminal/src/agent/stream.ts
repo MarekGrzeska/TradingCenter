@@ -5,12 +5,12 @@
  * EventSource"). Nothing here is agent-specific vocabulary beyond the four event kinds
  * the module actually sends — `_sse` in `agent/routers/sessions.py`.
  *
- * Split in two on purpose. `splitSseFrames`/`parseSseFrame` are pure string functions —
- * a frame arriving split across two network chunks is a plain-string test, no stream
- * required. `readAgentStream` is the one place a real `ReadableStream` is touched, and it
- * carries nothing worth testing on its own beyond wiring the two together.
+ * `parseSseFrame` is a pure string function and is the whole of what is agent-specific
+ * here — the reading itself lives in `data/sseStream.ts`, shared with the run stream on
+ * the teams side, which knows a different five event names and none of these.
  */
 
+import { readSseStream } from "../data/sseStream";
 import { mapToolCall, type AgentToolCall, type RawToolCall } from "./toolCall";
 
 export type AgentStreamEvent =
@@ -18,18 +18,6 @@ export type AgentStreamEvent =
   | { kind: "toolCall"; call: AgentToolCall }
   | { kind: "complete"; incomplete: boolean }
   | { kind: "error"; message: string };
-
-/**
- * Buffers raw SSE bytes and splits them into frames on the blank-line terminator
- * (`\n\n`) every real frame ends with. The last, possibly incomplete, piece is handed
- * back as `remainder` for the caller to prepend to the next chunk — a frame's `data:`
- * line has no reason to land inside one network read.
- */
-export function splitSseFrames(buffer: string): { frames: string[]; remainder: string } {
-  const parts = buffer.split("\n\n");
-  const remainder = parts.pop() ?? "";
-  return { frames: parts, remainder };
-}
 
 /**
  * One frame to a typed event, or `null` for a keepalive comment (`: ping`, sent every
@@ -73,27 +61,6 @@ export function parseSseFrame(frame: string): AgentStreamEvent | null {
  * where that silence becomes a visible error, since only it knows what, if anything,
  * arrived before the drop.
  */
-export async function* readAgentStream(
-  body: ReadableStream<Uint8Array>,
-): AsyncGenerator<AgentStreamEvent> {
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
-      const { frames, remainder } = splitSseFrames(buffer);
-      buffer = remainder;
-      for (const frame of frames) {
-        const event = parseSseFrame(frame);
-        if (event === null) continue;
-        yield event;
-        if (event.kind === "complete" || event.kind === "error") return;
-      }
-    }
-  } finally {
-    reader.releaseLock();
-  }
+export function readAgentStream(body: ReadableStream<Uint8Array>): AsyncGenerator<AgentStreamEvent> {
+  return readSseStream(body, parseSseFrame, (event) => event.kind === "complete" || event.kind === "error");
 }

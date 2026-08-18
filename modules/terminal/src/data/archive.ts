@@ -1,9 +1,8 @@
 import { noIdentity, type Identity } from "../auth/identity";
 import type { components } from "./contract.generated";
-import { jsonClient } from "./http";
+import { jsonClient, statusMapper } from "./http";
 import { SocketHub } from "./socketHub";
 import { parseIsoToEpochSeconds } from "./time";
-import { MarketDataError } from "./types";
 import type {
   Bar,
   Chunk,
@@ -301,12 +300,13 @@ function mapTrackPairsResult(raw: RawTrackPairsResult): TrackPairsResult {
  *  a ceiling to raise deliberately, 422 a pair it will not take on, and 502/504
  *  the *gateway* being unreachable — which is worth retrying and says nothing
  *  about the archive itself. */
-function mapStatus(status: number, detail: string): MarketDataError {
-  if (status === 404) return new MarketDataError("not-found", detail);
-  if (status === 409 || status === 422) return new MarketDataError("refused", detail);
-  if (status === 502 || status === 504) return new MarketDataError("upstream", detail);
-  return new MarketDataError("unknown", detail);
-}
+const mapStatus = statusMapper({
+  404: "not-found",
+  409: "refused",
+  422: "refused",
+  502: "upstream",
+  504: "upstream",
+});
 
 /** Every instant on the wire is ISO; every instant in the terminal is epoch
  *  seconds (types.ts, `Bar.time`). This is the only direction that needs
