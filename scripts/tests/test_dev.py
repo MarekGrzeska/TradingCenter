@@ -327,3 +327,117 @@ class TestEnvReading:
     @pytest.mark.parametrize("host", ["psql-x.postgres.database.azure.com", "10.0.0.5", "db"])
     def test_non_loopback_hosts(self, host: str) -> None:
         assert not is_loopback(host)
+
+
+class TestCommandResolution:
+    """`pnpm` and `npx` are `.CMD` shims on Windows, and CreateProcess only appends `.exe`.
+
+    The failure is nasty because `preflight` uses `shutil.which`, which *does* find the
+    `.CMD` — so the run passes every check, brings all seven back ends up, and then dies on
+    the terminal with `FileNotFoundError [WinError 2]`, taking them down with it. Neither
+    shell script could meet this: PATH resolution was the shell's job there.
+    """
+
+    def test_the_executable_is_resolved_on_path(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import dev
+
+        monkeypatch.setattr(
+            dev.shutil, "which", lambda name: rf"C:\shims\{name}.CMD" if name == "pnpm" else None
+        )
+        assert dev.resolve_command(("pnpm", "exec", "vite")) == [
+            r"C:\shims\pnpm.CMD",
+            "exec",
+            "vite",
+        ]
+
+    def test_an_unresolvable_name_is_passed_through(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Popen's own error names the command, which beats one invented here."""
+        import dev
+
+        monkeypatch.setattr(dev.shutil, "which", lambda _: None)
+        assert dev.resolve_command(("nope", "--flag")) == ["nope", "--flag"]
+
+    def test_the_arguments_are_untouched(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import dev
+
+        monkeypatch.setattr(dev.shutil, "which", lambda name: f"/usr/bin/{name}")
+        assert dev.resolve_command(("uv", "run", "uvicorn", "--port", "8010"))[1:] == [
+            "run",
+            "uvicorn",
+            "--port",
+            "8010",
+        ]
+
+    def test_an_empty_command_is_not_a_crash(self) -> None:
+        import dev
+
+        assert dev.resolve_command(()) == []
+
+    def test_every_service_command_resolves_on_this_machine(self) -> None:
+        """The real check: the first word of each row is something this machine can launch.
+
+        `uv` covers seven of the eight; the terminal's is `pnpm` or `npx`, and which one is
+        available is exactly what `terminal_command` decides.
+        """
+        import shutil
+
+        import dev
+
+        for service in dev.SERVICES:
+            if service.name == "terminal":
+                continue
+            assert shutil.which(service.command[0]), f"{service.name}: {service.command[0]}"
+
+    def test_start_actually_uses_the_resolution(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Testing `resolve_command` alone would pass with `Stack.start` ignoring it.
+
+        That is the same shape as asserting a permissions block on the file where it has no
+        effect — the unit is right and the wiring is what breaks.
+        """
+        import io
+
+        import dev
+
+        seen: list[list[str]] = []
+
+        class FakePopen:
+            def __init__(self, argv: list[str], **_: object) -> None:
+                seen.append(argv)
+                self.stdout = io.StringIO("")
+                self.returncode: int | None = None
+
+            def poll(self) -> int | None:
+                return None
+
+        monkeypatch.setattr(dev.shutil, "which", lambda name: f"/resolved/{name}.CMD")
+        monkeypatch.setattr(dev.subprocess, "Popen", FakePopen)
+
+        terminal = next(s for s in dev.SERVICES if s.name == "terminal")
+        dev.Stack().start(terminal, terminal.command)
+
+        assert seen == [["/resolved/pnpm.CMD", "exec", "vite", "--port", "5173", "--strictPort"]]
+
+class TestPortOwner:
+    """Both shell scripts printed who holds the port; the first port of this one did not."""
+
+    def test_the_real_environment_supplies_one(self) -> None:
+        env = __import__("dev").real_environment()
+        assert env.port_owner(0) == "", "a free port has no owner, and that is not a crash"
+
+    def test_the_message_names_the_process_and_the_pid(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import dev
+
+        monkeypatch.setattr(dev, "_listening_pid", lambda _: 4312)
+        monkeypatch.setattr(dev, "_process_name", lambda _: "uvicorn")
+        assert dev.real_environment().port_owner(8010) == " by uvicorn (pid 4312)"
+
+    def test_a_pid_with_no_name_still_reads(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        import dev
+
+        monkeypatch.setattr(dev, "_listening_pid", lambda _: 4312)
+        monkeypatch.setattr(dev, "_process_name", lambda _: None)
+        assert dev.real_environment().port_owner(8010) == " by a process (pid 4312)"

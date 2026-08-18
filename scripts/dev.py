@@ -23,6 +23,7 @@ import argparse
 import io
 import os
 import re
+import shutil
 import signal
 import socket
 import subprocess
@@ -549,7 +550,7 @@ class Stack:
     def start(self, service: Service, command: Sequence[str]) -> Running:
         creationflags = CREATE_NEW_PROCESS_GROUP if WINDOWS else 0
         process = subprocess.Popen(
-            list(command),
+            resolve_command(command),
             cwd=service.directory,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -584,6 +585,24 @@ class Stack:
                 entry.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 entry.process.kill()
+
+
+def resolve_command(command: Sequence[str]) -> list[str]:
+    """Resolve the executable on PATH before handing it to `Popen`.
+
+    On Windows `pnpm` and `npx` are `.CMD` shims, and CreateProcess only ever appends
+    `.exe` — so `Popen(["pnpm", ...])` raises `FileNotFoundError [WinError 2]` while
+    `shutil.which("pnpm")` happily finds `pnpm.CMD`. That split is what makes the failure
+    nasty: `preflight` uses `which`, passes, and the run dies on the *last* service after
+    all seven back ends are up, taking them down with it.
+
+    `dev.sh` never met this (PATH lookup is the shell's) and `dev.ps1` never met it either
+    (PowerShell resolves `.CMD`), so it is new with the port, not carried over.
+    """
+    if not command:
+        return []
+    resolved = shutil.which(command[0])
+    return [resolved or command[0], *command[1:]]
 
 
 def _terminate_tree(process: subprocess.Popen[str]) -> None:
@@ -748,8 +767,6 @@ def explain() -> None:
 
 
 def real_environment() -> Environment:
-    import shutil
-
     def read_env(module: str) -> str | None:
         path = MODULES / module / ".env"
         try:
@@ -762,6 +779,18 @@ def real_environment() -> Environment:
             probe.settimeout(0.5)
             return probe.connect_ex((LOOPBACK, port)) == 0
 
+    def port_owner(port: int) -> str:
+        """Best-effort, for the message only. Often empty, and that is fine.
+
+        Worth having anyway: "port 8010 is already in use by uvicorn (pid 4312)" names the
+        leftover run, and "already in use" alone sends the reader looking for a second
+        stack that is not there.
+        """
+        pid = _listening_pid(port)
+        if pid is None:
+            return ""
+        return f" by {_process_name(pid) or 'a process'} (pid {pid})"
+
     def docker_daemon_answers() -> bool:
         return (
             subprocess.run(["docker", "info"], capture_output=True, check=False).returncode == 0
@@ -771,9 +800,52 @@ def real_environment() -> Environment:
         which=lambda name: shutil.which(name),
         read_env=read_env,
         port_in_use=port_in_use,
+        port_owner=port_owner,
         docker_daemon_answers=docker_daemon_answers,
         node_modules_present=lambda: (MODULES / "terminal" / "node_modules").is_dir(),
     )
+
+
+def _listening_pid(port: int) -> int | None:
+    """Who is listening on `port`, asked the way each platform will answer."""
+    if WINDOWS:
+        done = subprocess.run(
+            ["netstat", "-ano", "-p", "TCP"], capture_output=True, text=True, check=False
+        )
+        for line in done.stdout.splitlines():
+            fields = line.split()
+            listening = len(fields) >= 5 and fields[0] == "TCP" and fields[3] == "LISTENING"
+            if listening and fields[1].rsplit(":", 1)[-1] == str(port):
+                return int(fields[4])
+        return None
+
+    # `lsof` rather than `ss`: it is what macOS has, and a service left over from a previous
+    # run does not always show up under the current user in the alternatives.
+    done = subprocess.run(
+        ["lsof", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN", "-t"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    first = done.stdout.split()
+    return int(first[0]) if first else None
+
+
+def _process_name(pid: int) -> str | None:
+    if WINDOWS:
+        done = subprocess.run(
+            ["tasklist", "/FI", f"PID eq {pid}", "/NH", "/FO", "CSV"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        line = done.stdout.strip().splitlines()
+        return line[0].split('","')[0].strip('"') if line else None
+
+    done = subprocess.run(
+        ["ps", "-p", str(pid), "-o", "comm="], capture_output=True, text=True, check=False
+    )
+    return done.stdout.strip() or None
 
 
 def terminal_command(env: Environment) -> tuple[str, ...]:

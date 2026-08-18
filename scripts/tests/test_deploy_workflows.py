@@ -102,6 +102,23 @@ class TestEveryCaller:
         """The pull_request federated credential cannot authenticate to Azure at all."""
         assert load(path)[True]["push"]["branches"] == ["main"]
 
+    def test_declares_the_permissions_itself(self, path: Path) -> None:
+        """On the caller, and nowhere else will do.
+
+        A reusable workflow can only *narrow* the caller's GITHUB_TOKEN, never widen it.
+        This repository's default workflow permission is `read`, and `id-token` is never
+        granted by default at all — so a caller without this block hands the shared workflow
+        a token that cannot push to GHCR and cannot exchange an OIDC assertion, and every
+        deploy dies at `azure/login` with `Unable to get ACTIONS_ID_TOKEN_REQUEST_URL`.
+
+        Asserting it on `_deploy-app-service.yml` alone is what missed this: there the block
+        is real and has no effect.
+        """
+        permissions = load(path).get("permissions")
+        assert permissions, f"{path.name} grants the shared workflow nothing to work with"
+        assert permissions.get("id-token") == "write"  # azure/login's OIDC exchange
+        assert permissions.get("packages") == "write"  # docker push to GHCR
+
 
 class TestSharedWorkflow:
     def test_declares_the_production_environment(self) -> None:
