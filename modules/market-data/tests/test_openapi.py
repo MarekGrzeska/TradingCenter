@@ -13,6 +13,9 @@ import subprocess
 import sys
 from pathlib import Path
 
+import httpx
+import pytest
+
 from market_data.openapi import document
 
 # Every shape the terminal reads off the wire. Named rather than counted: adding a model
@@ -148,3 +151,50 @@ def test_the_printed_bytes_are_stable() -> None:
     ]
 
     assert runs[0] == runs[1]
+
+
+# --- 8.8: the schema describes the HTTP contract and nothing else ---------------------
+#
+# Served through the app rather than read from `document()`, because what these three
+# pin is what a consumer actually fetches. They arrived here from `test_app.py` and lost
+# their PostgreSQL container on the way: `/openapi.json` is built from the routes and
+# reads no state, so `api` — which brings a database with it — was never what they needed.
+
+
+@pytest.fixture
+async def served(app):
+    transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
+    async with httpx.AsyncClient(transport=transport, base_url="http://archive.test") as client:
+        yield client
+
+
+async def test_the_websocket_path_is_absent_from_the_schema(served) -> None:
+    """OpenAPI has no vocabulary for WebSocket payloads, so a path that appeared there
+    would describe a contract it cannot actually state — and the README would become the
+    second description rather than the only one."""
+    schema = (await served.get("/openapi.json")).json()
+
+    assert "/ws/candles" not in schema["paths"]
+    assert not [path for path in schema["paths"] if path.startswith("/ws")]
+
+
+async def test_the_http_routes_are_all_described(served) -> None:
+    paths = (await served.get("/openapi.json")).json()["paths"]
+
+    assert {
+        "/candles/{symbol}",
+        "/coverage/{symbol}",
+        "/pairs",
+        "/pairs/{symbol}",
+        "/deletions",
+        "/jobs/estimate",
+        "/jobs",
+        "/jobs/{job_id}",
+        "/jobs/{job_id}/retry",
+    } <= set(paths)
+
+
+async def test_the_schema_says_which_side_of_the_spread_is_stored(served) -> None:
+    schema = (await served.get("/openapi.json")).json()
+
+    assert "bid" in schema["info"]["description"]

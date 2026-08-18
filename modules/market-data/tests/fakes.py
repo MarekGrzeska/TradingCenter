@@ -135,3 +135,12 @@ class FakeJobRunner:
 
     def notify(self) -> None:
         self.notifications += 1
+
+
+def at(stamp: str) -> datetime:
+    """The instant a timestamp names, however it was spelled.
+
+    JSON renders UTC with a `Z`; comparing strings would be testing pydantic's choice of
+    suffix rather than whether the archive answered with the right moment.
+    """
+    return datetime.fromisoformat(stamp)
