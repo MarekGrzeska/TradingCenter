@@ -30,7 +30,7 @@ Odrzucona, bo dała pięć fałszywych trafień na sześć — zmierzone polami:
 | `IndicatorsOut.price_side` | nie | w duchu tego samego wymagania | zostaje |
 | `IndicatorsOut.warmup_from` | nie | **tak** — `market-data-indicators` | zostaje |
 | `StreamTicketOut.expires_in_seconds` | nie | **tak** — `market-data-browser-access` | zostaje |
-| `TrackedPairOut.last_fill` | nie | nie | **usuwane** |
+| `TrackedPairOut.last_fill` | nie | **tak, i ostrzej, niż to pole umiało** | **usuwane** — patrz D1a |
 
 Kierunek zależności jest tu całą sprawą. Kontrakt jest publikowany dla konsumentów, których
 jeszcze nie ma, a nie tylko dla tego jednego, który jest — `market-data-store` mówi to
@@ -40,6 +40,29 @@ archiwum ma publikować, i kasuje wymaganie przez przeoczenie w konsumencie.
 
 Praktyczna konsekwencja: **kwerenda po `openspec/specs/` idzie przed grepem po konsumentach,
 nie po nim.** Odwrotna kolejność podpowiada odpowiedź, zanim padnie właściwe pytanie.
+
+### D1a. Kwerendę robi się po *zdolności*, nie po nazwie pola — i to prawie nie wyszło
+
+Pierwsze zastosowanie D1 do `last_fill` dało „żadne wymaganie tego nie żąda", bo grep szedł
+po `last_fill`, a specyfikacje nie nazywają pól na drucie. Wymaganie było i jest —
+`market-data-ingest`, „Ingest raportuje swój postęp i porażki" — a znalazł je dopiero
+**docstring testu**, który je cytował. Gdyby ten test nie cytował specyfikacji, pole
+wyszłoby z drutu z uzasadnieniem, które było nieprawdziwe.
+
+Wniosek jest ostrzejszy niż D1: nazwa pola jest w kontrakcie, a wymaganie mówi o zdolności,
+więc grep po identyfikatorze **z zasady** nie znajdzie wymagania. Szuka się słów, którymi
+specyfikacja opisuje to, do czego pole służy.
+
+Właściwy powód usunięcia jest przy tym mocniejszy od tego, którego szukano. Wymaganie ma
+klauzulę trwałości — *raport, który ginie przy restarcie, nie odpowiada na pytanie „co się
+dociągnęło i kiedy", zadawane właśnie po restarcie* — a `last_fill` żył w słowniku
+w pamięci i sam się do tego przyznawał w opisie pola. Był drugą implementacją tego
+wymagania, i tą, która go nie spełniała. Trwałą jest ewidencja zleceń, i to ona przechodzi
+wszystkie trzy scenariusze.
+
+Reguła stąd: **dwie implementacje jednego wymagania to nie jest nadmiarowość, tylko pytanie,
+która z nich jest niezgodna.** Tutaj odpowiedź była w klauzuli, którą jedna z nich jawnie
+łamała.
 
 ### D2. Stan, którego producent nie umie osiągnąć, schodzi z drutu — zamiast zostać zaimplementowany
 
@@ -82,10 +105,16 @@ zregenerowane, i testy dwóch konsumentów — `checks.yml` uruchamia przy tym d
 terminala i job market-mcp. To jest słabsza obrona niż delta specyfikacji i warto to
 wiedzieć, zamiast zakładać, że skoro CI jest zielone, to zakres był dobry.
 
-**Usunięcie `last_fill` zabiera stan, którego operator mógłby kiedyś chcieć.** Ten stan
-i tak nie przeżywał restartu — opis pola mówił to wprost — a od `market-data-jobs` jest
-trwała ewidencja dociągnięć, którą terminal faktycznie pokazuje
-(`terminal-collection-history`). Usuwane jest gorsze, nietrwałe źródło tej samej wiedzy.
+**Usunięcie `last_fill` zabiera jedyne miejsce, gdzie widać dociągnięcie *poza* zleceniem.**
+Ewidencja zleceń pokrywa dociągnięcia zaplanowane jako zlecenie; `last_fill` pokazywał także
+to, co `PairIngest` domyka sam przy starcie pary i po zerwaniu feedu. Te dociągnięcia
+przestają być widoczne inaczej niż w logu — czyli dokładnie tam, gdzie wymaganie nie chce
+ich zostawiać.
+
+Przyjęto to świadomie: wymaganie żąda stanu **trwałego**, a to źródło trwałe nie było, więc
+zastąpienie go niczym nie oddala od zgodności, tylko przestaje udawać, że się do niej
+zbliża. Zamknięcie luki na dobre znaczy zapisywać te dociągnięcia tam, gdzie leżą kawałki
+zleceń — i to jest osobna zmiana, z migracją, a nie skutek uboczny sprzątania kontraktu.
 
 ## Open Questions
 

@@ -17,12 +17,26 @@ wymaganiem**, i to takim, które robi dokładnie to, po co je napisano:
 Terminal ich nie czyta i to jest luka terminala, nie balast archiwum. Usunięcie ich
 znaczyłoby edytowanie wymagania po to, żeby dopasować je do przeoczenia konsumenta.
 
-Zostają dwie rzeczy, których **żadne wymaganie nie żąda**, a które kontrakt niesie:
+Zostają dwie rzeczy, których żadne wymaganie nie potrzebuje **na drucie**:
 
-1. **`last_fill` i model `FillOut`** (46 linii). Wymaganie „Śledzone pary są wyliczalne wraz
-   ze swoim stanem" (`market-data-tracking`) wylicza, co niesie wpis pary — symbol,
-   rozdzielczość, stan połączenia, najnowsza i najstarsza świeca, moment pokrycia, liczba
-   świec, szacowana objętość. Ostatniego dociągnięcia nie ma na tej liście.
+1. **`last_fill` i model `FillOut`** (46 linii). Tu wymaganie istnieje i mówi więcej, niż
+   to pole umiało dać. `market-data-ingest`, „Ingest raportuje swój postęp i porażki":
+   *moduł MUST udostępniać stan tej pracy — co jest w toku, co się powiodło, co zawiodło
+   i dlaczego — zamiast pozostawiać to w logach*, **a dalej**: *ten stan MUST być trwały:
+   raport, który ginie przy restarcie, nie odpowiada na pytanie „co się dociągnęło
+   i kiedy", zadawane właśnie po restarcie*.
+
+   `last_fill` był dokładnie tym raportem, który ginie przy restarcie — jego własny opis
+   na drucie mówił to wprost: *fills live in memory and do not survive a restart*. Nie
+   spełniał więc wymagania, które go pozornie uzasadniało. Spełnia je natomiast
+   **ewidencja zleceń zbierania**: `Chunk` niesie `candles_written`, `chunk_start`/
+   `chunk_end`, `failure`, leży w PostgreSQL, a `interrupt_orphaned_chunks` przy starcie
+   odnotowuje przerwane jako przerwane, nie jako trwające — czyli wszystkie trzy
+   scenariusze tego wymagania, z testami (`test_jobs_store.py::test_startup_interrupts_*`).
+   To ją pokazuje terminal (`terminal-collection-history`).
+
+   Usuwana jest więc **druga, niezgodna implementacja spełnionego już wymagania**, a nie
+   jedyna odpowiedź na nie.
 2. **Stan `anchored`**, którego nic nie umie wyprodukować. `warmup_kind` deklaruje
    `Literal["fixed", "decay", "anchored"]`, a katalog zna dwa rodzaje rozgrzewki —
    zmierzone uruchomieniem na 63 wpisach: **51 `fixed`, 12 `decay`, zero `anchored`**.
@@ -61,9 +75,10 @@ Brak.
 
 ### Modified Capabilities
 
-Brak — i to jest teza tej zmiany, nie jej efekt uboczny. Obie usuwane rzeczy nie
-występują w żadnym wymaganiu w `openspec/specs/`, co zostało sprawdzone dla każdej
-z osobna. Wszystko, czego wymaganie żąda, zostaje na drucie.
+Brak — i to jest teza tej zmiany, nie jej efekt uboczny. Wszystko, czego wymaganie żąda,
+zostaje spełnione: `"anchored"` nie występuje w żadnym wymaganiu, a raportowanie postępu
+ingestu zostaje spełnione tak, jak wymaganie tego żąda — trwale, ewidencją zleceń — po
+zdjęciu drugiej implementacji, która jego klauzuli o trwałości nie spełniała.
 
 Zmiana ma więc `skip_specs: true`. Kwalifikuje się do OpenSpeca przez **drugą kategorię**
 wyzwalacza — kontrakt między modułami (`market_data/contract.py`).
