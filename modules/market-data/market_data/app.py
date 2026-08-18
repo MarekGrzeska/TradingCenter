@@ -21,7 +21,9 @@ import logging
 from contextlib import asynccontextmanager
 from datetime import timedelta
 
-from . import migrate, schema_version, telemetry
+from tc_runtime import migrate, schema_version
+
+from . import telemetry
 
 # Must run before `from fastapi import FastAPI` below, not merely before `FastAPI(...)` is
 # called. OpenTelemetry's FastAPI auto-instrumentation (enabled by `configure_azure_monitor`
@@ -49,6 +51,7 @@ from .market_status import MarketStatus
 from .models import Candle
 from .openapi import add_stream_messages, require_response_fields
 from .routers import candles, indicators, instruments, jobs, meta, pairs, stream
+from .runtime import MIGRATIONS
 from .tickets import TicketStore
 from .tracking import LimitReached, TrackingRefused
 
@@ -109,11 +112,11 @@ async def lifespan(app: FastAPI):
             async with advisory_lock(
                 conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds
             ):
-                await migrate.run()
+                await migrate.run(MIGRATIONS)
             # Still checked, and now for a narrower pair of accidents than before: a
             # migration that reported success without arriving, and an image older than
             # the schema it found (`schema_version.py`).
-            await schema_version.verify(conn)
+            await schema_version.verify(conn, MIGRATIONS)
 
         history = GatewayHistory(settings.gateway_base_url, client)
         hub = Hub()

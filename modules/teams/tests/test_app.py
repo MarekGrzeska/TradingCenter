@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import pytest
 from fastapi.testclient import TestClient
+from tc_runtime import schema_version
+from tc_runtime.schema_version import SchemaMismatch
 
-from teams import schema_version
 from teams.app import app
-from teams.schema_version import SchemaMismatch
 
 from .mcp_stand_in import free_port
 
@@ -75,7 +75,7 @@ def test_a_schema_the_image_was_not_built_for_refuses_to_start(
 ) -> None:
     # The wiring, not the comparison — `test_schema_version.py` owns the comparison.
     # What this proves is that a mismatch reaches the lifespan and stops it.
-    monkeypatch.setattr(schema_version, "expected_heads", lambda: {"9999_from_a_newer_image"})
+    monkeypatch.setattr(schema_version, "expected_heads", lambda _migrations: {"9999_from_a_newer_image"})
 
     with pytest.raises(SchemaMismatch), TestClient(app):
         pass  # pragma: no cover - the lifespan raises before the body runs

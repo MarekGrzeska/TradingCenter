@@ -12,11 +12,11 @@ from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
+from tc_runtime.network_identity import RequireCallerIdentity
 
 from . import resources, tools
 from .client import UpstreamClient
 from .config import Settings
-from .network_identity import RequireCallerIdentity
 
 INSTRUCTIONS = (
     "Read-only tools over market-data's candle archive and indicator catalogue. No "

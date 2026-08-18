@@ -17,6 +17,8 @@ dependencies = [
     { name = "mcp" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "tc-openai" },
+    { name = "tc-runtime" },
     { name = "uvicorn", extra = ["standard"] },
 ]
 
@@ -42,6 +44,8 @@ requires-dist = [
     { name = "mcp", specifier = "==1.27.0" },
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
+    { name = "tc-openai", editable = "../../packages/tc-openai" },
+    { name = "tc-runtime", editable = "../../packages/tc-runtime" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },
 ]
 
@@ -2114,6 +2118,60 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/b5/b4/205b0d5241d934e8add0c38aa924c4f9fb7330834ff11e5444db964ec3f9/starlette-1.6.0.tar.gz", hash = "sha256:d4e3ac5e546444960c710297a3c9fc3f7ebae1b7e963f3d36173b49da535be9b", size = 2716969, upload-time = "2026-08-08T18:27:57.512Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/c8/cb/6a6a47d5b464bd08695d254f3da6e7986cc70c9fa5d778eda57538edfe56/starlette-1.6.0-py3-none-any.whl", hash = "sha256:a86dd39d14bb45f85a3d18525215a9ef0cfd1f192ac793220e72598c90335f0c", size = 75969, upload-time = "2026-08-08T18:27:56.196Z" },
+]
+
+[[package]]
+name = "tc-openai"
+version = "0.1.0"
+source = { editable = "../../packages/tc-openai" }
+dependencies = [
+    { name = "langchain-openai" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "langchain-openai", specifier = ">=0.2" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pyright", specifier = "==1.1.411" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "ruff", specifier = "==0.16.2" },
+]
+
+[[package]]
+name = "tc-runtime"
+version = "0.1.0"
+source = { editable = "../../packages/tc-runtime" }
+dependencies = [
+    { name = "aiohttp" },
+    { name = "alembic" },
+    { name = "asyncpg" },
+    { name = "azure-identity" },
+    { name = "fastapi" },
+    { name = "httpx" },
+    { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "starlette" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "aiohttp", specifier = ">=3.10" },
+    { name = "alembic", specifier = ">=1.14" },
+    { name = "asyncpg", specifier = ">=0.30" },
+    { name = "azure-identity", specifier = ">=1.19" },
+    { name = "fastapi", specifier = ">=0.110" },
+    { name = "httpx", specifier = ">=0.27" },
+    { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
+    { name = "starlette", specifier = ">=0.37" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pyright", specifier = "==1.1.411" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "ruff", specifier = "==0.16.2" },
 ]
 
 [[package]]

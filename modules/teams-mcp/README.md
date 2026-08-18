@@ -57,6 +57,12 @@ stands in front of this module, the address about the `teams` that would attribu
 it came up in, once, at startup; and `REQUIRE_AUTHENTICATED_PRINCIPAL=true` in a local
 `.env` puts the refusal back without touching code.
 
+## Packages it takes
+
+`tc-runtime`, for the caller-identity middleware and the helper that turns an upstream's
+refusal into a sentence. Its server, client, settings and error taxonomy stay here — they
+were measured as different files, not copies.
+
 ## Commands
 
 ```

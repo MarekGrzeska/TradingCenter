@@ -20,14 +20,15 @@ logging.basicConfig(
 )
 
 from fastapi import FastAPI
+from tc_runtime import migrate, schema_version
+from tc_runtime.db import advisory_lock
+from tc_runtime.db import pool as make_pool
 
-from . import migrate, schema_version
 from .config import Settings
-from .db import MIGRATION_LOCK_KEY, advisory_lock
-from .db import pool as make_pool
 from .models_catalogue import ModelCatalogue
 from .provider import OpenAIProvider
 from .routers import chart, drawings, models, prompt, sessions, usage
+from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 from .tools import ToolServerRegistry
 
 log = logging.getLogger(__name__)
@@ -64,11 +65,11 @@ async def lifespan(app: FastAPI):
                 async with advisory_lock(
                     conn, MIGRATION_LOCK_KEY, wait=settings.migration_lock_wait_seconds
                 ):
-                    await migrate.run()
+                    await migrate.run(MIGRATIONS)
                 # Still checked, and now for a narrower pair of accidents than before:
                 # a migration that reported success without arriving, and an image older
                 # than the schema it found (`schema_version.py`).
-                await schema_version.verify(conn)
+                await schema_version.verify(conn, MIGRATIONS)
 
             app.state.settings = settings
             app.state.pool = pool

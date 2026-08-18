@@ -45,6 +45,14 @@ jobs:
       teams: ${{ steps.filter.outputs.teams }}
       terminal: ${{ steps.filter.outputs.terminal }}
       openspec: ${{ steps.filter.outputs.openspec }}
+      packages: ${{ steps.filter.outputs.packages }}
+      # The matrix the `packages` job runs, read off the directory rather than typed
+      # out. A hand-written list plus a `^packages/` filter is a job that goes green
+      # having tested somebody else's package: the filter fires for a package the
+      # matrix never names. Same shape as the deploy probes that passed on the
+      # previous container until iteration 0 — a mechanism reporting success without
+      # having checked the thing it exists for.
+      package-list: ${{ steps.packages.outputs.list }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -76,10 +84,19 @@ jobs:
           # be exercised by running them.
           self='^\.github/workflows/checks\.yml$'
 
+          # Packages first, because module patterns below refer to them. A module's own
+          # directory plus every package it takes as a path dependency: the package is
+          # compiled into that module's image, so a change there can break it exactly the
+          # way a change in its own tree can. This is the whole price of sharing source,
+          # and it is paid in CI rather than in production
+          # (packages-replace-the-hand-copies/design.md, D5).
+          tc_runtime='^packages/tc-runtime/'
+          tc_openai='^packages/tc-openai/'
+
           gateway='^modules/capital-gateway/'
-          archive='^modules/market-data/'
-          agent='^modules/agent/'
-          teams='^modules/teams/'
+          archive="^modules/market-data/|$tc_runtime"
+          agent="^modules/agent/|$tc_runtime|$tc_openai"
+          teams="^modules/teams/|$tc_runtime|$tc_openai"
           # The terminal's `contract:check` compares its generated types against the
           # schema market-data builds from `contract.py`. Filtering the terminal on its
           # own directory alone would let a contract change land with the check that
@@ -100,13 +117,13 @@ jobs:
           # Same reasoning as the terminal's own filter, one line up: market-mcp keeps a
           # committed snapshot of the same contract (`contract/market-data.openapi.json`),
           # and `test_contract.py` is the check that catches it going stale.
-          mcp='^modules/market-mcp/|^modules/market-data/market_data/contract\.py$'
+          mcp="^modules/market-mcp/|^modules/market-data/market_data/contract\.py$|$tc_runtime"
           # The same rule again, one module along: trading-mcp keeps a committed snapshot
           # of capital-gateway's whole OpenAPI document (`contract/capital-gateway.
           # openapi.json`), and `scripts/contract.py check` is what catches it going
           # stale. The gateway's *whole* directory, not one file: that document is built
           # from its routes as well as its DTOs, so there is no narrower honest filter.
-          trading='^modules/trading-mcp/|^modules/capital-gateway/'
+          trading="^modules/trading-mcp/|^modules/capital-gateway/|$tc_runtime"
           # And once more, one module further in: teams-mcp keeps a committed snapshot of
           # teams' OpenAPI document (`contract/teams.openapi.json`).
           #
@@ -118,11 +135,12 @@ jobs:
           # `contract.py` imports its models rather than defining them all, and the
           # document is built from routes as well, so the whole module is the only honest
           # filter — the same conclusion trading-mcp's reached one line up.
-          teamsmcp='^modules/teams-mcp/|^modules/teams/'
+          teamsmcp="^modules/teams-mcp/|^modules/teams/|$tc_runtime"
           # The archive-shape check, plus the script that is the shape.
           specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
+          packages='^packages/'
 
-          for name in capital-gateway market-data market-mcp trading-mcp teams-mcp agent teams terminal openspec; do
+          for name in capital-gateway market-data market-mcp trading-mcp teams-mcp agent teams terminal openspec packages; do
             case "$name" in
               capital-gateway) pattern="$gateway" ;;
               market-data)     pattern="$archive" ;;
@@ -133,6 +151,7 @@ jobs:
               teams)           pattern="$teams" ;;
               terminal)        pattern="$terminal" ;;
               openspec)        pattern="$specs" ;;
+              packages)        pattern="$packages" ;;
             esac
             if matches "$pattern|$self"; then
               echo "$name=true" >> "$GITHUB_OUTPUT"
@@ -142,6 +161,13 @@ jobs:
           done
           echo "--- decisions ---"
           cat "$GITHUB_OUTPUT"
+      - id: packages
+        name: Which packages exist
+        run: |
+          set -euo pipefail
+          list=$(ls -1 packages | jq -R . | jq -sc .)
+          echo "packages: $list"
+          echo "list=$list" >> "$GITHUB_OUTPUT"
 
   capital-gateway:
     name: capital-gateway
@@ -257,6 +283,33 @@ jobs:
       # Nothing here reaches a running teams: every test doubles it. What cannot be
       # doubled — whether Easy Auth passes the operator's token through — is not a test,
       # it is the deployment check in this change's review.md.
+      - run: uv run pytest -q
+
+  packages:
+    name: packages
+    needs: changes
+    if: needs.changes.outputs.packages == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      # One job per package rather than a loop, so a failure names which one — and the
+      # list comes from `changes`, which reads `packages/`, so adding a package cannot
+      # leave it untested while the job reports green.
+      fail-fast: false
+      matrix:
+        package: ${{ fromJSON(needs.changes.outputs.package-list) }}
+    defaults:
+      run:
+        working-directory: packages/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      - run: uv run pyright
+      # The package's own tests only. What proves a package change is safe for its
+      # consumers is that *their* jobs run too — the filter above adds every module that
+      # takes the package as a path dependency, so this job never stands alone.
       - run: uv run pytest -q
 
   agent:

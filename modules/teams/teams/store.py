@@ -26,9 +26,9 @@ from datetime import datetime
 from decimal import Decimal
 
 import asyncpg
+from tc_runtime.db import Conn, fetch_one
 
 from .contract import TeamDefinition
-from .db import Conn, fetch_one
 
 # `latest_revision` is derived rather than stored on `teams`. The correlated subquery
 # reads one row from `ix_team_revisions_team_version` per team — a catalogue is tens of

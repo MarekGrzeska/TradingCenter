@@ -1,20 +1,23 @@
-"""Who may call this module over the network — a deliberate twin of `market_mcp/
-network_identity.py` and `trading_mcp/network_identity.py`, copied rather than shared (no
-shared library between modules).
+"""Who may call this module over the network.
 
-This checks **who is calling**, not in whose name — the second question is `operator.py`'s
-and is asked per tool, not per connection. Both have to be answered before anything reaches
-`teams`, and neither substitutes for the other: a caller this module trusts is still not
-allowed to act for an operator it cannot name.
+One copy of what `market-mcp`, `teams-mcp` and `trading-mcp` each carried. Measured
+18 August 2026 at 76.9–86.2% identical, and the remainder was prose in every line: strip
+the docstrings and comments and the three bodies are the same 32 lines, character for
+character.
 
-Raw ASGI middleware, not Starlette's `BaseHTTPMiddleware` — the streamable-http
-transport streams its response, and `BaseHTTPMiddleware` buffers a response body in
-some Starlette versions, which would break exactly the transport this wraps.
+This checks **who is calling**, not in whose name. The second question belongs to a module
+that has one (`teams_mcp/operator.py`), is asked per tool rather than per connection, and
+stays there — a caller this middleware trusts is still not allowed to act for an operator
+it cannot name.
 
-Mirrors market-data's and market-mcp's own check: same headers, same anonymous
-sentinel, same reasoning — a platform authenticator populates these headers after
-validating a token, and this module does not take that on trust
-(specs/teams-mcp-transport, "Wołający jest jeden i jest nazwany").
+Raw ASGI middleware, not Starlette's `BaseHTTPMiddleware`: the streamable-http transport
+streams its response, and `BaseHTTPMiddleware` buffers a response body in some Starlette
+versions, which would break exactly the transport this wraps. A pass-through here touches
+nothing about the response; only a refusal builds one.
+
+Mirrors market-data's own check (`market_data/routers/stream.py`): same headers, same
+anonymous sentinel, same reasoning. That one is four lines inside a WebSocket route rather
+than a file, so it is not moved here.
 """
 
 from __future__ import annotations
@@ -31,8 +34,7 @@ PRINCIPAL_NAME_HEADER = b"x-ms-client-principal-name"
 UNAUTHENTICATED = "anonymous"
 
 # Reachable with no identity even when the requirement is on — the platform's own
-# probe carries none (specs/teams-mcp-transport, "Zdrowie modułu da się sprawdzić
-# bez sesji MCP").
+# probe carries none (each module names the requirement in its own spec).
 EXEMPT_PATHS = {"/health"}
 
 

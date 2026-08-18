@@ -1,44 +1,28 @@
-"""Who is calling.
+"""Who is calling — this module's binding of `tc_runtime.auth`.
 
-Same two headers and the same fallback as `agent/auth.py` and `market_data/routers/
-stream.py`'s own Easy Auth handling — duplicated, not imported, for the reason every
-cross-module borrowing here is (no shared library, docs/architecture.md).
+The reading of the two Easy Auth headers is shared (`tc_runtime/auth.py`, one copy of what
+this file and `agent/auth.py` each carried). What stays here is the half the package must
+not know: which of *this* module's settings decides that a missing principal is a refusal
+(specs/teams-browser-access, "Moduł nie bierze na wiarę warstwy przed sobą").
 """
 
 from __future__ import annotations
 
-import logging
+from fastapi import Request
+from tc_runtime.auth import (
+    PRINCIPAL_ID_HEADER,
+    PRINCIPAL_NAME_HEADER,
+    UNAUTHENTICATED,
+    principal_from,
+)
 
-from fastapi import HTTPException, Request
-
-log = logging.getLogger(__name__)
-
-# What a platform authenticator puts on every request it lets through. The id is the
-# stable half — a name can be changed, an object id cannot.
-PRINCIPAL_ID_HEADER = "X-MS-CLIENT-PRINCIPAL-ID"
-PRINCIPAL_NAME_HEADER = "X-MS-CLIENT-PRINCIPAL-NAME"
-
-# Assigned when nobody stands in front of the module — reachable only while
-# `require_authenticated_principal` is off, which means local development
-# (specs/teams-browser-access, "Moduł nie bierze na wiarę warstwy przed sobą").
-UNAUTHENTICATED = "anonymous"
+__all__ = ["PRINCIPAL_ID_HEADER", "PRINCIPAL_NAME_HEADER", "UNAUTHENTICATED", "current_principal"]
 
 
 def current_principal(request: Request) -> str:
     """A `Depends()` used by every owned-resource route — raising here refuses a request
     before it ever reaches a route body, so `REQUIRE_AUTHENTICATED_PRINCIPAL` refuses
-    before a model is ever touched (specs/teams-browser-access, "Moduł nie bierze na
-    wiarę warstwy przed sobą")."""
-    settings = request.app.state.settings
-    identity = (
-        request.headers.get(PRINCIPAL_ID_HEADER) or request.headers.get(PRINCIPAL_NAME_HEADER) or ""
-    ).strip()
-
-    if identity:
-        return identity
-
-    if settings.require_authenticated_principal:
-        log.warning("request refused: no authenticated principal")
-        raise HTTPException(status_code=401, detail="not authenticated")
-
-    return UNAUTHENTICATED
+    before a model is ever touched."""
+    return principal_from(
+        request, required=request.app.state.settings.require_authenticated_principal
+    )

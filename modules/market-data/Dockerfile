@@ -1,24 +1,33 @@
 # Multi-stage: uv resolves and builds the venv, the runtime stage only ever ships
 # that venv and the source — no compiler toolchain, no uv binary, no lockfile parsing
 # at container start.
+#
+# **The build context is the repository root, not this directory.** It became so when
+# `tc-runtime` turned from a copied file into a path dependency: uv resolves that path
+# while installing the lock, so the package has to be inside the context. The image
+# mirrors the repository's layout for the same reason — `pyproject.toml` names the
+# package relative to the repository, and a flattened image would have to rewrite that
+# path, which is one more place for the two to disagree.
 FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
-WORKDIR /app
+WORKDIR /app/modules/market-data
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
 # Dependencies first, from the lockfile alone — this layer only invalidates when
 # pyproject.toml or uv.lock change, not on every source edit.
-COPY pyproject.toml uv.lock ./
+# The package before the lock: `uv sync` reads it during resolution, not after.
+COPY packages /app/packages
+COPY modules/market-data/pyproject.toml modules/market-data/uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
-COPY market_data ./market_data
-COPY migrations ./migrations
-COPY alembic.ini ./alembic.ini
+COPY modules/market-data/market_data ./market_data
+COPY modules/market-data/migrations ./migrations
+COPY modules/market-data/alembic.ini ./alembic.ini
 RUN uv sync --frozen --no-dev
 
 FROM python:3.12-slim-bookworm
-WORKDIR /app
+WORKDIR /app/modules/market-data
 COPY --from=builder /app /app
-ENV PATH="/app/.venv/bin:$PATH"
+ENV PATH="/app/modules/market-data/.venv/bin:$PATH"
 
 # Azure App Service's default expectation for a Linux custom container — matches
 # infra/app-service.tf, which sets no WEBSITES_PORT override.

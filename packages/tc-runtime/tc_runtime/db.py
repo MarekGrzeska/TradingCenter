@@ -1,8 +1,14 @@
-"""The connection string, in the two shapes this module needs it.
+"""The connection string, the pool and the migration lock — in the shapes every module
+with a database needs them.
 
-Duplicated from `agent/db.py` rather than imported — there is no shared library between
-modules (docs/architecture.md, "Why no shared library"), and this module owns its own
-database (specs/teams-database-connection, "Moduł nie dzieli bazy z innym modułem").
+One copy, taken from `agent/db.py` on 18 August 2026, where it was 97.1% identical to
+`teams/db.py`. What did *not* come here is `market_data/db.py`: measured at 56.2% against
+this one, with its own thirty-minute migration window for the largest table in the
+repository. That is a different file, not a copy that drifted, and it stays where it is
+(`packages-replace-the-hand-copies/design.md`, D4).
+
+What this package cannot know stays with the caller: which advisory-lock key a module's
+migrations take, and where its migrations live. Both arrive as arguments.
 """
 
 from __future__ import annotations
@@ -34,15 +40,9 @@ _AAD_SCOPE = "https://ossrdbms-aad.database.windows.net/.default"
 
 Credential = ClientSecretCredential | DefaultAzureCredential
 
-# The advisory-lock key this module's migrations take. Advisory locks are scoped to one
-# database and this module has its own (`teams-database-connection`, "Moduł nie dzieli
-# bazy z innym modułem"), so the value only has to be stable — it carries the module's
-# port so a log line naming it says which module took it.
-MIGRATION_LOCK_KEY = 8050
-
 
 class LockNotAcquired(RuntimeError):
-    """The lock did not free up within the wait this module allows."""
+    """The lock did not free up within the wait the caller allows."""
 
 
 @asynccontextmanager
@@ -59,6 +59,11 @@ async def advisory_lock(
     A lock left behind by a process that died needs no timeout to clear — it is session
     scoped, so Postgres drops it with the connection. `wait` is therefore sized for the
     slow case (a long migration ahead of us in the queue), not the dead one.
+
+    `key` is the caller's, and it matters that it stays the caller's: advisory locks are
+    scoped to a database, so two modules sharing a value would each be waiting on a lock
+    the other holds in a database it cannot see. Every module asserts its own value in
+    its own test suite.
     """
     deadline = time.monotonic() + wait
     while not await conn.fetchval("SELECT pg_try_advisory_lock($1)", key):
@@ -88,7 +93,7 @@ def asyncpg_dsn(database_url: str) -> str:
 def sqlalchemy_url(database_url: str) -> str:
     """The URL as SQLAlchemy takes it — asyncpg named, because it is the only driver
     here. Alembic runs through SQLAlchemy; without the suffix it defaults to psycopg2,
-    which this module does not install."""
+    which no module here installs."""
     scheme, separator, rest = database_url.partition(_SCHEME_SEPARATOR)
     if not separator:
         raise ValueError(f"DATABASE_URL is not a usable connection string: {database_url!r}")
@@ -143,7 +148,7 @@ def identity_connect_args(
     tenant_id: str | None,
 ) -> tuple[dict[str, object], Credential]:
     """`connect_args` for a SQLAlchemy engine reaching this database with identity auth
-    — for `migrations/env.py`, which drives its own engine."""
+    — for a module's `migrations/env.py`, which drives its own engine."""
     credential = _credential(client_id, client_secret, tenant_id)
     return {"user": user, "password": _TokenProvider(credential)}, credential
 
@@ -160,7 +165,7 @@ async def pool(
     max_size: int = 10,
 ) -> AsyncIterator:
     """A pool. `user` selects identity-based auth: an Entra token is fetched fresh at
-    the moment each connection is opened. Omitted — as the test suite's throwaway
+    the moment each connection is opened. Omitted — as a test suite's throwaway
     PostgreSQL needs — `database_url` is used exactly as given."""
     if user is None:
         try:
@@ -195,8 +200,12 @@ async def pool(
 
 
 async def fetch_one(conn: Conn, query: str, *args: object) -> asyncpg.Record:
-    """`fetchrow` for a statement that cannot answer with nothing — see
-    `market_data/db.py`'s twin for the full rationale."""
+    """`fetchrow` for a statement that cannot answer with nothing.
+
+    An `INSERT ... RETURNING` that comes back empty is not "no rows" — it is a statement
+    that did not do what it said. Turning that into `None` hands the caller an optional
+    it will dereference two lines later, a long way from the cause.
+    """
     row = await conn.fetchrow(query, *args)
     if row is None:
         raise RuntimeError(f"no row from a statement that always returns one: {query.strip()}")

@@ -49,6 +49,12 @@ than a number nobody can raise.
 - `app.py` — assembly only: lifespan and routers. Nothing that decides anything.
 - `migrations/` — the schema, as the statements a deployment actually runs.
 
+## Packages it takes
+
+`tc-runtime` (database, migrations, schema check, Easy Auth principal, `GET /models`) and
+`tc-openai` (the streamed call). Both are **build-time** path dependencies compiled into
+this module's image — no module imports another module.
+
 ## Run
 
 ```bash

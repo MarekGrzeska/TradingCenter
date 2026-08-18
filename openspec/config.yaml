@@ -39,7 +39,8 @@ context: |
        or the terminal's generated contract
     3. infrastructure — infra/**
     4. an architectural rule — one docs/architecture.md states and CLAUDE.md calls
-       load-bearing, such as "no cross-module imports and no shared library"
+       load-bearing, such as "no module imports another module" and the conditions
+       under which source may be shared at build time
 
   The fourth was added on 18 August 2026, and the reason is worth keeping because the
   first three read as complete until they were tested against a real change. The plan

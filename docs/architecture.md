@@ -3,7 +3,9 @@
 ## The shape
 
 One repository, many modules, no shared runtime. A module is a directory under `modules/`
-that runs on its own and publishes a contract. Nothing imports across that boundary.
+that runs on its own and publishes a contract. Nothing imports across that boundary at
+runtime; source may be shared at build time through `packages/`, under the conditions in
+"What may be shared, and what may not".
 
 ```
                   capital.com
@@ -162,15 +164,51 @@ optional and an absent one means no limit at all. That split is the rule worth c
 the next ceiling anyone adds: **a number the operator must not be able to change belongs in
 `trading-mcp`; a budget that is theirs belongs in the revision.**
 
-## Why no shared library
+## What may be shared, and what may not
 
-Shared code is coupling that no contract records. Two modules importing the same helper
-cannot be deployed, tested or deleted independently, and the day one needs the helper to
-change is the day both do.
+**Nothing is shared at runtime.** A module reaches another only through a published
+contract — HTTP described by OpenAPI, MCP, or typed events. No module imports another
+module's package, reads another module's database, or runs on another module's identity.
+That boundary is the architecture and it does not move.
 
-The cost is real and accepted: DTOs will be spelled out twice when a second module needs
-the same shape. That duplication is visible in a diff. A shared base class that quietly
-constrains four modules is not.
+**Source may be shared at build time, under conditions.** Two modules may depend on a
+package under `packages/`, which is resolved into each module's own lock and compiled
+into each module's own image. Nothing is published to a registry and nothing is versioned:
+there is one copy in the repository, and an image carries whichever copy was there when it
+was built. A module still deploys, tests and rolls back alone.
+
+Three conditions, and a candidate that fails any of them stays copied:
+
+1. **Measured, not assumed.** The code is already a hand-maintained copy — at least 70%
+   identical line for line between two modules. `scripts/measure-duplication.py` is what
+   answers this, and a proposal to share something says what it printed.
+2. **Every difference is an argument.** What differs between the copies has to become a
+   parameter, not a branch on which module is calling. A shared file with a switch per
+   consumer is the base class this rule used to forbid, wearing a different hat.
+3. **Every consumer is tested on every change.** A change under `packages/` runs the test
+   job of each module that depends on it (`.github/workflows/checks.yml`). Sharing source
+   converts a visible drift into an invisible regression unless this holds.
+
+### Why the rule changed
+
+It used to read: no shared library at all, because shared code is coupling no contract
+records, and duplication is at least visible in a diff. The reasoning was sound and the
+price turned out to be higher than the argument assumed. Measured on 18 August 2026:
+**959 lines** of production Python existed only as hand-maintained copies of each other,
+and four separate bugs had been fixed in one copy and not the other — one of them the
+retry on the order path, fixed in `teams` and missing from `agent` for a day.
+
+The old rule protected independent deploy, test and deletion. A build-time package
+protects all three as well, because the coupling is resolved before an image exists. What
+it does not protect on its own is the fourth thing the old rule gave for free — that a
+change cannot break a module its author was not looking at — and that is what condition 3
+buys back, in CI rather than in production.
+
+**What this costs, stated plainly.** A module is no longer deleted by deleting its
+directory alone: its entry comes out of the packages' consumer lists too, and a package
+with no consumers left goes with it. And the build context of a containerised module is
+the repository root rather than its own directory, because uv resolves the path
+dependency while installing the lock.
 
 ## Module anatomy
 
@@ -183,7 +221,8 @@ modules/<name>/
   .env.example      what it needs configured
 ```
 
-A module is deleted by deleting its directory. If that breaks something else, the
+A module is deleted by deleting its directory, plus its line in the dependency list of
+any package under `packages/` — see the section above. If anything *else* breaks, the
 something else was reaching past a contract.
 
 ## What a contract is

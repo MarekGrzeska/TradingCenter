@@ -1,10 +1,10 @@
-"""Whether the database this process reached is at the revision its code was built for.
+"""Whether the database a process reached is at the revision its code was built for.
 
-A twin of `agent/schema_version.py`, duplicated rather than shared — no library between
-modules. A comparison, never a migration: the heads alembic ships in the image against
-the version the database says it is at.
+One copy of what `agent`, `teams` and `market_data` each carried. A comparison, never a
+migration: the heads alembic ships in the image against the version the database says it
+is at.
 
-`migrate.py` runs immediately before this, so the common case is that this check passes
+`migrate.run()` runs immediately before this, so the common case is that the check passes
 over a database it just watched being migrated. What it still catches is the pair the
 migration cannot fix:
 
@@ -14,13 +14,24 @@ migration cannot fix:
   This one gets *more* likely once deployments migrate on their own, not less, because
   the schema now moves forward at every deploy and a rollback moves only the code back.
 
-Both leave the module running code against a schema it was never tested on, so both end
-the same way: the process refuses to start and says which two revisions disagree.
+Both leave a module running code against a schema it was never tested on, so both end the
+same way: the process refuses to start and says which two revisions disagree.
+
+Written after 15 August 2026, when the image carrying `0003_prompt_revisions` served
+against a database still at `0002` and only `GET /prompt` failed — a half-broken
+deployment with no symptom until an operator opened the one panel that read the new table.
+
+This is teams' version of the file, and the difference from agent's is the reason. Both
+name the case where the *database* is at no revision; only teams names it where the
+*image* ships none. Agent's message then read "expects the database at , and it is at …"
+— a sentence with a hole in it, produced exactly when a module has migrations pending
+creation. Merged here with agent's own paragraph above, which teams had dropped.
 """
 
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import asyncpg
 from alembic.script import ScriptDirectory
@@ -34,9 +45,9 @@ class SchemaMismatch(RuntimeError):
     """The database is not at the revision this code expects."""
 
 
-def expected_heads() -> set[str]:
+def expected_heads(migrations: Path) -> set[str]:
     """The revisions this image's migrations end at."""
-    return set(ScriptDirectory.from_config(alembic_config()).get_heads())
+    return set(ScriptDirectory.from_config(alembic_config(migrations)).get_heads())
 
 
 async def applied_heads(conn: asyncpg.Connection) -> set[str]:
@@ -48,14 +59,14 @@ async def applied_heads(conn: asyncpg.Connection) -> set[str]:
     return {row["version_num"] for row in rows}
 
 
-async def verify(conn: asyncpg.Connection) -> None:
+async def verify(conn: asyncpg.Connection, migrations: Path) -> None:
     """Raise unless the database is at the revision this code was built for.
 
     Deliberately not "at least" — a database ahead of the image is the same accident seen
     from the other side (a rollback that left the schema where it was), and the code
     running against it is as untested as the case above.
     """
-    expected = expected_heads()
+    expected = expected_heads(migrations)
     applied = await applied_heads(conn)
     if applied == expected:
         at = ", ".join(sorted(expected)) if expected else "no revision (none exist yet)"

@@ -47,11 +47,23 @@ dependencies = [
     # container image usually ships none either — a schedule that cannot be expressed in
     # the operator's own clock is this module refusing to start (`scheduler/timing.py`).
     "tzdata>=2024.1",
+    # Runtime plumbing this module shares with the other modules that own a database.
+    # A path dependency, not a workspace member: the package is resolved into *this*
+    # module's own lock and baked into its image at build time
+    # (packages-replace-the-hand-copies/design.md, D3).
+    "tc-runtime",
+    # The streamed OpenAI call, shared with the other module that makes one. The key is
+    # not shared and never travels through the package.
+    "tc-openai",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
 [tool.uv]
 package = false
+
+[tool.uv.sources]
+tc-runtime = { path = "../../packages/tc-runtime", editable = true }
+tc-openai = { path = "../../packages/tc-openai", editable = true }
 
 [tool.ruff]
 line-length = 100

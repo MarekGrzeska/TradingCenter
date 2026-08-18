@@ -55,6 +55,12 @@ to mean something (specs/trading-mcp-transport).
   is `GatewayRefused.is_access_failure` — one list, in `errors.py`, because a 401
   read as a refusal sends an agent re-editing an order nobody looked at.
 
+## Packages it takes
+
+`tc-runtime`, for the caller-identity middleware and the helper that turns an upstream's
+refusal into a sentence. Its own error taxonomy stays here: distinguishing a provider's
+refusal from an access failure is this module's job and nobody else's.
+
 ## Running
 
 ```bash

@@ -9,9 +9,17 @@ A monorepo of **independent** modules supporting trading and research. Every mod
 standalone — its own entrypoint, dependencies, tests and README — and modules cooperate
 only through a published contract (HTTP/OpenAPI or typed events).
 
-**There are no cross-module imports and no shared library.** This is the load-bearing rule
-of the architecture (`docs/architecture.md`, "Why no shared library"). If a change seems to
-need one, the change is wrong, not the rule.
+**No module imports another module.** That is the load-bearing rule and it has not moved:
+at runtime a module reaches another only through a published contract, never through its
+package, its database or its identity.
+
+**Source may be shared at build time, through `packages/`, under three conditions** —
+measured as a copy (≥70% identical), every difference expressible as an argument, and
+every consumer's tests running on every change to the package. `docs/architecture.md`,
+"What may be shared, and what may not", carries the rule and the measurement that changed
+it on 18 August 2026. A package is resolved into each module's own lock and baked into
+each module's own image; nothing is published or versioned. If a change seems to need
+something a package cannot give it, the change is wrong, not the rule.
 
 ```
 modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
@@ -22,6 +30,7 @@ modules/teams             Python · teams of agents as data — a graph the oper
 modules/trading-mcp       Python · MCP tools over the gateway's demo account: positions, balance, orders. Network transport only, two named callers (teams, agent). Demo checked against the gateway, not against a setting.
 modules/teams-mcp         Python · MCP tools over teams' catalogue, so the agent can build and correct a team by talking. One named caller (agent). Every tool acts in the operator's name — their token travels with the call, in its own header.
 modules/terminal          React+TS · the operator's screen. Consumes the gateway, market-data, agent and teams. Publishes nothing.
+packages/tc-runtime       Python · the plumbing measured as a hand-copy across modules: database, migrations, schema check, caller identity. A build-time dependency, never a runtime one; its README names the consumers.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
 docs/                     architecture and reference — only what is true today
@@ -41,6 +50,7 @@ Run these from the module directory. Nothing at the repo root builds or tests ev
 | `market-data` | `uv run alembic upgrade head` then `uv run uvicorn market_data.app:app --reload --port 8020`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `market-mcp` | `uv run python -m market_mcp stdio` (desktop client) or `... http` (port 8040)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
 | `agent` | `uv run alembic upgrade head` then `uv run uvicorn agent.app:app --reload --port 8030`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
+| `packages/tc-runtime` | no entrypoint — a library<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `teams` | `uv run alembic upgrade head` then `uv run uvicorn teams.app:app --reload --port 8050`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `trading-mcp` | `uv run python -m trading_mcp` (port 8060 — one transport, no `stdio` to choose)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
 | `teams-mcp` | `uv run python -m teams_mcp` (port 8070 — same, one transport)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
@@ -207,8 +217,9 @@ and, in `market-data`, before it writes a single candle. Two properties carry it
 
 - **A Postgres advisory lock** (`db.py`, `MIGRATION_LOCK_KEY`) rather than a rule against
   migrating at startup. Two instances starting together give one migration and one waiter.
-  The wait is bounded and deliberately uneven: five minutes for `agent`, thirty for
-  `market-data`, whose candle table is the largest thing here. A lock held by a process that
+  The wait is bounded and deliberately uneven: five minutes for `agent`, twenty-five for
+  `market-data`, whose candle table is the largest thing here (`migration_lock_wait_seconds`,
+  300 s against 1500 s — this file said thirty until the numbers were read on 18 August 2026). A lock held by a process that
   died needs no timeout — it is session scoped and dies with the connection.
 - **The module's own identity**, not the server administrator's. A table created by the app
   role belongs to it, so nothing has to be granted afterwards. This is what closed the
@@ -290,7 +301,8 @@ shape**, or a **render style** (`Chart.tsx`'s `canDrawIndicator` and its sync ef
 change a requirement (`openspec/specs/**`), a contract between modules
 (`market_data/contract.py`, `capital_gateway/dtos.py`, the terminal's generated contract),
 infrastructure (`infra/**`), or **an architectural rule this file calls load-bearing** —
-"no cross-module imports and no shared library" being the one that exists today.
+today: "no module imports another module", and the three conditions under which source
+may be shared at build time.
 Otherwise: branch, tests, pull request — no proposal, no design, no review artifact. Bug
 fixes, behaviour-preserving refactors, UI work that adds no requirement, documentation, CI
 and tooling all take that path.

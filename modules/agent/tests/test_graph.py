@@ -36,7 +36,7 @@ class FakeProvider:
         *,
         model: str,
         system_prompt: str,
-        history: list[tuple[str, str]],
+        given,
         tools: Sequence[ToolDescriptor] = (),
         rounds: Sequence[ToolRound] = (),
     ):
@@ -45,7 +45,7 @@ class FakeProvider:
             {
                 "tools": list(tools),
                 "rounds": list(rounds),
-                "history": list(history),
+                "history": list(given.turns),
                 "system_prompt": system_prompt,
             }
         )

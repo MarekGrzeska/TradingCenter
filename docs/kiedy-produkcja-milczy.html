@@ -501,7 +501,7 @@
 
 <p><strong>Automatycznego uruchamiania migracji w workflow deploya.</strong> Kusi, bo usuwa krok, o którym się zapomina. Ale decyzja z <code>Dockerfile</code>a — że restart nie ma ścigać się o migrację — jest słuszna, a workflow, który migruje przed wdrożeniem, wprowadza własne okno: stary kod działa przez chwilę przy nowym schemacie. Dziś to okno byłoby nieszkodliwe, jutro przy migracji zmieniającej kolumnę już nie. Bramka, która <em>zatrzymuje</em> rozjazd, jest tańsza od automatu, który go tworzy w drugą stronę. Tą bramką jest PR #53 i stoi w module, nie w workflow — sprawdzenie, które podróżuje razem z obrazem, działa też wtedy, gdy kontener wstaje z powodu innego niż wdrożenie.</p>
 
-<p><strong>Rozbijania telemetrii na wspólną bibliotekę.</strong> Dwadzieścia linii konfiguracji logowania stoi teraz w dwóch modułach. To jest cena reguły „no shared library" i jest mniejsza niż sprzężenie, które usunęłaby.</p>
+<p><strong>Rozbijania telemetrii na wspólną bibliotekę.</strong> Dwadzieścia linii konfiguracji logowania stoi w dwóch modułach i tam zostaje — zmierzone 18 sierpnia 2026: <code>telemetry.py</code> ma 236 linii w market-data i 70 w bramie, czyli nie jest kopią, tylko dwoma różnymi plikami o tej samej nazwie. Gdy reguła „no shared library" ustąpiła miejsca dzieleniu kodu przy buildzie, ten wniosek się nie zmienił — zmienił się tylko powód, z zakazu na pomiar.</p>
 
 <footer>
   Wszystkie liczby i znaczniki czasu w tym dokumencie pochodzą z odpytania produkcji 10 sierpnia 2026: bazy <code>market_data</code>, Application Insights <code>appi-tradingcenter</code> i Azure Alerts. Czasy w UTC.

@@ -1,3 +1,7 @@
+"""The connection string, the credential and the pool — moved here with the code they
+test, from `modules/agent/tests/test_db.py`, where they had been asserting nothing about
+agent in particular."""
+
 from __future__ import annotations
 
 import logging
@@ -6,8 +10,8 @@ from typing import Self
 import pytest
 from azure.identity.aio import ClientSecretCredential, DefaultAzureCredential
 
-from teams import db
-from teams.db import (
+from tc_runtime import db
+from tc_runtime.db import (
     _connection_target,
     _credential,
     _TokenProvider,
@@ -16,8 +20,8 @@ from teams.db import (
     sqlalchemy_url,
 )
 
-PLAIN = "postgresql://teams:secret@db.internal:5432/teams"
-NO_CREDENTIAL_URL = "postgresql://db.internal:5432/teams?sslmode=require"
+PLAIN = "postgresql://someone:secret@db.internal:5432/agent"
+NO_CREDENTIAL_URL = "postgresql://db.internal:5432/agent?sslmode=require"
 
 
 def test_asyncpg_gets_a_scheme_without_a_driver() -> None:
@@ -26,7 +30,7 @@ def test_asyncpg_gets_a_scheme_without_a_driver() -> None:
 
 
 def test_sqlalchemy_gets_the_driver_named() -> None:
-    assert sqlalchemy_url(PLAIN) == "postgresql+asyncpg://teams:secret@db.internal:5432/teams"
+    assert sqlalchemy_url(PLAIN) == "postgresql+asyncpg://someone:secret@db.internal:5432/agent"
 
 
 @pytest.mark.parametrize("url", ["", "not-a-url-at-all"])
@@ -35,24 +39,13 @@ def test_a_connection_string_without_a_scheme_names_itself(url: str) -> None:
         asyncpg_dsn(url)
 
 
-@pytest.mark.db
-async def test_the_test_database_is_reachable(postgres_url: str) -> None:
-    import asyncpg as _asyncpg
-
-    conn = await _asyncpg.connect(asyncpg_dsn(postgres_url))
-    try:
-        assert await conn.fetchval("SELECT 1") == 1
-    finally:
-        await conn.close()
-
-
 def test_connection_target_names_host_port_and_database_never_a_credential() -> None:
     target = _connection_target(PLAIN)
-    assert target == "db.internal:5432/teams"
+    assert target == "db.internal:5432/agent"
     assert "secret" not in target
 
 
-# --- identity: specs/teams-database-connection ---
+# --- identity: specs/agent-database-connection/spec.md ---
 
 
 class _FakeToken:
@@ -142,10 +135,10 @@ async def test_pool_with_a_user_passes_it_and_a_token_provider(monkeypatch) -> N
     monkeypatch.setattr(db.asyncpg, "create_pool", fake_create_pool)
     monkeypatch.setattr(db, "_credential", lambda *a: _FakeCredential(["t"]))
 
-    async with pool(NO_CREDENTIAL_URL, user="app-tradingcenter-teams"):
+    async with pool(NO_CREDENTIAL_URL, user="app-tradingcenter-agent"):
         pass
 
-    assert captured["user"] == "app-tradingcenter-teams"
+    assert captured["user"] == "app-tradingcenter-agent"
     assert isinstance(captured["password"], _TokenProvider)
 
 
@@ -156,14 +149,14 @@ async def test_a_connection_failure_is_logged_without_the_credential(monkeypatch
     monkeypatch.setattr(db.asyncpg, "create_pool", fake_create_pool)
     monkeypatch.setattr(db, "_credential", lambda *a: _FakeCredential(["super-secret-token"]))
 
-    # See market_data's and agent's twin tests for why this is undone here rather than
-    # in migrations/env.py: alembic's fileConfig disables loggers that already exist.
-    monkeypatch.setattr(logging.getLogger("teams.db"), "disabled", False)
+    # See market_data's twin test for why this is undone here rather than in
+    # migrations/env.py: alembic's fileConfig disables loggers that already exist.
+    monkeypatch.setattr(logging.getLogger("agent.db"), "disabled", False)
 
-    with caplog.at_level(logging.ERROR, logger="teams.db"), pytest.raises(ConnectionError):
-        async with pool(NO_CREDENTIAL_URL, user="app-tradingcenter-teams"):
+    with caplog.at_level(logging.ERROR, logger="agent.db"), pytest.raises(ConnectionError):
+        async with pool(NO_CREDENTIAL_URL, user="app-tradingcenter-agent"):
             pass
 
     logged = caplog.text
-    assert "db.internal:5432/teams" in logged
+    assert "db.internal:5432/agent" in logged
     assert "super-secret-token" not in logged

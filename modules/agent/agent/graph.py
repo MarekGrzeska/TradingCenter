@@ -30,6 +30,7 @@ from langgraph.graph import END, StateGraph
 
 from .models import RecordedCall
 from .provider import (
+    Conversation,
     ModelProvider,
     TextDelta,
     ToolCallRequest,
@@ -129,7 +130,7 @@ def build_graph(
             async for chunk in provider.stream(
                 model=state["model"],
                 system_prompt=state["system_prompt"],
-                history=state["history"],
+                given=Conversation(turns=state["history"]),
                 tools=offered,
                 rounds=state["rounds"],
             ):

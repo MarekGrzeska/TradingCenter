@@ -90,14 +90,14 @@ class ScriptedProvider:
         *,
         model: str,
         system_prompt: str,
-        briefing: str,
+        given,
         tools: Sequence[ToolDescriptor] = (),
         rounds: Sequence[ToolRound] = (),
     ) -> AsyncIterator[ProviderChunk]:
         ask = Ask(
             model=model,
             system_prompt=system_prompt,
-            briefing=briefing,
+            briefing=given.text,
             tool_names=tuple(tool.name for tool in tools),
             rounds=len(rounds),
         )

@@ -39,7 +39,7 @@ class FakeProvider:
         self._then_raise = then_raise
 
     async def stream(
-        self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+        self, *, model: str, system_prompt: str, given, tools=(), rounds=()
     ):
         for chunk in self._chunks:
             yield chunk

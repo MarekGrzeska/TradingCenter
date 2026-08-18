@@ -42,7 +42,12 @@ jobs:
       # workflows.
       - uses: docker/build-push-action@v6
         with:
-          context: modules/teams-mcp
+          # The repository root, not the module: `tc-runtime` is a path dependency and
+          # uv resolves it while installing the lock, so it has to be inside the context
+          # (packages-replace-the-hand-copies). `.dockerignore` at the root keeps that
+          # from meaning "upload every virtualenv in the tree".
+          context: .
+          file: modules/teams-mcp/Dockerfile
           push: true
           tags: ${{ steps.image.outputs.name }}:${{ github.sha }}
           cache-from: type=gha,scope=teams-mcp

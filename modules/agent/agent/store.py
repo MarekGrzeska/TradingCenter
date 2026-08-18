@@ -11,8 +11,8 @@ from datetime import datetime
 from decimal import Decimal
 
 import asyncpg
+from tc_runtime.db import Conn, fetch_one
 
-from .db import Conn, fetch_one
 from .models import (
     ChartCommand,
     ChartDrawing,
