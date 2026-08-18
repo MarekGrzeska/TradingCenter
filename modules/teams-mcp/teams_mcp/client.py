@@ -156,7 +156,14 @@ class TeamsClient:
 
 def _detail(response: httpx.Response) -> str:
     """FastAPI spells a refusal two ways — a `detail` string, or its own list of
-    validation objects. Both are teams' own words and both travel unedited."""
+    validation objects. Both are teams's own words and both travel as a sentence.
+
+    The list half is what a bad query parameter produces, and until 18 August 2026 it
+    reached the model as the repr of a list of dicts, `url` to pydantic's error docs and
+    all. `isinstance(body, dict)` rather than a bare `.get`, too: a JSON body that is not
+    an object used to raise `AttributeError` here, which the `except ValueError` below
+    does not catch. Kept identical in all three MCP modules on purpose.
+    """
     try:
         body = response.json()
     except ValueError:
@@ -166,9 +173,24 @@ def _detail(response: httpx.Response) -> str:
     if isinstance(detail, str):
         return detail
     if isinstance(detail, list):
-        parts = [
-            str(entry.get("msg", entry)) if isinstance(entry, dict) else str(entry)
-            for entry in detail
-        ]
-        return "; ".join(parts)
+        return "; ".join(_one_problem(entry) for entry in detail)
     return response.text.strip() or f"teams refused with HTTP {response.status_code}"
+
+
+def _one_problem(entry: object) -> str:
+    """One entry of FastAPI's validation list, as a sentence naming the field.
+
+    `msg` on its own is "Field required", which is not something a caller can act on —
+    the field's name is in `loc`, and a refusal here MUST say what to change
+    (specs/teams-mcp-tools, "Odmowa nazywa, co zmienić"). The first element of `loc` is FastAPI's own plumbing
+    (`body`, `query`, `path`) and says nothing about the request.
+    """
+    if not isinstance(entry, dict):
+        return str(entry)
+    message = str(entry.get("msg", entry))
+    loc = entry.get("loc")
+    if isinstance(loc, list):
+        named = [str(part) for part in loc if str(part) not in {"body", "query", "path"}]
+        if named:
+            return f"{'.'.join(named)}: {message}"
+    return message
