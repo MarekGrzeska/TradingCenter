@@ -47,6 +47,7 @@ jobs:
       openspec: ${{ steps.filter.outputs.openspec }}
       packages: ${{ steps.filter.outputs.packages }}
       scripts: ${{ steps.filter.outputs.scripts }}
+      infra: ${{ steps.filter.outputs.infra }}
       # The matrix the `packages` job runs, read off the directory rather than typed
       # out. A hand-written list plus a `^packages/` filter is a job that goes green
       # having tested somebody else's package: the filter fires for a package the
@@ -95,10 +96,16 @@ jobs:
           tc_openai='^packages/tc-openai/'
           tc_mcp_kit='^packages/tc-mcp-kit/'
 
-          gateway='^modules/capital-gateway/'
-          archive="^modules/market-data/|$tc_runtime"
-          agent="^modules/agent/|$tc_runtime|$tc_openai"
-          teams="^modules/teams/|$tc_runtime|$tc_openai"
+          # Keyed by the job name each pattern decides, so there is one list of names
+          # rather than two. The `case` block this replaces existed for one reason — a bash
+          # variable name cannot hold a hyphen — and it meant every new job was two edits in
+          # two places, which is how a name gets added to one list and not the other.
+          declare -A PATTERNS=()
+
+          PATTERNS[capital-gateway]='^modules/capital-gateway/'
+          PATTERNS[market-data]="^modules/market-data/|$tc_runtime"
+          PATTERNS[agent]="^modules/agent/|$tc_runtime|$tc_openai"
+          PATTERNS[teams]="^modules/teams/|$tc_runtime|$tc_openai"
           # The terminal's `contract:check` compares its generated types against the
           # schema market-data builds from `contract.py`. Filtering the terminal on its
           # own directory alone would let a contract change land with the check that
@@ -115,17 +122,17 @@ jobs:
           # the way market-data's would. The whole module rather than its `contract.py`,
           # for the reason written out at `teamsmcp` below — that file imports models it
           # does not define, and one of them going stale is a thing that has happened.
-          terminal='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/agent/agent/contract\.py$|^modules/teams/'
+          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/agent/agent/contract\.py$|^modules/teams/'
           # Same reasoning as the terminal's own filter, one line up: market-mcp keeps a
           # committed snapshot of the same contract (`contract/market-data.openapi.json`),
           # and `test_contract.py` is the check that catches it going stale.
-          mcp="^modules/market-mcp/|^modules/market-data/market_data/contract\.py$|$tc_mcp_kit"
+          PATTERNS[market-mcp]="^modules/market-mcp/|^modules/market-data/market_data/contract\.py$|$tc_mcp_kit"
           # The same rule again, one module along: trading-mcp keeps a committed snapshot
           # of capital-gateway's whole OpenAPI document (`contract/capital-gateway.
           # openapi.json`), and `scripts/contract.py check` is what catches it going
           # stale. The gateway's *whole* directory, not one file: that document is built
           # from its routes as well as its DTOs, so there is no narrower honest filter.
-          trading="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
+          PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
           # And once more, one module further in: teams-mcp keeps a committed snapshot of
           # teams' OpenAPI document (`contract/teams.openapi.json`).
           #
@@ -137,29 +144,21 @@ jobs:
           # `contract.py` imports its models rather than defining them all, and the
           # document is built from routes as well, so the whole module is the only honest
           # filter — the same conclusion trading-mcp's reached one line up.
-          teamsmcp="^modules/teams-mcp/|^modules/teams/|$tc_mcp_kit"
+          PATTERNS[teams-mcp]="^modules/teams-mcp/|^modules/teams/|$tc_mcp_kit"
           # The archive-shape check, plus the script that is the shape.
-          specs='^openspec/|^scripts/trim-openspec-archive\.sh$'
-          packages='^packages/'
+          PATTERNS[openspec]='^openspec/|^scripts/trim-openspec-archive\.sh$'
+          PATTERNS[packages]='^packages/'
           # Repository tooling with tests of its own since one-deploy-path-one-dev-runner:
           # the dev-stack runner and the probe every deploy workflow ends in.
-          scripts='^scripts/'
+          PATTERNS[scripts]='^scripts/'
+          # Terraform reached `main` unvalidated until 18 August 2026: `terraform.yml` runs
+          # on pull_request only, so a push straight to `main` passed through nothing at
+          # all. `fmt` and `validate` need no credentials and no state, so they belong here
+          # rather than there. Both roots — `infra/bootstrap/` keeps its own state.
+          PATTERNS[infra]='^infra/'
 
-          for name in capital-gateway market-data market-mcp trading-mcp teams-mcp agent teams terminal openspec packages scripts; do
-            case "$name" in
-              capital-gateway) pattern="$gateway" ;;
-              market-data)     pattern="$archive" ;;
-              market-mcp)      pattern="$mcp" ;;
-              trading-mcp)     pattern="$trading" ;;
-              teams-mcp)       pattern="$teamsmcp" ;;
-              agent)           pattern="$agent" ;;
-              teams)           pattern="$teams" ;;
-              terminal)        pattern="$terminal" ;;
-              openspec)        pattern="$specs" ;;
-              packages)        pattern="$packages" ;;
-              scripts)         pattern="$scripts" ;;
-            esac
-            if matches "$pattern|$self"; then
+          for name in "${!PATTERNS[@]}"; do
+            if matches "${PATTERNS[$name]}|$self"; then
               echo "$name=true" >> "$GITHUB_OUTPUT"
             else
               echo "$name=false" >> "$GITHUB_OUTPUT"
@@ -422,6 +421,38 @@ jobs:
       - run: uv run ruff check .
       - run: uv run pyright
       - run: uv run pytest -q
+
+  # Terraform reached `main` unvalidated: `terraform.yml` runs a full plan, but only on
+  # pull_request, so a push straight to `main` with infrastructure in it passed through
+  # nothing at all. `apply` stays with the operator and CI stays unable to do it — none of
+  # that changes here. What changes is that `fmt` and `validate` now run on both doors, and
+  # they can, because neither needs a credential or the state:
+  # `init -backend=false` downloads the providers and stops.
+  #
+  # Both roots. `infra/bootstrap/` is a separate root with its own committed local state,
+  # and it was outside every check until now.
+  infra:
+    name: infra
+    needs: changes
+    if: needs.changes.outputs.infra == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+      - name: Formatting, both roots
+        run: terraform fmt -check -recursive infra
+      - name: Validate infra
+        working-directory: infra
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+      - name: Validate infra/bootstrap
+        working-directory: infra/bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
 
   # An archived change keeps proposal, design and review. Its delta specs were merged into
   # `openspec/specs/` by the archive itself and its ticked `tasks.md` is a worse account of

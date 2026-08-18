@@ -47,9 +47,9 @@
 
 ## 6. `checks.yml`
 
-- [ ] 6.1 Job `infra` na ścieżce `infra/**` — `terraform fmt -check`, `terraform init -backend=false`, `terraform validate`; bez OIDC i bez backendu
-- [ ] 6.2 Blok `case` translacji nazw → tablica asocjacyjna wzorców; wykaz nazw czytany z jej kluczy, nie z drugiej listy
-- [ ] 6.3 Uruchomić krok `changes` na sztucznym diffie (`infra/main.tf`, `scripts/dev.py`, `modules/agent/`) pod `set -u` i sprawdzić decyzje — ten sam sposób, który w iteracji 1 złapał błąd przewracający cały job
+- [x] 6.1 Job `infra` na ścieżce `infra/**` — `fmt -check -recursive`, potem `init -backend=false` + `validate` **w obu rootach**: `infra/bootstrap/` był dotąd poza każdym checkiem. Sprawdzone lokalnie: oba przechodzą
+- [x] 6.2 Blok `case` translacji nazw → tablica asocjacyjna wzorców; wykaz nazw czytany z jej kluczy, nie z drugiej listy
+- [x] 6.3 Zrobione jako **trwały test**, nie jednorazowy przebieg: `tests/test_checks_filter.py` wyciąga blok `run:` kroku `filter`, podstawia sztuczny diff i wykonuje prawdziwy shell pod `set -u`. 16 przypadków, w tym oba kierunki spójności — każdy bramkowany job ma wzorzec i każdy wzorzec ma czytającego
 
 ## 7. Terraform
 
