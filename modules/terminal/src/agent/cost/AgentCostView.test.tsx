@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
@@ -230,6 +230,13 @@ describe("AgentCostView", () => {
   });
 
   it("does not strand the operator on a page the new range no longer has", async () => {
+    // The clock is pinned because the range this test narrows *to* has to be one the
+    // picker is not already showing: the default `from` is today-6, and typing today-6
+    // into it is not a change React can see, so nothing refetches and the row never
+    // arrives. Left to the real date this passed for 364 days a year and failed on the
+    // 365th — it failed on 18 August 2026, six days after the date written below.
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-09-20T12:00:00Z"));
     let long = true;
     const api = fakeApi({
       usage: async () =>
@@ -260,5 +267,6 @@ describe("AgentCostView", () => {
 
     expect(await screen.findByText("2026-08-12")).toBeInTheDocument();
     expect(screen.queryByText(/of 23/)).not.toBeInTheDocument();
+    vi.useRealTimers();
   });
 });
