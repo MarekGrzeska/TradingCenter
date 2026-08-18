@@ -53,14 +53,14 @@
 
 ## 7. Terraform
 
-- [ ] 7.1 `infra/modules/easy-auth-app/` — `azuread_application` + `azuread_service_principal` + `azuread_application_password`, wejścia: nazwa wyświetlana, identifier URI, redirect URI, właściciel
-- [ ] 7.2 Sześć wywołań modułu (market-data, market-mcp, trading-mcp, teams-mcp z `app-service.tf`; agent, teams z `entra.tf`) plus bloki `moved` dla wszystkich osiemnastu zasobów
-- [ ] 7.3 `terraform plan` lokalnie: MUSI powiedzieć `0 to add, 0 to change, 0 to destroy`. Cokolwiek innego zatrzymuje zadanie i wraca do 7.2
-- [ ] 7.4 `for_each` dla siedmiu `azurerm_key_vault_access_policy` plus `moved` dla nich; ponowny plan `0/0/0`
-- [ ] 7.5 `local.web_app_names` jako źródło liczebników; treść alertu pamięci w `monitoring.tf` liczy przez `length(...)`
-- [ ] 7.6 Przejrzeć 11 ręcznie wpisanych liczebników w `infra/*.tf`, poprawić nieprawdziwe, wyliczać te, które mają na czym stanąć; pozostałe zostawić z liczbą, którą właśnie sprawdzono
-- [ ] 7.7 Zmierzyć linie `app-service.tf` i `entra.tf` przed i po
-- [ ] 7.8 Operator: `terraform apply` lokalnie; potwierdzić, że sześć aplikacji dalej wpuszcza token operatora (terminal się loguje, `agent` i `teams` odpowiadają przez Easy Auth)
+- [x] 7.1 `infra/modules/easy-auth-app/` — `azuread_application` + `azuread_service_principal` + `azuread_application_password`, wejścia: nazwa wyświetlana, identifier URI, redirect URI, właściciel
+- [x] 7.2 Sześć wywołań modułu plus `moved` dla **dwudziestu jednego** zasobów, nie osiemnastu: tryplet ×6 to osiemnaście, a trzy stabilne GUID-y scopeów (`random_uuid`) też wchodzą do modułu i też trzeba je przenieść
+- [x] 7.3 Bramka spełniona, ale w innym brzmieniu, niż zapowiadał design — i to jest istotne. **`0 to add, 0 to change, 0 to destroy` jest na tym stanie nieosiągalne, bo `main` planuje dziś cztery zmiany.** Zmierzone w osobnym worktree: plan na `main` to `0 to add, 4 to change, 0 to destroy`, dokładnie te same cztery App Service’y. Dryf idzie z `WEBSITES_ENABLE_APP_SERVICE_STORAGE` na `teams`, który odkłada trzy data source’y tożsamości i przez to zmienia `allowed_applications` w trzech kolejnych aplikacjach na `known after apply`. Uczciwa bramka: **plan gałęzi jest identyczny z planem `main` poza notkami `moved`, przy 0 add i 0 destroy** — i taki jest. Wszystkie 28 przeniesień trafiło w istniejące obiekty, te same ID
+- [x] 7.4 `for_each` po `local.web_app_principal_ids` plus siedem `moved`. Ponowny plan: siedem przeniesień, **zero zmian** na tych politykach
+- [x] 7.5 `local.web_app_names` jako źródło liczebników; treść alertu pamięci w `monitoring.tf` liczy przez `length(...)`
+- [x] 7.6 Przejrzane wszystkie 19 wystąpień, nie 11 — audyt policzył tylko te, które sam sprawdził. **Nieprawdziwych osiem**: nagłówek „six apps” przy siedmiu i z niepełną listą; „both apps” o poświadczeniach GHCR przy siedmiu; „same as the other two apps” o `WEBSITES_PORT`, którego nie nadpisuje żaden; „three deploy workflows” w trzech miejscach przy jednym wspólnym; „both apps read gateway-api-key” przy trzech (trading-mcp doszedł na `add-trading-mcp`); treść alertu wyjątków „across both apps” przy zapytaniu obejmującym cały workspace. **Wyliczane teraz dwie**, obie operatorskie: treść alertu pamięci i treść alertu wyjątków, przez `length(local.web_app_names)`. **Zostawione jako historia**: pomiary datowane (73,5% przy dwóch, 83,1% przy czterech, 84% przy sześciu) — to nie są stęchłe liczby, to zapis pomiaru. **Zostawione jako poprawne w kontekście**: pięć „the other two” o trzech serwerach narzędzi i trzech URL-ach
+- [x] 7.7 `app-service.tf` 1 367 → 1 240, `entra.tf` 225 → 169 (razem −183). Całe `infra/` 2 640 → 2 779, czyli **w górę o 139**: doszedł moduł (155 linii z README) i `moved.tf` (159). `moved.tf` schodzi po zarchiwizowaniu zmiany, więc trwały bilans to ok. −20 linii przy siedmiu politykach i sześciu trypletach zwiniętych do jednego miejsca. Cel „~300 linii mechanicznego boilerplate” z audytu nie jest osiągnięty w liniach i jest osiągnięty w tym, co się liczy: nowy moduł to jedno wywołanie z pięcioma argumentami, nie trzydzieści linii do skopiowania
+- [ ] 7.8 (operator — `apply` jest Twój) `terraform apply` lokalnie; potwierdzić, że sześć aplikacji dalej wpuszcza token operatora (terminal się loguje, `agent` i `teams` odpowiadają przez Easy Auth)
 
 ## 8. Domknięcie
 

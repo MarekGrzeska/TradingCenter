@@ -52,8 +52,10 @@ resource "azurerm_key_vault_access_policy" "operator" {
 #   az keyvault secret set --vault-name <output.key_vault_name> --name gateway-api-key      --value ...
 #   az keyvault secret set --vault-name <output.key_vault_name> --name openai-api-key       --value ...
 #   az keyvault secret set --vault-name <output.key_vault_name> --name teams-openai-api-key --value ...
-# (the same gateway-api-key value both apps read — capital-gateway checks it, market-data
-# presents it, exactly like GATEWAY_API_KEY in both .env.example files today)
+# (the same gateway-api-key value three apps read — capital-gateway checks it, market-data
+# and trading-mcp present it, exactly like GATEWAY_API_KEY in their .env.example files
+# today. trading-mcp joined on `add-trading-mcp`, and this line said "both apps" until
+# 18 August 2026)
 locals {
   key_vault_secret_names = {
     capital_api_key    = "capital-api-key"

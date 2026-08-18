@@ -31,7 +31,7 @@ locals {
 # reaches Azure. There are three such subjects, and which one a job gets is not obvious:
 #
 #   :pull_request           — terraform plan
-#   :environment:production — all three deploy workflows
+#   :environment:production — every App Service deploy, all of them now one workflow
 #   :ref:refs/heads/main    — a push to main from a job with no `environment:`
 #
 # The middle one is the trap. A job that declares `environment: production` is issued
@@ -55,7 +55,7 @@ resource "azuread_application_federated_identity_credential" "main_branch" {
 resource "azuread_application_federated_identity_credential" "production_environment" {
   application_id = azuread_application.github_actions.id
   display_name   = "github-production-environment"
-  description    = "The three deploy workflows, which all run in the production environment"
+  description    = "Every App Service deploy — one reusable workflow, running in the production environment"
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
   subject        = "repo:${local.github_repo}:environment:production"
@@ -92,7 +92,7 @@ resource "azuread_application_federated_identity_credential" "main_branch_immuta
 resource "azuread_application_federated_identity_credential" "production_environment_immutable" {
   application_id = azuread_application.github_actions.id
   display_name   = "github-production-environment-immutable"
-  description    = "The three deploy workflows, immutable-id subject — this is the one they present"
+  description    = "Every App Service deploy, immutable-id subject — this is the one they present"
   audiences      = ["api://AzureADTokenExchange"]
   issuer         = "https://token.actions.githubusercontent.com"
   subject        = "repo:${local.github_repo_immutable}:environment:production"

@@ -120,8 +120,24 @@ przeciw współdzielonemu stanowi, bez artefaktu w diffie i bez planu, który kt
 przeczyta przed apply. `moved` jest deklaratywne, idempotentne i widoczne w PR — a plan CI
 na tym PR pokazuje wynik przed tym, jak operator cokolwiek zaaplikuje.
 
-Bramka: zadanie nie jest zrobione, dopóki lokalny `terraform plan` nie powie
-`0 to add, 0 to change, 0 to destroy`. Nie „prawie zero" — zero.
+Bramka, jak ją tu zapisano: `0 to add, 0 to change, 0 to destroy`. Zmierzona przy
+wykonaniu i **przeformułowana**, bo w tym brzmieniu jest na tym stanie nieosiągalna — i nie
+z powodu tej zmiany. Plan na samym `main` mówi dziś `0 to add, 4 to change, 0 to destroy`:
+`WEBSITES_ENABLE_APP_SERVICE_STORAGE` istnieje na `teams` w Azure i nie ma go w
+konfiguracji, a odkładany przez to odczyt tożsamości zarządzanej zmienia
+`allowed_applications` w trzech kolejnych aplikacjach na `known after apply`. Jeden dryf,
+cztery aplikacje.
+
+Bramka w brzmieniu, które coś znaczy: **plan gałęzi jest identyczny z planem `main` poza
+notkami `moved`, przy zerze w `add` i zerze w `destroy`.** Sprawdzana przez uruchomienie
+obu — `main` w osobnym worktree — i porównanie treści, nie przez przeczytanie liczby na
+końcu. Ta wersja łapie dokładnie to, co pierwsza miała łapać, i nie zatrzymuje się na
+dryfie, który leży tu od wcześniej.
+
+Ten dryf jest osobnym znaleziskiem, nie częścią tej zmiany: cztery aplikacje mają w Azure
+stan, którego nikt nie zaaplikował z powrotem do konfiguracji, i najbliższy `apply`
+operatora go posprząta — co jest bezpieczne (jedno ustawienie platformowe i trzy listy
+odczytane na nowo), ale powinno zostać zauważone, a nie połknięte.
 
 ### D5. `terraform validate` w `checks.yml` przez `init -backend=false`
 

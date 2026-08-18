@@ -124,8 +124,10 @@ resource "azurerm_monitor_metric_alert" "database_storage" {
 # 92 has been this threshold twice over, meaning two different things. On B1 it was raised
 # from 85 because 85 sat on the plan's own baseline and fired on a normal Sunday
 # (openspec: raise-memory-alert-threshold); at 1.75 GB it left barely three points over the
-# nightly floor. On B2's 3.5 GB the same number means 3.2 GB in use against four apps whose
-# peaks add up to under a gigabyte — an anomaly rather than a Tuesday. Left unchanged on
+# nightly floor. On B2's 3.5 GB the same number meant 3.2 GB in use against the four apps
+# there were then, whose peaks added up to under a gigabyte — an anomaly rather than a
+# Tuesday. Seven apps and a B3 later the threshold has not moved and the reasoning has not
+# changed; the count in that sentence is the measurement's, not today's. Left unchanged on
 # purpose when the plan was scaled: moving the SKU and the threshold together would make
 # the next week of measurements unreadable, and lowering it is its own change with its own
 # measurement behind it.
@@ -133,10 +135,13 @@ resource "azurerm_monitor_metric_alert" "plan_memory" {
   name                = "alert-plan-memory-high"
   resource_group_name = azurerm_resource_group.main.name
   scopes              = [azurerm_service_plan.main.id]
-  description         = "The plan all four apps share is over 92% memory."
-  severity            = 2
-  frequency           = "PT5M"
-  window_size         = "PT15M"
+  # Counted, not typed. This is the alert the SKU decision stands on, and on 18 August 2026
+  # its own text still said "all four apps" at seven — a wrong number in the one message
+  # read while deciding whether to pay for a bigger plan.
+  description = "The plan all ${length(local.web_app_names)} apps share is over 92% memory."
+  severity    = 2
+  frequency   = "PT5M"
+  window_size = "PT15M"
 
   criteria {
     metric_namespace = "Microsoft.Web/serverfarms"
@@ -290,11 +295,12 @@ resource "azurerm_monitor_metric_alert" "market_data_availability" {
 # roughly between the two; see design.md (alert-on-dead-backend) for the arithmetic and the
 # caveat that it is an estimate from one night, not a tuned value.
 resource "azurerm_monitor_scheduled_query_rules_alert_v2" "app_exceptions_high" {
-  name                 = "alert-app-exceptions-high"
-  resource_group_name  = azurerm_resource_group.main.name
-  location             = azurerm_resource_group.main.location
-  scopes               = [azurerm_log_analytics_workspace.main.id]
-  description          = "Exception volume across both apps is above the measured reconnect-churn baseline."
+  name                = "alert-app-exceptions-high"
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  scopes              = [azurerm_log_analytics_workspace.main.id]
+  # `AppExceptions` is workspace-wide, so this counts every app, not two of them.
+  description          = "Exception volume across all ${length(local.web_app_names)} apps is above the measured reconnect-churn baseline."
   severity             = 2
   evaluation_frequency = "PT15M"
   window_duration      = "PT15M"
