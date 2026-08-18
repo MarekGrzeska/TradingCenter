@@ -1,0 +1,548 @@
+<title>Rachunek po refactorze</title>
+<style>
+  :root {
+    --bg: #edf1ef;
+    --surface: #ffffff;
+    --surface-2: #e2e8e5;
+    --ink: #1b2320;
+    --ink-2: #4c5a54;
+    --ink-3: #78877f;
+    --line: #d2dbd6;
+    --accent: #136069;
+    --accent-soft: #dbebed;
+    --good: #2f7d4f;
+    --good-soft: #dfeee5;
+    --bad: #a8433a;
+    --bad-soft: #f2e1de;
+    --warn: #8a651c;
+    --warn-soft: #f0e7d2;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131817;
+      --surface: #1a201f;
+      --surface-2: #232b29;
+      --ink: #e5eae8;
+      --ink-2: #a9b6b0;
+      --ink-3: #74837c;
+      --line: #2d3734;
+      --accent: #5db8c1;
+      --accent-soft: #173438;
+      --good: #74bd91;
+      --good-soft: #1d3327;
+      --bad: #dc8a7e;
+      --bad-soft: #392320;
+      --warn: #d2a75b;
+      --warn-soft: #362f1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131817;
+    --surface: #1a201f;
+    --surface-2: #232b29;
+    --ink: #e5eae8;
+    --ink-2: #a9b6b0;
+    --ink-3: #74837c;
+    --line: #2d3734;
+    --accent: #5db8c1;
+    --accent-soft: #173438;
+    --good: #74bd91;
+    --good-soft: #1d3327;
+    --bad: #dc8a7e;
+    --bad-soft: #392320;
+    --warn: #d2a75b;
+    --warn-soft: #362f1c;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.6; margin: 0; }
+  main, header.masthead { max-width: 1020px; margin: 0 auto; padding: 0 24px; }
+  header.masthead { padding-top: 56px; }
+  main { padding-bottom: 96px; }
+  a { color: var(--accent); }
+  a:focus-visible, :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.15em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin: 0 0 10px; }
+  h1 { font-size: clamp(34px, 5vw, 50px); line-height: 1.06; letter-spacing: -0.02em; margin: 0 0 14px; font-weight: 800; text-wrap: balance; }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 66ch; margin: 0 0 20px; }
+  .lede b { color: var(--ink); }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 8px 26px; font-size: 13px; color: var(--ink-3);
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0; }
+  .meta-row b { color: var(--ink-2); font-weight: 600; }
+  h2 { font-size: 28px; letter-spacing: -0.015em; line-height: 1.15; margin: 68px 0 8px; font-weight: 800; text-wrap: balance; }
+  h3 { font-size: 18px; margin: 34px 0 6px; letter-spacing: -0.01em; }
+  p { max-width: 74ch; }
+  .section-note { color: var(--ink-2); max-width: 74ch; margin-top: 0; }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--surface-2); border-radius: 4px; padding: 1px 5px; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 0.92em; white-space: nowrap; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin: 18px 0; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  tr:last-child td { border-bottom: none; }
+  td.r { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+  .chip { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+    padding: 2px 9px; border-radius: 999px; white-space: nowrap; }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad  { background: var(--bad-soft);  color: var(--bad); }
+  .chip.run  { background: var(--accent-soft); color: var(--accent); }
+  .chip.off  { background: var(--surface-2); color: var(--ink-3); }
+  .ledger { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 18px 0; }
+  @media (max-width: 760px) { .ledger { grid-template-columns: 1fr; } }
+  .ledger .side { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; }
+  .ledger h4 { margin: 0 0 4px; font-size: 13px; letter-spacing: 0.09em; text-transform: uppercase; }
+  .ledger .side.ma h4 { color: var(--good); }
+  .ledger .side.wn h4 { color: var(--bad); }
+  .ledger .sub { margin: 0 0 12px; font-size: 13px; color: var(--ink-3); }
+  .ledger ul { margin: 0; padding: 0; list-style: none; }
+  .ledger li { padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; color: var(--ink-2); }
+  .ledger li b { color: var(--ink); }
+  .callout { border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 22px 0; max-width: 78ch; }
+  .callout p { margin: 0; font-size: 14.5px; }
+  .callout p + p { margin-top: 8px; }
+  .callout.risk { border-left-color: var(--bad); }
+  .diag { counter-reset: none; }
+  .diag .item { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; margin: 14px 0; }
+  .diag .item h4 { margin: 0; font-size: 16.5px; display: flex; gap: 12px; align-items: baseline; }
+  .diag .rank { font-family: var(--mono); color: var(--accent); font-weight: 700; font-size: 15px; }
+  .diag .item p { margin: 8px 0 0; font-size: 14.5px; color: var(--ink-2); }
+  .diag .item p b { color: var(--ink); }
+  .dir { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 22px; margin: 16px 0; }
+  .dir-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .dir-letter { font-family: var(--mono); font-size: 24px; color: var(--accent); font-weight: 700; min-width: 30px; }
+  .dir h4 { margin: 0; font-size: 17.5px; }
+  .dir .horizon { margin-left: auto; font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+  .dir p, .dir ul { margin: 10px 0 0; font-size: 14.5px; color: var(--ink-2); }
+  .dir ul { padding-left: 20px; }
+  .dir li { margin: 4px 0; }
+  .dir li b, .dir p b { color: var(--ink); }
+  .gain { margin-top: 12px; font-size: 14px; color: var(--good); font-weight: 600; }
+  .gain::before { content: "Zysk — "; }
+  .cost { margin-top: 6px; font-size: 14px; color: var(--bad); font-weight: 600; }
+  .cost::before { content: "Cena — "; }
+  figure { margin: 28px 0; }
+  .diagram-frame { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; overflow-x: auto; }
+  .diagram-frame svg { min-width: 760px; max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  figcaption { font-size: 13.5px; color: var(--ink-3); margin-top: 10px; max-width: 80ch; }
+  .d-cont { fill: none; stroke: var(--line); stroke-width: 1.2; }
+  .d-node { fill: var(--bg); stroke: var(--ink-3); stroke-width: 1.2; }
+  .d-node-gone { fill: none; stroke: var(--bad); stroke-width: 1.2; stroke-dasharray: 4 3; }
+  .d-node-big { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.4; }
+  .d-name { fill: var(--ink); font: 600 12.5px var(--sans); text-anchor: middle; }
+  .d-name-gone { fill: var(--bad); font: 600 12.5px var(--sans); text-anchor: middle; }
+  .d-sub { fill: var(--ink-3); font: 10.5px var(--mono); text-anchor: middle; }
+  .d-cap { fill: var(--ink-3); font: 700 11px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; }
+  .d-lab { fill: var(--ink-3); font: 11px var(--sans); }
+  .d-lab-good { fill: var(--good); font: 600 11.5px var(--sans); }
+  .d-lab-bad { fill: var(--bad); font: 600 11px var(--sans); }
+  .d-edge { stroke: var(--ink-3); stroke-width: 1.2; fill: none; }
+  .d-edge-bad { stroke: var(--bad); stroke-width: 1.2; fill: none; stroke-dasharray: 4 3; }
+  .d-edge-good { stroke: var(--good); stroke-width: 1.6; fill: none; }
+  .d-arr { fill: var(--ink-3); }
+  .d-arr-bad { fill: var(--bad); }
+  .d-arr-good { fill: var(--good); }
+</style>
+
+<header class="masthead">
+  <p class="eyebrow">Ocena refactoru · pomiar z wieczora 18.08.2026</p>
+  <h1>Rachunek po refactorze</h1>
+  <p class="lede">Plan „Refactor bez świętości" rozliczony z własnych metryk i z celu, dla którego
+  powstał. Werdykt w jednym zdaniu: <b>kod stał się tańszy, czytanie nie</b> — refactor wygrał
+  wszystko, co mierzył w liniach kodu, a największy koszt pracy agenta, powierzchnię czytania
+  i liczbę ruchomych części, zostawił nietknięte, miejscami powiększone.</p>
+  <div class="meta-row">
+    <span><b>Pomiar:</b> 4 niezależne analizy kodu, gałąź <span class="num">change/python-monoliths-structure @ 3091003</span></span>
+    <span><b>Komentarze:</b> 0 wątków na artefaktach planu i audytu — za komentarze robią review.md i sekcje „Co wyszło inaczej"</span>
+    <span><b>Kontekst:</b> jeden operator, konto demo, kod pisany przez agentów</span>
+  </div>
+</header>
+
+<main>
+  <h2 id="werdykt">Iteracja po iteracji — co obiecano, co jest</h2>
+  <p class="section-note">Stan zmierzony dziś na kodzie, nie przepisany z planu. Trzy iteracje
+  dowiozły w całości, dwie w połowie, jedna trwa, jedna nie powinna już powstać w ogóle.</p>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Iteracja</th><th>Obietnica</th><th>Stan zmierzony</th><th>Ocena</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>0</b> · naprawy</td>
+        <td>osiem poprawek, każda z testem trybu awarii</td>
+        <td>dwa bugi na ścieżce pieniędzy zamknięte; zasada nr 5 złapała, że dwie poprawki
+        z audytu były opisane błędnie</td>
+        <td><span class="chip good">udana</span></td>
+      </tr>
+      <tr>
+        <td><b>1</b> · pakiety</td>
+        <td>koniec ręcznych kopii</td>
+        <td><span class="num">959 → 74</span> linii kopii ✓, CI odpala zależnych ✓ — ale
+        <b>żaden <code>deploy-*.yml</code> nie patrzy na <code>packages/**</code></b>: scalona
+        poprawka pakietu nie deployuje się nigdzie</td>
+        <td><span class="chip good">udana</span> <span class="chip bad">z dziurą</span></td>
+      </tr>
+      <tr>
+        <td><b>2</b> · jedna droga</td>
+        <td>jeden deploy, jeden runner dev</td>
+        <td>workflow <span class="num">458 → 256</span>, sonda jako moduł z testami,
+        <span class="num">155</span> testów dla <code>scripts/</code>; złapane dwa błędy, które
+        wywróciłyby produkcję przy pierwszym merge'u</td>
+        <td><span class="chip good">udana</span></td>
+      </tr>
+      <tr>
+        <td><b>3</b> · terminal</td>
+        <td>commodity kupione, moloch pocięty, −1 500 linii</td>
+        <td>TanStack ✓, Zustand słusznie odrzucony pomiarem, Chart.tsx
+        <span class="num">2 124 → 1 135</span> — ale linie płasko
+        (<span class="num">21 093 → 21 167</span>) i wszystkie ogony stoją:
+        <span class="num">709</span> dosłownych <code>className</code>,
+        <code>agentChatStore</code> 694 linie, brak tras w Teams</td>
+        <td><span class="chip warn">połowiczna</span></td>
+      </tr>
+      <tr>
+        <td><b>4</b> · gorące ścieżki</td>
+        <td>&lt; 10 tys. tokenów na turę</td>
+        <td><span class="num">15 134 → 11 704</span> (−22,7%); reszta to uczciwie zmierzony mur —
+        dalsze cięcie wymaga decyzji o <i>zakresie</i> zestawu narzędzi, czyli o architekturze</td>
+        <td><span class="chip warn">połowiczna</span></td>
+      </tr>
+      <tr>
+        <td><b>5</b> · monolity Pythona</td>
+        <td>~700 linii mniej, domknięcia → klasy</td>
+        <td>zrobione ~⅓: store agenta jako pakiet, czyszczenie drutu, <code>create_app()</code>
+        i podział 1 906-linijkowego testu; nietknięte: <code>teams/store.py</code>
+        (<span class="num">1 258</span>, największy ręczny plik repo), unia wskaźników, mappery
+        kontraktu, cztery konwersje domknięć</td>
+        <td><span class="chip run">w toku</span></td>
+      </tr>
+      <tr>
+        <td><b>6</b> · generator modułu</td>
+        <td>nowy moduł w pół dnia</td>
+        <td>niezaczęta — nowy moduł to nadal ~8–10 ręcznych punktów rejestracji; niżej wniosek,
+        że ta iteracja powinna umrzeć, nie powstać</td>
+        <td><span class="chip off">nie zaczęta</span></td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <h2 id="ledger">Rachunek: Ma i Winien</h2>
+  <p class="section-note">Po stronie „Ma" — to, co refactor realnie zapłacił. Po stronie
+  „Winien" — to, co wisi: rzeczy zadeklarowane jako zrobione, zdecydowane a niewykonane,
+  albo przeoczone przez sam plan.</p>
+
+  <div class="ledger">
+    <div class="side ma">
+      <h4>Ma — zapłacone</h4>
+      <p class="sub">potwierdzone dzisiejszym pomiarem, nie deklaracją planu</p>
+      <ul>
+        <li><b><span class="num">959 → 74</span> linii ręcznych kopii</b> — zostały trzy szwy
+        (provider, auth, routers/models), celowo</li>
+        <li><b>jedna implementacja dev</b> i workflow <span class="num">458 → 256</span>;
+        sonda deploy to moduł z 21 testami zamiast siedmiu wklejek bez żadnego</li>
+        <li><b>−22,7% tokenów</b> na każdą turę agenta, bez utraty jednego pola schematu</li>
+        <li><b>Chart.tsx −989 linii</b>; siatka wykresów przerysowuje slot, nie całość</li>
+        <li><b>zasada nr 5 działa</b> — na sztucznym diffie złapała <code>unbound variable</code>,
+        który wyłączyłby każde CI na każdym PR</li>
+        <li><b>review'y mówią prawdę</b> — każda iteracja ma spisane, co wyszło inaczej,
+        z liczbami, które plan miał błędnie</li>
+      </ul>
+    </div>
+    <div class="side wn">
+      <h4>Winien — wisi</h4>
+      <p class="sub">stan na dziś, wszystkie pozycje zweryfikowane w kodzie</p>
+      <ul>
+        <li><b>pakiety nie deployują się</b> — flagowa teza „klasa błędu «fix nie dotarł»
+        przestaje istnieć" jest prawdziwa w CI i fałszywa na produkcji</li>
+        <li><b>bliźniaki agent↔teams żyją</b> — <code>tools/client.py</code>
+        (<span class="num">508/488</span> linii) z adnotacją wprost: „a correction travels
+        by copying". Choroba, którą pakiety miały leczyć, trwa wewnątrz granicy modułów</li>
+        <li><b>zdecydowane ≠ wykonane</b>: 9 alertów stoi, gdzie kalibracja planu mówi 3;
+        transport stdio z testem parzystości stoi, choć jego usunięcie
+        zapisano; dwa martwe <code>.dockerignore</code> uczą fałszywego modelu</li>
+        <li><b>proza przerosła kod</b> — ~<span class="num">38,5 tys.</span> linii przewodników,
+        specek i archiwum wobec ~<span class="num">34 tys.</span> produkcyjnego Pythona;
+        w CLAUDE.md trzy nieaktualne twierdzenia znalezione dziś</li>
+        <li><b>split gubi powody</b> — podział store'a agenta uciął dwa komentarze niosące
+        uzasadnienia; złapał to ręczny diff, żaden test (<span class="num">3091003</span>)</li>
+        <li><b>ogony iteracji 3 i 5</b> — wszystkie pozycje „zostaje na później" stoją
+        nietknięte, w tym pułapka, którą linter aktywnie podpowiada</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2 id="diagnoza">Co poszło nie tak — trzy wzorce, nie lista wpadek</h2>
+  <div class="diag">
+    <div class="item">
+      <h4><span class="rank">1</span>Mierzono linie kodu, a wąskim gardłem jest powierzchnia czytania</h4>
+      <p>Repo jest pisane przez agentów, więc kosztem zmiany jest to, <b>ile agent musi
+      przeczytać i w ilu miejscach dotknąć</b>. Refactor ciął pisanie, nie czytanie: CLAUDE.md
+      ma 446 linii (~6,5 tys. tokenów płaconych w każdej sesji), specyfikacje
+      <span class="num">10,4 tys.</span> linii w 64 plikach, archiwum zmian
+      <span class="num">17,3 tys.</span>, dokumenty HTML <span class="num">10,1 tys.</span>
+      Ta proza nie ma testów i dryfuje — dzisiejszy pomiar znalazł w samym CLAUDE.md trzy
+      twierdzenia niezgodne z kodem. Przewodnik stał się drugim kodebase'em, tylko bez CI.</p>
+    </div>
+    <div class="item">
+      <h4><span class="rank">2</span>Refactor wewnątrz granic doszedł do ściany malejących zwrotów</h4>
+      <p>Duplikacja jest rozwiązana — 74 linie to szwy, nie kopie. To, co zostało drogie, to
+      <b>sama liczba ruchomych części</b>: 8 deployowalnych, 11 lockfile'ów, 13 jobów CI,
+      3 snapshoty kontraktów (<span class="num">7 561</span> linii JSON-a), 6 tripletów Entra,
+      87 zmiennych środowiskowych, topologia modułów utrzymywana ręcznie w 6+ miejscach
+      (port 8070 wpisany w ośmiu plikach). Iteracja 4 uderzyła w ten mur wprost: zejście
+      poniżej 10 tys. tokenów wymaga decyzji o zakresie zestawu — czyli o architekturze,
+      której plan świadomie nie dotykał. Trzy moduły MCP to
+      <span class="num">11,1 tys.</span> linii, z których ~<span class="num">2,6 tys.</span>
+      przetrwałoby każde scalenie; reszta to rusztowanie granic między procesami
+      jednego operatora.</p>
+    </div>
+    <div class="item">
+      <h4><span class="rank">3</span>Plan deklarował szybciej, niż wykonywał</h4>
+      <p>Trzy rozstrzygnięcia zapisane jako podjęte nie mają wykonania: cięcie alertów 9 → 3,
+      usunięcie transportu stdio, deploy pakietów. Ta ostatnia dziura jest najdroższa, bo
+      unieważnia flagową tezę iteracji 1 na jedynej warstwie, która się liczy. Do tego wzorzec
+      z <span class="num">3091003</span>: mechaniczny split przechodzi zielono
+      (<span class="num">354</span> testy przed i po), gubiąc przy tym zapisane <i>powody</i> —
+      zielona kompletność nie mierzy zachowanych uzasadnień.</p>
+    </div>
+  </div>
+
+  <h2 id="kierunki">Nowe kierunki — bez świętości naprawdę</h2>
+  <p class="section-note">Poprzedni plan zatrzymał się przed jedną granicą: „granice runtime
+  między modułami zostają nietknięte". Przy czterech kryteriach — prostota, wydajność pracy
+  agenta, objętość, architektura — następny duży zysk leży dokładnie za nią. Audyt granic
+  bronił argumentem „żadne znalezisko nie wymagało zmiany dwóch modułów naraz"; dzisiejszy
+  pomiar pokazuje odwrotność: przemianowanie pola w kontrakcie teams dotyka ~8–10 plików
+  w trzech modułach, a nowy moduł to ~8–10 ręcznych rejestracji.</p>
+
+  <figure>
+    <div class="diagram-frame">
+    <svg viewBox="0 0 940 400" role="img" aria-label="Porównanie: dziś wywołanie narzędzia idzie z agenta przez osobny proces proxy do właściciela danych, przez HTTP z Easy Auth i snapshotem kontraktu; po scaleniu MCP jest trasą w aplikacji właściciela, a narzędzia teams stają się wywołaniem funkcji wewnątrz jednego procesu workbench.">
+      <defs>
+        <marker id="ma" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr"/>
+        </marker>
+        <marker id="mb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr-bad"/>
+        </marker>
+        <marker id="mg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr-good"/>
+        </marker>
+      </defs>
+
+      <!-- DZIŚ -->
+      <rect class="d-cont" x="20" y="24" width="430" height="352" rx="10"/>
+      <text class="d-cap" x="36" y="50">Dziś — 7 procesów backendu, 3 z nich to proxy</text>
+
+      <rect class="d-node" x="50" y="72" width="100" height="44" rx="6"/>
+      <text class="d-name" x="100" y="98">agent</text>
+      <rect class="d-node" x="190" y="72" width="100" height="44" rx="6"/>
+      <text class="d-name" x="240" y="98">teams</text>
+
+      <rect class="d-node-gone" x="50" y="176" width="108" height="44" rx="6"/>
+      <text class="d-name-gone" x="104" y="196">market-mcp</text>
+      <text class="d-sub" x="104" y="211">proxy + snapshot</text>
+      <rect class="d-node-gone" x="178" y="176" width="108" height="44" rx="6"/>
+      <text class="d-name-gone" x="232" y="196">teams-mcp</text>
+      <text class="d-sub" x="232" y="211">proxy + snapshot</text>
+      <rect class="d-node-gone" x="306" y="176" width="112" height="44" rx="6"/>
+      <text class="d-name-gone" x="362" y="196">trading-mcp</text>
+      <text class="d-sub" x="362" y="211">proxy + snapshot</text>
+
+      <rect class="d-node" x="50" y="290" width="120" height="44" rx="6"/>
+      <text class="d-name" x="110" y="310">market-data</text>
+      <text class="d-sub" x="110" y="325">dane + wskaźniki</text>
+      <rect class="d-node" x="298" y="290" width="120" height="44" rx="6"/>
+      <text class="d-name" x="358" y="310">gateway</text>
+      <text class="d-sub" x="358" y="325">capital.com</text>
+
+      <line class="d-edge" x1="90" y1="116" x2="100" y2="176" marker-end="url(#ma)"/>
+      <line class="d-edge" x1="112" y1="116" x2="220" y2="176" marker-end="url(#ma)"/>
+      <line class="d-edge" x1="130" y1="116" x2="344" y2="176" marker-end="url(#ma)"/>
+      <line class="d-edge" x1="228" y1="116" x2="124" y2="176" marker-end="url(#ma)"/>
+      <line class="d-edge" x1="258" y1="116" x2="352" y2="176" marker-end="url(#ma)"/>
+      <line class="d-edge" x1="104" y1="220" x2="108" y2="290" marker-end="url(#ma)"/>
+      <line class="d-edge" x1="362" y1="220" x2="360" y2="290" marker-end="url(#ma)"/>
+      <path class="d-edge-bad" d="M 286 190 C 340 140, 300 122, 264 116" marker-end="url(#mb)"/>
+      <text class="d-lab-bad" x="316" y="148">z powrotem do teams</text>
+
+      <text class="d-lab" x="50" y="356">każda strzałka: HTTP + tożsamość Entra;</text>
+      <text class="d-lab" x="50" y="371">każde proxy: App Service, Dockerfile, lock, workflow, snapshot</text>
+
+      <!-- PO -->
+      <rect class="d-cont" x="490" y="24" width="430" height="352" rx="10"/>
+      <text class="d-cap" x="506" y="50">Po — 3 procesy backendu</text>
+
+      <rect class="d-node-big" x="560" y="76" width="290" height="96" rx="8"/>
+      <text class="d-name" x="705" y="100">workbench</text>
+      <text class="d-sub" x="705" y="117">agent + teams w jednym procesie</text>
+      <text class="d-lab-good" x="705" y="145" text-anchor="middle">narzędzia teams = wywołanie funkcji</text>
+      <text class="d-lab-good" x="705" y="160" text-anchor="middle">bliźniaki znikają konstrukcyjnie</text>
+
+      <rect class="d-node" x="520" y="272" width="150" height="56" rx="6"/>
+      <text class="d-name" x="595" y="294">market-data</text>
+      <text class="d-sub" x="595" y="311">+ /mcp w aplikacji</text>
+      <rect class="d-node" x="740" y="272" width="150" height="56" rx="6"/>
+      <text class="d-name" x="815" y="294">gateway</text>
+      <text class="d-sub" x="815" y="311">+ /mcp — do decyzji</text>
+
+      <line class="d-edge-good" x1="640" y1="172" x2="600" y2="272" marker-end="url(#mg)"/>
+      <text class="d-lab-good" x="540" y="222">1 hop zamiast 2</text>
+      <line class="d-edge" x1="770" y1="172" x2="810" y2="272" marker-end="url(#ma)"/>
+      <text class="d-lab" x="820" y="222">albo trading-mcp</text>
+      <text class="d-lab" x="820" y="237">zostaje osobno</text>
+
+      <text class="d-lab" x="506" y="356">znika: 3 App Services, 3 snapshoty (7 561 linii JSON),</text>
+      <text class="d-lab" x="506" y="371">3 workflowy, ~1 150 linii rusztowania, 4 triplety Entra</text>
+    </svg>
+    </div>
+    <figcaption>Różnica, o której się decyduje: trzy procesy-proxy stają się trasami w
+    aplikacjach właścicieli danych, a rozmowa agenta z teams przestaje przechodzić przez
+    trzeci proces i sieć. Terminal i granica do capital.com nie zmieniają się wcale.</figcaption>
+  </figure>
+
+  <div class="dir">
+    <div class="dir-head"><span class="dir-letter">A</span>
+    <h4>MCP wraca do właściciela danych</h4>
+    <span class="horizon">2× po 2–3 dni</span></div>
+    <p><code>market-mcp</code> montuje się jako <code>/mcp</code> w market-data,
+    <code>teams-mcp</code> — w teams. To, co w tych modułach jest wartością, przeżywa w całości
+    jako warstwa w aplikacji rodzica: redukcja świec i sufity (~1 650 linii), przekazywanie
+    tokenu operatora i patchowanie rewizji. Znika wyłącznie rusztowanie: klient HTTP do
+    rodzica, snapshot jego schematu i skrypt pilnujący snapshotu — schemat w tym samym
+    procesie nie może być nieświeży.</p>
+    <p class="gain">−2 App Services, −2 workflowy, −2 Dockerfile i locki, −2 snapshoty ze
+    skryptami, −2 triplety Entra; wywołanie narzędzia: 2 hopy → 1; joby CI 13 → 11.</p>
+    <p class="cost">Easy Auth autoryzuje per aplikacja, nie per trasa — wpuszczenie agenta
+    do market-data otwiera mu całe REST, więc autoryzacja per trasę musi wejść do aplikacji.
+    Mechanizm już istnieje: <code>RequireCallerIdentity</code> z tc-mcp-kit.</p>
+  </div>
+
+  <div class="dir">
+    <div class="dir-head"><span class="dir-letter">B</span>
+    <h4>agent + teams = workbench</h4>
+    <span class="horizon">1–2 tyg., fazowane</span></div>
+    <p>Największy pojedynczy zysk na stole. Pętla teams to strukturalnie tura agenta — mówią
+    to oba docstringi; agent jest zespołem-jedynką z SSE i wykresem. Deklarowane bliźniaki
+    (<code>tools/client.py</code>, rejestr, provider, config, env migracji — ~1 000 linii
+    „poprawka podróżuje kopiowaniem") znikają konstrukcyjnie, bo przestają mieć drugi
+    egzemplarz. <b>teams-mcp rozpuszcza się w wywołanie funkcji</b> — istnieje wyłącznie
+    dlatego, że agent buduje zespoły u sąsiada przez sieć.</p>
+    <ul>
+      <li>dwa klucze OpenAI <b>zostają</b> — rozdział kosztów to dwa klienty w jednym procesie,
+      nie granica modułu,</li>
+      <li>dwa schematy bazy <b>zostają</b> na start — scalanie danych to osobna, opcjonalna
+      decyzja,</li>
+      <li>API dla terminala bez zmian ścieżek — dwa bazowe URL-e stają się jednym,</li>
+      <li>uczciwie: <b>tokeny na turę nie spadają</b> — narzędzia teams nadal są prezentowane
+      modelowi; spada latencja, infrastruktura i liczba miejsc edycji.</li>
+    </ul>
+    <p class="gain">−1 moduł i −1 cały moduł proxy (teams-mcp), −~1 000 linii bliźniaków,
+    koniec klasy dryfu, której pakiety nie mogły objąć; 15 z 19 zmiennych env przestaje
+    istnieć podwójnie.</p>
+    <p class="cost">największa operacja planu — fazować: najpierw wspólny pakiet procesu
+    (dwa routery w jednej aplikacji, osobne schematy), scalanie pętli na końcu albo wcale.</p>
+  </div>
+
+  <div class="dir">
+    <div class="dir-head"><span class="dir-letter">C</span>
+    <h4>trading-mcp — decyzja pomiarem, nie z rozpędu</h4>
+    <span class="horizon">po A i B</span></div>
+    <p>Jedyny trudny przypadek: gateway jest celowo najbardziej zamkniętym modułem — bez
+    Easy Auth, za listą dwóch adresów IP, bez sondy. Wmontowanie <code>/mcp</code> znaczy
+    otwarcie go na tożsamości Entra. Zmierzyć, co kosztuje utrzymanie wyjątku
+    (~2,7 tys. linii z testami + App Service + snapshot), i wybrać świadomie —
+    zostawienie trading-mcp osobno jest legalnym wynikiem.</p>
+    <p class="gain">jeśli wejdzie: backend w trzech procesach; jeśli nie — decyzja z zapisanym
+    powodem zamiast reguły „proxy z zasady".</p>
+  </div>
+
+  <div class="dir">
+    <div class="dir-head"><span class="dir-letter">D</span>
+    <h4>Dieta prozy — sufit jak dla schematów narzędzi</h4>
+    <span class="horizon">~3 dni + rytm</span></div>
+    <p>Repo dało schematom narzędzi sufit znaków z testem, bo powierzchnia jest kosztem
+    płaconym w każdej turze. <b>CLAUDE.md jest dokładnie tym samym</b> — kosztem płaconym
+    w każdej sesji — a sufitu nie ma. Zejść do ~150 linii mapy i pułapek, które gryzą
+    naprawdę; szczegóły per moduł do README modułów, czytanych na żądanie. Naprawić trzy
+    nieaktualne twierdzenia (opis tc-mcp-kit bez <code>tool_schemas</code>, tc-openai poza
+    mapą, lokalizacja <code>MIGRATION_LOCK_KEY</code>). Skonsolidować 64 mikro-specki
+    w specyfikacje per moduł. Wykonać zdecydowane: alerty 9 → 3, stdio z testem parzystości
+    out, martwe <code>.dockerignore</code> out.</p>
+    <p class="gain">każda sesja agenta zaczyna się taniej; przewodnik przestaje dryfować
+    szybciej, niż jest czytany.</p>
+  </div>
+
+  <div class="dir">
+    <div class="dir-head"><span class="dir-letter">E</span>
+    <h4>Domknięcia natychmiastowe — zanim cokolwiek innego</h4>
+    <span class="horizon">1 dzień</span></div>
+    <ul>
+      <li><b><code>packages/**</code> w filtrach <code>deploy-*.yml</code></b> — dziura
+      unieważniająca flagową tezę iteracji 1; sześć jednolinijkowych edycji,</li>
+      <li>macierz pakietów w CI odpala tylko zmieniony pakiet, nie wszystkie trzy,</li>
+      <li><code>COPY packages/</code> per konsument albo zapisany powód, czemu całość —
+      dziś edycja tc-openai unieważnia warstwę zależności obrazu trading-mcp, który
+      tc-openai nie bierze.</li>
+    </ul>
+    <p class="gain">flagowa teza planu staje się prawdziwa na jedynej warstwie, która się
+    liczy.</p>
+  </div>
+
+  <h2 id="resztki">Co z iteracji 5 i 6</h2>
+  <p><b>Dokończyć z 5 tylko to, co przeżyje decyzję architektoniczną.</b> Parametryzacja
+  <code>teams/store.py</code> (1 258 linii, największy ręczny plik repo) i unia komputerów
+  wskaźników bronią się niezależnie od kierunków A–C. Przepisanie mapperów
+  <code>contract.py</code> — dopiero po decyzji o drucie, żeby nie polerować kodu, który
+  zmieni kształt. <b>Iterację 6 skasować, nie odkładać:</b> generator nowych modułów
+  w planie, którego celem jest <i>mniej</i> modułów, to inwestycja w odwrotny kierunek —
+  kryterium „tani nowy moduł" zamienia się na „moduły przestają przybywać".</p>
+
+  <div class="callout">
+    <p><b>Trzy zasady do dopisania, wszystkie z tego rozliczenia.</b>
+    <b>1.</b> Split mechaniczny kończy się diffem uzasadnień — zielone testy dowodzą
+    zachowania, nie zachowanych powodów (<span class="num">3091003</span>).
+    <b>2.</b> Proza ma sufit jak schematy narzędzi — CLAUDE.md z limitem linii
+    sprawdzanym w CI, symetrycznie do sufitów tokenów z iteracji 4.
+    <b>3.</b> „Zdecydowane" znaczy wykonane albo w planie z datą — alerty, stdio i deploy
+    pakietów wisiały jako rozstrzygnięte przez cały refactor i rozstrzygnięcie nic
+    nie zmieniło.</p>
+  </div>
+
+  <h2 id="stan">Stan docelowy w liczbach</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Miara</th><th>Dziś</th><th>Po A–C</th></tr></thead>
+    <tbody>
+      <tr><td>Deployowalne moduły</td><td class="r">8</td><td class="r">4–5</td></tr>
+      <tr><td>App Services (backend)</td><td class="r">7</td><td class="r">3–4</td></tr>
+      <tr><td>Workflowy deploy (callery)</td><td class="r">7</td><td class="r">3–4</td></tr>
+      <tr><td>Dockerfile / uv.lock</td><td class="r">7 / 11</td><td class="r">3–4 / 7–8</td></tr>
+      <tr><td>Joby w checks.yml</td><td class="r">13</td><td class="r">~9</td></tr>
+      <tr><td>Snapshoty kontraktów (linie JSON)</td><td class="r">3 (7 561)</td><td class="r">0–1</td></tr>
+      <tr><td>Instancje easy-auth-app</td><td class="r">6</td><td class="r">2</td></tr>
+      <tr><td>Porty do zapamiętania</td><td class="r">9</td><td class="r">5–6</td></tr>
+      <tr><td>Pliki .env.example / zmienne</td><td class="r">9 / 87</td><td class="r">5 / ~50</td></tr>
+      <tr><td>Hopy sieciowe na wywołanie narzędzia</td><td class="r">2</td><td class="r">0–1</td></tr>
+      <tr><td>Ręczne punkty rejestracji topologii</td><td class="r">6+ miejsc</td><td class="r">mniej miejsc, bo mniej bytów</td></tr>
+      <tr><td>Proza normatywna (linie)</td><td class="r">~38 500</td><td class="r">cel: &lt; 20 000 (kierunek D)</td></tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout risk">
+    <p><b>Co się oddaje — nazwane wprost.</b> Granulacja deployu spada z ośmiu niezależnych
+    jednostek do czterech–pięciu (nadal osobnych). Izolacja tożsamości per aplikacja staje
+    się autoryzacją per trasa wewnątrz aplikacji — to przeprowadzka mechanizmu, nie jego
+    utrata, ale przeprowadzka jest realną robotą. Reguła „no module imports another" traci
+    prostotę zero-jedynkową; w zamian musi stanąć równie mechaniczna reguła warstw wewnątrz
+    procesu. Przy jednym operatorze i koncie demo żadna z tych trzech cen nie kupuje dziś
+    niczego, czego nie kupi taniej — ale to zdanie warto będzie sfalsyfikować przy pierwszym
+    scaleniu, tak jak iteracja 1 sfalsyfikowała trzy liczby audytu.</p>
+  </div>
+
+  <p><b>Proponowana kolejność: E → A(market) → A(teams) → B → D → resztki 5 → C.</b>
+  E jest jednodniowe i zamyka dziurę unieważniającą już opłacony zysk. A na market-mcp jest
+  najtańszym dowodem wzorca — jeden konsument mniej, zero zmian w danych. B dopiero po dwóch
+  udanych A, fazowane. D może iść równolegle z każdym. Jak w poprzednim planie: każdy krok
+  zostawia system w całości działającym i można przerwać po dowolnym — z tą różnicą, że tym
+  razem „zdecydowane" ma stać się „wykonane", zanim dopisze się cokolwiek nowego.</p>
+</main>
