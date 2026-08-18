@@ -184,3 +184,18 @@ async def test_the_schema_still_says_what_a_reply_holds(server) -> None:
     assert output["required"]
     assert all("type" in p or "anyOf" in p or "$ref" in p for p in output["properties"].values())
     await upstream.aclose()
+
+
+async def test_the_catalogue_still_publishes_a_parameter_default(server) -> None:
+    """The catalogue is only "enough to build a request" if the defaults are in it
+    (specs/market-mcp-tools, "Katalog wystarcza do zbudowania żądania"). `default` is a
+    field name here and a JSON Schema keyword everywhere else, and the first version of
+    the schema slimmer could not tell the two apart — it took this one out."""
+    mcp, upstream = server
+    by_name = {t.name: t for t in await mcp.list_tools()}
+    for tool in ("list_indicators", "describe_indicator"):
+        schema = by_name[tool].outputSchema
+        assert schema is not None
+        parameter = schema["$defs"]["IndicatorParamOut"]["properties"]
+        assert set(parameter) == {"name", "type", "default", "min", "max"}, tool
+    await upstream.aclose()

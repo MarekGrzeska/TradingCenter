@@ -60,7 +60,14 @@ def slim_tool_schemas(mcp: FastMCP, *, keep_input_defaults: bool = True) -> None
         vars(tool).pop("output_schema", None)
 
 
-def _walk(node: Any, keep_defaults: bool) -> Any:
+# Keys whose *values* are maps of field name -> schema. Inside one of those, `title` and
+# `default` are names a model chose, not keywords pydantic emitted — market-data's
+# indicator catalogue publishes a parameter genuinely called `default`, and dropping it
+# took away exactly what `list_indicators` exists to hand over.
+_NAME_MAPS = frozenset({"properties", "$defs", "patternProperties", "definitions"})
+
+
+def _walk(node: Any, keep_defaults: bool, in_name_map: bool = False) -> Any:
     if isinstance(node, list):
         return [_walk(item, keep_defaults) for item in node]
     if not isinstance(node, dict):
@@ -68,12 +75,14 @@ def _walk(node: Any, keep_defaults: bool) -> Any:
 
     out: dict[str, Any] = {}
     for key, value in node.items():
-        if key == "title":
-            continue
-        if key == "default" and not keep_defaults:
-            continue
-        out[key] = _walk(value, keep_defaults)
-    return _collapse_nullable(out)
+        if not in_name_map:
+            if key == "title":
+                continue
+            if key == "default" and not keep_defaults:
+                continue
+        # A field genuinely named `properties` is a field name, not a nesting level.
+        out[key] = _walk(value, keep_defaults, key in _NAME_MAPS and not in_name_map)
+    return out if in_name_map else _collapse_nullable(out)
 
 
 def _collapse_nullable(node: dict[str, Any]) -> dict[str, Any]:

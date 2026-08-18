@@ -154,3 +154,58 @@ async def test_a_reply_invalid_before_is_still_invalid(server: FastMCP) -> None:
     assert after is not None
     with pytest.raises(jsonschema.ValidationError):
         jsonschema.validate(instance={"rows": []}, schema=after)
+
+
+class _Parameter(BaseModel):
+    """A model whose own field names collide with the keywords being stripped. Not
+    hypothetical: `market-data`'s indicator catalogue publishes exactly this shape, and
+    the first version of the slimmer deleted the `default` a model needs in order to
+    build a request at all."""
+
+    name: str
+    default: float
+    title: str
+
+
+def test_a_field_named_like_a_keyword_survives() -> None:
+    schema = {
+        "$defs": {
+            "Parameter": {
+                "title": "Parameter",
+                "properties": {
+                    "name": {"title": "Name", "type": "string"},
+                    "default": {"title": "Default", "type": "number"},
+                    "title": {"title": "Title", "type": "string"},
+                },
+                "required": ["name", "default", "title"],
+                "type": "object",
+            }
+        }
+    }
+    slimmed = slim_schema(schema, keep_defaults=False)
+
+    fields = slimmed["$defs"]["Parameter"]["properties"]
+    assert set(fields) == {"name", "default", "title"}
+    assert fields["default"] == {"type": "number"}
+    assert "title" not in slimmed["$defs"]["Parameter"]
+
+
+def test_a_field_named_properties_is_still_a_field() -> None:
+    schema = {"properties": {"properties": {"title": "Properties", "type": "object"}}}
+    assert slim_schema(schema) == {"properties": {"properties": {"type": "object"}}}
+
+
+async def test_a_registered_tool_keeps_a_field_named_default() -> None:
+    mcp = FastMCP("kit-test")
+
+    @mcp.tool()
+    async def catalogue() -> list[_Parameter]:
+        """Every published parameter, including the two named like keywords."""
+        return []
+
+    slim_tool_schemas(mcp)
+
+    schema = (await mcp.list_tools())[0].outputSchema
+    assert schema is not None
+    fields = schema["$defs"]["_Parameter"]["properties"]
+    assert set(fields) == {"name", "default", "title"}
