@@ -296,6 +296,45 @@ async def test_editing_a_trigger_changes_only_what_was_named(server) -> None:
 
 
 @respx.mock
+async def test_a_zero_cooldown_travels_instead_of_being_swallowed(server) -> None:
+    """`cooldown_seconds=0` is falsy, and `or` read that as "not given" — so the tool kept
+    the old value and answered with a success naming it. The operator asked for something
+    and was told it had been done.
+
+    Whether zero is *allowed* is teams' question, not this module's: it refuses a
+    non-positive cooldown with a sentence (`contract.py`, `_positive`). Forwarding the
+    value is what lets that refusal reach whoever asked, instead of a silent no-op.
+    """
+    mcp, teams = server
+    respx.get(f"{BASE}/triggers/21").mock(return_value=httpx.Response(200, json=_trigger()))
+    saved = respx.put(f"{BASE}/triggers/21").mock(
+        return_value=httpx.Response(200, json=_trigger())
+    )
+
+    await mcp.call_tool("edit_trigger", {"trigger_id": 21, "cooldown_seconds": 0})
+
+    body = json.loads(saved.calls.last.request.read())
+    assert body["cooldown_seconds"] == 0, "the old 900 would mean the request never left"
+    await teams.aclose()
+
+
+@respx.mock
+async def test_a_zero_poll_interval_travels_too(server) -> None:
+    """Same shape, same `or`, one field over."""
+    mcp, teams = server
+    respx.get(f"{BASE}/triggers/21").mock(return_value=httpx.Response(200, json=_trigger()))
+    saved = respx.put(f"{BASE}/triggers/21").mock(
+        return_value=httpx.Response(200, json=_trigger())
+    )
+
+    await mcp.call_tool("edit_trigger", {"trigger_id": 21, "poll_interval_seconds": 0})
+
+    body = json.loads(saved.calls.last.request.read())
+    assert body["poll_interval_seconds"] == 0
+    await teams.aclose()
+
+
+@respx.mock
 async def test_deleting_says_what_it_took_and_what_it_left(server) -> None:
     mcp, teams = server
     removed = respx.delete(f"{BASE}/schedules/11").mock(return_value=httpx.Response(204))
