@@ -10,6 +10,7 @@ import respx
 from capital_gateway.app import stream_tokens_for
 from capital_gateway.client import CapitalClient
 from capital_gateway.config import DEMO_BASE_URL, Settings
+from capital_gateway.errors import GatewayError
 from capital_gateway.rategate import RateGate
 
 SESSION = f"{DEMO_BASE_URL}/api/v1/session"
@@ -185,6 +186,47 @@ async def test_a_session_invalidated_elsewhere_is_replaced_before_the_stream_use
 
     assert (cst, token) == ("cst-2", "tok-2"), "the stream must not carry the dead pair"
     assert login.call_count == 2
+    await client.aclose()
+
+
+@respx.mock
+async def test_a_session_the_provider_will_not_confirm_stops_the_subscription(
+    client: CapitalClient,
+) -> None:
+    """The failure mode this defence exists for, and the one it did not cover until
+    18 August 2026: the check was made and its answer dropped on the floor.
+
+    A login that fails for good — a rotated key, a locked account, a provider outage —
+    leaves `request()` out of retries and the old tokens still sitting in the client.
+    Answering with them let `Upstream` subscribe with a dead pair and reconnect into
+    nothing every three seconds, which is exactly the loop this function was written to
+    break, one level down. Raising is what makes the caller back off.
+    """
+    respx.post(SESSION).mock(return_value=login_response())
+    check = respx.get(SESSION).mock(return_value=httpx.Response(403, json={}))
+
+    with pytest.raises(GatewayError) as raised:
+        await stream_tokens_for(client)
+
+    assert "403" in str(raised.value)
+    # Twice: `request()` does not retry a 403, so this is the check plus nothing.
+    assert check.call_count == 1
+    await client.aclose()
+
+
+@respx.mock
+async def test_a_session_that_cannot_be_renewed_stops_the_subscription(
+    client: CapitalClient,
+) -> None:
+    """The same thing by the route that actually happens: 401, one more login, 401 again.
+    `request()` has spent its retry, and the tokens it holds are the dead ones."""
+    respx.post(SESSION).mock(return_value=login_response())
+    check = respx.get(SESSION).mock(return_value=httpx.Response(401, json={}))
+
+    with pytest.raises(GatewayError):
+        await stream_tokens_for(client)
+
+    assert check.call_count == 2
     await client.aclose()
 
 

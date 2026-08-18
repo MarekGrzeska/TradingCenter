@@ -451,3 +451,73 @@ async def test_the_keepalive_stops_with_the_session(monkeypatch: pytest.MonkeyPa
     # A ping task outliving its session pings a socket nobody reads, forever, once per
     # reconnect — the kind of leak that only shows up after hours of uptime.
     assert len(socket.sent) == after_stop
+
+
+# --- backing off a run of failures ---------------------------------------------------
+#
+# The loop's other job, and the one it did not do until 18 August 2026. A drop over hours
+# is what `RECONNECT_DELAY_SECONDS` was chosen for; a session the provider will not renew
+# at all is the other case, and there three seconds flat means asking a settled question
+# 20 times a minute for as long as the room exists — through an allowance of 10
+# requests/second that the whole account shares.
+
+
+def test_a_run_of_failures_backs_off_towards_the_ceiling() -> None:
+    delays = [upstream_module.RECONNECT_DELAY_SECONDS]
+    for _ in range(8):
+        delays.append(upstream_module.next_reconnect_delay(delays[-1], session_lasted=0.2))
+
+    assert delays == [3.0, 6.0, 12.0, 24.0, 48.0, 60.0, 60.0, 60.0, 60.0]
+
+
+def test_a_session_that_stood_up_starts_the_next_drop_from_the_short_delay() -> None:
+    """Otherwise a feed that reconnects once an hour ends the day waiting a minute for
+    every gap — the backoff would be measuring the room's age, not its trouble."""
+    settled = upstream_module.next_reconnect_delay(
+        upstream_module.MAX_RECONNECT_DELAY_SECONDS,
+        session_lasted=upstream_module.HEALTHY_SESSION_SECONDS,
+    )
+
+    assert settled == upstream_module.RECONNECT_DELAY_SECONDS
+
+
+def test_a_session_that_died_on_arrival_is_not_read_as_healthy() -> None:
+    """Dead tokens are answered with an error frame and a close, which reaches `_run` as
+    a session that *ended cleanly* — the reason the reset is decided on how long the
+    session lasted rather than on whether it raised."""
+    grown = upstream_module.next_reconnect_delay(
+        upstream_module.RECONNECT_DELAY_SECONDS, session_lasted=0.05
+    )
+
+    assert grown > upstream_module.RECONNECT_DELAY_SECONDS
+
+
+async def test_the_loop_grows_its_wait_between_consecutive_failures(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The policy is wired in, not merely written: three sockets that die immediately,
+    and the delay handed to each successive wait is the previous one grown."""
+    asked: list[tuple[float, float]] = []
+    policy = upstream_module.next_reconnect_delay
+
+    def recording(delay: float, session_lasted: float) -> float:
+        asked.append((delay, session_lasted))
+        return policy(delay, session_lasted)
+
+    up, _emitted, provider = run_upstream(
+        monkeypatch,
+        [ScriptedSocket(ending="drop"), ScriptedSocket(ending="drop"), ScriptedSocket()],
+    )
+    # Scaled down rather than mocked away: the loop really sleeps what it computes, and
+    # what is asserted is the shape of the sequence, not the seconds.
+    monkeypatch.setattr(upstream_module, "RECONNECT_DELAY_SECONDS", 0.001)
+    monkeypatch.setattr(upstream_module, "next_reconnect_delay", recording)
+
+    up.start()
+    try:
+        await until(lambda: len(provider.opened) == 3)
+    finally:
+        await up.stop()
+
+    assert [delay for delay, _lasted in asked[:2]] == [0.001, 0.002]
+    assert all(lasted < upstream_module.HEALTHY_SESSION_SECONDS for _delay, lasted in asked)
