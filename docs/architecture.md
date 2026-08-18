@@ -182,6 +182,15 @@ Three conditions, and a candidate that fails any of them stays copied:
 1. **Measured, not assumed.** The code is already a hand-maintained copy — at least 70%
    identical line for line between two modules. `scripts/measure-duplication.py` is what
    answers this, and a proposal to share something says what it printed.
+
+   Code that does not exist yet cannot be measured, and the condition read literally said
+   a new shared thing must first be written out three times and wait for someone to notice.
+   So there is a second route to the same condition: the code is **new**, and it has more
+   than one consumer and is identical for every one of them from the first day. A proposal
+   taking that route names the consumers, and conditions 2 and 3 carry the whole weight —
+   which is where they were carrying it anyway. `tc_mcp_kit.tool_schemas` (18 August 2026)
+   is the first thing to arrive this way: one rule for slimming a published tool schema,
+   for the three modules that publish one.
 2. **Every difference is an argument.** What differs between the copies has to become a
    parameter, not a branch on which module is calling. A shared file with a switch per
    consumer is the base class this rule used to forbid, wearing a different hat.

@@ -14,8 +14,9 @@ at runtime a module reaches another only through a published contract, never thr
 package, its database or its identity.
 
 **Source may be shared at build time, through `packages/`, under three conditions** —
-measured as a copy (≥70% identical), every difference expressible as an argument, and
-every consumer's tests running on every change to the package. `docs/architecture.md`,
+measured as a copy (≥70% identical) *or* new and identical for every consumer from the
+first day, every difference expressible as an argument, and every consumer's tests running
+on every change to the package. `docs/architecture.md`,
 "What may be shared, and what may not", carries the rule and the measurement that changed
 it on 18 August 2026. A package is resolved into each module's own lock and baked into
 each module's own image; nothing is published or versioned. If a change seems to need

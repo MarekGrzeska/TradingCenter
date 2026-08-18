@@ -20,6 +20,7 @@ from market_data.gateway import (
     stream_url,
     subscribe,
 )
+from market_data.gateway.stream import _read_quote
 from market_data.models import CandleSource, PriceSide, Resolution
 
 MOMENT = datetime(2026, 8, 7, 12, 0, tzinfo=UTC)
@@ -92,8 +93,17 @@ def test_a_streamed_candle_has_no_volume() -> None:
     assert message.candle.volume is None
 
 
-def test_a_quote_frame_becomes_a_quote_in_milliseconds() -> None:
-    message = read_message(json.dumps(QUOTE_FRAME))
+def test_a_quote_frame_is_not_read_at_all() -> None:
+    """The busiest kind on the feed — about five a second per pair — and nothing here
+    consumes one. Reading it built an object a listener with no branch for it dropped
+    on the spot."""
+    assert read_message(json.dumps(QUOTE_FRAME)) is None
+
+
+def test_the_quote_reader_still_reads_a_quote() -> None:
+    """Kept because the gateway still sends the frame: what changed is that this module
+    stops paying for one, not that it forgot the shape."""
+    message = _read_quote(QUOTE_FRAME)
 
     assert isinstance(message, Quote)
     assert message.at == MOMENT.replace(microsecond=234_000)
@@ -177,10 +187,11 @@ async def test_a_subscription_reads_the_feed_in_order(gateway_feed: str) -> None
     async with subscribe(gateway_feed, "US100", Resolution.MINUTE_5, "test-key") as messages:
         received = [message async for message in messages]
 
-    # Five frames were sent; the orderbook is a kind this module does not consume.
-    assert [type(m) for m in received] == [FeedStatus, CandleUpdate, Quote, CandleUpdate]
+    # Five frames were sent; the orderbook and the quote are kinds this module does not
+    # consume, so three arrive.
+    assert [type(m) for m in received] == [FeedStatus, CandleUpdate, CandleUpdate]
     assert received[1].candle.forming is True
-    assert received[3].candle.forming is False
+    assert received[2].candle.forming is False
 
 
 @pytest.fixture

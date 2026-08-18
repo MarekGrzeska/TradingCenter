@@ -40,6 +40,12 @@ class CapitalClient:
     def authenticated(self) -> bool:
         return bool(self._cst and self._security_token)
 
+    @property
+    def base_url(self) -> str:
+        """The host this client is actually bound to — what `capabilities()` names the
+        environment from, rather than a constant that cannot come out any other way."""
+        return self._s.capital_base_url
+
     def stream_tokens(self) -> tuple[str, str]:
         """The pair the streaming protocol needs *inside* each message.
 

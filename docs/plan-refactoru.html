@@ -131,7 +131,7 @@
     <span><b>Kryteria:</b> wydajność · złożoność · koszt nowego modułu · reuse</span>
     <span><b>Kontekst:</b> projekt osobisty, edukacyjno-eksperymentalny, konto demo</span>
     <span><b>Horyzont:</b> 6 iteracji, każda domknięta i wartościowa osobno</span>
-    <span><b>Stan:</b> iteracje 0 i 1 zamknięte · następna: 2</span>
+    <span><b>Stan:</b> iteracje 0, 1 i 4 zamknięte · następna: 2</span>
   </div>
 </header>
 
@@ -491,29 +491,67 @@
     przestaje być największym ryzykiem każdego merge'a.</p>
   </div>
 
-  <div class="iter">
+  <div class="iter done">
     <div class="iter-head"><span class="iter-num">4</span>
     <h4>Wydajność gorących ścieżek</h4>
-    <span class="horizon">~1 tydz.</span></div>
-    <ul>
-      <li><b>Powierzchnia narzędzi MCP: 17,6 tys. tokenów na każdą turę agenta.</b> Rozbicie
-      <code>compute_indicators</code> (6,9 tys. znaków — sześć wzajemnie wykluczających się grup
-      pól w schemacie), wyrównanie długości docstringów, test sufitu serializowanego
-      <code>list_tools()</code> w każdym module. Cel: &lt; 10 tys. tokenów/turę — to bezpośrednio
-      koszt i latencja każdej rozmowy.</li>
-      <li><b>Setki walidacji/s za darmo</b>: ramki <code>quote</code> odrzucane przed parsowaniem
-      pydantic (jedna linia w <code>_READERS</code>).</li>
-      <li><b>Budżet 10 req/s</b>: memo per-request dla <code>/pairs</code> (dziś 2–3 pobrania w
-      jednym wywołaniu narzędzia), TTL-memo dla <code>_market_open</code> (dziś drugi pełny
-      request na jeden odczyt świec DAY/WEEK).</li>
-      <li><b>Demo-guard trading-mcp</b>: zostaje check startowy + uczciwie wyliczane
-      <code>environment</code> w bramie; znika re-check per zapis (dziś po każdym błędzie każdy
-      zapis kosztuje dwie rundy).</li>
-      <li><b>Zapisy bramy</b> przez <code>_write_json</code> — nie-JSON-owe 502/504 przestają
-      być nieobsłużonym 500.</li>
+    <span class="status-pill">Zrobione · 18.08 · gałąź perf/hot-paths</span>
+    <span class="horizon">6 commitów · 5 modułów + pakiet</span></div>
+    <p>Powierzchnia narzędzi <b>15 134 → 11 704 tokenów</b> na turę (−22,7%), zmierzone
+    tokenizerem <code>cl100k_base</code> na zserializowanym <code>list_tools()</code> trzech
+    serwerów. <b>Cel &lt; 10 tys. nie został osiągnięty</b> — i niżej jest, dlaczego nie da
+    się go kupić za mniej, niż kosztuje.</p>
+    <ul class="shipped">
+      <li><b><code>tc_mcp_kit.tool_schemas</code></b> zdejmuje z publikowanego schematu to,
+      co pydantic pisze dla siebie: <code>title</code> powtarzający nazwę pola,
+      <code>anyOf</code> z samych typów zamiast listy typów, <code>default</code> w schemacie
+      odpowiedzi. Ani jednego pola, typu ani wpisu <code>required</code> mniej,</li>
+      <li><b>sufit powierzchni jako test</b> w każdym z trzech modułów (19 700 / 21 100 /
+      11 600 znaków), obok testu, że schemat nadal mówi, co niesie odpowiedź,</li>
+      <li>ramki <code>quote</code> nie są już parsowane — <code>read_message</code> zwraca dla
+      nich <code>None</code>, jak dla każdego rodzaju bez konsumenta,</li>
+      <li><code>/pairs</code> raz na wywołanie narzędzia (memo 2 s) zamiast dwóch–trzech razy;
+      <code>GET /markets/{epic}</code> raz na odczyt DAY/WEEK (memo 5 s, per instrument),</li>
+      <li>brama wylicza <code>environment</code> z <code>capital_base_url</code>;
+      <code>trading-mcp</code> traci <code>_demo_verified</code>, inwalidację i re-check per
+      zapis — zostaje sprawdzenie przed otwarciem portu,</li>
+      <li><code>_write_json()</code> w pięciu miejscach: nie-JSON-owe 502/504 to
+      <code>GatewayError</code>, nie nieobsłużony 500 ze stack trace.</li>
     </ul>
-    <p class="gain-line">−40% tokenów na turę agenta; −1–2 requesty upstream na wywołanie
-    narzędzia; CPU market-data wolne od pracy wyrzucanej do kosza.</p>
+
+    <div class="aside">
+      <h5>Co wyszło inaczej, niż zakładał plan</h5>
+      <p><b>Rozbicie <code>compute_indicators</code> nie oszczędza — dokłada.</b> Policzone na
+      schemacie po odchudzeniu: dziś 4 465 znaków, po wydzieleniu trybu <code>series</code>
+      ~3 700 + ~1 850 = <b>~5 550</b>. Każde narzędzie niesie własną kopię wspólnej części
+      schematu, a <code>markers</code>/<code>zones</code>/<code>levels</code> muszą zostać w
+      obu, bo wskaźnik o takim wyjściu odpowiada tak samo w obu trybach. Sześć grup pól
+      kosztuje raz; dwa narzędzia kosztują dwa razy.</p>
+      <p><b>Powierzchnia to 15 134 tokeny, nie 17 600.</b> Audyt liczył kopertę wywołania,
+      której ten pomiar nie liczy — kierunek był dobry, liczba o 14% za wysoka.</p>
+      <p><b>Opisy nie były rozdęte, poza pięcioma.</b> Plan zakładał, że ich długość koreluje z
+      datą napisania narzędzia. Zmierzone tool po toolu: w market-mcp pięć powtarzało zdanie
+      wyżej (13 265 → 12 967 znaków w sumie), a w teams-mcp <i>żadne</i> — te długie są długie,
+      bo niosą granice odmowy, których żąda od nich ich własna specyfikacja. W trading-mcp
+      opisy <b>urosły</b> celowo: żadne narzędzie zapisujące nie mówiło, w czym wyrażony jest
+      <code>size</code>, a to jednostka, której pomyłka jest zleceniem innej wielkości
+      złożonym bez błędu.</p>
+      <p><b>Czego nie da się kupić.</b> Zejście poniżej 10 tys. wymaga usunięcia
+      <code>outputSchema</code> (zmierzone: 6 512 tokenów, −57%) — a to jedyny mechanizm, który
+      w tym repo wykrył realną awarię odpowiedzi narzędzia, bo serwer lowlevel waliduje nim
+      każdą odpowiedź, a <code>FastMCP.call_tool</code> (ścieżka wszystkich testów) nie. Albo
+      zmniejszenia zestawu — a to decyzja o zakresie, nie o formacie.</p>
+      <h5>Błąd złapany przez przegląd własnego diffu</h5>
+      <p>Odchudzacz kasował <b>każdy</b> klucz <code>title</code>/<code>default</code>, także
+      tam, gdzie to jest nazwa pola. <code>IndicatorParamOut</code> publikuje parametr o nazwie
+      <code>default</code>, więc <code>list_indicators</code> zaczął ogłaszać cztery pola przy
+      pięciu w odpowiedzi — i brakowało dokładnie tego, dla którego katalog istnieje. Nic nie
+      padało: <code>required</code> nadal nazywał pole, a JSON Schema nie protestuje przeciw
+      właściwości, o której nie wie.</p>
+    </div>
+
+    <p class="gain-line">−22,7% tokenów na turę agenta (−3 430 na każdą wymianę zdań);
+    <code>/pairs</code> 3–4 → 1 request na wywołanie narzędzia; setki walidacji pydantic na
+    sekundę mniej; zapis po błędzie bramy kosztuje jedną rundę, nie dwie.</p>
   </div>
 
   <div class="iter">
@@ -554,40 +592,47 @@
 
   <h2 id="metryki">Jak poznamy, że się udało</h2>
   <div class="table-wrap"><table>
-    <thead><tr><th>Metryka</th><th>Audyt 18.08</th><th>Po iter. 0</th><th>Po iter. 1</th><th>Cel</th></tr></thead>
+    <thead><tr><th>Metryka</th><th>Audyt 18.08</th><th>Po iter. 0</th><th>Po iter. 1</th><th>Po iter. 4</th><th>Cel</th></tr></thead>
     <tbody>
       <tr><td>Miejsca do edycji przy poprawce wspólnej logiki Pythona</td>
         <td class="num">2–7 kopii</td><td class="num">2–7 kopii</td>
-        <td class="num hit">1 pakiet ✓</td><td class="num">1 pakiet</td></tr>
+        <td class="num hit">1 pakiet ✓</td><td class="num hit">1 pakiet ✓</td><td class="num">1 pakiet</td></tr>
       <tr><td>Ręcznie kopiowane linie Pythona ponad pierwszy egzemplarz (pary ≥70%)</td>
         <td class="num">959</td><td class="num miss">+80</td>
-        <td class="num hit">74 ✓</td><td class="num">&lt; 200</td></tr>
+        <td class="num hit">74 ✓</td><td class="num hit">74 ✓</td><td class="num">&lt; 200</td></tr>
       <tr><td>Tokeny powierzchni narzędzi na turę agenta</td>
-        <td class="num">~17 600</td><td class="num">~17 600</td>
-        <td class="num">~17 600</td><td class="num">&lt; 10 000</td></tr>
+        <td class="num">15 134</td><td class="num">15 134</td>
+        <td class="num">15 134</td><td class="num miss">11 704</td><td class="num">&lt; 10 000</td></tr>
       <tr><td>Requesty upstream na wywołanie narzędzia z /pairs</td>
         <td class="num">3–4</td><td class="num">3–4</td>
-        <td class="num">3–4</td><td class="num">1–2</td></tr>
+        <td class="num">3–4</td><td class="num hit">1 ✓</td><td class="num">1–2</td></tr>
       <tr><td>Czas dodania nowego modułu (kod → produkcja)</td>
         <td class="num">~2 dni</td><td class="num">~2 dni</td>
-        <td class="num">niezmierzone</td><td class="num">&lt; 0,5 dnia</td></tr>
+        <td class="num">niezmierzone</td><td class="num">niezmierzone</td><td class="num">&lt; 0,5 dnia</td></tr>
       <tr><td>Linie workflow deploy</td>
         <td class="num">436</td><td class="num miss">452</td>
-        <td class="num miss">458</td><td class="num">~175</td></tr>
+        <td class="num miss">458</td><td class="num miss">458</td><td class="num">~175</td></tr>
       <tr><td>Największy plik w repo</td>
         <td class="num">3 302 (test) / 2 124 (prod)</td><td class="num">bez zmian</td>
-        <td class="num">bez zmian</td><td class="num">&lt; 1 000</td></tr>
+        <td class="num">bez zmian</td><td class="num">bez zmian</td><td class="num">&lt; 1 000</td></tr>
       <tr><td>Sondy mogące przejść na starym kontenerze</td>
         <td class="num">4 z 7</td><td class="num hit">0 ✓</td>
-        <td class="num hit">0 ✓</td><td class="num">0</td></tr>
+        <td class="num hit">0 ✓</td><td class="num hit">0 ✓</td><td class="num">0</td></tr>
     </tbody>
   </table></div>
 
-  <p><b>Po dwóch iteracjach trzy metryki są na celu, trzy stoją, jedna rośnie.</b>
-  Iteracja 0 była naprawcza i dwie liczby poszły w niej w górę — to normalny jej kształt.
-  Iteracja 1 spłaciła jedną z nich z nawiązką: ~80 linii świadomie zrównanych kopii
-  <code>_detail</code> zamieniło się w jeden egzemplarz, a razem z nimi zeszła cała reszta,
-  959 → 74.</p>
+  <p><b>Po trzech iteracjach cztery metryki są na celu, dwie stoją, jedna rośnie, jedna
+  ruszyła i nie doszła.</b> Iteracja 0 była naprawcza i dwie liczby poszły w niej w górę — to
+  normalny jej kształt. Iteracja 1 spłaciła jedną z nich z nawiązką: ~80 linii świadomie
+  zrównanych kopii <code>_detail</code> zamieniło się w jeden egzemplarz, a razem z nimi
+  zeszła cała reszta, 959 → 74.</p>
+  <p><b>Wiersz tokenów zmienił się dwa razy: raz przez pomiar, raz przez pracę.</b> 17 600
+  było o 14% za wysokie — audyt liczył kopertę wywołania, której pomiar przez zbudowanie
+  serwerów nie liczy; punkt wyjścia to 15 134. Iteracja 4 zdjęła z tego 22,7% i zatrzymała
+  się na <b>11 704</b>, bo dalej zaczyna się oddawanie rzeczy, które działają:
+  <code>outputSchema</code> to kolejne 5,2 tys. tokenów i jednocześnie jedyna obrona, która
+  w tym repo wykryła realną awarię odpowiedzi narzędzia. Ten wiersz zostaje otwarty
+  świadomie — zamknie go decyzja o <i>zakresie</i> zestawu, nie kolejna o jego formacie.</p>
   <p>Rosną wciąż <b>wiersze workflow deploy</b>: 436 → 452 → 458, bo najpierw doszła asercja
   tagu obrazu, a potem <code>file:</code> obok nowego kontekstu w sześciu plikach. To jest
   dokładnie ten dług, który iteracja 2 spłaca reusable workflow — a przy okazji rachunek

@@ -83,15 +83,13 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
     async def list_tracked_symbols() -> list[TrackedSymbolOut]:
         """Which symbols this archive follows at all — one row each, no resolutions.
 
-        The cheap answer to "what do we trade": the same `/pairs` reading as
-        `list_tracked_pairs`, folded to one row per symbol. Reach for that one instead
-        when the resolution is the point — how many candles are held, how old the newest
-        one is, or which timeframe in particular has stalled.
-
-        `collection` here is the least healthy state among that symbol's resolutions, so
-        a symbol shown as collecting is collecting everywhere.
+        The cheap answer to "what do we trade". Reach for `list_tracked_pairs` when the
+        resolution is the point: how many candles are held, how old the newest one is, or
+        which timeframe in particular has stalled. `collection` here is the least healthy
+        state among that symbol's resolutions, so a symbol shown as collecting is
+        collecting everywhere.
         """
-        response = await upstream.get("/pairs")
+        response = await upstream.pairs()
         await raise_for_status(response)
         by_symbol: dict[str, list[str]] = {}
         for row in response.json():
@@ -108,10 +106,9 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         of the newest one. A price or an indicator for a pair nobody tracks is not "the
         market is quiet", it is a question this archive was never asked to answer.
 
-        Use `list_tracked_symbols` when the question is only which symbols exist; this
-        one answers at seven rows per symbol and is worth that when the resolution, the
-        counts or the age of the data are part of what is being asked.
+        Seven rows per symbol; `list_tracked_symbols` is the one-row-per-symbol answer
+        when only the list of symbols is the point.
         """
-        response = await upstream.get("/pairs")
+        response = await upstream.pairs()
         await raise_for_status(response)
         return [_pair_out(row) for row in response.json()]

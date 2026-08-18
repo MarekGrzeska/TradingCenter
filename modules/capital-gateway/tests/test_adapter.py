@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime
 
 import httpx
 import pytest
 import respx
 
+from capital_gateway import adapter as adapter_module
 from capital_gateway.adapter import CapitalAdapter
 from capital_gateway.client import CapitalClient
 from capital_gateway.config import DEMO_BASE_URL, Settings
@@ -488,4 +490,163 @@ async def test_closing_a_position_settles_as_closed(adapter: CapitalAdapter) -> 
     order = await adapter.close_position("deal-1")
 
     assert order.status is OrderStatus.CLOSED
+    await adapter.aclose()
+
+
+# --- the account's request budget: one question, one request -------------------------
+
+
+@respx.mock
+async def test_two_daily_reads_ask_the_venue_once(adapter: CapitalAdapter) -> None:
+    """`GET /markets/{epic}` is what decides whether today's DAY candle is still forming,
+    and one operator question reaches it more than once — a chart read and the period
+    boundary behind it. capital.com counts its 10 requests/second against the account, so
+    the second one is taken from the archive's own collection."""
+    today = datetime.now(UTC).strftime("%Y-%m-%dT00:00:00")
+    respx.post(f"{API}/session").mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
+    )
+    respx.get(f"{API}/prices/GOLD").mock(
+        return_value=httpx.Response(200, json={"prices": [{"snapshotTimeUTC": today}]})
+    )
+    market = respx.get(f"{API}/markets/GOLD").mock(
+        return_value=httpx.Response(200, json={"snapshot": {"marketStatus": "TRADEABLE"}})
+    )
+
+    first = await adapter.get_candles("GOLD", Resolution.DAY, 1)
+    second = await adapter.get_candles("GOLD", Resolution.DAY, 1)
+
+    assert market.call_count == 1
+    assert first[-1].forming is True
+    assert second[-1].forming is True
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_the_memo_is_per_instrument(adapter: CapitalAdapter) -> None:
+    today = datetime.now(UTC).strftime("%Y-%m-%dT00:00:00")
+    respx.post(f"{API}/session").mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
+    )
+    respx.get(f"{API}/prices/GOLD").mock(
+        return_value=httpx.Response(200, json={"prices": [{"snapshotTimeUTC": today}]})
+    )
+    respx.get(f"{API}/prices/US100").mock(
+        return_value=httpx.Response(200, json={"prices": [{"snapshotTimeUTC": today}]})
+    )
+    gold = respx.get(f"{API}/markets/GOLD").mock(
+        return_value=httpx.Response(200, json={"snapshot": {"marketStatus": "TRADEABLE"}})
+    )
+    index = respx.get(f"{API}/markets/US100").mock(
+        return_value=httpx.Response(200, json={"snapshot": {"marketStatus": "CLOSED"}})
+    )
+
+    gold_candles = await adapter.get_candles("GOLD", Resolution.DAY, 1)
+    index_candles = await adapter.get_candles("US100", Resolution.DAY, 1)
+
+    assert (gold.call_count, index.call_count) == (1, 1)
+    assert gold_candles[-1].forming is True
+    assert index_candles[-1].forming is False
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_past_the_window_the_venue_is_asked_again(
+    adapter: CapitalAdapter, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    today = datetime.now(UTC).strftime("%Y-%m-%dT00:00:00")
+    monkeypatch.setattr(adapter_module, "_MARKET_STATUS_MEMO_SECONDS", 0)
+    respx.post(f"{API}/session").mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
+    )
+    respx.get(f"{API}/prices/GOLD").mock(
+        return_value=httpx.Response(200, json={"prices": [{"snapshotTimeUTC": today}]})
+    )
+    market = respx.get(f"{API}/markets/GOLD").mock(
+        side_effect=[
+            httpx.Response(200, json={"snapshot": {"marketStatus": "TRADEABLE"}}),
+            httpx.Response(200, json={"snapshot": {"marketStatus": "CLOSED"}}),
+        ]
+    )
+
+    still_running = await adapter.get_candles("GOLD", Resolution.DAY, 1)
+    after_the_bell = await adapter.get_candles("GOLD", Resolution.DAY, 1)
+
+    assert market.call_count == 2
+    assert still_running[-1].forming is True
+    assert after_the_bell[-1].forming is False
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_an_unknown_instrument_is_not_remembered(adapter: CapitalAdapter) -> None:
+    today = datetime.now(UTC).strftime("%Y-%m-%dT00:00:00")
+    respx.post(f"{API}/session").mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
+    )
+    respx.get(f"{API}/prices/NOPE").mock(
+        return_value=httpx.Response(200, json={"prices": [{"snapshotTimeUTC": today}]})
+    )
+    market = respx.get(f"{API}/markets/NOPE").mock(return_value=httpx.Response(404, json={}))
+
+    for _ in range(2):
+        with pytest.raises(GatewayError):
+            await adapter.get_candles("NOPE", Resolution.DAY, 1)
+
+    assert market.call_count == 2
+    await adapter.aclose()
+
+
+# --- a write that came back as something other than JSON -----------------------------
+
+
+@respx.mock
+@pytest.mark.parametrize(
+    "body,status",
+    [
+        ("<html><body>502 Bad Gateway</body></html>", 502),
+        ("", 504),
+    ],
+)
+async def test_a_write_answered_with_no_json_is_a_gateway_error(
+    adapter: CapitalAdapter, body: str, status: int
+) -> None:
+    """It used to leave the adapter as a `JSONDecodeError` and reach the caller as an
+    unhandled 500 with a stack trace — an App Service error page is exactly this shape."""
+    respx.post(f"{API}/session").mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
+    )
+    respx.post(f"{API}/positions").mock(return_value=httpx.Response(status, text=body))
+
+    with pytest.raises(GatewayError) as refused:
+        await adapter.place_order(
+            PlaceOrderRequest(
+                symbol="GOLD", direction=Direction.BUY, size=1.0, order_type=OrderType.MARKET
+            )
+        )
+
+    assert str(status) in str(refused.value)
+    await adapter.aclose()
+
+
+@respx.mock
+async def test_the_providers_own_json_refusal_still_reaches_the_caller_as_an_order(
+    adapter: CapitalAdapter,
+) -> None:
+    """The other half of the same helper: a refusal the provider spelled in JSON is an
+    answer about the order, not a failure of the gateway, and it stays one."""
+    respx.post(f"{API}/session").mock(
+        return_value=httpx.Response(200, headers={"CST": "c", "X-SECURITY-TOKEN": "t"}, json={})
+    )
+    respx.post(f"{API}/positions").mock(
+        return_value=httpx.Response(400, json={"errorCode": "error.invalid.size"})
+    )
+
+    order = await adapter.place_order(
+        PlaceOrderRequest(
+            symbol="GOLD", direction=Direction.BUY, size=1.0, order_type=OrderType.MARKET
+        )
+    )
+
+    assert order.status is OrderStatus.REJECTED
     await adapter.aclose()

@@ -36,11 +36,15 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
     ) -> OrderResultOut:
         """Place an order on the demo account. MARKET fills now; LIMIT and STOP rest
         until the market reaches `level`, which both require. `stop_loss` and
-        `take_profit` attach on open. A symbol the provider does not know or cannot
-        trade comes back as a refusal naming it, not as a settled order. Never
-        retried on this module's own failure — call `get_positions` or
-        `get_working_orders` to check the effect of a call that did not come back
-        clean before trying again.
+        `take_profit` attach on open, at price levels.
+
+        `size` is in the instrument's own units — the ones `get_instrument_terms`
+        reports `min_deal_size` and `size_increment` in — never lots and never an amount
+        of currency; `size_for_margin` converts a deposit into one. A symbol the provider
+        does not know or cannot trade comes back as a refusal naming it, not as a settled
+        order. Never retried on this module's own failure — call `get_positions` or
+        `get_working_orders` to check the effect of a call that did not come back clean
+        before trying again.
         """
         if order_type != "MARKET" and level is None:
             raise ToolRefusal(
@@ -93,11 +97,12 @@ def register(mcp: FastMCP, gateway: GatewayClient) -> None:
         clear_take_profit: bool = False,
     ) -> OrderResultOut:
         """Set or clear an open position's stop-loss and take-profit, independently.
+        Both are **price levels**, not distances and not sizes.
+
         Give `stop_loss`/`take_profit` a number to set it, `clear_stop_loss`/
-        `clear_take_profit` to remove it, or say nothing about a stop to leave it
-        exactly as it is — capital-gateway treats an omitted field as unchanged and
-        an explicit removal as different from a value, so setting one stop never
-        clears the other.
+        `clear_take_profit` to remove it, or say nothing about a stop to leave it exactly
+        as it is — an omitted field is unchanged and an explicit removal is different from
+        a value, so setting one stop never clears the other.
         """
         if stop_loss is not None and clear_stop_loss:
             raise ToolRefusal("refused: stop_loss and clear_stop_loss cannot both be given")

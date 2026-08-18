@@ -25,6 +25,20 @@ API_KEY_HEADER = "X-Gateway-Key"
 ENV_VAR = "GATEWAY_ENV"
 PRODUCTION = "production"
 
+DEMO_ENVIRONMENT = "demo"
+LIVE_ENVIRONMENT = "live"
+
+
+def environment_of(base_url: str) -> str:
+    """Which capital.com environment a base URL belongs to.
+
+    `Settings` refuses anything but `DEMO_BASE_URL` at startup, so in a running process
+    this only ever answers `demo`. It exists so that the answer is *read* rather than
+    asserted: `/capabilities` is what `trading-mcp` asks before it opens a port, and a
+    field that cannot come out any other way is a question answered by its own asking.
+    """
+    return DEMO_ENVIRONMENT if base_url.rstrip("/") == DEMO_BASE_URL else LIVE_ENVIRONMENT
+
 
 def is_production() -> bool:
     """Whether this process is the deployed one.

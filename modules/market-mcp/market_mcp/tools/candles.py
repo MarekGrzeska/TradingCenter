@@ -164,15 +164,13 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         to_iso: str | None = None,
     ) -> GetCandlesOut:
         """OHLC candles for one pair over a UTC time range, `from_iso`/`to_iso` in
-        ISO-8601. Omit both bounds for the last day. Prices are the **bid** side —
-        the only side the archive holds. A series larger than the ceiling comes back
-        bucketed to roughly 200 candles rather than in full — each bucket then
-        covers more than one original period, which `aggregated` and
-        `original_candle_count` say.
+        ISO-8601; omit both bounds for the last day. Prices are the **bid** side, the
+        only side the archive holds.
 
-        Refuses rather than aggregate a series so large the result would no longer
-        answer what was asked (~2000 candles) — ask for a coarser resolution or a
-        narrower window instead.
+        A series larger than the ceiling comes back bucketed to roughly 200 candles, each
+        bucket covering more than one period — `aggregated` and `original_candle_count`
+        say so. Past ~2000 candles it refuses rather than answer something other than what
+        was asked: ask for a coarser resolution or a narrower window.
         """
         start, end = resolve_window(from_iso, to_iso)
         response = await upstream.get(
@@ -222,17 +220,15 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
 
     @mcp.tool(annotations=READ_ONLY)
     async def get_last_price(symbol: str, resolution: str | None = None) -> LastPriceOut:
-        """What a pair costs **now**: the period being built while the market trades, and
-        the last one that closed once it stops. `forming` says which of the two this is —
-        a forming period's high, low and volume are not its range yet and will still move.
+        """What a pair costs **now**: the period being built while the market trades, the
+        last one that closed once it stops. `forming` says which — a forming period's high
+        and low are not its range yet and will still move.
 
         Omit `resolution` and the archive answers from the finest one actually receiving
-        quotes, which is not always the finest one tracked; name one and it is honoured.
-        The reply says which it used.
-
-        Always carries the candle's moment (UTC) and its age in seconds: a price with no
-        age could be from this second or from Friday's close, and the number alone does
-        not say which. Prices are the **bid** side, the only side the archive holds.
+        quotes, which is not always the finest one tracked; the reply says which it used.
+        Carries the candle's moment (UTC) and its age in seconds, because a price with no
+        age could be from this second or from Friday's close. Prices are the **bid** side,
+        the only side the archive holds.
         """
         response = await upstream.get(
             f"/candles/{symbol}/forming",
