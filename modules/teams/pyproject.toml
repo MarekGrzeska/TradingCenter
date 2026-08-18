@@ -52,6 +52,9 @@ dependencies = [
     # module's own lock and baked into its image at build time
     # (packages-replace-the-hand-copies/design.md, D3).
     "tc-runtime",
+    # The streamed OpenAI call, shared with the other module that makes one. The key is
+    # not shared and never travels through the package.
+    "tc-openai",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
@@ -60,6 +63,7 @@ package = false
 
 [tool.uv.sources]
 tc-runtime = { path = "../../packages/tc-runtime", editable = true }
+tc-openai = { path = "../../packages/tc-openai", editable = true }
 
 [tool.ruff]
 line-length = 100

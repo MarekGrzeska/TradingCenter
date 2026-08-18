@@ -28,6 +28,7 @@ from typing import Any
 
 from ..contract import AgentDefinition
 from ..provider import (
+    Briefing,
     ModelProvider,
     TextDelta,
     ToolCallRequest,
@@ -203,7 +204,7 @@ async def run_agent(
             async for chunk in provider.stream(
                 model=model,
                 system_prompt=system_prompt,
-                briefing=briefing,
+                given=Briefing(text=briefing),
                 tools=offered,
                 rounds=rounds,
             ):

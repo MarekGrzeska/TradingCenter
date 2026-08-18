@@ -77,16 +77,19 @@ jobs:
           # be exercised by running them.
           self='^\.github/workflows/checks\.yml$'
 
-          gateway='^modules/capital-gateway/'
-          archive="^modules/market-data/|$tc_runtime"
-          # A module's own directory, plus every package it takes as a path dependency:
-          # `tc-runtime` is compiled into this module's image, so a change there can break
-          # it exactly the way a change in its own tree can. This is the whole price of
-          # sharing source, and it is paid in CI rather than in production
+          # Packages first, because module patterns below refer to them. A module's own
+          # directory plus every package it takes as a path dependency: the package is
+          # compiled into that module's image, so a change there can break it exactly the
+          # way a change in its own tree can. This is the whole price of sharing source,
+          # and it is paid in CI rather than in production
           # (packages-replace-the-hand-copies/design.md, D5).
           tc_runtime='^packages/tc-runtime/'
-          agent="^modules/agent/|$tc_runtime"
-          teams="^modules/teams/|$tc_runtime"
+          tc_openai='^packages/tc-openai/'
+
+          gateway='^modules/capital-gateway/'
+          archive="^modules/market-data/|$tc_runtime"
+          agent="^modules/agent/|$tc_runtime|$tc_openai"
+          teams="^modules/teams/|$tc_runtime|$tc_openai"
           # The terminal's `contract:check` compares its generated types against the
           # schema market-data builds from `contract.py`. Filtering the terminal on its
           # own directory alone would let a contract change land with the check that
@@ -273,9 +276,13 @@ jobs:
     needs: changes
     if: needs.changes.outputs.packages == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      # One job per package rather than a loop, so a failure names which one.
+      matrix:
+        package: [tc-runtime, tc-openai]
     defaults:
       run:
-        working-directory: packages/tc-runtime
+        working-directory: packages/${{ matrix.package }}
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5

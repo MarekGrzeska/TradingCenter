@@ -2201,6 +2201,25 @@ wheels = [
 ]
 
 [[package]]
+name = "tc-openai"
+version = "0.1.0"
+source = { editable = "../../packages/tc-openai" }
+dependencies = [
+    { name = "langchain-openai" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "langchain-openai", specifier = ">=0.2" }]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pyright", specifier = "==1.1.411" },
+    { name = "pytest", specifier = ">=8.3" },
+    { name = "pytest-asyncio", specifier = ">=0.24" },
+    { name = "ruff", specifier = "==0.16.2" },
+]
+
+[[package]]
 name = "tc-runtime"
 version = "0.1.0"
 source = { editable = "../../packages/tc-runtime" }
@@ -2249,6 +2268,7 @@ dependencies = [
     { name = "mcp" },
     { name = "pydantic-settings" },
     { name = "sqlalchemy", extra = ["asyncio"] },
+    { name = "tc-openai" },
     { name = "tc-runtime" },
     { name = "tzdata" },
     { name = "uvicorn", extra = ["standard"] },
@@ -2277,6 +2297,7 @@ requires-dist = [
     { name = "mcp", specifier = "==1.27.0" },
     { name = "pydantic-settings", specifier = ">=2.2" },
     { name = "sqlalchemy", extras = ["asyncio"], specifier = ">=2.0" },
+    { name = "tc-openai", editable = "../../packages/tc-openai" },
     { name = "tc-runtime", editable = "../../packages/tc-runtime" },
     { name = "tzdata", specifier = ">=2024.1" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.29" },

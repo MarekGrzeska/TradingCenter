@@ -43,7 +43,7 @@ class _FakeProvider:
         self.prompts: list[str] = []
 
     async def stream(
-        self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+        self, *, model: str, system_prompt: str, given, tools=(), rounds=()
     ):
         self.prompts.append(system_prompt)
         for chunk in self._chunks:
@@ -254,7 +254,7 @@ def test_required_authentication_refuses_before_touching_the_model(
 
     class _ProviderThatMustNotBeCalled:
         async def stream(
-            self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+            self, *, model: str, system_prompt: str, given, tools=(), rounds=()
         ):
             raise AssertionError("the model must never be called")
             yield  # pragma: no cover - makes this an async generator
@@ -275,7 +275,7 @@ class _ScriptedProvider:
         self._script = script
         self.calls = 0
 
-    async def stream(self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()):
+    async def stream(self, *, model: str, system_prompt: str, given, tools=(), rounds=()):
         chunks = self._script[self.calls]
         self.calls += 1
         for chunk in chunks:
@@ -463,7 +463,7 @@ def test_a_turn_without_tools_leaves_the_list_empty() -> None:
 def test_a_broken_stream_reports_error_and_saves_the_partial_reply() -> None:
     class _BreakingProvider:
         async def stream(
-            self, *, model: str, system_prompt: str, history: list, tools=(), rounds=()
+            self, *, model: str, system_prompt: str, given, tools=(), rounds=()
         ):
             yield TextDelta("cut ")
             yield TextDelta("off")

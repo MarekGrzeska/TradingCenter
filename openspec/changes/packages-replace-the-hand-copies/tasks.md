@@ -56,15 +56,15 @@ dojdzie drugi moduł. Po niej `agent` bierze `tc-runtime`, a reszta repo stoi ni
 
 ## 4. `tc-openai`
 
-- [ ] 4.1 Utworzyć `packages/tc-openai/` z README mówiącym, co jest wspólne, a co jest
+- [x] 4.1 Utworzyć `packages/tc-openai/` z README mówiącym, co jest wspólne, a co jest
       wariantem wejścia
-- [ ] 4.2 Zaprojektować i przenieść `provider.py` z dwoma wariantami wejścia: historia rozmowy
+- [x] 4.2 Zaprojektować i przenieść `provider.py` z dwoma wariantami wejścia: historia rozmowy
       (`agent`) i briefing (`teams`) — 79,4% wspólnych linii znaczy, że ~20% to jest ta
       różnica, i ona ma być jawna w sygnaturze, nie w gałęzi
-- [ ] 4.3 Testy providera z obu modułów przeniesione do pakietu; w modułach zostają te o ich
+- [x] 4.3 Testy providera z obu modułów przeniesione do pakietu; w modułach zostają te o ich
       własnym użyciu
-- [ ] 4.4 `agent` i `teams`: pyproject, Dockerfile, filtr CI; oba zestawy testów zielone
-- [ ] 4.5 Potwierdzić, że **osobne klucze OpenAI zostają osobne** — pakiet nie czyta żadnej
+- [x] 4.4 `agent` i `teams`: pyproject, Dockerfile, filtr CI; oba zestawy testów zielone
+- [x] 4.5 Potwierdzić, że **osobne klucze OpenAI zostają osobne** — pakiet nie czyta żadnej
       zmiennej środowiskowej sam, klucz przychodzi z modułu
 
 ## 5. Trzy moduły MCP biorą to, co u nich jest kopią
