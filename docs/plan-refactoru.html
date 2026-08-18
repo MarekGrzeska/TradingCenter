@@ -1,0 +1,627 @@
+<title>Refactor bez świętości</title>
+<style>
+  :root {
+    --bg: #f3f2ef;
+    --surface: #ffffff;
+    --surface-2: #eae8e2;
+    --ink: #262219;
+    --ink-2: #57503f;
+    --ink-3: #837b68;
+    --line: #dcd8cd;
+    --accent: #b3441f;
+    --accent-soft: #f6e3da;
+    --keep: #2456c6;
+    --keep-soft: #e3eafb;
+    --gain: #2E7D5B;
+    --gain-soft: #dfeee7;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+    --serif: "Charter", "Iowan Old Style", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #191713;
+      --surface: #211e18;
+      --surface-2: #2b2820;
+      --ink: #ece8df;
+      --ink-2: #b3ab99;
+      --ink-3: #877f6c;
+      --line: #3a362b;
+      --accent: #e07a4f;
+      --accent-soft: #3d2418;
+      --keep: #6f96e8;
+      --keep-soft: #24304a;
+      --gain: #6cb287;
+      --gain-soft: #21332a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #191713;
+    --surface: #211e18;
+    --surface-2: #2b2820;
+    --ink: #ece8df;
+    --ink-2: #b3ab99;
+    --ink-3: #877f6c;
+    --line: #3a362b;
+    --accent: #e07a4f;
+    --accent-soft: #3d2418;
+    --keep: #6f96e8;
+    --keep-soft: #24304a;
+    --gain: #6cb287;
+    --gain-soft: #21332a;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.6; margin: 0; }
+  main, header.masthead { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+  header.masthead { padding-top: 56px; padding-bottom: 8px; }
+  main { padding-bottom: 96px; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 0 0 10px; }
+  h1 { font-family: var(--serif); font-size: clamp(34px, 5vw, 52px); line-height: 1.08; margin: 0 0 14px; text-wrap: balance; font-weight: 700; }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 64ch; margin: 0 0 20px; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 10px 26px; font-size: 13px; color: var(--ink-3);
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0; }
+  .meta-row b { color: var(--ink-2); font-weight: 600; }
+  h2 { font-family: var(--serif); font-size: 30px; line-height: 1.15; margin: 72px 0 8px; text-wrap: balance; }
+  h3 { font-size: 19px; margin: 40px 0 8px; }
+  p { max-width: 74ch; }
+  .section-note { color: var(--ink-2); max-width: 74ch; margin-top: 0; }
+  code, .path { font-family: var(--mono); font-size: 0.88em; background: var(--surface-2); border-radius: 4px; padding: 1px 5px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin: 18px 0; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; font-family: var(--mono); font-size: 13px; white-space: nowrap; }
+  .iter { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px 22px; margin: 16px 0; }
+  .iter-head { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+  .iter-num { font-family: var(--serif); font-size: 28px; color: var(--accent); font-weight: 700; min-width: 36px; font-variant-numeric: tabular-nums; }
+  .iter h4 { margin: 0; font-size: 17.5px; }
+  .iter .horizon { margin-left: auto; font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+  .iter p { margin: 10px 0 0; font-size: 14.5px; color: var(--ink-2); }
+  .iter ul { margin: 10px 0 0; padding-left: 20px; font-size: 14.5px; color: var(--ink-2); }
+  .iter li { margin: 4px 0; }
+  .iter li b { color: var(--ink); }
+  .gain-line { margin-top: 12px; font-size: 14px; color: var(--gain); font-weight: 600; }
+  .gain-line::before { content: "Zysk — "; }
+  .iter.done .iter-num { color: var(--gain); }
+  .iter.done .gain-line::before { content: "Osiągnięte — "; }
+  .status-pill { font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 999px; background: var(--gain-soft); color: var(--gain);
+    white-space: nowrap; font-family: var(--sans); }
+  .status-pill.next { background: var(--accent-soft); color: var(--accent); }
+  .iter ul.shipped { list-style: none; padding-left: 0; }
+  .iter ul.shipped li { display: grid; grid-template-columns: 16px 1fr; gap: 9px; align-items: start; margin: 6px 0; }
+  .iter ul.shipped li::before { content: "\2713"; color: var(--gain); font-weight: 700; }
+  .aside { border-left: 2px solid var(--line); padding-left: 15px; margin-top: 18px; }
+  .aside h5 { margin: 0 0 8px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--ink-3); font-weight: 700; }
+  .aside p { margin: 0 0 9px; font-size: 14px; color: var(--ink-2); max-width: 78ch; }
+  .aside p:last-child { margin-bottom: 0; }
+  td.hit { color: var(--gain); font-weight: 700; }
+  td.miss { color: var(--accent); }
+  .callout { border-left: 3px solid var(--accent); background: var(--surface); border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 22px 0; max-width: 78ch; }
+  .callout p { margin: 0; font-size: 14.5px; }
+  .callout p + p { margin-top: 8px; }
+  figure { margin: 28px 0; }
+  .diagram-frame { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; overflow-x: auto; }
+  .diagram-frame svg { min-width: 760px; max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  figcaption { font-size: 13.5px; color: var(--ink-3); margin-top: 10px; max-width: 80ch; }
+  .d-node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.2; }
+  .d-cont { fill: none; stroke: var(--line); stroke-width: 1.2; }
+  .d-name { fill: var(--ink); font: 600 12.5px var(--sans); text-anchor: middle; }
+  .d-sub  { fill: var(--ink-3); font: 10.5px var(--mono); text-anchor: middle; }
+  .d-cap  { fill: var(--ink-3); font: 600 11px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; }
+  .d-elab { fill: var(--ink-3); font: 11.5px var(--sans); }
+  .d-edge { stroke: var(--ink-3); stroke-width: 1.2; fill: none; }
+  .d-bad  { stroke: var(--accent); stroke-dasharray: 4 3; }
+  .d-bad-lab { fill: var(--accent); font: 600 11.5px var(--sans); }
+  .d-good { stroke: var(--gain); }
+  .d-good-lab { fill: var(--gain); font: 600 11.5px var(--sans); }
+  .d-arr { fill: var(--ink-3); }
+  .d-arr-good { fill: var(--gain); }
+</style>
+
+<header class="masthead">
+  <p class="eyebrow">Plan refactoru · na podstawie audytu z 18.08.2026</p>
+  <h1>Refactor bez świętości</h1>
+  <p class="lede">Cztery kryteria i żadnych aksjomatów: większa wydajność, mniejsza złożoność,
+  tani nowy moduł, wielokrotne użycie kodu. Tam, gdzie dotychczasowa reguła projektu stoi tym
+  kryteriom na drodze — łamiemy ją jawnie, zapisujemy dlaczego i wstawiamy lepszą.</p>
+  <div class="meta-row">
+    <span><b>Kryteria:</b> wydajność · złożoność · koszt nowego modułu · reuse</span>
+    <span><b>Kontekst:</b> projekt osobisty, edukacyjno-eksperymentalny, konto demo</span>
+    <span><b>Horyzont:</b> 6 iteracji, każda domknięta i wartościowa osobno</span>
+    <span><b>Stan:</b> iteracje 0 i 1 zamknięte · następna: 2</span>
+  </div>
+</header>
+
+<div style="max-width:1060px;margin:0 auto;padding:0 24px">
+  <div class="callout" style="margin-top:28px">
+    <p><b>Kalibracja: to nie jest system produkcyjny.</b> Jeden operator, cel edukacyjny,
+    konto demo — więc odchudzamy także <i>procesy</i>, nie tylko kod. Z bezpieczeństwa zostają
+    podstawy, bo są tanie i chronią przed jedynym realnym ryzykiem (przypadkowe wyjście poza
+    demo, wyciek kluczy): demo-check bramy, klucz na drzwiach, token operatora, sekrety poza
+    repo. Wypada natomiast ceremonia produkcyjna: artefakty OpenSpec opcjonalne poza samą
+    propozycją; brama <code>require-review</code> usunięta; z dziewięciu alertów zostają
+    trzy, które faktycznie budzą (pamięć planu, wiek świec, 5xx bramy); sondy deploy
+    proste — asercja obrazu tak (jest darmowa), wieloetapowe retry-budżety nie. Ta
+    kalibracja obowiązuje we wszystkich iteracjach poniżej.</p>
+    <p><b>Zrewidowane 18.08 przy okazji wykonania (PR&nbsp;#157).</b> Dwie rzeczy z tego
+    akapitu były nietrafione. <b>Liczba:</b> hook miał 256 linii, nie 383 — te 383 to hook
+    <i>plus</i> jego własne testy, czyli razem z częścią, która akurat była dobra.
+    <b>Kierunek:</b> zawężenie pełnej ścieżki do kontraktów między modułami oblałoby swój
+    pierwszy test — workspace z iteracji 1 nie rusza ani <code>contract.py</code>, ani
+    <code>infra/**</code>, więc wypadłby z ewidencji dokładnie ten wyłom, dla którego
+    reguła istnieje. Doszła za to <b>czwarta kategoria</b> wyzwalacza: reguła
+    architektoniczna, którą <code>CLAUDE.md</code> nazywa nośną. Cięcie ceremonii poszło
+    tam, gdzie było tanie i bezpieczne — <code>tasks.md</code> i <code>review.md</code>
+    dołączyły do <code>design.md</code> jako opcjonalne, a brama zniknęła, bo nie
+    przechodziła zasady nr 5: raz już cicho padła (wersja PowerShell nie wykonywała się na
+    macOS), a jej testy nie biegły w żadnym CI.</p>
+  </div>
+</div>
+
+<main>
+  <h2 id="zasady">Zasady, które łamiemy — i co wstawiamy w ich miejsce</h2>
+  <p class="section-note">Każda z tych reguł powstała z dobrego powodu. Audyt zmierzył jednak,
+  co naprawdę kosztują — i przy czterech przyjętych kryteriach rachunek wychodzi na minus.
+  Stary powód zostaje uszanowany w nowej regule, tylko innym mechanizmem.</p>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Łamana zasada</th><th>Po co była</th><th>Co zmierzył audyt</th><th>Nowa zasada</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Zero wspólnych bibliotek</b> — każdy moduł przepisuje wszystko u siebie</td>
+        <td>Niezależny deploy, test i kasowanie modułu; coupling widoczny w diffie</td>
+        <td>~20% produkcyjnego Pythona agent/teams to ręczne kopie (77% bajt-w-bajt);
+        <b>cztery klasy dryfu z bugami</b>, w tym niedoniesiona poprawka na ścieżce zleceń;
+        skrypt kontraktu ×3 z fixem w dwóch kopiach z trzech</td>
+        <td><b>Wewnętrzne pakiety w workspace</b> (uv workspace). Pakiet jest zapiekany w obraz
+        przy buildzie — moduły <i>pozostają</i> niezależnie deployowalne, znika tylko ręczne
+        kopiowanie. Zmiana w <code>packages/</code> odpala w CI testy wszystkich zależnych.
+        Kontrakt (HTTP/MCP) pozostaje jedyną granicą <i>runtime</i>.</td>
+      </tr>
+      <tr>
+        <td><b>DTO przepisane ręcznie to akceptowalny, widoczny koszt</b></td>
+        <td>Duplikacja w diffie zamiast ukrytej klasy bazowej</td>
+        <td>4× <code>mapStatus</code>, 12+12 ręcznych mapperów, ręczne DTO obok wygenerowanych,
+        2 martwe pola na drucie, dryf mapperów niewykrywalny</td>
+        <td><b>Generowane &gt; przepisane.</b> Ręczna kopia typu dozwolona wyłącznie z testem
+        dryfu, który czerwienieje, gdy źródło się zmieni.</td>
+      </tr>
+      <tr>
+        <td><b>dev.sh i dev.ps1 — ten sam skrypt dwa razy, z natury</b></td>
+        <td>Parytet macOS/Linux/Windows bez wspólnej zależności</td>
+        <td>Trzy udokumentowane rozjazdy naprawiane reaktywnie; dev.ps1 gubi teams-mcp z
+        nadzoru; 1 136 linii utrzymywanych ręcznie w rytmie</td>
+        <td><b>Jedna implementacja: <code>scripts/dev.py</code>.</b> uv i tak jest wymagane na
+        każdej platformie — Python jest już wspólnym mianownikiem. Tabela serwisów to dane,
+        nie kod.</td>
+      </tr>
+      <tr>
+        <td><b>Incydenty i pomiary żyją w prozie komentarzy</b></td>
+        <td>Wiedza przy kodzie, nie w zewnętrznym wiki</td>
+        <td>~25% linii to proza; urwane nagłówki, stęchłe liczebniki w treści alertów
+        („all four apps" przy siedmiu), pomiar dla 44 wpisów cytowany przy 57</td>
+        <td><b>Incydent → test regresyjny; komentarz linkuje test.</b> Liczby w komunikatach
+        i alertach są wyliczane (<code>${length(...)}</code>), nigdy wpisywane. Proza zostaje
+        tam, gdzie test jest niemożliwy.</td>
+      </tr>
+      <tr>
+        <td><b>Obrona pisana po incydencie jest z definicji dobra</b></td>
+        <td>Nigdy więcej tego samego pożaru</td>
+        <td><code>stream_tokens_for</code> wyrzuca odpowiedź, którą miał sprawdzać; demo-guard
+        waliduje literał; 4 sondy przechodzą na starym kontenerze; walidator kształtu
+        przepuszcza pusty wynik</td>
+        <td><b>Każdy mechanizm obronny ma test swojego trybu awarii</b> — test, który wywołuje
+        dokładnie ten scenariusz, przed którym obrona ma bronić. Obrona bez takiego testu nie
+        wchodzi na <code>main</code> — i to dotyczy także obron procesu: brama
+        <code>require-review</code> padła własną regułą 18.08.</td>
+      </tr>
+      <tr>
+        <td><b>Terminal nie bierze bibliotek do rzeczy, które umie napisać</b></td>
+        <td>Zero zależności, pełna kontrola</td>
+        <td>21 ręcznych efektów fetch (niespójne guardy), 3 hooki pollingu ×2-3 kopie,
+        5 store'ów z tym samym szkieletem, 2 czytniki SSE, 8× verbatim className przycisku</td>
+        <td><b>Commodity się kupuje, domenę się pisze.</b> TanStack Query na czytanie danych,
+        Zustand na store'y (API już zbieżne w ~90%). Własnoręcznie tylko to, co jest domeną:
+        prymitywy wykresu, socketHub, redukcja MCP.</td>
+      </tr>
+      <tr>
+        <td><b>Jawność Terraforma ponad wszystko</b> — każdy moduł to ręczny blok</td>
+        <td>Czytelność decyzji per aplikacja</td>
+        <td>~200 linii TF + tryplet Entra + workflow + sondy na każdy nowy moduł; 9 substytucji
+        różni 7 workflow; mechaniczny boilerplate ~300 linii</td>
+        <td><b>Mechaniczne przez moduł/szablon, decyzyjne jawnie.</b> Nowy moduł ma powstawać
+        w godziny, nie dni — to jest twarde kryterium akceptacji infrastruktury.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <div class="callout">
+    <p><b>Czego świadomie NIE łamiemy.</b> Granice runtime między modułami (kontrakt HTTP/MCP,
+    osobne bazy, osobne tożsamości, imienne listy wywołujących) zostają nietknięte — audyt
+    pokazał, że działają: żadne znalezisko nie wymagało zmiany dwóch modułów naraz poza
+    świadomymi kopiami. Łamiemy wyłącznie zakaz współdzielenia <i>kodu źródłowego w czasie
+    builda</i>. Demo-only enforcement, migracje w lifespan pod advisory lockiem i katalog
+    wskaźników jako dane też zostają — to najlepsze mechanizmy w repo.</p>
+  </div>
+
+  <figure>
+    <div class="diagram-frame">
+    <svg viewBox="0 0 900 380" role="img" aria-label="Porównanie: dziś poprawka błędu musi być ręcznie skopiowana do każdego modułu i dryfuje; po refactorze mieszka raz w pakiecie workspace, a moduły dostają ją przy buildzie obrazu.">
+      <defs>
+        <marker id="pa" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr"/>
+        </marker>
+        <marker id="pg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr-good"/>
+        </marker>
+      </defs>
+
+      <!-- DZIŚ -->
+      <rect class="d-cont" x="20" y="30" width="400" height="320" rx="10"/>
+      <text class="d-cap" x="32" y="56">Dziś: kopiuj i pilnuj ręcznie</text>
+      <rect class="d-node" x="50" y="80" width="150" height="48" rx="6"/>
+      <text class="d-name" x="125" y="100">poprawka błędu</text>
+      <text class="d-sub" x="125" y="116">np. session-gone retry</text>
+      <rect class="d-node" x="50" y="170" width="110" height="44" rx="6"/>
+      <text class="d-name" x="105" y="196">teams ✓</text>
+      <rect class="d-node" x="180" y="170" width="110" height="44" rx="6"/>
+      <text class="d-name" x="235" y="196">agent ✗</text>
+      <rect class="d-node" x="50" y="250" width="110" height="44" rx="6"/>
+      <text class="d-name" x="105" y="276">market-mcp ✗</text>
+      <rect class="d-node" x="180" y="250" width="110" height="44" rx="6"/>
+      <text class="d-name" x="235" y="276">trading-mcp ✓</text>
+      <line class="d-edge" x1="105" y1="128" x2="105" y2="170" marker-end="url(#pa)"/>
+      <line class="d-edge d-bad" x1="140" y1="128" x2="230" y2="170" marker-end="url(#pa)"/>
+      <line class="d-edge d-bad" x1="105" y1="214" x2="105" y2="250" marker-end="url(#pa)"/>
+      <line class="d-edge d-bad" x1="150" y1="214" x2="225" y2="250" marker-end="url(#pa)"/>
+      <text class="d-bad-lab" x="300" y="228">przerywane strzałki =</text>
+      <text class="d-bad-lab" x="300" y="243">ręczny transport,</text>
+      <text class="d-bad-lab" x="300" y="258">4 udokumentowane</text>
+      <text class="d-bad-lab" x="300" y="273">zaniechania</text>
+
+      <!-- PO -->
+      <rect class="d-cont" x="480" y="30" width="400" height="320" rx="10"/>
+      <text class="d-cap" x="492" y="56">Po: raz w pakiecie, wszędzie przy buildzie</text>
+      <rect class="d-node" x="510" y="80" width="180" height="52" rx="6"/>
+      <text class="d-name" x="600" y="101">packages/tc-mcp-kit</text>
+      <text class="d-sub" x="600" y="118">jedna poprawka + jeden test</text>
+      <rect class="d-node" x="510" y="180" width="100" height="44" rx="6"/>
+      <text class="d-name" x="560" y="206">agent</text>
+      <rect class="d-node" x="630" y="180" width="100" height="44" rx="6"/>
+      <text class="d-name" x="680" y="206">teams</text>
+      <rect class="d-node" x="750" y="180" width="110" height="44" rx="6"/>
+      <text class="d-name" x="805" y="206">3× *-mcp</text>
+      <line class="d-edge d-good" x1="560" y1="132" x2="560" y2="180" marker-end="url(#pg)"/>
+      <line class="d-edge d-good" x1="620" y1="132" x2="675" y2="180" marker-end="url(#pg)"/>
+      <line class="d-edge d-good" x1="670" y1="132" x2="795" y2="180" marker-end="url(#pg)"/>
+      <text class="d-elab" x="510" y="258">build obrazu zapieka wersję pakietu —</text>
+      <text class="d-elab" x="510" y="275">deploy każdego modułu nadal niezależny;</text>
+      <text class="d-elab" x="510" y="292">CI: zmiana pakietu = testy wszystkich zależnych</text>
+      <text class="d-good-lab" x="510" y="322">klasa błędu „fix nie dotarł" przestaje istnieć</text>
+    </svg>
+    </div>
+    <figcaption>Jedyna zmiana architektoniczna planu: transport poprawek między modułami
+    przestaje być ręczny. Granice runtime — kontrakty, tożsamości, osobne bazy — nie zmieniają
+    się ani o milimetr.</figcaption>
+  </figure>
+
+  <h2 id="iteracje">Iteracje — od największego zysku</h2>
+  <p class="section-note">Każda iteracja jest samodzielnie wartościowa i zostawia system w
+  całości działającym. Kolejność wynika z rachunku zysk/ryzyko, nie z elegancji. Iteracja 0
+  jest zamknięta — jej karta niżej opisuje, co naprawdę weszło, łącznie z tym, co wyszło
+  inaczej, niż zakładał plan.</p>
+
+  <div class="iter done">
+    <div class="iter-head"><span class="iter-num">0</span>
+    <h4>Naprawy błędów — zanim cokolwiek zrefactorujemy</h4>
+    <span class="status-pill">Zrobione · 18.08 · PR&nbsp;#156</span>
+    <span class="horizon">9 commitów · 31 plików</span></div>
+    <p>Osiem poprawek z audytu, każda z testem <i>swojego trybu awarii</i> — nowa zasada nr 5
+    obowiązuje od nich. Trzy sprawdzone przez odwrócenie fixa: testy czerwienieją bez niego.</p>
+    <ul class="shipped">
+      <li>retry <b>session-gone</b> w agencie — <code>teams</code> nauczył się go 17.08, agent
+      nie dostał go nigdy i odpowiadał <code>UNKNOWN</code> na ścieżce zleceń,</li>
+      <li><b>„czy narzędzie rusza rachunek"</b> czytane konserwatywnie w obu modułach,</li>
+      <li>asercja tagu obrazu w <b>4 sondach deploy</b> — żadna nie przejdzie już na starym
+      kontenerze,</li>
+      <li><code>stream_tokens_for</code> czyta odpowiedź, o którą i tak pytał; reconnect
+      wykłada się 3 s → 60 s zamiast pytać 20 razy na minutę w nieskończoność,</li>
+      <li><code>dev.ps1</code> nadzoruje teams-mcp, a oba skrypty startują w tej kolejności,
+      którą opisują,</li>
+      <li><code>edit_trigger</code> przekazuje zero zamiast czytać je jako „nie podano",</li>
+      <li>lista walidacyjna FastAPI spłaszczona do zdania <b>we wszystkich trzech</b> modułach
+      MCP,</li>
+      <li>trzy skrypty kontraktu normalizują tak samo; dwa snapshoty przestały uciekać polskie
+      znaki jako <code>\uXXXX</code>.</li>
+    </ul>
+
+    <div class="aside">
+      <h5>Co wyszło inaczej, niż zakładał plan</h5>
+      <p><b>#2 nie było zamianą operatora, tylko przeniesieniem decyzji.</b> Sam konserwatywny
+      odczyt <code>read_only is not True</code> byłby błędem lustrzanym: pętla w teams widzi
+      narzędzia <i>wszystkich</i> serwerów naraz, więc nieadnotowane narzędzie market-mcp
+      zaczęłoby liczyć się jako zlecenie. Decyzja przeniosła się z <code>loop.py</code>, które
+      miało tylko deskryptor, do <code>ToolPlan</code> — ono ma deskryptor <i>i</i> serwer, więc
+      konserwatyzm jest bramkowany przez <code>can_move_the_account</code>, pole pod nazwą,
+      którą agent już nosił.</p>
+      <p><b>#6 miało ostrzejszy powód, niż mówił audyt.</b> teams odrzuca
+      <code>cooldown_seconds ≤ 0</code> własnym walidatorem, więc zero nigdy nie było prawidłową
+      wartością. <code>or</code> nie tyle gubiło ustawienie, ile zamieniało odmowę w sukces:
+      operator prosił o coś niemożliwego i słyszał, że zrobione.</p>
+      <p><b>#7 dostało więcej, niż miało dostać.</b> Oryginał w teams-mcp gubił <code>loc</code>,
+      więc odmowa brzmiała „Field required" i nie nazywała pola. Wszystkie trzy kopie niosą teraz
+      nazwę pola — o to prosi własna reguła market-mcp. Drugi błąd w tych samych trzech liniach:
+      <code>.get()</code> na JSON-ie, który nie jest obiektem, rzucało <code>AttributeError</code>
+      spoza zasięgu <code>except ValueError</code>.</p>
+      <p><b>#5 wyszło poza dev.ps1.</b> Nadzór był realnym błędem, ale przy okazji okazało się,
+      że dev.sh, dev.ps1 i oba nagłówki opisywały <i>trzy różne</i> kolejności startu — a
+      komentarz teams-mcp w dev.ps1 mówił „after teams", siedząc przed teams.</p>
+      <p><b>Dziewiąty commit nie jest z audytu.</b> Test terminala zależny od kalendarza, który
+      pada dokładnie 18 sierpnia i przechodzi każdego innego dnia roku. Czerwony też na
+      <code>main</code>; wciągnięty, bo te zmiany włączają job terminala w CI.</p>
+    </div>
+
+    <p class="gain-line">dwa bugi na ścieżce pieniędzy zamknięte; sond mogących przejść na
+    starym kontenerze jest 0 zamiast 4 z 7; każda z ośmiu obron ma odtąd test scenariusza,
+    przed którym broni.</p>
+  </div>
+
+  <div class="iter done">
+    <div class="iter-head"><span class="iter-num">1</span>
+    <h4>Pakiety wewnętrzne — koniec ręcznych kopii</h4>
+    <span class="status-pill">Zrobione · 18.08 · PR&nbsp;#158</span>
+    <span class="horizon">7 commitów · 254 pliki</span></div>
+    <p>Powstały <b>dwa</b> pakiety — nie trzy, jak zakładał pierwotny plan — i <b>bez</b>
+    uv workspace, który zwinąłby siedem lockfile'ów w jeden. Zamiast tego zależność
+    ścieżkowa: pakiet wchodzi do własnego locka każdego modułu i jest zapiekany w jego
+    własny obraz.</p>
+    <ul>
+      <li><b><code>packages/tc-runtime</code></b> — <code>db.py</code> (advisory lock z kluczem
+      jako parametrem), <code>migrate.py</code>, <code>schema_version.py</code> (wersja teams,
+      ta z fixem pustych <code>heads</code>), <code>auth.py</code>,
+      <code>routers/models.py</code>, middleware tożsamości wołającego dla modułów MCP oraz
+      jedna implementacja <code>_detail</code> ze spłaszczaniem listy walidacyjnej.</li>
+      <li><b><code>packages/tc-openai</code></b> — <code>provider.py</code> z dwoma wariantami
+      wejścia (historia rozmowy / briefing). Konsumenci: agent, teams.</li>
+    </ul>
+    <p>CI: job <code>packages</code> w <code>checks.yml</code> — zmiana w <code>packages/</code>
+    odpala testy <i>wszystkich</i> zależnych modułów. Dockerfile'e: <code>COPY packages/</code>
+    przed <code>uv sync</code>, więc pakiet jest zapiekany w obraz i moduły zostają niezależnie
+    deployowalne.</p>
+    <p class="gain-line"><b>959 → 74 linie</b> kodu żyjącego wyłącznie jako ręczna kopia;
+    moduły straciły 2 269 linii Pythona; klasa błędu „fix nie dotarł do bliźniaka" przestaje
+    istnieć, bo zmiana w pakiecie odpala w CI joby wszystkich sześciu konsumentów.</p>
+
+    <div class="aside">
+      <h5>Co wyszło inaczej, niż zakładał plan</h5>
+      <p><b><code>tc-mcp-kit</code> nie powstaje.</b> Zmierzona identyczność linia po linii
+      pokazała, że w rusztowaniu MCP jest dokładnie <i>jeden</i> bliźniak:
+      <code>network_identity.py</code> (76,9–86,2%). Reszta, którą plan chciał tam włożyć, to
+      pliki różne, bo różnią się moduły — <code>server.py</code> 35,9–58,2%,
+      <code>config.py</code> 18,8–36,7%, <code>client.py</code> 14,8–32,1%,
+      <code>errors.py</code> 8,1–25,0%. Wspólny pakiet nad nimi byłby dokładnie tą „wspólną
+      klasą bazową, która po cichu ogranicza cztery moduły", przed którą przestrzega
+      <code>docs/architecture.md</code> — a tej części reguły nie podważamy.</p>
+      <p><b>Trzy liczby z tego planu były nietrafione.</b> <code>provider.py</code> jest
+      identyczny w 79,4%, nie 95%. Ręcznych kopii jest ~959 linii ponad pierwszy egzemplarz,
+      nie ~2 000+. A <code>db.py</code> to bliźniak <i>wyłącznie</i> agent↔teams (97,1%) —
+      market-data ma własny, 299-linijkowy, zbieżny w 56%, z trzydziestominutowym oknem na
+      migrację największej tabeli w repo. Za to doszli dwaj lokatorzy, których plan nie
+      wymieniał: <code>auth.py</code> (86,4%) i <code>routers/models.py</code> (93,8%).</p>
+      <p><b>Balast idzie osobną zmianą.</b> Usunięcie transportu stdio kasuje opublikowane
+      wymaganie „Dwa transporty, jeden zestaw narzędzi" z <code>market-mcp-transport</code>, a
+      z pakietami nie ma wspólnego nic poza terminem. Razem z nim wychodzą
+      <code>teams_scope</code>, zasoby MCP bez konsumenta, <code>provider_params</code> i
+      zapasowe klucze Capital.</p>
+      <p><b>Bez <code>uv workspace</code>.</b> Design mówił „workspace, pakiety jako
+      zależności ścieżkowe" — dwie rzeczy naraz, i pierwsza była błędem. Workspace w uv
+      zwija wszystkich członków do <i>jednego</i> locka; siedem modułów ma dziś siedem
+      własnych, a wspólny znaczyłby, że podbicie zależności w jednym re-rozwiązuje sześć
+      pozostałych. Sama zależność ścieżkowa daje całe dzielenie kodu i zostawia każdemu
+      modułowi jego lock.</p>
+      <p><b>Wdrożenia jednak się zmieniły</b>, wbrew propozycji. Zależność ścieżkowa
+      wychodzi poza katalog modułu, więc kontekst builda to katalog główny repozytorium,
+      z <code>.dockerignore</code>, żeby nie znaczyło to „wyślij każde <code>.venv</code>
+      w drzewie". Sześć <code>deploy-*.yml</code>; brama, która pakietu nie bierze,
+      została nietknięta.</p>
+      <p><b>Trzy błędy złapane przy wdrożeniu</b>, wszystkie naprawione i opisane w
+      <code>review.md</code>. Najpoważniejszy nie miał nic wspólnego z pakietami: wzorzec
+      w filtrze <code>checks.yml</code> sięgał po zmienną linię przed jej powstaniem, co
+      pod <code>set -u</code> przewróciłoby joba <code>changes</code> — a od niego zależą
+      wszystkie pozostałe, więc <i>żaden</i> PR w repo nie uruchomiłby żadnego testu.
+      Znalazło to uruchomienie tego kroku na sztucznym diffie, nie przeczytanie go.</p>
+      <h5>Co iteracja 0 już dla niej zrobiła</h5>
+      <p>Trzy kopie <code>_detail</code> są teraz <b>identyczne z dokładnością do dwóch
+      stałych</b> (nazwa modułu wyżej i odsyłacz do specyfikacji) — było 0, 17 i 8 linii, które
+      się nie zgadzały, jest 3 × 35 linii tego samego tekstu. <code>tc-mcp-kit</code> podnosi
+      więc <i>jeden</i> tekst zamiast godzić trzy, a wybór, który z nich jest ten właściwy, już
+      zapadł. To samo stało się z decyzją <code>moves_the_account</code>: agent i teams odpowiadają
+      teraz tak samo, więc pakiet nie odziedziczy sporu. <code>schema_version.py</code> wciąż
+      różni się między agentem a teams — to zostaje dla tej iteracji.</p>
+      <p>Ta iteracja łamie regułę zapisaną w <code>docs/architecture.md</code> i w
+      <code>openspec/</code>, więc idzie pełną ścieżką: propozycja, design, delta, dopiero
+      potem kod. To jedyna iteracja planu, dla której kalibracja przewiduje wszystkie pięć
+      artefaktów.</p>
+    </div>
+  </div>
+
+  <div class="iter">
+    <div class="iter-head"><span class="iter-num">2</span>
+    <h4>Jedna droga wdrożenia i jeden runner dev</h4>
+    <span class="status-pill next">Następna</span>
+    <span class="horizon">~1 tydz.</span></div>
+    <ul>
+      <li><b>Reusable workflow</b> <code>_deploy-app-service.yml</code> (wejścia: moduł,
+      app-name, wariant sondy) — 7 wywołujących po ~15 linii; komentarze-incydenty zostają u
+      wywołujących. 436 → ~175 linii, a zmiana bloku OIDC czy buildx to jedna edycja.</li>
+      <li><b><code>scripts/dev.py</code></b> zastępuje dev.sh + dev.ps1 (1 136 linii → ~400,
+      jedna implementacja); tabela serwisów jako dane w jednym miejscu.</li>
+      <li><code>checks.yml</code>: filtr <code>infra/**</code> (fmt+validate), likwidacja bloku
+      translacji nazw; liczebniki w alertach Terraforma wyliczane.</li>
+      <li>Terraform chirurgicznie: moduł lokalny <code>easy-auth-app</code> (tryplet ×6),
+      <code>for_each</code> dla 7 polityk Key Vault. Bloki App Service zostają jawne.</li>
+    </ul>
+    <p class="gain-line">koszt nowego modułu spada z ~2 dni do ~pół dnia (workflow 15 linii,
+    tryplet z modułu, wpis w tabeli dev); dryf skryptów dev znika konstrukcyjnie.</p>
+  </div>
+
+  <div class="iter">
+    <div class="iter-head"><span class="iter-num">3</span>
+    <h4>Terminal: kupujemy commodity, tniemy molocha</h4>
+    <span class="horizon">~2 tyg.</span></div>
+    <ul>
+      <li><b>TanStack Query</b> — zastępuje 21 ręcznych efektów fetch i 3 hooki pollingu
+      (~-500 linii); cache, deduplikacja i retry za darmo; niespójne guardy abortu znikają.</li>
+      <li><b>Zustand</b> — 5 ręcznych store'ów (API już zbieżne); <code>safeLocalStorage</code>
+      raz, przez middleware persist. <code>agentChatStore</code> przy okazji: mapa
+      AbortControllerów zamiast flag+sekwencji (701 → ~450 linii).</li>
+      <li><b>Chart.tsx</b> 2 124 → ~600: cztery hooki (<code>useChartInstance</code>,
+      <code>useIndicatorLayers</code> z generycznym reconcile <code>Map&lt;string, Layer&gt;</code>,
+      <code>useDrawingLayers</code>, <code>useChartFocus</code>) + <code>ChartReadout.tsx</code>;
+      <b><code>MarkPrimitive</code></b> ścina ~215 linii z trzech prymitywów.</li>
+      <li><b>Mini UI-kit</b>: <code>Button</code>, <code>Input</code>,
+      <code>UnreachableNotice</code>; <code>readSseStream&lt;T&gt;</code>;
+      <code>makeStatusMapper</code>; generyczne <code>RuleSection</code>/<code>FireHistory</code>
+      w SchedulesPanel; trasy zagnieżdżone w Teams (runy dostają linki).</li>
+    </ul>
+    <p class="gain-line">~1 500 linii mniej, cztery klasy dryfu zamknięte, największy plik repo
+    przestaje być największym ryzykiem każdego merge'a.</p>
+  </div>
+
+  <div class="iter">
+    <div class="iter-head"><span class="iter-num">4</span>
+    <h4>Wydajność gorących ścieżek</h4>
+    <span class="horizon">~1 tydz.</span></div>
+    <ul>
+      <li><b>Powierzchnia narzędzi MCP: 17,6 tys. tokenów na każdą turę agenta.</b> Rozbicie
+      <code>compute_indicators</code> (6,9 tys. znaków — sześć wzajemnie wykluczających się grup
+      pól w schemacie), wyrównanie długości docstringów, test sufitu serializowanego
+      <code>list_tools()</code> w każdym module. Cel: &lt; 10 tys. tokenów/turę — to bezpośrednio
+      koszt i latencja każdej rozmowy.</li>
+      <li><b>Setki walidacji/s za darmo</b>: ramki <code>quote</code> odrzucane przed parsowaniem
+      pydantic (jedna linia w <code>_READERS</code>).</li>
+      <li><b>Budżet 10 req/s</b>: memo per-request dla <code>/pairs</code> (dziś 2–3 pobrania w
+      jednym wywołaniu narzędzia), TTL-memo dla <code>_market_open</code> (dziś drugi pełny
+      request na jeden odczyt świec DAY/WEEK).</li>
+      <li><b>Demo-guard trading-mcp</b>: zostaje check startowy + uczciwie wyliczane
+      <code>environment</code> w bramie; znika re-check per zapis (dziś po każdym błędzie każdy
+      zapis kosztuje dwie rundy).</li>
+      <li><b>Zapisy bramy</b> przez <code>_write_json</code> — nie-JSON-owe 502/504 przestają
+      być nieobsłużonym 500.</li>
+    </ul>
+    <p class="gain-line">−40% tokenów na turę agenta; −1–2 requesty upstream na wywołanie
+    narzędzia; CPU market-data wolne od pracy wyrzucanej do kosza.</p>
+  </div>
+
+  <div class="iter">
+    <div class="iter-head"><span class="iter-num">5</span>
+    <h4>Struktura plików-molochów po stronie Pythona</h4>
+    <span class="horizon">~1–2 tyg.</span></div>
+    <ul>
+      <li><code>teams/store.py</code>: parametryzacja schedule/trigger po tabeli (−200 linii);
+      wspólny ogon <code>_fire_schedule</code>/<code>_check_trigger</code>.</li>
+      <li><code>agent/store.py</code> → pakiet <code>store/</code> (pięć domen); usunięcie 5
+      modeli przelotowych i migracji-z-prozą (prompt staje się danymi operatora przez
+      <code>PUT /prompt</code>).</li>
+      <li><code>routers/indicators.py</code>: tagowana unia computerów — <code>output</code>
+      wyprowadzany, nie deklarowany; <code>_result_out</code> jako <code>match</code>.</li>
+      <li><code>contract.py</code>: <code>model_validate</code> + <code>FromAlias</code>
+      (−80 linii); usunięcie martwych pól z drutu.</li>
+      <li>Domknięcia → klasy: <code>_execute_round</code> w agencie,
+      <code>_StepRunner</code> w teams; <code>commit_candles</code> jako jedyna ścieżka zapisu
+      świec; <code>gateway/_http.py</code>; <code>create_app()</code> w market-data i pocięcie
+      1 906-linijkowego test_app.py.</li>
+    </ul>
+    <p class="gain-line">~700 linii mniej; inwarianty przechodzą z „kolejności domknięć" do
+    stanu obiektów; testy przestają wymagać globalnego <code>app</code>.</p>
+  </div>
+
+  <div class="iter">
+    <div class="iter-head"><span class="iter-num">6</span>
+    <h4>Szablon nowego modułu — kryterium „tani nowy moduł" domknięte na stałe</h4>
+    <span class="horizon">~3 dni</span></div>
+    <p>Generator (copier/cookiecutter) produkujący gotowy moduł: zależność od
+    <code>tc-runtime</code> (i opcjonalnie <code>tc-mcp-kit</code>), Dockerfile, wpis w tabeli
+    dev, 15-linijkowy caller reusable workflow, szkielet testów z sufitem tokenów (dla MCP)
+    i testem trybu awarii obrony (jeśli jakąś deklaruje). Do tego lekki job CI diffujący
+    pozostałe świadome kopie (Dockerfile'e, .env.example) i raportujący dryf.</p>
+    <p class="gain-line">nowy serwis w &lt; pół dnia, z definicji zgodny z nowymi zasadami —
+    podwojenie liczby modułów przestaje być liniowym podwojeniem utrzymania.</p>
+  </div>
+
+  <h2 id="metryki">Jak poznamy, że się udało</h2>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Metryka</th><th>Audyt 18.08</th><th>Po iter. 0</th><th>Po iter. 1</th><th>Cel</th></tr></thead>
+    <tbody>
+      <tr><td>Miejsca do edycji przy poprawce wspólnej logiki Pythona</td>
+        <td class="num">2–7 kopii</td><td class="num">2–7 kopii</td>
+        <td class="num hit">1 pakiet ✓</td><td class="num">1 pakiet</td></tr>
+      <tr><td>Ręcznie kopiowane linie Pythona ponad pierwszy egzemplarz (pary ≥70%)</td>
+        <td class="num">959</td><td class="num miss">+80</td>
+        <td class="num hit">74 ✓</td><td class="num">&lt; 200</td></tr>
+      <tr><td>Tokeny powierzchni narzędzi na turę agenta</td>
+        <td class="num">~17 600</td><td class="num">~17 600</td>
+        <td class="num">~17 600</td><td class="num">&lt; 10 000</td></tr>
+      <tr><td>Requesty upstream na wywołanie narzędzia z /pairs</td>
+        <td class="num">3–4</td><td class="num">3–4</td>
+        <td class="num">3–4</td><td class="num">1–2</td></tr>
+      <tr><td>Czas dodania nowego modułu (kod → produkcja)</td>
+        <td class="num">~2 dni</td><td class="num">~2 dni</td>
+        <td class="num">niezmierzone</td><td class="num">&lt; 0,5 dnia</td></tr>
+      <tr><td>Linie workflow deploy</td>
+        <td class="num">436</td><td class="num miss">452</td>
+        <td class="num miss">458</td><td class="num">~175</td></tr>
+      <tr><td>Największy plik w repo</td>
+        <td class="num">3 302 (test) / 2 124 (prod)</td><td class="num">bez zmian</td>
+        <td class="num">bez zmian</td><td class="num">&lt; 1 000</td></tr>
+      <tr><td>Sondy mogące przejść na starym kontenerze</td>
+        <td class="num">4 z 7</td><td class="num hit">0 ✓</td>
+        <td class="num hit">0 ✓</td><td class="num">0</td></tr>
+    </tbody>
+  </table></div>
+
+  <p><b>Po dwóch iteracjach trzy metryki są na celu, trzy stoją, jedna rośnie.</b>
+  Iteracja 0 była naprawcza i dwie liczby poszły w niej w górę — to normalny jej kształt.
+  Iteracja 1 spłaciła jedną z nich z nawiązką: ~80 linii świadomie zrównanych kopii
+  <code>_detail</code> zamieniło się w jeden egzemplarz, a razem z nimi zeszła cała reszta,
+  959 → 74.</p>
+  <p>Rosną wciąż <b>wiersze workflow deploy</b>: 436 → 452 → 458, bo najpierw doszła asercja
+  tagu obrazu, a potem <code>file:</code> obok nowego kontekstu w sześciu plikach. To jest
+  dokładnie ten dług, który iteracja 2 spłaca reusable workflow — a przy okazji rachunek
+  robi się prostszy, bo teraz sześć z siedmiu plików różni się o dwie linie więcej tego
+  samego.</p>
+  <p><b>74 linie, które zostały, to szwy, nie kopie</b> — <code>provider.py</code>,
+  <code>auth.py</code> i <code>routers/models.py</code>, po docstringu i jednej linii
+  wiązania, trzymające klucz API, ustawienie i typ odpowiedzi każdego modułu. Zejście do zera
+  znaczyłoby pakiet czytający własny klucz OpenAI, a osobne klucze agenta i teams są celowe:
+  koszt eksperymentów ma mieć własną linię w rachunku.</p>
+
+  <p>Kolejność iteracji jest jednocześnie kolejnością malejącego zwrotu: 0 zamyka bugi, 1 zamyka
+  jedyną systemową klasę ryzyka, 2 tnie koszt każdej przyszłej zmiany, 3–4 oddają największe
+  pojedyncze zyski w złożoności i wydajności, 5–6 to porządki, które po 1–4 stają się tanie.
+  Plan można przerwać po dowolnej iteracji i każda z osobna zostawia repo w lepszym stanie, niż
+  je zastała. Po dwóch pierwszych to nie jest już założenie: <code>main</code> stoi zielony po
+  każdej z nich, a wdrożenia poszły bez ręcznego kroku.</p>
+
+  <div class="callout">
+    <p><b>Czego iteracja 1 dowiodła o pomiarze.</b> Plan opierał trzy pakiety na oszacowaniu
+    („<code>provider.py</code> 95% identyczny", „~2000+ linii kopii") i wszystkie trzy liczby
+    były nietrafione — w obie strony. Zmierzenie przed pisaniem propozycji skasowało jeden
+    pakiet, dołożyło dwóch lokatorów, których plan nie widział, i zamieniło pytanie otwarte
+    w designie na odpowiedź, której przesłanka była fałszywa. Skrypt pomiarowy jest teraz w
+    repo, a <code>docs/architecture.md</code> powołuje się na niego jako na sposób sprawdzenia
+    pierwszego warunku nowej reguły — bo reguła, której warunek jest liczbą, potrzebuje liczby
+    do sprawdzenia, nie do zacytowania.</p>
+    <p><b>Czego iteracja 0 dowiodła o samym planie.</b> Zasada nr 5 — „każdy mechanizm obronny
+    ma test swojego trybu awarii" — okazała się droższa i cenniejsza, niż wyglądała na papierze.
+    Droższa: trzy z ośmiu poprawek wymagały zbudowania szwu, którego nie było (polityka backoffu
+    wyciągnięta do czystej funkcji, dwa prawdziwe serwery na jednym porcie zamiast podniesionego
+    wyjątku). Cenniejsza: dokładnie te trzy testy złapały, że pierwotny opis poprawki był
+    niepełny — <span style="white-space:nowrap">#2</span> w wersji z audytu wprowadziłby błąd
+    lustrzany, a <span style="white-space:nowrap">#7</span> naprawiłby połowę problemu. Reguła
+    zostaje bez zmian na iteracje 1–6.</p>
+  </div>
+</main>

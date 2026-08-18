@@ -1,0 +1,1066 @@
+<title>Audyt TradingCenter</title>
+<style>
+  :root {
+    --bg: #f2f4f7;
+    --surface: #ffffff;
+    --surface-2: #e9edf2;
+    --ink: #1c2430;
+    --ink-2: #4a5666;
+    --ink-3: #74808f;
+    --line: #d5dbe3;
+    --accent: #2456c6;
+    --accent-soft: #e3eafb;
+    --high: #b23a3a;
+    --high-soft: #f6e4e4;
+    --med: #a06a14;
+    --med-soft: #f5ecd9;
+    --low: #37784f;
+    --low-soft: #e1efe6;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+    --serif: "Charter", "Iowan Old Style", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  :root:not([data-theme="light"]) { }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141922;
+      --surface: #1b212c;
+      --surface-2: #232b38;
+      --ink: #e5eaf1;
+      --ink-2: #a8b2c0;
+      --ink-3: #7d8798;
+      --line: #323c4b;
+      --accent: #6f96e8;
+      --accent-soft: #24304a;
+      --high: #d97070;
+      --high-soft: #3a2626;
+      --med: #cf9b46;
+      --med-soft: #37301f;
+      --low: #6cb287;
+      --low-soft: #21332a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141922;
+    --surface: #1b212c;
+    --surface-2: #232b38;
+    --ink: #e5eaf1;
+    --ink-2: #a8b2c0;
+    --ink-3: #7d8798;
+    --line: #323c4b;
+    --accent: #6f96e8;
+    --accent-soft: #24304a;
+    --high: #d97070;
+    --high-soft: #3a2626;
+    --med: #cf9b46;
+    --med-soft: #37301f;
+    --low: #6cb287;
+    --low-soft: #21332a;
+  }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    line-height: 1.6;
+    margin: 0;
+  }
+  main { max-width: 1080px; margin: 0 auto; padding: 0 24px 96px; }
+  header.masthead {
+    max-width: 1080px; margin: 0 auto; padding: 56px 24px 8px;
+  }
+  .eyebrow {
+    font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase;
+    color: var(--accent); font-weight: 600; margin: 0 0 10px;
+  }
+  h1 {
+    font-family: var(--serif); font-size: clamp(34px, 5vw, 52px);
+    line-height: 1.08; margin: 0 0 14px; text-wrap: balance; font-weight: 700;
+  }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 62ch; margin: 0 0 20px; }
+  .meta-row {
+    display: flex; flex-wrap: wrap; gap: 10px 26px;
+    font-size: 13px; color: var(--ink-3);
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+    padding: 12px 0; margin-bottom: 8px;
+  }
+  .meta-row b { color: var(--ink-2); font-weight: 600; }
+  .since { border-left: 3px solid var(--accent); background: var(--surface);
+    border-radius: 0 8px 8px 0; padding: 14px 18px; margin: 22px 0; max-width: 80ch; }
+  .since p { margin: 0; font-size: 14.5px; }
+  .since p + p { margin-top: 8px; }
+  .since ul { margin: 8px 0 0; padding-left: 20px; font-size: 14.5px; }
+  .since li { margin: 3px 0; }
+  h2 {
+    font-family: var(--serif); font-size: 30px; line-height: 1.15;
+    margin: 72px 0 8px; text-wrap: balance;
+  }
+  h3 { font-size: 19px; margin: 40px 0 8px; }
+  p { max-width: 72ch; }
+  .section-note { color: var(--ink-2); max-width: 72ch; margin-top: 0; }
+  code, .path {
+    font-family: var(--mono); font-size: 0.88em;
+    background: var(--surface-2); border-radius: 4px; padding: 1px 5px;
+  }
+  figure { margin: 28px 0; }
+  .diagram-frame {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 20px; overflow-x: auto;
+  }
+  .diagram-frame svg { min-width: 860px; max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  figcaption { font-size: 13.5px; color: var(--ink-3); margin-top: 10px; max-width: 78ch; }
+
+  /* karty ustaleń */
+  .finding {
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; padding: 18px 20px; margin: 14px 0;
+  }
+  .finding-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .finding h4 { margin: 0; font-size: 16.5px; }
+  .sev {
+    font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+    border-radius: 99px; padding: 2px 10px; white-space: nowrap;
+  }
+  .sev.high { color: var(--high); background: var(--high-soft); }
+  .sev.med  { color: var(--med);  background: var(--med-soft); }
+  .sev.low  { color: var(--low);  background: var(--low-soft); }
+  .finding p { margin: 10px 0 0; font-size: 14.5px; color: var(--ink-2); }
+  .finding .fix { color: var(--ink); }
+  .finding .fix::before { content: "Propozycja — "; font-weight: 650; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  tr:last-child td { border-bottom: none; }
+  td.num { font-variant-numeric: tabular-nums; text-align: right; font-family: var(--mono); font-size: 13px; }
+
+  /* diagramy */
+  .d-node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.2; rx: 6; }
+  .d-cont { fill: none; stroke: var(--line); stroke-width: 1.2; rx: 10; }
+  .d-ext  { fill: none; stroke: var(--ink-3); stroke-width: 1.2; stroke-dasharray: 5 4; rx: 6; }
+  .d-name { fill: var(--ink); font: 600 13px var(--sans); text-anchor: middle; }
+  .d-sub  { fill: var(--ink-3); font: 11px var(--mono); text-anchor: middle; }
+  .d-cap  { fill: var(--ink-3); font: 600 11px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; }
+  .d-elab { fill: var(--ink-3); font: 11.5px var(--sans); }
+  .d-edge { stroke: var(--ink-3); stroke-width: 1.3; fill: none; }
+  .d-dash { stroke-dasharray: 5 4; }
+  .d-acc  { stroke: var(--accent); }
+  .d-acc-lab { fill: var(--accent); font: 600 11.5px var(--sans); }
+  .d-arr  { fill: var(--ink-3); }
+  .d-arr-acc { fill: var(--accent); }
+
+  .toc { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 0; padding: 0; list-style: none; }
+  .toc a {
+    display: inline-block; font-size: 13.5px; text-decoration: none;
+    color: var(--accent); background: var(--accent-soft);
+    border-radius: 99px; padding: 5px 14px;
+  }
+  .toc a:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<header class="masthead">
+  <p class="eyebrow">Raport techniczny · monorepo</p>
+  <h1>Audyt TradingCenter</h1>
+  <p class="lede">Analiza ośmiu modułów i infrastruktury pod kątem miejsc do refaktoryzacji,
+  uproszczeń i mechanizmów, które urosły ponad swoją potrzebę — z mapą architektury
+  i drogi wdrożeniowej.</p>
+  <div class="meta-row">
+    <span><b>Zakres:</b> 8 modułów · infra · CI</span>
+    <span><b>Kod:</b> ~118 tys. linii</span>
+    <span><b>Data:</b> 18 sierpnia 2026</span>
+    <span><b>Metoda:</b> 6 równoległych przeglądów</span>
+  </div>
+  <div class="since">
+    <p><b>Ten dokument jest datowaną migawką, nie stanem na dziś.</b> Powstał 18 sierpnia
+    2026 rano; tego samego dnia zamknięto dwie pierwsze iteracje planu, który z niego
+    wyrósł (<code>docs/plan-refactoru.html</code>). Ustalenia zostają w oryginalnym
+    brzmieniu — po to, żeby dało się przeczytać, co było widać wtedy — ale przed lekturą
+    warto wiedzieć, czego już nie ma:</p>
+    <ul>
+      <li><b>Osiem poprawek z „Od czego zacząć" jest zrobionych</b> (PR&nbsp;#156), każda z
+      testem swojego trybu awarii. Sondy deploy nie mogą już przejść na starym kontenerze.</li>
+      <li><b>Ręczne kopie: 959 → 74 linie</b> (PR&nbsp;#158). Powstały pakiety pod
+      <code>packages/</code>, a reguła „bez wspólnej biblioteki" ustąpiła miejsca dzieleniu
+      kodu przy buildzie pod trzema warunkami — <code>docs/architecture.md</code>.</li>
+      <li><b>Hook <code>require-review</code> nie istnieje</b> (PR&nbsp;#157), a
+      <code>review.md</code> jest opcjonalny. Audyt podawał jego rozmiar jako 383 linie —
+      miał 256; te 383 to hook razem z własnymi testami.</li>
+      <li><b>Kilka liczb audytu było nietrafionych</b>, co wyszło dopiero przy mierzeniu:
+      <code>provider.py</code> był identyczny w 79,4%, nie 95%; kopii było ~959 linii, nie
+      ~2000+; <code>db.py</code> był bliźniakiem tylko agent↔teams.</li>
+    </ul>
+    <p>Czego audyt nie tknął i co wciąż czeka: powierzchnia narzędzi MCP (~17,6 tys.
+    tokenów na turę), <code>Chart.tsx</code>, pliki-molochy po stronie Pythona,
+    ujednolicenie siedmiu workflow wdrożeniowych. To są iteracje 2–6.</p>
+  </div>
+
+  <ul class="toc">
+    <li><a href="#architektura">Mapa architektury</a></li>
+    <li><a href="#infrastruktura">Infrastruktura i CI/CD</a></li>
+    <li><a href="#synteza">Synteza</a></li>
+    <li><a href="#ustalenia">Ustalenia per moduł</a></li>
+  </ul>
+</header>
+
+<main>
+  <h2 id="architektura">Mapa architektury</h2>
+  <p class="section-note">Osiem niezależnych modułów bez wspólnej biblioteki — każda strzałka to
+  opublikowany kontrakt (HTTP/OpenAPI albo MCP), nigdy import. Brama jest jedynymi drzwiami do
+  capital.com; do rachunku prowadzi osobny moduł z imienną listą wywołujących.</p>
+
+  <figure>
+    <div class="diagram-frame">
+    <svg viewBox="0 0 1000 680" role="img" aria-label="Mapa modułów TradingCenter: ścieżka odczytu przez capital-gateway i market-data, narzędzia MCP dla agent i teams, ścieżka zleceń przez trading-mcp oraz terminal jako konsument.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr"/>
+        </marker>
+        <marker id="ar-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr-acc"/>
+        </marker>
+      </defs>
+
+      <!-- zewnętrzne -->
+      <rect class="d-ext" x="30" y="14" width="170" height="46" rx="6"/>
+      <text class="d-name" x="115" y="34">capital.com</text>
+      <text class="d-sub" x="115" y="50">REST + WebSocket</text>
+
+      <!-- rząd 1 -->
+      <rect class="d-node" x="30" y="130" width="180" height="62" rx="6"/>
+      <text class="d-name" x="120" y="156">capital-gateway</text>
+      <text class="d-sub" x="120" y="174">:8010 · bez bazy</text>
+
+      <rect class="d-node" x="300" y="130" width="200" height="62" rx="6"/>
+      <text class="d-name" x="400" y="156">market-data</text>
+      <text class="d-sub" x="400" y="174">:8020 · PostgreSQL</text>
+
+      <rect class="d-node" x="770" y="130" width="180" height="62" rx="6"/>
+      <text class="d-name" x="860" y="156">market-mcp</text>
+      <text class="d-sub" x="860" y="174">:8040 · tylko odczyt</text>
+
+      <!-- rząd 2 -->
+      <rect class="d-node" x="30" y="300" width="180" height="62" rx="6"/>
+      <text class="d-name" x="120" y="326">trading-mcp</text>
+      <text class="d-sub" x="120" y="344">:8060 · zlecenia, demo</text>
+
+      <rect class="d-node" x="300" y="300" width="200" height="62" rx="6"/>
+      <text class="d-name" x="400" y="326">teams</text>
+      <text class="d-sub" x="400" y="344">:8050 · własna baza</text>
+
+      <rect class="d-ext" x="548" y="308" width="164" height="46" rx="6"/>
+      <text class="d-name" x="630" y="328">OpenAI</text>
+      <text class="d-sub" x="630" y="344">2 osobne klucze</text>
+
+      <rect class="d-node" x="770" y="300" width="180" height="62" rx="6"/>
+      <text class="d-name" x="860" y="326">agent</text>
+      <text class="d-sub" x="860" y="344">:8030 · własna baza</text>
+
+      <!-- teams-mcp -->
+      <rect class="d-node" x="460" y="470" width="190" height="56" rx="6"/>
+      <text class="d-name" x="555" y="493">teams-mcp</text>
+      <text class="d-sub" x="555" y="510">:8070 · katalog zespołów</text>
+
+      <!-- terminal -->
+      <rect class="d-node" x="300" y="580" width="300" height="64" rx="6"/>
+      <text class="d-name" x="450" y="606">terminal</text>
+      <text class="d-sub" x="450" y="624">:5173 · konsument, nie peer</text>
+
+      <!-- krawędzie: ścieżka odczytu -->
+      <line class="d-edge" x1="120" y1="130" x2="120" y2="60" marker-end="url(#ar)"/>
+      <text class="d-elab" x="128" y="99">REST + WS</text>
+
+      <line class="d-edge" x1="300" y1="161" x2="210" y2="161" marker-end="url(#ar)"/>
+      <text class="d-elab" x="255" y="151" text-anchor="middle">historia + stream</text>
+
+      <line class="d-edge" x1="770" y1="161" x2="500" y2="161" marker-end="url(#ar)"/>
+      <text class="d-elab" x="635" y="151" text-anchor="middle">HTTP · tylko odczyt</text>
+
+      <!-- agent/teams → market-mcp -->
+      <line class="d-edge" x1="860" y1="300" x2="860" y2="192" marker-end="url(#ar)"/>
+      <text class="d-elab" x="868" y="250">MCP (HTTP)</text>
+      <line class="d-edge" x1="470" y1="300" x2="795" y2="192" marker-end="url(#ar)"/>
+      <text class="d-elab" x="610" y="240" text-anchor="middle">MCP (HTTP)</text>
+
+      <!-- ścieżka zleceń -->
+      <line class="d-edge" x1="120" y1="300" x2="120" y2="192" marker-end="url(#ar)"/>
+      <text class="d-elab" x="128" y="242">klucz bramy · demo-check</text>
+      <line class="d-edge" x1="300" y1="331" x2="210" y2="331" marker-end="url(#ar)"/>
+      <text class="d-elab" x="255" y="322" text-anchor="middle">MCP</text>
+      <polyline class="d-edge" points="810,362 810,400 120,400 120,362" marker-end="url(#ar)"/>
+      <text class="d-elab" x="465" y="392" text-anchor="middle">MCP · zlecenia (imienna lista wywołujących)</text>
+
+      <!-- OpenAI -->
+      <line class="d-edge" x1="500" y1="331" x2="548" y2="331" marker-end="url(#ar)"/>
+      <line class="d-edge" x1="770" y1="331" x2="712" y2="331" marker-end="url(#ar)"/>
+
+      <!-- token operatora -->
+      <polyline class="d-edge d-acc" points="890,362 890,498 650,498" marker-end="url(#ar-acc)"/>
+      <text class="d-acc-lab" x="898" y="440">MCP ·</text>
+      <text class="d-acc-lab" x="898" y="455">X-Operator-Auth</text>
+      <polyline class="d-edge d-acc" points="460,498 360,498 360,362" marker-end="url(#ar-acc)"/>
+      <text class="d-acc-lab" x="252" y="490">HTTP · token operatora</text>
+
+      <!-- terminal -->
+      <polyline class="d-edge" points="300,596 255,596 255,192" marker-end="url(#ar)"/>
+      <text class="d-elab" x="262" y="572">świece + WS</text>
+      <polyline class="d-edge" points="300,632 12,632 12,161 30,161" marker-end="url(#ar)"/>
+      <text class="d-elab" x="20" y="622">instrumenty</text>
+      <line class="d-edge" x1="430" y1="580" x2="404" y2="362" marker-end="url(#ar)"/>
+      <polyline class="d-edge" points="600,616 975,616 975,331 950,331" marker-end="url(#ar)"/>
+      <text class="d-elab" x="900" y="608">SSE / HTTP</text>
+    </svg>
+    </div>
+    <figcaption>Ścieżka odczytu biegnie z lewej do prawej: brama jest jedynymi drzwiami do
+    capital.com, archiwum należy do market-data, a market-mcp podaje je modelom w formie
+    zredukowanej. Ścieżka zleceń (dół) prowadzi wyłącznie przez trading-mcp, który potwierdza
+    rachunek demo pytaniem do bramy, nie konfiguracją. Niebieska para krawędzi to jedyne miejsce,
+    gdzie wędruje cudzy mandat: agent przekazuje token operatora do teams-mcp, a ten dalej do
+    teams — dzięki temu zespoły należą do człowieka, nie do modułu.</figcaption>
+  </figure>
+
+  <h2 id="infrastruktura">Infrastruktura i CI/CD</h2>
+  <p class="section-note">Kod i infrastruktura lądują osobno: workflow wdraża obrazy, ale
+  <code>terraform apply</code> jest zawsze ręczny — a zmiany Entra wykonuje wyłącznie operator
+  lokalnie, bo principal CI ma tylko odczyt katalogu. Każdy moduł migruje własną bazę we własnym
+  <code>lifespan</code>, pod advisory lockiem, własną tożsamością.</p>
+
+  <figure>
+    <div class="diagram-frame">
+    <svg viewBox="0 0 1000 600" role="img" aria-label="Droga wdrożeniowa TradingCenter: GitHub Actions buduje obrazy do GHCR, App Services je pobierają; terraform apply jest ręczny, zmiany Entra robi operator lokalnie; lokalny dev używa Postgresa z compose.yaml.">
+      <defs>
+        <marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr"/>
+        </marker>
+      </defs>
+
+      <!-- GitHub -->
+      <rect class="d-cont" x="30" y="40" width="300" height="300" rx="10"/>
+      <text class="d-cap" x="42" y="66">GitHub Actions</text>
+      <rect class="d-node" x="50" y="80" width="260" height="44" rx="6"/>
+      <text class="d-name" x="180" y="98">checks.yml</text>
+      <text class="d-sub" x="180" y="114">filtr: tylko moduły z diffu</text>
+      <rect class="d-node" x="50" y="140" width="260" height="56" rx="6"/>
+      <text class="d-name" x="180" y="162">8× deploy-*.yml</text>
+      <text class="d-sub" x="180" y="180">push do main → obraz → smoke</text>
+      <rect class="d-node" x="50" y="212" width="260" height="44" rx="6"/>
+      <text class="d-name" x="180" y="230">terraform.yml</text>
+      <text class="d-sub" x="180" y="246">plan na PR — nigdy apply</text>
+      <rect class="d-node" x="50" y="268" width="260" height="56" rx="6"/>
+      <text class="d-name" x="180" y="290">terraform-apply.yml</text>
+      <text class="d-sub" x="180" y="308">ręczny · odmawia azuread_*</text>
+
+      <!-- GHCR -->
+      <rect class="d-node" x="400" y="140" width="150" height="56" rx="6"/>
+      <text class="d-name" x="475" y="162">GHCR</text>
+      <text class="d-sub" x="475" y="180">obrazy kontenerów</text>
+
+      <!-- Azure -->
+      <rect class="d-cont" x="620" y="40" width="350" height="420" rx="10"/>
+      <text class="d-cap" x="632" y="66">Azure · Terraform (infra/)</text>
+      <rect class="d-node" x="640" y="80" width="310" height="72" rx="6"/>
+      <text class="d-name" x="795" y="104">7× App Service</text>
+      <text class="d-sub" x="795" y="122">Easy Auth · managed identity</text>
+      <text class="d-sub" x="795" y="138">allowed_applications między modułami</text>
+      <rect class="d-node" x="640" y="168" width="310" height="56" rx="6"/>
+      <text class="d-name" x="795" y="190">PostgreSQL Flexible Server</text>
+      <text class="d-sub" x="795" y="208">bazy: marketdata · agent · teams</text>
+      <rect class="d-node" x="640" y="240" width="310" height="52" rx="6"/>
+      <text class="d-name" x="795" y="261">Key Vault</text>
+      <text class="d-sub" x="795" y="278">openai-api-key · teams-openai-api-key</text>
+      <rect class="d-node" x="640" y="308" width="310" height="52" rx="6"/>
+      <text class="d-name" x="795" y="329">Entra ID</text>
+      <text class="d-sub" x="795" y="346">rejestracje aplikacji · CI: tylko odczyt</text>
+      <rect class="d-node" x="640" y="376" width="310" height="52" rx="6"/>
+      <text class="d-name" x="795" y="397">Static Web App</text>
+      <text class="d-sub" x="795" y="414">terminal</text>
+
+      <!-- operator -->
+      <rect class="d-ext" x="30" y="380" width="300" height="60" rx="6"/>
+      <text class="d-name" x="180" y="404">Operator (lokalnie)</text>
+      <text class="d-sub" x="180" y="422">terraform apply · zmiany Entra</text>
+
+      <!-- dev -->
+      <rect class="d-ext" x="30" y="500" width="940" height="64" rx="6"/>
+      <text class="d-name" x="500" y="526">Środowisko lokalne</text>
+      <text class="d-sub" x="500" y="546">compose.yaml → PostgreSQL 127.0.0.1:55432 (3 bazy) · dev.sh / dev.ps1 · porty 8010–8070, 5173 · jeden stack naraz</text>
+
+      <!-- krawędzie -->
+      <line class="d-edge" x1="310" y1="168" x2="400" y2="168" marker-end="url(#ar2)"/>
+      <text class="d-elab" x="355" y="158" text-anchor="middle">push</text>
+      <line class="d-edge" x1="550" y1="160" x2="640" y2="118" marker-end="url(#ar2)"/>
+      <text class="d-elab" x="600" y="126">pull</text>
+      <polyline class="d-edge d-dash" points="310,186 380,186 380,220 605,220 605,146 640,146" marker-end="url(#ar2)"/>
+      <text class="d-elab" x="492" y="212" text-anchor="middle">smoke-check: /health · /ping · control plane</text>
+      <line class="d-edge" x1="310" y1="296" x2="620" y2="296" marker-end="url(#ar2)"/>
+      <text class="d-elab" x="465" y="286" text-anchor="middle">apply (bez azuread_*)</text>
+      <line class="d-edge" x1="330" y1="410" x2="620" y2="410" marker-end="url(#ar2)"/>
+      <text class="d-elab" x="465" y="400" text-anchor="middle">apply — Entra</text>
+      <line class="d-edge" x1="700" y1="152" x2="700" y2="168" marker-end="url(#ar2)"/>
+      <text class="d-elab" x="708" y="164">migracje w lifespan · advisory lock</text>
+    </svg>
+    </div>
+    <figcaption>Siedem backendowych App Service ciągnie obrazy z GHCR po pushu do main; smoke-check
+    każdego wdrożenia sięga tak głęboko, jak pozwala sieć — od <code>/health</code> w procesie po
+    słabszy odczyt control plane u bramy, której firewall nie wpuszcza nikogo poza market-data
+    i trading-mcp. Prawa kolumna to jeden serwer Postgresa z trzema logicznymi bazami — lokalny
+    kontener z <code>compose.yaml</code> powiela dokładnie ten kształt.</figcaption>
+  </figure>
+
+  <h2 id="synteza">Synteza</h2>
+  <p class="section-note">Cztery przekrojowe wzorce wracają w niezależnych przeglądach różnych
+  części repo — to one, a nie pojedyncze pliki, są właściwym adresatem refaktoryzacji.</p>
+
+  <h3>1. Dryf ręcznych kopii to ryzyko systemowe numer jeden</h3>
+  <p>Reguła „żadnej wspólnej biblioteki" jest świadoma i broni się architektonicznie — ale jej
+  cena ujawniła się w czterech niezależnych miejscach w ten sam sposób: <b>poprawka błędu ląduje
+  w jednej kopii i nigdy nie dociera do drugiej</b>. Konkretnie: obsługa „Session terminated"
+  naprawiona w teams 17 sierpnia, nieobecna w agencie (ścieżka pieniędzy); normalizacja
+  <code>sort_keys</code> w skrypcie kontraktu obecna w dwóch modułach MCP z trzech; asercja tagu
+  obrazu w dwóch smoke-checkach z sześciu; teams-mcp bez linii <code>aiohttp</code>, za którą
+  market-mcp zapłacił już 13 sierpnia niestartującym kontenerem. Bliźniacze pliki agent↔teams to
+  1 283 linie, z czego 77% bajt-w-bajt identycznych — dryfują dokładnie tam, gdzie ktoś coś
+  naprawił.</p>
+  <p>Wniosek: nie łamać reguły, tylko dać jej mechanizm kontroli — lekki job CI porównujący
+  znane pary bliźniaków i raportujący diff, komentarz-nagłówek w każdej kopii wskazujący
+  rodzeństwo, oraz zwyczaj: poprawka w bliźniaku = test regresyjny w obu modułach.</p>
+
+  <h3>2. Obrony, które nie sprawdzają tego, co obiecują</h3>
+  <p>Powtarzający się kształt: mechanizm napisany po incydencie, który nie weryfikuje własnego
+  wyniku. <code>stream_tokens_for</code> wykonuje request naprawczy i wyrzuca odpowiedź;
+  demo-guard trading-mcp porównuje z literałem, który nie umie być inny; cztery smoke-checki
+  odpytują HTTP, na który odpowiada jeszcze stary kontener; walidator kształtu wskaźników
+  przepuszcza wpis, który deklaruje strefy, a liczy puste linie. Każda z tych obron ma świetnie
+  udokumentowany powód istnienia — i dziurę dokładnie w scenariuszu, dla którego powstała.</p>
+
+  <h3>3. Kod „na przyszłość", który już dostał odpowiedź</h3>
+  <p>Transport stdio w market-mcp (~140 linii + najwolniejszy test suite'u, domyślny tryb
+  wiesza proces, omija middleware tożsamości — a dwa młodsze moduły MCP mają testy asercące
+  <i>nieobecność</i> tego wzorca); <code>teams_scope</code> + zależność azure-identity dla
+  ścieżki, której nie ma; zasoby MCP, których żaden konsument nie czyta (137 linii);
+  <code>provider_params</code> z zerem wywołujących i możliwością nadpisania pól zlecenia;
+  zapasowe klucze Capital w .env.example dla pytania zamkniętego pomiarem 10 sierpnia.
+  Wszystko to są odpowiedziane pytania — kod może wyjść, a zmierzone fakty zostają w
+  docstringach.</p>
+
+  <h3>4. Pojedyncze pliki, które urosły ponad miarę</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Plik</th><th>Linie</th><th>Problem</th><th>Cięcie</th></tr></thead>
+    <tbody>
+      <tr><td class="path">terminal/chart/Chart.tsx</td><td class="num">2 124</td>
+        <td>funkcja 1 435 linii, 26 refów, 17 efektów; test 3 302 linie</td>
+        <td>4 hooki + ChartReadout.tsx → ~600</td></tr>
+      <tr><td class="path">teams/store.py</td><td class="num">1 258</td>
+        <td>schedules ↔ triggery zdublowane wewnątrz pliku (~400 linii)</td>
+        <td>parametryzacja po tabeli → −200</td></tr>
+      <tr><td class="path">agent/store.py</td><td class="num">911</td>
+        <td>pięć niepowiązanych domen w jednym pliku</td>
+        <td>pakiet store/ z re-exportem</td></tr>
+      <tr><td class="path">market_data/contract.py</td><td class="num">747</td>
+        <td>~200 linii mechanicznych kopii pól, 2 martwe pola na drucie</td>
+        <td>model_validate + FromAlias → −80</td></tr>
+      <tr><td class="path">terminal/agent/agentChatStore.ts</td><td class="num">701</td>
+        <td>ręczna maszyna stanów, 7 cieni zmiennych poza stanem</td>
+        <td>mapa AbortControllerów → ~450</td></tr>
+      <tr><td class="path">terminal/teams/SchedulesPanel.tsx</td><td class="num">648</td>
+        <td>dwie sekcje-klony, historie bajt-w-bajt identyczne</td>
+        <td>generyczne RuleSection/FireHistory → −110</td></tr>
+      <tr><td class="path">market_data/routers/indicators.py</td><td class="num">511</td>
+        <td>compute 160 linii, _result_out 127 linii / 12 parametrów</td>
+        <td>tagowana unia computerów → ~60 + match</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Od czego zacząć — osiem małych poprawek o największym zwrocie</h3>
+  <div class="table-wrap"><table>
+    <thead><tr><th>#</th><th>Poprawka</th><th>Dlaczego najpierw</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td>Port retry „session-gone" z teams do agenta</td>
+        <td>żywy błąd na ścieżce zleceń; kod istnieje obok</td></tr>
+      <tr><td class="num">2</td><td>Ujednolicenie „czy narzędzie rusza rachunek" (konserwatywnie)</td>
+        <td>ciche obejście limitu dziennych zleceń</td></tr>
+      <tr><td class="num">3</td><td>Asercja tagu obrazu w 4 smoke-checkach</td>
+        <td>zielone deploye nad starym kontenerem; kod istnieje w 2 workflow</td></tr>
+      <tr><td class="num">4</td><td><code>stream_tokens_for</code>: sprawdzić odpowiedź + backoff w reconnect</td>
+        <td>gorąca pętla 20–40 req/min przez wspólny limit 10/s</td></tr>
+      <tr><td class="num">5</td><td>dev.ps1: teams-mcp do listy jobów, watch i finally</td>
+        <td>niewykrywana śmierć serwisu w dev</td></tr>
+      <tr><td class="num">6</td><td><code>edit_trigger</code>: <code>is not None</code> zamiast <code>or</code></td>
+        <td><code>cooldown_seconds=0</code> po cichu zachowuje starą wartość</td></tr>
+      <tr><td class="num">7</td><td>Flatten listy walidacyjnej w market-mcp <code>_detail</code></td>
+        <td>model dostaje repr listy dictów zamiast zdania</td></tr>
+      <tr><td class="num">8</td><td>Normalizacja + <code>ensure_ascii=False</code> w 3 skryptach kontraktu</td>
+        <td>flapujące checki i nieczytelne diffy snapshotów</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Co jest zdrowe i czego nie ruszać</h3>
+  <p>Granice modułów z kontraktami zamiast importów działają — dowód: żadne znalezisko nie
+  wymaga zmiany w dwóch modułach naraz poza świadomymi bliźniakami. Migracje w
+  <code>lifespan</code> pod advisory lockiem, katalog wskaźników jako dane (nowy wskaźnik = 1
+  plik, zero zmian w terminalu), tożsamości per moduł z imiennymi listami wywołujących, oraz
+  kultura komentarzy z datowanymi pomiarami — to filary, na których stoi reszta; ich koszt jest
+  uczciwie zapłacony. Rozmiar terminala (44 tys. linii) też jest w większości zasłużony: 42% to
+  testy, 10% wygenerowane kontrakty; ręcznego kodu jest ~16 tys., z czego mechaniczna
+  duplikacja to ~1,2 tys.</p>
+
+  <h2 id="ustalenia">Ustalenia per moduł</h2>
+  <p class="section-note">Każde ustalenie wskazuje konkretne miejsce w kodzie, powód i propozycję
+  uproszczenia. Ranga mówi o wpływie na utrzymanie i ryzyko — nie o pilności wdrożenia.</p>
+
+  <h3 id="u-gateway">capital-gateway · trading-mcp</h3>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Obrona przed 401-storm nie sprawdza własnego wyniku</h4></div>
+    <p><code>capital_gateway/app.py:60-88</code> — <code>stream_tokens_for</code> ma 27 linii,
+    z czego 25 to docstring, a 2 to kod: woła <code>session_details()</code> i <b>odrzuca
+    odpowiedź</b>. Gdy login pada trwale (zrotowane hasło, awaria providera), stare tokeny
+    zostają w pamięci, a pętla reconnect subskrybuje martwymi tokenami co 3 s — bez backoffu,
+    bez sufitu. To dokładnie ta niekończąca się pętla, przed którą funkcja miała bronić,
+    przeniesiona o poziom niżej. Zepsuty pokój to ~20–40 requestów/min do providera przez
+    wspólny limit 10/s, w nieskończoność. Oba testy mockują szczęśliwą ścieżkę.</p>
+    <p class="fix">sprawdzić <code>resp.is_success</code> i rzucić <code>GatewayError</code>;
+    w <code>Upstream._run</code> backoff wykładniczy 3 s → 60 s. Przenieść funkcję z
+    <code>app.py</code> do <code>client.py</code> — testy już importują ją „z app", co jest
+    symptomem złego adresu.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Demo-guard w trading-mcp waliduje stałą literałową</h4></div>
+    <p>Cały mechanizm — trójstanowe <code>_demo_verified</code>, inwalidacja w trzech klasach
+    błędów, re-check w <code>_write</code> przed każdym zapisem, 95 linii testów — porównuje
+    pole <code>environment</code> z <code>"demo"</code>. A to pole w
+    <code>capital_gateway/adapter.py:318-326</code> jest <b>zahardkodowanym literałem</b>,
+    który nigdy nie czyta <code>Settings</code>. Guard nie umie wykryć tego, od czego ma
+    bronić — wykrywa tylko „brama żyje", co i tak wykrywa następny request. Koszt: po
+    dowolnym błędzie (jedno 503, stary id pozycji → 404) każdy kolejny zapis to dwie rundy
+    zamiast jednej.</p>
+    <p class="fix">albo (a) uczciwie wyliczać <code>environment</code> z
+    <code>settings.capital_base_url</code> — jedna linia i guard zaczyna coś znaczyć — albo
+    (b) zostawić wyłącznie check startowy i usunąć <code>_demo_verified</code> z całą
+    otoczką (~50 linii testów mniej). Nie utrzymywać obu połówek w obecnej formie.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Martwy <code>provider_params</code> z nieograniczonym zasięgiem rażenia</h4></div>
+    <p><code>capital_gateway/dtos.py:200</code> — niewalidowany <code>dict</code> doklejany
+    do ciała zlecenia <b>po</b> polach modułu, więc mógłby nadpisać <code>epic</code>,
+    <code>size</code> czy <code>direction</code> za plecami wszystkich walidatorów — na
+    endpoincie tradingowym. Grep po całym repo: <b>zero wywołujących, które go ustawiają</b>.</p>
+    <p class="fix">usunąć. Jeśli musi zostać: odwrócić kolejność scalania i dodać allowlistę
+    kluczy.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Zapisy omijają własną konwersję błędów — 5 miejsc woła <code>.json()</code> na niesprawdzonej odpowiedzi</h4></div>
+    <p><code>adapter.py:253-285</code> — każdy odczyt idzie przez <code>_json_ok()</code>,
+    każdy zapis wprost przez <code>.json()</code>. HTML-owa strona 502 z App Service albo
+    puste 504 wychodzi z adaptera jako <code>JSONDecodeError</code> → nieobsłużone 500 ze
+    stack trace; JSON-owe 4xx ląduje jako <code>Order(status=REJECTED)</code>, przez co
+    odmowa providera i błąd bramy stają się nieodróżnialne — a na tym rozróżnieniu stoi cała
+    taksonomia <code>is_access_failure</code> w trading-mcp.</p>
+    <p class="fix">jeden helper <code>_write_json()</code> z konwersją nie-JSON-a na
+    <code>GatewayError</code>, pięć miejsc wywołania.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4><code>history.collect</code>: 146 linii, 5 współzależnych flag, wyjście z pętli w 5 miejscach</h4></div>
+    <p><code>capital_gateway/history.py:162-307</code> — największa funkcja w obu modułach.
+    Warunek końca to koniunkcja trzech predykatów ustawianych w trzech różnych miejscach,
+    a 28-linijkowy komentarz jest dowodem, że się zgadzają — poparty trzema zmierzonymi
+    incydentami produkcyjnymi. Rozumowanie jest jedyną strukturą; nic w kształcie kodu nie
+    blokuje czwartej regresji.</p>
+    <p class="fix">wyciągnąć decyzję o zakończeniu do czystej funkcji
+    <code>classify_ending() → "floor" | "provider_bottom" | "unanchored"</code>; trzy
+    incydenty z komentarza stają się trzema testami jednostkowymi bez transportu, a
+    <code>collect</code> spada do ~45 linii.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Snapshot kontraktu: 1 593 commitowane linie i pełny install zależności chronią 6 asercji</h4></div>
+    <p><code>trading-mcp/scripts/contract.py</code> — snapshot całego OpenAPI bramy z 66
+    polami <code>description</code> z docstringów: każda poprawka prozy w bramie czerwieni
+    CI trading-mcp, choć nie zmienia żadnego kształtu na drucie. Generacja instaluje od zera
+    pełny zestaw zależności bramy (z <code>azure-monitor-opentelemetry</code> ciągnącym ~30
+    pakietów) do katalogu tymczasowego — przy każdym uruchomieniu CI. A test konsumenta
+    sprawdza 6 rzeczy i <b>żadnego pola DTO</b>, których narzędzia faktycznie używają.</p>
+    <p class="fix">snapshotować projekcję (ścieżki + 6 używanych schematów, bez opisów) —
+    plik spada do ~200 linii, filtr CI zawęża się do <code>dtos.py</code>/<code>app.py</code>;
+    dopisać ~25 asercji o polach, które narzędzia czytają; wskazać uv stały cache'owalny
+    katalog zamiast <code>TemporaryDirectory</code>.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Powielona hydraulika odmów i porównanie klucza w dwóch kopiach</h4></div>
+    <p>Trzy linie „unknown instrument 404" występują <b>cztery razy</b>
+    (<code>adapter.py:158-221</code>); porównanie klucza bramy (<code>hmac.compare_digest</code>)
+    jest napisane dwa razy — w middleware i w handlerze WebSocket, z komentarzem „see above"
+    zamiast wspólnej funkcji; <code>GET /markets/{epic}</code> leci dwukrotnie dla jednego
+    odczytu świec DAY/WEEK, przez wspólny limit 10/s. W trading-mcp <code>_write</code> ma
+    72 linie, z czego ~52 to sześć niemal identycznych tłumaczeń wyjątków.</p>
+    <p class="fix">trzy helpery: <code>_market_or_404()</code>, <code>_key_matches()</code>
+    w <code>config.py</code>, tabelaryczny <code>_refuse()</code> w trading-mcp (~52 → ~18
+    linii); krótkie memo TTL dla <code>_market_open</code>.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev low">niska</span>
+    <h4>Martwy kod i martwa konfiguracja</h4></div>
+    <p><code>CAPITAL_API_KEY_SECONDARY</code>/<code>CAPITAL_PASSWORD_SECONDARY</code> w
+    <code>.env.example</code> — pytanie, na które miały odpowiedzieć, zmierzono i zamknięto
+    10 sierpnia; <code>Hub.room_count()</code> i <code>CapitalAdapter.aclose()</code> mają
+    wyłącznie testowych wywołujących (drugi to przyszły double-close); w README bramy ten
+    sam 8-linijkowy akapit występuje dwa razy. Guard MARKET-order w trading-mcp
+    (<code>orders.py:50-68</code>) kompensuje ciche gubienie <code>level</code>/<code>good_till</code>
+    przez bramę — walidator powinien mieszkać w bramie, wtedy chroni każdego wywołującego.</p>
+    <p class="fix">usunąć martwe zmienne (przenosząc zmierzone fakty do docstringa
+    <code>client.py</code>), skasować zduplikowany akapit, dodać walidator 422 w
+    <code>PlaceOrderRequest</code> i zwinąć kompensację w trading-mcp.</p>
+  </div>
+  <h3 id="u-agent-teams">agent · teams</h3>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Poprawka produkcyjnego błędu trafiła do teams i nigdy do agenta — na ścieżce pieniędzy</h4></div>
+    <p>Commit <code>bacf219</code> naprawił w <code>teams/tools/client.py</code> obsługę
+    „Session terminated" (kod 32600) z jednorazowym retry — po incydencie z 17 sierpnia,
+    gdy redeploy trading-mcp uśmiercił pierwsze zlecenie po restarcie. W
+    <code>agent/tools/client.py</code> grep po <code>_session_is_gone</code> daje <b>zero</b> —
+    a agent woła ten sam trading-mcp. U agenta jest gorzej niż było w teams: porażkę na
+    narzędziu ruszającym rachunek klasyfikuje jako <code>UNKNOWN</code> i każe operatorowi
+    iść sprawdzać konto — dla wywołania, które ewidentnie nie dotarło do serwera.</p>
+    <p class="fix">przenieść <code>_session_is_gone</code> + retry do agenta (odmowa
+    session-gone przychodzi zanim serwer przeczyta nazwę narzędzia, więc retry jest
+    bezpieczny nawet dla <code>place_order</code>) i dodać test regresyjny w obu modułach.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>„Czy to narzędzie rusza rachunek?" — dwie przeciwne odpowiedzi na to samo pytanie</h4></div>
+    <p>agent (<code>tools/client.py:213</code>): <code>read_only is not True</code> — brak
+    adnotacji = zapis. teams (<code>runner/loop.py:242</code>): <code>read_only is False</code>
+    — brak adnotacji = odczyt. To logiczne negacje na tym samym <code>readOnlyHint</code>
+    z tego samego trading-mcp. Jeśli trading-mcp kiedyś wypuści narzędzie bez adnotacji,
+    teams wyśle je <b>bez wiersza w <code>trades</code> i bez licznika dziennego limitu
+    zleceń</b> — ciche obejście <code>TradeGuard</code>.</p>
+    <p class="fix">przyjąć konserwatywne odczytanie agenta w obu modułach, z identycznym
+    komentarzem wskazującym bliźniaka; jeśli rozbieżność jest zamierzona — test w każdym
+    module asercący przeciwną decyzję, żeby przestała wyglądać na dryf.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Dwa niekompatybilne <code>ToolServerRegistry</code> pod jedną nazwą</h4></div>
+    <p>U agenta <code>configured</code> to <b>property → bool</b>, u teams <b>metoda →
+    lista</b>: przeniesione ślepo <code>if registry.configured:</code> u teams jest zawsze
+    prawdziwe (bound method). Kolizję nazw narzędzi agent po cichu <i>upuszcza</i> (dict
+    race decyduje, kto obsłuży <code>run_team</code>), teams twardo odmawia startu. Do tego
+    8 sygnatur w agencie anotuje <code>ToolServer</code>, choć płynie tam registry — typechecker
+    nie ostrzeże przy żadnej próbie ujednolicenia.</p>
+    <p class="fix">wyrównać powierzchnię (u agenta <code>configured()</code> → lista, kolizja
+    → odmowa jak <code>ToolNameCollision</code>; ~5 linii każda) i dodać <code>Protocol</code>
+    w <code>agent/tools/__init__.py</code> na te 8 sygnatur — pułapka staje się błędem typów.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Bliźniacze pliki: 77% bajt-w-bajt identyczne, a dryfują dokładnie tam, gdzie naprawiano błędy</h4></div>
+    <p>Zmierzone na 18 parach plików: 1 283 linie kodu po stronie agenta, z czego 989 (77%)
+    identycznych w teams — ~18-20% produkcyjnego Pythona każdego modułu to ręcznie
+    utrzymywana kopia drugiego. Reguła „bez wspólnej biblioteki" jest świadoma i zostaje;
+    ryzykiem jest wzorzec dryfu: teams naprawił w <code>schema_version.py</code> przypadek
+    pustych heads (komunikat z urwanym środkiem zdania), agent wciąż go ma. <code>db.py</code>
+    różni się <b>jedną stałą</b> (klucz locka 8030/8050), <code>provider.py</code> w 95%
+    identyczny.</p>
+    <p class="fix">skopiować wersję teams <code>schema_version.py</code> do agenta (zero
+    ryzyka); ujednolicić sygnatury <code>_checked_server</code>, żeby poprawki przenosiły
+    się przez kopiowanie; rozważyć okresowy skrypt porównujący pary bliźniaków i raportujący
+    dryf jako listę diffów.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>teams/store.py: 1 258 linii, w tym harmonogramy i triggery zdublowane wewnątrz jednego pliku</h4></div>
+    <p>~15 par funkcji lustrzanych (schedule ↔ trigger), ~400 linii — a wywołujący w
+    <code>clock.py</code> już przekazują różnicę trzema lambdami, więc uogólniono callera,
+    nie store. Udokumentowany w <code>clock.py:213-218</code> błąd fazy 2 wziął się dokładnie
+    z tej podwójności. Bliźniaczy problem: <code>_check_trigger</code> ma 107 linii i 8
+    osobnych <code>pool.acquire()</code>.</p>
+    <p class="fix">sparametryzować po nazwie tabeli (<code>_enabled_setter(table, id_column)</code>
+    itd.) — ~200 linii mniej bez zmiany zachowania; wyciągnąć wspólny ogon
+    <code>_fire_schedule</code>/<code>_check_trigger</code> do <code>_start_and_record()</code>.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Największe nietestowane jednostki: domknięcia w domknięciach</h4></div>
+    <p><code>agent/graph.py:112-306</code> — <code>build_graph</code> ma 195 linii z
+    124-linijkowym closure w środku i trzecim zagnieżdżonym; gałąź <code>outcome is None</code>
+    jest nieosiągalna produkcyjnie (<code>turn.py:184</code> zawsze podaje serwer).
+    <code>teams/runner/engine.py:260-409</code> — <code>_agent_runner</code>: 150 linii, pięć
+    zagnieżdżonych domknięć, protokół rozliczenia trade'a zapisany w <b>kolejności domknięć</b>
+    i mutowanym <code>nonlocal pending_trade</code>. Testy tych plików mają po 450-585 linii
+    głównie przez to.</p>
+    <p class="fix">agent: wyciągnąć <code>_execute_round(state, *, dispatcher)</code> na
+    poziom modułu, usunąć opcjonalność <code>tool_server</code>. teams: mała klasa
+    <code>_StepRunner</code> z hookami jako metodami i <code>pending_trade</code> jako
+    atrybutem — inwariant przestaje być własnością closure.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev low">niska</span>
+    <h4>Warstwy i migracje, które nie zarabiają na siebie</h4></div>
+    <p><code>agent/models.py</code>: 5 z 17 klas to lustrzane przepisy tabel bez zachowania —
+    dokładnie ta warstwa, którą teams w swoim <code>contract.py</code> jawnie odrzucił
+    („duplikacja, nie architektura"); każda tabela ma przez to trzy równoległe kształty.
+    ~750 linii migracji alembic (0005/0008/0010/0012) to wklejona proza promptów, choć
+    <code>PUT /prompt</code> robi to samo w runtime. <code>store.get_tool_calls</code> ma
+    wyłącznie testowych wywołujących; <code>agent/store.py</code> (911 linii) to pięć
+    niepowiązanych domen w jednym pliku, a limity rysunków importowane są ze store'a do
+    narzędzia — odwrócona warstwa.</p>
+    <p class="fix">zostawić w <code>models.py</code> typy wykresów/geometrii (mają
+    zachowanie), skasować 5 modeli przelotowych (~120 linii i jeden skok mapowania);
+    zdecydować: prompt jest danymi operatora (koniec migracji z prozą) albo kodem (anomalie
+    to <code>PUT /prompt</code>); podzielić store na pakiet <code>store/</code> z re-exportem.</p>
+  </div>
+
+  <h3 id="u-market-data">market-data</h3>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Ścieżka liczenia wskaźników: podwójne kodowanie kształtu wyjścia, którego nic nie uzgadnia</h4></div>
+    <p><code>routers/indicators.py</code> (511 linii): <code>compute</code> ma 160 linii i
+    osiem zadań; <code>_result_out</code> — 127 linii, 12 parametrów pozycyjnych i 7 gałęzi
+    dyspatchujących po <i>mieszance</i> dwóch kodowań: które z siedmiu opcjonalnych callbacków
+    jest ustawione oraz co mówi <code>output: Literal[...]</code>. Wpis deklarujący
+    <code>output="zones"</code> bez <code>compute_zones</code> po cichu spada do domyślnego
+    <code>compute = lambda: {}</code> i odpowiada „policzone, nic nie znaleziono" — dokładnie
+    to, przed czym broni walidator kontraktu. Gałęzie strzegą gołe <code>assert</code>y,
+    które znikają pod <code>python -O</code>.</p>
+    <p class="fix">zwinąć 7 callbacków w jedno tagowane pole <code>computer:
+    LinesComputer | ZonesComputer | ...</code>, z którego <code>output</code> jest
+    <i>wyprowadzany</i>; <code>_result_out</code> staje się <code>match</code> bez assertów.
+    Trzy bloki odczytu serii wyciągnąć do <code>_read_series()</code> — <code>compute</code>
+    spada do ~60 linii.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Ścieżka zapisu świec istnieje w trzech kopiach — i już się rozjechały</h4></div>
+    <p>„przefiltruj do okna → <code>write_candles</code> → <code>record_coverage</code> →
+    odśwież rollupy" jest napisane w <code>jobs/runner.py:111-142</code>,
+    <code>ingest/backfill.py:184-211</code> i <code>ingest/live.py:189-210</code> — a
+    semantyka <code>history_ends_at</code> i granic pokrycia różni się w każdej kopii, każda
+    z własnym wieloakapitowym komentarzem o krawędzi, którą pozostałe dwie też mają.</p>
+    <p class="fix">jedno <code>store.commit_candles(..., covered_from, covered_to,
+    history_ended)</code> — właściciel filtra, upsertu, scalenia pokrycia i odświeżenia
+    rollupów MINUTE; wywołujący deklarują tylko, które krawędzie okna zweryfikowali.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Setki walidacji na sekundę dla ramek, które są natychmiast wyrzucane</h4></div>
+    <p><code>gateway/stream.py</code> parsuje i waliduje pydantic-iem każdą ramkę
+    <code>quote</code> (~5/s na parę), a <code>ingest/live.py:_listen</code> nie ma gałęzi
+    dla <code>Quote</code> — przy 160 parach to setki walidacji na sekundę produkujące
+    obiekt, który natychmiast ginie.</p>
+    <p class="fix">jedna linia: <code>read_message</code> zwraca <code>None</code> dla
+    <code>"quote"</code>; model zostaje, jeśli potrzebują go testy.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Wewnątrzmodułowe kopie hydrauliki HTTP i mapowań</h4></div>
+    <p><code>_detail()</code> bajt-w-bajt w dwóch plikach <code>gateway/</code>;
+    <code>GatewayInstruments</code> ma helper <code>_get_json</code>, ale dwie własne metody
+    przepisują jego ciało ręcznie; <code>GatewayHistory.history</code> to czwarta kopia.
+    <code>db.py</code>: <code>connect()</code> i <code>pool()</code> to po dwie kopie tego
+    samego ciała (~94 linie roboty na ~35). <code>contract.py</code> (747 linii): cztery
+    <code>.of()</code> przepisują pole-po-polu identycznie nazwane atrybuty, wzorzec aliasów
+    <code>from</code>/<code>to</code> wypisany pięć razy; dwa martwe pola na drucie
+    (<code>anchored_at</code> nigdy nie ustawiane, literał <code>"anchored"</code> niemożliwy)
+    kosztują terminal obsługę <code>| undefined</code> dla przypadku, który nie może zajść.</p>
+    <p class="fix"><code>gateway/_http.py</code> z <code>_detail</code> + <code>_get_json</code>;
+    w db.py zbudować <code>kwargs</code> raz; <code>model_validate</code> +
+    <code>from_attributes</code> za czyste kopie; jeden typ <code>FromAlias</code>; usunąć
+    martwe pola zmianą kontraktu.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev low">niska</span>
+    <h4>Martwy kod, brak fabryki aplikacji i dryf komentarzy</h4></div>
+    <p>~150 linii martwych: <code>kernel.cross()</code> (docstring sam przyznaje: „nie czyta
+    żadien wpis"), <code>all_entries()</code>, <code>PairEstimate.clipped</code> na stałe
+    <code>False</code> na drucie, barrel <code>jobs/__init__</code> z 6 nazwami bez
+    zewnętrznych wywołujących. Brak <code>create_app()</code> ⇒ 1 906-linijkowy
+    <code>test_app.py</code> z 61 przypisaniami na globalny <code>app.state</code>.
+    Komentarze: cztery urwane nagłówki sekcji w katalogu wskaźników, README mówi „trzy
+    tabele" przy siedmiu, uzasadnienie <code>REQUEST_CEILING</code> cytuje pomiar dla 44
+    wpisów przy 57. Bonus: <code>safe_divide</code> obiecuje NaN, a oddaje <code>±inf</code>,
+    które serializuje się do niepoprawnego JSON-a.</p>
+    <p class="fix">skasować martwe; dodać <code>create_app()</code> i pociąć test_app.py po
+    istniejących banerach; naprawić urwane nagłówki i liczebniki; domknąć
+    <code>safe_divide</code> (np. <code>np.where(isfinite, x, nan)</code>).</p>
+  </div>
+
+  <h3 id="u-terminal">terminal</h3>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Chart.tsx to God component: 2 124 linie, w tym jedna funkcja na 1 435</h4></div>
+    <p>26 <code>useRef</code>, 17 efektów, 10 callbacków, 13-polowy interfejs propsów i 5
+    podkomponentów w jednym pliku. Sam efekt synchronizacji wskaźników ma 289 linii z
+    pięciogałęziowym dispatchem i <b>sześcioma niemal identycznymi pętlami sprzątającymi</b>;
+    efekt rysunków — trzy kopie bloku „reuse-if-instanceof-else-swap". Nikt nie jest w stanie
+    wnioskować o kolejności 17 efektów, a plik testowy ma 3 302 linie (największy w repo), bo
+    nie ma mniejszego szwu do testowania.</p>
+    <p class="fix">wyciąć cztery hooki (<code>useChartInstance</code>,
+    <code>useIndicatorLayers</code> z generycznym <code>Map&lt;string, Layer&gt;</code> i jedną
+    pętlą reconcile, <code>useDrawingLayers</code>, <code>useChartFocus</code>) plus
+    <code>ChartReadout.tsx</code> — 2 124 → ~600 linii, a fabryki warstw stają się testowalne
+    bez wykresu.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>21 ręcznych efektów fetch, choć właściwa abstrakcja już istnieje i jest użyta 3 razy</h4></div>
+    <p><code>teams/useTeamsData.ts</code> definiuje <code>useLoaded&lt;T&gt;</code> — dokładnie
+    właściwy kształt — i używa go w trzech miejscach. Ten sam 15-linijkowy szkielet
+    (<code>let cancelled</code> + AbortController + catch) jest równolegle wypisany ręcznie w
+    <b>21 miejscach</b> (~315 linii), niespójnie: część pomija guard
+    <code>signal.aborted</code>. Do tego <code>useTrackedPairs</code> i
+    <code>useJobHistory</code> to ten sam hook pollingu napisany dwa razy (~140 linii na ~60).</p>
+    <p class="fix">awansować <code>useLoaded</code> do <code>ui/</code> i użyć w ~18 miejscach;
+    dodać <code>usePolledRead&lt;T&gt;</code> dla trzech wariantów pollingu.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Trzy prymitywy rysunkowe wykresu są znak-w-znak identyczne poza geometrią</h4></div>
+    <p><code>RayPrimitive</code>, <code>ZonePrimitive</code> i <code>TrendlinePrimitive</code>
+    dzielą ~180 linii czystej duplikacji: te same 9 pól prywatnych, konstruktor, attach/detach,
+    axis-views i szkielet <code>hitTest</code> (39 linii różniących się wyłącznie nazwą klasy),
+    plus trzy 12-linijkowe klasy PaneView robiące to samo.</p>
+    <p class="fix">abstrakcyjna <code>MarkPrimitive&lt;TItem&gt;</code> w
+    <code>drawingStyle.ts</code> z dwoma abstrakcyjnymi metodami (<code>renderItems</code>,
+    <code>drawItems</code>) i generyczny <code>MarkPaneView&lt;T&gt;</code> — konkretne
+    prymitywy spadają do swojej geometrii (~90-140 linii każdy).</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Zakładka Teams: klony sekcji, drążenie propsów i drugi router w routowanej aplikacji</h4></div>
+    <p><code>SchedulesPanel.tsx</code> (648 linii): <code>ScheduleSection</code> i
+    <code>TriggerSection</code> to ten sam komponent z innymi rzeczownikami (~85 z ~100 linii
+    izomorficzne — i już dryfują: jedna sekcja ma ConfirmDialog usuwania, druga nie), a
+    <code>ScheduleHistory</code>/<code>TriggerHistory</code> są <b>bajt-w-bajt identyczne</b>
+    poza jednym wywołaniem API. Singleton <code>api</code> jest deklarowany jako props w 12
+    sygnaturach i przekazywany 14 razy; <code>models</code> drążone przez 5 poziomów.
+    <code>TeamsView</code> trzyma własną 5-wariantową unię <code>Open</code> zamiast tras —
+    przez co <b>run nie ma linku i ginie przy przeładowaniu</b>.</p>
+    <p class="fix">generyczne <code>RuleSection&lt;T&gt;</code> i <code>FireHistory</code>
+    (−110 linii); <code>TeamsApiContext</code> + <code>ModelCatalogueContext</code>; zagnieżdżone
+    trasy <code>/teams/:teamId/runs/:runId?</code> — react-router już jest zależnością, a
+    registry tras tylko czeka na <code>children</code>.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev low">niska</span>
+    <h4>Rozproszona drobnica: sklepy, SSE, przyciski, mappery</h4></div>
+    <p>Pięć ręcznych store'ów powtarza ten sam szkielet subscribe/commit, a
+    <code>safeLocalStorage()</code> jest wklejone dosłownie w trzech plikach (~120 linii na
+    20-linijkowy <code>createStore</code>). Czytnik SSE napisany dwa razy (agent/teams, ~35
+    wspólnych linii transportu). 74-znakowy className przycisku „Retry" występuje 8 razy
+    verbatim, <code>rounded border border-border</code> w 32 plikach — brak
+    <code>&lt;Button&gt;</code>/<code>&lt;Input&gt;</code>. <code>mapStatus</code> ×4,
+    <code>toIso</code> inline ×7, <code>gatewaySource</code> pisze ręcznie DTO, które są już w
+    wygenerowanym kontrakcie. Martwe: <code>SLOT_COUNT</code>, <code>isDrawingColorToken</code>;
+    539 linii dublerów testowych mieszka poza <code>src/test/</code>.</p>
+    <p class="fix"><code>createStore</code> + <code>safeStorage</code> +
+    <code>readSseStream&lt;T&gt;</code> + <code>&lt;Button&gt;</code>/<code>&lt;UnreachableNotice&gt;</code>
+    + <code>makeStatusMapper</code>; DTO bramy z <code>Wire["…"]</code>. Razem ~300 linii mniej
+    i cztery klasy dryfu zamknięte.</p>
+  </div>
+
+  <h3 id="u-mcp">market-mcp · teams-mcp (wzorzec trzech modułów MCP)</h3>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Skrypt kontraktu w trzech kopiach — i już zdywergowany, z jednym fixem, który nie wrócił</h4></div>
+    <p>Trzy ~66-linijkowe <code>scripts/contract.py</code> o identycznej strukturze.
+    Normalizacja <code>json.dumps(..., sort_keys=True)</code> (żeby check nie flapował na
+    kolejności kluczy) jest w teams-mcp i trading-mcp — <b>market-mcp jej nie dostał</b> i
+    przeżywa tylko dzięki temu, że market-data przypadkiem sortuje po swojej stronie.
+    W teams-mcp komunikat błędu mówi o „capital-gateway", wskazując na checkout teams —
+    odziedziczone z kopiowania. Dwa snapshoty z trzech mają <code>\uXXXX</code> zamiast
+    polskich znaków (brak <code>ensure_ascii=False</code>), przez co diff kontraktu — cała
+    racja bytu snapshotu — jest nieczytelny.</p>
+    <p class="fix">backport normalizacji do market-mcp, <code>ensure_ascii=False</code> we
+    wszystkich trzech, poprawka komunikatu; nagłówek w każdej kopii wymieniający rodzeństwo
+    albo job CI diffujący trzy ciała modulo stałe.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>market-mcp pokazuje modelowi surowy repr listy dictów walidacyjnych</h4></div>
+    <p>Trzy rozbieżne helpery „wyciągnij <code>detail</code> z błędu". teams-mcp obsługuje obie
+    formy FastAPI (string i listę walidacyjną — spłaszcza do zdań, z testem); market-mcp nie —
+    każdy błędny parametr zapytania wraca do modelu jako
+    <code>[{'type': 'missing', 'loc': [...], 'url': 'https://errors.pydantic.dev/...'}]</code>,
+    wbrew własnej regule modułu, że odmowa „musi mówić, co zmienić". Jedyny test tej ścieżki
+    używa stringa, więc luka jest niewidoczna w CI. Bonus: <code>.get()</code> na nie-dict JSON
+    rzuca AttributeError, którego <code>except ValueError</code> nie łapie.</p>
+    <p class="fix">port logiki <code>_detail</code> z teams-mcp do market-mcp i trading-mcp,
+    wraz z testem <code>test_a_validation_list_is_flattened…</code>.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Transport stdio: ~140 linii i najwolniejszy test suite'u dla drzwi, których nikt nie otwiera</h4></div>
+    <p>Nie masz desktopowego klienta MCP; agent i teams łączą się po HTTP, Dockerfile i dev.sh
+    jawnie przekazują <code>http</code>. Mimo to <b>domyślnym trybem</b> gołego
+    <code>python -m market_mcp</code> jest stdio — proces czyta stdin w nieskończoność, nie
+    otwiera portu i wygląda na zawieszony. Rozdział <code>build_server</code>/<code>build_http_app</code>
+    istnieje wyłącznie po to, by stdio mogło ominąć middleware tożsamości;
+    <code>test_transport_parity.py</code> (91 linii) spawnuje subprocess i port przy każdym
+    <code>pytest</code>. Dwa młodsze moduły MCP mają testy asercące <i>nieobecność</i>
+    dokładnie tego wzorca.</p>
+    <p class="fix">usunąć gałąź stdio, scalić dwie funkcje serwera, skasować test parzystości
+    (asercja nazw narzędzi już jest w <code>test_tool_surface</code>), dodać market-mcp do pary
+    modułów z testem <code>"run_stdio_async" not in source</code>; zaktualizować README,
+    CLAUDE.md i diagram architektury. Minimalna wersja: jedna linia — default na
+    <code>"http"</code>.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>teams-mcp: zależność i tryb konfiguracji dla ścieżki, która nie istnieje</h4></div>
+    <p><code>azure-identity</code> w zależnościach, pole <code>teams_scope</code>, ~20 linii
+    walidatora trybu, wpis w .env.example, app setting w Terraformie i 9 asercji testowych —
+    a grep po <code>azure</code> w kodzie źródłowym zwraca zero: klient wysyła wyłącznie
+    forwardowany token operatora. W dodatku zależność jest <b>bez</b> <code>aiohttp</code>,
+    czyli z dokładnie tą pułapką (ImportError w konstruktorze credentiala, tylko w Azure), którą
+    market-mcp odkrył niestartującym kontenerem 13 sierpnia i udokumentował 10-linijkowym
+    komentarzem.</p>
+    <p class="fix">usunąć <code>teams_scope</code> z zależnością i settingiem (walidator
+    loopback zostaje na fladze <code>operator_identity_optional</code>) — albo świadomie
+    zostawić i dodać <code>aiohttp</code> z odsyłaczem do komentarza market-mcp. Mniejsze i
+    zgodne z kodem jest pierwsze.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Powierzchnia narzędzi to ~17,6 tys. tokenów na turę agenta — i nic jej nie mierzy</h4></div>
+    <p>Zmierzone przez zbudowanie serwerów i serializację <code>list_tools()</code>: market-mcp
+    ~7,0 tys. tokenów, teams-mcp ~6,7 tys., trading-mcp ~3,9 tys. — agent montuje wszystkie
+    trzy. Sam <code>compute_indicators</code> to 6 910 znaków (25% powierzchni market-mcp), bo
+    jego model wyjściowy niesie sześć wzajemnie wykluczających się grup pól w każdym wywołaniu.
+    Długość docstringów koreluje z datą napisania narzędzia, nie z jego złożonością. Prozy jest
+    dużo i jest nośna (testy wymuszają nazwanie strony bid, strefy czasowej, sufitów) — problem
+    w tym, że totalu nikt nie pilnuje, więc tylko rośnie.</p>
+    <p class="fix">tani test regresyjny w każdym module: serializowany <code>list_tools()</code>
+    poniżej zadeklarowanego sufitu (obok istniejących sufitów liczbowych w design.md); rozbić
+    <code>compute_indicators</code> (tryb <code>series</code> jako osobne narzędzie albo model
+    wyjściowy bez pól nigdy-naraz).</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Błąd falsy-zero w edit_trigger i drobniejsza hydraulika wewnątrzmodułowa</h4></div>
+    <p><code>teams_mcp/schedules.py:307</code>: <code>cooldown_seconds or
+    current["cooldown_seconds"]</code> — zero jest falsy, więc
+    <code>edit_trigger(cooldown_seconds=0)</code> („strzelaj za każdym razem") po cichu
+    zachowuje starą wartość i raportuje sukces. W market-mcp: <code>/pairs</code> pobierane 2-3×
+    w jednym wywołaniu narzędzia (a katalog wskaźników — dużo stabilniejszy — jest cache'owany);
+    preambuła notek uncovered/derived wklejona trzy razy; <code>list_models</code>/<code>list_tools</code>
+    w teams-mcp to nietypowane proxy 1:1 wbrew racji bytu modułu; zasoby
+    <code>market://…</code> (137 linii) zwracają surowe payloady i nie mają żadnego konsumenta.</p>
+    <p class="fix"><code>is not None</code> zamiast <code>or</code>; memo per-request dla
+    <code>/pairs</code>; <code>notes_for()</code> w _shared; wąskie modele wyjściowe dla dwóch
+    proxy; zasoby usunąć albo przepuścić przez te same reduktory co narzędzia.</p>
+  </div>
+
+  <h3 id="u-infra">Infrastruktura · CI · skrypty</h3>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>Cztery z siedmiu smoke-checków potrafią przejść na starym kontenerze</h4></div>
+    <p><code>deploy-market-data/market-mcp/trading-mcp/teams-mcp.yml</code> sprawdzają tylko
+    odpowiedź HTTP — a podmiana kontenera w App Service nie jest natychmiastowa, więc
+    pierwszy <code>curl</code> często obsługuje <b>poprzedni</b> kontener i job zielenieje
+    nad obrazem, który się potem nie podniesie. To dokładnie klasa awarii opisana w
+    komentarzach <code>deploy-agent.yml</code> po 16 sierpnia — lekcję wdrożono w dwóch
+    workflow z sześciu. Najbardziej wystawiony jest market-data: jego sonda to 404, które
+    stary kontener zwraca identycznie.</p>
+    <p class="fix">dołożyć asercję tagu obrazu (<code>DOCKER_CUSTOM_IMAGE_NAME</code> ==
+    SHA) do każdej sondy HTTP — kod istnieje już w dwóch workflow, zero nowych konceptów.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev high">wysoka</span>
+    <h4>dev.ps1 startuje teams-mcp i natychmiast o nim zapomina</h4></div>
+    <p><code>$teamsMcpJob</code> nie ma w inicjalizacji, w liście obserwowanych jobów ani w
+    bloku <code>finally</code> — jego log nie jest odbierany, śmierć niewykrywana, a proces
+    przeżywa tylko dzięki zamiataniu portów. Kolejność startu różni się między skryptami
+    (dev.sh: agent → teams → teams-mcp; dev.ps1: teams-mcp → agent → teams — wbrew
+    własnemu komentarzowi), a nagłówki <b>obu</b> plików opisują kolejność, której nie ma
+    w żadnym z nich. Historia gita pokazuje, że to trzeci taki dryf.</p>
+    <p class="fix">naprawić trzy pominięcia i nagłówki teraz; potem wynieść tabelę serwisów
+    (nazwa, katalog, port, komenda, health-path, kolejność) do wspólnego
+    <code>scripts/services.json</code> czytanego przez oba skrypty — 100% dotychczasowego
+    dryfu siedzi w tej tabeli, nie w platformowej hydraulice procesów.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Siedem wdrożeniowych workflow różni się dziewięcioma podstawieniami</h4></div>
+    <p>Diff dowolnych dwóch z siedmiu <code>deploy-*.yml</code> (~436 linii bez komentarzy)
+    to dokładnie 9 substytucji: nazwa, filtr ścieżki, grupa concurrency, suffix obrazu,
+    context, cache scope, app-name, URL sondy, komunikat. Sond są naprawdę trzy kształty,
+    nie siedem. Zmiana bloku OIDC czy wersji buildx to siedem ręcznych edycji, których nic
+    nie pilnuje — patrz poprzednie znalezisko, gdzie tak właśnie rozjechały się sondy.</p>
+    <p class="fix">jeden reusable workflow (<code>workflow_call</code>) z wejściami
+    <code>module</code>/<code>app_name</code>/<code>probe</code>/<code>attempts</code>;
+    siedmiu wywołujących po ~15 linii. Komentarze per moduł (zapisy incydentów) zostają u
+    wywołujących — to najcenniejsza treść tych plików.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev med">średnia</span>
+    <h4>Operator dostaje alerty z nieprawdziwymi liczbami</h4></div>
+    <p><code>monitoring.tf:136</code>: treść e-maila alertu pamięci brzmi „The plan all
+    <b>four</b> apps share…" — aplikacji jest siedem, a na tym alercie stoi udokumentowana
+    procedura decyzji o SKU. Podobnie „both apps" przy wyjątkach, „six apps" w nagłówku
+    <code>app-service.tf</code>, „three deploy workflows" w dwóch miejscach przy ośmiu.
+    W repo, którego dokumentacją są komentarze, stęchłe liczebniki są droższe niż zwykle.
+    Do tego <code>checks.yml</code> nie ma filtra <code>infra/**</code> — push prosto na
+    main z Terraformem nie przechodzi żadnej walidacji.</p>
+    <p class="fix">liczby wyliczać: <code>"The plan all ${length(local.web_app_names)} apps
+    share…"</code>; dodać joba <code>terraform fmt -check</code> + <code>validate</code>
+    do checks.yml dla ścieżki <code>infra/**</code>.</p>
+  </div>
+
+  <div class="finding">
+    <div class="finding-head"><span class="sev low">niska</span>
+    <h4>Chirurgiczne, nie hurtowe odchudzenie Terraforma i skryptów</h4></div>
+    <p>W <code>app-service.tf</code> (1 367 linii) mechaniczne jest ~300 linii: tryplet
+    rejestracji Easy Auth ×6, polityki Key Vault ×7, <code>application_stack</code> z
+    placeholderem ×7. Same bloki siedmiu aplikacji zostawić jawne — różnią się naprawdę,
+    a połowa pliku to datowane komentarze incydentów, których <code>for_each</code> by nie
+    udźwignął. W dev.sh pięć wklejonych bloków „brak zmiennej w .env" i trzykrotny check
+    hosta bazy — dev.ps1 ma już funkcję, bash nie dostał tego refactoru.
+    <code>require-review.sh</code>: 383 linie z ręcznym tokenizerem shella do pilnowania
+    istnienia jednego pliku — a jego własne testy nie są uruchamiane w żadnym CI.</p>
+    <p class="fix">moduł lokalny <code>easy-auth-app</code>, <code>for_each</code> tylko dla
+    polityk KV; w bash <code>advise_setting()</code> i <code>check_local_db_host()</code>;
+    hook przepisać na PostToolUse skanujący archiwum pod brak <code>review.md</code>
+    (~20 linii, odporne na <code>cd</code>/aliasy) i włączyć jego testy do checks.yml.</p>
+  </div>
+
+</main>
