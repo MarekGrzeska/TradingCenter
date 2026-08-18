@@ -20,6 +20,8 @@ from ..models import (
     ChartZone,
 )
 
+# A hundred objects on one instrument is already a chart nothing can be read on, so the
+# ceiling sits where usefulness already ends rather than at some larger, arbitrary number.
 MAX_DRAWINGS_PER_SYMBOL = 100
 
 # The largest value `chart_drawings.id` can hold — PostgreSQL's `bigint`. Checked before a

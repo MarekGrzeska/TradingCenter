@@ -1,4 +1,7 @@
-"""The system prompt as versioned data — specs/agent-prompt-management.
+"""The system prompt as versioned data — specs/agent-prompt-management, "Zapis tworzy
+nową wersję, nigdy nie nadpisuje istniejącej".
+
+Global to the module, not scoped to an owner: one prompt, not one per operator.
 
 Append-only by construction: a write inserts a new revision and never touches one that
 already exists.
@@ -9,11 +12,7 @@ from __future__ import annotations
 import asyncpg
 from tc_runtime.db import Conn, fetch_one
 
-from ..models import (
-    PromptRevision,
-)
-
-# not one per operator.
+from ..models import PromptRevision
 
 _SELECT_LATEST_PROMPT_REVISION = """
     SELECT version, with_tools_body, without_tools_body, created_at
