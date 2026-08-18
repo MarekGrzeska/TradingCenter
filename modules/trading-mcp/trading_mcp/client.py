@@ -12,7 +12,7 @@ własnej awarii").
 from __future__ import annotations
 
 import httpx
-from tc_runtime.detail import detail
+from tc_mcp_kit.detail import detail
 
 from .config import Settings
 from .errors import GatewayRefused, GatewayUnavailable, NotDemoEnvironment

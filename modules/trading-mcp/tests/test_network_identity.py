@@ -38,7 +38,7 @@ def test_request_without_identity_is_refused_when_required() -> None:
 
 def test_request_with_identity_is_not_refused_by_this_layer(caplog) -> None:
     with (
-        caplog.at_level(logging.INFO, logger="tc_runtime.network_identity"),
+        caplog.at_level(logging.INFO, logger="tc_mcp_kit.network_identity"),
         _client(require=True) as client,
     ):
         response = client.post(
@@ -52,7 +52,7 @@ def test_request_with_identity_is_not_refused_by_this_layer(caplog) -> None:
 
 def test_request_without_identity_is_let_through_when_not_required(caplog) -> None:
     with (
-        caplog.at_level(logging.INFO, logger="tc_runtime.network_identity"),
+        caplog.at_level(logging.INFO, logger="tc_mcp_kit.network_identity"),
         _client(require=False) as client,
     ):
         response = client.post("/mcp", json={"jsonrpc": "2.0", "method": "ping", "id": 1})

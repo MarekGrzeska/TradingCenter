@@ -28,9 +28,17 @@ wyłącznie ręczny transport poprawek.
     implementacja `_detail` ze spłaszczaniem listy walidacyjnej.
   - `packages/tc-openai` — `provider.py` z dwoma wariantami wejścia: historia rozmowy
     (`agent`) i briefing (`teams`).
-- **`tc-mcp-kit` z planu nie powstaje.** Pomiar pokazał, że poza jednym plikiem rusztowanie
-  MCP nie jest kopią, tylko trzema plikami, które różnią się, bo różnią się moduły — patrz
-  `design.md`, decyzja D1.
+- **Powstaje trzeci pakiet, `tc-mcp-kit`** — poprawka do D1 z 18 sierpnia 2026, po
+  zamknięciu grupy 5. Pierwotnie: „`tc-mcp-kit` z planu nie powstaje. Pomiar pokazał, że
+  poza jednym plikiem rusztowanie MCP nie jest kopią, tylko trzema plikami, które różnią
+  się, bo różnią się moduły." To zostaje prawdą dla `server.py`, `client.py`, `config.py`,
+  `errors.py` — żaden z nich nie wchodzi do pakietu. Nieprawdą okazało się, że pominięcie
+  trzeciego pakietu jest tanie: trzy moduły MCP, żadny bez własnej bazy, zaciągnęły przez
+  `tc-runtime` cały jego stos bazodanowy i Entra za dwa importy
+  (`network_identity.RequireCallerIdentity`, `detail.detail`) — zmierzone jako 70 pakietów
+  w locku każdego z nich, gdzie `trading-mcp` miał 47 przed `tc-runtime`. `network_identity`
+  i `_detail` przenoszą się do `tc-mcp-kit`, zależnego wyłącznie od `httpx` i `starlette`;
+  szczegóły i pomiar w `design.md`, D1.
 - `checks.yml` dostaje job `packages`: zmiana w `packages/` odpala testy **wszystkich**
   modułów zależnych, a nie tylko tego, którego dotyczy diff.
 - Dockerfile'e modułów zależnych kopiują `packages/` przed `uv sync`, więc obraz nadal

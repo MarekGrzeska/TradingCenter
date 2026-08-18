@@ -58,30 +58,71 @@ tabeli w repo. To nie jest kopia, która się rozjechała; to jest inny plik.
 
 ### D1. Dwa pakiety, nie trzy — `tc-mcp-kit` nie powstaje
 
-**Decyzja:** powstają `tc-runtime` i `tc-openai`. Materiał, który plan przeznaczał dla
-`tc-mcp-kit`, rozchodzi się na dwie strony: `network_identity.py` i wspólny `_detail` wchodzą
-do `tc-runtime` jako jego pod-moduły, a `server.py`, `client.py`, `config.py` i `errors.py`
-zostają u siebie, nietknięte.
+**Decyzja (odwrócona 18 sierpnia 2026, patrz „Poprawione" niżej):** powstają `tc-runtime` i
+`tc-openai`. Materiał, który plan przeznaczał dla `tc-mcp-kit`, rozchodzi się na dwie strony:
+`network_identity.py` i wspólny `_detail` wchodzą do `tc-runtime` jako jego pod-moduły, a
+`server.py`, `client.py`, `config.py` i `errors.py` zostają u siebie, nietknięte.
 
-**Dlaczego:** tabela w „Context". Cztery pliki, które miały być trzonem `tc-mcp-kit`, mają
-8–58% wspólnych linii. To nie są kopie, które się rozjechały — to są pliki, które różnią się,
-bo różnią się moduły: `trading-mcp` ma 86-linijkową taksonomię błędów, bo odróżnia odmowę
-providera od awarii dostępu; `market-mcp` ma 13, bo jego odmowa ma jeden kształt. Wspólny
-pakiet nad nimi byłby dokładnie tą „wspólną klasą bazową, która po cichu ogranicza cztery
-moduły" — rzeczą, przed którą przestrzega `docs/architecture.md` i której ta zmiana **nie**
-podważa.
+**Dlaczego (pierwotne uzasadnienie, częściowo błędne):** tabela w „Context". Cztery pliki,
+które miały być trzonem `tc-mcp-kit`, mają 8–58% wspólnych linii. To nie są kopie, które się
+rozjechały — to są pliki, które różnią się, bo różnią się moduły: `trading-mcp` ma
+86-linijkową taksonomię błędów, bo odróżnia odmowę providera od awarii dostępu; `market-mcp`
+ma 13, bo jego odmowa ma jeden kształt. Wspólny pakiet nad nimi byłby dokładnie tą „wspólną
+klasą bazową, która po cichu ogranicza cztery moduły" — rzeczą, przed którą przestrzega
+`docs/architecture.md` i której ta zmiana **nie** podważa. Ten fragment rozumowania został
+**potwierdzony**, nie cofnięty: `server.py`, `client.py`, `config.py`, `errors.py` nadal
+zostają u siebie. Cofnięta jest wyłącznie odmowa trzeciego pakietu na `network_identity.py` i
+`_detail`.
 
 **Rozważone alternatywy:**
 
 - *Trzy pakiety, `tc-mcp-kit` chudy (`network_identity` + `_detail` + skrypt kontraktu).*
-  Zaleta: moduły nie-MCP nie ciągną zależności MCP. Odrzucone, bo `network_identity.py` nie
-  ma zależności MCP — to zwykły ASGI middleware, a `_detail` to `httpx`. Trzeci pakiet na
-  ~150 linii kosztowałby więcej w `pyproject.toml` siedmiu modułów, niż oszczędza.
+  Zaleta: moduły nie-MCP nie ciągną zależności MCP. **Odrzucone pierwotnie**, bo
+  `network_identity.py` nie ma zależności MCP — to zwykły ASGI middleware, a `_detail` to
+  `httpx`. Trzeci pakiet na ~150 linii kosztowałby więcej w `pyproject.toml` siedmiu modułów,
+  niż oszczędza. **To był błąd pomiaru, nie osądu** — patrz „Poprawione" niżej: to
+  rozumowanie liczyło zależności *pakietu*, a nie drzewo, które dziedziczy *konsument*.
+  Zmierzone 18 sierpnia 2026, ta alternatywa jest tą, która ostatecznie weszła.
 - *Trzy pakiety i sprowadzenie rozbieżnych plików do wspólnego kształtu.* Największy zysk w
   liczbach i jedyna droga do `tc-mcp-kit` w kształcie z planu. Odrzucone: to jest wymuszona
   abstrakcja nad plikami zmierzonymi jako różne w 65–92%, czyli zamiana kosztu widocznego w
   diffie na coupling, którego żaden kontrakt nie zapisuje. Reguła, którą tu łamiemy, dotyczy
   transportu poprawek — nie jest zaproszeniem do scalania wszystkiego, co ma tę samą nazwę.
+  Ta odmowa zostaje w mocy — poprawka niżej dotyczy tylko pierwszej alternatywy.
+
+**Poprawione 18 sierpnia 2026, po zamknięciu grupy 5.** Miernik przyrostu diffu na trzech
+kolejnych scaleniach pokazał, że 68% z **+7 451** linii to same lockfile'e (`uv.lock`), i
+rozbicie ich na moduły wskazało, dlaczego: `trading-mcp` urosło z 47 do 70 pakietów w
+locku, `teams-mcp` z 54 do 70, `market-mcp` z 61 do 70. Żaden z trzech modułów MCP nie ma
+bazy danych, a wszystkie trzy zaciągnęły `alembic`, `sqlalchemy[asyncio]`, `asyncpg`,
+`azure-identity` i `aiohttp` — cały stos bazodanowy i Entra `tc-runtime` — za dwa importy:
+`tc_runtime.detail.detail` i `tc_runtime.network_identity.RequireCallerIdentity`.
+
+Pierwotne odrzucenie rozumowało o tym, czego *potrzebuje pakiet* (`network_identity.py` to
+ASGI, `_detail` to `httpx` — oba już były w drzewie każdego konsumenta z innych powodów).
+To jest prawda i zostaje prawdą. Błędem było przyjęcie, że skoro pakiet niesie mało, koszt
+jego dodania jest mały — a decyduje **drzewo, które dziedziczy konsument**, nie zależności
+samego pliku. `tc-runtime` niesie `fastapi`, `sqlalchemy[asyncio]`, `asyncpg`, `alembic`,
+`azure-identity`, `aiohttp` dla `agent`/`teams`/`market-data`, i moduł biorący `tc-runtime`
+choćby dla dwóch plików bierze to wszystko razem z nim. Trzy linie w `pyproject.toml`,
+którymi oszacowano koszt trzeciego pakietu, były miarą niewłaściwej rzeczy.
+
+**Decyzja po poprawce:** `network_identity.py` i `_detail` przenoszą się z `tc-runtime` do
+nowego `packages/tc-mcp-kit`, zależnego wyłącznie od `httpx` i `starlette`. Trzy moduły MCP
+biorą odtąd `tc-mcp-kit`, nie `tc-runtime` — żaden z nich nie deklaruje już tej drugiej
+zależności. Po przełączeniu: `trading-mcp` 70 → 48 pakietów w locku (blisko punktu
+wyjścia — 47, sprzed `tc-runtime`), `teams-mcp` 70 → 55, `market-mcp` 70 → 62 (zostaje z
+`azure-identity`/`aiohttp` z własnego powodu — jego uwierzytelnianie do market-data, opisane
+w jego własnym `pyproject.toml` — nie z `tc-runtime`). Wszystkie pięć dotkniętych projektów
+(`tc-runtime`, `tc-mcp-kit`, trzy moduły MCP) przechodzą swoje testy bez zmiany liczby
+przypadków; trzy obrazy zbudowane lokalnie i zaimportowane. Szczegóły pomiaru i uzasadnienia
+— `packages/tc-mcp-kit/README.md`.
+
+Ironia, zapisana bo jest pouczająca: to jest dokładnie ta sama choroba, którą cała ta zmiana
+miała leczyć — twierdzenie zamiast pomiaru — i przeżyła własny `review.md`, bo weryfikacja z
+grupy 5 sprawdzała granicę runtime (czy moduł importuje moduł), a nie to, co pakiet ciągnie
+tranzytywnie do konsumenta. Znalazło to pytanie o rozmiar diffu po trzech kolejnych
+scaleniach, nie review tego jednego PR-a.
 
 ### D2. Próg podziału to pomiar, nie nazwa pliku
 

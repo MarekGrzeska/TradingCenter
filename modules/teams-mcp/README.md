@@ -59,9 +59,10 @@ it came up in, once, at startup; and `REQUIRE_AUTHENTICATED_PRINCIPAL=true` in a
 
 ## Packages it takes
 
-`tc-runtime`, for the caller-identity middleware and the helper that turns an upstream's
-refusal into a sentence. Its server, client, settings and error taxonomy stay here — they
-were measured as different files, not copies.
+`tc-mcp-kit`, for the caller-identity middleware and the helper that turns an upstream's
+refusal into a sentence — not `tc-runtime`, which needs a database this module doesn't
+have. Its server, client, settings and error taxonomy stay here — they were measured as
+different files, not copies.
 
 ## Commands
 

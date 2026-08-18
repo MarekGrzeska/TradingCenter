@@ -1,0 +1,481 @@
+<title>TradingCenter na AKS</title>
+<style>
+  :root {
+    --bg: #f2f5f4;
+    --surface: #ffffff;
+    --surface-2: #e7edeb;
+    --ink: #1b2622;
+    --ink-2: #47564f;
+    --ink-3: #71817a;
+    --line: #d2dcd7;
+    --accent: #1e6f54;
+    --accent-soft: #ddeee7;
+    --warn: #a06a14;
+    --warn-soft: #f5ecd9;
+    --keep: #2456c6;
+    --keep-soft: #e3eafb;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+    --serif: "Charter", "Iowan Old Style", Georgia, serif;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131a17;
+      --surface: #1a2320;
+      --surface-2: #223029;
+      --ink: #e3ece8;
+      --ink-2: #a5b5ad;
+      --ink-3: #7c8c84;
+      --line: #2f3f38;
+      --accent: #5fbb97;
+      --accent-soft: #1e3a30;
+      --warn: #cf9b46;
+      --warn-soft: #37301f;
+      --keep: #6f96e8;
+      --keep-soft: #24304a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131a17;
+    --surface: #1a2320;
+    --surface-2: #223029;
+    --ink: #e3ece8;
+    --ink-2: #a5b5ad;
+    --ink-3: #7c8c84;
+    --line: #2f3f38;
+    --accent: #5fbb97;
+    --accent-soft: #1e3a30;
+    --warn: #cf9b46;
+    --warn-soft: #37301f;
+    --keep: #6f96e8;
+    --keep-soft: #24304a;
+  }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.6; margin: 0; }
+  main, header.masthead { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
+  header.masthead { padding-top: 56px; padding-bottom: 8px; }
+  main { padding-bottom: 96px; }
+  .eyebrow { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 0 0 10px; }
+  h1 { font-family: var(--serif); font-size: clamp(34px, 5vw, 52px); line-height: 1.08; margin: 0 0 14px; text-wrap: balance; font-weight: 700; }
+  .lede { font-size: 18px; color: var(--ink-2); max-width: 64ch; margin: 0 0 20px; }
+  .meta-row { display: flex; flex-wrap: wrap; gap: 10px 26px; font-size: 13px; color: var(--ink-3);
+    border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); padding: 12px 0; }
+  .meta-row b { color: var(--ink-2); font-weight: 600; }
+  h2 { font-family: var(--serif); font-size: 30px; line-height: 1.15; margin: 72px 0 8px; text-wrap: balance; }
+  h3 { font-size: 19px; margin: 40px 0 8px; }
+  p { max-width: 74ch; }
+  .section-note { color: var(--ink-2); max-width: 74ch; margin-top: 0; }
+  code, .path { font-family: var(--mono); font-size: 0.88em; background: var(--surface-2); border-radius: 4px; padding: 1px 5px; }
+  figure { margin: 28px 0; }
+  .diagram-frame { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; overflow-x: auto; }
+  .diagram-frame svg { min-width: 860px; max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  figcaption { font-size: 13.5px; color: var(--ink-3); margin-top: 10px; max-width: 80ch; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin: 18px 0; }
+  th, td { text-align: left; padding: 9px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 12px; text-transform: uppercase; letter-spacing: 0.07em; color: var(--ink-3); }
+  tr:last-child td { border-bottom: none; }
+  .tag { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; border-radius: 99px; padding: 2px 10px; white-space: nowrap; }
+  .tag.simpler { color: var(--accent); background: var(--accent-soft); }
+  .tag.work { color: var(--warn); background: var(--warn-soft); }
+  .tag.same { color: var(--keep); background: var(--keep-soft); }
+  .phase { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; margin: 14px 0; }
+  .phase-head { display: flex; align-items: baseline; gap: 12px; }
+  .phase-num { font-family: var(--serif); font-size: 26px; color: var(--accent); font-weight: 700; min-width: 34px; font-variant-numeric: tabular-nums; }
+  .phase h4 { margin: 0; font-size: 16.5px; }
+  .phase p { margin: 10px 0 0; font-size: 14.5px; color: var(--ink-2); }
+  .phase .gate { color: var(--ink); }
+  .phase .gate::before { content: "Warunek wyjścia — "; font-weight: 650; }
+  .callout { border-left: 3px solid var(--warn); background: var(--surface); border-radius: 0 8px 8px 0;
+    padding: 14px 18px; margin: 22px 0; max-width: 78ch; }
+  .callout.green { border-left-color: var(--accent); }
+  .callout p { margin: 0; font-size: 14.5px; }
+  .callout p + p { margin-top: 8px; }
+  /* diagram */
+  .d-node { fill: var(--surface); stroke: var(--ink-3); stroke-width: 1.2; }
+  .d-cont { fill: none; stroke: var(--line); stroke-width: 1.2; }
+  .d-ext  { fill: none; stroke: var(--ink-3); stroke-width: 1.2; stroke-dasharray: 5 4; }
+  .d-name { fill: var(--ink); font: 600 13px var(--sans); text-anchor: middle; }
+  .d-sub  { fill: var(--ink-3); font: 11px var(--mono); text-anchor: middle; }
+  .d-cap  { fill: var(--ink-3); font: 600 11px var(--sans); letter-spacing: 0.08em; text-transform: uppercase; }
+  .d-elab { fill: var(--ink-3); font: 11.5px var(--sans); }
+  .d-edge { stroke: var(--ink-3); stroke-width: 1.3; fill: none; }
+  .d-acc  { stroke: var(--accent); }
+  .d-acc-lab { fill: var(--accent); font: 600 11.5px var(--sans); }
+  .d-arr  { fill: var(--ink-3); }
+  .d-arr-acc { fill: var(--accent); }
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<header class="masthead">
+  <p class="eyebrow">Plan infrastrukturalny</p>
+  <h1>TradingCenter na AKS</h1>
+  <p class="lede">Dziś: siedem kontenerów na jednym planie App Service B3 i terminal na Static
+  Web App. Założenie planistyczne: liczba serwisów rośnie co najmniej dwukrotnie, do 15–20
+  workloadów. Ten dokument mówi, co Kubernetes upraszcza, co komplikuje, czego nie wolno
+  zepsuć — i w jakiej kolejności przejść.</p>
+  <div class="meta-row">
+    <span><b>Stan dziś:</b> 7× App Service (B3, 1 worker) + SWA</span>
+    <span><b>Cel:</b> AKS, 15–20 workloadów</span>
+    <span><b>Data:</b> 18 sierpnia 2026</span>
+  </div>
+
+  <p style="max-width:78ch;border-left:3px solid var(--accent);padding:12px 16px;
+     background:var(--surface);border-radius:0 8px 8px 0;font-size:14.5px">
+    <b>Rozeznanie, nie decyzja.</b> Ten dokument leży w <code>docs/archive/</code>, bo
+    opisuje drogę, a nie stan: na 18 sierpnia 2026 infrastruktura to nadal siedem App
+    Service na planie B3 i Static Web App, a migracji na AKS nikt nie zatwierdził. Czytaj
+    go jako rachunek „kiedy to się zacznie opłacać", nie jako plan w realizacji.
+  </p>
+</header>
+
+<main>
+  <h2 id="dlaczego">Kiedy ta migracja się opłaca</h2>
+  <p>App Service dobrze niesie obecną siódemkę — ale trzy koszty rosną liniowo z liczbą
+  serwisów i przy podwojeniu zaczną boleć:</p>
+  <p><b>Konfiguracja per aplikacja.</b> Każdy nowy moduł to dziś ~200 linii Terraforma
+  (blok <code>azurerm_linux_web_app</code>, tryplet rejestracji Easy Auth, polityka Key Vault,
+  wpisy <code>allowed_applications</code> u wywoływanych), osobny workflow deploy i osobny
+  smoke-check. Audyt pokazał, że te kopie już dziś dryfują — przy 15–20 sztukach dryf będzie
+  regułą, nie wyjątkiem.</p>
+  <p><b>Pamięć planu jest wspólna i nieelastyczna.</b> Historia SKU (B1 → B2 → B3 w trzy dni
+  sierpnia) to historia dokładania aplikacji do jednej maszyny. Znaczna część zużycia to
+  narzut platformy per aplikacja (Kestrel + sidecar Easy Auth), nie moduły — zmierzone working
+  sety siedmiu kontenerów to razem ~2,5 GB z 7 GB planu. Kubernetes płaci ten narzut raz na
+  node, nie raz na serwis.</p>
+  <p><b>Wdrożenia i sondy są ręcznie utrzymywaną hydrauliką.</b> Osiem workflow różniących się
+  dziewięcioma podstawieniami, cztery sondy z dziurą „stary kontener odpowiada za nowy".
+  W Kubernetes rollout, readiness i „czy serwuje właściwy obraz" to natywne mechanizmy
+  (<code>kubectl rollout status</code> + readiness probe), nie skrypty w YAML-u.</p>
+
+  <div class="callout green">
+    <p><b>Co jest już gotowe na AKS — zasługa obecnej architektury:</b> wszystkie moduły są
+    kontenerami z obrazami per SHA w GHCR, cała konfiguracja idzie przez zmienne środowiskowe,
+    baza jest zewnętrzna (Postgres Flexible Server zostaje bez zmian), żaden moduł nie trzyma
+    stanu na dysku, migracje robią się same w <code>lifespan</code> pod advisory lockiem —
+    wiele startujących replik da jedną migrację i czekających, dokładnie tak jak dziś.
+    Terminal nie migruje: Static Web App zostaje.</p>
+  </div>
+
+  <h2 id="architektura">Architektura docelowa</h2>
+  <figure>
+    <div class="diagram-frame">
+    <svg viewBox="0 0 1000 700" role="img" aria-label="Docelowa architektura TradingCenter na AKS: ingress z walidacją JWT zastępuje Easy Auth, pody modułów w klastrze, workload identity i CSI do Key Vault, jeden stały adres egress do firewalli Postgresa i capital.com.">
+      <defs>
+        <marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr"/>
+        </marker>
+        <marker id="ar-acc" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 z" class="d-arr-acc"/>
+        </marker>
+      </defs>
+
+      <!-- zewnętrzne: góra -->
+      <rect class="d-node" x="30" y="20" width="190" height="50" rx="6"/>
+      <text class="d-name" x="125" y="41">GitHub Actions</text>
+      <text class="d-sub" x="125" y="58">1 reusable workflow</text>
+      <rect class="d-node" x="280" y="20" width="130" height="50" rx="6"/>
+      <text class="d-name" x="345" y="41">GHCR</text>
+      <text class="d-sub" x="345" y="58">obraz per SHA</text>
+      <rect class="d-ext" x="700" y="20" width="270" height="50" rx="6"/>
+      <text class="d-name" x="835" y="41">terminal · Static Web App</text>
+      <text class="d-sub" x="835" y="58">zostaje bez zmian</text>
+
+      <line class="d-edge" x1="220" y1="45" x2="280" y2="45" marker-end="url(#ar)"/>
+      <line class="d-edge" x1="345" y1="70" x2="345" y2="140" marker-end="url(#ar)"/>
+      <text class="d-elab" x="353" y="110">pull</text>
+
+      <!-- AKS -->
+      <rect class="d-cont" x="30" y="110" width="700" height="470" rx="10"/>
+      <text class="d-cap" x="42" y="134">AKS · 2 nody</text>
+
+      <rect class="d-node" x="60" y="150" width="640" height="56" rx="6"/>
+      <text class="d-name" x="380" y="173">Ingress — TLS · CORS · walidacja JWT (Entra)</text>
+      <text class="d-sub" x="380" y="191">przejmuje rolę Easy Auth; /health i /ws poza filtrem auth</text>
+      <polyline class="d-edge" points="835,70 835,90 380,90 380,150" marker-end="url(#ar)"/>
+      <text class="d-elab" x="600" y="84" text-anchor="middle">HTTPS · token operatora (MSAL)</text>
+
+      <!-- pody rząd 1 -->
+      <rect class="d-node" x="60" y="246" width="150" height="70" rx="6"/>
+      <text class="d-name" x="135" y="270">capital-gateway</text>
+      <text class="d-sub" x="135" y="286">replicas: 1</text>
+      <text class="d-sub" x="135" y="301">strategy: Recreate</text>
+      <rect class="d-node" x="230" y="246" width="150" height="70" rx="6"/>
+      <text class="d-name" x="305" y="274">market-data</text>
+      <text class="d-sub" x="305" y="292">startupProbe ≥ 1800 s</text>
+      <rect class="d-node" x="400" y="246" width="150" height="70" rx="6"/>
+      <text class="d-name" x="475" y="274">agent</text>
+      <text class="d-sub" x="475" y="292">SSE przez ingress</text>
+      <rect class="d-node" x="570" y="246" width="130" height="70" rx="6"/>
+      <text class="d-name" x="635" y="274">teams</text>
+      <text class="d-sub" x="635" y="292">replicas: 1 (clock)</text>
+
+      <!-- pody rząd 2 -->
+      <rect class="d-node" x="60" y="336" width="150" height="62" rx="6"/>
+      <text class="d-name" x="135" y="362">market-mcp</text>
+      <rect class="d-node" x="230" y="336" width="150" height="62" rx="6"/>
+      <text class="d-name" x="305" y="362">trading-mcp</text>
+      <text class="d-sub" x="305" y="379">demo-check przy starcie</text>
+      <rect class="d-node" x="400" y="336" width="150" height="62" rx="6"/>
+      <text class="d-name" x="475" y="362">teams-mcp</text>
+      <rect class="d-ext" x="570" y="336" width="130" height="62" rx="6"/>
+      <text class="d-name" x="635" y="362">+ nowe serwisy</text>
+      <text class="d-sub" x="635" y="379">plik YAML, nie 200 linii TF</text>
+
+      <!-- platforma -->
+      <rect class="d-node" x="60" y="440" width="200" height="60" rx="6"/>
+      <text class="d-name" x="160" y="464">Workload Identity</text>
+      <text class="d-sub" x="160" y="481">federacja per ServiceAccount</text>
+      <rect class="d-node" x="290" y="440" width="200" height="60" rx="6"/>
+      <text class="d-name" x="390" y="464">Secrets Store CSI</text>
+      <text class="d-sub" x="390" y="481">sekrety z Key Vault</text>
+      <rect class="d-node" x="520" y="440" width="180" height="60" rx="6"/>
+      <text class="d-name" x="610" y="464">NAT Gateway</text>
+      <text class="d-sub" x="610" y="481">jeden stały IP egress</text>
+
+      <!-- NetworkPolicy note -->
+      <text class="d-elab" x="60" y="545">NetworkPolicy: do capital-gateway tylko market-data i trading-mcp — zastępuje firewall IP bramy</text>
+      <text class="d-elab" x="60" y="563">imię wywołującego = tożsamość workloadu (JWT), jak dziś allowed_applications</text>
+
+      <!-- zewnętrzne: prawa kolumna -->
+      <rect class="d-node" x="790" y="160" width="180" height="56" rx="6"/>
+      <text class="d-name" x="880" y="183">Entra ID</text>
+      <text class="d-sub" x="880" y="200">federacja tożsamości</text>
+      <rect class="d-node" x="790" y="250" width="180" height="56" rx="6"/>
+      <text class="d-name" x="880" y="273">Key Vault</text>
+      <text class="d-sub" x="880" y="290">te same 7 sekretów</text>
+      <rect class="d-node" x="790" y="340" width="180" height="64" rx="6"/>
+      <text class="d-name" x="880" y="364">PostgreSQL Flexible</text>
+      <text class="d-sub" x="880" y="382">1 reguła firewalla</text>
+      <rect class="d-ext" x="790" y="440" width="180" height="50" rx="6"/>
+      <text class="d-name" x="880" y="461">capital.com</text>
+      <text class="d-sub" x="880" y="477">10 req/s na konto</text>
+      <rect class="d-ext" x="790" y="510" width="180" height="50" rx="6"/>
+      <text class="d-name" x="880" y="531">OpenAI</text>
+      <text class="d-sub" x="880" y="547">2 klucze z Key Vault</text>
+
+      <line class="d-edge" x1="260" y1="460" x2="790" y2="200" marker-end="url(#ar)"/>
+      <line class="d-edge" x1="490" y1="470" x2="790" y2="285" marker-end="url(#ar)"/>
+      <polyline class="d-edge d-acc" points="700,470 745,470 745,372 790,372" marker-end="url(#ar-acc)"/>
+      <text class="d-acc-lab" x="750" y="425">1 IP zamiast</text>
+      <text class="d-acc-lab" x="750" y="440">3× for_each</text>
+      <polyline class="d-edge" points="610,500 610,530 745,530 745,465 790,465" marker-end="url(#ar)"/>
+    </svg>
+    </div>
+    <figcaption>Zielona krawędź to największe uproszczenie migracji: dziś firewalle Postgresa i
+    bramy utrzymują listy <code>possible_outbound_ip_address_list</code> trzech App Service'ów
+    (z dwuetapowym „targetowanym apply" przy bootstrapie) — po migracji cały klaster wychodzi
+    jednym stałym adresem NAT i każda lista spada do jednej reguły. Ruch do capital.com i OpenAI
+    idzie tą samą drogą. Wewnątrz klastra imienne listy wywołujących nie znikają: przechodzą
+    z <code>allowed_applications</code> Easy Auth na walidację JWT po tożsamości workloadu,
+    a fizyczny dostęp do bramy dodatkowo ogranicza NetworkPolicy.</figcaption>
+  </figure>
+
+  <h2 id="mapa">Mapa zamienników — co się zmienia i o ile</h2>
+  <p class="section-note">Zebrane z inwentaryzacji <code>infra/</code>. Kolumna „bilans" mówi,
+  czy po migracji tej rzeczy jest mniej, tyle samo, czy więcej.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Dziś (App Service)</th><th>Na AKS</th><th>Bilans</th></tr></thead>
+    <tbody>
+      <tr><td>Easy Auth ×6 + nagłówek <code>x-ms-client-principal-*</code> + <code>allowed_applications</code></td>
+        <td>Walidacja JWT — na ingressie albo w module. Moduły <b>już</b> re-sprawdzają principal
+        (<code>REQUIRE_AUTHENTICATED_PRINCIPAL</code>), ale czytają format nagłówka App Service —
+        to jest największa pojedyncza praca migracji</td>
+        <td><span class="tag work">praca</span></td></tr>
+      <tr><td><code>excluded_paths</code> (/health, /ping, /ws/candles)</td>
+        <td>Reguły ścieżek na ingressie omijające filtr auth — ta sama warstwa, ta sama logika</td>
+        <td><span class="tag same">bez zmian</span></td></tr>
+      <tr><td>CORS w App Service <b>przed</b> Easy Auth (preflight bez credentiala)</td>
+        <td>CORS na ingressie, przed filtrem auth — ograniczenie warstwowe przeżywa; moduły
+        nadal nie mogą mieć własnego CORS</td>
+        <td><span class="tag same">bez zmian</span></td></tr>
+      <tr><td><code>@Microsoft.KeyVault(SecretUri=…)</code> + 7 polityk dostępu</td>
+        <td>Secrets Store CSI + workload identity; te same sekrety, jedna definicja
+        SecretProviderClass per moduł</td>
+        <td><span class="tag same">bez zmian</span></td></tr>
+      <tr><td>System-assigned MI per aplikacja (client_id przez 4 lookupy <code>data.azuread_service_principal</code>)</td>
+        <td>Workload Identity: federacja per ServiceAccount. <b>Każdy wpis
+        allowed_applications zmienia client_id</b> — wymiana wszystkich naraz w fazie auth</td>
+        <td><span class="tag work">praca</span></td></tr>
+      <tr><td>Firewalle IP: 3× <code>for_each</code> po outbound IP + 2 dynamic bloki u bramy + dwuetapowy bootstrap apply</td>
+        <td>Jeden stały IP egress (NAT Gateway) → jedna reguła na firewallu Postgresa; brama za
+        NetworkPolicy zamiast IP restrictions</td>
+        <td><span class="tag simpler">prościej</span></td></tr>
+      <tr><td>8 workflow deploy + ręczne sondy (4 z dziurą „stary kontener")</td>
+        <td>1 reusable workflow: <code>kubectl set image</code> + <code>rollout status</code>;
+        „czy serwuje ten SHA" i „czy proces wstał" to natywne readiness/rollout — cała klasa
+        problemu znika</td>
+        <td><span class="tag simpler">prościej</span></td></tr>
+      <tr><td><code>WEBSITES_CONTAINER_START_TIME_LIMIT=1800</code> (market-data)</td>
+        <td><code>startupProbe</code> z <code>failureThreshold × periodSeconds ≥ 1800 s</code>;
+        wewnętrzne 1500 s czekania na lock migracji musi zostać poniżej — jak dziś</td>
+        <td><span class="tag same">bez zmian</span></td></tr>
+      <tr><td>WebSockety (brama, market-data) — flaga per aplikacja</td>
+        <td>Adnotacje timeoutów na ingressie; SSE agenta i teams — te same adnotacje
+        (długie odpowiedzi, brak bufora)</td>
+        <td><span class="tag same">bez zmian</span></td></tr>
+      <tr><td>Alerty na <code>Microsoft.Web/sites</code> i <code>serverfarms</code> (5 z 9)</td>
+        <td>Do przepisania na metryki podów/kontenerów (Container Insights albo
+        Prometheus). Web-test <code>/ping</code> i alert KQL po wyjątkach przeżywają bez zmian</td>
+        <td><span class="tag work">praca</span></td></tr>
+      <tr><td><code>DOCKER_REGISTRY_SERVER_*</code> z PAT-em GHCR w Key Vault</td>
+        <td><code>imagePullSecret</code> z tym samym PAT-em — nadal jedyny kalendarzowo
+        wygasający credential w systemie</td>
+        <td><span class="tag same">bez zmian</span></td></tr>
+      <tr><td>Postgres Flexible B1ms, 3 bazy, auth wyłącznie Entra</td>
+        <td>Zostaje dokładnie tak, jak jest — role aplikacyjne, grant-schema-ownership,
+        wszystko bez zmian</td>
+        <td><span class="tag same">bez zmian</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h2 id="ograniczenia">Trzy ograniczenia, których Kubernetes nie może „naprawić"</h2>
+  <p><b>capital-gateway: dokładnie jedna replika, na zawsze.</b> To nie jest domyślna wartość,
+  tylko konstrukcyjny wymóg zapisany dziś w <code>worker_count = 1</code> z komentarzem „DO NOT
+  add autoscaling": capital.com liczy 10 req/s na <b>konto</b>, więc druga replika to drugi
+  RateGate wydający ten sam budżet. Na AKS: <code>replicas: 1</code>, <code>strategy:
+  Recreate</code> (dwie repliki nie mogą współistnieć nawet przez chwilę rolloutu),
+  <b>bez HPA</b>, i PodDisruptionBudget dopuszczający świadome przerwy. To samo dotyczy sesji
+  streamingowej — restart bramy to restart streamu, jak dziś.</p>
+  <p><b>teams: jedna replika, dopóki zegar mieszka w procesie.</b> <code>SCHEDULER_ENABLED</code>
+  uruchamia clock w <code>lifespan</code> — druga replika to podwójne odpalanie harmonogramów.
+  Claim przez warunkowy UPDATE daje wprawdzie exactly-once na poziomie wiersza, ale projekt
+  zakłada jeden zegar. Skalowanie teams w przyszłości = wydzielenie zegara albo leader
+  election; do tego czasu <code>replicas: 1</code>.</p>
+  <p><b>agent, market-data: skalowalne, ale bez pośpiechu.</b> Migracje pod advisory lockiem
+  obsługują wiele startujących replik poprawnie (jedna migruje, reszta czeka — sesyjny lock
+  umiera z połączeniem). Ingest market-data jest jednak zbudowany wokół jednego procesu
+  właściciela par; skalowanie w poziomie wymagałoby podziału par między repliki. Zaczynać
+  z <code>replicas: 1</code> wszędzie i skalować dopiero to, co zmierzy się jako wąskie gardło —
+  najpewniej nic w obecnym ruchu.</p>
+
+  <h2 id="sizing">Rozmiar i koszt</h2>
+  <p>Zmierzone working sety z komentarzy w Terraformie: brama 193–262 MB, market-data 311–327 MB,
+  typowy moduł 150–310 MB. Siedem kontenerów to realnie ~2,5 GB — reszta dzisiejszych 7 GB planu
+  B3 to narzut platformy per aplikacja, który na AKS znika. Przy 15–20 workloadach tej samej
+  wagi: <b>4–6 GB requestów pamięci</b>.</p>
+  <div class="table-wrap"><table>
+    <thead><tr><th>Wariant</th><th>Kształt</th><th>Uwagi</th></tr></thead>
+    <tbody>
+      <tr><td><b>Start (rekomendowany)</b></td>
+        <td>2× <code>Standard_D2as_v5</code> (2 vCPU / 8 GB każdy), jeden nodepool</td>
+        <td>Mieści dzisiejszą siódemkę z dużym zapasem i docelową dwudziestkę bez zmiany;
+        drugi node daje przeżycie awarii node'a dla wszystkiego poza singletonami
+        (brama/teams wstają na drugim po chwili — akceptowalne, bo i dziś restart App Service
+        znaczy to samo)</td></tr>
+      <tr><td>Oszczędny</td>
+        <td>2× <code>Standard_B2ms</code> (2 vCPU / 8 GB, burstable)</td>
+        <td>Bliżej dzisiejszego kosztu B3; burstable pasuje do profilu (długie idle, krótkie
+        piki), ale kredyty CPU trzeba obserwować przy backfillach market-data</td></tr>
+      <tr><td>Nie robić</td>
+        <td>1 node</td>
+        <td>Każda aktualizacja AKS = pełny downtime wszystkiego; oszczędność nie równoważy
+        utraty rolling updates</td></tr>
+    </tbody>
+  </table></div>
+  <p>Control plane AKS w tierze Free kosztuje zero. Rachunek jest więc z grubsza: dzisiejszy
+  plan B3 ↔ dwa node'y + NAT Gateway + ewentualny load balancer. Przy obecnej skali to
+  <b>podobny rząd albo nieco drożej</b>; oszczędność pojawia się dopiero tam, gdzie App Service
+  wymusiłby kolejne skoki SKU przy dokładaniu serwisów, a AKS przyjmuje je w istniejący zapas.
+  Migracji nie uzasadnia koszt — uzasadnia ją koszt <i>krańcowy</i> nowego serwisu (plik YAML
+  zamiast ~200 linii Terraforma + workflow + rejestracji) i naprawa klasy problemów z sondami.</p>
+
+  <h2 id="plan">Plan przejścia</h2>
+  <p class="section-note">Sześć faz; każda zostawia produkcję w całości działającą i ma jasny
+  warunek wyjścia. Fazy 0–1 są warte zrobienia nawet, gdyby migracja miała nigdy nie nastąpić.</p>
+
+  <div class="phase">
+    <div class="phase-head"><span class="phase-num">0</span>
+    <h4>Przygotowanie na App Service — dług, który i tak trzeba spłacić</h4></div>
+    <p>Z audytu: jeden reusable workflow deploy zamiast ośmiu kopii; asercja tagu obrazu we
+    wszystkich sondach; ujednolicenie sprawdzania principala w modułach — wyciągnięcie odczytu
+    <code>x-ms-client-principal-*</code> w każdym module do jednej funkcji z jednym testem, tak
+    żeby zamiana formatu nagłówka była później zmianą w jednym miejscu per moduł, nie
+    polowaniem po kodzie.</p>
+    <p class="gate">deploye przechodzą przez wspólny workflow, moduły czytają tożsamość
+    wywołującego przez własny, nazwany szew.</p>
+  </div>
+
+  <div class="phase">
+    <div class="phase-head"><span class="phase-num">1</span>
+    <h4>Fundament klastra</h4></div>
+    <p>AKS (2 node'y, Free control plane) + NAT Gateway + ingress controller z TLS + Workload
+    Identity + Secrets Store CSI — wszystko w <code>infra/</code> jako nowe pliki, bez ruszania
+    istniejących App Service'ów. Dodanie IP NAT-a do firewalla Postgresa <b>obok</b>
+    istniejących reguł. Zasada z dzisiejszego repo przeżywa: CI planuje, apply jest operatora.</p>
+    <p class="gate">testowy pod w klastrze czyta sekret z Key Vault przez CSI i łączy się
+    z Postgresem tożsamością federowaną.</p>
+  </div>
+
+  <div class="phase">
+    <div class="phase-head"><span class="phase-num">2</span>
+    <h4>Pierwszy moduł: market-mcp</h4></div>
+    <p>Najlepszy pionier: bezstanowy, jeden upstream (market-data, nadal na App Service — woła
+    przez publiczny URL ze scope, dokładnie jak dziś z kontenera), prosty <code>/health</code>,
+    dwóch znanych wywołujących. Tu przećwiczy się całą mechanikę: manifest, CSI, workload
+    identity, wpis nowego client_id do <code>allowed_applications</code> market-data,
+    przełączenie <code>MARKET_MCP_URL</code> agenta i teams na adres ingressu — i rollback
+    przez cofnięcie jednej zmiennej, jak przewiduje dzisiejszy projekt.</p>
+    <p class="gate">agent i teams używają narzędzi z klastra przez tydzień bez incydentu;
+    App Service'owy market-mcp zatrzymany.</p>
+  </div>
+
+  <div class="phase">
+    <div class="phase-head"><span class="phase-num">3</span>
+    <h4>Auth: wymiana Easy Auth na walidację w ingressie/modułach</h4></div>
+    <p>Największa merytoryczna praca. Dla ruchu moduł→moduł: walidacja JWT z Entra (audience +
+    lista dozwolonych appid — dokładny odpowiednik <code>allowed_applications</code>) w filtrze
+    ingressu albo w module, za szwem z fazy 0. Dla ruchu z przeglądarki (terminal → market-data
+    / agent / teams): ten sam token MSAL co dziś, walidowany w nowym miejscu;
+    <code>X-Operator-Authorization</code> przechodzi bez zmian, bo to nagłówek aplikacyjny,
+    nie platformowy. Wyjątki ścieżek (health, WS z ticketami) przenoszą się na reguły ingressu.
+    To jest OpenSpec change — zmienia kontrakt bezpieczeństwa między modułami.</p>
+    <p class="gate">jeden moduł (market-mcp z fazy 2) przyjmuje ruch bez Easy Auth, z tą samą
+    imienną listą wywołujących, potwierdzoną testem odmowy dla nieuprawnionej tożsamości.</p>
+  </div>
+
+  <div class="phase">
+    <div class="phase-head"><span class="phase-num">4</span>
+    <h4>Warstwa danych: market-data i capital-gateway, potem trading-mcp</h4></div>
+    <p>market-data z <code>startupProbe</code> ≥ 1800 s (migracje największej tabeli) i
+    adnotacjami WS. Brama jako singleton (<code>Recreate</code>, bez HPA) z NetworkPolicy
+    wpuszczającą tylko market-data i trading-mcp — koniec z listami outbound IP. trading-mcp
+    zaraz po bramie: jego start i tak wymaga żywej bramy z kontem demo, więc jest naturalnym
+    smoke-testem tej fazy. Firewall Postgresa traci trzy reguły <code>for_each</code>.</p>
+    <p class="gate">świece płyną, terminal rysuje, backfill przechodzi; stare reguły firewalla
+    usunięte.</p>
+  </div>
+
+  <div class="phase">
+    <div class="phase-head"><span class="phase-num">5</span>
+    <h4>agent, teams, teams-mcp — i domknięcie</h4></div>
+    <p>agent i teams z adnotacjami SSE (timeouty, brak buforowania), teams jako singleton przez
+    zegar. Kolejność bez znaczenia — oba czytają narzędzia z klastra już od fazy 2. Na końcu:
+    zatrzymanie App Service'ów, plan B3 do usunięcia, alerty przepisane na Container Insights
+    (web-test <code>/ping</code> i alert KQL zostają), aktualizacja
+    <code>docs/architecture.md</code> i CLAUDE.md. Terminal nie rusza się z SWA.</p>
+    <p class="gate">plan B3 usunięty; wszystkie 9 alertów ma odpowiednik; runbook „nowy serwis"
+    to jeden plik YAML + wpis w liście wywołujących.</p>
+  </div>
+
+  <div class="callout">
+    <p><b>Główne ryzyka.</b> (1) Faza auth jest jedyną, w której można otworzyć dziurę —
+    dlatego idzie za szwem z fazy 0, na jednym module, z testem odmowy przed przełączeniem
+    reszty. (2) Klaster to nowa powierzchnia operacyjna dla jednej osoby: aktualizacje AKS,
+    wersje ingressu, certyfikaty — realny, stały koszt uwagi, którego App Service nie miał;
+    tier Free + managed dodatki (ingress AGIC albo app routing, auto-upgrade patch) trzymają go
+    nisko, ale nie na zerze. (3) Kolejność faz chroni sesję Capital: brama migruje raz, w
+    fazie 4, a nie „przy okazji" — dwa stacki naraz to podwójne wydawanie limitu 10 req/s,
+    dokładnie jak w regule „jeden stack naraz" z dzisiejszego dev.</p>
+  </div>
+
+  <h2 id="rekomendacja">Rekomendacja</h2>
+  <p>Nie migrować „bo Kubernetes", migrować <b>na sygnał</b> — a sygnały są trzy: alert pamięci
+  planu wymuszający kolejny SKU, dziesiąty serwis w kolejce, albo trzeci incydent klasy
+  „workflow/sonda rozjechały się między kopiami". Przy założeniu podwojenia liczby serwisów
+  pierwsze dwa sygnały są kwestią czasu, więc właściwa decyzja dziś to: <b>zrobić fazę 0
+  natychmiast</b> (jest czystym spłaceniem długu z audytu), postawić fundament z fazy 1 przy
+  najbliższej okazji, i przenieść market-mcp jako pilota. Po fazie 2 koszt i kształt reszty
+  migracji przestają być szacunkiem, a stają się pomiarem — i decyzja o fazach 3–5 zapadnie na
+  liczbach, nie na tym dokumencie.</p>
+</main>

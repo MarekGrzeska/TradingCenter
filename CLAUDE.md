@@ -30,7 +30,8 @@ modules/teams             Python · teams of agents as data — a graph the oper
 modules/trading-mcp       Python · MCP tools over the gateway's demo account: positions, balance, orders. Network transport only, two named callers (teams, agent). Demo checked against the gateway, not against a setting.
 modules/teams-mcp         Python · MCP tools over teams' catalogue, so the agent can build and correct a team by talking. One named caller (agent). Every tool acts in the operator's name — their token travels with the call, in its own header.
 modules/terminal          React+TS · the operator's screen. Consumes the gateway, market-data, agent and teams. Publishes nothing.
-packages/tc-runtime       Python · the plumbing measured as a hand-copy across modules: database, migrations, schema check, caller identity. A build-time dependency, never a runtime one; its README names the consumers.
+packages/tc-runtime       Python · the plumbing measured as a hand-copy across modules: database, migrations, schema check, Easy Auth. A build-time dependency, never a runtime one; its README names the consumers.
+packages/tc-mcp-kit       Python · caller-identity middleware and upstream-refusal helper, taken only by the three MCP modules — none of which has a database, which is why this is not part of tc-runtime.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
 docs/                     architecture and reference — only what is true today
@@ -51,6 +52,8 @@ Run these from the module directory. Nothing at the repo root builds or tests ev
 | `market-mcp` | `uv run python -m market_mcp stdio` (desktop client) or `... http` (port 8040)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
 | `agent` | `uv run alembic upgrade head` then `uv run uvicorn agent.app:app --reload --port 8030`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `packages/tc-runtime` | no entrypoint — a library<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
+| `packages/tc-mcp-kit` | same |
+| `packages/tc-openai` | same |
 | `teams` | `uv run alembic upgrade head` then `uv run uvicorn teams.app:app --reload --port 8050`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `trading-mcp` | `uv run python -m trading_mcp` (port 8060 — one transport, no `stdio` to choose)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
 | `teams-mcp` | `uv run python -m teams_mcp` (port 8070 — same, one transport)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |

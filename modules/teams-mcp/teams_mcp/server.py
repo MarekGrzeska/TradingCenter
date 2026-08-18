@@ -18,7 +18,7 @@ from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
-from tc_runtime.network_identity import RequireCallerIdentity
+from tc_mcp_kit.network_identity import RequireCallerIdentity
 
 from . import tools
 from .client import TeamsClient
