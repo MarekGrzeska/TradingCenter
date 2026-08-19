@@ -8,14 +8,23 @@ credential for it, and the prohibition held by construction. It holds by this fi
 
 from __future__ import annotations
 
+import base64
 import inspect
+import json
 import types
 
 import httpx
 import pytest
 from starlette.middleware.base import BaseHTTPMiddleware
 
-from market_data.caller_access import OPEN_PATHS, REST_PATHS, CallerAccess, Surface, surface_for
+from market_data.caller_access import (
+    OPEN_PATHS,
+    REST_PATHS,
+    CallerAccess,
+    Surface,
+    calling_application,
+    surface_for,
+)
 from market_data.config import Settings
 
 AGENT = "agent-application-id"
@@ -66,8 +75,36 @@ def _client(app) -> httpx.AsyncClient:
     )
 
 
-def _as(identity: str | None) -> dict[str, str]:
-    return {"X-MS-CLIENT-PRINCIPAL-ID": identity} if identity else {}
+def _as(application: str | None, person: str = "a-person-object-id") -> dict[str, str]:
+    """The headers Easy Auth puts on a request it let through.
+
+    Both of them, and the pair is the whole lesson of 19 August 2026: the claims blob names
+    the **application** the token was issued to, while `X-MS-CLIENT-PRINCIPAL-ID` names the
+    person for a delegated token. The record is written in applications, so a test that
+    only set the id header was testing a header this module must not decide on.
+    """
+    if application is None:
+        return {}
+    return {
+        "X-MS-CLIENT-PRINCIPAL": _principal_blob(application),
+        "X-MS-CLIENT-PRINCIPAL-ID": person,
+    }
+
+
+def _principal_blob(application: str, claim: str = "azp") -> str:
+    """Easy Auth's own encoding: base64 of `{"auth_typ": …, "claims": [{"typ", "val"}, …]}`."""
+    blob = {
+        "auth_typ": "aad",
+        "name_typ": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+        "role_typ": "http://schemas.microsoft.com/ws/2008/06/identity/claims/role",
+        "claims": [
+            {"typ": "aud", "val": "api://tradingcenter-market-data"},
+            {"typ": "iss", "val": "https://login.microsoftonline.com/tenant/v2.0"},
+            {"typ": "oid", "val": "a-person-object-id"},
+            {"typ": claim, "val": application},
+        ],
+    }
+    return base64.b64encode(json.dumps(blob).encode("utf-8")).decode("ascii")
 
 
 # --- 4.1: the form, which is as load-bearing as the rule ---
@@ -346,3 +383,78 @@ async def test_an_open_path_answers_before_the_settings_exist() -> None:
 
     assert response.status_code == 200
     assert reached == ["/ping"]
+
+
+# --- the identity itself: which fact the record is written in --------------------------
+
+
+async def test_a_person_in_the_id_header_is_not_the_caller() -> None:
+    """The production failure of 19 August 2026, as a test.
+
+    The terminal presents a **delegated** token, and Easy Auth fills
+    `X-MS-CLIENT-PRINCIPAL-ID` with the signed-in person's object id — not the terminal
+    application's. A record of application identifiers can never match that, so every REST
+    request was refused until the image was rolled back. What must not happen again is this
+    module deciding on that header at all: without a claims blob there is no calling
+    application to name, and no identifier here is one either.
+    """
+    layer, reached = _wrap()
+
+    async with _client(layer) as client:
+        response = await client.get(
+            "/pairs", headers={"X-MS-CLIENT-PRINCIPAL-ID": "e6b7d7ba-a-person-not-an-app"}
+        )
+
+    assert response.status_code == 401
+    assert reached == []
+
+
+@pytest.mark.parametrize("claim", ["azp", "appid", "http://schemas.microsoft.com/identity/claims/appid"])
+def test_the_calling_application_is_read_from_any_spelling_of_the_claim(claim: str) -> None:
+    """`azp` in a v2 token, `appid` in a v1 one, and Easy Auth passes some claim types
+    through in their long URI form. Three spellings, one fact."""
+    headers = {b"x-ms-client-principal": _principal_blob(TERMINAL, claim=claim).encode()}
+
+    assert calling_application(headers) == TERMINAL
+
+
+def test_a_blob_that_will_not_decode_names_nobody() -> None:
+    """And naming nobody is a refusal upstream, never a pass."""
+    assert calling_application({b"x-ms-client-principal": b"not base64 at all !!"}) is None
+    assert calling_application({b"x-ms-client-principal": base64.b64encode(b"{]")}) is None
+    assert calling_application({}) is None
+
+
+def test_a_blob_carrying_only_a_person_names_nobody() -> None:
+    """`oid` and `sub` name the person at the keyboard. This module admits programs."""
+    blob = base64.b64encode(
+        json.dumps({"claims": [{"typ": "oid", "val": "a-person"}]}).encode()
+    )
+
+    assert calling_application({b"x-ms-client-principal": blob}) is None
+
+
+async def test_the_terminals_delegated_token_reaches_rest() -> None:
+    """The whole point of the fix: the person varies, the application does not."""
+    layer, reached = _wrap()
+
+    async with _client(layer) as client:
+        first = await client.get("/pairs", headers=_as(TERMINAL, person="operator-one"))
+        second = await client.get("/pairs", headers=_as(TERMINAL, person="operator-two"))
+
+    assert (first.status_code, second.status_code) == (200, 200)
+    assert reached == ["/pairs", "/pairs"]
+
+
+async def test_a_tool_callers_own_token_still_only_reaches_the_tools() -> None:
+    """A client-credentials token has no person in it at all — the claim this module reads
+    is the same one either way."""
+    layer, reached = _wrap()
+    headers = {"X-MS-CLIENT-PRINCIPAL": _principal_blob(AGENT)}
+
+    async with _client(layer) as client:
+        tools = await client.post("/mcp", headers=headers)
+        rest = await client.delete("/pairs/US100", headers=headers)
+
+    assert (tools.status_code, rest.status_code) == (200, 403)
+    assert reached == ["/mcp"]

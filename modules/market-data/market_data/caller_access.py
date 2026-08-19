@@ -14,6 +14,10 @@ cannot express — route by route, which identity has business there:
 - the REST caller (the terminal) reaches the REST contract and never `/mcp`;
 - two paths are open with no identity at all, each for a reason written beside it.
 
+**The identity is the calling application, read from the token's own claims.** Not the
+principal-id header, which for a delegated token names the person at the keyboard — see
+`calling_application` below, and the production measurement that put it there.
+
 **A path not in the record is refused, not passed.** The default matters more than any
 single entry: a new REST route added next month would otherwise be reachable by the agent
 on the day it is written, and nothing would say so.
@@ -26,6 +30,9 @@ the same constraint for the same reason, with tests that read its source.
 
 from __future__ import annotations
 
+import base64
+import binascii
+import json
 import logging
 import re
 from enum import Enum
@@ -35,12 +42,58 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 log = logging.getLogger(__name__)
 
-# What a platform authenticator puts on every request it lets through. Same pair
-# `routers/stream.py` reads, in bytes because raw ASGI headers are bytes.
+# What a platform authenticator puts on every request it lets through, in bytes because raw
+# ASGI headers are bytes.
+#
+# The **id** header is what `routers/stream.py` reads, and it answers a different question
+# than this file asks. Measured in production on 19 August 2026: for the terminal's
+# delegated token it carries the signed-in **person's** object id
+# (`e6b7d7ba-…`), not the application's — so a record of application identifiers can never
+# match it, and every REST request was refused until the image was rolled back. The claims
+# blob below is where the calling application actually is.
 PRINCIPAL_ID_HEADER = b"x-ms-client-principal-id"
 PRINCIPAL_NAME_HEADER = b"x-ms-client-principal-name"
+PRINCIPAL_HEADER = b"x-ms-client-principal"
+
+# The token claim naming the application the token was issued to. `azp` in a v2 token,
+# `appid` in a v1 one, and Easy Auth passes some claim types through as the long URI form.
+# All three are the same fact: **who is calling**, which is what `allowed_applications` in
+# `infra/app-service.tf` is written in terms of too.
+#
+# Deliberately not `oid` or `sub`: those name the person, and this module admits programs.
+APPLICATION_CLAIMS = (
+    "azp",
+    "appid",
+    "http://schemas.microsoft.com/identity/claims/appid",
+)
 
 UNAUTHENTICATED = "anonymous"
+
+
+def calling_application(headers: dict[bytes, bytes]) -> str | None:
+    """The application identifier this request was issued to, or `None` if it cannot be named.
+
+    `None` is a refusal, never a pass: a request whose calling application cannot be read is
+    exactly the request this record has nothing to say about.
+    """
+    raw = headers.get(PRINCIPAL_HEADER)
+    if not raw:
+        return None
+    try:
+        padded = raw + b"=" * (-len(raw) % 4)
+        blob = json.loads(base64.b64decode(padded).decode("utf-8"))
+    except (ValueError, binascii.Error):
+        # A blob that will not decode is not an identity; it is a header to ignore.
+        return None
+
+    claims = blob.get("claims") or []
+    for name in APPLICATION_CLAIMS:
+        for claim in claims:
+            if not isinstance(claim, dict):
+                continue
+            if claim.get("typ") == name and claim.get("val"):
+                return str(claim["val"]).strip()
+    return None
 
 
 class Surface(str, Enum):
@@ -171,7 +224,10 @@ class CallerAccess:
             return
 
         headers = dict(scope.get("headers", []))
-        identity = (
+        application = calling_application(headers)
+        # Who the request is *for*, kept for the log line only. A person and an application
+        # are two different facts and only one of them is what this record is written in.
+        principal = (
             (headers.get(PRINCIPAL_ID_HEADER) or headers.get(PRINCIPAL_NAME_HEADER) or b"")
             .decode("utf-8", errors="replace")
             .strip()
@@ -181,27 +237,33 @@ class CallerAccess:
             # Local work: nothing stands in front, so there is no identity to have and no
             # list to be on. Logged as such rather than silently — a deployed instance
             # printing this line is a misconfiguration somebody needs to see.
-            log.info("request on %s from %s", path, identity or UNAUTHENTICATED)
+            log.info("request on %s from %s", path, application or principal or UNAUTHENTICATED)
             await self._app(scope, receive, send)
             return
 
-        if not identity:
-            log.warning("request refused: no authenticated principal on %s", path)
+        if application is None:
+            log.warning(
+                "request refused: the calling application cannot be named on %s (principal %s)",
+                path,
+                principal or UNAUTHENTICATED,
+            )
             await self._refuse(scope, receive, send, 401, "not authenticated")
             return
 
         allowed = (
             settings.tool_caller_ids if surface is Surface.TOOLS else settings.rest_caller_ids
         )
-        if identity not in allowed:
-            # The identity, never the credential it arrived with, and never the request.
-            log.warning("request refused: %s has no access to %s (%s)", identity, path, surface)
+        if application not in allowed:
+            # The application, never the credential it arrived with, and never the request.
+            log.warning(
+                "request refused: application %s has no access to %s (%s)", application, path, surface
+            )
             await self._refuse(
                 scope, receive, send, 403, f"this caller has no access to {surface.value}"
             )
             return
 
-        log.info("request on %s from %s", path, identity)
+        log.info("request on %s from application %s (principal %s)", path, application, principal)
         await self._app(scope, receive, send)
 
     async def _refuse(

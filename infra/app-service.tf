@@ -406,22 +406,22 @@ resource "azurerm_linux_web_app" "market_data" {
     # gate in front authorizes an application and not a route. The terminal is the caller
     # of the REST contract and has no business on `/mcp`.
     #
-    # Two spellings per caller — the service principal's client id and its object id — and
-    # that is deliberate rather than sloppy: both name the same principal, and which of
-    # them Easy Auth puts in `X-MS-CLIENT-PRINCIPAL-ID` for an app-to-app token has not
-    # been measured against this tenant. Listing both means the first deploy cannot fail
-    # closed on a header nobody looked at; narrowing it to one is a follow-up with a
-    # measurement attached.
+    # Client ids, and only client ids — the same identifiers `allowed_applications` above
+    # is written in, because the module reads the same fact from the token: the `azp`
+    # (or `appid`) claim naming the application the token was issued to.
+    #
+    # This list carried object ids too for one afternoon, on the theory that Easy Auth
+    # might put either in `X-MS-CLIENT-PRINCIPAL-ID`. Measured in production on
+    # 19 August 2026 instead: for the terminal's delegated token that header carries the
+    # signed-in **person's** object id, so no list of application identifiers could ever
+    # have matched it, and every REST request was refused until the image was rolled back.
+    # The module reads the claims blob now (`market_data/caller_access.py`), which is the
+    # only place the calling application appears for both kinds of token.
     TOOL_CALLER_APPLICATION_IDS = join(",", [
       data.azuread_service_principal.agent_managed_identity.client_id,
-      data.azuread_service_principal.agent_managed_identity.object_id,
       data.azuread_service_principal.teams_managed_identity.client_id,
-      data.azuread_service_principal.teams_managed_identity.object_id,
     ])
-    REST_CALLER_APPLICATION_IDS = join(",", [
-      azuread_application.terminal.client_id,
-      azuread_application.terminal.object_id,
-    ])
+    REST_CALLER_APPLICATION_IDS = azuread_application.terminal.client_id
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
   }
