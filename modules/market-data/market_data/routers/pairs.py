@@ -29,13 +29,12 @@ from ..jobs import (
     plan_chunks,
 )
 from ..models import ESTIMATED_BYTES_PER_CANDLE, Resolution
+from ..reads import read_pairs
 from ..tracking import (
     LimitReached,
     TrackedPair,
     TrackingRefused,
     add_pair,
-    decide_late_pairs,
-    read_status,
 )
 from .deps import pool
 
@@ -53,11 +52,9 @@ router = APIRouter()
 async def pairs(request: Request, db=Depends(pool)) -> list[TrackedPairOut]:
     moment = datetime.now(UTC)
     async with db.acquire() as conn:
-        statuses = await read_status(conn, now=moment)
-
-    decided = await decide_late_pairs(
-        request.app.state.instruments, request.app.state.market_status, statuses, moment
-    )
+        decided = await read_pairs(
+            conn, request.app.state.instruments, request.app.state.market_status, moment
+        )
 
     return [
         TrackedPairOut(
