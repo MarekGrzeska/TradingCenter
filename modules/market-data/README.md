@@ -196,7 +196,11 @@ client and Easy Auth handles it, exactly as on every other route.
 
 ## The tool surface
 
-`/mcp`, streamable HTTP, eleven tools and three resources. What a model gets is not the
+`/mcp`, streamable HTTP, eleven tools and three resources. Both `/mcp` and `/mcp/` are the
+same address, the transport's session manager is started by this module's own lifespan, and
+the DNS-rebinding check FastMCP enables for a loopback host is off — three separate things
+a mounted transport needs and none of which a test that calls tools as objects can see
+(`mcp_app.py`, and the handshake test in `tests/test_mcp_mount.py`). What a model gets is not the
 REST contract in another spelling: a chart wants every candle, a model wants a summary, so
 a series above the ceiling comes back bucketed and named as bucketed, a series far above it
 is refused with what to ask instead, and every empty answer says which kind of empty it is.

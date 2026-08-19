@@ -182,8 +182,13 @@ async def lifespan(app: FastAPI):
                 candle_age_periods,
             )
         )
+        # The tool surface's own machinery, started here because a mounted application's
+        # lifespan is not run by the one mounting it (`mcp_app.tool_surface_session`).
+        from .mcp_app import tool_surface_session
+
         try:
-            yield
+            async with tool_surface_session(app):
+                yield
         finally:
             candle_age_task.cancel()
             with contextlib.suppress(asyncio.CancelledError):
@@ -296,15 +301,24 @@ def create_app() -> FastAPI:
     # `mcp_app` is imported here, inside the factory, and that is not style: it pulls in
     # Starlette, and the module-level import block must stay below `telemetry.configure()`
     # (see the top of this file). An import at call time cannot climb above it by accident.
-    from .mcp_app import build_mcp_app
+    from .mcp_app import ToolSurfaceAddress, build_mcp_app
 
-    app.mount("/mcp", build_mcp_app(app))
+    mcp_server, mcp_asgi = build_mcp_app(app)
+    # Kept on the application so the lifespan can start its session manager: the mounted
+    # app's own lifespan never runs, and without that task group every tool call answers
+    # `RuntimeError: Task group is not initialized` (`mcp_app.py`).
+    app.state.mcp_server = mcp_server
+    app.mount("/mcp", mcp_asgi)
 
     # In front of both surfaces, and it has to be one layer rather than a dependency per
     # router: `/mcp` is a mounted ASGI application, not a router, so a `dependencies=`
     # check could not reach it and the rule would exist in two mechanisms that drift in
     # one direction. `app.state` rather than the settings themselves — the lifespan puts
     # those there long after this line runs (`caller_access.py`).
+    # Added first, so it ends up *inside* the caller-access layer: that layer decides on
+    # `/mcp` as written, and this one turns it into the path the router can match
+    # (`mcp_app.ToolSurfaceAddress`).
+    app.add_middleware(ToolSurfaceAddress)
     app.add_middleware(CallerAccess, state=app.state)
 
     return app
