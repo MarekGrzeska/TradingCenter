@@ -131,7 +131,7 @@
     <span><b>Kryteria:</b> wydajność · złożoność · koszt nowego modułu · reuse</span>
     <span><b>Kontekst:</b> projekt osobisty, edukacyjno-eksperymentalny, konto demo</span>
     <span><b>Horyzont:</b> 6 iteracji, każda domknięta i wartościowa osobno</span>
-    <span><b>Stan:</b> iteracje 0, 1, 2 i 4 zamknięte, 3 w części · następna: reszta 3</span>
+    <span><b>Stan:</b> iteracje 0, 1, 2 i 4 zamknięte, 3 i 5 domknięte poza tym, co wymaga propozycji · otwarte: 6</span>
   </div>
 </header>
 
@@ -514,7 +514,8 @@
     <div class="iter-head"><span class="iter-num">3</span>
     <h4>Terminal: kupujemy commodity, tniemy molocha</h4>
     <span class="status-pill">Zrobione w części · 18.08 · PR&nbsp;#161</span>
-    <span class="status-pill next">Reszta otwarta</span>
+    <span class="status-pill">Domknięte · 19.08</span>
+    <span class="status-pill next">Trasy Teams — propozycja</span>
     <span class="horizon">8 commitów · 53 pliki</span></div>
     <p>Kupione zostało jedno commodity z dwóch — <b>TanStack Query</b> na odczyt danych.
     <b>Zustand nie wszedł</b>, i to jest wynik pomiaru, nie zaniechania. Moloch zszedł o
@@ -586,11 +587,53 @@
       strona pyta archiwum o id, którego katalog już nie oferuje. Katalog, który
       <i>padł</i>, działa jak dotąd: selekcje przechodzą niefiltrowane, żeby chwiejny odczyt
       nigdy nie czytał się jako „archiwum skasowało wszystko".</p>
-      <h5>Co z tej iteracji zostaje</h5>
-      <p><code>useChartInstance</code> (<code>Chart.tsx</code> → ~960), reszta przemiału
-      UI-kitu (~70 dalszych dosłownych <code>className</code>), trasy zagnieżdżone w Teams
-      (runy dostają linki) i <code>agentChatStore</code> — ten ostatni dopiero po
-      przeplanowaniu.</p>
+      <h5>Co z tej iteracji zostało domknięte 19.08</h5>
+      <p><b><code>useChartInstance</code> wyszedł</b> — <code>Chart.tsx</code> <b>1 135 →
+      1 033</b>, a węzeł kolejności efektów rozwiązał się z drugiej strony, dokładnie tak, jak
+      ta iteracja przewidywała: tablica zależności jest czytana w trakcie renderu, a
+      <i>zawartość refa</i> nie jest. <code>clearIndicatorLayers</code> przychodzi refem,
+      który komponent wypełnia po powrocie hooka warstw, a sprzątanie — biegnące przy
+      odmontowaniu, długo później — czyta to, co w nim wtedy leży.</p>
+      <p><b>Przemiał UI-kitu: 50 przycisków</b>, i dryf w nich był gorszy niż w pierwszej
+      dwunastce. Ta sama akcja główna miała <code>border-primary-line</code> w czterech
+      miejscach i <code>border-primary</code> w trzech; „wyłączony" znaczyło
+      <code>opacity-40</code> tu, <code>opacity-50</code> tam i nic gdzie indziej; osiem
+      przycisków miało margines poziomy bez pionowego, więc stały w innej wysokości niż
+      sąsiedzi. Doszły dwa tony (<code>muted</code> — realne rozróżnienie, nie dryf: akcja
+      drugoplanowa przygasa do najechania; <code>critical</code>) i dwa rozmiary. Pięć
+      przycisków zostaje pisanych ręcznie i każdy jest <i>wymieniony w straży</i> wraz z tym,
+      czego żaden ton nie powinien udawać. Straż to
+      <code>buttonsComeFromOnePlace.test.ts</code>, w kształcie, który to repo ma już dla
+      toastów i dialogów, sprawdzona odwróceniem.</p>
+      <h5>Co zostaje, i dlaczego to już nie jest refactor</h5>
+      <p><b>Trasy zagnieżdżone w Teams</b> nie są porządkiem — są <i>nowym wymaganiem</i>.
+      <code>terminal-shell</code> mówi „Zakładki są adresowalne" i kończy się na zakładce;
+      cała nawigacja wewnątrz Teams siedzi w jednym <code>useState&lt;Open&gt;</code>, więc
+      przebieg nie ma adresu, nie przeżywa odświeżenia i nie da się go nikomu podać. Nadanie
+      mu adresu rozszerza to wymaganie na wnętrze zakładki, a to jest propozycja OpenSpec,
+      nie gałąź z testami — test mechaniczny z <code>CLAUDE.md</code> wskazuje
+      <code>openspec/specs/**</code>.</p>
+      <h5>Przeplanowanie <code>agentChatStore</code> — co pokazał pomiar</h5>
+      <p>Pozycja wróciła „do przemyślenia" w iteracji 3, bo jej przesłanka była fałszywa.
+      Przemyślana, pokazuje coś <b>szerszego niż jeden store</b>: te <code>AbortController</code>y
+      istnieją, tylko <b>żaden z nich niczego nie przerywa</b>. Policzone:
+      <b>16 wywołań <code>new AbortController().signal</code></b> w stores agenta —
+      <code>agentChatStore</code> 10, <code>drawingsStore</code> 4,
+      <code>chartControl</code> 2 — każdy świeży, każdy tworzony wyłącznie po to, żeby
+      dopasować się do sygnatury <code>agentApi</code>, i ani jednego <code>.abort()</code>.
+      Hooki wykresu (<code>useIndicators</code>, <code>useOlderBars</code>,
+      <code>archive.ts</code>) robią to naprawdę.</p>
+      <p>W miejsce przerwania stoi <b>odrzucanie odpowiedzi po fakcie</b>: licznik
+      <code>transcriptSeq</code> z <code>transcriptFor</code> i trzy flagi
+      <code>*InFlight</code>. <code>++transcriptSeq</code> z komentarzem „orphans any
+      in-flight loadMessages" <i>jest</i> anulowaniem — wyrażonym jako wyrzucenie wyniku,
+      który i tak przyszedł. Przeplanowana pozycja brzmi więc inaczej niż w audycie: nie
+      „mapa kontrolerów zamiast flag", tylko <b>jeden kontroler na sprawę</b> (modele, sesje,
+      transkrypt, synchronizacja wykresu), po którym licznik i dwie z trzech flag przestają
+      mieć co robić, a żądanie naprawdę się kończy zamiast wracać do kosza. Ryzyko jest
+      nazwane i jest powodem, dla którego to nadal nie jest zrobione: <code>finishTurn</code>
+      dzieli <code>transcriptSeq</code> z ładowaniem transkryptu, więc naiwne przerwanie
+      ubija odczyt należący do trwającej tury.</p>
     </div>
   </div>
 
@@ -665,27 +708,166 @@
     sekundę mniej; zapis po błędzie bramy kosztuje jedną rundę, nie dwie.</p>
   </div>
 
-  <div class="iter">
+  <div class="iter done">
     <div class="iter-head"><span class="iter-num">5</span>
     <h4>Struktura plików-molochów po stronie Pythona</h4>
-    <span class="horizon">~1–2 tyg.</span></div>
-    <ul>
-      <li><code>teams/store.py</code>: parametryzacja schedule/trigger po tabeli (−200 linii);
-      wspólny ogon <code>_fire_schedule</code>/<code>_check_trigger</code>.</li>
-      <li><code>agent/store.py</code> → pakiet <code>store/</code> (pięć domen); usunięcie 5
-      modeli przelotowych i migracji-z-prozą (prompt staje się danymi operatora przez
-      <code>PUT /prompt</code>).</li>
-      <li><code>routers/indicators.py</code>: tagowana unia computerów — <code>output</code>
-      wyprowadzany, nie deklarowany; <code>_result_out</code> jako <code>match</code>.</li>
-      <li><code>contract.py</code>: <code>model_validate</code> + <code>FromAlias</code>
-      (−80 linii); usunięcie martwych pól z drutu.</li>
-      <li>Domknięcia → klasy: <code>_execute_round</code> w agencie,
-      <code>_StepRunner</code> w teams; <code>commit_candles</code> jako jedyna ścieżka zapisu
-      świec; <code>gateway/_http.py</code>; <code>create_app()</code> w market-data i pocięcie
-      1 906-linijkowego test_app.py.</li>
+    <span class="status-pill">Zrobione w części · 18.08 · PR&nbsp;#166</span>
+    <span class="status-pill">Domknięte · 19.08</span>
+    <span class="status-pill next">contract.py — propozycja</span>
+    <span class="horizon">11 commitów · 3 moduły + terminal</span></div>
+    <p>Z pięciu pozycji weszły dwie i pół: <b><code>agent/store.py</code></b> jako pakiet,
+    <b><code>create_app()</code></b> w market-data z pocięciem 1 906-linijkowego
+    <code>test_app.py</code> i martwe pola zdjęte z drutu. <b>Zapowiadane ~700 linii mniej nie
+    powstało</b> — kod produkcyjny wyszedł na <b>+93 linie</b> — a przy jednej z pozycji
+    wypadł bug, który przez cały czas kasował tekst operatora na produkcji.</p>
+    <ul class="shipped">
+      <li><b><code>agent/store.py</code> 911 linii → pakiet <code>store/</code></b>, jeden
+      moduł na tabelę. <b>Siedem, nie pięć</b> — a testy znały już sześć z tych szwów
+      (<code>test_tool_calls_store.py</code>, <code>test_usage_store.py</code>,
+      <code>test_prompt_store.py</code>, <code>test_chart_command_store.py</code>…). Split
+      domknął realną wadę, nie tylko skrócił plik: <code>usage</code> był rozdarty na pół —
+      zapis u góry, cztery odczyty agregujące 250 linii niżej, a między połówkami jednej
+      tabeli wklinowana cała 210-linijkowa sekcja tool-calls. Powierzchnia publiczna bez
+      zmian: <code>__init__.py</code> reeksportuje te same 36 nazw i nikt z zewnątrz nie
+      importuje submodułu,</li>
+      <li><b><code>create_app()</code> w market-data</b>: <code>app.state</code> — gdzie leży
+      każda zależność tego modułu — przestaje być globalem, którego jeden test podawał
+      następnemu. Dwadzieścia testów przypisywało <code>app.state.*</code> w trakcie i każde
+      z tych przypisań przeżywało do końca sesji. Import globalu zniknął z suit
+      <i>celowo</i>: z nazwą w zasięgu test, który zapomni fixture, znalazłby co mutować
+      i wyciek wróciłby niewidzialnie. Opublikowany dokument bez zmian, sprawdzone zrzutem
+      przed i po — 19 ścieżek, 46 schematów, bajt w bajt,</li>
+      <li><b><code>test_app.py</code> 1 906 → pięć plików</b> po szwach, które już w nim
+      były: każdy podział pada na komentarz-banner, żaden test nie został zmieniony ani
+      przegrupowany. Sekcja 8.8 poszła do <code>test_openapi.py</code> i zgubiła po drodze
+      kontener PostgreSQL — <code>/openapi.json</code> buduje się z tras i nie czyta stanu,
+      więc fixture <code>api</code> nigdy nie był tym, czego te trzy testy potrzebowały,</li>
+      <li><b>drut traci to, czego nic nie sięga</b>: <code>last_fill</code> z modelem
+      <code>FillOut</code> i całą pamięcią pod nim (<code>_fills</code>, <code>report()</code>,
+      hook <code>on_fill</code>), oraz stan rozgrzewki <code>anchored</code>, którego katalog
+      nie umie wyprodukować — zmierzone uruchomieniem: <b>51 <code>fixed</code>, 12
+      <code>decay</code>, 0 <code>anchored</code></b> na 63 wpisach, przy
+      <code>anchored_at</code> nieustawianym nigdzie. <code>TestWarmupKindsAgree</code> trzyma
+      odtąd obie listy razem i został sprawdzony odwróceniem w obie strony,</li>
+      <li><b>zasiew promptu przestaje nadpisywać operatora</b> — bug wypadł przy pozycji
+      „prompt staje się danymi operatora” i został odtworzony na bazie, nie wyrozumowany:
+      migracje zasiewają v4–v11 po +1, a <code>_next_prompt_version</code> robi to samo +1 od
+      najnowszej, więc wersja, którą operator dostaje za pierwszym zapisem, jest
+      <i>zawsze</i> dokładnie tą, której użyje następna migracja zasiewająca. Bez unikatu
+      wchodziły oba wiersze, a odczyt idzie <code>ORDER BY id DESC</code> — wygrywał zasiew;
+      <code>downgrade()</code> takiej migracji kasuje po wersji, więc zabrałby ze sobą tekst
+      operatora. <code>prompt_revisions</code> dostaje kolumnę <code>source</code>, jeden
+      <code>WHERE</code> w <code>agent/prompt_seed.py</code> i unikat zakładany
+      <i>po</i> deduplikacji, bo migracje biegną w <code>lifespan</code>.</li>
     </ul>
-    <p class="gain-line">~700 linii mniej; inwarianty przechodzą z „kolejności domknięć" do
-    stanu obiektów; testy przestają wymagać globalnego <code>app</code>.</p>
+    <p class="gain-line">dwa pliki-molochy mniej po stronie Pythona (911 i 1 906 linii);
+    dwadzieścia testów market-data przestaje przeciekać stanem do następnego; drut przestaje
+    ogłaszać stan, którego producent nie umie osiągnąć; tekst operatora przestaje ginąć przy
+    każdym wdrożeniu z migracją zasiewającą.</p>
+
+    <div class="aside">
+      <h5>Co wyszło inaczej, niż zakładał plan</h5>
+      <p><b>„~700 linii mniej” to +93.</b> Sam split store’a <i>dokłada</i>: 911 linii
+      w jednym pliku to 1 069 w ośmiu (+158), bo każdy moduł niesie własny docstring
+      i własne importy. Odjęły <code>contract.py</code> (−55), <code>supervisor.py</code>
+      (−17) oraz <code>live.py</code> z <code>pairs.py</code> (−9); <code>app.py</code>
+      dołożył 18. Do tego 150 linii poprawki zasiewu (migracja 0013,
+      <code>prompt_seed.py</code>, kolumna) — to nie refactor, to bug. Rachunek na liniach był
+      tu złą miarą od początku: pozycje, które faktycznie miały ciąć
+      (<code>teams/store.py</code>, tagowana unia, <code>FromAlias</code>), są dokładnie tymi,
+      których ta porcja nie ruszyła.</p>
+      <p><b>Sześć martwych pól z audytu to dwa.</b> Konsumpcja zmierzyła się tak, jak
+      zapowiadano — żadne nie ma odpowiednika camelCase w mapperach terminala, market-mcp nie
+      deklaruje żadnego — ale pięć z nich to opublikowane wymagania robiące dokładnie to, po
+      co je napisano, <code>price_side</code> z <code>market-data-store</code>
+      najwyraźniej ze wszystkich: zapisany zamiast domyślnego, żeby druga strona ceny nie
+      wmieszała się później w jedną serię. Czwarta taka liczba w tym planie.</p>
+      <p><b>Prompt nie stał się danymi operatora.</b> Druga rozważana droga — domyślny prompt
+      jako stała w kodzie, tabela wyłącznie na edycje operatora — kasuje 803 linie prozy
+      z historii migracji i jest pojęciowo czystsza. Odrzucona świadomie: zmienia
+      opublikowany scenariusz i wywraca 20 z 23 testów <code>test_prompt_store.py</code>, więc
+      jest decyzją o tym, <i>czym prompt jest</i>, a nie naprawą tego, że ginie.</p>
+      <h5>Reguła tej zmiany o mało nie zawiodła przy pierwszym użyciu</h5>
+      <p>Test na martwe pole brzmi: żadne wymaganie go nie żąda <i>i</i> żaden konsument go
+      nie czyta. Zastosowany do <code>last_fill</code> dał „żadne wymaganie tego nie żąda”
+      — i to była nieprawda. Wymaganie istnieje (<code>market-data-ingest</code>, „Ingest
+      raportuje swój postęp i porażki”) i jest <i>ostrzejsze</i>, niż to pole umiało
+      spełnić: żąda trwałości, a <code>last_fill</code> mieszkał w słowniku w pamięci
+      i sam to o sobie pisał na drucie. Znalazł to <b>docstring testu</b>, który wymaganie
+      cytował, a nie kwerenda, która miała je znaleźć — i powód jest strukturalny, nie
+      przypadkowy: specyfikacje nie nazywają pól, tylko zdolności, więc grep po
+      identyfikatorze <i>z zasady</i> wymagania nie znajdzie. Reguła dopisana jako D1a:
+      kwerendę robi się po słowach, którymi specyfikacja opisuje, <i>do czego</i> pole służy.
+      Usuwane jest ostatecznie mocniejszym powodem — to była druga implementacja spełnionego
+      wymagania, i ta, która łamała jego klauzulę trwałości.</p>
+      <h5>Poprawka o mało nie zrobiła tego, przed czym sama ostrzega</h5>
+      <p><code>design.md</code> odrzuca sam unikat na <code>version</code> argumentem, że
+      migracje biegną w <code>lifespan</code>, więc <b>ograniczenie, które pada, to nie
+      czerwony deploy, tylko moduł, który nie wstaje</b>. Backfill napisany w tej samej
+      zmianie aliasował podzapytanie jako <code>inner</code> — słowo zarezerwowane
+      w PostgreSQL — więc migracja rzucała <code>PostgresSyntaxError</code>. Ta sama awaria,
+      w tym samym miejscu, z tego samego pliku. Złapały ją testy przy pierwszym uruchomieniu,
+      nie przeczytanie migracji — i to jest argument za tym, żeby <code>test_migrate.py</code>
+      chodziło po każdej nietrywialnej migracji, bo migracja jest w tym repo kodem, który
+      <i>nie ma jak paść inaczej niż na produkcji</i>, jeśli nikt jej wcześniej nie uruchomi.</p>
+      <h5>Dwa powody, które split skasował</h5>
+      <p>Znalezione diffem każdej istotnej linii starego pliku wobec pakietu, nie testem —
+      żaden test by nie padł, i o to chodzi. Banner sekcji <code>prompt</code> niósł zdanie za
+      nagłówkiem („globalny dla modułu, nie per właściciel: jeden prompt, nie jeden na
+      operatora”), a cięcie urwało mu głowę. Gorzej: komentarz nad
+      <code>MAX_DRAWINGS_PER_SYMBOL</code>, tłumaczący <i>dlaczego</i> sufit to sto — wykres,
+      na którym nic nie da się odczytać — wisiał na tym bannerze i poszedł razem z nim. Liczba
+      ze skasowanym powodem jest dokładnie tym, po co to repo trzyma komentarze.</p>
+      <h5>Świadomie przyjęta regresja</h5>
+      <p>Ewidencja zleceń pokrywa dociągnięcia zaplanowane jako zlecenie. Te, które
+      <code>PairIngest</code> domyka sam — przy starcie pary i po zerwaniu feedu — przestają
+      być widoczne inaczej niż w logu, czyli tam, gdzie wymaganie ich nie chce. Terminal tego
+      pola nigdy nie pokazywał, więc operator nie traci nic, co widział; zamknięcie luki na
+      dobre to zapis tych dociągnięć przy kawałkach zleceń i osobna zmiana z migracją.</p>
+      <h5>Co z tej iteracji zostało domknięte 19.08</h5>
+      <ul class="shipped">
+        <li><b><code>teams/store.py</code></b> — dziewięć instrukcji na tabelę schodzi do
+        jednej klasy <code>_Recurring</code>, budowanej z nazwy tabeli, listy kolumn i nazwy
+        kolumny „terminu". W <code>scheduler/clock.py</code> <code>_fire_schedule</code>
+        i <code>_check_trigger</code> zatrzymują tylko to, co rozstrzyga „czy termin
+        nadszedł", a resztę oddają <code>_start_and_track</code>: sprawdzenie nakładania,
+        wiersz w <code>schedule_fires</code> tak czy inaczej, i seria porażek. Te dwie rzeczy
+        para mogła sobie pozwolić na rozjazd najmniej — harmonogram nakładający się na siebie
+        podwaja koszt zespołu, a seria pilnowana przez jedną połowę zostawia drugą strzelającą
+        w nieskończoność po tym, jak przestała działać,</li>
+        <li><b>domknięcia → klasy</b>: <code>_StepRunner</code> w teams trzyma
+        <code>pending_trade</code> jako pole zamiast <code>nonlocal</code> między dwoma
+        domknięciami — a to ta para decyduje, jak wysłane zlecenie odnajduje swój własny
+        wiersz; w agencie <code>PoolAccountTrace</code> przestaje być klasą deklarowaną
+        wewnątrz funkcji tylko po to, żeby złapać dwa argumenty,</li>
+        <li><b><code>commit_candles</code></b> jako jedyna droga świec do archiwum — zapis,
+        wiersz pokrycia i przeliczenie rollupów w jednym miejscu, bo trzy wywołania pisały te
+        trzy kroki z ręki i wszystkie trzy musiały się zgadzać co do dwóch, które nie są
+        zapisem. Straż czyta importy pakietu, bo nie ma tu zachowania do przeczytania, dopóki
+        nie jest błędne na produkcji,</li>
+        <li><b><code>gateway/_http.py</code></b> — sześć wywołań powtarzało ten sam podział na
+        trzy sposoby porażki, a <code>_detail</code> stał w dwóch plikach dosłownie,</li>
+        <li><b>tagowana unia computerów</b> — <code>IndicatorSpec</code> miał siedem
+        opcjonalnych pól <code>compute_*</code> i deklarowany obok nich napis
+        <code>output</code>, które mogły się <i>nie zgadzać</i>; router wybierał gałąź, pytając
+        które pole akurat nie jest <code>None</code>, w kolejności będącej rozstrzygnięciem
+        remisu. Dziś <code>output</code> jest wyprowadzany z przypadku, a
+        <code>_result_out</code> to <code>match</code>, w którym pyright zgłasza brakującą
+        gałąź.</li>
+      </ul>
+      <p><b>Liczba testów market-data schodzi 1 029 → 951, i te 78, które odeszły, przechodziły
+      na niczym.</b> Pięć sprawdzeń jechało po całym katalogu i wołało <code>compute</code> na
+      każdym wpisie — dla wpisu markerowego czy strefowego był to stary domyślny
+      <code>compute</code>, oddający <code>{}</code>, porównywane z <code>lines=()</code>.
+      W ich miejsce weszło to, czego brakowało: wpis nie może jednocześnie deklarować linii
+      i liczyć czegoś innego.</p>
+      <h5>Co zostaje, i dlaczego to już nie jest refactor</h5>
+      <p><b><code>model_validate</code> + <code>FromAlias</code> w <code>contract.py</code></b>
+      — jedyna pozycja tej iteracji, która dotyka pliku z kategorii „kontrakt między
+      modułami". Test mechaniczny z <code>CLAUDE.md</code> jest tu celowo bezwarunkowy: nie
+      pyta, czy opublikowany dokument się zmieni (nie zmieni), tylko czy zmiana dotyka
+      <code>market_data/contract.py</code>. Dotyka, więc idzie propozycją.</p>
+    </div>
   </div>
 
   <div class="iter">
@@ -703,57 +885,57 @@
 
   <h2 id="metryki">Jak poznamy, że się udało</h2>
   <div class="table-wrap"><table>
-    <thead><tr><th>Metryka</th><th>Audyt 18.08</th><th>Po iter. 0</th><th>Po iter. 1</th><th>Po iter. 3</th><th>Po iter. 4</th><th>Po iter. 2</th><th>Cel</th></tr></thead>
+    <thead><tr><th>Metryka</th><th>Audyt 18.08</th><th>Po iter. 0</th><th>Po iter. 1</th><th>Po iter. 3</th><th>Po iter. 4</th><th>Po iter. 2</th><th>Po iter. 5</th><th>Cel</th></tr></thead>
     <tbody>
       <tr><td>Miejsca do edycji przy poprawce wspólnej logiki Pythona</td>
         <td class="num">2–7 kopii</td><td class="num">2–7 kopii</td>
         <td class="num hit">1 pakiet ✓</td><td class="num hit">1 pakiet ✓</td><td class="num hit">1 pakiet ✓</td>
-        <td class="num hit">1 pakiet ✓</td><td class="num">1 pakiet</td></tr>
+        <td class="num hit">1 pakiet ✓</td><td class="num hit">1 pakiet ✓</td><td class="num">1 pakiet</td></tr>
       <tr><td>Ręcznie kopiowane linie Pythona ponad pierwszy egzemplarz (pary ≥70%)</td>
         <td class="num">959</td><td class="num miss">+80</td>
         <td class="num hit">74 ✓</td><td class="num hit">74 ✓</td><td class="num hit">74 ✓</td>
-        <td class="num hit">74 ✓</td><td class="num">&lt; 200</td></tr>
+        <td class="num hit">74 ✓</td><td class="num hit">74 ✓</td><td class="num">&lt; 200</td></tr>
       <tr><td>Tokeny powierzchni narzędzi na turę agenta</td>
         <td class="num">15 134</td><td class="num">15 134</td>
         <td class="num">15 134</td><td class="num">15 134</td><td class="num miss">11 704</td>
-        <td class="num miss">11 704</td><td class="num">&lt; 10 000</td></tr>
+        <td class="num miss">11 704</td><td class="num miss">11 704</td><td class="num">&lt; 10 000</td></tr>
       <tr><td>Requesty upstream na wywołanie narzędzia z /pairs</td>
         <td class="num">3–4</td><td class="num">3–4</td>
         <td class="num">3–4</td><td class="num">3–4</td><td class="num hit">1 ✓</td>
-        <td class="num hit">1 ✓</td><td class="num">1–2</td></tr>
+        <td class="num hit">1 ✓</td><td class="num hit">1 ✓</td><td class="num">1–2</td></tr>
       <tr><td>Czas dodania nowego modułu (kod → produkcja)</td>
         <td class="num">~2 dni</td><td class="num">~2 dni</td>
         <td class="num">niezmierzone</td><td class="num">niezmierzone</td><td class="num">niezmierzone</td>
-        <td class="num">niezmierzone</td><td class="num">&lt; 0,5 dnia</td></tr>
+        <td class="num">niezmierzone</td><td class="num">niezmierzone</td><td class="num">&lt; 0,5 dnia</td></tr>
       <tr><td>Linie workflow deploy (bez komentarzy, 7 App Service)</td>
         <td class="num">436</td><td class="num miss">452</td>
         <td class="num miss">458</td><td class="num miss">458</td><td class="num miss">458</td>
-        <td class="num miss">256</td><td class="num">~175</td></tr>
+        <td class="num miss">256</td><td class="num miss">256</td><td class="num">~175</td></tr>
       <tr><td>Linie skryptów dev</td>
         <td class="num">1 136</td><td class="num">1 143</td>
         <td class="num">1 143</td><td class="num">1 143</td><td class="num">1 143</td>
-        <td class="num hit">29 + 859 w jednym ✓</td><td class="num">jedna implementacja</td></tr>
+        <td class="num hit">29 + 859 w jednym ✓</td><td class="num hit">29 + 859 w jednym ✓</td><td class="num">jedna implementacja</td></tr>
       <tr><td>Obrony w CI i skryptach bez testu trybu awarii</td>
         <td class="num">wszystkie</td><td class="num">wszystkie</td>
         <td class="num">wszystkie</td><td class="num">wszystkie</td><td class="num">wszystkie</td>
-        <td class="num hit">0 ✓</td><td class="num">0</td></tr>
+        <td class="num hit">0 ✓</td><td class="num hit">0 ✓</td><td class="num">0</td></tr>
       <tr><td>Największy plik w repo</td>
         <td class="num">3 302 (test) / 2 124 (prod)</td><td class="num">bez zmian</td>
         <td class="num">bez zmian</td><td class="num miss">3 302 / 1 135</td><td class="num">bez zmian</td>
-        <td class="num">bez zmian</td><td class="num">&lt; 1 000</td></tr>
+        <td class="num">bez zmian</td><td class="num miss">3 302 / 1 258</td><td class="num">&lt; 1 000</td></tr>
       <tr><td>Sondy mogące przejść na starym kontenerze</td>
         <td class="num">4 z 7</td><td class="num hit">0 ✓</td>
         <td class="num hit">0 ✓</td><td class="num hit">0 ✓</td><td class="num hit">0 ✓</td>
-        <td class="num hit">0 ✓</td><td class="num">0</td></tr>
+        <td class="num hit">0 ✓</td><td class="num hit">0 ✓</td><td class="num">0</td></tr>
     </tbody>
   </table></div>
 
-  <p><b>Kolumny idą chronologią, nie numerem iteracji</b>, bo iteracja 2 domknęła się jako
-  ostatnia — 3 i 4 weszły przed nią. Każda kolumna jest więc prawdziwym pomiarem w swoim
-  momencie, a nie miejscem w planie. Wiersz workflow deploy pokazuje to najwyraźniej: 458
-  w kolumnach 3 i 4 nie jest regresją, tylko stanem sprzed iteracji 2.</p>
+  <p><b>Kolumny idą chronologią, nie numerem iteracji</b>, bo iteracja 2 domknęła się po 3
+  i 4, a 5 dopiero po niej. Każda kolumna jest więc prawdziwym pomiarem w swoim momencie,
+  a nie miejscem w planie. Wiersz workflow deploy pokazuje to najwyraźniej: 458 w kolumnach
+  3 i 4 nie jest regresją, tylko stanem sprzed iteracji 2.</p>
 
-  <p><b>Po pięciu iteracjach sześć metryk jest na celu, trzy ruszyły i nie doszły, jedna
+  <p><b>Po sześciu iteracjach sześć metryk jest na celu, trzy ruszyły i nie doszły, jedna
   stoi.</b> Iteracja 0 była naprawcza i dwie liczby poszły w niej w górę — to normalny jej
   kształt. Iteracja 1 spłaciła jedną z nich z nawiązką: ~80 linii świadomie zrównanych kopii
   <code>_detail</code> zamieniło się w jeden egzemplarz, a razem z nimi zeszła cała reszta,
@@ -765,8 +947,8 @@
   <code>outputSchema</code> to kolejne 5,2 tys. tokenów i jednocześnie jedyna obrona, która
   w tym repo wykryła realną awarię odpowiedzi narzędzia. Ten wiersz zostaje otwarty
   świadomie — zamknie go decyzja o <i>zakresie</i> zestawu, nie kolejna o jego formacie.</p>
-  <p><b>Największy plik produkcyjny zszedł o połowę i wciąż nie jest na celu:</b> 2 124 →
-  1 135. Cztery moduły wyszły z <code>Chart.tsx</code> jako pliki, które nie dotykają
+  <p><b>Największy plik produkcyjny zszedł o połowę i wciąż nie jest na celu — a przez trzy
+  kolumny tabela mierzyła nie ten plik, co trzeba:</b> 2 124 → 1 135. Cztery moduły wyszły z <code>Chart.tsx</code> jako pliki, które nie dotykają
   <code>lightweight-charts</code>, a dwa jako hooki trzymające mapy obiektów wykresu.
   Ostatni z planowanych, <code>useChartInstance</code>, zabrałby go do ~960 i został
   odłożony świadomie: hooki warstw muszą być zadeklarowane <i>pod</i> efektem tworzącym
@@ -774,6 +956,20 @@
   drugą stronę i chce osobnego podejścia. Wiersz z testem, 3 302, zostaje — to
   <code>Chart.test.tsx</code>, a jego cięcie jest osobną robotą od cięcia kodu, który
   testuje.</p>
+  <p>Kolumna po iteracji 5 poprawia ten wiersz w drugą stronę: od chwili, gdy
+  <code>Chart.tsx</code> zszedł do 1 135, największym pisanym ręcznie plikiem produkcyjnym
+  w repo jest <code>teams/store.py</code> — <b>1 258 linii</b>, tyle samo dziś, co wtedy.
+  Kolumny 3, 4 i 2 podawały 1 135, bo śledziły plik, który wcześniej ten tytuł nosił, a nie
+  największy plik. To jedyna liczba w tej tabeli, którą trzeba było skorygować w górę bez
+  żadnej zmiany w kodzie — i jest jednocześnie pierwszą pozycją, która została z iteracji 5.</p>
+  <p><b>Iteracja 5 nie ma własnej kolumny z ruchem</b>, i to jest o niej informacja, nie
+  przeoczenie: dwa pliki-molochy poszły (911 i 1 906 linii), a żadna z dziesięciu metryk
+  tego nie mierzy — bo wiersz „największy plik" pilnuje maksimum, a nie liczby plików nad
+  progiem. Rachunek na liniach, którym ta iteracja się zapowiadała (~700 mniej), wyszedł na
+  <b>+93</b>: split pliku na moduły dokłada docstringi i importy, a cięcia miały przyjść
+  z pozycji, których ta porcja nie ruszyła. To ta sama lekcja, co z iteracji 1 i 3 — liczba
+  wzięta z oszacowania jest hipotezą, nie celem — z tą różnicą, że tutaj pomylona była sama
+  <i>miara</i>, nie jej wartość.</p>
   <p><b>Wiersze workflow deploy przestały rosnąć</b>: 436 → 452 → 458 → <b>256</b>. Nie do
   ~175 z celu, i nie będzie: sam blok <code>inputs</code> z opisami to ~50 ze 111 linii
   wspólnego workflow, a te opisy są jedyną dokumentacją tego, co znaczy każdy parametr
@@ -797,8 +993,11 @@
   jedyną systemową klasę ryzyka, 2 tnie koszt każdej przyszłej zmiany, 3–4 oddają największe
   pojedyncze zyski w złożoności i wydajności, 5–6 to porządki, które po 1–4 stają się tanie.
   Plan można przerwać po dowolnej iteracji i każda z osobna zostawia repo w lepszym stanie, niż
-  je zastała. Po dwóch pierwszych to nie jest już założenie: <code>main</code> stoi zielony po
-  każdej z nich, a wdrożenia poszły bez ręcznego kroku.</p>
+  je zastała. Po pięciu to nie jest już założenie: <code>main</code> stoi zielony po każdej
+  z nich, a wdrożenia poszły bez ręcznego kroku. Malejący zwrot widać też inaczej, niż plan
+  zakładał: iteracja 5 oddała najwięcej nie tam, gdzie ciała pliki, tylko tam, gdzie przy
+  okazji wypadł bug kasujący tekst operatora — czytanie starego kodu linia po linii jest tu
+  drugim, nienazwanym produktem porządków.</p>
 
   <div class="callout">
     <p><b>Czego iteracja 1 dowiodła o pomiarze.</b> Plan opierał trzy pakiety na oszacowaniu
