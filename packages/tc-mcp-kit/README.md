@@ -1,6 +1,6 @@
 # tc-mcp-kit
 
-The caller-identity middleware and the upstream-refusal helper, shared by `market-mcp`,
+The caller-identity middleware and the upstream-refusal helper, shared by `market-data`,
 `teams-mcp` and `trading-mcp`. A **build-time** dependency like `tc-runtime` — see
 `docs/architecture.md`, "What may be shared, and what may not".
 
@@ -30,6 +30,14 @@ Splitting out this package is D1's correction, not a reversal of the rule it was
 the rule (measured copy, parameterisable difference, every consumer tested) is unchanged.
 What was wrong was measuring the package's own dependency list instead of the consumer's
 resolved tree.
+
+**The reason above stopped being the whole reason on 19 August 2026**, when `market-mcp`
+became a route in `market-data` and that module took this package. "None of the consumers
+owns a database" was true of the three MCP modules and is not true of `market-data`, which
+owns the PostgreSQL. What survives is the half that was always doing the work: this package
+carries what a module needs **to speak MCP**, and `tc-runtime` carries what a module needs
+**to own a schema**. A consumer may want one, the other, or — as `market-data` now does —
+both, and taking one has never implied taking the other.
 
 ## What is in here
 

@@ -53,9 +53,11 @@ class FakeInstruments:
         collectable: bool = True,
         error: Exception | None = None,
         market_open: bool | None = None,
+        search_results: list[dict] | None = None,
     ):
         self.collectable = collectable
         self.error = error
+        self.search_results = search_results
         # What the gateway would say about the instrument's session. `None` is the
         # default because it is the honest one for a fake: no answer, so `UNKNOWN`.
         self.market_open = market_open
@@ -88,6 +90,11 @@ class FakeInstruments:
     async def search(self, q: str) -> list:
         if self.error is not None:
             raise self.error
+        # One hit derived from the query unless a test says otherwise. `search_results`
+        # exists for the tool surface, whose whole question about this call is what it does
+        # with more matches than it will show.
+        if self.search_results is not None:
+            return self.search_results
         return [{"symbol": q.upper(), "name": q, "asset_class": "CRYPTO", "tradeable": True}]
 
     async def asset_classes(self) -> list:

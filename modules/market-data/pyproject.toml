@@ -44,6 +44,15 @@ dependencies = [
     # module keeps its own `db.py`, which is 56.2% identical to the package's rather than
     # a copy of it (packages-replace-the-hand-copies/design.md, D4).
     "tc-runtime",
+    # Pinned exactly, unlike everything above it. 2.0.0 moved `FastMCP` out of
+    # `mcp.server.fastmcp`, so a floor here is a module that stops importing on somebody
+    # else's release day.
+    "mcp==1.27.0",
+    # Caller identity, upstream-refusal flattening and the schema slimmer, for the tool
+    # surface this module serves at `/mcp`. Its README's consumer table now names four
+    # modules rather than three; see the note there on the database it used to be true
+    # that no consumer had.
+    "tc-mcp-kit",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.
@@ -52,6 +61,7 @@ package = false
 
 [tool.uv.sources]
 tc-runtime = { path = "../../packages/tc-runtime", editable = true }
+tc-mcp-kit = { path = "../../packages/tc-mcp-kit", editable = true }
 
 [tool.ruff]
 line-length = 100

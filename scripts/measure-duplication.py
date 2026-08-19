@@ -38,7 +38,6 @@ MODULES = {
     "teams": "teams",
     "market-data": "market_data",
     "capital-gateway": "capital_gateway",
-    "market-mcp": "market_mcp",
     "teams-mcp": "teams_mcp",
     "trading-mcp": "trading_mcp",
 }

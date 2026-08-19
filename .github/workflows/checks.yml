@@ -38,7 +38,6 @@ jobs:
     outputs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
       market-data: ${{ steps.filter.outputs.market-data }}
-      market-mcp: ${{ steps.filter.outputs.market-mcp }}
       trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
       teams-mcp: ${{ steps.filter.outputs.teams-mcp }}
       agent: ${{ steps.filter.outputs.agent }}
@@ -105,7 +104,7 @@ jobs:
           declare -A PATTERNS=()
 
           PATTERNS[capital-gateway]='^modules/capital-gateway/'
-          PATTERNS[market-data]="^modules/market-data/|$tc_runtime"
+          PATTERNS[market-data]="^modules/market-data/|$tc_runtime|$tc_mcp_kit"
           PATTERNS[agent]="^modules/agent/|$tc_runtime|$tc_openai"
           PATTERNS[teams]="^modules/teams/|$tc_runtime|$tc_openai"
           # The terminal's `contract:check` compares its generated types against the
@@ -125,10 +124,9 @@ jobs:
           # for the reason written out at `teamsmcp` below — that file imports models it
           # does not define, and one of them going stale is a thing that has happened.
           PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/agent/agent/contract\.py$|^modules/teams/'
-          # Same reasoning as the terminal's own filter, one line up: market-mcp keeps a
-          # committed snapshot of the same contract (`contract/market-data.openapi.json`),
-          # and `test_contract.py` is the check that catches it going stale.
-          PATTERNS[market-mcp]="^modules/market-mcp/|^modules/market-data/market_data/contract\.py$|$tc_mcp_kit"
+          # market-data takes `tc-mcp-kit` too since the tool surface moved into it: the
+          # package's schema slimmer is what keeps eleven tools under their published
+          # ceiling, and a change there is a change to what the archive announces.
           # The same rule again, one module along: trading-mcp keeps a committed snapshot
           # of capital-gateway's whole OpenAPI document (`contract/capital-gateway.
           # openapi.json`), and `scripts/contract.py check` is what catches it going
@@ -249,28 +247,6 @@ jobs:
       # skip are the `live` ones, which need a Capital session and stay behind --run-live.
       - run: uv run pytest -q
 
-  market-mcp:
-    name: market-mcp
-    needs: changes
-    if: needs.changes.outputs.market-mcp == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modules/market-mcp
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      # Before the tests, not after — same reasoning as the terminal's own
-      # `contract:check` below. `scripts/contract.py` reaches into `../market-data`
-      # itself (a sibling checkout in this same runner) and needs no database, no
-      # gateway and no running server to do it.
-      - run: uv run python scripts/contract.py check
-      - run: uv run ruff check .
-      - run: uv run pyright
-      - run: uv run pytest -q
-
   trading-mcp:
     name: trading-mcp
     needs: changes
@@ -284,7 +260,7 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
-      # Before the tests, same as market-mcp's own: `scripts/contract.py` reaches into
+      # Before the tests rather than after: `scripts/contract.py` reaches into
       # `../capital-gateway` in this same checkout and reads its OpenAPI document off the
       # app object — no database, no provider session and no CAPITAL_* credentials, since
       # that module builds its Settings inside `lifespan` rather than at import.
@@ -311,7 +287,7 @@ jobs:
           enable-cache: true
       # Before the tests, same as both other MCP modules': `scripts/contract.py` runs
       # `python -m teams.openapi` in `../teams` from this same checkout, which needs no
-      # database, no OpenAI key and no market-mcp — that module builds its Settings inside
+      # database, no OpenAI key and no tool server — that module builds its Settings inside
       # `lifespan` rather than at import.
       - run: uv run python scripts/contract.py check
       - run: uv run ruff check .
@@ -392,7 +368,7 @@ jobs:
       # Same as market-data's and agent's: the `db` tests are gated on Docker inside
       # conftest.py rather than on a flag, and this runner has it — so one `pytest -q`
       # runs the migration tests against a real PostgreSQL too. Nothing here reaches
-      # OpenAI or market-mcp; anything that would is a `live` test behind `--run-live`.
+      # OpenAI or a tool server; anything that would is a `live` test behind `--run-live`.
       - run: uv run pytest -q
 
   terminal:

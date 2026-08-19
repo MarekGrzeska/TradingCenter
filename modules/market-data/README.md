@@ -4,6 +4,11 @@ The candle archive. `capital-gateway` is a window onto the provider and keeps no
 module keeps what flew past it, so a chart, a backtest or an agent can read a series that
 exists tomorrow as well as today.
 
+**Two surfaces, one archive.** The REST contract below is what the terminal reads. At
+`/mcp` the same module serves eleven read-only MCP tools, reduced for a model rather than
+proxied for a chart — see "The tool surface". They were a module of their own until
+19 August 2026; what they are now is a route, reading the same functions the routers read.
+
 **Behind the gateway, always.** capital.com counts its 10 requests/second against the
 account, not the process, so a second client anywhere spends the same allowance twice. This
 module refuses to start if either of its upstream URLs points at capital.com — the gateway
@@ -30,6 +35,15 @@ owns the single rate gate and the demo-only guard, and going around it breaks bo
   trusted), `catalogue/` (every indicator this module offers, as data — id, params, output
   shape, how to draw it — not as a type per entry; `spec.py` holds the entry shape, one
   module per group holds the entries). See "Indicators" below.
+- `reads.py` — the reads with two consumers: the routers and the tools. Anything a tool
+  would otherwise re-derive — "collected beats computed", the three states of a forming
+  candle — lives here once, because a second copy of a decision that has been wrong twice
+  is how the two surfaces drift apart.
+- `tools/` — the tool surface itself: the eleven tools, the reduction that keeps a reply
+  small, and the sentences that say what the numbers do not (`uncertainty.py`).
+- `mcp_app.py` — one FastMCP instance, mounted at `/mcp` by `app.py`.
+- `caller_access.py` — which caller may reach which surface, as one record in front of the
+  whole application. See "The tool surface".
 - `hub.py` — fan-out to subscribers, and the hold that makes a snapshot airtight.
 - `app.py` — assembly only: the lifespan, the error handling every route shares, and the
   routers mounted onto it. Nothing that decides anything.
@@ -60,6 +74,12 @@ archive has actually verified.
 `tc-runtime`, partially: `migrate`, `schema_version` and the advisory-lock helper. This
 module keeps its own `db.py` — it has `connect()`, which nothing else does, and its own
 pool defaults (`packages/tc-runtime/README.md`).
+
+`tc-mcp-kit`, for one thing: `slim_tool_schemas`, which takes the scaffolding pydantic
+writes for its own sake out of every published tool schema — 22,6% of what a client reads
+before each turn, and not one field, type or `required` entry with it. The caller-identity
+middleware in that package is *not* taken: it answers "is anybody there", and this module
+has two surfaces and needs the narrower answer `caller_access.py` gives.
 
 ## Run
 
@@ -173,6 +193,32 @@ Two things to know before changing any of it:
 
 A consumer that is not a browser needs none of this: it sets a header on its own WebSocket
 client and Easy Auth handles it, exactly as on every other route.
+
+## The tool surface
+
+`/mcp`, streamable HTTP, eleven tools and three resources. What a model gets is not the
+REST contract in another spelling: a chart wants every candle, a model wants a summary, so
+a series above the ceiling comes back bucketed and named as bucketed, a series far above it
+is refused with what to ask instead, and every empty answer says which kind of empty it is.
+`uv run pytest tests/test_tools_*.py` is that half of the module.
+
+Every tool is annotated read-only and none reaches a route that writes. That used to be
+true by construction — the tools were a separate module with no address for anything but
+`GET` — and it is now true by record:
+
+- `caller_access.py` holds route against caller. `agent` and `teams` reach `/mcp` and
+  nothing else; the terminal reaches REST and never `/mcp`; `/ping` and `/ws/candles` are
+  open with no identity, each for a reason written beside it.
+- **A path the record does not name is refused, not passed**, so a REST route added next
+  month is not reachable by a tool caller on the day it is written.
+- The lists are `TOOL_CALLER_APPLICATION_IDS` and `REST_CALLER_APPLICATION_IDS`, read only
+  where `REQUIRE_AUTHENTICATED_PRINCIPAL` is on. Locally they are empty and every surface
+  answers: nothing stands in front, so there is no identity to match.
+
+The platform's own gate is still there and still necessary — it is the door. This record is
+which room, and Easy Auth cannot express it: it authorizes an application, and an
+application admitted for eleven read-only tools would otherwise also be admitted to
+`POST /pairs` and `DELETE /pairs/{symbol}`.
 
 ## Contract
 

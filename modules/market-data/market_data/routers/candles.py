@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
-from datetime import UTC, datetime, timedelta
+from datetime import datetime
 
 from fastapi import (
     APIRouter,
@@ -23,12 +22,15 @@ from ..contract import (
     Problem,
     Uncovered,
 )
-from ..coverage import earliest_reachable, read_coverage, uncovered_within
 from ..hub import Hub
-from ..models import Candle, PriceSide, Resolution
-from ..rollups import DERIVABLE, DerivedCandle, read_derived
-from ..store import read_candles
-from ..tracking import read_tracked
+from ..models import PriceSide, Resolution
+from ..reads import (
+    WindowRejected,
+    read_forming,
+    read_pair_coverage,
+    read_series,
+    window,
+)
 from .deps import hub_over_http, pool
 
 DERIVED_NOTE = (
@@ -65,33 +67,20 @@ async def candles(
     to: datetime | None = Query(None, description="exclusive, UTC"),
     db=Depends(pool),
 ) -> CandlesOut:
-    start, end = _window(from_, to, resolution)
+    start, end = _window(from_, to)
 
     async with db.acquire() as conn:
-        # Collected beats computed, and the order matters more than it looks. A
-        # resolution being *derivable* does not mean this pair was derived: an operator
-        # may track a pair at HOUR, in which case ingest fetches and stores the
-        # provider's own hourly candles and nothing ever builds a rollup for it, because
-        # rollups are refreshed off the minute series that pair does not have. Reading
-        # the rollup table unconditionally answered such a pair with an empty series
-        # while coverage said the range was verified — which reads as "the market was
-        # shut all day", the one confident wrong answer this module exists to prevent.
-        series: Sequence[Candle | DerivedCandle] = await read_candles(
-            conn, symbol, resolution, start, end
-        )
-        derived = False
-        if not series and resolution in DERIVABLE:
-            series = await read_derived(conn, symbol, resolution, start, end)
-            derived = True
-        gaps = await uncovered_within(conn, symbol, resolution, start, end)
+        series = await read_series(conn, symbol, resolution, start, end)
 
     return CandlesOut(
         symbol=symbol,
         resolution=resolution,
         price_side=PriceSide.BID,
-        derived=derived,
-        candles=[CandleOut.of(candle) for candle in series],
-        uncovered=[Uncovered(from_=gap_start, to=gap_end) for gap_start, gap_end in gaps],
+        derived=series.derived,
+        candles=[CandleOut.of(candle) for candle in series.candles],
+        uncovered=[
+            Uncovered(from_=gap_start, to=gap_end) for gap_start, gap_end in series.uncovered
+        ],
     )
 
 
@@ -125,51 +114,22 @@ async def forming_candle(
     db=Depends(pool),
 ) -> FormingCandleOut:
     async with db.acquire() as conn:
-        tracked = [pair for pair in await read_tracked(conn) if pair.symbol == symbol]
-
-    if not tracked:
-        return FormingCandleOut(
-            symbol=symbol,
-            resolution=resolution,
-            price_side=PriceSide.BID,
-            state=FormingState.NOT_TRACKED,
-        )
-
-    # Asked for even when a candle is found: a price with no session behind it cannot be
-    # told from a price that stopped moving an hour ago, and this answer is cached for a
-    # minute per symbol either way (`market_status.py`).
-    _, market_open = await request.app.state.market_status.of(
-        request.app.state.instruments, symbol
-    )
-
-    if resolution is not None:
-        candle = the_hub.forming(symbol, resolution)
-        answered_with = resolution
-    else:
-        answered_with = next(iter(the_hub.forming_resolutions(symbol)), None)
-        candle = the_hub.forming(symbol, answered_with) if answered_with else None
-
-    if candle is None:
-        return FormingCandleOut(
-            symbol=symbol,
-            resolution=resolution,
-            price_side=PriceSide.BID,
-            # `market_open is None` — the gateway would not say — falls to `no_quotes`
-            # rather than to `market_closed`: claiming a closed market on the strength of
-            # an unanswered question is the one wrong answer here that reads as certain.
-            state=(
-                FormingState.MARKET_CLOSED if market_open is False else FormingState.NO_QUOTES
-            ),
-            market_open=market_open,
+        forming = await read_forming(
+            conn,
+            the_hub,
+            request.app.state.instruments,
+            request.app.state.market_status,
+            symbol,
+            resolution,
         )
 
     return FormingCandleOut(
         symbol=symbol,
-        resolution=answered_with,
+        resolution=forming.resolution,
         price_side=PriceSide.BID,
-        state=FormingState.FORMING,
-        candle=CandleOut.of(candle),
-        market_open=market_open,
+        state=FormingState(forming.state.value),
+        candle=CandleOut.of(forming.candle) if forming.candle else None,
+        market_open=forming.market_open,
     )
 
 
@@ -183,41 +143,26 @@ async def coverage(
     symbol: str, resolution: Resolution = Query(Resolution.MINUTE), db=Depends(pool)
 ) -> PairCoverageOut:
     async with db.acquire() as conn:
-        ranges = await read_coverage(conn, symbol, resolution)
-        boundary = await earliest_reachable(conn, symbol, resolution)
+        found = await read_pair_coverage(conn, symbol, resolution)
 
     return PairCoverageOut(
         symbol=symbol,
         resolution=resolution,
         ranges=[
             CoverageOut(from_=r.range_start, to=r.range_end, history_ended=r.history_ended)
-            for r in ranges
+            for r in found.ranges
         ],
-        earliest_reachable=boundary,
+        earliest_reachable=found.earliest_reachable,
     )
 
 
+def _window(from_: datetime | None, to: datetime | None) -> tuple[datetime, datetime]:
+    """`reads.window`, with its refusal spelled as this transport spells refusals.
 
-def _window(
-    from_: datetime | None, to: datetime | None, resolution: Resolution
-) -> tuple[datetime, datetime]:
-    """The requested range, with defaults and both ends carrying a zone.
-
-    A naive bound is read as UTC rather than refused: it is the commonest way to write one
-    by hand, and the archive stores instants, so the alternative is a 422 for something
-    that has exactly one sensible reading.
+    A range whose end precedes its start is the request being wrong, not the archive, and
+    answering 500 would send a caller looking for a fault here.
     """
-    end = to or datetime.now(UTC)
-    start = from_ or end - timedelta(days=1)
-    if start.tzinfo is None:
-        start = start.replace(tzinfo=UTC)
-    if end.tzinfo is None:
-        end = end.replace(tzinfo=UTC)
-    if end < start:
-        # A refusal, not a failure. The request is the thing that is wrong, and answering
-        # 500 would send a caller looking for a fault in the archive.
-        raise HTTPException(
-            status_code=422,
-            detail=f"`to` is before `from`: {start.isoformat()} to {end.isoformat()}",
-        )
-    return start, end
+    try:
+        return window(from_, to)
+    except WindowRejected as refused:
+        raise HTTPException(status_code=422, detail=str(refused)) from refused

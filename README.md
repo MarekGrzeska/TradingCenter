@@ -16,9 +16,8 @@ modules move here one at a time.
 | Module | What | Contract |
 |---|---|---|
 | [capital-gateway](modules/capital-gateway/) | capital.com — trading, deep history, a live stream. Demo only. | HTTP + WebSocket |
-| [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. | HTTP + WebSocket |
-| [market-mcp](modules/market-mcp/) | MCP tools over market-data's archive, reduced for a model rather than proxied for a chart. Read-only — no tool writes. | MCP (stdio + streamable HTTP) |
-| [agent](modules/agent/) | The operator's conversation with a model — its own database, its own OpenAI key, and read-only tools over the archive through market-mcp. | HTTP, streamed |
+| [market-data](modules/market-data/) | The candle archive — what the gateway saw and does not keep. Owns a PostgreSQL. Serves two surfaces: the REST contract, and eleven read-only MCP tools at `/mcp`, reduced for a model rather than proxied for a chart. | HTTP + WebSocket, MCP (streamable HTTP) |
+| [agent](modules/agent/) | The operator's conversation with a model — its own database, its own OpenAI key, and read-only tools over the archive. | HTTP, streamed |
 | [teams](modules/teams/) | Teams of agents as **data**, not code — a graph the operator composes, versioned append-only, run against both tool servers. Its own database, its own OpenAI key. | HTTP + OpenAPI |
 | [trading-mcp](modules/trading-mcp/) | MCP tools over the gateway's **demo account** — positions, balance, and orders a team can actually place. Network transport only, one named caller, demo checked against the gateway rather than against a setting. | MCP (streamable HTTP) |
 | [teams-mcp](modules/teams-mcp/) | MCP tools over the **teams catalogue**, so a team can be built and corrected by talking to the agent instead of by dragging boxes. One named caller, and every tool acts in the operator's own name — their token travels with the call. | MCP (streamable HTTP) |
@@ -60,15 +59,15 @@ uv run python scripts/dev.py --explain
 Both bring the same things up in the same order:
 
 ```
-migrations -> capital-gateway -> market-data -> market-mcp -> trading-mcp -> teams
+migrations -> capital-gateway -> market-data -> trading-mcp -> teams
              -> teams-mcp -> agent
           -> teams -> terminal
 ```
 
 The order is not tidiness — every arrow in it is a real dependency. `market-data`
-subscribes to the gateway as it starts, `market-mcp` reads `market-data`, `trading-mcp`
+subscribes to the gateway as it starts, `trading-mcp`
 asks the gateway whether it is bound to the demo account and refuses to open a port if it
-is not, `agent` and `teams` ask `market-mcp` for their tool list — `teams` asks
+is not, `agent` and `teams` ask the archive for their tool list — `teams` asks
 `trading-mcp` for a second one, and `agent` reads `teams` through `teams-mcp` for a third
 — and the terminal's charts read `market-data` too.
 Starting anything early fills the console with retries, or — in the agent's case —
@@ -78,6 +77,9 @@ Each step waits for the one before it to actually answer. Ctrl+C stops the servi
 `agent` and `teams` each need `MARKET_MCP_URL` in their own `.env` to use the tools at
 all, and `teams` needs `TRADING_MCP_URL` as well for the ones that place orders; every
 `.env.example` has them, and both scripts say so at startup if an older `.env` does not.
+The first of those keeps its name and changed its address: the tools are a route of
+`market-data` now, so it points at 8020 rather than at the 8040 a module of their own used
+to hold.
 The consequence differs, which is why the messages do: an agent without a tool server
 answers from the model alone, while a team whose agents were *assigned* tools refuses to
 run at all rather than guess.
@@ -139,15 +141,14 @@ When it is a change:
 ### Checks
 
 Every pull request to `main`, and every push to it, runs
-[`.github/workflows/checks.yml`](.github/workflows/checks.yml): seven jobs in parallel, one
-per module, running the same commands a developer runs — and only for the modules the
+[`.github/workflows/checks.yml`](.github/workflows/checks.yml): a job per module in
+parallel, running the same commands a developer runs — and only for the modules the
 change can have broken. A first job works out which those are from the diff; a change under
 `docs/` or `infra/` runs no module suite at all.
 
 One exception is worth knowing: the terminal's job also runs when `market_data/contract.py`,
-`agent/contract.py` or `teams/contract.py` changes, even if no terminal file did, and
-market-mcp's runs on the first of those three for the same reason. `contract:check` and
-`scripts/contract.py check` exist to catch exactly that pairing with
+`agent/contract.py` or `teams/contract.py` changes, even if no terminal file did.
+`contract:check` exists to catch exactly that pairing with
 `market_data/contract.py`, and `teams/contract.py` is generated the same way;
 `agent/contract.py` has no generator to fail, so the terminal's own tests against its
 hand-written DTOs are what catch it instead — and none of them run at all if the job never
@@ -157,21 +158,21 @@ written for.
 | Job | Runs |
 |---|---|
 | `capital-gateway` | `ruff check`, `pyright`, `pytest` |
-| `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent |
-| `market-mcp` | `scripts/contract.py check`, `ruff check`, `pyright`, `pytest` |
+| `market-data` | `ruff check`, `pyright`, `pytest` — **including the database tests**, since the runner has Docker and `conftest` only skips them where it is absent, and including the tool surface it serves at `/mcp` |
 | `trading-mcp` | the same four — its snapshot is `capital-gateway`'s document, so **any** change under that module runs this job |
 | `teams-mcp` | the same four — its snapshot is `teams`' document, watched through `teams/contract.py`, which is where that document is printed from |
 | `agent` | `ruff check`, `pyright`, `pytest` — same database-test behaviour as market-data's; its `live` tests need a real OpenAI key and stay behind `--run-live` |
-| `teams` | `ruff check`, `pyright`, `pytest` — same again; nothing in the suite reaches OpenAI or market-mcp |
+| `teams` | `ruff check`, `pyright`, `pytest` — same again; nothing in the suite reaches OpenAI or a tool server |
 | `terminal` | `contract:check`, `lint`, `typecheck`, `test` |
 
-`contract:check` runs before the terminal's tests on purpose, and `scripts/contract.py
-check` before market-mcp's for the same reason: both compare their own copy of the wire —
-generated TypeScript for the terminal, a committed OpenAPI snapshot for market-mcp —
-against the schema `market-data` builds from its own models, and a stale copy makes every
-conclusion either suite reaches about the wire rest on an out-of-date premise. Regenerate
-with `pnpm contract:generate` (terminal) or `uv run python scripts/contract.py generate`
-(market-mcp) after changing a model in `market_data/contract.py`.
+`contract:check` runs before the terminal's tests on purpose: it compares the terminal's
+generated TypeScript against the schema `market-data` builds from its own models, and a
+stale copy makes every conclusion that suite reaches about the wire rest on an out-of-date
+premise. Regenerate with `pnpm contract:generate` after changing a model in
+`market_data/contract.py`. There used to be a second copy of that schema — market-mcp kept
+a committed OpenAPI snapshot and a script that policed it — and the module holding it is a
+route inside `market-data` now, so the tools read those models directly and there is
+nothing left to go stale.
 
 The `live` tests are not run — they need a real Capital demo session, and putting provider
 credentials in CI to earn a green tick is a bad trade. They stay behind `--run-live`.
@@ -180,9 +181,10 @@ credentials in CI to earn a green tick is a bad trade. They stay behind `--run-l
 
 Pushing to `main` deploys the module that changed. Each deploy ends by checking the thing
 actually answers, not merely that Azure accepted the request: `market-data` is probed on
-`/ws/candles`, the one path Easy Auth lets through to the container; `market-mcp` is probed
-on `/health`, excluded from Easy Auth the same way and answering a plain 200 with no trick
-needed; `trading-mcp` is probed there too, where the answer proves more than liveness —
+`/ws/candles`, the one path Easy Auth lets through to the container — and still that one
+rather than the tool surface it also serves, since `/mcp` answers nothing without a session
+and a caller identity; `trading-mcp` is probed on `/health`, excluded from Easy Auth the
+same way, where the answer proves more than liveness —
 that process refuses to listen at all unless the gateway just told it the account is a demo
 one, so a 200 means it reached the gateway, through its firewall, with the shared key; `agent` and `teams` ask both questions, the control plane for which image is
 serving and `/health` for whether the process behind it came up; the terminal is checked on

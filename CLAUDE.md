@@ -24,15 +24,14 @@ something a package cannot give it, the change is wrong, not the rule.
 
 ```
 modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
-modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway.
-modules/market-mcp        Python · MCP tools over market-data, reduced for a model. Read-only — no tool writes. Depends on market-data.
-modules/agent             Python · the operator's conversation with a model. Own database, own OpenAI key. Reads the archive through market-mcp's tools, builds teams through teams-mcp's, and moves the demo account through trading-mcp's.
-modules/teams             Python · teams of agents as data — a graph the operator composes, revisions, runs and their cost. Own database, own OpenAI key. Same market-mcp and trading-mcp tools as agent; no edge to agent itself.
+modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway. Serves two surfaces: the REST contract, and eleven read-only MCP tools at `/mcp` — reduced for a model, no tool writes.
+modules/agent             Python · the operator's conversation with a model. Own database, own OpenAI key. Reads the archive through its `/mcp` tools, builds teams through teams-mcp's, and moves the demo account through trading-mcp's.
+modules/teams             Python · teams of agents as data — a graph the operator composes, revisions, runs and their cost. Own database, own OpenAI key. Same archive and trading-mcp tools as agent; no edge to agent itself.
 modules/trading-mcp       Python · MCP tools over the gateway's demo account: positions, balance, orders. Network transport only, two named callers (teams, agent). Demo checked against the gateway, not against a setting.
 modules/teams-mcp         Python · MCP tools over teams' catalogue, so the agent can build and correct a team by talking. One named caller (agent). Every tool acts in the operator's name — their token travels with the call, in its own header.
 modules/terminal          React+TS · the operator's screen. Consumes the gateway, market-data, agent and teams. Publishes nothing.
 packages/tc-runtime       Python · the plumbing measured as a hand-copy across modules: database, migrations, schema check, Easy Auth. A build-time dependency, never a runtime one; its README names the consumers.
-packages/tc-mcp-kit       Python · caller-identity middleware and upstream-refusal helper, taken only by the three MCP modules — none of which has a database, which is why this is not part of tc-runtime.
+packages/tc-mcp-kit       Python · what a module needs in order to speak MCP: caller-identity middleware, the upstream-refusal helper, the tool-schema slimmer. Taken by trading-mcp, teams-mcp and market-data. Apart from tc-runtime because it is about the protocol, not about running a module — market-data takes both and has a database.
 infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
 openspec/                 specs (the truth) + change proposals
 docs/                     architecture and reference — only what is true today
@@ -49,8 +48,7 @@ Run these from the module directory. Nothing at the repo root builds or tests ev
 | Module | Commands |
 |---|---|
 | `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
-| `market-data` | `uv run alembic upgrade head` then `uv run uvicorn market_data.app:app --reload --port 8020`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
-| `market-mcp` | `uv run python -m market_mcp stdio` (desktop client) or `... http` (port 8040)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
+| `market-data` | `uv run alembic upgrade head` then `uv run uvicorn market_data.app:app --reload --port 8020` — serves REST and the MCP tools at `/mcp`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `agent` | `uv run alembic upgrade head` then `uv run uvicorn agent.app:app --reload --port 8030`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `packages/tc-runtime` | no entrypoint — a library<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
 | `packages/tc-mcp-kit` | same |
@@ -73,10 +71,11 @@ The whole stack: `./scripts/dev.sh` on macOS and Linux, `./scripts/dev.ps1` on W
 both wrappers of about a dozen lines over `scripts/dev.py`, which is the implementation
 (`--no-terminal` / `-NoTerminal` for back end only; either spelling works on either
 platform). It starts things in dependency order — migrations → gateway → market-data →
-market-mcp → trading-mcp → teams → teams-mcp → agent → terminal — waiting for each to
-actually answer. Ports are fixed: **8010** gateway, **8020** market-data, **8030** agent,
-**8040** market-mcp, **8050** teams, **8060** trading-mcp, **8070** teams-mcp,
-**5173** terminal.
+trading-mcp → teams → teams-mcp → agent → terminal — waiting for each to actually answer.
+Ports are fixed: **8010** gateway, **8020** market-data (REST *and* the tools at `/mcp`),
+**8030** agent, **8050** teams, **8060** trading-mcp, **8070** teams-mcp, **5173**
+terminal. 8040 is nobody's since `market-mcp-into-market-data`, and a `.env` still
+pointing there is a tool server that reads as down.
 
 That order, those ports and the reason each service sits where it does are one table at
 the top of `dev.py`, and `uv run python scripts/dev.py --explain` prints it. It used to be
@@ -145,9 +144,10 @@ over time. A 401 storm was really observed on 9–10 August; `stream_tokens_for`
 **Env files are per-module and gitignored.** Copy from `.env.example`. The gateway needs
 `CAPITAL_*` demo credentials plus its own `GATEWAY_API_KEY`; market-data needs the same
 `GATEWAY_API_KEY`, a `DATABASE_URL` and the `AZURE_*` identity it connects to Postgres with.
-market-mcp needs no `.env` at all locally — every setting has a working loopback default;
-`MARKET_DATA_SCOPE` only exists for the deployed instance, whose managed identity calls
-market-data with it. `agent` needs a `DATABASE_URL` of its own and an `OPENAI_API_KEY`.
+market-data's own two caller lists (`TOOL_CALLER_APPLICATION_IDS`,
+`REST_CALLER_APPLICATION_IDS`) are empty locally and read only where
+`REQUIRE_AUTHENTICATED_PRINCIPAL` is on, which is Azure. `agent` needs a `DATABASE_URL` of
+its own and an `OPENAI_API_KEY`.
 That key has no managed-identity alternative the way the database does — OpenAI is not in
 Entra — so production reads the same value from Key Vault (`openai-api-key`) and
 `config.py` refuses to start without it. `MARKET_MCP_URL` is the one setting whose
@@ -159,8 +159,11 @@ takes its tools away and leaves the other two exactly where they are. The third 
 whose absence reads least like a setting: the operator asks about their positions and the
 agent says it cannot see them, which sounds like the account being unreachable. An `.env`
 copied before either change is the usual reason a local agent answers from memory while
-market-mcp sits there idle — `dev.py` says so at startup rather than leave it to
-be discovered.
+the archive sits there idle — `dev.py` says so at startup rather than leave it to
+be discovered. A fourth shape of the same mistake arrived with
+`market-mcp-into-market-data`: `MARKET_MCP_URL` keeps its name and changes its address to
+market-data's own (8020 locally), so a `.env` from before that change points at a port
+nothing listens on.
 
 `teams` needs the same three — `DATABASE_URL`, `OPENAI_API_KEY`, `MODELS` — and none of
 them are agent's: a **separate** OpenAI key (`teams-openai-api-key` in Key Vault, so the
@@ -171,13 +174,13 @@ assigned tools refuses to run rather than answer without them. `TRADING_MCP_URL`
 same setting for the write tools, checked independently — clearing it takes the order tools
 away and leaves the reading ones exactly where they were.
 
-`teams-mcp` needs no `.env` locally either, for market-mcp's reason: every setting has a
-working loopback default. What it does need is something no setting can supply — the
+`teams-mcp` needs no `.env` locally: every setting it reads has a working loopback
+default. What it does need is something no setting can supply — the
 operator's own token, arriving per call from `agent` in `X-Operator-Authorization`. Without
 it every tool refuses by design: a team created on a module's own identity would belong to
 that module and be invisible to the person who asked for it.
 
-`trading-mcp` is the exception to market-mcp's "no `.env` needed locally": it has one
+`trading-mcp` is the exception to teams-mcp's "no `.env` needed locally": it has one
 required setting, `CAPITAL_GATEWAY_API_KEY`, and it must be the gateway's own
 `GATEWAY_API_KEY` — the gateway checks that header on every caller, loopback included, so
 there is no local mode where it can be left out. Together with the demo check it makes at
@@ -194,7 +197,10 @@ separately here, and this is the pairing where it shows: `agent` deployed with n
 `MARKET_MCP_URL` starts, runs and answers — without tools, which is a supported state and
 one its own tests walk, not a broken one. The tools appear only after the operator's
 `terraform apply` sets that setting and puts the agent's managed identity into
-`market-mcp`'s `allowed_applications`, and after the agent restarts. Rolling back is the
+market-data's `allowed_applications` **and** its `TOOL_CALLER_APPLICATION_IDS`, and after
+the agent restarts. Both, and neither substitutes for the other: the first is the door,
+the second is which surface behind it — Easy Auth authorizes an application, not a route
+(`market_data/caller_access.py`). Rolling back is the
 same lever: clear `MARKET_MCP_URL`, restart, and the module is what it was, with the rows
 in `tool_calls` still recording what happened while it had them.
 
@@ -391,10 +397,11 @@ job to run too; that is deliberate, since `contract:check` and the terminal's ow
 hand-written DTOs are the checks for exactly those pairings — `teams`' contract is generated
 the way market-data's is (`pnpm contract:generate` reads two sources and writes a file per
 source), while `agent`'s is not wired into the generator at all, so its half of that pairing
-is the terminal's tests passing rather than a regenerated file. `market_data/contract.py` pulls in `market-mcp`'s job for the same
-reason: that module keeps its own committed snapshot of the same schema
-(`contract/market-data.openapi.json`), and `scripts/contract.py check` is what catches it
-going stale. `trading-mcp` holds the same kind of snapshot one module further out —
+is the terminal's tests passing rather than a regenerated file. That file used to pull in a
+third job — `market-mcp` kept its own committed snapshot of the same schema and a script
+that policed it — and both are gone with the module: the tools read `contract.py` in the
+same process now, so there is no copy left to go stale. `trading-mcp` holds a snapshot of
+the same kind one module further out —
 `capital-gateway`'s whole OpenAPI document — so **any** change under the gateway runs that
 job too; `teams-mcp` holds one of `teams`' document, watched through
 `teams/teams/contract.py` alone, since that module prints its schema from those models; the document is built from its routes as well as its DTOs, and there is no
@@ -404,7 +411,7 @@ There is no branch protection on this repository — a private repo on the free 
 have it — so a skipped job blocks nothing. If that changes, the filter needs stand-in jobs
 or a required check will sit pending forever.
 
-Seven `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
+Six `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
 the matching module. Since `one-deploy-path-one-dev-runner` each is about twenty lines
 calling `_deploy-app-service.yml`, and what stays with the caller is what actually differs:
 the trigger, the path filter, the probe's four parameters, and the incident comments —
@@ -416,10 +423,12 @@ Every one ends in `scripts/deploy_probe.py`, which asks two questions — is thi
 image the one App Service will serve, and did the process inside it come up. The second is
 the one that used to go unasked, and the probe is now a function with a test of exactly
 that failure: the previous container answering 200 with the right body while the image tag
-is still the old one. Four inputs cover all seven: `probe_path`, `expected_status`,
+is still the old one. Four inputs cover all six: `probe_path`, `expected_status`,
 `body_contains`, `attempts`. market-data probes `/ws/candles` for a 404 with a `"detail"`
-body, because that is its only path excluded from Easy Auth; the three MCP modules and
-agent and teams probe `/health` for a 200 with `"status"`; agent and teams get twenty
+body, because that is its only path excluded from Easy Auth — and it is still that one
+route rather than the tool surface it now also serves, since `/mcp` needs a session and a
+caller identity to answer anything; the two MCP modules and agent and teams probe
+`/health` for a 200 with `"status"`; agent and teams get twenty
 attempts rather than twelve, because their lifespan blocks on their own migration.
 trading-mcp's probe proves the most for its length: that module refuses to open a port
 unless the gateway just confirmed a demo account, so a 200 there means it reached the

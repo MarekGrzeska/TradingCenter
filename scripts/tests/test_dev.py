@@ -149,10 +149,9 @@ class TestRefusals:
 
         assert any(f"modules/{module}/.env is missing" in p for p in problems)
 
-    def test_market_mcp_and_teams_mcp_need_no_env_at_all(self) -> None:
-        """Every setting they read has a working loopback default (`config.py`)."""
+    def test_teams_mcp_needs_no_env_at_all(self) -> None:
+        """Every setting it reads has a working loopback default (`config.py`)."""
         required = {module for module, _ in REQUIRED_ENV}
-        assert "market-mcp" not in required
         assert "teams-mcp" not in required
 
     def test_the_terminal_checks_are_skipped_when_it_is_not_started(self) -> None:
@@ -215,7 +214,6 @@ class TestStartOrder:
         assert [service.name for service in SERVICES] == [
             "capital-gateway",
             "market-data",
-            "market-mcp",
             "trading-mcp",
             "teams",
             "teams-mcp",
@@ -228,7 +226,6 @@ class TestStartOrder:
             "capital-gateway": 8010,
             "market-data": 8020,
             "agent": 8030,
-            "market-mcp": 8040,
             "teams": 8050,
             "trading-mcp": 8060,
             "teams-mcp": 8070,

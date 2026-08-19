@@ -32,6 +32,11 @@ PROVIDER_HOST_MARKER = "capital.com"
 _TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 
 
+def _identifiers(raw: str) -> frozenset[str]:
+    """A comma-separated setting as a set, with blanks and stray spaces dropped."""
+    return frozenset(part.strip() for part in raw.split(",") if part.strip())
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
@@ -127,6 +132,30 @@ class Settings(BaseSettings):
     # Azure (`infra/app-service.tf`); off locally, where nothing stands in front and
     # there is no identity to have.
     require_authenticated_principal: bool = False
+
+    # --- who may reach which surface, once they are through the door ---
+    #
+    # Easy Auth authorizes an application, not a route (`caller_access.py`). These two
+    # lists are what it cannot say: which callers are here for the tool surface at `/mcp`
+    # — `agent` and `teams`, which must never reach the routes that start collecting a
+    # pair or delete one — and which are here for the REST contract, which is the
+    # terminal. A caller on neither list is refused even with a token the platform
+    # accepted.
+    #
+    # Comma-separated application identifiers rather than names: a name is a description,
+    # an identifier is what arrives in the header. Empty locally, where
+    # `require_authenticated_principal` is off and there is no identity to match — the
+    # lists are read only where that requirement is on.
+    tool_caller_application_ids: str = ""
+    rest_caller_application_ids: str = ""
+
+    @property
+    def tool_caller_ids(self) -> frozenset[str]:
+        return _identifiers(self.tool_caller_application_ids)
+
+    @property
+    def rest_caller_ids(self) -> frozenset[str]:
+        return _identifiers(self.rest_caller_application_ids)
 
     @field_validator("gateway_base_url", "gateway_stream_url")
     @classmethod

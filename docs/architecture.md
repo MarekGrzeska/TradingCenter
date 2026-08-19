@@ -21,22 +21,15 @@ runtime; source may be shared at build time through `packages/`, under the condi
         ┌──────────────────────────────┐                  │
         │  market-data                 │                  │
         │  archive · coverage · rollups│                  │
+        │  REST  ·  MCP tools at /mcp  │                  │
         └──────┬───────────────┬───────┘                  │
      candles,  │               │  the same archive,       │
      the live  │               │  reduced for a model     │
-     stream    │               ▼                          │
-               │      ┌──────────────────────┐            │
-               │      │  market-mcp          │            │
-               │      │  MCP tools,          │            │
-               │      │  read-only           │            │
-               │      └───┬──────────────┬───┘            │
-               │          │              │ MCP (stdio)    │
-               │   MCP    │              ▼                │
-               │  (streamable HTTP)  the operator's       │
-               │  ┌───────┤           desktop client      │
-               │  │       ▼                               │
+     stream    │               │  (MCP, streamable HTTP)  │
+               │  ┌────────────┘                          │
+               │  │                                       │
                │  │  ┌──────────────────────────────┐     │
-               │  │  │  agent                       │◀─── OpenAI
+               │  ├─▶│  agent                       │◀─── OpenAI
                │  │  │  conversation · tools · cost │     │
                │  │  └──────────────┬───────────────┘     │
                │  │                 │ HTTP, streamed      │
@@ -67,31 +60,43 @@ account rather than the process, so a second client anywhere spends the same all
 the gateway owns the only door to the provider, and the archive refuses to start if its
 upstream URLs point anywhere else.
 
-`market-mcp` is a consumer of `market-data`, the same shape as `terminal`: it reads the
-published contract and imports nothing. Where it differs is the shape of what it hands
-onward — a chart wants every candle, a model wants a summary, so the same archive read
-comes out reduced rather than proxied. It has three callers and they arrive by two doors:
-`agent` and `teams`, over streamable HTTP from their own containers, and whatever MCP
-client the operator runs on the desktop, over stdio. One tool set, registered once; the
-transport decides only how a request gets in, and a second HTTP caller is an entry in
-`allowed_applications` rather than a change to this module.
+**The archive serves two surfaces, not one.** `market-data` publishes the REST contract the
+terminal reads and, at `/mcp`, eleven read-only MCP tools handing the same archive on in a
+different shape — a chart wants every candle, a model wants a summary, so the read comes
+out reduced rather than proxied. Both are the same process reading the same functions: a
+tool and a route are two consumers of one layer (`market_data/reads.py`), which is what
+stops a decision like "collected beats computed" from being made twice.
 
-`agent` reaches OpenAI and `market-mcp`, and nothing else in this diagram. That it is not
-drawn under `market-data` is the point: the archive is two hops away, and the module has
-no address for it, no credential for it and no code that would know what to do with a
-candle. What it has is a tool list it did not write, fetched from `market-mcp` at the
-start of a session and used as given.
+Those tools stood in a module of their own until 19 August 2026, and what that module was
+made of turned out to be mostly the separation itself: an HTTP client to market-data, a
+committed copy of market-data's schema, a script policing the copy, and an identity to
+present at the door. All of it is gone, and not one tool, ceiling or sentence about
+uncertainty went with it. What did go is the desktop client's stdio door — the tools are
+reachable over the network only now, which is where their two real callers already were.
+
+The merge moved a question rather than answering it. A gate in front of an application
+authorizes the **application**, so admitting `agent` and `teams` for eleven read-only tools
+would admit them to `POST /pairs` and `DELETE /pairs/{symbol}` as well. What keeps them to
+`/mcp` is the module's own record of caller against surface
+(`market_data/caller_access.py`), with a refusal test for every pair that has no business
+together — and a path the record does not name is refused rather than passed.
+
+`agent` reaches OpenAI and the archive's tool surface, and nothing else in this diagram.
+The edge is deliberately narrow: no route to the REST contract, no entitlement to one, and
+no code that would know what to do with a candle. What it has is a tool list it did not
+write, fetched at the start of a session and used as given.
 
 That edge is the one thing in this diagram with no committed copy of its contract
-anywhere. Every other arrow has one — the terminal's generated types, market-mcp's OpenAPI
-snapshot, the terminal's hand-written agent DTOs — because HTTP does not describe itself
-at call time. MCP does: the tool names, descriptions and argument schemas arrive in the
-same session that uses them, so there is no second copy to drift and nothing to
-regenerate. The trade is that a tool added on the `market-mcp` side reaches the model with
-no review on the `agent` side, which is safe exactly as long as that module's own
-specification keeps forbidding a tool that writes.
+anywhere. Every other arrow has one — the terminal's generated types, trading-mcp's
+snapshot of the gateway's document, the terminal's hand-written agent DTOs — because HTTP
+does not describe itself at call time. MCP does: the tool names, descriptions and argument
+schemas arrive in the same session that uses them, so there is no second copy to drift and
+nothing to regenerate. The trade is that a tool added on the archive's side reaches the
+model with no review on the `agent` side, which is safe exactly as long as the archive's
+own specification keeps forbidding a tool that writes — and, since the merge, as long as
+the caller record keeps the writing routes out of that caller's reach.
 
-`teams` sits beside `agent`, not under it: the same edges out to OpenAI and `market-mcp`,
+`teams` sits beside `agent`, not under it: the same edges out to OpenAI and the archive,
 its own database, its own key, and no edge between the two modules at all. What differs is
 what it stores. `agent` keeps a conversation; `teams` keeps the *definition* of a team —
 agents, their roles and the dependencies between them — as data in a revision that never
@@ -121,12 +126,12 @@ arrows to say something simpler than any of them:
         └──────────────────────────────┘
 ```
 
-A sixth module rather than a switch on the fifth. `market-mcp` stays read-only to the
-letter, and the two tool servers are separate deployables with separate identities, so
-"which module may move the account" is answered by a list of callers rather than by a flag
-inside one that reads.
+A module of its own rather than a switch on something that reads. The archive's tools stay
+read-only to the letter, and the tool server that writes is a separate deployable with a
+separate identity, so "which module may move the account" is answered by a list of callers
+rather than by a flag inside a process that also serves candles.
 
-**A seventh, and this one points the other way.** `teams-mcp` puts the *catalogue* behind
+**One more, and it points the other way.** `teams-mcp` puts the *catalogue* behind
 MCP tools so that `agent` can build and correct a team from the chat — the same shape one
 level up, one named caller, its own identity:
 

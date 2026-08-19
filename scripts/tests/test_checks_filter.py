@@ -138,12 +138,14 @@ class TestOneFileAtATime:
         assert decisions["agent"]
         assert not decisions["teams"]
 
-    def test_market_datas_contract_reaches_the_terminal_and_market_mcp(self) -> None:
-        """Both keep a copy of that schema; both checks only run if their job does."""
+    def test_market_datas_contract_reaches_the_terminal(self) -> None:
+        """The terminal keeps generated types built from that schema, and `contract:check`
+        only runs if its job does. There used to be a second copy — market-mcp's committed
+        snapshot — and the module that held it is now a route inside market-data, so the
+        second consumer of this file is the one that could never go stale."""
         decisions = decide(["modules/market-data/market_data/contract.py"])
         assert decisions["market-data"]
         assert decisions["terminal"]
-        assert decisions["market-mcp"]
 
     def test_the_gateway_reaches_trading_mcp(self) -> None:
         """trading-mcp keeps a snapshot of the gateway's whole OpenAPI document."""
@@ -171,9 +173,12 @@ class TestOneFileAtATime:
         assert decisions["teams"]
         assert not decisions["market-data"]
 
-    def test_tc_mcp_kit_reaches_the_three_mcp_modules_and_no_others(self) -> None:
+    def test_tc_mcp_kit_reaches_everything_that_speaks_mcp(self) -> None:
+        """Three modules and the archive, which took the package when the tool surface
+        moved into it — the one consumer with a database, which is why `CLAUDE.md`'s old
+        reason for this package existing apart from `tc-runtime` had to be rewritten."""
         decisions = decide(["packages/tc-mcp-kit/tc_mcp_kit/network_identity.py"])
-        assert decisions["market-mcp"]
+        assert decisions["market-data"]
         assert decisions["trading-mcp"]
         assert decisions["teams-mcp"]
         assert not decisions["agent"]
