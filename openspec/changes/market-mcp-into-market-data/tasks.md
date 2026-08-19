@@ -32,8 +32,8 @@
 
 ## 5. Konsumenci i runner dev
 
-- [ ] 5.1 `scripts/dev.py`: usunąć `market-mcp` z tabeli usług i port 8040, przestawić doradę o `MARKET_MCP_URL` na nowy adres; testy `scripts/` zielone
-- [ ] 5.2 `.env.example` w `agent` i `teams` — nowy adres i zakres, reguła „oba albo żaden" bez zmian
+- [x] 5.1 `scripts/dev.py`: usunąć `market-mcp` z tabeli usług i port 8040, przestawić doradę o `MARKET_MCP_URL` na nowy adres; testy `scripts/` zielone
+- [x] 5.2 `.env.example` w `agent` i `teams` — nowy adres i zakres, reguła „oba albo żaden" bez zmian
 - [ ] 5.3 Uruchomić stack lokalnie i potwierdzić, że agent widzi narzędzia bez `market-mcp`
 
 ## 6. Infrastruktura i CI

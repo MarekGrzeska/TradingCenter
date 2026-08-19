@@ -101,10 +101,10 @@ BLUE, MAGENTA, CYAN, YELLOW, GREEN, RED, DIM, RESET = (
     "\033[2m",
     "\033[0m",
 )
-# The six basic colours were spoken for at six services. Bright green for trading-mcp is
-# deliberately a shade of market-mcp's own — the two tool servers read as a pair in the log,
-# which is what they are — and bright magenta went to teams-mcp, the third tool server and
-# the only one carrying somebody's own credential rather than a module's.
+# The six basic colours were spoken for at six services. Bright green went to trading-mcp
+# and bright magenta to teams-mcp, the two remaining tool servers — the second being the
+# only one carrying somebody's own credential rather than a module's. Green freed up when
+# market-mcp became a route in market-data and stopped being a process to colour.
 BRIGHT_BLUE, BRIGHT_GREEN, BRIGHT_MAGENTA = "\033[94m", "\033[92m", "\033[95m"
 
 SERVICES: tuple[Service, ...] = (
@@ -130,27 +130,17 @@ SERVICES: tuple[Service, ...] = (
         health_path="/health",
         why=(
             "After the gateway: it opens a subscription per tracked pair the moment it "
-            "starts, so a gateway not listening yet costs it a round of backoff."
+            "starts, so a gateway not listening yet costs it a round of backoff. It also "
+            "serves the tool surface at /mcp, which is why nothing here starts a separate "
+            "one any more."
         ),
-    ),
-    Service(
-        name="market-mcp",
-        module="market-mcp",
-        port=8040,
-        # No `--reload`: unlike the uvicorn services this one is not started through
-        # uvicorn's CLI (`server.py`'s caller-identity wrapper needs the ASGI app built in
-        # Python first), so a code change here needs a manual restart.
-        command=("uv", "run", "python", "-m", "market_mcp", "http"),
-        log_prefix="mcp     ",
-        colour=GREEN,
-        health_path="/health",
-        why="After market-data, whose contract it reads.",
     ),
     Service(
         name="trading-mcp",
         module="trading-mcp",
         port=8060,
-        # No `--reload`, same reason as market-mcp's.
+        # No `--reload`: this one is not started through uvicorn's CLI, so a code
+        # change here needs a manual restart.
         command=("uv", "run", "python", "-m", "trading_mcp"),
         log_prefix="trading ",
         colour=BRIGHT_GREEN,
@@ -172,7 +162,7 @@ SERVICES: tuple[Service, ...] = (
         colour=BRIGHT_BLUE,
         health_path="/health",
         why=(
-            "After market-mcp and trading-mcp, whose tools its runs assign — and before "
+            "After market-data and trading-mcp, whose tools its runs assign — and before "
             "teams-mcp, whose tools *are* teams' catalogue. Not before the agent for any "
             "reason of its own: the two are siblings, and what puts teams first is "
             "teams-mcp standing between them."
@@ -189,7 +179,7 @@ SERVICES: tuple[Service, ...] = (
         why=(
             "After teams, because its tools are teams' catalogue — though it starts happily "
             "without it and reports the outage per call rather than refusing to run, which "
-            "is market-mcp's shape and not trading-mcp's. Before the agent, which mounts "
+            "is the archive's shape and not trading-mcp's. Before the agent, which mounts "
             "its tools: that is for a log reading in the direction the arrows point rather "
             "than for correctness."
         ),
@@ -267,9 +257,9 @@ def is_loopback(host: str | None) -> bool:
 # Collected and reported together. Finding out about a missing `.env` after two services
 # are running means killing them to fix one line.
 
-# Which `.env` each module needs, and what is missing from it if it is absent. market-mcp
-# and teams-mcp are not here on purpose: every setting they read has a working loopback
-# default (`config.py`), unlike the modules holding real credentials.
+# Which `.env` each module needs, and what is missing from it if it is absent. teams-mcp
+# is not here on purpose: every setting it reads has a working loopback default
+# (`config.py`), unlike the modules holding real credentials.
 REQUIRED_ENV: tuple[tuple[str, str], ...] = (
     ("capital-gateway", "copy .env.example and fill in demo credentials"),
     ("market-data", "copy .env.example; the defaults match compose.yaml"),
@@ -280,7 +270,7 @@ REQUIRED_ENV: tuple[tuple[str, str], ...] = (
         "teams",
         "copy .env.example and fill in OPENAI_API_KEY (MODELS has a working default there)",
     ),
-    # trading-mcp cannot fall back the way market-mcp does: `config.py` requires the
+    # trading-mcp cannot fall back the way teams-mcp does: `config.py` requires the
     # gateway's caller key, and the gateway checks it on loopback too.
     (
         "trading-mcp",
@@ -424,17 +414,20 @@ def _gateway_key_problems(env: Environment) -> list[str]:
 # module rather than a missing line. That is the whole reason they are said out loud.
 
 ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
+    # 8020, not 8040: the archive serves its own tools at /mcp since
+    # `market-mcp-into-market-data`, and a .env copied before that change points at a port
+    # nothing listens on — which reads as a tool server that is down.
     (
         "agent",
         "MARKET_MCP_URL",
         "the agent will run without tools",
-        "8040",
+        "8020",
     ),
     (
         "teams",
         "MARKET_MCP_URL",
         "teams whose agents assign tools will refuse to run rather than answer without them",
-        "8040",
+        "8020",
     ),
     (
         "teams",
@@ -867,7 +860,7 @@ def ready_lines(*, start_terminal: bool) -> list[str]:
     lines += [
         f"  market-data docs    http://{LOOPBACK}:8020/docs",
         f"  Gateway docs        http://{LOOPBACK}:8010/docs",
-        f"  market-mcp health   http://{LOOPBACK}:8040/health",
+        f"  Archive tools       http://{LOOPBACK}:8020/mcp",
         f"  trading-mcp health  http://{LOOPBACK}:8060/health",
         f"  teams-mcp health    http://{LOOPBACK}:8070/health",
         f"  agent docs          http://{LOOPBACK}:8030/docs",
