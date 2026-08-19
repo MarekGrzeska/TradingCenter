@@ -50,7 +50,7 @@
 
 ## 8. Dokumentacja
 
-- [ ] 8.1 `CLAUDE.md`: mapa modułów, tabela komend, porty, ustawienia — oraz przepisane uzasadnienie istnienia `tc-mcp-kit`, które dziś opiera się na tym, że biorą go wyłącznie moduły bez bazy danych
-- [ ] 8.2 `docs/architecture.md`: `market-mcp` znika z diagramu i z akapitu o kopiach kontraktu; opisać, że agent sięga po narzędzia archiwum wprost
-- [ ] 8.3 `README.md` i `modules/market-data/README.md`: nowa powierzchnia narzędziowa i jej autoryzacja
-- [ ] 8.4 `docs/rachunek-po-refactorze.html`: A(market) jako wykonane, z liczbami zmierzonymi po fakcie zamiast deklarowanych
+- [x] 8.1 `CLAUDE.md`: mapa modułów, tabela komend, porty, ustawienia — oraz przepisane uzasadnienie istnienia `tc-mcp-kit`, które dziś opiera się na tym, że biorą go wyłącznie moduły bez bazy danych
+- [x] 8.2 `docs/architecture.md`: `market-mcp` znika z diagramu i z akapitu o kopiach kontraktu; opisać, że agent sięga po narzędzia archiwum wprost
+- [x] 8.3 `README.md` i `modules/market-data/README.md`: nowa powierzchnia narzędziowa i jej autoryzacja
+- [x] 8.4 `docs/rachunek-po-refactorze.html`: A(market) jako wykonane, z liczbami zmierzonymi po fakcie zamiast deklarowanych
