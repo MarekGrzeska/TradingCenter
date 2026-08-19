@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from market_mcp.reduce import aggregate_candles, truncate
+from market_data.tools.reduce import aggregate_candles, truncate
 
 
 def _candle(time: str, open_: float, high: float, low: float, close: float) -> dict:

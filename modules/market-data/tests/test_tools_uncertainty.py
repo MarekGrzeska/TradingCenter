@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from market_mcp.uncertainty import derived_sentence, empty_series_sentence, uncovered_sentence
+from market_data.tools.uncertainty import (
+    derived_sentence,
+    empty_series_sentence,
+    uncovered_sentence,
+)
 
 
 def test_no_gaps_is_silent() -> None:

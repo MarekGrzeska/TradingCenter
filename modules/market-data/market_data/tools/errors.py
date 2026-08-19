@@ -3,7 +3,7 @@
 Raising `ToolRefusal` inside a tool function is enough: the MCP server converts any
 exception a tool raises into `isError=True`, carrying `str(exception)` as the content
 — so what matters here is the message. It MUST say what to change for the request to
-succeed (specs/market-mcp-answers, "Odmowa jest odpowiedzią o jednym kształcie").
+succeed (specs/market-data-answers, "Odmowa jest odpowiedzią o jednym kształcie").
 """
 
 from __future__ import annotations

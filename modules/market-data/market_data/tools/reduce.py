@@ -1,6 +1,6 @@
 """Turning "more than the ceiling" into "the ceiling, and a note about it" — the one
 place a tool's aggregation and truncation happens, so "nic nie znika po cichu"
-(specs/market-mcp-answers) is satisfied once instead of once per tool.
+(specs/market-data-answers) is satisfied once instead of once per tool.
 """
 
 from __future__ import annotations

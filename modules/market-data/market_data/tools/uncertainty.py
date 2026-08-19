@@ -1,6 +1,6 @@
 """Sentences for what the numbers alone don't say — built once here so every tool
 touching candles or coverage says the same thing the same way
-(specs/market-mcp-answers).
+(specs/market-data-answers).
 """
 
 from __future__ import annotations
@@ -33,7 +33,7 @@ def unsettled_sentence(warmup_bars: int | None) -> str:
     computed it from a series shorter than the formula wanted. `warmup_bars` is what
     the formula *needs*, not what was missing: the archive does not publish how many
     bars fell short, only how many the formula asked for
-    (specs/market-mcp-answers, "Wskaźnik bez pełnej rozgrzewki").
+    (specs/market-data-answers, "Wskaźnik bez pełnej rozgrzewki").
     """
     if warmup_bars is None:
         return (
@@ -50,7 +50,7 @@ def unsettled_sentence(warmup_bars: int | None) -> str:
 def forming_sentence(resolution: str) -> str:
     """Said whenever a price comes from a period that has not closed. Without it a model
     reports the period's high and low as its range, and both will still move
-    (specs/market-mcp-tools, "Zakres okresu w toku MUST NOT być podany jako zakres
+    (specs/market-data-tools, "Zakres okresu w toku MUST NOT być podany jako zakres
     zamknięty")."""
     return (
         f"This is the {resolution} period still being built — the price is current, but "
@@ -65,7 +65,7 @@ def no_live_price_sentence(symbol: str, state: str, market_open: bool | None = N
     `market_closed` and `no_quotes` are the pair worth keeping apart: the first is the
     venue being shut, which is nobody's problem, and the second is the archive not
     receiving anything while it is open, which is somebody's problem right now
-    (specs/market-mcp-tools, "Rynek otwarty, a ceny bieżącej nie ma").
+    (specs/market-data-tools, "Rynek otwarty, a ceny bieżącej nie ma").
 
     `no_quotes` covers one more case than its name suggests — the archive could not find
     out whether the market is open at all — and saying "the market is open" there would
@@ -98,7 +98,7 @@ def no_live_price_sentence(symbol: str, state: str, market_open: bool | None = N
 def empty_series_sentence(symbol: str, tracked: bool) -> str:
     """Distinguishes "nobody is collecting this pair" from "it is tracked, but this
     window has no candle" — the same empty list means two different things
-    (specs/market-mcp-answers, "Trzy rodzaje 'nie wiem' są rozróżnione").
+    (specs/market-data-answers, "Trzy rodzaje 'nie wiem' są rozróżnione").
     """
     if tracked:
         return (

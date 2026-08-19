@@ -1,8 +1,8 @@
 ## 1. Zależności i miejsce na narzędzia
 
-- [ ] 1.1 Dodać `mcp==1.27.0` i `tc-mcp-kit` do `modules/market-data/pyproject.toml`, przeliczyć lock, sprawdzić rozwiązanie wobec istniejących zależności
-- [ ] 1.2 Dodać `market-data` do tabeli konsumentów w `packages/tc-mcp-kit/README.md`
-- [ ] 1.3 Utworzyć `market_data/tools/` i przenieść `reduce.py`, `uncertainty.py`, `errors.py` wraz z ich testami — bez zmian w treści
+- [x] 1.1 Dodać `mcp==1.27.0` i `tc-mcp-kit` do `modules/market-data/pyproject.toml`, przeliczyć lock, sprawdzić rozwiązanie wobec istniejących zależności
+- [x] 1.2 Dodać `market-data` do tabeli konsumentów w `packages/tc-mcp-kit/README.md`
+- [x] 1.3 Utworzyć `market_data/tools/` i przenieść `reduce.py`, `uncertainty.py`, `errors.py` wraz z ich testami — bez zmian w treści
 
 ## 2. Narzędzia sięgają po dane wywołaniem funkcji
 
