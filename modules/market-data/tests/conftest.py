@@ -166,6 +166,28 @@ async def db(migrated_url: str) -> AsyncIterator[asyncpg.Connection]:
 
 
 @pytest.fixture
+def settings() -> Settings:
+    """What the application reads about itself, minus anything that reaches outward.
+
+    Every fixture that *serves* the app needs these, not only the ones that touch the
+    database: `caller_access.py` reads `require_authenticated_principal` on every request
+    and refuses when the settings are missing, on the grounds that "they were not there"
+    must never be the reading under which everything is allowed.
+
+    The database URL is metadata only — the pool the fixtures build is what actually
+    reaches PostgreSQL. A throwaway value that satisfies Settings' own rules (TLS
+    required, no embedded credential) rather than `migrated_url`, which as testcontainers
+    hands it out is neither.
+    """
+    return Settings(
+        database_url="postgresql://localhost:5432/test?sslmode=require",
+        database_user="test-user",
+        gateway_api_key="test-gateway-key",
+        _env_file=None,
+    )
+
+
+@pytest.fixture
 def app():
     """A fresh application per test.
 
@@ -189,7 +211,7 @@ async def pool(migrated_url: str):
 
 
 @pytest.fixture
-async def api(app, pool, migrated_url: str):
+async def api(app, pool, settings, migrated_url: str):
     """The app wired to a real database, with the two things that reach outward faked.
 
     The lifespan is bypassed rather than run: it would start ingest, which would try to
@@ -197,16 +219,7 @@ async def api(app, pool, migrated_url: str):
     """
     app.state.pool = pool
     app.state.hub = Hub()
-    app.state.settings = Settings(
-        # Metadata only — the pool above is what actually reaches the database. A
-        # throwaway value that satisfies Settings' own rules (TLS required, no embedded
-        # credential) rather than `migrated_url`, which as testcontainers hands it out
-        # is neither.
-        database_url="postgresql://localhost:5432/test?sslmode=require",
-        database_user="test-user",
-        gateway_api_key="test-gateway-key",
-        _env_file=None,
-    )
+    app.state.settings = settings
     app.state.instruments = FakeInstruments()
     app.state.ingest = FakeIngest()
     app.state.market_status = MarketStatus()

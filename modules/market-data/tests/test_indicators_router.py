@@ -74,7 +74,8 @@ class TestResultShapeOrError:
 
 
 @pytest.fixture
-async def catalogue_client(app):
+async def catalogue_client(app, settings):
+    app.state.settings = settings
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://archive.test") as client:
         yield client
@@ -113,8 +114,9 @@ pytestmark = pytest.mark.db
 # the archive and touches nothing that reaches outward, so it wires the two pieces the
 # router actually reads rather than the full set the contract suites need.
 @pytest.fixture
-async def api(app, pool):
+async def api(app, pool, settings):
     app.state.pool = pool
+    app.state.settings = settings
     app.state.indicator_limiter = asyncio.Semaphore(4)
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://archive.test") as client:

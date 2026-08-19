@@ -38,6 +38,7 @@ telemetry.configure()
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from .caller_access import CallerAccess
 from .config import Settings
 from .db import MIGRATION_LOCK_KEY, advisory_lock
 from .db import pool as make_pool
@@ -298,6 +299,13 @@ def create_app() -> FastAPI:
     from .mcp_app import build_mcp_app
 
     app.mount("/mcp", build_mcp_app(app))
+
+    # In front of both surfaces, and it has to be one layer rather than a dependency per
+    # router: `/mcp` is a mounted ASGI application, not a router, so a `dependencies=`
+    # check could not reach it and the rule would exist in two mechanisms that drift in
+    # one direction. `app.state` rather than the settings themselves — the lifespan puts
+    # those there long after this line runs (`caller_access.py`).
+    app.add_middleware(CallerAccess, state=app.state)
 
     return app
 

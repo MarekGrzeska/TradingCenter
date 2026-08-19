@@ -162,7 +162,8 @@ def test_the_printed_bytes_are_stable() -> None:
 
 
 @pytest.fixture
-async def served(app):
+async def served(app, settings):
+    app.state.settings = settings
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://archive.test") as client:
         yield client

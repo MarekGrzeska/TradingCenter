@@ -23,12 +23,12 @@
 
 ## 4. Autoryzacja per wołający
 
-- [ ] 4.1 Dodać warstwę ASGI z zapisem trasa → uprawnieni wołający; surowy ASGI, nie `BaseHTTPMiddleware`, z testem sprawdzającym tę formę
-- [ ] 4.2 Ustawienia z identyfikatorami aplikacji wołających narzędzia i wołających REST; puste lokalnie, gdy wymóg tożsamości jest wyłączony
-- [ ] 4.3 Wypisać trasy wyjęte spod wymogu tożsamości (`/ping`, `/ws/candles`) jako pozycję zapisu; obsłużyć scope `websocket` jawnie
-- [ ] 4.4 Test odmowy dla każdej pary „tożsamość — powierzchnia, do której nie ma prawa", w tym wołający narzędzi na `POST /pairs` i `DELETE /pairs/{symbol}`
-- [ ] 4.5 Test, że trasa nieznana zapisowi jest odmawiana, nie przepuszczana
-- [ ] 4.6 Test, że trasa niosąca dane dopisana do listy wyjętych spod tożsamości wywraca testy
+- [x] 4.1 Dodać warstwę ASGI z zapisem trasa → uprawnieni wołający; surowy ASGI, nie `BaseHTTPMiddleware`, z testem sprawdzającym tę formę
+- [x] 4.2 Ustawienia z identyfikatorami aplikacji wołających narzędzia i wołających REST; puste lokalnie, gdy wymóg tożsamości jest wyłączony
+- [x] 4.3 Wypisać trasy wyjęte spod wymogu tożsamości (`/ping`, `/ws/candles`) jako pozycję zapisu; obsłużyć scope `websocket` jawnie
+- [x] 4.4 Test odmowy dla każdej pary „tożsamość — powierzchnia, do której nie ma prawa", w tym wołający narzędzi na `POST /pairs` i `DELETE /pairs/{symbol}`
+- [x] 4.5 Test, że trasa nieznana zapisowi jest odmawiana, nie przepuszczana
+- [x] 4.6 Test, że trasa niosąca dane dopisana do listy wyjętych spod tożsamości wywraca testy
 
 ## 5. Konsumenci i runner dev
 
