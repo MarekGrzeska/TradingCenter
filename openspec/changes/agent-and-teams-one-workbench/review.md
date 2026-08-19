@@ -12,10 +12,23 @@ Wszystko poniżej biegło lokalnie na `refactor/agent-and-teams-one-workbench`.
 | `infra`: `terraform fmt -check -recursive`, `validate` | czysto, oba korzenie |
 | `openspec validate --strict` | valid |
 
-Czego **nie** zweryfikowano i czego nie da się tutaj: `terraform plan` wobec prawdziwego
-stanu, `moved.tf` (patrz niżej — to jest najważniejsza pozycja tego dokumentu), pierwszy
-start procesu wobec dwóch produkcyjnych baz, i to, czy Easy Auth wpuszcza terminal na
-niezmieniony rekord aplikacji. Wszystkie cztery są sprawdzalne wyłącznie przy wdrożeniu.
+`terraform plan` wobec **prawdziwego stanu** dobiegł w CI na PR&nbsp;#176 i zamknął
+najważniejszą pozycję tego dokumentu: `Plan: 1 to add, 14 to change, 45 to destroy`, ani
+jednego `forces replacement`. Cztery bloki `moved` zadziałały jako przeniesienia,
+`azurerm_linux_web_app.workbench` jest aktualizowane w miejscu, a wyjścia dowodzą, że to ten
+sam zasób — `workbench_managed_identity_principal_id` ma tę samą wartość
+(`b4ac41a9-…`), którą miało `agent_managed_identity_principal_id`. Tożsamość przeżyła, więc
+rola w Postgresie, client id trzymany przez build terminala i trzy listy w cudzych modułach
+nadal wskazują na coś, co istnieje.
+
+Czego **nie** zweryfikowano i czego nie da się tutaj: pierwszy start procesu wobec dwóch
+produkcyjnych baz, i to, czy Easy Auth wpuszcza terminal na niezmieniony rekord aplikacji.
+Oba są sprawdzalne wyłącznie przy wdrożeniu.
+
+Uboczne znalezisko z tego samego planu, **nie spowodowane tą zmianą**: `azuread_application_password`
+modułów `market_data` i `trading_mcp` też planują się jako aktualizacja w miejscu. Żadnego
+z nich ta gałąź nie dotyka — to istniejący dryf i warto na niego spojrzeć **przed** apply,
+a nie w trakcie.
 
 ## Wymaganie → test
 
@@ -77,22 +90,42 @@ proces.
 
 ## Ryzyka przy wdrożeniu, w kolejności ważności
 
-**`moved.tf` musi zadziałać, zanim cokolwiek innego.** Cztery bloki przenoszą adresy w
-stanie: App Service, moduł Easy Auth, `pre_authorized` i reguła firewalla. Bez nich
-Terraform czyta przemianowanie jako destroy+create, a dla rejestracji Easy Auth znaczy to
-**nowy client id** — który trzyma build terminala i trzy listy `allowed_applications`.
-Bramka jest ta sama, którą ten plik już raz opisał: `terraform plan` MUST pokazać dla tych
-czterech `0 to add, 0 to change, 0 to destroy`. Cokolwiek innego to przeprowadzka, która
-się nie odbyła, i wtedy **nie aplikować**.
+**`moved.tf` — sprawdzone, trzyma** (szczegóły wyżej). Zostaje jako bramka na wypadek
+rebase'u: przed apply plan MUST nadal czytać się jako przeniesienie, bez `forces
+replacement` na App Service i module Easy Auth. Bez tych bloków Terraform czyta
+przemianowanie jako destroy+create, a dla rejestracji Easy Auth znaczy to **nowy client
+id** — który trzyma build terminala i trzy listy `allowed_applications`.
 
 **Rola w bazie `teams` przed obrazem, nie po.** Jedno App Service ma jedną tożsamość, więc
 `app-tradingcenter-agent` musi istnieć jako rola w bazie `teams` i być właścicielem jej
 schematu. Bez tego `lifespan` nie zmigruje drugiego łańcucha i proces nie wstanie —
 głośno, co jest lepszym trybem awarii niż połowa serwująca, ale nadal przerwą.
 
-**`apply` przed deployem.** Nowe ustawienia (`AGENT_*`, `TEAMS_*`) muszą dotknąć App
-Service, zanim dotknie go obraz, który ich wymaga. Odwrotna kolejność to nie kwestia
-estetyki: obraz bez `AGENT_DATABASE_URL` nie wstaje wcale.
+**`apply` i merge nie dają się ustawić bezboleśnie — i to jest korekta do tego, co ten
+dokument mówił najpierw.** Napisałem „`apply` przed deployem", co jest prawdą o kierunku
+i przemilcza połowę: `app_settings` w `azurerm_linux_web_app` jest **autorytatywne**, więc
+apply nie dokłada `AGENT_DATABASE_URL` obok `DATABASE_URL`, tylko **zabiera** stare nazwy.
+Stary obraz, który wtedy jeszcze biegnie, czyta `DATABASE_URL` i przy pierwszym restarcie
+(a zmiana ustawień restartuje) nie wstaje.
+
+Obie kolejności dają więc okno, tej samej długości i o różnym objawie:
+
+| Kolejność | Co się dzieje w oknie |
+|---|---|
+| apply → merge | stary obraz traci `DATABASE_URL` i wchodzi w pętlę restartów; okno = build + deploy nowego obrazu (~5 min). Sonda deploy'u na końcu **przechodzi** |
+| merge → apply | nowy obraz startuje bez `AGENT_DATABASE_URL` i nie wstaje; sonda deploy'u **czerwona**; okno = czas do ręcznego apply |
+
+Zalecane: **apply → merge**, bo kończy się zielono i okno jest ograniczone czasem
+wdrożenia, a nie czasem reakcji operatora. Powierzchnia zespołów jest niedostępna od apply
+(App Service `teams` znika w nim) do końca deployu, niezależnie od wyboru.
+
+Zerowego okna da się dokupić za dwa applies: najpierw wersja `app-service.tf` niosąca
+**oba** komplety nazw, potem merge i deploy, potem drugi apply kasujący stare. Przy jednym
+operatorze i koncie demo to prawdopodobnie nie jest tego warte — ale jest to wybór, a nie
+konieczność, więc niech będzie zapisane, że istnieje.
+
+`terraform apply` jest tu **lokalne**, nie z CI: ta zmiana rusza `azuread_*`, a
+`terraform-apply.yml` odmawia każdego planu, który je dotyka.
 
 **Cofnięcie.** Poprzedni obraz `agent` plus przywrócone z Terraforma App Service `teams`
 i `teams-mcp`. Dane obu baz są nietknięte przez całą operację — żadna migracja nie jest
