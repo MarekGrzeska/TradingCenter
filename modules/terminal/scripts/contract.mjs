@@ -45,15 +45,17 @@ const SOURCES = [
   },
   {
     name: "teams",
-    moduleDir: resolve(terminal, "..", "teams"),
+    moduleDir: resolve(terminal, "..", "workbench"),
     pythonModule: "teams.openapi",
     output: join(terminal, "src", "data", "contract.teams.generated.ts"),
     banner: `/**
  * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
  *
- * The source is teams' own OpenAPI document, printed straight from its Pydantic models
- * by \`python -m teams.openapi\`. No WebSocket here — unlike market-data's, this schema
- * is exactly what FastAPI already describes on its own.
+ * The source is the workbench's teams surface, printed straight from its Pydantic models
+ * by \`python -m teams.openapi\`. That surface's own routers and prefixes, not the whole
+ * process's: the conversation's contract is hand-written in \`agentApi.ts\` and stays that
+ * way. No WebSocket here — unlike market-data's, this schema is exactly what FastAPI
+ * already describes on its own.
  */
 `,
   },

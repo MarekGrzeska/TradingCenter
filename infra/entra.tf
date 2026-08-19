@@ -35,28 +35,18 @@ resource "azuread_application" "terminal" {
     }
   }
 
-  # Ready for whenever the terminal is changed to ask for a token scoped to the agent
+  # Ready for whenever the terminal is changed to ask for a token scoped to the workbench
   # by name, rather than reusing its market-data token against it (see the comment on
-  # `module.agent_easy_auth` below) — `required_resource_access` takes one block per resource,
-  # so this sits alongside the one above rather than replacing it.
+  # `module.workbench_easy_auth` below) — `required_resource_access` takes one block per
+  # resource, so this sits alongside the one above rather than replacing it.
+  #
+  # There used to be a third block here, for teams. Its module and the workbench's are one
+  # process, so there is one registration to stand ready and one scope to ask for.
   required_resource_access {
-    resource_app_id = module.agent_easy_auth.client_id
+    resource_app_id = module.workbench_easy_auth.client_id
 
     resource_access {
-      id   = module.agent_easy_auth.scope_id
-      type = "Scope"
-    }
-  }
-
-  # And the same again for teams, standing ready for the same reason — the terminal's
-  # teams tab (tasks.md group 9) reaches that module with the token it already holds, and
-  # this block is what a later change needs to have been here for the terminal to ask for
-  # a token scoped to teams by name instead.
-  required_resource_access {
-    resource_app_id = module.teams_easy_auth.client_id
-
-    resource_access {
-      id   = module.teams_easy_auth.scope_id
+      id   = module.workbench_easy_auth.scope_id
       type = "Scope"
     }
   }
@@ -76,79 +66,45 @@ resource "azuread_application_pre_authorized" "terminal" {
   permission_ids       = [module.market_data_easy_auth.scope_id]
 }
 
-# --- agent, as a caller of the terminal (its own API registration) ------------------
+# --- the workbench, as an API of its own ---------------------------------------------
 #
 # Its own registration rather than reuse of `module.market_data_easy_auth` — each backend
-# module is its own API here the same way each is its own deployable (design.md,
-# "Osobny moduł `modules/agent`"), and tasks.md 10.6 asks for exactly this: a
-# registration and a scope of the agent's own.
+# module is its own API here the same way each is its own deployable, and a module that
+# borrowed another's registration could never be removed without touching the one it
+# borrowed from ("Moduł ma dać się usunąć przez skasowanie katalogu i zasobów").
 #
 # The terminal's identity layer (`src/auth/`) acquires one token today, scoped to
-# market-data — `add-agent-chat`'s Migration Plan lists only `VITE_AGENT_HTTP` as the
-# terminal-side step to go live, no second scope. So `allowed_audiences` on the
-# agent's App Service (app-service.tf) accepts *both* this new audience and
-# market-data's: the terminal's existing token works against agent unmodified today,
-# and the scope below stands ready, pre-authorized, for whenever the terminal is
-# changed to ask for it by name instead.
-module "agent_easy_auth" {
+# market-data, and reuses it everywhere. So `allowed_audiences` on this app's App Service
+# (app-service.tf) accepts *both* this audience and market-data's: the terminal's existing
+# token works against it unmodified, and the scope below stands ready, pre-authorized, for
+# whenever the terminal is changed to ask for it by name instead.
+#
+# **There used to be two of these**, one for the chat and one for teams. One process, one
+# registration — and the display name keeps the `-agent` spelling for the same reason the
+# App Service does (`local.workbench_app_name`): renaming an Entra application means a new
+# client id, and the client id is what the terminal's build and three allow-lists hold.
+module "workbench_easy_auth" {
   source = "./modules/easy-auth-app"
 
   display_name   = "app-tradingcenter-agent-easyauth"
-  identifier_uri = local.agent_api_uri
-  redirect_uri   = "https://${local.agent_hostname}/.auth/login/aad/callback"
+  identifier_uri = local.workbench_api_uri
+  redirect_uri   = "https://${local.workbench_hostname}/.auth/login/aad/callback"
 
   id_token_issuance_enabled = true
 
   scope = {
-    value                      = local.agent_api_scope
-    admin_consent_display_name = "Talk to the agent"
-    admin_consent_description  = "Allows the app to reach the agent as the signed-in operator."
-    user_consent_display_name  = "Talk to the agent on your behalf"
-    user_consent_description   = "Allows the app to reach the agent as you."
+    value                      = local.workbench_api_scope
+    admin_consent_display_name = "Talk to the agent and run teams"
+    admin_consent_description  = "Allows the app to reach the workbench as the signed-in operator."
+    user_consent_display_name  = "Talk to the agent and run teams on your behalf"
+    user_consent_description   = "Allows the app to reach the workbench as you."
   }
 }
 
-resource "azuread_application_pre_authorized" "agent_terminal" {
-  application_id       = module.agent_easy_auth.application_id
+resource "azuread_application_pre_authorized" "workbench_terminal" {
+  application_id       = module.workbench_easy_auth.application_id
   authorized_client_id = azuread_application.terminal.client_id
-  permission_ids       = [module.agent_easy_auth.scope_id]
-}
-
-# --- teams, as an API of its own -----------------------------------------------------
-#
-# The fifth backend module and the fourth registration of this shape. Its own, for the
-# reason the agent's comment above gives: each backend module is its own API here the
-# same way each is its own deployable, and a module that borrowed another's registration
-# could never be removed without touching the one it borrowed from (design.md, "Moduł ma
-# dać się usunąć przez skasowanie katalogu i zasobów").
-#
-# The scope below is granted to the terminal and pre-authorized, but is not yet what the
-# terminal's token carries — `src/auth/` asks Entra for market-data's scope and reuses
-# that token everywhere. So `allowed_audiences` on the teams App Service (app-service.tf)
-# accepts market-data's audience as well, exactly as agent's does, and for exactly as
-# long: until the terminal is taught to ask for each module's scope by name.
-module "teams_easy_auth" {
-  source = "./modules/easy-auth-app"
-
-  display_name   = "app-tradingcenter-teams-easyauth"
-  identifier_uri = local.teams_api_uri
-  redirect_uri   = "https://${local.teams_hostname}/.auth/login/aad/callback"
-
-  id_token_issuance_enabled = true
-
-  scope = {
-    value                      = local.teams_api_scope
-    admin_consent_display_name = "Compose and run agent teams"
-    admin_consent_description  = "Allows the app to reach the teams module as the signed-in operator."
-    user_consent_display_name  = "Compose and run your agent teams"
-    user_consent_description   = "Allows the app to reach the teams module as you."
-  }
-}
-
-resource "azuread_application_pre_authorized" "teams_terminal" {
-  application_id       = module.teams_easy_auth.application_id
-  authorized_client_id = azuread_application.terminal.client_id
-  permission_ids       = [module.teams_easy_auth.scope_id]
+  permission_ids       = [module.workbench_easy_auth.scope_id]
 }
 
 # The three values the terminal's build needs (deploy-terminal.yml). All three are public

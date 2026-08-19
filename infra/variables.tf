@@ -45,7 +45,7 @@ variable "agent_models" {
     (design.md, "Wobec OpenAI: klucz, i tylko klucz"), so there is no deployment
     resource to declare and no capacity to reserve. All this variable does is build the
     agent's MODELS app setting (app-service.tf) — a fourth model is one more entry here
-    and a restart, exactly as `modules/agent/.env.example` describes for local runs.
+    and a restart, exactly as `modules/workbench/.env.example` describes for local runs.
 
     Map key is this module's own stable id (`agent/models_catalogue.py`), carried in
     every session and usage row. `model` is what OpenAI is actually asked for, kept
@@ -60,7 +60,7 @@ variable "agent_models" {
     unit. They move faster than this module does (design.md, "Cennik jest konfiguracją"):
     the defaults below are illustrative, read from public pricing in August 2026; check
     OpenAI's own pricing page before trusting them at deploy time, the same caution
-    `modules/agent/.env.example` carries.
+    `modules/workbench/.env.example` carries.
   EOT
   type = map(object({
     model              = string
@@ -108,7 +108,7 @@ variable "teams_models" {
     something OpenAI serves. A name from memory fails at the first call, not at `apply`.
 
     Rates are per 1,000,000 tokens, the unit OpenAI's pricing page quotes. The defaults
-    below are the ones `modules/teams/.env.example` carries, read from public pricing in
+    below are the ones `modules/workbench/.env.example` carries, read from public pricing in
     August 2026; check the pricing page before trusting them at deploy time.
 
     Unlike `agent`, there is no default model id to pair with this: every agent in a saved

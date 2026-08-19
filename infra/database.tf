@@ -71,8 +71,8 @@ resource "azurerm_postgresql_flexible_server_database" "prod" {
 # "Baza: druga baza logiczna, jeden serwer": the free grant is 750 hours of *one*
 # B1ms. The Entra role this database's data actually needs is not created here —
 # same as `market_data`'s own role, it is a manual `psql` step against the server's AD
-# Administrator (tasks.md's Migration Plan step 3; `agent_managed_identity_principal_id`
-# in app-service.tf is the object id that step grants).
+# Administrator (`workbench_managed_identity_principal_id` in app-service.tf is the object
+# id that step grants).
 resource "azurerm_postgresql_flexible_server_database" "agent" {
   name      = "agent"
   server_id = azurerm_postgresql_flexible_server.main.id
@@ -84,8 +84,10 @@ resource "azurerm_postgresql_flexible_server_database" "agent" {
 # B1ms, and a module owning its own *schema* is the rule, not owning its own server
 # (specs/teams-database-connection, "Moduł nie dzieli bazy z innym modułem"). The role
 # this database's data belongs to is not created here: like `market_data`'s and `agent`'s,
-# it is a one-off `psql` step against the server's AD Administrator, and
-# `teams_managed_identity_principal_id` (app-service.tf) is the object id that step grants.
+# it is a one-off `psql` step against the server's AD Administrator. **The identity is the
+# same one `agent` takes** since the two modules became one process, so this database needs
+# that role created in it too — the one operator step
+# `agent-and-teams-one-workbench` carries.
 resource "azurerm_postgresql_flexible_server_database" "teams" {
   name      = "teams"
   server_id = azurerm_postgresql_flexible_server.main.id
@@ -129,29 +131,16 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "market_data_outboun
 }
 
 # Same two-apply shape as market-data's own rule above: `terraform apply
-# -target=azurerm_linux_web_app.agent` once, then the normal unrestricted apply.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "agent_outbound" {
-  for_each = toset(azurerm_linux_web_app.agent.possible_outbound_ip_address_list)
+# -target=azurerm_linux_web_app.workbench` once, then the normal unrestricted apply.
+#
+# One rule set where there were two. The workbench reaches both the `agent` and the `teams`
+# database, and it reaches them from one app's addresses — the second set only ever
+# duplicated the first under another name, and it went away with the App Service it was
+# read off.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "workbench_outbound" {
+  for_each = toset(azurerm_linux_web_app.workbench.possible_outbound_ip_address_list)
 
   name             = "AllowAgentOutbound-${replace(each.value, ".", "-")}"
-  server_id        = azurerm_postgresql_flexible_server.main.id
-  start_ip_address = each.value
-  end_ip_address   = each.value
-}
-
-# Third time the same shape, and the two-apply order is not optional here either:
-# `terraform apply -target=azurerm_linux_web_app.teams` once, then the normal apply. A
-# resource-level `for_each` refuses to plan against a list that is only "known after
-# apply", and the app has to exist before its outbound addresses are.
-#
-# In practice these are the plan's addresses, shared with the other apps, so the rules
-# below usually duplicate existing ones under a different name. That is deliberate: read
-# off *this* app's resource, they stay right through a plan-tier change that reassigns
-# them, and a future move of one app to its own plan needs no edit here.
-resource "azurerm_postgresql_flexible_server_firewall_rule" "teams_outbound" {
-  for_each = toset(azurerm_linux_web_app.teams.possible_outbound_ip_address_list)
-
-  name             = "AllowTeamsOutbound-${replace(each.value, ".", "-")}"
   server_id        = azurerm_postgresql_flexible_server.main.id
   start_ip_address = each.value
   end_ip_address   = each.value

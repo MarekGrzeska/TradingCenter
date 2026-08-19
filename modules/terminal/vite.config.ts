@@ -61,8 +61,7 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
-  const agent = env.AGENT_PROXY_TARGET || "http://localhost:8030";
-  const teams = env.TEAMS_PROXY_TARGET || "http://localhost:8050";
+  const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
 
   return {
     plugins: [react(), tailwindcss()],
@@ -87,26 +86,17 @@ export default defineConfig(({ mode }) => {
           configure: quietProxyErrors("market-data", archive),
         },
 
-        // The agent's own address, not a path under the archive's — it is a fourth,
-        // independent module (design.md, "Osobny moduł `modules/agent`, port 8030").
-        // No `ws: true`: its stream rides `fetch` + `ReadableStream` over plain HTTP,
-        // never a WebSocket upgrade (design.md, "Odpowiedź strumieniem: fetch +
-        // ReadableStream, nie EventSource").
-        "/agent-api": {
-          target: agent,
+        // The workbench's own address, not a path under the archive's — it is an
+        // independent module on 8030. One entry where there were two: the conversation and
+        // the team catalogue are one process, so `/agent-api` and `/teams-api` became this.
+        //
+        // No `ws: true`: a turn and a run's progress both ride `fetch` + `ReadableStream`
+        // over plain HTTP, never a WebSocket upgrade.
+        "/workbench-api": {
+          target: workbench,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/agent-api/, ""),
-          configure: quietProxyErrors("agent", agent),
-        },
-
-        // teams, on 8050 — a fifth module, reached directly like the agent. Nothing to
-        // upgrade here either: a run's progress rides the same `fetch` +
-        // `ReadableStream` the agent's turn does.
-        "/teams-api": {
-          target: teams,
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/teams-api/, ""),
-          configure: quietProxyErrors("teams", teams),
+          rewrite: (path) => path.replace(/^\/workbench-api/, ""),
+          configure: quietProxyErrors("workbench", workbench),
         },
       },
     },

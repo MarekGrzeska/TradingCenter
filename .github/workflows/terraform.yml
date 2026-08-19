@@ -69,28 +69,49 @@ jobs:
           terraform_version: "1.5.7"
       - run: terraform fmt -check
       - run: terraform init
-      - run: terraform plan -no-color -input=false
+      # Written to a file rather than captured as a step output, and that is not a style
+      # choice: a step output travels to the next step through its *environment*, and a
+      # large enough plan makes the whole environment block exceed the kernel's limit —
+      # the runner then fails to start node at all, with `Argument list too long` and not
+      # one word about Terraform. Measured on 19 August 2026 by a plan with 45 destroys in
+      # it (`agent-and-teams-one-workbench`), where the plan itself was correct and the
+      # job went red anyway. A file has no such ceiling.
+      - run: terraform plan -no-color -input=false | tee "$RUNNER_TEMP/plan.txt"
         id: plan
         continue-on-error: true
       - uses: actions/github-script@v7
-        env:
-          # Passed through the environment, not interpolated into the script string below:
-          # plan output is untrusted (it can contain resource values), and a backtick or
-          # `${` in it would otherwise break out of the template literal or run as script,
-          # in a job holding pull-requests: write and id-token: write.
-          PLAN: ${{ steps.plan.outputs.stdout }}
+        # `always()` so a plan that genuinely failed still gets its output commented; the
+        # step below is what turns that into a red job.
+        if: always()
         with:
           script: |
-            const output = `#### Terraform Plan
-            \`\`\`
-            ${process.env.PLAN}
-            \`\`\`
-            `;
-            github.rest.issues.createComment({
+            const fs = require("fs");
+            const path = `${process.env.RUNNER_TEMP}/plan.txt`;
+            // The plan may not exist at all — `terraform init` can fail before it runs.
+            const plan = fs.existsSync(path) ? fs.readFileSync(path, "utf8") : "(no plan was produced)";
+
+            // GitHub refuses a comment body over 65536 characters. Keep the head and the
+            // tail: the tail is where `Plan: N to add, N to change, N to destroy` and the
+            // output diff live, which is the half somebody reads first.
+            const LIMIT = 60000;
+            const elided = [
+              "",
+              "... [" + (plan.length - LIMIT) + " characters elided — read the job log for the whole plan]",
+              "",
+            ].join("\n");
+            const body = plan.length <= LIMIT
+              ? plan
+              : plan.slice(0, LIMIT - 6000) + elided + plan.slice(-6000);
+
+            // Read from a file rather than interpolated from an expression: plan output is
+            // untrusted (it can carry resource values), and a backtick or `${` in it would
+            // otherwise break out of the template literal or run as script, in a job
+            // holding pull-requests: write and id-token: write.
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: output,
+              body: ["#### Terraform Plan", "```", body, "```"].join("\n"),
             });
       - if: steps.plan.outcome == 'failure'
         run: exit 1

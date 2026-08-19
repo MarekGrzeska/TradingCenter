@@ -63,18 +63,21 @@ locals {
     capital_password   = "capital-password"
     gateway_api_key    = "gateway-api-key"
 
-    # The agent's OpenAI key — the same value `modules/agent/.env` carries locally.
+    # The conversation's OpenAI key — the value `modules/workbench/.env` carries locally as
+    # AGENT_OPENAI_API_KEY.
     # Unlike the database, which the app reaches with its managed identity, OpenAI has
     # no Entra to present one to: an API key is the only credential it accepts, so this
     # is the one place it can live without ending up in Terraform state or a deploy log
     # (design.md, "Wobec OpenAI: klucz, i tylko klucz").
     openai_api_key = "openai-api-key"
 
-    # The teams module's key — a second secret rather than a second reader of
-    # `openai-api-key`, and the reason is the bill, not the security. A team spends
-    # across several agents per run; on one key the experiments and the operator's chat
-    # arrive on OpenAI's usage page as one number and neither can be judged
-    # (`modules/teams/.env.example`, `teams/config.py`). Two keys, two lines.
+    # The teams surface's key — a second secret rather than a second reader of
+    # `openai-api-key`, and the reason is the bill, not the security. A team spends across
+    # several agents per run; on one key the experiments and the operator's chat arrive on
+    # OpenAI's usage page as one number and neither can be judged. **They are one process
+    # since `agent-and-teams-one-workbench` and still two keys**, because the split was
+    # always about the invoice: two clients in one process buy the same thing
+    # (`modules/workbench/.env.example`, TEAMS_OPENAI_API_KEY).
     teams_openai_api_key = "teams-openai-api-key"
 
     # A GitHub personal access token with `read:packages`, and nothing else — the only

@@ -49,17 +49,15 @@ export interface Endpoints {
    *  own any more. */
   archiveHttp: string;
   archiveWs: string;
-  /** `agent`, for the conversation and its cost. Its own address rather than a path
-   *  under the archive's: Static Web Apps cannot proxy a stream any more than it can a
-   *  WebSocket, so the agent gets the same split treatment as the archive — see
-   *  design.md, "Static Web Apps nie przeprowadzi strumienia". No WS counterpart: the
-   *  agent's stream rides plain HTTP (`fetch` + `ReadableStream`), not a socket. */
-  agentHttp: string;
-  /** `teams`, for the team catalogue, the model catalogue it publishes and — later — a
-   *  run's progress. Its own address for the same reason the agent has one: it is a
-   *  module of its own, on a host of its own, and nothing proxies it through the
-   *  archive. */
-  teamsHttp: string;
+  /** The workbench: the conversation and its cost, and the team catalogue, the model
+   *  catalogue and a run's progress. **One address for both**, because they are one
+   *  process — two were two modules on two hosts, and there is one host now.
+   *
+   *  Its own address rather than a path under the archive's: Static Web Apps cannot proxy
+   *  a stream any more than it can a WebSocket, so it gets the same split treatment as the
+   *  archive. No WS counterpart: both a turn and a run's progress ride plain HTTP
+   *  (`fetch` + `ReadableStream`), not a socket. */
+  workbenchHttp: string;
 }
 
 // Same defaults as .env.example: a checkout without one falls back to the dev proxy
@@ -69,14 +67,12 @@ export interface Endpoints {
 // the mistake. See the note in vite.config.ts.
 const DEFAULT_ARCHIVE_HTTP = "/archive-api";
 const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
-const DEFAULT_AGENT_HTTP = "/agent-api";
-const DEFAULT_TEAMS_HTTP = "/teams-api";
+const DEFAULT_WORKBENCH_HTTP = "/workbench-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
   VITE_ARCHIVE_WS?: string;
-  VITE_AGENT_HTTP?: string;
-  VITE_TEAMS_HTTP?: string;
+  VITE_WORKBENCH_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
@@ -123,7 +119,6 @@ export function resolveEndpoints(
   return {
     archiveHttp: resolveHttpBase(env.VITE_ARCHIVE_HTTP || DEFAULT_ARCHIVE_HTTP),
     archiveWs: resolveWsBase(env.VITE_ARCHIVE_WS || DEFAULT_ARCHIVE_WS, loc),
-    agentHttp: resolveHttpBase(env.VITE_AGENT_HTTP || DEFAULT_AGENT_HTTP),
-    teamsHttp: resolveHttpBase(env.VITE_TEAMS_HTTP || DEFAULT_TEAMS_HTTP),
+    workbenchHttp: resolveHttpBase(env.VITE_WORKBENCH_HTTP || DEFAULT_WORKBENCH_HTTP),
   };
 }

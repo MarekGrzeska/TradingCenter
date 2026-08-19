@@ -29,15 +29,12 @@ runtime; source may be shared at build time through `packages/`, under the condi
                │  ┌────────────┘                          │
                │  │                                       │
                │  │  ┌──────────────────────────────┐     │
-               │  ├─▶│  agent                       │◀─── OpenAI
-               │  │  │  conversation · tools · cost │     │
-               │  │  └──────────────┬───────────────┘     │
-               │  │                 │ HTTP, streamed      │
-               │  └────┐            │                     │
-               │       ▼            │                     │
-               │     ┌──────────────────────────────┐     │
-               │     │  teams                       │◀─── OpenAI
-               │     │  agents as data · runs · cost│     │
+               │  └─▶│  workbench                   │◀─── OpenAI ×2
+               │     │  ┌────────────┬─────────────┐│     │
+               │     │  │conversation│teams        ││     │
+               │     │  │tools · cost│as data · runs││    │
+               │     │  └────────────┴─────────────┘│     │
+               │     │  two schemas · one process   │     │
                │     └──────────────┬───────────────┘     │
                │                    │ HTTP, streamed      │
                ▼                    ▼                     ▼
@@ -50,10 +47,11 @@ depends on it. It reads market data through one interface, and that interface no
 implementations behind it — candles and the live stream from `market-data`, the instrument
 catalogue from `capital-gateway`, composed into a single instance the views never see
 through. The charts were not rewritten when the archive arrived, which is the whole point
-of having had the interface first. `agent` is a third, unrelated source behind its own
-interface — a conversation and its cost, nothing that shares a shape with a candle. `teams`
-is a fourth, and unlike the agent's it publishes a shape the terminal *edits*: a graph the
-operator composes on a canvas and saves as a new revision.
+of having had the interface first. The `workbench` is a third source behind its own
+interfaces — a conversation and its cost, nothing that shares a shape with a candle; and,
+unlike the conversation's, its teams surface publishes a shape the terminal *edits*: a graph
+the operator composes on a canvas and saves as a new revision. One base URL for both, since
+they are one process.
 
 `market-data` sits between the two on purpose. capital.com counts its rate limit against the
 account rather than the process, so a second client anywhere spends the same allowance twice:
@@ -75,16 +73,16 @@ uncertainty went with it. What did go is the desktop client's stdio door — the
 reachable over the network only now, which is where their two real callers already were.
 
 The merge moved a question rather than answering it. A gate in front of an application
-authorizes the **application**, so admitting `agent` and `teams` for eleven read-only tools
-would admit them to `POST /pairs` and `DELETE /pairs/{symbol}` as well. What keeps them to
+authorizes the **application**, so admitting a caller for eleven read-only tools would admit
+it to `POST /pairs` and `DELETE /pairs/{symbol}` as well. What keeps it to
 `/mcp` is the module's own record of caller against surface
 (`market_data/caller_access.py`), with a refusal test for every pair that has no business
 together — and a path the record does not name is refused rather than passed.
 
-`agent` reaches OpenAI and the archive's tool surface, and nothing else in this diagram.
-The edge is deliberately narrow: no route to the REST contract, no entitlement to one, and
-no code that would know what to do with a candle. What it has is a tool list it did not
-write, fetched at the start of a session and used as given.
+The `workbench` reaches OpenAI and the archive's tool surface, and nothing else in this
+diagram. The edge is deliberately narrow: no route to the REST contract, no entitlement to
+one, and no code that would know what to do with a candle. What it has is a tool list it did
+not write, fetched at the start of a session and used as given.
 
 That edge is the one thing in this diagram with no committed copy of its contract
 anywhere. Every other arrow has one — the terminal's generated types, trading-mcp's
@@ -92,22 +90,36 @@ snapshot of the gateway's document, the terminal's hand-written agent DTOs — b
 does not describe itself at call time. MCP does: the tool names, descriptions and argument
 schemas arrive in the same session that uses them, so there is no second copy to drift and
 nothing to regenerate. The trade is that a tool added on the archive's side reaches the
-model with no review on the `agent` side, which is safe exactly as long as the archive's
+model with no review on the caller's side, which is safe exactly as long as the archive's
 own specification keeps forbidding a tool that writes — and, since the merge, as long as
 the caller record keeps the writing routes out of that caller's reach.
 
-`teams` sits beside `agent`, not under it: the same edges out to OpenAI and the archive,
-its own database, its own key, and no edge between the two modules at all. What differs is
-what it stores. `agent` keeps a conversation; `teams` keeps the *definition* of a team —
-agents, their roles and the dependencies between them — as data in a revision that never
-changes once written, so a run months apart from another can be compared against the same
-definition rather than against a memory of it.
+**The two surfaces of the workbench sit beside each other, not one under the other.** Same
+edges out to OpenAI and the archive, a database each, a key each — and no import between
+them. What differs is what they store. One keeps a conversation; the other keeps the
+*definition* of a team — agents, their roles and the dependencies between them — as data in
+a revision that never changes once written, so a run months apart from another can be
+compared against the same definition rather than against a memory of it.
+
+They were two modules until 20 August 2026, and what separated them turned out to be mostly
+the separation: twin tool clients, twin registries, twin providers, twin catalogues, twelve
+settings that existed twice, and a whole third module — `teams-mcp` — whose only reason to
+exist was that the conversation built teams at a neighbour's address. What is left of that
+module is its tools, unchanged in name, description, ceiling and refusal, reaching the teams
+routes through an ASGI transport in the same process. Two network hops became none.
+
+The rule that was "no module imports another module" needs a second form inside the process
+that resulted, and it has one: `agent/` and `teams/` import neither each other nor
+`teams_tools/`, `teams_tools/` imports neither of them, and `workbench/` — the assembly — is
+the only place that may import all three. It is a test that reads the imports
+(`tests/test_layering.py`), not an understanding: the first convenient dependency is written
+in a hurry, and a rule with no failing case is a preference.
 
 ## The order path
 
-`teams` has one more edge than the diagram above draws, and it is drawn apart because the
-picture is a straight line while the read path is a fan — folding it in would cross three
-arrows to say something simpler than any of them:
+The workbench's teams surface has one more edge than the diagram above draws, and it is
+drawn apart because the picture is a straight line while the read path is a fan — folding it
+in would cross three arrows to say something simpler than any of them:
 
 ```
         ┌──────────────────────────────┐
@@ -122,7 +134,7 @@ arrows to say something simpler than any of them:
         └──────────────▲───────────────┘
                        │ MCP (streamable HTTP) · exactly one named caller
         ┌──────────────┴───────────────┐
-        │  teams                       │
+        │  workbench (teams surface)   │
         └──────────────────────────────┘
 ```
 
@@ -131,40 +143,48 @@ read-only to the letter, and the tool server that writes is a separate deployabl
 separate identity, so "which module may move the account" is answered by a list of callers
 rather than by a flag inside a process that also serves candles.
 
-**One more, and it points the other way.** `teams-mcp` puts the *catalogue* behind
-MCP tools so that `agent` can build and correct a team from the chat — the same shape one
-level up, one named caller, its own identity:
+**One more, and it points the other way — and it is no longer a network edge at all.** The
+tools that build and correct a team from the chat put the *catalogue* behind MCP, and they
+live inside the workbench:
 
 ```
-        ┌──────────────────────────────┐
-        │  teams                       │  the catalogue, the runs, the money
-        └──────────────▲───────────────┘
-                       │ HTTP · Authorization = **the operator's own token**, forwarded
-        ┌──────────────┴───────────────┐
-        │  teams-mcp                   │
-        │  MCP tools · build · run     │
-        └──────────────▲───────────────┘
-                       │ MCP · exactly one named caller
-                       │ X-Operator-Authorization carries the person
-        ┌──────────────┴───────────────┐
-        │  agent                       │
-        └──────────────────────────────┘
+        ┌───────────────────────────────────────────────┐
+        │  workbench                                    │
+        │                                               │
+        │   conversation ──▶ team tools ──▶ teams routes│
+        │                    (MCP names,    (owner filter,
+        │                     ceilings,      limits,     │
+        │                     refusals)      validation) │
+        │                        │                      │
+        │                        └─ ASGI, no socket ─────┤
+        │      the operator's principal travels with it, │
+        │      taken off the chat request being served   │
+        └───────────────────────────────────────────────┘
 ```
 
-The arrow into `teams` is the one worth reading twice. Every other edge in this system is a
-module proving *itself* to the next one; this one carries the credential of the person who
-asked, taken off the request `agent` is serving and passed no further. That is not a
-detail of the transport: `teams` filters every statement by owner, so a module acting on
-its own identity would create teams nobody can see — existing, costing money, impossible to
-open in the terminal. The two credentials never merge, and they travel in two headers for
-exactly that reason.
+The arrow into the teams routes is the one worth reading twice, for two reasons.
+
+**It goes through the routes rather than around them.** The owner filter, the revision
+validation, the daily cost limit and the tool-catalogue check live there, and a tool
+reaching past them into the store would be the access policy written a second time — which
+is exactly what the requirement "a tool set does not extend what the operator can already
+do" forbids.
+
+**It carries a person, not a service.** Every other edge in this system is a module proving
+*itself* to the next one; this one carries the identity of the operator who asked. The
+catalogue filters every statement by owner, so a call acting on the process's own identity
+would create teams nobody can see — existing, costing money, impossible to open in the
+terminal. What travels changed with the merge and is worth stating: not the operator's
+bearer token, which needed an authenticator in the middle to mean anything, but the
+principal Easy Auth already put on the incoming request. One credential fewer in flight,
+the same answer at the other end.
 
 The demo-only guarantee lives here and nowhere else that can be turned off: `trading-mcp`
 asks `capital-gateway` what environment it is bound to and refuses to open a port unless
 the answer is the demo one. It is not a setting of its own — a module that decided this
 from its own configuration would be a module an environment variable could aim at real
 money. Everything the operator *can* change — how large an order may be, how many a run or
-a day may place — lives one module up, in a `teams` revision, where every one of them is
+a day may place — lives one module up, in a team revision, where every one of them is
 optional and an absent one means no limit at all. That split is the rule worth carrying to
 the next ceiling anyone adds: **a number the operator must not be able to change belongs in
 `trading-mcp`; a budget that is theirs belongs in the revision.**
@@ -210,7 +230,9 @@ records, and duplication is at least visible in a diff. The reasoning was sound 
 price turned out to be higher than the argument assumed. Measured on 18 August 2026:
 **959 lines** of production Python existed only as hand-maintained copies of each other,
 and four separate bugs had been fixed in one copy and not the other — one of them the
-retry on the order path, fixed in `teams` and missing from `agent` for a day.
+retry on the order path, fixed in one of them and missing from the other for a day. Those
+two are one module since `agent-and-teams-one-workbench`, and their remaining twins went the
+way a package could not take them: by ceasing to have a second copy.
 
 The old rule protected independent deploy, test and deletion. A build-time package
 protects all three as well, because the coupling is resolved before an image exists. What

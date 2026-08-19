@@ -32,17 +32,12 @@ from dev import (
 GOOD_ENV: dict[str, str] = {
     "capital-gateway": "CAPITAL_LOGIN=x\nGATEWAY_API_KEY=shared-secret\n",
     "market-data": "DATABASE_URL=postgresql://market_data:pw@localhost:55432/market_data\n",
-    "agent": (
-        "DATABASE_URL=postgresql://agent:pw@127.0.0.1:55432/agent\n"
-        "OPENAI_API_KEY=sk-test\n"
-        "MARKET_MCP_URL=http://127.0.0.1:8040\n"
-        "TEAMS_MCP_URL=http://127.0.0.1:8070\n"
-        "TRADING_MCP_URL=http://127.0.0.1:8060\n"
-    ),
-    "teams": (
-        "DATABASE_URL=postgresql://teams:pw@localhost:55432/teams\n"
-        "OPENAI_API_KEY=sk-test-teams\n"
-        "MARKET_MCP_URL=http://127.0.0.1:8040\n"
+    "workbench": (
+        "AGENT_DATABASE_URL=postgresql://agent:pw@127.0.0.1:55432/agent\n"
+        "TEAMS_DATABASE_URL=postgresql://teams:pw@localhost:55432/teams\n"
+        "AGENT_OPENAI_API_KEY=sk-test\n"
+        "TEAMS_OPENAI_API_KEY=sk-test-teams\n"
+        "MARKET_MCP_URL=http://127.0.0.1:8020\n"
         "TRADING_MCP_URL=http://127.0.0.1:8060\n"
     ),
     "trading-mcp": "CAPITAL_GATEWAY_API_KEY=shared-secret\n",
@@ -97,22 +92,30 @@ class TestRefusals:
 
         assert any("has no CAPITAL_GATEWAY_API_KEY" in p for p in problems)
 
-    @pytest.mark.parametrize("module", ["market-data", "agent", "teams"])
-    def test_a_remote_database_url_is_refused(self, module: str) -> None:
-        """The quiet disaster: an `.env` still pointing at the Azure server."""
+    @pytest.mark.parametrize(
+        ("module", "key"),
+        [
+            ("market-data", "DATABASE_URL"),
+            ("workbench", "AGENT_DATABASE_URL"),
+            ("workbench", "TEAMS_DATABASE_URL"),
+        ],
+    )
+    def test_a_remote_database_url_is_refused(self, module: str, key: str) -> None:
+        """The quiet disaster: an `.env` still pointing at the Azure server.
+
+        Two keys for the workbench, checked separately: it owns two databases, and one of
+        them pointing at Azure while the other is local is exactly the half-configured
+        state a single check would wave through.
+        """
+        remote = "psql-tradingcenter.postgres.database.azure.com"
         files = dict(GOOD_ENV)
-        files[module] = (
-            "DATABASE_URL=postgresql://user:pw@psql-tradingcenter.postgres.database.azure.com"
-            ":5432/market_data\nOPENAI_API_KEY=sk-test\n"
+        files[module] = files[module].replace(
+            f"{key}=postgresql://", f"{key}=postgresql://user:pw@{remote}:5432/x?ignored="
         )
 
         problems = preflight(environment(files=files), start_terminal=True)
 
-        assert any(
-            f"modules/{module}/.env's DATABASE_URL points at "
-            "'psql-tradingcenter.postgres.database.azure.com'" in p
-            for p in problems
-        )
+        assert any(f"modules/{module}/.env's {key} points at '{remote}'" in p for p in problems)
         assert any("never a remote database" in p for p in problems)
 
     def test_a_missing_docker_is_refused(self) -> None:
@@ -149,10 +152,15 @@ class TestRefusals:
 
         assert any(f"modules/{module}/.env is missing" in p for p in problems)
 
-    def test_teams_mcp_needs_no_env_at_all(self) -> None:
-        """Every setting it reads has a working loopback default (`config.py`)."""
-        required = {module for module, _ in REQUIRED_ENV}
-        assert "teams-mcp" not in required
+    def test_the_modules_needing_an_env_are_the_ones_holding_a_credential(self) -> None:
+        """Everything trading-mcp does not read has a working loopback default; what is
+        listed here is what has no default because it is somebody's secret."""
+        assert {module for module, _ in REQUIRED_ENV} == {
+            "capital-gateway",
+            "market-data",
+            "workbench",
+            "trading-mcp",
+        }
 
     def test_the_terminal_checks_are_skipped_when_it_is_not_started(self) -> None:
         problems = preflight(
@@ -196,16 +204,33 @@ class TestAdvisoriesAreNotRefusals:
     def test_a_complete_env_says_nothing(self) -> None:
         assert advisories(environment()) == []
 
-    def test_clearing_one_tool_url_leaves_the_others_alone(self) -> None:
-        """All three are checked independently — clearing one takes only its tools away."""
+    def test_clearing_one_tool_url_leaves_the_other_alone(self) -> None:
+        """Both are checked independently — clearing one takes only its tools away."""
         files = dict(GOOD_ENV)
-        files["agent"] = files["agent"].replace("TRADING_MCP_URL=http://127.0.0.1:8060\n", "")
+        files["workbench"] = files["workbench"].replace(
+            "TRADING_MCP_URL=http://127.0.0.1:8060\n", ""
+        )
 
         lines = advisories(environment(files=files))
 
-        assert any("agent/.env has no TRADING_MCP_URL" in line for line in lines)
+        assert any("workbench/.env has no TRADING_MCP_URL" in line for line in lines)
         assert not any("MARKET_MCP_URL" in line for line in lines)
-        assert not any("TEAMS_MCP_URL" in line for line in lines)
+
+    def test_a_setting_that_stopped_existing_is_said_out_loud(self) -> None:
+        """A line read by nothing looks exactly like a line that is working — which is the
+        whole reason the advisories exist. An `.env` from before the merge carries four
+        shapes of it, and `TEAMS_MCP_URL` is the one that reads most like a working
+        setting."""
+        files = dict(GOOD_ENV)
+        files["workbench"] += "TEAMS_MCP_URL=http://127.0.0.1:8070\nOPENAI_API_KEY=sk-old\n"
+
+        lines = advisories(environment(files=files))
+
+        assert any("still has TEAMS_MCP_URL" in line for line in lines)
+        assert any("still has OPENAI_API_KEY" in line for line in lines)
+
+    def test_an_env_written_for_this_shape_says_nothing_about_retired_settings(self) -> None:
+        assert not any("still has" in line for line in advisories(environment()))
 
 
 class TestStartOrder:
@@ -215,9 +240,7 @@ class TestStartOrder:
             "capital-gateway",
             "market-data",
             "trading-mcp",
-            "teams",
-            "teams-mcp",
-            "agent",
+            "workbench",
             "terminal",
         ]
 
@@ -225,15 +248,18 @@ class TestStartOrder:
         assert {service.name: service.port for service in SERVICES} == {
             "capital-gateway": 8010,
             "market-data": 8020,
-            "agent": 8030,
-            "teams": 8050,
+            "workbench": 8030,
             "trading-mcp": 8060,
-            "teams-mcp": 8070,
             "terminal": 5173,
         }
 
+    def test_the_ports_that_stopped_being_anybodys_are_not_listened_on(self) -> None:
+        """8050 and 8070 went with teams and teams-mcp, the way 8040 went with market-mcp.
+        A `.env` still naming one is a tool server that reads as down."""
+        assert {8040, 8050, 8070}.isdisjoint({service.port for service in SERVICES})
+
     def test_every_back_end_is_waited_for(self) -> None:
-        """A service started and not waited for is what `dev.ps1` did to teams-mcp."""
+        """A service started and not waited for is what `dev.ps1` once did to teams-mcp."""
         for service in SERVICES:
             if service.name == "terminal":
                 continue

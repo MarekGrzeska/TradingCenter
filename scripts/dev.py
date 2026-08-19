@@ -101,11 +101,10 @@ BLUE, MAGENTA, CYAN, YELLOW, GREEN, RED, DIM, RESET = (
     "\033[2m",
     "\033[0m",
 )
-# The six basic colours were spoken for at six services. Bright green went to trading-mcp
-# and bright magenta to teams-mcp, the two remaining tool servers — the second being the
-# only one carrying somebody's own credential rather than a module's. Green freed up when
-# market-mcp became a route in market-data and stopped being a process to colour.
-BRIGHT_BLUE, BRIGHT_GREEN, BRIGHT_MAGENTA = "\033[94m", "\033[92m", "\033[95m"
+# Bright green went to trading-mcp, the one remaining tool server that is a process. Two
+# more colours freed up as the tool servers stopped being processes: market-mcp became a
+# route in market-data, and teams-mcp a layer in the workbench.
+BRIGHT_GREEN = "\033[92m"
 
 SERVICES: tuple[Service, ...] = (
     Service(
@@ -154,49 +153,20 @@ SERVICES: tuple[Service, ...] = (
         ),
     ),
     Service(
-        name="teams",
-        module="teams",
-        port=8050,
-        command=("uv", "run", "uvicorn", "teams.app:app", "--reload", "--port", "8050"),
-        log_prefix="teams   ",
-        colour=BRIGHT_BLUE,
-        health_path="/health",
-        why=(
-            "After market-data and trading-mcp, whose tools its runs assign — and before "
-            "teams-mcp, whose tools *are* teams' catalogue. Not before the agent for any "
-            "reason of its own: the two are siblings, and what puts teams first is "
-            "teams-mcp standing between them."
-        ),
-    ),
-    Service(
-        name="teams-mcp",
-        module="teams-mcp",
-        port=8070,
-        command=("uv", "run", "python", "-m", "teams_mcp"),
-        log_prefix="teamsmcp",
-        colour=BRIGHT_MAGENTA,
-        health_path="/health",
-        why=(
-            "After teams, because its tools are teams' catalogue — though it starts happily "
-            "without it and reports the outage per call rather than refusing to run, which "
-            "is the archive's shape and not trading-mcp's. Before the agent, which mounts "
-            "its tools: that is for a log reading in the direction the arrows point rather "
-            "than for correctness."
-        ),
-    ),
-    Service(
-        name="agent",
-        module="agent",
+        name="workbench",
+        module="workbench",
         port=8030,
-        command=("uv", "run", "uvicorn", "agent.app:app", "--reload", "--port", "8030"),
-        log_prefix="agent   ",
+        command=("uv", "run", "uvicorn", "workbench.app:app", "--reload", "--port", "8030"),
+        log_prefix="workbnch",
         colour=YELLOW,
         health_path="/health",
         why=(
-            "Last among the back ends: nothing else calls it, so nothing waits on it. It "
-            "calls all three tool servers, and each tool list is read on the first turn "
-            "that wants one — a server still coming up would mean a turn answered without "
-            "those tools rather than an error anyone would notice."
+            "Last among the back ends: nothing else calls it, so nothing waits on it. The "
+            "conversation and the teams catalogue are one process here — 8050 and 8070 "
+            "belong to nobody since `agent-and-teams-one-workbench`. It calls the two "
+            "remaining tool servers, and each tool list is read on the first turn that "
+            "wants one, so a server still coming up means a turn answered without those "
+            "tools rather than an error anyone would notice."
         ),
     ),
     Service(
@@ -219,7 +189,15 @@ SERVICES: tuple[Service, ...] = (
 # Modules whose migrations are applied before anything starts. Redundant with the startup
 # migration each of them now runs under an advisory lock, and kept because it fails here
 # with a readable error instead of inside a lifespan that is holding a lock.
-MIGRATING_MODULES = ("market-data", "agent", "teams")
+# Every migration chain, and which module owns it. `workbench` appears twice because it
+# owns two databases; its two alembic configurations sit beside each other because one
+# `alembic.ini` cannot name two `script_location`s. A module with one chain names no
+# configuration and alembic finds its own.
+MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
+    ("market-data", None),
+    ("workbench", "alembic-agent.ini"),
+    ("workbench", "alembic-teams.ini"),
+)
 
 # The further logical databases in the same container, created here if missing rather than
 # through docker-entrypoint-initdb.d — that only runs against an empty volume, so it would
@@ -239,9 +217,13 @@ def env_value(text: str, key: str) -> str | None:
     return None
 
 
-def database_host(text: str) -> str | None:
-    """The host out of `DATABASE_URL`, between the optional `user:pass@` and the port."""
-    url = env_value(text, "DATABASE_URL")
+def database_host(text: str, *, key: str = "DATABASE_URL") -> str | None:
+    """The host out of a database URL, between the optional `user:pass@` and the port.
+
+    The key is an argument because the workbench owns two databases and names them
+    separately; every other module has one and takes the default.
+    """
+    url = env_value(text, key)
     if not url:
         return None
     match = re.match(r"^[a-z+]*://(?:[^@/]*@)?([^:/?]*)", url)
@@ -257,18 +239,16 @@ def is_loopback(host: str | None) -> bool:
 # Collected and reported together. Finding out about a missing `.env` after two services
 # are running means killing them to fix one line.
 
-# Which `.env` each module needs, and what is missing from it if it is absent. teams-mcp
-# is not here on purpose: every setting it reads has a working loopback default
-# (`config.py`), unlike the modules holding real credentials.
+# Which `.env` each module needs, and what is missing from it if it is absent.
 REQUIRED_ENV: tuple[tuple[str, str], ...] = (
     ("capital-gateway", "copy .env.example and fill in demo credentials"),
     ("market-data", "copy .env.example; the defaults match compose.yaml"),
-    ("agent", "copy .env.example and fill in OPENAI_API_KEY"),
-    # teams needs a key and a MODELS catalogue: config.py refuses to build Settings without
-    # either, so the module would exit at import rather than start and misbehave.
+    # Two OpenAI keys, deliberately — the conversation's and the teams experiments', so the
+    # bill splits. `workbench/config.py` refuses to build Settings without either, so the
+    # process exits at start rather than running and misbehaving.
     (
-        "teams",
-        "copy .env.example and fill in OPENAI_API_KEY (MODELS has a working default there)",
+        "workbench",
+        "copy .env.example and fill in AGENT_OPENAI_API_KEY and TEAMS_OPENAI_API_KEY",
     ),
     # trading-mcp cannot fall back the way teams-mcp does: `config.py` requires the
     # gateway's caller key, and the gateway checks it on loopback too.
@@ -361,15 +341,19 @@ def _database_host_problems(env: Environment) -> list[str]:
     file to fix.
     """
     problems: list[str] = []
-    for module in ("market-data", "agent", "teams"):
+    for module, key in (
+        ("market-data", "DATABASE_URL"),
+        ("workbench", "AGENT_DATABASE_URL"),
+        ("workbench", "TEAMS_DATABASE_URL"),
+    ):
         text = env.read_env(module)
         if text is None:
             continue
-        host = database_host(text)
+        host = database_host(text, key=key)
         if not is_loopback(host):
             problems.append(
-                f"modules/{module}/.env's DATABASE_URL points at '{host}' — local runs use "
-                "the compose.yaml container (localhost), never a remote database"
+                f"modules/{module}/.env's {key} points at '{host}' — local runs use the "
+                "compose.yaml container (localhost), never a remote database"
             )
     return problems
 
@@ -418,34 +402,47 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
     # `market-mcp-into-market-data`, and a .env copied before that change points at a port
     # nothing listens on — which reads as a tool server that is down.
     (
-        "agent",
+        "workbench",
         "MARKET_MCP_URL",
-        "the agent will run without tools",
+        (
+            "the agent will run without tools, and a team whose agents assign them will "
+            "refuse to run rather than answer without them"
+        ),
         "8020",
     ),
     (
-        "teams",
-        "MARKET_MCP_URL",
-        "teams whose agents assign tools will refuse to run rather than answer without them",
-        "8020",
-    ),
-    (
-        "teams",
+        "workbench",
         "TRADING_MCP_URL",
-        "teams will have no order tools, and one assigning them refuses to run",
+        (
+            "the agent will not see positions and cannot send an order, and a team "
+            "assigning order tools refuses to run"
+        ),
         "8060",
     ),
+)
+
+# Settings that stopped existing, and what a `.env` still carrying them is a sign of. Said
+# rather than ignored for the reason the advisories above exist: a line that is read by
+# nothing looks exactly like a line that is working.
+RETIRED_SETTINGS: tuple[tuple[str, str], ...] = (
     (
-        "agent",
         "TEAMS_MCP_URL",
-        "the agent will have no tools for building or running teams",
-        "8070",
+        (
+            "the team tools are a layer in the workbench now, reached without a port — "
+            "this line is read by nothing"
+        ),
     ),
     (
-        "agent",
-        "TRADING_MCP_URL",
-        "the agent will not see positions and cannot send an order",
-        "8060",
+        "DATABASE_URL",
+        "the workbench owns two databases: AGENT_DATABASE_URL and TEAMS_DATABASE_URL",
+    ),
+    (
+        "OPENAI_API_KEY",
+        "the two surfaces keep separate keys: AGENT_OPENAI_API_KEY and TEAMS_OPENAI_API_KEY",
+    ),
+    (
+        "MODELS",
+        "the two surfaces keep separate catalogues: AGENT_MODELS and TEAMS_MODELS",
     ),
 )
 
@@ -459,6 +456,12 @@ def advisories(env: Environment) -> list[str]:
         if not env_value(text, key):
             lines.append(f"modules/{module}/.env has no {key} — {consequence}.")
             lines.append(f"  Add {key}=http://{LOOPBACK}:{port} as .env.example does.")
+
+    text = env.read_env("workbench")
+    if text is not None:
+        for key, why in RETIRED_SETTINGS:
+            if env_value(text, key):
+                lines.append(f"modules/workbench/.env still has {key} — {why}.")
     return lines
 
 
@@ -702,19 +705,20 @@ def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
     return True
 
 
-def apply_migrations(modules: Iterable[str] = MIGRATING_MODULES) -> bool:
+def apply_migrations(chains: Iterable[tuple[str, str | None]] = MIGRATION_CHAINS) -> bool:
     """Applied every run, not only on a fresh one: a checkout that has just pulled a new
     migration is exactly the case where forgetting this produces an error reading like a bug
     in the module."""
     say("Applying migrations...")
-    for module in modules:
-        done = subprocess.run(
-            ["uv", "run", "alembic", "upgrade", "head"],
-            cwd=MODULES / module,
-            check=False,
-        )
+    for module, config in chains:
+        command = ["uv", "run", "alembic"]
+        if config is not None:
+            command += ["-c", config]
+        command += ["upgrade", "head"]
+        done = subprocess.run(command, cwd=MODULES / module, check=False)
         if done.returncode != 0:
-            fail(f"{module}'s migrations failed — it would fail on its first query, so stopping.")
+            named = f"{module} ({config})" if config else module
+            fail(f"{named}'s migrations failed — it would fail on its first query, so stopping.")
             return False
     ok("Schema is up to date.")
     return True
@@ -862,9 +866,7 @@ def ready_lines(*, start_terminal: bool) -> list[str]:
         f"  Gateway docs        http://{LOOPBACK}:8010/docs",
         f"  Archive tools       http://{LOOPBACK}:8020/mcp",
         f"  trading-mcp health  http://{LOOPBACK}:8060/health",
-        f"  teams-mcp health    http://{LOOPBACK}:8070/health",
-        f"  agent docs          http://{LOOPBACK}:8030/docs",
-        f"  teams docs          http://{LOOPBACK}:8050/docs",
+        f"  Workbench docs      http://{LOOPBACK}:8030/docs",
         (
             "  Database            market_data, agent, teams @ localhost:55432 "
             "(compose.yaml; 'docker compose down' keeps the data)"

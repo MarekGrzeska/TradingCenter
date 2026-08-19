@@ -39,9 +39,7 @@ jobs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
       market-data: ${{ steps.filter.outputs.market-data }}
       trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
-      teams-mcp: ${{ steps.filter.outputs.teams-mcp }}
-      agent: ${{ steps.filter.outputs.agent }}
-      teams: ${{ steps.filter.outputs.teams }}
+      workbench: ${{ steps.filter.outputs.workbench }}
       terminal: ${{ steps.filter.outputs.terminal }}
       openspec: ${{ steps.filter.outputs.openspec }}
       packages: ${{ steps.filter.outputs.packages }}
@@ -105,25 +103,23 @@ jobs:
 
           PATTERNS[capital-gateway]='^modules/capital-gateway/'
           PATTERNS[market-data]="^modules/market-data/|$tc_runtime|$tc_mcp_kit"
-          PATTERNS[agent]="^modules/agent/|$tc_runtime|$tc_openai"
-          PATTERNS[teams]="^modules/teams/|$tc_runtime|$tc_openai"
+          # One module where there were three. It takes `tc-mcp-kit` as well as the
+          # other two, because the team tools moved into it with their schema slimmer.
+          PATTERNS[workbench]="^modules/workbench/|$tc_runtime|$tc_openai|$tc_mcp_kit"
           # The terminal's `contract:check` compares its generated types against the
           # schema market-data builds from `contract.py`. Filtering the terminal on its
           # own directory alone would let a contract change land with the check that
           # exists to catch it never running — the exact failure the check was added for.
           #
-          # `agent/contract.py` joins it for the same reason even though it is not wired
-          # into `contract:generate` (design.md, "Kontrakt terminala pisany ręcznie, bez
-          # generatora") — the terminal's hand-written DTOs in `agentApi.ts` are the
-          # check for *that* contract, and they only run if this job does.
-          #
-          # `teams` is the third, and it is the generated kind: from the add-teams-module
-          # change on, `contract:generate` reads two schema sources and writes a file per
-          # source, so a change there leaves the terminal's committed types stale exactly
-          # the way market-data's would. The whole module rather than its `contract.py`,
-          # for the reason written out at `teamsmcp` below — that file imports models it
-          # does not define, and one of them going stale is a thing that has happened.
-          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/agent/agent/contract\.py$|^modules/teams/'
+          # The workbench is the second source and the whole of it, not one file. Its
+          # teams surface is the generated kind — `contract:generate` reads two schema
+          # sources and writes a file per source — and the conversation's `contract.py` is
+          # the hand-written kind, checked by the terminal's own DTOs in `agentApi.ts`,
+          # which only run if this job does. The whole module rather than either
+          # `contract.py`, for the reason `weekdays-on-the-shorter-rhythms` measured: the
+          # document is built from routes and from models those files import rather than
+          # define, and `recurrence.py`'s docstring is a description in the schema.
+          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/'
           # market-data takes `tc-mcp-kit` too since the tool surface moved into it: the
           # package's schema slimmer is what keeps eleven tools under their published
           # ceiling, and a change there is a change to what the archive announces.
@@ -133,18 +129,10 @@ jobs:
           # stale. The gateway's *whole* directory, not one file: that document is built
           # from its routes as well as its DTOs, so there is no narrower honest filter.
           PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
-          # And once more, one module further in: teams-mcp keeps a committed snapshot of
-          # teams' OpenAPI document (`contract/teams.openapi.json`).
-          #
-          # This used to watch `teams/teams/contract.py` alone, on the theory that teams
-          # prints its document from that file's models and so nowhere else can move it.
-          # Measured wrong on 17 August 2026: `weekdays-on-the-shorter-rhythms` touched
-          # only `recurrence.py`, whose `Recurrence` docstring *is* a description in the
-          # schema — the snapshot went stale, this job never ran, and the PR merged green.
-          # `contract.py` imports its models rather than defining them all, and the
-          # document is built from routes as well, so the whole module is the only honest
-          # filter — the same conclusion trading-mcp's reached one line up.
-          PATTERNS[teams-mcp]="^modules/teams-mcp/|^modules/teams/|$tc_mcp_kit"
+          # There used to be a third of this shape — teams-mcp, watching the whole of
+          # `teams` because it kept a snapshot of that module's OpenAPI document. It is
+          # gone with the module: the team tools read those routes in the same process,
+          # so there is no copy left to go stale and nothing to watch.
           # The archive-shape check, plus the script that is the shape.
           PATTERNS[openspec]='^openspec/|^scripts/trim-openspec-archive\.sh$'
           PATTERNS[packages]='^packages/'
@@ -272,31 +260,6 @@ jobs:
       # place it can be exercised without an account to refuse.
       - run: uv run pytest -q
 
-  teams-mcp:
-    name: teams-mcp
-    needs: changes
-    if: needs.changes.outputs.teams-mcp == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modules/teams-mcp
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      # Before the tests, same as both other MCP modules': `scripts/contract.py` runs
-      # `python -m teams.openapi` in `../teams` from this same checkout, which needs no
-      # database, no OpenAI key and no tool server — that module builds its Settings inside
-      # `lifespan` rather than at import.
-      - run: uv run python scripts/contract.py check
-      - run: uv run ruff check .
-      - run: uv run pyright
-      # Nothing here reaches a running teams: every test doubles it. What cannot be
-      # doubled — whether Easy Auth passes the operator's token through — is not a test,
-      # it is the deployment check in this change's review.md.
-      - run: uv run pytest -q
-
   packages:
     name: packages
     needs: changes
@@ -325,14 +288,14 @@ jobs:
       # takes the package as a path dependency, so this job never stands alone.
       - run: uv run pytest -q
 
-  agent:
-    name: agent
+  workbench:
+    name: workbench
     needs: changes
-    if: needs.changes.outputs.agent == 'true'
+    if: needs.changes.outputs.workbench == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: modules/agent
+        working-directory: modules/workbench
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -343,32 +306,9 @@ jobs:
       # version is pinned in the same file, so this step answers the same way twice.
       - run: uv run pyright
       # Same as market-data's own step: the `db` tests are gated on Docker inside
-      # conftest.py, not on a flag, and this runner has it — so one `pytest -q` also
-      # runs them, real PostgreSQL and all. `live` tests need a real OpenAI key and
-      # stay behind --run-live, never here.
-      - run: uv run pytest -q
-
-  teams:
-    name: teams
-    needs: changes
-    if: needs.changes.outputs.teams == 'true'
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: modules/teams
-    steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-      - run: uv run ruff check .
-      # Types, which ruff does not check. Scope and mode are in `[tool.pyright]`; the
-      # version is pinned in the same file, so this step answers the same way twice.
-      - run: uv run pyright
-      # Same as market-data's and agent's: the `db` tests are gated on Docker inside
-      # conftest.py rather than on a flag, and this runner has it — so one `pytest -q`
-      # runs the migration tests against a real PostgreSQL too. Nothing here reaches
-      # OpenAI or a tool server; anything that would is a `live` test behind `--run-live`.
+      # conftest.py, not on a flag, and this runner has it — so one `pytest -q` also runs
+      # them, against two real PostgreSQL containers, one per schema. `live` tests need a
+      # real OpenAI key and stay behind --run-live, never here.
       - run: uv run pytest -q
 
   terminal:
