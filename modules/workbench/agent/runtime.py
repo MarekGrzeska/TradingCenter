@@ -10,12 +10,14 @@ from __future__ import annotations
 from pathlib import Path
 
 # `agent/` and `migrations/` are siblings — in the repository and in the image
-# (`Dockerfile` copies both to `/app`), so one expression locates it in both.
-MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"
+# (`Dockerfile` copies both), so one expression locates it in both. The chain is named
+# under `migrations/`, because the process runs a second one beside it.
+MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations" / "agent"
 
-# Advisory locks are scoped to one database and this module has its own
+# Advisory locks are scoped to one database and this surface has its own
 # (`agent-database-connection`, "Moduł nie dzieli bazy z innym modułem"), so the value
-# only has to be stable — it carries the module's port so a log line naming it says which
-# module took it. `tests/test_migrate.py` asserts this number: sharing the lock helper
-# with other modules is exactly what would make a collision here silent.
+# only has to be stable. It is the port this surface used to listen on, kept because a
+# log line naming it still says which of the two chains took the lock.
+# `tests/agent/test_migrate.py` asserts this number: the two chains run in one process
+# now, and a collision would be a start-up that hangs rather than fails.
 MIGRATION_LOCK_KEY = 8030

@@ -124,20 +124,10 @@ class Settings(BaseSettings):
     # room for its own work without turning one slow call into a turn that never ends.
     market_mcp_request_timeout_seconds: float = 15.0
 
-    # --- teams-mcp, the tool server that builds and runs teams ---
-    #
-    # Unset means the same thing market-mcp's absence means, one catalogue over: the
-    # module works, and this half of what it can do is simply not there. The two are
-    # configured and fail independently — one being down never costs the model the
-    # other's tools (specs/agent-tool-access, "Jeden serwer odpowiada, drugi nie").
-    teams_mcp_url: str | None = None
-    teams_mcp_scope: str | None = None
-    # Longer than market-mcp's, and for a reason that is about the far side rather than
-    # this one: a call here can create a team or start a run, and teams-mcp waits on
-    # teams for up to 30s before giving up. A ceiling below that would time out this
-    # side of a write that had already happened — the worst shape of all, since the
-    # model would be told nothing about a team that now exists.
-    teams_mcp_request_timeout_seconds: float = 35.0
+    # No settings for the teams tools, and their absence is the point: that surface is a
+    # layer in this process, so there is no address to name, no token to fetch and no
+    # timeout to choose. It is also the one tool source that cannot be unconfigured — see
+    # `tools/registry.py`.
 
     # --- trading-mcp, the tool server that moves the demo account ---
     #
@@ -174,8 +164,6 @@ class Settings(BaseSettings):
         "database_user",
         "market_mcp_url",
         "market_mcp_scope",
-        "teams_mcp_url",
-        "teams_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
     )
@@ -228,14 +216,14 @@ class Settings(BaseSettings):
         (specs/agent-tool-access, "Tryb połączenia z serwerem narzędzi jest wybrany
         jednoznacznie").
 
-        Run once per server rather than once, because the module has three of them now and
-        they are configured independently — and every message names the one it is about,
-        since "the tool server" stopped being unambiguous.
+        Run once per server rather than once, because there are two of them and they are
+        configured independently — and every message names the one it is about, since "the
+        tool server" stopped being unambiguous. The teams tools are not among them: a
+        source standing in this process has no mode to choose.
         """
         self.market_mcp_url = _checked_server(
             "MARKET_MCP", self.market_mcp_url, self.market_mcp_scope
         )
-        self.teams_mcp_url = _checked_server("TEAMS_MCP", self.teams_mcp_url, self.teams_mcp_scope)
         self.trading_mcp_url = _checked_server(
             "TRADING_MCP", self.trading_mcp_url, self.trading_mcp_scope
         )
