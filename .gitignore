@@ -91,6 +91,13 @@ temp/
 # never has a local state file to ignore in the first place.
 infra/**/.terraform/
 infra/**/*.tfplan
+# Any name at all, not just the two spellings above. A plan file is the whole diff with
+# sensitive values in it — seven Easy Auth application passwords and the App Insights
+# instrumentation key, in the one committed by accident on 19 August 2026 as
+# `infra/tfplan.out`, which matched neither pattern. `-out=` takes whatever name the
+# person running it types, so the pattern has to be the directory, not the extension.
+infra/**/*.out
+infra/**/*.plan
 infra/**/terraform.tfstate.backup
 infra/**/tfplan
 *.tfvars
