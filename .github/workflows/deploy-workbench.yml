@@ -1,4 +1,4 @@
-name: deploy-agent
+name: deploy-workbench
 
 # Only a push to `main` deploys — the pull_request federated credential (github-oidc.tf)
 # cannot even authenticate to Azure, so this cannot run from a fork's PR by construction.
@@ -6,13 +6,15 @@ on:
   push:
     branches: [main]
     paths:
-      - "modules/agent/**"
+      - "modules/workbench/**"
       # Path dependencies are baked into this image (see the Dockerfile), so a merged
       # package fix that never redeploys its consumers is a fix that never reaches
-      # production. Exactly the packages this module's pyproject.toml names.
+      # production. Exactly the packages this module's pyproject.toml names — three since
+      # the team tools moved in with the schema slimmer they use.
       - "packages/tc-runtime/**"
       - "packages/tc-openai/**"
-      - ".github/workflows/deploy-agent.yml"
+      - "packages/tc-mcp-kit/**"
+      - ".github/workflows/deploy-workbench.yml"
       - ".github/workflows/_deploy-app-service.yml"
       - "scripts/deploy_probe.py"
   workflow_dispatch: {}
@@ -31,7 +33,13 @@ jobs:
   deploy:
     uses: ./.github/workflows/_deploy-app-service.yml
     with:
-      module: agent
+      module: workbench
+      # **The app is still called `app-tradingcenter-agent`, and that is a decision.**
+      # An App Service name here is an identity, not a label: the managed identity takes
+      # it, the PostgreSQL role is that identity, and the identity's application id sits on
+      # three allow-lists in two other modules. Renaming buys a nicer hostname and costs a
+      # new identity, new roles in two databases and three edits in modules this change
+      # does not touch (agent-and-teams-one-workbench/design.md, D2).
       app_name: app-tradingcenter-agent
       # This is where the second question was learned. On 16 August 2026 the control plane
       # read `Running` for the better part of an hour while this container exited with code
@@ -40,14 +48,14 @@ jobs:
       #
       # `/health` answers that completely. It is excluded from Easy Auth
       # (infra/app-service.tf) so a caller with no token reaches the container rather than
-      # the platform's 401 — and because the module's lifespan does not finish until its
-      # migrations do (`agent/migrate.py`, under the advisory lock), a process answering
-      # here at all is a process whose database is at the revision this image was built for.
+      # the platform's 401 — and because the lifespan does not finish until **both**
+      # migration chains do, each under its own advisory lock, a process answering here at
+      # all is a process whose two databases are at the revisions this image was built for.
       # There is nothing further to ask.
       probe_path: /health
       expected_status: 200
       body_contains: '"status"'
-      # Five minutes rather than three, and that is the migration: the lifespan blocks
-      # until `alembic upgrade head` returns, so this module can legitimately be slower to
-      # answer than one with no schema of its own.
+      # Five minutes rather than three, and that is the migrations: the lifespan blocks
+      # until `alembic upgrade head` returns twice, so this module can legitimately be
+      # slower to answer than one with no schema of its own.
       attempts: 20

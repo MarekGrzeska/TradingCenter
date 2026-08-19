@@ -115,7 +115,7 @@ class TestOneFileAtATime:
     def test_infra_runs_the_infra_job_and_nothing_else(self) -> None:
         decisions = decide(["infra/main.tf"])
         assert decisions["infra"]
-        assert not decisions["agent"]
+        assert not decisions["workbench"]
         assert not decisions["terminal"]
 
     def test_bootstrap_counts_as_infra(self) -> None:
@@ -134,9 +134,9 @@ class TestOneFileAtATime:
         assert decisions["scripts"]
 
     def test_a_module_runs_its_own_job(self) -> None:
-        decisions = decide(["modules/agent/agent/loop.py"])
-        assert decisions["agent"]
-        assert not decisions["teams"]
+        decisions = decide(["modules/workbench/agent/turn.py"])
+        assert decisions["workbench"]
+        assert not decisions["market-data"]
 
     def test_market_datas_contract_reaches_the_terminal(self) -> None:
         """The terminal keeps generated types built from that schema, and `contract:check`
@@ -153,35 +153,43 @@ class TestOneFileAtATime:
         assert decisions["capital-gateway"]
         assert decisions["trading-mcp"]
 
-    def test_teams_reaches_teams_mcp_and_the_terminal(self) -> None:
-        decisions = decide(["modules/teams/teams/recurrence.py"])
-        assert decisions["teams"]
-        assert decisions["teams-mcp"]
+    def test_the_teams_surface_reaches_the_terminal(self) -> None:
+        """The terminal generates its types from that surface's schema, and
+        `weekdays-on-the-shorter-rhythms` measured why the filter is the whole module: it
+        touched only `recurrence.py`, whose docstring *is* a description in the schema.
+
+        It used to reach a third job as well — teams-mcp, which kept a committed snapshot of
+        the same document. There is no snapshot and no module: those tools read the routes in
+        the same process now."""
+        decisions = decide(["modules/workbench/teams/recurrence.py"])
+        assert decisions["workbench"]
         assert decisions["terminal"]
 
     def test_a_package_runs_every_module_that_takes_it(self) -> None:
         """The whole price of sharing source, paid in CI rather than in production."""
         decisions = decide(["packages/tc-runtime/tc_runtime/db.py"])
         assert decisions["packages"]
-        assert decisions["agent"]
-        assert decisions["teams"]
+        assert decisions["workbench"]
         assert decisions["market-data"]
 
-    def test_tc_openai_reaches_only_its_two_consumers(self) -> None:
+    def test_tc_openai_reaches_only_its_consumer(self) -> None:
+        """Two consumers became one when they became one module — and the property this
+        test is for is the other half: a package's edit must not run a module that does not
+        take it."""
         decisions = decide(["packages/tc-openai/tc_openai/provider.py"])
-        assert decisions["agent"]
-        assert decisions["teams"]
+        assert decisions["workbench"]
         assert not decisions["market-data"]
+        assert not decisions["trading-mcp"]
 
     def test_tc_mcp_kit_reaches_everything_that_speaks_mcp(self) -> None:
-        """Three modules and the archive, which took the package when the tool surface
-        moved into it — the one consumer with a database, which is why `CLAUDE.md`'s old
-        reason for this package existing apart from `tc-runtime` had to be rewritten."""
+        """The archive, trading-mcp and the workbench — the last two of those hold a
+        database, which is why `CLAUDE.md`'s old reason for this package existing apart from
+        `tc-runtime` (that only database-less modules took it) had to be rewritten twice."""
         decisions = decide(["packages/tc-mcp-kit/tc_mcp_kit/network_identity.py"])
         assert decisions["market-data"]
         assert decisions["trading-mcp"]
-        assert decisions["teams-mcp"]
-        assert not decisions["agent"]
+        assert decisions["workbench"]
+        assert not decisions["capital-gateway"]
 
 
 class TestTheMatrixTheJobRuns:
