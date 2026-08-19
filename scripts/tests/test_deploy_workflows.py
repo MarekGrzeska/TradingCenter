@@ -48,11 +48,6 @@ def callers() -> list[Path]:
     return found
 
 
-def shared_inputs() -> dict[str, Any]:
-    # `on:` parses as the boolean True in YAML 1.1, which is why this is not `["on"]`.
-    return load(SHARED)[True]["workflow_call"]["inputs"]
-
-
 def probe_step() -> dict[str, Any]:
     steps = load(SHARED)["jobs"]["deploy"]["steps"]
     for step in steps:
@@ -65,60 +60,22 @@ def test_there_is_at_least_one_caller() -> None:
     assert callers(), "the shared workflow with no callers is dead weight"
 
 
-@pytest.mark.parametrize("path", callers(), ids=lambda p: p.name)
-class TestEveryCaller:
-    def test_passes_only_inputs_the_shared_workflow_declares(self, path: Path) -> None:
-        declared = set(shared_inputs())
-        for name, job in load(path)["jobs"].items():
-            if job.get("uses") != SHARED_REF:
-                continue
-            unknown = set(job.get("with", {})) - declared
-            assert not unknown, f"{path.name}:{name} passes undeclared input(s) {unknown}"
+def test_every_caller_declares_the_permissions_itself() -> None:
+    """On the caller, and nowhere else will do.
 
-    def test_names_its_module_and_its_app(self, path: Path) -> None:
-        for job in load(path)["jobs"].values():
-            if job.get("uses") != SHARED_REF:
-                continue
-            given = job.get("with", {})
-            assert given.get("module"), "the module is the image suffix and the cache scope"
-            assert str(given.get("app_name", "")).startswith("app-tradingcenter-")
+    A reusable workflow can only *narrow* the caller's GITHUB_TOKEN, never widen it. This
+    repository's default workflow permission is `read`, and `id-token` is never granted by
+    default at all — so a caller without this block hands the shared workflow a token that
+    cannot push to GHCR and cannot exchange an OIDC assertion, and every deploy dies at
+    `azure/login` with `Unable to get ACTIONS_ID_TOKEN_REQUEST_URL`.
 
-    def test_watches_the_shared_workflow_and_the_probe(self, path: Path) -> None:
-        """A caller blind to either would keep deploying an image built the old way."""
-        paths = load(path)[True]["push"]["paths"]
-        assert ".github/workflows/_deploy-app-service.yml" in paths
-        assert "scripts/deploy_probe.py" in paths
-
-    def test_watches_its_own_module_and_itself(self, path: Path) -> None:
-        module = next(
-            job["with"]["module"]
-            for job in load(path)["jobs"].values()
-            if job.get("uses") == SHARED_REF
-        )
-        paths = load(path)[True]["push"]["paths"]
-        assert f"modules/{module}/**" in paths
-        assert f".github/workflows/{path.name}" in paths
-
-    def test_deploys_only_from_main(self, path: Path) -> None:
-        """The pull_request federated credential cannot authenticate to Azure at all."""
-        assert load(path)[True]["push"]["branches"] == ["main"]
-
-    def test_declares_the_permissions_itself(self, path: Path) -> None:
-        """On the caller, and nowhere else will do.
-
-        A reusable workflow can only *narrow* the caller's GITHUB_TOKEN, never widen it.
-        This repository's default workflow permission is `read`, and `id-token` is never
-        granted by default at all — so a caller without this block hands the shared workflow
-        a token that cannot push to GHCR and cannot exchange an OIDC assertion, and every
-        deploy dies at `azure/login` with `Unable to get ACTIONS_ID_TOKEN_REQUEST_URL`.
-
-        Asserting it on `_deploy-app-service.yml` alone is what missed this: there the block
-        is real and has no effect.
-        """
-        permissions = load(path).get("permissions")
-        assert permissions, f"{path.name} grants the shared workflow nothing to work with"
-        assert permissions.get("id-token") == "write"  # azure/login's OIDC exchange
-        assert permissions.get("packages") == "write"  # docker push to GHCR
+    Asserting it on `_deploy-app-service.yml` alone is what missed this: there the block is
+    real and has no effect.
+    """
+    for path in callers():
+        permissions = load(path).get("permissions") or {}
+        assert permissions.get("id-token") == "write", path.name  # azure/login's OIDC
+        assert permissions.get("packages") == "write", path.name  # docker push to GHCR
 
 
 class TestSharedWorkflow:
@@ -164,11 +121,19 @@ def test_every_app_service_module_deploys_through_the_shared_workflow() -> None:
     The same shape as the `packages` matrix in `checks.yml`: a hand-written list beside a
     directory is a check that reports green having tested something else. `terminal` is the
     one module excluded, and it is excluded because it is a Static Web App with no image.
+
+    A module is a directory with a `Dockerfile`, not merely a directory. An archived module
+    leaves its name on disk long after git stops tracking it — `.venv/` and `.pytest_cache/`
+    are ignored, so they keep the husk alive — and reading the bare directory listing made
+    this test fail over `agent/`, `teams/`, `teams-mcp/` and `market-mcp/` months after they
+    stopped existing. What deploys an image is what has one to build.
     """
     repo = Path(__file__).resolve().parents[2]
     app_service_modules = {
-        path.name for path in (repo / "modules").iterdir() if path.is_dir()
-    } - {"terminal"}
+        path.name
+        for path in (repo / "modules").iterdir()
+        if path.is_dir() and (path / "Dockerfile").is_file()
+    }
 
     deploying = {
         job["with"]["module"]

@@ -281,55 +281,67 @@ async def test_a_window_never_reaches_past_the_floor() -> None:
     assert seen[0] == (history.iso_utc(floor), history.iso_utc(anchor))
 
 
-async def test_reaching_the_floor_stops_the_paging() -> None:
-    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
-    floor = anchor - STEP * 3
-    calls = 0
+# Four ways a floored read can look like it ran out, and none of them is the provider's
+# bottom. `history_ended` is recorded downstream as a permanent boundary, so claiming it
+# because the *caller* asked for less stops the next, deeper read being made. Two of these
+# cost real candles:
+#
+#   - "not-found for a clamped window": Capital answers `error.prices.not-found` for a
+#     window holding nothing, and the last window of a floored read is narrow and often
+#     lands in a shut market. Read as an ending, it became a stored boundary and every
+#     older chunk still queued was skipped behind it.
+#   - "no progress at a clamped window": having paged down to its oldest candle, the read
+#     asks once more about the sliver left between that candle and the floor, and the
+#     provider answers with the candle it already sent. No progress, but equally no
+#     statement about its own bottom. Measured on 5-minute US100 floored at
+#     2026-02-16 07:01:23 — paging stopped on the 07:05 candle, and reading the sliver as
+#     an ending skipped every chunk queued back to 1 January.
+ANCHOR = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
+
+
+def _always(page):
+    async def fetch(date_from, date_to, limit):
+        return page
+
+    return fetch
+
+
+def _then_not_found(page):
+    pages = [page]
 
     async def fetch(date_from, date_to, limit):
-        nonlocal calls
-        calls += 1
-        return candles(anchor, 4)  # oldest is exactly the floor
+        return pages.pop(0) if pages else None
 
+    return fetch
+
+
+@pytest.mark.parametrize(
+    ("floor_back", "fetch", "expected_count", "expected_requests"),
+    [
+        pytest.param(STEP * 3, _always(candles(ANCHOR, 4)), 4, 1, id="window-clamped-to-the-floor"),
+        pytest.param(STEP * 3, _always([]), 0, 1, id="empty-window-at-the-floor"),
+        pytest.param(
+            STEP * 4, _then_not_found(candles(ANCHOR, 2)), 2, 2, id="not-found-for-a-clamped-window"
+        ),
+        pytest.param(
+            STEP * 3 + timedelta(minutes=3),
+            _always(candles(ANCHOR, 4)),
+            4,
+            2,  # the second request is the sliver
+            id="no-progress-at-a-clamped-window",
+        ),
+    ],
+)
+async def test_a_floored_read_never_claims_the_provider_ran_out(
+    floor_back, fetch, expected_count, expected_requests
+) -> None:
     result = await history.collect(
-        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
-    )
-
-    assert calls == 1  # nothing older is worth asking for
-    assert result.count == 4
-
-
-async def test_reaching_the_floor_is_not_the_end_of_provider_history() -> None:
-    """`history_ended` is recorded downstream as a permanent boundary — claiming it
-    because the *caller* asked for less would stop the next, deeper read being made."""
-    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
-    floor = anchor - STEP * 3
-
-    async def fetch(date_from, date_to, limit):
-        return candles(anchor, 4)
-
-    result = await history.collect(
-        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
+        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=ANCHOR, after=ANCHOR - floor_back
     )
 
     assert result.history_ended is False
-
-
-async def test_an_empty_window_at_the_floor_is_not_the_end_of_history_either() -> None:
-    # The floor can land inside a stretch the market was shut for, so the clamped window
-    # holds nothing. That is the caller's bound being reached, not the provider running
-    # out of data.
-    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
-    floor = anchor - STEP * 3
-
-    async def fetch(date_from, date_to, limit):
-        return []
-
-    result = await history.collect(
-        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
-    )
-
-    assert result.history_ended is False
+    assert result.count == expected_count
+    assert result.requests == expected_requests
 
 
 async def test_running_out_of_provider_data_above_the_floor_still_ends_history() -> None:
@@ -348,54 +360,6 @@ async def test_running_out_of_provider_data_above_the_floor_still_ends_history()
     )
 
     assert result.history_ended is True
-
-
-async def test_not_found_for_a_window_clamped_to_the_floor_is_not_an_ending() -> None:
-    """The one that cost six weeks of candles.
-
-    Capital answers `error.prices.not-found` for a window holding nothing, and the last
-    window of a floored read is narrow and often lands in a shut market. Read as an
-    ending it becomes a stored boundary, and every older chunk still queued is skipped
-    behind it — so this must say "the floor was reached", not "the provider is empty".
-    """
-    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
-    floor = anchor - STEP * 4
-    pages = [candles(anchor, 2)]  # reaches 13:55, still above the floor
-
-    async def fetch(date_from, date_to, limit):
-        return pages.pop(0) if pages else None
-
-    result = await history.collect(
-        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
-    )
-
-    assert result.history_ended is False
-    assert result.count == 2
-
-
-async def test_no_progress_at_a_window_clamped_to_the_floor_is_not_an_ending() -> None:
-    """The other half of the same lesson — the half that survived fixing the first.
-
-    A floored read pages down to the oldest candle its windows hold, then asks once more
-    about the sliver left between that candle and the floor. The provider answers with
-    the candle it already sent: no progress, but equally no statement about its own
-    bottom. Measured on 5-minute US100 floored at 2026-02-16 07:01:23 — paging stopped
-    on the 07:05 candle, the 3½-minute sliver below returned that same candle, and
-    reading it as an ending skipped every chunk queued back to 1 January.
-    """
-    anchor = datetime(2026, 7, 23, 14, 0, tzinfo=UTC)
-    floor = anchor - STEP * 3 - timedelta(minutes=3)  # a sliver below the oldest candle
-
-    async def fetch(date_from, date_to, limit):
-        return candles(anchor, 4)  # reaching down to 13:45, never below it
-
-    result = await history.collect(
-        "GOLD", Resolution.MINUTE_5, 1000, fetch, anchor=anchor, after=floor
-    )
-
-    assert result.history_ended is False
-    assert result.count == 4
-    assert result.requests == 2  # the second one is the sliver
 
 
 async def test_no_floor_leaves_the_read_exactly_as_it_was() -> None:

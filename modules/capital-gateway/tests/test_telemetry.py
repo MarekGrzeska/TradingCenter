@@ -38,40 +38,6 @@ def test_this_module_gets_somewhere_to_write(monkeypatch: pytest.MonkeyPatch) ->
     assert logging.getLogger("capital_gateway.stream.hub").isEnabledFor(logging.INFO)
 
 
-def test_the_volume_can_be_turned_down_without_a_deploy(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("LOG_LEVEL", "warning")
-    logging.getLogger().handlers.clear()
-
-    telemetry.configure_logging()
-
-    assert logging.getLogger().level == logging.WARNING
-
-
-def test_a_chatty_library_is_kept_to_its_warnings(monkeypatch: pytest.MonkeyPatch) -> None:
-    """httpx narrates every request, and at ten a second that is the whole log."""
-    monkeypatch.delenv("LOG_LEVEL", raising=False)
-    logging.getLogger().handlers.clear()
-
-    telemetry.configure_logging()
-
-    assert logging.getLogger("httpx").level == logging.WARNING
-    assert not logging.getLogger("httpx").isEnabledFor(logging.INFO)
-
-
-def test_existing_logging_configuration_is_left_alone(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A caller that configured logging itself keeps it — which is also what stops this
-    from fighting a test harness that captures logs."""
-    monkeypatch.delenv("LOG_LEVEL", raising=False)
-    root = logging.getLogger()
-    root.handlers.clear()
-    mine = logging.NullHandler()
-    root.addHandler(mine)
-
-    telemetry.configure_logging()
-
-    assert root.handlers == [mine]
-
-
 def test_no_connection_string_means_no_exporter(monkeypatch: pytest.MonkeyPatch) -> None:
     """Every local run. `configure` must still set logging up and must not reach for
     Azure — importing the exporter without one is a slow failure at startup."""

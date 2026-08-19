@@ -12,7 +12,7 @@ BASE = "http://127.0.0.1:8010"
 
 @respx.mock
 async def test_get_positions_maps_every_field(server) -> None:
-    mcp, gateway = server
+    mcp = server
     respx.get(f"{BASE}/positions").mock(
         return_value=httpx.Response(
             200,
@@ -34,23 +34,21 @@ async def test_get_positions_maps_every_field(server) -> None:
 
     assert structured["result"][0]["symbol"] == "GOLD"
     assert structured["result"][0]["pnl"] == 12.3
-    await gateway.aclose()
 
 
 @respx.mock
 async def test_get_positions_empty_account_answers_empty_list(server) -> None:
-    mcp, gateway = server
+    mcp = server
     respx.get(f"{BASE}/positions").mock(return_value=httpx.Response(200, json=[]))
 
     _content, structured = await mcp.call_tool("get_positions", {})
 
     assert structured["result"] == []
-    await gateway.aclose()
 
 
 @respx.mock
 async def test_get_working_orders_maps_every_field(server) -> None:
-    mcp, gateway = server
+    mcp = server
     respx.get(f"{BASE}/working-orders").mock(
         return_value=httpx.Response(
             200,
@@ -72,12 +70,11 @@ async def test_get_working_orders_maps_every_field(server) -> None:
     _content, structured = await mcp.call_tool("get_working_orders", {})
 
     assert structured["result"][0]["order_type"] == "LIMIT"
-    await gateway.aclose()
 
 
 @respx.mock
 async def test_get_balance_reads_the_active_account(server) -> None:
-    mcp, gateway = server
+    mcp = server
     respx.get(f"{BASE}/accounts").mock(
         return_value=httpx.Response(
             200,
@@ -108,12 +105,11 @@ async def test_get_balance_reads_the_active_account(server) -> None:
 
     assert structured["account_id"] == "a2"
     assert structured["balance"] == 5000.0
-    await gateway.aclose()
 
 
 @respx.mock
 async def test_get_balance_refuses_when_no_account_is_active(server) -> None:
-    mcp, gateway = server
+    mcp = server
     respx.get(f"{BASE}/accounts").mock(
         return_value=httpx.Response(
             200,
@@ -133,29 +129,26 @@ async def test_get_balance_refuses_when_no_account_is_active(server) -> None:
 
     with pytest.raises(ToolError, match="active account"):
         await mcp.call_tool("get_balance", {})
-    await gateway.aclose()
 
 
 @respx.mock
 async def test_a_gateway_timeout_is_an_access_failure_not_a_refusal(server) -> None:
-    mcp, gateway = server
+    mcp = server
     respx.get(f"{BASE}/positions").mock(side_effect=httpx.ReadTimeout("timed out"))
 
     with pytest.raises(ToolError, match="access failure"):
         await mcp.call_tool("get_positions", {})
-    await gateway.aclose()
 
 
 @respx.mock
 async def test_a_gateway_refusal_names_the_detail(server) -> None:
-    mcp, gateway = server
+    mcp = server
     respx.get(f"{BASE}/positions").mock(
         return_value=httpx.Response(422, json={"detail": "bad request"})
     )
 
     with pytest.raises(ToolError, match="bad request"):
         await mcp.call_tool("get_positions", {})
-    await gateway.aclose()
 
 
 @respx.mock
@@ -164,7 +157,7 @@ async def test_a_read_the_gateway_would_not_serve_is_an_access_failure(server) -
     would read as an answer *about the account* — which is the one thing this module's
     tools must never let a caller believe (specs/trading-mcp-tools, "Odmowa narzędzia
     jest odróżnialna od awarii dostępu")."""
-    mcp, gateway = server
+    mcp = server
     respx.get(f"{BASE}/positions").mock(
         return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
     )
@@ -173,4 +166,3 @@ async def test_a_read_the_gateway_would_not_serve_is_an_access_failure(server) -
         await mcp.call_tool("get_positions", {})
 
     assert "Nothing was read" in str(excinfo.value)
-    await gateway.aclose()
