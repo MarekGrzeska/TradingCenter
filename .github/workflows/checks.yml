@@ -167,19 +167,41 @@ jobs:
             fi
           done
           # See the `package-list` output above for why this is diff ∩ directory.
+          #
+          # Assembled without jq, which this step used to reach for. `jq` is on the CI
+          # runner and is not in the `/usr/bin:/bin` this step's own test pins, so a jq
+          # here is a step that runs green in CI and cannot execute where the test runs —
+          # the shape of defence this repository stopped accepting when the audit landed.
           all_pkgs="$(ls -1 packages)"
           touched="$(printf '%s\n' "$changed" | sed -n 's|^packages/\([^/]*\)/.*|\1|p' | sort -u)"
+          # Read line by line rather than `for p in $list`: word splitting would cut a
+          # directory name containing a space into two names that both look fine, and the
+          # guard below would then wave through a matrix entry nothing can run in.
           list=""
-          for p in $touched; do
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
             if printf '%s\n' "$all_pkgs" | grep -qxF "$p"; then
               list="$list$p"$'\n'
             fi
-          done
+          done <<< "$touched"
           if [ -z "$list" ]; then
             list="$all_pkgs"
           fi
-          json="$(printf '%s' "$list" | jq -R . | jq -sc .)"
-          echo "package-list=$json" >> "$GITHUB_OUTPUT"
+          json=""
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            # A name needing JSON escaping is also a broken matrix entry and a
+            # working-directory no job can enter. Refuse it here, where it names itself,
+            # rather than three jobs later as a quoting error in someone else's YAML.
+            case "$p" in
+              *[!A-Za-z0-9._-]*)
+                echo "package directory is not matrix-safe: $p" >&2
+                exit 1
+                ;;
+            esac
+            json="$json${json:+,}\"$p\""
+          done <<< "$list"
+          echo "package-list=[$json]" >> "$GITHUB_OUTPUT"
           echo "--- decisions ---"
           cat "$GITHUB_OUTPUT"
 

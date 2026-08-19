@@ -12,6 +12,7 @@ The real shell is executed: only the GitHub context and the `git diff` are repla
 
 from __future__ import annotations
 
+import json
 import shutil
 import subprocess
 import tempfile
@@ -20,7 +21,8 @@ from pathlib import Path
 import pytest
 import yaml
 
-CHECKS = Path(__file__).resolve().parents[2] / ".github" / "workflows" / "checks.yml"
+ROOT = Path(__file__).resolve().parents[2]
+CHECKS = ROOT / ".github" / "workflows" / "checks.yml"
 BASH = shutil.which("bash")
 
 pytestmark = pytest.mark.skipif(BASH is None, reason="needs bash to run the step's own shell")
@@ -40,7 +42,13 @@ def filter_script() -> str:
     return "\n".join(lines[start:])
 
 
-def decide(changed: list[str]) -> dict[str, bool]:
+def run_step(changed: list[str], cwd: Path) -> tuple[subprocess.CompletedProcess[str], str]:
+    """The step's own shell on a synthetic diff, and whatever it wrote to `GITHUB_OUTPUT`.
+
+    `cwd` matters: the step reads `packages/` to decide which packages the matrix runs, so
+    a run that cannot see that directory answers a question CI never asks. Only
+    `GITHUB_OUTPUT` and the diff are replaced.
+    """
     assert BASH is not None
     with tempfile.TemporaryDirectory() as directory:
         output = Path(directory) / "github_output"
@@ -57,15 +65,40 @@ def decide(changed: list[str]) -> dict[str, bool]:
             capture_output=True,
             text=True,
             check=False,
+            cwd=cwd,
             env={"GITHUB_OUTPUT": str(output), "PATH": "/usr/bin:/bin"},
         )
-        assert done.returncode == 0, f"the step itself failed:\n{done.stderr}"
-        decisions: dict[str, bool] = {}
-        for line in output.read_text(encoding="utf-8").splitlines():
-            if "=" in line:
-                name, _, value = line.partition("=")
-                decisions[name] = value == "true"
-        return decisions
+        return done, output.read_text(encoding="utf-8")
+
+
+def outputs(changed: list[str]) -> dict[str, str]:
+    """Every `name=value` the step writes, verbatim, run against the real repository."""
+    done, written_text = run_step(changed, ROOT)
+    assert done.returncode == 0, f"the step itself failed:\n{done.stderr}"
+    written: dict[str, str] = {}
+    for line in written_text.splitlines():
+        if "=" in line:
+            name, _, value = line.partition("=")
+            written[name] = value
+    return written
+
+
+def decide(changed: list[str]) -> dict[str, bool]:
+    """The job decisions alone.
+
+    The step writes one more output than there are jobs — `package-list`, the matrix — and
+    it is not a decision. Reading only `true`/`false` keeps the two tests below, which pair
+    every decision with a job that reads it, asking about the thing they were written for.
+    """
+    return {
+        name: value == "true"
+        for name, value in outputs(changed).items()
+        if value in ("true", "false")
+    }
+
+
+def matrix(changed: list[str]) -> list[str]:
+    return json.loads(outputs(changed)["package-list"])
 
 
 def test_the_step_runs_at_all_under_set_u() -> None:
@@ -144,6 +177,62 @@ class TestOneFileAtATime:
         assert decisions["trading-mcp"]
         assert decisions["teams-mcp"]
         assert not decisions["agent"]
+
+
+class TestTheMatrixTheJobRuns:
+    """`package-list`, which is the diff intersected with `packages/`.
+
+    Neither half alone is right: the directory alone runs all three packages for a
+    one-package edit, and the diff alone hands the matrix a package the pull request
+    deletes, whose `working-directory` no longer exists.
+    """
+
+    def test_one_package_edit_runs_that_package_alone(self) -> None:
+        assert matrix(["packages/tc-openai/tc_openai/provider.py"]) == ["tc-openai"]
+
+    def test_two_packages_run_both(self) -> None:
+        assert sorted(
+            matrix(
+                [
+                    "packages/tc-openai/tc_openai/provider.py",
+                    "packages/tc-runtime/tc_runtime/db.py",
+                ]
+            )
+        ) == ["tc-openai", "tc-runtime"]
+
+    def test_a_package_the_diff_deletes_is_not_in_the_matrix(self) -> None:
+        """The reason this is an intersection rather than the diff: no directory to run in."""
+        assert "tc-gone" not in matrix(["packages/tc-gone/tc_gone/thing.py"])
+
+    def test_a_new_package_cannot_merge_untested(self) -> None:
+        """What the directory listing was there for, and it survives the narrowing: a
+        package added by a pull request is in that pull request's diff by definition."""
+        added = min(p.name for p in (ROOT / "packages").iterdir() if p.is_dir())
+        assert matrix([f"packages/{added}/pyproject.toml"]) == [added]
+
+    def test_the_workflow_itself_runs_every_package(self) -> None:
+        """An empty intersection means `packages` fired on checks.yml rather than on a
+        package, and a change to how the checks run has to be exercised by running them."""
+        on_disk = sorted(p.name for p in (ROOT / "packages").iterdir() if p.is_dir())
+        assert sorted(matrix([".github/workflows/checks.yml"])) == on_disk
+
+    def test_a_name_that_would_break_the_matrix_stops_the_step(self, tmp_path: Path) -> None:
+        """The guard's own failure mode, which is why the loops read line by line: a
+        directory name with a space survives to be refused instead of being split into
+        two names that both look fine."""
+        (tmp_path / "packages" / "tc-fine").mkdir(parents=True)
+        (tmp_path / "packages" / "tc broken").mkdir()
+        done, _ = run_step([".github/workflows/checks.yml"], tmp_path)
+        assert done.returncode != 0
+        assert "not matrix-safe" in done.stderr, done.stderr
+
+    def test_the_guard_passes_the_names_this_repository_has(self, tmp_path: Path) -> None:
+        """The other direction, so the test above is not passing on a step that refuses
+        everything: the same tree without the bad name is accepted."""
+        (tmp_path / "packages" / "tc-fine").mkdir(parents=True)
+        (tmp_path / "packages" / "tc_also.fine").mkdir()
+        done, _ = run_step([".github/workflows/checks.yml"], tmp_path)
+        assert done.returncode == 0, done.stderr
 
 
 def test_touching_the_workflow_runs_everything() -> None:
