@@ -1,0 +1,312 @@
+<title>Bilans testów TradingCenter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700&family=Public+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --bg: #F6F8F7;
+    --surface: #FFFFFF;
+    --surface-2: #EEF2F0;
+    --ink: #1B2421;
+    --muted: #5C6864;
+    --rule: #DDE4E1;
+    --accent: #0E6B5C;
+    --accent-soft: #E1EFEB;
+    --keep: #2E7D4F;
+    --keep-soft: #E4F1E8;
+    --cut: #A85312;
+    --cut-soft: #F7EADD;
+    --code-bg: #EDF1EF;
+    --shadow: 0 1px 3px rgba(27, 36, 33, 0.07);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131917;
+      --surface: #1B2320;
+      --surface-2: #212B27;
+      --ink: #E7ECEA;
+      --muted: #97A5A0;
+      --rule: #2C3833;
+      --accent: #4FBFA8;
+      --accent-soft: #1C332E;
+      --keep: #71C08D;
+      --keep-soft: #1E3226;
+      --cut: #E0914D;
+      --cut-soft: #392A1B;
+      --code-bg: #232E2A;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131917;
+    --surface: #1B2320;
+    --surface-2: #212B27;
+    --ink: #E7ECEA;
+    --muted: #97A5A0;
+    --rule: #2C3833;
+    --accent: #4FBFA8;
+    --accent-soft: #1C332E;
+    --keep: #71C08D;
+    --keep-soft: #1E3226;
+    --cut: #E0914D;
+    --cut-soft: #392A1B;
+    --code-bg: #232E2A;
+    --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Public Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.65;
+    margin: 0;
+    padding: 0 1.25rem 5rem;
+  }
+  main { max-width: 60rem; margin: 0 auto; }
+
+  h1, h2, h3 {
+    font-family: "Bricolage Grotesque", "Public Sans", system-ui, sans-serif;
+    line-height: 1.15;
+    text-wrap: balance;
+  }
+  h1 { font-size: 2.4rem; font-weight: 700; letter-spacing: -0.01em; margin: 0 0 0.5rem; }
+  h2 { font-size: 1.55rem; font-weight: 650; margin: 3rem 0 0.9rem; }
+  h3 { font-size: 1.12rem; font-weight: 600; margin: 1.8rem 0 0.5rem; }
+
+  header { padding: 3.5rem 0 0; }
+  .eyebrow {
+    font-size: 0.78rem; font-weight: 600; letter-spacing: 0.09em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 0.8rem;
+  }
+  .lede { font-size: 1.08rem; color: var(--muted); max-width: 44rem; margin: 0; }
+
+  p, ul, ol { max-width: 44rem; }
+  li { margin-bottom: 0.35rem; }
+  strong { font-weight: 600; }
+
+  code, .path {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 0.85em;
+    background: var(--code-bg);
+    padding: 0.08em 0.35em;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .verdict {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-left: 4px solid var(--accent);
+    border-radius: 8px;
+    padding: 1.4rem 1.6rem;
+    margin: 2.2rem 0;
+    box-shadow: var(--shadow);
+  }
+  .verdict h2 { margin-top: 0; font-size: 1.25rem; }
+  .verdict p { max-width: none; }
+  .verdict p:last-child { margin-bottom: 0; }
+
+  .stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+    gap: 0.8rem;
+    margin: 1.8rem 0;
+  }
+  .stat {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 0.9rem 1.1rem;
+    box-shadow: var(--shadow);
+  }
+  .stat .num {
+    font-family: "Bricolage Grotesque", system-ui, sans-serif;
+    font-size: 1.7rem; font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--accent);
+    display: block; line-height: 1.2;
+  }
+  .stat .lbl { font-size: 0.82rem; color: var(--muted); }
+
+  .tablewrap { overflow-x: auto; margin: 1.2rem 0; border: 1px solid var(--rule); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); }
+  table { border-collapse: collapse; width: 100%; font-size: 0.92rem; }
+  th, td { text-align: left; padding: 0.6rem 0.9rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  th {
+    font-size: 0.76rem; font-weight: 600; letter-spacing: 0.06em;
+    text-transform: uppercase; color: var(--muted);
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+  td.n { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  th.n { text-align: right; }
+  tr.total td { font-weight: 600; background: var(--surface-2); }
+
+  .chip {
+    display: inline-block;
+    font-size: 0.74rem; font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.1em 0.6em;
+    border-radius: 99px;
+    white-space: nowrap;
+  }
+  .chip.keep { background: var(--keep-soft); color: var(--keep); }
+  .chip.cut { background: var(--cut-soft); color: var(--cut); }
+  .chip.note { background: var(--accent-soft); color: var(--accent); }
+
+  .module {
+    background: var(--surface);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 1.3rem 1.6rem 1.5rem;
+    margin: 1.4rem 0;
+    box-shadow: var(--shadow);
+  }
+  .module h3 { margin-top: 0; display: flex; align-items: baseline; gap: 0.7rem; flex-wrap: wrap; }
+  .module h3 .meta { font-family: "IBM Plex Mono", monospace; font-size: 0.78rem; font-weight: 400; color: var(--muted); }
+  .module p, .module ul { max-width: none; }
+  .module ul { padding-left: 1.2rem; }
+
+  .rules { counter-reset: rule; padding-left: 0; list-style: none; max-width: 46rem; }
+  .rules li {
+    counter-increment: rule;
+    position: relative;
+    padding-left: 2.6rem;
+    margin-bottom: 0.9rem;
+  }
+  .rules li::before {
+    content: counter(rule);
+    position: absolute; left: 0; top: 0.05rem;
+    width: 1.7rem; height: 1.7rem;
+    display: flex; align-items: center; justify-content: center;
+    font-family: "Bricolage Grotesque", sans-serif;
+    font-weight: 700; font-size: 0.9rem;
+    background: var(--accent-soft); color: var(--accent);
+    border-radius: 6px;
+  }
+
+  .footnote { font-size: 0.85rem; color: var(--muted); border-top: 1px solid var(--rule); margin-top: 3.5rem; padding-top: 1rem; max-width: none; }
+  @media (prefers-reduced-motion: no-preference) {
+    .module, .verdict, .stat { transition: border-color 120ms ease; }
+  }
+</style>
+
+<main>
+<header>
+  <div class="eyebrow">Audyt · 19 sierpnia 2026</div>
+  <h1>Bilans testów TradingCenter</h1>
+  <p class="lede">Czy warstwa testowa jest przerośnięta jak na projekt niekomercyjny — i gdzie realnie można obniżyć wymagania, żeby przyszłe zmiany były tańsze i szybsze. Analiza objęła wszystkie moduły, pakiety i <code>scripts/</code>; cztery niezależne przeglądy jakościowe plus pomiar ilościowy.</p>
+</header>
+
+<div class="stats">
+  <div class="stat"><span class="num">57 300</span><span class="lbl">linii testów (≈ tyle, co kodu produkcyjnego)</span></div>
+  <div class="stat"><span class="num">~2 800</span><span class="lbl">funkcji testowych w 240 plikach</span></div>
+  <div class="stat"><span class="num">~10 500</span><span class="lbl">linii do bezpiecznego wycięcia (~18%)</span></div>
+  <div class="stat"><span class="num">55%</span><span class="lbl">testów workbencha wymaga Dockera</span></div>
+</div>
+
+<div class="verdict">
+  <h2>Werdykt</h2>
+  <p><strong>Warstwa testowa jest duża jak na projekt niekomercyjny (1:1 z kodem produkcyjnym), ale nie jest bezmyślnie przerośnięta.</strong> Wszystkie cztery przeglądy zgodnie oceniły jakość jako wysoką: mało mocków, prawdziwa baza w kontenerze, nazwy-zdania, docstringi z odwołaniami do realnych bugów, zero snapshotów w terminalu. To nie jest suita generowana masowo — przerost jest <em>punktowy</em>, nie systemowy.</p>
+  <p>Przerost ma cztery powtarzalne źródła: <strong>(1) ta sama reguła testowana na 3–4 warstwach</strong> (unit → HTTP → MCP → telemetria; store → widok; lista → karta → wykres), <strong>(2) testowanie cudzych bibliotek</strong> (walidacja Pydantica per pole, constrainty Postgresa, okablowanie azure-identity, wnętrza langchaina), <strong>(3) testy implementacji zamiast zachowania</strong> (<code>inspect.getsource</code>, liczenie re-renderów, grep po klasach Tailwinda, pola prywatne) i <strong>(4) boilerplate</strong> (fixture przepisywany ręcznie w dziesiątkach testów, <code>aclose()</code> w każdym ciele testu, bliźniacze pliki agent/teams różniące się zerem linii).</p>
+  <p>Można bezpiecznie wyciąć <strong>~10 000–10 700 linii (~18%)</strong> i — ważniejsze — <strong>obniżyć wymagania na przyszłość</strong> według ośmiu reguł niżej. Największy podatek to jednak nie linie, lecz czas: ponad połowa testów workbencha i market-daty wymaga Dockera i kontenerów Postgresa, więc pełny przebieg nie jest uruchamialny „od ręki".</p>
+</div>
+
+<h2>Liczby</h2>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Moduł</th><th class="n">Kod (linie)</th><th class="n">Testy (linie)</th><th class="n">Stosunek</th><th class="n">Testy (szt.)</th><th>Charakter</th></tr></thead>
+  <tbody>
+    <tr><td>terminal</td><td class="n">21 264</td><td class="n">19 044</td><td class="n">0,90</td><td class="n">~907</td><td>55% komponentowe (RTL), 22% kontrakt/API, zero snapshotów</td></tr>
+    <tr><td>workbench</td><td class="n">17 111</td><td class="n">16 124</td><td class="n">0,94</td><td class="n">792</td><td>55% wymaga Dockera (dwa kontenery Postgresa)</td></tr>
+    <tr><td>market-data</td><td class="n">13 068</td><td class="n">14 438</td><td class="n">1,10</td><td class="n">813</td><td>54% integracyjne z realną bazą, golden file, orakul TA-Lib</td></tr>
+    <tr><td>capital-gateway</td><td class="n">2 713</td><td class="n">4 042</td><td class="n">1,49</td><td class="n">207</td><td>1,39 po odjęciu suit live; stanowość protokołu Capital</td></tr>
+    <tr><td>trading-mcp</td><td class="n">1 009</td><td class="n">1 662</td><td class="n">1,65</td><td class="n">88</td><td>najwyższy stosunek w repo — głównie boilerplate, nie asercje</td></tr>
+    <tr><td>pakiety (tc-*)</td><td class="n">988</td><td class="n">752</td><td class="n">0,76</td><td class="n">—</td><td>rozrzut 0,38 (tc-openai) … 1,43 (tc-mcp-kit)</td></tr>
+    <tr><td>scripts/</td><td class="n">1 340</td><td class="n">1 286</td><td class="n">0,96</td><td class="n">—</td><td>testy dev-runnera i sondy deployu + meta-testy CI</td></tr>
+    <tr class="total"><td>Razem</td><td class="n">~57 500</td><td class="n">~57 300</td><td class="n">~1,0</td><td class="n">~2 800</td><td></td></tr>
+  </tbody>
+</table>
+</div>
+<p>Rozrzut stosunków (0,38–1,65) pokazuje, że w repo nie ma jednej polityki rygoru — proporcja jest efektem historii pisania, nie decyzji. To argument za spisaniem reguł, a nie tylko za jednorazowym cięciem.</p>
+
+<h2>Moduł po module</h2>
+
+<div class="module">
+  <h3>terminal <span class="meta">19 044 linii · cięcie ~6 700 (−35%)</span></h3>
+  <p><span class="chip cut">przerost</span> Największa pojedyncza pozycja w repo. <code>Chart.test.tsx</code> to 3 302 linie (17% całej warstwy), z czego ~1 770 to sekcje wskaźnikowe dublujące testy prymitywów, a 453 dublują <code>DrawingList</code>. Jedna operacja PATCH na rysunkach jest testowana trzykrotnie (lista → karta → wykres, ~940 linii). Panel czatu agenta: ~1 600 linii na te same scenariusze w store i w widoku. Do tego 6 plików „testów konwencji" grepujących TSX regexem po klasach Tailwinda (~490 linii) i widoki CRUD z testami kolejności sortowania przez DOM oraz czterema <code>getByText</code> na wiersz.</p>
+  <p><span class="chip keep">zostaje</span> Cała warstwa <code>data/</code> i <code>*Api.test.ts</code> (mapowanie kontraktu wire↔domena, ISO↔epoch, rozróżnienie transport-failure od 5xx — jedyna obrona przed cichą zmianą kontraktu backendu), logika wykresu (stronicowanie historii, utrzymanie ramki, focus agenta, live bars — ~900 linii algorytmu nietestowalnego klikaniem), socketHub/reconnect, stany błędów, parsowanie poleceń agenta i undo.</p>
+  <ul>
+    <li>Skasować testy konwencji (<code>buttonsComeFromOnePlace</code> i rodzeństwo, licznik re-renderów) — <strong>~490 linii</strong></li>
+    <li><code>Chart.test.tsx</code>: zostawić logikę, wyciąć sekcje wskaźnikowe i drawings — <strong>~2 100</strong></li>
+    <li>Widoki CRUD do wzorca „happy path + błąd + odmowa" — <strong>~2 220</strong></li>
+    <li>Prymitywy canvas do jednego smoke na kształt — <strong>~790</strong>; scalenie DrawingCard/List — <strong>~290</strong>; AgentChat do 4–5 testów integracyjnych — <strong>~550</strong>; drobne — <strong>~260</strong></li>
+  </ul>
+</div>
+
+<div class="module">
+  <h3>workbench <span class="meta">16 124 linii · cięcie ~1 200–1 550 (−9%)</span></h3>
+  <p><span class="chip cut">przerost</span> Najsilniejszy sygnał: <strong>bliźniaki agent/teams</strong> — <code>test_auth.py</code> identyczny co do znaku, <code>test_no_cors.py</code> różni się dwoma liniami komentarza, <code>test_schema_version.py</code> istnieje w <em>czterech</em> miejscach w repo (moduły re-testują bibliotekę z <code>tc-runtime</code>). ~500 linii dosłownego kopiuj-wklej plus zduplikowany harness MCP (~865 linii na dwa niemal identyczne klienty). <code>test_drawings_tool.py</code>: 46 testów <code>@db</code>, z czego ~25 to permutacje walidacji wejścia odpalane przeciw realnej bazie. Połowa <code>teams/test_contract.py</code> testuje samego Pydantica.</p>
+  <p><span class="chip keep">zostaje</span> <code>test_layering.py</code> (jedyne, co utrzymuje modularność po zlaniu trzech modułów), <code>test_route_collisions.py</code> (udokumentowany realny bug 200-vs-422), migracje z advisory lockiem, walidacja DAG zespołów, silniki i pieniądze (<code>run_engine</code>, <code>cost_ledger</code>, <code>cost_limits</code>, <code>trading_limits</code>, <code>trading_trace</code>), czas/cron ze zmianą czasu, fixture <code>_no_developer_env</code>.</p>
+  <p><span class="chip note">mocki — hipoteza obalona</span> W całym module zero <code>MagicMock</code>; problem jest odwrotny: <strong>za dużo integracji</strong>. 432 z 792 testów wymaga Dockera; nawet <code>test_health</code> startuje pełen lifespan z dwiema zmigrowanymi bazami, żeby zobaczyć <code>{"status": "ok"}</code>. Zdjęcie <code>@db</code> z testów, które bazy nie dotykają, da więcej niż kasowanie plików.</p>
+</div>
+
+<div class="module">
+  <h3>market-data <span class="meta">14 438 linii · cięcie ~1 400–1 500 (−10%)</span></h3>
+  <p><span class="chip cut">przerost</span> Reguła „spóźniona para przy otwartym rynku = stalled" testowana na <em>czterech</em> warstwach, z czterema nazwami testów zduplikowanymi 1:1 między <code>test_pairs.py</code> a <code>test_market_status.py</code>. <code>test_schema.py</code> sprawdza insert-po-insercie constrainty DDL (czyli: czy Postgres działa). Meta-testy kształtu schematu narzędzi („każdy parametr ma typ") dublują pyrighta. Dwa pliki „testów wydajności" z progiem 10× — same przyznają w docstringu, że nic nie mierzą. Test grepujący <code>inspect.getsource</code> po źródle klasy. 15 plików <code>test_tools_*.py</code> po 3–6 testów każdy — narzut boilerplate'u importowego.</p>
+  <p><span class="chip keep">zostaje bez dyskusji</span> Wszystko, co chroni integralność archiwum, bo tam koszt błędu to <em>ciche uszkodzenie danych historycznych</em>, nie czerwone CI: idempotencja UPSERT i precedencja źródeł (<code>test_store</code>), rozróżnienie dwóch nieobecności świecy (<code>test_coverage</code>), arytmetyka luk i „nigdy nie zapisuj trwającego okresu" (<code>test_ingest</code>), brak podwójnego claimu joba, szew snapshot/subscribe (żadna świeca nie ginie, żadna nie dubluje), orakul TA-Lib (złapał realny bug w aroon), fail-closed na autoryzacji, lock migracji.</p>
+</div>
+
+<div class="module">
+  <h3>capital-gateway + trading-mcp <span class="meta">5 704 linii · cięcie ~700–800</span></h3>
+  <p><span class="chip note">wysoki stosunek — w większości zasłużony</span> Uzasadnieniem nie są „pieniądze" (konto jest demo, wymuszone twardo), lecz <strong>stanowość protokołu</strong>: jeden login przy współbieżności, dokładnie jedna próba po 401, składanie świec z tików — klasa błędów niewykrywalna ręcznie. W trading-mcp niezmienniki ścieżki zapisu (<code>zapis nigdy nie jest ponawiany przez ten moduł</code>, <code>timeout = skutek nieznany</code>) to jedyne, co chroni przed podwójną pozycją otwartą przez LLM. Nadwyżka ponad ~1,2:1 to boilerplate: literały JSON i <code>aclose()</code> powtórzone w ~50 testach zamiast we fixture.</p>
+  <p><span class="chip cut">do wycięcia</span> Kopia testów middleware'u z <code>tc-mcp-kit</code> (testowana już w pakiecie, lepiej), sekcja „floor" w <code>test_history.py</code> — 7 testów z jedną asercją zamiast jednego parametrize, testy konfiguracji <code>logging</code>, budżet znakowy <code>SURFACE_CEILING_CHARS</code> (czerwieni się przy każdej edycji opisu), meta-testy CI parametryzowane po 7 workflowach, <code>test_harness.py</code>. Suity <code>live</code> zostają — kosztują zero w CI, a jako jedyne łapią zmianę po stronie capital.com.</p>
+</div>
+
+<h2>Reguły na przyszłość — obniżone wymagania</h2>
+<p>To jest właściwa odpowiedź na pytanie o koszt i czas: jednorazowe cięcie oszczędza raz, reguły oszczędzają przy każdej przyszłej zmianie. Osiem zasad, wprost z tego, co audyt zastał:</p>
+<ol class="rules">
+  <li><strong>Reguła domenowa testowana raz, na najniższej warstwie.</strong> Wyżej (HTTP, MCP, widok, telemetria) tylko jeden test „stan dojechał na wire". Koniec z czterema kopiami tej samej macierzy.</li>
+  <li><strong>Nie testować cudzych bibliotek.</strong> Walidacja Pydantica per pole, constrainty i DEFAULT-y Postgresa, okablowanie azure-identity, wnętrza langchaina i lightweight-charts — nie nasz kod, nie nasze testy. Wyjątek: reguły bezpieczeństwa (credential w URL, brak TLS).</li>
+  <li><strong>Zero testów implementacji.</strong> Żadnych <code>inspect.getsource</code>, <code>__mro__</code>, pól prywatnych, liczenia re-renderów, grepowania klas CSS. Test, który łamie każdy refaktor niezależnie od poprawności, ma ujemną wartość.</li>
+  <li><strong>Widok CRUD = trzy testy:</strong> happy path, jeden błąd, jedna odmowa. Kolejność sortowania to unit test funkcji sortującej, nie DOM. Bez testów „czy tekst się wyświetla".</li>
+  <li><strong>Pakiet współdzielony testuje się raz — w <code>packages/</code>.</strong> Konsument dostaje najwyżej jeden test integracyjny „realna para działa". Bliźniacze pliki agent/teams → jeden sparametryzowany.</li>
+  <li><strong><code>@db</code> tylko dla testów, które naprawdę czytają lub piszą bazę.</strong> Permutacje walidacji wejścia to unit. To obniża odsetek testów wymagających Dockera — dziś główny podatek czasowy.</li>
+  <li><strong>Setup do fixture, dane do builderów.</strong> <code>aclose()</code> w teardownie, mock sesji jako wspólna fixtura, fixtury wykresów i zespołów jako buildery. Samo to skróciłoby największe pliki o setki linii bez utraty jednej asercji.</li>
+  <li><strong>Bez testów wydajności w suicie jednostkowej</strong> i bez progów znakowych na opisach — jeśli trzeba, osobny target odpalany ręcznie.</li>
+</ol>
+
+<h2>Czego cięcia nie dotykają</h2>
+<p>Lista nienegocjowalna — tam, gdzie błąd kosztuje ciche uszkodzenie danych, podwójną pozycję albo wyciek sekretu, a nie czerwony pasek w CI:</p>
+<ul>
+  <li>integralność archiwum: UPSERT, precedencja źródeł, pokrycie, joby, szew snapshot/subscribe;</li>
+  <li>ścieżka zapisu trading-mcp: brak retry, timeout = skutek nieznany, odmowa ≠ awaria dostępu;</li>
+  <li>odmowy startu i demo-guard (gateway, trading-mcp, config DB-mode) oraz fail-closed na autoryzacji;</li>
+  <li>niewyciekanie sekretów w odpowiedziach, logach i eventach;</li>
+  <li>sesja Capital: jeden login, jeden retry po 401, rate-gate;</li>
+  <li>layering workbencha, kolizje tras, migracje pod advisory lockiem, limity kosztowe i ślad tradingowy;</li>
+  <li>kontrakty: snapshot OpenAPI bramy w trading-mcp, mapowanie wire↔domena w terminalu, golden file wskaźników z orakulem TA-Lib;</li>
+  <li>sonda deployu (test „poprzedni kontener odpowiada zdrowo, a obraz jest stary") i odmowy <code>dev.py</code>.</li>
+</ul>
+
+<h2>Jedna luka w drugą stronę</h2>
+<p>Audyt szukał przerostu, ale znalazł też asymetrię: <code>packages/tc-openai/provider.py</code> — 257 linii obsługujących strumieniowanie i tool-calls dla obu powierzchni agentowych — ma 3 testy kształtu, z czego dwa dotykają pól prywatnych. To jedyne miejsce w przeglądanym zakresie, gdzie brak testu <em>już raz kosztował</em> (tura z narzędziami odpowiedziała 400, panel pokazał „incomplete" bez zapisanego powodu). Wysiłek zdjęty z permutacji i meta-testów ma tu wyraźnie wyższą stopę zwrotu niż gdziekolwiek indziej.</p>
+
+<h2>Podsumowanie cięć</h2>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Obszar</th><th class="n">Linie do wycięcia</th><th>Główny mechanizm</th></tr></thead>
+  <tbody>
+    <tr><td>terminal</td><td class="n">~6 700</td><td>deduplikacja warstw, CRUD do 3 testów, testy konwencji</td></tr>
+    <tr><td>market-data</td><td class="n">~1 400–1 500</td><td>deduplikacja warstw, testy Postgresa/pyrighta, perf</td></tr>
+    <tr><td>workbench</td><td class="n">~1 200–1 550</td><td>bliźniaki agent/teams, permutacje @db, testy Pydantica</td></tr>
+    <tr><td>gateway, trading-mcp, pakiety, scripts</td><td class="n">~900–1 000</td><td>kopie testów pakietu, fixtury zamiast boilerplate'u, meta-testy CI</td></tr>
+    <tr class="total"><td>Razem</td><td class="n">~10 200–10 750 (~18%)</td><td>przy zachowaniu całej listy nienegocjowalnej</td></tr>
+  </tbody>
+</table>
+</div>
+<p>Sensowna kolejność wdrożenia: najpierw spisać osiem reguł (np. sekcja w <code>CLAUDE.md</code>) — to zatrzymuje przyrost od zaraz i nic nie kosztuje. Cięcia robić przy okazji, plikami, zaczynając od pozycji o zerowym ryzyku: testy konwencji terminala, bliźniaki agent/teams, kopie testów middleware'u, testy wydajności. Wielkiej jednorazowej akcji nie potrzeba.</p>
+
+<p class="footnote">Pomiar: 19 sierpnia 2026, gałąź <code>main</code> (beebf4a). Linie liczone bez <code>.venv</code>, migracji wygenerowanych i pliku kontraktu generowanego; testy = pliki <code>test_*</code> + <code>conftest.py</code> + pomocnicze double. Oceny jakościowe: cztery niezależne przeglądy reprezentatywnych próbek (terminal, workbench, market-data, moduły mniejsze).</p>
+</main>
