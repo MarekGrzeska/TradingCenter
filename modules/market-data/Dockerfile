@@ -15,11 +15,18 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 # Dependencies first, from the lockfile alone — this layer only invalidates when
 # pyproject.toml or uv.lock change, not on every source edit.
 # The package before the lock: `uv sync` reads it during resolution, not after.
-# Only the one this module's pyproject.toml names — copying all of `packages/` made
+# Only the ones this module's pyproject.toml names — copying all of `packages/` made
 # an edit to a package this image never installs invalidate this layer and every one
 # below it. A package added to pyproject.toml but not here fails the build loudly:
 # uv cannot resolve a path dependency that is not in the context.
+#
+# `tc-mcp-kit` arrived with the tool surface on 19 August 2026 and this line did not,
+# which is how that failure was found: on `main`, in `deploy-market-data`, at `uv sync
+# --frozen`. Loud, and later than it needed to be — no module job builds an image, so
+# `scripts/tests/test_deploy_workflows.py` now holds this list against pyproject.toml
+# and against the deploy workflow's path filter.
 COPY packages/tc-runtime /app/packages/tc-runtime
+COPY packages/tc-mcp-kit /app/packages/tc-mcp-kit
 COPY modules/market-data/pyproject.toml modules/market-data/uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
