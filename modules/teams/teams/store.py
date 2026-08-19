@@ -755,11 +755,146 @@ async def fail_unfinished_runs(conn: Conn, *, reason: str) -> list[int]:
 # and finds it no longer due. No advisory lock, no "leader" process, nothing that
 # outlives one statement.
 
+
+class _Recurring:
+    """The statements a schedule and a trigger hold in common, written once per table.
+
+    The two tables are the same machine pointed at different questions — a clock or a
+    condition — and everything that follows from being that machine is identical in both:
+    who owns the row, whether it is enabled, how many times in a row it has failed, and
+    the conditional UPDATE that claims its next turn. Only the table name, the column
+    list and the name of the "due" column differ, and those are what this class carries.
+
+    Written as one statement per rule rather than two copies of each because the rules
+    are the load-bearing part and a copy only has to drift once: `set_enabled` decides
+    what re-enabling clears, `delete` decides that "not yours" and "not there" are one
+    answer, and `claim` is the whole of the exactly-once guarantee. Each of those was
+    true twice and had to stay true twice.
+
+    What is deliberately *not* here is what genuinely differs: the INSERT and UPDATE
+    column lists, which have nothing in common beyond `team_id`, and
+    `record_trigger_check`, which only one of the two has at all.
+    """
+
+    def __init__(self, *, table: str, columns: str, due_column: str, fire_column: str) -> None:
+        self.select = f"""
+            SELECT {columns} FROM {table} WHERE id = $1 AND owner_principal = $2
+        """
+
+        self.select_for_team = f"""
+            SELECT {columns} FROM {table}
+             WHERE team_id = $1 AND owner_principal = $2
+             ORDER BY created_at DESC, id DESC
+        """
+
+        # Re-enabling clears whatever disabled it and gives it a clean run of failures —
+        # the same "włączyć z powrotem" specs/teams-schedules describes. Disabling by an
+        # operator's own choice leaves `disabled_reason` as it was (usually NULL): the
+        # operator needs no explanation of a decision they just made themselves.
+        self.set_enabled = f"""
+            UPDATE {table}
+               SET enabled = $3,
+                   disabled_reason = CASE WHEN $3 THEN NULL ELSE disabled_reason END,
+                   consecutive_failures = CASE WHEN $3 THEN 0 ELSE consecutive_failures END,
+                   updated_at = now()
+             WHERE id = $1 AND owner_principal = $2
+            RETURNING {columns}
+        """
+
+        # The owner rides in the WHERE rather than being checked after the read, so "not
+        # yours" and "not there" are one statement and one answer — a route that could
+        # tell them apart would be telling a stranger that the row exists.
+        self.delete = f"""
+            DELETE FROM {table} WHERE id = $1 AND owner_principal = $2 RETURNING id
+        """
+
+        # System-initiated — no owner filter, because the caller is the clock loop acting
+        # on a row it already resolved, not an operator's request (specs/teams-schedules,
+        # "Harmonogram po serii nieudanych przebiegów wyłącza się sam").
+        self.disable_for_failures = f"""
+            UPDATE {table} SET enabled = false, disabled_reason = $2, updated_at = now()
+             WHERE id = $1
+            RETURNING {columns}
+        """
+
+        self.increment_failures = f"""
+            UPDATE {table}
+               SET consecutive_failures = consecutive_failures + 1, updated_at = now()
+             WHERE id = $1
+            RETURNING {columns}
+        """
+
+        self.reset_failures = f"""
+            UPDATE {table} SET consecutive_failures = 0, updated_at = now()
+             WHERE id = $1
+            RETURNING {columns}
+        """
+
+        self.claim_due = f"""
+            UPDATE {table} SET {due_column} = $2, updated_at = now()
+             WHERE id = $1 AND enabled AND {due_column} <= now()
+            RETURNING {columns}
+        """
+
+        # No owner filter — the clock (`scheduler/`) works across every operator's rows
+        # at once, the one place in this module that legitimately does. `enabled` rides in
+        # the WHERE rather than being filtered in Python so the partial index on
+        # `({due_column}) WHERE enabled` is what answers this, not a table scan.
+        self.select_due = f"""
+            SELECT {columns} FROM {table} WHERE enabled AND {due_column} <= now()
+        """
+
+        self.select_fires = f"""
+            SELECT f.id, f.schedule_id, f.trigger_id, f.fired_at, f.outcome, f.reason,
+                   f.run_id, f.skipped_count
+              FROM schedule_fires f
+              JOIN {table} o ON o.id = f.{fire_column}
+             WHERE f.{fire_column} = $1 AND o.owner_principal = $2
+             ORDER BY f.fired_at DESC, f.id DESC
+        """
+
+        # `runs` carries no `schedule_id`/`trigger_id` (design.md, "Trzy nowe tabele, zero
+        # zmian w tabelach fazy 1") — the fire that started a run is the only record of
+        # which run belongs to which schedule or trigger, so "is the previous run of this
+        # one still working" is answered by walking back to the most recent `started` fire
+        # and reading the status of the run it names, not by a join `runs` could offer.
+        self.latest_run_status = f"""
+            SELECT r.status
+              FROM schedule_fires f
+              JOIN runs r ON r.id = f.run_id
+             WHERE f.{fire_column} = $1 AND f.outcome = 'started'
+             ORDER BY f.fired_at DESC
+             LIMIT 1
+        """
+
+
 _SCHEDULE_COLUMNS = """
     id, team_id, owner_principal, revision_mode, pinned_revision_id, cron_expression,
     next_fire_at, enabled, disabled_reason, consecutive_failures,
     created_at, updated_at
 """
+
+_TRIGGER_COLUMNS = """
+    id, team_id, owner_principal, revision_mode, pinned_revision_id, tool_name,
+    arguments, field_path, comparison, threshold, cooldown_seconds,
+    poll_interval_seconds, next_check_at, last_result, last_checked_at, last_fired_at,
+    enabled, disabled_reason, consecutive_failures, created_at, updated_at
+"""
+
+_SCHEDULES = _Recurring(
+    table="schedules",
+    columns=_SCHEDULE_COLUMNS,
+    due_column="next_fire_at",
+    fire_column="schedule_id",
+)
+
+_TRIGGERS = _Recurring(
+    table="triggers",
+    columns=_TRIGGER_COLUMNS,
+    due_column="next_check_at",
+    fire_column="trigger_id",
+)
+
 
 _INSERT_SCHEDULE = f"""
     INSERT INTO schedules (
@@ -770,78 +905,12 @@ _INSERT_SCHEDULE = f"""
     RETURNING {_SCHEDULE_COLUMNS}
 """
 
-_SELECT_SCHEDULE = f"""
-    SELECT {_SCHEDULE_COLUMNS} FROM schedules WHERE id = $1 AND owner_principal = $2
-"""
-
-_SELECT_SCHEDULES_FOR_TEAM = f"""
-    SELECT {_SCHEDULE_COLUMNS} FROM schedules
-     WHERE team_id = $1 AND owner_principal = $2
-     ORDER BY created_at DESC, id DESC
-"""
-
 _UPDATE_SCHEDULE = f"""
     UPDATE schedules
        SET revision_mode = $3, pinned_revision_id = $4, cron_expression = $5,
            next_fire_at = $6, updated_at = now()
      WHERE id = $1 AND owner_principal = $2
     RETURNING {_SCHEDULE_COLUMNS}
-"""
-
-# Re-enabling clears whatever disabled it and gives it a clean run of failures — the
-# same "włączyć z powrotem" specs/teams-schedules describes. Disabling by an operator's
-# own choice leaves `disabled_reason` as it was (usually NULL): the operator needs no
-# explanation of a decision they just made themselves.
-_SET_SCHEDULE_ENABLED = f"""
-    UPDATE schedules
-       SET enabled = $3,
-           disabled_reason = CASE WHEN $3 THEN NULL ELSE disabled_reason END,
-           consecutive_failures = CASE WHEN $3 THEN 0 ELSE consecutive_failures END,
-           updated_at = now()
-     WHERE id = $1 AND owner_principal = $2
-    RETURNING {_SCHEDULE_COLUMNS}
-"""
-
-# The owner rides in the WHERE rather than being checked after the read, so "not yours"
-# and "not there" are one statement and one answer — a route that could tell them apart
-# would be telling a stranger that the row exists.
-_DELETE_SCHEDULE = """
-    DELETE FROM schedules WHERE id = $1 AND owner_principal = $2 RETURNING id
-"""
-
-# System-initiated — no owner filter, because the caller is the clock loop acting on a
-# row it already resolved, not an operator's request (specs/teams-schedules, "Harmonogram
-# po serii nieudanych przebiegów wyłącza się sam").
-_DISABLE_SCHEDULE_FOR_FAILURES = f"""
-    UPDATE schedules SET enabled = false, disabled_reason = $2, updated_at = now()
-     WHERE id = $1
-    RETURNING {_SCHEDULE_COLUMNS}
-"""
-
-_INCREMENT_SCHEDULE_FAILURES = f"""
-    UPDATE schedules SET consecutive_failures = consecutive_failures + 1, updated_at = now()
-     WHERE id = $1
-    RETURNING {_SCHEDULE_COLUMNS}
-"""
-
-_RESET_SCHEDULE_FAILURES = f"""
-    UPDATE schedules SET consecutive_failures = 0, updated_at = now()
-     WHERE id = $1
-    RETURNING {_SCHEDULE_COLUMNS}
-"""
-
-_CLAIM_DUE_SCHEDULE = f"""
-    UPDATE schedules SET next_fire_at = $2, updated_at = now()
-     WHERE id = $1 AND enabled AND next_fire_at <= now()
-    RETURNING {_SCHEDULE_COLUMNS}
-"""
-
-# No owner filter — the clock (`scheduler/`) works across every operator's schedules at
-# once, the one place in this module that legitimately does. `enabled` rides in the
-# WHERE rather than being filtered in Python so the index on `(next_fire_at) WHERE
-# enabled` (migration `0005`) is what answers this, not a table scan.
-_SELECT_DUE_SCHEDULES = f"""
-    SELECT {_SCHEDULE_COLUMNS} FROM schedules WHERE enabled AND next_fire_at <= now()
 """
 
 
@@ -870,13 +939,13 @@ async def create_schedule(
 async def get_schedule(
     conn: Conn, *, schedule_id: int, owner_principal: str
 ) -> asyncpg.Record | None:
-    return await conn.fetchrow(_SELECT_SCHEDULE, schedule_id, owner_principal)
+    return await conn.fetchrow(_SCHEDULES.select, schedule_id, owner_principal)
 
 
 async def list_schedules_for_team(
     conn: Conn, *, team_id: int, owner_principal: str
 ) -> list[asyncpg.Record]:
-    return list(await conn.fetch(_SELECT_SCHEDULES_FOR_TEAM, team_id, owner_principal))
+    return list(await conn.fetch(_SCHEDULES.select_for_team, team_id, owner_principal))
 
 
 async def update_schedule(
@@ -903,7 +972,7 @@ async def update_schedule(
 async def set_schedule_enabled(
     conn: Conn, *, schedule_id: int, owner_principal: str, enabled: bool
 ) -> asyncpg.Record | None:
-    return await conn.fetchrow(_SET_SCHEDULE_ENABLED, schedule_id, owner_principal, enabled)
+    return await conn.fetchrow(_SCHEDULES.set_enabled, schedule_id, owner_principal, enabled)
 
 
 async def delete_schedule(conn: Conn, *, schedule_id: int, owner_principal: str) -> bool:
@@ -916,22 +985,22 @@ async def delete_schedule(conn: Conn, *, schedule_id: int, owner_principal: str)
     the fire rows that point at runs (specs/teams-schedules, "Harmonogram i wyzwalacz dają
     się usunąć").
     """
-    row = await conn.fetchrow(_DELETE_SCHEDULE, schedule_id, owner_principal)
+    row = await conn.fetchrow(_SCHEDULES.delete, schedule_id, owner_principal)
     return row is not None
 
 
 async def disable_schedule_for_failures(
     conn: Conn, *, schedule_id: int, reason: str
 ) -> asyncpg.Record | None:
-    return await conn.fetchrow(_DISABLE_SCHEDULE_FOR_FAILURES, schedule_id, reason)
+    return await conn.fetchrow(_SCHEDULES.disable_for_failures, schedule_id, reason)
 
 
 async def increment_schedule_failures(conn: Conn, *, schedule_id: int) -> asyncpg.Record | None:
-    return await conn.fetchrow(_INCREMENT_SCHEDULE_FAILURES, schedule_id)
+    return await conn.fetchrow(_SCHEDULES.increment_failures, schedule_id)
 
 
 async def reset_schedule_failures(conn: Conn, *, schedule_id: int) -> asyncpg.Record | None:
-    return await conn.fetchrow(_RESET_SCHEDULE_FAILURES, schedule_id)
+    return await conn.fetchrow(_SCHEDULES.reset_failures, schedule_id)
 
 
 async def claim_due_schedule(
@@ -939,21 +1008,14 @@ async def claim_due_schedule(
 ) -> asyncpg.Record | None:
     """`None` means somebody else already claimed this fire, or it was disabled between
     being listed as due and this call — either way, this caller does nothing further."""
-    return await conn.fetchrow(_CLAIM_DUE_SCHEDULE, schedule_id, next_fire_at)
+    return await conn.fetchrow(_SCHEDULES.claim_due, schedule_id, next_fire_at)
 
 
 async def list_due_schedules(conn: Conn) -> list[asyncpg.Record]:
     """Every enabled schedule due right now, across every owner — what one wake of the
     clock works through before attempting to claim each (specs/teams-schedules)."""
-    return list(await conn.fetch(_SELECT_DUE_SCHEDULES))
+    return list(await conn.fetch(_SCHEDULES.select_due))
 
-
-_TRIGGER_COLUMNS = """
-    id, team_id, owner_principal, revision_mode, pinned_revision_id, tool_name,
-    arguments, field_path, comparison, threshold, cooldown_seconds,
-    poll_interval_seconds, next_check_at, last_result, last_checked_at, last_fired_at,
-    enabled, disabled_reason, consecutive_failures, created_at, updated_at
-"""
 
 _INSERT_TRIGGER = f"""
     INSERT INTO triggers (
@@ -963,16 +1025,6 @@ _INSERT_TRIGGER = f"""
     )
     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10, $11, $12)
     RETURNING {_TRIGGER_COLUMNS}
-"""
-
-_SELECT_TRIGGER = f"""
-    SELECT {_TRIGGER_COLUMNS} FROM triggers WHERE id = $1 AND owner_principal = $2
-"""
-
-_SELECT_TRIGGERS_FOR_TEAM = f"""
-    SELECT {_TRIGGER_COLUMNS} FROM triggers
-     WHERE team_id = $1 AND owner_principal = $2
-     ORDER BY created_at DESC, id DESC
 """
 
 _UPDATE_TRIGGER = f"""
@@ -985,53 +1037,12 @@ _UPDATE_TRIGGER = f"""
     RETURNING {_TRIGGER_COLUMNS}
 """
 
-_SET_TRIGGER_ENABLED = f"""
-    UPDATE triggers
-       SET enabled = $3,
-           disabled_reason = CASE WHEN $3 THEN NULL ELSE disabled_reason END,
-           consecutive_failures = CASE WHEN $3 THEN 0 ELSE consecutive_failures END,
-           updated_at = now()
-     WHERE id = $1 AND owner_principal = $2
-    RETURNING {_TRIGGER_COLUMNS}
-"""
-
-_DELETE_TRIGGER = """
-    DELETE FROM triggers WHERE id = $1 AND owner_principal = $2 RETURNING id
-"""
-
-_DISABLE_TRIGGER_FOR_FAILURES = f"""
-    UPDATE triggers SET enabled = false, disabled_reason = $2, updated_at = now()
-     WHERE id = $1
-    RETURNING {_TRIGGER_COLUMNS}
-"""
-
-_INCREMENT_TRIGGER_FAILURES = f"""
-    UPDATE triggers SET consecutive_failures = consecutive_failures + 1, updated_at = now()
-     WHERE id = $1
-    RETURNING {_TRIGGER_COLUMNS}
-"""
-
-_RESET_TRIGGER_FAILURES = f"""
-    UPDATE triggers SET consecutive_failures = 0, updated_at = now()
-     WHERE id = $1
-    RETURNING {_TRIGGER_COLUMNS}
-"""
-
-_CLAIM_TRIGGER_FOR_CHECK = f"""
-    UPDATE triggers SET next_check_at = $2, updated_at = now()
-     WHERE id = $1 AND enabled AND next_check_at <= now()
-    RETURNING {_TRIGGER_COLUMNS}
-"""
-
-_SELECT_DUE_TRIGGERS = f"""
-    SELECT {_TRIGGER_COLUMNS} FROM triggers WHERE enabled AND next_check_at <= now()
-"""
-
 # The edge-detection state itself: what the condition answered, and when it last fired.
 # `result` is `NULL` when the tool server could not be asked at all — a third value, not
 # a `false` (specs/teams-triggers, "Niedostępność serwera narzędzi to nie jest niespełniony
 # warunek") — so this statement, not the caller's Python, is what a reader trusts for
-# "was this ever actually evaluated".
+# "was this ever actually evaluated". The one statement in this half with no counterpart
+# on the other: a schedule has nothing to evaluate.
 _RECORD_TRIGGER_CHECK = f"""
     UPDATE triggers
        SET last_result = $2,
@@ -1080,13 +1091,13 @@ async def create_trigger(
 async def get_trigger(
     conn: Conn, *, trigger_id: int, owner_principal: str
 ) -> asyncpg.Record | None:
-    return await conn.fetchrow(_SELECT_TRIGGER, trigger_id, owner_principal)
+    return await conn.fetchrow(_TRIGGERS.select, trigger_id, owner_principal)
 
 
 async def list_triggers_for_team(
     conn: Conn, *, team_id: int, owner_principal: str
 ) -> list[asyncpg.Record]:
-    return list(await conn.fetch(_SELECT_TRIGGERS_FOR_TEAM, team_id, owner_principal))
+    return list(await conn.fetch(_TRIGGERS.select_for_team, team_id, owner_principal))
 
 
 async def update_trigger(
@@ -1123,28 +1134,28 @@ async def update_trigger(
 async def set_trigger_enabled(
     conn: Conn, *, trigger_id: int, owner_principal: str, enabled: bool
 ) -> asyncpg.Record | None:
-    return await conn.fetchrow(_SET_TRIGGER_ENABLED, trigger_id, owner_principal, enabled)
+    return await conn.fetchrow(_TRIGGERS.set_enabled, trigger_id, owner_principal, enabled)
 
 
 async def delete_trigger(conn: Conn, *, trigger_id: int, owner_principal: str) -> bool:
     """The same as `delete_schedule`, for the other half of the pair — including the fire
     history going with it and the runs staying."""
-    row = await conn.fetchrow(_DELETE_TRIGGER, trigger_id, owner_principal)
+    row = await conn.fetchrow(_TRIGGERS.delete, trigger_id, owner_principal)
     return row is not None
 
 
 async def disable_trigger_for_failures(
     conn: Conn, *, trigger_id: int, reason: str
 ) -> asyncpg.Record | None:
-    return await conn.fetchrow(_DISABLE_TRIGGER_FOR_FAILURES, trigger_id, reason)
+    return await conn.fetchrow(_TRIGGERS.disable_for_failures, trigger_id, reason)
 
 
 async def increment_trigger_failures(conn: Conn, *, trigger_id: int) -> asyncpg.Record | None:
-    return await conn.fetchrow(_INCREMENT_TRIGGER_FAILURES, trigger_id)
+    return await conn.fetchrow(_TRIGGERS.increment_failures, trigger_id)
 
 
 async def reset_trigger_failures(conn: Conn, *, trigger_id: int) -> asyncpg.Record | None:
-    return await conn.fetchrow(_RESET_TRIGGER_FAILURES, trigger_id)
+    return await conn.fetchrow(_TRIGGERS.reset_failures, trigger_id)
 
 
 async def claim_trigger_for_check(
@@ -1152,13 +1163,13 @@ async def claim_trigger_for_check(
 ) -> asyncpg.Record | None:
     """`None` means another process is already evaluating this trigger's next check, or
     it was disabled in between — mirrors `claim_due_schedule`."""
-    return await conn.fetchrow(_CLAIM_TRIGGER_FOR_CHECK, trigger_id, next_check_at)
+    return await conn.fetchrow(_TRIGGERS.claim_due, trigger_id, next_check_at)
 
 
 async def list_due_triggers(conn: Conn) -> list[asyncpg.Record]:
     """Every enabled trigger due for a check right now, across every owner — mirrors
     `list_due_schedules`."""
-    return list(await conn.fetch(_SELECT_DUE_TRIGGERS))
+    return list(await conn.fetch(_TRIGGERS.select_due))
 
 
 async def record_trigger_check(
@@ -1173,24 +1184,6 @@ _INSERT_FIRE = """
     )
     VALUES ($1, $2, $3, $4, $5, $6)
     RETURNING id, schedule_id, trigger_id, fired_at, outcome, reason, run_id, skipped_count
-"""
-
-_SELECT_FIRES_FOR_SCHEDULE = """
-    SELECT f.id, f.schedule_id, f.trigger_id, f.fired_at, f.outcome, f.reason,
-           f.run_id, f.skipped_count
-      FROM schedule_fires f
-      JOIN schedules s ON s.id = f.schedule_id
-     WHERE f.schedule_id = $1 AND s.owner_principal = $2
-     ORDER BY f.fired_at DESC, f.id DESC
-"""
-
-_SELECT_FIRES_FOR_TRIGGER = """
-    SELECT f.id, f.schedule_id, f.trigger_id, f.fired_at, f.outcome, f.reason,
-           f.run_id, f.skipped_count
-      FROM schedule_fires f
-      JOIN triggers t ON t.id = f.trigger_id
-     WHERE f.trigger_id = $1 AND t.owner_principal = $2
-     ORDER BY f.fired_at DESC, f.id DESC
 """
 
 
@@ -1215,44 +1208,20 @@ async def record_fire(
 async def list_fires_for_schedule(
     conn: Conn, *, schedule_id: int, owner_principal: str
 ) -> list[asyncpg.Record]:
-    return list(await conn.fetch(_SELECT_FIRES_FOR_SCHEDULE, schedule_id, owner_principal))
+    return list(await conn.fetch(_SCHEDULES.select_fires, schedule_id, owner_principal))
 
 
 async def list_fires_for_trigger(
     conn: Conn, *, trigger_id: int, owner_principal: str
 ) -> list[asyncpg.Record]:
-    return list(await conn.fetch(_SELECT_FIRES_FOR_TRIGGER, trigger_id, owner_principal))
-
-
-# `runs` carries no `schedule_id`/`trigger_id` (design.md, "Trzy nowe tabele, zero zmian
-# w tabelach fazy 1") — the fire that started a run is the only record of which run
-# belongs to which schedule or trigger, so "is the previous run of this schedule still
-# working" is answered by walking back to the most recent `started` fire and reading the
-# status of the run it names, not by a join `runs` itself could ever offer.
-_LATEST_RUN_STATUS_FOR_SCHEDULE = """
-    SELECT r.status
-      FROM schedule_fires f
-      JOIN runs r ON r.id = f.run_id
-     WHERE f.schedule_id = $1 AND f.outcome = 'started'
-     ORDER BY f.fired_at DESC
-     LIMIT 1
-"""
-
-_LATEST_RUN_STATUS_FOR_TRIGGER = """
-    SELECT r.status
-      FROM schedule_fires f
-      JOIN runs r ON r.id = f.run_id
-     WHERE f.trigger_id = $1 AND f.outcome = 'started'
-     ORDER BY f.fired_at DESC
-     LIMIT 1
-"""
+    return list(await conn.fetch(_TRIGGERS.select_fires, trigger_id, owner_principal))
 
 
 async def latest_run_status_for_schedule(conn: Conn, *, schedule_id: int) -> str | None:
     """`None` when this schedule has never started a run — never mistaken for "the run
     finished", which is a real status (`completed`) and not the absence of one."""
-    return await conn.fetchval(_LATEST_RUN_STATUS_FOR_SCHEDULE, schedule_id)
+    return await conn.fetchval(_SCHEDULES.latest_run_status, schedule_id)
 
 
 async def latest_run_status_for_trigger(conn: Conn, *, trigger_id: int) -> str | None:
-    return await conn.fetchval(_LATEST_RUN_STATUS_FOR_TRIGGER, trigger_id)
+    return await conn.fetchval(_TRIGGERS.latest_run_status, trigger_id)
