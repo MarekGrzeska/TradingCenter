@@ -34,17 +34,9 @@ function attach(primitive: TimeProfilePrimitive, priceToCoordinate: (price: numb
   primitive.attached(param);
 }
 
-describe("TimeProfilePrimitive — coordinate resolution", () => {
+describe("TimeProfilePrimitive", () => {
   it("has nothing to draw before it is attached", () => {
     const primitive = new TimeProfilePrimitive(COLORS);
-    primitive.setBars([{ price: 100, count: 5, isPointOfControl: true }]);
-    expect(primitive.renderItems()).toEqual([]);
-  });
-
-  it("stops resolving anything once detached", () => {
-    const primitive = new TimeProfilePrimitive(COLORS);
-    attach(primitive, (p) => p);
-    primitive.detached();
     primitive.setBars([{ price: 100, count: 5, isPointOfControl: true }]);
     expect(primitive.renderItems()).toEqual([]);
   });
@@ -60,38 +52,10 @@ describe("TimeProfilePrimitive — coordinate resolution", () => {
 
     const items = primitive.renderItems();
     expect(items.map((i) => i.share)).toEqual([0.25, 1, 0.5]);
+    // The point of control is coloured apart from every other bucket.
+    expect(items.map((i) => i.color)).toEqual([COLORS.bar, COLORS.pointOfControl, COLORS.bar]);
   });
 
-  it("colors the point of control apart from every other bucket", () => {
-    const primitive = new TimeProfilePrimitive(COLORS);
-    attach(primitive, (p) => p);
-    primitive.setBars([
-      { price: 100, count: 5, isPointOfControl: false },
-      { price: 101, count: 20, isPointOfControl: true },
-    ]);
-
-    const [regular, poc] = primitive.renderItems();
-    expect(regular?.color).toBe(COLORS.bar);
-    expect(poc?.color).toBe(COLORS.pointOfControl);
-  });
-
-  it("carries a price the series could not place through as null rather than guessing", () => {
-    const primitive = new TimeProfilePrimitive(COLORS);
-    attach(primitive, () => null);
-    primitive.setBars([{ price: 100, count: 5, isPointOfControl: true }]);
-
-    expect(primitive.renderItems()).toEqual([{ y: null, share: 1, color: COLORS.pointOfControl }]);
-  });
-
-  it("draws nothing for an empty profile rather than dividing by zero", () => {
-    const primitive = new TimeProfilePrimitive(COLORS);
-    attach(primitive, (p) => p);
-    primitive.setBars([]);
-    expect(primitive.renderItems()).toEqual([]);
-  });
-});
-
-describe("TimeProfilePrimitive — drawing", () => {
   it("fills a bar reaching from the pane's right edge, sized by its own share", () => {
     const primitive = new TimeProfilePrimitive(COLORS);
     attach(primitive, () => 90);

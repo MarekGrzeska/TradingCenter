@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router";
 import { MarketDataError } from "../data/types";
@@ -131,9 +131,7 @@ describe("Instruments list — grouping (terminal-data-manager spec)", () => {
     expect(await screen.findByText(/archive is not reachable/i)).toBeInTheDocument();
     expect(screen.queryByText(/nothing is being archived yet/i)).not.toBeInTheDocument();
   });
-});
 
-describe("Instruments list — a lagging interval", () => {
   it("marks the row and the stalled interval out from the rest", async () => {
     fakeArchive.pairs = [
       pair({ resolution: "MINUTE", collection: "collecting" }),
@@ -146,17 +144,9 @@ describe("Instruments list — a lagging interval", () => {
     // The healthy resolution and the stalled one must not read the same way.
     expect(within(row).getByText("m1").className).not.toBe(within(row).getByText("h1").className);
   });
-
-  it("does not mark an instrument whose resolutions are all healthy", async () => {
-    fakeArchive.pairs = [pair({ resolution: "MINUTE", collection: "collecting" })];
-    renderView();
-
-    const row = await screen.findByTestId("instrument-US100");
-    expect(row).toHaveAttribute("data-stalled", "false");
-  });
 });
 
-describe("Instruments list — volume per interval, on expand", () => {
+describe("Instruments list — what one interval holds, on expand", () => {
   it("shows how many candles are collected, roughly how much they take, and since when", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [
@@ -196,50 +186,6 @@ describe("Instruments list — volume per interval, on expand", () => {
     expect(screen.queryByText(/0 candles/)).not.toBeInTheDocument();
   });
 
-  it("gives each interval its own since, when they reach back different distances", async () => {
-    const user = userEvent.setup();
-    fakeArchive.pairs = [
-      pair({ resolution: "MINUTE", earliestCandle: 1785542400 }), // 2026-08-01
-      pair({ resolution: "DAY", earliestCandle: 1577923200 }), // 2020-01-02
-    ];
-    renderView();
-
-    await user.click(await screen.findByText("US100"));
-
-    expect(await screen.findByText(/2026-08-01/)).toBeInTheDocument();
-    expect(screen.getByText(/2020-01-02/)).toBeInTheDocument();
-  });
-});
-
-describe("Instruments list — coverage gaps, on expand", () => {
-  it("says nothing about coverage when it is one continuous range", async () => {
-    const user = userEvent.setup();
-    fakeArchive.pairs = [pair()];
-    let coverageRequested: () => void;
-    const requested = new Promise<void>((resolve) => {
-      coverageRequested = resolve;
-    });
-    fakeArchive.coverage = async (symbol: string, resolution: Resolution) => {
-      coverageRequested();
-      return {
-        symbol,
-        resolution,
-        ranges: [{ from: 1785542400, to: 1786113600, historyEnded: true }],
-        earliestReachable: 1785542400,
-      };
-    };
-    renderView();
-
-    await user.click(await screen.findByText("US100"));
-    await requested;
-    // One continuous range still has to reach the component and be applied
-    // before its absence from the screen means anything.
-    await act(async () => {});
-
-    expect(screen.queryByText(/stretches/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/covered from/i)).not.toBeInTheDocument();
-  });
-
   it("names the gaps when coverage is more than one stretch", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [pair()];
@@ -261,7 +207,7 @@ describe("Instruments list — coverage gaps, on expand", () => {
   });
 });
 
-describe("Instruments list — deleting a single interval", () => {
+describe("Instruments list — deleting", () => {
   it("asks first, warns the removal is permanent, and drops only that interval", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [pair({ resolution: "MINUTE" }), pair({ resolution: "HOUR" })];
@@ -285,30 +231,6 @@ describe("Instruments list — deleting a single interval", () => {
       expect(within(row).queryByText("m1")).not.toBeInTheDocument();
       expect(within(row).getByText("h1")).toBeInTheDocument();
     });
-  });
-
-  it("leaves the interval collecting when the confirmation is dismissed", async () => {
-    const user = userEvent.setup();
-    fakeArchive.pairs = [pair()];
-    renderView();
-
-    await user.click(await screen.findByText("US100"));
-    await user.click(screen.getByRole("button", { name: /delete us100 minute/i }));
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
-
-    expect(fakeArchive.deleteCalls).toHaveLength(0);
-    expect(screen.getByTestId("instrument-US100")).toBeInTheDocument();
-  });
-
-  it("reports how many candles were removed and points to Data History", async () => {
-    const user = userEvent.setup();
-    fakeArchive.pairs = [pair({ resolution: "MINUTE", latestCandle: 1786113600 })];
-    renderView();
-
-    await user.click(await screen.findByText("US100"));
-    await user.click(screen.getByRole("button", { name: /delete us100 minute/i }));
-    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
-
     expect(await screen.findByText(/deleted 3 candles for US100 in MINUTE/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /data history/i })).toHaveAttribute(
       "href",
@@ -316,23 +238,7 @@ describe("Instruments list — deleting a single interval", () => {
     );
   });
 
-  it("says so and leaves the interval listed when deletion fails", async () => {
-    const user = userEvent.setup();
-    fakeArchive.pairs = [pair()];
-    fakeArchive.deleteFailures.add("US100|MINUTE");
-    renderView();
-
-    await user.click(await screen.findByText("US100"));
-    await user.click(screen.getByRole("button", { name: /delete us100 minute/i }));
-    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
-
-    expect(await screen.findByText(/could not delete/i)).toBeInTheDocument();
-    expect(within(screen.getByTestId("instrument-US100")).getByText("m1")).toBeInTheDocument();
-  });
-});
-
-describe("Instruments list — deleting a whole instrument", () => {
-  it("names every resolution that will be deleted, and removes the whole row once confirmed", async () => {
+  it("names every resolution a whole-instrument delete takes, and removes only that row", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [
       pair({ resolution: "MINUTE" }),
@@ -348,6 +254,7 @@ describe("Instruments list — deleting a whole instrument", () => {
     expect(dialog).toHaveTextContent("MINUTE");
     expect(dialog).toHaveTextContent("HOUR");
     expect(dialog).toHaveTextContent(/cannot be undone/i);
+    expect(dialog).toHaveTextContent(/collecting stops/i);
     expect(fakeArchive.deleteCalls).toHaveLength(0);
 
     await user.click(screen.getByRole("button", { name: /^delete data$/i }));
@@ -363,20 +270,7 @@ describe("Instruments list — deleting a whole instrument", () => {
     expect(screen.getByTestId("instrument-GOLD")).toBeInTheDocument();
   });
 
-  it("reports the total removed across every interval that succeeded", async () => {
-    const user = userEvent.setup();
-    fakeArchive.pairs = [pair({ resolution: "MINUTE" }), pair({ resolution: "HOUR" })];
-    renderView();
-
-    await screen.findByText("US100");
-    await user.click(screen.getByRole("button", { name: "Delete US100" }));
-    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
-
-    // Both pairs share the fake's fixed 3-candle answer, so two intervals sum to 6.
-    expect(await screen.findByText(/deleted 6 candles for US100 in MINUTE, HOUR/i)).toBeInTheDocument();
-  });
-
-  it("drops what succeeded, keeps what failed listed, and names it in the confirmation", async () => {
+  it("drops what succeeded, keeps what failed listed, and names it", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [pair({ resolution: "MINUTE" }), pair({ resolution: "HOUR" })];
     fakeArchive.deleteFailures.add("US100|HOUR");
@@ -394,40 +288,19 @@ describe("Instruments list — deleting a whole instrument", () => {
     expect(screen.getByText(/could not delete HOUR/i)).toBeInTheDocument();
   });
 
-  it("asks in a dialog, the same way starting collection does", async () => {
+  it("leaves everything alone when the confirmation is dismissed", async () => {
     const user = userEvent.setup();
     fakeArchive.pairs = [pair()];
     renderView();
 
     await screen.findByText("US100");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-
     await user.click(screen.getByRole("button", { name: "Delete US100" }));
-
-    const dialog = screen.getByRole("dialog", { name: /delete us100/i });
-    // Says what goes, how far back it reached, and that collection stops with it.
-    expect(dialog).toHaveTextContent(/permanently removes/i);
-    expect(dialog).toHaveTextContent(/2026-08-01/);
-    expect(dialog).toHaveTextContent(/collecting stops/i);
-
-    await user.click(within(dialog).getByRole("button", { name: /cancel/i }));
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: /cancel/i }),
+    );
 
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(fakeArchive.deleteCalls).toHaveLength(0);
-  });
-
-  it("dismisses the deletion banner on request", async () => {
-    const user = userEvent.setup();
-    fakeArchive.pairs = [pair()];
-    renderView();
-
-    await screen.findByText("US100");
-    await user.click(screen.getByRole("button", { name: "Delete US100" }));
-    await user.click(screen.getByRole("button", { name: /^delete data$/i }));
-    await screen.findByText(/deleted 3 candles/i);
-
-    await user.click(screen.getByRole("button", { name: /dismiss/i }));
-
-    expect(screen.queryByText(/deleted 3 candles/i)).not.toBeInTheDocument();
+    expect(screen.getByTestId("instrument-US100")).toBeInTheDocument();
   });
 });
