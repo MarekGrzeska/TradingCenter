@@ -38,15 +38,15 @@
 
 ## 6. Infrastruktura i CI
 
-- [ ] 6.1 `infra/app-service.tf`: dopisać `agent` i `teams` do `allowed_applications` archiwum; przestawić `MARKET_MCP_URL` i `MARKET_MCP_SCOPE` u obu modułów
-- [ ] 6.2 `.github/workflows/checks.yml`: usunąć job `market-mcp` i jego filtr; potwierdzić 13 → 12 jobów
-- [ ] 6.3 `terraform fmt` i `validate` na obu rootach
+- [x] 6.1 `infra/app-service.tf`: dopisać `agent` i `teams` do `allowed_applications` archiwum; przestawić `MARKET_MCP_URL` i `MARKET_MCP_SCOPE` u obu modułów
+- [x] 6.2 `.github/workflows/checks.yml`: usunąć job `market-mcp` i jego filtr; potwierdzić 13 → 12 jobów
+- [x] 6.3 `terraform fmt` i `validate` na obu rootach
 
 ## 7. Usunięcie modułu — dopiero po działającej nowej drodze
 
-- [ ] 7.1 Usunąć `modules/market-mcp/` w całości
-- [ ] 7.2 Usunąć `.github/workflows/deploy-market-mcp.yml`
-- [ ] 7.3 `infra/app-service.tf`: usunąć `azurerm_linux_web_app.market_mcp`, `module.market_mcp_easy_auth`, `data.azuread_service_principal.market_mcp_managed_identity`, `output market_mcp_hostname` i lokalne `market_mcp_*`
+- [x] 7.1 Usunąć `modules/market-mcp/` w całości
+- [x] 7.2 Usunąć `.github/workflows/deploy-market-mcp.yml`
+- [x] 7.3 `infra/app-service.tf`: usunąć `azurerm_linux_web_app.market_mcp`, `module.market_mcp_easy_auth`, `data.azuread_service_principal.market_mcp_managed_identity`, `output market_mcp_hostname` i lokalne `market_mcp_*`
 
 ## 8. Dokumentacja
 

@@ -13,8 +13,10 @@
 #
 # These blocks can be deleted once the move has been applied and the state reflects it —
 # they are a one-time instruction, not a permanent part of the configuration. Keeping them
-# costs nothing and documents where these twenty-one came from, so they stay until the change
-# is archived.
+# costs nothing and documents where these came from, so they stay until the change
+# is archived. Four have gone already, and not because they were applied: they named
+# market-mcp's Easy Auth triplet and its Key Vault policy, and that module is a route in
+# market-data now — a move to an address that no longer exists says nothing to anybody.
 
 moved {
   from = azuread_application.market_data_easy_auth
@@ -34,21 +36,6 @@ moved {
 moved {
   from = random_uuid.market_data_scope
   to   = module.market_data_easy_auth.random_uuid.scope[0]
-}
-
-moved {
-  from = azuread_application.market_mcp_easy_auth
-  to   = module.market_mcp_easy_auth.azuread_application.this
-}
-
-moved {
-  from = azuread_service_principal.market_mcp_easy_auth
-  to   = module.market_mcp_easy_auth.azuread_service_principal.this
-}
-
-moved {
-  from = azuread_application_password.market_mcp_easy_auth
-  to   = module.market_mcp_easy_auth.azuread_application_password.this
 }
 
 moved {
@@ -141,11 +128,6 @@ moved {
 moved {
   from = azurerm_key_vault_access_policy.teams
   to   = azurerm_key_vault_access_policy.apps["teams"]
-}
-
-moved {
-  from = azurerm_key_vault_access_policy.market_mcp
-  to   = azurerm_key_vault_access_policy.apps["market-mcp"]
 }
 
 moved {
