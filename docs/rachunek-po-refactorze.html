@@ -166,8 +166,9 @@
 <main>
   <h2 id="werdykt">Iteracja po iteracji — co obiecano, co jest</h2>
   <p class="section-note">Stan zmierzony na kodzie, nie przepisany z planu; zaktualizowany
-  19.08 po scaleniu PR&nbsp;#166 i&nbsp;#167. Pięć iteracji domkniętych, jedna zatrzymana na
-  uczciwie zmierzonym murze, jedna nie powinna już powstać w ogóle.</p>
+  20.08 po scaleniu kierunku B (PR&nbsp;#176), wcześniej 19.08 po PR&nbsp;#166 i&nbsp;#167.
+  Pięć iteracji domkniętych, jedna zatrzymana na uczciwie zmierzonym murze, jedna nie
+  powinna już powstać w ogóle.</p>
 
   <div class="table-wrap"><table>
     <thead><tr><th>Iteracja</th><th>Obietnica</th><th>Stan zmierzony</th><th>Ocena</th></tr></thead>
@@ -268,18 +269,21 @@
     </div>
     <div class="side wn">
       <h4>Winien — wisi</h4>
-      <p class="sub">zweryfikowane ponownie 19.08, na main @ 53e87dc — cztery z sześciu pozycji
-      stoją bez zmian, dwie spłacone</p>
+      <p class="sub">zweryfikowane ponownie 20.08, po scaleniu B — trzy z sześciu pozycji
+      stoją bez zmian, trzy spłacone</p>
       <ul>
         <li><b>spłacone — pakiety deployują się</b>: kierunek E wykonany i scalony 19.08
         (PR&nbsp;#168), wszystkie trzy pozycje — sześć filtrów <code>deploy-*.yml</code> po
         konsumpcji z <code>pyproject.toml</code>, macierz pakietów w CI z przecięcia diffu
         z katalogiem, <code>COPY packages/</code> zwężone per konsument. Flagowa teza
         iteracji 1 jest odtąd prawdziwa na warstwie, która się liczy</li>
-        <li><b>bliźniaki agent↔teams żyją</b> — <code>tools/client.py</code>
-        (<span class="num">508/488</span> linii, stan niezmieniony) z adnotacją wprost:
-        „a correction travels by copying". Choroba, którą pakiety miały leczyć, trwa
-        wewnątrz granicy modułów</li>
+        <li><b>spłacone — bliźniaki agent↔teams</b>: nie wyciągnięte do pakietu, tylko
+        pozbawione drugiego egzemplarza (kierunek B, 20.08, PR&nbsp;#176).
+        <code>tools/client.py</code> <span class="num">508/488</span> linii, rejestr,
+        provider, katalog modeli, <code>auth.py</code>, <code>migrations/env.py</code>
+        i&nbsp;<code>conftest.py</code> — jeden egzemplarz każdego. To jest ta klasa dryfu,
+        której pakiety <i>nie mogły</i> objąć, bo różnica była typem, nie zachowaniem: kod
+        znikł, bo przestał mieć powód, żeby być dwa razy</li>
         <li><b>zdecydowane ≠ wykonane, nadal</b>: alerty stoją, gdzie kalibracja planu mówi 3;
         transport stdio z testem parzystości stoi, choć jego usunięcie zapisano; dwa martwe
         <code>.dockerignore</code> uczą fałszywego modelu — żadna z trzech pozycji nie drgnęła</li>
@@ -438,7 +442,7 @@
   <div class="dir">
     <div class="dir-head"><span class="dir-letter">A</span>
     <h4>MCP wraca do właściciela danych</h4>
-    <span class="chip run">market-mcp wykonane 19.08 — zostaje A(teams)</span>
+    <span class="chip run">market-mcp wykonane 19.08 · A(teams) wypadło — patrz B</span>
     <span class="horizon">market-mcp: 1 dzień · teams-mcp: 2–3 dni</span></div>
     <p><code>market-mcp</code> montuje się jako <code>/mcp</code> w market-data,
     <code>teams-mcp</code> — w teams. To, co w tych modułach jest wartością, przeżywa w całości
@@ -469,7 +473,8 @@
   <div class="dir">
     <div class="dir-head"><span class="dir-letter">B</span>
     <h4>agent + teams = workbench</h4>
-    <span class="horizon">1–2 tyg., fazowane</span></div>
+    <span class="chip run">faza 1 wykonana 20.08 — PR #176</span>
+    <span class="horizon">szacowano 1–2 tyg.; faza 1 zajęła 1 dzień</span></div>
     <p>Największy pojedynczy zysk na stole. Pętla teams to strukturalnie tura agenta — mówią
     to oba docstringi; agent jest zespołem-jedynką z SSE i wykresem. Deklarowane bliźniaki
     (<code>tools/client.py</code>, rejestr, provider, config, env migracji — ~1 000 linii
@@ -490,6 +495,45 @@
     istnieć podwójnie.</p>
     <p class="cost">największa operacja planu — fazować: najpierw wspólny pakiet procesu
     (dwa routery w jednej aplikacji, osobne schematy), scalanie pętli na końcu albo wcale.</p>
+
+    <p class="gain"><b>Zmierzone po fazie 1</b> (261 plików, +5 139 / −12 356): trzy moduły
+    stały się jednym, −2 App Service, −2 workflow deploy, −2 triplety Entra, −2 porty
+    (8050, 8070), joby CI 12 → 10, migawka kontraktu teams (3 047 linii JSON) skasowana.
+    Wywołanie narzędzia zespołowego: 2 hopy → <b>0</b>. Zielone: workbench 838 testów,
+    terminal 915, scripts 151, tc-runtime 22, ruff i pyright czysto, terraform plan bez
+    jednego <code>forces replacement</code>.</p>
+
+    <p class="cost"><b>Trzy poprawki do tego, co ta karta zapowiadała</b>, i wszystkie trzy
+    wyszły dopiero z roboty:</p>
+    <ul>
+      <li><b>„API dla terminala bez zmian ścieżek" było nieprawdą</b> i nie dało się jej
+      uratować: <code>GET /models</code> i <code>GET /usage</code> istniały na obu
+      powierzchniach z <i>różnym kształtem odpowiedzi</i>. Zespołowe poszły na
+      <code>/teams/models</code> i <code>/teams/usage</code>; reszta tras stoi tam, gdzie
+      stała. Dwa bazowe URL-e stały się jednym, jak obiecano.</li>
+      <li><b>Token operatora nie miał czym być w jednym procesie.</b> Plan mówił, że pojedzie
+      do narzędzi tak jak jechał — nie pojedzie: token wymaga walidatora, a między czatem
+      a trasami zespołów nie ma już żadnego. Jedzie <b>principal</b>, zdjęty z obsługiwanego
+      żądania, który przez walidator już przeszedł. Poświadczeń w locie o jedno mniej,
+      a <code>agent/tools/client.py</code> traci cały tryb sesji-na-wywołanie.</li>
+      <li><b>A(teams) zostało pominięte, nie odłożone.</b> Wmontowanie teams-mcp w teams,
+      żeby chwilę później B usunęło ostatni powód, dla którego ta trasa jest po sieci, to
+      przeniesienie tego samego kodu dwa razy. Cena pominięcia jest realna i zapisana: B
+      ruszyło z jednym udanym A zamiast dwóch.</li>
+    </ul>
+
+    <p class="cost"><b>Czego faza 1 świadomie nie zrobiła:</b> pętla tury nietknięta
+    (<code>agent/turn.py</code>, <code>teams/runner/loop.py</code>), bazy niescalone,
+    katalogi i klucze niescalone, App Service <b>nieprzemianowany</b> — nazwa zasobu to tu
+    tożsamość, a nie etykieta: bierze ją tożsamość zarządzana, jest nią
+    <code>DATABASE_USER</code>, a jej identyfikator aplikacji stoi na trzech listach w dwóch
+    cudzych modułach. Moduł nazywa się <code>workbench</code>, zasób nadal
+    <code>app-tradingcenter-agent</code>. Gorsze niż jedna nazwa, tańsze niż migracja
+    tożsamości, której nikt nie zamawiał.</p>
+
+    <p class="cost"><b>Jedno zdanie tej karty przeżyło pomiar bez zmiany i warto je
+    powtórzyć, bo brzmi jak zysk:</b> tokeny na turę nie spadły. Narzędzia zespołowe nadal
+    jadą do modelu w tej samej liczbie i za tę samą powierzchnię.</p>
   </div>
 
   <div class="dir">
@@ -592,22 +636,29 @@
 
   <h2 id="stan">Stan docelowy w liczbach</h2>
   <div class="table-wrap"><table>
-    <thead><tr><th>Miara</th><th>Dziś</th><th>Po A–C</th></tr></thead>
+    <thead><tr><th>Miara</th><th>Przed A</th><th>Po B (20.08, zmierzone)</th><th>Po A–C (cel)</th></tr></thead>
     <tbody>
-      <tr><td>Deployowalne moduły</td><td class="r">8</td><td class="r">4–5</td></tr>
-      <tr><td>App Services (backend)</td><td class="r">7</td><td class="r">3–4</td></tr>
-      <tr><td>Workflowy deploy (callery)</td><td class="r">7</td><td class="r">3–4</td></tr>
-      <tr><td>Dockerfile / uv.lock</td><td class="r">7 / 11</td><td class="r">3–4 / 7–8</td></tr>
-      <tr><td>Joby w checks.yml</td><td class="r">13</td><td class="r">~9</td></tr>
-      <tr><td>Snapshoty kontraktów (linie JSON)</td><td class="r">3 (7 561)</td><td class="r">0–1</td></tr>
-      <tr><td>Instancje easy-auth-app</td><td class="r">6</td><td class="r">2</td></tr>
-      <tr><td>Porty do zapamiętania</td><td class="r">9</td><td class="r">5–6</td></tr>
-      <tr><td>Pliki .env.example / zmienne</td><td class="r">9 / 87</td><td class="r">5 / ~50</td></tr>
-      <tr><td>Hopy sieciowe na wywołanie narzędzia</td><td class="r">2</td><td class="r">0–1</td></tr>
-      <tr><td>Ręczne punkty rejestracji topologii</td><td class="r">6+ miejsc</td><td class="r">mniej miejsc, bo mniej bytów</td></tr>
-      <tr><td>Proza normatywna (linie)</td><td class="r">~38 500</td><td class="r">cel: &lt; 20 000 (kierunek D)</td></tr>
+      <tr><td>Deployowalne moduły</td><td class="r">8</td><td class="r">5</td><td class="r">4–5</td></tr>
+      <tr><td>App Services (backend)</td><td class="r">7</td><td class="r">4</td><td class="r">3–4</td></tr>
+      <tr><td>Workflowy deploy (callery)</td><td class="r">7</td><td class="r">4</td><td class="r">3–4</td></tr>
+      <tr><td>Dockerfile / uv.lock</td><td class="r">7 / 11</td><td class="r">4 / 8</td><td class="r">3–4 / 7–8</td></tr>
+      <tr><td>Joby w checks.yml</td><td class="r">13</td><td class="r">10</td><td class="r">~9</td></tr>
+      <tr><td>Snapshoty kontraktów (linie JSON)</td><td class="r">3 (7 561)</td><td class="r">1 (1 593)</td><td class="r">0–1</td></tr>
+      <tr><td>Instancje easy-auth-app</td><td class="r">6</td><td class="r">3</td><td class="r">2</td></tr>
+      <tr><td>Porty do zapamiętania</td><td class="r">9</td><td class="r">5</td><td class="r">5–6</td></tr>
+      <tr><td>Pliki .env.example / zmienne</td><td class="r">9 / 87</td><td class="r">5 / 62</td><td class="r">5 / ~50</td></tr>
+      <tr><td>Hopy sieciowe na wywołanie narzędzia</td><td class="r">2</td><td class="r">1 archiwum · <b>0</b> zespoły</td><td class="r">0–1</td></tr>
+      <tr><td>Ręczne punkty rejestracji topologii</td><td class="r">6+ miejsc</td><td class="r">mniej o dwa byty</td><td class="r">mniej miejsc, bo mniej bytów</td></tr>
+      <tr><td>Proza normatywna (linie)</td><td class="r">~38 500</td><td class="r">nie mierzone — D nie ruszyło</td><td class="r">cel: &lt; 20 000 (kierunek D)</td></tr>
     </tbody>
   </table></div>
+
+  <div class="callout"><p><b>Środkowa kolumna jest policzona, nie przepisana z planu</b> — i pięć
+  z jedenastu pozycji <b>trafiło już w cel A–C</b>, zanim C w ogóle ruszyło. To nie jest
+  powód do świętowania, tylko do przeczytania celu jeszcze raz: część widełek „3–4" opierała
+  się na tym, że trading-mcp też zniknie, a decyzja o nim ma zapaść <i>pomiarem</i>. Jeśli
+  zostanie osobno — co jest legalnym wynikiem C — to ta kolumna już jest stanem
+  docelowym.</p></div>
 
   <div class="callout risk">
     <p><b>Co się oddaje — nazwane wprost.</b> Granulacja deployu spada z ośmiu niezależnych
@@ -620,14 +671,25 @@
     scaleniu, tak jak iteracja 1 sfalsyfikowała trzy liczby audytu.</p>
   </div>
 
-  <p><b>Kolejność: A(market) wykonane → A(teams) ← tu jesteśmy → B → D → C.</b>
+  <p><b>Kolejność: A(market) wykonane → B faza 1 wykonana ← tu jesteśmy → D → C. A(teams) wypadło z sekwencji — B zjadło jego przedmiot.</b>
   Resztki iteracji 5 wypadły z sekwencji (weszły 19.08, PR&nbsp;#167), <b>E jest
   wykonane i scalone</b> (PR&nbsp;#168) — dziura unieważniająca opłacony zysk iteracji 1
   zamknięta tego samego dnia, którego rachunek ją nazwał — a <b>A na market-mcp jest
   wykonane</b> (19.08). Było najtańszym dowodem wzorca i dowiodło go z jedną poprawką do
   własnego kosztorysu: rusztowania było więcej, niż mówiła deklaracja, a autoryzacja per
-  trasa okazała się nowym plikiem, nie przeprowadzką gotowego mechanizmu. B dopiero po dwóch
-  udanych A, fazowane. D może iść równolegle z każdym. Jak w poprzednim planie: każdy krok
-  zostawia system w całości działającym i można przerwać po dowolnym — z tą różnicą, że tym
-  razem „zdecydowane" ma stać się „wykonane", zanim dopisze się cokolwiek nowego.</p>
+  trasa okazała się nowym plikiem, nie przeprowadzką gotowego mechanizmu.</p>
+
+  <p><b>Warunek „B dopiero po dwóch udanych A" został złamany świadomie</b> i to jest
+  jedyna decyzja tego dnia, która wymaga obrony. A(teams) miało wmontować teams-mcp jako
+  trasę w teams; B usuwa ostatni powód, dla którego ta trasa jest po sieci. Wykonanie obu
+  znaczy przenieść ten sam kod dwa razy — więc B ruszyło z jednym dowodem wzorca zamiast
+  dwóch, a A(teams) nie zostało odłożone, tylko straciło przedmiot. Faza 1 zajęła dzień
+  wobec szacowanych 1–2 tygodni, co jest różnicą na tyle dużą, że warto ją traktować jako
+  ostrzeżenie przed następnym szacunkiem, nie jako zasługę.</p>
+
+  <p>Zostaje D (może iść równolegle z każdym), C (po pomiarze, nie z rozpędu) i faza 2 B —
+  scalanie pętli tury — którą ta karta od początku dopuszczała jako „na końcu albo wcale",
+  i która nadal nie ma powodu, żeby ruszyć. Jak w poprzednim planie: każdy krok zostawia
+  system w całości działającym i można przerwać po dowolnym — z tą różnicą, że tym razem
+  „zdecydowane" ma stać się „wykonane", zanim dopisze się cokolwiek nowego.</p>
 </main>
