@@ -48,13 +48,15 @@ jobs:
       packages: ${{ steps.filter.outputs.packages }}
       scripts: ${{ steps.filter.outputs.scripts }}
       infra: ${{ steps.filter.outputs.infra }}
-      # The matrix the `packages` job runs, read off the directory rather than typed
-      # out. A hand-written list plus a `^packages/` filter is a job that goes green
-      # having tested somebody else's package: the filter fires for a package the
-      # matrix never names. Same shape as the deploy probes that passed on the
-      # previous container until iteration 0 — a mechanism reporting success without
-      # having checked the thing it exists for.
-      package-list: ${{ steps.packages.outputs.list }}
+      # The matrix the `packages` job runs: the diff's package names intersected with
+      # the directory. The diff alone would list a package this PR deletes (whose
+      # working-directory no longer exists); the directory alone runs all three on a
+      # one-package edit, which is what this used to do. A package added by the PR is
+      # in the diff by definition, so the original hazard — a job going green having
+      # tested somebody else's package — stays closed. Empty means the `packages`
+      # output fired on this file itself; then every package runs, because a change
+      # to how the checks run has to be exercised by running them.
+      package-list: ${{ steps.filter.outputs.package-list }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -164,15 +166,22 @@ jobs:
               echo "$name=false" >> "$GITHUB_OUTPUT"
             fi
           done
+          # See the `package-list` output above for why this is diff ∩ directory.
+          all_pkgs="$(ls -1 packages)"
+          touched="$(printf '%s\n' "$changed" | sed -n 's|^packages/\([^/]*\)/.*|\1|p' | sort -u)"
+          list=""
+          for p in $touched; do
+            if printf '%s\n' "$all_pkgs" | grep -qxF "$p"; then
+              list="$list$p"$'\n'
+            fi
+          done
+          if [ -z "$list" ]; then
+            list="$all_pkgs"
+          fi
+          json="$(printf '%s' "$list" | jq -R . | jq -sc .)"
+          echo "package-list=$json" >> "$GITHUB_OUTPUT"
           echo "--- decisions ---"
           cat "$GITHUB_OUTPUT"
-      - id: packages
-        name: Which packages exist
-        run: |
-          set -euo pipefail
-          list=$(ls -1 packages | jq -R . | jq -sc .)
-          echo "packages: $list"
-          echo "list=$list" >> "$GITHUB_OUTPUT"
 
   capital-gateway:
     name: capital-gateway
@@ -297,8 +306,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       # One job per package rather than a loop, so a failure names which one — and the
-      # list comes from `changes`, which reads `packages/`, so adding a package cannot
-      # leave it untested while the job reports green.
+      # list comes from `changes`, which intersects the diff with the directory, so a
+      # one-package edit runs one package and adding a package cannot leave it
+      # untested while the job reports green.
       fail-fast: false
       matrix:
         package: ${{ fromJSON(needs.changes.outputs.package-list) }}
