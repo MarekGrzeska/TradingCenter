@@ -873,6 +873,7 @@
   <div class="iter">
     <div class="iter-head"><span class="iter-num">6</span>
     <h4>Szablon nowego modułu — kryterium „tani nowy moduł" domknięte na stałe</h4>
+    <span class="status-pill next">Nie zaczęte</span>
     <span class="horizon">~3 dni</span></div>
     <p>Generator (copier/cookiecutter) produkujący gotowy moduł: zależność od
     <code>tc-runtime</code> (i opcjonalnie <code>tc-mcp-kit</code>), Dockerfile, wpis w tabeli
@@ -882,6 +883,58 @@
     <p class="gain-line">nowy serwis w &lt; pół dnia, z definicji zgodny z nowymi zasadami —
     podwojenie liczby modułów przestaje być liniowym podwojeniem utrzymania.</p>
   </div>
+
+  <h2 id="zostalo">Co zostało otwarte</h2>
+  <p class="section-note">Stan na 19.08. Cztery pozycje, i tylko jedna z nich jest jeszcze
+  refactorem — pozostałe trzy przestały nim być z trzech różnych powodów, i każdy z nich
+  jest tu nazwany, żeby następny czytelnik nie zaczął od pisania kodu tam, gdzie zaczyna się
+  od czegoś innego.</p>
+
+  <div class="table-wrap"><table>
+    <thead><tr><th>Co</th><th>Gdzie</th><th>Czym to jest</th><th>Czego wymaga, zanim ruszy kod</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><b>Iteracja 6 — szablon nowego modułu</b></td>
+        <td><code>tools/</code>, CI</td>
+        <td class="num">refactor</td>
+        <td>niczego — jedyna pozycja, którą można zacząć od gałęzi. ~3 dni, opis wyżej.</td>
+      </tr>
+      <tr>
+        <td><b>Trasy zagnieżdżone w Teams</b> — przebieg dostaje adres</td>
+        <td><code>terminal/src/teams/</code>, <code>App.tsx</code></td>
+        <td class="num miss">nowe wymaganie</td>
+        <td>propozycja OpenSpec. <code>terminal-shell</code> mówi „Zakładki są adresowalne"
+        i kończy się na zakładce; cała nawigacja Teams siedzi w jednym
+        <code>useState&lt;Open&gt;</code>, więc przebieg nie przeżywa odświeżenia i nie da się
+        go nikomu podać. Adres dla przebiegu rozszerza to wymaganie na wnętrze zakładki.</td>
+      </tr>
+      <tr>
+        <td><b><code>model_validate</code> + <code>FromAlias</code></b> — koniec ręcznych
+        <code>of()</code></td>
+        <td><code>market_data/contract.py</code></td>
+        <td class="num miss">kontrakt między modułami</td>
+        <td>propozycja OpenSpec. Test mechaniczny z <code>CLAUDE.md</code> jest tu celowo
+        bezwarunkowy: nie pyta, czy opublikowany dokument się zmieni (nie zmieni), tylko czy
+        zmiana dotyka pliku z tej kategorii.</td>
+      </tr>
+      <tr>
+        <td><b><code>agentChatStore</code></b> — kontroler na sprawę zamiast licznika i flag</td>
+        <td><code>terminal/src/agent/</code></td>
+        <td class="num">refactor z nazwanym ryzykiem</td>
+        <td>niczego formalnie — ale <code>finishTurn</code> dzieli <code>transcriptSeq</code>
+        z ładowaniem transkryptu, więc naiwne przerwanie ubija odczyt należący do trwającej
+        tury. To jest ta jedna rzecz, którą trzeba rozstrzygnąć przed pisaniem.</td>
+      </tr>
+    </tbody>
+  </table></div>
+
+  <p><b>Trzy pozycje z pierwotnego planu zostały zamknięte inaczej, niż zapowiadał</b>, i nie
+  wracają: <code>Zustand</code> (szkielet do usunięcia to ~34 linie na cztery store'y, reszta
+  jest domeną), rozbicie <code>compute_indicators</code> na dwa narzędzia (policzone: dokłada
+  ~1 100 znaków schematu zamiast ujmować) oraz cel &lt;&nbsp;10&nbsp;tys. tokenów powierzchni
+  narzędzi (zejście poniżej wymaga usunięcia <code>outputSchema</code> — jedynej obrony, która
+  w tym repo wykryła realną awarię odpowiedzi narzędzia). Każda z nich ma swój akapit wyżej,
+  przy iteracji, która ją zmierzyła.</p>
 
   <h2 id="metryki">Jak poznamy, że się udało</h2>
   <div class="table-wrap"><table>
