@@ -1,6 +1,6 @@
 """The indicator catalogue, and computing entries from it — reduced to what changed
 recently rather than the full series a chart would draw
-(`market-mcp-tools`, "Zestaw odpowiada na pytania o wskaźniki").
+(`market-data-tools`, "Zestaw odpowiada na pytania o wskaźniki").
 """
 
 from __future__ import annotations
@@ -11,18 +11,21 @@ from datetime import UTC, datetime, timedelta
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from .. import reduce, uncertainty
-from ..client import UpstreamClient
-from ..errors import ToolRefusal
-from ..upstream import UpstreamCandles
+from ..contract import IndicatorSpecIn as IndicatorSpecWire
+from ..contract import IndicatorsRequest
+from ..indicators import service
+from ..reads import read_series
+from . import reduce, uncertainty
 from ._shared import (
     PERIOD_SECONDS,
     READ_ONLY,
+    ToolContext,
     WindowedOut,
     is_tracked,
-    raise_for_status,
+    resolution_of,
     resolve_window,
 )
+from .errors import ToolRefusal
 
 INDICATOR_HARD_LIMIT = 10
 SERIES_POINT_LIMIT = 200
@@ -125,7 +128,12 @@ class IndicatorMarkerOut(BaseModel):
 
 
 class IndicatorZoneOut(BaseModel):
-    from_: datetime = Field(alias="from")
+    # The two aliases rather than `alias="from"`, for `WindowedOut`'s reason: with one
+    # alias pyright synthesizes an `__init__` taking a parameter literally named `from`,
+    # which is a keyword and so unwritable, and rejects every construction here. These
+    # used to be built by `model_validate` off a dict, where that never came up; they are
+    # built by name now that the shapes arrive as models rather than as JSON.
+    from_: datetime = Field(validation_alias="from", serialization_alias="from")
     to: datetime | None = None
     top: float
     bottom: float
@@ -137,7 +145,7 @@ class IndicatorZoneOut(BaseModel):
 
 
 class IndicatorLevelOut(BaseModel):
-    from_: datetime = Field(alias="from")
+    from_: datetime = Field(validation_alias="from", serialization_alias="from")
     price: float
     label: str | None = None
     count: int | None = None
@@ -196,41 +204,52 @@ class LevelsNearPriceOut(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
-# --- catalogue cache (task 3.1) ---
+# --- the catalogue, read where it lives ---
 
 
-class _CatalogueCache:
+class _Catalogue:
+    """The catalogue as two lookups, built once at first use.
+
+    It used to be fetched over HTTP and cached because the fetch cost a request. There is
+    no request now — this is the same tuple the REST route serves — so what is left of the
+    cache is the two dictionaries, worth building once rather than per call.
+    """
+
     def __init__(self) -> None:
-        self.algorithm_version: int | None = None
-        self.entries: dict[str, dict] = {}
-        self.by_alias: dict[str, str] = {}
+        self._entries: dict | None = None
+        self._by_alias: dict[str, str] = {}
+        self._algorithm_version: int = 0
+
+    def _load(self) -> None:
+        if self._entries is not None:
+            return
+        published = service.catalogue()
+        self._algorithm_version = published.algorithm_version
+        self._entries = {entry.id: entry for entry in published.indicators}
+        self._by_alias = {
+            alias: entry.id for entry in published.indicators for alias in entry.aliases
+        }
 
     @property
-    def is_loaded(self) -> bool:
-        return self.algorithm_version is not None
+    def algorithm_version(self) -> int:
+        self._load()
+        return self._algorithm_version
 
-    def store(self, algorithm_version: int, raw_entries: list[dict]) -> None:
-        self.algorithm_version = algorithm_version
-        self.entries = {e["id"]: e for e in raw_entries}
-        self.by_alias = {alias: e["id"] for e in raw_entries for alias in e.get("aliases", [])}
+    @property
+    def entries(self) -> dict:
+        self._load()
+        assert self._entries is not None
+        return self._entries
 
-
-async def _ensure_catalogue(upstream: UpstreamClient, cache: _CatalogueCache) -> _CatalogueCache:
-    """Fetched once per process and kept. The catalogue changes on a market-data
-    deployment — which restarts this module's own process too, far more often than an
-    operator would ever notice one stale entry."""
-    if cache.is_loaded:
-        return cache
-    response = await upstream.get("/indicators")
-    await raise_for_status(response)
-    body = response.json()
-    cache.store(body["algorithm_version"], body["indicators"])
-    return cache
+    @property
+    def by_alias(self) -> dict[str, str]:
+        self._load()
+        return self._by_alias
 
 
-def _validate_spec_ids(spec_ids: list[str], cache: _CatalogueCache) -> None:
+def _validate_spec_ids(spec_ids: list[str], cache: _Catalogue) -> None:
     """Refuses rather than substitutes — an alias hit is named, never silently used
-    (specs/market-mcp-tools, "MUST NOT podstawić w jego miejsce wpisu podobnego z nazwy")."""
+    (specs/market-data-tools, "MUST NOT podstawić w jego miejsce wpisu podobnego z nazwy")."""
     for entry_id in spec_ids:
         if entry_id in cache.entries:
             continue
@@ -244,44 +263,43 @@ def _validate_spec_ids(spec_ids: list[str], cache: _CatalogueCache) -> None:
         )
 
 
-def _param_out(p: dict) -> IndicatorParamOut:
+def _param_out(param) -> IndicatorParamOut:
     return IndicatorParamOut(
-        name=p["name"], type=p["type"], default=p["default"], min=p["min"], max=p["max"]
+        name=param.name, type=param.type, default=param.default, min=param.min, max=param.max
     )
 
 
-def _summary_out(entry: dict) -> IndicatorSummaryOut:
+def _summary_out(entry) -> IndicatorSummaryOut:
     return IndicatorSummaryOut(
-        id=entry["id"],
-        name=entry["name"],
-        group=entry["group"],
-        output=entry["output"],
-        aliases=entry.get("aliases", []),
-        params=[_param_out(p) for p in entry["params"]],
+        id=entry.id,
+        name=entry.name,
+        group=entry.group,
+        output=entry.output,
+        aliases=list(entry.aliases),
+        params=[_param_out(p) for p in entry.params],
     )
 
 
-def _detail_out(entry: dict) -> IndicatorDetailOut:
-    render = entry["render"]
+def _detail_out(entry) -> IndicatorDetailOut:
     return IndicatorDetailOut(
-        id=entry["id"],
-        name=entry["name"],
-        aliases=entry.get("aliases", []),
-        group=entry["group"],
-        output=entry["output"],
-        params=[_param_out(p) for p in entry["params"]],
+        id=entry.id,
+        name=entry.name,
+        aliases=list(entry.aliases),
+        group=entry.group,
+        output=entry.output,
+        params=[_param_out(p) for p in entry.params],
         lines=[
-            IndicatorLineSpecOut(key=line["key"], label=line["label"], style=line.get("style"))
-            for line in entry.get("lines", [])
+            IndicatorLineSpecOut(key=line.key, label=line.label, style=line.style)
+            for line in entry.lines
         ],
         render=IndicatorRenderOut(
-            pane=render["pane"],
-            style=render["style"],
-            scale=render.get("scale", "price"),
-            autoscale=render.get("autoscale", True),
-            levels=render.get("levels", []),
+            pane=entry.render.pane,
+            style=entry.render.style,
+            scale=entry.render.scale,
+            autoscale=entry.render.autoscale,
+            levels=list(entry.render.levels),
         ),
-        warmup_kind=entry["warmup_kind"],
+        warmup_kind=entry.warmup_kind,
     )
 
 
@@ -298,15 +316,11 @@ def _latest_window(to_iso: str | None, resolution: str) -> tuple[datetime, datet
 
 
 async def _closes_by_time(
-    upstream: UpstreamClient, symbol: str, resolution: str, start: datetime, end: datetime
+    ctx: ToolContext, symbol: str, resolution: str, start: datetime, end: datetime
 ) -> dict[datetime, float]:
-    response = await upstream.get(
-        f"/candles/{symbol}",
-        params={"resolution": resolution, "from": start.isoformat(), "to": end.isoformat()},
-    )
-    await raise_for_status(response)
-    parsed = UpstreamCandles.model_validate(response.json())
-    return {c.time: c.close for c in parsed.candles if c.close is not None}
+    async with ctx.pool.acquire() as conn:
+        series = await read_series(conn, symbol, resolution_of(resolution), start, end)
+    return {c.period_start: c.close for c in series.candles if c.close is not None}
 
 
 def _last_non_none_index(values: list[float | None]) -> int | None:
@@ -379,28 +393,32 @@ def _line_latest(
 
 
 def _reduce_result(
-    raw: dict,
-    entry: dict,
+    raw,
+    entry,
     times: list[datetime],
     mode: str,
     closes: dict[datetime, float],
 ) -> ComputedIndicatorOut:
-    output = entry.get("output", "unknown") if entry else "unknown"
-    settled = raw.get("settled", False)
-    error = raw.get("error")
+    output = entry.output if entry is not None else "unknown"
     notes = (
-        [uncertainty.unsettled_sentence(raw.get("warmup_bars"))]
-        if not settled and not error
+        [uncertainty.unsettled_sentence(raw.warmup_bars)]
+        if not raw.settled and not raw.error
         else []
     )
-    base = {"id": raw["id"], "output": output, "settled": settled, "error": error, "notes": notes}
-    if error:
+    base = {
+        "id": raw.id,
+        "output": output,
+        "settled": raw.settled,
+        "error": raw.error,
+        "notes": notes,
+    }
+    if raw.error:
         return ComputedIndicatorOut(**base)
 
-    line_labels = {line["key"]: line["label"] for line in entry.get("lines", [])} if entry else {}
+    line_labels = {line.key: line.label for line in entry.lines} if entry is not None else {}
 
     if output == "lines":
-        lines = raw.get("lines") or {}
+        lines = raw.lines or {}
         if mode == "latest":
             latest = [
                 _line_latest(key, line_labels.get(key, key), values, times, closes)
@@ -426,23 +444,44 @@ def _reduce_result(
         )
 
     if output == "markers":
-        kept, dropped = reduce.cap_by_freshness(raw.get("markers") or [], "time", NEAR_PRICE_LIMIT)
+        ordered = sorted(raw.markers or [], key=lambda m: m.time, reverse=True)
+        kept, dropped = reduce.truncate(ordered, NEAR_PRICE_LIMIT)
         return ComputedIndicatorOut(
-            **base, markers=[IndicatorMarkerOut.model_validate(m) for m in kept], omitted=dropped
+            **base,
+            markers=[IndicatorMarkerOut(time=m.time, label=m.label, price=m.price) for m in kept],
+            omitted=dropped,
         )
 
     if output == "zones":
-        zones = raw.get("zones") or []
-        ordered = sorted(zones, key=lambda z: z.get("touched_at") or z["from"], reverse=True)
+        ordered = sorted(raw.zones or [], key=lambda z: z.touched_at or z.from_, reverse=True)
         kept, dropped = reduce.truncate(ordered, NEAR_PRICE_LIMIT)
         return ComputedIndicatorOut(
-            **base, zones=[IndicatorZoneOut.model_validate(z) for z in kept], omitted=dropped
+            **base,
+            zones=[
+                IndicatorZoneOut(
+                    from_=z.from_,
+                    to=z.to,
+                    top=z.top,
+                    bottom=z.bottom,
+                    direction=z.direction,
+                    touched_at=z.touched_at,
+                    filled_at=z.filled_at,
+                )
+                for z in kept
+            ],
+            omitted=dropped,
         )
 
     if output == "levels":
-        kept, dropped = reduce.cap_by_freshness(raw.get("levels") or [], "from", NEAR_PRICE_LIMIT)
+        ordered = sorted(raw.levels or [], key=lambda lv: lv.from_, reverse=True)
+        kept, dropped = reduce.truncate(ordered, NEAR_PRICE_LIMIT)
         return ComputedIndicatorOut(
-            **base, levels=[IndicatorLevelOut.model_validate(lv) for lv in kept], omitted=dropped
+            **base,
+            levels=[
+                IndicatorLevelOut(from_=lv.from_, price=lv.price, label=lv.label, count=lv.count)
+                for lv in kept
+            ],
+            omitted=dropped,
         )
 
     return ComputedIndicatorOut(**base)
@@ -459,7 +498,7 @@ def _chunks(items: list, size: int) -> Iterator[list]:
 def _near_price_item(
     indicator_id: str,
     kind: str,
-    time_iso: str,
+    moment: datetime,
     price: float,
     label: str | None,
     reference_price: float,
@@ -469,7 +508,7 @@ def _near_price_item(
     return NearPriceItemOut(
         indicator_id=indicator_id,
         kind=kind,
-        time=datetime.fromisoformat(time_iso),
+        time=moment,
         price=price,
         label=label,
         distance=distance,
@@ -477,8 +516,33 @@ def _near_price_item(
     )
 
 
-def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
-    catalogue = _CatalogueCache()
+async def _compute(
+    ctx: ToolContext,
+    symbol: str,
+    resolution: str,
+    start: datetime,
+    end: datetime,
+    specs: list[tuple[str, dict[str, float]]],
+):
+    """One computation, through the same service and the same ceiling the REST route uses.
+
+    `ctx.indicator_limiter` is that route's own semaphore, not a second one: two entrances
+    to one computation with one ceiling between them (design.md, D1).
+    """
+    request = IndicatorsRequest(
+        resolution=resolution_of(resolution),
+        from_=start,
+        to=end,
+        specs=[IndicatorSpecWire(id=entry_id, params=params) for entry_id, params in specs],
+    )
+    try:
+        return await service.compute(symbol, request, ctx.pool, ctx.indicator_limiter)
+    except service.IndicatorRequestRejected as rejected:
+        raise ToolRefusal(str(rejected)) from rejected
+
+
+def register(mcp: FastMCP, ctx: ToolContext) -> None:
+    catalogue = _Catalogue()
 
     @mcp.tool(annotations=READ_ONLY)
     async def list_indicators(group: str | None = None) -> ListIndicatorsOut:
@@ -487,13 +551,11 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         beforehand. Narrow to one group (e.g. "averages", "oscillators", "structure")
         to keep the reply short; omit it for the whole catalogue.
         """
-        cache = await _ensure_catalogue(upstream, catalogue)
-        assert cache.algorithm_version is not None  # _ensure_catalogue guarantees this
-        entries = list(cache.entries.values())
+        entries = list(catalogue.entries.values())
         if group is not None:
-            entries = [e for e in entries if e["group"] == group]
+            entries = [e for e in entries if e.group == group]
         return ListIndicatorsOut(
-            algorithm_version=cache.algorithm_version,
+            algorithm_version=catalogue.algorithm_version,
             group=group,
             indicators=[_summary_out(e) for e in entries],
         )
@@ -504,9 +566,8 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         output shape and how it likes to be drawn. Read this before calling
         compute_indicators with a parameter you are not sure is in range.
         """
-        cache = await _ensure_catalogue(upstream, catalogue)
-        _validate_spec_ids([id], cache)
-        return _detail_out(cache.entries[id])
+        _validate_spec_ids([id], catalogue)
+        return _detail_out(catalogue.entries[id])
 
     @mcp.tool(annotations=READ_ONLY)
     async def compute_indicators(
@@ -535,8 +596,7 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         if mode not in ("latest", "series"):
             raise ToolRefusal(f"mode must be 'latest' or 'series', got {mode!r}.")
 
-        cache = await _ensure_catalogue(upstream, catalogue)
-        _validate_spec_ids([s.id for s in specs], cache)
+        _validate_spec_ids([s.id for s in specs], catalogue)
 
         start, end = (
             resolve_window(from_iso, to_iso)
@@ -544,41 +604,30 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
             else _latest_window(to_iso, resolution)
         )
 
-        body = {
-            "resolution": resolution,
-            "from": start.isoformat(),
-            "to": end.isoformat(),
-            "specs": [{"id": s.id, "params": s.params} for s in specs],
-        }
-        response = await upstream.compute_indicators(symbol, body)
-        await raise_for_status(response)
-        payload = response.json()
-        times = [datetime.fromisoformat(t) for t in payload["times"]]
+        computed = await _compute(
+            ctx, symbol, resolution, start, end, [(s.id, s.params) for s in specs]
+        )
+        times = list(computed.times)
 
         notes: list[str] = []
         uncovered_note = uncertainty.uncovered_sentence(
-            [
-                (datetime.fromisoformat(u["from"]), datetime.fromisoformat(u["to"]))
-                for u in payload.get("uncovered", [])
-            ]
+            [(u.from_, u.to) for u in computed.uncovered]
         )
         if uncovered_note:
             notes.append(uncovered_note)
-        derived_note = uncertainty.derived_sentence(payload["derived"], resolution)
+        derived_note = uncertainty.derived_sentence(computed.derived, resolution)
         if derived_note:
             notes.append(derived_note)
 
         needs_closes = mode == "latest" and any(
-            not r.get("error") and cache.entries.get(r["id"], {}).get("output") == "lines"
-            for r in payload["results"]
+            not raw.error and getattr(catalogue.entries.get(raw.id), "output", None) == "lines"
+            for raw in computed.results
         )
-        closes = (
-            await _closes_by_time(upstream, symbol, resolution, start, end) if needs_closes else {}
-        )
+        closes = await _closes_by_time(ctx, symbol, resolution, start, end) if needs_closes else {}
 
         results = [
-            _reduce_result(raw, cache.entries.get(raw["id"], {}), times, mode, closes)
-            for raw in payload["results"]
+            _reduce_result(raw, catalogue.entries.get(raw.id), times, mode, closes)
+            for raw in computed.results
         ]
 
         return ComputeIndicatorsOut(
@@ -601,12 +650,11 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         Narrow to one group to avoid surveying the whole catalogue; omit it to check
         everything.
         """
-        cache = await _ensure_catalogue(upstream, catalogue)
         candidates = [
             e
-            for e in cache.entries.values()
-            if e["output"] in ("levels", "zones", "markers")
-            and (group is None or e["group"] == group)
+            for e in catalogue.entries.values()
+            if e.output in ("levels", "zones", "markers")
+            and (group is None or e.group == group)
         ]
         if not candidates:
             raise ToolRefusal(
@@ -618,72 +666,51 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         end = datetime.now(UTC)
         start = end - LEVELS_LOOKBACK
 
-        price_response = await upstream.get(
-            f"/candles/{symbol}",
-            params={"resolution": resolution, "from": start.isoformat(), "to": end.isoformat()},
-        )
-        await raise_for_status(price_response)
-        price_parsed = UpstreamCandles.model_validate(price_response.json())
-        if not price_parsed.candles:
-            tracked = await is_tracked(upstream, symbol, resolution)
+        async with ctx.pool.acquire() as conn:
+            price_series = await read_series(conn, symbol, resolution_of(resolution), start, end)
+        if not price_series.candles:
+            tracked = await is_tracked(ctx, symbol, resolution)
             raise ToolRefusal(uncertainty.empty_series_sentence(symbol, tracked))
-        last_candle = price_parsed.candles[-1]
+        last_candle = price_series.candles[-1]
         if last_candle.close is None:
             raise ToolRefusal(
                 f"{symbol}'s last candle has no close price to measure distance from."
             )
         reference_price = last_candle.close
-        reference_time = last_candle.time
+        reference_time = last_candle.period_start
 
         items: list[NearPriceItemOut] = []
         for chunk in _chunks(candidates, INDICATOR_HARD_LIMIT):
-            body = {
-                "resolution": resolution,
-                "from": start.isoformat(),
-                "to": end.isoformat(),
-                "specs": [{"id": e["id"], "params": {}} for e in chunk],
-            }
-            response = await upstream.compute_indicators(symbol, body)
-            await raise_for_status(response)
-            payload = response.json()
-            for raw in payload["results"]:
-                if raw.get("error"):
+            computed = await _compute(
+                ctx, symbol, resolution, start, end, [(e.id, {}) for e in chunk]
+            )
+            for raw in computed.results:
+                if raw.error:
                     continue
-                entry_id = raw["id"]
-                for lv in raw.get("levels") or []:
+                for lv in raw.levels or []:
                     items.append(
                         _near_price_item(
-                            entry_id,
-                            "level",
-                            lv["from"],
-                            lv["price"],
-                            lv.get("label"),
-                            reference_price,
+                            raw.id, "level", lv.from_, lv.price, lv.label, reference_price
                         )
                     )
-                for z in raw.get("zones") or []:
-                    midpoint = (z["top"] + z["bottom"]) / 2
+                for z in raw.zones or []:
+                    midpoint = (z.top + z.bottom) / 2
                     items.append(
                         _near_price_item(
-                            entry_id,
+                            raw.id,
                             "zone",
-                            z.get("touched_at") or z["from"],
+                            z.touched_at or z.from_,
                             midpoint,
-                            z.get("direction"),
+                            z.direction,
                             reference_price,
                         )
                     )
-                for m in raw.get("markers") or []:
-                    if m.get("price") is None:
+                for m in raw.markers or []:
+                    if m.price is None:
                         continue
                     items.append(
                         _near_price_item(
-                            entry_id,
-                            "marker",
-                            m["time"],
-                            m["price"],
-                            m.get("label"),
-                            reference_price,
+                            raw.id, "marker", m.time, m.price, m.label, reference_price
                         )
                     )
 

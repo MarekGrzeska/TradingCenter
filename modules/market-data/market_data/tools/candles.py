@@ -2,24 +2,27 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from .. import reduce, uncertainty
-from ..client import UpstreamClient
-from ..errors import ToolRefusal
-from ..upstream import UpstreamCandles, UpstreamCoverage, UpstreamForming
+from ..models import Candle
+from ..reads import FormingState, Series, read_forming, read_pair_coverage, read_series
+from ..rollups import DerivedCandle
+from . import reduce, uncertainty
 from ._shared import (
     READ_ONLY,
+    ToolContext,
     WindowedOut,
     is_tracked,
-    raise_for_status,
+    resolution_of,
     resolve_window,
     tracked_pair,
     tracked_resolutions,
 )
+from .errors import ToolRefusal
 
 # design.md, "Sufity są liczbami w kodzie, nie wartościami w konfiguracji" — a ceiling
 # that lived in .env would drift from the description a caller was given for it.
@@ -121,41 +124,54 @@ class DescribeCoverageOut(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
-async def _newest_candle(
-    upstream: UpstreamClient, symbol: str, resolution: str, notes: list[str]
-) -> UpstreamCandles:
-    """The archive's newest candle for a pair, read at the instant `/pairs` reports for
-    it rather than found by widening a window. Appends the sentence that says which kind
-    of empty this is when there is nothing to read.
+def _rows(candles: Sequence[Candle | DerivedCandle]) -> list[dict]:
+    """The four edges and the instant, as the reduction expects them.
+
+    `time` rather than `period_start`: the reduction and every model here speak the wire's
+    word for it, and a candle carries a dozen fields a model has no use for.
     """
-    row = await tracked_pair(upstream, symbol, resolution)
-    newest = row.get("latest_candle") if row else None
-    empty = UpstreamCandles(
-        symbol=symbol, resolution=resolution, derived=False, candles=[], uncovered=[]
-    )
+    return [
+        {
+            "time": candle.period_start,
+            "open": candle.open,
+            "high": candle.high,
+            "low": candle.low,
+            "close": candle.close,
+        }
+        for candle in candles
+    ]
+
+
+async def _read_window(
+    ctx: ToolContext, symbol: str, resolution: str, start: datetime, end: datetime
+) -> Series:
+    async with ctx.pool.acquire() as conn:
+        return await read_series(conn, symbol, resolution_of(resolution), start, end)
+
+
+async def _newest_candle(
+    ctx: ToolContext, symbol: str, resolution: str, notes: list[str]
+) -> Series:
+    """The archive's newest candle for a pair, read at the instant the pair's own row
+    reports for it rather than found by widening a window. Appends the sentence that says
+    which kind of empty this is when there is nothing to read.
+    """
+    row = await tracked_pair(ctx, symbol, resolution)
+    newest = row.latest_candle if row else None
+    empty = Series(candles=[], derived=False, uncovered=[])
     if newest is None:
         notes.append(uncertainty.empty_series_sentence(symbol, row is not None))
         return empty
 
-    moment = datetime.fromisoformat(newest)
-    response = await upstream.get(
-        f"/candles/{symbol}",
-        params={
-            "resolution": resolution,
-            "from": moment.isoformat(),
-            # `to` is exclusive on market-data's side, so a second past the candle's own
-            # instant is the narrowest range that contains it.
-            "to": (moment + timedelta(seconds=1)).isoformat(),
-        },
-    )
-    await raise_for_status(response)
-    parsed = UpstreamCandles.model_validate(response.json())
-    if not parsed.candles:
+    # The read is exclusive at the top, so a second past the candle's own instant is the
+    # narrowest range that contains it.
+    series = await _read_window(ctx, symbol, resolution, newest, newest + timedelta(seconds=1))
+    if not series.candles:
         notes.append(uncertainty.empty_series_sentence(symbol, True))
-    return parsed
+    return series
 
 
-def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
+def register(mcp: FastMCP, ctx: ToolContext) -> None:
     @mcp.tool(annotations=READ_ONLY)
     async def get_candles(
         symbol: str,
@@ -173,14 +189,9 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         was asked: ask for a coarser resolution or a narrower window.
         """
         start, end = resolve_window(from_iso, to_iso)
-        response = await upstream.get(
-            f"/candles/{symbol}",
-            params={"resolution": resolution, "from": start.isoformat(), "to": end.isoformat()},
-        )
-        await raise_for_status(response)
-        parsed = UpstreamCandles.model_validate(response.json())
+        series = await _read_window(ctx, symbol, resolution, start, end)
 
-        raw = [c.model_dump() for c in parsed.candles]
+        raw = _rows(series.candles)
         if len(raw) > REFUSE_ABOVE_CANDLES:
             raise ToolRefusal(
                 f"{symbol} {resolution} over {start.isoformat()}..{end.isoformat()} is "
@@ -189,14 +200,14 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
             )
 
         notes: list[str] = []
-        uncovered_note = uncertainty.uncovered_sentence([(u.from_, u.to) for u in parsed.uncovered])
+        uncovered_note = uncertainty.uncovered_sentence(list(series.uncovered))
         if uncovered_note:
             notes.append(uncovered_note)
-        derived_note = uncertainty.derived_sentence(parsed.derived, resolution)
+        derived_note = uncertainty.derived_sentence(series.derived, resolution)
         if derived_note:
             notes.append(derived_note)
         if not raw:
-            tracked = await is_tracked(upstream, symbol, resolution)
+            tracked = await is_tracked(ctx, symbol, resolution)
             notes.append(uncertainty.empty_series_sentence(symbol, tracked))
 
         aggregated_candles, agg = reduce.aggregate_candles(raw, DEFAULT_CANDLE_TARGET)
@@ -230,46 +241,48 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         age could be from this second or from Friday's close. Prices are the **bid** side,
         the only side the archive holds.
         """
-        response = await upstream.get(
-            f"/candles/{symbol}/forming",
-            params={"resolution": resolution} if resolution else {},
-        )
-        await raise_for_status(response)
-        live = UpstreamForming.model_validate(response.json())
+        async with ctx.pool.acquire() as conn:
+            live = await read_forming(
+                conn,
+                ctx.hub,
+                ctx.instruments,
+                ctx.market_status,
+                symbol,
+                resolution_of(resolution) if resolution else None,
+            )
 
         notes: list[str] = []
-        if live.state == "forming" and live.candle is not None:
-            notes.append(uncertainty.forming_sentence(live.resolution or "current"))
+        if live.state is FormingState.FORMING and live.candle is not None:
+            answered_with = live.resolution.value if live.resolution else None
+            notes.append(uncertainty.forming_sentence(answered_with or "current"))
             return LastPriceOut(
                 symbol=symbol,
-                resolution=live.resolution,
-                time=live.candle.time,
+                resolution=answered_with,
+                time=live.candle.period_start,
                 close=live.candle.close,
-                age_seconds=(datetime.now(UTC) - live.candle.time).total_seconds(),
+                age_seconds=(datetime.now(UTC) - live.candle.period_start).total_seconds(),
                 forming=True,
                 market_open=live.market_open,
                 notes=notes,
             )
 
-        notes.append(uncertainty.no_live_price_sentence(symbol, live.state, live.market_open))
-        if live.state == "not_tracked":
+        notes.append(uncertainty.no_live_price_sentence(symbol, live.state.value, live.market_open))
+        if live.state is FormingState.NOT_TRACKED:
             # Nothing is collected for this symbol at any resolution, so there is no
             # settled candle to fall back to either — and the sentence above already says
             # what to do about it.
             return LastPriceOut(symbol=symbol, resolution=resolution, notes=notes)
 
-        settled_resolution = resolution or next(
-            iter(await tracked_resolutions(upstream, symbol)), None
-        )
+        settled_resolution = resolution or next(iter(await tracked_resolutions(ctx, symbol)), None)
         if settled_resolution is None:  # pragma: no cover - `not_tracked` covers this
             return LastPriceOut(symbol=symbol, resolution=None, notes=notes)
 
-        parsed = await _newest_candle(upstream, symbol, settled_resolution, notes)
-        derived_note = uncertainty.derived_sentence(parsed.derived, settled_resolution)
+        series = await _newest_candle(ctx, symbol, settled_resolution, notes)
+        derived_note = uncertainty.derived_sentence(series.derived, settled_resolution)
         if derived_note:
             notes.append(derived_note)
 
-        if not parsed.candles:
+        if not series.candles:
             return LastPriceOut(
                 symbol=symbol,
                 resolution=settled_resolution,
@@ -277,13 +290,13 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
                 notes=notes,
             )
 
-        latest = parsed.candles[-1]
+        latest = series.candles[-1]
         return LastPriceOut(
             symbol=symbol,
             resolution=settled_resolution,
-            time=latest.time,
+            time=latest.period_start,
             close=latest.close,
-            age_seconds=(datetime.now(UTC) - latest.time).total_seconds(),
+            age_seconds=(datetime.now(UTC) - latest.period_start).total_seconds(),
             market_open=live.market_open,
             notes=notes,
         )
@@ -302,24 +315,19 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         the series itself.
         """
         start, end = resolve_window(from_iso, to_iso)
-        response = await upstream.get(
-            f"/candles/{symbol}",
-            params={"resolution": resolution, "from": start.isoformat(), "to": end.isoformat()},
-        )
-        await raise_for_status(response)
-        parsed = UpstreamCandles.model_validate(response.json())
+        series = await _read_window(ctx, symbol, resolution, start, end)
 
         notes: list[str] = []
-        uncovered_note = uncertainty.uncovered_sentence([(u.from_, u.to) for u in parsed.uncovered])
+        uncovered_note = uncertainty.uncovered_sentence(list(series.uncovered))
         if uncovered_note:
             notes.append(uncovered_note)
-        derived_note = uncertainty.derived_sentence(parsed.derived, resolution)
+        derived_note = uncertainty.derived_sentence(series.derived, resolution)
         if derived_note:
             notes.append(derived_note)
 
-        candles = parsed.candles
+        candles = series.candles
         if not candles:
-            tracked = await is_tracked(upstream, symbol, resolution)
+            tracked = await is_tracked(ctx, symbol, resolution)
             notes.append(uncertainty.empty_series_sentence(symbol, tracked))
             return SummarizeRangeOut(
                 symbol=symbol,
@@ -327,13 +335,13 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
                 from_=start,
                 to=end,
                 candle_count=0,
-                gap_count=len(parsed.uncovered),
+                gap_count=len(series.uncovered),
                 notes=notes,
             )
 
         ranges = [c.high - c.low for c in candles if c.high is not None and c.low is not None]
         moves = [
-            (c.time, c.close - c.open)
+            (c.period_start, c.close - c.open)
             for c in candles
             if c.open is not None and c.close is not None
         ]
@@ -362,7 +370,7 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
             max_candle_range=max(ranges) if ranges else None,
             biggest_move=biggest[1] if biggest else None,
             biggest_move_at=biggest[0] if biggest else None,
-            gap_count=len(parsed.uncovered),
+            gap_count=len(series.uncovered),
             notes=notes,
         )
 
@@ -374,16 +382,15 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         recent first; older ones are counted in `omitted_ranges`, not dropped
         silently.
         """
-        response = await upstream.get(f"/coverage/{symbol}", params={"resolution": resolution})
-        await raise_for_status(response)
-        parsed = UpstreamCoverage.model_validate(response.json())
+        async with ctx.pool.acquire() as conn:
+            found = await read_pair_coverage(conn, symbol, resolution_of(resolution))
 
         notes: list[str] = []
-        if not parsed.ranges:
-            tracked = await is_tracked(upstream, symbol, resolution)
+        if not found.ranges:
+            tracked = await is_tracked(ctx, symbol, resolution)
             notes.append(uncertainty.empty_series_sentence(symbol, tracked))
 
-        ordered = sorted(parsed.ranges, key=lambda r: r.to, reverse=True)
+        ordered = sorted(found.ranges, key=lambda r: r.range_end, reverse=True)
         kept, dropped = reduce.truncate(ordered, COVERAGE_RANGE_LIMIT)
         if dropped:
             notes.append(
@@ -395,10 +402,12 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
             symbol=symbol,
             resolution=resolution,
             ranges=[
-                CoverageRangeOut(from_=r.from_, to=r.to, history_ended=r.history_ended)
+                CoverageRangeOut(
+                    from_=r.range_start, to=r.range_end, history_ended=r.history_ended
+                )
                 for r in kept
             ],
-            earliest_reachable=parsed.earliest_reachable,
+            earliest_reachable=found.earliest_reachable,
             omitted_ranges=dropped,
             notes=notes,
         )

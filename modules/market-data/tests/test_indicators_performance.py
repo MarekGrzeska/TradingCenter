@@ -17,7 +17,7 @@ import numpy as np
 from computers import LINE_ENTRIES, fn_of
 
 from market_data.indicators.catalogue import CATALOGUE, IndicatorSpec, Lines, Series
-from market_data.routers.indicators import REQUEST_CEILING
+from market_data.indicators.service import REQUEST_CEILING
 
 # Measured on the machine that set this: the full catalogue at exactly
 # REQUEST_CEILING candles×entries costs ~63ms p95 (was ~16.5ms for 10 entries

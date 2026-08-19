@@ -227,7 +227,7 @@ _LEVEL_CLUSTERS = IndicatorSpec(
 # (docs/wskazniki-plan-wdrozenia.html, "htf_levels(okres)" and "pivots(typ, okres)").
 # The period is a choice of catalogue id here, not a numeric parameter — the same
 # choice `bbands_percent_b` already makes for its output shape instead of taking it
-# as a `mode`. The router (`routers/indicators.py`) reads the series named in
+# as a `mode`. The service (`indicators/service.py`) reads the series named in
 # `higher_resolution` separately and hands the OHLC tuple of one closed candle down
 # ready — none of the functions below ever sees the database. ---
 

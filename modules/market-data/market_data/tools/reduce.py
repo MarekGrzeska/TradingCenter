@@ -65,7 +65,8 @@ def thin_series(values: list, target_count: int) -> tuple[list, int | None]:
     return values[::stride], stride
 
 
-def cap_by_freshness(items: list[dict], time_key: str, limit: int) -> tuple[list[dict], int]:
-    """The most recent `limit` items, and how many older ones were dropped."""
-    ordered = sorted(items, key=lambda item: item[time_key], reverse=True)
-    return truncate(ordered, limit)
+# `cap_by_freshness(items, time_key, limit)` stood here until the tools moved into
+# market-data. It indexed its items as dicts, which was true while they arrived as JSON off
+# a wire and stopped being true when they arrived as models — and it had no test, so nothing
+# said so. Its two callers now sort explicitly and call `truncate`, which reads the same as
+# the third branch beside them, whose key is a fallback no shared helper could express.

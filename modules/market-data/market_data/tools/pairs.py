@@ -15,8 +15,8 @@ from datetime import UTC, datetime
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, Field
 
-from ..client import UpstreamClient
-from ._shared import READ_ONLY, raise_for_status
+from ..tracking import TrackedPairStatus
+from ._shared import READ_ONLY, ToolContext, tracked_pairs
 
 # Least healthy first. A symbol whose five-minute candles have stalled is a symbol to
 # warn about even when its weekly ones are fine, so the summary takes the worst state
@@ -30,8 +30,10 @@ def _severity(state: str) -> int:
     try:
         return _COLLECTION_SEVERITY.index(state)
     except ValueError:
-        # A state this module has never heard of ranks worst, not best. market-data
-        # naming a new one is not a reason to call the symbol healthy on its behalf.
+        # A state this list has never heard of ranks worst, not best. A new one being
+        # added to `CollectionState` is not a reason to call the symbol healthy on its
+        # behalf — and the two now live in one module, so this is the case where they
+        # were changed together and this list was not.
         return -1
 
 
@@ -63,22 +65,20 @@ class TrackedPairOut(BaseModel):
     )
 
 
-def _pair_out(row: dict) -> TrackedPairOut:
-    latest = row.get("latest_candle")
+def _pair_out(pair: TrackedPairStatus) -> TrackedPairOut:
     age_seconds = None
-    if latest is not None:
-        moment = datetime.fromisoformat(latest)
-        age_seconds = (datetime.now(UTC) - moment).total_seconds()
+    if pair.latest_candle is not None:
+        age_seconds = (datetime.now(UTC) - pair.latest_candle).total_seconds()
     return TrackedPairOut(
-        symbol=row["symbol"],
-        resolution=row["resolution"],
-        collection=row["collection"],
-        candle_count=row["candle_count"],
+        symbol=pair.symbol,
+        resolution=pair.resolution.value,
+        collection=pair.collection.value,
+        candle_count=pair.candle_count,
         latest_candle_age_seconds=age_seconds,
     )
 
 
-def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
+def register(mcp: FastMCP, ctx: ToolContext) -> None:
     @mcp.tool(annotations=READ_ONLY)
     async def list_tracked_symbols() -> list[TrackedSymbolOut]:
         """Which symbols this archive follows at all — one row each, no resolutions.
@@ -89,11 +89,9 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         state among that symbol's resolutions, so a symbol shown as collecting is
         collecting everywhere.
         """
-        response = await upstream.pairs()
-        await raise_for_status(response)
         by_symbol: dict[str, list[str]] = {}
-        for row in response.json():
-            by_symbol.setdefault(row["symbol"], []).append(row["collection"])
+        for pair in await tracked_pairs(ctx):
+            by_symbol.setdefault(pair.symbol, []).append(pair.collection.value)
         return [
             TrackedSymbolOut(symbol=symbol, collection=_worst_collection(states))
             for symbol, states in sorted(by_symbol.items())
@@ -101,7 +99,7 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
 
     @mcp.tool(annotations=READ_ONLY)
     async def list_tracked_pairs() -> list[TrackedPairOut]:
-        """Which pairs market-data is collecting right now, and whether collection is
+        """Which pairs this archive is collecting right now, and whether collection is
         actually happening — per symbol *and* resolution, with candle counts and the age
         of the newest one. A price or an indicator for a pair nobody tracks is not "the
         market is quiet", it is a question this archive was never asked to answer.
@@ -109,6 +107,4 @@ def register(mcp: FastMCP, upstream: UpstreamClient) -> None:
         Seven rows per symbol; `list_tracked_symbols` is the one-row-per-symbol answer
         when only the list of symbols is the point.
         """
-        response = await upstream.pairs()
-        await raise_for_status(response)
-        return [_pair_out(row) for row in response.json()]
+        return [_pair_out(pair) for pair in await tracked_pairs(ctx)]

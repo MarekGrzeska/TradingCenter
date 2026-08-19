@@ -155,7 +155,7 @@ async def lifespan(app: FastAPI):
         app.state.market_status = MarketStatus()
         # A recursive filter's loop holds the GIL, so this is a plain gate on how many
         # `POST /indicators/*` requests compute at once — not a pool, since a thread would
-        # not free the event loop the way it does for I/O (routers/indicators.py).
+        # not free the event loop the way it does for I/O (indicators/service.py).
         app.state.indicator_limiter = asyncio.Semaphore(settings.indicator_concurrency)
 
         candle_age = telemetry.CandleAgeGauge()
@@ -286,6 +286,18 @@ def create_app() -> FastAPI:
     # rest and go last, after everything this module owned before them.
     for area in (meta, candles, pairs, jobs, stream, instruments, indicators):
         app.include_router(area.router)
+
+    # The tool surface, as a mounted ASGI application rather than a router: what the MCP
+    # library builds is a Starlette app, not an `APIRouter`, and it owns its own session
+    # handling underneath. `build_mcp_app` is handed the application rather than its state
+    # because the state does not exist yet — the lifespan fills it, long after this line.
+    #
+    # `mcp_app` is imported here, inside the factory, and that is not style: it pulls in
+    # Starlette, and the module-level import block must stay below `telemetry.configure()`
+    # (see the top of this file). An import at call time cannot climb above it by accident.
+    from .mcp_app import build_mcp_app
+
+    app.mount("/mcp", build_mcp_app(app))
 
     return app
 

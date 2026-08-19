@@ -292,7 +292,7 @@ async def test_a_range_that_ends_before_it_starts_is_refused(api) -> None:
 
 
 async def test_request_above_the_ceiling_is_refused(api) -> None:
-    from market_data.routers.indicators import REQUEST_CEILING
+    from market_data.indicators.service import REQUEST_CEILING
 
     # One indicator, a range wide enough alone to clear the ceiling.
     minutes = REQUEST_CEILING + 10
@@ -717,7 +717,7 @@ async def test_a_wide_request_hiding_a_bigger_minute_read_is_refused(api, pool) 
     """The fine-resolution series `time_profile` needs behind a DAY-resolution
     request is invisible to the ceiling's own `candles×indicators` count —
     this is the check that keeps it from silently bypassing that ceiling."""
-    from market_data.routers.indicators import REQUEST_CEILING
+    from market_data.indicators.service import REQUEST_CEILING
 
     # `FINE_RESOLUTION` is MINUTE_5 (288/day), not MINUTE (1440/day) — the
     # width that clears the ceiling is almost five times as many days.
@@ -845,7 +845,7 @@ class TestPartialAnswer:
         """The reason a missing series is recorded per resolution rather than per entry:
         four entries wanting the fine series must not read it four times."""
         reads: list[Resolution] = []
-        import market_data.routers.indicators as router_module
+        import market_data.indicators.service as router_module
 
         real_read = router_module.read_candles
 
