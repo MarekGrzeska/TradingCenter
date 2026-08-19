@@ -11,8 +11,13 @@ FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder
 WORKDIR /app/modules/teams
 ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 
-# The package before the lock: `uv sync` reads it during resolution, not after.
-COPY packages /app/packages
+# The packages before the lock: `uv sync` reads them during resolution, not after.
+# Only the ones this module's pyproject.toml names — copying all of `packages/` made
+# an edit to a package this image never installs invalidate this layer and every one
+# below it. A package added to pyproject.toml but not here fails the build loudly:
+# uv cannot resolve a path dependency that is not in the context.
+COPY packages/tc-runtime /app/packages/tc-runtime
+COPY packages/tc-openai /app/packages/tc-openai
 COPY modules/teams/pyproject.toml modules/teams/uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 

@@ -48,13 +48,15 @@ jobs:
       packages: ${{ steps.filter.outputs.packages }}
       scripts: ${{ steps.filter.outputs.scripts }}
       infra: ${{ steps.filter.outputs.infra }}
-      # The matrix the `packages` job runs, read off the directory rather than typed
-      # out. A hand-written list plus a `^packages/` filter is a job that goes green
-      # having tested somebody else's package: the filter fires for a package the
-      # matrix never names. Same shape as the deploy probes that passed on the
-      # previous container until iteration 0 — a mechanism reporting success without
-      # having checked the thing it exists for.
-      package-list: ${{ steps.packages.outputs.list }}
+      # The matrix the `packages` job runs: the diff's package names intersected with
+      # the directory. The diff alone would list a package this PR deletes (whose
+      # working-directory no longer exists); the directory alone runs all three on a
+      # one-package edit, which is what this used to do. A package added by the PR is
+      # in the diff by definition, so the original hazard — a job going green having
+      # tested somebody else's package — stays closed. Empty means the `packages`
+      # output fired on this file itself; then every package runs, because a change
+      # to how the checks run has to be exercised by running them.
+      package-list: ${{ steps.filter.outputs.package-list }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -164,15 +166,44 @@ jobs:
               echo "$name=false" >> "$GITHUB_OUTPUT"
             fi
           done
+          # See the `package-list` output above for why this is diff ∩ directory.
+          #
+          # Assembled without jq, which this step used to reach for. `jq` is on the CI
+          # runner and is not in the `/usr/bin:/bin` this step's own test pins, so a jq
+          # here is a step that runs green in CI and cannot execute where the test runs —
+          # the shape of defence this repository stopped accepting when the audit landed.
+          all_pkgs="$(ls -1 packages)"
+          touched="$(printf '%s\n' "$changed" | sed -n 's|^packages/\([^/]*\)/.*|\1|p' | sort -u)"
+          # Read line by line rather than `for p in $list`: word splitting would cut a
+          # directory name containing a space into two names that both look fine, and the
+          # guard below would then wave through a matrix entry nothing can run in.
+          list=""
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            if printf '%s\n' "$all_pkgs" | grep -qxF "$p"; then
+              list="$list$p"$'\n'
+            fi
+          done <<< "$touched"
+          if [ -z "$list" ]; then
+            list="$all_pkgs"
+          fi
+          json=""
+          while IFS= read -r p; do
+            [ -n "$p" ] || continue
+            # A name needing JSON escaping is also a broken matrix entry and a
+            # working-directory no job can enter. Refuse it here, where it names itself,
+            # rather than three jobs later as a quoting error in someone else's YAML.
+            case "$p" in
+              *[!A-Za-z0-9._-]*)
+                echo "package directory is not matrix-safe: $p" >&2
+                exit 1
+                ;;
+            esac
+            json="$json${json:+,}\"$p\""
+          done <<< "$list"
+          echo "package-list=[$json]" >> "$GITHUB_OUTPUT"
           echo "--- decisions ---"
           cat "$GITHUB_OUTPUT"
-      - id: packages
-        name: Which packages exist
-        run: |
-          set -euo pipefail
-          list=$(ls -1 packages | jq -R . | jq -sc .)
-          echo "packages: $list"
-          echo "list=$list" >> "$GITHUB_OUTPUT"
 
   capital-gateway:
     name: capital-gateway
@@ -297,8 +328,9 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       # One job per package rather than a loop, so a failure names which one — and the
-      # list comes from `changes`, which reads `packages/`, so adding a package cannot
-      # leave it untested while the job reports green.
+      # list comes from `changes`, which intersects the diff with the directory, so a
+      # one-package edit runs one package and adding a package cannot leave it
+      # untested while the job reports green.
       fail-fast: false
       matrix:
         package: ${{ fromJSON(needs.changes.outputs.package-list) }}

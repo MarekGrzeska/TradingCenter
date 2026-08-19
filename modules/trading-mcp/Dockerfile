@@ -15,7 +15,11 @@ ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
 # Dependencies first, from the lockfile alone — this layer only invalidates when
 # pyproject.toml or uv.lock change, not on every source edit.
 # The package before the lock: `uv sync` reads it during resolution, not after.
-COPY packages /app/packages
+# Only the one this module's pyproject.toml names — copying all of `packages/` made
+# an edit to a package this image never installs invalidate this layer and every one
+# below it. A package added to pyproject.toml but not here fails the build loudly:
+# uv cannot resolve a path dependency that is not in the context.
+COPY packages/tc-mcp-kit /app/packages/tc-mcp-kit
 COPY modules/trading-mcp/pyproject.toml modules/trading-mcp/uv.lock ./
 RUN uv sync --frozen --no-install-project --no-dev
 
