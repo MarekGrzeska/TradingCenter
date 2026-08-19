@@ -271,11 +271,11 @@
       <p class="sub">zweryfikowane ponownie 19.08, na main @ 53e87dc — cztery z sześciu pozycji
       stoją bez zmian, dwie spłacone</p>
       <ul>
-        <li><b>spłacone — pakiety deployują się</b>: kierunek E wykonany 19.08, wszystkie
-        trzy pozycje — sześć filtrów <code>deploy-*.yml</code> po konsumpcji z
-        <code>pyproject.toml</code>, macierz pakietów w CI z przecięcia diffu z katalogiem,
-        <code>COPY packages/</code> zwężone per konsument. Flagowa teza iteracji 1 jest
-        odtąd prawdziwa na warstwie, która się liczy</li>
+        <li><b>spłacone — pakiety deployują się</b>: kierunek E wykonany i scalony 19.08
+        (PR&nbsp;#168), wszystkie trzy pozycje — sześć filtrów <code>deploy-*.yml</code> po
+        konsumpcji z <code>pyproject.toml</code>, macierz pakietów w CI z przecięcia diffu
+        z katalogiem, <code>COPY packages/</code> zwężone per konsument. Flagowa teza
+        iteracji 1 jest odtąd prawdziwa na warstwie, która się liczy</li>
         <li><b>bliźniaki agent↔teams żyją</b> — <code>tools/client.py</code>
         (<span class="num">508/488</span> linii, stan niezmieniony) z adnotacją wprost:
         „a correction travels by copying". Choroba, którą pakiety miały leczyć, trwa
@@ -437,6 +437,7 @@
   <div class="dir">
     <div class="dir-head"><span class="dir-letter">A</span>
     <h4>MCP wraca do właściciela danych</h4>
+    <span class="chip run">w toku — market-mcp</span>
     <span class="horizon">2× po 2–3 dni</span></div>
     <p><code>market-mcp</code> montuje się jako <code>/mcp</code> w market-data,
     <code>teams-mcp</code> — w teams. To, co w tych modułach jest wartością, przeżywa w całości
@@ -509,7 +510,8 @@
   <div class="dir">
     <div class="dir-head"><span class="dir-letter">E</span>
     <h4>Domknięcia natychmiastowe — zanim cokolwiek innego</h4>
-    <span class="horizon">1 dzień</span></div>
+    <span class="chip good">wykonane · 19.08 · PR&nbsp;#168</span>
+    <span class="horizon">1 dzień — tyle zajęło</span></div>
     <ul>
       <li><b><code>packages/**</code> w filtrach <code>deploy-*.yml</code></b> — dziura
       unieważniająca flagową tezę iteracji 1; sześć jednolinijkowych edycji,</li>
@@ -530,6 +532,18 @@
     Zwężone <code>COPY</code> ma swój tryb awarii w buildzie: pakiet dopisany do
     <code>pyproject.toml</code> a nie do Dockerfile'a to ścieżka, której uv nie
     rozwiąże — build pada głośno, nie cicho.</p>
+    <p><b>Najciekawsze wyszło z pierwszego, czerwonego pchnięcia</b>, i jest to ten sam
+    wzorzec, który to repo już raz nazwało. Nowy krok macierzy złamał
+    <code>test_checks_filter.py</code> — test, który uruchamia <i>prawdziwą powłokę</i> tego
+    kroku — z dwóch niezależnych powodów naraz: czytał <code>packages/</code> w pustym
+    katalogu tymczasowym, i sięgał po <code>jq</code>, które jest na runnerze CI, a nie
+    w <code>/usr/bin:/bin</code>, które ten test przypina. Każda z tych połówek osobno daje
+    krok zielony w CI i niewykonywalny tam, gdzie stoi jego własny test — dokładnie hook
+    z PowerShella, który nie umiał się uruchomić na macOS tego projektu. Krok składa dziś
+    JSON w bashu, harness biegnie z korzenia repo (tak jak CI), a strażnik nazw pakietów
+    przestał być dekoracją: obie pętle czytają linia po linii, bo <code>for p in $list</code>
+    tnie nazwę ze spacją na dwie, które strażnik przepuszcza. Sprawdzony odwróceniem,
+    w obie strony. Testów w <code>scripts/</code> <span class="num">155 → 162</span>.</p>
   </div>
 
   <h2 id="resztki">Co z iteracji 5 i 6</h2>
@@ -592,10 +606,10 @@
     scaleniu, tak jak iteracja 1 sfalsyfikowała trzy liczby audytu.</p>
   </div>
 
-  <p><b>Proponowana kolejność: A(market) → A(teams) → B → D → C.</b>
+  <p><b>Kolejność: A(market) ← tu jesteśmy → A(teams) → B → D → C.</b>
   Resztki iteracji 5 wypadły z sekwencji (weszły 19.08, PR&nbsp;#167), a <b>E jest
-  wykonane</b> — dziura unieważniająca opłacony zysk iteracji 1 zamknięta tego samego dnia,
-  którego rachunek ją nazwał. A na market-mcp jest
+  wykonane i scalone</b> (PR&nbsp;#168) — dziura unieważniająca opłacony zysk iteracji 1
+  zamknięta tego samego dnia, którego rachunek ją nazwał. A na market-mcp jest
   najtańszym dowodem wzorca — jeden konsument mniej, zero zmian w danych. B dopiero po dwóch
   udanych A, fazowane. D może iść równolegle z każdym. Jak w poprzednim planie: każdy krok
   zostawia system w całości działającym i można przerwać po dowolnym — z tą różnicą, że tym
