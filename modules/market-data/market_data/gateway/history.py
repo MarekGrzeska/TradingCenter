@@ -18,29 +18,10 @@ from datetime import datetime
 import httpx
 from pydantic import BaseModel, ValidationError
 
-from ..errors import GatewayRefused, GatewayUnreachable, UnreadablePayload
+from ..errors import UnreadablePayload
 from ..models import Candle, CandleSource, PriceSide, Resolution
 from ..periods import from_iso
-
-# A deep read is tens of provider calls behind one HTTP request, so the read timeout is
-# minutes rather than seconds. Connect stays short: a gateway that is not listening
-# should be reported as unreachable now, not after three minutes of waiting.
-DEFAULT_TIMEOUT = httpx.Timeout(connect=5.0, read=300.0, write=10.0, pool=5.0)
-
-# Matches capital-gateway's API_KEY_HEADER. Duplicated rather than imported — the two
-# modules share no code, only the header name as a convention (architecture.md, "Why no
-# shared library") — so a rename on one side has to be a deliberate edit on the other,
-# not a silent break through a shared import. `stream.py` reuses this constant rather
-# than defining its own copy, because within this module — unlike across modules — one
-# name for the same header is simply not duplicating anything.
-GATEWAY_KEY_HEADER = "X-Gateway-Key"
-
-
-def http_client(api_key: str, timeout: httpx.Timeout = DEFAULT_TIMEOUT) -> httpx.AsyncClient:
-    """A client sized for deep reads, presenting this module's caller key on every
-    request. Owned by the caller, so a fill and an interactive request can share one
-    connection pool — and one set of default headers — rather than opening one each."""
-    return httpx.AsyncClient(timeout=timeout, headers={GATEWAY_KEY_HEADER: api_key})
+from ._http import get_json
 
 
 class HistoryPage(BaseModel):
@@ -103,18 +84,11 @@ class GatewayHistory:
         if after is not None:
             params["after"] = after.isoformat()
 
+        body = await get_json(
+            self._client, url, params=params, what=f"{symbol} {resolution.value}"
+        )
         try:
-            response = await self._client.get(url, params=params)
-        except httpx.RequestError as err:
-            raise GatewayUnreachable(
-                f"the gateway did not answer for {symbol} {resolution.value}: {err}"
-            ) from err
-
-        if response.is_error:
-            raise GatewayRefused(response.status_code, _detail(response))
-
-        try:
-            payload = _CandleHistory.model_validate(response.json())
+            payload = _CandleHistory.model_validate(body)
         except (ValueError, ValidationError) as err:
             raise UnreadablePayload(
                 f"the gateway's history for {symbol} {resolution.value} did not match the "
@@ -154,18 +128,6 @@ class GatewayHistory:
             requests=payload.requests,
             history_ended=payload.history_ended,
         )
-
-
-def _detail(response: httpx.Response) -> str:
-    """What the gateway said. Its error handler puts the cause in `detail`; anything
-    else is a failure that never reached that handler, so the body is read raw."""
-    try:
-        body = response.json()
-    except ValueError:
-        return response.text.strip() or response.reason_phrase
-    if isinstance(body, dict) and isinstance(body.get("detail"), str):
-        return body["detail"]
-    return str(body)
 
 
 class _Candle(BaseModel):

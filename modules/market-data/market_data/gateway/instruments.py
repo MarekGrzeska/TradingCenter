@@ -15,8 +15,9 @@ from __future__ import annotations
 
 import httpx
 
-from ..errors import GatewayRefused, GatewayUnreachable, UnreadablePayload
+from ..errors import UnreadablePayload
 from ..models import Resolution
+from ._http import get_json
 
 
 class GatewayInstruments:
@@ -32,26 +33,12 @@ class GatewayInstruments:
         went but has no series; a symbol the provider does not know at all comes back as
         `GatewayRefused`, and the caller can tell an operator which of the two it was.
         """
-        url = f"{self._base_url}/instruments/{symbol}/candles"
-        params = {"resolution": resolution.value, "limit": 1}
-
-        try:
-            response = await self._client.get(url, params=params)
-        except httpx.RequestError as err:
-            raise GatewayUnreachable(
-                f"the gateway did not answer when asked about {symbol}: {err}"
-            ) from err
-
-        if response.is_error:
-            raise GatewayRefused(response.status_code, _detail(response))
-
-        try:
-            candles = response.json()
-        except ValueError as err:
-            raise UnreadablePayload(
-                f"the gateway's candles for {symbol} were not JSON: {err}"
-            ) from err
-
+        candles = await get_json(
+            self._client,
+            f"{self._base_url}/instruments/{symbol}/candles",
+            params={"resolution": resolution.value, "limit": 1},
+            what=f"candles for {symbol}",
+        )
         return isinstance(candles, list) and len(candles) > 0
 
     async def is_market_open(self, symbol: str) -> bool | None:
@@ -67,25 +54,12 @@ class GatewayInstruments:
         instrument, and matched on the symbol **exactly**: search matches names as well as
         symbols, so its first hit for `GOLD` is not guaranteed to be `GOLD`.
         """
-        url = f"{self._base_url}/instruments/search"
-
-        try:
-            response = await self._client.get(url, params={"q": symbol})
-        except httpx.RequestError as err:
-            raise GatewayUnreachable(
-                f"the gateway did not answer when asked whether {symbol} is open: {err}"
-            ) from err
-
-        if response.is_error:
-            raise GatewayRefused(response.status_code, _detail(response))
-
-        try:
-            hits = response.json()
-        except ValueError as err:
-            raise UnreadablePayload(
-                f"the gateway's search for {symbol} was not JSON: {err}"
-            ) from err
-
+        hits = await get_json(
+            self._client,
+            f"{self._base_url}/instruments/search",
+            params={"q": symbol},
+            what=f"whether {symbol} is open",
+        )
         if not isinstance(hits, list):
             raise UnreadablePayload(f"the gateway's search for {symbol} was not a list")
 
@@ -108,42 +82,25 @@ class GatewayInstruments:
             params["max_nodes"] = max_nodes
         if asset_class is not None:
             params["asset_class"] = asset_class
-        return await self._get_json(f"{self._base_url}/instruments", params, "the catalogue")
+        return await get_json(
+            self._client, f"{self._base_url}/instruments", params=params, what="the catalogue"
+        )
 
     async def search(self, q: str) -> list:
-        body = await self._get_json(f"{self._base_url}/instruments/search", {"q": q}, "a search")
+        body = await get_json(
+            self._client,
+            f"{self._base_url}/instruments/search",
+            params={"q": q},
+            what="a search",
+        )
         if not isinstance(body, list):
             raise UnreadablePayload("the gateway's search response was not a list")
         return body
 
     async def asset_classes(self) -> list:
-        body = await self._get_json(f"{self._base_url}/asset-classes", {}, "the asset classes")
+        body = await get_json(
+            self._client, f"{self._base_url}/asset-classes", params={}, what="the asset classes"
+        )
         if not isinstance(body, list):
             raise UnreadablePayload("the gateway's asset classes were not a list")
         return body
-
-    async def _get_json(self, url: str, params: dict, what: str):
-        try:
-            response = await self._client.get(url, params=params)
-        except httpx.RequestError as err:
-            raise GatewayUnreachable(f"the gateway did not answer for {what}: {err}") from err
-
-        if response.is_error:
-            raise GatewayRefused(response.status_code, _detail(response))
-
-        try:
-            return response.json()
-        except ValueError as err:
-            raise UnreadablePayload(
-                f"the gateway's response for {what} was not JSON: {err}"
-            ) from err
-
-
-def _detail(response: httpx.Response) -> str:
-    try:
-        body = response.json()
-    except ValueError:
-        return response.text.strip() or response.reason_phrase
-    if isinstance(body, dict) and isinstance(body.get("detail"), str):
-        return body["detail"]
-    return str(body)

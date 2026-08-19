@@ -26,7 +26,7 @@ from websockets.exceptions import WebSocketException
 from ..errors import GatewayUnreachable, UnreadablePayload
 from ..models import Candle, CandleSource, PriceSide, Resolution
 from ..periods import from_epoch_millis, from_epoch_seconds
-from .history import GATEWAY_KEY_HEADER
+from ._http import GATEWAY_KEY_HEADER
 
 
 class FeedState(str, Enum):
