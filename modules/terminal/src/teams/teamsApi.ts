@@ -566,7 +566,9 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
 
   return {
     async listModels(signal) {
-      const raw = await http.json<RawModel[]>(`${httpBase}/models`, { signal });
+      // `/teams/models`, not `/models`: both surfaces of the workbench publish a model
+      // catalogue and they are not the same one. The conversation's kept the bare path.
+      const raw = await http.json<RawModel[]>(`${httpBase}/teams/models`, { signal });
       return raw.map(mapModel);
     },
 
@@ -834,4 +836,4 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
 
 /** The one teams client the tab uses, sharing `identity` with every other module's —
  *  same operator, one sign-in. */
-export const teamsApi: TeamsApi = createTeamsApi(resolveEndpoints().teamsHttp, identity);
+export const teamsApi: TeamsApi = createTeamsApi(resolveEndpoints().workbenchHttp, identity);

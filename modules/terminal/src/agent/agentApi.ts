@@ -645,4 +645,4 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
  * registration's worth of session state, and a second `MSAL` instance would just be two
  * copies of the same sign-in.
  */
-export const agentApi: AgentApi = createAgentApi(resolveEndpoints().agentHttp, identity);
+export const agentApi: AgentApi = createAgentApi(resolveEndpoints().workbenchHttp, identity);

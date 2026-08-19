@@ -52,34 +52,30 @@ describe("resolveEndpoints", () => {
       {
         VITE_ARCHIVE_HTTP: "/archive-api",
         VITE_ARCHIVE_WS: "/archive-api/ws",
-        VITE_AGENT_HTTP: "/agent-api",
-        VITE_TEAMS_HTTP: "/teams-api",
+        VITE_WORKBENCH_HTTP: "/workbench-api",
       },
       devLoc,
     );
     expect(endpoints).toEqual({
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
-      agentHttp: "/agent-api",
-      teamsHttp: "/teams-api",
+      workbenchHttp: "/workbench-api",
     });
   });
 
-  it("resolves a fully split topology — static site, archive and agent on three hosts", () => {
+  it("resolves a fully split topology — static site, archive and workbench on three hosts", () => {
     const endpoints = resolveEndpoints(
       {
         VITE_ARCHIVE_HTTP: "https://archive.example.com",
         VITE_ARCHIVE_WS: "wss://archive.example.com/ws",
-        VITE_AGENT_HTTP: "https://agent.example.com",
-        VITE_TEAMS_HTTP: "https://teams.example.com",
+        VITE_WORKBENCH_HTTP: "https://workbench.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
     expect(endpoints).toEqual({
       archiveHttp: "https://archive.example.com",
       archiveWs: "wss://archive.example.com/ws",
-      agentHttp: "https://agent.example.com",
-      teamsHttp: "https://teams.example.com",
+      workbenchHttp: "https://workbench.example.com",
     });
   });
 
@@ -87,8 +83,7 @@ describe("resolveEndpoints", () => {
     expect(resolveEndpoints({}, devLoc)).toEqual({
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
-      agentHttp: "/agent-api",
-      teamsHttp: "/teams-api",
+      workbenchHttp: "/workbench-api",
     });
   });
 
@@ -98,15 +93,13 @@ describe("resolveEndpoints", () => {
   // server — which is why nothing in this suite noticed.
   //
   // The relative prefix is only safe if no tab claims it, so it is compared
-  // against the route list rather than eyeballed. Covers the agent's prefix too,
+  // against the route list rather than eyeballed. Covers the workbench's prefix too,
   // since it is a relative default of the same shape.
   it("gives no back end a relative prefix that a tab route already claims", () => {
-    const { archiveHttp, archiveWs, agentHttp, teamsHttp } = resolveEndpoints({}, devLoc);
+    const { archiveHttp, archiveWs, workbenchHttp } = resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
-    // `teamsHttp` matters most of the four: the tab it would shadow is `/teams`, one
-    // character away from its own default.
-    const prefixes = [archiveHttp, new URL(archiveWs).pathname, agentHttp, teamsHttp]
+    const prefixes = [archiveHttp, new URL(archiveWs).pathname, workbenchHttp]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);
 
