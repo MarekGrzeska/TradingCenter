@@ -146,14 +146,18 @@
 </style>
 
 <header class="masthead">
-  <p class="eyebrow">Ocena refactoru · pomiar z wieczora 18.08.2026</p>
+  <p class="eyebrow">Ocena refactoru · pomiar z wieczora 18.08.2026 · aktualizacja 19.08 po PR&nbsp;#166 i&nbsp;#167</p>
   <h1>Rachunek po refactorze</h1>
   <p class="lede">Plan „Refactor bez świętości" rozliczony z własnych metryk i z celu, dla którego
   powstał. Werdykt w jednym zdaniu: <b>kod stał się tańszy, czytanie nie</b> — refactor wygrał
   wszystko, co mierzył w liniach kodu, a największy koszt pracy agenta, powierzchnię czytania
-  i liczbę ruchomych części, zostawił nietknięte, miejscami powiększone.</p>
+  i liczbę ruchomych części, zostawił nietknięte, miejscami powiększone. Dzień później dwa
+  scalone PR-y domknęły ogony iteracji 3 i 5 — <b>werdykt się nie zmienia</b>: wszystko, co
+  weszło, jest po stronie „linii kodu"; z pozycji „Winien" nie spadła żadna z tych, które
+  ważą najwięcej.</p>
   <div class="meta-row">
     <span><b>Pomiar:</b> 4 niezależne analizy kodu, gałąź <span class="num">change/python-monoliths-structure @ 3091003</span></span>
+    <span><b>Aktualizacja:</b> 19.08, <span class="num">main @ 53e87dc</span> — po PR&nbsp;#166 (reszta iteracji 5, scalony tuż po pomiarze) i PR&nbsp;#167 (ogony 3 i 5)</span>
     <span><b>Komentarze:</b> 0 wątków na artefaktach planu i audytu — za komentarze robią review.md i sekcje „Co wyszło inaczej"</span>
     <span><b>Kontekst:</b> jeden operator, konto demo, kod pisany przez agentów</span>
   </div>
@@ -161,8 +165,9 @@
 
 <main>
   <h2 id="werdykt">Iteracja po iteracji — co obiecano, co jest</h2>
-  <p class="section-note">Stan zmierzony dziś na kodzie, nie przepisany z planu. Trzy iteracje
-  dowiozły w całości, dwie w połowie, jedna trwa, jedna nie powinna już powstać w ogóle.</p>
+  <p class="section-note">Stan zmierzony na kodzie, nie przepisany z planu; zaktualizowany
+  19.08 po scaleniu PR&nbsp;#166 i&nbsp;#167. Pięć iteracji domkniętych, jedna zatrzymana na
+  uczciwie zmierzonym murze, jedna nie powinna już powstać w ogóle.</p>
 
   <div class="table-wrap"><table>
     <thead><tr><th>Iteracja</th><th>Obietnica</th><th>Stan zmierzony</th><th>Ocena</th></tr></thead>
@@ -194,11 +199,13 @@
         <td><b>3</b> · terminal</td>
         <td>commodity kupione, moloch pocięty, −1 500 linii</td>
         <td>TanStack ✓, Zustand słusznie odrzucony pomiarem, Chart.tsx
-        <span class="num">2 124 → 1 135</span> — ale linie płasko
-        (<span class="num">21 093 → 21 167</span>) i wszystkie ogony stoją:
-        <span class="num">709</span> dosłownych <code>className</code>,
-        <code>agentChatStore</code> 694 linie, brak tras w Teams</td>
-        <td><span class="chip warn">połowiczna</span></td>
+        <span class="num">2 124 → 1 033</span> (19.08: <code>useChartInstance</code> wyszedł,
+        węzeł kolejności efektów rozwiązany refem), przemiał UI-kitu z 50 przyciskami i strażą
+        (<code>className</code> <span class="num">709 → 673</span>) — linie w końcu minimalnie
+        pod kreską (<span class="num">21 093 → 21 046</span>); ogony przeklasyfikowane:
+        trasy w Teams to <i>nowe wymaganie</i> (OpenSpec), <code>agentChatStore</code>
+        (694 linie) to refactor z nazwanym ryzykiem, przeplanowany po pomiarze</td>
+        <td><span class="chip good">domknięta 19.08</span></td>
       </tr>
       <tr>
         <td><b>4</b> · gorące ścieżki</td>
@@ -210,11 +217,15 @@
       <tr>
         <td><b>5</b> · monolity Pythona</td>
         <td>~700 linii mniej, domknięcia → klasy</td>
-        <td>zrobione ~⅓: store agenta jako pakiet, czyszczenie drutu, <code>create_app()</code>
-        i podział 1 906-linijkowego testu; nietknięte: <code>teams/store.py</code>
-        (<span class="num">1 258</span>, największy ręczny plik repo), unia wskaźników, mappery
-        kontraktu, cztery konwersje domknięć</td>
-        <td><span class="chip run">w toku</span></td>
+        <td>domknięta 19.08 (PR&nbsp;#167): <code>teams/store.py</code> — dziewięć instrukcji
+        na tabelę schodzi do klasy <code>_Recurring</code>; tagowana unia computerów
+        (<code>output</code> wyprowadzany, <code>match</code> z kontrolą gałęzi w pyright);
+        domknięcia → klasy w teams i agencie; <code>commit_candles</code> i
+        <code>gateway/_http.py</code>. Po drodze wypadł bug kasujący tekst operatora przy
+        każdym deployu z migracją zasiewającą (PR&nbsp;#166). „~700 linii mniej" nie powstało
+        — <span class="num">+93</span>; jedyna reszta: mappery <code>contract.py</code>,
+        słusznie odesłane do propozycji OpenSpec</td>
+        <td><span class="chip good">domknięta 19.08</span></td>
       </tr>
       <tr>
         <td><b>6</b> · generator modułu</td>
@@ -241,7 +252,14 @@
         <li><b>jedna implementacja dev</b> i workflow <span class="num">458 → 256</span>;
         sonda deploy to moduł z 21 testami zamiast siedmiu wklejek bez żadnego</li>
         <li><b>−22,7% tokenów</b> na każdą turę agenta, bez utraty jednego pola schematu</li>
-        <li><b>Chart.tsx −989 linii</b>; siatka wykresów przerysowuje slot, nie całość</li>
+        <li><b>Chart.tsx −1 091 linii</b> (2 124 → 1 033); siatka wykresów przerysowuje slot,
+        nie całość; od 19.08 cykl życia instancji w <code>useChartInstance</code></li>
+        <li><b>bug na danych operatora zamknięty po drodze</b> — zasiew promptu nadpisywał
+        (i przy rollbacku kasował) tekst zapisany przez operatora, przy <i>każdym</i> deployu
+        z migracją zasiewającą; odtworzony na bazie, nie wyrozumowany (PR&nbsp;#166)</li>
+        <li><b>78 testów market-data odeszło, bo przechodziły na niczym</b> — pięć sprawdzeń
+        wołało domyślny <code>compute</code> oddający <code>{}</code>; w ich miejsce weszła
+        niezmienność, której brakowało (1 029 → 951)</li>
         <li><b>zasada nr 5 działa</b> — na sztucznym diffie złapała <code>unbound variable</code>,
         który wyłączyłby każde CI na każdym PR</li>
         <li><b>review'y mówią prawdę</b> — każda iteracja ma spisane, co wyszło inaczej,
@@ -250,23 +268,32 @@
     </div>
     <div class="side wn">
       <h4>Winien — wisi</h4>
-      <p class="sub">stan na dziś, wszystkie pozycje zweryfikowane w kodzie</p>
+      <p class="sub">zweryfikowane ponownie 19.08, na main @ 53e87dc — cztery z sześciu pozycji
+      stoją bez zmian, dwie spłacone</p>
       <ul>
-        <li><b>pakiety nie deployują się</b> — flagowa teza „klasa błędu «fix nie dotarł»
-        przestaje istnieć" jest prawdziwa w CI i fałszywa na produkcji</li>
+        <li><b>spłacone — pakiety deployują się</b>: kierunek E wykonany 19.08, wszystkie
+        trzy pozycje — sześć filtrów <code>deploy-*.yml</code> po konsumpcji z
+        <code>pyproject.toml</code>, macierz pakietów w CI z przecięcia diffu z katalogiem,
+        <code>COPY packages/</code> zwężone per konsument. Flagowa teza iteracji 1 jest
+        odtąd prawdziwa na warstwie, która się liczy</li>
         <li><b>bliźniaki agent↔teams żyją</b> — <code>tools/client.py</code>
-        (<span class="num">508/488</span> linii) z adnotacją wprost: „a correction travels
-        by copying". Choroba, którą pakiety miały leczyć, trwa wewnątrz granicy modułów</li>
-        <li><b>zdecydowane ≠ wykonane</b>: 9 alertów stoi, gdzie kalibracja planu mówi 3;
-        transport stdio z testem parzystości stoi, choć jego usunięcie
-        zapisano; dwa martwe <code>.dockerignore</code> uczą fałszywego modelu</li>
-        <li><b>proza przerosła kod</b> — ~<span class="num">38,5 tys.</span> linii przewodników,
-        specek i archiwum wobec ~<span class="num">34 tys.</span> produkcyjnego Pythona;
-        w CLAUDE.md trzy nieaktualne twierdzenia znalezione dziś</li>
-        <li><b>split gubi powody</b> — podział store'a agenta uciął dwa komentarze niosące
-        uzasadnienia; złapał to ręczny diff, żaden test (<span class="num">3091003</span>)</li>
-        <li><b>ogony iteracji 3 i 5</b> — wszystkie pozycje „zostaje na później" stoją
-        nietknięte, w tym pułapka, którą linter aktywnie podpowiada</li>
+        (<span class="num">508/488</span> linii, stan niezmieniony) z adnotacją wprost:
+        „a correction travels by copying". Choroba, którą pakiety miały leczyć, trwa
+        wewnątrz granicy modułów</li>
+        <li><b>zdecydowane ≠ wykonane, nadal</b>: alerty stoją, gdzie kalibracja planu mówi 3;
+        transport stdio z testem parzystości stoi, choć jego usunięcie zapisano; dwa martwe
+        <code>.dockerignore</code> uczą fałszywego modelu — żadna z trzech pozycji nie drgnęła</li>
+        <li><b>proza przerosła kod i rośnie</b> — ~<span class="num">38,5 tys.</span> linii
+        przewodników, specek i archiwum wobec ~<span class="num">34 tys.</span> produkcyjnego
+        Pythona; PR&nbsp;#167 dołożył planowi +342 linie; trzy nieaktualne twierdzenia
+        w CLAUDE.md (446 linii) stoją niepoprawione</li>
+        <li><b>spłacone — split gubi powody</b>: dwa ucięte komentarze wróciły
+        (<span class="num">3091003</span>), a przy splicie <code>test_app.py</code> tej klasy
+        błędu już nie było; reguła „split kończy się diffem uzasadnień" czeka na dopisanie</li>
+        <li><b>spłacone — ogony iteracji 3 i 5</b>: <code>useChartInstance</code>,
+        50 przycisków, <code>teams/store.py</code>, unia computerów i konwersje domknięć weszły
+        w PR&nbsp;#167; to, co zostało, jest nazwane po imieniu i tylko jedno z czterech jest
+        jeszcze refactorem (sekcja „Co zostało otwarte" w planie)</li>
       </ul>
     </div>
   </div>
@@ -303,7 +330,13 @@
       unieważnia flagową tezę iteracji 1 na jedynej warstwie, która się liczy. Do tego wzorzec
       z <span class="num">3091003</span>: mechaniczny split przechodzi zielono
       (<span class="num">354</span> testy przed i po), gubiąc przy tym zapisane <i>powody</i> —
-      zielona kompletność nie mierzy zachowanych uzasadnień.</p>
+      zielona kompletność nie mierzy zachowanych uzasadnień. <b>Stan 19.08: wzorzec trwa,
+      z jednym wyjątkiem od strony rachunku.</b> PR&nbsp;#167 domknął ogony iteracji — czyli
+      to, co było <i>w planie z datą</i> — a rozstrzygnięcia bez daty przetrwały kolejny
+      dzień nietknięte, dopóki ten rachunek nie nadał jednemu z nich rangi kierunku:
+      deploy pakietów (E) wykonany jeszcze 19.08. Alerty i stdio, którym rangi nie nadał,
+      stoją — co potwierdza diagnozę z obu stron: wykonuje się to, co ma gałąź albo
+      nazwaną pozycję planu, nie to, co zapisano jako postanowione.</p>
     </div>
   </div>
 
@@ -487,16 +520,30 @@
     </ul>
     <p class="gain">flagowa teza planu staje się prawdziwa na jedynej warstwie, która się
     liczy.</p>
+    <p class="cost">wykonane 19.08 — wszystkie trzy pozycje, z konsumpcją czytaną
+    z <code>pyproject.toml</code> każdego modułu: agent i teams biorą tc-runtime
+    i tc-openai, market-data sam tc-runtime, trzy moduły MCP sam tc-mcp-kit; gateway
+    i terminal nie biorą nic i ich filtry słusznie nie drgnęły. Macierz pakietów
+    liczy przecięcie diffu z katalogiem — nowy pakiet jest w diffie z definicji, więc
+    własność „dodany nie może zostać nieprzetestowany" przeżywa zwężenie; pusty wynik
+    znaczy, że zmieniło się samo <code>checks.yml</code>, i wtedy biegną wszystkie.
+    Zwężone <code>COPY</code> ma swój tryb awarii w buildzie: pakiet dopisany do
+    <code>pyproject.toml</code> a nie do Dockerfile'a to ścieżka, której uv nie
+    rozwiąże — build pada głośno, nie cicho.</p>
   </div>
 
   <h2 id="resztki">Co z iteracji 5 i 6</h2>
-  <p><b>Dokończyć z 5 tylko to, co przeżyje decyzję architektoniczną.</b> Parametryzacja
-  <code>teams/store.py</code> (1 258 linii, największy ręczny plik repo) i unia komputerów
-  wskaźników bronią się niezależnie od kierunków A–C. Przepisanie mapperów
-  <code>contract.py</code> — dopiero po decyzji o drucie, żeby nie polerować kodu, który
-  zmieni kształt. <b>Iterację 6 skasować, nie odkładać:</b> generator nowych modułów
-  w planie, którego celem jest <i>mniej</i> modułów, to inwestycja w odwrotny kierunek —
-  kryterium „tani nowy moduł" zamienia się na „moduły przestają przybywać".</p>
+  <p><b>Z 5 — wykonane 19.08 dokładnie w zaleconym zakresie.</b> Parametryzacja
+  <code>teams/store.py</code> (klasa <code>_Recurring</code>) i tagowana unia komputerów
+  wskaźników weszły w PR&nbsp;#167 — obie bronią się niezależnie od kierunków A–C, jak
+  napisano niżej. Przepisanie mapperów <code>contract.py</code> zostało odłożone z powodem
+  mocniejszym, niż ten rachunek podał: nie tylko „po decyzji o drucie" — to plik z kategorii
+  „kontrakt między modułami", więc idzie propozycją OpenSpec niezależnie od wszystkiego.
+  <b>Iterację 6 skasować, nie odkładać:</b> generator nowych modułów w planie, którego celem
+  jest <i>mniej</i> modułów, to inwestycja w odwrotny kierunek — kryterium „tani nowy moduł"
+  zamienia się na „moduły przestają przybywać". <b>Stan 19.08: plan nadal trzyma ją jako
+  jedyną pozycję „można zacząć od gałęzi"</b> — ta rekomendacja nie została ani przyjęta,
+  ani odrzucona, a rozstrzygnięcie bez zapisu to dokładnie wzorzec nr 3.</p>
 
   <div class="callout">
     <p><b>Trzy zasady do dopisania, wszystkie z tego rozliczenia.</b>
@@ -507,6 +554,12 @@
     <b>3.</b> „Zdecydowane" znaczy wykonane albo w planie z datą — alerty, stdio i deploy
     pakietów wisiały jako rozstrzygnięte przez cały refactor i rozstrzygnięcie nic
     nie zmieniło.</p>
+    <p><b>Stan 19.08: żadna z trzech nie jest dopisana</b> — a dzień dostarczył po jednym
+    dowodzie na każdą: powody z <span class="num">3091003</span> wróciły ręcznym diffem,
+    nie regułą; proza urosła o kolejne +342 linie planu; z trzech „rozstrzygniętych"
+    pozycji wykonała się ta, której rachunek nadał rangę kierunku (deploy pakietów — E),
+    a dwie bez rangi (alerty, stdio) stoją. Zasada nr 3 właśnie zmierzyła samą siebie,
+    w obie strony.</p>
   </div>
 
   <h2 id="stan">Stan docelowy w liczbach</h2>
@@ -539,8 +592,10 @@
     scaleniu, tak jak iteracja 1 sfalsyfikowała trzy liczby audytu.</p>
   </div>
 
-  <p><b>Proponowana kolejność: E → A(market) → A(teams) → B → D → resztki 5 → C.</b>
-  E jest jednodniowe i zamyka dziurę unieważniającą już opłacony zysk. A na market-mcp jest
+  <p><b>Proponowana kolejność: A(market) → A(teams) → B → D → C.</b>
+  Resztki iteracji 5 wypadły z sekwencji (weszły 19.08, PR&nbsp;#167), a <b>E jest
+  wykonane</b> — dziura unieważniająca opłacony zysk iteracji 1 zamknięta tego samego dnia,
+  którego rachunek ją nazwał. A na market-mcp jest
   najtańszym dowodem wzorca — jeden konsument mniej, zero zmian w danych. B dopiero po dwóch
   udanych A, fazowane. D może iść równolegle z każdym. Jak w poprzednim planie: każdy krok
   zostawia system w całości działającym i można przerwać po dowolnym — z tą różnicą, że tym
