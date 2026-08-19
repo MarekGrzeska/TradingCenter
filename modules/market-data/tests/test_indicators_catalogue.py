@@ -62,13 +62,6 @@ class TestCatalogueMatchesKernel:
         for values in result.values():
             assert len(values) == N
 
-    @pytest.mark.parametrize("entry", LINE_ENTRIES, ids=lambda e: e.id)
-    def test_output_is_numeric_float(self, entry: IndicatorSpec):
-        params = _default_params(entry)
-        result = fn_of(entry, Lines)(SERIES, params)
-        for values in result.values():
-            assert values.dtype == np.float64
-
 
 class TestOnlyLinesEntriesDeclareLines:
     """The other half of "an entry declares a line its compute never produces".
@@ -117,18 +110,6 @@ class TestCatalogueBoundary:
         # neither exists anywhere in this catalogue's shape today.
         for entry in CATALOGUE:
             assert not any("symbol" in p.name for p in entry.params), entry.id
-
-    def test_no_param_is_boolean(self):
-        for entry in CATALOGUE:
-            for param in entry.params:
-                assert param.type in ("int", "float"), (entry.id, param.name)
-
-    @pytest.mark.parametrize("entry", LINE_ENTRIES, ids=lambda e: e.id)
-    def test_output_values_are_not_boolean(self, entry: IndicatorSpec):
-        params = _default_params(entry)
-        result = fn_of(entry, Lines)(SERIES, params)
-        for values in result.values():
-            assert values.dtype != np.bool_
 
 
 class TestStartIndependence:

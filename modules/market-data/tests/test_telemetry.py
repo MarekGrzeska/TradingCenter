@@ -1,4 +1,8 @@
-"""The candle-age gauge: what it reports, and what it deliberately leaves out."""
+"""The candle-age gauge: the arithmetic it reports, and that it is fed at all.
+
+Which pairs the gauge leaves out is not decided here — that is `decide_late_pairs`, and
+`test_market_status.py` is where the rule is tested, once.
+"""
 
 from __future__ import annotations
 
@@ -8,7 +12,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 from market_data import telemetry
-from market_data.errors import GatewayUnreachable
 from market_data.market_status import MarketStatus
 from market_data.models import Candle, CandleSource, Resolution
 from market_data.store import write_candles
@@ -122,6 +125,10 @@ async def _track_with_candle(conn, symbol: str, resolution: Resolution, latest: 
 
 @pytest.mark.db
 async def test_a_stalled_pair_is_reported(db) -> None:
+    """That the gauge is fed at all: a late pair reaches `compute_ages` with its age in
+    seconds. Which pairs the decision then keeps or drops — market shut, gateway silent,
+    nothing collected yet — is one rule tested once, in `test_market_status.py`, against
+    the decision itself rather than a third time through a database."""
     latest = NOW - timedelta(minutes=10)
     await _track_with_candle(db, "US100", Resolution.MINUTE, latest)
 
@@ -132,44 +139,22 @@ async def test_a_stalled_pair_is_reported(db) -> None:
 
 @pytest.mark.db
 async def test_a_pair_whose_market_is_shut_is_excluded(db) -> None:
-    # specs-level intent (design.md, group 10): the alert this feeds fires "w godzinach
-    # handlu" — during trading hours. A market known to be closed contributes nothing,
-    # so a Friday-to-Monday gap on an index never reads as staleness.
+    """The one exclusion that is this function's own, not `decide_late_pairs`'.
+
+    The alert fed from here fires during trading hours, so a Friday-to-Monday gap on an
+    index must never read as staleness. `test_market_status.py` proves the rule for the
+    decision; `compute_ages` is a different function feeding a different gauge, and this
+    is the only test that it obeys the rule too.
+    """
     latest = NOW - timedelta(days=2)
     await _track_with_candle(db, "US100", Resolution.MINUTE, latest)
 
     ages = await compute_ages(_FakePool(db), FakeInstruments(market_open=False), MarketStatus(), now=NOW)
 
     assert ages == {}
-    # The periods gauge is derived from the same `ages` dict `refresh_loop` computes —
-    # nothing to derive from means nothing reported, same as the seconds gauge.
-    periods = {(s, r): periods_late(a, Resolution(r)) for (s, r), a in ages.items()}
-    assert periods == {}
-
-
-@pytest.mark.db
-async def test_a_pair_with_nothing_collected_is_excluded(db) -> None:
-    await track(db, "US100", Resolution.MINUTE, limit=20)
-
-    ages = await compute_ages(_FakePool(db), FakeInstruments(market_open=True), MarketStatus(), now=NOW)
-
-    assert ages == {}
-
-
-@pytest.mark.db
-async def test_a_gateway_that_will_not_say_still_reports_the_pair(db) -> None:
-    # UNKNOWN, not silently dropped — an operator should see this pair, not have it
-    # disappear because the gateway that would say whether to trust it is down too.
-    latest = NOW - timedelta(minutes=10)
-    await _track_with_candle(db, "US100", Resolution.MINUTE, latest)
-
-    class Unreachable:
-        async def is_market_open(self, symbol: str) -> bool | None:
-            raise GatewayUnreachable("down")
-
-    ages = await compute_ages(_FakePool(db), Unreachable(), MarketStatus(), now=NOW)
-
-    assert ("US100", "MINUTE") in ages
+    # The periods gauge derives from the same dict, so nothing to derive from is nothing
+    # reported — the seconds gauge and this one fall quiet together.
+    assert {(s, r): periods_late(a, Resolution(r)) for (s, r), a in ages.items()} == {}
 
 
 # --- logging configuration ------------------------------------------------------------

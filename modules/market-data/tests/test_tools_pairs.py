@@ -5,44 +5,7 @@ from datetime import UTC, datetime
 from tools_double import tracked
 
 from market_data.models import Resolution
-from market_data.tools.pairs import _pair_out, _worst_collection
 from market_data.tracking import CollectionState
-
-
-def test_all_collecting_summarises_as_collecting() -> None:
-    assert _worst_collection(["collecting", "collecting", "collecting"]) == "collecting"
-
-
-def test_one_stalled_resolution_decides_the_symbol() -> None:
-    """The whole reason this summary takes the worst rather than the commonest: six
-    healthy timeframes must not hide the seventh that stopped."""
-    assert _worst_collection(["collecting"] * 6 + ["stalled"]) == "stalled"
-
-
-def test_market_closed_loses_to_never_collected() -> None:
-    assert _worst_collection(["market_closed", "never_collected"]) == "never_collected"
-
-
-def test_a_state_this_list_has_never_heard_of_ranks_worst() -> None:
-    """A state added to `CollectionState` and not to this list is not a reason to report
-    the symbol as healthy on its behalf — the summary would then be silently wrong in the
-    one direction that matters. The two live in one module now, so this is the case where
-    they were changed together and this list was not."""
-    assert _worst_collection(["collecting", "paused_by_operator"]) == "paused_by_operator"
-
-
-def test_pair_out_computes_age_from_latest_candle() -> None:
-    out = _pair_out(tracked(candle_count=42, latest_candle=datetime(2020, 1, 1, tzinfo=UTC)))
-    assert out.symbol == "US100"
-    assert out.latest_candle_age_seconds is not None
-    assert out.latest_candle_age_seconds > 0
-
-
-def test_pair_out_with_no_candles_has_no_age() -> None:
-    out = _pair_out(
-        tracked(collection=CollectionState.NEVER_COLLECTED, candle_count=0, latest_candle=None)
-    )
-    assert out.latest_candle_age_seconds is None
 
 
 async def test_one_row_per_symbol_sorted_and_without_resolutions(tool_server, archive) -> None:

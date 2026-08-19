@@ -7,7 +7,7 @@ a consumer can act on it rather than retry a request that will never be honoured
 
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 
 import pytest
 from fakes import (
@@ -193,11 +193,16 @@ async def test_a_pair_with_nothing_collected_reports_zero_candles(api, pool) -> 
 
 
 async def test_a_late_pair_with_the_market_open_is_reported_stalled(app, api, pool) -> None:
-    """The state the panel exists to show, reaching the panel at last.
+    """The state the panel exists to show, reaching the panel at last — and the only test
+    of it that runs end to end.
 
     `collection_state` could always tell `STALLED` from `MARKET_CLOSED`, and was tested
     doing so — but nothing supplied the one thing it needs, so every late pair came out
-    `UNKNOWN` and the distinction never left the unit test.
+    `UNKNOWN` and the distinction never left the unit test. What this pins is the wiring:
+    that the route reaches a market-status source at all. The rules it decides by —
+    market shut, gateway silent, one question per symbol, the cached answer — are
+    `test_market_status.py`'s, tested there against `decide_late_pairs` directly rather
+    than a fourth time through HTTP and a database.
     """
     app.state.instruments = FakeInstruments(market_open=True)
     async with pool.acquire() as conn:
@@ -208,78 +213,6 @@ async def test_a_late_pair_with_the_market_open_is_reported_stalled(app, api, po
     [listed] = (await api.get("/pairs")).json()
 
     assert listed["collection"] == "stalled"
-
-
-async def test_the_same_lateness_with_the_market_shut_is_not_a_fault(app, api, pool) -> None:
-    app.state.instruments = FakeInstruments(market_open=False)
-    async with pool.acquire() as conn:
-        await track(conn, "US100", Resolution.MINUTE, LIMIT)
-        await write_candles(conn, [candle(300)])
-
-    [listed] = (await api.get("/pairs")).json()
-
-    assert listed["collection"] == "market_closed"
-
-
-async def test_a_gateway_that_cannot_say_leaves_the_pair_unknown(app, api, pool) -> None:
-    """Not a failure of the read. The list is the archive's own, and not knowing why one
-    pair is late is not a reason to refuse all of them."""
-    app.state.instruments = FakeInstruments(error=GatewayUnreachable("the gateway is down"))
-    async with pool.acquire() as conn:
-        await track(conn, "US100", Resolution.MINUTE, LIMIT)
-        await write_candles(conn, [candle(300)])
-
-    response = await api.get("/pairs")
-
-    assert response.status_code == 200
-    assert response.json()[0]["collection"] == "unknown"
-
-
-async def test_a_fresh_pair_costs_the_gateway_nothing(app, api, pool) -> None:
-    """The budget rule. A pair whose newest candle is fresh is `COLLECTING` whatever the
-    market is doing, so asking about it would spend the shared allowance to learn nothing
-    that changes an answer."""
-    instruments = FakeInstruments(market_open=True)
-    app.state.instruments = instruments
-    async with pool.acquire() as conn:
-        await track(conn, "US100", Resolution.MINUTE, LIMIT)
-        await write_candles(conn, [candle(0, period_start=datetime.now(UTC))])
-
-    [listed] = (await api.get("/pairs")).json()
-
-    assert listed["collection"] == "collecting"
-    assert instruments.asked == []
-
-
-async def test_one_symbol_at_two_resolutions_is_one_question(app, api, pool) -> None:
-    """A market is a property of the instrument, not of the resolution it is sampled at."""
-    instruments = FakeInstruments(market_open=False)
-    app.state.instruments = instruments
-    async with pool.acquire() as conn:
-        await track(conn, "US100", Resolution.MINUTE, LIMIT)
-        await track(conn, "US100", Resolution.HOUR, LIMIT)
-        await write_candles(conn, [candle(300), candle(300, resolution=Resolution.HOUR)])
-
-    listed = (await api.get("/pairs")).json()
-
-    assert {row["collection"] for row in listed} == {"market_closed"}
-    assert instruments.asked == ["US100"]
-
-
-async def test_a_market_that_was_just_asked_about_is_not_asked_again(app, api, pool) -> None:
-    """A shut market is permanently late, so without remembering the answer every read of
-    the list spends a request per closed pair. Measured on a live weekend before this
-    existed: 74 requests about one instrument that had been shut since Friday."""
-    instruments = FakeInstruments(market_open=False)
-    app.state.instruments = instruments
-    async with pool.acquire() as conn:
-        await track(conn, "US100", Resolution.MINUTE, LIMIT)
-        await write_candles(conn, [candle(300)])
-
-    for _ in range(5):
-        assert (await api.get("/pairs")).json()[0]["collection"] == "market_closed"
-
-    assert instruments.asked == ["US100"]
 
 
 async def test_a_pair_can_be_deleted_over_the_contract(api, pool) -> None:

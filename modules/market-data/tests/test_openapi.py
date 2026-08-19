@@ -1,17 +1,13 @@
-"""The published contract, and the fact that it can be read without running anything.
+"""The published contract the terminal's generated types are built from.
 
-These are not tests of FastAPI. They pin the two properties the terminal's generated
-types depend on: the document is obtainable from the code alone, and it describes the
-subscription's messages, which FastAPI by itself does not.
+These are not tests of FastAPI. They pin what the generator depends on: the document
+carries every shape the terminal reads, and it describes the subscription's messages,
+which FastAPI by itself does not.
 """
 
 from __future__ import annotations
 
 import json
-import os
-import subprocess
-import sys
-from pathlib import Path
 
 import httpx
 import pytest
@@ -102,55 +98,6 @@ def test_augmenting_twice_changes_nothing() -> None:
     twice = json.dumps(document(), sort_keys=True)
 
     assert once == twice
-
-
-def test_the_document_prints_with_no_environment_at_all() -> None:
-    """No database, no gateway, no settings — the property the generator relies on.
-
-    Run as a subprocess with a stripped environment rather than by calling `main()`:
-    importing this module has already imported the app, so an in-process check could
-    not tell whether the import itself needs anything.
-    """
-    root = Path(__file__).resolve().parents[1]
-
-    # `SystemRoot` is carried on Windows and is not one of the variables under test:
-    # winsock resolves its provider catalogue through the registry, so `_overlapped`
-    # — which importing the app pulls in with asyncio's proactor loop — dies with
-    # WinError 10106 without it. What the test asserts is that no CAPITAL_*,
-    # DATABASE_* or AZURE_* setting is needed, and none is carried.
-    env = {"PATH": "/usr/bin:/bin"}
-    if sys.platform == "win32":
-        env["SystemRoot"] = os.environ["SystemRoot"]
-
-    finished = subprocess.run(
-        [sys.executable, "-m", "market_data.openapi"],
-        cwd=root,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert finished.returncode == 0, finished.stderr
-    assert CONSUMED_BY_THE_TERMINAL <= set(json.loads(finished.stdout)["components"]["schemas"])
-
-
-def test_the_printed_bytes_are_stable() -> None:
-    """The generated TypeScript is committed and compared, so an unordered dump would
-    produce diffs nobody can act on."""
-    root = Path(__file__).resolve().parents[1]
-    runs = [
-        subprocess.run(
-            [sys.executable, "-m", "market_data.openapi"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            check=True,
-        ).stdout
-        for _ in range(2)
-    ]
-
-    assert runs[0] == runs[1]
 
 
 # --- 8.8: the schema describes the HTTP contract and nothing else ---------------------

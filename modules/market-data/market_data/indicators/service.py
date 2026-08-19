@@ -60,8 +60,9 @@ from .catalogue import get as get_indicator
 # Set in the first stage at 5000 candles × 10 indicators, ~16.5ms p95 on a 3-entry catalogue.
 # Re-measured in 2.17 against the full 44-entry catalogue E1 grew it to: every entry at
 # once, at however many candles this ceiling allows that many entries (~4500), costs
-# ~63ms p95 (`test_indicators_performance.py`) — cells scale roughly linearly with
-# either factor, so the number held rather than needing to move
+# ~63ms p95 — measured by hand, not guarded by a test: a threshold at 10x the p95 caught
+# nothing vectorised numpy can do by accident and went red on a slow runner instead.
+# Cells scale roughly linearly with either factor, so the number held rather than moving
 # (design.md, "Obliczenia dzielą pętlę zdarzeń ze strumieniem świec").
 REQUEST_CEILING = 200_000
 

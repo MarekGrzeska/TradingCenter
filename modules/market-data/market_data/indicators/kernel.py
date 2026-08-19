@@ -100,7 +100,7 @@ def _recursive_smoothing(values: FloatArray, alpha: float) -> np.ndarray:
 
     A Python loop, not a vectorised one — there is no vectorised form of a first-order
     recursive filter, and at the sizes this module reads (a few thousand bars) the loop
-    costs low single-digit milliseconds, measured in `test_kernel_performance.py`.
+    costs low single-digit milliseconds, measured by hand rather than watched by a test.
     """
     arr = _as_float64(values)
     out = np.empty(arr.shape, dtype=np.float64)
