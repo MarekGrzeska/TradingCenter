@@ -7,6 +7,10 @@ on:
     branches: [main]
     paths:
       - "modules/teams-mcp/**"
+      # Path dependencies are baked into this image (see the Dockerfile), so a merged
+      # package fix that never redeploys its consumers is a fix that never reaches
+      # production. Exactly the packages this module's pyproject.toml names.
+      - "packages/tc-mcp-kit/**"
       - ".github/workflows/deploy-teams-mcp.yml"
       - ".github/workflows/_deploy-app-service.yml"
       - "scripts/deploy_probe.py"
