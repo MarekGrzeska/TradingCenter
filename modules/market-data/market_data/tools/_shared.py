@@ -114,13 +114,26 @@ def resolve_window(from_iso: str | None, to_iso: str | None) -> tuple[datetime, 
 
     Takes ISO strings because that is what an MCP client sends; `reads.window` takes
     instants and is what the REST route uses.
+
+    The reversed-range refusal is raised *here* now, and it has to be. It used to arrive
+    as market-data's own 422 across the wire — the tool asked for a backwards range, the
+    archive refused, and the refusal was rewritten for the model. Reading in-process there
+    is nothing to refuse it: the query simply matches nothing, and a backwards range would
+    have come back as "no candles", which reads as a quiet market.
     """
+    from .errors import ToolRefusal
+
     end = datetime.fromisoformat(to_iso) if to_iso else datetime.now(UTC)
     if end.tzinfo is None:
         end = end.replace(tzinfo=UTC)
     start = datetime.fromisoformat(from_iso) if from_iso else end - DEFAULT_WINDOW
     if start.tzinfo is None:
         start = start.replace(tzinfo=UTC)
+    if end < start:
+        raise ToolRefusal(
+            f"`to` is before `from`: {start.isoformat()} to {end.isoformat()}. "
+            "Swap the two bounds."
+        )
     return start, end
 
 

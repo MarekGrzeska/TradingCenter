@@ -219,3 +219,119 @@ async def api(app, pool, migrated_url: str):
     transport = httpx.ASGITransport(app=app, raise_app_exceptions=False)
     async with httpx.AsyncClient(transport=transport, base_url="http://archive.test") as client:
         yield client
+
+
+# --- the tool surface -----------------------------------------------------------------
+#
+# These tests came from a separate module, where the seam was an HTTP client and `respx`
+# mocked it. The seam is now the `reads` layer and the indicator service, so the double
+# sits there. What is under test is unchanged: given an archive answer, what does the
+# model receive.
+
+
+@pytest.fixture
+def archive():
+    from tools_double import FakeArchive
+
+    return FakeArchive()
+
+
+@pytest.fixture
+def tool_server(archive, monkeypatch: pytest.MonkeyPatch):
+    """A FastMCP server whose tools read the double, with the output-schema check put back.
+
+    Over the wire the lowlevel server validates every structured reply against the tool's
+    published `outputSchema` and turns a mismatch into a refusal the caller sees instead of
+    the answer. `FastMCP.call_tool` — the entry point every test here uses — does not, so a
+    tool can be green in CI and refuse itself on every real call. That is not hypothetical:
+    `serialization_alias` on the output models published `from_` in the schema and wrote
+    `from` in the reply, and all four window-carrying tools answered
+    `Output validation error: 'from_' is a required property` (see `WindowedOut`).
+    """
+    import jsonschema
+
+    from market_data.indicators import service
+    from market_data.mcp_app import build_server
+    from market_data.tools import _shared, candles, indicators
+
+    class _FakeConnection:
+        pass
+
+    class _FakePool:
+        def acquire(self):
+            class _Held:
+                async def __aenter__(self_inner):
+                    return _FakeConnection()
+
+                async def __aexit__(self_inner, *_exc):
+                    return False
+
+            return _Held()
+
+    class _FakeState:
+        pool = _FakePool()
+        hub = Hub()
+        instruments = FakeInstruments()
+        market_status = MarketStatus()
+        indicator_limiter = _NullLimiter()
+
+    class _FakeApp:
+        state = _FakeState()
+
+    async def read_series(_conn, _symbol, _resolution, _start, _end):
+        return archive.next_series()
+
+    async def read_forming(_conn, _hub, _instruments, _status, _symbol, _resolution):
+        return archive.forming
+
+    async def read_pair_coverage(_conn, _symbol, _resolution):
+        return archive.coverage
+
+    async def read_pairs(_conn, _instruments, _status, _now):
+        return [(pair, pair.collection) for pair in archive.pairs]
+
+    async def compute(symbol, body, _db, _limiter):
+        archive.computations.append((symbol, body))
+        if archive.compute_error is not None:
+            raise archive.compute_error
+        assert archive.computed is not None, "the test did not set archive.computed"
+        return archive.computed
+
+    monkeypatch.setattr(candles, "read_series", read_series)
+    monkeypatch.setattr(candles, "read_forming", read_forming)
+    monkeypatch.setattr(candles, "read_pair_coverage", read_pair_coverage)
+    monkeypatch.setattr(indicators, "read_series", read_series)
+    monkeypatch.setattr(_shared, "read_pairs", read_pairs)
+    monkeypatch.setattr(service, "compute", compute)
+
+    app = _FakeApp()
+    mcp = build_server(app)
+    _check_output_schema(mcp, jsonschema)
+    mcp._fake_app = app  # so a test can reach the instruments double
+    return mcp
+
+
+class _NullLimiter:
+    """The indicator semaphore, held open. The real ceiling has its own test."""
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_exc):
+        return False
+
+
+def _check_output_schema(mcp, jsonschema) -> None:
+    original = mcp.call_tool
+    schemas: dict = {}
+
+    async def checked(name: str, arguments: dict, **kwargs):
+        content, structured = await original(name, arguments, **kwargs)
+        if not schemas:
+            schemas.update({tool.name: tool.outputSchema for tool in await mcp.list_tools()})
+        schema = schemas.get(name)
+        if schema is not None and structured is not None:
+            jsonschema.validate(instance=structured, schema=schema)
+        return content, structured
+
+    mcp.call_tool = checked  # type: ignore[method-assign]
