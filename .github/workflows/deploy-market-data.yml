@@ -11,6 +11,7 @@ on:
       # package fix that never redeploys its consumers is a fix that never reaches
       # production. Exactly the packages this module's pyproject.toml names.
       - "packages/tc-runtime/**"
+      - "packages/tc-mcp-kit/**"
       - ".github/workflows/deploy-market-data.yml"
       - ".github/workflows/_deploy-app-service.yml"
       - "scripts/deploy_probe.py"

@@ -14,6 +14,7 @@ what it was added to assert.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 from typing import Any
 
@@ -177,3 +178,67 @@ def test_every_app_service_module_deploys_through_the_shared_workflow() -> None:
     }
 
     assert deploying == app_service_modules
+
+
+# --- the packages an image bakes in, held against the three places that name them -------
+#
+# Written from a failure on 19 August 2026. `market-data` took `tc-mcp-kit` when the tool
+# surface moved into it — pyproject.toml said so, uv.lock said so, and its Dockerfile still
+# copied only `tc-runtime`. Nothing caught it: no module job builds an image, so the first
+# thing to notice was `deploy-market-data` on `main`, failing at `uv sync --frozen` with
+# `Distribution not found at: file:///app/packages/tc-mcp-kit`.
+#
+# The build failing loudly was the design and it worked. What was missing is a check that
+# runs before `main`, which is what these two are.
+
+MODULES = Path(__file__).resolve().parents[2] / "modules"
+
+WORKFLOW_NAMES = {"capital-gateway": "deploy-gateway.yml"}
+
+PATH_DEPENDENCY = re.compile(r'^(tc-[a-z-]+)\s*=\s*\{\s*path\s*=\s*"\.\./\.\./packages/', re.MULTILINE)
+DOCKERFILE_COPY = re.compile(r"^COPY packages/(tc-[a-z-]+) ", re.MULTILINE)
+
+
+def modules_with_a_dockerfile() -> list[Path]:
+    return sorted(p for p in MODULES.iterdir() if (p / "Dockerfile").is_file())
+
+
+@pytest.mark.parametrize(
+    "module", modules_with_a_dockerfile(), ids=lambda p: p.name
+)
+def test_the_image_copies_exactly_the_packages_the_module_takes(module: Path) -> None:
+    """A package in `pyproject.toml` and not in the Dockerfile is a build that fails on
+    `main`; one in the Dockerfile and not in `pyproject.toml` is a layer invalidated by
+    edits to source this image never installs, which is why the comment in every Dockerfile
+    says "only the ones this module's pyproject.toml names"."""
+    pyproject = (module / "pyproject.toml").read_text(encoding="utf-8")
+    dockerfile = (module / "Dockerfile").read_text(encoding="utf-8")
+
+    declared = set(PATH_DEPENDENCY.findall(pyproject))
+    copied = set(DOCKERFILE_COPY.findall(dockerfile))
+
+    assert copied == declared, (
+        f"{module.name}: pyproject.toml names {sorted(declared)}, the Dockerfile copies "
+        f"{sorted(copied)}"
+    )
+
+
+@pytest.mark.parametrize(
+    "module", modules_with_a_dockerfile(), ids=lambda p: p.name
+)
+def test_the_deploy_filter_watches_every_package_the_image_bakes_in(module: Path) -> None:
+    """Baked in at build time means a merged package fix reaches production only if this
+    module redeploys. A filter missing a package is a fix that is merged, green, and not
+    running."""
+    # One workflow is not named after its module: the gateway's.
+    workflow = WORKFLOWS / WORKFLOW_NAMES.get(module.name, f"deploy-{module.name}.yml")
+    assert workflow.is_file(), f"{module.name} has a Dockerfile and no deploy workflow"
+
+    declared = set(PATH_DEPENDENCY.findall((module / "pyproject.toml").read_text("utf-8")))
+    paths = load(workflow)[True]["push"]["paths"]
+
+    for package in declared:
+        assert f"packages/{package}/**" in paths, (
+            f"deploy-{module.name}.yml does not watch packages/{package}, which its image "
+            "bakes in"
+        )
