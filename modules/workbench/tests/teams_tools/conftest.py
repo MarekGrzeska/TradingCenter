@@ -1,87 +1,79 @@
+"""Fixtures for the team tools, and the one thing about them that had to change.
+
+These tools reach the teams routes through `httpx.ASGITransport` now — no socket, no
+server. respx's default mocker patches httpcore, which an ASGI transport never touches, so
+every route in this suite would be bypassed and every test would hit a real application
+object. Its other mocker patches `httpx` one layer higher, above the transport, and that
+one intercepts regardless of which transport the client was built with. Selecting it here
+is what keeps the rest of this suite written the way it was.
+"""
+
 from __future__ import annotations
 
 import pytest
+import respx.mocks
 
-from teams_mcp.client import TeamsClient
-from teams_mcp.config import Settings
-from teams_mcp.server import build_server
+from teams_tools.client import BASE_URL, TeamsClient
+from teams_tools.operator import carrying
+from teams_tools.server import build_server
 
-BASE = "http://127.0.0.1:8050"
-# The deployed upstream, used by the fixtures that stand on the other side of
-# `Settings.operator_identity_optional`. A hostname, not a real deployment's secret.
-REMOTE = "https://app-tradingcenter-teams.azurewebsites.net"
-# Not a real token and not shaped like one on purpose: nothing here parses it, and a
-# test carrying something that looks like a credential invites somebody to paste a real
-# one in its place.
-OPERATOR_TOKEN = "operator-token-for-tests"
+# Patch above the transport, not below it. Without this line every `respx.get(...)` in this
+# directory registers a route nothing routes through.
+respx.mocks.DEFAULT_MOCKER = "httpx"
+
+BASE = BASE_URL
+
+# Not a real principal and not shaped like one on purpose: nothing here parses it, and a
+# test carrying something that looks like a credential invites somebody to paste a real one
+# in its place.
+OPERATOR = "operator-principal-for-tests"
 
 
-@pytest.fixture(autouse=True)
-def _no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Keep a developer's real .env out of the tests — `Settings` reads the environment
-    and the .env file, so without this a machine holding one runs different tests than
-    a machine without it."""
-    for name in (
-        "TEAMS_URL",
-        "TEAMS_SCOPE",
-        "TEAMS_REQUEST_TIMEOUT_SECONDS",
-        "TEAMS_MCP_PORT",
-        "TEAMS_MCP_HOST",
-        "REQUIRE_AUTHENTICATED_PRINCIPAL",
-    ):
-        monkeypatch.delenv(name, raising=False)
+class _NeverReached:
+    """The application the client is built over. Every test in this suite intercepts above
+    the transport, so this is called only if an interception was forgotten — where failing
+    loudly is the point."""
+
+    async def __call__(self, scope, receive, send):  # pragma: no cover - see the docstring
+        raise AssertionError(
+            "a tool call reached the application object: this test meant to intercept it"
+        )
 
 
 @pytest.fixture
-def settings() -> Settings:
-    """The local shape, and that is load-bearing rather than incidental: loopback `teams`
-    with no authenticator in front is exactly where `operator_identity_optional` is true
-    (`config.py`). Tests that want the other side of that boundary take `guarded_settings`."""
-    return Settings(teams_url=BASE, _env_file=None)  # type: ignore[call-arg]
+def teams() -> TeamsClient:
+    """The local shape, and that is load-bearing rather than incidental: with nothing
+    authenticating in front of the process, a missing operator is a desk rather than a
+    broken chain. Tests wanting the other side of that boundary take `guarded_teams`."""
+    return TeamsClient(_NeverReached(), operator_identity_optional=True)
 
 
 @pytest.fixture
-def guarded_settings() -> Settings:
-    """The deployed shape: an authenticator in front and a `teams` off this machine, so a
-    missing operator identity is a broken chain and not a desk."""
-    return Settings(  # type: ignore[call-arg]
-        teams_url=REMOTE,
-        teams_scope="api://tradingcenter-teams/.default",
-        require_authenticated_principal=True,
-        _env_file=None,
-    )
+def guarded_teams() -> TeamsClient:
+    """The deployed shape: an authenticator in front, so a missing operator identity is a
+    broken chain and every tool refuses."""
+    return TeamsClient(_NeverReached(), operator_identity_optional=False)
 
 
 @pytest.fixture
-def teams(settings: Settings) -> TeamsClient:
-    return TeamsClient(settings)
+def server(teams: TeamsClient):
+    """The tool registry and the client it was built with, so a test can mock the exact
+    requests it will make."""
+    return build_server(teams), teams
 
 
 @pytest.fixture
-def guarded_server(guarded_settings: Settings):
-    """A server built on the deployed shape, for the tests that check what happens when
+def guarded_server(guarded_teams: TeamsClient):
+    """A registry built on the deployed shape, for the tests that check what happens when
     nobody is behind a call there. Deliberately not paired with `signed_in`."""
-    client = TeamsClient(guarded_settings)
-    return build_server(guarded_settings, client), client
+    return build_server(guarded_teams), guarded_teams
 
 
 @pytest.fixture
-def server(settings: Settings, teams: TeamsClient):
-    """The server and the client it was built with, so a test can mock the exact base
-    URL it will call — same shape as both other MCP modules' own `server` fixture."""
-    return build_server(settings, teams), teams
-
-
-@pytest.fixture
-def signed_in(monkeypatch: pytest.MonkeyPatch):
-    """Every tool asks `operator.operator_token` for the caller's credential before it
-    touches the network. Calling a tool through `mcp.call_tool` has no HTTP request
-    behind it, so the token is supplied here — the extraction itself is what
-    `test_operator.py` checks, and stubbing it there would leave nothing tested."""
-    monkeypatch.setattr(
-        # `optional` is accepted and ignored: a signed-in operator's token is the same
-        # token whether or not an absent one would have been tolerated.
-        "teams_mcp.tools._shared.operator_token",
-        lambda _context, optional=False: OPERATOR_TOKEN,
-    )
-    return OPERATOR_TOKEN
+def signed_in():
+    """Every tool asks `operator.py` who this call acts for before it touches a route.
+    Calling a tool through `mcp.call_tool` has no chat request behind it, so the identity is
+    put in place here — through the same context manager the adapter uses, rather than by
+    stubbing the function that reads it, which would leave nothing tested."""
+    with carrying(OPERATOR):
+        yield OPERATOR

@@ -1,10 +1,14 @@
-"""Several tool servers behind one door — specs/agent-tool-access, as modified by
-add-teams-mcp.
+"""Several sources of tools behind one door — specs/agent-tool-access.
 
-The property under test is independence: one server being absent, unreachable or slow
-costs the model that server's tools and nothing else. It is easy to write a registry that
-loses this by gathering everything and failing as a unit, and the failure is invisible
-until the day one of them is down.
+The property under test is independence: one source being absent, unreachable or slow costs
+the model that source's tools and nothing else. It is easy to write a registry that loses
+this by gathering everything and failing as a unit, and the failure is invisible until the
+day one of them is down.
+
+Two of the three are servers on a network; the third runs in this process and is handed in
+rather than built from settings, because building one needs the application object
+(`workbench/team_tools.py`). The stand-in below is all three — what the registry knows about
+a source is five members, and it does not ask which kind it is.
 """
 
 from __future__ import annotations
@@ -48,20 +52,19 @@ class _Server:
     ) -> None:
         self.label = label
         self.configured = configured
-        self.forwards_operator_token = label == "teams-mcp"
         self._tools = tools
         self._account_tools = account_tools
         self.calls: list[tuple[str, str | None]] = []
         self.closed = False
 
-    async def list_tools(self, operator_token: str | None = None) -> list[ToolDescriptor]:
+    async def list_tools(self, operator_principal: str | None = None) -> list[ToolDescriptor]:
         return [ToolDescriptor(name=name, description="", input_schema={}) for name in self._tools]
 
     def moves_the_account(self, name: str) -> bool:
         return name in self._account_tools
 
-    async def call(self, name, arguments, operator_token=None) -> ToolOutcome:
-        self.calls.append((name, operator_token))
+    async def call(self, name, arguments, operator_principal=None) -> ToolOutcome:
+        self.calls.append((name, operator_principal))
         return ToolOutcome(ToolOutcomeKind.OK, f"{self.label} ran {name}", 1)
 
     async def aclose(self) -> None:
@@ -69,21 +72,40 @@ class _Server:
 
 
 class _UnreachableServer(_Server):
-    async def list_tools(self, operator_token: str | None = None) -> list[ToolDescriptor]:
+    async def list_tools(self, operator_principal: str | None = None) -> list[ToolDescriptor]:
         # What `ToolServer` really does when it cannot be asked: an empty list, never an
         # exception (specs/agent-tool-access, "Brak serwera narzędzi nie odbiera agentowi
         # mowy").
         return []
 
 
-def test_from_settings_builds_three_servers_and_only_one_forwards_the_operators_token() -> None:
+def test_from_settings_builds_the_two_servers_that_are_on_a_network() -> None:
     registry = ToolServerRegistry.from_settings(_settings())
-    # Reaching inside on purpose: which servers get built, which one carries a person's
-    # credential, and which one can move the account is the arrangement this test pins.
-    servers = registry._servers
+    # Reaching inside on purpose: which sources get built is the arrangement this test
+    # pins. The team tools are not among them and cannot be — settings hold no address for
+    # something in this process.
+    assert [server.label for server in registry._servers] == ["market-mcp", "trading-mcp"]
 
-    labels = {server.label: server.forwards_operator_token for server in servers}
-    assert labels == {"market-mcp": False, "teams-mcp": True, "trading-mcp": False}
+
+def test_a_local_source_is_appended_to_the_servers_rather_than_replacing_one() -> None:
+    team_tools = _Server("team tools", ["create_team"])
+
+    registry = ToolServerRegistry.from_settings(_settings(), local_sources=[team_tools])
+
+    labels = [server.label for server in registry._servers]
+    assert labels == ["market-mcp", "trading-mcp", "team tools"]
+
+
+async def test_the_local_source_answers_while_neither_server_is_configured() -> None:
+    """The asymmetry worth pinning: a network server with no address publishes nothing, and
+    a source in this process has no address to lack."""
+    registry = ToolServerRegistry.from_settings(
+        _settings(), local_sources=[_Server("team tools", ["create_team"])]
+    )
+
+    names = [tool.name for tool in await registry.list_tools()]
+
+    assert names == ["create_team"]
 
 
 def test_only_trading_mcp_is_built_as_a_server_that_can_move_the_account() -> None:
@@ -126,7 +148,7 @@ def test_nothing_configured_means_no_tools_rather_than_an_error() -> None:
 
 async def test_the_union_of_both_catalogues_reaches_the_model() -> None:
     registry = ToolServerRegistry(
-        [_Server("market-mcp", ["get_candles"]), _Server("teams-mcp", ["create_team"])]
+        [_Server("market-mcp", ["get_candles"]), _Server("team tools", ["create_team"])]
     )
 
     names = [tool.name for tool in await registry.list_tools()]
@@ -136,7 +158,7 @@ async def test_the_union_of_both_catalogues_reaches_the_model() -> None:
 
 async def test_one_server_being_unreachable_leaves_the_others_tools_in_place() -> None:
     market = _UnreachableServer("market-mcp", ["get_candles"])
-    teams = _Server("teams-mcp", ["create_team"])
+    teams = _Server("team tools", ["create_team"])
     registry = ToolServerRegistry([market, teams])
 
     names = [tool.name for tool in await registry.list_tools()]
@@ -144,29 +166,29 @@ async def test_one_server_being_unreachable_leaves_the_others_tools_in_place() -
     assert names == ["create_team"]
 
 
-async def test_a_call_reaches_the_server_that_announced_the_name() -> None:
+async def test_a_call_reaches_the_source_that_announced_the_name() -> None:
     market = _Server("market-mcp", ["get_candles"])
-    teams = _Server("teams-mcp", ["create_team"])
+    teams = _Server("team tools", ["create_team"])
     registry = ToolServerRegistry([market, teams])
     await registry.list_tools()
 
-    await registry.call("create_team", {}, "operator-token")
+    await registry.call("create_team", {}, "operator-principal")
 
-    assert teams.calls == [("create_team", "operator-token")]
+    assert teams.calls == [("create_team", "operator-principal")]
     assert market.calls == []
 
 
-async def test_the_operators_token_travels_to_every_server_the_registry_dispatches_to() -> None:
-    """The registry does not decide who needs the token — the server does, and the one
-    that does not want it never looks at it. Keeping the decision in one place is what
-    stops a third server from being added without one."""
+async def test_the_operators_identity_travels_to_every_source_the_registry_dispatches_to() -> None:
+    """The registry does not decide who needs it — the source does, and the one that does
+    not want it never looks at it. Keeping the decision in one place is what stops a further
+    source from being added without one."""
     market = _Server("market-mcp", ["get_candles"])
     registry = ToolServerRegistry([market])
     await registry.list_tools()
 
-    await registry.call("get_candles", {}, "operator-token")
+    await registry.call("get_candles", {}, "operator-principal")
 
-    assert market.calls == [("get_candles", "operator-token")]
+    assert market.calls == [("get_candles", "operator-principal")]
 
 
 async def test_a_name_nobody_announces_is_an_outcome_not_an_exception() -> None:
@@ -182,7 +204,7 @@ async def test_a_name_nobody_announces_is_an_outcome_not_an_exception() -> None:
 async def test_a_name_two_servers_both_announce_is_offered_by_neither() -> None:
     """Guessing would send an operator's "run it" to whichever server sorted first."""
     registry = ToolServerRegistry(
-        [_Server("market-mcp", ["run_team"]), _Server("teams-mcp", ["run_team"])]
+        [_Server("market-mcp", ["run_team"]), _Server("team tools", ["run_team"])]
     )
 
     names = [tool.name for tool in await registry.list_tools()]
@@ -193,7 +215,7 @@ async def test_a_name_two_servers_both_announce_is_offered_by_neither() -> None:
 
 
 async def test_closing_the_registry_closes_every_server() -> None:
-    market, teams = _Server("market-mcp", []), _Server("teams-mcp", [])
+    market, teams = _Server("market-mcp", []), _Server("team tools", [])
     await ToolServerRegistry([market, teams]).aclose()
 
     assert market.closed and teams.closed
@@ -202,9 +224,8 @@ async def test_closing_the_registry_closes_every_server() -> None:
 @pytest.mark.parametrize(
     ("prefix", "url", "scope", "expected"),
     [
-        ("TEAMS_MCP", "https://teams.example.com", None, "TEAMS_MCP_SCOPE"),
-        ("TEAMS_MCP", "http://127.0.0.1:8070", "api://teams/.default", "loopback"),
         ("MARKET_MCP", "https://market.example.com", None, "MARKET_MCP_SCOPE"),
+        ("MARKET_MCP", "http://127.0.0.1:8020", "api://market/.default", "loopback"),
         ("TRADING_MCP", "https://trading.example.com", None, "TRADING_MCP_SCOPE"),
         ("TRADING_MCP", "http://127.0.0.1:8060", "api://trading/.default", "loopback"),
         ("TRADING_MCP", None, "api://trading/.default", "TRADING_MCP_URL"),
@@ -220,21 +241,28 @@ def test_each_servers_mode_is_refused_on_its_own_terms(prefix, url, scope, expec
     assert expected in str(err.value)
 
 
-def test_one_server_configured_and_the_others_absent_is_a_working_configuration() -> None:
-    settings = _settings(teams_mcp_url="http://127.0.0.1:8070")
+def test_one_server_configured_and_the_other_absent_is_a_working_configuration() -> None:
+    settings = _settings(market_mcp_url="http://127.0.0.1:8020")
 
-    assert settings.teams_mcp_url == "http://127.0.0.1:8070"
-    assert settings.market_mcp_url is None
+    assert settings.market_mcp_url == "http://127.0.0.1:8020"
     assert settings.trading_mcp_url is None
 
 
-def test_the_trading_server_is_configured_without_touching_the_other_two() -> None:
+def test_the_trading_server_is_configured_without_touching_the_other() -> None:
     settings = _settings(trading_mcp_url="http://127.0.0.1:8060/")
 
     # The trailing slash goes, the same as market-mcp's, so nothing downstream builds `//mcp`.
     assert settings.trading_mcp_url == "http://127.0.0.1:8060"
     assert settings.market_mcp_url is None
-    assert settings.teams_mcp_url is None
+
+
+def test_there_is_no_setting_for_the_team_tools_at_all() -> None:
+    """Their absence is the point: a source in this process has no address to name, no
+    token to fetch and no timeout to choose — so there is nothing to leave unset and no
+    state in which the conversation has no team tools."""
+    settings = _settings()
+
+    assert not [name for name in type(settings).model_fields if name.startswith("teams_mcp")]
 
 
 def test_a_blank_trading_server_url_means_unset() -> None:

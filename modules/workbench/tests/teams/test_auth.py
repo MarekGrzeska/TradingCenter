@@ -13,6 +13,14 @@ class _FakeSettings:
 
 
 class _FakeAppState:
+    """`app.state.teams`, not `app.state` — the two surfaces keep their own namespace on
+    the one application they share."""
+
+    def __init__(self, require_authenticated_principal: bool) -> None:
+        self.teams = _FakeSurfaceState(require_authenticated_principal)
+
+
+class _FakeSurfaceState:
     def __init__(self, require_authenticated_principal: bool) -> None:
         self.settings = _FakeSettings(require_authenticated_principal)
 

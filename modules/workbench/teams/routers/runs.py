@@ -51,7 +51,7 @@ async def start_run(
     function the schedule/trigger clock calls once it has resolved its own revision
     (design.md, "Uruchomienie przebiegu tą samą drogą co router").
     """
-    pool = request.app.state.pool
+    pool = request.app.state.teams.pool
     async with pool.acquire() as conn:
         revision = await store.get_latest_revision(conn, team_id=team_id, owner_principal=owner)
     if revision is None:
@@ -66,11 +66,11 @@ async def start_run(
             pool,
             revision=dict(revision),
             owner_principal=owner,
-            catalogue=request.app.state.catalogue,
-            provider=request.app.state.provider,
-            tool_registry=request.app.state.tools,
-            settings=request.app.state.settings,
-            registry=request.app.state.runs,
+            catalogue=request.app.state.teams.catalogue,
+            provider=request.app.state.teams.provider,
+            tool_registry=request.app.state.teams.tools,
+            settings=request.app.state.teams.settings,
+            registry=request.app.state.teams.runs,
         )
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
@@ -88,7 +88,7 @@ async def list_runs(
 ) -> list[RunOut]:
     """Every run of this team, newest first — including runs of revisions since replaced,
     which is what makes two of them comparable at all."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         team = await store.get_team(conn, team_id=team_id, owner_principal=owner)
         if team is None:
             raise HTTPException(404, detail="no such team")
@@ -98,7 +98,7 @@ async def list_runs(
 
 @router.get("/runs/{run_id}")
 async def get_run(run_id: int, request: Request, owner: str = Depends(current_principal)) -> RunOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_run(conn, run_id=run_id, owner_principal=owner)
     if row is None:
         raise HTTPException(404, detail="no such run")
@@ -112,7 +112,7 @@ async def get_run_steps(
     """Who is waiting, who is working, who has finished and what they handed over — the
     same picture the progress stream carries, for a viewer that arrived late or came back
     (specs/teams-runs, "po ponownym otwarciu widać jego bieżący stan")."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         run = await store.get_run(conn, run_id=run_id, owner_principal=owner)
         if run is None:
             raise HTTPException(404, detail="no such run")
@@ -124,7 +124,7 @@ async def get_run_steps(
 async def get_run_tool_calls(
     run_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> list[ToolCallOut]:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         run = await store.get_run(conn, run_id=run_id, owner_principal=owner)
         if run is None:
             raise HTTPException(404, detail="no such run")
@@ -144,7 +144,7 @@ async def get_run_trades(
     filter is the same one every other run route uses — a stranger's run is 404, the
     same answer as one that never existed (specs/teams-browser-access).
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         run = await store.get_run(conn, run_id=run_id, owner_principal=owner)
         if run is None:
             raise HTTPException(404, detail="no such run")
@@ -159,13 +159,13 @@ async def cancel_run(
     """Asks a run to stop. 202, not 200: the status is written by the run itself as it
     unwinds, so what comes back here is the run as it was when the interruption was
     accepted — the operator's own view catches up through the stream or a reload."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_run(conn, run_id=run_id, owner_principal=owner)
     if row is None:
         raise HTTPException(404, detail="no such run")
     if row["status"] not in ("pending", "running"):
         raise HTTPException(409, detail=f"the run is already {row['status']}")
-    if not request.app.state.runs.cancel(run_id):
+    if not request.app.state.teams.runs.cancel(run_id):
         # In the database as running, but nothing in this process is running it — the
         # state `store.fail_unfinished_runs` closes at start-up. Answering 409 rather than
         # pretending to interrupt something that is not there.
@@ -189,8 +189,8 @@ async def run_events(
     holds no reference to any of this (specs/teams-runs, "Zerwanie połączenia odbierającego
     postęp MUST NOT przerwać przebiegu").
     """
-    pool = request.app.state.pool
-    registry = request.app.state.runs
+    pool = request.app.state.teams.pool
+    registry = request.app.state.teams.runs
     # Subscribed before the snapshot is **read**, not merely before it is sent. Reading it
     # first left a window nothing covered: releasing the connection is a suspension point,
     # so a step finishing right there landed in neither place — too late for the snapshot,

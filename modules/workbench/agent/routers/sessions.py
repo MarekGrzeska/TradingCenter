@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from .. import store
-from ..auth import current_principal
+from ..auth import PRINCIPAL_ID_HEADER, PRINCIPAL_NAME_HEADER, current_principal
 from ..contract import (
     CreateSessionIn,
     MessageOut,
@@ -37,17 +37,17 @@ async def create_session(
     body: CreateSessionIn, request: Request, owner: str = Depends(current_principal)
 ) -> SessionOut:
     try:
-        model = request.app.state.catalogue.resolve(body.model_id)
+        model = request.app.state.agent.catalogue.resolve(body.model_id)
     except ModelNotInCatalogue as err:
         raise HTTPException(422, detail=str(err)) from err
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         session = await store.create_session(conn, owner_principal=owner, model_id=model.id)
     return SessionOut.from_session(session)
 
 
 @router.get("/sessions")
 async def list_sessions(request: Request, owner: str = Depends(current_principal)) -> list[SessionOut]:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         sessions = await store.list_sessions(conn, owner_principal=owner)
     return [SessionOut.from_session(s) for s in sessions]
 
@@ -56,7 +56,7 @@ async def list_sessions(request: Request, owner: str = Depends(current_principal
 async def get_session(
     session_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> SessionOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
     # A foreign session reads exactly like a missing one — specs/agent-browser-access,
     # "Odmowa dostępu do cudzej sesji MUST być nieodróżnialna od odpowiedzi o sesji
@@ -70,7 +70,7 @@ async def get_session(
 async def get_messages(
     session_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> list[MessageOut]:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
         if session is None:
             raise HTTPException(404, detail="no such session")
@@ -94,7 +94,7 @@ async def get_unclaimed_tool_calls(
     Empty for almost every session, and that is the point — a row here is the record of an
     order whose fate nobody knows.
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
         if session is None:
             raise HTTPException(404, detail="no such session")
@@ -108,11 +108,11 @@ async def patch_session(
 ) -> SessionOut:
     if body.model_id is not None:
         try:
-            request.app.state.catalogue.get(body.model_id)
+            request.app.state.agent.catalogue.get(body.model_id)
         except ModelNotInCatalogue as err:
             raise HTTPException(422, detail=str(err)) from err
 
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
         if session is None:
             raise HTTPException(404, detail="no such session")
@@ -139,22 +139,29 @@ async def delete_session(
 ) -> None:
     """Removes the rozmowa from the operator's history. What it cost stays in the ledger —
     see `store.delete_session` for why that is not a compromise but the point."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         removed = await store.delete_session(conn, session_id=session_id, owner_principal=owner)
     if not removed:
         raise HTTPException(404, detail="no such session")
 
 
-def _bearer(request: Request) -> str | None:
-    """The caller's own token, as presented. Easy Auth validates it and leaves it in
-    place, so this is the same credential the terminal holds — not a copy this module
-    minted and not one it may keep: it is passed on for the length of a turn and never
-    written down."""
-    header = request.headers.get("authorization", "")
-    scheme, _, value = header.partition(" ")
-    if scheme.lower() != "bearer" or not value.strip():
-        return None
-    return value.strip()
+def _operator_principal(request: Request) -> str | None:
+    """Who this turn acts for, as the authenticator in front of this process said it.
+
+    Not the bearer token, which is what travelled here while the team tools stood in their
+    own process: a token needs a validator, and there is none between this line and the
+    routes it ends up at. The principal has already been through one — Easy Auth wrote
+    these headers and overwrote whatever the caller sent — so it is the identity itself
+    that is carried, for the length of a turn and never written down.
+
+    `None` where nothing authenticates, which is a developer's machine: the team tools then
+    act carrying no identity at all, and what they create belongs to the same principal the
+    local terminal gets (`teams_tools/operator.py`).
+    """
+    identity = (
+        request.headers.get(PRINCIPAL_ID_HEADER) or request.headers.get(PRINCIPAL_NAME_HEADER) or ""
+    ).strip()
+    return identity or None
 
 
 def _sse(event: str, data: dict) -> str:
@@ -165,7 +172,7 @@ def _sse(event: str, data: dict) -> str:
 async def send_message(
     session_id: int, body: SendMessageIn, request: Request, owner: str = Depends(current_principal)
 ) -> StreamingResponse:
-    pool = request.app.state.pool
+    pool = request.app.state.agent.pool
     async with pool.acquire() as conn:
         session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
         if session is None:
@@ -175,7 +182,7 @@ async def send_message(
         # typed survives a call that never answers.
         await store.append_operator_message(conn, session_id=session_id, content=body.content)
 
-    model_entry = request.app.state.catalogue.get(session.current_model_id)
+    model_entry = request.app.state.agent.catalogue.get(session.current_model_id)
     queue: asyncio.Queue = asyncio.Queue()
 
     task = asyncio.create_task(
@@ -183,22 +190,23 @@ async def send_message(
             pool,
             session_id=session_id,
             model_entry=model_entry,
-            provider=request.app.state.provider,
+            provider=request.app.state.agent.provider,
             queue=queue,
-            tool_server=request.app.state.tool_server,
+            tool_server=request.app.state.agent.tool_server,
             chart=body.chart.to_snapshot() if body.chart is not None else None,
-            # The operator's own credential, taken off the request being served and
-            # carried no further than the tool servers that act in their name. Tools
-            # that create teams and spend money must belong to the person asking, not to
-            # this module (design.md of add-teams-mcp, D2). Absent — local development,
-            # where nothing authenticates — those tools refuse and say why.
-            operator_token=_bearer(request),
+            # The operator's own identity, taken off the request being served and carried
+            # no further than the tool sources that act in their name. Tools that create
+            # teams and spend money must belong to the person asking, not to this process.
+            # Absent — local development, where nothing authenticates — those tools act
+            # carrying no identity rather than refusing, because refusing there would take
+            # the whole surface away from a desk.
+            operator_principal=_operator_principal(request),
         )
     )
     # A task with nothing referencing it is eligible for collection mid-run — kept here
     # so it always finishes, whether or not the stream below is still being read
     # (design.md, "Tura modelu przeżywa rozłączenie wołającego").
-    background = request.app.state.background_tasks
+    background = request.app.state.agent.background_tasks
     background.add(task)
     task.add_done_callback(background.discard)
 

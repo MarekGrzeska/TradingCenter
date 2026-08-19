@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from starlette.middleware.cors import CORSMiddleware
 
-from teams.app import app
+from workbench.app import app
 
 
 def test_the_app_adds_no_cors_middleware_of_its_own() -> None:

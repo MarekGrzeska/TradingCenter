@@ -15,7 +15,7 @@ import asyncpg
 import pytest
 from fastapi.testclient import TestClient
 
-from teams.app import app
+from workbench.app import app
 
 from .mcp_stand_in import serving_sync
 
@@ -24,8 +24,8 @@ pytestmark = pytest.mark.db
 MODEL_ID = "gpt-5.6-luna"
 
 _ENV = {
-    "OPENAI_API_KEY": "key",
-    "MODELS": (
+    "TEAMS_OPENAI_API_KEY": "key",
+    "TEAMS_MODELS": (
         f'[{{"id":"{MODEL_ID}","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
@@ -35,11 +35,15 @@ OWNER = {"X-MS-CLIENT-PRINCIPAL-ID": "operator-1"}
 
 
 @pytest.fixture
-def client(db: asyncpg.Connection, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
+def client(
+    workbench_env: None,
+    db: asyncpg.Connection,
+    migrated_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> Iterator[TestClient]:
     """The app against a stand-in tool server announcing three tools. `db` is depended on
     for its truncation — every test here starts against an empty catalogue."""
     with serving_sync() as url:
-        monkeypatch.setenv("DATABASE_URL", migrated_url)
         monkeypatch.setenv("MARKET_MCP_URL", url)
         for key, value in _ENV.items():
             monkeypatch.setenv(key, value)

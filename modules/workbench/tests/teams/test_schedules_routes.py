@@ -23,7 +23,7 @@ from fastapi.testclient import TestClient
 from tc_runtime.db import asyncpg_dsn
 
 from teams import store
-from teams.app import app
+from workbench.app import app
 
 from .mcp_stand_in import serving_sync
 
@@ -32,8 +32,8 @@ pytestmark = pytest.mark.db
 MODEL_ID = "gpt-5.6-luna"
 
 _ENV = {
-    "OPENAI_API_KEY": "key",
-    "MODELS": (
+    "TEAMS_OPENAI_API_KEY": "key",
+    "TEAMS_MODELS": (
         f'[{{"id":"{MODEL_ID}","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
@@ -44,8 +44,7 @@ STRANGER = {"X-MS-CLIENT-PRINCIPAL-ID": "operator-2"}
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DATABASE_URL", migrated_url)
+def _env(workbench_env: None, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 

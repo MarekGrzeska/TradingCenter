@@ -114,7 +114,7 @@ def build_graph(
     provider: ModelProvider,
     tool_server: ToolServer | None = None,
     local_tools: Mapping[str, LocalTool] | None = None,
-    operator_token: str | None = None,
+    operator_principal: str | None = None,
     account_trace: AccountTrace | None = None,
 ):
     async def call_model(state: ConversationState) -> dict:
@@ -188,7 +188,7 @@ def build_graph(
             assert tool_server is not None
             if account_trace is None or not tool_server.moves_the_account(request.name):
                 return (
-                    await tool_server.call(request.name, request.arguments, operator_token),
+                    await tool_server.call(request.name, request.arguments, operator_principal),
                     None,
                 )
             try:
@@ -210,7 +210,7 @@ def build_graph(
                     ),
                     None,
                 )
-            outcome = await tool_server.call(request.name, request.arguments, operator_token)
+            outcome = await tool_server.call(request.name, request.arguments, operator_principal)
             try:
                 await account_trace.settle(
                     row_id=row_id,

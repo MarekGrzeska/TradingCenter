@@ -33,7 +33,7 @@ async def list_drawings(
     symbol: str = Query(description="the instrument whose drawings to read, e.g. US100"),
     _: str = Depends(current_principal),
 ) -> list[ChartDrawingOut]:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         drawings = await store.list_drawings(conn, symbol=symbol)
     return [ChartDrawingOut.from_drawing(drawing) for drawing in drawings]
 
@@ -93,7 +93,7 @@ async def patch_drawing(
     """The correction keeps the drawing's identity: same id, same kind, same instrument,
     so a model that read the id before the operator moved the level still points at the
     same object (specs/agent-chart-drawings, "Operator cofa rysunek ręką")."""
-    async with request.app.state.pool.acquire() as conn, conn.transaction():
+    async with request.app.state.agent.pool.acquire() as conn, conn.transaction():
         standing = await store.lock_drawing(conn, drawing_id=drawing_id)
         if standing is None:
             raise HTTPException(404, f"no drawing #{drawing_id}")
@@ -118,7 +118,7 @@ async def delete_drawing(
     drawing_id: int,
     _: str = Depends(current_principal),
 ) -> None:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         removed = await store.delete_drawing(conn, drawing_id=drawing_id)
     if not removed:
         # Not a quiet success: an object the operator saw and cannot remove is a fact

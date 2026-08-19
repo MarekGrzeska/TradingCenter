@@ -21,7 +21,7 @@ async def get_usage(
     since: datetime | None = Query(None, alias="from"),
     until: datetime | None = Query(None, alias="to"),
 ) -> UsageSummaryOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         by_model = await store.usage_by_model(conn, owner_principal=owner, since=since, until=until)
         by_session = await store.usage_by_session(
             conn, owner_principal=owner, since=since, until=until

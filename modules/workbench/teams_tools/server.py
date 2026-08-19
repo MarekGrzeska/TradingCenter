@@ -1,13 +1,15 @@
-"""One FastMCP instance, one transport — and it is the network one.
+"""One FastMCP instance, and no transport at all.
 
-Unlike `market-mcp`, which also wires up `stdio` for a client on a desk, this module
-publishes nothing over a locally spawned process. A spawned process carries no caller
-identity, and the tools here create teams and start runs in an operator's name
-(specs/teams-mcp-transport, "Jeden transport, wybrany bez pytania wołającego").
+`FastMCP` is kept even though nothing is served over a socket any more, and the reason is
+that a transport was never what it was for here: it is the tool registry, the schema
+generator and the annotation carrier. Registering with `@mcp.tool` is what turns a typed
+Python function into a description, an input schema and a `readOnlyHint` the model reads —
+and `slim_tool_schemas` is what keeps the whole of that under the ceiling this surface has
+a written one for.
 
-`custom_route` puts `/health` on the same Starlette app `streamable_http_app()` builds,
-the same mechanism both other MCP modules use for the same reason: the platform that
-restarts the container on a failed probe does not speak MCP.
+What went with the process: `streamable_http_app()`, `RequireCallerIdentity` (there is no
+caller across a network to identify), `/health` (`workbench/app.py` publishes the one this
+process has) and the host and port it used to bind.
 """
 
 from __future__ import annotations
@@ -15,15 +17,10 @@ from __future__ import annotations
 import logging
 
 from mcp.server.fastmcp import FastMCP
-from starlette.requests import Request
-from starlette.responses import JSONResponse
-from starlette.types import ASGIApp
-from tc_mcp_kit.network_identity import RequireCallerIdentity
 from tc_mcp_kit.tool_schemas import slim_tool_schemas
 
 from . import tools
 from .client import TeamsClient
-from .config import Settings
 
 log = logging.getLogger(__name__)
 
@@ -33,68 +30,46 @@ INSTRUCTIONS = (
     "put it on a schedule or a market-condition trigger. Everything acts in the name of "
     "the operator whose chat this is — what you create here is theirs, appears in their "
     "Teams tab, and is spent against their limits. Nothing here reads the market: that "
-    "is market-mcp's archive, and this module has none of its own."
+    "is the archive's own tool surface, and this one has none of its own."
 )
 
 
-def build_server(settings: Settings, teams: TeamsClient) -> FastMCP:
-    mcp = FastMCP(
-        "teams-mcp",
-        instructions=INSTRUCTIONS,
-        host=settings.teams_mcp_host,
-        port=settings.teams_mcp_port,
-    )
-
-    @mcp.custom_route("/health", methods=["GET"])
-    async def health(_request: Request) -> JSONResponse:
-        # Says that the process answers, and nothing else — no count of teams, no
-        # operator, no word about whether `teams` itself is up (specs/teams-mcp-transport,
-        # "Jedno wejście odpowiada bez poświadczenia").
-        return JSONResponse({"status": "ok"})
+def build_server(teams: TeamsClient) -> FastMCP:
+    mcp = FastMCP("teams-tools", instructions=INSTRUCTIONS)
 
     tools.register(mcp, teams)
 
     # Every tool's schema, minus what pydantic writes for its own sake: field titles
     # repeating field names, an `anyOf` of bare types where a type list says the same, and
-    # defaults on a reply nobody constructs. 22,6% of what this process announces in every
+    # defaults on a reply nobody constructs. 22,6% of what this surface announces in every
     # turn of a conversation, and not one field, type or `required` entry with it
-    # (specs/teams-mcp-tools, "Powierzchnia narzędzi ma zapisany sufit").
+    # ("Powierzchnia narzędzi ma zapisany sufit").
     slim_tool_schemas(mcp)
 
     return mcp
 
 
-def build_http_app(settings: Settings, teams: TeamsClient) -> ASGIApp:
-    _say_whose_name_the_tools_act_in(settings)
-    mcp = build_server(settings, teams)
-    return RequireCallerIdentity(
-        mcp.streamable_http_app(), settings.require_authenticated_principal
-    )
-
-
-def _say_whose_name_the_tools_act_in(settings: Settings) -> None:
+def say_whose_name_the_tools_act_in(operator_identity_optional: bool) -> None:
     """Which of the two states this process came up in, said once, at startup.
 
     The state where tools work without an operator behind them MUST NOT be one an operator
-    infers from an absence of refusals (specs/teams-mcp-authorship, "Moduł mówi, w którym
-    stanie wstał"). Said in a log line rather than appended to every tool answer: a
-    sentence in each result is paid for in model tokens on every call, and it would make a
-    local answer differ in content from the deployed one — the one thing a local run exists
-    to compare (design.md, "Jedna linia przy starcie").
+    infers from an absence of refusals ("Moduł mówi, w którym stanie wstał"). Said in a log
+    line rather than appended to every tool answer: a sentence in each result is paid for
+    in model tokens on every call, and it would make a local answer differ in content from
+    the deployed one — the one thing a local run exists to compare.
+
+    One condition rather than two: the second was whether the catalogue was reached at a
+    remote address, and there is no address now.
     """
-    if settings.operator_identity_optional:
+    if operator_identity_optional:
         log.info(
-            "no authenticator stands in front of this module "
-            "(REQUIRE_AUTHENTICATED_PRINCIPAL=false) and teams is on this machine (%s), so "
-            "no layer could issue an operator token: tools act carrying no identity, and "
-            "what they create belongs to whatever principal teams gives an unauthenticated "
-            "request",
-            settings.teams_url,
+            "no authenticator stands in front of this process "
+            "(REQUIRE_AUTHENTICATED_PRINCIPAL=false), so no layer could identify an "
+            "operator: the team tools act carrying no identity, and what they create "
+            "belongs to whatever principal the teams routes give an unauthenticated request"
         )
         return
     log.info(
-        "tools act in the operator's own name, carried per call: a call reaching this "
-        "module without one is refused (teams at %s, authenticator in front: %s)",
-        settings.teams_url,
-        settings.require_authenticated_principal,
+        "the team tools act in the operator's own name, taken from the request being "
+        "served: a turn reaching them without one is refused"
     )

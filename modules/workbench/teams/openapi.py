@@ -70,11 +70,33 @@ def require_response_fields(schema: dict[str, Any]) -> dict[str, Any]:
     return schema
 
 
-def document() -> dict[str, Any]:
-    """The schema this module publishes, built in-process."""
-    from .app import app  # local: `app` imports this module
+# Built once per process. `require_response_fields` mutates in place and every caller is
+# free to read the result, so handing out two objects that only look alike is a way for one
+# caller's edit to be invisible to the next — which is what FastAPI's own `openapi_schema`
+# cache used to prevent while this read a running application's document.
+_document: dict[str, Any] | None = None
 
-    return app.openapi()
+
+def document() -> dict[str, Any]:
+    """The schema this surface publishes, built in-process.
+
+    A FastAPI of its own rather than the process's, and the difference is the point: the
+    generated TypeScript describes *this* surface, not the conversation's beside it. The
+    routers and their prefixes come from `surface.include`, the same function
+    `workbench/app.py` calls, so a path published here is a path served there — there is no
+    second list of prefixes to keep in step. What is *not* here is `/health`: that belongs
+    to the process, not to either surface.
+    """
+    global _document
+    if _document is None:
+        from fastapi import FastAPI
+
+        from .surface import include
+
+        app = FastAPI(title="TradingCenter · teams", version="0.1.0")
+        include(app)
+        _document = require_response_fields(app.openapi())
+    return _document
 
 
 def main() -> None:

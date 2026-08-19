@@ -2,11 +2,10 @@
 something, and the one seam that turns a `TeamsClient` outcome into what a tool answers.
 
 The seam is where the operator's identity is required, so no tool can forget it: `_call`
-asks `operator.py` for the token before it asks the client for anything, and a call with
-no operator behind it never reaches the network (specs/teams-mcp-authorship, "Brak
-tożsamości operatora zatrzymuje zapis, nie podstawia zastępczej") — except on a machine
-where no layer could have issued one, which is `operator.py`'s decision to make and not
-this file's.
+asks `operator.py` who this is before it asks the client for anything, and a call with no
+operator behind it never reaches a route ("Brak tożsamości operatora zatrzymuje zapis, nie
+podstawia zastępczej") — except on a machine where no layer could have identified one,
+which is `operator.py`'s decision to make and not this file's.
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ from mcp.types import ToolAnnotations
 
 from ..client import TeamsClient
 from ..errors import ToolRefusal, UpstreamUnavailable
-from ..operator import operator_token
+from ..operator import operator_principal
 
 # Applied to every read tool — a structural claim an MCP client can act on without
 # reading this module's source (specs/teams-mcp-tools, "Narzędzie zapisujące jest
@@ -59,8 +58,10 @@ async def _call(
     """
     # Whether an absent identity is allowed is the client's fact, read off the settings it
     # was built from; this seam only carries the answer through. `None` travels on to
-    # `client.py` unchanged — nothing here substitutes anything for it.
-    token = operator_token(context, optional=teams.operator_identity_optional)
+    # `client.py` unchanged — nothing here substitutes anything for it. The `context`
+    # parameter stays because FastMCP passes one to every tool; it is no longer where the
+    # identity comes from.
+    token = operator_principal(optional=teams.operator_identity_optional)
     try:
         if method == "GET":
             return await teams.get(path, token=token, params=params)

@@ -14,14 +14,14 @@ Alembic executes each `env.py` as a script, so the import below resolves against
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from logging.config import fileConfig
-from typing import Callable
 from urllib.parse import parse_qs, urlparse, urlunparse
 
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
-from tc_runtime.db import Credential, sqlalchemy_url
+from tc_runtime.db import sqlalchemy_url
 
 # Neither chain autogenerates: the migrations are handwritten SQL, so alembic has no
 # metadata to compare against.

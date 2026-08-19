@@ -14,10 +14,10 @@ import pytest
 from fastapi.testclient import TestClient
 
 from teams import store
-from teams.app import app
 from teams.contract import TeamDefinition, TeamRevisionOut
 from teams.models_catalogue import ModelCatalogue
 from teams.validation import DefinitionRefused, check_runnable
+from workbench.app import app
 
 pytestmark = pytest.mark.db
 
@@ -39,10 +39,9 @@ OWNER = {"X-MS-CLIENT-PRINCIPAL-ID": "operator-1"}
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DATABASE_URL", migrated_url)
-    monkeypatch.setenv("OPENAI_API_KEY", "key")
-    monkeypatch.setenv("MODELS", _MODELS)
+def _env(workbench_env: None, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("TEAMS_OPENAI_API_KEY", "key")
+    monkeypatch.setenv("TEAMS_MODELS", _MODELS)
 
 
 @pytest.fixture
@@ -70,7 +69,7 @@ def _create(client: TestClient, agents: list[dict]) -> int:
 
 
 def test_the_catalogue_is_published_cheapest_first_with_its_rates(client: TestClient) -> None:
-    published = client.get("/models").json()
+    published = client.get("/teams/models").json()
 
     assert published == [
         {
@@ -128,10 +127,10 @@ def test_a_withdrawn_model_leaves_the_catalogue_and_its_revisions_readable(
 
     # The operator drops the dear model from the configuration and restarts — the state a
     # narrower catalogue on the running app stands in for.
-    settings = app.state.settings
-    app.state.catalogue = ModelCatalogue([e for e in settings.models if e.id == CHEAP])
+    settings = app.state.teams.settings
+    app.state.teams.catalogue = ModelCatalogue([e for e in settings.models if e.id == CHEAP])
 
-    assert [entry["id"] for entry in client.get("/models").json()] == [CHEAP]
+    assert [entry["id"] for entry in client.get("/teams/models").json()] == [CHEAP]
     # Still readable, unchanged, and so is the catalogue entry pointing at it.
     reread = client.get(f"/teams/{team_id}/revisions/{revision['version']}", headers=OWNER)
     assert reread.status_code == 200

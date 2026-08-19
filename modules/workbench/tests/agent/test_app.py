@@ -5,31 +5,30 @@ from fastapi.testclient import TestClient
 from tc_runtime import schema_version
 from tc_runtime.schema_version import SchemaMismatch
 
-from agent.app import app
+from workbench.app import app
 
 # The lifespan now opens a real pool — it did not, back when this file's tests were
 # first written, and their env carried a DATABASE_URL nothing was listening on. A `db`
-# test since group 4 (`app.state.pool`, `POST /sessions` etc.), pointed at the
+# test since group 4 (`app.state.agent.pool`, `POST /sessions` etc.), pointed at the
 # throwaway container `migrated_url` gives.
 pytestmark = pytest.mark.db
 
 _ENV = {
-    "OPENAI_API_KEY": "key",
-    "MODELS": (
+    "AGENT_OPENAI_API_KEY": "key",
+    "AGENT_MODELS": (
         '[{"id":"gpt-5.6-sol","model":"sol-prod","display_name":"Sol",'
         '"cost_rank":3,"input_rate_per_1m":"5","output_rate_per_1m":"30"},'
         '{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
-    "DEFAULT_MODEL_ID": "gpt-5.6-luna",
+    "AGENT_DEFAULT_MODEL_ID": "gpt-5.6-luna",
 }
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
+def _env(workbench_env: None, migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
     # `db` requested for its TRUNCATE side effect — see test_usage_router.py's twin.
     del db
-    monkeypatch.setenv("DATABASE_URL", migrated_url)
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 

@@ -8,7 +8,7 @@ import asyncpg
 import pytest
 from fastapi.testclient import TestClient
 
-from teams.app import app
+from workbench.app import app
 
 from .scripted_provider import ScriptedProvider, says
 
@@ -18,8 +18,8 @@ MODEL_ID = "gpt-5.6-luna"
 DEAR_MODEL_ID = "gpt-5.6-sol"
 
 _ENV = {
-    "OPENAI_API_KEY": "key",
-    "MODELS": (
+    "TEAMS_OPENAI_API_KEY": "key",
+    "TEAMS_MODELS": (
         f'[{{"id":"{MODEL_ID}","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"},'
         f'{{"id":"{DEAR_MODEL_ID}","model":"sol-prod","display_name":"Sol",'
@@ -32,8 +32,7 @@ STRANGER = {"X-MS-CLIENT-PRINCIPAL-ID": "operator-2"}
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DATABASE_URL", migrated_url)
+def _env(workbench_env: None, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 
@@ -41,7 +40,7 @@ def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
 @pytest.fixture
 def client(db: asyncpg.Connection) -> Iterator[TestClient]:
     with TestClient(app) as started:
-        app.state.provider = ScriptedProvider(default=says("done."))
+        app.state.teams.provider = ScriptedProvider(default=says("done."))
         yield started
 
 
@@ -89,7 +88,7 @@ def test_usage_is_broken_down_so_a_cost_can_be_put_on_a_role(client: TestClient)
     )
     run_id = _run_to_the_end(client, team_id)
 
-    usage = client.get("/usage", params={"run_id": run_id}, headers=OWNER).json()
+    usage = client.get("/teams/usage", params={"run_id": run_id}, headers=OWNER).json()
 
     by_agent = {row["key"]: row for row in usage["by_agent"]}
     assert set(by_agent) == {"scout", "judge"}
@@ -111,8 +110,8 @@ def test_usage_of_one_run_is_not_the_usage_of_another(client: TestClient) -> Non
     first = _run_to_the_end(client, team_id)
     second = _run_to_the_end(client, team_id)
 
-    one = client.get("/usage", params={"run_id": first}, headers=OWNER).json()
-    both = client.get("/usage", params={"team_id": team_id}, headers=OWNER).json()
+    one = client.get("/teams/usage", params={"run_id": first}, headers=OWNER).json()
+    both = client.get("/teams/usage", params={"team_id": team_id}, headers=OWNER).json()
 
     assert float(both["total_cost"]) == pytest.approx(float(one["total_cost"]) * 2)
     assert second != first
@@ -123,11 +122,11 @@ def test_a_call_the_provider_reported_nothing_for_is_counted_as_unknown(
 ) -> None:
     """specs/teams-usage, "Model nie zwrócił liczby tokenów" — the row exists, the cost is
     absent rather than zero, and the summary says how many such rows it is missing."""
-    app.state.provider = ScriptedProvider(default=says("done.", tokens=None))
+    app.state.teams.provider = ScriptedProvider(default=says("done.", tokens=None))
     team_id = _team(client, [_agent("scout")])
     run_id = _run_to_the_end(client, team_id)
 
-    usage = client.get("/usage", params={"run_id": run_id}, headers=OWNER).json()
+    usage = client.get("/teams/usage", params={"run_id": run_id}, headers=OWNER).json()
 
     assert usage["total_cost"] == "0"
     assert usage["by_agent"][0]["unknown_count"] == 1
@@ -138,7 +137,7 @@ def test_a_stranger_sees_none_of_it(client: TestClient) -> None:
     team_id = _team(client, [_agent("scout")])
     run_id = _run_to_the_end(client, team_id)
 
-    usage = client.get("/usage", params={"run_id": run_id}, headers=STRANGER).json()
+    usage = client.get("/teams/usage", params={"run_id": run_id}, headers=STRANGER).json()
 
     # Empty, not 404: this is an aggregate, and "no rows" is the only answer that does not
     # tell a stranger the run exists (specs/teams-browser-access).

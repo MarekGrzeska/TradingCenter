@@ -45,7 +45,7 @@ async def get_usage(
     aggregate, and the difference between "no rows" and "not yours" is exactly what
     specs/teams-browser-access says a stranger must not be able to tell.
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         by_agent = await store.usage_by_agent(
             conn, owner_principal=owner, run_id=run_id, team_id=team_id
         )

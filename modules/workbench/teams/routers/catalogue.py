@@ -49,8 +49,8 @@ async def _check(request: Request, definition: TeamDefinition) -> None:
     try:
         check_definition(
             definition,
-            model_ids=request.app.state.catalogue.ids(),
-            announced=await announced_snapshot(request.app.state.settings),
+            model_ids=request.app.state.teams.catalogue.ids(),
+            announced=await announced_snapshot(request.app.state.teams.settings),
         )
     except DefinitionRefused as err:
         raise HTTPException(422, detail=str(err)) from err
@@ -61,7 +61,7 @@ async def create_team(
     body: CreateTeamIn, request: Request, owner: str = Depends(current_principal)
 ) -> TeamOut:
     await _check(request, body.definition)
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         team, revision = await store.create_team(
             conn,
             owner_principal=owner,
@@ -75,7 +75,7 @@ async def create_team(
 @router.get("/teams")
 async def list_teams(request: Request, owner: str = Depends(current_principal)) -> list[TeamOut]:
     """The whole of what a picker needs, and no definition — see `store._LATEST_REVISION`."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         rows = await store.list_teams(conn, owner_principal=owner)
     # `dict(row)`, here and below: asyncpg's Record forwards mapping access at
     # runtime but is not a Mapping to a type checker, and `from_row` takes one.
@@ -86,7 +86,7 @@ async def list_teams(request: Request, owner: str = Depends(current_principal)) 
 async def get_team(
     team_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> TeamOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_team(conn, team_id=team_id, owner_principal=owner)
     if row is None:
         raise HTTPException(404, detail="no such team")
@@ -103,7 +103,7 @@ async def save_revision(
     """Appends. The previous revision is not read, not touched and not made obsolete —
     a run already pointing at it keeps meaning what it meant."""
     await _check(request, body.definition)
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.save_revision(
             conn, team_id=team_id, owner_principal=owner, definition=body.definition
         )
@@ -118,7 +118,7 @@ async def get_latest_revision(
 ) -> TeamRevisionOut:
     """What the canvas opens on. Declared before the `{version}` route below, or FastAPI
     would try to parse "latest" as an int and answer 422."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_latest_revision(conn, team_id=team_id, owner_principal=owner)
     if row is None:
         raise HTTPException(404, detail="no such team")
@@ -131,7 +131,7 @@ async def get_revision(
 ) -> TeamRevisionOut:
     """Including a revision of a retired team: a run points at a revision, and a trace
     that cannot be opened is not a trace (specs/teams-catalogue)."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_revision(
             conn, team_id=team_id, owner_principal=owner, version=version
         )
@@ -149,7 +149,7 @@ async def get_revision_by_id(
     up. Drawing a run against the team's *latest* revision instead would show the operator
     a graph the run is not running (specs/teams-runs, "Przebieg odbywa się na rewizji, nie
     na zespole")."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_revision_by_id(
             conn, revision_id=revision_id, owner_principal=owner
         )
@@ -165,7 +165,7 @@ async def get_layout(
     """Where the operator left each agent. A team with nothing saved answers with an empty
     layout rather than a 404 — never having been arranged is the ordinary state, and the
     canvas computes places from the dependencies for every agent this does not name."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         team = await store.get_team(conn, team_id=team_id, owner_principal=owner)
         if team is None:
             raise HTTPException(404, detail="no such team")
@@ -188,7 +188,7 @@ async def save_layout(
     drew, an unsaved draft can carry an agent no revision knows yet, and a key that never
     becomes one is a row nobody reads.
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         saved = await store.save_layout(
             conn,
             team_id=team_id,
@@ -206,7 +206,7 @@ async def archive_team(
 ) -> None:
     """Retires the team from the catalogue. Its runs and the revisions they name stay —
     see `store._ARCHIVE_TEAM`."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         retired = await store.archive_team(conn, team_id=team_id, owner_principal=owner)
     if not retired:
         raise HTTPException(404, detail="no such team")

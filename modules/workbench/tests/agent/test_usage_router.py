@@ -5,30 +5,29 @@ from decimal import Decimal
 import pytest
 from fastapi.testclient import TestClient
 
-from agent.app import app
 from agent.provider import TextDelta, UsageReport
+from workbench.app import app
 
 pytestmark = pytest.mark.db
 
 _ENV = {
-    "OPENAI_API_KEY": "key",
-    "MODELS": (
+    "AGENT_OPENAI_API_KEY": "key",
+    "AGENT_MODELS": (
         '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
-    "DEFAULT_MODEL_ID": "gpt-5.6-luna",
+    "AGENT_DEFAULT_MODEL_ID": "gpt-5.6-luna",
 }
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
+def _env(workbench_env: None, migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
     # `db` is requested for its side effect, not its value: TestClient below opens its
     # own pool against the same `migrated_url`, and without `db`'s TRUNCATE this file
     # shares one un-reset database across every test in the session — invisible to a
     # test that only checks its own session id, but not to one asserting an empty
     # summary against everyone else who wrote to it first.
     del db
-    monkeypatch.setenv("DATABASE_URL", migrated_url)
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 
@@ -46,7 +45,7 @@ class _FakeProvider:
 
 def test_usage_reflects_a_completed_turn() -> None:
     with TestClient(app) as client:
-        app.state.provider = _FakeProvider(
+        app.state.agent.provider = _FakeProvider(
             [TextDelta("hi"), UsageReport(1000, 500, None, None)]
         )
         session_id = client.post("/sessions", json={}).json()["id"]

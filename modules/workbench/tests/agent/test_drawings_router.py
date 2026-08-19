@@ -12,25 +12,24 @@ import pytest
 from fastapi.testclient import TestClient
 
 from agent import store
-from agent.app import app
 from agent.models import ChartLevel, ChartTrendline, ChartTrendlinePoint, ChartZone
+from workbench.app import app
 
 pytestmark = pytest.mark.db
 
 _ENV = {
-    "OPENAI_API_KEY": "key",
-    "MODELS": (
+    "AGENT_OPENAI_API_KEY": "key",
+    "AGENT_MODELS": (
         '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
-    "DEFAULT_MODEL_ID": "gpt-5.6-luna",
+    "AGENT_DEFAULT_MODEL_ID": "gpt-5.6-luna",
 }
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
+def _env(workbench_env: None, migrated_url: str, db, monkeypatch: pytest.MonkeyPatch) -> None:
     del db  # requested for its TRUNCATE side effect — see test_chart_router.py's twin
-    monkeypatch.setenv("DATABASE_URL", migrated_url)
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 

@@ -63,11 +63,10 @@ _SESSION_GONE_MESSAGE = "Session terminated"
 # `streamable_http_app()` and wraps it without touching the route).
 MCP_PATH = "/mcp"
 
-# Where the operator's own credential rides — never `Authorization`, which carries this
-# module's identity to whatever authenticator stands in front of the server. The name
-# matches what teams-mcp reads (`teams_mcp/operator.py`); it is one contract in two
-# repositories' worth of modules and there is no shared constant to import.
-OPERATOR_TOKEN_HEADER = "X-Operator-Authorization"
+# No header for an operator's own credential any more, and its absence is the whole of
+# what this file lost with `teams-mcp`: every server reached from here is reached on this
+# module's own identity. The one tool source that acts for a person is not on a network at
+# all (`workbench/team_tools.py`).
 
 
 @dataclass(frozen=True)
@@ -145,7 +144,9 @@ class ToolServer:
     keeps constructing a bare `ToolServer(settings)` and gets exactly the market-mcp
     instance it always did.
 
-    `forwards_operator_token` marks the one server that acts **for a person** rather
+    `can_move_the_account` marks the one server whose calls could leave the account
+    changed even when nothing comes back. It used to have a sibling — a flag for the one
+    server that acted **for a person** rather
     than merely on this module's behalf. Its tools create teams and spend money in an
     operator's name, so a call to it carries their credential; market-mcp reads a shared
     archive and has no use for one (design.md, D2).
@@ -160,12 +161,10 @@ class ToolServer:
         settings: Settings,
         *,
         prefix: str = "market_mcp",
-        forwards_operator_token: bool = False,
         can_move_the_account: bool = False,
     ) -> None:
         self.label = prefix.replace("_", "-")
         self._env_prefix = prefix.upper()
-        self.forwards_operator_token = forwards_operator_token
         self.can_move_the_account = can_move_the_account
         self._url: str | None = getattr(settings, f"{prefix}_url")
         self._scope: str | None = getattr(settings, f"{prefix}_scope")
@@ -198,17 +197,23 @@ class ToolServer:
         if self._credential is not None:
             await self._credential.close()
 
-    async def list_tools(self, operator_token: str | None = None) -> list[ToolDescriptor]:
+    async def list_tools(self, operator_principal: str | None = None) -> list[ToolDescriptor]:
         """What the model may call this turn. An empty list is the answer whenever the
         server is not configured or not reachable — the caller's job is to run the turn
         without tools, not to fail it (specs/agent-tool-access, "Brak serwera narzędzi
-        nie odbiera agentowi mowy")."""
+        nie odbiera agentowi mowy").
+
+        `operator_principal` is accepted and ignored, so that every tool source in the
+        registry has one signature. A server on a network is reached on *this* module's
+        identity and its session is shared across turns; the source that acts for a person
+        is not on a network (`workbench/team_tools.py`).
+        """
         if self._url is None:
             return []
         if self._tools is not None:
             return self._tools
         try:
-            async with self._session_for(operator_token) as session:
+            async with self._session_for() as session:
                 result = await asyncio.wait_for(session.list_tools(), timeout=self._timeout)
         except Exception as err:  # noqa: BLE001 - every failure here means "no tools"
             log.warning(
@@ -248,9 +253,10 @@ class ToolServer:
         return True
 
     async def call(
-        self, name: str, arguments: dict[str, Any], operator_token: str | None = None
+        self, name: str, arguments: dict[str, Any], operator_principal: str | None = None
     ) -> ToolOutcome:
-        """One logical call, and at most two requests.
+        """One logical call, and at most two requests. `operator_principal` is accepted
+        and ignored — see `list_tools`.
 
         The second request happens only when the server rejected the first as belonging
         to a session it does not know — which it answers **before** looking at which tool
@@ -281,7 +287,7 @@ class ToolServer:
         # tool list and with it the only thing that could answer this afterwards.
         may_have_landed = self.moves_the_account(name)
         try:
-            result = await self._send(name, arguments, operator_token)
+            result = await self._send(name, arguments)
         except TimeoutError:
             await self._disconnect()
             return ToolOutcome(*self._timed_out(may_have_landed), elapsed())
@@ -296,7 +302,7 @@ class ToolServer:
                 name,
             )
             try:
-                result = await self._send(name, arguments, operator_token)
+                result = await self._send(name, arguments)
             except TimeoutError:
                 await self._disconnect()
                 return ToolOutcome(*self._timed_out(may_have_landed), elapsed())
@@ -333,10 +339,10 @@ class ToolServer:
         )
         return ToolOutcome(ToolOutcomeKind.OK, text, elapsed())
 
-    async def _send(self, name: str, arguments: dict[str, Any], operator_token: str | None) -> Any:
+    async def _send(self, name: str, arguments: dict[str, Any]) -> Any:
         """One request. Separate from `call` so the retry above is the same request
         twice rather than two spellings of it."""
-        async with self._session_for(operator_token) as session:
+        async with self._session_for() as session:
             return await asyncio.wait_for(session.call_tool(name, arguments), timeout=self._timeout)
 
     def _timed_out(self, may_have_landed: bool) -> tuple[ToolOutcomeKind, str]:
@@ -354,46 +360,17 @@ class ToolServer:
         return ToolOutcomeKind.UNAVAILABLE, f"{opening} {_WAS_NOT_MADE}"
 
     @asynccontextmanager
-    async def _session_for(self, operator_token: str | None) -> AsyncIterator[ClientSession]:
-        """A session to work through, and the reason there are two ways of getting one.
+    async def _session_for(self) -> AsyncIterator[ClientSession]:
+        """One session for the life of the process — the credential this module presents
+        never varies, so a connection is paid for once.
 
-        **A server that acts only on this module's behalf keeps one session** for the
-        life of the process: the credential never varies, so a connection can be paid
-        for once. That is market-mcp, and it is what this class did before there was
-        anything else.
-
-        **A server that acts for a *person* cannot.** Its credential is that person's,
-        it arrives per call, and the streamable-http transport fixes its headers when
-        the connection opens — so a shared session would carry whichever operator
-        happened to open it. A ContextVar does not rescue this either: the transport
-        sends from its own anyio task, which copied the context when it was created and
-        never sees a value set later. So a session per call, opened and closed inside
-        this one coroutine.
-
-        Closing it here is what makes that safe. A session left open by a task that then
-        returns strands anyio's cancel scopes on that task's stack, and the next scope
-        exit raises "Attempted to exit a cancel scope that isn't the current task's
-        current cancel scope" nowhere near the cause. `teams`' own save-time check opens
-        and closes one the same way, for the same reason.
-
-        The cost is one connection per tool call against that one server. An operator
-        typing in a chat is not a rate worth optimising for, and the alternative is
-        acting in the wrong person's name.
+        There used to be a second way through here, for the one server that acted in a
+        *person's* name: its credential arrived per call, the streamable-http transport
+        fixes its headers when the connection opens, and a shared session would have
+        carried whichever operator happened to open it. That server is a layer in this
+        process now, so the branch and its per-call connection are gone with it.
         """
-        if not self.forwards_operator_token:
-            yield await self._connected_session()
-            return
-
-        assert self._url is not None
-        stack = AsyncExitStack()
-        try:
-            session = await self._open(stack, operator_token=operator_token)
-            yield session
-        finally:
-            try:
-                await stack.aclose()
-            except Exception as err:  # noqa: BLE001 - closing a broken stream often raises
-                log.debug("%s: closing the per-call session raised: %s", self.label, err)
+        yield await self._connected_session()
 
     async def _connected_session(self) -> ClientSession:
         if self._session is not None:
@@ -403,7 +380,7 @@ class ToolServer:
                 return self._session
             stack = AsyncExitStack()
             try:
-                session = await self._open(stack, operator_token=None)
+                session = await self._open(stack)
             except BaseException:
                 await stack.aclose()
                 raise
@@ -411,19 +388,11 @@ class ToolServer:
             self._session = session
             return session
 
-    async def _open(self, stack: AsyncExitStack, *, operator_token: str | None) -> ClientSession:
+    async def _open(self, stack: AsyncExitStack) -> ClientSession:
         assert self._url is not None
         auth = (
             _ManagedIdentityAuth(self._credential, self._scope)
             if self._credential is not None and self._scope is not None
-            else None
-        )
-        # Two credentials answering two questions, and they travel in two headers:
-        # `Authorization` (this module's identity, added by `auth` above) says who is
-        # calling, and this one says in whose name (design.md, D2). Never merged.
-        headers = (
-            {OPERATOR_TOKEN_HEADER: operator_token}
-            if self.forwards_operator_token and operator_token
             else None
         )
         # `create_mcp_http_client` rather than a bare `httpx.AsyncClient`: the transport
@@ -433,7 +402,7 @@ class ToolServer:
         # `asyncio.wait_for` at the call sites instead.
         http_client = await stack.enter_async_context(
             create_mcp_http_client(
-                headers=headers, timeout=httpx.Timeout(self._timeout, read=None), auth=auth
+                timeout=httpx.Timeout(self._timeout, read=None), auth=auth
             )
         )
         read, write, _ = await stack.enter_async_context(

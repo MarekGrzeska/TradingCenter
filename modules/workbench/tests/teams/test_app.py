@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from tc_runtime import schema_version
 from tc_runtime.schema_version import SchemaMismatch
 
-from teams.app import app
+from workbench.app import app
 
 from .mcp_stand_in import free_port
 
@@ -14,8 +14,8 @@ from .mcp_stand_in import free_port
 pytestmark = pytest.mark.db
 
 _ENV = {
-    "OPENAI_API_KEY": "key",
-    "MODELS": (
+    "TEAMS_OPENAI_API_KEY": "key",
+    "TEAMS_MODELS": (
         '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
@@ -23,8 +23,7 @@ _ENV = {
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DATABASE_URL", migrated_url)
+def _env(workbench_env: None, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 
@@ -55,7 +54,7 @@ def test_the_module_starts_with_no_tool_server_configured() -> None:
     """
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
-        assert app.state.tools.configured() == []
+        assert app.state.teams.tools.configured() == []
 
 
 def test_a_tool_server_that_is_not_answering_does_not_stop_the_module(
@@ -67,7 +66,7 @@ def test_a_tool_server_that_is_not_answering_does_not_stop_the_module(
 
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
-        assert [server.label for server in app.state.tools.configured()] == ["market-mcp"]
+        assert [server.label for server in app.state.teams.tools.configured()] == ["market-mcp"]
 
 
 def test_a_schema_the_image_was_not_built_for_refuses_to_start(

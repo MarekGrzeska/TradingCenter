@@ -13,8 +13,8 @@ import pytest
 from fastapi.testclient import TestClient
 
 from teams import store
-from teams.app import app
 from teams.provider import ProviderChunk, TextDelta, UsageReport
+from workbench.app import app
 
 from .mcp_stand_in import serving_sync
 from .scripted_provider import ScriptedProvider, says
@@ -25,8 +25,8 @@ pytestmark = pytest.mark.db
 MODEL_ID = "gpt-5.6-luna"
 
 _ENV = {
-    "OPENAI_API_KEY": "key",
-    "MODELS": (
+    "TEAMS_OPENAI_API_KEY": "key",
+    "TEAMS_MODELS": (
         f'[{{"id":"{MODEL_ID}","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
@@ -37,8 +37,7 @@ STRANGER = {"X-MS-CLIENT-PRINCIPAL-ID": "operator-2"}
 
 
 @pytest.fixture(autouse=True)
-def _env(migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DATABASE_URL", migrated_url)
+def _env(workbench_env: None, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     for key, value in _ENV.items():
         monkeypatch.setenv(key, value)
 
@@ -49,7 +48,7 @@ def client(db: asyncpg.Connection) -> Iterator[TestClient]:
     routes read it off `app.state` per request, so nothing here needs an OpenAI key to be
     a real one."""
     with TestClient(app) as started:
-        app.state.provider = ScriptedProvider(default=says("done."))
+        app.state.teams.provider = ScriptedProvider(default=says("done."))
         yield started
 
 
@@ -143,7 +142,7 @@ def test_a_revision_naming_a_model_since_withdrawn_cannot_be_run(
         def ids(self):
             return frozenset()
 
-    monkeypatch.setattr(app.state, "catalogue", EmptyCatalogue())
+    monkeypatch.setattr(app.state.teams, "catalogue", EmptyCatalogue())
     response = client.post(f"/teams/{team_id}/runs", headers=OWNER)
 
     assert response.status_code == 422
@@ -172,7 +171,7 @@ class _Sleeper:
 def _start_a_slow_run(client: TestClient) -> tuple[int, int, _Sleeper]:
     team_id = _a_team(client)
     sleeper = _Sleeper()
-    app.state.provider = sleeper
+    app.state.teams.provider = sleeper
     run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
     _wait_for_status(client, run_id, {"running"})
     return team_id, run_id, sleeper
@@ -280,7 +279,7 @@ def test_a_watcher_is_subscribed_before_the_snapshot_is_read(
     _wait_for_status(client, run_id, {"completed", "failed"})
 
     order: list[str] = []
-    registry = app.state.runs
+    registry = app.state.teams.runs
     subscribed = registry.subscribe
     read_steps = store.get_run_steps
 
@@ -312,7 +311,7 @@ def test_a_stranger_who_is_refused_leaves_no_watcher_behind(
     run_id = client.post(f"/teams/{team_id}/runs", headers=OWNER).json()["id"]
     _wait_for_status(client, run_id, {"completed", "failed"})
 
-    registry = app.state.runs
+    registry = app.state.teams.runs
     with client.stream("GET", f"/runs/{run_id}/events", headers=STRANGER) as stream:
         assert stream.status_code == 404
 
@@ -337,7 +336,7 @@ def test_a_strangers_stream_is_refused(client: TestClient) -> None:
 def trading_client(db: asyncpg.Connection, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClient]:
     """The app against a stand-in announcing one *write* tool.
 
-    A real announcing server rather than an `app.state.tools` override, because the save
+    A real announcing server rather than an `app.state.teams.tools` override, because the save
     path does not read `app.state`: it asks whatever servers the settings name
     (`announced_snapshot`), which is what keeps a saved definition checked against what
     is actually published (specs/teams-tool-access).
@@ -345,7 +344,7 @@ def trading_client(db: asyncpg.Connection, monkeypatch: pytest.MonkeyPatch) -> I
     with serving_sync(("place_order",)) as url:
         monkeypatch.setenv("TRADING_MCP_URL", url)
         with TestClient(app) as started:
-            app.state.provider = ScriptedProvider(default=places_orders(1))
+            app.state.teams.provider = ScriptedProvider(default=places_orders(1))
             yield started
 
 

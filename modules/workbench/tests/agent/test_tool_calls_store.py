@@ -54,7 +54,7 @@ class ServerWithTools(FakeToolServer):
     """A tool server the turn can also ask for a tool list — `run_turn` reads one before
     the first model call."""
 
-    async def list_tools(self, operator_token: str | None = None):
+    async def list_tools(self, operator_principal: str | None = None):
         return [PRICE_TOOL]
 
 
@@ -73,7 +73,7 @@ class TradingServer(ServerWithTools):
     def __init__(self, outcomes: dict[str, ToolOutcome] | None = None) -> None:
         super().__init__(outcomes, account_tools=frozenset({"place_order"}))
 
-    async def list_tools(self, operator_token: str | None = None):
+    async def list_tools(self, operator_principal: str | None = None):
         return [PRICE_TOOL, ORDER_TOOL]
 
 
@@ -86,10 +86,10 @@ class TradingServerThatDiesMidOrder(TradingServer):
     what came back.
     """
 
-    async def call(self, name: str, arguments: dict, operator_token: str | None = None):
+    async def call(self, name: str, arguments: dict, operator_principal: str | None = None):
         if name == "place_order":
             raise RuntimeError("the process went away with the order in flight")
-        return await super().call(name, arguments, operator_token)
+        return await super().call(name, arguments, operator_principal)
 
 
 class QueueThatDiesOnTheFirstCall(RecordingQueue):
@@ -381,7 +381,7 @@ class ServerWithNoTools(FakeToolServer):
     than raising, which is the whole of `agent-tool-access`'s "Brak serwera narzędzi nie
     odbiera agentowi mowy"."""
 
-    async def list_tools(self, operator_token: str | None = None):
+    async def list_tools(self, operator_principal: str | None = None):
         return []
 
 

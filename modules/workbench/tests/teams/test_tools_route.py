@@ -15,15 +15,15 @@ import asyncpg
 import pytest
 from fastapi.testclient import TestClient
 
-from teams.app import app
+from workbench.app import app
 
 from .mcp_stand_in import free_port, serving_sync
 
 pytestmark = pytest.mark.db
 
 _ENV = {
-    "OPENAI_API_KEY": "key",
-    "MODELS": (
+    "TEAMS_OPENAI_API_KEY": "key",
+    "TEAMS_MODELS": (
         '[{"id":"gpt-5.6-luna","model":"luna-prod","display_name":"Luna",'
         '"cost_rank":1,"input_rate_per_1m":"1","output_rate_per_1m":"6"}]'
     ),
@@ -31,8 +31,7 @@ _ENV = {
 
 
 @pytest.fixture
-def _env(db: asyncpg.Connection, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("DATABASE_URL", migrated_url)
+def _env(workbench_env: None, db: asyncpg.Connection, migrated_url: str, monkeypatch: pytest.MonkeyPatch) -> None:
     # Neither MARKET_MCP_URL nor TRADING_MCP_URL here on purpose — `conftest`'s
     # `_no_developer_env` is what keeps both unset, on a machine with an `.env` as much
     # as in CI (see the note there).
@@ -116,4 +115,4 @@ def test_the_route_does_not_need_the_run_session_and_leaves_it_alone(
     assert announcing.get("/tools").status_code == 200
     assert announcing.get("/tools").status_code == 200
     # The long-lived registry's own sessions were never opened by either read.
-    assert all(server._session is None for server in app.state.tools.servers.values())
+    assert all(server._session is None for server in app.state.teams.tools.servers.values())

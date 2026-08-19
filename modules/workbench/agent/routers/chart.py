@@ -32,7 +32,7 @@ async def get_chart(
     ),
     _: str = Depends(current_principal),
 ) -> ChartCommandOut | None:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.agent.pool.acquire() as conn:
         command = await store.chart_state_after(conn, sequence=after)
     # `null`, not an empty object: "nothing new" and "a command that sets nothing" would
     # otherwise read the same, and one of them cannot happen.

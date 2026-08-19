@@ -13,7 +13,7 @@ import pytest
 import respx
 from mcp.server.fastmcp.exceptions import ToolError
 
-from .conftest import BASE, OPERATOR_TOKEN
+from .conftest import BASE, OPERATOR
 
 pytestmark = pytest.mark.usefixtures("signed_in")
 
@@ -123,7 +123,7 @@ async def test_create_team_carries_the_operators_token(server) -> None:
 
     await mcp.call_tool("create_team", {"name": "d", "agents": [_AGENT]})
 
-    assert created.calls.last.request.headers["authorization"] == f"Bearer {OPERATOR_TOKEN}"
+    assert created.calls.last.request.headers["x-ms-client-principal-id"] == OPERATOR
     await teams.aclose()
 
 

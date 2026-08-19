@@ -70,12 +70,12 @@ class FakeToolServer:
         return name in self._account_tools
 
     async def call(
-        self, name: str, arguments: dict, operator_token: str | None = None
+        self, name: str, arguments: dict, operator_principal: str | None = None
     ) -> ToolOutcome:
         # The token is accepted and recorded rather than ignored: the graph forwards it,
         # and a fake that could not take it would let that forwarding rot unnoticed.
         self.seen.append((name, arguments))
-        self.tokens.append(operator_token)
+        self.tokens.append(operator_principal)
         return self._outcomes.get(
             name, ToolOutcome(ToolOutcomeKind.OK, f"{name} says 21000.5", 4)
         )

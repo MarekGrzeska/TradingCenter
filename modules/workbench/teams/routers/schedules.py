@@ -67,7 +67,7 @@ async def _revision_must_be_there(
     the consent check that read the agents' tools; that check is gone, and a resolver whose
     answer nobody reads is a resolver pretending to be one.
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         team = await store.get_team(conn, team_id=team_id, owner_principal=owner)
         if team is None:
             raise HTTPException(404, detail="no such team")
@@ -106,7 +106,7 @@ async def create_schedule(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.create_schedule(
             conn,
             team_id=team_id,
@@ -123,7 +123,7 @@ async def create_schedule(
 async def list_schedules(
     team_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> list[ScheduleOut]:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         team = await store.get_team(conn, team_id=team_id, owner_principal=owner)
         if team is None:
             raise HTTPException(404, detail="no such team")
@@ -135,7 +135,7 @@ async def list_schedules(
 async def get_schedule(
     schedule_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> ScheduleOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_schedule(conn, schedule_id=schedule_id, owner_principal=owner)
     if row is None:
         raise HTTPException(404, detail="no such schedule")
@@ -146,7 +146,7 @@ async def get_schedule(
 async def update_schedule(
     schedule_id: int, body: ScheduleIn, request: Request, owner: str = Depends(current_principal)
 ) -> ScheduleOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         existing = await store.get_schedule(conn, schedule_id=schedule_id, owner_principal=owner)
     if existing is None:
         raise HTTPException(404, detail="no such schedule")
@@ -158,7 +158,7 @@ async def update_schedule(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.update_schedule(
             conn,
             schedule_id=schedule_id,
@@ -177,7 +177,7 @@ async def update_schedule(
 async def enable_schedule(
     schedule_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> ScheduleOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.set_schedule_enabled(
             conn, schedule_id=schedule_id, owner_principal=owner, enabled=True
         )
@@ -190,7 +190,7 @@ async def enable_schedule(
 async def disable_schedule(
     schedule_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> ScheduleOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.set_schedule_enabled(
             conn, schedule_id=schedule_id, owner_principal=owner, enabled=False
         )
@@ -210,7 +210,7 @@ async def delete_schedule(
     The runs it started are not touched, and nothing here has to arrange that — no column
     in `runs` points at a schedule.
     """
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         deleted = await store.delete_schedule(
             conn, schedule_id=schedule_id, owner_principal=owner
         )
@@ -222,7 +222,7 @@ async def delete_schedule(
 async def get_schedule_fires(
     schedule_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> list[ScheduleFireOut]:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         schedule = await store.get_schedule(conn, schedule_id=schedule_id, owner_principal=owner)
         if schedule is None:
             raise HTTPException(404, detail="no such schedule")
@@ -242,7 +242,7 @@ async def next_fires(
     """specs/terminal-teams-schedules, "Terminal nie liczy czasu wyzwolenia sam" — every
     time in the answer is rolled forward from now by this module, not the row's stored
     `next_fire_at`, which only reflects the last claim."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_schedule(conn, schedule_id=schedule_id, owner_principal=owner)
     if row is None:
         raise HTTPException(404, detail="no such schedule")
@@ -299,10 +299,10 @@ async def create_trigger(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    announced = await announced_snapshot(request.app.state.settings)
+    announced = await announced_snapshot(request.app.state.teams.settings)
     _check_trigger_tool(body.tool_name, announced=announced)
 
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.create_trigger(
             conn,
             team_id=team_id,
@@ -325,7 +325,7 @@ async def create_trigger(
 async def list_triggers(
     team_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> list[TriggerOut]:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         team = await store.get_team(conn, team_id=team_id, owner_principal=owner)
         if team is None:
             raise HTTPException(404, detail="no such team")
@@ -337,7 +337,7 @@ async def list_triggers(
 async def get_trigger(
     trigger_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> TriggerOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.get_trigger(conn, trigger_id=trigger_id, owner_principal=owner)
     if row is None:
         raise HTTPException(404, detail="no such trigger")
@@ -348,7 +348,7 @@ async def get_trigger(
 async def update_trigger(
     trigger_id: int, body: TriggerIn, request: Request, owner: str = Depends(current_principal)
 ) -> TriggerOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         existing = await store.get_trigger(conn, trigger_id=trigger_id, owner_principal=owner)
     if existing is None:
         raise HTTPException(404, detail="no such trigger")
@@ -360,10 +360,10 @@ async def update_trigger(
         revision_mode=body.revision_mode,
         pinned_revision_id=body.pinned_revision_id,
     )
-    announced = await announced_snapshot(request.app.state.settings)
+    announced = await announced_snapshot(request.app.state.teams.settings)
     _check_trigger_tool(body.tool_name, announced=announced)
 
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.update_trigger(
             conn,
             trigger_id=trigger_id,
@@ -387,7 +387,7 @@ async def update_trigger(
 async def enable_trigger(
     trigger_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> TriggerOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.set_trigger_enabled(
             conn, trigger_id=trigger_id, owner_principal=owner, enabled=True
         )
@@ -400,7 +400,7 @@ async def enable_trigger(
 async def disable_trigger(
     trigger_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> TriggerOut:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         row = await store.set_trigger_enabled(
             conn, trigger_id=trigger_id, owner_principal=owner, enabled=False
         )
@@ -414,7 +414,7 @@ async def delete_trigger(
     trigger_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> None:
     """The same as deleting a schedule, for the other half of the pair."""
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         deleted = await store.delete_trigger(conn, trigger_id=trigger_id, owner_principal=owner)
     if not deleted:
         raise HTTPException(404, detail="no such trigger")
@@ -424,7 +424,7 @@ async def delete_trigger(
 async def get_trigger_fires(
     trigger_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> list[ScheduleFireOut]:
-    async with request.app.state.pool.acquire() as conn:
+    async with request.app.state.teams.pool.acquire() as conn:
         trigger = await store.get_trigger(conn, trigger_id=trigger_id, owner_principal=owner)
         if trigger is None:
             raise HTTPException(404, detail="no such trigger")

@@ -1,131 +1,111 @@
-"""specs/teams-mcp-authorship — whose request this is, and what happens when nobody can
-say. Header extraction gets its own file because every other test in this suite stubs it
-out, and something has to check the thing being stubbed."""
+"""Whose request this is, and what happens when nobody can say.
+
+Its own file because every other test in this suite puts an operator in place through
+`signed_in`, and something has to check the thing being put in place.
+
+What is read changed with the merge and is worth stating: not a bearer token out of a
+header, but the operator's own principal out of a context variable the adapter sets. There
+is no authenticator between the chat request and these tools any more — the identity has
+already been through one, and it is the identity that travels rather than the credential.
+"""
 
 from __future__ import annotations
 
 import pytest
 
-from teams_mcp.errors import ToolRefusal
-from teams_mcp.operator import OPERATOR_TOKEN_HEADER, operator_token, redacted
+from teams_tools.errors import ToolRefusal
+from teams_tools.operator import carrying, operator_principal, redacted
 
 
-class _Headers(dict):
-    """Starlette's own headers read case-insensitively, and the header this looks for is
-    written in mixed case by whoever sends it."""
-
-    def get(self, key, default=None):
-        return super().get(key.lower(), default)
+def test_the_operator_is_read_from_what_the_adapter_put_in_place() -> None:
+    with carrying("some-operator"):
+        assert operator_principal() == "some-operator"
 
 
-class _Request:
-    def __init__(self, headers: dict[str, str]) -> None:
-        self.headers = _Headers({k.lower(): v for k, v in headers.items()})
-
-
-class _RequestContext:
-    def __init__(self, request) -> None:
-        self.request = request
-
-
-class _Context:
-    def __init__(self, request) -> None:
-        self.request_context = _RequestContext(request)
-
-
-class _ContextOutsideARequest:
-    @property
-    def request_context(self):
-        raise ValueError("Context is not available outside of a request")
-
-
-def test_the_token_is_read_from_its_own_header() -> None:
-    context = _Context(_Request({OPERATOR_TOKEN_HEADER: "operator-token"}))
-    assert operator_token(context) == "operator-token"
-
-
-def test_a_call_with_no_operator_header_is_refused_naming_the_absence() -> None:
+def test_a_call_with_no_operator_is_refused_naming_the_absence() -> None:
     with pytest.raises(ToolRefusal) as err:
-        operator_token(_Context(_Request({})))
+        operator_principal()
 
     assert "no operator identity" in str(err.value)
     assert "nothing was written" in str(err.value).lower()
 
 
-def test_a_blank_header_counts_as_absent() -> None:
-    with pytest.raises(ToolRefusal):
-        operator_token(_Context(_Request({OPERATOR_TOKEN_HEADER: "   "})))
+def test_a_blank_principal_counts_as_absent() -> None:
+    with carrying("   "), pytest.raises(ToolRefusal):
+        operator_principal()
 
 
-def test_a_tool_running_outside_a_request_is_refused_rather_than_crashing() -> None:
-    with pytest.raises(ToolRefusal):
-        operator_token(_ContextOutsideARequest())
-
-
-def test_the_modules_own_authorization_header_is_not_mistaken_for_the_operators() -> None:
-    """`Authorization` carries agent's identity to this module's own authenticator. It is
-    a different credential answering a different question and must never be borrowed."""
-    context = _Context(_Request({"authorization": "Bearer agents-own-managed-identity"}))
+def test_the_identity_does_not_outlive_the_call_it_was_set_for() -> None:
+    """The bug this rules out is the expensive one: a principal left behind on a task that
+    is reused, so the next operator's turn acts as the last one."""
+    with carrying("some-operator"):
+        assert operator_principal() == "some-operator"
 
     with pytest.raises(ToolRefusal):
-        operator_token(context)
+        operator_principal()
 
 
-def test_an_absent_operator_answers_nothing_when_nobody_could_have_issued_one() -> None:
+def test_it_is_reset_even_when_a_tool_raises() -> None:
+    with pytest.raises(RuntimeError), carrying("some-operator"):
+        raise RuntimeError("a tool failed")
+
+    with pytest.raises(ToolRefusal):
+        operator_principal()
+
+
+def test_an_absent_operator_answers_nothing_when_nobody_could_have_been_identified() -> None:
     """The local carve-out: `None`, not a substituted identity and not a refusal
-    (specs/teams-mcp-authorship, "Maszyna deweloperska, gdzie nikt nie może być
-    uwierzytelniony")."""
-    assert operator_token(_Context(_Request({})), optional=True) is None
+    ("Maszyna deweloperska, gdzie nikt nie może być uwierzytelniony")."""
+    assert operator_principal(optional=True) is None
 
 
-def test_the_three_ways_of_arriving_at_an_absence_answer_the_same() -> None:
-    assert operator_token(_Context(_Request({OPERATOR_TOKEN_HEADER: "  "})), optional=True) is None
-    assert operator_token(_ContextOutsideARequest(), optional=True) is None
+def test_a_blank_principal_answers_the_same_as_none_under_the_carve_out() -> None:
+    with carrying("  "):
+        assert operator_principal(optional=True) is None
 
 
-def test_a_present_token_is_still_carried_when_an_absent_one_would_be_tolerated() -> None:
-    """The carve-out tolerates an absence; it does not stop reading a token that is there,
-    which is what would quietly turn a signed-in local operator into an anonymous one."""
-    context = _Context(_Request({OPERATOR_TOKEN_HEADER: "operator-token"}))
-
-    assert operator_token(context, optional=True) == "operator-token"
+def test_a_present_operator_is_still_carried_when_an_absent_one_would_be_tolerated() -> None:
+    """The carve-out tolerates an absence; it does not stop reading an identity that is
+    there, which is what would quietly turn a signed-in local operator into an anonymous
+    one."""
+    with carrying("some-operator"):
+        assert operator_principal(optional=True) == "some-operator"
 
 
 def test_requiring_an_operator_is_what_happens_by_default() -> None:
     # The keyword exists for exactly one caller, and nothing reaches this function's
     # tolerant branch by forgetting to pass anything.
     with pytest.raises(ToolRefusal):
-        operator_token(_Context(_Request({})))
+        operator_principal()
 
 
 def test_redacted_says_whether_there_was_one_and_nothing_else() -> None:
-    assert redacted("a-real-looking-token") == "present"
+    assert redacted("a-real-looking-principal") == "present"
     assert redacted(None) == "absent"
-    assert "a-real-looking-token" not in redacted("a-real-looking-token")
+    assert "a-real-looking-principal" not in redacted("a-real-looking-principal")
 
 
-async def test_the_operators_token_never_reaches_a_log_line(caplog, monkeypatch) -> None:
-    """specs/teams-mcp-authorship and design.md's "Cena, którą ta droga ma" — the token
-    passes through two processes and neither may write it down. Checked at DEBUG, where
-    a library that logs request headers would show up."""
+async def test_the_operators_identity_never_reaches_a_log_line(caplog) -> None:
+    """It passes through the tool seam and the client, and neither may write it down.
+    Checked at DEBUG, where a library that logs request headers would show up."""
     import logging
 
     import httpx
     import respx
 
-    from teams_mcp.client import TeamsClient
-    from teams_mcp.config import Settings
+    from teams_tools.client import BASE_URL, TeamsClient
 
-    secret = "operator-token-that-must-not-be-logged"
-    settings = Settings(teams_url="http://127.0.0.1:8050", _env_file=None)  # type: ignore[call-arg]
-    client = TeamsClient(settings)
+    secret = "operator-principal-that-must-not-be-logged"
+    client = TeamsClient(_never_reached, operator_identity_optional=False)
 
     with caplog.at_level(logging.DEBUG), respx.mock:
-        respx.get("http://127.0.0.1:8050/teams").mock(
-            return_value=httpx.Response(200, json=[])
-        )
+        respx.get(f"{BASE_URL}/teams").mock(return_value=httpx.Response(200, json=[]))
         await client.get("/teams", token=secret)
 
     await client.aclose()
     assert secret not in caplog.text
     assert secret not in "".join(record.getMessage() for record in caplog.records)
+
+
+async def _never_reached(scope, receive, send):  # pragma: no cover - intercepted above
+    raise AssertionError("the request should have been intercepted above the transport")

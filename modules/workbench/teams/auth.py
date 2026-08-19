@@ -24,5 +24,5 @@ def current_principal(request: Request) -> str:
     before it ever reaches a route body, so `REQUIRE_AUTHENTICATED_PRINCIPAL` refuses
     before a model is ever touched."""
     return principal_from(
-        request, required=request.app.state.settings.require_authenticated_principal
+        request, required=request.app.state.teams.settings.require_authenticated_principal
     )

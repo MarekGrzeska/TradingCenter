@@ -148,7 +148,7 @@ def test_seed_prompt_is_not_reachable_from_the_runtime_path() -> None:
     prompt on a request, which is not a thing this module does."""
     import pathlib
 
-    root = pathlib.Path(__file__).resolve().parents[1] / "agent"
+    root = pathlib.Path(__file__).resolve().parents[2] / "agent"
     callers = [
         path
         for path in root.rglob("*.py")
@@ -168,8 +168,8 @@ def test_the_migration_that_added_source_states_the_versions_it_backfills() -> N
     import pathlib
 
     migration = (
-        pathlib.Path(__file__).resolve().parents[1]
-        / "migrations/versions/0013_prompt_seed_yields_to_operator.py"
+        pathlib.Path(__file__).resolve().parents[2]
+        / "migrations/agent/versions/0013_prompt_seed_yields_to_operator.py"
     ).read_text(encoding="utf-8")
 
     assert '_SEEDED_VERSIONS = ("v4", "v5", "v6", "v7", "v8", "v9", "v10", "v11")' in migration

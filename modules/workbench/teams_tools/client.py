@@ -1,16 +1,18 @@
-"""The client for `teams` — the one seam every call passes through, and so the one place
-the two identities are kept apart.
+"""The seam every call to the teams surface passes through.
 
-Every request carries the **operator's** token as `Authorization`. That is the whole
-mechanism by which a team created from the chat belongs to the person who asked for it:
-the authenticator in front of `teams` validates that token and puts their principal on the
-request, exactly as it does for the terminal (design.md, D2).
+**No network.** The routes this speaks to are in the same process, reached through
+`httpx.ASGITransport` — so what used to be two hops from the model to the catalogue is
+none. HTTP is kept as the shape of the call rather than replaced by direct calls into
+`teams.store`, and that is a decision with a reason
+(`agent-and-teams-one-workbench/design.md`, D3): the owner filter, the revision
+validation, the daily cost limit and the tool-catalogue check all live in the routers, and
+a tool reaching past them would be a second copy of the access policy.
 
-This module's *own* managed identity is a different credential answering a different
-question, and it is not sent here at all — it proves `agent`'s right to reach *this*
-module, one hop earlier. `teams_scope` exists for the day that changes; today the token
-that opens `teams` is the operator's, and there is no path in this file that substitutes
-one for the other.
+Every request carries the **operator's principal** in the header a platform authenticator
+would have written. That is the whole mechanism by which a team created from the chat
+belongs to the person who asked for it — and the principal is not invented here: it comes
+off the incoming chat request, which the authenticator in front of this process has
+already validated (`operator.py`).
 
 Three outcomes, not two (`errors.py`). And one rule with teeth: **a write is never
 retried.** A repeated `create_team` is a second team, a repeated `run_team` a second bill.
@@ -23,9 +25,10 @@ import logging
 from typing import Any
 
 import httpx
+from starlette.types import ASGIApp
 from tc_mcp_kit.detail import detail
+from tc_runtime.auth import PRINCIPAL_ID_HEADER
 
-from .config import Settings
 from .errors import ToolRefusal, UpstreamUnavailable
 
 log = logging.getLogger(__name__)
@@ -36,20 +39,26 @@ log = logging.getLogger(__name__)
 _WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
+# Never resolved and never dialled — `ASGITransport` answers every request whatever the
+# authority says. It exists because httpx requires an absolute URL, and it is spelled so a
+# stray log line says which client produced it.
+BASE_URL = "http://workbench.internal"
+
+
 class TeamsClient:
-    def __init__(self, settings: Settings) -> None:
+    def __init__(self, app: ASGIApp, *, operator_identity_optional: bool) -> None:
+        # `raise_app_exceptions=False` so a 500 from a route arrives here as a response
+        # rather than as that route's exception unwinding into the model's turn — the whole
+        # of `_read` below exists to turn a status into a sentence, and it cannot do that
+        # for an exception that never became one.
         self._http = httpx.AsyncClient(
-            base_url=settings.teams_url,
-            timeout=settings.teams_request_timeout_seconds,
+            transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+            base_url=BASE_URL,
         )
-        self._timeout_seconds = settings.teams_request_timeout_seconds
-        # Read here so the tool seam can ask without `tools.register` growing a `Settings`
-        # parameter to carry one bool to where an object built from those settings already
-        # stands (design.md, "Decyzja zostaje w operator.py, a warunek dojeżdża klientem").
         # Behind a property because it is the switch that decides whether a call may go out
-        # with no identity: settings are validated at startup, and a plain attribute would
-        # let anything holding the client widen that afterwards.
-        self._operator_identity_optional = settings.operator_identity_optional
+        # with no identity: it is derived from settings validated at startup, and a plain
+        # attribute would let anything holding the client widen that afterwards.
+        self._operator_identity_optional = operator_identity_optional
 
     @property
     def operator_identity_optional(self) -> bool:
@@ -76,38 +85,31 @@ class TeamsClient:
         is_write = method in _WRITE_METHODS
         response = await self._send(method, path, token=token, **kwargs)
 
-        # One retry, reads only (specs/teams-mcp-upstream-access, "Wołanie modułu
-        # `teams` ma skończony czas"). A 5xx on a write is left as it fell: `teams` may
-        # have done the thing and failed on the way back, and asking again would be a
-        # second team or a second run rather than a second attempt at the first.
+        # One retry, reads only. A 5xx on a write is left as it fell: the route may have
+        # done the thing and failed on the way back, and asking again would be a second
+        # team or a second run rather than a second attempt at the first.
         if response.status_code >= 500 and not is_write:
             response = await self._send(method, path, token=token, **kwargs)
 
         return self._read(response, method=method, path=path, is_write=is_write)
 
     async def _send(self, method: str, path: str, *, token: str | None, **kwargs) -> httpx.Response:
-        # The operator's token, not this module's. See this file's docstring. `None` means
-        # the local shape, where nobody could have issued one: then the header is **left
-        # off** rather than sent empty or invented — `teams` reads no `Authorization`
-        # locally anyway, and a fabricated `Bearer` would start behaving differently the
-        # day it did (design.md, "Brak nagłówka, nie udawany token").
+        # The operator's principal, in the header a platform authenticator writes. `None`
+        # means the local shape, where nobody could have been authenticated: then the
+        # header is **left off** rather than sent empty or invented, and the routes assign
+        # the same principal they assign the local terminal.
+        #
+        # Nothing has to strip a caller-supplied copy of this header, because nothing comes
+        # in: this client speaks to an application object, not to a socket. Whatever a
+        # browser sent is gone before then — Easy Auth overwrites it in front of the
+        # process.
         headers = {**kwargs.pop("headers", {})}
         if token is not None:
-            headers["Authorization"] = f"Bearer {token}"
+            headers[PRINCIPAL_ID_HEADER] = token
         try:
             return await self._http.request(method, path, headers=headers, **kwargs)
-        except httpx.TimeoutException as err:
-            raise UpstreamUnavailable(
-                f"teams did not answer within {self._timeout_seconds:g}s. "
-                + (
-                    "This call may or may not have taken effect — read the catalogue "
-                    "before trying it again."
-                    if method in _WRITE_METHODS
-                    else "Nothing was read; this says nothing about the catalogue."
-                )
-            ) from err
         except httpx.HTTPError as err:
-            raise UpstreamUnavailable(f"teams could not be reached: {err}") from err
+            raise UpstreamUnavailable(f"the teams surface could not be reached: {err}") from err
 
     def _read(self, response: httpx.Response, *, method: str, path: str, is_write: bool) -> Any:
         if response.status_code == 401:
@@ -115,20 +117,19 @@ class TeamsClient:
             # whoever reads this sentence, because only one of them can be renewed by
             # signing in again.
             raise UpstreamUnavailable(
-                "teams did not accept the operator's credential — it has most likely "
-                "expired. Nothing was read or written. Signing in again in the terminal "
-                "renews it."
+                "the teams surface did not accept the operator's identity. Nothing was "
+                "read or written. Signing in again in the terminal renews it."
             )
         if response.status_code == 403:
             raise ToolRefusal(
-                "teams refused this operator's credential for that request. Nothing was "
-                "read or written."
+                "the teams surface refused this operator's identity for that request. "
+                "Nothing was read or written."
             )
         if response.status_code == 404:
             raise ToolRefusal(
-                f"teams has nothing at {path} for this operator. A team belonging to "
-                "somebody else answers exactly like one that does not exist, so this is "
-                "both answers at once."
+                f"the teams catalogue has nothing at {path} for this operator. A team "
+                "belonging to somebody else answers exactly like one that does not exist, "
+                "so this is both answers at once."
             )
         if 400 <= response.status_code < 500:
             # teams writes its refusals for a reader who can act on them, so its own
@@ -136,7 +137,7 @@ class TeamsClient:
             raise ToolRefusal(detail(response, upstream="teams"))
         if response.status_code >= 500:
             raise UpstreamUnavailable(
-                f"teams answered {response.status_code} to {method} {path}. "
+                f"the teams surface answered {response.status_code} to {method} {path}. "
                 + (
                     "Whether it took effect is unknown — read the catalogue before "
                     "trying again."
@@ -151,5 +152,5 @@ class TeamsClient:
             return response.json()
         except ValueError as err:
             raise UpstreamUnavailable(
-                f"teams answered {method} {path} with something that is not JSON"
+                f"the teams surface answered {method} {path} with something not JSON"
             ) from err

@@ -141,7 +141,7 @@ async def run_turn(
     queue: Queue,
     tool_server: ToolServer | None = None,
     chart: ChartSnapshot | None = None,
-    operator_token: str | None = None,
+    operator_principal: str | None = None,
 ) -> None:
     async with pool.acquire() as conn:
         messages = await store.get_messages(conn, session_id=session_id)
@@ -159,7 +159,7 @@ async def run_turn(
     # holding a call for a tool that had just gone away. An empty list is the whole
     # answer to a tool server that is down (specs/agent-tool-access).
     server_tools = (
-        await tool_server.list_tools(operator_token) if tool_server is not None else []
+        await tool_server.list_tools(operator_principal) if tool_server is not None else []
     )
 
     # This module's own tools sit beside the server's and are announced even when the
@@ -181,7 +181,7 @@ async def run_turn(
     tools = [*server_tools, CHART_TOOL, DRAW_TOOL, LIST_DRAWINGS_TOOL]
 
     graph = build_graph(
-        provider, tool_server, local_tools, operator_token, _PoolAccountTrace(pool, session_id)
+        provider, tool_server, local_tools, operator_principal, _PoolAccountTrace(pool, session_id)
     )
     try:
         result = await graph.ainvoke(
