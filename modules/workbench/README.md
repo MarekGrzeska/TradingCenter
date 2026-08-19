@@ -1,109 +1,163 @@
-# agent
+# workbench
 
-The operator's conversation with a model. Persists what `AgentChat.tsx` used to fake:
-sessions and their transcripts, in this module's own database, with every model call
-priced at the moment it happens rather than recomputed later against whatever the
-cennik says today.
+The operator's conversation with a model, and the teams of agents they compose — **one
+process over two schemas**.
 
-**Three tool servers, and one of them writes.** The model can ask `market-mcp` for
-candles, coverage, indicators and levels mid-answer, build and run teams through
-`teams-mcp`, and read *and move* the demo account through `trading-mcp` — positions,
-balance and working orders on the reading side, orders sent, closed, amended and
-cancelled on the other. At most eight calls per turn, a number in the code rather than a
-setting. Each server is configured and fails on its own: one being absent or unreachable
-costs the model that server's tools and nothing else, and with all three unset the agent
-answers from the model alone and says so.
+They were two modules until 20 August 2026, and what separated them turned out to be mostly
+the separation itself: twin tool clients, twin registries, twin providers, twin catalogues,
+twelve settings that existed twice, and a whole third module — `teams-mcp` — whose only
+reason to exist was that the conversation built teams at a neighbour's address. What is here
+is the same behaviour with one process, one image and one App Service under it
+(`openspec/changes/agent-and-teams-one-workbench`).
+
+## The four packages, and the rule between them
+
+| Package | What |
+|---|---|
+| `agent/` | the conversation: sessions, transcripts, streamed turns, the chart and drawing tools it owns, and every model call priced at the moment it happens |
+| `teams/` | teams as **data** — a graph the operator composes, versioned append-only, its runs, their cost, and the clock that fires a schedule |
+| `teams_tools/` | the MCP tools that build and run a team by talking, reaching the teams routes in this same process |
+| `workbench/` | the assembly: one settings read, one FastAPI, one lifespan |
+
+**`agent/` and `teams/` import neither each other nor `teams_tools/`; `teams_tools/` imports
+neither of them; `workbench/` may import all three and is the only place that may.** That is
+the second form of "no module imports another module", and it is a test rather than an
+understanding — `tests/test_layering.py` reads the imports and refuses. The first convenient
+dependency gets written in a hurry, and a rule with no failing case is a preference.
+
+## Two of everything that stayed two
+
+- **Two databases**, `agent` and `teams`, migrated in the one lifespan under separate
+  advisory-lock keys. Merging the data is a separate decision nobody has taken.
+- **Two OpenAI keys**, so the cost of the team experiments shows up on its own line. That
+  was always about the invoice and never about the process boundary.
+- **Two model catalogues**, `AGENT_MODELS` and `TEAMS_MODELS`. Only the conversation has a
+  default: every agent in a saved team revision names its own model.
+
+Everything else is one setting for the whole process — `workbench/config.py` is the only
+code that reads the environment, and both surfaces' own `Settings` are built from it by
+argument, with every validator they had.
+
+## Two tool servers on a network, and one source that is not
+
+The model can ask **market-data** for candles, coverage, indicators and levels mid-answer,
+and read *and move* the demo account through **trading-mcp** — positions, balance and
+working orders on the reading side, orders sent, closed, amended and cancelled on the other.
+At most eight calls per turn, a number in the code rather than a setting. Each server is
+configured and fails on its own: one being absent or unreachable costs the model that
+server's tools and nothing else.
+
+The **team tools** are the third source and they are not on a network at all. They keep every
+name, description, ceiling and refusal they had as a module; what went is the transport.
+They still reach the teams routes through their own contract — `httpx.ASGITransport` on this
+application — rather than calling `teams/store.py`, because the owner filter, the revision
+validation, the daily cost limit and the tool-catalogue check live in those routers, and a
+tool reaching past them would be the access policy written a second time.
+
+What travels with a tool call is the **operator's principal**, taken off the chat request
+being served. Not their bearer token: a token needs an authenticator to mean anything, and
+there is none between the conversation and the routes any more. The identity has already
+been through one.
 
 `trading-mcp`'s four writing tools are the reason two things here look different from the
-rest of the module. Their trace is written **before** the call is sent and settled after
-it, so a turn that dies mid-order still leaves the row — with the outcome recorded as
-`unknown`, which is neither a failure nor an absence (`specs/agent-trading`). And nothing
-in this module caps an order's size or counts orders: the account is a demo one, enforced
-by `trading-mcp` against the gateway before it opens a port, and that is the guard rather
-than a number nobody can raise.
+rest of the module. Their trace is written **before** the call is sent and settled after it,
+so a turn that dies mid-order still leaves the row — with the outcome recorded as `unknown`,
+which is neither a failure nor an absence (`specs/agent-trading`). And nothing here caps an
+order's size or counts orders: the account is a demo one, enforced by `trading-mcp` against
+the gateway before it opens a port, and that is the guard rather than a number nobody can
+raise.
 
-## What
+## Route surface
 
-- `config.py` — settings and two mode switches, each refusing a configuration that
-  leaves ambiguous which of two things is really in effect: the database (identity vs.
-  local password) and the tool server (identity vs. loopback). The model provider has
-  no such switch — OpenAI is not in Entra, so a key is the only shape there is. Also the
-  model catalogue's shape (`ModelCatalogueEntry`) and its own validation — a model
-  without a rate fails to parse, so it can never be started with, let alone billed as
-  free.
-- `db.py` — the connection, in the two shapes asyncpg and SQLAlchemy each insist on;
-  same split as `market-data/db.py`, duplicated rather than shared.
-- `models.py` — sessions, messages, usage rows.
-- `models_catalogue.py` — the queryable catalogue built from `Settings.models`.
-- `prompt.py` — the one system prompt this module runs, versioned.
-- `graph.py` — the LangGraph conversation graph: a model node, a tool node, and the
-  conditional edge between them. Also where the three failures a turn can hit are kept
-  apart — the tool refusing, the tool server being unreachable, and the provider
-  breaking are three different answers.
-- `provider.py` — the OpenAI client, chosen model by catalogue entry.
-- `tools/` — the session with `market-mcp` and the shapes a turn sees. The only place
-  the `mcp` package is imported, the way `provider.py` is the only place langchain's
-  message classes are. No committed list of tools and nothing to regenerate: MCP
-  describes itself, so the contract arrives in the session that uses it.
-- `routers/` — the HTTP surface, split by area.
-- `app.py` — assembly only: lifespan and routers. Nothing that decides anything.
-- `migrations/` — the schema, as the statements a deployment actually runs.
+Every path is where it was, except the two that collided. `GET /models` and `GET /usage`
+existed on both surfaces with different answers, so the teams ones are `/teams/models` and
+`/teams/usage`, registered before `/teams/{team_id}` — a path parameter matches a segment
+before FastAPI reads it as an `int`, so order decides, and `tests/test_route_collisions.py`
+asserts the behaviour rather than the order.
 
 ## Packages it takes
 
-`tc-runtime` (database, migrations, schema check, Easy Auth principal, `GET /models`) and
-`tc-openai` (the streamed call). Both are **build-time** path dependencies compiled into
-this module's image — no module imports another module.
+`tc-runtime` (database, migrations, schema check, Easy Auth principal, `GET /models`),
+`tc-openai` (the streamed call) and `tc-mcp-kit` (the upstream-refusal helper and the
+tool-schema slimmer). All **build-time** path dependencies compiled into this module's
+image — no module imports another module.
 
 ## Run
 
 ```bash
-cp .env.example .env   # then fill in OPENAI_API_KEY and MODELS
-uv run alembic upgrade head
-uv run uvicorn agent.app:app --reload --port 8030
+cp .env.example .env   # then fill in AGENT_OPENAI_API_KEY and TEAMS_OPENAI_API_KEY
+uv run alembic -c alembic-agent.ini upgrade head
+uv run alembic -c alembic-teams.ini upgrade head
+uv run uvicorn workbench.app:app --reload --port 8030
 ```
 
-Needs a database: `../../compose.yaml` at the repo root starts one on
-`127.0.0.1:55432` (`./scripts/dev.sh` / `./scripts/dev.ps1` create the `agent` database
-inside it if it does not exist yet).
+Two ini files because one `alembic.ini` cannot name two `script_location`s. They exist for
+running a chain by hand; the process builds its own configuration in memory and never reads
+them.
 
-`alembic upgrade head` above is the local convenience, not the mechanism: **the module
-migrates its own database at startup** (`migrate.py`, called from `app.py`'s lifespan),
-so running it by hand only saves the first start a few seconds. Production has no step of
-its own at all — a merge to `main` leaves it serving.
+Needs both databases: `../../compose.yaml` at the repo root starts a PostgreSQL on
+`127.0.0.1:55432` (`./scripts/dev.sh` / `./scripts/dev.ps1` create `agent` and `teams`
+inside it if they do not exist yet).
 
-Two things hold that up. Migrations run under a Postgres advisory lock (`db.py`), so two
-instances starting together produce one migration and one waiter rather than a race. And
-they run as the module's **own** identity, not the server administrator's, which means
-every table they create belongs to the role that will read it — the reason there is no
-`GRANT` step here any more. That was the other half of the old arrangement and the half
-with no check on it: `prompt_revisions` was invisible to the app on 15 August, reading as
-`permission denied` rather than as a missing table.
+`alembic upgrade head` above is the local convenience, not the mechanism: **the process
+migrates both of its databases at startup**, so running it by hand only saves the first
+start a few seconds. Production has no step of its own at all — a merge to `main` leaves it
+serving.
 
-`schema_version.py` still runs, immediately after. It now catches the narrower pair the
-migration cannot fix: an upgrade that reported success without arriving, and an image
-older than the schema it found — the second being a rollback that moved the code back and
-left the database where it was.
+**The lifespan is all-or-nothing.** There is no mode where the conversation serves and the
+teams catalogue reports itself unavailable: a half-state nobody exercises is worse than a
+failure that shows, and the deploy probe reaches the process rather than the control plane,
+so a process that answers is itself the proof that both chains are at head.
 
-Needs none of the three tool servers: `MARKET_MCP_URL`, `TEAMS_MCP_URL` and
-`TRADING_MCP_URL` left unset each mean no tools from that one, and a server configured but
-not answering means the same thing for that turn. Pointing any of the three off loopback
-needs its own `*_SCOPE` set too — the module refuses to start otherwise, the same way it
-refuses a remote database with no identity, and the message names which server it is
-about.
+Two things hold that up. Each chain runs under its own Postgres advisory lock, so two
+instances starting together produce one migration and one waiter rather than a race — and a
+process waiting on one database never holds up the other. And they run as the module's
+**own** identity, not the server administrator's, which means every table they create
+belongs to the role that will read it. That was the half with no check on it before:
+`prompt_revisions` was invisible to the app on 15 August 2026, reading as `permission
+denied` rather than as a missing table.
+
+`schema_version.py` still runs, immediately after each. It now catches the narrower pair the
+migration cannot fix: an upgrade that reported success without arriving, and an image older
+than the schema it found — the second being a rollback that moved the code back and left the
+database where it was.
+
+Needs neither network tool server: `MARKET_MCP_URL` and `TRADING_MCP_URL` left unset each
+mean no tools from that one, and a server configured but not answering means the same thing
+for that turn. Pointing either off loopback needs its own `*_SCOPE` set too — the process
+refuses to start otherwise, the same way it refuses a remote database with no identity, and
+the message names which server it is about. There is no setting for the team tools and there
+cannot be: a source in this process has no address to leave unset.
+
+## Deploy
+
+One image, one App Service — and it is still called `app-tradingcenter-agent`. A name there
+is an identity rather than a label: the managed identity takes it, `DATABASE_USER` *is* that
+identity, and its application id sits on three allow-lists in two other modules. Renaming
+buys a hostname and costs new roles in both databases plus three edits elsewhere
+(`agent-and-teams-one-workbench/design.md`, D2).
+
+One operator step, exactly once: that role must exist and own the schema in **both**
+databases (`scripts/grant-schema-ownership.sql`). One App Service presents one identity, so
+the `teams` database needs the role the `agent` database already had.
 
 ## Test
 
 ```bash
 uv run pytest              # unit tests — anything needing a database skips without Docker
-uv run pytest -m db        # integration, against a throwaway PostgreSQL container
+uv run pytest -m db        # integration, against two throwaway PostgreSQL containers
 uv run ruff check .
 uv run pyright
 ```
 
+Three suites under `tests/`, one per package that has behaviour, and one shared
+`conftest.py` — the Docker probe, `--run-live` and the environment a developer's machine has
+were a byte-identical copy in two of them.
+
 ## Contract
 
-FastAPI serves its own OpenAPI at `/openapi.json`; the terminal's DTOs
-(`modules/terminal/src/agent/agentApi.ts`) are written by hand against it rather than
-generated — this module's contract is not wired into `pnpm contract:generate`, which is
-market-data's alone (design.md, "Kontrakt terminala pisany ręcznie, bez generatora").
+FastAPI serves its own OpenAPI at `/openapi.json`. The teams surface's document is generated
+into the terminal by `pnpm contract:generate` (`python -m teams.openapi`, printing that
+surface's own routers and prefixes rather than the whole process's); the conversation's DTOs
+(`modules/terminal/src/agent/agentApi.ts`) are written by hand against it instead, and the
+terminal's own tests are what catch a drift there.

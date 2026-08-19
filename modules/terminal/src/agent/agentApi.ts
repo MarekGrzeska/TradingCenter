@@ -13,7 +13,7 @@ export type { AgentToolCall, ToolOutcome } from "./toolCall";
  * The agent module's own DTOs, written by hand against its OpenAPI rather than
  * generated: `pnpm contract:generate` is wired to `market-data`'s one contract alone,
  * and giving the agent a second generator is a change of its own weight
- * (design.md, "Kontrakt terminala pisany ręcznie, bez generatora"; `modules/agent/
+ * (design.md, "Kontrakt terminala pisany ręcznie, bez generatora"; `modules/workbench/
  * README.md`, "Contract"). The module's wire shapes (snake_case, per `agent/
  * contract.py`) stay private to this file — every other file speaks the camelCase
  * ones below.
