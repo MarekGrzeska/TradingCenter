@@ -12,6 +12,7 @@ archive answering correctly is what `-m db` tests cover, against a real PostgreS
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -105,7 +106,13 @@ class FakeArchive:
     )
     pairs: list[TrackedPairStatus] = field(default_factory=list)
     computed: IndicatorsOut | None = None
+    # For the tool that computes more than once per call: `levels_near_price` surveys the
+    # catalogue in chunks of ten, and what each chunk answers depends on what it asked for.
+    compute_with: Callable[[str, Any], IndicatorsOut] | None = None
     compute_error: Exception | None = None
+    # A read that fails rather than answers — the archive being unreachable used to be an
+    # HTTP failure and is a database one now. What it must not become is an empty answer.
+    series_error: Exception | None = None
 
     reads: list[tuple[str, Any]] = field(default_factory=list)
     computations: list[Any] = field(default_factory=list)
@@ -143,3 +150,31 @@ def coverage_range(
         history_ended=history_ended,
         history_ends_at=None,
     )
+
+
+def forming(
+    state: FormingState,
+    *,
+    resolution: Resolution | None = None,
+    close: float | None = None,
+    time: datetime | None = None,
+    market_open: bool | None = None,
+    symbol: str = "US100",
+) -> Forming:
+    """What `read_forming` answers, in the four shapes it has.
+
+    A candle only when `close` is given: the three no-candle states are the interesting
+    half of this read, and building one for them would hide which state is under test.
+    """
+    built = None
+    if close is not None:
+        built = candle(
+            time or datetime.now(UTC),
+            open_=close,
+            high=close,
+            low=close,
+            close=close,
+            resolution=resolution or Resolution.MINUTE,
+            symbol=symbol,
+        )
+    return Forming(state=state, resolution=resolution, candle=built, market_open=market_open)

@@ -12,14 +12,14 @@
 - [x] 2.4 Przenieść `tools/indicators.py` na katalog i komputery wskaźników zamiast `GET /indicators` i `POST /indicators/{symbol}`
 - [x] 2.5 Wziąć w narzędziach wskaźnikowych ten sam semafor `indicator_limiter`, którego używa router — z testem, że sufit równoczesności obowiązuje obiema drogami
 - [x] 2.6 Przenieść `resources.py` (trzy zasoby MCP i prompt `analyze-symbol`)
-- [ ] 2.7 Przenieść testy narzędzi wraz z `conftest.py` dokładającym walidację odpowiedzi wobec `outputSchema`
-- [ ] 2.8 Przenieść `test_tool_surface.py` z sufitem 19 700 znaków bez zmiany wartości; potwierdzić zmierzoną wielkość po przeprowadzce
+- [x] 2.7 Przenieść testy narzędzi wraz z `conftest.py` dokładającym walidację odpowiedzi wobec `outputSchema`
+- [x] 2.8 Przenieść `test_tool_surface.py` z sufitem 19 700 znaków bez zmiany wartości; potwierdzić zmierzoną wielkość po przeprowadzce
 
 ## 3. Montaż `/mcp`
 
 - [x] 3.1 Dodać `market_data/mcp_app.py` budujący serwer MCP, rejestrujący narzędzia i wołający `slim_tool_schemas`
 - [x] 3.2 Zamontować aplikację MCP pod `/mcp` w `create_app()`, poniżej `telemetry.configure()`; test, że import FastAPI nie wywędrował powyżej linii konfigurującej telemetrię
-- [ ] 3.3 Test, że lista narzędzi pod `/mcp` zawiera dokładnie te same nazwy co dotąd
+- [x] 3.3 Test, że lista narzędzi pod `/mcp` zawiera dokładnie te same nazwy co dotąd
 
 ## 4. Autoryzacja per wołający
 

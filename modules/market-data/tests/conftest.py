@@ -252,7 +252,7 @@ def tool_server(archive, monkeypatch: pytest.MonkeyPatch):
 
     from market_data.indicators import service
     from market_data.mcp_app import build_server
-    from market_data.tools import _shared, candles, indicators
+    from market_data.tools import _shared, candles, indicators, resources
 
     class _FakeConnection:
         pass
@@ -278,13 +278,18 @@ def tool_server(archive, monkeypatch: pytest.MonkeyPatch):
     class _FakeApp:
         state = _FakeState()
 
-    async def read_series(_conn, _symbol, _resolution, _start, _end):
+    async def read_series(_conn, symbol, resolution, start, end):
+        archive.reads.append(("series", symbol, resolution, start, end))
+        if archive.series_error is not None:
+            raise archive.series_error
         return archive.next_series()
 
-    async def read_forming(_conn, _hub, _instruments, _status, _symbol, _resolution):
+    async def read_forming(_conn, _hub, _instruments, _status, symbol, resolution):
+        archive.reads.append(("forming", symbol, resolution))
         return archive.forming
 
-    async def read_pair_coverage(_conn, _symbol, _resolution):
+    async def read_pair_coverage(_conn, symbol, resolution):
+        archive.reads.append(("coverage", symbol, resolution))
         return archive.coverage
 
     async def read_pairs(_conn, _instruments, _status, _now):
@@ -294,12 +299,15 @@ def tool_server(archive, monkeypatch: pytest.MonkeyPatch):
         archive.computations.append((symbol, body))
         if archive.compute_error is not None:
             raise archive.compute_error
+        if archive.compute_with is not None:
+            return archive.compute_with(symbol, body)
         assert archive.computed is not None, "the test did not set archive.computed"
         return archive.computed
 
     monkeypatch.setattr(candles, "read_series", read_series)
     monkeypatch.setattr(candles, "read_forming", read_forming)
     monkeypatch.setattr(candles, "read_pair_coverage", read_pair_coverage)
+    monkeypatch.setattr(resources, "read_pair_coverage", read_pair_coverage)
     monkeypatch.setattr(indicators, "read_series", read_series)
     monkeypatch.setattr(_shared, "read_pairs", read_pairs)
     monkeypatch.setattr(service, "compute", compute)
