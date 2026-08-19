@@ -11,8 +11,16 @@ from zoneinfo import ZoneInfo
 
 import numpy as np
 import pytest
+from computers import fn_of
 
-from market_data.indicators.catalogue import IndicatorSpec, Series, Zone, get
+from market_data.indicators.catalogue import (
+    IndicatorSpec,
+    MinuteZones,
+    Series,
+    Zone,
+    Zones,
+    get,
+)
 
 LONDON = ZoneInfo("Europe/London")
 
@@ -31,15 +39,13 @@ def _no_session_gaps(n: int) -> np.ndarray:
 def _own_series_zones(
     entry: IndicatorSpec, series: Series, params: dict[str, float], session_close_before: np.ndarray
 ) -> list[Zone]:
-    assert entry.compute_zones is not None, entry.id
-    return entry.compute_zones(series, params, session_close_before)
+    return fn_of(entry, Zones)(series, params, session_close_before)
 
 
 def _minute_zones(
     entry: IndicatorSpec, series: Series, times: list[datetime], params: dict[str, float]
 ) -> list[Zone]:
-    assert entry.compute_minute_zones is not None, entry.id
-    return entry.compute_minute_zones(series, times, params)
+    return fn_of(entry, MinuteZones)(series, times, params)
 
 
 class TestRangeGap:

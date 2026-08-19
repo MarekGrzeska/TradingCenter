@@ -16,11 +16,15 @@ from ...models import Resolution
 from .. import kernel
 from .spec import (
     ClusterLevel,
+    ClusterLevels,
     HtfLevel,
+    HtfLevels,
     HtfLevelsFn,
     IndicatorSpec,
+    Lines,
     LineSpec,
     MarkerPoint,
+    Markers,
     Param,
     Render,
     Series,
@@ -72,10 +76,9 @@ _SWING_POINTS = IndicatorSpec(
     aliases=("Fraktale Williamsa", "Williams Fractal"),
     inputs=("high", "low"),
     params=(Param(name="n", type="int", default=2, min=1, max=50),),
-    output="markers",
     render=Render(pane="price", style="dots"),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["n"])),
-    compute_markers=_compute_swing_points,
+    computer=Markers(_compute_swing_points),
 )
 
 
@@ -116,7 +119,7 @@ _LAST_SWING_HIGH = IndicatorSpec(
     lines=(LineSpec(key="last_swing_high", label="Last Swing High {n}"),),
     render=Render(pane="price", style="line", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["n"])),
-    compute=_compute_last_swing_high,
+    computer=Lines(_compute_last_swing_high),
 )
 
 _LAST_SWING_LOW = IndicatorSpec(
@@ -128,7 +131,7 @@ _LAST_SWING_LOW = IndicatorSpec(
     lines=(LineSpec(key="last_swing_low", label="Last Swing Low {n}"),),
     render=Render(pane="price", style="line", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["n"])),
-    compute=_compute_last_swing_low,
+    computer=Lines(_compute_last_swing_low),
 )
 
 _ROLLING_EXTREME = IndicatorSpec(
@@ -144,10 +147,10 @@ _ROLLING_EXTREME = IndicatorSpec(
     ),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["n"])),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "upper": kernel.rolling_max(s.high, int(p["n"])),
         "lower": kernel.rolling_min(s.low, int(p["n"])),
-    },
+    }),
 )
 
 
@@ -214,10 +217,9 @@ _LEVEL_CLUSTERS = IndicatorSpec(
         Param(name="tol", type="float", default=0.1, min=0.0, max=5.0),
         Param(name="atr_period", type="int", default=14, min=2, max=5000),
     ),
-    output="levels",
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: max(int(p["n"]), int(p["atr_period"]))),
-    compute_cluster_levels=_compute_level_clusters,
+    computer=ClusterLevels(_compute_level_clusters),
 )
 
 # --- levels from a higher interval: a cross-resolution read of one closed period
@@ -246,11 +248,9 @@ _HTF_LEVELS_DAY = IndicatorSpec(
     group="structure",
     aliases=("PDH/PDL",),
     inputs=("open", "high", "low", "close"),
-    output="levels",
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    higher_resolution=Resolution.DAY,
-    compute_htf_levels=lambda ohlc: _htf_ohlc_levels(ohlc, "PD"),
+    computer=HtfLevels(lambda ohlc: _htf_ohlc_levels(ohlc, "PD"), Resolution.DAY),
 )
 
 _HTF_LEVELS_WEEK = IndicatorSpec(
@@ -259,11 +259,9 @@ _HTF_LEVELS_WEEK = IndicatorSpec(
     group="structure",
     aliases=("PWH/PWL",),
     inputs=("open", "high", "low", "close"),
-    output="levels",
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    higher_resolution=Resolution.WEEK,
-    compute_htf_levels=lambda ohlc: _htf_ohlc_levels(ohlc, "PW"),
+    computer=HtfLevels(lambda ohlc: _htf_ohlc_levels(ohlc, "PW"), Resolution.WEEK),
 )
 
 
@@ -354,11 +352,9 @@ _PIVOTS: tuple[IndicatorSpec, ...] = tuple(
         name=name,
         group="structure",
         inputs=("open", "high", "low", "close"),
-        output="levels",
         render=Render(pane="price", style="line"),
         warmup=Warmup(kind="fixed", bars=lambda p: 0),
-        higher_resolution=Resolution.DAY,
-        compute_htf_levels=fn,
+        computer=HtfLevels(fn, Resolution.DAY),
     )
     for id_, name, fn in _PIVOT_TYPES
 )

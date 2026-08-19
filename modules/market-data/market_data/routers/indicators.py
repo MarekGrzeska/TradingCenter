@@ -35,11 +35,18 @@ from ..coverage import uncovered_within
 from ..indicators.catalogue import (
     ALGORITHM_VERSION,
     CATALOGUE,
+    ClusterLevels,
+    HtfLevels,
     IndicatorSpec,
+    Lines,
+    Markers,
+    MinuteZones,
     ParamOutOfRange,
     Series,
+    TimeProfile,
     UnknownIndicator,
     Zone,
+    Zones,
 )
 from ..indicators.catalogue import get as get_indicator
 from ..models import Candle, PriceSide, Resolution
@@ -418,94 +425,104 @@ def _result_out(
                 id=entry.id, params=params, settled=False, error=missing_series[resolution]
             )
 
-    if entry.compute_zones is not None:
-        zones = [
-            _zone_out(zone, times_all)
-            for zone in entry.compute_zones(series, params, session_close_before)
-            if zone.start_bar >= first_requested
-        ]
-        return IndicatorResultOut(
-            id=entry.id, params=params, warmup_bars=needed, settled=settled, zones=zones
-        )
-
-    if entry.compute_minute_zones is not None:
-        assert minute_series is not None and minute_times is not None, entry.id
-        zones = [
-            _zone_out(zone, minute_times)
-            for zone in entry.compute_minute_zones(minute_series, minute_times, params)
-        ]
-        return IndicatorResultOut(
-            id=entry.id, params=params, warmup_bars=0, settled=True, zones=zones
-        )
-
-    if entry.compute_time_profile is not None:
-        assert minute_series is not None and minute_times is not None, entry.id
-        profile_levels = [
-            IndicatorLevelOut(
-                from_=requested_start, price=level.price, label=level.label, count=level.count
+    # One case per computer, and the computer is what says which. This used to be a
+    # chain of `if entry.compute_x is not None`, where the *order* of the branches was
+    # the tie-break for an entry that had set two of them — a state nothing refused and
+    # nobody meant. A `match` on the tagged union has no order to get wrong, and pyright
+    # tells us when a case is missing rather than the entry silently falling through to
+    # `lines` and answering with an empty dict.
+    #
+    # The two `warmup_bars` values are the real difference between these cases and not
+    # an inconsistency: an entry reading its own series has a warmup measured in bars of
+    # that series, and one reading a different series (a closed DAY candle, the fine
+    # minute series) has none to measure — it is settled the moment its source is there.
+    match entry.computer:
+        case Zones(fn=compute):
+            zones = [
+                _zone_out(zone, times_all)
+                for zone in compute(series, params, session_close_before)
+                if zone.start_bar >= first_requested
+            ]
+            return IndicatorResultOut(
+                id=entry.id, params=params, warmup_bars=needed, settled=settled, zones=zones
             )
-            for level in entry.compute_time_profile(minute_series, minute_times, params)
-        ]
-        return IndicatorResultOut(
-            id=entry.id, params=params, warmup_bars=0, settled=True, levels=profile_levels
-        )
 
-    if entry.higher_resolution is not None:
-        assert entry.compute_htf_levels is not None, entry.id
-        levels: list[IndicatorLevelOut] = []
-        for close_moment, candle in htf_periods.get(entry.higher_resolution, []):
-            if (
-                candle.open is None
-                or candle.high is None
-                or candle.low is None
-                or candle.close is None
-            ):
-                continue
-            ohlc = (candle.open, candle.high, candle.low, candle.close)
-            levels.extend(
-                IndicatorLevelOut(from_=close_moment, price=level.price, label=level.label)
-                for level in entry.compute_htf_levels(ohlc)
+        case MinuteZones(fn=compute):
+            assert minute_series is not None and minute_times is not None, entry.id
+            zones = [
+                _zone_out(zone, minute_times)
+                for zone in compute(minute_series, minute_times, params)
+            ]
+            return IndicatorResultOut(
+                id=entry.id, params=params, warmup_bars=0, settled=True, zones=zones
             )
-        return IndicatorResultOut(
-            id=entry.id, params=params, warmup_bars=0, settled=True, levels=levels
-        )
 
-    if entry.output == "markers":
-        assert entry.compute_markers is not None, entry.id
-        markers = [
-            IndicatorMarkerOut(time=times_all[point.bar], label=point.label, price=point.price)
-            for point in entry.compute_markers(series, params)
-            if point.bar >= first_requested
-        ]
-        return IndicatorResultOut(
-            id=entry.id, params=params, warmup_bars=needed, settled=settled, markers=markers
-        )
-
-    if entry.output == "levels":
-        assert entry.compute_cluster_levels is not None, entry.id
-        levels = [
-            IndicatorLevelOut(
-                from_=times_all[cluster.bar],
-                price=cluster.price,
-                label=cluster.label,
-                count=cluster.count,
+        case TimeProfile(fn=compute):
+            assert minute_series is not None and minute_times is not None, entry.id
+            profile_levels = [
+                IndicatorLevelOut(
+                    from_=requested_start, price=level.price, label=level.label, count=level.count
+                )
+                for level in compute(minute_series, minute_times, params)
+            ]
+            return IndicatorResultOut(
+                id=entry.id, params=params, warmup_bars=0, settled=True, levels=profile_levels
             )
-            for cluster in entry.compute_cluster_levels(series, params)
-            if cluster.bar >= first_requested
-        ]
-        return IndicatorResultOut(
-            id=entry.id, params=params, warmup_bars=needed, settled=settled, levels=levels
-        )
 
-    values = entry.compute(series, params)
-    lines = {
-        key: [None if math.isnan(v) else float(v) for v in arr[first_requested:]]
-        for key, arr in values.items()
-    }
-    return IndicatorResultOut(
-        id=entry.id,
-        params=params,
-        warmup_bars=needed,
-        settled=settled,
-        lines=lines,
-    )
+        case HtfLevels(fn=compute, resolution=resolution):
+            levels: list[IndicatorLevelOut] = []
+            for close_moment, candle in htf_periods.get(resolution, []):
+                if (
+                    candle.open is None
+                    or candle.high is None
+                    or candle.low is None
+                    or candle.close is None
+                ):
+                    continue
+                ohlc = (candle.open, candle.high, candle.low, candle.close)
+                levels.extend(
+                    IndicatorLevelOut(from_=close_moment, price=level.price, label=level.label)
+                    for level in compute(ohlc)
+                )
+            return IndicatorResultOut(
+                id=entry.id, params=params, warmup_bars=0, settled=True, levels=levels
+            )
+
+        case Markers(fn=compute):
+            markers = [
+                IndicatorMarkerOut(time=times_all[point.bar], label=point.label, price=point.price)
+                for point in compute(series, params)
+                if point.bar >= first_requested
+            ]
+            return IndicatorResultOut(
+                id=entry.id, params=params, warmup_bars=needed, settled=settled, markers=markers
+            )
+
+        case ClusterLevels(fn=compute):
+            levels = [
+                IndicatorLevelOut(
+                    from_=times_all[cluster.bar],
+                    price=cluster.price,
+                    label=cluster.label,
+                    count=cluster.count,
+                )
+                for cluster in compute(series, params)
+                if cluster.bar >= first_requested
+            ]
+            return IndicatorResultOut(
+                id=entry.id, params=params, warmup_bars=needed, settled=settled, levels=levels
+            )
+
+        case Lines(fn=compute):
+            values = compute(series, params)
+            lines = {
+                key: [None if math.isnan(v) else float(v) for v in arr[first_requested:]]
+                for key, arr in values.items()
+            }
+            return IndicatorResultOut(
+                id=entry.id,
+                params=params,
+                warmup_bars=needed,
+                settled=settled,
+                lines=lines,
+            )

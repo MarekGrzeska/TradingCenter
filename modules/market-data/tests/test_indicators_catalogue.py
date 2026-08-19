@@ -18,8 +18,9 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from computers import LINE_ENTRIES, fn_of
 
-from market_data.indicators.catalogue import CATALOGUE, IndicatorSpec, Series
+from market_data.indicators.catalogue import CATALOGUE, IndicatorSpec, Lines, Series
 
 N = 4000
 GOLDEN = Path(__file__).parent / "golden" / "indicators_golden.json"
@@ -48,25 +49,58 @@ class TestCatalogueMatchesKernel:
     """Every entry, computed once on a shared series, checked against its own
     declaration — the test 1.15 calls for in tasks.md."""
 
-    @pytest.mark.parametrize("entry", CATALOGUE, ids=lambda e: e.id)
+    @pytest.mark.parametrize("entry", LINE_ENTRIES, ids=lambda e: e.id)
     def test_output_keys_match_declared_lines(self, entry: IndicatorSpec):
         params = _default_params(entry)
-        result = entry.compute(SERIES, params)
+        result = fn_of(entry, Lines)(SERIES, params)
         assert set(result.keys()) == {line.key for line in entry.lines}
 
-    @pytest.mark.parametrize("entry", CATALOGUE, ids=lambda e: e.id)
+    @pytest.mark.parametrize("entry", LINE_ENTRIES, ids=lambda e: e.id)
     def test_every_line_has_the_series_length(self, entry: IndicatorSpec):
         params = _default_params(entry)
-        result = entry.compute(SERIES, params)
+        result = fn_of(entry, Lines)(SERIES, params)
         for values in result.values():
             assert len(values) == N
 
-    @pytest.mark.parametrize("entry", CATALOGUE, ids=lambda e: e.id)
+    @pytest.mark.parametrize("entry", LINE_ENTRIES, ids=lambda e: e.id)
     def test_output_is_numeric_float(self, entry: IndicatorSpec):
         params = _default_params(entry)
-        result = entry.compute(SERIES, params)
+        result = fn_of(entry, Lines)(SERIES, params)
         for values in result.values():
             assert values.dtype == np.float64
+
+
+class TestOnlyLinesEntriesDeclareLines:
+    """The other half of "an entry declares a line its compute never produces".
+
+    Only a `Lines` computer produces the arrays a `LineSpec` names; every other kind
+    answers with markers, zones or levels. An entry that declared both would publish a
+    line the terminal draws an empty series for — and the checks above cannot see it,
+    because they only ever run over the entries that do compute lines.
+
+    This is what replaced running those checks over the whole catalogue. Against a
+    markers or zones entry they asserted `set() == set()` — the old `compute` default
+    answered `{}` for every one of them, so eighty assertions passed by having nothing
+    to compare.
+    """
+
+    def test_no_other_kind_of_entry_declares_a_line(self) -> None:
+        offenders = [
+            (entry.id, type(entry.computer).__name__)
+            for entry in CATALOGUE
+            if entry.lines and not isinstance(entry.computer, Lines)
+        ]
+        assert offenders == [], (
+            f"{offenders} declare lines but do not compute any — a line the picker offers "
+            "and the chart draws nothing for"
+        )
+
+    def test_every_lines_entry_declares_at_least_one(self) -> None:
+        offenders = [entry.id for entry in LINE_ENTRIES if not entry.lines]
+        assert offenders == [], (
+            f"{offenders} compute lines and declare none, so nothing is published from "
+            "what they compute"
+        )
 
 
 class TestCatalogueBoundary:
@@ -89,10 +123,10 @@ class TestCatalogueBoundary:
             for param in entry.params:
                 assert param.type in ("int", "float"), (entry.id, param.name)
 
-    @pytest.mark.parametrize("entry", CATALOGUE, ids=lambda e: e.id)
+    @pytest.mark.parametrize("entry", LINE_ENTRIES, ids=lambda e: e.id)
     def test_output_values_are_not_boolean(self, entry: IndicatorSpec):
         params = _default_params(entry)
-        result = entry.compute(SERIES, params)
+        result = fn_of(entry, Lines)(SERIES, params)
         for values in result.values():
             assert values.dtype != np.bool_
 
@@ -106,7 +140,7 @@ class TestStartIndependence:
     TAIL = 500
 
     @pytest.mark.parametrize(
-        "entry", [e for e in CATALOGUE if e.warmup.kind == "decay"], ids=lambda e: e.id
+        "entry", [e for e in LINE_ENTRIES if e.warmup.kind == "decay"], ids=lambda e: e.id
     )
     def test_tail_matches_regardless_of_where_the_read_started(self, entry: IndicatorSpec):
         params = _default_params(entry)
@@ -121,8 +155,8 @@ class TestStartIndependence:
             close=SERIES.close[short_start:],
         )
 
-        long_result = entry.compute(long_series, params)
-        short_result = entry.compute(short_series, params)
+        long_result = fn_of(entry, Lines)(long_series, params)
+        short_result = fn_of(entry, Lines)(short_series, params)
 
         for key in long_result:
             long_tail = long_result[key][-self.TAIL :]
@@ -153,12 +187,12 @@ class TestCatalogueGoldenFile:
     formula change shows up here as a diff, not as a chart that quietly draws
     something else (design.md, "Zmiana wzoru bez podniesienia wersji")."""
 
-    @pytest.mark.parametrize("entry", CATALOGUE, ids=lambda e: e.id)
+    @pytest.mark.parametrize("entry", LINE_ENTRIES, ids=lambda e: e.id)
     def test_default_params_match_the_committed_snapshot(self, entry: IndicatorSpec):
         golden = _load_golden()
         series = _golden_series(golden)
         params = _default_params(entry)
-        result = entry.compute(series, params)
+        result = fn_of(entry, Lines)(series, params)
 
         for line in entry.lines:
             key = f"{entry.id}_{line.key}"

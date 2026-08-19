@@ -12,7 +12,7 @@ from collections.abc import Mapping
 import numpy as np
 
 from .. import kernel, warmup
-from .spec import IndicatorSpec, LineSpec, Param, Render, Series, Warmup
+from .spec import IndicatorSpec, Lines, LineSpec, Param, Render, Series, Warmup
 
 _SMA = IndicatorSpec(
     id="sma",
@@ -22,7 +22,7 @@ _SMA = IndicatorSpec(
     lines=(LineSpec(key="sma", label="SMA {period}"),),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {"sma": kernel.sma(s.close, int(p["period"]))},
+    computer=Lines(lambda s, p: {"sma": kernel.sma(s.close, int(p["period"]))}),
 )
 
 _EMA = IndicatorSpec(
@@ -33,7 +33,7 @@ _EMA = IndicatorSpec(
     lines=(LineSpec(key="ema", label="EMA {period}"),),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="decay", bars=lambda p: warmup.ema_warmup_bars(int(p["period"]))),
-    compute=lambda s, p: {"ema": kernel.ema(s.close, int(p["period"]))},
+    computer=Lines(lambda s, p: {"ema": kernel.ema(s.close, int(p["period"]))}),
 )
 
 
@@ -47,7 +47,7 @@ _WMA = IndicatorSpec(
     lines=(LineSpec(key="wma", label="WMA {period}"),),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {"wma": kernel.wma(s.close, int(p["period"]))},
+    computer=Lines(lambda s, p: {"wma": kernel.wma(s.close, int(p["period"]))}),
 )
 
 _RMA = IndicatorSpec(
@@ -59,7 +59,7 @@ _RMA = IndicatorSpec(
     lines=(LineSpec(key="rma", label="RMA {period}"),),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["period"]))),
-    compute=lambda s, p: {"rma": kernel.rma(s.close, int(p["period"]))},
+    computer=Lines(lambda s, p: {"rma": kernel.rma(s.close, int(p["period"]))}),
 )
 
 
@@ -84,7 +84,7 @@ _HMA = IndicatorSpec(
     warmup=Warmup(
         kind="fixed", bars=lambda p: int(p["period"]) + round(math.sqrt(int(p["period"])))
     ),
-    compute=_compute_hma,
+    computer=Lines(_compute_hma),
 )
 
 _KAMA = IndicatorSpec(
@@ -102,9 +102,9 @@ _KAMA = IndicatorSpec(
         kind="decay",
         bars=lambda p: warmup.kama_warmup_bars(int(p["period"]), int(p["slow"])),
     ),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "kama": kernel.kama(s.close, int(p["period"]), int(p["fast"]), int(p["slow"]))
-    },
+    }),
 )
 
 _ALMA = IndicatorSpec(
@@ -119,9 +119,9 @@ _ALMA = IndicatorSpec(
     lines=(LineSpec(key="alma", label="ALMA {period}"),),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "alma": kernel.alma(s.close, int(p["period"]), float(p["offset"]), float(p["sigma"]))
-    },
+    }),
 )
 
 _LSMA = IndicatorSpec(
@@ -133,7 +133,7 @@ _LSMA = IndicatorSpec(
     lines=(LineSpec(key="lsma", label="LSMA {period}"),),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {"lsma": kernel.linreg(s.close, int(p["period"]))},
+    computer=Lines(lambda s, p: {"lsma": kernel.linreg(s.close, int(p["period"]))}),
 )
 
 

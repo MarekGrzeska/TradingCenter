@@ -14,7 +14,7 @@ import numpy as np
 
 from .. import kernel, warmup
 from .arithmetic import LN2, safe_divide
-from .spec import IndicatorSpec, LineSpec, Param, Render, Series, Warmup
+from .spec import IndicatorSpec, Lines, LineSpec, Param, Render, Series, Warmup
 
 _ATR = IndicatorSpec(
     id="atr",
@@ -26,9 +26,9 @@ _ATR = IndicatorSpec(
     lines=(LineSpec(key="atr", label="ATR {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["period"]))),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "atr": kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["period"]))
-    },
+    }),
 )
 
 _ATR_PCT = IndicatorSpec(
@@ -40,12 +40,12 @@ _ATR_PCT = IndicatorSpec(
     lines=(LineSpec(key="atr_pct", label="ATR% {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["period"]))),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "atr_pct": 100
         * safe_divide(
             kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["period"])), s.close
         )
-    },
+    }),
 )
 
 # --- candle geometry: six numbers every candlestick pattern and every "reaction
@@ -62,12 +62,12 @@ _BAR_RANGE_ATR = IndicatorSpec(
     lines=(LineSpec(key="bar_range_atr", label="Bar Range/ATR {atr_period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["atr_period"]))),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "bar_range_atr": safe_divide(
             s.high - s.low,
             kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["atr_period"])),
         )
-    },
+    }),
 )
 
 _BODY_RATIO = IndicatorSpec(
@@ -78,7 +78,7 @@ _BODY_RATIO = IndicatorSpec(
     lines=(LineSpec(key="body_ratio", label="Body Ratio"),),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    compute=lambda s, p: {"body_ratio": safe_divide(np.abs(s.close - s.open), s.high - s.low)},
+    computer=Lines(lambda s, p: {"body_ratio": safe_divide(np.abs(s.close - s.open), s.high - s.low)}),
 )
 
 _WICK_UP_RATIO = IndicatorSpec(
@@ -89,9 +89,9 @@ _WICK_UP_RATIO = IndicatorSpec(
     lines=(LineSpec(key="wick_up_ratio", label="Upper Wick Ratio"),),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "wick_up_ratio": safe_divide(s.high - np.maximum(s.open, s.close), s.high - s.low)
-    },
+    }),
 )
 
 _WICK_DOWN_RATIO = IndicatorSpec(
@@ -102,9 +102,9 @@ _WICK_DOWN_RATIO = IndicatorSpec(
     lines=(LineSpec(key="wick_down_ratio", label="Lower Wick Ratio"),),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "wick_down_ratio": safe_divide(np.minimum(s.open, s.close) - s.low, s.high - s.low)
-    },
+    }),
 )
 
 _CLOSE_POSITION = IndicatorSpec(
@@ -116,7 +116,7 @@ _CLOSE_POSITION = IndicatorSpec(
     lines=(LineSpec(key="close_position", label="Close Position"),),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    compute=lambda s, p: {"close_position": safe_divide(s.close - s.low, s.high - s.low)},
+    computer=Lines(lambda s, p: {"close_position": safe_divide(s.close - s.low, s.high - s.low)}),
 )
 
 _GAP_PREV_CLOSE_ATR = IndicatorSpec(
@@ -128,12 +128,12 @@ _GAP_PREV_CLOSE_ATR = IndicatorSpec(
     lines=(LineSpec(key="gap_prev_close_atr", label="Gap/ATR {atr_period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["atr_period"]))),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "gap_prev_close_atr": safe_divide(
             s.open - kernel.shift(s.close, 1),
             kernel.rma(kernel.true_range(s.high, s.low, s.close), int(p["atr_period"])),
         )
-    },
+    }),
 )
 
 # --- position in the range: where the close sits against its own recent history,
@@ -149,12 +149,12 @@ _RANGE_POSITION = IndicatorSpec(
     lines=(LineSpec(key="range_position", label="Range Position {period}"),),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "range_position": safe_divide(
             s.close - kernel.rolling_min(s.low, int(p["period"])),
             kernel.rolling_max(s.high, int(p["period"])) - kernel.rolling_min(s.low, int(p["period"])),
         )
-    },
+    }),
 )
 
 _ZSCORE = IndicatorSpec(
@@ -165,12 +165,12 @@ _ZSCORE = IndicatorSpec(
     lines=(LineSpec(key="zscore", label="Z-Score {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "zscore": safe_divide(
             s.close - kernel.sma(s.close, int(p["period"])),
             kernel.stdev(s.close, int(p["period"])),
         )
-    },
+    }),
 )
 
 # --- volatility from OHLC: a family with no volume in it at all, built for exactly
@@ -187,7 +187,7 @@ _STDEV = IndicatorSpec(
     lines=(LineSpec(key="stdev", label="StDev {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {"stdev": kernel.stdev(s.close, int(p["period"]))},
+    computer=Lines(lambda s, p: {"stdev": kernel.stdev(s.close, int(p["period"]))}),
 )
 
 
@@ -207,7 +207,7 @@ _PARKINSON = IndicatorSpec(
     lines=(LineSpec(key="parkinson", label="Parkinson {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_parkinson,
+    computer=Lines(_compute_parkinson),
 )
 
 
@@ -227,7 +227,7 @@ _GARMAN_KLASS = IndicatorSpec(
     lines=(LineSpec(key="garman_klass", label="Garman-Klass {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_garman_klass,
+    computer=Lines(_compute_garman_klass),
 )
 
 
@@ -249,7 +249,7 @@ _ROGERS_SATCHELL = IndicatorSpec(
     lines=(LineSpec(key="rogers_satchell", label="Rogers-Satchell {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_rogers_satchell,
+    computer=Lines(_compute_rogers_satchell),
 )
 
 
@@ -280,7 +280,7 @@ _YANG_ZHANG = IndicatorSpec(
     lines=(LineSpec(key="yang_zhang", label="Yang-Zhang {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"]) + 1),
-    compute=_compute_yang_zhang,
+    computer=Lines(_compute_yang_zhang),
 )
 
 
@@ -303,7 +303,7 @@ _ULCER = IndicatorSpec(
     # "sum of consecutive windows" rule `stoch` (oscillators.py) and `hma`
     # (averages.py) use too.
     warmup=Warmup(kind="fixed", bars=lambda p: 2 * int(p["period"])),
-    compute=_compute_ulcer,
+    computer=Lines(_compute_ulcer),
 )
 
 

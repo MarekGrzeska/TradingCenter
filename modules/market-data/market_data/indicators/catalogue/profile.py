@@ -13,7 +13,7 @@ from datetime import datetime
 import numpy as np
 
 from .. import kernel
-from .spec import IndicatorSpec, Param, ProfileLevel, Render, Series, Warmup
+from .spec import IndicatorSpec, Param, ProfileLevel, Render, Series, TimeProfile, Warmup
 
 
 def _time_profile_levels(
@@ -96,11 +96,9 @@ _TIME_PROFILE = IndicatorSpec(
         Param(name="bucket_atr", type="float", default=0.25, min=0.01, max=5.0),
         Param(name="value_area_pct", type="float", default=70.0, min=1.0, max=99.9),
     ),
-    output="levels",
     render=Render(pane="price", style="histogram"),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    needs_minute_series=True,
-    compute_time_profile=_time_profile_levels,
+    computer=TimeProfile(_time_profile_levels),
 )
 
 

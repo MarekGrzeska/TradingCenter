@@ -51,7 +51,9 @@ import pytest
 
 talib = pytest.importorskip("talib", reason="TA-Lib is a dev-only comparison oracle")
 
-from market_data.indicators.catalogue import get
+from computers import fn_of
+
+from market_data.indicators.catalogue import Lines, get
 
 N = 2000
 TAIL = 300
@@ -84,58 +86,58 @@ def _assert_tail_matches(ours: np.ndarray, theirs: np.ndarray, label: str, tol: 
 
 class TestAgainstTalib:
     def test_sma(self):
-        r = get("sma").compute(SERIES, {"period": 20})
+        r = fn_of(get("sma"), Lines)(SERIES, {"period": 20})
         _assert_tail_matches(r["sma"], talib.SMA(CLOSE, 20), "sma")
 
     def test_ema(self):
-        r = get("ema").compute(SERIES, {"period": 20})
+        r = fn_of(get("ema"), Lines)(SERIES, {"period": 20})
         _assert_tail_matches(r["ema"], talib.EMA(CLOSE, 20), "ema")
 
     def test_wma(self):
-        r = get("wma").compute(SERIES, {"period": 20})
+        r = fn_of(get("wma"), Lines)(SERIES, {"period": 20})
         _assert_tail_matches(r["wma"], talib.WMA(CLOSE, 20), "wma")
 
     def test_kama(self):
         # TA-Lib's KAMA hardcodes fast=2/slow=30 internally — matched here rather
         # than left at this catalogue's own defaults (fast=2, slow=30, period=10),
         # which happen to already agree.
-        r = get("kama").compute(SERIES, {"period": 10, "fast": 2, "slow": 30})
+        r = fn_of(get("kama"), Lines)(SERIES, {"period": 10, "fast": 2, "slow": 30})
         _assert_tail_matches(r["kama"], talib.KAMA(CLOSE, 10), "kama")
 
     def test_lsma_against_linearreg(self):
-        r = get("lsma").compute(SERIES, {"period": 20})
+        r = fn_of(get("lsma"), Lines)(SERIES, {"period": 20})
         _assert_tail_matches(r["lsma"], talib.LINEARREG(CLOSE, 20), "lsma vs LINEARREG")
 
     def test_linreg_slope(self):
-        r = get("linreg_slope").compute(SERIES, {"period": 14})
+        r = fn_of(get("linreg_slope"), Lines)(SERIES, {"period": 14})
         _assert_tail_matches(
             r["linreg_slope"], talib.LINEARREG_SLOPE(CLOSE, 14), "linreg_slope", tol=1e-4
         )
 
     def test_atr(self):
-        r = get("atr").compute(SERIES, {"period": 14})
+        r = fn_of(get("atr"), Lines)(SERIES, {"period": 14})
         _assert_tail_matches(r["atr"], talib.ATR(HIGH, LOW, CLOSE, 14), "atr")
 
     def test_atr_pct(self):
         # Not a TA-Lib function of its own — `atr / close * 100`, checked against
         # TA-Lib's own ATR run through that same, trivial arithmetic.
-        r = get("atr_pct").compute(SERIES, {"period": 14})
+        r = fn_of(get("atr_pct"), Lines)(SERIES, {"period": 14})
         expected = 100 * talib.ATR(HIGH, LOW, CLOSE, 14) / CLOSE
         _assert_tail_matches(r["atr_pct"], expected, "atr_pct")
 
     def test_rsi(self):
-        r = get("rsi").compute(SERIES, {"period": 14})
+        r = fn_of(get("rsi"), Lines)(SERIES, {"period": 14})
         _assert_tail_matches(r["rsi"], talib.RSI(CLOSE, 14), "rsi")
 
     def test_macd(self):
-        r = get("macd").compute(SERIES, {"fast_period": 12, "slow_period": 26, "signal_period": 9})
+        r = fn_of(get("macd"), Lines)(SERIES, {"fast_period": 12, "slow_period": 26, "signal_period": 9})
         macd, signal, hist = talib.MACD(CLOSE, 12, 26, 9)
         _assert_tail_matches(r["macd"], macd, "macd.macd")
         _assert_tail_matches(r["signal"], signal, "macd.signal")
         _assert_tail_matches(r["histogram"], hist, "macd.histogram")
 
     def test_stoch(self):
-        r = get("stoch").compute(SERIES, {"k_period": 14, "k_smooth": 3, "d_period": 3})
+        r = fn_of(get("stoch"), Lines)(SERIES, {"k_period": 14, "k_smooth": 3, "d_period": 3})
         k, d = talib.STOCH(
             HIGH, LOW, CLOSE, fastk_period=14, slowk_period=3, slowk_matype=0, slowd_period=3, slowd_matype=0
         )
@@ -143,31 +145,31 @@ class TestAgainstTalib:
         _assert_tail_matches(r["d"], d, "stoch.d")
 
     def test_cci(self):
-        r = get("cci").compute(SERIES, {"period": 20})
+        r = fn_of(get("cci"), Lines)(SERIES, {"period": 20})
         _assert_tail_matches(r["cci"], talib.CCI(HIGH, LOW, CLOSE, 20), "cci", tol=1e-4)
 
     def test_roc(self):
-        r = get("roc").compute(SERIES, {"period": 9})
+        r = fn_of(get("roc"), Lines)(SERIES, {"period": 9})
         _assert_tail_matches(r["roc"], talib.ROC(CLOSE, 9), "roc")
 
     def test_williams_r(self):
-        r = get("williams_r").compute(SERIES, {"period": 14})
+        r = fn_of(get("williams_r"), Lines)(SERIES, {"period": 14})
         _assert_tail_matches(r["williams_r"], talib.WILLR(HIGH, LOW, CLOSE, 14), "williams_r")
 
     def test_adx_and_directional_indicators(self):
-        r = get("adx").compute(SERIES, {"period": 14})
+        r = fn_of(get("adx"), Lines)(SERIES, {"period": 14})
         _assert_tail_matches(r["adx"], talib.ADX(HIGH, LOW, CLOSE, 14), "adx")
         _assert_tail_matches(r["plus_di"], talib.PLUS_DI(HIGH, LOW, CLOSE, 14), "plus_di")
         _assert_tail_matches(r["minus_di"], talib.MINUS_DI(HIGH, LOW, CLOSE, 14), "minus_di")
 
     def test_aroon(self):
-        r = get("aroon").compute(SERIES, {"period": 14})
+        r = fn_of(get("aroon"), Lines)(SERIES, {"period": 14})
         aroon_down, aroon_up = talib.AROON(HIGH, LOW, 14)
         _assert_tail_matches(r["aroon_up"], aroon_up, "aroon_up")
         _assert_tail_matches(r["aroon_down"], aroon_down, "aroon_down")
 
     def test_bbands(self):
-        r = get("bbands").compute(SERIES, {"period": 20, "mult": 2.0})
+        r = fn_of(get("bbands"), Lines)(SERIES, {"period": 20, "mult": 2.0})
         upper, basis, lower = talib.BBANDS(CLOSE, 20, 2.0, 2.0, 0)
         _assert_tail_matches(r["upper"], upper, "bbands.upper")
         _assert_tail_matches(r["basis"], basis, "bbands.basis")

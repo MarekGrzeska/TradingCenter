@@ -183,6 +183,88 @@ class ProfileLevel:
 TimeProfileFn = Callable[[Series, Sequence[datetime], Mapping[str, float]], list[ProfileLevel]]
 
 
+# --- what an entry computes, and therefore what shape it answers with ----------------
+#
+# One field, seven cases. It used to be seven optional `compute_*` fields plus an
+# `output` string declared beside them, and the two could disagree: an entry could
+# announce `output="levels"` and set no level computer, or set `compute_zones` and leave
+# `output` at its `"lines"` default. Neither is a state anything refused — the router
+# picked a branch by asking which fields happened to be set, in an order that was itself
+# the tie-break, and the wire published whatever the string said.
+#
+# `output` is derived from the case below rather than declared next to it, so the two can
+# no longer disagree, and the router matches on the case instead of interrogating eight
+# fields for `None`. The one thing this cannot express is an entry with two computers,
+# which was never a thing an entry could usefully be.
+
+
+@dataclass(frozen=True)
+class Lines:
+    """The ordinary case: one array per declared line, indexed by bar."""
+
+    fn: ComputeFn
+
+
+@dataclass(frozen=True)
+class Markers:
+    """Discrete events on the entry's own series — `swing_points`."""
+
+    fn: MarkerComputeFn
+
+
+@dataclass(frozen=True)
+class ClusterLevels:
+    """Price levels computed from the entry's own series — `level_clusters`."""
+
+    fn: ClusterComputeFn
+
+
+@dataclass(frozen=True)
+class HtfLevels:
+    """Price levels implied by one closed candle of a *coarser* resolution —
+    `pivots_*`, `htf_levels_*`. The resolution belongs to the computer, not to the
+    entry: it is the only case that reads a series other than the one requested from
+    above, and the router reads it to know which one to fetch."""
+
+    fn: HtfLevelsFn
+    resolution: Resolution
+
+
+@dataclass(frozen=True)
+class Zones:
+    """Regions on the entry's own series — `range_gap`, `body_gap`."""
+
+    fn: ZoneComputeFn
+
+
+@dataclass(frozen=True)
+class MinuteZones:
+    """Regions computed from the archive's fine series regardless of what resolution
+    was requested — `session_range_*`, `opening_range`."""
+
+    fn: MinuteZoneFn
+
+
+@dataclass(frozen=True)
+class TimeProfile:
+    """Price buckets over the archive's fine series — `time_profile`."""
+
+    fn: TimeProfileFn
+
+
+Computer = Lines | Markers | ClusterLevels | HtfLevels | Zones | MinuteZones | TimeProfile
+
+_OUTPUT_OF: dict[type, Literal["lines", "markers", "zones", "levels"]] = {
+    Lines: "lines",
+    Markers: "markers",
+    ClusterLevels: "levels",
+    HtfLevels: "levels",
+    Zones: "zones",
+    MinuteZones: "zones",
+    TimeProfile: "levels",
+}
+
+
 @dataclass(frozen=True)
 class IndicatorSpec:
     id: str
@@ -193,29 +275,28 @@ class IndicatorSpec:
     aliases: tuple[str, ...] = ()
     inputs: tuple[str, ...] = ("close",)
     params: tuple[Param, ...] = ()
-    output: Literal["lines", "markers", "zones", "levels"] = "lines"
     lines: tuple[LineSpec, ...] = ()
     render: Render = field(default_factory=lambda: Render(pane="price", style="line"))
     warmup: Warmup = field(default_factory=lambda: Warmup(kind="fixed", bars=lambda p: 0))
-    compute: ComputeFn = field(default=lambda series, params: {})
-    # Set instead of `compute` for an `output="markers"` entry.
-    compute_markers: MarkerComputeFn | None = None
-    # Set instead of `compute` for an `output="levels"` entry computed from this
-    # entry's own series, e.g. `level_clusters`.
-    compute_cluster_levels: ClusterComputeFn | None = None
-    # Set together with `higher_resolution` for an `output="levels"` entry computed
-    # from one closed candle of a *different* resolution, e.g. `pivots_classic`.
-    higher_resolution: Resolution | None = None
-    compute_htf_levels: HtfLevelsFn | None = None
-    # Set instead of `compute` for an `output="zones"` entry computed from this
-    # entry's own series — `range_gap`, `body_gap`.
-    compute_zones: ZoneComputeFn | None = None
-    # `compute_minute_zones` and `compute_time_profile` both read the archive's
-    # MINUTE series instead of whatever resolution was requested — set together
-    # with `needs_minute_series`, which tells the router to fetch it.
-    needs_minute_series: bool = False
-    compute_minute_zones: MinuteZoneFn | None = None
-    compute_time_profile: TimeProfileFn | None = None
+    computer: Computer = field(default_factory=lambda: Lines(lambda series, params: {}))
+
+    @property
+    def output(self) -> Literal["lines", "markers", "zones", "levels"]:
+        """The shape this entry answers with, as published in the catalogue. Read off
+        the computer, so it cannot be set to something the computer will not produce."""
+        return _OUTPUT_OF[type(self.computer)]
+
+    @property
+    def higher_resolution(self) -> Resolution | None:
+        """The coarser series this entry reads instead of the requested one, if any."""
+        return self.computer.resolution if isinstance(self.computer, HtfLevels) else None
+
+    @property
+    def needs_minute_series(self) -> bool:
+        """Whether this entry reads the archive's fine series regardless of what
+        resolution was requested — which the router has to know before it reads
+        anything."""
+        return isinstance(self.computer, MinuteZones | TimeProfile)
 
     def resolve_params(self, requested: Mapping[str, float]) -> dict[str, float]:
         """Requested values over defaults, each checked against its declared range.
