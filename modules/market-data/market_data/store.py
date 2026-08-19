@@ -14,12 +14,15 @@ migrations; the runtime path has no ORM in it.
 from __future__ import annotations
 
 from collections.abc import Iterable, Sequence
+from dataclasses import dataclass
 from datetime import datetime
 
 import asyncpg
 
+from .coverage import record_coverage
 from .db import fetch_one
-from .models import Candle, CandleSource, PriceSide, Resolution
+from .models import Candle, CandleSource, CoverageRange, PriceSide, Resolution
+from .rollups import refresh_all
 
 
 class FormingCandleRejected(ValueError):
@@ -104,6 +107,11 @@ _DELETE_ALL = """
 async def write_candles(conn: asyncpg.Connection, candles: Iterable[Candle]) -> int:
     """Store closed candles, overwriting what is already held for the same period.
 
+    The statement and nothing else — no coverage, no rollups. Ingest goes through
+    `commit_candles`, which is the only caller of this in the module and the only one a
+    test allows (`test_ingest.py::test_nothing_but_the_store_writes_candles_on_its_own`);
+    the tests that reach for this directly are seeding rows, not ingesting them.
+
     Returns how many rows the archive actually took — which is not always how many were
     offered, because a streamed value never displaces a stored history one.
 
@@ -143,6 +151,61 @@ async def write_candles(conn: asyncpg.Connection, candles: Iterable[Candle]) -> 
         [c.source.value for c in rows],
     )
     return len(written)
+
+
+@dataclass(frozen=True)
+class Committed:
+    """What one ingest write did: how many rows the archive took, and the coverage range
+    as it stands after the stretch was merged into it."""
+
+    written: int
+    coverage: CoverageRange
+
+
+async def commit_candles(
+    conn: asyncpg.Connection,
+    candles: Sequence[Candle],
+    *,
+    symbol: str,
+    resolution: Resolution,
+    covered_from: datetime,
+    covered_to: datetime,
+    history_ended: bool = False,
+    history_ends_at: datetime | None = None,
+) -> Committed:
+    """The one way candles enter the archive: stored, the stretch recorded as verified,
+    and the rollups rebuilt over what arrived.
+
+    Three call sites wrote those three steps out by hand — the stream, a gap fill and a
+    collection job's chunk — and all three had to agree about the two that are not the
+    write. Missing the coverage row leaves a stretch that was read reporting as never
+    collected, which sends the same request again tomorrow and every day after; missing
+    the rollup refresh leaves every derived resolution a period behind its own minutes,
+    with nothing to say so. Neither failure is visible at the call site that caused it,
+    and neither reddens a test of the write.
+
+    Coverage is recorded whether or not anything was written: an exhaustive read of an
+    empty stretch is still a stretch looked at (`jobs/runner.py` depends on exactly
+    that). The rollups are refreshed over what *arrived* rather than what was taken,
+    because the authority rule can decline a streamed value over a stored history one
+    and the derived candle still has to be rebuilt from the minutes that are there.
+
+    `candles` is assumed oldest-first, which every caller's own filtering already gives
+    it — the range handed to `refresh_all` is its first and last.
+    """
+    written = await write_candles(conn, candles) if candles else 0
+    coverage = await record_coverage(
+        conn,
+        symbol,
+        resolution,
+        covered_from,
+        covered_to,
+        history_ended=history_ended,
+        history_ends_at=history_ends_at,
+    )
+    if candles and resolution is Resolution.MINUTE:
+        await refresh_all(conn, symbol, candles[0].period_start, candles[-1].period_start)
+    return Committed(written=written, coverage=coverage)
 
 
 async def read_candles(

@@ -7,9 +7,11 @@ import sys
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 
 import pytest
 
+import market_data
 from market_data.coverage import read_coverage
 from market_data.errors import GatewayRefused, GatewayUnreachable
 from market_data.gateway import CandleUpdate, FeedFailure, FeedState, FeedStatus, HistoryPage, Quote
@@ -1150,3 +1152,26 @@ class _PoolSayingTracked:
 
     async def fetchval(self, *args, **kwargs):
         return 1
+
+
+def test_nothing_but_the_store_writes_candles_on_its_own() -> None:
+    """`commit_candles` is the only way candles enter the archive.
+
+    Its two other steps — the coverage row and the rollup refresh — are what a caller
+    doing the write by hand forgets, and neither omission fails anything: a stretch that
+    was read reports as never collected and gets requested again tomorrow, and every
+    derived resolution sits a period behind its own minutes. The failure mode of this
+    guard is a new ingest path calling `write_candles` directly, so this reads the
+    imports rather than the behaviour — there is no behaviour to read until it is wrong
+    in production.
+    """
+    package = Path(market_data.__file__).parent
+    offenders = sorted(
+        path.relative_to(package).as_posix()
+        for path in package.rglob("*.py")
+        if path.name != "store.py" and "write_candles" in path.read_text(encoding="utf-8")
+    )
+    assert offenders == [], (
+        f"{offenders} reach `write_candles` directly; ingest goes through `commit_candles`, "
+        "which also records the coverage and refreshes the rollups"
+    )

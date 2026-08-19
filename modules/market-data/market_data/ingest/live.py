@@ -18,14 +18,12 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
-from ..coverage import record_coverage
 from ..errors import GatewayError
 from ..gateway import CandleUpdate, FeedFailure, FeedState, FeedStatus, subscribe
 from ..gateway import GatewayHistory as _GatewayHistory
 from ..models import Candle, Resolution
 from ..periods import period_length
-from ..rollups import refresh_all
-from ..store import write_candles
+from ..store import commit_candles
 from .backfill import FillOutcome, fill_gap
 
 log = logging.getLogger(__name__)
@@ -190,16 +188,14 @@ async def store_closed_candle(pool, candle: Candle) -> None:
     """
     period = period_length(candle.resolution)
     async with pool.acquire() as conn:
-        await write_candles(conn, [candle])
-        # The period is now verified, and so is the moment it closed. Recording only the
-        # period itself would leave a hairline gap between consecutive candles that a
-        # coverage lookup would report as never collected.
-        await record_coverage(
+        # Verified up to the moment the period closed, not only the period itself —
+        # recording the period alone would leave a hairline gap between consecutive
+        # candles that a coverage lookup would report as never collected.
+        await commit_candles(
             conn,
-            candle.symbol,
-            candle.resolution,
-            candle.period_start,
-            max(candle.period_start + period, datetime.now(UTC)),
+            [candle],
+            symbol=candle.symbol,
+            resolution=candle.resolution,
+            covered_from=candle.period_start,
+            covered_to=max(candle.period_start + period, datetime.now(UTC)),
         )
-        if candle.resolution is Resolution.MINUTE:
-            await refresh_all(conn, candle.symbol, candle.period_start, candle.period_start)
