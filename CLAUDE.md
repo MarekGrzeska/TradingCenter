@@ -200,7 +200,15 @@ one its own tests walk, not a broken one. The tools appear only after the operat
 market-data's `allowed_applications` **and** its `TOOL_CALLER_APPLICATION_IDS`, and after
 the agent restarts. Both, and neither substitutes for the other: the first is the door,
 the second is which surface behind it — Easy Auth authorizes an application, not a route
-(`market_data/caller_access.py`). Rolling back is the
+(`market_data/caller_access.py`).
+
+Both lists hold **application** ids, and the module reads the application from the token's
+`azp`/`appid` claim rather than from `X-MS-CLIENT-PRINCIPAL-ID`. That header names the
+signed-in person for a delegated token — measured on 19 August 2026 by deploying the
+opposite assumption, which refused every request the terminal made until the image went
+back. The route record is empty in a fresh deployment, so **the settings have to reach the
+app before the image that enforces them does**: an apply that lands after the deploy is an
+outage in between, not merely an ordering preference. Rolling back is the
 same lever: clear `MARKET_MCP_URL`, restart, and the module is what it was, with the rows
 in `tool_calls` still recording what happened while it had them.
 

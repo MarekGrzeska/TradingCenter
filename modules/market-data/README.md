@@ -214,6 +214,10 @@ true by construction — the tools were a separate module with no address for an
 - The lists are `TOOL_CALLER_APPLICATION_IDS` and `REST_CALLER_APPLICATION_IDS`, read only
   where `REQUIRE_AUTHENTICATED_PRINCIPAL` is on. Locally they are empty and every surface
   answers: nothing stands in front, so there is no identity to match.
+- **The identity is the calling application, taken from the token's own `azp`/`appid`
+  claim** — not from `X-MS-CLIENT-PRINCIPAL-ID`, which for the terminal's delegated token
+  carries the signed-in person. Measured in production on 19 August 2026, the hard way:
+  deciding on that header refused every REST request until the image was rolled back.
 
 The platform's own gate is still there and still necessary — it is the door. This record is
 which room, and Easy Auth cannot express it: it authorizes an application, and an

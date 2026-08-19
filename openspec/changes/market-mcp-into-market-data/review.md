@@ -49,10 +49,20 @@ Trzymają go: odmowa domyślna dla trasy nieznanej zapisowi, test odmowy dla ka�
 opublikowanego dokumentu, żeby nowa trasa REST nie stała się ani otwarta, ani nieosiągalna
 po cichu.
 
-**Której wartości Easy Auth używa w `X-MS-CLIENT-PRINCIPAL-ID` dla tokenu app-to-app — nie
-zmierzono.** Dlatego każdy wołający jest wpisany dwiema pisowniami: client id i object id.
-Obie nazywają tego samego principala, więc to nie jest rozluźnienie reguły, tylko brak
-pomiaru. Zawężenie do jednej to osobna zmiana z pomiarem, nie zgadywanka teraz.
+**Zmierzone 19.08.2026, po wdrożeniu — i pomiar obalił założenie.**
+`X-MS-CLIENT-PRINCIPAL-ID` przy tokenie delegowanym niesie object id **zalogowanej osoby**,
+nie aplikacji: produkcja odmówiła terminalowi każdego żądania REST
+(`request refused: e6b7d7ba-… has no access to /stream-tickets`), obraz został cofnięty w
+około minutę, a moduł czyta teraz claim `azp`/`appid` z blobu `X-MS-CLIENT-PRINCIPAL` —
+jedyne miejsce, w którym wołająca aplikacja występuje przy obu rodzajach tokenu. Wpisanie
+dwóch pisowni identyfikatora nie mogło tego uratować i nie uratowało; to była hipoteza
+zamiast pomiaru i tak też się skończyła.
+
+Druga rzecz, której ta awaria nauczyła: **ustawienia muszą dojechać przed obrazem, który je
+egzekwuje.** Zapis pusty przy włączonym wymogu tożsamości to odmowa wszystkiego, więc
+`apply` po deployu jest przerwą w działaniu, a nie tylko inną kolejnością. Kolejność z D6
+(kod przed prawami wejścia) zostaje w mocy dla `allowed_applications`; same listy wołających
+są nieszkodliwe dla starego obrazu i mają iść pierwsze.
 
 **Brak ustawień jest odmową, nie przepuszczeniem.** Trzy fikstury testowe serwowały gołą
 aplikację bez `app.state.settings`; dostały je, bo proces, który serwuje, ustawienia ma.
