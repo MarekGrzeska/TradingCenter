@@ -128,23 +128,20 @@ export function RunMonitor({
             is worth reading before the rest arrives, and the dialog renders whatever the
             stream has delivered so far. The count is on the button because it is the
             question the button answers — is there anything in there yet. */}
-        <button
-          type="button"
+        <Button
           onClick={() => setReadingOutputs(true)}
           disabled={steps.length === 0}
-          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong disabled:cursor-not-allowed disabled:opacity-40"
         >
           Outputs ({steps.filter((step) => step.output).length})
-        </button>
+        </Button>
         {working && (
-          <button
-            type="button"
+          <Button
+            tone="critical"
             onClick={stop}
             disabled={stopping}
-            className="cursor-pointer rounded border border-critical px-2 py-1 text-xs text-critical hover:bg-panel-strong disabled:cursor-not-allowed disabled:opacity-40"
           >
             {stopping ? "Stopping…" : "Stop"}
-          </button>
+          </Button>
         )}
         {run?.startedAt !== null && run?.startedAt !== undefined && (
           <span className="text-xs text-ink-faint">started {formatInstant(run.startedAt)}</span>

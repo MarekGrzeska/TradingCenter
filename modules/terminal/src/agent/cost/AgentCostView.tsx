@@ -6,6 +6,7 @@ import { defaultDateRangeInputs, toUsageRange, type DateRangeInputs } from "./da
 import { pageOf, type Page } from "./pagination";
 import { useUsage, type UsageState } from "./useUsage";
 import { todayInWarsaw } from "../../ui/formatTime";
+import { Button } from "../../ui/Button";
 
 /**
  * Where the operator checks what conversations with the agent have cost, before the
@@ -206,13 +207,13 @@ function AggregateTable({
               <td className="px-2 py-1.5 text-right text-ink-secondary">${row.cost}</td>
               <td className="px-2 py-1.5 text-right">
                 {onRowOpen && (
-                  <button
-                    type="button"
+                  <Button
+                    tone="muted"
+                    size="xs"
                     onClick={() => onRowOpen(row)}
-                    className="rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
                   >
                     {openLabel}
-                  </button>
+                  </Button>
                 )}
               </td>
             </tr>
@@ -245,27 +246,25 @@ function Pagination({
         {page.firstRow}–{page.lastRow} of {page.total}
       </span>
       <div className="ml-auto flex items-center gap-1">
-        <button
-          type="button"
+        <Button
+          size="xs"
           onClick={() => onPage(page.index - 1)}
           disabled={page.index === 0}
           aria-label={`${label}: previous page`}
-          className="cursor-pointer rounded border border-border px-1.5 py-0.5 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
         >
           Prev
-        </button>
+        </Button>
         <span aria-current="page">
           {page.index + 1} / {page.count}
         </span>
-        <button
-          type="button"
+        <Button
+          size="xs"
           onClick={() => onPage(page.index + 1)}
           disabled={page.index === page.count - 1}
           aria-label={`${label}: next page`}
-          className="cursor-pointer rounded border border-border px-1.5 py-0.5 hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
         >
           Next
-        </button>
+        </Button>
       </div>
     </div>
   );

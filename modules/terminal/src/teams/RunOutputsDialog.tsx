@@ -3,6 +3,7 @@ import { MessageBody } from "../agent/MessageBody";
 import { ModalShell } from "../ui/ModalShell";
 import { formatInstant } from "../ui/formatTime";
 import { outcomeOf, type TeamRunStep, type TeamRunToolCall, type TeamTrade } from "./runs";
+import { Button } from "../ui/Button";
 
 /**
  * What the agents wrote, in a window wide enough to read it in.
@@ -60,13 +61,13 @@ export function RunOutputsDialog({
             {steps.filter((step) => step.output).length} of {steps.length} have written
             something
           </span>
-          <button
-            type="button"
+          <Button
+            tone="primary"
+            size="md"
             onClick={onClose}
-            className="cursor-pointer rounded border border-primary bg-primary-soft px-3 py-1 text-xs text-ink hover:bg-primary-strong hover:text-ink-inverse"
           >
             Done
-          </button>
+          </Button>
         </div>
       }
     >

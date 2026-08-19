@@ -51,6 +51,7 @@ import { useDrawingLayers } from "./useDrawingLayers";
 import { useIndicatorLayers } from "./useIndicatorLayers";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
+import { Button } from "../ui/Button";
 
 export interface ChartProps {
   source: MarketDataSource;
@@ -974,13 +975,12 @@ export function Chart({
               >
                 indicators unavailable
               </span>
-              <button
-                type="button"
+              <Button
+                size="2xs"
                 onClick={indicatorsState.retry}
-                className="rounded border border-border px-1.5 py-0.5 text-[10px] text-ink hover:bg-panel-strong"
               >
                 Retry
-              </button>
+              </Button>
             </span>
           )}
           <OlderHistoryState older={older} />

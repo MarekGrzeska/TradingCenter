@@ -22,6 +22,7 @@ import type {
   ScheduleDraft,
   TeamsApi,
 } from "./teamsApi";
+import { Button } from "../ui/Button";
 
 /**
  * Where a schedule is made: a rhythm, a time of day, and the days it applies to — no cron
@@ -91,22 +92,22 @@ export function ScheduleWizardDialog({
         <div className="flex flex-col gap-2">
           {error && <p className="text-critical">{error}</p>}
           <div className="flex justify-end gap-2">
-            <button
-              type="button"
+            <Button
+              tone="muted"
+              size="md"
               disabled={saving}
               onClick={onClose}
-              className="rounded border border-border px-3 py-1 text-ink-muted hover:text-ink disabled:opacity-40"
             >
               Cancel
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              tone="primary"
+              size="md"
               disabled={saving}
               onClick={save}
-              className="rounded border border-primary bg-primary-soft px-3 py-1 text-ink hover:bg-primary-strong hover:text-ink-inverse disabled:opacity-40"
             >
               {saving ? "Saving…" : schedule === null ? "Create schedule" : "Save schedule"}
-            </button>
+            </Button>
           </div>
         </div>
       }
@@ -156,15 +157,14 @@ export function ScheduleWizardDialog({
               className="rounded border border-border bg-panel px-2 py-1 font-mono text-sm text-ink"
             />
             {draft.cronExpression !== null && (
-              <button
-                type="button"
+              <Button
+                className="self-start"
                 onClick={() =>
                   setDraft(withTiming(draft, { recurrence: recurrenceOfKind("daily", null) }))
                 }
-                className="self-start rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
               >
                 Back to the wizard
-              </button>
+              </Button>
             )}
           </div>
         </details>

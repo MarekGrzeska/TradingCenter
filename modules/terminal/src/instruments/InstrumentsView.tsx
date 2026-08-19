@@ -10,6 +10,7 @@ import { AddInstrumentWizard } from "./AddInstrumentWizard";
 import { formatBytes, formatInstant } from "../ui/formatTime";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { useTrackedPairs } from "./useTrackedPairs";
+import { Button } from "../ui/Button";
 
 /**
  * What the archive is collecting, one row per instrument — because the questions an
@@ -305,17 +306,17 @@ function InstrumentRow({
           ))}
         </td>
         <td className="px-4 py-1.5 text-right">
-          <button
-            type="button"
+          <Button
+            tone="muted"
+            size="xs"
             aria-label={`Delete ${group.symbol}`}
             onClick={(e) => {
               e.stopPropagation();
               setConfirming(true);
             }}
-            className="rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
           >
             Delete
-          </button>
+          </Button>
         </td>
       </tr>
 
@@ -431,14 +432,14 @@ function IntervalCoverage({
       <div className="grid grid-cols-[2.5rem_7rem_4.5rem_1fr_auto] items-center gap-x-4">
         <span className="font-semibold text-ink">{RESOLUTION_LABEL[pair.resolution]}</span>
         <IntervalVolume pair={pair} />
-        <button
-          type="button"
+        <Button
+          tone="muted"
+          size="xs"
           aria-label={`Delete ${pair.symbol} ${pair.resolution}`}
           onClick={() => setConfirming(true)}
-          className="rounded border border-border px-2 py-0.5 text-ink-muted hover:text-ink"
         >
           Delete
-        </button>
+        </Button>
       </div>
 
       {error && <p className="text-critical">{error}</p>}

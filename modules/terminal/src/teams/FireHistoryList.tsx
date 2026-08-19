@@ -1,5 +1,6 @@
 import { formatInstant } from "../ui/formatTime";
 import type { ScheduleFire } from "./teamsApi";
+import { Button } from "../ui/Button";
 
 /**
  * A schedule's or a trigger's fire history — including a fire that started nothing.
@@ -35,13 +36,13 @@ export function FireHistoryList({
             {fire.reason !== null && ` — ${fire.reason}`}
           </span>
           {fire.runId !== null && (
-            <button
-              type="button"
+            <Button
+              size="xs"
+              className="shrink-0"
               onClick={() => onWatchRun(fire.runId!)}
-              className="shrink-0 cursor-pointer rounded border border-border px-2 py-0.5 text-ink hover:bg-panel-strong"
             >
               Watch
-            </button>
+            </Button>
           )}
         </li>
       ))}

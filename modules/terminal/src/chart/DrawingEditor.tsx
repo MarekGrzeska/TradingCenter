@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { AgentChartDrawing, AgentDrawingPatch } from "../agent/agentApi";
 import { priceFields } from "./drawingFields";
+import { Button } from "../ui/Button";
 
 /**
  * The prices and the caption of one object, editable. Built from `priceFields`, so a
@@ -86,13 +87,14 @@ export function DrawingEditor({
         />
       </label>
       {problem !== null && <p className="text-[10px] text-critical">{problem}</p>}
-      <button
+      <Button
+        size="2xs"
+        className="self-start"
         type="submit"
         disabled={busy}
-        className="self-start rounded border border-border px-1.5 py-0.5 text-[10px] text-ink hover:bg-panel-strong disabled:opacity-50"
       >
         Save
-      </button>
+      </Button>
     </form>
   );
 }

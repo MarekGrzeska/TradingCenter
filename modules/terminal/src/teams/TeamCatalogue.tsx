@@ -70,13 +70,12 @@ export function TeamCatalogue({
     <div className="flex h-full min-h-0 flex-col gap-3 overflow-auto p-4">
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-semibold text-ink">Teams</h2>
-        <button
-          type="button"
+        <Button
+          tone="primary"
           onClick={onNew}
-          className="cursor-pointer rounded border border-primary-line bg-primary-soft px-2 py-1 text-xs text-ink hover:bg-primary-strong hover:text-ink-inverse"
         >
           New team
-        </button>
+        </Button>
       </div>
 
       {status === "loading" && <p className="text-sm text-ink-muted">Reading the catalogue…</p>}
@@ -141,14 +140,13 @@ export function TeamCatalogue({
                 </div>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <button
-                  type="button"
+                <Button
+                  tone="primary"
                   onClick={() => run(team)}
                   disabled={starting === team.id}
-                  className="cursor-pointer rounded border border-primary-line bg-primary-soft px-2 py-1 text-xs text-ink hover:bg-primary-strong hover:text-ink-inverse disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   {starting === team.id ? "Starting…" : "Run"}
-                </button>
+                </Button>
                 {/* A door, not a drawer. This used to unfold the run list inside the row,
                     which meant picking a run took two clicks and then read the run on a
                     canvas that had to be opened separately. It now goes to the view where
@@ -159,13 +157,12 @@ export function TeamCatalogue({
                 <Button onClick={() => onSchedules(team.id, team.name)}>
                   Schedules
                 </Button>
-                <button
-                  type="button"
+                <Button
+                  tone="muted"
                   onClick={() => setRetiring(team)}
-                  className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink-muted hover:bg-panel-strong"
                 >
                   Retire
-                </button>
+                </Button>
               </div>
             </div>
           </li>

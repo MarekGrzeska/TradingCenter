@@ -9,6 +9,7 @@ import { formatInstant } from "../ui/formatTime";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { useJobHistory } from "./useJobHistory";
 import type { JobHistoryState } from "./useJobHistory";
+import { Button } from "../ui/Button";
 
 /**
  * Every pull the archive has run, per instrument and per interval — the
@@ -323,17 +324,17 @@ function HistoryRow({ row, onOpenJob }: { row: JobPairView; onOpenJob(jobId: num
               (terminal-collection-history spec, "Ponowienie stoi przy całości,
               nie przy parze"). Keyboard-reachable in its own right, so opening a
               job never needs a pointer. */}
-          <button
-            type="button"
+          <Button
+            tone="muted"
+            size="xs"
             aria-label={`Job ${row.jobId} details`}
             onClick={(e) => {
               e.stopPropagation();
               onOpenJob(row.jobId);
             }}
-            className="rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
           >
             Job #{row.jobId}
-          </button>
+          </Button>
         </td>
       </tr>
 
@@ -467,13 +468,14 @@ function JobDialog({
           This job cannot be removed from the history while its chunks are still running.
         </p>
       ) : (
-        <button
-          type="button"
+        <Button
+          tone="muted"
+          size="xs"
+          className="mt-3"
           onClick={() => setRemoving(true)}
-          className="mt-3 rounded border border-border px-2 py-0.5 text-xs text-ink-muted hover:text-ink"
         >
           Remove from history
-        </button>
+        </Button>
       )}
     </>
   );

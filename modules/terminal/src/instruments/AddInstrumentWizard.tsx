@@ -19,6 +19,7 @@ import type {
 } from "../data/types";
 import { formatBytes, formatInstant, todayInWarsaw, warsawMidnightEpochSeconds } from "../ui/formatTime";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
+import { Button } from "../ui/Button";
 
 /**
  * Adding instruments as a decision made once, not one blind click per pair
@@ -174,14 +175,13 @@ export function AddInstrumentWizard({
           />
         </Field>
 
-        <button
-          type="button"
+        <Button
+          size="md"
           disabled={missing !== null}
           onClick={review}
-          className="rounded border border-border px-3 py-1.5 text-xs text-ink hover:bg-panel-strong disabled:opacity-40"
         >
           Review and add
-        </button>
+        </Button>
       </div>
 
       {missing && <p className="mt-2 text-xs text-ink-muted">{missing}</p>}

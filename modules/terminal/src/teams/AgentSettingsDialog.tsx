@@ -2,6 +2,7 @@ import { useState } from "react";
 import { ModalShell } from "../ui/ModalShell";
 import type { Refusal } from "./refusal";
 import type { TeamAgent, TeamDefinition, TeamDependency, TeamsModel, TeamsTool } from "./teamsApi";
+import { Button } from "../ui/Button";
 
 /**
  * One agent's settings, opened from the gear on its own box on the canvas.
@@ -79,20 +80,19 @@ export function AgentSettingsDialog({
       onClose={onClose}
       footer={
         <div className="flex items-center justify-between gap-2">
-          <button
-            type="button"
+          <Button
+            tone="critical"
             onClick={onRemove}
-            className="cursor-pointer rounded border border-critical px-2 py-1 text-xs text-critical hover:bg-panel-strong"
           >
             Remove agent
-          </button>
-          <button
-            type="button"
+          </Button>
+          <Button
+            tone="primary"
+            size="md"
             onClick={onClose}
-            className="cursor-pointer rounded border border-primary bg-primary-soft px-3 py-1 text-xs text-ink hover:bg-primary-strong hover:text-ink-inverse"
           >
             Done
-          </button>
+          </Button>
         </div>
       }
     >
@@ -219,17 +219,15 @@ export function AgentSettingsDialog({
                     </option>
                   ))}
                 </select>
-                <button
-                  type="button"
+                <Button
                   disabled={waitFor === ""}
                   onClick={() => {
                     onConnect({ from: waitFor, to: agent.key });
                     setWaitFor("");
                   }}
-                  className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong disabled:cursor-not-allowed disabled:opacity-40"
                 >
                   Add
-                </button>
+                </Button>
               </div>
             )}
           </section>
@@ -297,14 +295,14 @@ function DependencyRow({ label, onRemove }: { label: string; onRemove(): void })
   return (
     <div className="flex items-center justify-between gap-2 text-xs text-ink">
       <span>{label}</span>
-      <button
-        type="button"
+      <Button
+        tone="muted"
+        size="xs"
         onClick={onRemove}
         aria-label={`Remove dependency: ${label}`}
-        className="cursor-pointer rounded border border-border px-1.5 py-0.5 text-ink-muted hover:bg-panel-strong"
       >
         Remove
-      </button>
+      </Button>
     </div>
   );
 }

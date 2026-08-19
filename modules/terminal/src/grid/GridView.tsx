@@ -9,6 +9,7 @@ import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { gridStore } from "./gridStore";
 import { SymbolField } from "./SymbolField";
 import { LAYOUTS, LAYOUT_IDS, visibleSlotIds, type SlotId } from "./model";
+import { Button } from "../ui/Button";
 
 function groupResolutionsBySymbol(pairs: TrackedPair[]): Map<string, Resolution[]> {
   const map = new Map<string, Resolution[]>();
@@ -313,14 +314,13 @@ function StaleSlot({
           <p className="text-xs text-ink-muted">Still collected at:</p>
           <div className="flex flex-wrap justify-center gap-1">
             {stillArchivedAt.map((r) => (
-              <button
+              <Button
+                size="xs"
                 key={r}
-                type="button"
                 onClick={() => gridStore.setSlotResolution(slotId, r)}
-                className="rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
               >
                 {RESOLUTION_LABEL[r]}
-              </button>
+              </Button>
             ))}
           </div>
         </>

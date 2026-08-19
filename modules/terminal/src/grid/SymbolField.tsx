@@ -1,5 +1,6 @@
 import { Link } from "react-router";
 import type { PairsStatus } from "../instruments/useTrackedPairs";
+import { Button } from "../ui/Button";
 
 /**
  * The only way a symbol reaches a slot: picked from what the archive is
@@ -43,13 +44,12 @@ export function SymbolField({
             odczytać"). */}
         {value !== null && <span className="text-sm font-semibold text-ink">{value}</span>}
         <span>Can’t pick an instrument — {error ?? "the archive is not answering"}.</span>
-        <button
-          type="button"
+        <Button
+          size="xs"
           onClick={onRetry}
-          className="rounded border border-border px-1.5 py-0.5 text-xs text-ink hover:bg-panel-strong"
         >
           Retry
-        </button>
+        </Button>
       </span>
     );
   }
