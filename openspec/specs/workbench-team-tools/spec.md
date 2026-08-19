@@ -1,4 +1,12 @@
-## ADDED Requirements
+# workbench-team-tools Specification
+
+## Purpose
+
+Co model dostaje do ręki, kiedy operator prosi o zespół zdaniem zamiast formularzem:
+zestaw narzędzi mówiący językiem zadania, a nie językiem tras, do czyjej tożsamości
+należy to, co przez niego powstaje, i jaki sufit ma jego ogłoszona powierzchnia.
+
+## Requirements
 
 ### Requirement: Zestaw jest zredukowany do zadań operatora, nie odwzorowuje tras
 

@@ -1,4 +1,12 @@
-## ADDED Requirements
+# workbench-process Specification
+
+## Purpose
+
+Co znaczy, że rozmowa operatora i katalog zespołów są jednym procesem: jak ten proces
+wstaje wobec dwóch baz, gdzie zapisuje koszt każdej z dwóch powierzchni, która z nich
+odpowiada pod daną ścieżką i czego jednej powierzchni nie wolno wiedzieć o drugiej.
+
+## Requirements
 
 ### Requirement: Jeden proces obsługuje obie powierzchnie albo żadnej
 
