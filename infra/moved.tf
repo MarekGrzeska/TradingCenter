@@ -168,3 +168,15 @@ moved {
   from = azurerm_postgresql_flexible_server_firewall_rule.agent_outbound
   to   = azurerm_postgresql_flexible_server_firewall_rule.workbench_outbound
 }
+
+# The Key Vault grant is keyed by app name, and the app changed names — so `agent` and
+# `workbench` are the same grant, on the same managed identity, under two `for_each` keys.
+# Terraform reads that as a create and a destroy, and both resolve to the *same* Azure
+# resource id (a policy is addressed by vault plus object id). Nothing orders them, so the
+# apply either creates over what still exists — `A resource with the ID ... already exists`
+# — or destroys after creating and leaves the workbench unable to read its own secrets,
+# which surfaces as an image pull failing on an unresolved registry token.
+moved {
+  from = azurerm_key_vault_access_policy.apps["agent"]
+  to   = azurerm_key_vault_access_policy.apps["workbench"]
+}

@@ -75,8 +75,12 @@ Jedyna pozycja niezaznaczona jest operatora i jest nią z konstrukcji (6.5).
 - [x] 6.4 Jeden bazowy URL dla terminala — w `deploy-terminal.yml`, nie w
   `static-web-app.tf`: ten plik nie nosi żadnego `VITE_*`, adresy jadą przez zmienne
   budowania
-- [ ] 6.5 **Operator, raz:** rola `app-tradingcenter-agent` w bazie `teams` z własnością
-  schematu (`scripts/grant-schema-ownership.sql`)
+- [x] 6.5 **Operator, raz:** rola `app-tradingcenter-agent` w bazie `teams` z własnością
+  schematu (`scripts/grant-schema-ownership.sql`) — wykonane 19 sierpnia 2026, przed apply;
+  rola już istniała (role są serwerowe), własność 22 obiektów przeszła, kontrola zwróciła
+  zero wierszy
+- [x] 6.6 `moved` dla `azurerm_key_vault_access_policy.apps["agent"]` →
+  `apps["workbench"]` — ten sam obiekt Key Vault pod dwoma kluczami `for_each`
 
 ## 7. Terminal
 

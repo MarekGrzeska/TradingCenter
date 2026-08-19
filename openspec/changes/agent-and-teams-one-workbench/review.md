@@ -27,8 +27,38 @@ Oba są sprawdzalne wyłącznie przy wdrożeniu.
 
 Uboczne znalezisko z tego samego planu, **nie spowodowane tą zmianą**: `azuread_application_password`
 modułów `market_data` i `trading_mcp` też planują się jako aktualizacja w miejscu. Żadnego
-z nich ta gałąź nie dotyka — to istniejący dryf i warto na niego spojrzeć **przed** apply,
-a nie w trakcie.
+z nich ta gałąź nie dotyka — to wyglądało na istniejący dryf i miało zostać obejrzane przed
+apply. Obejrzane: **to nie jest dryf, tylko wersja Terraforma.** Plan operatora
+(1.14.8, ten sam stan, ten sam dzień) czyta `0 to add, 7 to change, 44 to destroy`, a CI
+(`terraform.yml` przypina 1.5.7) czyta o siedem zmian więcej — i każda z tych siedmiu to
+`~ resource` bez ani jednego widocznego atrybutu, z samym „(N unchanged attributes hidden)".
+Poza dwoma hasłami są to `azurerm_application_insights.main`,
+`azurerm_linux_web_app.capital_gateway` i hasło `workbench_easy_auth`. Zastosowany jest plan
+operatora, więc żadna z nich nie jedzie do Azure.
+
+**Znalezisko, które planu nie przeszło i było realne: dotacja Key Vaulta.**
+`azurerm_key_vault_access_policy.apps` jest kluczowany nazwą aplikacji, a aplikacja zmieniła
+nazwę — więc `apps["agent"]` i `apps["workbench"]` to ta sama dotacja, na tej samej
+tożsamości (`b4ac41a9-…`), pod dwoma kluczami `for_each`. Terraform czytał to jako `create`
+i `destroy`, a **oba rozwiązują się do tego samego identyfikatora zasobu w Azure**: polityka
+jest adresowana parą (vault, object id). Nic tych dwóch operacji nie porządkuje, więc apply
+kończy się albo błędem `A resource with the ID ... already exists`, albo — przy odwrotnej
+kolejności — skasowaniem dotacji, którą przed chwilą utworzył. Drugi wariant nie krzyczy:
+workbench przestaje rozwiązywać `@Microsoft.KeyVault(...)`, a pierwszym objawem jest
+nieudane pobranie obrazu z GHCR, dokładnie ten sam objaw, który 13 sierpnia 2026 zjadł
+godzinę diagnozy przy `market-mcp`. Zamknięte blokiem `moved` w `infra/moved.tf`; po nim
+plan czyta `0 to add` i dotacja nie jest ruszana w ogóle.
+
+**Krok operatorski (6.5) wykonany przed apply, 19 sierpnia 2026.** Rola
+`app-tradingcenter-agent` w bazie `teams` **już istniała** — role w PostgreSQL są serwerowe,
+a ta powstała przy pierwszym wdrożeniu modułu `agent` — więc został sam transfer własności:
+`scripts/grant-schema-ownership.sql` z `-v role=app-tradingcenter-agent` wobec `dbname=teams`
+przeniósł 22 obiekty (11 tabel z `alembic_version`, 11 sekwencji) z
+`app-tradingcenter-teams`, dołożył `CREATE, USAGE` na `public`, a kontrola na końcu skryptu
+zwróciła zero wierszy. `has_database_privilege(…, 'teams', 'CONNECT')`,
+`has_schema_privilege(…, 'public', 'CREATE')` i `USAGE` — wszystkie `t`. Rola
+`app-tradingcenter-teams` zostaje w bazie, już niczego nie posiadając: skasowanie jej nie
+jest częścią tej zmiany i nie jest niczym pilnym.
 
 ## Wymaganie → test
 
