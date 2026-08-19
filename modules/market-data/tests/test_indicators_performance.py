@@ -14,8 +14,9 @@ from __future__ import annotations
 import time
 
 import numpy as np
+from computers import LINE_ENTRIES, fn_of
 
-from market_data.indicators.catalogue import CATALOGUE, IndicatorSpec, Series
+from market_data.indicators.catalogue import CATALOGUE, IndicatorSpec, Lines, Series
 from market_data.routers.indicators import REQUEST_CEILING
 
 # Measured on the machine that set this: the full catalogue at exactly
@@ -48,8 +49,8 @@ def test_full_catalogue_at_the_request_ceiling_stays_fast():
     series = _synthetic_series(candles)
 
     def batch() -> None:
-        for entry in CATALOGUE:
-            entry.compute(series, _default_params(entry))
+        for entry in LINE_ENTRIES:
+            fn_of(entry, Lines)(series, _default_params(entry))
 
     batch()  # warm up: import machinery, numpy's first-call cache
 

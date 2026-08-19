@@ -12,6 +12,7 @@ import type { AgentToolCall } from "./agentApi";
 import { agentChatStore, type AgentChatState, type AgentChatStore, type ChatMessage } from "./agentChatStore";
 import { MessageBody } from "./MessageBody";
 import { ToolCallEntry } from "./ToolCallEntry";
+import { Button } from "../ui/Button";
 
 /**
  * Mounted once in `Shell`, as a sibling of the router outlet rather than inside it: the
@@ -75,26 +76,27 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-primary-line bg-panel-strong px-3">
         <AgentGlyph className="h-4 w-4 text-secondary" />
         <span className="text-sm font-semibold">Agent</span>
-        <button
-          type="button"
+        <Button
+          tone="muted"
+          size="2xs"
+          className="ml-2"
           onClick={() => setView(view === "chat" ? "conversations" : "chat")}
           aria-pressed={view === "conversations"}
-          className="ml-2 rounded border border-border px-1.5 py-0.5 text-[11px] text-ink-muted hover:bg-panel hover:text-ink"
         >
           {view === "chat" ? "Conversations" : "Back to chat"}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          tone="muted"
+          size="2xs"
           onClick={() => {
             store.newSession();
             setView("chat");
           }}
           disabled={turnInFlight}
           title="New conversation"
-          className="rounded border border-border px-1.5 py-0.5 text-[11px] text-ink-muted hover:bg-panel hover:text-ink disabled:cursor-not-allowed disabled:opacity-50"
         >
           New
-        </button>
+        </Button>
         <button
           type="button"
           onClick={() => store.setExpanded(false)}
@@ -333,13 +335,13 @@ function ConversationRow({
         >
           Delete
         </button>
-        <button
-          type="button"
+        <Button
+          tone="muted"
+          size="2xs"
           onClick={() => setMode("idle")}
-          className="cursor-pointer rounded border border-border px-1.5 py-0.5 text-[11px] text-ink-muted hover:text-ink"
         >
           Keep
-        </button>
+        </Button>
       </li>
     );
   }

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { KeyboardEvent, ReactNode } from "react";
+import { Button } from "./Button";
 
 /**
  * Everything a modal owes the operator, in one place: the ground it dims, the focus it
@@ -117,15 +118,15 @@ export function ModalShell({
         <div className="flex items-start justify-between gap-3 px-4 pt-4">
           <h2 className="text-base font-semibold text-ink">{title}</h2>
           {showCloseButton && (
-            <button
-              type="button"
+            <Button
+              tone="muted"
+              className="leading-6"
               aria-label="Close"
               disabled={closeDisabled}
               onClick={onClose}
-              className="cursor-pointer rounded border border-border px-2 leading-6 text-ink-muted hover:text-ink disabled:cursor-not-allowed disabled:opacity-40"
             >
               ✕
-            </button>
+            </Button>
           )}
         </div>
 

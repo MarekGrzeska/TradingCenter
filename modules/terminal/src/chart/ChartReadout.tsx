@@ -5,6 +5,7 @@ import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { groupReadoutByIndicator, type IndicatorReadoutEntry } from "./indicatorReadout";
 import type { useBarFeed } from "./useBarFeed";
 import type { useOlderBars } from "./useOlderBars";
+import { Button } from "../ui/Button";
 
 /**
  * Everything the chart says in words rather than in candles: the OHLC line under the
@@ -51,13 +52,12 @@ export function OlderHistoryState({ older }: { older: ReturnType<typeof useOlder
         >
           older history failed
         </span>
-        <button
-          type="button"
+        <Button
+          size="2xs"
           onClick={older.retry}
-          className="rounded border border-border px-1.5 py-0.5 text-[10px] text-ink hover:bg-panel-strong"
         >
           Retry
-        </button>
+        </Button>
       </span>
     );
   }
@@ -147,13 +147,12 @@ export function FeedOverlay({
         <div className="text-center">
           <p className="text-sm text-critical">Could not load {symbol}.</p>
           <p className="mt-1 max-w-xs text-xs text-ink-muted">{feed.error}</p>
-          <button
-            type="button"
+          <Button
+            className="mt-3"
             onClick={feed.retry}
-            className="mt-3 rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong"
           >
             Retry
-          </button>
+          </Button>
         </div>
       </Veil>
     );

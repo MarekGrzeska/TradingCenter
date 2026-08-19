@@ -290,28 +290,26 @@ export function TeamEditor({
             Runs →
           </Button>
         )}
-        <button
-          type="button"
+        <Button
           onClick={takeBack}
           disabled={history.length === 0}
           title="Undo the last change (Ctrl+Z)"
-          className="cursor-pointer rounded border border-border px-2 py-1 text-xs text-ink hover:bg-panel-strong disabled:cursor-not-allowed disabled:opacity-40"
         >
           Undo
-        </button>
+        </Button>
         {/* No "Team" button any more: the right-hand column is the team's, always, so
             there is nothing to come back from. */}
         <Button onClick={() => edit(addAgent(draft, defaultModelId))}>
           Add agent
         </Button>
-        <button
-          type="button"
+        <Button
+          tone="primary"
+          size="md"
           onClick={save}
           disabled={saving || !dirty}
-          className="cursor-pointer rounded border border-primary-line bg-primary-soft px-3 py-1 text-xs text-ink hover:bg-primary-strong hover:text-ink-inverse disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving ? "Saving…" : teamId === null ? "Create team" : "Save revision"}
-        </button>
+        </Button>
         {dirty && !saving && <span className="text-xs text-ink-faint">unsaved changes</span>}
       </header>
 

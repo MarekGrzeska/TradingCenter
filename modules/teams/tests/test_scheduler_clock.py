@@ -23,7 +23,7 @@ from teams import store
 from teams.contract import AgentDefinition, CostLimits, TeamDefinition, TradingLimits
 from teams.models_catalogue import ModelCatalogue
 from teams.runner import RunRegistry
-from teams.scheduler.clock import Clock, _fire_schedule, _next_fire_and_skipped
+from teams.scheduler.clock import Clock, _Deps, _fire_schedule, _next_fire_and_skipped
 from teams.tools import ToolServerRegistry
 
 from .mcp_stand_in import settings_for
@@ -280,11 +280,13 @@ async def _fire_directly(pool: asyncpg.Pool, schedule_id: int, *, provider, sett
     task = await _fire_schedule(
         pool,
         dict(row),
-        catalogue=ModelCatalogue.from_settings(settings),
-        provider=provider,
-        tool_registry=ToolServerRegistry.from_settings(settings),
-        settings=settings,
-        registry=RunRegistry(),
+        _Deps(
+            catalogue=ModelCatalogue.from_settings(settings),
+            provider=provider,
+            tool_registry=ToolServerRegistry.from_settings(settings),
+            settings=settings,
+            registry=RunRegistry(),
+        ),
     )
     assert task is not None
     await task
@@ -389,11 +391,11 @@ async def test_one_schedule_failing_does_not_silence_the_others_in_the_same_wake
     real = clock_module._fire_schedule
     exploded: list[int] = []
 
-    async def _explode_on_the_first(pool_, schedule, **kwargs):
+    async def _explode_on_the_first(pool_, schedule, deps):
         if schedule["id"] == first["id"]:
             exploded.append(schedule["id"])
             raise RuntimeError("the database went away mid-fire")
-        return await real(pool_, schedule, **kwargs)
+        return await real(pool_, schedule, deps)
 
     monkeypatch.setattr(clock_module, "_fire_schedule", _explode_on_the_first)
 

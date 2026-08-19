@@ -26,10 +26,12 @@ import json
 import logging
 import operator as op
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import asyncpg
+from tc_runtime.db import Conn
 
 from .. import store
 from ..config import Settings
@@ -55,6 +57,23 @@ _COMPARISONS: dict[str, Callable[[float, float], bool]] = {
 }
 
 
+@dataclass(frozen=True)
+class _Deps:
+    """Everything a fire needs that is not the row itself.
+
+    None of the five is read by the clock — they are what `start_run_on_revision` wants,
+    carried four call levels down to it. Bundled because they travelled as five separate
+    keyword arguments through every signature on the way, so adding a sixth meant editing
+    each of them and the two handlers had to keep agreeing about all of it.
+    """
+
+    catalogue: ModelCatalogue
+    provider: ModelProvider
+    tool_registry: ToolServerRegistry
+    settings: Settings
+    registry: RunRegistry
+
+
 class Clock:
     """Owns exactly one background task, started in `app.py`'s `lifespan` and stopped
     with it — the same shape `ToolServerRegistry`'s own lifetime already has."""
@@ -70,11 +89,14 @@ class Clock:
         registry: RunRegistry,
     ) -> None:
         self._pool = pool
-        self._catalogue = catalogue
-        self._provider = provider
-        self._tool_registry = tool_registry
         self._settings = settings
-        self._registry = registry
+        self._deps = _Deps(
+            catalogue=catalogue,
+            provider=provider,
+            tool_registry=tool_registry,
+            settings=settings,
+            registry=registry,
+        )
         self._task: asyncio.Task[None] | None = None
 
     def start(self) -> None:
@@ -136,7 +158,7 @@ class Clock:
 
     async def _attempt(
         self,
-        handler: Callable[..., Any],
+        handler: Callable[[asyncpg.Pool, Mapping[str, Any], _Deps], Any],
         row: dict[str, Any],
         *,
         what: str,
@@ -150,15 +172,7 @@ class Clock:
         above), not for one row.
         """
         try:
-            return await handler(
-                self._pool,
-                row,
-                catalogue=self._catalogue,
-                provider=self._provider,
-                tool_registry=self._tool_registry,
-                settings=self._settings,
-                registry=self._registry,
-            )
+            return await handler(self._pool, row, self._deps)
         except Exception:
             log.exception("%s failed this wake — the rest of the wake carries on", what)
             return None
@@ -181,14 +195,7 @@ async def _resolve_revision(conn: asyncpg.pool.PoolConnectionProxy, *, row: Mapp
 
 
 async def _start_from(
-    pool: asyncpg.Pool,
-    *,
-    row: Mapping[str, Any],
-    catalogue: ModelCatalogue,
-    provider: ModelProvider,
-    tool_registry: ToolServerRegistry,
-    settings: Settings,
-    registry: RunRegistry,
+    pool: asyncpg.Pool, *, row: Mapping[str, Any], deps: _Deps
 ) -> tuple[asyncpg.Record, asyncio.Task[None]] | str:
     """Resolves the revision and starts a run on it, or returns the refusal reason as a
     string instead of raising — every caller here writes that string into a
@@ -204,11 +211,11 @@ async def _start_from(
             pool,
             revision=revision,
             owner_principal=row["owner_principal"],
-            catalogue=catalogue,
-            provider=provider,
-            tool_registry=tool_registry,
-            settings=settings,
-            registry=registry,
+            catalogue=deps.catalogue,
+            provider=deps.provider,
+            tool_registry=deps.tool_registry,
+            settings=deps.settings,
+            registry=deps.registry,
         )
     # The ceilings are caught by their *base* classes, not by the two daily ones
     # `routers/runs.py` names. A route may enumerate: an uncaught ceiling there is one
@@ -218,6 +225,152 @@ async def _start_from(
     # A ceiling added later is caught by this on the day it is written.
     except (DefinitionRefused, CostLimitReached, TradeLimitReached) as err:
         return str(err)
+
+
+class _ScheduleSource:
+    """A claimed row as the shared tail sees it: what to call it, and the four `store`
+    calls that name it. `_TriggerSource` is the same five methods against the other
+    table, and `_Source` is the two of them.
+
+    `store` keeps its schedule and trigger functions apart, and `schedule_id=` and
+    `trigger_id=` are different keyword arguments on purpose — a caller cannot hand one
+    an id belonging to the other. That is why the tail below could not simply take an
+    integer: binding the kind here is what lets one sequence serve both.
+
+    No shared base, deliberately — it would be five `raise NotImplementedError` bodies
+    standing in for what the union below already says, and pyright checks the two agree
+    at every call site in the tail. Everything that actually differs between a schedule
+    and a trigger — a cron slot against the clock, a tool call against the market —
+    happens before the tail starts.
+    """
+
+    kind = "schedule"
+
+    def __init__(self, row_id: int) -> None:
+        self.id = row_id
+
+    async def latest_run_status(self, conn: Conn) -> str | None:
+        return await store.latest_run_status_for_schedule(conn, schedule_id=self.id)
+
+    async def record_fire(
+        self,
+        conn: Conn,
+        *,
+        outcome: str,
+        reason: str | None = None,
+        run_id: int | None = None,
+        skipped_count: int = 0,
+    ) -> None:
+        await store.record_fire(
+            conn,
+            schedule_id=self.id,
+            outcome=outcome,
+            reason=reason,
+            run_id=run_id,
+            skipped_count=skipped_count,
+        )
+
+    async def reset_failures(self, conn: Conn) -> asyncpg.Record | None:
+        return await store.reset_schedule_failures(conn, schedule_id=self.id)
+
+    async def increment_failures(self, conn: Conn) -> asyncpg.Record | None:
+        return await store.increment_schedule_failures(conn, schedule_id=self.id)
+
+    async def disable_for_failures(self, conn: Conn, reason: str) -> asyncpg.Record | None:
+        return await store.disable_schedule_for_failures(conn, schedule_id=self.id, reason=reason)
+
+
+class _TriggerSource:
+    kind = "trigger"
+
+    def __init__(self, row_id: int) -> None:
+        self.id = row_id
+
+    async def latest_run_status(self, conn: Conn) -> str | None:
+        return await store.latest_run_status_for_trigger(conn, trigger_id=self.id)
+
+    async def record_fire(
+        self,
+        conn: Conn,
+        *,
+        outcome: str,
+        reason: str | None = None,
+        run_id: int | None = None,
+        skipped_count: int = 0,
+    ) -> None:
+        await store.record_fire(
+            conn,
+            trigger_id=self.id,
+            outcome=outcome,
+            reason=reason,
+            run_id=run_id,
+            skipped_count=skipped_count,
+        )
+
+    async def reset_failures(self, conn: Conn) -> asyncpg.Record | None:
+        return await store.reset_trigger_failures(conn, trigger_id=self.id)
+
+    async def increment_failures(self, conn: Conn) -> asyncpg.Record | None:
+        return await store.increment_trigger_failures(conn, trigger_id=self.id)
+
+    async def disable_for_failures(self, conn: Conn, reason: str) -> asyncpg.Record | None:
+        return await store.disable_trigger_for_failures(conn, trigger_id=self.id, reason=reason)
+
+
+_Source = _ScheduleSource | _TriggerSource
+
+
+async def _start_and_track(
+    pool: asyncpg.Pool,
+    source: _Source,
+    claimed: Mapping[str, Any],
+    *,
+    deps: _Deps,
+    skipped_count: int = 0,
+) -> asyncio.Task[None] | None:
+    """Everything after a row has been claimed and its own kind of "is it due" answered:
+    the overlap check, the run, the `schedule_fires` row either way, and the failure
+    streak that decides whether this row keeps working unattended.
+
+    Written once because every line of it was true twice. The overlap check and the
+    streak wiring are the two the pair could least afford to drift on — a schedule that
+    overlaps itself doubles a team's cost, and a streak that only one half tracked would
+    leave that half firing forever after it stopped working.
+    """
+    async with pool.acquire() as conn:
+        previous_status = await source.latest_run_status(conn)
+    if previous_status in _RUN_IN_PROGRESS:
+        async with pool.acquire() as conn:
+            await source.record_fire(
+                conn,
+                outcome="skipped",
+                reason=f"the previous run of this {source.kind} is still working",
+                skipped_count=skipped_count,
+            )
+        return None
+
+    started = await _start_from(pool, row=claimed, deps=deps)
+    if isinstance(started, str):
+        async with pool.acquire() as conn:
+            await source.record_fire(
+                conn, outcome="skipped", reason=started, skipped_count=skipped_count
+            )
+        return None
+
+    run, task = started
+    async with pool.acquire() as conn:
+        await source.record_fire(
+            conn, outcome="started", run_id=run["id"], skipped_count=skipped_count
+        )
+    return asyncio.create_task(
+        _track_run(
+            pool,
+            task=task,
+            run_id=run["id"],
+            source=source,
+            failure_threshold=deps.settings.scheduler_failure_threshold,
+        )
+    )
 
 
 # --- schedules --------------------------------------------------------------------
@@ -240,14 +393,7 @@ def _next_fire_and_skipped(
 
 
 async def _fire_schedule(
-    pool: asyncpg.Pool,
-    schedule: Mapping[str, Any],
-    *,
-    catalogue: ModelCatalogue,
-    provider: ModelProvider,
-    tool_registry: ToolServerRegistry,
-    settings: Settings,
-    registry: RunRegistry,
+    pool: asyncpg.Pool, schedule: Mapping[str, Any], deps: _Deps
 ) -> asyncio.Task[None] | None:
     """Returns the failure-streak tracking task when a run actually started, so a caller
     that cares when the bookkeeping is done (a test; nothing in production does) can
@@ -270,54 +416,12 @@ async def _fire_schedule(
     # asyncpg's Record forwards mapping access at runtime but is not a `Mapping` to a
     # type checker (contract.py's own `from_row` callers hit the same thing).
     claimed = dict(claimed_row)
-    schedule_id = claimed["id"]
-
-    async with pool.acquire() as conn:
-        previous_status = await store.latest_run_status_for_schedule(conn, schedule_id=schedule_id)
-    if previous_status in _RUN_IN_PROGRESS:
-        async with pool.acquire() as conn:
-            await store.record_fire(
-                conn,
-                schedule_id=schedule_id,
-                outcome="skipped",
-                reason="the previous run of this schedule is still working",
-                skipped_count=skipped,
-            )
-        return
-
-    started = await _start_from(
+    return await _start_and_track(
         pool,
-        row=claimed,
-        catalogue=catalogue,
-        provider=provider,
-        tool_registry=tool_registry,
-        settings=settings,
-        registry=registry,
-    )
-    if isinstance(started, str):
-        async with pool.acquire() as conn:
-            await store.record_fire(
-                conn, schedule_id=schedule_id, outcome="skipped", reason=started, skipped_count=skipped
-            )
-        return
-
-    run, task = started
-    async with pool.acquire() as conn:
-        await store.record_fire(
-            conn, schedule_id=schedule_id, outcome="started", run_id=run["id"], skipped_count=skipped
-        )
-    return asyncio.create_task(
-        _track_run(
-            pool,
-            task=task,
-            run_id=run["id"],
-            on_completed=lambda conn: store.reset_schedule_failures(conn, schedule_id=schedule_id),
-            on_failed=lambda conn: store.increment_schedule_failures(conn, schedule_id=schedule_id),
-            on_threshold_reached=lambda conn, reason: store.disable_schedule_for_failures(
-                conn, schedule_id=schedule_id, reason=reason
-            ),
-            failure_threshold=settings.scheduler_failure_threshold,
-        )
+        _ScheduleSource(claimed["id"]),
+        claimed,
+        deps=deps,
+        skipped_count=skipped,
     )
 
 
@@ -411,14 +515,7 @@ async def _evaluate_condition(
 
 
 async def _check_trigger(
-    pool: asyncpg.Pool,
-    trigger: Mapping[str, Any],
-    *,
-    catalogue: ModelCatalogue,
-    provider: ModelProvider,
-    tool_registry: ToolServerRegistry,
-    settings: Settings,
-    registry: RunRegistry,
+    pool: asyncpg.Pool, trigger: Mapping[str, Any], deps: _Deps
 ) -> asyncio.Task[None] | None:
     """Mirrors `_fire_schedule`'s own return: the failure-streak tracking task when a
     run actually started, `None` otherwise."""
@@ -433,18 +530,21 @@ async def _check_trigger(
         return
     claimed = dict(claimed_row)
     trigger_id = claimed["id"]
+    source = _TriggerSource(trigger_id)
 
     # Evaluating the condition never calls a model — one tool call, nothing charged to
     # this team's usage (specs/teams-triggers, "Obserwowanie rynku nie kosztuje tokenów
     # modelu") — so a trigger checked every few seconds costs nothing until it fires.
-    result, unavailable_reason = await _evaluate_condition(claimed, tool_registry=tool_registry)
+    result, unavailable_reason = await _evaluate_condition(
+        claimed, tool_registry=deps.tool_registry
+    )
     if unavailable_reason is not None:
         async with pool.acquire() as conn:
             await store.record_trigger_check(conn, trigger_id=trigger_id, result=None, fired=False)
-            await store.record_fire(
-                conn, trigger_id=trigger_id, outcome="unavailable", reason=unavailable_reason
+            await source.record_fire(
+                conn, outcome="unavailable", reason=unavailable_reason
             )
-        return
+        return None
 
     # A fire is the `false -> true` transition, not the state itself — reading it stays
     # true for the next ten checks fires nothing ten more times
@@ -464,59 +564,17 @@ async def _check_trigger(
         await store.record_trigger_check(conn, trigger_id=trigger_id, result=result, fired=proceeding)
 
     if not edge:
-        return
+        return None
     if cooldown_active:
         async with pool.acquire() as conn:
-            await store.record_fire(
+            await source.record_fire(
                 conn,
-                trigger_id=trigger_id,
                 outcome="skipped",
                 reason=f"cooldown active — the last fire was less than {cooldown_seconds}s ago",
             )
-        return
+        return None
 
-    async with pool.acquire() as conn:
-        previous_status = await store.latest_run_status_for_trigger(conn, trigger_id=trigger_id)
-    if previous_status in _RUN_IN_PROGRESS:
-        async with pool.acquire() as conn:
-            await store.record_fire(
-                conn,
-                trigger_id=trigger_id,
-                outcome="skipped",
-                reason="the previous run of this trigger is still working",
-            )
-        return
-
-    started = await _start_from(
-        pool,
-        row=claimed,
-        catalogue=catalogue,
-        provider=provider,
-        tool_registry=tool_registry,
-        settings=settings,
-        registry=registry,
-    )
-    if isinstance(started, str):
-        async with pool.acquire() as conn:
-            await store.record_fire(conn, trigger_id=trigger_id, outcome="skipped", reason=started)
-        return
-
-    run, task = started
-    async with pool.acquire() as conn:
-        await store.record_fire(conn, trigger_id=trigger_id, outcome="started", run_id=run["id"])
-    return asyncio.create_task(
-        _track_run(
-            pool,
-            task=task,
-            run_id=run["id"],
-            on_completed=lambda conn: store.reset_trigger_failures(conn, trigger_id=trigger_id),
-            on_failed=lambda conn: store.increment_trigger_failures(conn, trigger_id=trigger_id),
-            on_threshold_reached=lambda conn, reason: store.disable_trigger_for_failures(
-                conn, trigger_id=trigger_id, reason=reason
-            ),
-            failure_threshold=settings.scheduler_failure_threshold,
-        )
-    )
+    return await _start_and_track(pool, source, claimed, deps=deps)
 
 
 # --- the failure streak, common to both --------------------------------------------
@@ -527,9 +585,7 @@ async def _track_run(
     *,
     task: asyncio.Task[None],
     run_id: int,
-    on_completed: Callable[[asyncpg.pool.PoolConnectionProxy], Any],
-    on_failed: Callable[[asyncpg.pool.PoolConnectionProxy], Any],
-    on_threshold_reached: Callable[[asyncpg.pool.PoolConnectionProxy, str], Any],
+    source: _Source,
     failure_threshold: int,
 ) -> None:
     """Waits for a run this clock started to finish, then moves the failure streak that
@@ -544,13 +600,13 @@ async def _track_run(
             status = await store.get_run_status(conn, run_id=run_id)
         if status == "completed":
             async with pool.acquire() as conn:
-                await on_completed(conn)
+                await source.reset_failures(conn)
         elif status == "failed":
             async with pool.acquire() as conn:
-                row = await on_failed(conn)
+                row = await source.increment_failures(conn)
             if row is not None and row["consecutive_failures"] >= failure_threshold:
                 async with pool.acquire() as conn:
-                    await on_threshold_reached(
+                    await source.disable_for_failures(
                         conn,
                         f"{failure_threshold} kolejne przebiegi zakończone niepowodzeniem",
                     )

@@ -3,6 +3,7 @@ import { marketData } from "../data/marketData";
 import type { SourcePart } from "../data/source";
 import { useIdentityState } from "./useIdentityState";
 import { useSourceHealth, type SourceHealth } from "./useSourceHealth";
+import { Button } from "../ui/Button";
 
 const HEALTH_LABEL: Record<SourceHealth, string> = {
   checking: "checking…",
@@ -78,13 +79,13 @@ function SignInState({ signedIn }: { signedIn: boolean }) {
     <span className="flex items-center gap-2 rounded-full border border-critical/40 bg-critical-soft px-2 py-0.5">
       <span className="h-2 w-2 rounded-full bg-critical" aria-hidden />
       <span className="text-critical">signed out</span>
-      <button
-        type="button"
+      <Button
+        tone="primary"
+        size="xs"
         onClick={() => identity.signIn()}
-        className="cursor-pointer rounded border border-primary-line bg-primary-soft px-2 py-0.5 text-ink hover:bg-primary-strong hover:text-ink-inverse"
       >
         Sign in
-      </button>
+      </Button>
     </span>
   );
 }

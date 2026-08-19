@@ -13,7 +13,7 @@ import numpy as np
 
 from .. import kernel, warmup
 from .arithmetic import safe_divide
-from .spec import IndicatorSpec, LineSpec, Param, Render, Series, Warmup
+from .spec import IndicatorSpec, Lines, LineSpec, Param, Render, Series, Warmup
 
 
 def _rsi_values(close: np.ndarray, period: int) -> np.ndarray:
@@ -38,7 +38,7 @@ _RSI = IndicatorSpec(
         pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False, levels=(30.0, 70.0)
     ),
     warmup=Warmup(kind="decay", bars=lambda p: warmup.rma_warmup_bars(int(p["period"]))),
-    compute=lambda s, p: {"rsi": _rsi_values(s.close, int(p["period"]))},
+    computer=Lines(lambda s, p: {"rsi": _rsi_values(s.close, int(p["period"]))}),
 )
 
 
@@ -71,7 +71,7 @@ _MACD = IndicatorSpec(
         bars=lambda p: warmup.ema_warmup_bars(int(p["slow_period"]))
         + warmup.ema_warmup_bars(int(p["signal_period"])),
     ),
-    compute=_compute_macd,
+    computer=Lines(_compute_macd),
 )
 
 
@@ -106,7 +106,7 @@ _STOCH = IndicatorSpec(
         kind="fixed",
         bars=lambda p: int(p["k_period"]) + int(p["k_smooth"]) + int(p["d_period"]),
     ),
-    compute=_compute_stoch,
+    computer=Lines(_compute_stoch),
 )
 
 
@@ -145,7 +145,7 @@ _STOCH_RSI = IndicatorSpec(
         + int(p["k_smooth"])
         + int(p["d_period"]),
     ),
-    compute=_compute_stoch_rsi,
+    computer=Lines(_compute_stoch_rsi),
 )
 
 
@@ -165,7 +165,7 @@ _CCI = IndicatorSpec(
     lines=(LineSpec(key="cci", label="CCI {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_cci,
+    computer=Lines(_compute_cci),
 )
 
 _ROC = IndicatorSpec(
@@ -176,12 +176,12 @@ _ROC = IndicatorSpec(
     lines=(LineSpec(key="roc", label="ROC {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "roc": 100
         * safe_divide(
             s.close - kernel.shift(s.close, int(p["period"])), kernel.shift(s.close, int(p["period"]))
         )
-    },
+    }),
 )
 
 _WILLIAMS_R = IndicatorSpec(
@@ -200,13 +200,13 @@ _WILLIAMS_R = IndicatorSpec(
         levels=(-20.0, -80.0),
     ),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {
+    computer=Lines(lambda s, p: {
         "williams_r": -100
         * safe_divide(
             kernel.rolling_max(s.high, int(p["period"])) - s.close,
             kernel.rolling_max(s.high, int(p["period"])) - kernel.rolling_min(s.low, int(p["period"])),
         )
-    },
+    }),
 )
 
 
@@ -229,7 +229,7 @@ _CMO = IndicatorSpec(
     lines=(LineSpec(key="cmo", label="CMO {period}"),),
     render=Render(pane="own", style="line", scale="fixed", range=(-100.0, 100.0), autoscale=False),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_cmo,
+    computer=Lines(_compute_cmo),
 )
 
 

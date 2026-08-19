@@ -18,13 +18,11 @@ from datetime import UTC, datetime
 
 from pydantic import BaseModel
 
-from ..coverage import record_coverage
 from ..errors import GatewayError
 from ..gateway import GatewayHistory
 from ..models import Resolution
 from ..periods import period_length, periods_between
-from ..rollups import refresh_all
-from ..store import read_latest_period, write_candles
+from ..store import commit_candles, read_latest_period
 from ..tracking import read_collect_from
 
 log = logging.getLogger(__name__)
@@ -189,26 +187,26 @@ async def fill_gap(
         oldest = within[0].period_start
         newest = within[-1].period_start
         async with pool.acquire() as conn:
-            written = await write_candles(conn, within)
-            # Verified up to the moment of the read, not up to the newest candle. The two
-            # differ exactly when the market was shut for the tail of the window — and
-            # recording only as far as the last candle is what would send this same
-            # request again tomorrow, and every day after.
-            covered = await record_coverage(
+            committed = await commit_candles(
                 conn,
-                symbol,
-                resolution,
-                oldest,
-                max(newest + period_length(resolution), moment),
+                within,
+                symbol=symbol,
+                resolution=resolution,
+                covered_from=oldest,
+                # Verified up to the moment of the read, not up to the newest candle. The
+                # two differ exactly when the market was shut for the tail of the window —
+                # and recording only as far as the last candle is what would send this
+                # same request again tomorrow, and every day after.
+                covered_to=max(newest + period_length(resolution), moment),
                 history_ended=page.history_ended,
                 # Where the read ran out, which for a fill is the oldest candle it came
                 # back with. Never the moment it was clipped to: that is the caller's own
                 # bound and says nothing about what the provider holds below it.
                 history_ends_at=oldest if page.history_ended else None,
             )
-            covered_from, covered_to = covered.range_start, covered.range_end
-            if resolution is Resolution.MINUTE:
-                await refresh_all(conn, symbol, oldest, newest)
+            written = committed.written
+            covered_from = committed.coverage.range_start
+            covered_to = committed.coverage.range_end
 
     outcome = FillOutcome(
         symbol=symbol,

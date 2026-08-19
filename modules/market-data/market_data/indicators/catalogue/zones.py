@@ -18,11 +18,13 @@ import numpy as np
 from .spec import (
     IndicatorSpec,
     MinuteZoneFn,
+    MinuteZones,
     Param,
     Render,
     Series,
     Warmup,
     Zone,
+    Zones,
 )
 
 # ("market_status wie tylko, czy rynek jest otwarty teraz"). ---
@@ -110,12 +112,11 @@ _RANGE_GAP = IndicatorSpec(
     aliases=("Fair Value Gap", "FVG", "Imbalance"),
     inputs=("high", "low"),
     params=(_SKIP_SESSION_GAPS_PARAM,),
-    output="zones",
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    compute_zones=lambda s, p, session_close_before: _three_bar_gaps(
+    computer=Zones(lambda s, p, session_close_before: _three_bar_gaps(
         s.high, s.low, session_close_before, bool(p["skip_session_gaps"])
-    ),
+    )),
 )
 
 _BODY_GAP = IndicatorSpec(
@@ -124,12 +125,11 @@ _BODY_GAP = IndicatorSpec(
     group="zones",
     inputs=("open", "close"),
     params=(_SKIP_SESSION_GAPS_PARAM,),
-    output="zones",
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    compute_zones=lambda s, p, session_close_before: _three_bar_gaps(
+    computer=Zones(lambda s, p, session_close_before: _three_bar_gaps(
         *_body_edges(s), session_close_before, bool(p["skip_session_gaps"])
-    ),
+    )),
 )
 
 
@@ -238,11 +238,9 @@ _SESSIONS: tuple[IndicatorSpec, ...] = tuple(
             Param(name="from_hour", type="float", default=default_from, min=0.0, max=24.0),
             Param(name="to_hour", type="float", default=default_to, min=0.0, max=24.0),
         ),
-        output="zones",
         render=Render(pane="price", style="line"),
         warmup=Warmup(kind="fixed", bars=lambda p: 0),
-        needs_minute_series=True,
-        compute_minute_zones=_session_window_zones(ZoneInfo(tz_name)),
+        computer=MinuteZones(_session_window_zones(ZoneInfo(tz_name))),
     )
     for id_, name, tz_name, default_from, default_to in _SESSION_TYPES
 )
@@ -257,11 +255,9 @@ _OPENING_RANGE = IndicatorSpec(
         Param(name="window_minutes", type="int", default=30, min=1, max=240),
         Param(name="n", type="int", default=5, min=1, max=50),
     ),
-    output="zones",
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: 0),
-    needs_minute_series=True,
-    compute_minute_zones=_opening_range_zones,
+    computer=MinuteZones(_opening_range_zones),
 )
 
 

@@ -24,7 +24,7 @@ from teams import store
 from teams.contract import AgentDefinition, TeamDefinition
 from teams.models_catalogue import ModelCatalogue
 from teams.runner import RunRegistry
-from teams.scheduler.clock import Clock, _check_trigger
+from teams.scheduler.clock import Clock, _check_trigger, _Deps
 from teams.tools import ToolServerRegistry
 
 from .mcp_stand_in import serving, settings_for
@@ -281,11 +281,13 @@ async def _check_directly(pool: asyncpg.Pool, trigger_id: int, *, provider, sett
         task = await _check_trigger(
             pool,
             dict(row),
-            catalogue=ModelCatalogue.from_settings(settings),
-            provider=provider,
-            tool_registry=tools,
-            settings=settings,
-            registry=RunRegistry(),
+            _Deps(
+                catalogue=ModelCatalogue.from_settings(settings),
+                provider=provider,
+                tool_registry=tools,
+                settings=settings,
+                registry=RunRegistry(),
+            ),
         )
         assert task is not None
         await task

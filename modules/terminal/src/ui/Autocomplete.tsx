@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
 import { useAsyncOptions } from "./useAsyncOptions";
 import type { OptionsFetcher } from "./useAsyncOptions";
+import { Button } from "./Button";
 
 export interface AutocompleteProps<T> {
   value: T | null;
@@ -163,14 +164,14 @@ export function Autocomplete<T>({
           {state.status === "error" && (
             <li className="flex items-center justify-between gap-2 px-2 py-1.5 text-critical">
               <span>{state.error}</span>
-              <button
-                type="button"
+              <Button
+                size="xs"
+                className="shrink-0"
                 onMouseDown={(event) => event.preventDefault()}
                 onClick={() => state.retry()}
-                className="shrink-0 rounded border border-border px-2 py-0.5 text-xs text-ink hover:bg-panel-strong"
               >
                 Retry
-              </button>
+              </Button>
             </li>
           )}
           {state.status === "no-results" && (

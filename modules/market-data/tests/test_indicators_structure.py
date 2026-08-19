@@ -11,8 +11,16 @@ import math
 
 import numpy as np
 import pytest
+from computers import fn_of
 
-from market_data.indicators.catalogue import Series, get
+from market_data.indicators.catalogue import (
+    ClusterLevels,
+    HtfLevels,
+    Lines,
+    Markers,
+    Series,
+    get,
+)
 
 # A high series with two unambiguous swing highs (n=2), at index 2 and index 7.
 _HIGH = [1.0, 2.0, 5.0, 2.0, 1.0, 1.0, 2.0, 7.0, 2.0, 1.0]
@@ -33,7 +41,7 @@ class TestSwingPoints:
     def test_confirmed_swing_highs_and_lows(self):
         entry = get("swing_points")
         series = _structure_series()
-        points = entry.compute_markers(series, {"n": 2})
+        points = fn_of(entry, Markers)(series, {"n": 2})
 
         highs = {p.bar: p.price for p in points if p.label == "Swing High"}
         lows = {p.bar: p.price for p in points if p.label == "Swing Low"}
@@ -43,7 +51,7 @@ class TestSwingPoints:
     def test_too_short_a_series_confirms_nothing(self):
         entry = get("swing_points")
         series = _structure_series(4)  # shorter than 2n+1 = 5
-        assert entry.compute_markers(series, {"n": 2}) == []
+        assert fn_of(entry, Markers)(series, {"n": 2}) == []
 
     def test_stays_the_same_on_a_longer_read(self):
         """Task 3.10: a turning point neither disappears nor moves when the same
@@ -54,10 +62,10 @@ class TestSwingPoints:
         long_series = _structure_series(10)
 
         short_points = {
-            (p.bar, p.label): p.price for p in entry.compute_markers(short_series, {"n": 2})
+            (p.bar, p.label): p.price for p in fn_of(entry, Markers)(short_series, {"n": 2})
         }
         long_points = {
-            (p.bar, p.label): p.price for p in entry.compute_markers(long_series, {"n": 2})
+            (p.bar, p.label): p.price for p in fn_of(entry, Markers)(long_series, {"n": 2})
         }
 
         for key, price in short_points.items():
@@ -68,7 +76,7 @@ class TestLastSwing:
     def test_steps_at_confirmation_not_at_the_extreme(self):
         entry = get("last_swing_high")
         series = _structure_series()
-        result = entry.compute(series, {"n": 2})["last_swing_high"]
+        result = fn_of(entry, Lines)(series, {"n": 2})["last_swing_high"]
 
         # The extreme sits at bar 2; confirmation (n=2 bars later) lands at bar 4.
         for i in range(4):
@@ -80,7 +88,7 @@ class TestLastSwing:
     def test_last_swing_low_mirrors_last_swing_high(self):
         entry = get("last_swing_low")
         series = _structure_series()
-        result = entry.compute(series, {"n": 2})["last_swing_low"]
+        result = fn_of(entry, Lines)(series, {"n": 2})["last_swing_low"]
 
         for i in range(4):
             assert math.isnan(result[i])
@@ -93,7 +101,7 @@ class TestLastSwing:
         holes after its first confirmation."""
         entry = get("last_swing_high")
         series = _structure_series()
-        result = entry.compute(series, {"n": 2})["last_swing_high"]
+        result = fn_of(entry, Lines)(series, {"n": 2})["last_swing_high"]
         assert not any(math.isnan(v) for v in result[4:])
 
 
@@ -101,7 +109,7 @@ class TestRollingExtreme:
     def test_matches_rolling_max_and_min(self):
         entry = get("rolling_extreme")
         series = _structure_series()
-        result = entry.compute(series, {"n": 3})
+        result = fn_of(entry, Lines)(series, {"n": 3})
         assert result["upper"][-1] == max(_HIGH[7:10])
         assert result["lower"][-1] == min(_LOW[7:10])
 
@@ -120,7 +128,7 @@ class TestLevelClusters:
             close=np.array(close, dtype=np.float64),
         )
         entry = get("level_clusters")
-        clusters = entry.compute_cluster_levels(series, {"n": 2, "tol": 2.0, "atr_period": 2})
+        clusters = fn_of(entry, ClusterLevels)(series, {"n": 2, "tol": 2.0, "atr_period": 2})
 
         equal_highs = [c for c in clusters if c.label == "Equal High"]
         assert len(equal_highs) == 1
@@ -130,7 +138,7 @@ class TestLevelClusters:
     def test_zero_tolerance_never_clusters(self):
         series = _structure_series()
         entry = get("level_clusters")
-        clusters = entry.compute_cluster_levels(series, {"n": 2, "tol": 0.0, "atr_period": 2})
+        clusters = fn_of(entry, ClusterLevels)(series, {"n": 2, "tol": 0.0, "atr_period": 2})
         assert clusters == []
 
 
@@ -142,8 +150,7 @@ class TestPivots:
 
     def _levels(self, indicator_id: str) -> dict[str, float]:
         entry = get(indicator_id)
-        assert entry.compute_htf_levels is not None
-        return {level.label: level.price for level in entry.compute_htf_levels(self.OHLC)}
+        return {level.label: level.price for level in fn_of(entry, HtfLevels)(self.OHLC)}
 
     def test_classic(self):
         levels = self._levels("pivots_classic")
@@ -191,5 +198,4 @@ class TestPivots:
         self, indicator_id: str, ohlc: tuple[float, float, float, float]
     ) -> dict[str, float]:
         entry = get(indicator_id)
-        assert entry.compute_htf_levels is not None
-        return {level.label: level.price for level in entry.compute_htf_levels(ohlc)}
+        return {level.label: level.price for level in fn_of(entry, HtfLevels)(ohlc)}

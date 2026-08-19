@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
+from functools import partial
 from typing import Protocol
 
 import asyncpg
@@ -32,7 +33,6 @@ from .tools import (
     ChartTool,
     DrawOnChartTool,
     ListChartDrawingsTool,
-    ToolOutcome,
     ToolServer,
 )
 
@@ -93,6 +93,45 @@ def _system_prompt(revision, *, has_tools: bool, chart: ChartSnapshot | None) ->
     return body + "\n\n" + chart.as_context()
 
 
+class _PoolAccountTrace:
+    """The two halves of a tool call's own row: written before the call goes out, settled
+    when its answer comes back (design.md, D1).
+
+    Its own connection per half, not one held for the turn: a turn spends most of its
+    time waiting on a model, and a pooled connection parked across that is a connection
+    nobody else can have. Both halves are short.
+    """
+
+    def __init__(self, pool: asyncpg.Pool, session_id: int) -> None:
+        self._pool = pool
+        self._session_id = session_id
+
+    async def begin(self, *, round_index: int, position: int, name: str, arguments: dict) -> int:
+        async with self._pool.acquire() as conn:
+            return await store.begin_tool_call(
+                conn,
+                session_id=self._session_id,
+                round_index=round_index,
+                position=position,
+                tool_name=name,
+                arguments=arguments,
+                result_text=(
+                    "sent; no answer had come back when this was written. If it stays "
+                    "this way, the outcome of this call is unknown."
+                ),
+            )
+
+    async def settle(self, *, row_id: int, outcome: str, text: str, duration_ms: int) -> None:
+        async with self._pool.acquire() as conn:
+            await store.settle_tool_call(
+                conn,
+                tool_call_id=row_id,
+                outcome=outcome,
+                result_text=text,
+                duration_ms=duration_ms,
+            )
+
+
 async def run_turn(
     pool: asyncpg.Pool,
     *,
@@ -132,56 +171,18 @@ async def run_turn(
     draw_tool = DrawOnChartTool(pool, tool_server)
     list_drawings_tool = ListChartDrawingsTool(pool)
 
-    async def set_chart(arguments: dict) -> ToolOutcome:
-        return await chart_tool.call(arguments, session_id=session_id, chart=chart)
-
-    async def draw_on_chart(arguments: dict) -> ToolOutcome:
-        return await draw_tool.call(arguments, session_id=session_id)
-
-    async def list_chart_drawings(arguments: dict) -> ToolOutcome:
-        return await list_drawings_tool.call(arguments)
-
+    # Bound rather than wrapped: each of these took a three-line `async def` whose whole
+    # body was the same call with this turn's session and chart filled in.
     local_tools: dict[str, LocalTool] = {
-        CHART_TOOL_NAME: set_chart,
-        DRAW_TOOL_NAME: draw_on_chart,
-        LIST_DRAWINGS_TOOL_NAME: list_chart_drawings,
+        CHART_TOOL_NAME: partial(chart_tool.call, session_id=session_id, chart=chart),
+        DRAW_TOOL_NAME: partial(draw_tool.call, session_id=session_id),
+        LIST_DRAWINGS_TOOL_NAME: list_drawings_tool.call,
     }
     tools = [*server_tools, CHART_TOOL, DRAW_TOOL, LIST_DRAWINGS_TOOL]
 
-    # Its own connection per half, not one held for the turn: a turn spends most of its
-    # time waiting on a model, and a pooled connection parked across that is a connection
-    # nobody else can have. Both halves are short.
-    class PoolAccountTrace:
-        async def begin(
-            self, *, round_index: int, position: int, name: str, arguments: dict
-        ) -> int:
-            async with pool.acquire() as conn:
-                return await store.begin_tool_call(
-                    conn,
-                    session_id=session_id,
-                    round_index=round_index,
-                    position=position,
-                    tool_name=name,
-                    arguments=arguments,
-                    result_text=(
-                        "sent; no answer had come back when this was written. If it stays "
-                        "this way, the outcome of this call is unknown."
-                    ),
-                )
-
-        async def settle(
-            self, *, row_id: int, outcome: str, text: str, duration_ms: int
-        ) -> None:
-            async with pool.acquire() as conn:
-                await store.settle_tool_call(
-                    conn,
-                    tool_call_id=row_id,
-                    outcome=outcome,
-                    result_text=text,
-                    duration_ms=duration_ms,
-                )
-
-    graph = build_graph(provider, tool_server, local_tools, operator_token, PoolAccountTrace())
+    graph = build_graph(
+        provider, tool_server, local_tools, operator_token, _PoolAccountTrace(pool, session_id)
+    )
     try:
         result = await graph.ainvoke(
             initial_state(

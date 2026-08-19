@@ -172,19 +172,17 @@ async def execute_run(
         # (specs/teams-usage, specs/teams-trading).
         guard = CostGuard(limit_from(definition.limits.run_limit))
         trades = TradeGuard(definition.trading)
-        graph = compile_team(
-            definition,
-            _agent_runner(
-                pool,
-                run_id=run_id,
-                plan=plan,
-                provider=provider,
-                catalogue=catalogue,
-                registry=registry,
-                guard=guard,
-                trades=trades,
-            ),
+        run = _Run(
+            pool=pool,
+            run_id=run_id,
+            plan=plan,
+            provider=provider,
+            catalogue=catalogue,
+            registry=registry,
+            guard=guard,
+            trades=trades,
         )
+        graph = compile_team(definition, run.run_agent_step)
         try:
             await asyncio.wait_for(
                 graph.ainvoke({"outputs": {}}), timeout=settings.run_timeout_seconds
@@ -257,157 +255,187 @@ async def _close(
     registry.publish(run_id, None)
 
 
-def _agent_runner(
-    pool: asyncpg.Pool,
-    *,
-    run_id: int,
-    plan: ToolPlan,
-    provider: ModelProvider,
-    catalogue: ModelCatalogue,
-    registry: RunRegistry,
-    guard: CostGuard,
-    trades: TradeGuard,
-):
-    async def run_one(agent: AgentDefinition, given: Sequence[tuple[str, str]]) -> str:
-        entry = catalogue.get(agent.model_id)
-        async with pool.acquire() as conn:
-            step = await store.start_step(conn, run_id=run_id, agent_key=agent.key)
-        registry.publish(run_id, StepStarted(agent_key=agent.key))
+@dataclass(frozen=True)
+class _Run:
+    """What every agent in one run shares: the pool, the plan, the two guards, and the
+    id everything it writes points at.
 
-        # The trade row written by `before_write_call`, waiting for the reply that
-        # settles it. One variable rather than a map because one agent's calls are
-        # sequential (`loop.py` walks a round's requests in order) — agents run
-        # concurrently, but each holds its own `run_one` frame and its own of these.
-        pending_trade: int | None = None
+    One of these per run, handed to the graph as `run_agent_step` — the callable
+    `compile_team` calls once per node. Frozen because none of it changes during a run;
+    what does change belongs to one step and lives on `_StepRunner`.
+    """
 
-        async def on_tool_call(call: RecordedCall) -> None:
-            nonlocal pending_trade
-            async with pool.acquire() as conn:
-                await store.record_tool_call(
-                    conn,
-                    run_id=run_id,
-                    run_step_id=step["id"],
-                    round_index=call.round_index,
-                    position=call.position,
-                    tool_name=call.name,
-                    arguments=call.arguments,
-                    outcome=call.outcome,
-                    result_text=call.text,
-                    duration_ms=call.duration_ms,
-                )
-                if pending_trade is not None:
-                    settlement = _read_settlement(call)
-                    await store.settle_trade(
-                        conn,
-                        trade_id=pending_trade,
-                        status=settlement.status,
-                        result_status=settlement.result_status,
-                        provider_order_id=settlement.order_id,
-                        reference=settlement.reference,
-                    )
-                    pending_trade = None
-            registry.publish(run_id, ToolCalled(agent_key=agent.key, call=call))
+    pool: asyncpg.Pool
+    run_id: int
+    plan: ToolPlan
+    provider: ModelProvider
+    catalogue: ModelCatalogue
+    registry: RunRegistry
+    guard: CostGuard
+    trades: TradeGuard
 
-        async def before_write_call(name: str, arguments: dict) -> str | None:
-            """The order ceiling, and the row that outlives whatever happens next.
+    async def run_agent_step(
+        self, agent: AgentDefinition, given: Sequence[tuple[str, str]]
+    ) -> str:
+        return await _StepRunner(self, agent).run(given)
 
-            Order matters twice over: the guard is asked first, so a refused call leaves
-            no row for an order that was never sent; and the row is written before the
-            call goes out, so an order whose reply never comes back is still in the trace
-            (specs/teams-trading, "Wiersz MUST powstać przed wysłaniem wywołania").
-            """
-            nonlocal pending_trade
-            try:
-                trades.check(arguments)
-            except OrderTooLarge as err:
-                # Refused to the model as this one call; the run goes on, because a size
-                # is something the agent can correct.
-                return str(err)
 
-            async with pool.acquire() as conn:
-                row = await store.record_trade(
-                    conn,
-                    run_id=run_id,
-                    run_step_id=step["id"],
-                    agent_key=agent.key,
-                    tool_name=name,
-                    symbol=_text_arg(arguments, "symbol"),
-                    direction=_text_arg(arguments, "direction"),
-                    size=_decimal_arg(arguments, "size"),
-                    level=_decimal_arg(arguments, "level"),
-                )
-            pending_trade = row["id"]
-            trades.placing()
-            return None
+class _StepRunner:
+    """One agent's step: the row it writes, the guards it asks, and the trade it is
+    holding while it waits for the reply that settles it.
 
-        async def before_model_call() -> None:
-            guard.check()
+    The four callbacks `run_agent` takes were closures over this same state, and
+    `pending_trade` was a `nonlocal` between two of them — `_before_write_call` sets it,
+    the next `_on_tool_call` settles it and clears it. That ordering is the whole of how
+    a sent order finds its own row again, and as a `nonlocal` it could only be read by
+    following the closures in the order they happened to be defined. As a field it is a
+    fact about the step, stated once and readable where it is declared.
 
-        async def on_model_call(usage) -> None:
-            """One row per model call, written as the call finishes rather than when the
-            agent does — which is what makes the guard's own total current enough to stop
-            the *next* call (specs/teams-usage)."""
-            async with pool.acquire() as conn:
-                row = await store.record_usage(
-                    conn,
-                    run_id=run_id,
-                    run_step_id=step["id"],
-                    model_id=entry.id,
-                    input_tokens=usage.input_tokens if usage else None,
-                    output_tokens=usage.output_tokens if usage else None,
-                    cached_tokens=usage.cached_tokens if usage else None,
-                    reasoning_tokens=usage.reasoning_tokens if usage else None,
-                    input_rate_per_1m=entry.input_rate_per_1m,
-                    output_rate_per_1m=entry.output_rate_per_1m,
-                )
-            guard.add(row["cost"])
+    One instance per agent per run, which is what makes a plain field correct here at
+    all: agents run concurrently, but each holds its own of these, and one agent's calls
+    are sequential (`loop.py` walks a round's requests in order).
+    """
+
+    def __init__(self, run: _Run, agent: AgentDefinition) -> None:
+        self._run = run
+        self._agent = agent
+        self._entry = run.catalogue.get(agent.model_id)
+        self._pending_trade: int | None = None
+
+    async def run(self, given: Sequence[tuple[str, str]]) -> str:
+        run = self._run
+        agent = self._agent
+        async with run.pool.acquire() as conn:
+            self._step = await store.start_step(conn, run_id=run.run_id, agent_key=agent.key)
+        run.registry.publish(run.run_id, StepStarted(agent_key=agent.key))
 
         work = await run_agent(
             agent,
-            model=entry.model,
+            model=self._entry.model,
             briefing=briefing_for(agent, given),
-            provider=provider,
-            tools=plan.for_agent(agent.key),
-            call_tool=plan.call,
-            on_tool_call=on_tool_call,
-            before_model_call=before_model_call,
-            on_model_call=on_model_call,
-            before_write_call=before_write_call,
-            moves_the_account=plan.moves_the_account,
+            provider=run.provider,
+            tools=run.plan.for_agent(agent.key),
+            call_tool=run.plan.call,
+            on_tool_call=self._on_tool_call,
+            before_model_call=self._before_model_call,
+            on_model_call=self._on_model_call,
+            before_write_call=self._before_write_call,
+            moves_the_account=run.plan.moves_the_account,
         )
 
-        async with pool.acquire() as conn:
+        async with run.pool.acquire() as conn:
             if work.failed:
                 await store.finish_step(
-                    conn, step_id=step["id"], status="failed", output=None, rounds=work.rounds
+                    conn, step_id=self._step["id"], status="failed", output=None, rounds=work.rounds
                 )
             else:
                 await store.finish_step(
                     conn,
-                    step_id=step["id"],
+                    step_id=self._step["id"],
                     status="completed",
                     output=work.text,
                     rounds=work.rounds,
                 )
 
         if work.failed:
-            registry.publish(
-                run_id, StepFinished(agent_key=agent.key, status="failed", output=None)
+            run.registry.publish(
+                run.run_id, StepFinished(agent_key=agent.key, status="failed", output=None)
             )
             raise AgentFailed(agent.key, "the model call failed")
 
-        registry.publish(
-            run_id, StepFinished(agent_key=agent.key, status="completed", output=work.text)
+        run.registry.publish(
+            run.run_id, StepFinished(agent_key=agent.key, status="completed", output=work.text)
         )
         if work.ceiling_reached:
             log.info(
                 "agent %s in run %s reached the round ceiling and answered without tools",
                 agent.key,
-                run_id,
+                run.run_id,
             )
         return work.text
 
-    return run_one
+    async def _on_tool_call(self, call: RecordedCall) -> None:
+        run = self._run
+        async with run.pool.acquire() as conn:
+            await store.record_tool_call(
+                conn,
+                run_id=run.run_id,
+                run_step_id=self._step["id"],
+                round_index=call.round_index,
+                position=call.position,
+                tool_name=call.name,
+                arguments=call.arguments,
+                outcome=call.outcome,
+                result_text=call.text,
+                duration_ms=call.duration_ms,
+            )
+            if self._pending_trade is not None:
+                settlement = _read_settlement(call)
+                await store.settle_trade(
+                    conn,
+                    trade_id=self._pending_trade,
+                    status=settlement.status,
+                    result_status=settlement.result_status,
+                    provider_order_id=settlement.order_id,
+                    reference=settlement.reference,
+                )
+                self._pending_trade = None
+        run.registry.publish(run.run_id, ToolCalled(agent_key=self._agent.key, call=call))
+
+    async def _before_write_call(self, name: str, arguments: dict) -> str | None:
+        """The order ceiling, and the row that outlives whatever happens next.
+
+        Order matters twice over: the guard is asked first, so a refused call leaves no
+        row for an order that was never sent; and the row is written before the call goes
+        out, so an order whose reply never comes back is still in the trace
+        (specs/teams-trading, "Wiersz MUST powstać przed wysłaniem wywołania").
+        """
+        run = self._run
+        try:
+            run.trades.check(arguments)
+        except OrderTooLarge as err:
+            # Refused to the model as this one call; the run goes on, because a size is
+            # something the agent can correct.
+            return str(err)
+
+        async with run.pool.acquire() as conn:
+            row = await store.record_trade(
+                conn,
+                run_id=run.run_id,
+                run_step_id=self._step["id"],
+                agent_key=self._agent.key,
+                tool_name=name,
+                symbol=_text_arg(arguments, "symbol"),
+                direction=_text_arg(arguments, "direction"),
+                size=_decimal_arg(arguments, "size"),
+                level=_decimal_arg(arguments, "level"),
+            )
+        self._pending_trade = row["id"]
+        run.trades.placing()
+        return None
+
+    async def _before_model_call(self) -> None:
+        self._run.guard.check()
+
+    async def _on_model_call(self, usage) -> None:
+        """One row per model call, written as the call finishes rather than when the
+        agent does — which is what makes the guard's own total current enough to stop the
+        *next* call (specs/teams-usage)."""
+        run = self._run
+        async with run.pool.acquire() as conn:
+            row = await store.record_usage(
+                conn,
+                run_id=run.run_id,
+                run_step_id=self._step["id"],
+                model_id=self._entry.id,
+                input_tokens=usage.input_tokens if usage else None,
+                output_tokens=usage.output_tokens if usage else None,
+                cached_tokens=usage.cached_tokens if usage else None,
+                reasoning_tokens=usage.reasoning_tokens if usage else None,
+                input_rate_per_1m=self._entry.input_rate_per_1m,
+                output_rate_per_1m=self._entry.output_rate_per_1m,
+            )
+        run.guard.add(row["cost"])
 
 
 # --- reading a write call's own arguments and reply (specs/teams-trading) -------------

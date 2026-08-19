@@ -3,6 +3,7 @@ import type { ChartDrawings } from "./Chart";
 import { DrawingEditor } from "./DrawingEditor";
 import { priceSummary, shapeLabel } from "./drawingFields";
 import { formatInstant } from "../ui/formatTime";
+import { Button } from "../ui/Button";
 
 /**
  * The objects standing on this instrument, and one of the two ways the operator takes one
@@ -49,19 +50,18 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
 
   return (
     <div className="relative">
-      <button
-        type="button"
+      <Button
+        className="h-6"
         onClick={() => {
           setOpen(!open);
           setFailure(null);
         }}
         aria-expanded={open}
         aria-label="Drawn objects"
-        className="h-6 rounded border border-border px-1.5 text-xs text-ink hover:bg-panel-strong"
       >
         Objects{items.length > 0 ? ` (${items.length})` : ""}
         {drawings.status === "error" && <span className="ml-1 text-critical">!</span>}
-      </button>
+      </Button>
 
       {open && (
         <div className="absolute top-7 left-0 z-20 max-h-96 w-80 overflow-y-auto rounded border border-border bg-panel p-2 shadow-lg">
@@ -128,8 +128,8 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
                       <span className="truncate text-xs text-ink-muted">{drawing.label}</span>
                     )}
                     <span className="ml-auto flex gap-1">
-                      <button
-                        type="button"
+                      <Button
+                        size="2xs"
                         // Picking a row out is the same act as clicking the object on the
                         // chart, and opens the same editor — the row is where the editor
                         // appears, the chart is where the card does.
@@ -137,12 +137,11 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
                           onSelect(selectedId === drawing.id ? null : drawing.id);
                           setFailure(null);
                         }}
-                        className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong"
                       >
                         Edit
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        size="2xs"
                         disabled={busy === drawing.id}
                         aria-label={
                           drawing.hidden ? `Show drawing ${drawing.id}` : `Hide drawing ${drawing.id}`
@@ -152,19 +151,17 @@ export function DrawingList({ drawings, selectedId, onSelect }: DrawingListProps
                             drawings.patch(drawing.id, { hidden: !drawing.hidden }),
                           )
                         }
-                        className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong disabled:opacity-50"
                       >
                         {drawing.hidden ? "Show" : "Hide"}
-                      </button>
-                      <button
-                        type="button"
+                      </Button>
+                      <Button
+                        size="2xs"
                         disabled={busy === drawing.id}
                         aria-label={`Remove drawing ${drawing.id}`}
                         onClick={() => void act(drawing.id, () => drawings.remove(drawing.id))}
-                        className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong disabled:opacity-50"
                       >
                         Remove
-                      </button>
+                      </Button>
                     </span>
                   </div>
                   <p className="text-[10px] text-secondary">

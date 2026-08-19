@@ -12,7 +12,7 @@ import numpy as np
 
 from .. import kernel, warmup
 from .arithmetic import safe_divide
-from .spec import IndicatorSpec, LineSpec, Param, Render, Series, Warmup
+from .spec import IndicatorSpec, Lines, LineSpec, Param, Render, Series, Warmup
 
 
 def _bbands_edges(s: Series, p: Mapping[str, float]) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
@@ -38,7 +38,7 @@ _BBANDS = IndicatorSpec(
     ),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: dict(zip(("upper", "basis", "lower"), _bbands_edges(s, p), strict=True)),
+    computer=Lines(lambda s, p: dict(zip(("upper", "basis", "lower"), _bbands_edges(s, p), strict=True))),
 )
 
 def _compute_bbands_percent_b(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
@@ -60,7 +60,7 @@ _BBANDS_PERCENT_B = IndicatorSpec(
     # would clip that off screen.
     render=Render(pane="own", style="line", scale="own", autoscale=True, levels=(0.0, 1.0)),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_bbands_percent_b,
+    computer=Lines(_compute_bbands_percent_b),
 )
 
 
@@ -80,7 +80,7 @@ _BBANDS_BANDWIDTH = IndicatorSpec(
     lines=(LineSpec(key="bandwidth", label="Bandwidth {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_bbands_bandwidth,
+    computer=Lines(_compute_bbands_bandwidth),
 )
 
 
@@ -114,7 +114,7 @@ _KELTNER = IndicatorSpec(
             warmup.ema_warmup_bars(int(p["period"])), warmup.rma_warmup_bars(int(p["atr_period"]))
         ),
     ),
-    compute=_compute_keltner,
+    computer=Lines(_compute_keltner),
 )
 
 def _compute_donchian(s: Series, p: Mapping[str, float]) -> dict[str, np.ndarray]:
@@ -137,7 +137,7 @@ _DONCHIAN = IndicatorSpec(
     ),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_donchian,
+    computer=Lines(_compute_donchian),
 )
 
 
@@ -162,7 +162,7 @@ _ENVELOPE = IndicatorSpec(
     ),
     render=Render(pane="price", style="line"),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_envelope,
+    computer=Lines(_compute_envelope),
 )
 
 

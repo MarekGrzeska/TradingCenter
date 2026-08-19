@@ -5,6 +5,7 @@ import {
   type IndicatorSelection,
 } from "../../data/types";
 import { INDICATOR_LINE_TOKENS } from "../theme";
+import { Button } from "../../ui/Button";
 
 export interface IndicatorPickerProps {
   entries: IndicatorCatalogueEntry[];
@@ -235,13 +236,14 @@ export function IndicatorPicker({ entries, selections, onChange, canDraw }: Indi
                 ))}
 
                 {instances.length > 0 && (
-                  <button
-                    type="button"
+                  <Button
+                    tone="muted"
+                    size="2xs"
+                    className="ml-5 mt-1"
                     onClick={() => addInstance(entry)}
-                    className="ml-5 mt-1 rounded border border-border px-1 py-0.5 text-[10px] text-ink-muted hover:bg-panel-strong"
                   >
                     + Add another {entry.id.toUpperCase()}
-                  </button>
+                  </Button>
                 )}
               </div>
             );
@@ -308,14 +310,14 @@ function IndicatorInstance({
           );
         })}
 
-        <button
-          type="button"
+        <Button
+          tone="muted"
+          size="2xs"
           onClick={onRemove}
           aria-label={`Remove ${label}`}
-          className="rounded border border-border px-1 py-0.5 text-[10px] text-ink-muted hover:bg-panel-strong"
         >
           Remove
-        </button>
+        </Button>
       </div>
 
       <div className="mt-1 flex flex-wrap items-center gap-1">

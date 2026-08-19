@@ -1,6 +1,7 @@
 import { useCallback, useState } from "react";
 import type { ReactNode } from "react";
 import { ModalShell } from "./ModalShell";
+import { Button } from "./Button";
 
 /**
  * The one way the terminal asks for consent — the wizard, deleting a pair's data,
@@ -78,14 +79,14 @@ export function ConfirmDialog({
           {failure && <p className="text-critical">{failure}</p>}
           <div className="flex justify-end gap-2">
             {cancelLabel !== null && (
-              <button
-                type="button"
+              <Button
+                tone="muted"
+                size="md"
                 disabled={busy}
                 onClick={onClose}
-                className="rounded border border-border px-3 py-1 text-ink-muted hover:text-ink disabled:opacity-40"
               >
                 {cancelLabel}
-              </button>
+              </Button>
             )}
             <button
               type="button"

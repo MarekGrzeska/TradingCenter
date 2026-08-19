@@ -10,8 +10,9 @@ from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import pytest
+from computers import fn_of
 
-from market_data.indicators.catalogue import Series, get
+from market_data.indicators.catalogue import Series, TimeProfile, get
 
 
 def _minute_series(mid: list[float]) -> tuple[Series, list[datetime]]:
@@ -49,8 +50,7 @@ class TestTimeProfile:
         # bucket 3 (mid=102): bars 7,8 → count 2
         series, times = _minute_series(_MID)
         entry = get("time_profile")
-        assert entry.compute_time_profile is not None
-        levels = entry.compute_time_profile(series, times, _PARAMS)
+        levels = fn_of(entry, TimeProfile)(series, times, _PARAMS)
 
         poc = next(lvl for lvl in levels if lvl.label == "POC")
         assert poc.count == 5
@@ -59,8 +59,7 @@ class TestTimeProfile:
     def test_every_bucket_carries_its_own_count(self):
         series, times = _minute_series(_MID)
         entry = get("time_profile")
-        assert entry.compute_time_profile is not None
-        levels = entry.compute_time_profile(series, times, _PARAMS)
+        levels = fn_of(entry, TimeProfile)(series, times, _PARAMS)
 
         buckets = sorted(
             ((lvl.price, lvl.count) for lvl in levels if lvl.label not in ("VAH", "VAL")),
@@ -78,8 +77,7 @@ class TestTimeProfile:
         # lighter one (bucket 3, weight 2) — 5 + 3 = 8 clears the target.
         series, times = _minute_series(_MID)
         entry = get("time_profile")
-        assert entry.compute_time_profile is not None
-        levels = entry.compute_time_profile(series, times, _PARAMS)
+        levels = fn_of(entry, TimeProfile)(series, times, _PARAMS)
 
         vah = next(lvl for lvl in levels if lvl.label == "VAH")
         val = next(lvl for lvl in levels if lvl.label == "VAL")
@@ -94,9 +92,8 @@ class TestTimeProfile:
         # which was already in — the edges become the full range's own.
         series, times = _minute_series(_MID)
         entry = get("time_profile")
-        assert entry.compute_time_profile is not None
         params = {**_PARAMS, "value_area_pct": 100.0}
-        levels = entry.compute_time_profile(series, times, params)
+        levels = fn_of(entry, TimeProfile)(series, times, params)
 
         vah = next(lvl for lvl in levels if lvl.label == "VAH")
         val = next(lvl for lvl in levels if lvl.label == "VAL")
@@ -113,13 +110,11 @@ class TestTimeProfile:
         base = datetime(2026, 6, 1, tzinfo=UTC)
         times = [base + timedelta(minutes=i) for i in range(5)]
         entry = get("time_profile")
-        assert entry.compute_time_profile is not None
-        assert entry.compute_time_profile(series, times, _PARAMS) == []
+        assert fn_of(entry, TimeProfile)(series, times, _PARAMS) == []
 
     def test_an_empty_series_answers_empty(self):
         entry = get("time_profile")
-        assert entry.compute_time_profile is not None
         empty = Series(
             open=np.array([]), high=np.array([]), low=np.array([]), close=np.array([])
         )
-        assert entry.compute_time_profile(empty, [], _PARAMS) == []
+        assert fn_of(entry, TimeProfile)(empty, [], _PARAMS) == []

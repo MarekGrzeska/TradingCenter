@@ -80,13 +80,12 @@ export function TeamRunsView({
         <Button onClick={onEdit}>
           ← Edit team
         </Button>
-        <button
-          type="button"
+        <Button
+          tone="primary"
           onClick={() => setStarting(true)}
-          className="cursor-pointer rounded border border-primary bg-primary-soft px-2 py-1 text-xs text-ink hover:bg-primary-strong hover:text-ink-inverse"
         >
           ▶ Run now
-        </button>
+        </Button>
         {runs !== null && (
           <span className="text-xs text-ink-faint">
             {runs.length} recorded{runs.length > 0 && ", newest first"}

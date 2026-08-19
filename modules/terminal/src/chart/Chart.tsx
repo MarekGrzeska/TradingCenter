@@ -1,17 +1,11 @@
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  CandlestickSeries,
-  ColorType,
-  CrosshairMode,
-  createChart,
   LineStyle,
   type IChartApi,
   type IPriceLine,
   type ISeriesApi,
-  type LogicalRange,
   type MouseEventParams,
   type Time,
-  type TickMarkType,
 } from "lightweight-charts";
 import type { AgentChartDrawing, AgentDrawingPatch } from "../agent/agentApi";
 import type { DrawingsStatus } from "../agent/drawingsStore";
@@ -26,14 +20,9 @@ import {
   type VisibleTimeRange,
 } from "../data/types";
 import type { MarketDataSource } from "../data/source";
-import { formatCrosshairTime, formatTickMark } from "../ui/formatTime";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
 import { showToast } from "../ui/toastStore";
-import {
-  candlestickColors,
-  readChartColors,
-  type ChartColors,
-} from "./theme";
+import { readChartColors, type ChartColors } from "./theme";
 import { DrawingCard } from "./DrawingCard";
 import { DrawingList } from "./DrawingList";
 import { IndicatorPicker } from "./indicators/IndicatorPicker";
@@ -57,10 +46,12 @@ import {
 } from "./chartWindow";
 import { FeedOverlay, OhlcReadout, OlderHistoryState } from "./ChartReadout";
 import { activeIndicatorReadout, type Readout } from "./indicatorReadout";
+import { useChartInstance } from "./useChartInstance";
 import { useDrawingLayers } from "./useDrawingLayers";
 import { useIndicatorLayers } from "./useIndicatorLayers";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
+import { Button } from "../ui/Button";
 
 export interface ChartProps {
   source: MarketDataSource;
@@ -127,12 +118,6 @@ export interface ChartDrawings {
   remove(id: number): Promise<string | null>;
   patch(id: number, patch: AgentDrawingPatch): Promise<string | null>;
 }
-
-/** The price pane's own stretch factor, set once at chart creation so an
- *  own-pane oscillator added later does not grow to the price chart's own
- *  height — `lightweight-charts`' default (equal stretch for every pane) reads
- *  as "RSI is as important as the candles" the moment a second pane exists. */
-const PRICE_PANE_STRETCH = 4;
 
 /** One shared empty array for a chart with no drawings, so "none" is the same reference
  *  on every render and never restarts the sync effect that watches it. */
@@ -397,117 +382,30 @@ export function Chart({
     });
   }, [indicatorError, failureDigest, symbol, resolution]);
 
+  // Declared up here rather than with the rest of the focus refs below, because the
+  // chart-instance call reads it during render and a ref read during render must
+  // already exist. Its assignment stays where every other callback ref's is.
+  const onVisibleRangeChangeRef = useRef(onVisibleRangeChange);
+  onVisibleRangeChangeRef.current = onVisibleRangeChange;
+
   // --- the chart instance itself: created once, never on data change ---
-  useLayoutEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const colors = readChartColors();
-    const chart = createChart(container, {
-      layout: {
-        background: { type: ColorType.Solid, color: colors.surface },
-        textColor: colors.inkMuted,
-        attributionLogo: false,
-      },
-      grid: {
-        vertLines: { color: colors.grid },
-        horzLines: { color: colors.grid },
-      },
-      rightPriceScale: { borderColor: colors.axis },
-      // Both formatters read Warsaw's calendar instead of the library's own UTC one —
-      // the candles' timestamps are untouched, only their labels (design.md, "Strefa:
-      // formatowanie, nie przesuwanie znaczników").
-      localization: {
-        timeFormatter: (time: Time) => formatCrosshairTime(time as number),
-      },
-      timeScale: {
-        borderColor: colors.axis,
-        timeVisible: true,
-        secondsVisible: false,
-        tickMarkFormatter: (time: Time, tickMarkType: TickMarkType) =>
-          formatTickMark(time as number, tickMarkType),
-      },
-      crosshair: { mode: CrosshairMode.Normal },
-      autoSize: false,
-      width: container.clientWidth,
-      height: container.clientHeight,
-    });
-    const series = chart.addSeries(CandlestickSeries, {
-      ...candlestickColors(colors),
-      // Both of the series' own price markers are off, and one of them is the
-      // point: the price-axis label the library draws is sourced from the last
-      // *visible* bar (`SeriesPriceAxisView` asks for `lastValueData(false)`,
-      // whatever `priceLineSource` says), so panning into history left the
-      // right-hand scale announcing the price of whatever candle happened to be
-      // at the edge of the viewport. The chart draws its own instead, always at
-      // the newest candle.
-      lastValueVisible: false,
-      priceLineVisible: false,
-    });
-
-    chartRef.current = chart;
-    seriesRef.current = series;
-    colorsRef.current = colors;
-    chart.panes()[0]?.setStretchFactor(PRICE_PANE_STRETCH);
-
-    // Whatever the feed already delivered before this effect re-ran (a
-    // StrictMode remount, most often) is redrawn rather than lost.
-    if (barsRef.current.length > 0) {
-      series.setData(barsRef.current.map(toCandlestick));
-      chart.timeScale().fitContent();
-    }
-
-    // Panning towards the left edge of what is drawn is the whole trigger for
-    // loading older candles (terminal-chart spec, "Wykres dociąga starszą
-    // historię przy przewijaniu w lewo"). How much gets loaded is not decided
-    // here: the pager keeps asking until `needsMore` below says the margin is
-    // filled, which is what stops it looping on its own frame correction.
-    const onRangeChange = (range: LogicalRange | null) => {
-      if (range && range.from < OLDER_MARGIN_BARS) requestOlderRef.current();
-      // Panning off the computed window is what asks for a new one — the operator who
-      // jumped to March needs indicators over March, not over the whole series behind it.
-      syncIndicatorWindowRef.current();
-
-      const series = barsRef.current;
-      const fromIndex = range ? Math.max(0, Math.round(range.from)) : -1;
-      const toIndex = range ? Math.min(series.length - 1, Math.round(range.to)) : -1;
-      const fromTime = series[fromIndex]?.time;
-      const toTime = series[toIndex]?.time;
-      onVisibleRangeChangeRef.current?.(
-        fromTime !== undefined && toTime !== undefined ? { from: fromTime, to: toTime } : null,
-      );
-    };
-    chart.timeScale().subscribeVisibleLogicalRangeChange(onRangeChange);
-
-    const observer = new ResizeObserver(([entry]) => {
-      const { width, height } = entry.contentRect;
-      if (width > 0 && height > 0) {
-        chart.resize(width, height);
-      }
-    });
-    observer.observe(container);
-
-    const forgetIndicatorLayers = clearIndicatorLayers;
-    return () => {
-      observer.disconnect();
-      chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRangeChange);
-      chart.remove();
-      onVisibleRangeChangeRef.current?.(null);
-      chartRef.current = null;
-      seriesRef.current = null;
-      // The line belonged to the series that just went away with the chart.
-      priceLineRef.current = null;
-      // Every indicator series, pane, reference level, marker plugin and
-      // primitive belonged to it too — `chart.remove()` already freed them,
-      // this only stops the sync effect from reaching for one that is gone.
-      forgetIndicatorLayers();
-    };
-    // Empty, and `clearIndicatorLayers` deliberately not listed: it is a stable callback
-    // from a hook declared *below* this effect — because that hook's own effect has to
-    // run after this one has created the chart — so naming it here would read it before
-    // it exists. The cleanup closure runs long after the render that assigns it.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  //
+  // Declared here, above every hook that draws onto the chart, because effects run in
+  // the order they were declared. `useChartInstance` carries why its one moving part —
+  // what to clear on the way out — arrives as a ref.
+  const clearIndicatorLayersRef = useRef<() => void>(() => {});
+  useChartInstance({
+    containerRef,
+    chartRef,
+    seriesRef,
+    colorsRef,
+    barsRef,
+    priceLineRef,
+    requestOlderRef,
+    syncIndicatorWindowRef,
+    onVisibleRangeChangeRef,
+    clearIndicatorLayersRef,
+  });
 
   const publishLatestBar = useCallback(() => {
     if (latestFrameRef.current) return;
@@ -630,8 +528,6 @@ export function Chart({
   const pendingFocusRef = useRef<ChartFocusRequest | null>(null);
   const onFocusRequestSettledRef = useRef(onFocusRequestSettled);
   onFocusRequestSettledRef.current = onFocusRequestSettled;
-  const onVisibleRangeChangeRef = useRef(onVisibleRangeChange);
-  onVisibleRangeChangeRef.current = onVisibleRangeChange;
 
   // --- resolution change: the viewport it leaves behind, for the incoming series' first
   // draw to stand over instead of `fitContent()`'s whole-series view ---
@@ -955,6 +851,9 @@ export function Chart({
     catalogueById,
     instanceColors,
   });
+  // The other end of the knot the instance hook describes: the ref is filled here, after
+  // the hook that owns this function has returned, and read at unmount.
+  clearIndicatorLayersRef.current = clearIndicatorLayers;
 
   // Below the chart instance effect for the same reason the indicator layers are: their
   // effects have to find a chart that has already been created.
@@ -1076,13 +975,12 @@ export function Chart({
               >
                 indicators unavailable
               </span>
-              <button
-                type="button"
+              <Button
+                size="2xs"
                 onClick={indicatorsState.retry}
-                className="rounded border border-border px-1.5 py-0.5 text-[10px] text-ink hover:bg-panel-strong"
               >
                 Retry
-              </button>
+              </Button>
             </span>
           )}
           <OlderHistoryState older={older} />

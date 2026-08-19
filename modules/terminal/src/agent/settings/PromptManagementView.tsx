@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { UnreachableNotice } from "../../ui/UnreachableNotice";
 import { agentApi, type AgentApi, type AgentPrompt } from "../agentApi";
 import { usePrompt } from "./usePrompt";
+import { Button } from "../../ui/Button";
 
 interface Draft {
   withTools: string;
@@ -95,14 +96,14 @@ export function PromptManagementView({ api = agentApi }: { api?: AgentApi } = {}
       {saveError && <p className="text-sm text-critical">{saveError}</p>}
 
       <div className="flex items-center gap-3">
-        <button
-          type="button"
+        <Button
+          tone="primary"
+          size="md"
           onClick={save}
           disabled={saving || !dirty}
-          className="cursor-pointer rounded border border-primary-line bg-primary-soft px-3 py-1 text-sm text-ink hover:bg-primary-strong hover:text-ink-inverse disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving ? "Saving…" : "Save"}
-        </button>
+        </Button>
         {dirty && !saving && <span className="text-xs text-ink-faint">unsaved changes</span>}
       </div>
     </div>

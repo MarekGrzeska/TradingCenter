@@ -1,4 +1,5 @@
 import { Component, Fragment, type ReactNode } from "react";
+import { Button } from "../ui/Button";
 
 interface Props {
   children: ReactNode;
@@ -37,13 +38,13 @@ export class ViewErrorBoundary extends Component<Props, State> {
           <div className="max-w-md text-center">
             <p className="text-lg text-critical">This view hit an error.</p>
             <p className="mt-1 text-sm text-ink-muted">{this.state.error.message}</p>
-            <button
-              type="button"
+            <Button
+              size="md"
+              className="mt-4"
               onClick={this.retry}
-              className="mt-4 rounded border border-border px-3 py-1.5 text-sm text-ink hover:bg-panel-strong"
             >
               Retry
-            </button>
+            </Button>
           </div>
         </div>
       );

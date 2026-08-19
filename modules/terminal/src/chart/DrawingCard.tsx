@@ -5,6 +5,7 @@ import type { ChartDrawings } from "./Chart";
 import { DrawingEditor } from "./DrawingEditor";
 import { cardPosition } from "./cardPosition";
 import { priceSummary, shapeLabel } from "./drawingFields";
+import { Button } from "../ui/Button";
 
 /**
  * What the picked object is, said beside it.
@@ -68,14 +69,14 @@ export function DrawingCard({ drawing, drawings, at, onClose }: DrawingCardProps
           {shapeLabel(drawing)}
         </span>
         <span className="text-xs text-ink">{priceSummary(drawing)}</span>
-        <button
-          type="button"
+        <Button
+          size="2xs"
+          className="ml-auto"
           aria-label="Close object card"
           onClick={onClose}
-          className="ml-auto rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong"
         >
           ✕
-        </button>
+        </Button>
       </div>
 
       {drawing.label && <p className="mt-0.5 truncate text-xs text-ink-muted">{drawing.label}</p>}
@@ -91,30 +92,28 @@ export function DrawingCard({ drawing, drawings, at, onClose }: DrawingCardProps
       )}
 
       <div className="mt-1 flex gap-1">
-        <button
-          type="button"
+        <Button
+          size="2xs"
           onClick={() => {
             setEditing(!editing);
             setFailure(null);
           }}
-          className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong"
         >
           Edit
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          size="2xs"
           disabled={busy}
           aria-label={drawing.hidden ? `Show drawing ${drawing.id}` : `Hide drawing ${drawing.id}`}
           // The card stays open afterwards, with this button flipped: hiding is undoable,
           // and the nearest way back has to be where the action happened rather than in
           // the list (`terminal-chart-objects` spec, "Zgaszenie z opisu").
           onClick={() => void act(() => drawings.patch(drawing.id, { hidden: !drawing.hidden }))}
-          className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong disabled:opacity-50"
         >
           {drawing.hidden ? "Show" : "Hide"}
-        </button>
-        <button
-          type="button"
+        </Button>
+        <Button
+          size="2xs"
           disabled={busy}
           aria-label={`Remove drawing ${drawing.id}`}
           // The selection is not put down here: the object leaving the list is what does
@@ -122,10 +121,9 @@ export function DrawingCard({ drawing, drawings, at, onClose }: DrawingCardProps
           // (`terminal-chart-objects` spec, "Usunięcie wskazanego obiektu MUST zdjąć
           // wskazanie razem z nim").
           onClick={() => void act(() => drawings.remove(drawing.id))}
-          className="rounded border border-border px-1.5 text-[10px] text-ink hover:bg-panel-strong disabled:opacity-50"
         >
           Remove
-        </button>
+        </Button>
       </div>
 
       {editing && (

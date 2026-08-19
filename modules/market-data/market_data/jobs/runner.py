@@ -13,13 +13,10 @@ from __future__ import annotations
 import asyncio
 import logging
 
-from ..coverage import record_coverage
 from ..errors import GatewayError
 from ..gateway import GatewayHistory
-from ..models import Resolution
 from ..periods import periods_between
-from ..rollups import refresh_all
-from ..store import write_candles
+from ..store import commit_candles
 from ..tracking import is_tracked
 from .models import Chunk
 from .store import (
@@ -113,31 +110,28 @@ async def execute_chunk(
             for c in page.candles
             if c.period_start >= chunk.chunk_start and not c.forming
         ]
-        written = await write_candles(conn, within) if within else 0
-        # The requested window is what was verified, not only the span the candles
-        # happen to occupy — an exhaustive read of an empty stretch is still a stretch
-        # looked at, and using the requested edges keeps neighbouring chunks' coverage
-        # touching with no seam between them.
-        #
-        # The boundary is the exception, and it is recorded where the data actually ran
-        # out rather than where this chunk asked. Those two are a whole window apart, and
-        # the wrong one announces as checked a stretch nobody looked at — which is then
-        # kept forever. A chunk that came back with nothing cannot place a boundary at
-        # all, so it records none: what it has is an absence, not an edge.
+        # The boundary is where the data actually ran out rather than where this chunk
+        # asked. Those two are a whole window apart, and the wrong one announces as
+        # checked a stretch nobody looked at — which is then kept forever. A chunk that
+        # came back with nothing cannot place a boundary at all, so it records none:
+        # what it has is an absence, not an edge.
         boundary = page.history_ended and bool(within)
-        covered = await record_coverage(
+        committed = await commit_candles(
             conn,
-            chunk.symbol,
-            chunk.resolution,
-            chunk.chunk_start,
-            chunk.chunk_end,
+            within,
+            symbol=chunk.symbol,
+            resolution=chunk.resolution,
+            # The requested window is what was verified, not only the span the candles
+            # happen to occupy — an exhaustive read of an empty stretch is still a
+            # stretch looked at, and using the requested edges keeps neighbouring
+            # chunks' coverage touching with no seam between them.
+            covered_from=chunk.chunk_start,
+            covered_to=chunk.chunk_end,
             history_ended=boundary,
             history_ends_at=within[0].period_start if boundary else None,
         )
-        if within and chunk.resolution is Resolution.MINUTE:
-            # Over what was actually stored, not what arrived — rebuilding a bucket from
-            # minutes that were filtered out would derive a candle with no source.
-            await refresh_all(conn, chunk.symbol, within[0].period_start, within[-1].period_start)
+        written = committed.written
+        covered = committed.coverage
 
         await finish_chunk_done(conn, chunk.id, written=written, requests=page.requests)
 

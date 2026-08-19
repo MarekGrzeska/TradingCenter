@@ -12,7 +12,7 @@ import numpy as np
 
 from .. import kernel, warmup
 from .arithmetic import safe_divide
-from .spec import IndicatorSpec, LineSpec, Param, Render, Series, Warmup
+from .spec import IndicatorSpec, Lines, LineSpec, Param, Render, Series, Warmup
 
 # before it means anything (docs/wskazniki-plan-wdrozenia.html, "Reżim"). ---
 
@@ -55,7 +55,7 @@ _ADX = IndicatorSpec(
     # to decay below epsilon as one `rma` alone (design.md, "Głębokość archiwum":
     # ADX(14) needs ~580 bars, close to 2 × rma_warmup_bars(14) ≈ 560).
     warmup=Warmup(kind="decay", bars=lambda p: 2 * warmup.rma_warmup_bars(int(p["period"]))),
-    compute=_compute_adx,
+    computer=Lines(_compute_adx),
 )
 
 
@@ -76,7 +76,7 @@ _CHOPPINESS = IndicatorSpec(
     lines=(LineSpec(key="choppiness", label="Choppiness {period}"),),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=_compute_choppiness,
+    computer=Lines(_compute_choppiness),
 )
 
 
@@ -107,7 +107,7 @@ _AROON = IndicatorSpec(
     ),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 100.0), autoscale=False),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"]) + 1),
-    compute=_compute_aroon,
+    computer=Lines(_compute_aroon),
 )
 
 
@@ -136,7 +136,7 @@ _VORTEX = IndicatorSpec(
     ),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"]) + 1),
-    compute=_compute_vortex,
+    computer=Lines(_compute_vortex),
 )
 
 _LINREG_SLOPE = IndicatorSpec(
@@ -149,7 +149,7 @@ _LINREG_SLOPE = IndicatorSpec(
     lines=(LineSpec(key="linreg_slope", label="LinReg Slope {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {"linreg_slope": kernel.linreg_slope(s.close, int(p["period"]))},
+    computer=Lines(lambda s, p: {"linreg_slope": kernel.linreg_slope(s.close, int(p["period"]))}),
 )
 
 _R_SQUARED = IndicatorSpec(
@@ -160,7 +160,7 @@ _R_SQUARED = IndicatorSpec(
     lines=(LineSpec(key="r_squared", label="R² {period}"),),
     render=Render(pane="own", style="line", scale="fixed", range=(0.0, 1.0), autoscale=False),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
-    compute=lambda s, p: {"r_squared": kernel.r_squared(s.close, int(p["period"]))},
+    computer=Lines(lambda s, p: {"r_squared": kernel.r_squared(s.close, int(p["period"]))}),
 )
 
 
