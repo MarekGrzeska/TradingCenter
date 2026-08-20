@@ -27,6 +27,34 @@ is_refused_by_default` jest tam po to, żeby trasa dopisana za miesiąc była do
 zasięgiem przeglądarki — i to jest w tej warstwie wart więcej niż którykolwiek pojedynczy
 wpis.
 
+## Co apply pokazał: dwie rzeczy, obie moje
+
+**Easy Auth zabija upgrade WebSocketa, a `AllowAnonymous` tego nie zmienia.** Zmierzone
+20 sierpnia, kilka minut po pierwszym apply: strumienie market-daty padły z „timed out
+during opening handshake" i **nie wróciły** — ostatnie połączenie `/ws/stream` skończyło
+się o 13:43, dokładnie przy restarcie, i przez godzinę nie było ani jednego nowego. Gateway
+przez cały ten czas odpowiadał na HTTP, więc z zewnątrz nic nie wyglądało na zepsute, a
+archiwum przestało dostawać świece i poszło nadrabiać REST-em, aż capital.com zaczął
+odpowiadać `error.too-many.requests`.
+
+`AllowAnonymous` rozstrzyga, czy żądanie **zostanie odrzucone**, a nie czy upgrade
+przeżyje przechwycenie. Naprawa to `excluded_paths = ["/ws/stream", "/"]` — dokładnie ten
+sam wyjątek, który market-data ma u siebie dla `/ws/candles`, i którego nie przepisałem
+razem z resztą wzorca. Nic nie tracimy: klucz jest sprawdzany w samym handlerze
+WebSocketa, i zawsze tam był. Potwierdzone po naprawie ręcznym połączeniem z produkcyjnym
+gatewayem: handshake OK, `status: connected`, świeca US100 MINUTE_5 w drugiej ramce.
+
+**Terminal wdrożony bez adresu gatewaya.** `deploy-terminal.yml` ma ten sam wpis dla
+archiwum i dla workbencha, a dla gatewaya go nie dostał — więc przeglądarka pytała Static
+Web App o `/gateway-api/accounts`, dostawała stronę aplikacji i ekran mówił
+`Unexpected token '<'`. Pułapka jest w tym pliku opisana dwa razy, dla agenta i dla teams;
+wszedłem w nią trzeci raz. Dopisana z komentarzem, żeby czwartego nie było.
+
+Co z tego wynika ogólniej: obie pomyłki są tego samego rodzaju — **wzorzec przepisany bez
+jednej linii**. Za pierwszym razem brakowało wyjątku dla strumienia, za drugim wpisu w
+buildzie. Kopiowanie kształtu z market-daty było dobrym pomysłem; kopiowanie go z pamięci
+zamiast obok otwartego pliku nie.
+
 ## Czego nie dało się sprawdzić bez apply
 
 Wszystkiego, co dzieje się **przed** aplikacją: czy Easy Auth z `AllowAnonymous` naprawdę
