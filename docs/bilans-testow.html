@@ -194,16 +194,16 @@
 
 <main>
 <header>
-  <div class="eyebrow">Audyt · 19 sierpnia 2026</div>
+  <div class="eyebrow">Audyt · 19 sierpnia 2026 · <span style="color:var(--keep)">wykonano 20 sierpnia</span></div>
   <h1>Bilans testów TradingCenter</h1>
-  <p class="lede">Czy warstwa testowa jest przerośnięta jak na projekt niekomercyjny — i gdzie realnie można obniżyć wymagania, żeby przyszłe zmiany były tańsze i szybsze. Analiza objęła wszystkie moduły, pakiety i <code>scripts/</code>; cztery niezależne przeglądy jakościowe plus pomiar ilościowy.</p>
+  <p class="lede">Czy warstwa testowa jest przerośnięta jak na projekt niekomercyjny — i gdzie realnie można obniżyć wymagania, żeby przyszłe zmiany były tańsze i szybsze. Analiza objęła wszystkie moduły, pakiety i <code>scripts/</code>; cztery niezależne przeglądy jakościowe plus pomiar ilościowy. <strong>Cięcia zostały wykonane</strong> — sekcja „Co zrobiono" niżej podaje wynik i miejsca, w których wykonanie rozminęło się z planem.</p>
 </header>
 
 <div class="stats">
-  <div class="stat"><span class="num">57 300</span><span class="lbl">linii testów (≈ tyle, co kodu produkcyjnego)</span></div>
-  <div class="stat"><span class="num">~2 800</span><span class="lbl">funkcji testowych w 240 plikach</span></div>
-  <div class="stat"><span class="num">~10 500</span><span class="lbl">linii do bezpiecznego wycięcia (~18%)</span></div>
-  <div class="stat"><span class="num">55%</span><span class="lbl">testów workbencha wymaga Dockera</span></div>
+  <div class="stat"><span class="num">57 348</span><span class="lbl">linii testów przed cięciem (≈ tyle, co kodu)</span></div>
+  <div class="stat"><span class="num">50 023</span><span class="lbl">linii po cięciu — o 7 325 mniej (−13%)</span></div>
+  <div class="stat"><span class="num">9 425</span><span class="lbl">usuniętych linii w 87 plikach, 6 commitów</span></div>
+  <div class="stat"><span class="num">0</span><span class="lbl">czerwonych testów — wszystkie suity zielone</span></div>
 </div>
 
 <div class="verdict">
@@ -213,7 +213,39 @@
   <p>Można bezpiecznie wyciąć <strong>~10 000–10 700 linii (~18%)</strong> i — ważniejsze — <strong>obniżyć wymagania na przyszłość</strong> według ośmiu reguł niżej. Największy podatek to jednak nie linie, lecz czas: ponad połowa testów workbencha i market-daty wymaga Dockera i kontenerów Postgresa, więc pełny przebieg nie jest uruchamialny „od ręki".</p>
 </div>
 
+<h2>Co zrobiono</h2>
+<p>Cięcia wykonano 20 sierpnia 2026 na gałęzi <code>chore/trim-the-test-layer</code>, w sześciu commitach. Najpierw osiem reguł trafiło do <code>CLAUDE.md</code> — bo jednorazowe cięcie oszczędza raz, a reguła przy każdej przyszłej zmianie — potem usunięcia, moduł po module, każdy zweryfikowany własną suitą, linterem i kontrolą typów.</p>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Moduł</th><th class="n">Przed</th><th class="n">Po</th><th class="n">Różnica</th><th>Weryfikacja</th></tr></thead>
+  <tbody>
+    <tr><td>terminal</td><td class="n">19 044</td><td class="n">13 412</td><td class="n">−5 632</td><td>640 testów zielonych, <code>tsc</code> i <code>eslint</code> czyste</td></tr>
+    <tr><td>workbench</td><td class="n">16 124</td><td class="n">15 426</td><td class="n">−698</td><td>792 zielone (838 przed), ruff i pyright czyste</td></tr>
+    <tr><td>market-data</td><td class="n">14 438</td><td class="n">13 650</td><td class="n">−788</td><td>960 unit + 334 db zielone, pyright czysty</td></tr>
+    <tr><td>capital-gateway</td><td class="n">4 042</td><td class="n">3 946</td><td class="n">−96</td><td>210 zielonych, 11 pominiętych (live)</td></tr>
+    <tr><td>trading-mcp</td><td class="n">1 662</td><td class="n">1 378</td><td class="n">−284</td><td>84 zielone, snapshot kontraktu aktualny</td></tr>
+    <tr><td>scripts/</td><td class="n">1 286</td><td class="n">1 227</td><td class="n">−59</td><td>104 zielone, 21 uczciwie pominiętych (było 24 czerwone)</td></tr>
+    <tr><td>tc-openai</td><td class="n">112</td><td class="n">344</td><td class="n">+232</td><td>10 zielonych (było 5) — luka, nie przerost</td></tr>
+    <tr class="total"><td>Razem</td><td class="n">57 348</td><td class="n">50 023</td><td class="n">−7 325</td><td>wszystko zielone</td></tr>
+  </tbody>
+</table>
+</div>
+
+<h3>Gdzie wykonanie rozminęło się z planem</h3>
+<p>Cztery odchylenia, wszystkie w stronę ostrożności — warte zapisania, bo to one korygują sam audyt:</p>
+<ul>
+  <li><span class="chip note">−1 000 wzgl. planu</span> <strong>Terminal miał podłogę, której audyt nie widział z zewnątrz.</strong> Plan mówił ~6 700 linii, wyszło 5 632. Każdy test widoku niesie ręcznie pisany fake szerokiego interfejsu API: sam <code>fakeApi</code> w <code>TeamsView</code> to 199 linii implementujących 40 metod, w <code>CollectionHistoryView</code> 121, w <code>SchedulesPanel</code> 143. Te podłogi nie maleją wraz z liczbą testów, więc dobicie do celu oznaczałoby wycinanie zachowań, nie duplikatów. Pozostałe ~900 linii odzyskałoby dopiero wyniesienie trzech fake'ów do wspólnych test-double'i — to osobna zmiana.</li>
+  <li><span class="chip keep">przywrócone</span> <strong>Dwa testy w market-data wróciły po wycięciu.</strong> Kategoria była trafna, instancja nie: partial unique index na <code>coverage_ranges</code> to nie typ, tylko reguła („jak głęboko sięga ta para" ma jedną odpowiedź), a cisza <code>compute_ages</code> nad zamkniętym rynkiem to inna funkcja niż <code>decide_late_pairs</code> i nie miała innego domu. Obie są z powrotem, z komentarzem mówiącym dlaczego stoją tam, gdzie stoją.</li>
+  <li><span class="chip cut">naprawione po drodze</span> <strong>Dwa błędy w <code>scripts/</code> zastane, nie wprowadzone.</strong> <code>test_checks_filter.py</code> bramkował się na „czy jest bash", a macOS wozi 3.2, gdzie <code>declare -A</code> nie istnieje — więc wszystkie 21 testów padało i <em>nigdy</em> nie uruchomiły się na tej maszynie. To ta sama historia, co hook w PowerShellu z <code>CLAUDE.md</code>: obrona, której trybu awarii nikt nie przetestował. Bramka pyta teraz powłokę, co potrafi. Drugi: test czytał <code>modules/</code> z dysku, a zarchiwizowany moduł zostawia tam nazwę (<code>.venv</code> i <code>.pytest_cache</code> są ignorowane, więc skorupa przeżywa gita) — moduł to teraz katalog z <code>Dockerfile</code>.</li>
+  <li><span class="chip note">dopisane</span> <strong>tc-openai dostał testy zamiast cięć.</strong> Jedyna luka w drugą stronę, zgodnie z audytem: cztery testy na publicznym <code>stream()</code> — dzielony JSON składający się w jedno wywołanie narzędzia, awaria upstreamu docierająca z powodem i z już wysłanymi deltami, powtórzona runda, oraz zużycie, które jest <code>None</code>, a nie zerem.</li>
+</ul>
+
+<h3>Czego nauczyło samo wykonanie</h3>
+<p>Pierwszy pełny przebieg workbencha dał 8 czerwonych testów planisty. Nie były regresją: w izolacji te same testy przechodziły, a przyczyną było trzy równoległe suity walczące o Dockera — dziewięć osieroconych kontenerów Postgresa naraz. Po posprzątaniu środowiska i powtórzeniu w izolacji: 792 zielone. To najmocniejsze możliwe potwierdzenie diagnozy z audytu — <strong>prawdziwym kosztem tej warstwy nie są linie, tylko kontenery</strong>. Suita workbencha to niecałe trzy minuty, gdy nic jej nie przeszkadza, i nieprzewidywalna, gdy cokolwiek dzieli z nią maszynę. Reguła szósta (<code>@db</code> tylko tam, gdzie test dotyka bazy) jest więc najważniejsza z ośmiu, a <code>test_drawings_refusals.py</code> — 25 permutacji walidacji wyjętych spod markera bazy — jest jej pierwszym zastosowaniem.</p>
+
 <h2>Liczby</h2>
+<p>Stan sprzed cięcia, dla porównania:</p>
 <div class="tablewrap">
 <table>
   <thead><tr><th>Moduł</th><th class="n">Kod (linie)</th><th class="n">Testy (linie)</th><th class="n">Stosunek</th><th class="n">Testy (szt.)</th><th>Charakter</th></tr></thead>
@@ -290,23 +322,25 @@
   <li>sonda deployu (test „poprzedni kontener odpowiada zdrowo, a obraz jest stary") i odmowy <code>dev.py</code>.</li>
 </ul>
 
-<h2>Jedna luka w drugą stronę</h2>
-<p>Audyt szukał przerostu, ale znalazł też asymetrię: <code>packages/tc-openai/provider.py</code> — 257 linii obsługujących strumieniowanie i tool-calls dla obu powierzchni agentowych — ma 3 testy kształtu, z czego dwa dotykają pól prywatnych. To jedyne miejsce w przeglądanym zakresie, gdzie brak testu <em>już raz kosztował</em> (tura z narzędziami odpowiedziała 400, panel pokazał „incomplete" bez zapisanego powodu). Wysiłek zdjęty z permutacji i meta-testów ma tu wyraźnie wyższą stopę zwrotu niż gdziekolwiek indziej.</p>
-
-<h2>Podsumowanie cięć</h2>
+<h2>Plan wobec wykonania</h2>
 <div class="tablewrap">
 <table>
-  <thead><tr><th>Obszar</th><th class="n">Linie do wycięcia</th><th>Główny mechanizm</th></tr></thead>
+  <thead><tr><th>Obszar</th><th class="n">Plan</th><th class="n">Wykonano</th><th>Dlaczego różnica</th></tr></thead>
   <tbody>
-    <tr><td>terminal</td><td class="n">~6 700</td><td>deduplikacja warstw, CRUD do 3 testów, testy konwencji</td></tr>
-    <tr><td>market-data</td><td class="n">~1 400–1 500</td><td>deduplikacja warstw, testy Postgresa/pyrighta, perf</td></tr>
-    <tr><td>workbench</td><td class="n">~1 200–1 550</td><td>bliźniaki agent/teams, permutacje @db, testy Pydantica</td></tr>
-    <tr><td>gateway, trading-mcp, pakiety, scripts</td><td class="n">~900–1 000</td><td>kopie testów pakietu, fixtury zamiast boilerplate'u, meta-testy CI</td></tr>
-    <tr class="total"><td>Razem</td><td class="n">~10 200–10 750 (~18%)</td><td>przy zachowaniu całej listy nienegocjowalnej</td></tr>
+    <tr><td>terminal</td><td class="n">~6 700</td><td class="n">5 632</td><td>podłoga ręcznie pisanych fake'ów API, niewidoczna z zewnątrz</td></tr>
+    <tr><td>market-data</td><td class="n">~1 400–1 500</td><td class="n">788</td><td>konsolidacja plików dała mniej, niż liczył audyt; dwa testy przywrócone</td></tr>
+    <tr><td>workbench</td><td class="n">~1 200–1 550</td><td class="n">698</td><td>deduplikacja bliźniaków wymagała dopisania plików wspólnych</td></tr>
+    <tr><td>gateway, trading-mcp, scripts</td><td class="n">~900–1 000</td><td class="n">439</td><td>fixtury skróciły mniej, niż zakładano; tc-openai dostał +232 zamiast cięcia</td></tr>
+    <tr class="total"><td>Razem</td><td class="n">~10 200–10 750</td><td class="n">7 325 (−13%)</td><td>cała lista nienegocjowalna nietknięta</td></tr>
   </tbody>
 </table>
 </div>
-<p>Sensowna kolejność wdrożenia: najpierw spisać osiem reguł (np. sekcja w <code>CLAUDE.md</code>) — to zatrzymuje przyrost od zaraz i nic nie kosztuje. Cięcia robić przy okazji, plikami, zaczynając od pozycji o zerowym ryzyku: testy konwencji terminala, bliźniaki agent/teams, kopie testów middleware'u, testy wydajności. Wielkiej jednorazowej akcji nie potrzeba.</p>
+<p>Wykonano ~70% planowanego cięcia. Reszta nie jest zaległością do nadrobienia: w każdym z czterech miejsc zatrzymanie nastąpiło tam, gdzie dalsze cięcie przestawało usuwać redundancję, a zaczynało usuwać zachowania. Jedyna pozycja warta osobnej zmiany to wyniesienie trzech fake'ów API terminala do wspólnych test-double'i — około 900 linii, zero utraconych asercji.</p>
+<p>Kolejność okazała się słuszna: osiem reguł w <code>CLAUDE.md</code> poszło pierwsze i nic nie kosztowało, a cięcia dały się zrobić modułami, każde zweryfikowane własną suitą. Wielkiej jednorazowej akcji rzeczywiście nie było potrzeba.</p>
 
-<p class="footnote">Pomiar: 19 sierpnia 2026, gałąź <code>main</code> (beebf4a). Linie liczone bez <code>.venv</code>, migracji wygenerowanych i pliku kontraktu generowanego; testy = pliki <code>test_*</code> + <code>conftest.py</code> + pomocnicze double. Oceny jakościowe: cztery niezależne przeglądy reprezentatywnych próbek (terminal, workbench, market-data, moduły mniejsze).</p>
+<h2>Jedna luka w drugą stronę — zamknięta</h2>
+<p>Audyt szukał przerostu, ale znalazł też asymetrię: <code>packages/tc-openai/provider.py</code> — 257 linii obsługujących strumieniowanie i tool-calls dla obu powierzchni agentowych — miał 3 testy kształtu, z czego dwa dotykały pól prywatnych. To jedyne miejsce w przeglądanym zakresie, gdzie brak testu <em>już raz kosztował</em>: tura z narzędziami odpowiedziała 400, a panel pokazał „incomplete" bez zapisanego powodu.</p>
+<p>Zamknięte w tej samej zmianie: pakiet ma 10 testów zamiast 5, a cztery nowe stoją na publicznym <code>stream()</code>, nie na polach prywatnych — w tym jeden odtwarzający dokładnie tamten incydent. Trzy stare testy kształtu zostały, bo podstawiony klient nie odpowie, czy langchain honoruje <code>use_responses_api</code>; nowe ich nie zastępują.</p>
+
+<p class="footnote">Pomiar wyjściowy: 19 sierpnia 2026, gałąź <code>main</code> (beebf4a). Wykonanie i pomiar końcowy: 20 sierpnia 2026, gałąź <code>chore/trim-the-test-layer</code>, sześć commitów, 87 plików, +2 482 / −9 425 linii. Linie liczone bez <code>.venv</code>, migracji wygenerowanych i pliku kontraktu generowanego; testy = pliki <code>test_*</code> + <code>conftest.py</code> + pomocnicze double. Oceny jakościowe: cztery niezależne przeglądy reprezentatywnych próbek (terminal, workbench, market-data, moduły mniejsze). Każdy moduł zweryfikowany po cięciu własną suitą, linterem i kontrolą typów; baseline sprawdzony w osobnym worktree na <code>main</code>.</p>
 </main>
