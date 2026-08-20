@@ -20,38 +20,29 @@ import {
   type VisibleTimeRange,
 } from "../data/types";
 import type { MarketDataSource } from "../data/source";
-import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
-import { showToast } from "../ui/toastStore";
 import { readChartColors, type ChartColors } from "./theme";
 import { DrawingCard } from "./DrawingCard";
-import { DrawingList } from "./DrawingList";
-import { IndicatorPicker } from "./indicators/IndicatorPicker";
-import { type BarsRange, useIndicators } from "./indicators/useIndicators";
-import { useIndicatorCatalogue } from "./indicators/useIndicatorCatalogue";
-import { assignLineColors, canDrawIndicator, drawnInstances } from "./chartLines";
 import {
   MAX_VISIBLE_BARS,
   MIN_VISIBLE_BARS,
   OLDER_MARGIN_BARS,
   RESOLUTION_SECONDS,
   RIGHT_EDGE_SLACK_BARS,
-  focusNeedsBackTo,
-  indicatorWindow,
   nearestBarIndex,
-  overlapsSeries,
   reachesBack,
   toCandlestick,
-  windowStillCovers,
   type PendingResolutionFrame,
 } from "./chartWindow";
-import { FeedOverlay, OhlcReadout, OlderHistoryState } from "./ChartReadout";
+import { FeedOverlay, OhlcReadout } from "./ChartReadout";
 import { activeIndicatorReadout, type Readout } from "./indicatorReadout";
 import { useChartInstance } from "./useChartInstance";
 import { useDrawingLayers } from "./useDrawingLayers";
 import { useIndicatorLayers } from "./useIndicatorLayers";
+import { useChartIndicators } from "./useChartIndicators";
+import { useChartFocus } from "./useChartFocus";
+import { ChartHeader } from "./ChartHeader";
 import { useBarFeed, type BarSink } from "./useBarFeed";
 import { useOlderBars, type OlderBarsReader } from "./useOlderBars";
-import { Button } from "../ui/Button";
 
 export interface ChartProps {
   source: MarketDataSource;
@@ -122,10 +113,6 @@ export interface ChartDrawings {
 /** One shared empty array for a chart with no drawings, so "none" is the same reference
  *  on every render and never restarts the sync effect that watches it. */
 const EMPTY_DRAWINGS: readonly AgentChartDrawing[] = [];
-/** Asked for while the catalogue has not answered yet — one identity, so waiting for it
- *  costs no render of its own. */
-const NO_SELECTIONS: IndicatorSelection[] = [];
-
 /**
  * One candlestick chart, defined entirely by `symbol` + `resolution` — the same
  * component standalone and inside a grid slot (terminal-chart spec, "Wykres
@@ -234,153 +221,24 @@ export function Chart({
   const latestFrameRef = useRef(0);
 
   // --- indicators: chosen by the operator, computed over whatever the chart draws ---
-  const [indicatorSelections, setIndicatorSelectionsState] = useState<IndicatorSelection[]>(
-    () => initialIndicatorSelections ?? [],
-  );
-  // A ref, not a dependency: notifying the caller must not itself be a reason
-  // to redo anything below, only a side effect of the operator's own action.
-  const onIndicatorSelectionsChangeRef = useRef(onIndicatorSelectionsChange);
-  onIndicatorSelectionsChangeRef.current = onIndicatorSelectionsChange;
-  const setIndicatorSelections = useCallback((next: IndicatorSelection[]) => {
-    setIndicatorSelectionsState(next);
-    onIndicatorSelectionsChangeRef.current?.(next);
-  }, []);
-  // The lazy `useState` initializer above only ever runs once, at mount — a later change
-  // to the prop is otherwise invisible until the component remounts (a page reload,
-  // previously the only way an agent-set indicator ever appeared). Re-adopted here
-  // whenever the prop is a *different* array than the one already in state: the
-  // operator's own edit above already set that state before its callback reaches the
-  // grid store, so the round-tripped prop is the same reference and this is a no-op for
-  // it; a write from elsewhere — `chartControl.ts`'s `syncAgentChart`, so far the one
-  // other writer of a slot's indicators — hands back a new one and belongs on screen
-  // without the operator refreshing to see it.
-  useEffect(() => {
-    if (initialIndicatorSelections === undefined) return;
-    setIndicatorSelectionsState((current) =>
-      current === initialIndicatorSelections ? current : initialIndicatorSelections,
-    );
-  }, [initialIndicatorSelections]);
-  // The range indicators are computed over — set from what `redraw` actually drew, not
-  // from every live tick, so an indicator does not refetch on each forming-candle update
-  // (design.md's "na żywo" is a later stage; see `useIndicators`).
-  const [barsRange, setBarsRange] = useState<BarsRange | null>(null);
-  // What was last asked for, so a pan inside it costs nothing. State cannot answer this:
-  // the range handler runs on every frame the library reports, long before a render.
-  const heldIndicatorWindowRef = useRef<BarsRange | null>(null);
-
-  /** Points the indicator window at what is on screen now, if what is on screen has left
-   *  the window already computed. `force` for the structural changes that invalidate an
-   *  answer whatever the frame is doing: a new period at the live edge, a series that
-   *  just grew at the front. */
-  const syncIndicatorWindow = useCallback(
-    (force = false) => {
-      const series = barsRef.current;
-      const visible = chartRef.current?.timeScale().getVisibleLogicalRange() ?? null;
-      const held = heldIndicatorWindowRef.current;
-      if (!force && held !== null && windowStillCovers(held, series, visible)) return;
-      // A forced sync always hands over a fresh object, even for an unchanged window, and
-      // that is load-bearing rather than sloppy: `useIndicators` watches `range` by
-      // reference, and a candle closing has to be recomputed over exactly the window that
-      // was already asked for. Equal values, different answer.
-      const next = indicatorWindow(series, visible, resolution);
-      heldIndicatorWindowRef.current = next;
-      setBarsRange(next);
-    },
-    [resolution],
-  );
-  const syncIndicatorWindowRef = useRef(syncIndicatorWindow);
-  syncIndicatorWindowRef.current = syncIndicatorWindow;
-
-  const catalogue = useIndicatorCatalogue(indicatorSource);
-  const catalogueById = useMemo(
-    () => new Map(catalogue.entries.map((entry) => [entry.id, entry] as const)),
-    [catalogue.entries],
-  );
-  // A selection restored from a saved slot may name an indicator the catalogue no
-  // longer offers (a removed entry, or storage from a build that had a
-  // different one). Dropped from what actually computes and draws — surfaced
-  // in the header instead — but never rewritten in the caller's storage on its
-  // own: only an explicit change through the picker does that (terminal-grid
-  // spec, "wpis nieznany katalogowi pomijany z komunikatem").
   //
-  // The two not-ready states are not the same state. Still loading: nothing is asked
-  // for yet, because a compute for an id the catalogue no longer offers is a read the
-  // archive refuses, and the answer that would have filtered it is one tick away.
-  // Failed: the selections pass through unfiltered, so a flaky read never reads as
-  // "the archive removed everything".
-  const { knownIndicatorSelections, unknownIndicatorIds } = useMemo(() => {
-    if (catalogue.status === "loading") {
-      return { knownIndicatorSelections: NO_SELECTIONS, unknownIndicatorIds: [] as string[] };
-    }
-    if (catalogue.status === "error") {
-      return { knownIndicatorSelections: indicatorSelections, unknownIndicatorIds: [] as string[] };
-    }
-    const known: IndicatorSelection[] = [];
-    const unknown: string[] = [];
-    for (const selection of indicatorSelections) {
-      if (catalogueById.has(selection.id)) known.push(selection);
-      else unknown.push(selection.id);
-    }
-    return { knownIndicatorSelections: known, unknownIndicatorIds: unknown };
-  }, [indicatorSelections, catalogue.status, catalogueById]);
-
-  const indicatorsState = useIndicators(
+  // Everything from the picker to the numbers behind a line lives in `useChartIndicators`,
+  // called here rather than lower down because effects run in the order they were declared
+  // and its window sync has to exist before the chart instance is handed a ref to it.
+  const indicators = useChartIndicators({
     indicatorSource,
     symbol,
     resolution,
-    knownIndicatorSelections,
-    barsRange,
-  );
-
-  // The colours as they stand *now*, not as they stood when the archive last answered.
-  // Picking a swatch must repaint the line it names immediately; waiting for the next
-  // recompute would make choosing a colour feel like a read of the archive, which it
-  // is not (design.md, "Kolor rozwiązywany przy rysowaniu z bieżących selekcji").
-  const instanceColors = useMemo(
-    () => new Map(indicatorSelections.map((selection) => [selection.key, selection.color])),
-    [indicatorSelections],
-  );
-
-  // The same assignment the sync effect makes, from the same input, kept out of the
-  // readout below: `shown` moves on every crosshair pixel and neither `drawnInstances`
-  // nor `assignLineColors` needs to redo its work that often.
-  const readoutAssignment = useMemo(() => {
-    const drawn = drawnInstances(indicatorsState.selections, indicatorsState.results, catalogueById);
-    const colors = colorsRef.current ?? readChartColors();
-    return { drawn, lineColors: assignLineColors(drawn, colors, instanceColors) };
-  }, [indicatorsState.selections, indicatorsState.results, catalogueById, instanceColors]);
-
-  // The header badge says *that* indicators are unavailable; it has nowhere to put *why*
-  // except a `title` nobody hovers. The reason is the useful part and is often actionable
-  // on the spot — "no MINUTE_5 series collected" is a thing the operator can go and fix —
-  // so it is raised where it will be read. Keyed per slot, so a chart requerying on every
-  // candle close refreshes one toast instead of stacking one per close, and two slots
-  // failing for different reasons still say so separately.
-  //
-  // Two ways this goes wrong and they read differently. The whole read can fail — the
-  // archive is unreachable, or refused the request — and then nothing was computed. Or
-  // the archive answered and some indicators came back carrying a reason instead of an
-  // answer, which is the archive not holding a series they need; the rest drew fine and
-  // the toast has to say which ones did not.
-  const indicatorError = indicatorsState.status === "error" ? indicatorsState.error : null;
-  const failedIndicators = indicatorsState.results.filter((result) => result.error !== null);
-  // A string, not the array: the array is rebuilt every render and would refire the
-  // effect on every one of them.
-  const failureDigest = failedIndicators.map((r) => `${r.id}: ${r.error}`).join("\n");
-
-  useEffect(() => {
-    if (indicatorError === null && failureDigest === "") return;
-    const failedCount = failureDigest === "" ? 0 : failureDigest.split("\n").length;
-    showToast({
-      key: `indicators:${symbol}:${resolution}`,
-      severity: "error",
-      title:
-        indicatorError !== null
-          ? `${symbol} · indicators unavailable`
-          : `${symbol} · ${failedCount} of the chosen indicators unavailable`,
-      detail: indicatorError ?? failureDigest,
-    });
-  }, [indicatorError, failureDigest, symbol, resolution]);
+    initialIndicatorSelections,
+    onIndicatorSelectionsChange,
+    chartRef,
+    barsRef,
+    colorsRef,
+  });
+  // The header takes the hook's return whole; what the chart itself needs from it is
+  // these five, all of them for drawing rather than for rendering.
+  const { indicatorsState, catalogueById, instanceColors, readoutAssignment } = indicators;
+  const { syncIndicatorWindowRef, clearIndicatorWindow } = indicators;
 
   // Declared up here rather than with the rest of the focus refs below, because the
   // chart-instance call reads it during render and a ref read during render must
@@ -521,94 +379,22 @@ export function Chart({
   }, []);
 
   // --- focus: a one-off "show this fragment" from outside ---
-  // What is currently being pursued — set the moment a request cannot be shown yet,
-  // cleared the moment it settles one way or the other. Read by `needsMore` below, which
-  // is how a single `requestOlder()` call ends up paging until this is satisfied or the
-  // pager gives up on its own (design.md, "Dociąganie pod kadr przez istniejący pager").
-  const pendingFocusRef = useRef<ChartFocusRequest | null>(null);
-  const onFocusRequestSettledRef = useRef(onFocusRequestSettled);
-  onFocusRequestSettledRef.current = onFocusRequestSettled;
+  // --- focus: a one-off "show this fragment" from outside ---
+  const { pendingFocusRef, pursueFocus, settlePendingFocus, abandonPendingFocus } = useChartFocus({
+    symbol,
+    resolution,
+    focusRequest,
+    onFocusRequestSettled,
+    chartRef,
+    barsRef,
+    requestOlderRef,
+    reachBackRef,
+  });
 
   // --- resolution change: the viewport it leaves behind, for the incoming series' first
   // draw to stand over instead of `fitContent()`'s whole-series view ---
   const pendingResolutionFrameRef = useRef<PendingResolutionFrame | null>(null);
   const previousParamsRef = useRef({ source, symbol, resolution });
-
-  const applyFocusToView = useCallback((focus: ChartFocusRequest): boolean => {
-    const chart = chartRef.current;
-    const series = barsRef.current;
-    if (!chart || !overlapsSeries(series, focus)) return false;
-    const timeScale = chart.timeScale();
-    if (focus.lastBars !== null) {
-      const shown = Math.min(focus.lastBars, series.length);
-      timeScale.setVisibleLogicalRange({ from: series.length - shown, to: series.length - 1 });
-      return true;
-    }
-    if (focus.from !== null && focus.to !== null) {
-      timeScale.setVisibleRange({ from: focus.from as Time, to: focus.to as Time });
-      return true;
-    }
-    // The one shape left: `around` + `bars`, checked exactly one way by the module that
-    // wrote this request — `around` and `bars` are never null here.
-    const index = nearestBarIndex(series, focus.around as number);
-    const bars = focus.bars as number;
-    const from = index - Math.floor(bars / 2);
-    timeScale.setVisibleLogicalRange({ from, to: from + bars - 1 });
-    return true;
-  }, []);
-
-  /** The one place a pursuit ends, however it ends: applies `focus` against whatever is
-   *  now drawn (which may be all of it, some of it, or — if nothing overlaps — none),
-   *  clears it as the pending one, and always tells the caller it is done. An application
-   *  that touched nothing is reported the way an unreadable indicator already is
-   *  (`terminal-chart` spec, "say it, do not hide it" — the same rule this file already
-   *  follows for indicators it could not compute). */
-  const settlePendingFocus = useCallback(
-    (focus: ChartFocusRequest) => {
-      pendingFocusRef.current = null;
-      const applied = applyFocusToView(focus);
-      onFocusRequestSettledRef.current?.();
-      if (!applied) {
-        showToast({
-          key: `focus:${symbol}:${resolution}`,
-          severity: "error",
-          title: `${symbol} · requested focus is outside the archive`,
-          detail: "The archive has no candles there right now.",
-        });
-      }
-    },
-    [applyFocusToView, symbol, resolution],
-  );
-
-  /** Applies `focus` now if the series already reaches back far enough; otherwise asks
-   *  the archive for what is missing and waits.
-   *
-   *  A focus that names a moment is fetched in one read of exactly the window between
-   *  that moment and the oldest drawn bar (`reachBack`) — not walked to by the pager,
-   *  which moves about a day of calendar per page on MINUTE_5 and stops after twenty of
-   *  them. Walking is right for a drag to the left edge, where the destination is "a bit
-   *  more"; it is wrong for "the middle of March", where the destination is known before
-   *  the first request and five months away.
-   *
-   *  `lastBars` names no moment and keeps the walk: it wants more of the newest end, which
-   *  is what the pager's own margin is already for. */
-  const pursueFocus = useCallback(
-    (focus: ChartFocusRequest) => {
-      if (reachesBack(barsRef.current, focus)) {
-        settlePendingFocus(focus);
-        return;
-      }
-      pendingFocusRef.current = focus;
-      const target = focusNeedsBackTo(focus, resolution);
-      if (target === null) requestOlderRef.current();
-      else reachBackRef.current(target);
-    },
-    [settlePendingFocus, resolution],
-  );
-
-  useEffect(() => {
-    if (focusRequest) pursueFocus(focusRequest);
-  }, [focusRequest, pursueFocus]);
 
   /**
    * Redraw the whole series, keeping the operator looking at the same candles.
@@ -667,7 +453,7 @@ export function Chart({
     // Structural change to what is drawn — recompute, whatever the frame did.
     // Not on every live tick: `applyBar`'s hot path never calls `redraw`.
     syncIndicatorWindowRef.current(true);
-  }, [resolution]);
+  }, [resolution, syncIndicatorWindowRef]);
 
   // --- the feed writes straight into the series ---
   const applyHistory = useCallback(
@@ -693,7 +479,7 @@ export function Chart({
       // now that the deep read has landed.
       if (pendingFocusRef.current) pursueFocus(pendingFocusRef.current);
     },
-    [redraw, pursueFocus],
+    [redraw, pursueFocus, pendingFocusRef],
   );
 
   /** A page of candles older than everything drawn. Merged rather than
@@ -721,7 +507,7 @@ export function Chart({
         if (reached || noProgress) settlePendingFocus(pending);
       }
     },
-    [redraw, settlePendingFocus],
+    [redraw, settlePendingFocus, pendingFocusRef],
   );
 
   const applyBar = useCallback((bar: Bar) => {
@@ -750,7 +536,7 @@ export function Chart({
       redraw(barsRef.current, previous[0]?.time);
     }
     publishLatestBar();
-  }, [publishLatestBar, redraw]);
+  }, [publishLatestBar, redraw, syncIndicatorWindowRef]);
 
   const sink: BarSink = useMemo(
     () => ({ onHistory: applyHistory, onBar: applyBar }),
@@ -778,7 +564,7 @@ export function Chart({
         if (pending) settlePendingFocus(pending);
       },
     }),
-    [applyOlder, settlePendingFocus],
+    [applyOlder, settlePendingFocus, pendingFocusRef],
   );
 
   // Changing symbol, resolution *or source* must not leave the previous
@@ -823,22 +609,13 @@ export function Chart({
     // An indicator computed for the previous series has no business staying on screen
     // while the new one loads — `barsRange` going null empties `indicatorsState.results`
     // (`useIndicators`), which the sync effect below reads as "remove every line".
-    heldIndicatorWindowRef.current = null;
-    setBarsRange(null);
+    clearIndicatorWindow();
     // The cleanup, not the body: a cleanup runs only when `source`/`symbol`/`resolution`
     // are *about to change* — never on the initial mount, which is what a focus supplied
     // as a starting prop needs, since the "pursue on prop change" effect below runs in
     // the same commit and must not have what it just set undone by this one.
-    return () => {
-      // A focus pursued for the series that is about to be cleared cannot be honoured
-      // against whatever loads next — abandoned rather than retried, and told to the
-      // caller the same as any other settled request.
-      if (pendingFocusRef.current) {
-        pendingFocusRef.current = null;
-        onFocusRequestSettledRef.current?.();
-      }
-    };
-  }, [source, symbol, resolution]);
+    return abandonPendingFocus;
+  }, [source, symbol, resolution, clearIndicatorWindow, abandonPendingFocus]);
 
   // Declared here rather than higher up on purpose: effects run in the order they were
   // declared, and this one has to find a chart that the instance effect above has already
@@ -873,124 +650,30 @@ export function Chart({
   useEffect(() => {
     if (older.status !== "exhausted" && older.status !== "error") return;
     if (pendingFocusRef.current) settlePendingFocus(pendingFocusRef.current);
-  }, [older.status, settlePendingFocus]);
+  }, [older.status, settlePendingFocus, pendingFocusRef]);
 
   const shown: Readout | null =
     readout ?? (latestBar ? { bar: latestBar, hovered: false } : null);
 
-  const staleStream = feed.streamState === "reconnecting" || feed.streamState === "closed";
-  const unsettledIndicators = indicatorsState.results.filter((r) => !r.settled);
 
   return (
     <section className="flex h-full min-h-0 flex-col bg-panel">
-      <header className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 border-b border-border px-2 py-1.5">
-        {headerLeft ?? <span className="text-sm font-semibold text-ink">{symbol}</span>}
-
-        <select
-          aria-label="Resolution"
-          value={resolution}
-          onChange={(e) => onResolutionChange(e.target.value as Resolution)}
-          // `h-6` rather than the vertical padding alone: a native `<select>` carries its
-          // own intrinsic sizing on top of padding, which made it taller than a `<button>`
-          // given the identical classes — pinning the height is what actually matches
-          // them, not the padding.
-          className="h-6 rounded border border-border bg-sunken px-1.5 text-xs text-ink"
-        >
-          {resolutions.map((r) => (
-            <option key={r} value={r}>
-              {RESOLUTION_LABEL[r]}
-            </option>
-          ))}
-        </select>
-
-        {/* Grouped with the instrument and interval, not pushed to the far right with
-            the status badges below: this is a control the operator reaches for, the
-            same as the two selectors beside it — and the right side of the header sits
-            directly above the right edge of the price pane, where the current price and
-            its axis label live. Nothing that competes for attention belongs there. */}
-        {indicatorSource && (
-          <IndicatorPicker
-            entries={catalogue.entries}
-            selections={knownIndicatorSelections}
-            onChange={(next) => {
-              // An unknown selection is never touched by an edit to a known
-              // one — only a change that names it (impossible: it has no
-              // checkbox) or a later catalogue read that recognizes it again
-              // moves it out of this list.
-              const stillUnknown = indicatorSelections.filter((s) => !catalogueById.has(s.id));
-              setIndicatorSelections([...stillUnknown, ...next]);
-            }}
-            canDraw={canDrawIndicator}
-          />
-        )}
-
-        {/* Beside the indicator picker, and for the same reason it is there rather than
-            in the agent panel: this is the one place the operator undoes what the agent
-            drew, and it has to be reachable without a conversation (`agent-tools` spec,
-            "Zapis MUST być odwracalny ręką operatora"). */}
-        {drawings && (
-          <DrawingList
-            drawings={drawings}
-            selectedId={selectedId}
-            // Picked from the list, so there is no click on the chart to sit beside — the
-            // card takes its own corner (`DrawingCard.cardPosition`).
-            onSelect={(id) => setSelected(id === null ? null : { id, at: null })}
-          />
-        )}
-
-        <div className="ml-auto flex items-center gap-2">
-          {unknownIndicatorIds.length > 0 && (
-            <span
-              title={`No longer offered by the indicator catalogue: ${unknownIndicatorIds.join(", ")}`}
-              className="rounded border border-warning/40 px-1.5 py-0.5 text-[10px] tracking-wide text-warning uppercase"
-            >
-              {unknownIndicatorIds.length} saved {unknownIndicatorIds.length === 1 ? "indicator" : "indicators"}{" "}
-              unavailable
-            </span>
-          )}
-          {unsettledIndicators.length > 0 && (
-            <span
-              title="The archive did not hold enough history before this range for every value to be trusted yet."
-              className="rounded border border-warning/40 px-1.5 py-0.5 text-[10px] tracking-wide text-warning uppercase"
-            >
-              warming up
-            </span>
-          )}
-          {failedIndicators.length > 0 && (
-            // Named by id rather than counted: with several chosen, "one is unavailable"
-            // sends the operator looking for which. The reason is in the toast; the id
-            // is what makes the toast findable.
-            <span
-              title={failureDigest}
-              className="rounded border border-critical/40 px-1.5 py-0.5 text-[10px] tracking-wide text-critical uppercase"
-            >
-              {failedIndicators.map((result) => result.id).join(", ")} unavailable
-            </span>
-          )}
-          {indicatorsState.status === "error" && (
-            <span className="flex items-center gap-1">
-              <span
-                title={indicatorsState.error ?? undefined}
-                className="rounded border border-critical/40 px-1.5 py-0.5 text-[10px] tracking-wide text-critical uppercase"
-              >
-                indicators unavailable
-              </span>
-              <Button
-                size="2xs"
-                onClick={indicatorsState.retry}
-              >
-                Retry
-              </Button>
-            </span>
-          )}
-          <OlderHistoryState older={older} />
-          {staleStream && (
-            <span className="rounded border border-down/40 px-1.5 py-0.5 text-[10px] tracking-wide text-down uppercase">
-              {feed.streamState === "closed" ? "stream closed" : "reconnecting"}
-            </span>
-          )}
-        </div>
-      </header>
+      <ChartHeader
+        symbol={symbol}
+        resolution={resolution}
+        resolutions={resolutions}
+        onResolutionChange={onResolutionChange}
+        headerLeft={headerLeft}
+        hasIndicatorSource={indicatorSource !== undefined}
+        indicators={indicators}
+        drawings={drawings}
+        selectedId={selectedId}
+        // Picked from the list, so there is no click on the chart to sit beside — the
+        // card takes its own corner (`DrawingCard.cardPosition`).
+        onSelectDrawing={(id) => setSelected(id === null ? null : { id, at: null })}
+        feed={feed}
+        older={older}
+      />
 
       <div className="relative min-h-0 flex-1">
         <div ref={containerRef} className="absolute inset-0" data-testid="chart-canvas" />
