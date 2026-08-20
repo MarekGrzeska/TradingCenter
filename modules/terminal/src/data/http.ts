@@ -10,6 +10,15 @@ import { MarketDataError, type MarketDataErrorKind } from "./types";
  * what a status means: 422 is an unsupported resolution to the gateway and a
  * pair the archive will not take on. That judgement stays with each adapter,
  * which is what `mapStatus` is.
+ *
+ * This is already as much as the adapters have in common, and that was measured rather
+ * than assumed: `agentApi.ts` (649 lines) and `teamsApi.ts` (840) look like twins from
+ * the outside, and on 20 August 2026 they were compared the way the Python modules are
+ * before anything is shared — `difflib.SequenceMatcher` over lines, `autojunk` off.
+ * 14.8% of lines in common, 7.9% ignoring blanks and comments, against the 70% the
+ * sharing rule asks for and the 79.4% that moved the OpenAI provider into `tc-openai`.
+ * The longest identical run is eight lines, and it is the model-catalogue row both
+ * surfaces publish. A second wrapper beneath this one would have nothing to hold.
  */
 
 export interface JsonRequest {
