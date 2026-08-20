@@ -125,7 +125,7 @@ def test_the_step_runs_at_all_under_set_u() -> None:
 
 
 def test_a_documentation_change_runs_nothing() -> None:
-    decisions = decide(["README.md", "docs/plan-refactoru.html"])
+    decisions = decide(["README.md", "docs/nastepne-ciecia.html"])
     assert not any(decisions.values()), decisions
 
 
