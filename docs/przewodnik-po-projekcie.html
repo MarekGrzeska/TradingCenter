@@ -1,0 +1,441 @@
+<title>TradingCenter z lotu ptaka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 26px 0 8px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Przewodnik · przegląd całości</span>
+    <h1>TradingCenter z lotu ptaka</h1>
+    <p class="lede">Monorepo <b>niezależnych modułów</b>: pięć procesów współpracujących wyłącznie przez opublikowane kontrakty, trzy paczki źródeł dzielonych w czasie budowy, Terraform na Azure. Ten dokument to mapa dla programisty C# wchodzącego w projekt; każdy moduł ma obok własny przewodnik szczegółowy.</p>
+    <div class="strip">
+      <span>~118,5 tys. linii kodu · ~49 tys. w testach</span>
+      <span>Python 3.12 · TypeScript/React · Terraform</span>
+      <span>61 specyfikacji OpenSpec · 53 zarchiwizowane zmiany</span>
+      <span>20 sierpnia 2026</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">5</div><div class="l">niezależnych modułów</div></div>
+      <div class="cell"><div class="v">3</div><div class="l">paczki dzielone w czasie budowy</div></div>
+      <div class="cell"><div class="v">10/s</div><div class="l">budżet zapytań u dostawcy, na rachunek</div></div>
+      <div class="cell"><div class="v">1</div><div class="l">rachunek — wyłącznie demo, sprawdzany u źródła</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Zasada</div>
+      <h2>Kontrakty zamiast referencji</h2>
+      <p class="intro">Każdy moduł działa samodzielnie — własny entrypoint, zależności, testy, README, własny obraz Dockera i własny deploy. Nie ma solution ani grafu referencji projektów: w czasie wykonania moduł sięga do drugiego tylko przez HTTP/OpenAPI albo MCP.</p>
+      <div class="quote">Moduł sięga do drugiego tylko przez kontrakt — nigdy przez jego pakiet, bazę czy tożsamość.</div>
+      <p>Źródła wolno dzielić <strong>w czasie budowy</strong> przez <code>packages/</code>, pod trzema warunkami spisanymi w <code>docs/architecture.md</code> z pomiarem, który je tam umieścił (sekcja 05). Paczka jest rozwiązywana do locka każdego modułu i wpiekana w jego obraz — niczego się nie publikuje ani nie wersjonuje. Gdy zmiana zdaje się potrzebować czegoś, czego paczka dać nie może, <span class="hl">zła jest zmiana, nie reguła</span>.</p>
+      <p>Dla programisty C#: to mikroserwisy bez współdzielonych bibliotek NuGet — a tam, gdzie .NET dałby wam projekt <code>Shared.Contracts</code>, tu każdy konsument trzyma własne DTO albo generuje je z OpenAPI drugiej strony i pilnuje w CI, żeby nie zgniły.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Mapa</div>
+      <h2>Kto z kim rozmawia</h2>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 540" role="img" aria-label="Mapa systemu: terminal rozmawia z workbenchem, market-data i capital-gateway; workbench czyta /mcp market-data i woła trading-mcp; trading-mcp i market-data wołają capital-gateway, który jako jedyny rozmawia z capital.com; market-data i workbench trzymają dane w jednym PostgreSQL">
+            <defs>
+              <marker id="g1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="390" y="16" width="200" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="490" y="40" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">terminal</text>
+              <text x="490" y="58" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">React · 5173 · Static Web App</text>
+
+              <rect x="60" y="150" width="200" height="60" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="160" y="174" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">market-data</text>
+              <text x="160" y="192" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8020 · archiwum + /mcp</text>
+
+              <rect x="390" y="150" width="200" height="60" fill="#14306b" stroke="#14306b"></rect>
+              <text x="490" y="174" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">workbench</text>
+              <text x="490" y="192" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">8030 · rozmowa + zespoły</text>
+
+              <rect x="720" y="150" width="200" height="60" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="820" y="174" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">trading-mcp</text>
+              <text x="820" y="192" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8060 · strażnik rachunku</text>
+
+              <rect x="390" y="330" width="200" height="60" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="490" y="354" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">capital-gateway</text>
+              <text x="490" y="372" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8010 · jedyne drzwi</text>
+
+              <rect x="60" y="330" width="200" height="60" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="160" y="354" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">PostgreSQL</text>
+              <text x="160" y="372" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">market_data · agent · teams</text>
+
+              <rect x="390" y="464" width="200" height="56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="490" y="488" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">capital.com</text>
+              <text x="490" y="506" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">demo API + strumień</text>
+
+              <line x1="490" y1="76" x2="490" y2="146" stroke="currentColor" stroke-width="1.4" marker-end="url(#g1)"></line>
+              <text x="502" y="116" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">czat SSE · zespoły</text>
+
+              <line x1="416" y1="76" x2="196" y2="146" stroke="currentColor" stroke-width="1.4" marker-end="url(#g1)"></line>
+              <text x="252" y="100" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">REST + /ws/candles</text>
+
+              <polyline points="594,44 680,44 680,360 598,360" fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#g1)"></polyline>
+              <text x="692" y="270" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">Accounts · rachunek demo</text>
+
+              <line x1="386" y1="180" x2="268" y2="180" stroke="#14306b" stroke-width="1.7" marker-end="url(#g1)"></line>
+              <text x="327" y="168" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#14306b">/mcp · 11 narzędzi · 0 zapisów</text>
+
+              <line x1="594" y1="180" x2="716" y2="180" stroke="#14306b" stroke-width="1.7" marker-end="url(#g1)"></line>
+              <text x="655" y="168" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#14306b">MCP · jeden rozmówca</text>
+
+              <line x1="800" y1="214" x2="594" y2="344" stroke="currentColor" stroke-width="1.4" marker-end="url(#g1)"></line>
+              <text x="740" y="288" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">REST + klucz</text>
+
+              <line x1="180" y1="214" x2="386" y2="344" stroke="currentColor" stroke-width="1.4" marker-end="url(#g1)"></line>
+              <text x="200" y="288" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">zasilanie: WS + REST + klucz</text>
+
+              <line x1="160" y1="214" x2="160" y2="326" stroke="currentColor" stroke-width="1.3" marker-end="url(#g1)"></line>
+              <text x="172" y="276" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">schemat market_data</text>
+
+              <line x1="410" y1="214" x2="268" y2="332" stroke="currentColor" stroke-width="1.3" marker-end="url(#g1)"></line>
+              <text x="272" y="240" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">agent · teams</text>
+
+              <line x1="490" y1="394" x2="490" y2="460" stroke="currentColor" stroke-width="1.4" marker-end="url(#g1)"></line>
+              <text x="502" y="432" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">jedna sesja demo</text>
+
+              <rect x="720" y="446" width="200" height="74" fill="none" stroke="#b8322a" stroke-width="1.2" stroke-dasharray="4 4"></rect>
+              <text x="820" y="474" text-anchor="middle" font-size="11" font-weight="700" fill="#b8322a">porty niczyje</text>
+              <text x="820" y="494" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#b8322a">8040 · 8050 · 8070</text>
+              <text x="820" y="510" text-anchor="middle" font-size="9.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">.env, który tam celuje, czyta się jako awaria</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — przerywana ramka na dole to granica, za którą nic w repozytorium nie sięga. Ścieżka zlecenia: terminal → workbench → trading-mcp → capital-gateway → capital.com; typ rachunku jest sprawdzany u bramki, zanim trading-mcp w ogóle otworzy port.</figcaption>
+      </figure>
+      <p>Dwa dawne moduły zniknęły z tej mapy w połowie sierpnia 2026: <code>market-mcp</code> wtopił się w market-data jako trasa <code>/mcp</code>, a <code>teams-mcp</code> w workbench jako wywołanie funkcji. <code>trading-mcp</code> został — reguła, która z tego wynikła: <span class="hl">serwer narzędzi stojący przed właścicielem własnych danych wtapia się w niego; stojący przed inną granicą bezpieczeństwa — nie</span>. Bramka nie jest właścicielem rachunku, jest drzwiami do dostawcy, a sednem osobnego modułu jest to, że drzwi i lista uprawnionych do pukania to nie ten sam artefakt.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Moduły</div>
+      <h2>Pięć procesów, pięć przewodników</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Moduł</th><th class="n">Port</th><th>Rola i implementacja wysokopoziomowa</th><th>Przewodnik</th></tr></thead>
+          <tbody>
+            <tr><td><b>capital-gateway</b></td><td class="n">8010</td><td>Jedyne drzwi do capital.com: handel na demo, głęboka historia, strumień na żywo. FastAPI + httpx + websockets; cztery warstwy (klient → mappery → adapter → HTTP), zero bazy. Sesja dostawcy i limit 10 req/s zamknięte w środku.</td><td><code>przewodnik-capital-gateway.html</code></td></tr>
+            <tr><td><b>market-data</b></td><td class="n">8020</td><td>Archiwum świec i jedyny właściciel PostgreSQL. Zasilanie WS + backfill przez bramkę, pokrycie jako fakt, interwały pochodne, ~50 wskaźników na własnym kernelu numpy. Dwie powierzchnie: REST (źródło kontraktu terminala) i 11 narzędzi MCP tylko-odczyt na <code>/mcp</code>.</td><td><code>przewodnik-market-data.html</code></td></tr>
+            <tr><td><b>workbench</b></td><td class="n">8030</td><td>Rozmowa operatora z modelem <em>i</em> zespoły agentów — jeden proces, dwie powierzchnie, dwa schematy, dwa klucze OpenAI. LangGraph do pętli model↔narzędzia i do grafu zespołu; harmonogramy cron po warszawsku; rewizje zespołów tylko do dopisania.</td><td><code>przewodnik-workbench.html</code></td></tr>
+            <tr><td><b>trading-mcp</b></td><td class="n">8060</td><td>Dwanaście narzędzi MCP nad rachunkiem demo bramki: 6 odczytów, 6 zapisów. Demo sprawdzane u bramki przed otwarciem portu; zapis nigdy nie jest ponawiany; jeden nazwany rozmówca (workbench).</td><td><code>przewodnik-trading-mcp.html</code></td></tr>
+            <tr><td><b>terminal</b></td><td class="n">5173</td><td>Ekran operatora: React 19 + TS + Vite, sześć zakładek z jednego rejestru, panel czatu obok tras. Kontrakty generowane z OpenAPI (market-data, teams) plus ręczne DTO rozmowy; tożsamość Entra przez MSAL, bilety jednorazowe do WebSocketu. Konsumuje, nie publikuje.</td><td><code>przewodnik-terminal.html</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Przewodniki leżą obok tego pliku w <code>docs/</code> i są też opublikowane jako artefakty. Zajrzyj do nich po szczegóły plik-po-pliku — ten dokument celowo zostaje na wysokości mapy.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Statystyki</div>
+      <h2>Ile tego jest</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Obszar</th><th class="n">Pliki źródłowe</th><th class="n">Linie ogółem</th><th class="n">W tym testy</th><th>Języki</th></tr></thead>
+          <tbody>
+            <tr><td><b>modules/workbench</b></td><td class="n">190</td><td class="n">33 249</td><td class="n">15 708</td><td>Python</td></tr>
+            <tr><td><b>modules/terminal</b></td><td class="n">177</td><td class="n">40 916</td><td class="n">14 059</td><td>TypeScript/TSX (w tym ~4,5 tys. generowanych)</td></tr>
+            <tr><td><b>modules/market-data</b></td><td class="n">131</td><td class="n">27 319</td><td class="n">13 650</td><td>Python</td></tr>
+            <tr><td><b>modules/capital-gateway</b></td><td class="n">32</td><td class="n">7 067</td><td class="n">4 161</td><td>Python</td></tr>
+            <tr><td><b>modules/trading-mcp</b></td><td class="n">23</td><td class="n">2 678</td><td class="n">1 564</td><td>Python</td></tr>
+            <tr><td><b>packages/ (3 paczki)</b></td><td class="n">21</td><td class="n">1 972</td><td class="n">—</td><td>Python</td></tr>
+            <tr><td><b>infra/</b></td><td class="n">17</td><td class="n">2 412</td><td class="n">—</td><td>Terraform</td></tr>
+            <tr><td><b>scripts/</b></td><td class="n">12</td><td class="n">2 936</td><td class="n">—</td><td>Python, bash, SQL</td></tr>
+            <tr><td><b>razem</b></td><td class="n">603</td><td class="n">~118 500</td><td class="n">~49 100</td><td>Python ~75,0 tys. · TS ~40,9 tys. · TF ~2,4 tys.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Stosunek testów do produkcji jest bliski 1:1 — i jest <em>zmierzony oraz regulowany</em>: <code>docs/bilans-testow.html</code> i osiem reguł w CLAUDE.md pilnują, żeby piąta kopia tego samego testu nie powstała, nie obniżając poprzeczki tam, gdzie chybienie to cicha korupcja danych, druga pozycja na rachunku albo wyciek sekretu. Do tego <code>openspec/</code>: 61 specyfikacji zdolności (prawda o wymaganiach) i 53 zarchiwizowane zmiany (droga do niej).</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Paczki</div>
+      <h2>Dzielenie źródeł pod trzema warunkami</h2>
+      <p class="intro">Stara reguła brzmiała „żadnych wspólnych bibliotek” — duplikacja jest przynajmniej widoczna w diffie. Cena okazała się wyższa: 959 linii żyjących wyłącznie jako kopie i cztery błędy naprawione w jednej kopii, a nie w drugiej (jeden na ścieżce zleceń, przez dobę). Stąd trzy warunki:</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>1 · Zmierzone, nie założone <span class="tag ok">próg 70%</span></h3>
+          <p>Kod już <em>jest</em> ręcznie utrzymywaną kopią — co najmniej 70% identycznych linii między modułami, wg <code>scripts/measure-duplication.py</code> (komentarze i docstringi liczą się celowo). Druga furtka dla kodu nowego: więcej niż jeden konsument i identyczność od pierwszego dnia.</p>
+        </div>
+        <div class="fail ok">
+          <h3>2 · Każda różnica jest argumentem <span class="tag ok">nigdy switch po module</span></h3>
+          <p>Wspólny plik z rozgałęzieniem „kto woła” to zakazana klasa bazowa w innym kapeluszu.</p>
+        </div>
+        <div class="fail ok">
+          <h3>3 · Każdy konsument testowany przy każdej zmianie <span class="tag ok">CI</span></h3>
+          <p>Zmiana pod <code>packages/</code> odpala job testowy każdego modułu zależnego — to odkupuje jedyną rzecz, którą stara reguła dawała za darmo.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Paczka</th><th>Zawartość</th><th>Konsumenci</th></tr></thead>
+          <tbody>
+            <tr><td><b>tc-runtime</b></td><td>pula asyncpg z tożsamością Entra, rygiel doradczy migracji, jazda Alembikiem z konfiguracji w pamięci, kontrola rewizji schematu (dokładna równość — baza <em>przed</em> obrazem też jest błędem), odczyt principala Easy Auth, fabryka trasy <code>/models</code></td><td>market-data (częściowo), workbench</td></tr>
+            <tr><td><b>tc-mcp-kit</b></td><td>middleware tożsamości rozmówcy (surowe ASGI — buforujące middleware łamie transport strumieniowy), spłaszczanie odmowy upstreamu do jednego zdania, odchudzanie schematów narzędzi (−22,6% znaków czytanych przez model na turę)</td><td>market-data, workbench, trading-mcp</td></tr>
+            <tr><td><b>tc-openai</b></td><td>jeden plik ze streamowanym wywołaniem OpenAI z narzędziami; unia <code>Conversation | Briefing</code> jako strażnik różnicy między powierzchniami; klucz przyjmowany stringiem, żeby dwa klucze nie mogły po cichu stać się jednym</td><td>workbench (obie powierzchnie; 79,4% identyczności zmierzone przed scaleniem)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Uwaga praktyczna: przez zależności ścieżkowe kontekstem budowy obrazu każdego konsumenta jest <strong>korzeń repozytorium</strong>, a skasowanie modułu przestało być skasowaniem samego katalogu.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Infrastruktura</div>
+      <h2>Azure spisany w Terraformie</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zasób</th><th>Nazwa</th><th>Uwagi</th></tr></thead>
+          <tbody>
+            <tr><td><b>App Service Plan</b></td><td>asp-tradingcenter</td><td>Linux B3, <strong>jeden worker</strong> — drugi worker to drugi RateGate wydający ten sam budżet 10 req/s; historia SKU zapisana pomiarami pamięci</td></tr>
+            <tr><td><b>4 × Web App</b></td><td>…-gateway · …-market-data · …-agent (workbench) · …-trading-mcp</td><td>tożsamości SystemAssigned; obrazy z GHCR tagowane SHA; <code>app-tradingcenter-agent</code> zachowuje nazwę, bo nazwa <em>jest</em> tożsamością na trzech listach dozwolonych</td></tr>
+            <tr><td><b>PostgreSQL Flexible</b></td><td>psql-tradingcenter</td><td>PG 17, B1ms (750 h darmowego grantu = jeden serwer), trzy bazy logiczne: market_data, agent, teams; hasła wyłączone, wyłącznie Entra, wymuszony TLS</td></tr>
+            <tr><td><b>Easy Auth + Entra</b></td><td>moduł easy-auth-app ×4 + SPA terminala</td><td>listy <code>allowed_applications</code> są właściwą bramą; autoryzowana jest <em>aplikacja</em> z claimu <code>azp</code>/<code>appid</code> — nie nagłówek z osobą (zmierzono odwrotne założenie na produkcji); <code>/ws/*</code> i <code>/health</code> wyłączone spod Easy Auth po incydentach</td></tr>
+            <tr><td><b>Key Vault</b></td><td>kv-tradingctr-*</td><td>same nazwy sekretów w Terraformie, wartości ustawiane ręcznie; dwa klucze OpenAI, jeden klucz bramki o trzech czytelnikach</td></tr>
+            <tr><td><b>Static Web App</b></td><td>swa-tradingcenter-terminal</td><td>Free, eastus2 (SWA nie istnieje w Poland Central)</td></tr>
+            <tr><td><b>Monitoring</b></td><td>log-/appi-tradingcenter</td><td>alert na wiek świecy liczony <em>w okresach</em>, nie sekundach; zewnętrzna sonda <code>/ping</code> — jedyne pytanie, na które metryki platformy nie odpowiadają</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><code>infra/bootstrap/</code> to osobny korzeń z lokalnym, komitowanym stanem — tworzy konto storage, w którym żyje stan reszty; jego klucze są bezczynne z konstrukcji (<code>shared_access_key_enabled = false</code>). <strong><code>terraform apply</code> jest zawsze ręczny</strong>: ten korzeń zarządza aplikacjami Entra, a apply z CI oznaczałby oddanie principalowi CI prawa zapisu do katalogu — CI trzyma <code>Application.Read.All</code> i ręczny workflow odmawia każdego planu dotykającego <code>azuread_*</code>.</p>
+      <p>Pułapka kolejności warta zapamiętania: <span class="hl">narzędzia modułu przybywają przy <code>apply</code>, nie przy deployu</span>. Workbench wdrożony bez <code>MARKET_MCP_URL</code> startuje i odpowiada — bez narzędzi, co jest stanem wspieranym; pojawiają się dopiero, gdy apply ustawi URL <em>i</em> wpisze tożsamość na listy, a aplikacja się zrestartuje. Ustawienia muszą dotrzeć przed obrazem, który je egzekwuje — apply lądujący po deployu to przerwa w działaniu pomiędzy.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · CI/CD</div>
+      <h2>Jeden job na moduł, tylko dotknięte</h2>
+      <p class="intro"><code>checks.yml</code> liczy na starcie, które moduły diff mógł zepsuć, i uruchamia tylko ich joby (ruff + pyright + pytest, terminal: contract:check + lint + typecheck + test). Trzy sprzężenia są nieoczywiste i każde jest prawdziwą kontrolą:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zmiana w…</th><th>Odpala też…</th><th>Bo…</th></tr></thead>
+          <tbody>
+            <tr><td><code>market_data/contract.py</code> <b>albo cokolwiek</b> w workbenchu</td><td>job terminala</td><td><code>contract:check</code> i ręczne DTO terminala są kontrolami tych szwów; cały workbench, bo dokument OpenAPI budują trasy i importowane modele, nie jeden plik</td></tr>
+            <tr><td>cokolwiek w capital-gateway</td><td>job trading-mcp</td><td>trzyma komitowaną migawkę całego OpenAPI bramki</td></tr>
+            <tr><td>cokolwiek w <code>packages/</code></td><td>joby wszystkich konsumentów</td><td>warunek 3 reguły dzielenia źródeł</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Cztery workflowy deployują na push do <code>main</code> przez jeden reużywalny <code>_deploy-app-service.yml</code>, a każdy kończy się <code>scripts/deploy_probe.py</code> — pytającym o <em>dwie</em> rzeczy: czy App Service wskazuje obraz tego commita <strong>i czy proces w środku wstał</strong>. To drugie pytanie kiedyś nie padało: 16 sierpnia 2026 kontrola plane'u raportowała <code>Running</code> nad kontenerem w pętli restartów. Bramki nie da się sondować wcale (wpuszcza tylko adresy wychodzące własnego planu), więc tam zostaje pytanie do control plane'u. Ważne: <strong>repo nie ma branch protection</strong> (prywatne, darmowy plan) — pominięty job niczego nie blokuje.</p>
+      <p>Zasada spinająca deploy z migracjami: <strong>merge do <code>main</code> musi zostawić produkcję obsługującą ruch</strong> — bez kroku operatora między merge'em a działającą aplikacją. Każdy moduł migruje swoje bazy sam w <code>lifespan</code>, pod ryglem doradczym Postgresa (klucze: 8020, 8030, 8050 — porty, które moduły kiedyś miały). Jedyny krok operatora, dokładnie raz na bazę: <code>scripts/grant-schema-ownership.sql</code>.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Biblioteki</div>
+      <h2>Stos w jednej tabeli</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Warstwa</th><th>Biblioteka</th><th>Rola · odpowiednik .NET</th></tr></thead>
+          <tbody>
+            <tr><td rowspan="6"><b>Python — wszystkie backendy</b></td><td>FastAPI + uvicorn</td><td>HTTP/WebSocket/OpenAPI · ASP.NET Core minimal API + Kestrel</td></tr>
+            <tr><td>pydantic (+ pydantic-settings)</td><td>DTO z walidacją przy konstrukcji i konfiguracja z <code>.env</code> · rekordy + FluentValidation + IOptions</td></tr>
+            <tr><td>httpx / websockets / respx</td><td>klienty HTTP i WS, mock transportu w testach · HttpClient + podmieniony HttpMessageHandler</td></tr>
+            <tr><td>asyncpg + alembic (+ SQLAlchemy tylko pod alembika)</td><td>surowy SQL bez ORM + migracje ręczne · Dapper + własne skrypty migracji, nie EF</td></tr>
+            <tr><td>mcp == 1.27.0 (przypięte)</td><td>serwery FastMCP i klienty sesji MCP — protokół narzędzi dla modeli</td></tr>
+            <tr><td>uv · ruff (0.16.2) · pyright (1.1.411) · pytest</td><td>menedżer pakietów i venv · linter+formatter · type-checker · testy — NuGet/dotnet · analizatory · kompilator-checker · xUnit; wersje narzędzi przypięte co do numeru, żeby CI nie czerwieniło się samo</td></tr>
+            <tr><td rowspan="3"><b>workbench</b></td><td>LangGraph</td><td>graf pętli model↔narzędzia i DAG zespołu — „start, gdy poprzednicy skończyli” za darmo</td></tr>
+            <tr><td>langchain-openai</td><td>zamknięte w jednym pliku <code>tc-openai</code>; nigdzie indziej nie istnieje</td></tr>
+            <tr><td>croniter + tzdata</td><td>„kiedy następne odpalenie” · cron czytany w Europe/Warsaw, emitowany w UTC</td></tr>
+            <tr><td><b>market-data</b></td><td>numpy (+ ta-lib tylko w dev)</td><td>kernel wskaźników; TA-Lib jest wyrocznią porównawczą w testach, nie zależnością produktu</td></tr>
+            <tr><td rowspan="4"><b>terminal</b></td><td>React 19 + react-router 7 + Vite 7</td><td>UI, routing, build — komponenty funkcyjne + hooki</td></tr>
+            <tr><td>TanStack Query 5</td><td>stan serwera: cache, retry, polling · nie ma odpowiednika Polly-pipeline — to biblioteka danych, nie polityk</td></tr>
+            <tr><td>lightweight-charts 5 + @xyflow/react 12</td><td>wykres świecowy z własnymi prymitywami · kanwa zespołów</td></tr>
+            <tr><td>@azure/msal-browser + openapi-typescript + Tailwind 4 + Vitest</td><td>logowanie Entra · generacja kontraktu z OpenAPI · style · testy</td></tr>
+            <tr><td><b>infra</b></td><td>Terraform (azurerm 4, azuread 3)</td><td>całe Azure jako kod; apply wyłącznie ręczny</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Jak pracować</div>
+      <h2>Dzień pierwszy przy klawiaturze</h2>
+      <p class="intro">Cały stos stawia <code>./scripts/dev.sh</code> (implementacja w <code>scripts/dev.py</code>; <code>--explain</code> drukuje kolejność startu z powodami). Preflight zgłasza <em>wszystkie</em> braki naraz: uv, Docker z żywym demonem, komplet <code>.env</code>, wolne porty, bazy na loopbacku, zgodność klucza bramki między dwoma plikami.</p>
+      <div class="fails">
+        <div class="fail">
+          <h3>Baza dev = kontener z compose.yaml <span class="tag att">127.0.0.1:55432</span></h3>
+          <p>Docker jest wymagany do uruchomienia stosu, nie tylko testów. Nieustawiony <code>DATABASE_USER</code> wybiera tryb lokalny i zawęża moduł do loopbacku — <code>DATABASE_URL</code> na zdalny host jest odrzucany przy starcie. Produkcja używa tożsamości Entra.</p>
+        </div>
+        <div class="fail">
+          <h3>Nieobecność bywa konfiguracją <span class="tag att">cicha awaria</span></h3>
+          <p>Brak <code>MARKET_MCP_URL</code> = rozmowa bez narzędzi archiwum (stan wspierany); brak <code>TRADING_MCP_URL</code> = agent „nie widzi” pozycji operatora — czyta się najgorzej ze wszystkich, bo wygląda jak błąd modelu, a jest ustawieniem.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Stare pliki .env <span class="tag stop">trzy daty, jeden błąd</span></h3>
+          <p>Plik sprzed scaleń może celować w martwe porty (8040/8050/8070) albo nosić emerytowane nazwy (<code>TEAMS_MCP_URL</code>, nieprefiksowany <code>DATABASE_URL</code>/<code>OPENAI_API_KEY</code>/<code>MODELS</code>) — <code>dev.py</code> wymienia wszystko przy starcie.</p>
+        </div>
+      </div>
+      <p><strong>Workflow zmian:</strong> najpierw pytanie, czy to zmiana OpenSpec — mechanicznie, po plikach, które praca dotknie: wymaganie w <code>openspec/specs/**</code>, kontrakt między modułami, <code>infra/**</code> albo reguła architektoniczna nazwana w CLAUDE.md. Jeśli tak: <code>/opsx:propose → apply → archive</code>. Jeśli nie: branch, testy, PR. Konwencja językowa jest nieoczywista: <span class="hl">artefakty OpenSpec to polska proza z angielską strukturą</span> (nagłówki, <code>**WHEN**</code>/<code>**THEN**</code>, słowa RFC 2119 — walidator nie uznaje „MUSI”), a cała reszta repo — kod, komentarze, commity, README — jest po angielsku.</p>
+      <p>Praca równoległa: <code>git worktree</code> zamiast drugiego klona — ale kontener bazy, sesja Capital i stałe porty są wspólne, więc stos i migracje może naraz uruchamiać tylko jeden agent. I nawyk najważniejszy: <strong>czytaj komentarze</strong> — w tym repo są zapisem projektowym z datami pomiarów i incydentami; niejedna decyzja istnieje tylko tam.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Przegląd projektu TradingCenter · stan z 20 sierpnia 2026</span>
+    <span>Źródła: CLAUDE.md · docs/architecture.md · README modułów · pięć przewodników obok</span>
+  </div>
+</footer>
