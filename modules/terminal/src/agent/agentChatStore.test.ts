@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { waitFor } from "@testing-library/react";
-import { createAgentChatStore, STORAGE_KEY } from "./agentChatStore";
+import {
+  createAgentChatStore,
+  DEFAULT_PANEL_WIDTH,
+  MIN_PANEL_WIDTH,
+  maxPanelWidth,
+  STORAGE_KEY,
+} from "./agentChatStore";
 import type {
   AgentApi,
   AgentMessage,
@@ -1034,5 +1040,86 @@ describe("createAgentChatStore — stopping a turn", () => {
     const reply = store.getSnapshot().messages[1];
     expect(reply.incomplete).toBe(true);
     expect(reply.stopped).toBe(true);
+  });
+});
+
+
+describe("createAgentChatStore — the width the operator sets", () => {
+  const WIDTH_KEY = "terminal.agentChat.width.v1";
+  // Wide enough that the bounds under test are the ones being asked about, not the
+  // window's.
+  const WINDOW = 1600;
+
+  it("starts at the width the panel always had, with nothing stored", () => {
+    const store = createAgentChatStore(memoryStorage(), createFakeApi());
+
+    expect(store.getSnapshot().width).toBe(DEFAULT_PANEL_WIDTH);
+  });
+
+  it("remembers a width across a new store, which is what a reload is", () => {
+    const storage = memoryStorage();
+    const first = createAgentChatStore(storage, createFakeApi());
+
+    first.setWidth(600, WINDOW);
+    expect(first.getSnapshot().width).toBe(600);
+    expect(storage.getItem(WIDTH_KEY)).toBe("600");
+
+    const second = createAgentChatStore(storage, createFakeApi());
+    expect(second.getSnapshot().width).toBe(600);
+  });
+
+  it("keeps the width through collapsing and expanding again", () => {
+    const store = createAgentChatStore(memoryStorage(), createFakeApi());
+
+    store.setWidth(700, WINDOW);
+    store.setExpanded(false);
+    store.setExpanded(true);
+
+    expect(store.getSnapshot().width).toBe(700);
+  });
+
+  it("stops at both bounds rather than following the drag", () => {
+    const store = createAgentChatStore(memoryStorage(), createFakeApi());
+
+    store.setWidth(10, WINDOW);
+    expect(store.getSnapshot().width).toBe(MIN_PANEL_WIDTH);
+
+    store.setWidth(WINDOW * 2, WINDOW);
+    expect(store.getSnapshot().width).toBe(maxPanelWidth(WINDOW));
+    // The tab beside it keeps a usable share of the screen, which is the whole reason
+    // there is an upper bound at all.
+    expect(store.getSnapshot().width).toBeLessThan(WINDOW);
+  });
+
+  it("brings a width saved on a wider screen inside this window's bounds", () => {
+    // `terminal-agent-chat` spec, "Okno węższe niż zapamiętana szerokość"
+    const storage = memoryStorage({ [WIDTH_KEY]: "1400" });
+    const store = createAgentChatStore(storage, createFakeApi());
+
+    // The store reads `window.innerWidth`, which jsdom fixes at 1024.
+    expect(store.getSnapshot().width).toBe(maxPanelWidth(window.innerWidth));
+  });
+
+  it("falls back to the default when the stored value is not a width", () => {
+    const store = createAgentChatStore(memoryStorage({ [WIDTH_KEY]: "wide" }), createFakeApi());
+
+    expect(store.getSnapshot().width).toBe(DEFAULT_PANEL_WIDTH);
+  });
+
+  it("survives a storage that throws", () => {
+    const throwing: Storage = {
+      ...memoryStorage(),
+      getItem: () => {
+        throw new Error("Safari private mode");
+      },
+      setItem: () => {
+        throw new Error("Safari private mode");
+      },
+    };
+    const store = createAgentChatStore(throwing, createFakeApi());
+
+    expect(store.getSnapshot().width).toBe(DEFAULT_PANEL_WIDTH);
+    store.setWidth(600, WINDOW);
+    expect(store.getSnapshot().width).toBe(600);
   });
 });

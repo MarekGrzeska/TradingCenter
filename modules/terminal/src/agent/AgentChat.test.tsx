@@ -1,9 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 import { AgentChat } from "./AgentChat";
-import { createAgentChatStore } from "./agentChatStore";
+import {
+  createAgentChatStore,
+  DEFAULT_PANEL_WIDTH,
+  MIN_PANEL_WIDTH,
+  maxPanelWidth,
+} from "./agentChatStore";
 import type { AgentApi, AgentMessage, AgentModel, AgentSession, AgentToolCall } from "./agentApi";
 import type { AgentStreamEvent } from "./stream";
 
@@ -206,6 +211,18 @@ function createFakeApi(): FakeApi {
   return api;
 }
 
+/** One drag of the handle to a screen position.
+ *
+ *  Dispatched as `MouseEvent`s named for the pointer events, rather than through
+ *  `fireEvent.pointerMove`: jsdom's own `PointerEvent` drops `clientX`, so the handler
+ *  under test would read `undefined` and the gesture would prove nothing. React reads the
+ *  coordinate off the native event, which a `MouseEvent` carries. */
+function drag(handle: HTMLElement, clientX: number): void {
+  fireEvent(handle, new MouseEvent("pointerdown", { bubbles: true, clientX: 0 }));
+  fireEvent(handle, new MouseEvent("pointermove", { bubbles: true, clientX }));
+  fireEvent(handle, new MouseEvent("pointerup", { bubbles: true, clientX }));
+}
+
 function renderChat(api: FakeApi = createFakeApi()) {
   const store = createAgentChatStore(null, api);
   return { api, store, ...render(<AgentChat store={store} />) };
@@ -397,5 +414,75 @@ describe("AgentChat", () => {
     await user.click(screen.getByRole("button", { name: /expand get_candles/i }));
     expect(screen.getByText(/"symbol":"US100"/)).toBeInTheDocument();
     expect(screen.getByText('{"candles": 78}')).toBeInTheDocument();
+  });
+
+  it("gives the panel the width the operator drags it to, and stops at the bounds", async () => {
+    // `terminal-agent-chat` spec, "Operator poszerza panel" and "Ciągnięcie poza granicę"
+    await openPanel();
+    const panel = screen.getByRole("complementary", { name: /agent chat/i });
+    const handle = screen.getByRole("separator", { name: /resize agent chat/i });
+    expect(panel).toHaveStyle({ width: `${DEFAULT_PANEL_WIDTH}px` });
+
+    // jsdom has no layout, so the drag is the three pointer events themselves — which is
+    // also all the component reads.
+    drag(handle, window.innerWidth - 600);
+    expect(panel).toHaveStyle({ width: "600px" });
+
+    // Past the far end: the panel stops, and the tab beside it keeps its share.
+    drag(handle, 0);
+    expect(panel).toHaveStyle({ width: `${maxPanelWidth(window.innerWidth)}px` });
+
+    // And past the near end.
+    drag(handle, window.innerWidth);
+    expect(panel).toHaveStyle({ width: `${MIN_PANEL_WIDTH}px` });
+  });
+
+  it("resizes from the keyboard, in steps and to either bound", async () => {
+    // `terminal-agent-chat` spec, "Chwyt z klawiatury"
+    const { user } = await openPanel();
+    const panel = screen.getByRole("complementary", { name: /agent chat/i });
+    const handle = screen.getByRole("separator", { name: /resize agent chat/i });
+
+    handle.focus();
+    await user.keyboard("{ArrowLeft}");
+    expect(panel).toHaveStyle({ width: `${DEFAULT_PANEL_WIDTH + 16}px` });
+    await user.keyboard("{ArrowRight}{ArrowRight}");
+    expect(panel).toHaveStyle({ width: `${DEFAULT_PANEL_WIDTH - 16}px` });
+
+    await user.keyboard("{Home}");
+    expect(panel).toHaveStyle({ width: `${MIN_PANEL_WIDTH}px` });
+    await user.keyboard("{End}");
+    expect(panel).toHaveStyle({ width: `${maxPanelWidth(window.innerWidth)}px` });
+  });
+
+  it("keeps the operator's width through collapsing and expanding again", async () => {
+    const { user } = await openPanel();
+    const handle = screen.getByRole("separator", { name: /resize agent chat/i });
+    drag(handle, window.innerWidth - 520);
+
+    await user.click(screen.getByRole("button", { name: /collapse agent chat/i }));
+    await user.click(screen.getByRole("button", { name: /open agent chat/i }));
+
+    expect(screen.getByRole("complementary", { name: /agent chat/i })).toHaveStyle({
+      width: "520px",
+    });
+  });
+
+  it("opens no wider than the window allows, whatever was saved", async () => {
+    // `terminal-agent-chat` spec, "Okno węższe niż zapamiętana szerokość"
+    const storage = window.localStorage;
+    storage.setItem("terminal.agentChat.width.v1", "3000");
+    try {
+      const api = createFakeApi();
+      const store = createAgentChatStore(storage, api);
+      render(<AgentChat store={store} />);
+      await userEvent.setup().click(screen.getByRole("button", { name: /open agent chat/i }));
+
+      expect(screen.getByRole("complementary", { name: /agent chat/i })).toHaveStyle({
+        width: `${maxPanelWidth(window.innerWidth)}px`,
+      });
+    } finally {
+      storage.removeItem("terminal.agentChat.width.v1");
+    }
   });
 });

@@ -5,11 +5,19 @@ import {
   useState,
   useSyncExternalStore,
   type KeyboardEvent,
+  type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
 
 import type { AgentToolCall } from "./agentApi";
-import { agentChatStore, type AgentChatState, type AgentChatStore, type ChatMessage } from "./agentChatStore";
+import {
+  agentChatStore,
+  maxPanelWidth,
+  MIN_PANEL_WIDTH,
+  type AgentChatState,
+  type AgentChatStore,
+  type ChatMessage,
+} from "./agentChatStore";
 import { MessageBody } from "./MessageBody";
 import { ToolCallEntry } from "./ToolCallEntry";
 import { Button } from "../ui/Button";
@@ -39,6 +47,15 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
   // request carry a token — see `ensureLoaded`.
   useEffect(() => {
     store.ensureLoaded();
+  }, [store]);
+
+  // A width chosen on a wide window is not a width on a narrow one. Re-asked rather than
+  // recomputed: `setWidth` clamps against the window it is given and commits only when
+  // the answer actually moved, so a resize that changes nothing costs no render.
+  useEffect(() => {
+    const reclamp = (): void => store.setWidth(store.getSnapshot().width);
+    window.addEventListener("resize", reclamp);
+    return () => window.removeEventListener("resize", reclamp);
   }, [store]);
 
   if (!state.expanded) {
@@ -71,8 +88,13 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
     <aside
       id="agent-chat-panel"
       aria-label="Agent chat"
-      className="flex w-115 shrink-0 flex-col border-l border-primary-line bg-panel"
+      // Width from the store rather than a Tailwind class: there is no class for a number
+      // the operator chose, and building class names at runtime is exactly what Tailwind's
+      // scanner cannot see.
+      style={{ width: state.width }}
+      className="relative flex shrink-0 flex-col border-l border-primary-line bg-panel"
     >
+      <ResizeHandle width={state.width} onResize={(next) => store.setWidth(next)} />
       <header className="flex h-12 shrink-0 items-center gap-2 border-b border-primary-line bg-panel-strong px-3">
         <AgentGlyph className="h-4 w-4 text-secondary" />
         <span className="text-sm font-semibold">Agent</span>
@@ -153,6 +175,80 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
         </>
       )}
     </aside>
+  );
+}
+
+/**
+ * The panel's own left edge, made draggable.
+ *
+ * A `separator` rather than a decorated border: it is the one control here that has no
+ * label of its own on screen, and an operator who cannot use a mouse still has to be able
+ * to give the chart its width back (`terminal-agent-chat` spec, "Chwyt MUST dać się
+ * obsłużyć klawiaturą").
+ *
+ * Absolutely positioned over the border and a few pixels wide, so it takes the drag
+ * without taking layout: a handle inside the flow would move the very column it is
+ * measuring.
+ */
+function ResizeHandle({
+  width,
+  onResize,
+}: {
+  width: number;
+  onResize: (width: number) => void;
+}) {
+  const max = maxPanelWidth(typeof window === "undefined" ? width : window.innerWidth);
+  // Whether a drag is under way. Kept here rather than asked of the element: pointer
+  // capture is what keeps the moves coming, but it is an optimisation of the browser's
+  // and not every environment has it — this is the fact the handler actually needs.
+  const dragging = useRef(false);
+
+  function onPointerDown(event: ReactPointerEvent<HTMLDivElement>): void {
+    dragging.current = true;
+    // Captured, so a pointer that leaves the handle mid-drag — which it does immediately,
+    // because the panel is moving under it — keeps sending its moves here.
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+    event.preventDefault();
+  }
+
+  function stopDragging(): void {
+    dragging.current = false;
+  }
+
+  function onPointerMove(event: ReactPointerEvent<HTMLDivElement>): void {
+    if (!dragging.current) return;
+    // From the right edge of the window, not from a delta: the panel is the last column,
+    // so its width *is* the distance from the pointer to that edge, and a delta would
+    // drift by whatever the clamp swallowed on the previous frame.
+    onResize(window.innerWidth - event.clientX);
+  }
+
+  function onKeyDown(event: KeyboardEvent<HTMLDivElement>): void {
+    const step = event.shiftKey ? 64 : 16;
+    if (event.key === "ArrowLeft") onResize(width + step);
+    else if (event.key === "ArrowRight") onResize(width - step);
+    else if (event.key === "Home") onResize(MIN_PANEL_WIDTH);
+    else if (event.key === "End") onResize(max);
+    else return;
+    event.preventDefault();
+  }
+
+  return (
+    <div
+      role="separator"
+      aria-label="Resize agent chat"
+      aria-orientation="vertical"
+      aria-valuenow={width}
+      aria-valuemin={MIN_PANEL_WIDTH}
+      aria-valuemax={max}
+      tabIndex={0}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={stopDragging}
+      onPointerCancel={stopDragging}
+      onKeyDown={onKeyDown}
+      className="absolute top-0 -left-1 z-10 h-full w-2 cursor-col-resize hover:bg-primary/40 focus:bg-primary/40 focus:outline-none"
+    />
   );
 }
 
