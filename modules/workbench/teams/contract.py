@@ -37,7 +37,7 @@ from .recurrence import Recurrence, from_cron, to_cron
 
 def _parse_jsonb(value: object) -> Any:
     # asyncpg hands JSONB back as text unless a codec is registered — same reading
-    # agent's own store.py gives its JSONB columns.
+    # agent's own store gives its JSONB columns.
     return json.loads(value) if isinstance(value, str) else value
 
 

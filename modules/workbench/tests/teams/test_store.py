@@ -1,4 +1,4 @@
-"""The catalogue's queries against a real PostgreSQL — `store.py`.
+"""The catalogue's queries against a real PostgreSQL — `store/catalogue.py`.
 
 Against the container rather than a fake: what is under test here is append-only-ness,
 the owner filter and what survives retiring a team, and all three are properties of the

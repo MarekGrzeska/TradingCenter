@@ -74,7 +74,7 @@ async def create_team(
 
 @router.get("/teams")
 async def list_teams(request: Request, owner: str = Depends(current_principal)) -> list[TeamOut]:
-    """The whole of what a picker needs, and no definition — see `store._LATEST_REVISION`."""
+    """The whole of what a picker needs, and no definition — see `store.catalogue._LATEST_REVISION`."""
     async with request.app.state.teams.pool.acquire() as conn:
         rows = await store.list_teams(conn, owner_principal=owner)
     # `dict(row)`, here and below: asyncpg's Record forwards mapping access at
@@ -205,7 +205,7 @@ async def archive_team(
     team_id: int, request: Request, owner: str = Depends(current_principal)
 ) -> None:
     """Retires the team from the catalogue. Its runs and the revisions they name stay —
-    see `store._ARCHIVE_TEAM`."""
+    see `store.catalogue._ARCHIVE_TEAM`."""
     async with request.app.state.teams.pool.acquire() as conn:
         retired = await store.archive_team(conn, team_id=team_id, owner_principal=owner)
     if not retired:
