@@ -232,13 +232,24 @@ resource "azurerm_linux_web_app" "capital_gateway" {
 
   auth_settings_v2 {
     auth_enabled           = true
-    require_authentication = false
-    # **Anonymous is deliberate and load-bearing.** market-data and trading-mcp call this
-    # app with the shared key and no token at all; requiring authentication here would cut
-    # both off at the moment of apply. What this setting buys is narrower and is all that
-    # is wanted: a request that *does* carry a token has it validated before the app sees
-    # it, so the claims the module reads are ones the platform vouched for.
-    unauthenticated_action = "AllowAnonymous"
+    require_authentication = true
+    # **This app authenticates now, and the sentence that used to stand here was false.**
+    # It said anonymous was deliberate and bought a narrower thing — "a request that *does*
+    # carry a token has it validated before the app sees it". It does not. Measured on
+    # 20 August 2026: a request carrying `Authorization: Bearer notatoken` reached this
+    # module's own middleware and was refused by it, where the same request to market-data
+    # was refused by the platform with `WWW-Authenticate` and never arrived. Under
+    # `AllowAnonymous` the auth module validates nothing and injects no
+    # `x-ms-client-principal` — which left `caller_access.py` reading claims from a header
+    # nobody filled in, and the terminal's Accounts screen refused as an unidentified
+    # caller for as long as it existed.
+    #
+    # What made the flip possible is the ordering, not a change of mind: market-data and
+    # trading-mcp present tokens of their own identities as of `the-gateway-door-
+    # authenticates`, and both are in `allowed_applications` below. Doing this first would
+    # have cut both off at the moment of apply, which is what the old comment correctly
+    # feared.
+    unauthenticated_action = "Return401"
 
     # **The stream must not pass through Easy Auth at all.** Measured the hard way on
     # 20 August 2026, minutes after this block was first applied: market-data's feeds died
@@ -255,6 +266,14 @@ resource "azurerm_linux_web_app" "capital_gateway" {
     # been — Easy Auth was never what guarded this path.
     #
     # `/` is the health route, excluded for the reason market-data excludes `/ping`.
+    #
+    # Both exclusions matter more now than they did when they were written. With
+    # `require_authentication = true` above, an excluded path is the only kind that
+    # reaches this app without a token — so `/ws/stream` is, from this apply onward, the
+    # one route in this system whose door is the shared key alone, checked inside the
+    # gateway's own WebSocket handler. That is not a gap left open by accident: an
+    # authenticator in front of a WebSocket upgrade intercepts it and never completes it,
+    # which killed every candle feed for an hour on 20 August 2026.
     excluded_paths = ["/ws/stream", "/"]
 
     active_directory_v2 {
