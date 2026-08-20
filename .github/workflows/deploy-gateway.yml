@@ -32,17 +32,27 @@ jobs:
       # its Dockerfile copies `pyproject.toml` from the context root rather than from
       # `modules/capital-gateway/`.
       build_context: modules/capital-gateway
-      # No HTTP probe, and that is by design rather than an omission.
-      # `ip_restriction_default_action = "Deny"` (infra/app-service.tf) admits only
-      # market-data's and trading-mcp's outbound addresses, so a runner gets 403 whether the
-      # container is healthy or dead. Opening the firewall to check on it would cost more
-      # than the check is worth, so the control plane answers instead, over the same OIDC
-      # session the deploy used.
+      # This module went without an HTTP probe for two months, on a premise nobody checked.
+      # The comment here cited `ip_restriction_default_action = "Deny"` in
+      # infra/app-service.tf, admitting only market-data's and trading-mcp's outbound
+      # addresses, so a runner would get 403 whether the container was healthy or dead.
+      # **There is no such setting, and there never was**: `ip_restriction` appears nowhere in
+      # `infra/`, `az webapp config access-restriction show` answers `Allow` / "Allow all" for
+      # every App Service in the resource group, and this app's `/` answered a laptop on the
+      # first try (20 August 2026). So the deploy asked the control plane — the weaker
+      # question, and the one that reported `Running` over a crash-looping container on
+      # 16 August 2026 — for no reason at all.
       #
-      # What that proves: the site is running and the image App Service will serve is the
-      # one this run pushed. What it does not prove: that the process inside came up — the
-      # weaker of the two questions, and on 16 August 2026 the control plane reported
-      # `Running` over a crash-looping container elsewhere. market-data's own probe covers
-      # the end of this path: it calls this module on every candle it archives.
-      probe_path: ""
+      # `/` is the health route, excluded from Easy Auth so that it answers without a
+      # credential (infra/app-service.tf, the same exclusion `/ws/stream` has). Matching on
+      # `capital-gateway` rather than on a status word is deliberate: the body carries this
+      # module's own name, so a 200 from anything else in front of the container cannot pass
+      # for it.
+      probe_path: "/"
+      expected_status: 200
+      body_contains: "capital-gateway"
       attempts: 10
+      failure_hint: >-
+        The container did not answer /. This module refuses to start when a CAPITAL_*
+        credential or GATEWAY_API_KEY is missing, and when the host it is bound to is not the
+        demo one — the app's log stream says which.

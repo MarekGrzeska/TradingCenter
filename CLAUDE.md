@@ -241,8 +241,14 @@ it — so a skipped job blocks nothing.
 Four `deploy-*.yml` workflows deploy on pushes to `main`, each ~20 lines calling
 `_deploy-app-service.yml` and ending in `scripts/deploy_probe.py`, which asks whether this commit's
 image is the one App Service will serve *and* whether the process inside came up — the second being
-the one that used to go unasked. `capital-gateway` cannot be probed at all: it admits only the
-service plan's own outbound addresses, so a runner gets 403 either way. `terraform.yml` plans on
+the one that used to go unasked. `capital-gateway` went without that probe until
+20 August 2026, on a premise nobody had checked: that it admits only the service plan's own
+outbound addresses. **No App Service in this resource group carries an address restriction at
+all** — `az webapp config access-restriction show` answers `Allow` / "Allow all" for every one of
+the four, and the gateway's `/` answered a laptop on the first try. What holds its door is its own
+shared key, checked in `RequireGatewayKey`; the Easy Auth in front of it validates nothing, because
+`AllowAnonymous` passes a bearer token through untouched. It probes `/` for `"capital-gateway"`
+now, like every other module. `terraform.yml` plans on
 infra PRs; `terraform-apply.yml` is a manual dispatch that applies and refuses any plan touching
 `azuread_*`, since CI holds `Application.Read.All` and not write.
 

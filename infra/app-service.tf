@@ -831,9 +831,11 @@ resource "azurerm_linux_web_app" "trading_mcp" {
 
   site_config {
     always_on = true
-    # No `cors` and no `ip_restriction`, unlike market-data: no browser ever calls this
-    # app, so there is no preflight to answer, and the gate on who
-    # may reach it is Easy Auth below rather than an address list.
+    # No `cors`: no browser ever calls this app, so there is no preflight to answer, and the
+    # gate on who may reach it is Easy Auth below. No `ip_restriction` either — and neither has
+    # any other app here, which is worth saying because three files claimed otherwise until
+    # 20 August 2026. Nothing in this root has ever set one. What differs between these apps is
+    # only which credential their door asks for.
 
     application_stack {
       # Placeholder — `deploy-trading-mcp.yml` (group 10) pushes the real GHCR image after

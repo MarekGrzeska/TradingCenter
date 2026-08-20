@@ -1,0 +1,368 @@
+<title>Workbench od środka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 26px 0 8px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Przewodnik po module · 4 z 5</span>
+    <h1>Workbench od środka</h1>
+    <p class="lede">Rozmowa operatora z modelem <b>i</b> zespoły agentów, które operator komponuje — jeden proces, dwie powierzchnie, dwa schematy bazy, dwa klucze OpenAI, dwa katalogi modeli. Największy moduł repozytorium.</p>
+    <div class="strip">
+      <span>port <b>8030</b> · Python 3.12 · FastAPI · LangGraph</span>
+      <span>~17,5 tys. linii produkcyjnych</span>
+      <span>App Service: <b>app-tradingcenter-agent</b> — nazwa jest tożsamością</span>
+      <span>20 sierpnia 2026 · dla programisty C#</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">4</div><div class="l">pakiety, jedno miejsce montażu</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">łańcuchy migracji: 14 + 7 rewizji</div></div>
+      <div class="cell"><div class="v">8+6</div><div class="l">sufity rund: tura rozmowy + agent zespołu</div></div>
+      <div class="cell"><div class="v">78</div><div class="l">plików testów — najwięcej w repo</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Rola</div>
+      <h2>Jeden proces, dwie powierzchnie</h2>
+      <p class="intro">Do 20 sierpnia 2026 rozmowa i zespoły były osobnymi modułami. Scalenie skasowało bliźniacze klienty narzędzi, rejestry, dostawców, katalogi, dwanaście zdublowanych ustawień i cały trzeci moduł (teams-mcp), który istniał tylko dlatego, że rozmowa musiała sięgać do zespołów przez sieć.</p>
+      <p>Trzy rzeczy zostały podwojone <strong>celowo</strong>, a <code>workbench/config.py</code> uzasadnia każdą:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Co podwojone</th><th>Nazwy</th><th>Dlaczego zostało</th></tr></thead>
+          <tbody>
+            <tr><td><b>Bazy danych</b></td><td><code>AGENT_DATABASE_URL</code> · <code>TEAMS_DATABASE_URL</code></td><td>scalenie danych to osobna, niepodjęta decyzja; dwa łańcuchy, dwie tabele <code>alembic_version</code>, dwa klucze rygla</td></tr>
+            <tr><td><b>Klucze OpenAI</b></td><td><code>AGENT_OPENAI_API_KEY</code> · <code>TEAMS_OPENAI_API_KEY</code></td><td>koszt eksperymentów zespołowych ląduje na własnej linii faktury</td></tr>
+            <tr><td><b>Katalogi modeli</b></td><td><code>AGENT_MODELS</code> + domyślny · <code>TEAMS_MODELS</code></td><td>tylko rozmowa ma model domyślny — każdy agent w zapisanej rewizji nazywa swój własny</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>App Service nadal nazywa się <code>app-tradingcenter-agent</code>, choć moduł to workbench — <span class="hl">nazwa jest tożsamością, nie etykietą</span>: bierze ją tożsamość zarządzana, <code>DATABASE_USER</code> <em>jest</em> tą tożsamością, a jej id aplikacji siedzi na trzech listach dozwolonych w innych modułach.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Warstwy</div>
+      <h2>Reguła repo w miniaturze, z testem AST</h2>
+      <p class="intro">„Żaden moduł nie importuje innego modułu” ma tu drugą postać, bo dwa byłe moduły są teraz pakietami jednego:</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 900 240" role="img" aria-label="Cztery pakiety workbencha: agent, teams i teams_tools nie importują siebie nawzajem; workbench, czyli montaż, jako jedyny importuje wszystkie trzy">
+            <defs>
+              <marker id="l1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#14306b"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="330" y="20" width="240" height="56" fill="#14306b" stroke="#14306b"></rect>
+              <text x="450" y="44" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">workbench/ — montaż</text>
+              <text x="450" y="62" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">jedyne miejsce znające całą trójkę</text>
+
+              <rect x="60" y="150" width="200" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="160" y="174" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">agent/</text>
+              <text x="160" y="192" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">rozmowa · schemat agent</text>
+
+              <rect x="350" y="150" width="200" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="450" y="174" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">teams/</text>
+              <text x="450" y="192" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">zespoły · schemat teams</text>
+
+              <rect x="640" y="150" width="200" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="740" y="174" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">teams_tools/</text>
+              <text x="740" y="192" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">narzędzia MCP nad zespołami</text>
+
+              <line x1="380" y1="80" x2="185" y2="146" stroke="#14306b" stroke-width="1.6" marker-end="url(#l1)"></line>
+              <line x1="450" y1="80" x2="450" y2="146" stroke="#14306b" stroke-width="1.6" marker-end="url(#l1)"></line>
+              <line x1="520" y1="80" x2="715" y2="146" stroke="#14306b" stroke-width="1.6" marker-end="url(#l1)"></line>
+
+              <line x1="264" y1="178" x2="346" y2="178" stroke="#b8322a" stroke-width="1.6"></line>
+              <line x1="295" y1="168" x2="315" y2="188" stroke="#b8322a" stroke-width="2"></line>
+              <line x1="295" y1="188" x2="315" y2="168" stroke="#b8322a" stroke-width="2"></line>
+              <line x1="554" y1="178" x2="636" y2="178" stroke="#b8322a" stroke-width="1.6"></line>
+              <line x1="585" y1="168" x2="605" y2="188" stroke="#b8322a" stroke-width="2"></line>
+              <line x1="585" y1="188" x2="605" y2="168" stroke="#b8322a" stroke-width="2"></line>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — w .NET tę regułę wymusiłby graf referencji projektów; tu wymusza ją test parsujący źródła. <code>tests/test_layering.py</code> chodzi po AST (importy schowane w ciałach funkcji też się liczą) i ma test pozytywny: montaż <em>musi</em> znać całą trójkę, żeby reguły nie dało się spełnić niczym nie importując niczego.</figcaption>
+      </figure>
+      <p>Adapter, który inaczej wymusiłby złamanie reguły, mieszka w montażu: <code>workbench/team_tools.py</code> zna protokół źródła narzędzi agenta <em>i</em> rejestr FastMCP z <code>teams_tools</code> — i dokładnie dlatego leży tam, a nie w żadnym z nich.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Start</div>
+      <h2>Wszystko albo nic</h2>
+      <p class="intro">Jeden <code>lifespan</code> w <code>workbench/app.py</code>: dwa pule asyncpg, dwie migracje pod osobnymi ryglami (klucz 8030 dla agenta, 8050 dla zespołów — porty, na których każda powierzchnia kiedyś nasłuchiwała), zamknięcie osieroconych przebiegów, na końcu zegar harmonogramów. Nie ma półstanu, w którym rozmowa działa, a zespoły zgłaszają niedostępność — proces odpowiadający na <code>/health</code> jest dowodem, że oba łańcuchy są u głowy.</p>
+      <p>Rejestry narzędzi są na starcie <strong>zbudowane, nie połączone</strong> — sesje MCP otwierają się przy pierwszej turze, która chce narzędzia, więc zdrowie startu nie zależy od tego, czy market-data wstało. <code>workbench/config.py</code> to jedyny kod czytający środowisko; <code>for_conversation()</code> i <code>for_teams()</code> budują ustawienia powierzchni <em>jawnie argumentami</em>, żeby zabłąkany <code>DATABASE_URL</code> w powłoce nie mógł przesłonić <code>AGENT_DATABASE_URL</code>.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Plik po pliku</div>
+      <h2>Cztery pakiety w skrócie</h2>
+      <h3 class="sub">workbench/ — montaż (5 plików)</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plik</th><th>Odpowiedzialność</th></tr></thead>
+          <tbody>
+            <tr><td><b>app.py</b></td><td>Instancja FastAPI, jeden lifespan, <code>_migrate()</code>, <code>/health</code>, oba <code>surface.include(app)</code>. Jedyny plik importujący <code>agent</code>, <code>teams</code> i <code>teams_tools</code>.</td></tr>
+            <tr><td><b>config.py</b></td><td>Jedyny odczyt środowiska; prefiksy <code>AGENT_</code>/<code>TEAMS_</code> na tym, co podwojone celowo.</td></tr>
+            <tr><td><b>team_tools.py</b></td><td><code>LocalTeamsTools</code> — wpina rejestr FastMCP zespołów jako źródło narzędzi rozmowy; strukturalny zamiennik <code>ToolServer</code> (te same pięć metod, żadnego interfejsu). Wywołania owija w <code>carrying(principal)</code> — zespół stworzony z czatu należy do osoby, która o niego poprosiła.</td></tr>
+            <tr><td><b>alembic_env.py</b></td><td>Jedna kopia okablowania Alembika dla obu łańcuchów; przenosi <code>sslmode</code> do <code>connect_args["ssl"]</code>, bo asyncpg odrzuca je jako kwarg.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">agent/ — rozmowa</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Obszar</th><th>Pliki i role</th></tr></thead>
+          <tbody>
+            <tr><td><b>rdzeń</b></td><td><code>graph.py</code> (LangGraph: dwa węzły <code>call_model</code>/<code>run_tools</code>, sufit <code>TOOL_CALL_CEILING = 8</code>), <code>turn.py</code> (<code>run_turn</code> — dokładnie jedna wiadomość agenta i jeden wiersz zużycia na turę; zdarzenia Fragment/ToolCalled/Complete/Failed/Stopped), <code>provider.py</code> (wiązanie tc-openai z kluczem tej powierzchni), <code>prompt.py</code>/<code>prompt_seed.py</code> (prompt mieszka w tabeli, nie w kodzie; seed z deploya nigdy nie nadpisuje edycji operatora).</td></tr>
+            <tr><td><b>kontrakt i konfiguracja</b></td><td><code>contract.py</code> (kształty drutu, snake_case, pisane ręcznie), <code>config.py</code> (walidatory spójności trybu bazy i serwerów narzędzi), <code>models.py</code> (domena: sesje, wiadomości, wykres, rysunki), <code>models_catalogue.py</code>, <code>auth.py</code>, <code>surface.py</code> (stan na <code>app.state.agent</code>, rejestracja sześciu routerów).</td></tr>
+            <tr><td><b>routers/</b></td><td><code>sessions.py</code> (największy: sesje, tura SSE, stop), <code>chart.py</code> (kursor poleceń wykresu), <code>drawings.py</code> (bez POST — agent rysuje przez narzędzie), <code>prompt.py</code>, <code>usage.py</code>, <code>models.py</code> (14 linii — ciało z tc-runtime).</td></tr>
+            <tr><td><b>store/</b></td><td>asyncpg wprost, jeden plik na tabelę (stary pojedynczy plik miał 911 linii): sesje, wiadomości, zużycie (koszt liczony raz, przy zapisie), wywołania narzędzi (dwufazowy ślad konta: <code>begin</code> przed wysłaniem, <code>settle</code> po), polecenia wykresu, rysunki, prompt (append-only — brak UPDATE z konstrukcji).</td></tr>
+            <tr><td><b>tools/</b></td><td><code>client.py</code> (sesja MCP, która <em>nigdy nie rzuca w turę</em> — trzy wyniki OK/REFUSED/UNAVAILABLE), <code>registry.py</code> (kilka źródeł jako jedno; nazwa ogłoszona przez dwa źródła nie jest oferowana przez żadne), <code>chart.py</code> i <code>drawings.py</code> (własne narzędzia modułu: wykres i rysunki, walidowane przeciw market-data zanim powstanie wiersz).</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">teams/ — zespoły jako dane</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Obszar</th><th>Pliki i role</th></tr></thead>
+          <tbody>
+            <tr><td><b>definicja</b></td><td><code>contract.py</code> (871 linii, największy plik: <code>TeamDefinition</code> z walidatorami — unikalne klucze, krawędzie do realnych agentów, brak cyklu przez algorytm Kahna, każdy agent nazywa model), <code>validation.py</code> (odmowa przy zapisie ≠ odmowa przy starcie przebiegu), <code>models_catalogue.py</code> (celowo bez <code>resolve()</code> i bez domyślnego).</td></tr>
+            <tr><td><b>runner/</b></td><td><code>graph.py</code> (<code>compile_team</code> — LangGraph z węzłem na agenta i krawędziami operatora; węzeł dostaje <em>wyłącznie</em> wnioski poprzedników), <code>loop.py</code> (pętla model-narzędzia jednego agenta, <code>ROUND_CEILING = 6</code>), <code>engine.py</code> (ślad pisany na bieżąco; rejestr przebiegów w pamięci), <code>cost.py</code> (limit przebiegu sprawdzany przed każdym wywołaniem modelu, dzienny przed startem — nigdy w prompcie), <code>trading.py</code> (bliźniak dla zleceń), <code>starter.py</code> (jedna ścieżka dla kliknięcia i odpalenia o 3 nad ranem).</td></tr>
+            <tr><td><b>scheduler/</b></td><td><code>clock.py</code> (jedno budzenie obsługuje harmonogramy i wyzwalacze), <code>timing.py</code> (cron czytany jako zegar ścienny Polski, wychodzi UTC), <code>recurrence.py</code> (rytm ↔ cron w obie strony, wąsko z zasady).</td></tr>
+            <tr><td><b>store/</b></td><td>Jeden plik na agregat: katalog (<code>team_revisions</code> <strong>tylko INSERT</strong> — żaden UPDATE nie istnieje i istnieć nie powinien), przebiegi (+ zamykanie osieroconych na starcie), zużycie, transakcje (dwa zapisy na zlecenie, kolejność jest sednem), harmonogramy/wyzwalacze (warunkowy UPDATE, którego <code>WHERE</code> <em>jest</em> gwarancją dokładnie-raz — bez elekcji lidera), odpalenia, layout (poza rewizjami: przeciągnięcie węzła nie bije rewizji).</td></tr>
+            <tr><td><b>routery</b></td><td>katalog, przebiegi (201 z przebiegiem, nigdy z wynikiem; SSE z keep-alive 15 s pod 230-sekundowy limit App Service), harmonogramy (434 linie), narzędzia (trzy różne odpowiedzi: narzędzia / pusto-bo-nieskonfigurowane / nie-dało-się-zapytać), zużycie (rozbicie po agencie), modele.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">teams_tools/ — budowanie zespołów rozmową</h3>
+      <p>Narzędzia MCP, którymi <em>model w rozmowie</em> tworzy, rewiduje, uruchamia i harmonogramuje zespoły. FastMCP bez żadnego transportu — jest rejestrem, generatorem schematów i nośnikiem adnotacji; wywołania idą przez <code>httpx.ASGITransport</code> wprost we własne trasy procesu (adres <code>http://workbench.internal</code> nigdy nie jest rozwiązywany). Podróżuje <strong>principal osoby, nie token usługi</strong> — przez <code>ContextVar</code> w <code>operator.py</code>, odpowiednik <code>AsyncLocal</code>. <code>revise_team</code> robi read-modify-write po tej stronie z łatki nazywającej tylko zmiany — model poprawiający jedną rolę nie może przez przeoczenie skasować agenta.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Tura rozmowy</div>
+      <h2>Tura przeżywa rozłączenie</h2>
+      <p class="intro">Wiadomość operatora jest zapisywana <strong>przed</strong> wywołaniem modelu — to, co wpisał, przeżyje wywołanie, które nigdy nie odpowie. Tura rusza jako zadanie w tle z nieograniczoną kolejką: rozłączenie przeglądarki niczego nie przerywa, a <code>POST /stop</code> znajduje turę po id sesji.</p>
+      <p>Wywołanie modelu idzie przez <code>packages/tc-openai</code> — jedyne miejsce, w którym istnieją klasy langchain-openai. Rozmowa podaje <code>Conversation</code> (transkrypt), zespół podaje <code>Briefing</code> (wnioski poprzedników) — <span class="hl">unia typów jest strażnikiem: kto trzyma Briefing, nie ma do czego dopisywać historii</span>. Narzędzia przychodzą z trzech źródeł naraz: <code>MARKET_MCP_URL</code> (archiwum), <code>TRADING_MCP_URL</code> (rachunek, budowany z <code>can_move_the_account=True</code>) i lokalne narzędzia zespołowe. Każde źródło zawodzi <strong>osobno</strong> — nieustawione albo nieosiągalne kosztuje narzędzia tego źródła i nic więcej.</p>
+      <p>Po ósmym wywołaniu narzędzia w turze model jest wołany <em>bez</em> narzędzi, zamiast być proszonym, żeby ich nie używał. Wywołania ruszające rachunkiem piszą swój wiersz <em>przed</em> wyjściem żądania i rozliczają po — tura, która umrze w połowie zlecenia, zostawia wiersz z wynikiem <code>unknown</code>, nie ciszę.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Zespoły</div>
+      <h2>Zespół jest danymi</h2>
+      <p class="intro">Zespół to wiersz; to, co <em>robi</em>, to blob <code>TeamDefinition</code> w JSONB: agenci (klucz, rola, prompt, <strong>wymagany</strong> <code>model_id</code>, lista narzędzi), krawędzie zależności, limity kosztu i limity handlowe (każdy opcjonalny — nieodwracalnym strażnikiem jest trading-mcp odmawiający startu poza demo).</p>
+      <div class="quote">Rewizja jest tylko do dopisania — przebieg wskazuje na nią na zawsze.</div>
+      <p>Edycja rewizji pod skończonym przebiegiem zmieniłaby jego ślad w twierdzenie o zespole, którego już nie ma — dlatego w <code>store/catalogue.py</code> UPDATE przeciw <code>team_revisions</code> nie istnieje. Model usunięty z katalogu po zapisaniu rewizji nie psuje odczytu: odmawiany jest dopiero <em>start nowego przebiegu</em>, z nazwą agenta i modelu. Harmonogram (cron po warszawsku) i wyzwalacz (zbocze warunku rynkowego) kończą w tej samej funkcji, co kliknięcie operatora: <code>start_run_on_revision</code>.</p>
+      <p>Odmowa, o której mówi CLAUDE.md: <code>plan_tools()</code> najpierw zbiera narzędzia <em>przypisane</em> agentom. Pusty zbiór — żaden serwer nie jest w ogóle pytany, zespół bez narzędzi biegnie zawsze. Niepusty zbiór bez skonfigurowanego serwera, z serwerem nieosiągalnym albo z nazwą, której nikt już nie ogłasza — <strong>odmowa przebiegu</strong>, nazywająca narzędzie i agentów; rewizja pozostaje nietknięta i czytelna.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Testy</div>
+      <h2>Dwa testy, które trzymają architekturę</h2>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>test_layering.py <span class="tag ok">reguła z zębami</span></h3>
+          <p>Parsuje AST czterech pakietów. „Reguła bez przypadku porażki jest preferencją” — to zdanie z modułu.</p>
+        </div>
+        <div class="fail ok">
+          <h3>test_route_collisions.py <span class="tag ok">zachowanie, nie kolejność linii</span></h3>
+          <p><code>/teams/models</code> musi trafić do katalogu modeli, nie do <code>/teams/{team_id}</code> — parametr ścieżki kompiluje się do dopasowania <code>[^/]+</code> biegnącego <em>przed</em> odczytem go jako <code>int</code>, więc literał wygrywa wyłącznie kolejnością rejestracji. Odwrócenie dwóch linii w <code>surface.py</code> odpowiada <code>422 int_parsing</code> — i właśnie to asertuje test.</p>
+        </div>
+        <div class="fail">
+          <h3>mcp_stand_in.py <span class="tag att">prawdziwy serwer, nie mock</span></h3>
+          <p>Sesja MCP to jedyny kontrakt w repo bez komitowanej migawki — mockowana sesja testowałaby tylko mocka. Stąd prawdziwy FastMCP na prawdziwym porcie uvicorna w testach.</p>
+        </div>
+      </div>
+      <p>Poza tym: 27 plików testów agenta, 33 zespołów (dwa sufity kosztowe, ślad handlowy, zegar, graf przebiegu), 9 narzędzi zespołowych; wspólne bloki walidatorów parametryzowane po obu powierzchniach, żeby reguła naprawiona na jednej nie zgniła na drugiej; marker <code>db</code> na testcontainers, <code>live</code> na prawdziwy model za flagą.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Dla przybysza z C#</div>
+      <h2>Idiomy, które tu pracują</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>W tym module</th><th>Najbliższy odpowiednik .NET</th><th>Różnica, która gryzie</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>brak kontenera DI</b></td><td><code>IServiceCollection</code> + scope'y</td><td>zależności budowane raz w lifespanie i wieszane na <code>app.state.agent</code>/<code>.teams</code> jako dataclassy</td></tr>
+            <tr><td><b>interfejsy strukturalne</b></td><td>nominalne <code>interface</code></td><td><code>LocalTeamsTools</code> „jest” ToolServerem przez pięć metod o tych samych nazwach; <code>typing.Protocol</code> to duck typing sprawdzany tylko statycznie</td></tr>
+            <tr><td><b>reguła warstw = test</b></td><td>graf referencji projektów</td><td>kompilator niczego nie zabrania — zabrania test parsujący źródła</td></tr>
+            <tr><td><b><code>ContextVar</code></b></td><td><code>AsyncLocal&lt;T&gt;</code> / <code>ClaimsPrincipal</code></td><td>ambientna tożsamość operatora płynie przez <code>carrying(principal)</code>, resetowana nawet gdy narzędzie rzuci</td></tr>
+            <tr><td><b>wyjątki jako odmowy, wyniki jako awarie</b></td><td><code>Result&lt;T&gt;</code></td><td>odmowy (<code>DefinitionRefused</code>, limity) są rzucane i mapowane na 422; awarie narzędzi <em>nigdy</em> nie rzucają — zepsute narzędzie nie może być zepsutą turą</td></tr>
+            <tr><td><b>singletons w pamięci procesu</b></td><td>cache rozproszony z odruchu</td><td><code>RunRegistry</code>, biegnące tury i zegar żyją w pamięci — uzasadnione komentarzem w Terraformie: plan ma dokładnie jednego workera</td></tr>
+            <tr><td><b>dwa klucze OpenAI naraz</b></td><td>oczywisty cel refaktoryzacji</td><td>kształt broniony w trzech osobnych plikach: chodzi o fakturę, nie architekturę</td></tr>
+            <tr><td><b>snake_case na drucie</b></td><td><code>JsonNamingPolicy.CamelCase</code></td><td>terminal pisze mappery pod snake_case; nikt niczego nie przemianowuje po drodze</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Komentarze cytują polskie klauzule specyfikacji („Odmowa narzędzia jest wynikiem, nie awarią tury”) — to identyfikatory wymagań; niemal każda nieoczywista decyzja w module nosi jeden.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Przewodnik po module workbench · stan kodu z 20 sierpnia 2026</span>
+    <span>Źródła: modules/workbench · README modułu · CLAUDE.md</span>
+  </div>
+</footer>

@@ -1,0 +1,314 @@
+<title>Trading-mcp od środka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Przewodnik po module · 2 z 5</span>
+    <h1>Trading-mcp od środka</h1>
+    <p class="lede">Dwanaście narzędzi MCP nad rachunkiem demo bramki — żeby agent mógł <b>działać na decyzji</b>, nie tylko ją rekomendować. Jeden transport, jeden nazwany rozmówca, zero ponowień przy zapisie.</p>
+    <div class="strip">
+      <span>port <b>8060</b> · Python 3.12 · FastMCP</span>
+      <span>~1,1 tys. linii produkcyjnych · 11 plików</span>
+      <span>rozmówca: <b>workbench</b> — nikt inny</span>
+      <span>20 sierpnia 2026 · dla programisty C#</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">12</div><div class="l">narzędzi: 6 odczytów, 6 zapisów</div></div>
+      <div class="cell"><div class="v">1</div><div class="l">wpis na liście allowed_applications</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">ponowień zapisu — kiedykolwiek</div></div>
+      <div class="cell"><div class="v">15 tys.</div><div class="l">znaków — sufit powierzchni narzędzi, z testem</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Rola</div>
+      <h2>Ręka agenta na rachunku demo</h2>
+      <p class="intro">Moduł wystawia przez MCP odczyty rachunku (pozycje, zlecenia oczekujące, saldo, lista rachunków) i zapisy (złożenie, zamknięcie, korekta, anulowanie, przełączenie rachunku, doładowanie demo). Żadnych świec, cen ani wskaźników — rynek to archiwum market-data.</p>
+      <p>Trzy ograniczenia definiują moduł: <strong>tylko demo</strong>, sprawdzone u bramki (<code>GET /capabilities</code> musi odpowiedzieć <code>environment == "demo"</code> — bramka <em>wyprowadza</em> tę wartość z hosta, do którego jest przypięta, więc odpowiedź coś znaczy); <strong>jeden transport</strong> — strumieniowe HTTP, żadnego stdio, bo lokalnie odpalony proces nie niesie tożsamości rozmówcy; <strong>jeden rozmówca</strong> — lista <code>allowed_applications</code> w Terraformie ma dokładnie jeden wpis: tożsamość zarządzaną workbencha. Przeglądarka nigdy tu nie dzwoni.</p>
+      <p>Kontrola demo biegnie <span class="hl">przed otwarciem portu</span> — proces, który nie nasłuchuje, jest nieosiągalny, co jest mocniejszą gwarancją niż odmowa w pierwszym żądaniu.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Start procesu</div>
+      <h2>Cztery kroki, dwa powody odmowy</h2>
+      <pre><code><span class="c"># __main__.py — _serve() robi dokładnie cztery rzeczy, po kolei</span>
+settings = Settings()                          <span class="c"># CAPITAL_GATEWAY_API_KEY bez domyślnej — brak = ValidationError</span>
+gateway = GatewayClient(settings)
+<span class="k">await</span> gateway.ensure_demo_environment()        <span class="c"># nie-demo → NotDemoEnvironment; bramka padła → GatewayUnavailable</span>
+<span class="k">await</span> uvicorn.Server(config).serve()           <span class="c"># dopiero teraz otwiera się port 8060</span></code></pre>
+      <p><code>main()</code> nie przyjmuje żadnych argumentów i nie ma <code>argparse</code> — nie ma transportu do wybrania, a test źródłowy pilnuje, żeby grep za <code>run_stdio_async</code> nigdy nic nie znalazł. Klucz bramki jest wymagany także na loopbacku: bramka sprawdza nagłówek <code>X-Gateway-Key</code> u <em>każdego</em> rozmówcy.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Plik po pliku</div>
+      <h2>Mały moduł o ostrych krawędziach</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Plik</th><th>Odpowiedzialność</th><th>Perspektywa C#</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>__main__.py</b></td><td>Wejście: <code>uv run python -m trading_mcp</code>. Buduje ustawienia, robi kontrolę demo, startuje uvicorn; <code>finally</code> zamyka klienta.</td><td><code>Program.Main</code> z twardą walidacją startu</td></tr>
+            <tr><td><b>config.py</b></td><td><code>Settings</code>: URL bramki, wymagany klucz, timeout 30 s (wyprowadzony w komentarzu ze zwykłego najgorszego przypadku bramki ≈22 s), host/port, przełącznik wymogu principala.</td><td><code>IOptions&lt;T&gt;</code> walidowane przy starcie</td></tr>
+            <tr><td><b>client.py</b></td><td><code>GatewayClient</code> — jedyny szew do bramki: jeden <code>httpx.AsyncClient</code> z kluczem w nagłówku; <code>get()</code> ponawia raz na 5xx, <code>write()</code> <em>nigdy</em>; timeouty i błędy sieci → <code>GatewayUnavailable</code>.</td><td>typowany <code>HttpClient</code>, polityka asymetryczna per czasownik</td></tr>
+            <tr><td><b>errors.py</b></td><td>Taksonomia: <code>GatewayUnavailable</code> (nie dało się zapytać — skutek zapisu <em>nieznany</em>), <code>GatewayRefused</code> z kluczową własnością <code>is_access_failure</code> (401/403/408/429 i 5xx), <code>NotDemoEnvironment</code>, <code>ToolRefusal</code>.</td><td>hierarchia wyjątków jako kontrakt słowny</td></tr>
+            <tr><td><b>server.py</b></td><td><code>build_server()</code> — FastMCP, <code>GET /health</code>, rejestracja narzędzi, odchudzenie schematów; <code>build_http_app()</code> owija transport w <code>RequireCallerIdentity</code> z tc-mcp-kit.</td><td>Startup + middleware pipeline</td></tr>
+            <tr><td><b>tools/_shared.py</b></td><td>Dwa szwy, przez które idzie każde narzędzie: <code>_read()</code> i <code>_write()</code> tłumaczą błędy bramki na komunikaty odróżniające „awaria dostępu, skutek nieznany, nie powtarzaj” od „odmowa, oto co zmienić”. Adnotacje <code>READ_ONLY</code>/<code>WRITE</code>.</td><td>wspólny handler + <code>ProblemDetails</code>, tyle że tekstem</td></tr>
+            <tr><td><b>tools/account.py</b></td><td>Odczyty rachunku i zapisy na jego poziomie: pozycje, zlecenia oczekujące, saldo, lista rachunków, przełączenie, doładowanie.</td><td>kontroler odczytów</td></tr>
+            <tr><td><b>tools/instruments.py</b></td><td>Warunki instrumentu i jedyna arytmetyka modułu: <code>size_for_margin</code> — <code>Decimal(str(x))</code>, zaokrąglanie <em>w dół</em> do kroku dostawcy, odmowy poniżej/powyżej limitów wielkości.</td><td><code>decimal</code>, ale konstruowany ze stringa — patrz §07</td></tr>
+            <tr><td><b>tools/orders.py</b></td><td>Cztery zapisy zleceń i kombinacje argumentów odrzucane lokalnie, zanim powstanie żądanie.</td><td>walidacja przed I/O</td></tr>
+            <tr><td><b>scripts/contract.py</b></td><td>Migawka całego OpenAPI bramki, komitowana w <code>contract/</code>; <code>check</code> regeneruje w pamięci i pada na różnicy.</td><td>snapshot test kontraktu, jak Verify/approvals</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Narzędzia</div>
+      <h2>Sześć odczytów, sześć zapisów</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Narzędzie</th><th>Robi</th><th>Charakter</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>get_positions</b></td><td>otwarte pozycje; pusty rachunek to pusta lista, nie błąd</td><td><span class="tag ok">odczyt</span></td></tr>
+            <tr><td><b>get_working_orders</b></td><td>oczekujące zlecenia LIMIT/STOP</td><td><span class="tag ok">odczyt</span></td></tr>
+            <tr><td><b>get_balance</b></td><td>saldo, dostępne środki i bieżący wynik aktywnego rachunku</td><td><span class="tag ok">odczyt</span></td></tr>
+            <tr><td><b>list_accounts</b></td><td>wszystkie rachunki demo z zaznaczonym aktywnym</td><td><span class="tag ok">odczyt</span></td></tr>
+            <tr><td><b>get_instrument_terms</b></td><td>warunki dostawcy dla symbolu: depozyt, min/max wielkość, krok</td><td><span class="tag ok">odczyt</span></td></tr>
+            <tr><td><b>size_for_margin</b></td><td>przelicza depozyt + cenę na wielkość zaokrągloną w dół do kroku</td><td><span class="tag ok">odczyt</span></td></tr>
+            <tr><td><b>place_order</b></td><td>MARKET/LIMIT/STOP z opcjonalnymi stop-loss / take-profit</td><td><span class="tag stop">zapis</span></td></tr>
+            <tr><td><b>close_position</b></td><td>zamyka pozycję po id</td><td><span class="tag stop">zapis</span></td></tr>
+            <tr><td><b>amend_stops</b></td><td>ustawia lub czyści stopy niezależnie (trójstanowo)</td><td><span class="tag stop">zapis</span></td></tr>
+            <tr><td><b>cancel_working_order</b></td><td>anuluje oczekujące zlecenie</td><td><span class="tag stop">zapis</span></td></tr>
+            <tr><td><b>switch_active_account</b></td><td>zmienia aktywny rachunek demo; opis ostrzega, że zrywa strumień notowań</td><td><span class="tag stop">zapis</span></td></tr>
+            <tr><td><b>top_up_demo_account</b></td><td>przesuwa saldo demo o kwotę — pieniądz wyłącznie ćwiczebny</td><td><span class="tag stop">zapis</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Docstring narzędzia <em>jest</em> jego dokumentacją wysyłaną do modelu przy każdej turze, a podpowiedzi typów stają się schematem JSON. Dlatego zmiana brzmienia to zmiana zachowania z mierzonym kosztem — stąd sufit <code>SURFACE_CEILING_CHARS = 15 000</code> (zmierzone 13 772 na 20 sierpnia 2026) i test dokładnego zestawu narzędzi.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Ścieżka zapisu</div>
+      <h2>Zapis wychodzi raz albo wcale</h2>
+      <p class="intro">Droga zapisu: funkcja narzędzia → lokalna walidacja argumentów → <code>_write</code> → <code>GatewayClient.write</code> → jedno żądanie httpx → wynik. Bramka nie przyjmuje klucza idempotencji, więc powtórka nie jest potwierdzeniem — jest drugim zleceniem.</p>
+      <div class="quote">Powtórzone zlecenie to druga pozycja, nie potwierdzenie pierwszej.</div>
+      <p>Jedno rozróżnienie niesie całe bezpieczeństwo słowne: <code>GatewayRefused.is_access_failure</code>. 401, 403, 408, 429 i każde 5xx to „awaria dostępu — <span class="hl">skutek na rachunku nieznany, odczytaj pozycje, nie powtarzaj</span>”; 404 i 422 zostają odmową z nazwanym polem do poprawy. Powód zapisany w <code>errors.py</code>: 401 odczytane jako odmowa wysyła agenta w poprawianie zlecenia, na które nikt nigdy nie spojrzał.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Strażnicy lokalni <span class="tag ok">przed żądaniem</span></h3>
+          <p><code>place_order</code> odmawia LIMIT/STOP bez poziomu i MARKET niosącego <code>level</code> lub <code>good_till</code> — bramka po cichu je upuszcza, a odczytany z powrotem poziom byłby ceną wykonania, więc nic w odpowiedzi nie zdradziłoby, że limit zignorowano. <code>amend_stops</code> odmawia ustawienia i wyczyszczenia tego samego stopu naraz.</p>
+        </div>
+        <div class="fail">
+          <h3>REJECTED i PENDING dostawcy <span class="tag att">przeniesione dalej</span></h3>
+          <p>Odrzucenie dostawcy staje się odmową narzędzia; zlecenie nierozliczone wychodzi jako <code>outcome="unsettled"</code> — bramka zdążyła już wydać swój budżet odpytywania potwierdzeń.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Poświadczenie nie wycieka <span class="tag stop">nigdy</span></h3>
+          <p><code>X-Gateway-Key</code> podróżuje tylko na żądaniu wychodzącym; żaden typ wyjątku go nie niesie.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Migawka kontraktu</div>
+      <h2>Cały OpenAPI bramki, komitowany tutaj</h2>
+      <p class="intro"><code>scripts/contract.py</code> trzyma w <code>contract/capital-gateway.openapi.json</code> migawkę całego dokumentu OpenAPI bramki. <code>check</code> generuje na nowo i pada na różnicy — zmiana kontraktu pokazuje się jako diff obok zmiany, która ją wywołała.</p>
+      <p>Generacja nie potrzebuje bazy, sesji u dostawcy ani poświadczeń — bramka buduje swoje <code>Settings</code> w <code>lifespan</code>, nie przy imporcie. Determinizm jest pilnowany świadomie: Python przypięty do 3.12 (3.13 zmienił frazę powodu HTTP 422, co wyglądałoby jak zmiana kontraktu), wymuszone UTF-8 (Windows psuł pauzy w opisach), posortowane klucze. Dlatego też w CI <span class="hl">każda zmiana w całym module capital-gateway odpala job trading-mcp</span> — dokument budują trasy i dekoratory rozsiane po module, więc nie ma węższego uczciwego filtra.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Testy</div>
+      <h2>Prawdziwy FastMCP, atrapa HTTP</h2>
+      <p>Testy ćwiczą prawdziwą instancję FastMCP przez <code>await mcp.call_tool(...)</code> na zamockowanym respx HTTP — żaden test nie dotyka capital.com ani działającej bramki. Autouse'owy fixture czyści zmienne środowiskowe, żeby lokalny <code>.env</code> nie zmieniał wyników. Najcięższe testy strzegą ścieżki zapisu: „zapis nigdy nie jest ponawiany po 5xx”, „zapis nigdy nie jest ponawiany po timeoutcie”, „zapis kosztuje jedną rundę”, „401 to awaria dostępu, nie odmowa”. Dwa testy transportu monkeypatchują <code>uvicorn.Server.serve</code> i dowodzą, że przy nie-demo i przy niedostępnej bramce <em>port nigdy nie został otwarty</em>.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Dla przybysza z C#</div>
+      <h2>Idiomy, które tu pracują</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>W tym module</th><th>Najbliższy odpowiednik .NET</th><th>Różnica, która gryzie</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>narzędzia jako funkcje zagnieżdżone</b></td><td>metody kontrolera z atrybutami</td><td><code>register(mcp, gateway)</code> definiuje funkcje w środku siebie; <code>gateway</code> łapany domknięciem — to jest tutejsze DI</td></tr>
+            <tr><td><b>docstring = opublikowane API</b></td><td>komentarze XML doc</td><td>opis czyta model przy każdej turze; brzmienie ma mierzony koszt i sufit z testem</td></tr>
+            <tr><td><b><code>Decimal(str(value))</code></b></td><td><code>decimal</code></td><td>pythonowy <code>Decimal</code> z <code>float</code> zachowuje błąd binarny — <code>Decimal(0.001) != 0.001</code>; wszystko idzie przez <code>str()</code></td></tr>
+            <tr><td><b><code>mcp==1.27.0</code> przypięte co do wersji</b></td><td>—</td><td>slimmer schematów sięga w prywatne <code>mcp._tool_manager</code> — legalne w Pythonie i właśnie dlatego wersja jest dokładna</td></tr>
+            <tr><td><b>wyjątki jako przepływ odmowy</b></td><td><code>Result&lt;T&gt;</code> / <code>ProblemDetails</code></td><td>MCP zamienia każdy wyjątek na <code>isError=true</code> z komunikatem — <em>tekst</em> komunikatu jest kontraktem</td></tr>
+            <tr><td><b>duplikacja z zasady</b></td><td>„DRY zawsze”</td><td><code>GATEWAY_KEY_HEADER</code> jest skopiowany, nie importowany: moduły nie dzielą bibliotek; do paczki trafia dopiero to, co <em>zmierzono</em> jako identyczne</td></tr>
+            <tr><td><b>testy jak proza</b></td><td>konwencje nazw xUnit</td><td>nazwy są zdaniami, docstringi cytują polskie klauzule specyfikacji — test wskazuje wymóg, którego broni</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Ciekawostka budowlana: kontekstem obrazu Dockera jest <strong>korzeń repozytorium</strong>, nie katalog modułu — <code>tc-mcp-kit</code> to zależność ścieżkowa, którą uv rozwiązuje przy instalacji.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Przewodnik po module trading-mcp · stan kodu z 20 sierpnia 2026</span>
+    <span>Źródła: modules/trading-mcp · README modułu · CLAUDE.md</span>
+  </div>
+</footer>
