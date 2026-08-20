@@ -16,6 +16,7 @@ growing it: a guide kept under its ceiling by saying nothing would be cheap and 
 
 from __future__ import annotations
 
+import subprocess
 from pathlib import Path
 
 import dev
@@ -49,24 +50,48 @@ def test_the_guide_stays_under_its_ceiling() -> None:
     )
 
 
+def tracked_directories() -> list[str]:
+    """What the repository actually holds, as `modules/x` and `packages/y`.
+
+    **Git, not the filesystem, and that distinction is the whole point of this helper.**
+    The first version of this guard walked `iterdir()`, which meant it read a working copy
+    rather than a repository — and a working copy keeps what `git rm` cannot touch. Four
+    directories deleted in the August merges still stood on disk on 20 August 2026 holding
+    609 MB of `.venv` and `__pycache__`: `modules/agent`, `modules/teams`,
+    `modules/market-mcp`, `modules/teams-mcp`. The guard saw all four and passed on all
+    four, because `agent`, `teams`, `market-mcp` and `teams-mcp` each appear in CLAUDE.md
+    for unrelated reasons — `AGENT_DATABASE_URL`, the resource still named
+    `app-tradingcenter-agent`, the `.env` trap named after `market-mcp-into-market-data`.
+    A guard that reads what a deleted module left behind is checking the wrong thing, and
+    a substring match let it agree with itself.
+    """
+    out = subprocess.run(
+        ["git", "ls-files", "-z", "modules", "packages"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+    return sorted({"/".join(path.split("/")[:2]) for path in out.split("\0") if path})
+
+
 def test_every_module_and_package_is_on_the_map() -> None:
     """The drift this file is really written against.
 
     The guide's whole job is to be the map, and the way a map goes wrong is not that a
-    sentence ages — it is that something is built and never added. Read off the filesystem
+    sentence ages — it is that something is built and never added. Read off the repository
     rather than a list kept here, because a hand-maintained list of what to check is the
     thing that goes stale (the same reasoning `scripts/pyproject.toml` gives pyright).
+
+    Matched as the full `modules/<name>` path rather than the bare name, so a module can
+    only satisfy this by being named where the map names things — never by its name
+    happening to occur in a settings example or an Azure resource id.
     """
     text = guide()
-    directories = sorted(
-        path
-        for parent in ("modules", "packages")
-        for path in (REPO_ROOT / parent).iterdir()
-        if path.is_dir() and not path.name.startswith(".")
-    )
+    directories = tracked_directories()
     assert directories, "found no modules or packages to check the map against"
 
-    missing = [f"{d.parent.name}/{d.name}" for d in directories if d.name not in text]
+    missing = [d for d in directories if d not in text]
     assert not missing, (
         f"CLAUDE.md's map does not name {', '.join(missing)}. A module or package the guide "
         "does not mention is one the next session does not know exists."
