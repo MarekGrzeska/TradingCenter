@@ -741,6 +741,20 @@
         "title": "SetActiveAccount",
         "type": "object"
       },
+      "TopUp": {
+        "properties": {
+          "amount": {
+            "description": "how much to move the demo balance by; negative takes funds away, which is as much a way of setting up an experiment as adding them. The provider's own limits — the balance ceiling, the range and the daily count — are its own, and a refusal names them.",
+            "title": "Amount",
+            "type": "number"
+          }
+        },
+        "required": [
+          "amount"
+        ],
+        "title": "TopUp",
+        "type": "object"
+      },
       "UpdatePositionRequest": {
         "description": "Amend an open position's stops. Tri-state per field: omitted leaves it unchanged,\na number sets that level, ``null`` removes it.",
         "properties": {
@@ -934,7 +948,7 @@
     },
     "/accounts/active": {
       "put": {
-        "description": "Switch the active account. Positions and orders act on it afterwards.",
+        "description": "Switch the active account. Positions and orders act on it afterwards.\n\n**Switching drops the quote stream.** capital.com ends the streaming session when the\nfinancial account changes, so anything collecting candles through `/ws/quotes` sees a\ndisconnect and reconnects on its own — a gap of seconds, in data nobody is watching at\nthe moment of the switch. Said here because this route answers success while the\nconsequence lands somewhere else entirely.",
         "operationId": "set_active_account_accounts_active_put",
         "requestBody": {
           "content": {
@@ -969,6 +983,48 @@
           }
         },
         "summary": "Set Active Account",
+        "tags": [
+          "accounts"
+        ]
+      }
+    },
+    "/accounts/top-up": {
+      "post": {
+        "description": "Move the demo account's balance, and answer with the account as it stands after.\n\nActs on the **active** account — there is no account id to pass, because capital.com\nadjusts the session's own account and a parameter here would promise a choice that\ndoes not exist. Switch first if the money belongs somewhere else.",
+        "operationId": "top_up_accounts_top_up_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TopUp"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Account"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Top Up",
         "tags": [
           "accounts"
         ]

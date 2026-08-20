@@ -26,7 +26,7 @@ from . import telemetry
 # regardless of where `FastAPI(...)` itself is called.
 telemetry.configure()
 
-from fastapi import Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -251,8 +251,39 @@ class SetActiveAccount(BaseModel):
 
 @app.put("/accounts/active", tags=["accounts"], response_model=Account)
 async def set_active_account(body: SetActiveAccount, a: CapitalAdapter = Depends(adapter)):
-    """Switch the active account. Positions and orders act on it afterwards."""
+    """Switch the active account. Positions and orders act on it afterwards.
+
+    **Switching drops the quote stream.** capital.com ends the streaming session when the
+    financial account changes, so anything collecting candles through `/ws/quotes` sees a
+    disconnect and reconnects on its own — a gap of seconds, in data nobody is watching at
+    the moment of the switch. Said here because this route answers success while the
+    consequence lands somewhere else entirely.
+    """
     return await a.set_active_account(body.account_id)
+
+
+class TopUp(BaseModel):
+    amount: float = Field(
+        description=(
+            "how much to move the demo balance by; negative takes funds away, which is "
+            "as much a way of setting up an experiment as adding them. The provider's "
+            "own limits — the balance ceiling, the range and the daily count — are its "
+            "own, and a refusal names them."
+        )
+    )
+
+
+@app.post("/accounts/top-up", tags=["accounts"], response_model=Account)
+async def top_up(body: TopUp, a: CapitalAdapter = Depends(adapter)):
+    """Move the demo account's balance, and answer with the account as it stands after.
+
+    Acts on the **active** account — there is no account id to pass, because capital.com
+    adjusts the session's own account and a parameter here would promise a choice that
+    does not exist. Switch first if the money belongs somewhere else.
+    """
+    if body.amount == 0:
+        raise HTTPException(422, detail="amount must not be zero")
+    return await a.top_up(body.amount)
 
 
 # --- market data ---

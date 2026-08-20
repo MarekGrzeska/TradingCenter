@@ -1,8 +1,11 @@
 """specs/trading-mcp-tools: the announced shape of the set, not what any one tool
-does — read vs write annotations, and the absence of a market tool.
+does — read vs write annotations, the absence of a market tool, and what the whole set
+costs to read.
 """
 
 from __future__ import annotations
+
+import json
 
 READ_TOOLS = {
     "get_positions",
@@ -10,8 +13,18 @@ READ_TOOLS = {
     "get_balance",
     "get_instrument_terms",
     "size_for_margin",
+    "list_accounts",
 }
-WRITE_TOOLS = {"place_order", "close_position", "amend_stops", "cancel_working_order"}
+# Choosing the account and funding it change what money is at stake as surely as placing
+# an order does (specs/trading-mcp-tools, "Zmianą stanu jest także wybór rachunku").
+WRITE_TOOLS = {
+    "place_order",
+    "close_position",
+    "amend_stops",
+    "cancel_working_order",
+    "switch_active_account",
+    "top_up_demo_account",
+}
 
 
 async def test_the_expected_tools_and_no_others(server) -> None:
@@ -115,3 +128,35 @@ async def test_a_tool_taking_a_size_says_what_a_size_is(server) -> None:
         description = tool.description or ""
         assert "unit" in description.lower(), tool.name
         assert "size_for_margin" in description or tool.name == "size_for_margin", tool.name
+
+
+# --- the surface as a running cost (specs/trading-mcp-tools, "Powierzchnia narzędzi ma
+# zapisany sufit") ---
+
+SURFACE_CEILING_CHARS = 15_000
+
+# Measured 13 772 characters on 20 August 2026, across twelve tools, with the three
+# account tools in — 11 092 across nine without them. The spec has asked for a written
+# ceiling since this module was split out; this is the first change to add tools since,
+# and so the first to need one.
+#
+# The headroom is about a tenth: one more tool of the size the account ones are (~900
+# characters each) fits, and a paragraph added to every existing description does not.
+# `place_order` alone is 2 178 characters, which is where to look first if this ever has
+# to come down.
+
+
+def _surface(tools) -> str:
+    return json.dumps(
+        [t.model_dump(exclude_none=True) for t in tools], separators=(",", ":"), ensure_ascii=False
+    )
+
+
+async def test_the_surface_stays_under_its_ceiling(server) -> None:
+    """Read by the model in every turn of a conversation that holds these tools, so its
+    size is a cost paid per turn, not an implementation detail."""
+    measured = len(_surface(await server.list_tools()))
+    assert measured <= SURFACE_CEILING_CHARS, (
+        f"the tool surface is {measured} characters, above the {SURFACE_CEILING_CHARS} "
+        "ceiling. Shorten a description, narrow a reply, or raise the ceiling on purpose."
+    )

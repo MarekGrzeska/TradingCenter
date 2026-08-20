@@ -128,6 +128,16 @@ class CapitalClient:
     async def switch_account(self, account_id: str) -> httpx.Response:
         return await self.request("PUT", f"{API_PREFIX}/session", json={"accountId": account_id})
 
+    async def top_up(self, amount: float) -> httpx.Response:
+        """Moves the demo account's balance by `amount`, positive or negative.
+
+        No account in the body: capital.com adjusts the session's active account, and a
+        parameter naming another one would promise a choice the provider does not offer.
+        """
+        return await self.request(
+            "POST", f"{API_PREFIX}/accounts/topUp", json={"amount": amount}
+        )
+
     async def search_markets(self, search_term: str) -> httpx.Response:
         return await self.request(
             "GET", f"{API_PREFIX}/markets", params={"searchTerm": search_term}
