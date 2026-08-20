@@ -159,14 +159,17 @@ that justified this direction ran 1 260 out against 569 back. This one is near o
 
 What decides it is three things no line count shows.
 
-**The probe dies and nothing replaces it.** `trading-mcp` refuses to open a port until the
-gateway has told it the account is a demo one, so its `/health` 200 proves it reached the
-gateway, through the firewall, with the shared key, and was believed — the most a probe
-proves anywhere here. The gateway itself cannot be probed at all: its `ip_restriction`
-admits only the service plan's own outbound addresses, and a CI runner is not one of them,
-so its deploy asks the control plane — the question that reported `Running` over a
-crash-looping container on 16 August 2026. Folding puts the write path inside the one
-module whose deployment cannot see in.
+**~~The probe dies and nothing replaces it.~~ — withdrawn on 20 August 2026, the same day it
+was written.** The argument had two halves. The first stands: `trading-mcp` refuses to open a
+port until the gateway has told it the account is a demo one, so its `/health` 200 proves it
+reached the gateway, with the shared key, and was believed — the most a probe proves anywhere
+here. The second was false. The gateway was said to be unprobeable, its `ip_restriction`
+admitting only the service plan's own outbound addresses; **there is no such restriction, on this
+app or on any other in the resource group.** `az webapp config access-restriction show` answers
+`Allow` / "Allow all" for all four, `ip_restriction` appears nowhere in `infra/`, and the
+gateway's `/` answered a laptop on the first try. `deploy-gateway.yml` probes it now, so the fold
+would not have taken a probe away from anything. Read this argument as one point about
+`trading-mcp`'s own probe, not as two.
 
 **The demo guard stops being two answers.** The gateway derives its environment from the
 host it is bound to and refuses to start elsewhere; `trading-mcp` refuses to listen until
@@ -177,10 +180,11 @@ candle through the gateway. Today a crash in an order tool kills a process nothi
 depends on. The two folds that worked had the opposite shape — the tools moved into the
 module they already could not survive without.
 
-One premise of the question was wrong, and it argues the other way, so it is recorded too.
-The gateway is described as sitting behind "a list of two addresses"; it sits behind one
-list of the *plan's* addresses, and all four backend apps share that plan. The workbench is
-already inside the gateway's network perimeter and is held out by one thing: it does not
+One premise of the question was wrong, and it argues the other way, so it is recorded too —
+and it was wrong by more than the day's correction assumed. The gateway was described as sitting
+behind "a list of two addresses"; the correction written here first said it sits behind one list
+of the *plan's* addresses. It sits behind no list at all. Every caller that knows the hostname
+reaches it, and the one thing holding the workbench out — or anybody else — is that they do not
 hold `GATEWAY_API_KEY`. So the fold would not open a closed network boundary — it would
 change which credential closes it, from a static key two apps share to an enumerated list
 of named applications. That is the better mechanism, and it is available to the gateway

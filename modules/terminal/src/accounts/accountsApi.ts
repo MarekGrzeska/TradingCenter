@@ -9,8 +9,15 @@
  *
  * The credential is not here and must never be: the gateway's shared key belongs to the
  * modules that call it over the network. In development the dev server attaches it
- * (`vite.config.ts`); in production the browser's own token does the work, validated
- * before the request reaches the app.
+ * (`vite.config.ts`); in production the browser's own token was meant to do the work.
+ *
+ * **In production it does not, and this screen has never read an account there.** The token is
+ * sent, but the gateway's Easy Auth runs with `AllowAnonymous` — it cannot require a token,
+ * because two modules call that app with a shared key and none — and under that setting it
+ * validates nothing and forwards no principal, so the module refuses every browser request as
+ * an unidentified caller. A 401 reaches this file as "you are signed out", which is what the
+ * operator saw on 20 August 2026. `capital_gateway/caller_access.py` carries the measurement;
+ * the fix is a change to the gateway's door, not to this file.
  */
 
 import { noIdentity, type Identity } from "../auth/identity";

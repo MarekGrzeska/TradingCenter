@@ -1,0 +1,396 @@
+<title>Market-data od środka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 26px 0 8px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Przewodnik po module · 3 z 5</span>
+    <h1>Market-data od środka</h1>
+    <p class="lede">Bramka jest oknem na dostawcę i nic nie pamięta. To archiwum pamięta, co przeleciało obok — żeby wykres, backtest i agent czytali serię, która <b>istnieje także jutro</b>. Jedyny właściciel PostgreSQL w systemie.</p>
+    <div class="strip">
+      <span>port <b>8020</b> — REST i /mcp z jednego procesu</span>
+      <span>~13,7 tys. linii produkcyjnych</span>
+      <span>Python 3.12 · FastAPI · asyncpg · numpy</span>
+      <span>20 sierpnia 2026 · dla programisty C#</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">7</div><div class="l">tabel — siedem ręcznych migracji SQL</div></div>
+      <div class="cell"><div class="v">11</div><div class="l">narzędzi MCP, wszystkie tylko-odczyt</div></div>
+      <div class="cell"><div class="v">~50</div><div class="l">wskaźników w katalogu-danych</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">ORM-ów na ścieżce zapytań</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Rola</div>
+      <h2>Archiwum świec z własną bazą</h2>
+      <p class="intro">Moduł robi pięć rzeczy: zbiera (jedna subskrypcja WebSocket na śledzoną parę plus głębokie backfille przez bramkę), przechowuje (tabela <code>candles</code> i jej pochodne), zna swoją niewiedzę (pokrycie jako fakt pierwszej klasy), liczy wskaźniki (własny kernel numpy) i odpowiada dwiema powierzchniami nad jednym archiwum.</p>
+      <p>Pokrycie zasługuje na zdanie: <code>coverage_ranges</code> zapisuje, co <em>zweryfikowano</em>, więc „brak świecy” ma dwie różne odpowiedzi — <span class="hl">rynek był zamknięty albo nikt jeszcze nie zbierał</span> — zamiast jednej pustej listy. Interwały <code>MINUTE_5…HOUR_4</code> są wyliczane z serii minutowej do osobnej tabeli <code>derived_candles</code>; DAY i WEEK nigdy, bo ich granica biegnie za sesją giełdy. W tym wdrożeniu pary są zbierane od <strong>MINUTE_5</strong> w górę — surowy MINUTE istnieje tylko jako źródło wyliczeń na żądanie.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 300" role="img" aria-label="Dwie powierzchnie nad jednym archiwum: terminal czyta REST i WebSocket, workbench czyta /mcp; obie powierzchnie wołają te same funkcje reads.py, pod spodem store, coverage i rollups nad PostgreSQL; ingest zasila archiwum z capital-gateway">
+            <defs>
+              <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="24" width="150" height="52" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="87" y="46" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">terminal</text>
+              <text x="87" y="64" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">REST + /ws/candles</text>
+
+              <rect x="12" y="110" width="150" height="52" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="87" y="132" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">workbench</text>
+              <text x="87" y="150" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">/mcp · 11 narzędzi</text>
+
+              <rect x="250" y="62" width="170" height="62" fill="#14306b" stroke="#14306b"></rect>
+              <text x="335" y="88" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">reads.py</text>
+              <text x="335" y="106" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">jedne odczyty, dwie powierzchnie</text>
+
+              <rect x="500" y="24" width="180" height="44" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="590" y="51" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">store.py · candles</text>
+              <rect x="500" y="78" width="180" height="44" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="590" y="105" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">coverage.py</text>
+              <rect x="500" y="132" width="180" height="44" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="590" y="159" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">rollups.py</text>
+
+              <rect x="760" y="62" width="200" height="62" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="860" y="88" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">PostgreSQL</text>
+              <text x="860" y="106" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">7 tabel · własność modułu</text>
+
+              <line x1="166" y1="50" x2="246" y2="80" stroke="currentColor" stroke-width="1.4" marker-end="url(#m1)"></line>
+              <line x1="166" y1="136" x2="246" y2="106" stroke="currentColor" stroke-width="1.4" marker-end="url(#m1)"></line>
+              <line x1="424" y1="80" x2="496" y2="52" stroke="currentColor" stroke-width="1.3" marker-end="url(#m1)"></line>
+              <line x1="424" y1="93" x2="496" y2="100" stroke="currentColor" stroke-width="1.3" marker-end="url(#m1)"></line>
+              <line x1="424" y1="106" x2="496" y2="150" stroke="currentColor" stroke-width="1.3" marker-end="url(#m1)"></line>
+              <line x1="684" y1="93" x2="756" y2="93" stroke="currentColor" stroke-width="1.4" marker-end="url(#m1)"></line>
+
+              <rect x="250" y="216" width="200" height="56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="350" y="240" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">ingest + jobs</text>
+              <text x="350" y="258" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">jeden semafor budżetu</text>
+              <rect x="12" y="216" width="150" height="56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="87" y="240" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">capital-gateway</text>
+              <text x="87" y="258" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8010</text>
+              <line x1="166" y1="244" x2="246" y2="244" stroke="currentColor" stroke-width="1.4" marker-end="url(#m1)"></line>
+              <text x="206" y="232" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">WS + REST</text>
+              <line x1="454" y1="232" x2="540" y2="180" stroke="currentColor" stroke-width="1.4" marker-end="url(#m1)"></line>
+              <text x="520" y="216" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">commit_candles()</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — narzędzia MCP były osobnym modułem do 19 sierpnia 2026; dziś to trasa wołająca te same funkcje w procesie, które woła router. Zasilanie i głębokie zbieranie dzielą jeden semafor, bo budżet 10 req/s liczy się na rachunek.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Start i migracje</div>
+      <h2>Moduł migruje się sam, pod ryglem</h2>
+      <p class="intro">W <code>lifespan</code>: jedno połączenie trzymane przez cały blok, <code>advisory_lock</code> z kluczem <strong>8020</strong> i czekaniem do 1500 s — tabela świec jest największą rzeczą w systemie, a App Service ubija start kontenera po 1800 s. W ryglu: <code>tc_runtime.migrate.run()</code>. Zaraz po nim <code>schema_version.verify()</code> łapie „migracja zgłosiła sukces, ale nie dotarła” i „obraz starszy niż zastany schemat”.</p>
+      <p>Odpowiednik .NET nie istnieje wprost: nie ma kroku <code>dotnet ef database update</code> w pipeline — <span class="hl">proces, który odpowiada na <code>/health</code>, sam jest dowodem, że schemat jest u głowy</span>. Dwie instancje startujące naraz dają jednego migrującego i jednego czekającego, bo rygiel doradczy Postgresa jest sesyjny.</p>
+      <p>Autoryzację robi surowe middleware ASGI <code>CallerAccess</code> — rejestr tras kontra wywołujący. Ścieżka spoza spisu dostaje 403, więc nowa trasa REST nie jest osiągalna dla narzędziowego rozmówcy w dniu, w którym powstała. Tożsamością jest <em>aplikacja</em> z claimu <code>azp</code>/<code>appid</code> tokenu — celowo nie <code>X-MS-CLIENT-PRINCIPAL-ID</code>, który dla tokenu delegowanego niesie osobę (zmierzono na produkcji 19 sierpnia 2026: odrzucał każde żądanie terminala).</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Plik po pliku</div>
+      <h2>Sześć pakietów, jedne drzwi na tabelę</h2>
+      <p>Zasada organizująca: <strong>jedne drzwi do każdej tabeli</strong> — <code>store.py</code> do świec, <code>coverage.py</code> do pokrycia, <code>jobs/store.py</code> do zleceń zbierania. Nikt inny nie pisze SQL-a przeciw tym tabelom.</p>
+      <h3 class="sub">Poziom główny</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Plik</th><th>Odpowiedzialność</th></tr></thead>
+          <tbody>
+            <tr><td><b>app.py</b></td><td>Wyłącznie montaż: <code>create_app()</code> (fabryka, nie singleton — <code>app.state</code> jest całym kontenerem zależności), <code>lifespan</code>, cztery handlery wyjątków, montaż <code>/mcp</code>, dwa surowe middleware. Zero CORS — odpowiada za niego App Service przed Easy Auth.</td></tr>
+            <tr><td><b>caller_access.py</b></td><td>Rejestr trasa-kontra-wołający: <code>Surface.OPEN/TOOLS/REST</code>, dekodowanie principala, listy dozwolonych aplikacji. Brak ustawień przy włączonym wymogu → 503, nie przepuszczenie.</td></tr>
+            <tr><td><b>config.py</b></td><td><code>Settings</code> z walidatorami: odmowa URL-a wskazującego na capital.com, spójność trybu połączenia (tożsamość+TLS poza loopbackiem albo loopback bez tożsamości), budżety współbieżności.</td></tr>
+            <tr><td><b>contract.py</b></td><td><strong>Drut.</strong> Wszystkie modele <code>*Out</code>/żądań, z których FastAPI buduje dokument OpenAPI — źródło wygenerowanego kontraktu terminala.</td></tr>
+            <tr><td><b>store.py</b> · <b>coverage.py</b> · <b>rollups.py</b></td><td>Drzwi do <code>candles</code> (upsert, w którym historia przebija strumień), scalanie zakresów pokrycia pod <code>pg_advisory_xact_lock</code>, odświeżanie interwałów pochodnych (<code>date_bin</code>, całe okresy, jedna transakcja).</td></tr>
+            <tr><td><b>reads.py</b></td><td>Odczyty o dwóch konsumentach (routery i narzędzia): okno, seria, formująca się świeca, pokrycie. Tu mieszka reguła „zebrane bije wyliczone”.</td></tr>
+            <tr><td><b>hub.py</b> · <b>tickets.py</b></td><td>Fan-out do subskrybentów ze szczelnym szwem migawka-plus-zmiany (zapis dzieje się <em>wewnątrz</em> <code>held()</code>); jednorazowe bilety WebSocketu — słownik w procesie, poprawny tylko przy <code>worker_count = 1</code> i tak opisany.</td></tr>
+            <tr><td><b>tracking.py</b> · <b>deletion.py</b> · <b>market_status.py</b></td><td>Stojąca decyzja operatora (śledzone pary, sufit, stany zbierania), jawne nieodwracalne usunięcie pary ze śladem, minuta cache'u odpowiedzi „czy rynek otwarty”.</td></tr>
+            <tr><td><b>periods.py</b> · <b>models.py</b> · <b>errors.py</b> · <b>db.py</b> · <b>telemetry.py</b> · <b>openapi.py</b> · <b>mcp_app.py</b></td><td>Arytmetyka okresów; słownik domeny; taksonomia błędów bramki; własna hydraulika bazy (klucz rygla 8020, token Entra na połączenie fizyczne); dwa mierniki wieku świecy; dokument OpenAPI bez bazy i ustawień; budowa serwera FastMCP i sesji montowanej aplikacji.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">Podpakiety</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Pakiet</th><th>Pliki i role</th></tr></thead>
+          <tbody>
+            <tr><td><b>routers/</b></td><td><code>deps.py</code> (jedyne, po co sięga trasa), <code>meta</code> (/, /health, /ping), <code>candles</code>, <code>pairs</code> (śledzenie + zlecenia + usunięcia), <code>jobs</code>, <code>stream</code> (bilet wydawany przed dotknięciem bazy), <code>instruments</code> (nieczytane proxy katalogu bramki), <code>indicators</code>.</td></tr>
+            <tr><td><b>gateway/</b></td><td>Klient bramki: <code>_http.py</code> (connect 5 s, read 300 s — głęboki backfill to dziesiątki wywołań dostawcy), <code>history.py</code>, <code>instruments.py</code> („czy da się zbierać” = jedna najtańsza świeca), <code>stream.py</code> (czytanie ramek; <code>quote</code> celowo ignorowane — ~5/s/parę śmieci).</td></tr>
+            <tr><td><b>ingest/</b></td><td><code>supervisor.py</code> (jedno zadanie na parę, martwe zadanie logowane i wskrzeszane po 30 s), <code>backfill.py</code> (domknięcie luki; pokrycie zapisywane do chwili odczytu, nie do najnowszej świecy), <code>live.py</code> (pętla: domknij lukę → słuchaj → odczekaj backoff 1→60 s → powtórz).</td></tr>
+            <tr><td><b>jobs/</b></td><td><code>models.py</code> (status <em>wyliczany</em> z chunków, nigdy nie przechowywany), <code>plan.py</code> (okna od najnowszego — chunk, który znajdzie granicę historii dostawcy, biegnie wcześnie i reszta jest pomijana hurtem), <code>store.py</code> (jedyne drzwi; <code>FOR UPDATE SKIP LOCKED</code> jako kolejka), <code>runner.py</code> (jedno żądanie bramki na chunk, granica historii stawiana na najstarszej zwróconej świecy).</td></tr>
+            <tr><td><b>indicators/</b></td><td><code>kernel.py</code> (czysty numpy, ~20 prymitywów, zero importów FastAPI/asyncpg), <code>warmup.py</code> (rozgrzewka jako próg zaniku — wynik niezależny od tego, gdzie zaczęto czytać), <code>service.py</code> (sufit 200 000 świec×wskaźników; obliczenie wspólne dla obu powierzchni), <code>catalogue/</code> — osiem grup danych: średnie, zmienność (16), reżim, oscylatory, wstęgi, struktura, strefy, profil.</td></tr>
+            <tr><td><b>tools/</b></td><td>Jedenaście narzędzi MCP + trzy zasoby + jeden prompt. <code>reduce.py</code> (agregacja OHLC zamiast proxy), <code>uncertainty.py</code> — zdania, których liczby nie mówią: „niepokryte”, „wyliczone”, „nierozliczone”, „formująca się”. Każda pusta odpowiedź mówi, <em>jakim rodzajem pustki</em> jest.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Droga świecy</div>
+      <h2>Zebrane bije wyliczone</h2>
+      <p class="intro">Świeca wchodzi jedną z dwóch dróg: żywą subskrypcją (zamknięte świece przez <code>commit_candles()</code> — zapis + pokrycie + odświeżenie pochodnych w jednym wejściu) albo chunkiem zlecenia zbierania. Obie drogi liczą się do tego samego semafora, bo dostawca liczy budżet na rachunek.</p>
+      <div class="quote">Zebrane bije wyliczone — tabela pochodna jest czytana dopiero, gdy właściwa wróciła pusta.</div>
+      <p>Upsert w <code>store.py</code> ma w <code>WHERE</code> regułę autorytetu: świeca ze źródła <code>history</code> nie zostanie nadpisana świecą ze strumienia. Formująca się świeca podana do zapisu <em>podnosi wyjątek</em> i odrzuca całą partię — cicha korupcja archiwum to kategoria, w której ten moduł nie negocjuje.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Wskaźniki</div>
+      <h2>Katalog jest danymi, nie kodem</h2>
+      <p class="intro">Nowy wskaźnik to dopisanie wpisu do krotki grupy w <code>indicators/catalogue/&lt;grupa&gt;.py</code> — <span class="hl">dokładnie jeden plik</span>. Nie <code>spec.py</code>, nie <code>contract.py</code>, nie terminal, zero <code>contract:generate</code>: katalog jest publikowany przez <code>GET /indicators</code> i picker terminala oferuje go w chwili, gdy wyląduje.</p>
+      <p>Umożliwiają to dwie decyzje. Kształt wyniku jest unią tagowaną (<code>Lines | Markers | ClusterLevels | HtfLevels | Zones | MinuteZones | TimeProfile</code>) — odpowiednik zamkniętej hierarchii rekordów z <code>switch</code>-em po tagu — a <code>IndicatorSpec.output</code> jest <em>wyprowadzany</em> z typu komputera, więc wpis nie może ogłosić kształtu, którego jego funkcja nie wyprodukuje. Matematyka siedzi w <code>kernel.py</code>: czysty numpy, <code>float64</code>, jedna ustalona kolejność redukcji, indeksowanie po świecy, nie po czasie. W testach TA-Lib jest wyrocznią porównawczą — dev-only, nic w produkcie go nie importuje.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Kontrakt</div>
+      <h2>Pięć przystanków nowego pola</h2>
+      <p class="intro"><code>python -m market_data.openapi</code> drukuje dokument OpenAPI bez bazy, bramki i ustawień. Terminal generuje z niego swoje typy — a nowe pole na drucie jedzie pięcioma przystankami:</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="n">#</th><th>Przystanek</th><th>Co pilnuje</th></tr></thead>
+          <tbody>
+            <tr><td class="n">1</td><td><code>models.py</code> — pole domenowe i zapytanie, które je wypełnia</td><td rowspan="2"><span class="tag att">tylko oko</span> — rozjazd 1↔2 nie łamie niczego: pole nigdy niedodane do <code>*Out</code> po prostu nie jest publikowane</td></tr>
+            <tr><td class="n">2</td><td><code>contract.py</code> — pole na modelu <code>*Out</code></td></tr>
+            <tr><td class="n">3</td><td>terminal: <code>pnpm contract:generate</code> → <code>contract.generated.ts</code></td><td><span class="tag ok">contract:check w CI</span></td></tr>
+            <tr><td class="n">4</td><td><code>archive.ts</code> — mapper snake_case → camelCase, ISO → epoka</td><td rowspan="2"><span class="tag ok">pnpm typecheck</span></td></tr>
+            <tr><td class="n">5</td><td><code>types.ts</code> i komponent — nic poza mapperem nie widzi pola z drutu</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Dlatego w CI zmiana <code>contract.py</code> odpala cały job terminala. <code>openapi.py</code> dodatkowo dowiesza do dokumentu modele WebSocketu i czyni każde pole odpowiedzi wymaganym — żeby generator nie produkował <code>T | undefined</code> na polach, które zawsze są.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Narzędzia MCP</div>
+      <h2>Redukcja zamiast proxy, sufit z testem</h2>
+      <p class="intro">Jedenaście narzędzi tylko-odczyt: <code>list_tracked_symbols</code>, <code>list_tracked_pairs</code>, <code>get_candles</code>, <code>get_last_price</code>, <code>summarize_range</code>, <code>describe_coverage</code>, <code>search_instruments</code>, <code>list_indicators</code>, <code>describe_indicator</code>, <code>compute_indicators</code>, <code>levels_near_price</code>.</p>
+      <p>Zasada powierzchni: modelowi nie oddaje się surowych danych hurtem. <code>get_candles</code> agreguje powyżej 200 świec i <strong>odmawia powyżej 2000</strong>, mówiąc, o co zapytać zamiast tego; <code>levels_near_price</code> zwraca 20 najbliższych poziomów i liczy resztę w polu <code>omitted</code>. Cała powierzchnia ma sufit znakowy z testem: <code>SURFACE_CEILING_CHARS = 19 700</code> (zmierzone 18 844 na 19 sierpnia 2026) — obok test, że sufitu nie da się spełnić publikując nic, i test przypinający jedenaście nazw.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Baza danych</div>
+      <h2>Siedem tabel, status nigdzie</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tabela</th><th>Klucz</th><th>Rola</th></tr></thead>
+          <tbody>
+            <tr><td><b>candles</b></td><td>(symbol, resolution, period_start)</td><td>samo archiwum; <code>source</code> i <code>price_side</code> obok danych, PK jest zarazem indeksem odczytu zakresu</td></tr>
+            <tr><td><b>tracked_pairs</b></td><td>(symbol, resolution)</td><td>trwała konfiguracja — nie ma listy w pliku; od-śledzenie przestawia wiersz, nie usuwa go</td></tr>
+            <tr><td><b>coverage_ranges</b></td><td>(symbol, resolution, range_start)</td><td>co faktycznie zweryfikowano + granica historii dostawcy (najwyżej jedna na parę, indeks częściowy)</td></tr>
+            <tr><td><b>derived_candles</b></td><td>(symbol, resolution, period_start)</td><td>wyliczone z serii minutowej; osobna tabela, żeby obliczone i zaobserwowane nigdy nie były nierozróżnialne</td></tr>
+            <tr><td><b>collection_jobs</b></td><td>id</td><td>zlecenie zbierania; <em>bez kolumny statusu</em> — status wyliczany z chunków</td></tr>
+            <tr><td><b>collection_job_chunks</b></td><td>id</td><td>para × okno × jedno żądanie bramki; indeks częściowy <code>WHERE state='pending'</code> jest kolejką runnera; bez kaskady usuwania — celowo</td></tr>
+            <tr><td><b>pair_deletions</b></td><td>id</td><td>ślad usunięcia, kiedy danych już nie ma</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Pliki migracji wypisują listę interwałów zamiast importować enum modułu — migracja jest zapisem tego, co uruchomiono danego dnia, a import dzisiejszego enuma pozwoliłby późniejszej edycji przepisać historię.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Testy</div>
+      <h2>Kontener na sesję, TRUNCATE między testami</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Uruchomienie</th><th>Zakres</th><th>Stan</th></tr></thead>
+          <tbody>
+            <tr><td><b>uv run pytest</b></td><td>jednostkowe; wszystko z markerem <code>db</code> pomija się bez Dockera — ale demon zainstalowany i chory <em>nie</em> pomija (cichy skip nieodróżnialny od passa)</td><td><span class="tag ok">zawsze</span></td></tr>
+            <tr><td><b>-m db</b></td><td>integracja: jednorazowy <code>postgres:17-alpine</code> (testcontainers), zmigrowany prawdziwym Alembikiem, <code>TRUNCATE</code> między testami</td><td><span class="tag ok">CI</span></td></tr>
+            <tr><td><b>-m live --run-live</b></td><td>odczyty przez prawdziwą bramkę na :8010, m.in. porównanie wyliczeń z własnymi świecami dostawcy</td><td><span class="tag att">nigdy w CI</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Fixture <code>app</code> buduje <em>świeżą</em> <code>create_app()</code> na test; <code>tool_server</code> odtwarza walidację schematu wyjściowego, którą <code>FastMCP.call_tool</code> pomija — bez niej błąd, w którym cztery narzędzia odmawiały własnych odpowiedzi, był zielony w CI.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">10 · Dla przybysza z C#</div>
+      <h2>Idiomy, które tu pracują</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>W tym module</th><th>Najbliższy odpowiednik .NET</th><th>Różnica, która gryzie</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>surowy SQL w stałych</b></td><td>EF Core / Dapper</td><td>zero ORM na ścieżce zapytań; SQLAlchemy jest tu wyłącznie po to, by Alembic mógł jeździć — <code>target_metadata = None</code></td></tr>
+            <tr><td><b>migracje ręczne, numerowane</b></td><td>EF migrations z diffów modeli</td><td>nie ma warstwy modeli do porównania; migracja to Python wołający <code>op.create_table(...)</code>, uruchamiany przez sam proces</td></tr>
+            <tr><td><b>app.state jako kontener</b></td><td><code>IServiceCollection</code></td><td>worek atrybutów wypełniany w lifespanie; „interfejs” to metody, które obiekt akurat ma — dublery są strukturalne</td></tr>
+            <tr><td><b>jedna pętla zdarzeń</b></td><td>async/await + pula wątków</td><td><code>asyncio.Semaphore</code> to budżet, nie wątki; rekurencyjny wskaźnik trzyma GIL, więc bramą jest zwykły licznik</td></tr>
+            <tr><td><b>middleware = klasa z <code>__call__</code></b></td><td>pipeline ASP.NET Core</td><td>kolejność rejestracji jest <em>odwrotna</em> do wykonania — <code>add_middleware</code> owija, dodane pierwsze siedzi najgłębiej</td></tr>
+            <tr><td><b>dwa aliasy na pole <code>from</code></b></td><td>—</td><td><code>from</code> to słowo kluczowe Pythona; jeden <code>alias=</code> kazałby type-checkerowi syntezować parametr o tej nazwie</td></tr>
+            <tr><td><b><code>assert</code> jako niezmiennik</b></td><td><code>Debug.Assert</code></td><td>znika pod <code>python -O</code> — konwencja, nie kontrakt</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>I gęstość prozy: niemal każda stała i każda instrukcja SQL niesie komentarz z datą pomiaru i incydentem, z którego przyszła. To styl domowy — czytanie komentarzy jest najszybszą drogą w głąb tego modułu.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Przewodnik po module market-data · stan kodu z 20 sierpnia 2026</span>
+    <span>Źródła: modules/market-data · README modułu · CLAUDE.md</span>
+  </div>
+</footer>

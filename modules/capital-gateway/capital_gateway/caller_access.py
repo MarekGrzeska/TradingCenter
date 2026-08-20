@@ -7,10 +7,20 @@ This module has two kinds of caller and they cannot present the same credential.
 has always described, and nothing here changes it.
 
 **A browser** — the terminal's Accounts screen — cannot carry that key: a secret in
-downloaded code is a published secret. What it carries instead is a token, validated by the
-platform in front of this app, whose claims name the application it was issued to. This file
-is what turns that name into an answer, and it answers narrowly: the account, and nothing
-else. A caller who came through the platform's door is *not* thereby allowed to place an
+downloaded code is a published secret. What it carries instead is a token whose claims name the
+application it was issued to. This file is what turns that name into an answer, and it answers
+narrowly: the account, and nothing else.
+
+**This path does not work in production today, and the reason is written here rather than left
+to be rediscovered.** It assumed the token arrives validated by the platform in front of this
+app, with `x-ms-client-principal` set from its claims. Easy Auth here runs with
+`unauthenticated_action = "AllowAnonymous"`, because market-data and trading-mcp call with the
+shared key and no token at all — and under that setting the auth module validates nothing and
+injects no principal. Measured on 20 August 2026: a request carrying `Authorization: Bearer
+notatoken` reached this middleware and was refused by it, where the same request to market-data
+was refused by the platform with `WWW-Authenticate` and never reached the app. So every browser
+request lands on the last branch below and answers 401, which the terminal reads as a signed-out
+session. A caller who came through the platform's door is *not* thereby allowed to place an
 order — the platform authorizes an application, not a route.
 
 **The record is a list of what is allowed, so anything new is refused by default.** A route

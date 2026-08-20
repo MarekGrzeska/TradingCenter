@@ -138,7 +138,13 @@ jobs:
           PATTERNS[packages]='^packages/'
           # Repository tooling with tests of its own since one-deploy-path-one-dev-runner:
           # the dev-stack runner and the probe every deploy workflow ends in.
-          PATTERNS[scripts]='^scripts/'
+          # `CLAUDE.md` is in this list because `scripts/tests/test_guide_ceiling.py` reads
+          # it: the guide has a size ceiling and must name every module and package the
+          # repository holds. Filtered on `^scripts/` alone, an edit to the guide itself —
+          # the one thing that guard is written against — ran none of it, and a guide over
+          # its ceiling or missing a module would have gone green. Found on 20 August 2026,
+          # in the pull request that fixed the same guard for reading a working copy.
+          PATTERNS[scripts]='^scripts/|^CLAUDE\.md$'
           # Terraform reached `main` unvalidated until 18 August 2026: `terraform.yml` runs
           # on pull_request only, so a push straight to `main` passed through nothing at
           # all. `fmt` and `validate` need no credentials and no state, so they belong here

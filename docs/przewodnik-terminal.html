@@ -1,0 +1,312 @@
+<title>Terminal od środka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Przewodnik po module · 5 z 5</span>
+    <h1>Terminal od środka</h1>
+    <p class="lede">Ekran operatora: React + TypeScript, budowany Vite, wdrażany na Azure Static Web Apps. Konsumuje pozostałe cztery moduły i <b>nie publikuje niczego</b> — konsument, nie równorzędny partner.</p>
+    <div class="strip">
+      <span>port dev <b>5173</b> · React 19 · TS 5.9 · Vite 7</span>
+      <span>~27 tys. linii TS/TSX (w tym ~4,5 tys. generowanych)</span>
+      <span>tożsamość: <b>Entra</b> przez MSAL, nie Easy Auth</span>
+      <span>20 sierpnia 2026 · dla programisty C#</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">6</div><div class="l">zakładek z jednego rejestru w tabs.ts</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">wygenerowane kontrakty: market-data i teams</div></div>
+      <div class="cell"><div class="v">50</div><div class="l">plików testów, obok kodu, nie w tests/</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">kontraktów publikowanych — tylko konsumpcja</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Rola</div>
+      <h2>Trzy adresy, cztery powierzchnie</h2>
+      <p class="intro">Terminal rozmawia z market-data (świece przez REST i WebSocket, pary, zlecenia zbierania, wskaźniki — oraz proxy katalogu instrumentów bramki), z workbenchem (dwie powierzchnie: rozmowa i zespoły) i — od ekranu Accounts — z samą bramką (rachunek demo). Z trading-mcp nie rozmawia nigdy: ten pojawia się tu tylko jako nazwy narzędzi w transkrypcie.</p>
+      <p>Widoki widzą jedno <code>MarketDataSource</code> i nigdy nie dowiadują się, które wywołanie poszło dokąd — kompozycja mieszka w <code>src/data/marketData.ts</code> i nigdzie indziej. To jest korzeń kompozycji tego modułu: odpowiednik <code>Program.cs</code> z ręcznym DI, wykonywany raz przy załadowaniu modułu.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zakładka</th><th>Widok</th><th>Co pokazuje</th></tr></thead>
+          <tbody>
+            <tr><td><b>Graph</b></td><td><code>grid/GridView</code></td><td>do sześciu slotów wykresu (układy 1×1…3×2), wspólne gniazdo na parę, stan w localStorage</td></tr>
+            <tr><td><b>Instruments</b></td><td><code>instruments/</code></td><td>śledzone instrumenty, stan zbierania per interwał, kreator dodawania z wyceną przed utworzeniem, usuwanie za dialogiem zgody</td></tr>
+            <tr><td><b>Data History</b></td><td><code>history/</code></td><td>zlecenia zbierania i usunięcia w jednej osi czasu, od najnowszych; ponawianie całości albo tylko nieudanych chunków</td></tr>
+            <tr><td><b>Teams</b></td><td><code>teams/</code></td><td>katalog, edytor na kanwie React Flow (agenci-węzły, zależności-krawędzie), przebiegi na żywo po SSE, harmonogramy i wyzwalacze</td></tr>
+            <tr><td><b>Accounts</b></td><td><code>accounts/</code></td><td>rachunki demo, salda i otwarte pozycje aktywnego rachunku; poll 5 s budżetowany pod limit dostawcy</td></tr>
+            <tr><td><b>Agent Settings</b></td><td><code>agent/settings/</code></td><td>koszt agenta per zakres/sesja/model i zarządzanie żywym promptem systemowym bez commitu i deploya</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Obok zakładek żyje <strong>panel czatu</strong> (<code>agent/AgentChat.tsx</code>) — zamontowany raz w <code>Shell</code> jako <em>rodzeństwo</em> outletu, nie nakładka: rozsuwana kolumna, która odpycha treść zakładki i przeżywa każde przełączenie.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Stos</div>
+      <h2>Wybory i ich powody</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Obszar</th><th>Wybór</th><th>Uwaga</th></tr></thead>
+          <tbody>
+            <tr><td><b>UI</b></td><td>React 19, komponenty funkcyjne + hooki</td><td>jedna klasa: <code>ViewErrorBoundary</code>, bo error boundary musi być klasą — try/catch drzewa renderowania, po jednym na zakładkę</td></tr>
+            <tr><td><b>stan serwera</b></td><td>TanStack Query 5</td><td>cache, dedup, retry, polling; jeden <code>queryClient</code> podawany jawnie — bez providera, żeby testy renderowały widoki wprost</td></tr>
+            <tr><td><b>stan klienta</b></td><td>własne store'y + <code>useSyncExternalStore</code></td><td>bez Reduxa i Contextu; singletony ze zdarzeniem zmiany (<code>gridStore</code>, <code>agentChatStore</code>, <code>toastStore</code>)</td></tr>
+            <tr><td><b>style</b></td><td>Tailwind 4, tokeny CSS w <code>@theme</code></td><td>wykres canvas czyta te same tokeny przez <code>getComputedStyle</code> — kanwa nie nosi klas</td></tr>
+            <tr><td><b>wykres</b></td><td>lightweight-charts 5.0.9 (przypięte)</td><td>+ własne prymitywy serii: Ray, Zone, Trendline, TimeProfile, Mark</td></tr>
+            <tr><td><b>kanwa zespołów</b></td><td>@xyflow/react 12</td><td>agenci jako węzły, zależności jako krawędzie, przeciąganie</td></tr>
+            <tr><td><b>markdown</b></td><td>react-markdown + remark-gfm + remend</td><td><code>remend</code> domyka niedokończone znaczniki w trakcie streamu; <code>rehype-raw</code> celowo nieobecny — to jest argument anty-XSS</td></tr>
+            <tr><td><b>logowanie</b></td><td>@azure/msal-browser 5, przepływ redirect</td><td>tylko <code>src/auth/entra.ts</code> wie, że Entra istnieje</td></tr>
+            <tr><td><b>testy</b></td><td>Vitest 3 + Testing Library, jsdom</td><td>konfiguracja mieszka w <code>vite.config.ts</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Katalog po katalogu</div>
+      <h2>Jedno słownictwo, jeden kierunek</h2>
+      <p class="intro">Kształty z drutu są snake_case i żyją wyłącznie w plikach-adapterach; reszta terminala mówi camelCase typami domeny z <code>src/data/types.ts</code>. Znaczniki czasu to epoka w sekundach wszędzie poza drutem — konwersja w dokładnie dwóch funkcjach.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Katalog</th><th>Zawartość i rola</th></tr></thead>
+          <tbody>
+            <tr><td><b>src/app/</b></td><td>Powłoka: <code>tabs.ts</code> (jedyny rejestr zakładek — routing i pasek nawigacji oba z niego wyprowadzone, nowa zakładka = jeden wpis), <code>Shell</code>, <code>TopBar</code> ze wskaźnikiem osiągalności per backend (poll 15 s; „wylogowany” trzymany osobno od „padł”), <code>ViewErrorBoundary</code>, <code>NotFound</code>.</td></tr>
+            <tr><td><b>src/data/</b></td><td>Warstwa kontraktu: <code>types.ts</code> (własne słownictwo), <code>source.ts</code> (interfejsy, przez które czyta każdy widok), <code>marketData.ts</code> (korzeń kompozycji), <code>archive.ts</code> (adapter market-data: typy <code>Raw*</code> to jednolinijkowe aliasy w wygenerowany kontrakt + ręczne mappery), <code>gatewaySource.ts</code>, <code>socketHub.ts</code> (jeden WebSocket na <code>symbol|interwał</code>, zliczany referencjami, reconnect z backoffem), <code>sseStream.ts</code>, <code>http.ts</code> (<code>jsonClient</code> — jedyne miejsce doklejania tokenu i mapowania statusów na błędy czytelne dla operatora, jedno ciche 401→refresh→retry), <code>query.ts</code>, <code>config.ts</code>, <code>merge.ts</code> (scalanie serii jednym przejściem), dwa pliki <code>contract*.generated.ts</code>.</td></tr>
+            <tr><td><b>src/auth/</b></td><td><code>identity.ts</code> (szew: <code>unconfigured | signed-out | signed-in</code>), <code>entra.ts</code>, <code>autoSignIn.ts</code> — skonfigurowany a wylogowany terminal wysyła się do logowania dokładnie raz na załadowanie strony, ze strażnikiem w sessionStorage przeciw pętli redirectów.</td></tr>
+            <tr><td><b>src/ui/</b></td><td>Wspólne widżety: <code>Autocomplete</code>, <code>ModalShell</code> (ręczny focus-trap, bo jsdom nie zna <code>showModal()</code>), <code>ConfirmDialog</code> (jedyny sposób pytania o zgodę — trzyma pracę w toku, drugi klik i komunikat porażki przy decyzji), <code>toastStore</code>+<code>Toaster</code>, <code>Button</code> (urodzony z ~60 dryfujących kopii stringa klas), <code>formatTime</code> (wszystko renderowane w Europe/Warsaw).</td></tr>
+            <tr><td><b>src/grid/ + src/chart/</b></td><td>Siatka i wykres wielokrotnego użytku: <code>Chart.tsx</code> (716 linii), feed (pierwsza wiadomość subskrypcji <em>jest</em> historią, scalana zamiast wklejana), stronicowanie w lewo, fokus na fragment, warstwy wskaźników i rysunków (osobne cykle życia — celowo), pięć własnych prymitywów canvas.</td></tr>
+            <tr><td><b>src/teams/</b></td><td><code>teamsApi.ts</code> (839 linii, typowany z wygenerowanego kontraktu), edytor (<code>teamDraft.ts</code> — czyste funkcje nad definicją, undo przywraca też geometrię), <code>RunMonitor</code> (przebieg rysowany na <em>swojej</em> rewizji grafu, stream-first), harmonogramy z podglądem następnych odpaleń liczonym przez moduł, nie lokalnie.</td></tr>
+            <tr><td><b>src/agent/</b></td><td>Czat: <code>agentApi.ts</code> (ręczne DTO camelCase nad snake_case), <code>agentChatStore.ts</code> (maszyna stanów panelu; transkrypt zawsze czytany ponownie z modułu, nigdy z pamięci), <code>stream.ts</code> (fetch + ReadableStream, bo POST z nagłówkiem Authorization — EventSource nie umie żadnego z tych dwóch), <code>chartControl.ts</code> (polecenia wykresu od agenta z kursorem w localStorage), <code>drawingsStore.ts</code> (rysunki per symbol, nie per slot), <code>agentActivity.ts</code> (kanał „tura się skończyła” celowo bez ładunku — widoki re-czytają się same), koszt i prompt w <code>settings/</code>.</td></tr>
+            <tr><td><b>src/accounts/</b></td><td>Jedyne bezpośrednie odczyty bramki; wspólny klucz nigdy nie trafia do bundla — w dev dokleja go proxy, na produkcji idzie token przeglądarki.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Kontrakt</div>
+      <h2>Wygenerowane tam, gdzie szeroko; ręczne tam, gdzie wąsko</h2>
+      <p class="intro"><code>scripts/contract.mjs</code> odpala <code>python -m market_data.openapi</code> i <code>python -m teams.openapi</code> (żaden serwer nie musi działać), przepuszcza JSON przez openapi-typescript i zapisuje dwa komitowane pliki <code>*.generated.ts</code>. <code>pnpm contract:check</code> regeneruje i porównuje bajt po bajcie.</p>
+      <p>TypeScript jest wymazywany w czasie wykonania — nic nie sprawdza JSON-a przy deserializacji, więc pole przemianowane po stronie Pythona przyszłoby jako <code>undefined</code> i wyrenderowało pustą komórkę. Wygenerowany kontrakt jest substytutem bezpieczeństwa, które w C# daje deserializacja do rekordu: <span class="hl">przemianowane pole to błąd kompilacji w linii, która je czyta</span>.</p>
+      <p>Powierzchnia rozmowy agenta ma za to <strong>ręczne</strong> DTO w <code>agentApi.ts</code> — garść wąskich kształtów, podczas gdy zespoły to grafy, rewizje i przebiegi, zbyt szerokie, by ręczne kopie nie zgniły. Stąd sprzężenie w CI: job terminala biegnie przy każdej zmianie <code>market_data/contract.py</code> <em>i całego</em> katalogu workbencha, a <code>contract:check</code> biegnie <strong>przed</strong> testami — przestarzały kontrakt czyni każdy wniosek suite'y wyciągniętym z nieaktualnej przesłanki.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Tożsamość</div>
+      <h2>Token w kliencie, bilet w adresie</h2>
+      <p>Dlaczego nie Easy Auth: wdrożony terminal i market-data stoją na różnych hostach, więc ciasteczko Easy Auth nigdy nie opuściłoby przeglądarki. Terminal trzyma token Entra, a <code>jsonClient</code> dokleja go do każdego żądania — trasa dodana później <em>nie może</em> wyjść goła, bo przechodzi przez ten sam klient. WebSocket nie uniesie nagłówka wcale, więc przed <strong>każdym</strong> handshakiem (retry też) terminal kupuje po HTTP jednorazowy bilet i wkłada go do URL-a — token nigdy nie pojawia się w adresie.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Wzorce</div>
+      <h2>Trzy stany, nie dwa</h2>
+      <div class="quote">Pusta lista ze zdrowego backendu i pusta lista z awarii nie mogą wyglądać tak samo.</div>
+      <p>Ten wzorzec wraca wszędzie: tożsamość ma stany <code>unconfigured / signed-out / signed-in</code>; odczyty <code>loading / ready / unreachable</code>; błędy rozróżniają <code>unreachable</code> od <code>unauthenticated</code>. Podobnie pięć wyników wywołania narzędzia w transkrypcie nigdy nie zlewa się w mniej.</p>
+      <p>Druga żelazna zasada: <strong>pieniądze i stawki z modułu agenta są stringami od końca do końca</strong> — terminal je renderuje i ma zakaz sumowania. Trzecia: niemutowalność nie jest stylem — React re-renderuje po zmianie referencji, więc mutacja w miejscu czyni zmianę niewidzialną; stąd <code>mergeBar</code> zwraca nową tablicę, a spread zastępuje przypisanie.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Testy</div>
+      <h2>Obok kodu, przeciw dublerom</h2>
+      <p class="intro">50 plików testów kolokowanych (<code>Foo.tsx</code> ↔ <code>Foo.test.tsx</code>) — nie ma osobnego drzewa <code>tests/</code>. Najciężej testowany jest szew drut↔domena: <code>archive.test.ts</code> ma 1169 linii.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Strażnik strukturalny w config.test.ts <span class="tag ok">kodyfikacja incydentu</span></h3>
+          <p>„Żaden backend nie dostaje względnego prefiksu, który zajmuje już trasa zakładki” — importuje <code>TABS</code> i porównuje z rozwiązanymi prefiksami. To spisany fix po tym, jak <code>/archive</code> przesłoniło zakładkę Archive; złapał <code>/accounts</code> zanim zakładka Accounts w ogóle wyszła.</p>
+        </div>
+        <div class="fail">
+          <h3>Wykres przez dublera <span class="tag att">granica jest opisana</span></h3>
+          <p><code>chart/testDoubles.ts</code> (557 linii) zastępuje lightweight-charts; testy asertują, <em>o co komponent prosi bibliotekę</em>, nie piksele. Czego dubler nie pokryje, zweryfikowano prawdziwą przeglądarką na prawdziwych backendach — spisane w sekcji „Findings” README.</p>
+        </div>
+      </div>
+      <p>Brama PR: <code>contract:check</code> → <code>lint</code> → <code>typecheck</code> → <code>test</code>. Uwaga lokalna: corepack pada pod Node 25 — binarki wołać wprost z <code>node_modules/.bin</code>.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Dla przybysza z C#</div>
+      <h2>Mapa pojęć frontendowych</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Tutaj</th><th>Najbliższy odpowiednik .NET</th><th>Różnica, która gryzie</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>package.json + pnpm-lock</b></td><td>csproj + packages.lock.json</td><td><code>packageManager</code> przypina wersję samego pnpm; <code>--frozen-lockfile</code> to restore</td></tr>
+            <tr><td><b>tsc -b (typecheck)</b></td><td>msbuild po referencjach projektów</td><td>TypeScript niczego tu nie emituje — transpiluje Vite/esbuild, <code>tsc</code> jest czystym checkerem</td></tr>
+            <tr><td><b>typy strukturalne, wymazywane</b></td><td>typy nominalne + refleksja</td><td>brak refleksji nad typami w runtime — dlatego kontrakt musi być generowany</td></tr>
+            <tr><td><b>unie dyskryminowane</b></td><td>hierarchia + pattern matching</td><td><code>switch (e.kind)</code> zawęża typ po tagu; kompilator pilnuje wyczerpania gałęzi</td></tr>
+            <tr><td><b>useEffect z cleanupem</b></td><td>subskrypcja + <code>IDisposable</code></td><td>StrictMode w dev podwójnie odpala efekty: świeży wykres subskrybuje, odsubskrybuje, resubskrybuje — wygląda jak wyciek gniazd i nim nie jest</td></tr>
+            <tr><td><b>AbortSignal / AbortController</b></td><td>CancellationToken / -Source</td><td>abort jest celowo re-rzucany nietknięty, żeby pozostał odróżnialny od prawdziwej awarii</td></tr>
+            <tr><td><b>jsonClient</b></td><td>HttpClient + handlery + Polly</td><td>cała historia w jednym pliku; retry odczytów robi TanStack Query, nie pipeline polityk</td></tr>
+            <tr><td><b>klasy Tailwinda w JSX</b></td><td>style/XAML per kontrola</td><td>tokeny projektu to zmienne CSS w <code>@theme</code>; warunkowe klasy to template stringi</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Komentarze nagłówkowe plików są nośne: wiele opisuje incydent, przeciw któremu obecny kształt istnieje (pętla redirectów MSAL, przesłonięta zakładka, koszt pokazujący liczby sprzed awarii). Przeczytaj nagłówek, zanim zmienisz plik.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Przewodnik po module terminal · stan kodu z 20 sierpnia 2026</span>
+    <span>Źródła: modules/terminal · README modułu · CLAUDE.md</span>
+  </div>
+</footer>

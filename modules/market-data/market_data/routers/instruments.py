@@ -1,8 +1,10 @@
 """The instrument catalogue, proxied from `capital-gateway`.
 
-capital-gateway is not public in production — every caller needs its own caller key, and
-a browser is not a place one can be kept (docs/azure-infrastructure-proposal.html,
-section 5). The terminal reads the catalogue through this module instead, which already
+Every caller of capital-gateway needs its caller key, and a browser is not a place one can be
+kept (docs/azure-infrastructure-proposal.html, section 5). That, and not a closed network, is
+what routes the catalogue through here: the gateway's address answers anybody who knows it —
+measured 20 August 2026, when the address list this repo believed in turned out never to have
+existed — and the key is the whole of its door. The terminal reads the catalogue through this module instead, which already
 holds that key for its own upstream calls. Nothing here is reshaped: what the gateway
 returns is what a caller of this module gets, unread past the point of forwarding it.
 """

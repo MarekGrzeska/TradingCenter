@@ -1,0 +1,380 @@
+<title>Capital-gateway od środka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Przewodnik po module · 1 z 5</span>
+    <h1>Capital-gateway od środka</h1>
+    <p class="lede">Jedyne drzwi do capital.com: handel, głęboka historia i strumień na żywo za <b>jednym neutralnym kontraktem</b>. Każde dziwactwo dostawcy zostaje w środku — na zewnątrz wychodzą wyłącznie DTO.</p>
+    <div class="strip">
+      <span>port <b>8010</b> · Python 3.12 · FastAPI</span>
+      <span>~2,9 tys. linii produkcyjnych · 17 plików</span>
+      <span>rachunek <b>wyłącznie demo</b></span>
+      <span>20 sierpnia 2026 · dla programisty C#</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">17</div><div class="l">plików źródłowych w pakiecie</div></div>
+      <div class="cell"><div class="v">~220</div><div class="l">testów, offline na respx</div></div>
+      <div class="cell"><div class="v">10/s</div><div class="l">budżet zapytań, licznik w RateGate</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">baz danych — okno, nie archiwum</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Rola</div>
+      <h2>Okno na dostawcę, nie archiwum</h2>
+      <p class="intro">Moduł robi trzy rzeczy: składa, zmienia i zamyka pozycje na rachunku demo; stronicuje historię świec wstecz ponad limit 1000 świec na zapytanie; utrzymuje jedno wychodzące połączenie WebSocket na parę <code>(symbol, interwał)</code> i rozdziela je subskrybentom.</p>
+      <p>Równie ważne jest to, czego <span class="hl">moduł odmawia — i odmawia zanim wstanie</span>, nie przy pierwszym żądaniu:</p>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Rachunek żywy <span class="tag stop">start odmówiony</span></h3>
+          <p><code>Settings._demo_only</code> w <code>config.py</code> wymaga <em>dokładnej</em> równości adresu z <code>DEMO_BASE_URL</code> — nie testu „wygląda na demo”, bo host żywy to host demo minus przedrostek. Zła wartość zabija konstrukcję ustawień, więc sesja żywa nigdy nie istnieje w procesie.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Puste poświadczenia <span class="tag stop">start odmówiony</span></h3>
+          <p><code>Settings._not_blank</code> łapie „ustawione, ale puste” — czyli dokładnie to, jak wygląda niewypełniony <code>.env</code>. Dotyczy też własnego klucza <code>GATEWAY_API_KEY</code>.</p>
+        </div>
+        <div class="fail">
+          <h3>Przechowywanie czegokolwiek <span class="tag att">nie robi tego</span></h3>
+          <p>Żadnej bazy, żadnego cache poza pięciosekundową notatką o statusie rynku. Archiwum świec to zadanie modułu market-data.</p>
+        </div>
+        <div class="fail">
+          <h3>Schemat OpenAPI na produkcji <span class="tag att">ukryty</span></h3>
+          <p>Przy <code>GATEWAY_ENV=production</code> zarówno <code>/docs</code>, jak i <code>/openapi.json</code> są wyłączone — kontrakt jest opublikowany w migawce trading-mcp, nie na żywym serwerze.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Warstwy</div>
+      <h2>Cztery warstwy, jeden kierunek</h2>
+      <p class="intro">Architektura wewnętrzna to prosty łańcuch: transport zwraca surowe odpowiedzi, czyste funkcje tłumaczą je na DTO, adapter orkiestruje, a HTTP tylko publikuje. Po drodze dwa silniki reguł bez I/O — stronicowanie historii i świeca formująca się.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 250" role="img" aria-label="Warstwy modułu: app.py przyjmuje HTTP i WebSocket, adapter.py orkiestruje, mapping.py tłumaczy surowe payloady na DTO, client.py rozmawia z capital.com; obok czyste silniki history.py i stream/forming.py">
+            <defs>
+              <marker id="w1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="30" width="180" height="56" fill="#14306b" stroke="#14306b"></rect>
+              <text x="102" y="54" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">app.py</text>
+              <text x="102" y="72" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">HTTP + /ws/stream</text>
+
+              <rect x="252" y="30" width="180" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="342" y="54" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">adapter.py</text>
+              <text x="342" y="72" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">orkiestracja, GatewayError</text>
+
+              <rect x="492" y="30" width="180" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="582" y="54" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">mapping.py</text>
+              <text x="582" y="72" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">czyste funkcje → DTO</text>
+
+              <rect x="732" y="30" width="180" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="822" y="54" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">client.py</text>
+              <text x="822" y="72" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">httpx · sesja · RateGate</text>
+
+              <line x1="196" y1="58" x2="248" y2="58" stroke="currentColor" stroke-width="1.4" marker-end="url(#w1)"></line>
+              <line x1="436" y1="58" x2="488" y2="58" stroke="currentColor" stroke-width="1.4" marker-end="url(#w1)"></line>
+              <line x1="676" y1="58" x2="728" y2="58" stroke="currentColor" stroke-width="1.4" marker-end="url(#w1)"></line>
+
+              <rect x="252" y="150" width="180" height="52" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="342" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">history.py</text>
+              <text x="342" y="190" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">stronicowanie, bez I/O</text>
+
+              <rect x="492" y="150" width="200" height="52" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="592" y="172" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">stream/forming.py</text>
+              <text x="592" y="190" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">świeca w budowie, bez I/O</text>
+
+              <line x1="342" y1="146" x2="342" y2="92" stroke="currentColor" stroke-width="1.2" marker-end="url(#w1)"></line>
+              <text x="356" y="122" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">FetchPage wstrzyknięty</text>
+              <line x1="592" y1="146" x2="592" y2="92" stroke="currentColor" stroke-width="1.2" marker-end="url(#w1)"></line>
+              <text x="606" y="122" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">używany przez hub.py</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — kierunek zależności biegnie w jedną stronę. Silniki reguł (ramki przerywane) dostają współpracowników jako wstrzykiwane funkcje, więc testują się bez gniazda sieciowego.</figcaption>
+      </figure>
+      <p>W kategoriach C#: <code>client.py</code> to typowany <code>HttpClient</code>, który zwraca surowe <code>HttpResponseMessage</code>; <code>mapping.py</code> to statyczna klasa mapperów bez stanu; <code>adapter.py</code> to warstwa serwisowa; <code>app.py</code> to kontrolery. Różnica: <span class="hl">zamiast interfejsów wstrzykuje się gołe funkcje</span> — <code>FetchPage</code> czy <code>MarketOpen</code> to aliasy typów wywoływalnych, odpowiednik <code>Func&lt;…, Task&lt;…&gt;&gt;</code> podawanego do konstruktora.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Start procesu</div>
+      <h2>Program.cs nazywa się lifespan</h2>
+      <p class="intro">Nie ma <code>Startup.cs</code> ani kontenera DI. Kompozycja dzieje się ręcznie w <code>lifespan</code> — funkcji-generatorze, która buduje obiekty, robi <code>yield</code>, a wszystko po <code>yield</code> jest zamknięciem procesu (jak <code>IHostApplicationLifetime</code> w jednym miejscu).</p>
+      <pre><code><span class="c"># app.py — kolejność importów jest znacząca: telemetry.configure()</span>
+<span class="c"># musi zajść PRZED `from fastapi import FastAPI`, bo patch Azure Monitor</span>
+<span class="c"># nie sięgnie nazwy już związanej importem.</span>
+<span class="k">@asynccontextmanager</span>
+<span class="k">async def</span> lifespan(app: FastAPI):
+    settings = Settings()          <span class="c"># poza try — zły .env ma zabić proces tutaj</span>
+    client = CapitalClient(settings)
+    adapter = CapitalAdapter(client)
+    hub = Hub(lambda epic, res, emit: Upstream(...), current_period)
+    app.state.adapter, app.state.hub = adapter, hub
+    <span class="k">yield</span>                          <span class="c"># ← tu żyje aplikacja</span>
+    <span class="k">await</span> hub.aclose(); <span class="k">await</span> client.aclose()</code></pre>
+      <p>Zbudowane obiekty lądują w <code>app.state</code> — worku atrybutów bez typu. Trasa dostaje je przez <code>Depends(adapter)</code>: to DI FastAPI, zwykła funkcja, której wynik jest wstrzykiwany w parametr trasy przy każdym żądaniu. Zapis <code>a: CapitalAdapter = Depends(adapter)</code> wygląda jak błąd z mutowalnym argumentem domyślnym — jest idiomem i ruff ma na niego jawny wyjątek w <code>pyproject.toml</code>.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Plik po pliku</div>
+      <h2>Siedemnaście plików, każdy z jednym zadaniem</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Plik</th><th>Odpowiedzialność</th><th>Perspektywa C#</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>app.py</b></td><td>Powierzchnia publiczna: budowa aplikacji, <code>lifespan</code>, middleware <code>RequireGatewayKey</code>, wszystkie trasy REST i WebSocket <code>/ws/stream</code>, budżety węzłów katalogu.</td><td>kontrolery + <code>Program.cs</code> + middleware</td></tr>
+            <tr><td><b>config.py</b></td><td><code>Settings</code> na pydantic-settings; strażnicy demo-only i produkcji, <code>environment_of()</code>, <code>is_production()</code> czytany z <code>os.environ</code> w czasie importu.</td><td><code>IOptions&lt;T&gt;</code> z walidacją przy starcie</td></tr>
+            <tr><td><b>client.py</b></td><td>Cienki klient async na <code>httpx</code>; sesja (login współdzielony, retry na 401), <code>RateGate</code> w <code>_send()</code>, surowe odpowiedzi na zewnątrz.</td><td>typowany <code>HttpClient</code> + <code>DelegatingHandler</code></td></tr>
+            <tr><td><b>dtos.py</b></td><td>Właściwy kontrakt: enumy (<code>Resolution</code>, <code>Direction</code>…) i modele pydantic z walidatorami. Świadomie bez interfejsu <code>BrokerPort</code>.</td><td>rekordy + walidacja à la FluentValidation</td></tr>
+            <tr><td><b>adapter.py</b></td><td><code>CapitalAdapter</code>: surowe payloady → DTO; drzewo instrumentów (współbieżny spacer z limitem), rozliczanie zleceń <code>_settle</code>, memo statusu rynku 5 s.</td><td>warstwa serwisowa</td></tr>
+            <tr><td><b>mapping.py</b></td><td>Czyste funkcje payload → DTO, testowalne na nagranych fixture'ach: <code>candle_from_price</code>, <code>order_from_confirm</code>, strona bid jako źródło ceny.</td><td>statyczne mappery, zero stanu</td></tr>
+            <tr><td><b>history.py</b></td><td>Reguły głębokiego odczytu zmierzone na żywym API: rozmiar okna, kursor po najstarszej otrzymanej świecy, semantyka <code>before</code>/<code>after</code>, <code>history_ended</code>.</td><td>czysty silnik reguł, <code>Func&lt;&gt;</code> zamiast interfejsu</td></tr>
+            <tr><td><b>errors.py</b></td><td>Jedyny typ błędu <code>GatewayError(message, status_code)</code>; wyjątki httpx nigdy nie przenoszą kształtu dostawcy dalej.</td><td>jeden exception filter</td></tr>
+            <tr><td><b>rategate.py</b></td><td><code>RateGate(10, 1.0)</code> — okno przesuwne na <code>deque</code> monotonicznych stempli, <code>asyncio.Lock</code> trzymany przez sen.</td><td>ręczny rate limiter; lock przez await to nie smell w asyncio</td></tr>
+            <tr><td><b>caller_access.py</b></td><td>Kto sięga bez wspólnego klucza: dekodowanie principala Easy Auth, odczyt claimu aplikacji (<code>azp</code>/<code>appid</code>), lista ścieżek dozwolonych przeglądarce — dopasowanie dokładne, nigdy prefiks.</td><td>polityka autoryzacji, fail-closed</td></tr>
+            <tr><td><b>telemetry.py</b></td><td>Logi + opcjonalny eksport do Application Insights; bez connection stringa jest bezczynny. Wołany w czasie importu.</td><td><code>ILogger</code> + OpenTelemetry</td></tr>
+            <tr><td><b>stream/messages.py</b></td><td>Kontrakt WebSocketu (poza OpenAPI): <code>CandleMessage</code> (czas w sekundach), <code>QuoteMessage</code> (milisekundy), <code>StatusMessage</code>, <code>ErrorMessage</code>.</td><td>DTO kanału, unia typów</td></tr>
+            <tr><td><b>stream/forming.py</b></td><td>Świeca w budowie, bez I/O: <code>Bar</code>, <code>FormingCandle</code>; interwały śróddzienne liczone arytmetycznie, DAY/WEEK celowo nieobecne — granicę zna tylko dostawca.</td><td>maszyna stanów, czysta</td></tr>
+            <tr><td><b>stream/upstream.py</b></td><td>Jedno wychodzące połączenie na <code>(epic, interwał)</code>: pętla reconnect z backoffem, ping co 4 min pod 10-minutowy limit bezczynności, tokeny w każdej wiadomości.</td><td>klient WebSocket z polityką ponowień</td></tr>
+            <tr><td><b>stream/hub.py</b></td><td>Pokoje i fan-out: <code>Room</code> na parę, jedno połączenie na pokój, zamykane z ostatnim subskrybentem; spóźniony dostaje stan i formującą się świecę na powitanie.</td><td>coś jak grupy SignalR, ręcznie</td></tr>
+            <tr><td><b>__init__.py</b> ×2</td><td>Same docstringi — jednolinijkowy opis pakietu i czterech plików strumienia.</td><td>—</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Sesja i budżet</div>
+      <h2>Jeden login, jedno ponowienie</h2>
+      <p class="intro">Sesja u dostawcy to tokeny <code>CST</code> i <code>X-SECURITY-TOKEN</code> czytane z nagłówków odpowiedzi — i nigdy nie opuszczają modułu: nie ma ich w żadnej odpowiedzi, żadnym logu, żadnej ramce błędu.</p>
+      <p><code>CapitalClient.login()</code> trzyma trwający login jako <code>asyncio.Task</code> i każdy oczekujący dostaje <em>ten sam</em> wynik — odpowiednik pola <code>Task&lt;T&gt;</code> cache'owanego w C#, celowo zamiast locka, bo lock pozwoliłby każdemu czekającemu zalogować się po kolei. <code>asyncio.shield</code> to brakujący w .NET element: anulowanie jednego oczekującego nie zabija wspólnej pracy. Na <strong>401</strong> klient loguje się raz jeszcze i ponawia dokładnie raz; drugie 401 idzie dalej jako błąd.</p>
+      <div class="quote">Sesja u dostawcy nigdy nie opuszcza tego modułu.</div>
+      <p>Budżet 10 zapytań na sekundę egzekwuje <code>RateGate</code> w <code>_send()</code>, więc liczy się <em>każde</em> wywołanie, z loginem włącznie. Okno przesuwne zamiast semafora, bo ograniczenie jest tempem; jedna brama na klienta i jeden klient na proces dają budżet procesu. Dostawca liczy <span class="hl">na rachunek, nie na sesję</span> — dwa uruchomione stosy dławią się nawzajem.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Strumień</div>
+      <h2>Pokoje, świeca w budowie i granice sesji</h2>
+      <p class="intro"><code>Hub</code> kluczuje pokoje po <code>(epic, interwał)</code>. Jedno wychodzące połączenie na pokój; padły subskrybent jest po cichu odrzucany, żeby jedno martwe gniazdo nie uciszyło pokoju.</p>
+      <p>Świeca formująca się jest składana tu, a nie u konsumentów — wykres, agent i backtest dzielą jedną definicję. Interwały śróddzienne zaokrąglają stempel arytmetycznie; DAY i WEEK biegną za sesją giełdy, więc o granicę pyta się dostawcę (<code>Room.place_boundary</code>, ponawiane co 30 s) — albo nie publikuje się nic. Handshake WebSocketu nie przechodzi przez middleware HTTP, więc trasa <code>stream()</code> sama sprawdza klucz <strong>przed</strong> <code>accept()</code> (kod 4401), a brakujący symbol lub nieznany interwał odrzuca kodem 1008 — złe żądanie nie dostaje gniazda, które zaraz umrze.</p>
+      <p>Ramki błędów cytują wyłącznie nazwane pola, nigdy cały payload — capital.com odbija nieudane żądanie z tokenami sesji w środku.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Dwa rodzaje poświadczeń</div>
+      <h2>Klucz dla maszyn, principal dla przeglądarki</h2>
+      <p><code>RequireGatewayKey</code> to middleware HTTP, nie zależność trasy — celowo, żeby żadnej trasy nie dało się zapomnieć; tylko <code>/</code>, <code>/docs</code> i <code>/openapi.json</code> przechodzą bez klucza. Porównanie robi <code>hmac.compare_digest</code> na bajtach (odpowiednik <code>CryptographicOperations.FixedTimeEquals</code>).</p>
+      <p>Druga ścieżka: przeglądarka uwierzytelniona przez Easy Auth niesie nagłówek <code>x-ms-client-principal</code>; <code>caller_access.py</code> wyciąga z niego claim <em>aplikacji</em>, sprawdza listę dozwolonych aplikacji i listę pięciu dokładnych ścieżek. Wszystko nowe jest domyślnie odrzucane — przeglądarka może odczytać rachunek, ale <span class="hl">nigdy nie złoży zlecenia</span>, a komunikat 403 celowo nie wspomina capital.com.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Testy</div>
+      <h2>Offline na respx, żywe za flagą</h2>
+      <p class="intro">Płaski katalog <code>tests/</code> z nagranymi payloadami dostawcy w <code>tests/fixtures/</code>. Wszystko offline jedzie na respx (mock transportu httpx — odpowiednik podmienionego <code>HttpMessageHandler</code>); sieci nie dotyka nic bez flagi.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Uruchomienie</th><th>Zakres</th><th>Stan</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>uv run pytest</b></td><td>~220 testów jednostkowych: mapowanie, sesja, historia, strumień, każda trasa, kontrola dostępu, „żadna odpowiedź nie niesie poświadczenia”.</td><td><span class="tag ok">zawsze, także CI</span></td></tr>
+            <tr><td><b>-m live --run-live</b></td><td>Odczyty na żywej sesji demo: głęboki odczyt, brama tempa pod serią, strumień dostarcza notowania.</td><td><span class="tag att">nigdy w CI</span></td></tr>
+            <tr><td><b>--run-live-trading</b></td><td><em>Pisze</em>: otwiera, zmienia i zamyka pozycje demo, odkłada i anuluje zlecenie; sprzątanie w <code>finally</code>.</td><td><span class="tag stop">tylko świadomie</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Autouse'owy fixture <code>_no_ambient_credentials</code> czyści <code>CAPITAL_*</code>/<code>GATEWAY_*</code> ze środowiska, żeby prawdziwy <code>.env</code> dewelopera nie zmieniał tego, co się uruchamia. Fałszywki w testach są strukturalne (duck typing) — dlatego pyright celowo sprawdza tylko pakiet produkcyjny.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">09 · Dla przybysza z C#</div>
+      <h2>Idiomy, które tu pracują</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>W tym module</th><th>Najbliższy odpowiednik .NET</th><th>Różnica, która gryzie</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>FastAPI + dekoratory tras</b></td><td>minimal API / atrybuty <code>[HttpGet]</code></td><td>dekorator to zwykła funkcja wykonywana przy imporcie, nie metadana</td></tr>
+            <tr><td><b><code>Depends(...)</code></b></td><td>wstrzykiwanie do akcji kontrolera</td><td>brak kontenera; „rejestracją” jest sama funkcja-dostawca</td></tr>
+            <tr><td><b><code>lifespan</code> z <code>yield</code></b></td><td><code>IHostedService</code> + <code>Program.cs</code></td><td>start i shutdown to jedna funkcja rozcięta yieldem</td></tr>
+            <tr><td><b>pydantic</b></td><td>rekordy + walidacja + <code>System.Text.Json</code></td><td>walidacja odpala się przy konstrukcji obiektu, nie w osobnym kroku</td></tr>
+            <tr><td><b><code>model_fields_set</code></b></td><td>tri-state PATCH (JSON Patch / <code>Optional&lt;T&gt;</code>)</td><td>„pole pominięte” i „pole ustawione na null” są rozróżnialne za darmo</td></tr>
+            <tr><td><b>asyncio</b></td><td><code>async/await</code></td><td>jeden wątek: między await'ami nie trzeba locka — i kod z tego korzysta</td></tr>
+            <tr><td><b><code>class Resolution(str, Enum)</code></b></td><td>enum + konwertery</td><td>enum <em>jest</em> stringiem na drucie, porównywalny z surową wartością</td></tr>
+            <tr><td><b>kolejność importów</b></td><td>—</td><td><code>from X import Y</code> wiąże nazwę do bieżącej wartości; późniejszy patch klasy jej nie dosięgnie — brak analogii w .NET</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Ostatnia rzecz, której nie widać w żadnej tabeli: <strong>komentarze są zapisem projektowym</strong>. Bloki dłuższe niż kod cytują daty pomiarów („zmierzono 10 sierpnia 2026”) i odrzucone podejścia. To nie szum — to jedyny zapis tych decyzji, traktuj je jak ADR-y wpisane w źródło.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Przewodnik po module capital-gateway · stan kodu z 20 sierpnia 2026</span>
+    <span>Źródła: modules/capital-gateway · README modułu · CLAUDE.md</span>
+  </div>
+</footer>
