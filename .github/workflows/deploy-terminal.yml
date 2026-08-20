@@ -104,6 +104,17 @@ jobs:
           # The host keeps the `-agent` spelling because the App Service does
           # (infra/app-service.tf, `local.workbench_app_name`).
           VITE_WORKBENCH_HTTP: https://app-tradingcenter-agent.azurewebsites.net
+          # The third time this trap has been walked into, and the second time it is
+          # written down here. The Accounts tab shipped on 20 August without this line,
+          # so the browser asked the Static Web App for `/gateway-api/accounts`, got the
+          # single-page app back, and the screen said `Unexpected token '<'` — the JSON
+          # parser meeting `<!doctype html>`. Nothing reached capital-gateway, whose log
+          # stayed quiet and healthy throughout.
+          #
+          # No token setting beside it, for the same reason the workbench has none: the
+          # terminal asks for one scope, market-data's, and the gateway's Easy Auth
+          # accepts that audience deliberately (infra/app-service.tf).
+          VITE_GATEWAY_HTTP: https://app-tradingcenter-gateway.azurewebsites.net
           VITE_ENTRA_CLIENT_ID: ${{ vars.TERMINAL_ENTRA_CLIENT_ID }}
           VITE_ENTRA_TENANT_ID: ${{ vars.TERMINAL_ENTRA_TENANT_ID }}
           VITE_ENTRA_SCOPE: ${{ vars.TERMINAL_ENTRA_SCOPE }}

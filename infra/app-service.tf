@@ -215,6 +215,23 @@ resource "azurerm_linux_web_app" "capital_gateway" {
     # it, so the claims the module reads are ones the platform vouched for.
     unauthenticated_action = "AllowAnonymous"
 
+    # **The stream must not pass through Easy Auth at all.** Measured the hard way on
+    # 20 August 2026, minutes after this block was first applied: market-data's feeds died
+    # with "timed out during opening handshake" and did not come back, because the auth
+    # module intercepts the WebSocket upgrade and never completes it — `AllowAnonymous`
+    # governs whether a request is refused, not whether the upgrade survives the
+    # interception. The gateway kept answering HTTP the whole time, so nothing looked
+    # broken from the outside while candles stopped arriving and the archive fell back to
+    # REST until capital.com started answering `error.too-many.requests`.
+    #
+    # `market-data` carries the same exclusion for its own `/ws/candles`, for the same
+    # reason. Nothing is lost by it: the gateway checks the caller key inside the
+    # WebSocket handler itself (`app.py`, `stream`), which is where that check has always
+    # been — Easy Auth was never what guarded this path.
+    #
+    # `/` is the health route, excluded for the reason market-data excludes `/ping`.
+    excluded_paths = ["/ws/stream", "/"]
+
     active_directory_v2 {
       client_id                  = module.capital_gateway_easy_auth.client_id
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
