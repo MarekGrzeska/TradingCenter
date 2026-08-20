@@ -72,6 +72,36 @@ nieudane ponowienia byłyby głośne. Przy okazji capital.com odpowiedziało
 `error.too-many.requests` — wszystkie pary spadły na REST naraz i zjadły budżet 10/s. To też jest
 znane i przechodzi samo.
 
+## Czwarta rzecz, która poszła inaczej: audiencja
+
+Po przestawieniu drzwi ekran Kont nadal odmawiał — ale inaczej, i to „inaczej" było całą
+diagnozą. W telemetrii gatewaya **zniknęły żądania na `/accounts`**: przed przestawieniem każde
+pojawiało się jako `401` aplikacji, po przestawieniu nie było żadnego. Żądanie, którego nie widać
+w logach modułu, to żądanie odrzucone przez platformę.
+
+Gateway miał w `allowed_audiences` trzy pozycje. Workbench — druga aplikacja, do której trafia
+token terminala — nosi cztery, a czwartą jest **client id market-daty**. Potwierdzone u źródła, nie
+przez porównanie: rejestracja market-daty ma `requestedAccessTokenVersion: 2`, a token v2 niesie
+jako `aud` client id zasobu, nie jego `api://`. Token operatora niósł więc `3612647a…`, czyli
+dokładnie tę pozycję, której brakowało.
+
+Dlaczego nie wyszło to wcześniej: przy `require_authentication = false` audiencja nie była
+sprawdzana w ogóle. Lista trzech wpisów wyglądała na poprawną tak długo, jak długo nikt do niej nie
+zaglądał. To ten sam kształt co reszta tej zmiany — **sprawdzenie, które nie działa, nie może być
+błędne, dopóki nie zacznie działać** — i drugi raz tego samego wieczoru.
+
+Poprawka (`#197`) dokłada czwartą audiencję. `apply` poszedł przed pull requestem, bo produkcja
+odmawiała operatorowi jego własnego ekranu; `terraform plan` z `main` po mergu wraca czysty.
+
+## Ślad po odmowie
+
+Trzy różne usterki dały w dwa dni identyczny, cichy `401`: niepasujący klucz, platforma nie
+wstawiająca principala, i nieuwzględniona audiencja. Moduł nie zapisywał przy tym nic, więc jedynym
+dowodem był **brak** wiersza w `AppRequests` — rzecz, którą da się zauważyć tylko, jeśli już się jej
+podejrzewa. `RequireGatewayKey` loguje teraz, czym odmówił: ścieżka, obecność klucza, obecność
+nagłówka principala i odczytana aplikacja. Bez sekretów — identyfikator aplikacji jest publiczny,
+klucz i token nie trafiają do linii, i jest na to test.
+
 ## Co zostaje operatorowi
 
 Trzy rzeczy wymagają sesji w przeglądarce i nikt inny ich nie sprawdzi:

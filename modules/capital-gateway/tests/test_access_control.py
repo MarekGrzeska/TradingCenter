@@ -291,3 +291,37 @@ def test_the_key_still_reaches_everything(with_terminal: TestClient) -> None:
         response = client.get("/positions", headers={API_KEY_HEADER: GATEWAY_KEY})
 
     assert response.status_code == 200
+
+
+# --- a refusal leaves a trace, so the next one is one query rather than a bisection ---
+
+
+def test_a_refusal_says_which_door_it_was(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Three different faults produced an identical silent 401 in two days: a caller key
+    that did not match, a platform injecting no principal, and an audience this app did not
+    list. The module wrote nothing for any of them, so the only evidence was the absence of
+    a row in `AppRequests` — a thing you can only notice if you already suspect it."""
+    with caplog.at_level("WARNING"), client:
+        client.get("/positions", headers={API_KEY_HEADER: "not-the-key"})
+
+    line = "\n".join(caplog.messages)
+    assert "/positions" in line
+    assert "caller key present" in line
+    assert "principal header absent" in line
+
+
+def test_a_refusal_logs_neither_the_key_nor_the_token(
+    client: TestClient, caplog: pytest.LogCaptureFixture
+) -> None:
+    with caplog.at_level("WARNING"), client:
+        client.get(
+            "/positions",
+            headers={API_KEY_HEADER: "guess-1", "Authorization": "Bearer a-secret-token"},
+        )
+
+    line = "\n".join(caplog.messages)
+    assert "guess-1" not in line
+    assert "a-secret-token" not in line
+    assert GATEWAY_KEY not in line
