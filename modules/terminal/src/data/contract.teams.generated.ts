@@ -302,7 +302,7 @@ export interface paths {
         };
         /**
          * List Teams
-         * @description The whole of what a picker needs, and no definition — see `store._LATEST_REVISION`.
+         * @description The whole of what a picker needs, and no definition — see `store.catalogue._LATEST_REVISION`.
          */
         get: operations["list_teams_teams_get"];
         put?: never;
@@ -370,7 +370,7 @@ export interface paths {
         /**
          * Archive Team
          * @description Retires the team from the catalogue. Its runs and the revisions they name stay —
-         *     see `store._ARCHIVE_TEAM`.
+         *     see `store.catalogue._ARCHIVE_TEAM`.
          */
         delete: operations["archive_team_teams__team_id__delete"];
         options?: never;

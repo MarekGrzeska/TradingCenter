@@ -1,4 +1,4 @@
-"""Schedules, triggers and the fires either one produces — `store.py` against a real
+"""Schedules, triggers and the fires either one produces — `store/` against a real
 PostgreSQL, same reasoning as `test_store.py`: what is under test is the owner filter,
 exactly-once claiming, and the three-valued state a trigger's own condition carries.
 """

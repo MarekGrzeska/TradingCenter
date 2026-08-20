@@ -1,0 +1,164 @@
+"""Reading and writing everything `teams` owns — asyncpg directly, no ORM in the runtime
+path, the same shape as `agent/store.py` and `market_data/store.py`. Unlike those two it is
+a package: one file per aggregate, because as one file it had reached 1 227 lines and every
+change to any part of `teams` pulled all of them into the reader's context.
+
+    catalogue.py   teams, team_revisions — the definitions and their history
+    layout.py      team_layouts — where the operator dragged each node
+    runs.py        runs, run_steps, tool_calls, and the start-up recovery
+    usage.py       usage — the cost written once, and the sums read from it
+    trades.py      trades — orders a run placed, and what came back
+    recurring.py   the machine a schedule and a trigger both are
+    schedules.py   schedules — only what a trigger has no version of
+    triggers.py    triggers — the same, the other way round
+    fires.py       schedule_fires — rows either source produces
+
+One property rides on every statement in every one of them rather than on the routes that
+call them, so that no route can forget it: **the owner filter is part of the statement.** A
+row belonging to somebody else and a row that was never created answer identically — `None`,
+no row, nothing to tell them apart by (specs/teams-browser-access, "Odmowa dostępu do cudzego
+zespołu MUST być nieodróżnialna od odpowiedzi o zespole nieistniejącym"). The two exceptions
+are named where they stand: the clock reaching across every owner, and reads a caller already
+resolved an id for.
+
+Rows come back as `asyncpg.Record` and go to `contract.py`'s `from_row` unchanged — see that
+file's docstring for why there is no domain layer in between.
+
+Callers import the package, not its parts (`from .. import store`, then `store.get_team(...)`),
+which is why the surface below is re-exported here: it is the same list of names it was when
+this was one file, and a caller cannot tell that it moved.
+"""
+
+from __future__ import annotations
+
+from .catalogue import (
+    archive_team,
+    create_team,
+    get_latest_revision,
+    get_revision,
+    get_revision_by_id,
+    get_team,
+    list_teams,
+    save_revision,
+)
+from .fires import (
+    latest_run_status_for_schedule,
+    latest_run_status_for_trigger,
+    list_fires_for_schedule,
+    list_fires_for_trigger,
+    record_fire,
+)
+from .layout import get_layout, save_layout
+from .runs import (
+    create_run,
+    fail_running_steps,
+    fail_unfinished_runs,
+    finish_run,
+    finish_step,
+    get_run,
+    get_run_status,
+    get_run_steps,
+    get_run_tool_calls,
+    list_runs_for_team,
+    mark_run_running,
+    record_tool_call,
+    start_step,
+)
+from .schedules import (
+    claim_due_schedule,
+    create_schedule,
+    delete_schedule,
+    disable_schedule_for_failures,
+    get_schedule,
+    increment_schedule_failures,
+    list_due_schedules,
+    list_schedules_for_team,
+    reset_schedule_failures,
+    set_schedule_enabled,
+    update_schedule,
+)
+from .trades import get_run_trades, record_trade, settle_trade, team_trades_since
+from .triggers import (
+    claim_trigger_for_check,
+    create_trigger,
+    delete_trigger,
+    disable_trigger_for_failures,
+    get_trigger,
+    increment_trigger_failures,
+    list_due_triggers,
+    list_triggers_for_team,
+    record_trigger_check,
+    reset_trigger_failures,
+    set_trigger_enabled,
+    update_trigger,
+)
+from .usage import (
+    record_usage,
+    team_cost_since,
+    usage_by_agent,
+    usage_by_model,
+    usage_total_cost,
+)
+
+__all__ = [
+    "archive_team",
+    "claim_due_schedule",
+    "claim_trigger_for_check",
+    "create_run",
+    "create_schedule",
+    "create_team",
+    "create_trigger",
+    "delete_schedule",
+    "delete_trigger",
+    "disable_schedule_for_failures",
+    "disable_trigger_for_failures",
+    "fail_running_steps",
+    "fail_unfinished_runs",
+    "finish_run",
+    "finish_step",
+    "get_latest_revision",
+    "get_layout",
+    "get_revision",
+    "get_revision_by_id",
+    "get_run",
+    "get_run_status",
+    "get_run_steps",
+    "get_run_tool_calls",
+    "get_run_trades",
+    "get_schedule",
+    "get_team",
+    "get_trigger",
+    "increment_schedule_failures",
+    "increment_trigger_failures",
+    "latest_run_status_for_schedule",
+    "latest_run_status_for_trigger",
+    "list_due_schedules",
+    "list_due_triggers",
+    "list_fires_for_schedule",
+    "list_fires_for_trigger",
+    "list_runs_for_team",
+    "list_schedules_for_team",
+    "list_teams",
+    "list_triggers_for_team",
+    "mark_run_running",
+    "record_fire",
+    "record_tool_call",
+    "record_trade",
+    "record_trigger_check",
+    "record_usage",
+    "reset_schedule_failures",
+    "reset_trigger_failures",
+    "save_layout",
+    "save_revision",
+    "set_schedule_enabled",
+    "set_trigger_enabled",
+    "settle_trade",
+    "start_step",
+    "team_cost_since",
+    "team_trades_since",
+    "update_schedule",
+    "update_trigger",
+    "usage_by_agent",
+    "usage_by_model",
+    "usage_total_cost",
+]

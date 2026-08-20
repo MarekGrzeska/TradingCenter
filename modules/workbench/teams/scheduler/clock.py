@@ -184,7 +184,7 @@ class Clock:
 async def _resolve_revision(conn: asyncpg.pool.PoolConnectionProxy, *, row: Mapping[str, Any]):
     """The revision a schedule or trigger would run — both carry the same
     `revision_mode`/`pinned_revision_id`/`team_id`/`owner_principal` shape
-    (`store._SCHEDULE_COLUMNS`, `store._TRIGGER_COLUMNS`)."""
+    (`store.recurring.SCHEDULE_COLUMNS`, `store.recurring.TRIGGER_COLUMNS`)."""
     if row["revision_mode"] == "pinned":
         return await store.get_revision_by_id(
             conn, revision_id=row["pinned_revision_id"], owner_principal=row["owner_principal"]

@@ -50,7 +50,7 @@ server's tools and nothing else.
 The **team tools** are the third source and they are not on a network at all. They keep every
 name, description, ceiling and refusal they had as a module; what went is the transport.
 They still reach the teams routes through their own contract — `httpx.ASGITransport` on this
-application — rather than calling `teams/store.py`, because the owner filter, the revision
+application — rather than calling `teams/store/`, because the owner filter, the revision
 validation, the daily cost limit and the tool-catalogue check live in those routers, and a
 tool reaching past them would be the access policy written a second time.
 

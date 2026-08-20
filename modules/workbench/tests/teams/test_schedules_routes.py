@@ -4,7 +4,7 @@ Through `TestClient` and the real lifespan, like `test_catalogue_routes.py`: the
 read the pool and the settings the lifespan puts on `app.state`, so a test that assembled
 its own app would be testing a second arrangement rather than the one deployed.
 
-Fire history is written directly through `store.py` in these tests rather than through a
+Fire history is written directly through `store` in these tests rather than through a
 route — starting the clock that claims a due fire and writes the history row is group 3's
 job (`scheduler/`), not these routes'. What is proven here is that the row, once it
 exists, is exactly what an operator sees.
