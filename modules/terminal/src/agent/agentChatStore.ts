@@ -52,6 +52,35 @@ export const STORAGE_KEY = "terminal.agentChat.v1";
  *  key is a smaller change than restructuring what a checkout already has stored. */
 const ACTIVE_SESSION_KEY = "terminal.agentChat.session.v1";
 
+/** How wide the operator dragged the panel, in pixels. Its own key for the same reason
+ *  the session id has one: `STORAGE_KEY` holds a string enum that already shipped. */
+const WIDTH_KEY = "terminal.agentChat.width.v1";
+
+/** The width the panel had when it was one number in the markup (`w-115`), and what a
+ *  checkout that has never dragged it still gets. */
+export const DEFAULT_PANEL_WIDTH = 460;
+
+/** Below this the header's own row — the two buttons, the model name and the collapse
+ *  control — stops fitting, and the panel is a column of wrapped words. */
+export const MIN_PANEL_WIDTH = 320;
+
+/** The other end is a fraction of the window rather than a number: a stopping point
+ *  chosen on one screen is arbitrary on every other, and what has to stay true is that
+ *  the tab beside the panel is still worth looking at. */
+const MAX_PANEL_FRACTION = 0.6;
+
+/** The widest the panel may be right now. Asked at every point the width is set — the
+ *  operator drags, the window resizes, or a width saved on a larger screen is read back
+ *  on a smaller one (`terminal-agent-chat` spec, "Okno węższe niż zapamiętana
+ *  szerokość"). */
+export function maxPanelWidth(windowWidth: number): number {
+  return Math.max(MIN_PANEL_WIDTH, Math.round(windowWidth * MAX_PANEL_FRACTION));
+}
+
+export function clampPanelWidth(width: number, windowWidth: number): number {
+  return Math.min(Math.max(width, MIN_PANEL_WIDTH), maxPanelWidth(windowWidth));
+}
+
 export interface ChatMessage {
   /** A number once the module has assigned one; a `local-`-prefixed string for a
    *  message that exists only on screen — the operator's turn before the module has
@@ -93,6 +122,10 @@ export type LoadStatus = "loading" | "ready" | "unreachable";
 
 export interface AgentChatState {
   expanded: boolean;
+  /** How wide the panel stands, in pixels — the operator's own measure, kept between
+   *  reloads and across collapsing (`terminal-agent-chat` spec, "Operator ustawia
+   *  szerokość panelu"). */
+  width: number;
   sessions: AgentSession[];
   sessionsStatus: LoadStatus;
   activeSessionId: number | null;
@@ -120,6 +153,10 @@ export interface AgentChatStore {
   subscribe(listener: () => void): () => void;
   getSnapshot(): AgentChatState;
   setExpanded(expanded: boolean): void;
+  /** Sets the panel's width, brought inside the bounds for the window it is being asked
+   *  about. Called on every drag frame, so it commits only when the clamped value
+   *  actually changed. */
+  setWidth(width: number, windowWidth?: number): void;
   /** Loads what an open panel needs and has not got. Called by the panel on mount —
    *  after sign-in has resolved, which construction is not. Safe to call repeatedly. */
   ensureLoaded(): void;
@@ -152,6 +189,13 @@ export interface AgentChatStore {
 
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
 
+/** The window this terminal is running in, or a wide-enough stand-in where there is none
+ *  — a test constructing the store outside a DOM is asking about widths, not about
+ *  windows. */
+function currentWindowWidth(): number {
+  return typeof window === "undefined" ? DEFAULT_PANEL_WIDTH / MAX_PANEL_FRACTION : window.innerWidth;
+}
+
 function loadExpanded(storage: Storage | null): boolean {
   if (!storage) return false;
   try {
@@ -159,6 +203,20 @@ function loadExpanded(storage: Storage | null): boolean {
   } catch {
     // A storage that throws (Safari private mode) must not stop the terminal starting.
     return false;
+  }
+}
+
+function loadWidth(storage: Storage | null, windowWidth: number): number {
+  if (!storage) return DEFAULT_PANEL_WIDTH;
+  try {
+    const raw = Number(storage.getItem(WIDTH_KEY));
+    // A key that was never written, or was written by hand into something that is not a
+    // number, is the same case as no storage at all — the default, not a panel one pixel
+    // wide (`loadActiveSessionId` treats a spoiled id the same way).
+    if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_PANEL_WIDTH;
+    return clampPanelWidth(raw, windowWidth);
+  } catch {
+    return DEFAULT_PANEL_WIDTH;
   }
 }
 
@@ -210,6 +268,7 @@ export function createAgentChatStore(
 ): AgentChatStore {
   let state: AgentChatState = {
     expanded: loadExpanded(storage),
+    width: loadWidth(storage, currentWindowWidth()),
     sessions: [],
     sessionsStatus: "loading",
     activeSessionId: loadActiveSessionId(storage),
@@ -239,6 +298,18 @@ export function createAgentChatStore(
   function commit(next: AgentChatState): void {
     state = next;
     for (const listener of listeners) listener();
+  }
+
+  function setWidth(width: number, windowWidth: number = currentWindowWidth()): void {
+    const next = clampPanelWidth(width, windowWidth);
+    if (next === state.width) return;
+    try {
+      storage?.setItem(WIDTH_KEY, String(next));
+    } catch {
+      // Full or unavailable quota — the panel simply won't remember past this session,
+      // the same as the collapse bit.
+    }
+    commit({ ...state, width: next });
   }
 
   function persistActiveSessionId(id: number | null): void {
@@ -716,6 +787,7 @@ export function createAgentChatStore(
     },
     getSnapshot: () => state,
     setExpanded,
+    setWidth,
     ensureLoaded,
     toggle() {
       setExpanded(!state.expanded);
