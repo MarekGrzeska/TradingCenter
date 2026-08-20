@@ -1,0 +1,427 @@
+<title>Następne cięcia</title>
+<style>
+  :root {
+    --bg: #edf1ef;
+    --surface: #ffffff;
+    --surface-2: #e2e8e5;
+    --ink: #1b2320;
+    --ink-2: #4c5a54;
+    --ink-3: #78877f;
+    --line: #d2dbd6;
+    --accent: #136069;
+    --accent-soft: #dbebed;
+    --good: #2f7d4f;
+    --good-soft: #dfeee5;
+    --bad: #a8433a;
+    --bad-soft: #f2e1de;
+    --warn: #8a651c;
+    --warn-soft: #f0e7d2;
+    --mono: ui-monospace, "SF Mono", "Cascadia Code", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #131817; --surface: #1a201f; --surface-2: #232b29; --ink: #e5eae8;
+      --ink-2: #a9b6b0; --ink-3: #74837c; --line: #2d3734; --accent: #5db8c1;
+      --accent-soft: #173438; --good: #74bd91; --good-soft: #1d3327;
+      --bad: #dc8a7e; --bad-soft: #392320; --warn: #d2a75b; --warn-soft: #362f1c;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #131817; --surface: #1a201f; --surface-2: #232b29; --ink: #e5eae8;
+    --ink-2: #a9b6b0; --ink-3: #74837c; --line: #2d3734; --accent: #5db8c1;
+    --accent-soft: #173438; --good: #74bd91; --good-soft: #1d3327;
+    --bad: #dc8a7e; --bad-soft: #392320; --warn: #d2a75b; --warn-soft: #362f1c;
+  }
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font-family: var(--sans); line-height: 1.6; margin: 0; }
+  main, header.masthead { max-width: 1020px; margin: 0 auto; padding: 0 24px; }
+  header.masthead { padding-top: 48px; }
+  h1 { font-size: 30px; margin: 0 0 6px; letter-spacing: -0.02em; }
+  .sub { color: var(--ink-3); font-size: 14px; margin: 0 0 8px; }
+  h2 { font-size: 21px; margin: 44px 0 12px; letter-spacing: -0.01em; }
+  h3 { font-size: 16.5px; margin: 26px 0 8px; }
+  p, li { font-size: 15px; color: var(--ink-2); max-width: 86ch; }
+  p b, li b { color: var(--ink); }
+  code { font-family: var(--mono); font-size: 0.88em; background: var(--surface-2); padding: 1px 5px; border-radius: 4px; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin: 20px 0; }
+  .tile { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  .tile .n { font-family: var(--mono); font-size: 22px; font-weight: 700; color: var(--ink); }
+  .tile .l { font-size: 12px; color: var(--ink-3); line-height: 1.35; margin-top: 2px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); margin: 18px 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-3); padding: 10px 14px; border-bottom: 1px solid var(--line); }
+  td { padding: 8px 14px; border-bottom: 1px solid var(--line); color: var(--ink-2); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  td.r, th.r { text-align: right; font-family: var(--mono); font-size: 13px; }
+  td b { color: var(--ink); }
+  .chip { display: inline-block; font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 99px; }
+  .chip.good { background: var(--good-soft); color: var(--good); }
+  .chip.warn { background: var(--warn-soft); color: var(--warn); }
+  .chip.bad  { background: var(--bad-soft);  color: var(--bad); }
+  .chip.off  { background: var(--surface-2); color: var(--ink-3); }
+  .cut { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px 22px; margin: 14px 0; }
+  .cut-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .cut-letter { font-family: var(--mono); font-weight: 700; color: var(--accent); font-size: 15px; }
+  .cut h4 { font-size: 16px; margin: 0; }
+  .cut .horizon { margin-left: auto; font-size: 12px; color: var(--ink-3); font-family: var(--mono); }
+  .cut p { margin: 10px 0 0; font-size: 14.5px; }
+  .gain { margin-top: 12px; font-size: 14px; color: var(--good); font-weight: 600; }
+  .gain::before { content: "Zysk — "; }
+  .cost { margin-top: 6px; font-size: 14px; color: var(--bad); font-weight: 600; }
+  .cost::before { content: "Cena — "; }
+  figure { margin: 28px 0; }
+  .diagram-frame { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; overflow-x: auto; }
+  .diagram-frame svg { min-width: 780px; max-width: 100%; height: auto; display: block; margin: 0 auto; }
+  figcaption { font-size: 13.5px; color: var(--ink-3); margin-top: 10px; max-width: 86ch; }
+  .d-node { fill: var(--surface-2); stroke: var(--ink-3); stroke-width: 1.1; rx: 6; }
+  .d-node-acc { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.3; rx: 6; }
+  .d-node-warn { fill: var(--warn-soft); stroke: var(--warn); stroke-width: 1.2; rx: 6; }
+  .d-ext { fill: none; stroke: var(--ink-3); stroke-width: 1; stroke-dasharray: 4 3; rx: 6; }
+  .d-t { font-family: var(--sans); font-size: 12.5px; fill: var(--ink); font-weight: 600; }
+  .d-s { font-family: var(--mono); font-size: 10px; fill: var(--ink-3); }
+  .d-e { font-family: var(--sans); font-size: 10.5px; fill: var(--ink-2); }
+  .d-a { stroke: var(--ink-3); stroke-width: 1.2; fill: none; marker-end: url(#arr); }
+  .d-a-acc { stroke: var(--accent); stroke-width: 1.4; fill: none; marker-end: url(#arrAcc); }
+  .callout { background: var(--surface); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; padding: 14px 20px; margin: 20px 0; }
+  .callout.risk { border-left-color: var(--bad); }
+  .callout p { margin: 6px 0; }
+  footer { color: var(--ink-3); font-size: 12.5px; padding: 40px 0 60px; }
+</style>
+
+<header class="masthead">
+  <h1>Następne cięcia</h1>
+  <p class="sub">Stan projektu po refactorze · zmierzone 20 sierpnia 2026, wieczorem — po scaleniu PR #178 i po <code>terraform apply</code>, który zdjął sześć alertów.
+  Czwarty dokument cyklu: audyt (18.08) → plan (19.08) → rachunek (20.08) → ten. Konwencja bez zmian: każda liczba tu jest z pomiaru, nie z pamięci,
+  a rekomendacja bez wysiłku i ryzyka obok siebie nie jest rekomendacją.</p>
+</header>
+
+<main>
+
+<h2 id="liczby">System w liczbach — 20.08.2026</h2>
+
+<div class="tiles">
+  <div class="tile"><div class="n">5 + 3</div><div class="l">modułów deployowalnych + pakietów build-time</div></div>
+  <div class="tile"><div class="n">~56,0 tys.</div><div class="l">linii produkcji (35,5 tys. Py + 20,5 tys. TS)</div></div>
+  <div class="tile"><div class="n">~48,8 tys.</div><div class="l">linii testów · stosunek 0,87 po cięciu −7 325</div></div>
+  <div class="tile"><div class="n">1 027</div><div class="l">plików w repo (bez venv / node_modules)</div></div>
+  <div class="tile"><div class="n">790</div><div class="l">commitów w 13 dni (od 7.08) ≈ 61/dzień</div></div>
+  <div class="tile"><div class="n">251</div><div class="l">linii CLAUDE.md · sufit 21 000 znaków z testem</div></div>
+  <div class="tile"><div class="n">3</div><div class="l">alerty produkcyjne (było 9 rano tego samego dnia)</div></div>
+  <div class="tile"><div class="n">5</div><div class="l">portów do zapamiętania · 8040/8050/8070 niczyje</div></div>
+</div>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Moduł</th><th class="r">produkcja</th><th class="r">testy</th><th class="r">plików .py/.ts</th><th class="r">zależności</th><th>uwaga</th></tr></thead>
+  <tbody>
+    <tr><td><b>capital-gateway</b></td><td class="r">2 713</td><td class="r">3 946</td><td class="r">31</td><td class="r">6</td><td>jedyne drzwi do dostawcy; bez sondy z zewnątrz, celowo</td></tr>
+    <tr><td><b>market-data</b></td><td class="r">13 669</td><td class="r">13 650</td><td class="r">131</td><td class="r">16</td><td>REST + 11 narzędzi MCP w jednym procesie; właściciel PostgreSQL</td></tr>
+    <tr><td><b>workbench</b></td><td class="r">17 111</td><td class="r">15 426</td><td class="r">180</td><td class="r">18</td><td>agent + teams + teams_tools, jeden proces od 20.08 — największy moduł repo</td></tr>
+    <tr><td><b>trading-mcp</b></td><td class="r">1 009</td><td class="r">1 378</td><td class="r">23</td><td class="r">6</td><td>zostaje osobno — decyzja C, pomiarem (rachunek, karta C)</td></tr>
+    <tr><td><b>terminal</b></td><td class="r">20 505 <span style="color:var(--ink-3)">+4 461 gen.</span></td><td class="r">13 412</td><td class="r">170</td><td class="r">10</td><td>testy ścięte z 19 044 (−35%, PR #177 dokładnie wg bilansu)</td></tr>
+    <tr><td><b>pakiety ×3</b></td><td class="r">988</td><td class="r">984</td><td class="r">—</td><td class="r">6/3/1</td><td>tc-runtime 463 · tc-mcp-kit 233 · tc-openai 292</td></tr>
+    <tr><td><b>scripts/</b></td><td class="r">1 340</td><td class="r">1 337</td><td class="r">—</td><td class="r">1</td><td>dev.py 934 · deploy_probe.py 297 · measure-duplication.py 109</td></tr>
+    <tr><td><b>infra/</b></td><td class="r" colspan="2">2 302 (tf)</td><td class="r">—</td><td class="r">—</td><td>2 rooty · 4 App Services · 1 SWA · 3 bazy logiczne · 27 migracji</td></tr>
+  </tbody>
+</table></div>
+
+<p><b>Proza, policzona osobno</b>, bo to ona jest kosztem sesji agentowej: CLAUDE.md 251 linii (17 831 znaków, sufit 21 000 z testem
+w <code>scripts/tests/test_guide_ceiling.py</code>), README-y ~2,0 tys., <code>architecture.md</code> ~345, specyfikacje 10 420 linii
+(61 specek, 389 wymagań pod 356 nazwami, 1 033 scenariusze), archiwum OpenSpec 18 163 linii md po trimie (51 zmian),
+<code>docs/*.html</code> 11 557 linii w 21 plikach + 10 w <code>docs/archive/</code>. Cel D „&lt; 20 000 linii prozy normatywnej" jest osiągnięty,
+jeżeli liczyć to, co naprawdę jest normą (CLAUDE + README + architecture + specs ≈ 13 tys.) — archiwum i research to droga, nie stan.
+Gdzie ta granica dziś nie przebiega poprawnie — cięcie K1 niżej.</p>
+
+<h2 id="mapa">Mapa runtime — stan po C</h2>
+
+<figure>
+<div class="diagram-frame">
+<svg viewBox="0 0 860 400" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mapa modułów w runtime">
+  <defs>
+    <marker id="arr" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--ink-3)"/></marker>
+    <marker id="arrAcc" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="var(--accent)"/></marker>
+  </defs>
+
+  <rect x="330" y="12" width="200" height="40" class="d-ext"/>
+  <text x="430" y="30" text-anchor="middle" class="d-t">capital.com</text>
+  <text x="430" y="44" text-anchor="middle" class="d-s">REST + WS · 10 req/s na KONTO · demo</text>
+
+  <rect x="330" y="86" width="200" height="52" class="d-node-acc"/>
+  <text x="430" y="106" text-anchor="middle" class="d-t">capital-gateway · 8010</text>
+  <text x="430" y="122" text-anchor="middle" class="d-s">X-Gateway-Key · IP planu · bez sondy</text>
+  <path d="M430,52 L430,84" class="d-a"/>
+
+  <rect x="120" y="182" width="230" height="58" class="d-node-acc"/>
+  <text x="235" y="202" text-anchor="middle" class="d-t">market-data · 8020</text>
+  <text x="235" y="217" text-anchor="middle" class="d-s">REST + 11 narzędzi MCP na /mcp</text>
+  <text x="235" y="231" text-anchor="middle" class="d-s">caller_access: trasa → wołający</text>
+  <path d="M355,138 L280,180" class="d-a"/>
+  <text x="290" y="158" class="d-e">świece, instrumenty, stream</text>
+
+  <rect x="520" y="182" width="200" height="58" class="d-node-warn"/>
+  <text x="620" y="202" text-anchor="middle" class="d-t">trading-mcp · 8060</text>
+  <text x="620" y="217" text-anchor="middle" class="d-s">4 narzędzia piszą po rachunku</text>
+  <text x="620" y="231" text-anchor="middle" class="d-s">demo pytaniem, nie ustawieniem</text>
+  <path d="M540,180 L470,138" class="d-a"/>
+  <text x="520" y="160" class="d-e">zlecenia</text>
+
+  <rect x="300" y="286" width="280" height="72" class="d-node-acc"/>
+  <text x="440" y="304" text-anchor="middle" class="d-t">workbench · 8030 (zasób: app-…-agent)</text>
+  <text x="440" y="320" text-anchor="middle" class="d-s">agent/ ⊥ teams/ ⊥ teams_tools/ — importuje tylko workbench/</text>
+  <text x="440" y="334" text-anchor="middle" class="d-s">2 schematy DB · 2 klucze OpenAI · narzędzia zespołów in-process</text>
+  <text x="440" y="349" text-anchor="middle" class="d-s">MARKET_MCP_URL i TRADING_MCP_URL — brak to stan wspierany</text>
+  <path d="M320,240 L380,284" class="d-a-acc"/>
+  <text x="300" y="266" class="d-e">MCP (archiwum, tylko czyta)</text>
+  <path d="M580,240 L510,284" class="d-a-acc"/>
+  <text x="530" y="266" class="d-e">MCP (rachunek)</text>
+
+  <rect x="700" y="292" width="130" height="40" class="d-ext"/>
+  <text x="765" y="310" text-anchor="middle" class="d-t">OpenAI ×2</text>
+  <text x="765" y="324" text-anchor="middle" class="d-s">2 klucze, 2 rachunki</text>
+  <path d="M698,312 L582,315" class="d-a"/>
+
+  <rect x="60" y="292" width="150" height="40" class="d-ext"/>
+  <text x="135" y="310" text-anchor="middle" class="d-t">PostgreSQL</text>
+  <text x="135" y="324" text-anchor="middle" class="d-s">market_data · agent · teams</text>
+  <path d="M175,290 L215,242" class="d-a"/>
+  <path d="M212,312 L298,318" class="d-a"/>
+
+  <rect x="30" y="60" width="180" height="46" class="d-node"/>
+  <text x="120" y="79" text-anchor="middle" class="d-t">terminal · 5173</text>
+  <text x="120" y="94" text-anchor="middle" class="d-s">konsument, nie peer · SWA</text>
+  <path d="M140,108 L210,180" class="d-a"/>
+  <path d="M120,108 C120,220 200,300 296,306" class="d-a"/>
+</svg>
+</div>
+<figcaption>Stan po decyzji C: cztery procesy backendu i terminal. Jedna zmiana wobec diagramu z rachunku — <code>trading-mcp</code>
+przestał być „do decyzji" i został, z powodem zapisanym w <code>architecture.md</code> („The order path"). Porty 8040, 8050, 8070 nie istnieją;
+<code>.env</code> wskazujący którykolwiek to serwer narzędzi, który czyta się jako martwy.</figcaption>
+</figure>
+
+<h2 id="infra">Mapa infrastruktury — stan po apply 20.08</h2>
+
+<figure>
+<div class="diagram-frame">
+<svg viewBox="0 0 860 430" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Mapa infrastruktury Azure">
+  <rect x="20" y="20" width="560" height="390" class="d-ext"/>
+  <text x="36" y="42" class="d-t">Azure · rg-tradingcenter · polandcentral</text>
+
+  <rect x="40" y="60" width="300" height="130" class="d-node"/>
+  <text x="190" y="80" text-anchor="middle" class="d-t">App Service Plan B3 (jeden, współdzielony)</text>
+  <text x="60" y="102" class="d-s">app-…-gateway        · IP-deny, bez Easy Auth</text>
+  <text x="60" y="120" class="d-s">app-…-market-data    · Easy Auth + caller_access</text>
+  <text x="60" y="138" class="d-s">app-…-agent (workbench) · Easy Auth</text>
+  <text x="60" y="156" class="d-s">app-…-trading-mcp    · Easy Auth, 1 wołający</text>
+  <text x="60" y="176" class="d-e">4 aplikacje = 1 lista adresów wyjściowych planu</text>
+
+  <rect x="370" y="60" width="190" height="70" class="d-node"/>
+  <text x="465" y="80" text-anchor="middle" class="d-t">PostgreSQL Flexible B1ms</text>
+  <text x="465" y="97" text-anchor="middle" class="d-s">market_data · agent · teams</text>
+  <text x="465" y="112" text-anchor="middle" class="d-s">32 GB · Entra-only · TLS</text>
+
+  <rect x="370" y="146" width="190" height="44" class="d-node"/>
+  <text x="465" y="164" text-anchor="middle" class="d-t">Key Vault kv-tradingctr</text>
+  <text x="465" y="180" text-anchor="middle" class="d-s">sekrety przez referencje, nie w tf</text>
+
+  <rect x="40" y="210" width="300" height="96" class="d-node-acc"/>
+  <text x="190" y="230" text-anchor="middle" class="d-t">Monitoring — po cięciu 9 → 3</text>
+  <text x="60" y="252" class="d-s">sev 0 · database-connections-failed</text>
+  <text x="60" y="268" class="d-s">sev 1 · candle-age-stale (w okresach)</text>
+  <text x="60" y="284" class="d-s">sev 1 · market-data-availability (webtest /ping)</text>
+  <text x="60" y="300" class="d-e">metryki zostały wszystkie; zniknęły powiadomienia</text>
+
+  <rect x="370" y="210" width="190" height="60" class="d-node"/>
+  <text x="465" y="230" text-anchor="middle" class="d-t">App Insights + LAW</text>
+  <text x="465" y="246" text-anchor="middle" class="d-s">candle_age w sekundach i okresach</text>
+  <text x="465" y="261" text-anchor="middle" class="d-s">retencja 30 dni</text>
+
+  <rect x="40" y="326" width="300" height="44" class="d-node"/>
+  <text x="190" y="344" text-anchor="middle" class="d-t">Static Web App · terminal</text>
+  <text x="190" y="360" text-anchor="middle" class="d-s">bez obrazu, bez sondy — deploy-terminal.yml</text>
+
+  <rect x="370" y="290" width="190" height="80" class="d-node-warn"/>
+  <text x="465" y="310" text-anchor="middle" class="d-t">3 × easy-auth-app (Entra)</text>
+  <text x="465" y="326" text-anchor="middle" class="d-s">market-data · workbench · trading-mcp</text>
+  <text x="465" y="342" text-anchor="middle" class="d-s">azuread_* = apply operatora,</text>
+  <text x="465" y="356" text-anchor="middle" class="d-s">CI czyta, nie pisze</text>
+
+  <rect x="620" y="60" width="220" height="150" class="d-ext"/>
+  <text x="730" y="82" text-anchor="middle" class="d-t">GitHub Actions</text>
+  <text x="640" y="104" class="d-s">checks.yml · 10 jobów, filtr diffu</text>
+  <text x="640" y="121" class="d-s">4 × deploy-*.yml → _deploy-app-service</text>
+  <text x="640" y="138" class="d-s">każdy kończy w deploy_probe.py</text>
+  <text x="640" y="155" class="d-s">terraform.yml — plan na PR</text>
+  <text x="640" y="172" class="d-s">terraform-apply.yml — dispatch,</text>
+  <text x="640" y="187" class="d-s">odmawia planu z azuread_*</text>
+
+  <rect x="620" y="240" width="220" height="54" class="d-ext"/>
+  <text x="730" y="260" text-anchor="middle" class="d-t">GHCR</text>
+  <text x="730" y="277" text-anchor="middle" class="d-s">4 obrazy · pull tokenem z Key Vault</text>
+
+  <rect x="620" y="320" width="220" height="54" class="d-ext"/>
+  <text x="730" y="340" text-anchor="middle" class="d-t">infra/bootstrap (2. root)</text>
+  <text x="730" y="357" text-anchor="middle" class="d-s">stan lokalny, commitowany, klucze inertne</text>
+
+  <path d="M618,120 L582,120" class="d-a"/>
+  <path d="M618,262 L582,150" class="d-a"/>
+</svg>
+</div>
+<figcaption>Jeden plan, cztery aplikacje, jeden serwer Postgresa z trzema bazami — i granica odpowiedzialności apply:
+wszystko <code>azurerm_*</code> może iść z CI (ręczny dispatch), wszystko <code>azuread_*</code> stosuje operator lokalnie. Dzisiejszy apply
+poszedł lokalnie właśnie dlatego — provider oznaczył trzy <code>azuread_application_password</code> jako update i strażnik workflowa by odmówił (cięcie K4).</figcaption>
+</figure>
+
+<h2 id="ledger">Co zalecały poprzednie dokumenty — i co się z tym stało</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Dokument</th><th>Główne zalecenia</th><th>Stan 20.08 wieczorem</th></tr></thead>
+  <tbody>
+    <tr><td><b>mniej-prosciej-szybciej</b> · 10.08</td><td>archiwum OpenSpec żyje podwójnie · pyright · przypiąć ruff · przystanki nowego pola · 4 worktree</td>
+        <td><span class="chip good">wykonane</span> trim-script działa (0 delt w archiwum) · pyright w każdym module · ruff==0.16.2 · trasa pola w README market-daty · worktree stoją</td></tr>
+    <tr><td><b>dlaczego-robi-sie-wolniej</b> · 10.08</td><td>rytuał stały niezależnie od wagi zmiany · komentarze-eseje · brak CLAUDE.md</td>
+        <td><span class="chip good">wykonane</span> tylko proposal.md bezwarunkowe · pass po komentarzach · CLAUDE.md istnieje i ma sufit z testem</td></tr>
+    <tr><td><b>audyt</b> · 18.08</td><td>4 ustalenia systemowe + 8 poprawek o największym zwrocie</td>
+        <td><span class="chip good">3 z 4 zamknięte</span> dryf kopii → pakiety · obrony bez testu → sondy i strażniki z testami · kod na przyszłość → wycięty. <span class="chip warn">otwarte #4</span>: pliki ponad miarę — <code>teams/store.py</code> 1 227, <code>Chart.tsx</code> 1 033 (cięcie K2)</td></tr>
+    <tr><td><b>plan-refactoru</b> · 19.08</td><td>6 iteracji od największego zysku</td>
+        <td><span class="chip good">5 domkniętych</span>, iteracja 6 (generator modułów) skasowana — inwestycja w odwrotny kierunek</td></tr>
+    <tr><td><b>bilans-testow</b> · 20.08</td><td>8 reguł, cięcie ~10 tys. linii testów bez utraty ani jednej asercji domenowej</td>
+        <td><span class="chip good">wykonane</span> PR #177: −7 325 linii · terminal −35% dokładnie wg planu · reguły w CLAUDE.md</td></tr>
+    <tr><td><b>rachunek-po-refactorze</b> · 20.08</td><td>kierunki A–E</td>
+        <td><span class="chip good">A, B f.1, E wykonane</span> · <span class="chip good">C rozstrzygnięte: NIE</span> (trading-mcp zostaje) · <span class="chip good">D wykonane</span> (CLAUDE 531→251, alerty 9→3, konsolidacja specek <b>wycofana pomiarem</b> — 22 wspólne tytuły to 1 wspólny akapit wobec 103) · <span class="chip off">parked</span> B faza 2 (pętla tury, „na końcu albo wcale")</td></tr>
+  </tbody>
+</table></div>
+
+<div class="callout"><p><b>Wzorzec, który się z tego wyłania i który jest właściwym wynikiem eksperymentu:</b> z ostatnich pięciu decyzji
+architektonicznych trzy zakończyły się „nie rób" z zapisanym pomiarem (C — nie zwijać trading-mcp; specki — nie konsolidować;
+iteracja 6 — nie budować generatora). System po diecie zachowuje się jak system po diecie: <b>następne zyski nie są w cięciu masy,
+tylko w higienie granic</b> — gdzie leży prawda-dziś vs droga, gdzie plik urósł ponad czytelność, gdzie dryf wraca sam.</p></div>
+
+<h2 id="nih">Eksperyment: co robimy sami, a co mogłaby dać biblioteka</h2>
+
+<p>Przejrzane każde miejsce, gdzie repo utrzymuje własny mechanizm zamiast zależności. Werdykty są per przypadek — i uczciwy wynik
+brzmi: <b>ten audyt jest prawie czysty</b>. Repo już dziś bierze biblioteki tam, gdzie problem jest generyczny
+(<code>remend</code> do samo-leczącego markdownu w streamie, <code>croniter</code> do harmonogramów, <code>langgraph</code> do grafu zespołu,
+<code>lightweight-charts</code>, <code>testcontainers</code>, <code>azure-monitor-opentelemetry</code>) i pisze własne tam, gdzie mechanizm niesie semantykę domeny.</p>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Własny mechanizm</th><th class="r">linie</th><th>Kandydat zewnętrzny</th><th>Werdykt</th></tr></thead>
+  <tbody>
+    <tr><td><code>rategate.py</code> — okno przesuwne 10 req/s</td><td class="r">~60</td><td><code>aiolimiter</code></td>
+        <td><span class="chip good">zostaje</span> wymiana oszczędza ~30 linii i gubi komentarz z pomiarem, czemu semafor nie wystarcza; limit jest per <i>konto</i>, co i tak trzeba nieść samemu</td></tr>
+    <tr><td>SSE przez <code>StreamingResponse</code></td><td class="r">rozprosz.</td><td><code>sse-starlette</code></td>
+        <td><span class="chip good">zostaje</span> terminal czyta <code>fetch</code>+<code>ReadableStream</code>, nie EventSource — reconnect/last-event-id, które lib dodaje, nie są używane</td></tr>
+    <tr><td><code>scripts/dev.py</code> — orkiestracja stacka</td><td class="r">934</td><td><code>process-compose</code> / <code>honcho</code></td>
+        <td><span class="chip warn">jedyny realny kandydat</span> — ale wartością dev.py są <i>odmowy</i> (porównanie kluczy gateway↔trading-mcp, odmowa zdalnej bazy, <code>--explain</code>), nie sama orkiestracja; świeżo skonsolidowany, z 151 testami. Wraca na stół, gdy urośnie ponad ~1 200 linii</td></tr>
+    <tr><td>migracje + advisory lock (<code>tc-runtime</code>)</td><td class="r">463</td><td>—</td>
+        <td><span class="chip good">zostaje</span> alembic nie daje blokady między instancjami App Service ani startu w lifespanie; to jest cienka warstwa nad alembikiem, nie jego zamiennik</td></tr>
+    <tr><td>snapshot kontraktu (<code>contract.py</code> w trading-mcp)</td><td class="r">111</td><td><code>oasdiff</code></td>
+        <td><span class="chip good">zostaje</span> bajtowy diff jest ostrzejszy niż semantyczny i nie wnosi zależności Go do CI</td></tr>
+    <tr><td>kernel wskaźników (numpy własny)</td><td class="r">~1 800</td><td>TA-Lib bezpośrednio</td>
+        <td><span class="chip good">zostaje</span> — świadomy wzorzec: TA-Lib jest <i>wyrocznią w testach</i> (golden file), a produkcja nie ciągnie C-zależności do obrazu. To jest lepsze niż obie skrajności</td></tr>
+    <tr><td>klienty HTTP między modułami</td><td class="r">~700</td><td><code>openapi-python-client</code></td>
+        <td><span class="chip good">zostaje</span> generowany klient nie umie nieść semantyki tego repo: „zapis nigdy nie ponawiany", „timeout to skutek nieznany", „odmowa ≠ awaria dostępu" — a to jej bronią testy</td></tr>
+    <tr><td>mappery wire→domain w terminalu (<code>archive.ts</code>)</td><td class="r">611</td><td><code>zod</code> / openapi-zod-client</td>
+        <td><span class="chip good">zostaje</span> <code>pnpm typecheck</code> już łapie obie strony rozjazdu; mapper robi konwersje (ISO→epoch, snake→camel), których generator nie zna</td></tr>
+    <tr><td><code>caller_access.py</code> — trasa→wołający</td><td class="r">283</td><td>—</td>
+        <td><span class="chip good">zostaje</span> żadna biblioteka nie wyraża „Easy Auth autoryzuje aplikację, nie trasę"; to jest opłacona jawnie cena kierunku A</td></tr>
+    <tr><td>streaming markdown w UI</td><td class="r">0</td><td><code>remend</code></td>
+        <td><span class="chip good">już biblioteka</span> — kontrprzykład pokazujący, że NIH tu nie jest odruchem: własnego parsera nikt nie napisał</td></tr>
+  </tbody>
+</table></div>
+
+<p><b>Wniosek z eksperymentu:</b> zero pilnych wymian, jeden kandydat warunkowy. To nie jest repo, które przyspieszy przez dokładanie
+zależności — przyspieszy przez cięcia K1–K3 niżej, bo one zmniejszają to, co agent musi przeczytać, zanim zacznie pisać.</p>
+
+<h2 id="ciecia">Następna lista cięć — od największego zwrotu</h2>
+
+<div class="cut">
+  <div class="cut-head"><span class="cut-letter">K1</span><h4>docs/ przestało mówić prawdę o dziś — 13 plików do archiwum</h4><span class="horizon">~1 godzina · ryzyko zero</span></div>
+  <p>Reguła repo brzmi: „<code>docs/</code> — only what is true today; <code>docs/archive/</code> — the road, not the state". Pomiar: <b>9 z 21 plików
+  w docs/ odwołuje się do modułów lub portów, które nie istnieją</b> (teams-mcp, market-mcp, 8040/8050/8070). Pięć dokumentów
+  <code>teams-*</code> opisuje moduł sprzed scalenia w workbench; <code>mcp-plan-wdrozenia</code> i <code>wskazniki-plan/-testy</code> to plany rzeczy
+  wykonanych; <code>azure-infrastructure-proposal</code> to propozycja infrastruktury, która od tygodnia stoi; <code>audyt</code>, <code>plan-refactoru</code>,
+  <code>dlaczego-robi-sie-wolniej</code>, <code>mniej-prosciej-szybciej</code> — cykl badawczy, którego wyniki niesie rachunek.</p>
+  <p><b>Zostaje osiem:</b> rachunek (żywa księga), bilans-testow (przywołany z CLAUDE.md), wskazniki-techniczne (referencja),
+  kiedy-produkcja-milczy (runbook — sprawdzone: wskazuje tylko <code>alert-candle-age-stale</code>, który przeżył cięcie),
+  dbeaver, rotacja-poswiadczen, terminal-market-data-auth, git-worktree — plus ten dokument.</p>
+  <p class="gain">granica prawda-dziś/droga znowu przebiega tam, gdzie mówi reguła; agent czytający docs/ nie buduje mapy świata sprzed trzech przeprowadzek.</p>
+</div>
+
+<div class="cut">
+  <div class="cut-head"><span class="cut-letter">K2</span><h4>teams/store.py — 1 227 linii, ostatnie otwarte ustalenie audytu</h4><span class="horizon">0,5–1 dnia · ryzyko niskie</span></div>
+  <p>Największy plik produkcyjny repo i jedyny żyjący przedstawiciel ustalenia #4 audytu („pojedyncze pliki ponad miarę").
+  Jeden magazyn trzyma dziś wszystkie agregaty teams: definicje, rewizje, przebiegi, harmonogramy, zużycie. Podział wzdłuż agregatów —
+  z twardym warunkiem z rachunku: <b>split mechaniczny kończy się diffem uzasadnień</b>, bo zielone testy dowodzą zachowania, nie zachowanych powodów.
+  <code>_Recurring</code> (parametryzacja z PR #167) idzie w całości do jednego z plików, nie jest dzielona.</p>
+  <p class="gain">każda zmiana w teams przestaje wciągać do kontekstu 1 227 linii; przegląd diffu widzi agregat, nie magazyn-wszystkiego.</p>
+</div>
+
+<div class="cut">
+  <div class="cut-head"><span class="cut-letter">K3</span><h4>Chart.tsx — 1 033 linie; ta sama choroba po stronie terminala</h4><span class="horizon">0,5 dnia · ryzyko niskie</span></div>
+  <p>Wykres trzyma w jednym pliku: montaż, paging, sync-effecty wskaźników, <code>canDrawIndicator</code> i spawn primitives. Naturalna granica
+  przebiega między „cyklem życia wykresu" a „synchronizacją wskaźników" — ta druga część to osobny, testowalny moduł.
+  Obok: <code>teamsApi.ts</code> 839 i <code>agentApi.ts</code> 648 wyglądają jak bliźniaki sprzed scalenia — <b>zmierzyć</b> tym samym narzędziem co provider
+  (79,4% → tc-openai); jeśli pomiar potwierdzi, wspólny fetch-wrapper w terminalu, jeśli nie — zapisać wynik i zostawić.</p>
+  <p class="gain">plik wykresu wraca pod ~600 linii; ewentualny wspólny wrapper zdejmuje klasę dryfu, którą repo już raz nazwało.</p>
+</div>
+
+<div class="cut">
+  <div class="cut-head"><span class="cut-letter">K4</span><h4>Dryf trzech haseł Entra — pomiar przy następnym planie</h4><span class="horizon">1 godzina · po pomiarze</span></div>
+  <p>Dzisiejszy apply przeszedł lokalnie, bo provider oznaczył <code>azuread_application_password</code> ×3 jako update (zero widocznych atrybutów) —
+  a strażnik <code>terraform-apply.yml</code> odmawia każdego planu z <code>azuread_*</code>. Po apply plan jest czysty. <b>Jeżeli dryf wróci</b> przy następnym
+  planie CI, każdy apply przez workflow będzie odbity na zawsze: wtedy przypiąć wersję providera <code>azuread</code> albo dodać
+  <code>lifecycle.ignore_changes</code> na tym jednym polu, z komentarzem czemu. Jeżeli nie wróci — nic nie robić i nic nie dopisywać.</p>
+  <p class="gain">ścieżka CI-apply zostaje przejezdna dla zmian, które są jej — jak dzisiejsze cięcie alertów, które musiało pójść ręcznie nie ze swojej winy.</p>
+</div>
+
+<div class="cut">
+  <div class="cut-head"><span class="cut-letter">K5</span><h4>Kolizje nazw wymagań — 22 tytuły, decyzja odłożona świadomie</h4><span class="horizon">bez terminu · ryzyko wysokie</span></div>
+  <p>Z wycofanej konsolidacji zostało znalezisko: 22 tytuły wymagań są używane po 2–3 razy do wymagań, które <i>mówią co innego</i>
+  („Migruje dokładnie jeden proces naraz" znaczy co innego przy tabeli świec niż przy dwóch łańcuchach workbencha). OpenSpec adresuje wymaganie
+  tytułem, a naprawa to przemianowanie — jedyna operacja, która blokuje archiwizację. <b>Nie ruszać osobno.</b> Przemianować tylko przy okazji
+  naturalnej zmiany dotykającej danej specki, po jednym tytule na raz.</p>
+  <p class="cost">to jest dług nazewniczy, nie funkcjonalny — koszt nosi wyłącznie czytelnik porównujący specki między modułami.</p>
+</div>
+
+<div class="cut">
+  <div class="cut-head"><span class="cut-letter">K6</span><h4>Czego nie ciąć — lista równie ważna jak cięcia</h4><span class="horizon">—</span></div>
+  <p><b>B faza 2</b> (scalanie pętli tury agent/teams) — nadal „na końcu albo wcale" i nadal bez powodu, żeby ruszyć.
+  <b>Testy</b> — stosunek 0,87 po świeżym cięciu −7 325; następne cięcie tutaj to byłoby cięcie asercji, nie boilerplate'u.
+  <b>Zależności</b> — 6–18 na moduł to dolna granica zdrowia; nic do wyjęcia.
+  <b>Specki</b> — konsolidacja zmierzona i wycofana; nie wracać bez nowej przesłanki.
+  <b>dev.py</b> — patrz eksperyment NIH.
+  <b>51/51 design.md w archiwum</b> — wygląda jak przerost, ale to historia sprzed reguły z 18.08 („design tylko przy realnej decyzji");
+  reguła działa od tygodnia i to wystarczy — przepisywanie historii to churn.</p>
+</div>
+
+<h2 id="agent">Kontekst agentowy — gdzie jesteśmy po diecie</h2>
+
+<div class="table-wrap"><table>
+  <thead><tr><th>Powierzchnia czytana przez model</th><th class="r">koszt</th><th>sufit</th><th>strażnik</th></tr></thead>
+  <tbody>
+    <tr><td>CLAUDE.md — każda sesja, przed pierwszym pytaniem</td><td class="r">17 831 zn ≈ 4,2 tys. tok.</td><td class="r">21 000 zn</td><td><code>test_guide_ceiling.py</code> + 3 strażniki czytające źródło prawdy (mapa, porty, porty wycofane)</td></tr>
+    <tr><td>narzędzia market-data — każda tura rozmowy z archiwum</td><td class="r">18 844 zn ≈ 4,5 tys. tok.</td><td class="r">19 700 zn</td><td><code>test_tools_surface.py</code> + test, że sufit nie jest kupiony pustką schematów</td></tr>
+    <tr><td>narzędzia trading-mcp — każda tura z rachunkiem</td><td class="r">po slimie −22,6%</td><td class="r">zapisany</td><td><code>test_tool_surface.py</code> · <code>slim_tool_schemas</code> z tc-mcp-kit</td></tr>
+    <tr><td>README / specs / docs — na żądanie</td><td class="r">0 na starcie</td><td class="r">—</td><td>celowo bez sufitu: czytane, gdy trzeba — K1 pilnuje tylko, żeby mówiły prawdę</td></tr>
+  </tbody>
+</table></div>
+
+<p><b>Dieta osiągnęła dno i to trzeba powiedzieć wprost:</b> każda powierzchnia płacona per sesję lub per turę ma dziś sufit z testem
+i zapas 4–15%. Kolejne tokeny nie leżą w cięciu prozy, tylko w K1 (żeby to, co czytane na żądanie, nie uczyło agenta świata sprzed
+przeprowadzek) i w K2–K3 (żeby dotknięcie teams lub wykresu nie wciągało tysiąca linii do kontekstu edycji).</p>
+
+<h2 id="werdykt">Werdykt architekta</h2>
+
+<div class="callout">
+<p><b>Stan:</b> system po największym tygodniu w swojej historii — 8 modułów → 5, 13 jobów CI → 10, 9 alertów → 3, CLAUDE.md −53%,
+testy −7,3 tys. linii, trzy snapshoty kontraktów → jeden — i <b>wszystkie liczby stanu docelowego z rachunku osiągnięte</b>, łącznie z tymi,
+które osiągnęto przez udokumentowane „nie".</p>
+<p><b>Metoda, którą warto zatrzymać:</b> decyzja pomiarem ma tu już pięć precedensów i trzy z nich skończyły się odmową. To jest właściwa
+proporcja dla systemu po diecie — architektura, w której każda kolejna „optymalizacja" przechodzi, jest architekturą, której nikt nie mierzy.</p>
+<p><b>Następny tydzień, w kolejności:</b> K1 (godzina, czysty zysk) → K2 z diffem uzasadnień → K3 z pomiarem bliźniaków API →
+K4 tylko jeśli dryf wróci. Nic z tej listy nie jest zmianą OpenSpec poza niczym — wszystko to gałąź, testy, PR.</p>
+</div>
+
+<footer>Następne cięcia · TradingCenter · pomiary z 20.08.2026 po scaleniu PR #178 i apply 6 alertów · poprzednik: rachunek-po-refactorze.html</footer>
+
+</main>
