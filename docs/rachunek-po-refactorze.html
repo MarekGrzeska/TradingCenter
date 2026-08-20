@@ -635,7 +635,7 @@
   <div class="dir">
     <div class="dir-head"><span class="dir-letter">D</span>
     <h4>Dieta prozy — sufit jak dla schematów narzędzi</h4>
-    <span class="chip good">wykonane 20.08 — poza speckami, które czekają na decyzję</span>
+    <span class="chip good">wykonane 20.08 — poza speckami, które pomiar odrzucił</span>
     <span class="horizon">szacowano ~3 dni; zajęło 1</span></div>
     <p>Repo dało schematom narzędzi sufit znaków z testem, bo powierzchnia jest kosztem
     płaconym w każdej turze. <b>CLAUDE.md jest dokładnie tym samym</b> — kosztem płaconym
@@ -689,20 +689,41 @@
     z market-mcp 19.08, razem z modułem. Pozycja stała na liście jako do zrobienia przez
     dzień po tym, jak przestała istnieć.</p>
 
-    <p class="cost"><b>Specki: przesłanka nie przeżyła pomiaru, dwa razy.</b> Nie jest ich
-    64 tylko 61 i nie są mikro — 10 420 linii, 389 wymagań, średnio 171 linii, poniżej 80
-    linii jest 11 z 61. „Per moduł" dałoby dwa pliki po ponad trzy tysiące linii (terminal
-    3 168, workbench 3 573), a obiecany zysk — tańsza sesja — jest zaadresowany do
-    niewłaściwego kosztu, bo specki nie wchodzą do kontekstu sesji. Duplikacja istnieje
-    i daje się policzyć: <b>33 z 389 wymagań to drugie albo trzecie postawienie tej samej
-    nazwy</b>, i układają się w trzy grona — baza i migracje (9 nazw × 3), dostęp
-    z przeglądarki (5 × 2–3), powierzchnia narzędzi (3 × 2–3). Wszystkie trzy to kod, który
-    <code>packages-replace-the-hand-copies</code> wyniosło do <code>tc-runtime</code>
-    i <code>tc-mcp-kit</code> — a <code>packages/</code> nie ma ani jednej specki.
-    <code>agent-database-connection</code> i <code>teams-database-connection</code> mają
-    identyczną listę dziewięciu wymagań, nazwa w nazwę, o jednym procesie. Propozycja
-    <code>specs-follow-the-packages</code> czeka na decyzję, bo wprowadza kategorię, której
-    to repo nie miało: wymaganie należące do pakietu.</p>
+    <p class="cost"><b>Specki: przesłanka nie przeżyła pomiaru — cztery razy z rzędu, i za
+    każdym razem cel przesuwał się gdzie indziej.</b> Zapowiedź brzmiała „skonsolidować 64
+    mikro-specki w specyfikacje per moduł". <b>(1)</b> Nie jest ich 64 tylko 61 i nie są mikro:
+    10 420 linii, 389 wymagań, średnio 171 linii, poniżej 80 linii jest 11 z 61.
+    <b>(2)</b> „Per moduł" dałoby dwa pliki po ponad trzy tysiące linii (terminal 3 168,
+    workbench 3 573), a obiecany zysk — tańsza sesja — celuje w niewłaściwy koszt, bo specki
+    nie wchodzą do kontekstu sesji. <b>(3)</b> Duplikacja wyglądała na policzalną i realną:
+    <b>33 z 389 wymagań to powtórzenie nazwy</b>, w trzech gronach pokrywających się dokładnie
+    z kodem, który wyszedł do <code>tc-runtime</code> i <code>tc-mcp-kit</code> — a
+    <code>packages/</code> nie ma ani jednej specki. Na tej podstawie powstała propozycja
+    <code>specs-follow-the-packages</code>.</p>
+
+    <p class="cost"><b>(4) Czwarty pomiar ją obalił i to jest ten, który trzeba było zrobić
+    najpierw:</b> porównanie <i>ciał</i>, nie nazw. Na 22 powtórzone tytuły przypada
+    <b>1 akapit wspólny wszystkim domom danego tytułu wobec 103 niewspólnych</b>, i
+    <b>10 wspólnych nazw scenariuszy wobec 86</b> — z czego <b>tylko 3 mają identyczne
+    ciała</b>, a 7 różne. Nawet <code>agent</code> i <code>teams</code>, dwie powierzchnie
+    jednego procesu, dzielą <b>4 akapity wobec 60</b>. Wspólny jest tytuł, nie wymaganie.</p>
+
+    <p class="cost">Widać to najlepiej na jednym przykładzie, bo tam różnica jest wartością,
+    a nie przypadkiem. „Migruje dokładnie jeden proces naraz" u market-daty to wersja agenta
+    <i>plus jeden akapit i jeden scenariusz</i>: kres czekania MUSI być dłuższy niż najdłuższa
+    migracja, <b>bo tabela świec jest największa w tym systemie</b> — stąd 1500 sekund wobec
+    300 u workbencha. Scalenie w jedno wymaganie pakietu albo wyrzuca ten powód, albo pisze
+    trzecie ciało od nowa. To nie jest konsolidacja, tylko przepisanie 22 wymagań i 86
+    scenariuszy przy ryzyku zgubienia dokładnie tego, po co wymaganie istnieje.</p>
+
+    <p class="cost"><b>Zmiana wycofana.</b> Zostaje jednak znalezisko, tylko innego rodzaju
+    niż zapowiadała karta: <b>22 tytuły wymagań są używane po dwa i trzy razy do wymagań,
+    które mówią co innego</b>. To nie jest duplikacja, to <i>kolizja nazw</i> — a OpenSpec
+    adresuje wymaganie nazwą. Naprawą byłoby przemianowanie, czyli dokładnie ta operacja,
+    która blokuje archiwizację, więc jest to osobna decyzja z osobnym ryzykiem i nie została
+    tu podjęta. Druga rzecz warta zapisania: <code>packages/</code> nadal nie ma ani jednej
+    specki, i po tym pomiarze wiadomo, że nie dlatego, że o niej zapomniano — wymagania,
+    które pakiety spełniają, są u każdego konsumenta inne.</p>
 
     <p class="gain">każda sesja agenta zaczyna się o ~4 560 tokenów taniej, a przewodnik
     dostał regułę, która zatrzymuje dryf u źródła zamiast go nadrabiać: <b>co ma inny dom,
@@ -816,7 +837,7 @@
     scaleniu, tak jak iteracja 1 sfalsyfikowała trzy liczby audytu.</p>
   </div>
 
-  <p><b>Kolejność: A(market) wykonane → B faza 1 wykonana → C rozstrzygnięte → D wykonane ← tu jesteśmy. A(teams) wypadło z sekwencji — B zjadło jego przedmiot; C skończyło się decyzją, nie robotą; z D została jedna propozycja czekająca na decyzję.</b>
+  <p><b>Kolejność: A(market) wykonane → B faza 1 wykonana → C rozstrzygnięte → D wykonane ← tu jesteśmy. A(teams) wypadło z sekwencji — B zjadło jego przedmiot; C skończyło się decyzją, nie robotą; D wykonało się w całości poza speckami, których konsolidacja została wycofana pomiarem.</b>
   Resztki iteracji 5 wypadły z sekwencji (weszły 19.08, PR&nbsp;#167), <b>E jest
   wykonane i scalone</b> (PR&nbsp;#168) — dziura unieważniająca opłacony zysk iteracji 1
   zamknięta tego samego dnia, którego rachunek ją nazwał — a <b>A na market-mcp jest

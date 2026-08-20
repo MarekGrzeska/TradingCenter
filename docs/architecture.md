@@ -275,6 +275,28 @@ Three conditions, and a candidate that fails any of them stays copied:
    job of each module that depends on it (`.github/workflows/checks.yml`). Sharing source
    converts a visible drift into an invisible regression unless this holds.
 
+**A package does not get a capability spec, and that is measured rather than assumed.**
+The question was opened on 20 August 2026, because `openspec/specs/` holds nothing for
+`packages/` while three specs each state that a module presents an identity rather than a
+password, migrates itself under an advisory lock and owns what its migrations create — all
+of it code that now lives once, in `tc-runtime`. The titles do repeat: 22 of them, over 33
+of 389 requirement statements.
+
+The requirements do not. Comparing bodies rather than titles across every repeated one:
+**one paragraph is shared by all the homes of a title, against 103 that are not**, and ten
+scenario names are shared against 86, of which only three have identical bodies. Even
+`agent` and `teams`, two surfaces of one process, share four paragraphs against sixty.
+
+The reason is visible in any one of them. `market-data`'s "Migruje dokładnie jeden proces
+naraz" is the workbench's plus a paragraph and a scenario: the wait must exceed the longest
+migration *because the candle table is the largest thing here*, which is why it is 1500
+seconds against 300. A package-level requirement either drops that reason or is a third
+body written from scratch. So the rule is: **a package earns a spec when the requirement it
+satisfies is the same for every consumer — and here it is the same rule with a different
+reason each time, which is a different requirement.** What repeats is the naming, and that
+is a naming collision rather than duplication: OpenSpec addresses a requirement by its
+title, and three of these titles mean three different things.
+
 ### Why the rule changed
 
 It used to read: no shared library at all, because shared code is coupling no contract
