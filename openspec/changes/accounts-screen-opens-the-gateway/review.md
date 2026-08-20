@@ -90,3 +90,38 @@ moduł i osobne testy, a nie część tej zmiany.
 - `trading-mcp`: `scripts/contract.py check` — snapshot gatewaya zgodny
 - `terraform fmt -check -recursive` i `terraform validate` — czysto
 - `openspec validate accounts-screen-opens-the-gateway --strict` — valid
+
+## Trzecia połowa tego samego wzorca (20 sierpnia, po wdrożeniu)
+
+Ekran kont na produkcji odpowiedział „the accounts could not be read — capital-gateway is
+not reachable", a log gatewaya milczał. To nie był ten sam błąd co poprzednio: paczka
+terminala zbudowana z `fdd5591` ma już adres gatewaya wkompilowany (sprawdzone w
+`assets/index-*.js` serwowanym z produkcji — są tam wszystkie trzy hosty). Pytanie szło pod
+właściwy adres i nie doszło.
+
+Zabrakło CORS-u na App Service gatewaya. `GET /accounts` z tokenem jest zapytaniem
+międzydomenowym z nagłówkiem `Authorization`, więc przeglądarka wysyła najpierw `OPTIONS` —
+a `OPTIONS` nie niesie żadnego tokenu. Easy Auth odpowiedziało `401`, przeglądarka nie
+wysłała właściwego zapytania, a odmowa na poziomie sieci dociera do `fetch` jako wyjątek,
+nie jako status. Stąd komunikat o module nieosiągalnym zamiast o odrzuconym.
+
+Zmierzone z zewnątrz, tym samym `Origin` co terminal:
+
+| Aplikacja | Odpowiedź na preflight |
+|---|---|
+| `app-tradingcenter-market-data` | `200`, z `Access-Control-Allow-Origin` |
+| `app-tradingcenter-gateway` | `401`, bez żadnego nagłówka CORS |
+
+Poprawka to ten sam blok `cors`, który market-data i workbench noszą od początku —
+`allowed_origins = [local.terminal_origin]`, `support_credentials = false`. Żadna trasa się
+przez to nie otwiera: co przeglądarka może osiągnąć za drzwiami, mówi lista w
+`caller_access.py`, i ta się nie zmienia.
+
+Wzorzec do zapamiętania, bo to jego trzecie wystąpienie w dwa dni: **wystawienie modułu
+przeglądarce to trzy rzeczy, nie jedna** — audiencja i aplikacja w Easy Auth, adres
+wkompilowany w paczkę terminala, oraz CORS. Za każdym razem skopiowano dwie z trzech, za
+każdym razem objaw wyglądał na awarię czegoś innego.
+
+Zmiana jest w `infra/`, więc `terraform apply` należy do operatora. Do sprawdzenia po
+zastosowaniu: preflight na `/accounts` z origin terminala ma odpowiedzieć `200` z
+`Access-Control-Allow-Origin`, a zakładka Konta pokazać saldo zamiast ostatniej odpowiedzi.
