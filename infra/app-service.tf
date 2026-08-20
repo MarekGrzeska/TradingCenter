@@ -281,15 +281,24 @@ resource "azurerm_linux_web_app" "capital_gateway" {
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
 
-      # Both spellings of the same request, for the reason market-data's own block gives —
-      # and market-data's own audience as a third, for the reason the workbench's block
-      # gives: the terminal's identity layer acquires one token, scoped to market-data, and
-      # reuses it. The scope below stands ready and pre-authorized for whenever it is
-      # changed to ask for this API by name instead.
+      # Four, and the fourth is not decoration — it is the one this list was missing, and
+      # the terminal's Accounts screen stayed refused for it. Two spellings of *this* API,
+      # for the reason market-data's own block gives, and two of **market-data's**, because
+      # the terminal's identity layer acquires one token scoped to market-data and reuses
+      # it here. A token asked for by scope name carries the `api://` uri as its audience;
+      # the same request as `<client-id>/.default` carries the client id — and the operator's
+      # token carries the client id, which is why listing only the uri looked like a working
+      # configuration and refused every browser request.
+      #
+      # `module.workbench_easy_auth` has carried all four since it was written. This block
+      # copied three of them, and the missing one only became visible when
+      # `require_authentication` was turned on and the platform started actually checking:
+      # before that nothing validated the audience at all, so nothing could notice.
       allowed_audiences = [
         local.capital_gateway_api_uri,
         module.capital_gateway_easy_auth.client_id,
         local.market_data_api_uri,
+        module.market_data_easy_auth.client_id,
       ]
 
       # The browser, and — since `the-gateway-door-authenticates` — the two service callers
