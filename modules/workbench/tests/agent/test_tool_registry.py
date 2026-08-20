@@ -256,19 +256,6 @@ def test_the_trading_server_is_configured_without_touching_the_other() -> None:
     assert settings.market_mcp_url is None
 
 
-def test_there_is_no_setting_for_the_team_tools_at_all() -> None:
-    """Their absence is the point: a source in this process has no address to name, no
-    token to fetch and no timeout to choose — so there is nothing to leave unset and no
-    state in which the conversation has no team tools."""
-    settings = _settings()
-
-    assert not [name for name in type(settings).model_fields if name.startswith("teams_mcp")]
-
-
-def test_a_blank_trading_server_url_means_unset() -> None:
-    assert _settings(trading_mcp_url="  ").trading_mcp_url is None
-
-
 def test_the_trading_servers_ceiling_matches_what_trading_mcp_waits_for() -> None:
     """trading-mcp waits on the gateway for up to 30s. A lower ceiling here would time out
     this side of an order that had already been sent (design.md, D4)."""

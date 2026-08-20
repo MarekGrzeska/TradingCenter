@@ -28,21 +28,6 @@ def _env(workbench_env: None, migrated_url: str, monkeypatch: pytest.MonkeyPatch
         monkeypatch.setenv(key, value)
 
 
-def test_health() -> None:
-    with TestClient(app) as client:
-        response = client.get("/health")
-    assert response.status_code == 200
-    assert response.json() == {"status": "ok"}
-
-
-def test_health_requires_no_identity() -> None:
-    # No REQUIRE_AUTHENTICATED_PRINCIPAL set — off by default — and no principal header
-    # sent; the route MUST NOT depend on `current_principal`.
-    with TestClient(app) as client:
-        response = client.get("/health")
-    assert response.status_code == 200
-
-
 def test_the_module_starts_with_no_tool_server_configured() -> None:
     """specs/teams-tool-access, "Moduł startuje bez serwera narzędzi". `_ENV` sets no
     MARKET_MCP_URL or TRADING_MCP_URL, so this is the state a fresh deployment is in

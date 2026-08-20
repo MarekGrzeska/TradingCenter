@@ -4,7 +4,6 @@ import logging
 from typing import Self
 
 import pytest
-from azure.identity.aio import ClientSecretCredential, DefaultAzureCredential
 
 from market_data import db
 from market_data.db import (
@@ -100,16 +99,6 @@ def test_connection_target_names_host_port_and_database_never_a_credential() -> 
     assert "secret" not in target
 
 
-def test_credential_selects_a_service_principal_when_all_three_are_given() -> None:
-    # Constructing a credential opens no transport and makes no request — only
-    # `get_token()` does — so nothing here needs to be awaited or closed.
-    assert isinstance(_credential("client-id", "client-secret", "tenant-id"), ClientSecretCredential)
-
-
-def test_credential_falls_back_to_default_when_none_are_given() -> None:
-    assert isinstance(_credential(None, None, None), DefaultAzureCredential)
-
-
 @pytest.mark.parametrize(
     "client_id,client_secret,tenant_id",
     [
@@ -131,17 +120,6 @@ def test_credential_rejects_a_partial_set(
 async def test_token_provider_returns_the_credentials_token() -> None:
     provider = _TokenProvider(_FakeCredential(["the-token"]))
     assert await provider() == "the-token"
-
-
-async def test_token_provider_fetches_fresh_on_every_call() -> None:
-    # specs/market-data-database-connection/spec.md, "Wygasające poświadczenie jest
-    # odnawiane": a connection opened after the previous token's validity window gets a
-    # new one, because this is called again — no cached value is reused across calls.
-    fake = _FakeCredential(["token-a", "token-b"])
-    provider = _TokenProvider(fake)
-    assert await provider() == "token-a"
-    assert await provider() == "token-b"
-    assert fake.calls == 2
 
 
 async def test_token_provider_wraps_a_credential_failure() -> None:

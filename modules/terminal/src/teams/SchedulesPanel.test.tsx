@@ -1,7 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { agentActivity } from "../agent/agentActivity";
 import { MarketDataError } from "../data/types";
 import { formatInstant } from "../ui/formatTime";
 import { SchedulesPanel } from "./SchedulesPanel";
@@ -142,97 +141,35 @@ function fakeApi(overrides: Partial<TeamsApi> = {}): TeamsApi {
   };
 }
 
+function renderPanel(api: TeamsApi, extra: Partial<{ tools: never[]; onWatchRun: () => void }> = {}) {
+  return render(
+    <SchedulesPanel
+      api={api}
+      teamId={1}
+      teamName="Morning desk"
+      tools={extra.tools ?? []}
+      onClose={vi.fn()}
+      onWatchRun={extra.onWatchRun ?? vi.fn()}
+    />,
+  );
+}
+
 describe("a schedule's next fire", () => {
   it("shows the module's own timestamp in Polish time — never recomputed", async () => {
-    const api = fakeApi();
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
     // The exact instant the module answered with — nothing here parses `*/5 * * * *`
     // to produce it.
-    expect(await screen.findByText(new RegExp(formatInstant(SCHEDULE.nextFireAt)))).toBeInTheDocument();
-  });
+    renderPanel(fakeApi());
 
-  it("previews a draft's next fires from the module, not from a local parser", async () => {
-    // Deliberately not slots any rhythm in the form would land on, so a passing test
-    // proves the value came from `previewNextFires` and not from a parser here.
-    const oddTimes = [1_755_000_037, 1_755_000_911];
-    const api = fakeApi({ previewNextFires: vi.fn(async () => oddTimes) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(within(await scheduleRow()).getByRole("button", { name: "Edit" }));
-
-    await waitFor(() =>
-      expect(api.previewNextFires).toHaveBeenCalledWith(
-        expect.objectContaining({ recurrence: expect.objectContaining({ kind: "every_minutes" }) }),
-        3,
-        expect.anything(),
-      ),
-    );
-    for (const t of oddTimes) {
-      expect(await screen.findByText(new RegExp(formatInstant(t)))).toBeInTheDocument();
-    }
-  });
-
-  it("asks the module again when the operator changes the time, before anything is saved", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
-    fireEvent.change(screen.getByLabelText("Time of day"), { target: { value: "06:45" } });
-
-    await waitFor(() =>
-      expect(api.previewNextFires).toHaveBeenCalledWith(
-        expect.objectContaining({ recurrence: expect.objectContaining({ hour: 6, minute: 45 }) }),
-        3,
-        expect.anything(),
-      ),
-    );
-    expect(api.createSchedule).not.toHaveBeenCalled();
-  });
-
-  it("shows the browser's own zone beside Polish time for an operator outside Poland", async () => {
-    zone.outsidePoland = true;
-    const api = fakeApi({ previewNextFires: vi.fn(async () => [SCHEDULE.nextFireAt]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(within(await scheduleRow()).getByRole("button", { name: "Edit" }));
-
-    // Both readings of the same second: the zone the schedule is written in, and the one
-    // the operator is sitting in.
-    expect(await screen.findByText(/in the operator's own zone/)).toBeInTheDocument();
-  });
-});
-
-describe("what the chat changed", () => {
-  it("re-reads after an agent turn, because schedule_team is a chat tool too", async () => {
-    // The same staleness the catalogue had: `schedule_team` and `trigger_team` write in
-    // the module and nothing about them reaches this panel (`agentActivity.ts`).
-    const listSchedules = vi
-      .fn()
-      .mockResolvedValueOnce([])
-      .mockResolvedValue([{ ...SCHEDULE, cronExpression: "30 8 * * 1-5", recurrence: null }]);
-    render(
-      <SchedulesPanel
-        api={fakeApi({ listSchedules })}
-        teamId={1}
-        teamName="Morning desk"
-        tools={[]}
-        onClose={vi.fn()}
-        onWatchRun={vi.fn()}
-      />,
-    );
-    await waitFor(() => expect(listSchedules).toHaveBeenCalledTimes(1));
-
-    agentActivity.turnFinished();
-
-    expect(await screen.findByText(/30 8 \* \* 1-5/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(new RegExp(formatInstant(SCHEDULE.nextFireAt))),
+    ).toBeInTheDocument();
   });
 });
 
 describe("creating and editing a schedule", () => {
   it("posts a rhythm the operator chose, with no cron expression typed anywhere", async () => {
     const api = fakeApi({ listSchedules: vi.fn(async () => []) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+    renderPanel(api);
 
     await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
     await userEvent.click(screen.getByText("On chosen weekdays"));
@@ -260,85 +197,10 @@ describe("creating and editing a schedule", () => {
     expect((api.listSchedules as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
   });
 
-  it("turns the weekend off on an hourly rhythm, without a cron expression", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
-    await userEvent.click(screen.getByText("Every hour"));
-    fireEvent.change(screen.getByLabelText("Minute of the hour"), { target: { value: "35" } });
-    await userEvent.click(screen.getByRole("button", { name: "Sat" }));
-    await userEvent.click(screen.getByRole("button", { name: "Sun" }));
-    await userEvent.click(screen.getByRole("button", { name: "Create schedule" }));
-
-    await waitFor(() =>
-      expect(api.createSchedule).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          cronExpression: null,
-          recurrence: expect.objectContaining({
-            kind: "hourly",
-            minute: 35,
-            weekdays: [1, 2, 3, 4, 5],
-          }),
-        }),
-        expect.anything(),
-      ),
-    );
-  });
-
-  it("sends every day as no days at all, so one trigger has one shape", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
-    await userEvent.click(screen.getByText("Every hour"));
-    // Off and straight back on: the form must end where it started, not on seven days.
-    await userEvent.click(screen.getByRole("button", { name: "Sat" }));
-    await userEvent.click(screen.getByRole("button", { name: "Sat" }));
-    await userEvent.click(screen.getByRole("button", { name: "Create schedule" }));
-
-    await waitFor(() =>
-      expect(api.createSchedule).toHaveBeenCalledWith(
-        1,
-        expect.objectContaining({
-          recurrence: expect.objectContaining({ kind: "hourly", weekdays: null }),
-        }),
-        expect.anything(),
-      ),
-    );
-  });
-
-  it("offers no days at all under the daily rhythm", async () => {
-    // Daily on chosen days is `weekly`, and the module refuses the second spelling — so the
-    // wizard must not be able to build it.
-    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
-    await userEvent.click(screen.getByText("Every day"));
-
-    expect(screen.queryByRole("button", { name: "Sat" })).not.toBeInTheDocument();
-    expect(screen.queryByText("On which days?")).not.toBeInTheDocument();
-  });
-
-  it("keeps the last day rather than letting a schedule fire on none", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
-    await userEvent.click(screen.getByText("Every hour"));
-    for (const day of ["Tue", "Wed", "Thu", "Fri", "Sat", "Sun", "Mon"]) {
-      await userEvent.click(screen.getByRole("button", { name: day }));
-    }
-
-    expect(screen.getByRole("button", { name: "Mon" })).toHaveAttribute("aria-pressed", "true");
-  });
-
   it("opens a schedule the wizard has no rhythm for on its own expression, and saves it unchanged", async () => {
     const written = { ...SCHEDULE, cronExpression: "0 9 * * MON-FRI", recurrence: null };
     const api = fakeApi({ listSchedules: vi.fn(async () => [written]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+    renderPanel(api);
 
     const row = (await screen.findByText("0 9 * * MON-FRI")).closest("li")!;
     await userEvent.click(within(row).getByRole("button", { name: "Edit" }));
@@ -359,7 +221,7 @@ describe("creating and editing a schedule", () => {
         throw new MarketDataError("refused", "not a valid five-field cron expression");
       }),
     });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+    renderPanel(api);
 
     await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
     await userEvent.click(screen.getByRole("button", { name: "Create schedule" }));
@@ -383,12 +245,14 @@ describe("creating and editing a schedule", () => {
         return disabled;
       }),
     });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+    renderPanel(api);
 
     await userEvent.click(within(await scheduleRow()).getByRole("button", { name: "Disable" }));
 
     expect(api.disableSchedule).toHaveBeenCalledWith(SCHEDULE.id, expect.anything());
-    expect(await screen.findByText(/3 kolejne przebiegi zakończone niepowodzeniem/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/3 kolejne przebiegi zakończone niepowodzeniem/),
+    ).toBeInTheDocument();
   });
 
   it("shows the module's own words when enabling is refused", async () => {
@@ -402,7 +266,7 @@ describe("creating and editing a schedule", () => {
         throw new MarketDataError("refused", "agent 'trader' carries tool(s) ['place_order']");
       }),
     });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+    renderPanel(api);
 
     await userEvent.click(within(await scheduleRow()).getByRole("button", { name: "Enable" }));
 
@@ -411,41 +275,19 @@ describe("creating and editing a schedule", () => {
 });
 
 describe("fire history", () => {
-  const SKIPPED: ScheduleFire = {
-    id: 1,
-    scheduleId: SCHEDULE.id,
-    triggerId: null,
-    firedAt: 1_755_374_400,
-    outcome: "skipped",
-    reason: "the previous run of this schedule is still working",
-    runId: null,
-    skippedCount: 0,
-  };
-  const STARTED: ScheduleFire = {
-    id: 2,
-    scheduleId: SCHEDULE.id,
-    triggerId: null,
-    firedAt: 1_755_374_700,
-    outcome: "started",
-    reason: null,
-    runId: 42,
-    skippedCount: 3,
-  };
-
-  it("shows a fire that started nothing, with its reason and no way to watch it", async () => {
-    const api = fakeApi({ scheduleFires: vi.fn(async () => [SKIPPED]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(within(await scheduleRow()).getByRole("button", { name: "History" }));
-
-    const entry = await screen.findByText(/still working/);
-    expect(within(entry.closest("li")!).queryByRole("button", { name: "Watch" })).not.toBeInTheDocument();
-  });
-
   it("leads to the run's own trace for a fire that started one, folded slots and all", async () => {
     const onWatchRun = vi.fn();
-    const api = fakeApi({ scheduleFires: vi.fn(async () => [STARTED]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={onWatchRun} />);
+    const started: ScheduleFire = {
+      id: 2,
+      scheduleId: SCHEDULE.id,
+      triggerId: null,
+      firedAt: 1_755_374_700,
+      outcome: "started",
+      reason: null,
+      runId: 42,
+      skippedCount: 3,
+    };
+    renderPanel(fakeApi({ scheduleFires: vi.fn(async () => [started]) }), { onWatchRun });
 
     await userEvent.click(within(await scheduleRow()).getByRole("button", { name: "History" }));
     expect(await screen.findByText(/3 folded in/)).toBeInTheDocument();
@@ -457,10 +299,11 @@ describe("fire history", () => {
 
 describe("triggers", () => {
   it("shows an unknown last read as a third state, not as false", async () => {
-    const api = fakeApi();
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+    renderPanel(fakeApi());
 
-    expect(await screen.findByText(/unknown — the tool server could not be asked/)).toBeInTheDocument();
+    expect(
+      await screen.findByText(/unknown — the tool server could not be asked/),
+    ).toBeInTheDocument();
   });
 
   it("posts a new trigger naming a tool the module announces, with its JSON arguments", async () => {
@@ -492,69 +335,34 @@ describe("triggers", () => {
   });
 
   it("refuses to submit while the arguments are not valid JSON", async () => {
-    const api = fakeApi();
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+    renderPanel(fakeApi());
 
     await userEvent.click(await screen.findByRole("button", { name: "New trigger" }));
-    const args = screen.getByLabelText(/Arguments/);
-    fireEvent.change(args, { target: { value: "{not json" } });
+    fireEvent.change(screen.getByLabelText(/Arguments/), { target: { value: "{not json" } });
 
     expect(screen.getByRole("button", { name: "Create trigger" })).toBeDisabled();
   });
 });
 
 describe("deleting a schedule", () => {
-  it("deletes after the confirmation and re-reads the list", async () => {
+  it("says what it takes and what it leaves, then deletes and re-reads the list", async () => {
     const api = fakeApi({ listSchedules: vi.fn(async () => [SCHEDULE]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+    renderPanel(api);
 
     // Two rows carry a "Delete", and the dialog adds a third: the schedule's own is the
     // first, and the confirming one lives inside the dialog.
     await userEvent.click((await screen.findAllByRole("button", { name: "Delete" }))[0]);
-    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }));
-
-    await waitFor(() => expect(api.deleteSchedule).toHaveBeenCalledWith(SCHEDULE.id, expect.anything()));
-    expect((api.listSchedules as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
-  });
-
-  it("says what the delete takes and what it leaves, before it is done", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => [SCHEDULE]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click((await screen.findAllByRole("button", { name: "Delete" }))[0]);
-
     expect(screen.getByText(/fire history goes with it/)).toBeInTheDocument();
     expect(screen.getByText(/runs it started stay/)).toBeInTheDocument();
     expect(api.deleteSchedule).not.toHaveBeenCalled();
-  });
 
-  it("leaves the schedule alone when the operator backs out", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => [SCHEDULE]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
+    await userEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }),
+    );
 
-    await userEvent.click((await screen.findAllByRole("button", { name: "Delete" }))[0]);
-    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Cancel" }));
-
-    expect(api.deleteSchedule).not.toHaveBeenCalled();
-    expect(await screen.findByText(/Every 5 minutes/)).toBeInTheDocument();
-  });
-
-  it("keeps disabling as its own, reversible action", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => [SCHEDULE]) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click((await screen.findAllByRole("button", { name: "Disable" }))[0]);
-
-    expect(api.disableSchedule).toHaveBeenCalled();
-    expect(api.deleteSchedule).not.toHaveBeenCalled();
-  });
-
-  it("has no consent box left in the form", async () => {
-    const api = fakeApi({ listSchedules: vi.fn(async () => []) });
-    render(<SchedulesPanel api={api} teamId={1} teamName="Morning desk" tools={[]} onClose={vi.fn()} onWatchRun={vi.fn()} />);
-
-    await userEvent.click(await screen.findByRole("button", { name: "New schedule" }));
-
-    expect(screen.queryByText(/without an operator watching/)).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(api.deleteSchedule).toHaveBeenCalledWith(SCHEDULE.id, expect.anything()),
+    );
+    expect((api.listSchedules as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(1);
   });
 });

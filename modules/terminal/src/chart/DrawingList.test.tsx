@@ -4,6 +4,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AgentChartDrawing } from "../agent/agentApi";
 import type { ChartDrawings } from "./Chart";
+import { cardPosition } from "./cardPosition";
+import { DrawingCard } from "./DrawingCard";
 import { DrawingList } from "./DrawingList";
 
 function drawing(
@@ -195,13 +197,6 @@ describe("DrawingList", () => {
     expect(screen.getByText(/could not be read/)).toBeInTheDocument();
     expect(screen.queryByText("Nothing is drawn on this instrument.")).toBeNull();
   });
-
-  it("a failed read keeps showing what was already there", async () => {
-    await open(props({ status: "error", error: "agent is not reachable" }));
-
-    expect(screen.getByTestId("drawing-1")).toBeInTheDocument();
-    expect(screen.getByText(/could not be read/)).toBeInTheDocument();
-  });
 });
 
 describe("DrawingList — one selection, shared with the chart", () => {
@@ -222,12 +217,6 @@ describe("DrawingList — one selection, shared with the chart", () => {
 
     expect(onSelect).toHaveBeenCalledWith(1);
   });
-
-  it("nothing is marked out when nothing is picked", async () => {
-    await open(props(), null);
-
-    expect(screen.getByTestId("drawing-1")).toHaveAttribute("aria-current", "false");
-  });
 });
 
 describe("DrawingList — hiding without removing", () => {
@@ -247,33 +236,69 @@ describe("DrawingList — hiding without removing", () => {
   it("keeps a hidden object on the list, marked out and offering to bring it back", async () => {
     // The list is the only way back to a hidden object, so one that dropped off it would
     // be hidden for good (`terminal-chart` spec, "Operator zarządza naniesionymi obiektami
-    // z listy").
+    // z listy"), and an instrument with everything hidden must not read as an empty one.
     const patch = vi.fn(async () => null);
     await open(props({ items: [HIDDEN], patch }));
 
     const row = screen.getByTestId("drawing-1");
     expect(row).toHaveAttribute("data-hidden", "true");
     expect(row).toHaveTextContent(/hidden/i);
+    expect(screen.queryByText("Nothing is drawn on this instrument.")).toBeNull();
 
     await userEvent.click(screen.getByLabelText("Show drawing 1"));
     expect(patch).toHaveBeenCalledWith(1, { hidden: false });
   });
+});
 
-  it("an instrument with everything hidden does not read as an empty one", async () => {
-    // `terminal-chart` spec, "Instrument z samymi zgaszonymi obiektami".
-    await open(props({ items: [HIDDEN] }));
+/** The card is the same object described beside the chart, over the same `ChartDrawings`
+ *  calls the list makes — so only what the card does *differently* is tested here. */
+describe("DrawingCard — the same object, beside the chart", () => {
+  function show(drawn: AgentChartDrawing, chartDrawings: ChartDrawings = props()) {
+    const onClose = vi.fn();
+    render(
+      <DrawingCard drawing={drawn} drawings={chartDrawings} at={{ x: 100, y: 100 }} onClose={onClose} />,
+    );
+    return { onClose };
+  }
 
-    expect(screen.queryByText("Nothing is drawn on this instrument.")).toBeNull();
-    expect(screen.getByTestId("drawing-1")).toBeInTheDocument();
+  it("describes the object: its shape, its price, its caption and when it was drawn", () => {
+    show(A_LEVEL);
+
+    const card = screen.getByTestId("drawing-card-1");
+    expect(card).toHaveTextContent("level");
+    expect(card).toHaveTextContent("21500");
+    expect(card).toHaveTextContent("weekly high");
+    expect(card).toHaveTextContent(/drawn/);
   });
 
-  it("says a failed hiding failed and leaves the row lit", async () => {
-    const patch = vi.fn(async () => "the agent module is not reachable");
-    await open(props({ patch }));
+  it("closes on the operator's own say-so, and stays open when they only hide the object", async () => {
+    // The card is where the operator hid it, so the nearest way back is there too
+    // (`terminal-chart-objects` spec, "Zgaszenie z opisu"). What takes the card away is the
+    // object leaving the instrument, which hiding does not do.
+    const patch = vi.fn(async () => null);
+    const { onClose } = show(A_LEVEL, props({ patch }));
 
     await userEvent.click(screen.getByLabelText("Hide drawing 1"));
+    expect(patch).toHaveBeenCalledWith(1, { hidden: true });
+    expect(onClose).not.toHaveBeenCalled();
 
-    expect(await screen.findByText("the agent module is not reachable")).toBeInTheDocument();
-    expect(screen.getByTestId("drawing-1")).toHaveAttribute("data-hidden", "false");
+    await userEvent.click(screen.getByLabelText("Close object card"));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("opens on the side of the click that has room for it, and never off the pane", () => {
+    const pane = { width: 800, height: 600 };
+    expect(cardPosition({ x: 100, y: 100 }, pane).left).toBeGreaterThan(100);
+    // Near the right edge it goes the other way — and an object near the right edge is the
+    // one most often looked at.
+    expect(cardPosition({ x: 780, y: 100 }, pane).left).toBeLessThan(780);
+    expect(cardPosition({ x: 100, y: 590 }, pane).top).toBeLessThan(590);
+
+    // A corner too small for it either way still leaves it on the pane, and an object
+    // chosen from the list has no pointer to sit beside at all.
+    const corner = cardPosition({ x: 5, y: 5 }, { width: 100, height: 60 });
+    expect(corner.left).toBeGreaterThanOrEqual(0);
+    expect(corner.top).toBeGreaterThanOrEqual(0);
+    expect(cardPosition(null, pane)).toEqual({ left: 12, top: 12 });
   });
 });

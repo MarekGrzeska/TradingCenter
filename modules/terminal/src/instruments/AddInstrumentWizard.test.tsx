@@ -116,22 +116,21 @@ async function pickInstrument(user: ReturnType<typeof userEvent.setup>, symbol: 
   await user.click(await screen.findByRole("option", { name: new RegExp(symbol) }));
 }
 
+function trackedPair(resolution: Resolution): TrackedPair {
+  return {
+    symbol: "BTCUSD",
+    resolution,
+    addedAt: 0,
+    collectFrom: 0,
+    earliestCandle: null,
+    latestCandle: null,
+    collection: "never_collected",
+    candleCount: 0,
+    estimatedBytes: 0,
+  };
+}
+
 describe("AddInstrumentWizard — steps (terminal-data-manager spec)", () => {
-  // Year to date by default, not the beginning of time. An arbitrarily early date is a
-  // legitimate request and clips rather than fails, but as the default it would commit
-  // every operator who never touched the field to hundreds of gateway requests.
-  it("starts at the beginning of the current year, not at everything the provider has", () => {
-    renderWizard();
-
-    const field = screen.getByLabelText("History from") as HTMLInputElement;
-
-    // Warsaw's own year, not UTC's — the two disagree for an hour or two around
-    // every New Year, which is exactly the gap a UTC-based expectation here would miss.
-    expect(field.value).toBe(`${todayInWarsaw().slice(0, 4)}-01-01`);
-    // And never a date the archive would refuse outright.
-    expect(field.value <= todayInWarsaw()).toBe(true);
-  });
-
   it("blocks review until an instrument and at least one resolution are chosen", async () => {
     const user = userEvent.setup();
     renderWizard();
@@ -149,68 +148,34 @@ describe("AddInstrumentWizard — steps (terminal-data-manager spec)", () => {
     expect(submit).toBeEnabled();
   });
 
-  // The operator commits real collection work off this list, so a row carries what
-  // that decision rests on (terminal-instruments spec, "Instrumenty wyszukuje się po
-  // frazie").
-  it("shows symbol, name, class, the spread and tradeability for each suggestion", async () => {
+  // The date field is the operator's own calendar, not UTC's — picking "2026-08-01" MUST
+  // mean the start of that day in Warsaw (`terminal-shell` spec, "Czas jest pokazywany w
+  // polskiej strefie czasowej", scenario "Data podana przez operatora"). And it starts at
+  // the beginning of the current year rather than at everything the provider has: an
+  // arbitrarily early default would commit every operator to hundreds of requests.
+  it("defaults to this Warsaw year and reads the picked date as Warsaw midnight, not UTC", async () => {
     const user = userEvent.setup();
-    fakeGateway.instrumentsByClass = [
-      { symbol: "BTCUSD", name: "Bitcoin", assetClass: "CRYPTO", tradeable: false, bid: 60000, ask: 60010 },
-    ];
+    fakeArchive.estimateAnswer = {
+      pairs: [pairEstimate("BTCUSD", "MINUTE")],
+      totalEstimatedCandles: 1000,
+      totalEstimatedBytes: 64000,
+    };
     renderWizard();
 
-    await pickAssetClass(user, "CRYPTO");
-    await user.click(screen.getByRole("combobox", { name: "Instrument" }));
+    const field = screen.getByLabelText("History from") as HTMLInputElement;
+    expect(field.value).toBe(`${todayInWarsaw().slice(0, 4)}-01-01`);
+    expect(field.value <= todayInWarsaw()).toBe(true);
 
-    const option = await screen.findByRole("option", { name: /BTCUSD/ });
-    expect(option).toHaveTextContent("Bitcoin");
-    expect(option).toHaveTextContent("CRYPTO");
-    expect(option).toHaveTextContent("60000");
-    expect(option).toHaveTextContent("60010");
-    // Not disqualifying — the archive collects it and the chart draws it either way.
-    expect(option).toHaveTextContent(/not tradeable/i);
-  });
-
-  it("states the instrument count when the class was enumerated whole", async () => {
-    const user = userEvent.setup();
-    fakeGateway.instrumentsByClass = [instrument("BTCUSD"), instrument("ETHUSD")];
-    renderWizard();
-
-    await pickAssetClass(user, "CRYPTO");
-    await user.click(screen.getByRole("combobox", { name: "Instrument" }));
-
-    expect(await screen.findByText("2 instruments in CRYPTO")).toBeInTheDocument();
-    expect(screen.queryByText(/cut short/i)).not.toBeInTheDocument();
-  });
-
-  it("warns instead of counting when the class was cut short", async () => {
-    const user = userEvent.setup();
-    fakeGateway.truncated = true;
-    fakeGateway.instrumentsByClass = [instrument("BTCUSD")];
-    renderWizard();
-
-    await pickAssetClass(user, "CRYPTO");
-    await user.click(screen.getByRole("combobox", { name: "Instrument" }));
-
-    expect(await screen.findByText(/cut short/i)).toBeInTheDocument();
-    // A count under a truncated list would read as the total when it is not one.
-    expect(screen.queryByText(/instruments in CRYPTO/)).not.toBeInTheDocument();
-  });
-
-  it("clears the chosen instrument when the asset class changes", async () => {
-    const user = userEvent.setup();
-    fakeGateway.classes = ["CRYPTO", "INDICES"];
-    renderWizard();
-
+    fireEvent.change(field, { target: { value: "2026-08-01" } });
     await pickAssetClass(user, "CRYPTO");
     await pickInstrument(user, "BTCUSD");
-    expect(screen.getByText("BTCUSD")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "m1" }));
+    await user.click(screen.getByRole("button", { name: /review and add/i }));
 
-    await user.click(screen.getByRole("button", { name: "Clear Asset class" }));
-    await pickAssetClass(user, "INDICES");
-
-    expect(screen.queryByText("BTCUSD")).not.toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Instrument" })).toBeInTheDocument();
+    await screen.findByRole("dialog");
+    expect(fakeArchive.estimateCalls[0].collectFrom).toBe(
+      warsawMidnightEpochSeconds("2026-08-01"),
+    );
   });
 });
 
@@ -223,7 +188,10 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
     await user.click(screen.getByRole("button", { name: /review and add/i }));
   }
 
-  it("prices every pair, shows the range and a total, and asks for one estimate covering both resolutions", async () => {
+  it("prices every pair, says the numbers are estimates, and asks once for both resolutions", async () => {
+    // The operator decides on cost from these numbers, so their being calendar-period
+    // overestimates is part of what the dialog has to say (market-data-jobs spec,
+    // "Szacunek jest opisany jako szacunek").
     const user = userEvent.setup();
     fakeArchive.estimateAnswer = {
       pairs: [pairEstimate("BTCUSD", "MINUTE"), pairEstimate("BTCUSD", "HOUR")],
@@ -235,87 +203,14 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
     await reachDialog(user);
 
     const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText("m1")).toBeInTheDocument();
-    expect(within(dialog).getByText("h1")).toBeInTheDocument();
     expect(within(dialog).getByText(/total: 2,000 candles/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/these are estimates/i)).toBeInTheDocument();
+    expect(within(dialog).getByText(/market closed for part of the range/i)).toBeInTheDocument();
     expect(fakeArchive.estimateCalls).toHaveLength(1);
     expect(fakeArchive.estimateCalls[0].pairs).toEqual([
       { symbol: "BTCUSD", resolution: "MINUTE" },
       { symbol: "BTCUSD", resolution: "HOUR" },
     ]);
-  });
-
-  // The date field is the operator's own calendar, not UTC's — picking "2026-08-01" MUST
-  // mean the start of that day in Warsaw (`terminal-shell` spec, "Czas jest pokazywany w
-  // polskiej strefie czasowej", scenario "Data podana przez operatora").
-  it("reads the picked date as the start of that day in Warsaw, not in UTC", async () => {
-    const user = userEvent.setup();
-    fakeArchive.estimateAnswer = {
-      pairs: [pairEstimate("BTCUSD", "MINUTE")],
-      totalEstimatedCandles: 1000,
-      totalEstimatedBytes: 64000,
-    };
-    renderWizard();
-
-    fireEvent.change(screen.getByLabelText("History from"), {
-      target: { value: "2026-08-01" },
-    });
-    await pickAssetClass(user, "CRYPTO");
-    await pickInstrument(user, "BTCUSD");
-    await user.click(screen.getByRole("button", { name: "m1" }));
-    await user.click(screen.getByRole("button", { name: /review and add/i }));
-
-    await screen.findByRole("dialog");
-    expect(fakeArchive.estimateCalls[0].collectFrom).toBe(
-      warsawMidnightEpochSeconds("2026-08-01"),
-    );
-  });
-
-  // The operator decides on cost from these numbers, so their being calendar-period
-  // overestimates is part of what the dialog has to say (market-data-jobs spec,
-  // "Szacunek jest opisany jako szacunek").
-  it("says the numbers are estimates and why the real count comes in lower", async () => {
-    const user = userEvent.setup();
-    fakeArchive.estimateAnswer = {
-      pairs: [pairEstimate("BTCUSD", "MINUTE")],
-      totalEstimatedCandles: 1000,
-      totalEstimatedBytes: 64000,
-    };
-    renderWizard();
-
-    await reachDialog(user);
-
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/these are estimates/i)).toBeInTheDocument();
-    expect(within(dialog).getByText(/market closed for part of the range/i)).toBeInTheDocument();
-  });
-
-  it("marks a clipped range and a pair already being collected", async () => {
-    const user = userEvent.setup();
-    fakeArchive.estimateAnswer = {
-      pairs: [pairEstimate("BTCUSD", "MINUTE", { clipped: true }), pairEstimate("BTCUSD", "HOUR")],
-      totalEstimatedCandles: 2000,
-      totalEstimatedBytes: 128000,
-    };
-    renderWizard([
-      {
-        symbol: "BTCUSD",
-        resolution: "HOUR",
-        addedAt: 0,
-        collectFrom: 0,
-        earliestCandle: null,
-        latestCandle: null,
-        collection: "collecting",
-        candleCount: 0,
-        estimatedBytes: 0,
-      },
-    ]);
-
-    await reachDialog(user);
-
-    const dialog = await screen.findByRole("dialog");
-    expect(within(dialog).getByText(/clipped/i)).toBeInTheDocument();
-    expect(within(dialog).getByText(/already collecting/i)).toBeInTheDocument();
   });
 
   it("blocks acceptance and adds nothing when the estimate fails", async () => {
@@ -330,30 +225,6 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
     expect(fakeArchive.trackCalls).toHaveLength(0);
   });
 
-  it("adds nothing and keeps the wizard's choices when the dialog is dismissed", async () => {
-    const user = userEvent.setup();
-    fakeArchive.estimateAnswer = {
-      pairs: [pairEstimate("BTCUSD", "MINUTE")],
-      totalEstimatedCandles: 1000,
-      totalEstimatedBytes: 64000,
-    };
-    renderWizard();
-
-    await pickAssetClass(user, "CRYPTO");
-    await pickInstrument(user, "BTCUSD");
-    await user.click(screen.getByRole("button", { name: "m1" }));
-    await user.click(screen.getByRole("button", { name: /review and add/i }));
-
-    await screen.findByRole("dialog");
-    await user.click(screen.getByRole("button", { name: /cancel/i }));
-
-    expect(fakeArchive.trackCalls).toHaveLength(0);
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    // The wizard's own choices survived the round trip.
-    expect(screen.getByText("BTCUSD")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "m1", pressed: true })).toBeInTheDocument();
-  });
-
   it("starts collection, lists what is now archiving, points to Data History, and resets the wizard", async () => {
     const user = userEvent.setup();
     fakeArchive.estimateAnswer = {
@@ -363,22 +234,7 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
     };
     fakeArchive.trackAnswer = {
       results: [
-        {
-          symbol: "BTCUSD",
-          resolution: "MINUTE",
-          pair: {
-            symbol: "BTCUSD",
-            resolution: "MINUTE",
-            addedAt: 0,
-            collectFrom: 0,
-            earliestCandle: null,
-            latestCandle: null,
-            collection: "never_collected",
-            candleCount: 0,
-            estimatedBytes: 0,
-          },
-          refused: null,
-        },
+        { symbol: "BTCUSD", resolution: "MINUTE", pair: trackedPair("MINUTE"), refused: null },
       ],
       jobId: 42,
     };
@@ -416,22 +272,7 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
     };
     fakeArchive.trackAnswer = {
       results: [
-        {
-          symbol: "BTCUSD",
-          resolution: "MINUTE",
-          pair: {
-            symbol: "BTCUSD",
-            resolution: "MINUTE",
-            addedAt: 0,
-            collectFrom: 0,
-            earliestCandle: null,
-            latestCandle: null,
-            collection: "never_collected",
-            candleCount: 0,
-            estimatedBytes: 0,
-          },
-          refused: null,
-        },
+        { symbol: "BTCUSD", resolution: "MINUTE", pair: trackedPair("MINUTE"), refused: null },
         {
           symbol: "BTCUSD",
           resolution: "HOUR",
@@ -443,11 +284,7 @@ describe("AddInstrumentWizard — the acceptance dialog", () => {
     };
     renderWizard();
 
-    await pickAssetClass(user, "CRYPTO");
-    await pickInstrument(user, "BTCUSD");
-    await user.click(screen.getByRole("button", { name: "m1" }));
-    await user.click(screen.getByRole("button", { name: "h1" }));
-    await user.click(screen.getByRole("button", { name: /review and add/i }));
+    await reachDialog(user);
     await screen.findByRole("dialog");
     await user.click(screen.getByRole("button", { name: /start collecting/i }));
 

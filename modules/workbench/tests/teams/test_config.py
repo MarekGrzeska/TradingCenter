@@ -1,3 +1,9 @@
+"""What the teams surface's settings hold that the conversation's do not.
+
+The database-mode rules and the market-mcp mode switch are the same validators on both
+surfaces and are checked once for both, in `tests/test_config_common.py`.
+"""
+
 from __future__ import annotations
 
 import pytest
@@ -27,57 +33,6 @@ REQUIRED = {
 def settings(**overrides) -> Settings:
     # _env_file=None so a developer's real .env cannot make a test pass or fail.
     return Settings(**{**REQUIRED, **overrides}, _env_file=None)
-
-
-def test_a_complete_configuration_builds() -> None:
-    s = settings()
-    assert s.models[0].display_name == "Luna"
-
-
-# --- database mode, same two failures as market-data's and agent's config.py ---
-
-
-def test_no_database_user_with_a_loopback_url_is_local_mode() -> None:
-    s = settings(
-        database_user=None,
-        database_url="postgresql://teams:change-me@127.0.0.1:55432/teams",
-    )
-    assert s.database_user is None
-
-
-def test_a_blank_database_user_means_local_mode_not_a_role_named_blank() -> None:
-    s = settings(
-        database_user="   ",
-        database_url="postgresql://teams:change-me@localhost:55432/teams",
-    )
-    assert s.database_user is None
-
-
-def test_no_database_user_with_a_remote_host_refuses_to_start() -> None:
-    with pytest.raises(ValidationError) as err:
-        settings(
-            database_user=None,
-            database_url="postgresql://teams:change-me@psql-tradingcenter.postgres.database.azure.com/teams",
-        )
-    assert "DATABASE_USER" in str(err.value)
-    assert "loopback" in str(err.value)
-
-
-def test_a_database_url_that_does_not_require_tls_refuses_to_start() -> None:
-    with pytest.raises(ValidationError) as err:
-        settings(database_url="postgresql://localhost:5432/teams?sslmode=prefer")
-    assert "TLS" in str(err.value)
-
-
-def test_a_database_url_with_a_credential_refuses_to_start() -> None:
-    with pytest.raises(ValidationError) as err:
-        settings(database_url="postgresql://user:pass@localhost:5432/teams?sslmode=require")
-    assert "DATABASE_URL" in str(err.value)
-
-
-def test_local_mode_does_not_require_tls() -> None:
-    url = "postgresql://teams:change-me@127.0.0.1:55432/teams"
-    assert settings(database_user=None, database_url=url).database_url == url
 
 
 # --- provider credential: the key, and nothing to fall back to ---
@@ -131,61 +86,6 @@ def test_a_non_positive_rate_refuses_to_start(field: str) -> None:
     with pytest.raises(ValidationError) as err:
         settings(models=broken)
     assert field in str(err.value)
-
-
-def test_a_missing_database_url_names_itself() -> None:
-    with pytest.raises(ValidationError) as err:
-        Settings(_env_file=None)
-    assert "database_url" in str(err.value)
-
-
-# --- the tool server's own mode switch (specs/teams-tool-access) ---
-
-
-def test_no_tool_server_configured_is_a_valid_state() -> None:
-    # Not a misconfiguration: a team whose agents carry no assigned tools never needs
-    # one, and a team that does is refused at run time, not at startup.
-    assert settings().market_mcp_url is None
-
-
-def test_remote_tool_server_without_a_scope_is_refused() -> None:
-    with pytest.raises(ValidationError) as err:
-        settings(market_mcp_url="https://market-mcp.example.com")
-    assert "MARKET_MCP_SCOPE" in str(err.value)
-
-
-def test_scope_with_a_loopback_tool_server_is_refused() -> None:
-    with pytest.raises(ValidationError) as err:
-        settings(
-            market_mcp_url="http://127.0.0.1:8040",
-            market_mcp_scope="api://some-app/.default",
-        )
-    assert "loopback" in str(err.value)
-
-
-def test_a_scope_with_no_url_at_all_is_refused() -> None:
-    with pytest.raises(ValidationError) as err:
-        settings(market_mcp_scope="api://some-app/.default")
-    assert "MARKET_MCP_URL" in str(err.value)
-
-
-def test_loopback_tool_server_without_a_scope_is_accepted() -> None:
-    assert settings(market_mcp_url="http://127.0.0.1:8040").market_mcp_url == (
-        "http://127.0.0.1:8040"
-    )
-
-
-def test_remote_tool_server_with_a_scope_is_accepted() -> None:
-    resolved = settings(
-        market_mcp_url="https://market-mcp.example.com/",
-        market_mcp_scope="api://some-app/.default",
-    )
-    # The trailing slash is dropped here so nothing downstream builds `//mcp`.
-    assert resolved.market_mcp_url == "https://market-mcp.example.com"
-
-
-def test_a_blank_tool_server_url_means_unset() -> None:
-    assert settings(market_mcp_url="   ").market_mcp_url is None
 
 
 # --- the second tool server, checked independently (specs/teams-tool-access,

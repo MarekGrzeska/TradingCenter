@@ -1,33 +1,37 @@
-"""The client against a real MCP server, not a mock of one.
+"""The conversation's MCP client against a real MCP server, not a mock of one.
 
-`market-mcp` is not importable from here — no cross-module imports — so the stand-in is
-a two-tool FastMCP server built in this file and served by a real uvicorn on a real
-port. That is enough to prove the three things this client owes the turn above it: a
-tool list it did not write, a refusal that arrives as a result, and an unreachable
-server that arrives as something else.
+`market-mcp` is not importable from here — no cross-module imports — so the stand-in is a
+FastMCP server built in this file and served by a real uvicorn on a real port. That is
+enough to prove the three things this client owes the turn above it: a tool list it did not
+write, a refusal that arrives as a result, and an unreachable server that arrives as
+something else.
 
-Slower than the rest of this suite (a second or two, binding a port), and worth it: the
-one contract in this repository with no committed snapshot is this session, so a mocked
-session would be a test of the mock.
+The uvicorn-in-a-thread harness is `tests/mcp_stand_in.py`'s — it was pasted inline here
+and kept in the teams suite as a file, from back when the two were separate modules. The
+catalogues below stay local, because they are the point: `list_tracked_pairs` returning a
+bare string beside `list_pairs_typed` returning a typed list is the production bug this
+file exists for.
+
+Slower than the rest of this suite (a second or two, binding a port), and worth it: the one
+contract in this repository with no committed snapshot is this session, so a mocked session
+would be a test of the mock.
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import socket
-import threading
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
 
 import pytest
-import uvicorn
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel
 
 from agent.config import Settings
 from agent.tools import ToolDescriptor, ToolOutcomeKind, ToolServer
+
+from ..mcp_stand_in import free_port as _free_port
+from ..mcp_stand_in import serving_app as _serving
 
 ONE_MODEL = [
     {
@@ -51,12 +55,6 @@ def settings_for(url: str | None, **overrides) -> Settings:
         _env_file=None,  # type: ignore[call-arg]
         **overrides,
     )
-
-
-def _free_port() -> int:
-    with socket.socket() as sock:
-        sock.bind(("127.0.0.1", 0))
-        return sock.getsockname()[1]
 
 
 class _PairOut(BaseModel):
@@ -92,27 +90,14 @@ def _stand_in_server(port: int) -> FastMCP:
 
 
 @pytest.fixture
-async def tool_server() -> AsyncIterator[ToolServer]:
+async def tool_server():
     port = _free_port()
-    app = _stand_in_server(port).streamable_http_app()
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
-    server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    for _ in range(100):
-        if server.started:
-            break
-        await asyncio.sleep(0.05)
-    else:  # pragma: no cover - only reached if the stand-in never comes up
-        raise RuntimeError("the stand-in tool server did not start in time")
-
-    client = ToolServer(settings_for(f"http://127.0.0.1:{port}"))
-    try:
-        yield client
-    finally:
-        await client.aclose()
-        server.should_exit = True
-        thread.join(timeout=5)
+    async with _serving(_stand_in_server(port).streamable_http_app(), port):
+        client = ToolServer(settings_for(f"http://127.0.0.1:{port}"))
+        try:
+            yield client
+        finally:
+            await client.aclose()
 
 
 async def test_the_tool_list_comes_from_the_server(tool_server: ToolServer) -> None:
@@ -128,13 +113,6 @@ async def test_the_tool_list_comes_from_the_server(tool_server: ToolServer) -> N
     price = next(tool for tool in tools if tool.name == "get_last_price")
     assert "bid side" in price.description
     assert price.input_schema["properties"]["symbol"]["type"] == "string"
-
-
-async def test_the_tool_list_is_read_once_per_session(tool_server: ToolServer) -> None:
-    first = await tool_server.list_tools()
-    second = await tool_server.list_tools()
-
-    assert first is second
 
 
 async def test_a_successful_call_carries_the_servers_text(tool_server: ToolServer) -> None:
@@ -214,26 +192,14 @@ async def test_a_slow_server_times_out_as_unavailable() -> None:
         await asyncio.sleep(30)
         return "never"
 
-    config = uvicorn.Config(
-        mcp.streamable_http_app(), host="127.0.0.1", port=port, log_level="error"
-    )
-    server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    for _ in range(100):
-        if server.started:
-            break
-        await asyncio.sleep(0.05)
-
-    client = ToolServer(
-        settings_for(f"http://127.0.0.1:{port}", market_mcp_request_timeout_seconds=1.0)
-    )
-    try:
-        outcome = await client.call("sleeps", {})
-    finally:
-        await client.aclose()
-        server.should_exit = True
-        thread.join(timeout=5)
+    async with _serving(mcp.streamable_http_app(), port):
+        client = ToolServer(
+            settings_for(f"http://127.0.0.1:{port}", market_mcp_request_timeout_seconds=1.0)
+        )
+        try:
+            outcome = await client.call("sleeps", {})
+        finally:
+            await client.aclose()
 
     assert outcome.kind is ToolOutcomeKind.UNAVAILABLE
     assert "did not answer within" in outcome.text
@@ -286,36 +252,19 @@ def _trading_stand_in(port: int) -> FastMCP:
     return mcp
 
 
-def _serve(app, port: int) -> tuple[uvicorn.Server, threading.Thread]:
-    config = uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error")
-    server = uvicorn.Server(config)
-    thread = threading.Thread(target=server.run, daemon=True)
-    thread.start()
-    return server, thread
-
-
 @pytest.fixture
-async def trading_server() -> AsyncIterator[ToolServer]:
+async def trading_server():
     port = _free_port()
-    server, thread = _serve(_trading_stand_in(port).streamable_http_app(), port)
-    for _ in range(100):
-        if server.started:
-            break
-        await asyncio.sleep(0.05)
-    else:  # pragma: no cover - only reached if the stand-in never comes up
-        raise RuntimeError("the trading stand-in did not start in time")
-
-    client = ToolServer(
-        settings_for(None, trading_mcp_url=f"http://127.0.0.1:{port}"),
-        prefix="trading_mcp",
-        can_move_the_account=True,
-    )
-    try:
-        yield client
-    finally:
-        await client.aclose()
-        server.should_exit = True
-        thread.join(timeout=5)
+    async with _serving(_trading_stand_in(port).streamable_http_app(), port):
+        client = ToolServer(
+            settings_for(None, trading_mcp_url=f"http://127.0.0.1:{port}"),
+            prefix="trading_mcp",
+            can_move_the_account=True,
+        )
+        try:
+            yield client
+        finally:
+            await client.aclose()
 
 
 async def test_the_read_only_hint_comes_from_the_server(trading_server: ToolServer) -> None:
@@ -411,28 +360,21 @@ async def test_a_slow_write_times_out_as_unknown() -> None:
         await asyncio.sleep(30)
         return "never"
 
-    server, thread = _serve(mcp.streamable_http_app(), port)
-    for _ in range(100):
-        if server.started:
-            break
-        await asyncio.sleep(0.05)
-
-    client = ToolServer(
-        settings_for(
-            None,
-            trading_mcp_url=f"http://127.0.0.1:{port}",
-            trading_mcp_request_timeout_seconds=1.0,
-        ),
-        prefix="trading_mcp",
-        can_move_the_account=True,
-    )
-    try:
-        await client.list_tools()
-        outcome = await client.call("place_order", {"symbol": "US100"})
-    finally:
-        await client.aclose()
-        server.should_exit = True
-        thread.join(timeout=5)
+    async with _serving(mcp.streamable_http_app(), port):
+        client = ToolServer(
+            settings_for(
+                None,
+                trading_mcp_url=f"http://127.0.0.1:{port}",
+                trading_mcp_request_timeout_seconds=1.0,
+            ),
+            prefix="trading_mcp",
+            can_move_the_account=True,
+        )
+        try:
+            await client.list_tools()
+            outcome = await client.call("place_order", {"symbol": "US100"})
+        finally:
+            await client.aclose()
 
     assert outcome.kind is ToolOutcomeKind.UNKNOWN
     assert "did not answer within" in outcome.text
@@ -440,24 +382,6 @@ async def test_a_slow_write_times_out_as_unknown() -> None:
 
 
 # --- the server restarting under a call (the production failure of 17 August 2026) ---
-
-
-@asynccontextmanager
-async def _serving(app, port: int) -> AsyncIterator[None]:
-    """One stand-in, started and stopped on a port of the caller's choosing — so the same
-    port can be served twice, which is what a redeploy looks like from this side."""
-    server, thread = _serve(app, port)
-    for _ in range(100):
-        if server.started:
-            break
-        await asyncio.sleep(0.05)
-    else:  # pragma: no cover - only reached if the stand-in never comes up
-        raise RuntimeError("the stand-in did not start in time")
-    try:
-        yield
-    finally:
-        server.should_exit = True
-        thread.join(timeout=5)
 
 
 async def test_a_call_survives_the_server_restarting_under_it() -> None:
@@ -505,23 +429,6 @@ async def test_a_write_refused_as_an_unknown_session_is_retried_rather_than_left
 
     assert outcome.kind is ToolOutcomeKind.OK
     assert "sent for US100" in outcome.text
-
-
-async def test_a_retried_call_is_one_outcome_the_turn_can_record() -> None:
-    """`tool_calls` writes a row per outcome, so one outcome is one row — the model called
-    the tool once and the reopening was not its decision."""
-    port = _free_port()
-    async with _serving(_stand_in_server(port).streamable_http_app(), port):
-        client = ToolServer(settings_for(f"http://127.0.0.1:{port}"))
-        await client.call("list_tracked_pairs", {})
-
-    async with _serving(_stand_in_server(port).streamable_http_app(), port):
-        try:
-            outcome = await client.call("list_tracked_pairs", {})
-        finally:
-            await client.aclose()
-
-    assert outcome.duration_ms >= 0
 
 
 def test_describe_unwraps_nested_task_groups() -> None:

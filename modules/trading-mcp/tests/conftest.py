@@ -36,14 +36,16 @@ def settings() -> Settings:
 
 
 @pytest.fixture
-def gateway(settings: Settings) -> GatewayClient:
-    return GatewayClient(settings)
+async def gateway(settings: Settings):
+    """Closed in teardown rather than by each test's last line: an unclosed client is a
+    warning, never a failure, so leaving it to the test is a rule nothing enforces."""
+    client = GatewayClient(settings)
+    yield client
+    await client.aclose()
 
 
 @pytest.fixture
 def server(settings: Settings, gateway: GatewayClient):
-    """The server and the gateway client it was built with, so a test can close the
-    client and mock the exact base URL it will call — same shape as market-mcp's own
-    `server` fixture."""
-    mcp = build_server(settings, gateway)
-    return mcp, gateway
+    """The server, built on the base URL a test mocks. The client underneath it is the
+    `gateway` fixture, so nothing here has to be closed by hand."""
+    return build_server(settings, gateway)

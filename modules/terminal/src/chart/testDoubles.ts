@@ -490,6 +490,25 @@ export function indicatorResult(overrides: Partial<IndicatorResult> = {}): Indic
   };
 }
 
+/** One answer for `FakeIndicatorSource.computeQueue`. The envelope around `times` and
+ *  `results` is the same in every test that seeds one, so only the two that carry the
+ *  assertion are arguments; anything else is an override. */
+export function indicatorAnswer(
+  times: number[],
+  results: IndicatorResult[],
+  overrides: Partial<IndicatorsResult> = {},
+): IndicatorsResult {
+  return {
+    symbol: "US100",
+    resolution: "MINUTE_5",
+    derived: false,
+    algorithmVersion: 1,
+    times,
+    results,
+    ...overrides,
+  };
+}
+
 /**
  * An indicator source the test drives directly — no HTTP, no fake server. `computeQueue`
  * answers successive `computeIndicators` calls in order; an exhausted queue answers with

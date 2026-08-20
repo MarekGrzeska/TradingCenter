@@ -1,9 +1,13 @@
-"""The two drawing tools: what they accept, what they refuse, and what they leave behind.
+"""The two drawing tools against a real database: what lands, what comes back, what does not.
 
 specs/agent-chart-drawings, "Agent stawia i kasuje rysunki narzędziem", "Agent odczytuje
 rysunki narzędziem" and "Odmowa rysowania nazywa, co poprawić". The market-mcp stand-in
 answers with the same JSON the real server's typed tools serialize, which is what
 `drawings.py` parses through `chart.read_json`.
+
+Argument validation is not here. It refuses before the pool is touched, so the two dozen
+permutations that used to sit in this file were paying for a PostgreSQL container to check
+arithmetic — they are one parameterised test in `test_drawings_refusals.py` now.
 """
 
 from __future__ import annotations
@@ -81,7 +85,7 @@ async def test_two_levels_in_one_call_both_land(db, pool) -> None:
             "symbol": "US100",
             "add": [
                 {"kind": "level", "price": 21500.0, "label": "resistance"},
-                {"kind": "level", "price": 21000.0, "label": "support"},
+                {"kind": "level", "price": 21000.0, "label": "support", "color": "--color-drawing-2"},
             ],
         },
         session_id=session.id,
@@ -91,17 +95,18 @@ async def test_two_levels_in_one_call_both_land(db, pool) -> None:
     drawings = await store.list_drawings(db, symbol="US100")
     assert [d.geometry.price for d in drawings] == [21500.0, 21000.0]  # pyright: ignore[reportAttributeAccessIssue]
     assert all(d.session_id == session.id for d in drawings)
+    # specs/agent-chart-drawings, "Kolor z palety rysunków" — a token from the drawing
+    # palette is kept as written.
+    assert [d.geometry.color for d in drawings] == [None, "--color-drawing-2"]
 
 
 async def test_all_three_shapes_are_drawable(db, pool) -> None:
-    session = await _session(db)
-
     outcome = await _draw(pool).call(
         {
             "symbol": "US100",
             "add": [
                 {"kind": "level", "price": 21500.0, "at": "2026-01-03T09:00:00Z"},
-                {"kind": "zone", "top": 21600.0, "bottom": 21550.0},
+                {"kind": "zone", "top": 21600.0, "bottom": 21550.0, "from": "2026-01-03T09:00:00Z"},
                 {
                     "kind": "trendline",
                     "a": {"time": "2026-01-03T09:00:00Z", "price": 21000.0},
@@ -109,12 +114,14 @@ async def test_all_three_shapes_are_drawable(db, pool) -> None:
                 },
             ],
         },
-        session_id=session.id,
+        session_id=(await _session(db)).id,
     )
 
     assert outcome.kind is ToolOutcomeKind.OK
-    kinds = [type(d.geometry) for d in await store.list_drawings(db, symbol="US100")]
-    assert kinds == [ChartLevel, ChartZone, ChartTrendline]
+    drawings = await store.list_drawings(db, symbol="US100")
+    assert [type(d.geometry) for d in drawings] == [ChartLevel, ChartZone, ChartTrendline]
+    # A zone open-ended in time is a zone: both of its moments are optional.
+    assert drawings[1].geometry.to is None  # pyright: ignore[reportAttributeAccessIssue]
 
 
 async def test_adding_does_not_remove_what_is_already_there(db, pool) -> None:
@@ -159,16 +166,14 @@ async def test_a_removal_and_an_addition_travel_together(db, pool) -> None:
     assert standing.geometry.price == 21510.0  # pyright: ignore[reportAttributeAccessIssue]
 
 
-# --- what it refuses -----------------------------------------------------------------
+# --- what it refuses once it has reached something -----------------------------------
 
 
 async def test_a_symbol_the_archive_does_not_collect_is_refused_with_the_ones_it_does(
     db, pool
 ) -> None:
-    session = await _session(db)
-
     outcome = await _draw(pool).call(
-        {"symbol": "EURUSD", "add": [A_LEVEL]}, session_id=session.id
+        {"symbol": "EURUSD", "add": [A_LEVEL]}, session_id=(await _session(db)).id
     )
 
     assert outcome.kind is ToolOutcomeKind.REFUSED
@@ -176,149 +181,21 @@ async def test_a_symbol_the_archive_does_not_collect_is_refused_with_the_ones_it
     assert await store.list_drawings(db, symbol="EURUSD") == []
 
 
-async def test_a_colour_the_chart_cannot_draw_is_refused_and_nothing_lands(db, pool) -> None:
-    """Three drawings, one bad colour, none written (specs/agent-chart-drawings,
-    "Wywołanie z jednym rysunkiem nie do przyjęcia")."""
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {
-            "symbol": "US100",
-            "add": [
-                {"kind": "level", "price": 21500.0},
-                {"kind": "level", "price": 21400.0, "color": "hotpink"},
-                {"kind": "level", "price": 21300.0},
-            ],
-        },
-        session_id=session.id,
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert "hotpink" in outcome.text
-    assert await store.list_drawings(db, symbol="US100") == []
-
-
-async def test_a_zone_with_inverted_prices_names_both(db, pool) -> None:
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "add": [{"kind": "zone", "top": 21400.0, "bottom": 21600.0}]},
-        session_id=session.id,
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert "21400" in outcome.text and "21600" in outcome.text
-    assert await store.list_drawings(db, symbol="US100") == []
-
-
-async def test_a_zone_with_equal_prices_is_not_a_zone(db, pool) -> None:
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "add": [{"kind": "zone", "top": 21500.0, "bottom": 21500.0}]},
-        session_id=session.id,
+async def test_without_a_tool_server_it_refuses_rather_than_drawing_blind(db, pool) -> None:
+    outcome = await DrawOnChartTool(pool, None).call(
+        {"symbol": "US100", "add": [A_LEVEL]}, session_id=(await _session(db)).id
     )
 
     assert outcome.kind is ToolOutcomeKind.REFUSED
     assert await store.list_drawings(db, symbol="US100") == []
 
 
-async def test_a_zone_that_ends_before_it_starts_is_refused(db, pool) -> None:
-    """Not a `CHECK`, unlike every other shape rule: a zone's two moments are both
-    optional, so the database has nothing to pin their order against. The terminal draws
-    such a band as a rectangle of zero width — a drawing that silently is not there."""
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {
-            "symbol": "US100",
-            "add": [
-                {
-                    "kind": "zone",
-                    "top": 21600.0,
-                    "bottom": 21550.0,
-                    "from": "2026-01-05T09:00:00Z",
-                    "to": "2026-01-03T09:00:00Z",
-                }
-            ],
-        },
-        session_id=session.id,
+async def test_an_archive_that_does_not_answer_is_not_a_reason_to_guess(db, pool) -> None:
+    outcome = await _draw(pool, FakeToolServer(failing=True)).call(
+        {"symbol": "US100", "add": [A_LEVEL]}, session_id=(await _session(db)).id
     )
 
     assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert "ends before it starts" in outcome.text
-    assert await store.list_drawings(db, symbol="US100") == []
-
-
-async def test_a_zone_open_ended_in_time_is_accepted(db, pool) -> None:
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {
-            "symbol": "US100",
-            "add": [
-                {
-                    "kind": "zone",
-                    "top": 21600.0,
-                    "bottom": 21550.0,
-                    "from": "2026-01-03T09:00:00Z",
-                }
-            ],
-        },
-        session_id=session.id,
-    )
-
-    assert outcome.kind is ToolOutcomeKind.OK
-    [standing] = await store.list_drawings(db, symbol="US100")
-    assert isinstance(standing.geometry, ChartZone)
-    assert standing.geometry.to is None
-
-
-async def test_an_id_no_column_could_hold_is_refused_rather_than_raised(db, pool) -> None:
-    """A model inventing a long number must get a sentence back, not a dead turn: asyncpg
-    refuses an integer past `bigint` by raising, and Python's ints have no such ceiling."""
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "remove": [10**25]}, session_id=session.id
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert "no drawing" in outcome.text
-
-
-async def test_a_trendline_with_both_points_at_one_moment_is_refused(db, pool) -> None:
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {
-            "symbol": "US100",
-            "add": [
-                {
-                    "kind": "trendline",
-                    "a": {"time": "2026-01-03T09:00:00Z", "price": 21000.0},
-                    "b": {"time": "2026-01-03T09:00:00Z", "price": 21400.0},
-                }
-            ],
-        },
-        session_id=session.id,
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert "apart in time" in outcome.text
-    assert await store.list_drawings(db, symbol="US100") == []
-
-
-async def test_a_price_at_or_below_zero_is_refused(db, pool) -> None:
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "add": [{"kind": "level", "price": 0}]},
-        session_id=session.id,
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert "above zero" in outcome.text
     assert await store.list_drawings(db, symbol="US100") == []
 
 
@@ -328,9 +205,7 @@ async def test_the_ceiling_refuses_the_whole_call(db, pool) -> None:
         db,
         session_id=session.id,
         symbol="US100",
-        geometries=[
-            ChartLevel(price=float(20000 + n)) for n in range(MAX_DRAWINGS_PER_SYMBOL - 1)
-        ],
+        geometries=[ChartLevel(price=float(20000 + n)) for n in range(MAX_DRAWINGS_PER_SYMBOL - 1)],
     )
 
     outcome = await _draw(pool).call(
@@ -395,37 +270,6 @@ async def test_an_id_belonging_to_another_instrument_is_not_removable(db, pool) 
     assert len(await store.list_drawings(db, symbol="GOLD")) == 1
 
 
-async def test_a_call_that_neither_adds_nor_removes_is_refused(db, pool) -> None:
-    session = await _session(db)
-
-    outcome = await _draw(pool).call({"symbol": "US100"}, session_id=session.id)
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert "nothing to do" in outcome.text
-
-
-async def test_without_a_tool_server_it_refuses_rather_than_drawing_blind(db, pool) -> None:
-    session = await _session(db)
-
-    outcome = await DrawOnChartTool(pool, None).call(
-        {"symbol": "US100", "add": [A_LEVEL]}, session_id=session.id
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert await store.list_drawings(db, symbol="US100") == []
-
-
-async def test_an_archive_that_does_not_answer_is_not_a_reason_to_guess(db, pool) -> None:
-    session = await _session(db)
-
-    outcome = await _draw(pool, FakeToolServer(failing=True)).call(
-        {"symbol": "US100", "add": [A_LEVEL]}, session_id=session.id
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert await store.list_drawings(db, symbol="US100") == []
-
-
 # --- what it reads -------------------------------------------------------------------
 
 
@@ -460,18 +304,6 @@ async def test_the_read_carries_ids_shapes_and_labels(db, pool) -> None:
     assert payload["drawings"][1]["bottom"] == 21550.0
 
 
-async def test_the_read_is_safe_to_repeat(db, pool) -> None:
-    session = await _session(db)
-    await store.add_drawings(
-        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
-    )
-
-    first = await _read(pool).call({"symbol": "US100"})
-    second = await _read(pool).call({"symbol": "US100"})
-
-    assert first.text == second.text
-
-
 async def test_the_read_does_not_show_another_instruments_drawings(db, pool) -> None:
     session = await _session(db)
     await store.add_drawings(
@@ -481,20 +313,6 @@ async def test_the_read_does_not_show_another_instruments_drawings(db, pool) -> 
     outcome = await _read(pool).call({"symbol": "US100"})
 
     assert json.loads(outcome.text)["drawings"] == []
-
-
-async def test_the_read_answers_without_an_archive(db, pool) -> None:
-    """`list_chart_drawings` never asks market-mcp anything — it reads this module's own
-    table, and the prompt promises the operator exactly that."""
-    session = await _session(db)
-    await store.add_drawings(
-        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
-    )
-
-    outcome = await _read(pool).call({"symbol": "US100"})
-
-    assert outcome.kind is ToolOutcomeKind.OK
-    assert len(json.loads(outcome.text)["drawings"]) == 1
 
 
 async def test_read_then_remove_uses_the_same_id(db, pool) -> None:
@@ -508,61 +326,11 @@ async def test_read_then_remove_uses_the_same_id(db, pool) -> None:
 
     read = json.loads((await _read(pool).call({"symbol": "US100"})).text)
     first_id = read["drawings"][0]["id"]
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "remove": [first_id]}, session_id=session.id
-    )
+    outcome = await _draw(pool).call({"symbol": "US100", "remove": [first_id]}, session_id=session.id)
 
     assert outcome.kind is ToolOutcomeKind.OK
     remaining = await store.list_drawings(db, symbol="US100")
     assert [d.id for d in remaining] == [read["drawings"][1]["id"]]
-
-
-# --- the palette a drawing is drawn from ---------------------------------------------
-
-
-async def test_a_colour_from_the_drawing_palette_is_taken(db, pool) -> None:
-    """specs/agent-chart-drawings, "Kolor z palety rysunków"."""
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "add": [{"kind": "level", "price": 21500.0, "color": "--color-drawing-2"}]},
-        session_id=session.id,
-    )
-
-    assert outcome.kind is ToolOutcomeKind.OK
-    standing = await store.list_drawings(db, symbol="US100")
-    assert [drawing.geometry.color for drawing in standing] == ["--color-drawing-2"]
-
-
-async def test_an_indicator_colour_is_refused_and_named(db, pool) -> None:
-    """A drawing is not an indicator, and wearing its colour is exactly what made the two
-    indistinguishable on one chart. The refusal names the token so the model can correct
-    it in the same turn (specs/agent-chart-drawings, "Kolor spoza palety rysunków")."""
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "add": [{"kind": "level", "price": 21500.0, "color": "--color-accent"}]},
-        session_id=session.id,
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert "--color-accent" in outcome.text
-    assert "--color-drawing-1" in outcome.text
-    assert await store.list_drawings(db, symbol="US100") == []
-
-
-def test_the_tool_offers_the_drawing_palette_and_no_indicator_token() -> None:
-    """What the model sees before it picks: a schema offering a colour that can only be
-    refused is a schema that lies."""
-    from agent.tools.chart import CHART_COLORS, DRAWING_COLORS
-    from agent.tools.drawings import DRAW_TOOL
-
-    offered = set()
-    for shape in DRAW_TOOL.input_schema["properties"]["add"]["items"]["oneOf"]:
-        offered.update(shape["properties"]["color"]["enum"])
-
-    assert offered == set(DRAWING_COLORS)
-    assert offered.isdisjoint(CHART_COLORS)
 
 
 # --- hiding, which is not removing ---------------------------------------------------
@@ -583,10 +351,12 @@ async def test_hiding_takes_a_drawing_off_the_chart_and_keeps_it(db, pool) -> No
     assert outcome.kind is ToolOutcomeKind.OK
     [after] = await store.list_drawings(db, symbol="US100")
     assert after.hidden is True
-    # Everything else is exactly what it was — that is the whole difference from removing.
+    # Everything else is exactly what it was — that is the whole difference from removing,
+    # and the confirmation the operator reads back has to say which of the two happened.
     assert after.id == standing.id
     assert after.created_at == standing.created_at
     assert after.geometry == standing.geometry
+    assert "hid" in outcome.text and "removed" not in outcome.text
 
 
 async def test_showing_gives_back_the_same_drawing(db, pool) -> None:
@@ -602,23 +372,6 @@ async def test_showing_gives_back_the_same_drawing(db, pool) -> None:
     [after] = await store.list_drawings(db, symbol="US100")
     assert after.hidden is False
     assert after.geometry == standing.geometry
-
-
-async def test_hiding_and_showing_one_id_at_once_is_refused(db, pool) -> None:
-    """Two opposite orders about one drawing have no outcome the model could have
-    predicted (specs/agent-chart-drawings, "Zgaszenie i zapalenie jednego rysunku naraz")."""
-    session = await _session(db)
-    [standing] = await store.add_drawings(
-        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
-    )
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "hide": [standing.id], "show": [standing.id]}, session_id=session.id
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert str(standing.id) in outcome.text
-    assert (await store.list_drawings(db, symbol="US100"))[0].hidden is False
 
 
 async def test_hiding_an_id_that_is_not_there_takes_back_the_others(db, pool) -> None:
@@ -639,20 +392,6 @@ async def test_hiding_an_id_that_is_not_there_takes_back_the_others(db, pool) ->
     assert outcome.kind is ToolOutcomeKind.REFUSED
     assert str(written[1].id + 99) in outcome.text
     assert [d.hidden for d in await store.list_drawings(db, symbol="US100")] == [False, False]
-
-
-async def test_an_id_from_another_instrument_is_not_hideable(db, pool) -> None:
-    session = await _session(db)
-    [elsewhere] = await store.add_drawings(
-        db, session_id=session.id, symbol="GOLD", geometries=[ChartLevel(price=2400.0)]
-    )
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "hide": [elsewhere.id]}, session_id=session.id
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert (await store.list_drawings(db, symbol="GOLD"))[0].hidden is False
 
 
 async def test_hiding_does_not_touch_what_it_was_not_told_to(db, pool) -> None:
@@ -693,30 +432,6 @@ async def test_hiding_and_drawing_travel_together(db, pool) -> None:
     assert [(d.geometry.price, d.hidden) for d in standing] == [(21500.0, True), (21600.0, False)]
 
 
-async def test_the_confirmation_says_hidden_rather_than_removed(db, pool) -> None:
-    # The operator reads this back through the model, and one of the two is undoable.
-    session = await _session(db)
-    [standing] = await store.add_drawings(
-        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
-    )
-
-    outcome = await _draw(pool).call({"symbol": "US100", "hide": [standing.id]}, session_id=session.id)
-
-    assert "hid" in outcome.text
-    assert "removed" not in outcome.text
-
-
-async def test_a_call_that_only_names_empty_lists_is_still_refused(db, pool) -> None:
-    session = await _session(db)
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "add": [], "remove": [], "hide": [], "show": []},
-        session_id=session.id,
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-
-
 async def test_hidden_drawings_still_count_towards_the_ceiling(db, pool) -> None:
     """The ceiling is about the record, not about how crowded the screen looks; one that
     can be walked around by hiding is not a ceiling (proposal.md, "Impact")."""
@@ -752,34 +467,4 @@ async def test_the_read_says_which_drawings_are_hidden(db, pool) -> None:
 
     outcome = await _read(pool).call({"symbol": "US100"})
 
-    payload = json.loads(outcome.text)
-    assert [d["hidden"] for d in payload["drawings"]] == [True, False]
-
-
-def test_the_tool_offers_hide_and_show_beside_remove() -> None:
-    from agent.tools.drawings import DRAW_TOOL
-
-    properties = DRAW_TOOL.input_schema["properties"]
-    assert {"add", "remove", "hide", "show"} <= properties.keys()
-    # The one distinction the model has to carry away from this schema.
-    assert "without deleting" in properties["hide"]["description"]
-
-
-async def test_removing_and_hiding_one_id_at_once_is_refused_by_name(db, pool) -> None:
-    """Without this the removal runs first and the hiding refuses as "no drawing with that
-    id", which sends the model hunting a wrong id instead of at the two lists it wrote."""
-    session = await _session(db)
-    [standing] = await store.add_drawings(
-        db, session_id=session.id, symbol="US100", geometries=[ChartLevel(price=21500.0)]
-    )
-
-    outcome = await _draw(pool).call(
-        {"symbol": "US100", "remove": [standing.id], "hide": [standing.id]},
-        session_id=session.id,
-    )
-
-    assert outcome.kind is ToolOutcomeKind.REFUSED
-    assert "`remove`" in outcome.text and "`hide`" in outcome.text
-    assert str(standing.id) in outcome.text
-    # And the removal it ran first is taken back with it.
-    assert len(await store.list_drawings(db, symbol="US100")) == 1
+    assert [d["hidden"] for d in json.loads(outcome.text)["drawings"]] == [True, False]

@@ -27,7 +27,9 @@ API = f"{DEMO_BASE_URL}/api/v1"
 
 
 @pytest.fixture
-def adapter() -> CapitalAdapter:
+async def adapter():
+    """Closed in teardown rather than by each test's last line: an unclosed client is a
+    warning, never a failure, so leaving it to the test is a rule nothing enforces."""
     client = CapitalClient(
         Settings(
             capital_api_key="k",
@@ -37,7 +39,9 @@ def adapter() -> CapitalAdapter:
             _env_file=None,
         )
     )
-    return CapitalAdapter(client)
+    built = CapitalAdapter(client)
+    yield built
+    await built.aclose()
 
 
 def mock_session(account_id: str = "acc-1") -> None:
@@ -80,7 +84,6 @@ async def test_searching_returns_matching_instruments(adapter: CapitalAdapter) -
     assert found
     assert any(i.symbol == "GOLD" for i in found)
     assert all(i.provider == "capital.com" for i in found)
-    await adapter.aclose()
 
 
 @respx.mock
@@ -96,7 +99,6 @@ async def test_switching_to_a_known_account_makes_it_active(adapter: CapitalAdap
     assert account.id == target
     assert account.active is True
     assert json.loads(switch.calls.last.request.content) == {"accountId": target}
-    await adapter.aclose()
 
 
 @respx.mock
@@ -109,7 +111,6 @@ async def test_accounts_mark_the_active_one(adapter: CapitalAdapter) -> None:
 
     assert sum(a.active for a in accounts) == 1
     assert accounts[0].active is True
-    await adapter.aclose()
 
 
 @respx.mock
@@ -124,7 +125,6 @@ async def test_switching_to_an_unknown_account_leaves_the_current_one(
 
     assert err.value.status_code == 400
     assert "nope" in err.value.message
-    await adapter.aclose()
 
 
 @respx.mock
@@ -139,7 +139,6 @@ async def test_the_traversal_dedupes_and_survives_a_bad_branch(adapter: CapitalA
     assert page.truncated is False
     # The 500 on the indices branch cost that branch, not the catalogue.
     assert page.count == 3
-    await adapter.aclose()
 
 
 @respx.mock
@@ -153,7 +152,6 @@ async def test_a_cut_short_traversal_says_so(adapter: CapitalAdapter) -> None:
     # small.
     assert page.truncated is True
     assert page.nodes_visited == 1
-    await adapter.aclose()
 
 
 def mock_mixed_navigation() -> None:
@@ -197,7 +195,6 @@ async def test_one_asset_class_comes_back_without_the_others(adapter: CapitalAda
     # it would otherwise be told about instruments it cannot see.
     assert page.count == 2
     assert page.truncated is False
-    await adapter.aclose()
 
 
 @respx.mock
@@ -214,7 +211,6 @@ async def test_filtering_by_class_still_walks_the_whole_tree(adapter: CapitalAda
     filtered = await adapter.list_instruments(max_nodes=100, asset_class=AssetClass.SHARES)
 
     assert filtered.nodes_visited == unfiltered.nodes_visited
-    await adapter.aclose()
 
 
 @respx.mock
@@ -228,7 +224,6 @@ async def test_a_class_nothing_matches_is_an_empty_catalogue_not_an_error(
 
     assert page.instruments == []
     assert page.count == 0
-    await adapter.aclose()
 
 
 @respx.mock
@@ -241,7 +236,6 @@ async def test_a_filtered_walk_cut_short_still_says_so(adapter: CapitalAdapter) 
     # The filter narrows what comes back; it does not turn a partial walk into a
     # complete one, which is the mistake that would matter here.
     assert page.truncated is True
-    await adapter.aclose()
 
 
 @respx.mock
@@ -255,7 +249,6 @@ async def test_candles_come_back_in_the_requested_resolution(adapter: CapitalAda
 
     assert len(candles) == 3
     assert all(c.resolution is Resolution.MINUTE_5 for c in candles)
-    await adapter.aclose()
 
 
 @respx.mock
@@ -269,7 +262,6 @@ async def test_an_unknown_symbol_is_a_404_not_a_502(adapter: CapitalAdapter) -> 
         await adapter.get_candles("NOPE", Resolution.MINUTE, 10)
 
     assert err.value.status_code == 404
-    await adapter.aclose()
 
 
 @respx.mock
@@ -287,7 +279,6 @@ async def test_a_rate_limited_read_raises_instead_of_reaching_a_mapper(
         await adapter.list_positions()
 
     assert "429" in err.value.message
-    await adapter.aclose()
 
 
 # --- trading ---
@@ -303,7 +294,6 @@ async def test_open_positions_are_readable(adapter: CapitalAdapter) -> None:
 
     assert len(positions) == len(raw["positions"])
     assert all(p.id and p.symbol for p in positions)
-    await adapter.aclose()
 
 
 @respx.mock
@@ -314,7 +304,6 @@ async def test_no_positions_is_an_empty_list_not_an_error(adapter: CapitalAdapte
     # A flat account is a normal state, and a caller polling it should not have to catch
     # an exception to learn that.
     assert await adapter.list_positions() == []
-    await adapter.aclose()
 
 
 @respx.mock
@@ -329,7 +318,6 @@ async def test_working_orders_are_listed(adapter: CapitalAdapter) -> None:
     first = orders[0]
     assert first.id and first.symbol
     assert first.order_type in (OrderType.LIMIT, OrderType.STOP)
-    await adapter.aclose()
 
 
 @respx.mock
@@ -347,7 +335,6 @@ async def test_a_market_order_settles_as_filled(adapter: CapitalAdapter) -> None
     )
 
     assert order.status is OrderStatus.FILLED
-    await adapter.aclose()
 
 
 @respx.mock
@@ -378,7 +365,6 @@ async def test_a_resting_order_goes_to_working_orders_and_settles_as_working(
     assert sent["type"] == "LIMIT"
     assert sent["level"] == 1900.0
     assert sent["stopLevel"] == 1850.0
-    await adapter.aclose()
 
 
 @respx.mock
@@ -398,7 +384,6 @@ async def test_an_amendment_sends_only_the_named_stop(adapter: CapitalAdapter) -
     # profitLevel absent, not null: sending null here removes a take-profit the caller
     # never mentioned.
     assert "profitLevel" not in sent
-    await adapter.aclose()
 
 
 @respx.mock
@@ -414,7 +399,6 @@ async def test_clearing_a_stop_sends_null(adapter: CapitalAdapter) -> None:
     await adapter.update_position("deal-1", UpdatePositionRequest(take_profit=None))
 
     assert json.loads(updated.calls.last.request.content) == {"profitLevel": None}
-    await adapter.aclose()
 
 
 @respx.mock
@@ -433,7 +417,6 @@ async def test_a_refused_deal_is_rejected_with_the_provider_reason(
     # No dealReference at all: refused before the deal existed.
     assert order.status is OrderStatus.REJECTED
     assert order.reason == "error.invalid.size"
-    await adapter.aclose()
 
 
 @respx.mock
@@ -458,7 +441,6 @@ async def test_a_deal_that_never_settles_is_pending_never_filled(
     assert order.status is OrderStatus.PENDING
     assert order.reference == "ref-late"
     assert confirms.call_count == 5
-    await adapter.aclose()
 
 
 @respx.mock
@@ -474,7 +456,6 @@ async def test_cancelling_a_working_order_settles_as_cancelled(adapter: CapitalA
     order = await adapter.cancel_working_order("wo-1")
 
     assert order.status is OrderStatus.CANCELLED
-    await adapter.aclose()
 
 
 @respx.mock
@@ -490,7 +471,6 @@ async def test_closing_a_position_settles_as_closed(adapter: CapitalAdapter) -> 
     order = await adapter.close_position("deal-1")
 
     assert order.status is OrderStatus.CLOSED
-    await adapter.aclose()
 
 
 # --- the account's request budget: one question, one request -------------------------
@@ -519,7 +499,6 @@ async def test_two_daily_reads_ask_the_venue_once(adapter: CapitalAdapter) -> No
     assert market.call_count == 1
     assert first[-1].forming is True
     assert second[-1].forming is True
-    await adapter.aclose()
 
 
 @respx.mock
@@ -547,7 +526,6 @@ async def test_the_memo_is_per_instrument(adapter: CapitalAdapter) -> None:
     assert (gold.call_count, index.call_count) == (1, 1)
     assert gold_candles[-1].forming is True
     assert index_candles[-1].forming is False
-    await adapter.aclose()
 
 
 @respx.mock
@@ -575,7 +553,6 @@ async def test_past_the_window_the_venue_is_asked_again(
     assert market.call_count == 2
     assert still_running[-1].forming is True
     assert after_the_bell[-1].forming is False
-    await adapter.aclose()
 
 
 @respx.mock
@@ -594,7 +571,6 @@ async def test_an_unknown_instrument_is_not_remembered(adapter: CapitalAdapter) 
             await adapter.get_candles("NOPE", Resolution.DAY, 1)
 
     assert market.call_count == 2
-    await adapter.aclose()
 
 
 # --- a write that came back as something other than JSON -----------------------------
@@ -626,7 +602,6 @@ async def test_a_write_answered_with_no_json_is_a_gateway_error(
         )
 
     assert str(status) in str(refused.value)
-    await adapter.aclose()
 
 
 @respx.mock
@@ -649,4 +624,3 @@ async def test_the_providers_own_json_refusal_still_reaches_the_caller_as_an_ord
     )
 
     assert order.status is OrderStatus.REJECTED
-    await adapter.aclose()

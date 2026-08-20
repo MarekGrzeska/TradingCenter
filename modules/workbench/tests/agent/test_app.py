@@ -34,6 +34,9 @@ def _env(workbench_env: None, migrated_url: str, db, monkeypatch: pytest.MonkeyP
 
 
 def test_health() -> None:
+    """`/health` belongs to the process, not to either surface — one test for it, not one
+    per surface. It also takes no identity: nothing is sent here and nothing is required,
+    because the deploy probe reads this route from outside Easy Auth."""
     with TestClient(app) as client:
         response = client.get("/health")
     assert response.status_code == 200

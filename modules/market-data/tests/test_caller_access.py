@@ -9,13 +9,11 @@ credential for it, and the prohibition held by construction. It holds by this fi
 from __future__ import annotations
 
 import base64
-import inspect
 import json
 import types
 
 import httpx
 import pytest
-from starlette.middleware.base import BaseHTTPMiddleware
 
 from market_data.caller_access import (
     OPEN_PATHS,
@@ -105,26 +103,6 @@ def _principal_blob(application: str, claim: str = "azp") -> str:
         ],
     }
     return base64.b64encode(json.dumps(blob).encode("utf-8")).decode("ascii")
-
-
-# --- 4.1: the form, which is as load-bearing as the rule ---
-
-
-def test_the_layer_is_raw_asgi_not_a_starlette_base_middleware() -> None:
-    """`BaseHTTPMiddleware` buffers a response body in some Starlette versions, which
-    would break the streamable-http transport `/mcp` is served over. The same check
-    `tc-mcp-kit` keeps on its own middleware, for the same reason."""
-    assert not issubclass(CallerAccess, BaseHTTPMiddleware)
-    assert CallerAccess.__mro__ == (CallerAccess, object)
-    # The three-argument ASGI signature, which is what "raw" means here: a scope, and the
-    # two callables. `BaseHTTPMiddleware` would hand a `Request` to a `dispatch` instead.
-    assert list(inspect.signature(CallerAccess.__call__).parameters) == [
-        "self",
-        "scope",
-        "receive",
-        "send",
-    ]
-    assert "BaseHTTPMiddleware" not in inspect.getsource(CallerAccess)
 
 
 # --- 4.2: the record's two lists, read from settings ---

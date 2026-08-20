@@ -340,6 +340,56 @@ shape**, or a **render style** (`Chart.tsx`'s `canDrawIndicator` and its sync ef
 `*Primitive.ts`) the terminal has no drawing code for yet. Only that touches
 `market_data/contract.py`, and only then does the full route apply.
 
+## How much test is enough
+
+Measured on 19 August 2026 across every module: ~57,300 lines of test against ~57,500 of
+production code, ~2,800 test functions. The suite is *good* — few mocks, a real Postgres in
+a container rather than a fake, names that read as sentences, docstrings that name the bug
+the test was written from. Nothing below is a retreat from that. What the audit found was
+~18% carrying no assertion of its own, produced by four mechanisms, and the rules exist to
+stop the fifth copy rather than to lower the bar (`docs/bilans-testow.html`).
+
+1. **A domain rule is tested once, at the lowest layer that holds it.** Above it — HTTP, the
+   tool surface, the view, telemetry — one test that the state reaches the wire, not the
+   whole matrix again. "A late pair with the market open is stalled" had four homes and four
+   identical test names; the terminal tested one PATCH through the list, the card and the
+   chart.
+2. **Don't test other people's libraries.** Pydantic validating a field, Postgres honouring
+   a CHECK or a DEFAULT, `azure-identity` picking a credential, langchain's internals. The
+   exception that stays is a *security* rule expressed through them — a credential in a URL,
+   a missing TLS, a remote host without a user.
+3. **No test of implementation.** Not `inspect.getsource`, `__mro__` or `signature`, not a
+   private attribute, not a re-render count, not a regex over Tailwind classes. A test that
+   breaks on every refactor regardless of correctness has negative value: it is a second
+   copy of the code, written in assertions.
+4. **A CRUD view gets three tests**: the happy path, one error, one refusal. Sort order is a
+   unit test of the sorting function, never through the DOM, and "the text appears" is not a
+   test.
+5. **A shared package is tested once, in `packages/`.** A consumer gets at most one
+   integration test that the real pairing works. Twin files across two surfaces — the
+   workbench's `agent/` and `teams/` — are one parameterised file; `test_auth.py` was
+   identical to the character, and `test_schema_version.py` existed in four places.
+6. **`@pytest.mark.db` only where the test reads or writes the database.** Input-validation
+   permutations are unit tests. This is the rule with the largest effect on the day: 55% of
+   the workbench's tests needed Docker and two Postgres containers, `test_health` among them.
+7. **Setup belongs in a fixture, data in a builder.** `aclose()` in a teardown, not in fifty
+   test bodies; the chart's `computeQueue` and the team definition built rather than
+   retyped. This removes more lines than any deletion and no assertion at all.
+8. **No performance tests in the unit suite**, and no character budgets on descriptions. A
+   threshold at 10× the measured p95 catches nothing that vectorised numpy can do by
+   accident, and a ceiling on a tool's prose turns every edit red. If it is needed, it is a
+   target run by hand.
+
+What none of this touches, because there the cost of a miss is silent corruption, a second
+position or a leaked secret rather than a red CI: archive integrity (UPSERT idempotence,
+source precedence, coverage, jobs, the snapshot/subscribe seam), trading-mcp's write path
+(never retried, a timeout is an unknown effect, a refusal is not an access failure), the
+demo guard and every refusal to start, fail-closed authorization, secrets never appearing in
+a response or a log, the Capital session's one-login/one-retry, the workbench's layering and
+route-collision tests, migrations under their advisory lock, cost limits and the trading
+trace, and the contracts — trading-mcp's snapshot of the gateway's OpenAPI, the terminal's
+wire↔domain mappers, the indicator golden file against its TA-Lib oracle.
+
 ## Workflow
 
 **First decide whether this is an OpenSpec change at all.** Open one when the work will
