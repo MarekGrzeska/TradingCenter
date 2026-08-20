@@ -108,6 +108,17 @@ asks the gateway whether the account is a demo one *before* it opens a port. Bot
 compare the two files and refuse up front, because otherwise the symptom is the whole stack
 going down with "a service exited".
 
+**The gateway's door asks for different things in different places, and the key is only half of
+it.** Locally the shared key is the whole credential and nothing changes. In production, since
+`the-gateway-door-authenticates`, the gateway's Easy Auth requires a validated token: `market-data`
+and `trading-mcp` present tokens of their own managed identities (`GATEWAY_SCOPE`,
+`CAPITAL_GATEWAY_SCOPE`) beside the key, and the terminal presents the operator's. A caller with
+only the key is refused by the platform before the module sees it. Two exceptions, both
+deliberate: `/` is the health route, and **`/ws/stream` is the one path in this system whose door
+is the shared key alone** — an authenticator in front of a WebSocket upgrade intercepts it and
+never completes it, which killed every candle feed for an hour on 20 August 2026, so that check
+lives inside the gateway's own handler instead.
+
 **Capital sessions coexist**, and the warning that stood here until 10 August 2026 was never
 measured and was wrong. What constrains parallel work is the rate budget — 10 req/s counted against the
 **account**, so two stacks starve each other — not the session. The measurement, the API key's
