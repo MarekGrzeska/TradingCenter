@@ -48,6 +48,17 @@ class Settings(BaseSettings):
     # not defaulted: a module that started without it would run and archive nothing,
     # and the gap would surface as silence hours later instead of as a refusal now.
     gateway_api_key: str
+    # The gateway's own audience, when this module has an identity to present to it.
+    # Absent is a working configuration and the local one: without a directory there is no
+    # token to get, and the shared key above is the whole credential — which is what
+    # `market-data-upstream-access` means by the credential's shape following the place.
+    # Set, it is `api://tradingcenter-capital-gateway/.default`, and every REST request
+    # carries a bearer token beside the key.
+    #
+    # The stream is deliberately not covered by it: `/ws/stream` sits outside the
+    # gateway's authenticator, so the key checked inside its WebSocket handler is the only
+    # check that path has (`the-gateway-door-authenticates/design.md`).
+    gateway_scope: str | None = None
 
     # --- the archive's own storage ---
     #

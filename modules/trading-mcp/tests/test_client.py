@@ -5,6 +5,7 @@ from __future__ import annotations
 import httpx
 import pytest
 import respx
+from azure.core.exceptions import ClientAuthenticationError
 
 from trading_mcp.client import GATEWAY_KEY_HEADER, GatewayClient
 from trading_mcp.config import Settings
@@ -149,4 +150,93 @@ async def test_unreachable_gateway_is_a_gateway_unavailable(client: GatewayClien
 
     with pytest.raises(GatewayUnavailable, match="unreachable"):
         await client.get("/positions")
+    await client.aclose()
+
+
+# --- the-gateway-door-authenticates: the credential's shape follows the place ---------
+
+
+class _FakeToken:
+    def __init__(self, token: str) -> None:
+        self.token = token
+
+
+class _FakeCredential:
+    def __init__(self, token: str | None = "a-token") -> None:
+        self._token = token
+        self.scopes: list[str] = []
+
+    async def get_token(self, scope: str) -> _FakeToken:
+        self.scopes.append(scope)
+        if self._token is None:
+            raise ClientAuthenticationError("no identity on this machine")
+        return _FakeToken(self._token)
+
+    async def close(self) -> None:
+        pass
+
+
+@respx.mock
+async def test_with_a_scope_every_request_carries_a_token_beside_the_key(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    credential = _FakeCredential()
+    monkeypatch.setattr("trading_mcp.client.DefaultAzureCredential", lambda: credential)
+    scoped = settings.model_copy(update={"capital_gateway_scope": "api://gateway/.default"})
+    client = GatewayClient(scoped)
+    route = respx.get(f"{BASE}/positions").mock(return_value=httpx.Response(200, json=[]))
+
+    await client.get("/positions")
+
+    request = route.calls.last.request
+    assert request.headers[GATEWAY_KEY_HEADER] == "test-gateway-key"
+    assert request.headers["Authorization"] == "Bearer a-token"
+    assert credential.scopes == ["api://gateway/.default"]
+    await client.aclose()
+
+
+@respx.mock
+async def test_without_a_scope_no_token_is_asked_for(client: GatewayClient) -> None:
+    # The local shape: nothing to ask, and the key is the whole credential.
+    route = respx.get(f"{BASE}/positions").mock(return_value=httpx.Response(200, json=[]))
+
+    await client.get("/positions")
+
+    assert "Authorization" not in route.calls.last.request.headers
+    await client.aclose()
+
+
+@respx.mock
+async def test_a_token_that_cannot_be_had_leaves_the_key_to_do_the_work(
+    settings: Settings, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Not a refusal to start: until the gateway's door requires a token, the key is what
+    # gets in, and refusing here would be this module taking itself down over a credential
+    # nothing yet asks for.
+    monkeypatch.setattr("trading_mcp.client.DefaultAzureCredential", lambda: _FakeCredential(None))
+    scoped = settings.model_copy(update={"capital_gateway_scope": "api://gateway/.default"})
+    client = GatewayClient(scoped)
+    route = respx.get(f"{BASE}/capabilities").mock(
+        return_value=httpx.Response(200, json={"environment": "demo"})
+    )
+
+    await client.ensure_demo_environment()
+
+    assert "Authorization" not in route.calls.last.request.headers
+    await client.aclose()
+
+
+@respx.mock
+async def test_a_gateway_that_refuses_the_demo_check_stops_the_port_opening(
+    settings: Settings,
+) -> None:
+    # Where "cannot present itself" is actually answered: by the gateway, on the check
+    # that runs before uvicorn listens. After the door is flipped, a module without a
+    # usable token lands here.
+    client = GatewayClient(settings)
+    respx.get(f"{BASE}/capabilities").mock(return_value=httpx.Response(401))
+
+    with pytest.raises(GatewayRefused):
+        await client.ensure_demo_environment()
+
     await client.aclose()

@@ -188,6 +188,14 @@ async def subscribe(
     """
     url = stream_url(base_url, symbol, resolution)
     try:
+        # The key, and only the key — no bearer token beside it, unlike every REST call
+        # this module makes since `the-gateway-door-authenticates`. `/ws/stream` is
+        # excluded from the gateway's authenticator, because that authenticator intercepts
+        # a WebSocket upgrade and never completes it: measured 20 August 2026, when every
+        # feed died with "timed out during opening handshake" the minute the exclusion was
+        # missing. So this handshake is checked inside the gateway's own WebSocket handler,
+        # by this header, and after that flip it is the one path where the key is still
+        # what opens the door.
         connection = await websockets.connect(
             url, additional_headers={GATEWAY_KEY_HEADER: api_key}
         )

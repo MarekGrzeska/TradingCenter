@@ -5,6 +5,7 @@ from datetime import UTC, datetime
 import httpx
 import pytest
 import respx
+from azure.core.exceptions import ClientAuthenticationError
 
 from market_data.errors import GatewayRefused, GatewayUnreachable, UnreadablePayload
 from market_data.gateway import GATEWAY_KEY_HEADER, GatewayHistory, http_client
@@ -276,3 +277,95 @@ async def test_a_401_from_the_gateway_is_a_refusal_not_an_empty_history(
         await reader.history("US100", Resolution.MINUTE, 1000)
 
     assert err.value.status_code == 401
+
+
+# --- specs/the-gateway-door-authenticates: the credential's shape follows the place ----
+
+
+class _FakeToken:
+    def __init__(self, token: str) -> None:
+        self.token = token
+
+
+class _FakeCredential:
+    """What `DefaultAzureCredential` is here: something that answers with a token, or
+    refuses to. The real one reaches the instance metadata endpoint, which no test has."""
+
+    def __init__(self, token: str | None = "a-token") -> None:
+        self._token = token
+        self.scopes: list[str] = []
+
+    async def get_token(self, scope: str) -> _FakeToken:
+        self.scopes.append(scope)
+        if self._token is None:
+            raise ClientAuthenticationError("no identity on this machine")
+        return _FakeToken(self._token)
+
+    async def close(self) -> None:  # pragma: no cover - httpx never calls this
+        pass
+
+
+@respx.mock
+async def test_a_module_with_an_identity_carries_a_token_beside_the_key(monkeypatch) -> None:
+    credential = _FakeCredential()
+    monkeypatch.setattr("market_data.gateway._http.DefaultAzureCredential", lambda: credential)
+    route = respx.get(HISTORY_URL).mock(
+        return_value=httpx.Response(200, json=gateway_history([gateway_candle("2026-08-07T12:00:00Z")]))
+    )
+
+    async with http_client("the-caller-key", "api://gateway/.default") as client:
+        await GatewayHistory(BASE_URL, client).history("US100", Resolution.MINUTE, 1000)
+
+    request = route.calls.last.request
+    assert request.headers[GATEWAY_KEY_HEADER] == "the-caller-key"
+    assert request.headers["Authorization"] == "Bearer a-token"
+    assert credential.scopes == ["api://gateway/.default"]
+
+
+@respx.mock
+async def test_without_a_scope_the_key_is_the_whole_credential() -> None:
+    # Local work: no directory, nothing to ask for a token, and that is a supported
+    # configuration rather than a degraded one.
+    route = respx.get(HISTORY_URL).mock(
+        return_value=httpx.Response(200, json=gateway_history([gateway_candle("2026-08-07T12:00:00Z")]))
+    )
+
+    async with http_client("the-caller-key") as client:
+        await GatewayHistory(BASE_URL, client).history("US100", Resolution.MINUTE, 1000)
+
+    request = route.calls.last.request
+    assert request.headers[GATEWAY_KEY_HEADER] == "the-caller-key"
+    assert "Authorization" not in request.headers
+
+
+@respx.mock
+async def test_a_token_that_cannot_be_had_leaves_the_key_to_do_the_work(monkeypatch) -> None:
+    # Between the deploy and the flip, the key is still what opens the gateway's door.
+    # Refusing here would stop the archive filling over a credential nothing yet asks for;
+    # once the door does ask, the gateway answers 401 and that is a refusal this module
+    # already reports as one.
+    monkeypatch.setattr(
+        "market_data.gateway._http.DefaultAzureCredential", lambda: _FakeCredential(None)
+    )
+    route = respx.get(HISTORY_URL).mock(
+        return_value=httpx.Response(200, json=gateway_history([gateway_candle("2026-08-07T12:00:00Z")]))
+    )
+
+    async with http_client("the-caller-key", "api://gateway/.default") as client:
+        await GatewayHistory(BASE_URL, client).history("US100", Resolution.MINUTE, 1000)
+
+    request = route.calls.last.request
+    assert request.headers[GATEWAY_KEY_HEADER] == "the-caller-key"
+    assert "Authorization" not in request.headers
+
+
+@respx.mock
+async def test_a_401_after_the_door_is_flipped_is_still_a_refusal(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "market_data.gateway._http.DefaultAzureCredential", lambda: _FakeCredential(None)
+    )
+    respx.get(HISTORY_URL).mock(return_value=httpx.Response(401, json={"detail": "unauthorized"}))
+
+    async with http_client("the-caller-key", "api://gateway/.default") as client:
+        with pytest.raises(GatewayRefused):
+            await GatewayHistory(BASE_URL, client).history("US100", Resolution.MINUTE, 1000)

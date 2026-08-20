@@ -18,6 +18,7 @@ def _no_ambient_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     for name in (
         "CAPITAL_GATEWAY_URL",
         "CAPITAL_GATEWAY_API_KEY",
+        "CAPITAL_GATEWAY_SCOPE",
         "CAPITAL_GATEWAY_REQUEST_TIMEOUT_SECONDS",
         "TRADING_MCP_PORT",
         "TRADING_MCP_HOST",

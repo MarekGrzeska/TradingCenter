@@ -81,6 +81,25 @@ zaniedbanie:
 Skutek do zapamiętania: po tej zmianie klucz i token bronią różnych tras tej samej aplikacji.
 `capital-access-control` mówi o tym jako o dwóch postaciach poświadczenia i to zostaje prawdą.
 
+### Brak tokenu nie zatrzymuje żądania — rozstrzyga gateway, nie katalog
+
+Dopisane przy implementacji, bo pierwsza wersja tego planu miała tu wadę. Napisane wprost
+„nie udało się uzyskać tokenu → odmowa" zamieniało krok 2 z nieszkodliwego w ryzykowny:
+między wdrożeniem a przestawieniem drzwi token nie jest jeszcze do niczego potrzebny, więc
+zająknięcie katalogu zatrzymywałoby archiwum z powodu poświadczenia, o które nikt jeszcze
+nie prosi.
+
+Zamiast tego oba moduły wysyłają, co mają — token, jeśli go dostały, klucz zawsze — i to
+gateway odpowiada, czy to wystarcza. Przed przestawieniem wystarcza klucz. Po
+przestawieniu żądanie bez tokenu dostaje `401` od platformy, a odmowa od gatewaya jest
+odmową, którą oba moduły już umieją zaraportować: `market-data` odróżnia ją od braku
+danych, a `trading-mcp` nie otwiera portu, bo sprawdzenie demo wykonuje przed nasłuchem i
+to ono się o nią rozbija.
+
+Skutek dla wymagań: `trading-mcp-upstream-access` mówi, że odmową startu jest brak
+skonfigurowanego klucza, a nieuzyskany token — nie. Miejsce, w którym „nie mogę się
+przedstawić" naprawdę się rozstrzyga, to sprawdzenie u gatewaya.
+
 ### Lista aplikacji zamiast ról aplikacji
 
 Entra wystawi tożsamości zarządzanej token dla `api://tradingcenter-capital-gateway` bez

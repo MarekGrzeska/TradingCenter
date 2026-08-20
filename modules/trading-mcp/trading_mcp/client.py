@@ -11,7 +11,12 @@ własnej awarii").
 
 from __future__ import annotations
 
+import logging
+from collections.abc import AsyncGenerator
+
 import httpx
+from azure.core.exceptions import AzureError
+from azure.identity.aio import DefaultAzureCredential
 from tc_mcp_kit.detail import detail
 
 from .config import Settings
@@ -24,18 +29,65 @@ GATEWAY_KEY_HEADER = "X-Gateway-Key"
 
 DEMO_ENVIRONMENT = "demo"
 
+log = logging.getLogger(__name__)
+
+
+class _ManagedIdentityAuth(httpx.Auth):
+    """A bearer token on every request, from this module's own identity.
+
+    Per request, not per client: this process outlives a token, and a token read once at
+    start-up would expire into refusals that read like the gateway having changed its
+    mind about who may place an order. `DefaultAzureCredential` caches and only goes to
+    the directory near expiry.
+
+    **A token that cannot be had does not stop the request**, it is logged and the key
+    goes alone. Refusing here would be this module deciding it cannot start over a
+    credential the gateway does not yet require — the gateway is the one that answers that
+    question, and it answers it in the only place it can be answered honestly: the demo
+    check that runs before the port opens. A gateway refusing that check is still a module
+    that never listens (specs/trading-mcp-upstream-access, "Bez poświadczenia do gatewaya
+    moduł nie wstaje").
+    """
+
+    def __init__(self, credential: DefaultAzureCredential, scope: str) -> None:
+        self._credential = credential
+        self._scope = scope
+
+    async def async_auth_flow(
+        self, request: httpx.Request
+    ) -> AsyncGenerator[httpx.Request, httpx.Response]:
+        try:
+            token = await self._credential.get_token(self._scope)
+        # Every way this fails is an `AzureError`: no identity on the host, a
+        # directory that will not issue for this audience, or the metadata endpoint
+        # not answering. All three mean the same thing here — no token this time.
+        except AzureError as err:
+            log.warning("no token for %s, sending the caller key alone: %s", self._scope, err)
+        else:
+            request.headers["Authorization"] = f"Bearer {token.token}"
+        yield request
+
 
 class GatewayClient:
     def __init__(self, settings: Settings) -> None:
+        scope = settings.capital_gateway_scope
+        self._credential = DefaultAzureCredential() if scope else None
         self._http = httpx.AsyncClient(
             base_url=settings.capital_gateway_url,
             timeout=settings.capital_gateway_request_timeout_seconds,
             headers={GATEWAY_KEY_HEADER: settings.capital_gateway_api_key},
+            auth=(
+                _ManagedIdentityAuth(self._credential, scope)
+                if self._credential is not None and scope
+                else None
+            ),
         )
         self._timeout_seconds = settings.capital_gateway_request_timeout_seconds
 
     async def aclose(self) -> None:
         await self._http.aclose()
+        if self._credential is not None:
+            await self._credential.close()
 
     async def ensure_demo_environment(self) -> None:
         """Refuse to proceed unless the gateway confirms it is bound to the demo account.
