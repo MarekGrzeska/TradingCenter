@@ -122,6 +122,9 @@
   .gain::before { content: "Zysk — "; }
   .cost { margin-top: 6px; font-size: 14px; color: var(--bad); font-weight: 600; }
   .cost::before { content: "Cena — "; }
+  /* Poprawka do liczby, którą ta strona podała wcześniej — zostaje widoczna zamiast
+     zostać podmieniona, bo różnica między deklaracją a pomiarem jest tu treścią. */
+  .fix { color: var(--warn); font-weight: 600; }
   figure { margin: 28px 0; }
   .diagram-frame { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 20px; overflow-x: auto; }
   .diagram-frame svg { min-width: 760px; max-width: 100%; height: auto; display: block; margin: 0 auto; }
@@ -461,7 +464,7 @@
     <p class="cost">Easy Auth autoryzuje per aplikacja, nie per trasa — wpuszczenie agenta
     do market-data otwiera mu całe REST, więc autoryzacja per trasę musiała wejść do
     aplikacji. <code>RequireCallerIdentity</code> z tc-mcp-kit odpowiada na węższe pytanie
-    („czy ktokolwiek się przedstawił"), więc powstał <code>caller_access.py</code>: 221 linii
+    („czy ktokolwiek się przedstawił"), więc powstał <code>caller_access.py</code>: 221 linii <span class="fix">(+ 348 testów = 569; ta strona podawała sam plik — poprawione przy C)</span>
     zapisu trasa → wołający, z odmową dla trasy, której zapis nie wymienia, i testem odmowy
     dla każdej pary „tożsamość — powierzchnia, do której nie ma prawa". To jest cena, którą
     ten kierunek naprawdę kosztuje, i jest zapłacona jawnie zamiast odziedziczona.</p>
@@ -539,14 +542,94 @@
   <div class="dir">
     <div class="dir-head"><span class="dir-letter">C</span>
     <h4>trading-mcp — decyzja pomiarem, nie z rozpędu</h4>
-    <span class="horizon">po A i B</span></div>
+    <span class="chip good">rozstrzygnięte 20.08 — zostaje osobnym modułem</span>
+    <span class="horizon">pomiar: 1 dzień · wdrożenia: żadnego</span></div>
     <p>Jedyny trudny przypadek: gateway jest celowo najbardziej zamkniętym modułem — bez
     Easy Auth, za listą dwóch adresów IP, bez sondy. Wmontowanie <code>/mcp</code> znaczy
     otwarcie go na tożsamości Entra. Zmierzyć, co kosztuje utrzymanie wyjątku
     (~2,7 tys. linii z testami + App Service + snapshot), i wybrać świadomie —
     zostawienie trading-mcp osobno jest legalnym wynikiem.</p>
-    <p class="gain">jeśli wejdzie: backend w trzech procesach; jeśli nie — decyzja z zapisanym
-    powodem zamiast reguły „proxy z zasady".</p>
+
+    <p><b>Zmierzone, nie oszacowane.</b> Utrzymanie wyjątku kosztuje dziś 5 333 linie
+    w <code>modules/trading-mcp</code> — z czego 2 610 pisanych ręcznie (898 produkcji,
+    1 378 testów, 111 skryptu kontraktu, 223 README/Dockerfile/pyproject) i 2 723
+    generowanych (<code>capital-gateway.openapi.json</code> 1 593, <code>uv.lock</code>
+    1 130). Do tego App Service, instancja easy-auth-app, workflow deployu, job w CI,
+    port 8060, triplet Entra, polisa Key Vault i blok <code>ip_restriction</code>
+    w gatewayu. Deklaracja karty („~2,7 tys. linii z testami") trafiła w liczbę pisaną
+    ręcznie co do dwóch procent.</p>
+
+    <p><b>Ile z tego zniknęłoby po zwinięciu.</b> Rusztowanie istniejące wyłącznie z powodu
+    rozdzielenia to <code>client.py</code> 95, <code>__main__.py</code> 38, ta część
+    <code>config.py</code>, która nazywa upstream (~65 z 77), połowa <code>errors.py</code>
+    mapująca statusy HTTP (~40 z 86), <code>scripts/contract.py</code> 111 — i ich testy:
+    <code>test_client</code> 152, <code>test_config</code> 48, <code>test_contract</code> 49,
+    <code>test_transport</code> 77, <code>test_demo_guard</code> 117. Razem <b>~790 linii
+    ręcznych</b> plus 2 723 generowanych. <b>Przeżywa</b> to, co jest wartością: pięć plików
+    <code>tools/</code> (540) i ich testy (884) — przenoszą się, nie znikają.</p>
+
+    <div class="table-wrap"><table>
+      <thead><tr><th>Bilans zwinięcia</th><th>A — market-mcp (wykonane)</th><th>C — trading-mcp (policzone)</th></tr></thead>
+      <tbody>
+        <tr><td>rusztowanie pisane ręcznie, do skasowania</td><td>1 260</td><td>~790</td></tr>
+        <tr><td>autoryzacja per trasa, do dopisania</td><td>569</td><td>~570</td></tr>
+        <tr><td><b>netto linii ręcznych</b></td><td><b>691</b></td><td><b>~220</b></td></tr>
+        <tr><td>stosunek</td><td>2,2 : 1</td><td>1,4 : 1</td></tr>
+        <tr><td>pliki generowane (snapshot + lock)</td><td>4 685</td><td>2 723</td></tr>
+        <tr><td>co najgorszego wpuszcza zły wpis w zapisie tras</td><td>skasowanie śledzonej pary</td><td>złożenie zlecenia</td></tr>
+      </tbody>
+    </table></div>
+
+    <p>Kolumna A jest poprawką do tego, co ta strona podała wyżej: rachunek policzył
+    <code>caller_access.py</code> jako 221 linii, bo policzył sam plik. W commicie
+    <code>ad29529</code> weszło 221 + 348 testów = 569. Zysk A był zatem 2,2 : 1, nie
+    prawie sześć do jednego — i to jest liczba, do której C ma się porównywać. C wychodzi
+    poniżej połowy tego, na module, na którym zły wpis w zapisie tras składa zlecenie.</p>
+
+    <p><b>Trzy rzeczy rozstrzygają, i żadnej nie widać w liniach.</b></p>
+    <p><b>Sonda ginie i nic jej nie zastępuje.</b> <code>trading-mcp</code> nie otwiera
+    portu, dopóki gateway nie powie, że rachunek jest demo — więc 200 na jego
+    <code>/health</code> dowodzi, że doszedł do gatewaya, przez jego firewall, wspólnym
+    kluczem, i został uznany. Sam gateway nie da się sondować w ogóle:
+    <code>ip_restriction_default_action = "Deny"</code> wpuszcza wyłącznie adresy
+    wyjściowe planu, a runnera CI wśród nich nie ma, więc jego deploy pyta panel
+    sterowania — dokładnie to pytanie odpowiedziało <code>Running</code> nad kontenerem
+    w pętli restartów 16.08.2026. Zwinięcie przenosi ścieżkę zapisu do jedynego modułu,
+    którego wdrożenie nie widzi do środka.</p>
+    <p><b>Gwarancja demo przestaje być dwiema odpowiedziami.</b> Dziś gateway wyprowadza
+    środowisko z hosta, do którego jest przypięty, i nie wstaje na innym — <i>oraz</i>
+    <code>trading-mcp</code> nie słucha, dopóki tej odpowiedzi nie przeczyta po sieci.
+    W jednym procesie druga zapada się w pierwszą. Jedno sprawdzenie tam, gdzie były dwa,
+    na gwarancji, której ten system najmniej chce stracić.</p>
+    <p><b>Awaria w kodzie narzędzia zabrałaby zasilanie archiwum.</b> market-data ciągnie
+    każdą świecę przez gateway. Dziś awaria w narzędziu zleceń kładzie proces, od którego
+    nic nie zależy. Oba udane zwinięcia miały kształt odwrotny — narzędzia szły do modułu,
+    bez którego i tak nie działały.</p>
+
+    <p class="cost"><b>Jedna przesłanka pytania była nieprawdziwa i argumentuje w drugą
+    stronę</b>, więc zostaje zapisana. Gateway nie stoi „za listą dwóch adresów IP" —
+    stoi za jedną listą adresów <i>planu</i>, a wszystkie cztery aplikacje backendu stoją
+    na tym samym planie (<code>azurerm_service_plan.main</code>). Workbench jest już
+    wewnątrz sieciowego obwodu gatewaya i trzyma go poza nim jedna rzecz: nie ma
+    <code>GATEWAY_API_KEY</code>. Zwinięcie nie otworzyłoby więc zamkniętej granicy
+    sieciowej — zmieniłoby poświadczenie, które ją zamyka, ze statycznego klucza
+    dzielonego przez dwie aplikacje na wyliczoną listę nazwanych aplikacji. To jest
+    lepszy mechanizm i jest dostępny dla gatewaya <b>bez</b> zwijania. Osobne pytanie,
+    zmiana infrastruktury, własna propozycja.</p>
+
+    <p class="cost"><b>Czego pomiar nie rozstrzygnął, i trzeba to powiedzieć wprost:</b>
+    kosztu bieżącego. Moduł ma cztery dni. W tym czasie pięć commitów ruszyło gateway
+    i dwa z nich wymusiły regenerację snapshotu — jeden z tych dwóch był normalizacją
+    samych snapshotów, czyli kosztem posiadania snapshotu, nie kosztem zmiany kontraktu.
+    Na czterech dniach to nie jest szereg, tylko anegdota. Decyzja stoi na arytmetyce
+    zwinięcia i na trzech powodach wyżej; jeśli ten snapshot zacznie boleć, to jest nowa
+    przesłanka i ta karta wraca — do przeczytania z tą samą tabelą.</p>
+
+    <p class="gain">backend zostaje w czterech procesach, a nie w trzech — z zapisanym
+    powodem zamiast reguły „proxy z zasady". Reguła, która wychodzi z tego pomiaru, jest
+    węższa i mechaniczna: <b>zwija się serwer narzędzi stojący przed właścicielem swoich
+    danych; nie zwija się serwer narzędzi stojący przed inną granicą bezpieczeństwa.</b>
+    market-mcp i teams-mcp były tym pierwszym. trading-mcp jest tym drugim.</p>
   </div>
 
   <div class="dir">
@@ -636,29 +719,29 @@
 
   <h2 id="stan">Stan docelowy w liczbach</h2>
   <div class="table-wrap"><table>
-    <thead><tr><th>Miara</th><th>Przed A</th><th>Po B (20.08, zmierzone)</th><th>Po A–C (cel)</th></tr></thead>
+    <thead><tr><th>Miara</th><th>Przed A</th><th>Po B (20.08, zmierzone)</th><th>Po A–C (rozstrzygnięte)</th></tr></thead>
     <tbody>
-      <tr><td>Deployowalne moduły</td><td class="r">8</td><td class="r">5</td><td class="r">4–5</td></tr>
-      <tr><td>App Services (backend)</td><td class="r">7</td><td class="r">4</td><td class="r">3–4</td></tr>
-      <tr><td>Workflowy deploy (callery)</td><td class="r">7</td><td class="r">4</td><td class="r">3–4</td></tr>
-      <tr><td>Dockerfile / uv.lock</td><td class="r">7 / 11</td><td class="r">4 / 8</td><td class="r">3–4 / 7–8</td></tr>
-      <tr><td>Joby w checks.yml</td><td class="r">13</td><td class="r">10</td><td class="r">~9</td></tr>
-      <tr><td>Snapshoty kontraktów (linie JSON)</td><td class="r">3 (7 561)</td><td class="r">1 (1 593)</td><td class="r">0–1</td></tr>
-      <tr><td>Instancje easy-auth-app</td><td class="r">6</td><td class="r">3</td><td class="r">2</td></tr>
-      <tr><td>Porty do zapamiętania</td><td class="r">9</td><td class="r">5</td><td class="r">5–6</td></tr>
-      <tr><td>Pliki .env.example / zmienne</td><td class="r">9 / 87</td><td class="r">5 / 62</td><td class="r">5 / ~50</td></tr>
-      <tr><td>Hopy sieciowe na wywołanie narzędzia</td><td class="r">2</td><td class="r">1 archiwum · <b>0</b> zespoły</td><td class="r">0–1</td></tr>
+      <tr><td>Deployowalne moduły</td><td class="r">8</td><td class="r">5</td><td class="r">5</td></tr>
+      <tr><td>App Services (backend)</td><td class="r">7</td><td class="r">4</td><td class="r">4</td></tr>
+      <tr><td>Workflowy deploy (callery)</td><td class="r">7</td><td class="r">4</td><td class="r">4</td></tr>
+      <tr><td>Dockerfile / uv.lock</td><td class="r">7 / 11</td><td class="r">4 / 8</td><td class="r">4 / 8</td></tr>
+      <tr><td>Joby w checks.yml</td><td class="r">13</td><td class="r">10</td><td class="r">10</td></tr>
+      <tr><td>Snapshoty kontraktów (linie JSON)</td><td class="r">3 (7 561)</td><td class="r">1 (1 593)</td><td class="r">1 (1 593)</td></tr>
+      <tr><td>Instancje easy-auth-app</td><td class="r">6</td><td class="r">3</td><td class="r">3</td></tr>
+      <tr><td>Porty do zapamiętania</td><td class="r">9</td><td class="r">5</td><td class="r">5</td></tr>
+      <tr><td>Pliki .env.example / zmienne</td><td class="r">9 / 87</td><td class="r">5 / 62</td><td class="r">5 / ~50 (kierunek D)</td></tr>
+      <tr><td>Hopy sieciowe na wywołanie narzędzia</td><td class="r">2</td><td class="r">1 archiwum · <b>0</b> zespoły · 2 rachunek</td><td class="r">bez zmian — C zostawiło 2 na rachunku</td></tr>
       <tr><td>Ręczne punkty rejestracji topologii</td><td class="r">6+ miejsc</td><td class="r">mniej o dwa byty</td><td class="r">mniej miejsc, bo mniej bytów</td></tr>
       <tr><td>Proza normatywna (linie)</td><td class="r">~38 500</td><td class="r">nie mierzone — D nie ruszyło</td><td class="r">cel: &lt; 20 000 (kierunek D)</td></tr>
     </tbody>
   </table></div>
 
-  <div class="callout"><p><b>Środkowa kolumna jest policzona, nie przepisana z planu</b> — i pięć
-  z jedenastu pozycji <b>trafiło już w cel A–C</b>, zanim C w ogóle ruszyło. To nie jest
-  powód do świętowania, tylko do przeczytania celu jeszcze raz: część widełek „3–4" opierała
-  się na tym, że trading-mcp też zniknie, a decyzja o nim ma zapaść <i>pomiarem</i>. Jeśli
-  zostanie osobno — co jest legalnym wynikiem C — to ta kolumna już jest stanem
-  docelowym.</p></div>
+  <div class="callout"><p><b>Prawa kolumna przestała być celem i stała się wynikiem</b>, bo C
+  zapadło (20.08): trading-mcp zostaje osobnym modułem. Widełki „3–4" opierały się w całości
+  na tym, że on też zniknie — więc <b>środkowa kolumna, policzona 20.08, już jest stanem
+  docelowym</b>, na dziesięciu z dwunastu pozycji. Do zdobycia zostaje wyłącznie to, co
+  należy do D: proza i liczba zmiennych. Jeden wiersz doszedł i jest ceną, nie zyskiem —
+  wywołanie narzędzia rachunku nadal idzie dwoma hopami, i C zdecydowało to zostawić.</p></div>
 
   <div class="callout risk">
     <p><b>Co się oddaje — nazwane wprost.</b> Granulacja deployu spada z ośmiu niezależnych
@@ -671,7 +754,7 @@
     scaleniu, tak jak iteracja 1 sfalsyfikowała trzy liczby audytu.</p>
   </div>
 
-  <p><b>Kolejność: A(market) wykonane → B faza 1 wykonana ← tu jesteśmy → D → C. A(teams) wypadło z sekwencji — B zjadło jego przedmiot.</b>
+  <p><b>Kolejność: A(market) wykonane → B faza 1 wykonana → C rozstrzygnięte ← tu jesteśmy → D. A(teams) wypadło z sekwencji — B zjadło jego przedmiot; C skończyło się decyzją, nie robotą.</b>
   Resztki iteracji 5 wypadły z sekwencji (weszły 19.08, PR&nbsp;#167), <b>E jest
   wykonane i scalone</b> (PR&nbsp;#168) — dziura unieważniająca opłacony zysk iteracji 1
   zamknięta tego samego dnia, którego rachunek ją nazwał — a <b>A na market-mcp jest
@@ -687,9 +770,20 @@
   wobec szacowanych 1–2 tygodni, co jest różnicą na tyle dużą, że warto ją traktować jako
   ostrzeżenie przed następnym szacunkiem, nie jako zasługę.</p>
 
-  <p>Zostaje D (może iść równolegle z każdym), C (po pomiarze, nie z rozpędu) i faza 2 B —
-  scalanie pętli tury — którą ta karta od początku dopuszczała jako „na końcu albo wcale",
-  i która nadal nie ma powodu, żeby ruszyć. Jak w poprzednim planie: każdy krok zostawia
-  system w całości działającym i można przerwać po dowolnym — z tą różnicą, że tym razem
-  „zdecydowane" ma stać się „wykonane", zanim dopisze się cokolwiek nowego.</p>
+  <p><b>C zapadło pomiarem i zapadło na „nie".</b> Trzeci raz z rzędu ten sam wzorzec dał
+  inny wynik, i to jest jedyny powód, dla którego warto go było mierzyć zamiast stosować:
+  market-mcp i teams-mcp stały przed właścicielem swoich danych, trading-mcp stoi przed inną
+  granicą bezpieczeństwa. Arytmetyka zwinięcia wychodzi 1,4 : 1 wobec 2,2 : 1 przy A,
+  a trzy rzeczy, których liczby nie pokazują — sonda, która ginie, gwarancja demo, która
+  przestaje być dwiema odpowiedziami, i awaria narzędzia, która zabrałaby zasilanie archiwum
+  — idą w tę samą stronę. Karta C nosi pełne wyliczenie razem z jedną przesłanką pytania,
+  która okazała się nieprawdziwa i argumentowała w drugą stronę.</p>
+
+  <p>Zostaje więc D (może iść równolegle z każdym) i faza 2 B — scalanie pętli tury — którą
+  ta karta od początku dopuszczała jako „na końcu albo wcale", i która nadal nie ma powodu,
+  żeby ruszyć. Jak w poprzednim planie: każdy krok zostawia system w całości działającym
+  i można przerwać po dowolnym — z tą różnicą, że tym razem „zdecydowane" ma stać się
+  „wykonane", zanim dopisze się cokolwiek nowego. Zasada nr 3 dostaje przy okazji swój
+  czwarty dowód, tym razem na plus: pozycja, której nadano rangę kierunku, została
+  rozstrzygnięta i zapisana tego samego dnia.</p>
 </main>
