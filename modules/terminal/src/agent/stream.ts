@@ -17,7 +17,10 @@ export type AgentStreamEvent =
   | { kind: "fragment"; text: string }
   | { kind: "toolCall"; call: AgentToolCall }
   | { kind: "complete"; incomplete: boolean }
-  | { kind: "error"; message: string };
+  | { kind: "error"; message: string }
+  /** The operator ended this turn. Carries nothing: what was said is already on screen,
+   *  and the reply itself comes back from the transcript like every other one. */
+  | { kind: "stopped" };
 
 /**
  * One frame to a typed event, or `null` for a keepalive comment (`: ping`, sent every
@@ -48,6 +51,8 @@ export function parseSseFrame(frame: string): AgentStreamEvent | null {
       return { kind: "complete", incomplete: Boolean(payload.incomplete) };
     case "error":
       return { kind: "error", message: String(payload.message ?? "") };
+    case "stopped":
+      return { kind: "stopped" };
     default:
       return null;
   }
@@ -55,12 +60,16 @@ export function parseSseFrame(frame: string): AgentStreamEvent | null {
 
 /**
  * Reads a turn's body as the sequence of events it carries, stopping at whichever
- * terminal event arrives first (`complete` or `error` — `agent-chat` spec, "three
- * distinguishable event kinds"). A body that ends with neither — the connection
+ * terminal event arrives first — `complete`, `error`, or `stopped`, the three endings a
+ * turn has (`agent-chat` spec). A body that ends with none of them — the connection
  * dropped — simply ends the generator without one; the caller (`agentChatStore`) is
  * where that silence becomes a visible error, since only it knows what, if anything,
  * arrived before the drop.
  */
 export function readAgentStream(body: ReadableStream<Uint8Array>): AsyncGenerator<AgentStreamEvent> {
-  return readSseStream(body, parseSseFrame, (event) => event.kind === "complete" || event.kind === "error");
+  return readSseStream(
+    body,
+    parseSseFrame,
+    (event) => event.kind === "complete" || event.kind === "error" || event.kind === "stopped",
+  );
 }

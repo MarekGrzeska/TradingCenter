@@ -17,16 +17,19 @@ from ..models import (
 from .sessions import derive_title
 
 _SELECT_MESSAGES = """
-    SELECT id, session_id, role, content, model_id, prompt_version, incomplete, created_at
+    SELECT id, session_id, role, content, model_id, prompt_version, incomplete, stopped,
+           created_at
       FROM messages
      WHERE session_id = $1
      ORDER BY id
 """
 
 _INSERT_MESSAGE = """
-    INSERT INTO messages (session_id, role, content, model_id, prompt_version, incomplete)
-    VALUES ($1, $2, $3, $4, $5, $6)
-    RETURNING id, session_id, role, content, model_id, prompt_version, incomplete, created_at
+    INSERT INTO messages (session_id, role, content, model_id, prompt_version, incomplete,
+                          stopped)
+    VALUES ($1, $2, $3, $4, $5, $6, $7)
+    RETURNING id, session_id, role, content, model_id, prompt_version, incomplete, stopped,
+              created_at
 """
 
 _TOUCH_SESSION = """
@@ -53,7 +56,15 @@ async def append_operator_message(
     same transaction as the message it is derived from."""
     async with conn.transaction():
         row = await fetch_one(
-            conn, _INSERT_MESSAGE, session_id, Role.OPERATOR.value, content, None, None, False
+            conn,
+            _INSERT_MESSAGE,
+            session_id,
+            Role.OPERATOR.value,
+            content,
+            None,
+            None,
+            False,
+            False,
         )
         await conn.execute(_TOUCH_SESSION, session_id, derive_title(content))
     return _message_from_row(row)
@@ -67,7 +78,11 @@ async def append_agent_message(
     model_id: str,
     prompt_version: str,
     incomplete: bool,
+    stopped: bool = False,
 ) -> Message:
+    """One row, however the turn ended. `stopped` is the operator's own ending — always
+    alongside `incomplete`, never instead of it: a stopped reply is not the whole answer
+    either, and a reader filtering on `incomplete` MUST NOT stop seeing it."""
     async with conn.transaction():
         row = await fetch_one(
             conn,
@@ -78,6 +93,7 @@ async def append_agent_message(
             model_id,
             prompt_version,
             incomplete,
+            stopped,
         )
         await conn.execute("UPDATE sessions SET last_active_at = now() WHERE id = $1", session_id)
     return _message_from_row(row)

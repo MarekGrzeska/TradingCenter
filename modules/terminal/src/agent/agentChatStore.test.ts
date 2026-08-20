@@ -9,6 +9,7 @@ import type {
   AgentToolCall,
 } from "./agentApi";
 import type { AgentStreamEvent } from "./stream";
+import { toastStore } from "../ui/toastStore";
 
 const MODELS: AgentModel[] = [
   { id: "luna", displayName: "Luna", costRank: 1, inputRatePer1M: "0.2", outputRatePer1M: "1.2" },
@@ -83,6 +84,10 @@ interface FakeApi extends AgentApi {
   failSendMessage: boolean;
   failRenameSession: boolean;
   failDeleteSession: boolean;
+  /** Sessions `stopTurn` was called for, in order — what the panel asked the module to
+   *  end, as opposed to what the module then did about it. */
+  stopped: number[];
+  failStopTurn: boolean;
   /** What `sendMessage` hands back, set per test — a plain event list by default. */
   script: AgentStreamEvent[];
   /** Seeds a titled, already-exchanged conversation, the way one would exist in the
@@ -96,6 +101,8 @@ function createFakeApi(): FakeApi {
     sessions: [],
     transcripts: new Map(),
     nextId: 1,
+    stopped: [],
+    failStopTurn: false,
     failListModels: false,
     failListSessions: false,
     failGetMessages: false,
@@ -167,6 +174,10 @@ function createFakeApi(): FakeApi {
       api.sessions.splice(index, 1);
       api.transcripts.delete(id);
     },
+    async stopTurn(id) {
+      if (api.failStopTurn) throw new Error("agent is not reachable");
+      api.stopped.push(id);
+    },
     async getUnclaimedToolCalls() {
       return [];
     },
@@ -184,6 +195,7 @@ function createFakeApi(): FakeApi {
         modelId: null,
         promptVersion: null,
         incomplete: false,
+        stopped: false,
         createdAt: 0,
         toolCalls: [],
       });
@@ -209,6 +221,7 @@ function createFakeApi(): FakeApi {
           modelId: session?.currentModelId ?? null,
           promptVersion: "v1",
           incomplete: broke,
+          stopped: false,
           createdAt: 0,
           toolCalls: calls,
         });
@@ -404,6 +417,7 @@ describe("createAgentChatStore", () => {
         modelId: null,
         promptVersion: null,
         incomplete: false,
+        stopped: false,
         createdAt: 0,
         toolCalls: [],
       },
@@ -416,7 +430,7 @@ describe("createAgentChatStore", () => {
     await waitFor(() => expect(store.getSnapshot().transcriptStatus).toBe("ready"));
 
     expect(store.getSnapshot().messages).toEqual([
-      { id: 1, role: "operator", text: "hello", incomplete: false, toolCalls: [] },
+      { id: 1, role: "operator", text: "hello", incomplete: false, stopped: false, toolCalls: [] },
     ]);
     expect(store.getSnapshot().selectedModelId).toBe("luna");
   });
@@ -527,6 +541,7 @@ describe("createAgentChatStore", () => {
         modelId: null,
         promptVersion: null,
         incomplete: false,
+        stopped: false,
         createdAt: 0,
         toolCalls: [],
       },
@@ -547,7 +562,7 @@ describe("createAgentChatStore", () => {
     second.ensureLoaded();
     await waitFor(() => expect(second.getSnapshot().transcriptStatus).toBe("ready"));
     expect(second.getSnapshot().messages).toEqual([
-      { id: 1, role: "operator", text: "hello", incomplete: false, toolCalls: [] },
+      { id: 1, role: "operator", text: "hello", incomplete: false, stopped: false, toolCalls: [] },
     ]);
   });
 
@@ -894,5 +909,130 @@ describe("createAgentChatStore — the chart the agent can set", () => {
     store.send("create the team and then fall over");
 
     await waitFor(() => expect(heard).toHaveLength(1));
+  });
+});
+
+
+/** A turn that says one fragment and then waits, so a test can act while it is genuinely
+ *  in flight. `ending` is what it says once released. The module's own transcript is
+ *  recorded through `recordExchange`'s twin on the fake, so the reload afterwards shows
+ *  what a real one would. */
+function holdAfterFirstFragment(
+  api: FakeApi,
+  ending: AgentStreamEvent,
+): { api: FakeApi; release: () => void } {
+  let release = (): void => {};
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  async function* holding(): AsyncGenerator<AgentStreamEvent> {
+    yield { kind: "fragment", text: "half an " };
+    await held;
+    yield ending;
+  }
+  return {
+    api: {
+      ...api,
+      async sendMessage(id: number, content: string, signal: AbortSignal) {
+        // Through the real fake first, so the transcript it keeps has the operator's
+        // message in it and the reload after the turn is not empty.
+        await api.sendMessage(id, content, signal);
+        return holding();
+      },
+    },
+    release: () => release(),
+  };
+}
+
+describe("createAgentChatStore — stopping a turn", () => {
+  it("asks the module to stop and marks nothing itself", async () => {
+    // `terminal-agent-chat` spec, "Operator zatrzymuje trwającą odpowiedź" — the ending
+    // comes from the module, on the stream and in the transcript. The store's own job is
+    // to ask.
+    const api = createFakeApi();
+    const held = holdAfterFirstFragment(api, { kind: "stopped" });
+    const store = createAgentChatStore(null, held.api);
+
+    store.send("hello");
+    await waitFor(() => expect(store.getSnapshot().turn?.status).toBe("streaming"));
+
+    store.stop();
+    await waitFor(() => expect(api.stopped).toHaveLength(1));
+    // Still running as far as this side is concerned: nothing was marked on a promise.
+    expect(store.getSnapshot().turn).not.toBeNull();
+
+    held.release();
+    await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
+    // And the composer is usable again — a stopped turn is a finished turn.
+    expect(store.getSnapshot().transcriptStatus).toBe("ready");
+  });
+
+  it("does nothing when no turn is running", async () => {
+    const api = createFakeApi();
+    const store = createAgentChatStore(null, api);
+
+    store.stop();
+    await Promise.resolve();
+
+    expect(api.stopped).toEqual([]);
+  });
+
+  it("says so when the module refuses the stop, and marks nothing", async () => {
+    // `terminal-agent-chat` spec, "Moduł nie przyjął zatrzymania"
+    const api = createFakeApi();
+    api.failStopTurn = true;
+    // The turn carries on to its own ending, which is the point: a refused stop stops
+    // nothing.
+    const held = holdAfterFirstFragment(api, { kind: "complete", incomplete: false });
+    const store = createAgentChatStore(null, held.api);
+
+    store.send("hello");
+    await waitFor(() => expect(store.getSnapshot().turn?.status).toBe("streaming"));
+    store.stop();
+
+    await waitFor(() => expect(toastStore.getSnapshot()).toHaveLength(1));
+    expect(toastStore.getSnapshot()[0].title).toMatch(/could not be stopped/i);
+
+    held.release();
+    await waitFor(() => expect(store.getSnapshot().turn).toBeNull());
+    const reply = store.getSnapshot().messages.at(-1)!;
+    expect(reply.stopped).toBe(false);
+  });
+
+  it("carries the module's own stopped mark into the transcript", async () => {
+    const api = createFakeApi();
+    const session = api.seed("earlier", "luna");
+    api.transcripts.set(session.id, [
+      {
+        id: 1,
+        role: "operator",
+        content: "long question",
+        modelId: null,
+        promptVersion: null,
+        incomplete: false,
+        stopped: false,
+        createdAt: 0,
+        toolCalls: [],
+      },
+      {
+        id: 2,
+        role: "agent",
+        content: "half an ",
+        modelId: "luna",
+        promptVersion: "v1",
+        incomplete: true,
+        stopped: true,
+        createdAt: 0,
+        toolCalls: [],
+      },
+    ]);
+    const store = createAgentChatStore(null, api);
+
+    store.openSession(session.id);
+    await waitFor(() => expect(store.getSnapshot().messages).toHaveLength(2));
+
+    const reply = store.getSnapshot().messages[1];
+    expect(reply.incomplete).toBe(true);
+    expect(reply.stopped).toBe(true);
   });
 });

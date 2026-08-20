@@ -110,6 +110,39 @@ async def test_an_incomplete_reply_is_marked(db) -> None:
         incomplete=True,
     )
     assert reply.incomplete is True
+    assert reply.stopped is False
+
+
+async def test_a_stopped_reply_is_marked_apart_from_a_broken_one(db) -> None:
+    """specs/agent-chat, "Zatrzymana odróżnia się od urwanej błędem" — read back from the
+    transcript, not only from the return value, because that is where a later reader
+    looks."""
+    session = await store.create_session(db, owner_principal="op-1", model_id="gpt-5.6-luna")
+    await store.append_operator_message(db, session_id=session.id, content="hello")
+    await store.append_agent_message(
+        db,
+        session_id=session.id,
+        content="the model broke here",
+        model_id="gpt-5.6-luna",
+        prompt_version="v1",
+        incomplete=True,
+    )
+    stopped = await store.append_agent_message(
+        db,
+        session_id=session.id,
+        content="the operator stopped here",
+        model_id="gpt-5.6-luna",
+        prompt_version="v1",
+        incomplete=True,
+        stopped=True,
+    )
+    assert stopped.stopped is True
+
+    messages = await store.get_messages(db, session_id=session.id)
+    broken, cut = messages[1], messages[2]
+    # Both are incomplete; only one of them was somebody's decision.
+    assert (broken.incomplete, broken.stopped) == (True, False)
+    assert (cut.incomplete, cut.stopped) == (True, True)
 
 
 async def test_usage_cost_is_computed_from_the_rates_given(db) -> None:

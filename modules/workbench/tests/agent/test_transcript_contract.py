@@ -24,6 +24,7 @@ TRANSCRIPT_FIELDS = {
     "model_id",
     "prompt_version",
     "incomplete",
+    "stopped",
     "created_at",
     "tool_calls",
 }
@@ -49,6 +50,7 @@ def _message(role: Role = Role.AGENT) -> Message:
         model_id="gpt-5.6-luna" if role is Role.AGENT else None,
         prompt_version="v3" if role is Role.AGENT else None,
         incomplete=False,
+        stopped=False,
         created_at=datetime(2026, 8, 13, tzinfo=UTC),
     )
 

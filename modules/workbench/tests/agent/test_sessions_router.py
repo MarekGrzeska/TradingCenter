@@ -6,7 +6,9 @@ built a real pool against the throwaway database — nothing here calls OpenAI.
 
 from __future__ import annotations
 
+import asyncio
 import json
+import threading
 from decimal import Decimal
 
 import pytest
@@ -46,6 +48,27 @@ class _FakeProvider:
     ):
         self.prompts.append(system_prompt)
         for chunk in self._chunks:
+            yield chunk
+
+
+class _BlockingProvider:
+    """Yields its first chunk, then waits to be let go — long enough for another request
+    to reach the stop route while this turn is genuinely in flight. `started` says the
+    turn is inside the provider; `release` lets it produce the rest."""
+
+    def __init__(self, chunks: list) -> None:
+        self._chunks = chunks
+        self.started = threading.Event()
+        self.release = threading.Event()
+
+    async def stream(self, *, model: str, system_prompt: str, given, tools=(), rounds=()):
+        first, *rest = self._chunks
+        yield first
+        self.started.set()
+        # Waited on off the event loop: this thread is the loop, and blocking it would
+        # stop the stop request from being served at all.
+        await asyncio.get_running_loop().run_in_executor(None, self.release.wait)
+        for chunk in rest:
             yield chunk
 
 
@@ -541,3 +564,65 @@ def test_a_turn_that_dies_before_it_can_report_closes_the_stream() -> None:
 
     assert [kind for kind, _ in events] == ["error"]
     assert "failed" in events[0][1]
+
+
+def test_stopping_a_turn_ends_the_stream_and_marks_the_reply() -> None:
+    """specs/agent-chat, "Operator zatrzymuje odpowiedź w połowie" — end to end, with the
+    stop arriving over HTTP while the turn is inside the provider."""
+    provider = _BlockingProvider(
+        [TextDelta("half an "), TextDelta("answer"), UsageReport(10, 5, None, None)]
+    )
+    with TestClient(app) as client:
+        app.state.agent.provider = provider
+        session_id = client.post("/sessions", json={}).json()["id"]
+
+        events: list[tuple[str, str]] = []
+
+        def send() -> None:
+            response = client.post(
+                f"/sessions/{session_id}/messages", json={"content": "hello"}
+            )
+            events.extend(_sse_events(response.text))
+
+        turn = threading.Thread(target=send)
+        turn.start()
+        assert provider.started.wait(timeout=10)
+
+        stopped = client.post(f"/sessions/{session_id}/stop")
+        provider.release.set()
+        turn.join(timeout=10)
+
+        messages = client.get(f"/sessions/{session_id}/messages").json()
+
+    assert stopped.status_code == 204
+    # The fragment already in flight when the click landed is kept and forwarded — the
+    # boundary is between one chunk and the next, and text that was generated and billed
+    # is not thrown away for being late (design.md, D3).
+    assert [kind for kind, _ in events] == ["fragment", "fragment", "stopped"]
+    assert messages[-1]["content"] == "half an answer"
+    assert messages[-1]["stopped"] is True
+    assert messages[-1]["incomplete"] is True
+
+
+def test_stopping_when_nothing_is_running_changes_nothing() -> None:
+    # A stop that lands after the turn already finished is a race, not an error (design.md, D1).
+    with TestClient(app) as client:
+        app.state.agent.provider = _FakeProvider([TextDelta("hi"), UsageReport(1, 1, None, None)])
+        session_id = client.post("/sessions", json={}).json()["id"]
+        client.post(f"/sessions/{session_id}/messages", json={"content": "hello"})
+
+        first = client.post(f"/sessions/{session_id}/stop")
+        second = client.post(f"/sessions/{session_id}/stop")
+        messages = client.get(f"/sessions/{session_id}/messages").json()
+
+    assert (first.status_code, second.status_code) == (204, 204)
+    assert [m["role"] for m in messages] == ["operator", "agent"]
+    assert messages[-1]["stopped"] is False
+
+
+def test_stopping_a_foreign_or_missing_session_reads_the_same_404() -> None:
+    # specs/agent-chat, "Zatrzymanie cudzej rozmowy" — the registry must not answer
+    # before the owner filter has.
+    with TestClient(app) as client:
+        response = client.post("/sessions/999999/stop")
+    assert response.status_code == 404

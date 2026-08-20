@@ -143,7 +143,11 @@ export function AgentChat({ store = agentChatStore }: { store?: AgentChatStore }
               the writing rather than at the far end of the panel. It rides inside the
               composer for that reason and is out of sight in the conversations view,
               where there is nothing to send. */}
-          <Composer onSend={(text) => store.send(text)} disabled={turnInFlight}>
+          <Composer
+            onSend={(text) => store.send(text)}
+            onStop={() => store.stop()}
+            disabled={turnInFlight}
+          >
             <ModelPicker state={state} onChange={(modelId) => store.setModel(modelId)} />
           </Composer>
         </>
@@ -439,7 +443,14 @@ function Transcript({
       {turn?.status === "waiting" && <ThinkingBubble />}
       {turn?.status === "streaming" && (
         <Bubble
-          message={{ id: "turn", role: "agent", text: turn.text, incomplete: false, toolCalls: [] }}
+          message={{
+            id: "turn",
+            role: "agent",
+            text: turn.text,
+            incomplete: false,
+            stopped: false,
+            toolCalls: [],
+          }}
           streaming
         />
       )}
@@ -503,7 +514,7 @@ function Bubble({ message, streaming = false }: { message: ChatMessage; streamin
         className={`max-w-[85%] rounded-lg px-3 py-2 text-xs leading-relaxed wrap-break-word ${
           operator
             ? "rounded-br-sm bg-primary-soft text-ink"
-            : message.incomplete
+            : message.incomplete && !message.stopped
               ? "rounded-bl-sm border border-critical/50 bg-panel-strong text-ink-secondary"
               : "rounded-bl-sm border border-border bg-panel-strong text-ink-secondary"
         }`}
@@ -516,7 +527,14 @@ function Bubble({ message, streaming = false }: { message: ChatMessage; streamin
             straight through (`terminal-agent-chat` spec, "Odpowiedź niepełna MUST być
             oznaczona jako niepełna, a nie pokazana jako całość"). */}
         {!operator && message.incomplete && (
-          <div className="mt-1 text-[10px] font-semibold text-critical">⚠ incomplete — broke off</div>
+          message.stopped ? (
+            // Not critical-coloured and not called a break: nothing went wrong here, the
+            // operator ended it (`terminal-agent-chat` spec, "Odpowiedź zatrzymana nie
+            // jest błędem").
+            <div className="mt-1 text-[10px] font-semibold text-ink-faint">■ stopped by you</div>
+          ) : (
+            <div className="mt-1 text-[10px] font-semibold text-critical">⚠ incomplete — broke off</div>
+          )
         )}
       </div>
     </div>
@@ -525,10 +543,16 @@ function Bubble({ message, streaming = false }: { message: ChatMessage; streamin
 
 function Composer({
   onSend,
+  onStop,
   disabled,
   children,
 }: {
   onSend: (text: string) => void;
+  /** Ends the turn in flight. Takes the place of Send while one is running — the button
+   *  the operator is looking at is the one they can actually use, and there is nothing
+   *  else in this corner to reach for (`terminal-agent-chat` spec, "Operator zatrzymuje
+   *  odpowiedź z panelu"). */
+  onStop: () => void;
   disabled: boolean;
   /** Rendered between the box and the send row — the model picker, today. */
   children?: ReactNode;
@@ -565,14 +589,24 @@ function Composer({
       {children}
       <div className="mt-2 flex items-center gap-2">
         <span className="text-[10px] text-ink-faint">Enter sends · Shift+Enter new line</span>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={disabled || draft.trim() === ""}
-          className="ml-auto cursor-pointer rounded border border-primary-line bg-primary-soft px-2 py-1 text-xs text-ink transition-colors hover:bg-primary-strong hover:text-ink-inverse disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-ink-faint"
-        >
-          Send
-        </button>
+        {disabled ? (
+          <button
+            type="button"
+            onClick={onStop}
+            className="ml-auto cursor-pointer rounded border border-critical/40 px-2 py-1 text-xs text-critical transition-colors hover:bg-critical hover:text-ink-inverse"
+          >
+            Stop
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={submit}
+            disabled={draft.trim() === ""}
+            className="ml-auto cursor-pointer rounded border border-primary-line bg-primary-soft px-2 py-1 text-xs text-ink transition-colors hover:bg-primary-strong hover:text-ink-inverse disabled:cursor-not-allowed disabled:border-border disabled:bg-transparent disabled:text-ink-faint"
+          >
+            Send
+          </button>
+        )}
       </div>
     </div>
   );

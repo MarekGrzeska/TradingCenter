@@ -36,6 +36,10 @@ class Message(BaseModel):
     model_id: str | None
     prompt_version: str | None
     incomplete: bool
+    # Why it is incomplete, when it is: the operator said stop. A reply that broke is
+    # something to try again, and one that was stopped is something somebody meant
+    # (specs/agent-chat, "Zatrzymana odróżnia się od urwanej błędem").
+    stopped: bool
     created_at: datetime
 
 
