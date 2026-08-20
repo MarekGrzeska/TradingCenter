@@ -20,7 +20,7 @@ from ..contract import (
     ToolCallOut,
 )
 from ..models_catalogue import ModelNotInCatalogue
-from ..turn import Complete, Failed, Fragment, ToolCalled, run_turn
+from ..turn import Complete, Failed, Fragment, Stopped, ToolCalled, run_turn
 
 log = logging.getLogger(__name__)
 
@@ -184,6 +184,10 @@ async def send_message(
 
     model_entry = request.app.state.agent.catalogue.get(session.current_model_id)
     queue: asyncio.Queue = asyncio.Queue()
+    # Set by the stop route, asked by the graph between one fragment and the next. Created
+    # here rather than in `run_turn` so the route below has something to find before the
+    # turn has read its first chunk.
+    stop = asyncio.Event()
 
     task = asyncio.create_task(
         run_turn(
@@ -201,6 +205,7 @@ async def send_message(
             # carrying no identity rather than refusing, because refusing there would take
             # the whole surface away from a desk.
             operator_principal=_operator_principal(request),
+            stop=stop,
         )
     )
     # A task with nothing referencing it is eligible for collection mid-run — kept here
@@ -209,6 +214,14 @@ async def send_message(
     background = request.app.state.agent.background_tasks
     background.add(task)
     task.add_done_callback(background.discard)
+
+    # Findable by rozmowa for as long as it runs. A second turn in the same rozmowa cannot
+    # start while one is in flight — the terminal disables sending, and a caller that does
+    # it anyway replaces the entry, which is the honest answer: stop then ends the turn
+    # that is actually running.
+    running = request.app.state.agent.running_turns
+    running[session_id] = stop
+    task.add_done_callback(lambda _: running.pop(session_id, None))
 
     def _close_stream_if_the_turn_died(finished: asyncio.Task) -> None:
         """A turn that raises before its own guard leaves nothing on the queue, and the
@@ -253,5 +266,36 @@ async def send_message(
             elif isinstance(event, Failed):
                 yield _sse("error", {"message": event.message})
                 return
+            elif isinstance(event, Stopped):
+                # No payload: what there is to say is that the operator ended it, and the
+                # reply itself arrives from the transcript like every other reply
+                # (specs/agent-chat, "Operator zatrzymuje turę w trakcie").
+                yield _sse("stopped", {})
+                return
 
     return StreamingResponse(event_stream(), media_type="text/event-stream")
+
+
+@router.post("/sessions/{session_id}/stop", status_code=204)
+async def stop_turn(
+    session_id: int, request: Request, owner: str = Depends(current_principal)
+) -> None:
+    """Ends the turn running in this rozmowa, at the next boundary the graph reaches.
+
+    `204` whether or not one was running. A stop arriving a moment after the turn wrote
+    its last fragment is a race, not a mistake — and there is nothing an operator could do
+    with an error saying they were too late (design.md, D1).
+
+    The rozmowa is read first, with the owner filter every other route here uses, so a
+    stranger's session and a session that does not exist answer the same `404`. Without
+    that read, the registry alone would tell a stranger whether somebody else's rozmowa is
+    busy right now.
+    """
+    async with request.app.state.agent.pool.acquire() as conn:
+        session = await store.get_session(conn, session_id=session_id, owner_principal=owner)
+    if session is None:
+        raise HTTPException(404, detail="no such session")
+
+    stop = request.app.state.agent.running_turns.get(session_id)
+    if stop is not None:
+        stop.set()

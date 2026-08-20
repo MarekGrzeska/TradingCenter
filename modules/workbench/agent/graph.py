@@ -50,6 +50,14 @@ log = logging.getLogger(__name__)
 LocalTool = Callable[[dict], Awaitable[ToolOutcome]]
 
 
+class StopSignal(Protocol):
+    """Whether the operator has asked for this turn to end. `asyncio.Event` satisfies it,
+    and the graph asks for nothing more than the question — who sets it, and how it
+    travelled from a route to here, is `routers/sessions.py`'s business."""
+
+    def is_set(self) -> bool: ...
+
+
 class AccountTrace(Protocol):
     """The two halves of the trace a call that can move the account leaves behind: a row
     before it is sent, and its outcome once one is known (specs/agent-trading, "Wywołanie
@@ -108,6 +116,11 @@ class ConversationState(TypedDict):
     tool_calls_made: int
     text: str
     failed: bool
+    # Asked between one fragment and the next, and once more before a round of tools
+    # turns into another model call. Never inside `run_tools`: a call that has been sent
+    # is finished and recorded whatever the operator has asked for (design.md, D3).
+    stop: StopSignal | None
+    stopped: bool
 
 
 def build_graph(
@@ -117,7 +130,17 @@ def build_graph(
     operator_principal: str | None = None,
     account_trace: AccountTrace | None = None,
 ):
+    def stop_requested(state: ConversationState) -> bool:
+        signal = state["stop"]
+        return signal is not None and signal.is_set()
+
     async def call_model(state: ConversationState) -> dict:
+        # The round after a round of tools: the calls resolved and were recorded, and
+        # this is where the turn ends rather than asking the model what to do with them
+        # (specs/agent-chat, "Zatrzymanie zastaje trwające wywołanie narzędzia").
+        if stop_requested(state):
+            return {"pending": [], "stopped": True}
+
         parts: list[str] = []
         requests: list[ToolCallRequest] = []
         usage: UsageReport | None = None
@@ -141,6 +164,19 @@ def build_graph(
                     requests.append(chunk)
                 else:
                     usage = chunk
+                if stop_requested(state):
+                    # Leaving the loop closes the provider's stream through the generator's
+                    # own context. What arrived is kept — the operator stopped the answer,
+                    # they did not ask for it to be thrown away — and the requests the
+                    # model had asked for are dropped rather than sent: a tool call that
+                    # never left is not the "already sent" the boundary protects.
+                    return {
+                        "text": state["text"] + "".join(parts),
+                        "usages": [*state["usages"], usage],
+                        "pending": [],
+                        "failed": False,
+                        "stopped": True,
+                    }
         except Exception:
             # Caught here, not by the caller: whatever text arrived before the
             # provider broke must still be returned, not lost along with the
@@ -294,7 +330,7 @@ def build_graph(
         }
 
     def after_model(state: ConversationState) -> str:
-        if state["failed"] or not state["pending"]:
+        if state["failed"] or state["stopped"] or not state["pending"]:
             return END
         return "tools"
 
@@ -315,6 +351,7 @@ def initial_state(
     on_delta: Callable[[str], Awaitable[None]],
     on_tool_call: Callable[[RecordedCall, int], Awaitable[None]],
     tools: Sequence[ToolDescriptor] = (),
+    stop: StopSignal | None = None,
 ) -> ConversationState:
     return {
         "system_prompt": system_prompt,
@@ -330,4 +367,6 @@ def initial_state(
         "tool_calls_made": 0,
         "text": "",
         "failed": False,
+        "stop": stop,
+        "stopped": False,
     }

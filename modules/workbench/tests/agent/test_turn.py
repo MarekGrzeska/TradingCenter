@@ -7,7 +7,7 @@ import pytest
 from agent import store
 from agent.config import ModelCatalogueEntry
 from agent.provider import TextDelta, UsageReport
-from agent.turn import Complete, Failed, Fragment, run_turn
+from agent.turn import Complete, Failed, Fragment, Stopped, run_turn
 
 pytestmark = pytest.mark.db
 
@@ -96,6 +96,72 @@ async def test_a_broken_stream_saves_the_partial_reply_as_incomplete(pool, db) -
     assert messages[-1].content == "cut off"
     assert messages[-1].incomplete is True
     assert queue.events[-1] == Failed("the model call failed")
+
+
+class StopAfter:
+    """The click, landing after `after` questions. `run_turn` asks through the graph: once
+    on entry to a model call, once per chunk read."""
+
+    def __init__(self, after: int) -> None:
+        self._left = after
+
+    def is_set(self) -> bool:
+        if self._left <= 0:
+            return True
+        self._left -= 1
+        return False
+
+
+async def test_a_stopped_turn_keeps_what_was_said_and_says_who_ended_it(pool, db) -> None:
+    # specs/agent-chat, "Operator zatrzymuje odpowiedź w połowie"
+    session_id = await _new_session(db)
+    provider = FakeProvider(
+        [TextDelta("half an "), TextDelta("answer"), UsageReport(10, 5, None, None)]
+    )
+    queue = RecordingQueue()
+
+    await run_turn(
+        pool,
+        session_id=session_id,
+        model_entry=LUNA,
+        provider=provider,
+        queue=queue,
+        stop=StopAfter(1),
+    )
+
+    assert queue.events[-1] == Stopped()
+    assert Failed("the model call failed") not in queue.events
+
+    reply = (await store.get_messages(db, session_id=session_id))[-1]
+    assert reply.content == "half an "
+    assert reply.stopped is True
+    # Still incomplete, because it still is not the whole answer.
+    assert reply.incomplete is True
+
+    # specs/agent-chat: "Zużycie tury zatrzymanej MUST zostać zapisane" — the tokens were
+    # spent before the click, and a ledger that forgets them is a ledger that undercounts.
+    rows = await db.fetch("SELECT * FROM usage WHERE message_id = $1", reply.id)
+    assert len(rows) == 1
+
+
+async def test_stopping_before_the_first_fragment_still_writes_the_turn(pool, db) -> None:
+    session_id = await _new_session(db)
+    provider = FakeProvider([TextDelta("never read"), UsageReport(1, 1, None, None)])
+    queue = RecordingQueue()
+
+    await run_turn(
+        pool,
+        session_id=session_id,
+        model_entry=LUNA,
+        provider=provider,
+        queue=queue,
+        stop=StopAfter(0),
+    )
+
+    reply = (await store.get_messages(db, session_id=session_id))[-1]
+    assert reply.content == ""
+    assert reply.stopped is True
+    assert queue.events == [Stopped()]
 
 
 async def test_usage_never_reported_is_recorded_as_unknown_not_skipped(pool, db) -> None:

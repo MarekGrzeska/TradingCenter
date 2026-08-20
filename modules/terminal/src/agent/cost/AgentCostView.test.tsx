@@ -40,6 +40,9 @@ function fakeApi(overrides: Partial<AgentApi> = {}): AgentApi {
     sendMessage: async () => {
       throw new Error("not used");
     },
+    stopTurn: async () => {
+      throw new Error("not used");
+    },
     usage: async () => summaryFixture(),
     getPrompt: async () => {
       throw new Error("not used");

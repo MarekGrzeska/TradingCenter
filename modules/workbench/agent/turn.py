@@ -18,7 +18,7 @@ from typing import Protocol
 import asyncpg
 
 from . import store
-from .graph import LocalTool, build_graph, initial_state
+from .graph import LocalTool, StopSignal, build_graph, initial_state
 from .models import ChartSnapshot, RecordedCall
 from .models_catalogue import ModelCatalogueEntry
 from .prompt import prompt_text
@@ -64,7 +64,14 @@ class Failed:
     message: str
 
 
-StreamEvent = Fragment | ToolCalled | Complete | Failed
+@dataclass(frozen=True)
+class Stopped:
+    """The operator ended this turn. A third ending rather than a flavour of either of the
+    two above: a turn that broke is something to try again, and a turn that was stopped is
+    not (specs/agent-chat, "Operator zatrzymuje turę w trakcie")."""
+
+
+StreamEvent = Fragment | ToolCalled | Complete | Failed | Stopped
 
 
 class Queue(Protocol):
@@ -142,6 +149,7 @@ async def run_turn(
     tool_server: ToolServer | None = None,
     chart: ChartSnapshot | None = None,
     operator_principal: str | None = None,
+    stop: StopSignal | None = None,
 ) -> None:
     async with pool.acquire() as conn:
         messages = await store.get_messages(conn, session_id=session_id)
@@ -199,18 +207,20 @@ async def run_turn(
                 on_delta=on_delta,
                 on_tool_call=on_tool_call,
                 tools=tools,
+                stop=stop,
             )
         )
         text: str = result["text"]
         usages = result["usages"]
         calls = result["calls"]
         failed: bool = result["failed"]
+        stopped: bool = result["stopped"]
     except Exception:
         # A last-resort backstop, not the primary path: `graph.py`'s own node already
         # catches a broken provider call so partial text survives it. Reaching here
         # means the graph wiring itself failed, and nothing was ever generated.
         log.exception("the conversation graph failed for session %s", session_id)
-        text, usages, calls, failed = "", [None], [], True
+        text, usages, calls, failed, stopped = "", [None], [], True, False
 
     async with pool.acquire() as conn:
         reply = await store.append_agent_message(
@@ -219,7 +229,11 @@ async def run_turn(
             content=text,
             model_id=model_entry.id,
             prompt_version=revision.version,
-            incomplete=failed,
+            # A stopped reply is not the whole answer either — `incomplete` says that much
+            # and keeps saying it. `stopped` is the half `incomplete` cannot carry: who
+            # ended it (design.md, D4).
+            incomplete=failed or stopped,
+            stopped=stopped,
         )
         # One row per model call, all pointing at this one reply. A turn that asked for
         # a tool was billed at least twice, and the tool's own answer went into the
@@ -252,5 +266,7 @@ async def run_turn(
 
     if failed:
         queue.put_nowait(Failed("the model call failed"))
+    elif stopped:
+        queue.put_nowait(Stopped())
     else:
         queue.put_nowait(Complete(incomplete=False))

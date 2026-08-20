@@ -71,6 +71,8 @@ interface FakeApi extends AgentApi {
    *  overrides `sendMessage` for control over event *timing* does not also have to
    *  reinvent what a reload afterwards shows. */
   recordExchange(id: number, content: string, replyText: string, toolCalls?: AgentToolCall[]): void;
+  /** Sessions the panel asked to stop, in order. */
+  stopped: number[];
 }
 
 function createFakeApi(): FakeApi {
@@ -78,6 +80,11 @@ function createFakeApi(): FakeApi {
     sessions: [],
     transcripts: new Map(),
     nextId: 1,
+    stopped: [],
+
+    async stopTurn(id) {
+      api.stopped.push(id);
+    },
 
     seed(title, modelId, messages = []) {
       const session: AgentSession = {
@@ -148,6 +155,7 @@ function createFakeApi(): FakeApi {
         modelId: null,
         promptVersion: null,
         incomplete: false,
+        stopped: false,
         createdAt: 0,
         toolCalls: [],
       });
@@ -160,6 +168,7 @@ function createFakeApi(): FakeApi {
         modelId: session?.currentModelId ?? null,
         promptVersion: "v1",
         incomplete: false,
+        stopped: false,
         createdAt: 0,
         toolCalls,
       });
@@ -255,6 +264,75 @@ describe("AgentChat", () => {
     await screen.findByText("consolidating");
   });
 
+  it("offers Stop while the turn runs, and asks the module to end it", async () => {
+    // `terminal-agent-chat` spec, "Operator zatrzymuje trwającą odpowiedź"
+    const api = createFakeApi();
+    const controllable = controllableEvents();
+    api.sendMessage = async (id, content) => {
+      api.recordExchange(id, content, "half an ", []);
+      return controllable.events;
+    };
+    const { user } = await openPanel(api);
+    await screen.findByLabelText("Model");
+
+    // Nothing to stop before there is a turn.
+    expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+
+    await user.type(screen.getByRole("textbox", { name: /message the agent/i }), "long question");
+    await user.click(screen.getByRole("button", { name: "Send" }));
+
+    const stop = await screen.findByRole("button", { name: "Stop" });
+    expect(screen.queryByRole("button", { name: "Send" })).not.toBeInTheDocument();
+
+    controllable.push({ kind: "fragment", text: "half an " });
+    await screen.findByText("half an");
+    await user.click(stop);
+    await waitFor(() => expect(api.stopped).toHaveLength(1));
+
+    controllable.push({ kind: "stopped" });
+    // The turn is over: the composer takes questions again.
+    await screen.findByRole("button", { name: "Send" });
+  });
+
+  it("shows a stopped reply as stopped, not as a break", async () => {
+    // `terminal-agent-chat` spec, "Odpowiedź zatrzymana nie jest błędem"
+    const api = createFakeApi();
+    const session = api.seed("earlier", "luna", [
+      {
+        id: 1,
+        role: "operator",
+        content: "long question",
+        modelId: null,
+        promptVersion: null,
+        incomplete: false,
+        stopped: false,
+        createdAt: 0,
+        toolCalls: [],
+      },
+      {
+        id: 2,
+        role: "agent",
+        content: "half an answer",
+        modelId: "luna",
+        promptVersion: "v1",
+        incomplete: true,
+        stopped: true,
+        createdAt: 0,
+        toolCalls: [],
+      },
+    ]);
+    void session;
+    const { user } = await openPanel(api);
+    await screen.findByLabelText("Model");
+
+    await user.click(screen.getByRole("button", { name: /^conversations$/i }));
+    await user.click(await screen.findByRole("button", { name: /^earlier$/i }));
+
+    await screen.findByText("half an answer");
+    expect(screen.getByText(/stopped by you/i)).toBeInTheDocument();
+    expect(screen.queryByText(/broke off/i)).not.toBeInTheDocument();
+  });
+
   it("says the model picker is unavailable when the catalogue cannot be read, and offers no select", async () => {
     const api = createFakeApi();
     api.listModels = async () => {
@@ -276,6 +354,7 @@ describe("AgentChat", () => {
         modelId: null,
         promptVersion: null,
         incomplete: false,
+        stopped: false,
         createdAt: 0,
         toolCalls: [],
       },

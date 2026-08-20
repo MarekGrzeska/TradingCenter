@@ -55,14 +55,38 @@ class FakeProvider:
             raise RuntimeError("provider broke")
 
 
+class Stop:
+    """What the route sets when the operator clicks stop. `asyncio.Event` in production;
+    here a counter, so a test can say *when* the click lands: `after` is how many times
+    the graph may ask before the answer becomes yes. The graph asks once on entry to a
+    model call and once per chunk it reads."""
+
+    def __init__(self, after: int | None = None) -> None:
+        self._left = after
+
+    def is_set(self) -> bool:
+        if self._left is None:
+            return False
+        if self._left <= 0:
+            return True
+        self._left -= 1
+        return False
+
+    def set(self) -> None:
+        self._left = 0
+
+
 class FakeToolServer:
     def __init__(
         self,
         outcomes: dict[str, ToolOutcome] | None = None,
         account_tools: frozenset[str] = frozenset(),
+        stop_when_called: Stop | None = None,
     ) -> None:
         self._outcomes = outcomes or {}
         self._account_tools = account_tools
+        # The operator clicking stop while this very call is in flight.
+        self._stop_when_called = stop_when_called
         self.seen: list[tuple[str, dict]] = []
         self.tokens: list[str | None] = []
 
@@ -75,6 +99,8 @@ class FakeToolServer:
         # The token is accepted and recorded rather than ignored: the graph forwards it,
         # and a fake that could not take it would let that forwarding rot unnoticed.
         self.seen.append((name, arguments))
+        if self._stop_when_called is not None:
+            self._stop_when_called.set()
         self.tokens.append(operator_principal)
         return self._outcomes.get(
             name, ToolOutcome(ToolOutcomeKind.OK, f"{name} says 21000.5", 4)
@@ -112,6 +138,7 @@ async def _run(
     announced=None,
     local_tools=None,
     account_trace=None,
+    stop=None,
 ):
     """`announced` collects `(call, position)` for every tool call the graph announced —
     the events a caller watching the turn sees, as opposed to `result["calls"]`, which is
@@ -135,6 +162,7 @@ async def _run(
             on_delta=on_delta,
             on_tool_call=on_tool_call,
             tools=tools,
+            stop=stop,
         )
     )
     return result, seen
@@ -583,3 +611,71 @@ async def test_without_a_trace_at_all_the_graph_still_runs_orders() -> None:
     assert server.seen == [("place_order", {"symbol": "US100"})]
     [call] = result["calls"]
     assert call.row_id is None
+
+
+async def test_a_turn_nobody_stopped_is_not_stopped() -> None:
+    provider = FakeProvider([[TextDelta("all of it"), UsageReport(10, 5, None, None)]])
+
+    result, _ = await _run(provider, FakeToolServer())
+
+    assert result["stopped"] is False
+    assert result["failed"] is False
+
+
+async def test_stopping_mid_stream_keeps_what_arrived_and_asks_the_model_no_more() -> None:
+    """specs/agent-chat, "Operator zatrzymuje odpowiedź w połowie". The click lands after
+    the first fragment: the second one is never read, and the tool the model had asked
+    for is never sent — nothing had left yet."""
+    provider = FakeProvider(
+        [
+            [
+                TextDelta("the first thing. "),
+                TextDelta("the second thing. "),
+                ToolCallRequest("c1", "get_last_price", {"symbol": "US100"}),
+                UsageReport(10, 5, None, None),
+            ],
+            [TextDelta("never asked for"), UsageReport(1, 1, None, None)],
+        ]
+    )
+    server = FakeToolServer()
+
+    # The query on entry says no; the one after the first fragment says yes.
+    result, streamed = await _run(provider, server, stop=Stop(after=1))
+
+    assert result["stopped"] is True
+    assert result["failed"] is False
+    assert result["text"] == "the first thing. "
+    assert streamed == ["the first thing. "]
+    assert server.seen == []
+    assert len(provider.calls) == 1
+
+
+async def test_stopping_during_a_tool_round_lets_the_call_finish_first() -> None:
+    """specs/agent-chat, "Zatrzymanie zastaje trwające wywołanie narzędzia" — the call was
+    already sent, so it resolves and is recorded; what does not happen is the model call
+    that would have read its result."""
+    provider = FakeProvider(
+        [
+            [
+                TextDelta("let me check. "),
+                ToolCallRequest("c1", "get_last_price", {"symbol": "US100"}),
+                UsageReport(10, 5, None, None),
+            ],
+            [TextDelta("21000.5"), UsageReport(80, 12, None, None)],
+        ]
+    )
+    # Not set until the tool server trips it, which is the whole point: the click
+    # lands while the call is out.
+    stop = Stop()
+    server = FakeToolServer(stop_when_called=stop)
+
+    announced: list[tuple[RecordedCall, int]] = []
+    result, _ = await _run(provider, server, announced=announced, stop=stop)
+
+    assert server.seen == [("get_last_price", {"symbol": "US100"})]
+    assert [call.name for call in result["calls"]] == ["get_last_price"]
+    assert result["calls"][0].outcome == "ok"
+    assert [call.name for call, _ in announced] == ["get_last_price"]
+    assert len(provider.calls) == 1
+    assert result["stopped"] is True
+    assert result["text"] == "let me check. "

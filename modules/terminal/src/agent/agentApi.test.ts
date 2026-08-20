@@ -156,9 +156,11 @@ describe("agentApi.getMessages", () => {
         modelId: null,
         promptVersion: null,
         incomplete: false,
+        // Neither `tool_calls` nor `stopped` is in this response at all, which is a module
+        // from before it published either. Empty and false, not undefined — the panel maps
+        // over the first and branches on the second.
+        stopped: false,
         createdAt: 1786442400,
-        // Neither message in this response carries `tool_calls` at all, which is a module
-        // from before it published them. Empty, not undefined — the panel maps over this.
         toolCalls: [],
       },
       {
@@ -168,10 +170,35 @@ describe("agentApi.getMessages", () => {
         modelId: "gpt-5.6-luna",
         promptVersion: "v1",
         incomplete: true,
+        stopped: false,
         createdAt: 1786442405,
         toolCalls: [],
       },
     ]);
+  });
+
+  it("passes the module's own stopped mark through, beside incomplete", async () => {
+    server.use(
+      http.get(`${HTTP_BASE}/sessions/7/messages`, () =>
+        HttpResponse.json([
+          {
+            id: 2,
+            role: "agent",
+            content: "half an ",
+            model_id: "gpt-5.6-luna",
+            prompt_version: "v1",
+            incomplete: true,
+            stopped: true,
+            created_at: "2026-08-11T10:00:05Z",
+            tool_calls: [],
+          },
+        ]),
+      ),
+    );
+
+    const [reply] = await api().getMessages(7, new AbortController().signal);
+    expect(reply.incomplete).toBe(true);
+    expect(reply.stopped).toBe(true);
   });
 
   it("maps the tool calls a reply was reached through", async () => {

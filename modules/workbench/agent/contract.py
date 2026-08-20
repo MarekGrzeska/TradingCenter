@@ -156,6 +156,11 @@ class MessageOut(BaseModel):
     model_id: str | None
     prompt_version: str | None
     incomplete: bool
+    # Published beside `incomplete` rather than folded into it: the panel says two
+    # different things about the two, and a caller that knows only `incomplete` still
+    # reads a stopped reply correctly (specs/terminal-agent-chat, "Odpowiedź zatrzymana
+    # nie jest błędem").
+    stopped: bool
     created_at: datetime
     # Empty for an operator's message and for an agent message that asked nothing — never
     # absent, and never null. "No calls" and "the calls were lost on the way" are two
@@ -172,6 +177,7 @@ class MessageOut(BaseModel):
             model_id=message.model_id,
             prompt_version=message.prompt_version,
             incomplete=message.incomplete,
+            stopped=message.stopped,
             created_at=message.created_at,
             tool_calls=[ToolCallOut.from_tool_call(call) for call in tool_calls],
         )

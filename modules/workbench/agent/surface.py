@@ -11,6 +11,7 @@ goes on `app.state.agent` for them to read.
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -41,6 +42,17 @@ class State:
     # mid-generation just because the request that started it ended (design.md, "Tura
     # modelu przeżywa rozłączenie wołającego").
     background_tasks: set = field(default_factory=set)
+    # The turn running in each rozmowa, by session id, so the stop route can find the one
+    # the operator is looking at. Written when a turn starts, removed when it ends —
+    # by the same `done_callback` that empties `background_tasks`.
+    #
+    # In this process and nowhere else, which is a decision resting on one fact: the plan
+    # this module runs on has exactly one worker, on purpose and with a comment saying so
+    # (`infra/app-service.tf`). A second worker would leave a stop request landing on the
+    # instance that is not running the turn — refusing nothing, doing nothing, saying
+    # nothing. What replaces this then is a signal through the database
+    # (design.md, D2); the boundary the signal is read at does not move.
+    running_turns: dict[int, asyncio.Event] = field(default_factory=dict)
 
 
 def include(app: FastAPI) -> None:

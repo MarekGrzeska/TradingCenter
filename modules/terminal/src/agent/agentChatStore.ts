@@ -38,6 +38,7 @@ import {
   type DrawingsStore,
 } from "./drawingsStore";
 import type { AgentStreamEvent } from "./stream";
+import { showToast } from "../ui/toastStore";
 
 export type { ChatRole };
 
@@ -67,6 +68,10 @@ export interface ChatMessage {
    *  (`terminal-agent-chat` spec, "Odpowiedź niepełna MUST być oznaczona jako
    *  niepełna"). */
   incomplete: boolean;
+  /** Incomplete because the operator said stop, rather than because anything broke. The
+   *  panel says two different things about the two, and only the module can tell them
+   *  apart (`terminal-agent-chat` spec, "Odpowiedź zatrzymana nie jest błędem"). */
+  stopped: boolean;
 }
 
 /** The turn in flight, or the one that just failed before anything was persisted.
@@ -139,6 +144,10 @@ export interface AgentChatStore {
   /** Blank input is ignored rather than rejected — an accidental Enter is not an error
    *  worth a message about. */
   send(text: string): void;
+  /** Asks the module to end the turn in flight. Marks nothing itself: the ending arrives
+   *  on the stream and the reply from the transcript, the same as every other turn. A
+   *  no-op when nothing is running. */
+  stop(): void;
 }
 
 type Storage = Pick<globalThis.Storage, "getItem" | "setItem">;
@@ -175,6 +184,7 @@ function toChatMessage(message: AgentMessage): ChatMessage {
     role: message.role,
     text: message.content,
     incomplete: message.incomplete,
+    stopped: message.stopped,
     toolCalls: message.toolCalls,
   };
 }
@@ -359,6 +369,7 @@ export function createAgentChatStore(
           role: "agent",
           text: accumulated,
           incomplete: true,
+          stopped: false,
           // The module could not be asked what it holds, so the calls that arrived on the
           // stream are the only record of them there is on screen — dropping them here
           // would take away the one thing that explains a reply that broke off.
@@ -586,6 +597,7 @@ export function createAgentChatStore(
       role: "operator",
       text: trimmed,
       incomplete: false,
+      stopped: false,
       toolCalls: [],
     };
     commit({
@@ -647,6 +659,12 @@ export function createAgentChatStore(
           } else if (event.kind === "error") {
             await finishTurn(sessionId, accumulated, calls, event.message);
             return;
+          } else if (event.kind === "stopped") {
+            // Nothing said in the console and nothing kept in state: this ending is not a
+            // fault, and the reply reloaded below carries its own mark
+            // (`terminal-agent-chat` spec, "Odpowiedź zatrzymana nie jest błędem").
+            await finishTurn(sessionId, accumulated, calls, null);
+            return;
           }
         }
         // The body ended with neither `complete` nor `error` — a dropped connection.
@@ -661,6 +679,28 @@ export function createAgentChatStore(
       // Creating the session itself failed — nothing was accepted for this turn.
       commit({ ...state, turn: { status: "unreachable", message: describeError(cause) } });
     }
+  }
+
+  function stop(): void {
+    const sessionId = state.activeSessionId;
+    if (sessionId === null || !turnInFlight()) return;
+
+    void (async () => {
+      try {
+        await api.stopTurn(sessionId, new AbortController().signal);
+      } catch (cause) {
+        // The turn is still running and will still answer. Saying so is the whole of what
+        // this branch does: marking the reply stopped here would put a word on screen
+        // that the module never agreed to (`terminal-agent-chat` spec, "Moduł nie przyjął
+        // zatrzymania").
+        showToast({
+          key: "agent:stop",
+          severity: "error",
+          title: "the turn could not be stopped",
+          detail: describeError(cause),
+        });
+      }
+    })();
   }
 
   // A checkout that reloads with the panel already expanded (`STORAGE_KEY` read as
@@ -685,6 +725,7 @@ export function createAgentChatStore(
     renameSession,
     deleteSession,
     setModel,
+    stop,
     send(text) {
       void send(text);
     },

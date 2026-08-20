@@ -48,6 +48,10 @@ export interface AgentMessage {
   modelId: string | null;
   promptVersion: string | null;
   incomplete: boolean;
+  /** Why it is incomplete, when the module knows: the operator stopped it. False against
+   *  a module from before stopping existed, which reads as "it broke", the only thing that
+   *  could happen then. */
+  stopped: boolean;
   createdAt: number;
   /** How the agent got to this reply. Empty on an operator's message and on a reply that
    *  asked nothing — and empty, too, against a module from before `tool_calls` existed on
@@ -207,6 +211,11 @@ export interface AgentApi {
     signal: AbortSignal,
     chart?: AgentChartSnapshot | null,
   ): Promise<AsyncGenerator<AgentStreamEvent>>;
+  /** Ends the turn running in this conversation. Resolves on 204 — which is also the
+   *  answer when nothing was running, because a stop landing just after the turn finished
+   *  is a race and not something an operator can act on. A conversation that is not
+   *  theirs answers 404, the same as one that never existed. */
+  stopTurn(id: number, signal: AbortSignal): Promise<void>;
   /** What the agent set the chart to since `after`, or null when it set nothing. Safe to
    *  repeat: the module keeps no cursor of its own, so asking twice answers twice the
    *  same (specs/agent-chart-control, "Konsument czyta tylko to, czego jeszcze nie
@@ -258,6 +267,9 @@ interface RawMessage {
   model_id: string | null;
   prompt_version: string | null;
   incomplete: boolean;
+  /** Optional for the same reason `tool_calls` is: a terminal deployed ahead of the
+   *  module reads a transcript without it. */
+  stopped?: boolean;
   created_at: string;
   /** Optional here and required on the module's own contract: a terminal deployed ahead
    *  of the agent reads a transcript without it, and the panel must open rather than
@@ -462,6 +474,7 @@ function mapMessage(raw: RawMessage): AgentMessage {
     modelId: raw.model_id,
     promptVersion: raw.prompt_version,
     incomplete: raw.incomplete,
+    stopped: raw.stopped ?? false,
     createdAt: parseIsoToEpochSeconds(raw.created_at),
     toolCalls: (raw.tool_calls ?? []).map(mapToolCall),
   };
@@ -573,6 +586,10 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
         throw new MarketDataError("unknown", "agent sent no stream body");
       }
       return readAgentStream(response.body);
+    },
+
+    async stopTurn(id, signal) {
+      await http.send(`${httpBase}/sessions/${id}/stop`, { method: "POST", signal });
     },
 
     async chartCommand(after, signal) {
