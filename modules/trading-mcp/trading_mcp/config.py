@@ -1,13 +1,17 @@
 """Settings, and the one thing this module cannot start without: the header
 `capital-gateway` requires on every request, loopback included.
 
-Unlike `market-mcp`'s upstream — `market-data`, gated by Easy Auth and a managed-identity
-scope that only applies once the archive is off this machine — `capital-gateway` checks a
-static shared key (`X-Gateway-Key`, `RequireGatewayKey` in its own `app.py`) on every
-caller regardless of where it is running. There is no loopback exemption to switch on, so
-there is no mode to select: the key is required, full stop
+`capital-gateway` checks a static shared key (`X-Gateway-Key`, `RequireGatewayKey` in its
+own `app.py`) on every caller regardless of where it is running. There is no loopback
+exemption to switch on, so the key is required at every address, full stop
 (specs/trading-mcp-upstream-access, "Poświadczenie do gatewaya jest wymagane niezależnie
 od adresu").
+
+What *does* follow the address is the second credential. Where this module has an identity
+in the directory it also presents a token for the gateway's audience
+(`CAPITAL_GATEWAY_SCOPE`), because the gateway's own door validates tokens rather than
+trusting a key two modules share. Absent, there is nothing to ask for a token and the key
+is the whole credential — the local shape, and not a degraded one.
 
 Refusing to build the settings leaves nothing running to misuse — the same reasoning
 `capital_gateway/config.py` itself uses for its own credential.
@@ -25,6 +29,9 @@ class Settings(BaseSettings):
     # --- capital-gateway, this module's only upstream ---
     capital_gateway_url: str = "http://127.0.0.1:8010"
     capital_gateway_api_key: str
+    # The gateway's audience, where there is an identity to present it with:
+    # `api://tradingcenter-capital-gateway/.default`. Unset is the local shape.
+    capital_gateway_scope: str | None = None
     # Chosen against the gateway's *ordinary* worst case, not its pathological one, and
     # the difference is worth stating because the arithmetic here was wrong once.
     #

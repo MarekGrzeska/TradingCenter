@@ -5,11 +5,15 @@
 Moduł MUST odmówić startu, gdy nie może przedstawić się gatewayowi, i MUST NOT wstawać w trybie, w
 którym gateway jest wołany bez poświadczenia. Odmowa MUST nazywać, czego zabrakło.
 
-Zabraknąć może dwóch rzeczy, zależnie od tego, gdzie moduł stoi: konfiguracji klucza
-współdzielonego tam, gdzie moduł nie ma własnej tożsamości, albo tokenu tej tożsamości tam, gdzie ją
-ma. Obie MUST być odmową startu, nie ostrzeżeniem — moduł bez poświadczenia nie jest modułem
-ograniczonym do odczytu, jest modułem, którego każde narzędzie odpowiada tym samym błędem, i
-którego awarię widać dopiero w środku przebiegu.
+Brakiem poświadczenia jest nieskonfigurowany klucz współdzielony — to MUST być odmowa startu, nie
+ostrzeżenie. Moduł bez klucza nie jest modułem ograniczonym do odczytu, jest modułem, którego każde
+narzędzie odpowiada tym samym błędem, i którego awarię widać dopiero w środku przebiegu.
+
+Nieudane uzyskanie tokenu MUST NOT być samo w sobie odmową startu. O tym, czy moduł może się
+przedstawić, rozstrzyga gateway, a nie katalog: moduł MUST wysłać żądanie tym, co ma, i MUST
+odmówić otwarcia portu, gdy gateway odrzuci sprawdzenie środowiska, które ten moduł wykonuje przed
+nasłuchem. Reguła oparta na katalogu zatrzymywałaby moduł z powodu poświadczenia, którego gateway
+w danym momencie może wcale nie wymagać.
 
 #### Scenario: Start bez skonfigurowanego poświadczenia
 
@@ -17,11 +21,15 @@ którego awarię widać dopiero w środku przebiegu.
 - **THEN** odmawia startu z komunikatem nazywającym brakujące ustawienie
 - **AND** nie zaczyna nasłuchiwać
 
-#### Scenario: Start bez możliwości uzyskania tokenu
+#### Scenario: Tokenu nie udało się uzyskać, gateway jeszcze go nie wymaga
 
-- **WHEN** moduł stoi tam, gdzie ma własną tożsamość, i nie może uzyskać tokenu dla gatewaya
-- **THEN** odmawia startu z komunikatem nazywającym, czego nie udało się uzyskać
-- **AND** nie zaczyna nasłuchiwać
+- **WHEN** moduł nie może uzyskać tokenu, a gateway odpowiada na sprawdzenie środowiska
+- **THEN** moduł startuje i pracuje na kluczu współdzielonym
+
+#### Scenario: Gateway odrzuca sprawdzenie środowiska
+
+- **WHEN** gateway odrzuca sprawdzenie środowiska wykonywane przed otwarciem portu
+- **THEN** moduł nie zaczyna nasłuchiwać
 
 ### Requirement: Poświadczenie do gatewaya jest wymagane niezależnie od adresu
 

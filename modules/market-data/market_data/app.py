@@ -97,7 +97,7 @@ async def lifespan(app: FastAPI):
             client_secret=settings.azure_client_secret,
             tenant_id=settings.azure_tenant_id,
         ) as pool,
-        http_client(settings.gateway_api_key) as client,
+        http_client(settings.gateway_api_key, settings.gateway_scope) as client,
     ):
         # The database is brought to this image's revision here, before anything is
         # built on top of it, before a request is served and — the one that leaves a

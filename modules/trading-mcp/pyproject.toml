@@ -15,6 +15,9 @@ dependencies = [
     # (packages-replace-the-hand-copies). Everything else in this module stays here:
     # its server, its client, its settings and its error taxonomy are not copies.
     "tc-mcp-kit",
+    # This module's own identity, presented to capital-gateway wherever there is a
+    # directory to get a token from (the-gateway-door-authenticates).
+    "azure-identity>=1.17",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.

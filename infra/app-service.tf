@@ -273,10 +273,20 @@ resource "azurerm_linux_web_app" "capital_gateway" {
         local.market_data_api_uri,
       ]
 
-      # The browser, and only the browser. The two service callers are not here because
-      # they present the key instead — adding them would mean giving both modules a token
-      # to fetch and this app a second way to say yes, for no gain.
-      allowed_applications = [azuread_application.terminal.client_id]
+      # The browser, and — since `the-gateway-door-authenticates` — the two service callers
+      # as well. They are listed *before* this app requires authentication, which is the
+      # whole point of the ordering: an entry here costs nothing while
+      # `unauthenticated_action` is still `AllowAnonymous`, and doing it the other way
+      # round would cut both modules off at the moment of apply.
+      #
+      # A managed identity publishes `principal_id`, and `allowed_applications` wants the
+      # client id, which lives on the service principal that object id names — the same
+      # lookup market-data already does for the workbench.
+      allowed_applications = [
+        azuread_application.terminal.client_id,
+        data.azuread_service_principal.market_data_managed_identity.client_id,
+        data.azuread_service_principal.trading_mcp_managed_identity.client_id,
+      ]
     }
 
     login {
@@ -463,7 +473,13 @@ resource "azurerm_linux_web_app" "market_data" {
   app_settings = {
     GATEWAY_BASE_URL   = "https://${local.capital_gateway_hostname}"
     GATEWAY_STREAM_URL = "wss://${local.capital_gateway_hostname}/ws/stream"
-    GATEWAY_API_KEY    = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
+    # What this module presents to the gateway besides the key: a token of its own
+    # identity, for the gateway's audience. Set here rather than left to the module,
+    # because the absence of this setting is what selects local work, where there is no
+    # directory to ask (the-gateway-door-authenticates). The stream is not covered by it —
+    # `/ws/stream` is outside the gateway's authenticator, so the key is what opens it.
+    GATEWAY_SCOPE   = "${local.capital_gateway_api_uri}/.default"
+    GATEWAY_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
 
     # No credential in the URL and no AZURE_* triple here — config.py refuses a
     # DATABASE_URL that carries one, and the App Service's own system-assigned identity
@@ -795,6 +811,19 @@ data "azuread_service_principal" "workbench_managed_identity" {
   object_id = azurerm_linux_web_app.workbench.identity[0].principal_id
 }
 
+# The two service callers of capital-gateway, for its own `allowed_applications`. They
+# reach that module with a shared key today and with a token of their own from
+# `the-gateway-door-authenticates` onward; the lookup is here for the same reason the
+# workbench's is — an App Service identity publishes an object id, and the door needs a
+# client id.
+data "azuread_service_principal" "market_data_managed_identity" {
+  object_id = azurerm_linux_web_app.market_data.identity[0].principal_id
+}
+
+data "azuread_service_principal" "trading_mcp_managed_identity" {
+  object_id = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
+}
+
 # trading-mcp: a tool server, and shaped unlike market-data: its only caller is a backend
 # service presenting a managed identity, so there is no delegated scope and no consent
 # screen — only client credentials.
@@ -908,6 +937,10 @@ resource "azurerm_linux_web_app" "trading_mcp" {
     # to nothing and this module refuses to start, which is the intended failure and not
     # a quiet one (`config.py` requires the key).
     CAPITAL_GATEWAY_API_KEY = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
+    # The same second credential market-data presents, for the same reason: the gateway's
+    # door validates a token rather than trusting a key two modules share. Unset — local
+    # work — leaves the key as the whole credential (the-gateway-door-authenticates).
+    CAPITAL_GATEWAY_SCOPE = "${local.capital_gateway_api_uri}/.default"
 
     # App Service's default expectation for a Linux custom container, matching what the
     # Dockerfile's own ENV sets. Said here as well as there so a reader of either file

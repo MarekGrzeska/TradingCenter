@@ -1,30 +1,31 @@
 ## 1. Infrastruktura, która nic jeszcze nie wymaga
 
-- [ ] 1.1 Dodać `market-data` i `trading-mcp` do `allowed_applications` gatewaya w `infra/app-service.tf` (tożsamości zarządzane obu aplikacji, obok terminala)
-- [ ] 1.2 Sprawdzić `terraform plan` i potwierdzić, że plan nie rusza `excluded_paths` ani `unauthenticated_action`
+- [x] 1.1 Dodać `market-data` i `trading-mcp` do `allowed_applications` gatewaya w `infra/app-service.tf` (tożsamości zarządzane obu aplikacji, obok terminala)
+- [x] 1.2 Sprawdzić `terraform plan` i potwierdzić, że plan nie rusza `excluded_paths` ani `unauthenticated_action`
 - [ ] 1.3 `apply` lokalny operatora; potwierdzić, że oba moduły i strumień pracują dalej bez zmian
 
 ## 2. market-data przedstawia token
 
-- [ ] 2.1 W `market_data/gateway/` uzyskać token dla odbiorcy `api://tradingcenter-capital-gateway` tożsamością modułu i dołączać go do żądań REST obok klucza (wzór: `workbench/agent/tools/client.py`)
-- [ ] 2.2 Zostawić zestawienie WebSocketa na samym kluczu i opisać w komentarzu, dlaczego to jedyna taka trasa
-- [ ] 2.3 Ustawienie odbiorcy w `config.py` — brak wartości oznacza pracę lokalną i sam klucz, nie awarię
-- [ ] 2.4 Testy: żądanie REST niesie oba poświadczenia tam, gdzie jest tożsamość; sam klucz tam, gdzie jej nie ma; nieudane uzyskanie tokenu jest raportowane jako odmowa dostępu, nie jako brak danych
-- [ ] 2.5 `uv run pytest`, `ruff`, `pyright`
+- [x] 2.1 W `market_data/gateway/` uzyskać token dla odbiorcy `api://tradingcenter-capital-gateway` tożsamością modułu i dołączać go do żądań REST obok klucza (wzór: `workbench/agent/tools/client.py`)
+- [x] 2.2 Zostawić zestawienie WebSocketa na samym kluczu i opisać w komentarzu, dlaczego to jedyna taka trasa
+- [x] 2.3 Ustawienie odbiorcy w `config.py` — brak wartości oznacza pracę lokalną i sam klucz, nie awarię
+- [x] 2.6 `GATEWAY_SCOPE` i `CAPITAL_GATEWAY_SCOPE` w `infra/app-service.tf` — obie aplikacje dostają odbiorcę razem z krokiem 1, a moduł bez tej wartości pracuje jak dotąd
+- [x] 2.4 Testy: żądanie REST niesie oba poświadczenia tam, gdzie jest tożsamość; sam klucz tam, gdzie jej nie ma; nieudane uzyskanie tokenu jest raportowane jako odmowa dostępu, nie jako brak danych
+- [x] 2.5 `uv run pytest`, `ruff`, `pyright`
 
 ## 3. trading-mcp przedstawia token
 
-- [ ] 3.1 Dodać `azure-identity` do zależności modułu
-- [ ] 3.2 W `trading_mcp/client.py` dołączać token dla tego samego odbiorcy obok klucza
-- [ ] 3.3 Rozszerzyć odmowę startu: brak klucza tam, gdzie nie ma tożsamości, brak tokenu tam, gdzie jest — obie nazwane w komunikacie
-- [ ] 3.4 Sprawdzenie demo przed otwarciem portu wykonuje się już z tokenem
-- [ ] 3.5 Testy: obie odmowy startu, oba poświadczenia na żądaniu, `scripts/contract.py check`
-- [ ] 3.6 `uv run pytest`, `ruff`, `pyright`
+- [x] 3.1 Dodać `azure-identity` do zależności modułu
+- [x] 3.2 W `trading_mcp/client.py` dołączać token dla tego samego odbiorcy obok klucza
+- [x] 3.3 Odmowa startu zostaje przy braku klucza; nieuzyskany token nie zatrzymuje modułu, bo rozstrzyga o tym gateway (design.md, "Brak tokenu nie zatrzymuje żądania")
+- [x] 3.4 Sprawdzenie demo przed otwarciem portu wykonuje się już z tokenem
+- [x] 3.5 Testy: obie odmowy startu, oba poświadczenia na żądaniu, `scripts/contract.py check`
+- [x] 3.6 `uv run pytest`, `ruff`, `pyright`
 
 ## 4. Wdrożenie kodu i sprawdzenie przed przestawieniem drzwi
 
 - [ ] 4.1 Wypuścić oba moduły; sondy `/health` odpowiadają
-- [ ] 4.2 Potwierdzić w logach gatewaya, że żądania obu modułów niosą rozpoznaną aplikację, a nie sam klucz
+- [ ] 4.2 Potwierdzić w logach obu modułów brak ostrzeżenia "no token for …" — gateway nie może tego potwierdzić przed krokiem 5, bo przy `AllowAnonymous` nie czyta tokenu w ogóle
 
 ## 5. Drzwi zaczynają wymagać
 
