@@ -143,6 +143,58 @@ read-only to the letter, and the tool server that writes is a separate deployabl
 separate identity, so "which module may move the account" is answered by a list of callers
 rather than by a flag inside a process that also serves candles.
 
+### Why it stays that way — decided 20 August 2026, by measurement
+
+Two tool servers stopped being modules a day apart: `market-mcp` mounted as `/mcp` inside
+`market-data` on 19 August 2026, and `teams-mcp` dissolved into the workbench as a function
+call on the 20th. Both paid. `trading-mcp` was put to the same question and the answer came
+out the other way, so the reason is written here rather than left as "proxy by principle" —
+the arithmetic is in `docs/rachunek-po-refactorze.html`, card C.
+
+The line count is close to a wash: the fold deletes ~790 hand-written lines of scaffolding
+and writes back ~570, because Easy Auth authorizes an application and not a path, so the
+gateway would need the route-by-route record `market-data` had to write for exactly this
+reason (`caller_access.py`, 221 lines and 348 of tests on the day it landed). The fold
+that justified this direction ran 1 260 out against 569 back. This one is near one to one.
+
+What decides it is three things no line count shows.
+
+**The probe dies and nothing replaces it.** `trading-mcp` refuses to open a port until the
+gateway has told it the account is a demo one, so its `/health` 200 proves it reached the
+gateway, through the firewall, with the shared key, and was believed — the most a probe
+proves anywhere here. The gateway itself cannot be probed at all: its `ip_restriction`
+admits only the service plan's own outbound addresses, and a CI runner is not one of them,
+so its deploy asks the control plane — the question that reported `Running` over a
+crash-looping container on 16 August 2026. Folding puts the write path inside the one
+module whose deployment cannot see in.
+
+**The demo guard stops being two answers.** The gateway derives its environment from the
+host it is bound to and refuses to start elsewhere; `trading-mcp` refuses to listen until
+it has read that answer over the wire. In one process the second collapses into the first.
+
+**A fault in a tool would take the archive's feed with it.** `market-data` fills every
+candle through the gateway. Today a crash in an order tool kills a process nothing else
+depends on. The two folds that worked had the opposite shape — the tools moved into the
+module they already could not survive without.
+
+One premise of the question was wrong, and it argues the other way, so it is recorded too.
+The gateway is described as sitting behind "a list of two addresses"; it sits behind one
+list of the *plan's* addresses, and all four backend apps share that plan. The workbench is
+already inside the gateway's network perimeter and is held out by one thing: it does not
+hold `GATEWAY_API_KEY`. So the fold would not open a closed network boundary — it would
+change which credential closes it, from a static key two apps share to an enumerated list
+of named applications. That is the better mechanism, and it is available to the gateway
+**without** the fold. Whether to give it one is a separate question, and an infrastructure
+change, so it goes through a proposal on its own merits.
+
+The rule that comes out of the measurement is narrower than the one it replaces, and it is
+mechanical enough to apply to the next tool server without measuring again: **a tool server
+standing in front of the owner of its own data folds into it; a tool server standing in
+front of a different security boundary does not.** `market-mcp` and `teams-mcp` were the
+first kind. `trading-mcp` is the second — the gateway is not the owner of the account, it
+is the only door to a provider that owns it, and the whole point of a second module here is
+that the door and the list of who may knock are not the same artifact.
+
 **One more, and it points the other way — and it is no longer a network edge at all.** The
 tools that build and correct a team from the chat put the *catalogue* behind MCP, and they
 live inside the workbench:
@@ -222,6 +274,28 @@ Three conditions, and a candidate that fails any of them stays copied:
 3. **Every consumer is tested on every change.** A change under `packages/` runs the test
    job of each module that depends on it (`.github/workflows/checks.yml`). Sharing source
    converts a visible drift into an invisible regression unless this holds.
+
+**A package does not get a capability spec, and that is measured rather than assumed.**
+The question was opened on 20 August 2026, because `openspec/specs/` holds nothing for
+`packages/` while three specs each state that a module presents an identity rather than a
+password, migrates itself under an advisory lock and owns what its migrations create — all
+of it code that now lives once, in `tc-runtime`. The titles do repeat: 22 of them, over 33
+of 389 requirement statements.
+
+The requirements do not. Comparing bodies rather than titles across every repeated one:
+**one paragraph is shared by all the homes of a title, against 103 that are not**, and ten
+scenario names are shared against 86, of which only three have identical bodies. Even
+`agent` and `teams`, two surfaces of one process, share four paragraphs against sixty.
+
+The reason is visible in any one of them. `market-data`'s "Migruje dokładnie jeden proces
+naraz" is the workbench's plus a paragraph and a scenario: the wait must exceed the longest
+migration *because the candle table is the largest thing here*, which is why it is 1500
+seconds against 300. A package-level requirement either drops that reason or is a third
+body written from scratch. So the rule is: **a package earns a spec when the requirement it
+satisfies is the same for every consumer — and here it is the same rule with a different
+reason each time, which is a different requirement.** What repeats is the naming, and that
+is a naming collision rather than duplication: OpenSpec addresses a requirement by its
+title, and three of these titles mean three different things.
 
 ### Why the rule changed
 

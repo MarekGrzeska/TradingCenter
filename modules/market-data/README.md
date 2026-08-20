@@ -244,6 +244,54 @@ nothing checks (`npm run contract:generate`, in `modules/terminal`). Change a mo
 terminal stops compiling at the line that reads the field — which is the point. Regenerating
 deliberately needs no running stack: a check that needs one is a check nobody runs.
 
+### A new field on the wire — five stops, every one somebody's job
+
+The most expensive routine change in this repository, and it is an OpenSpec change:
+`contract.py` is a contract between modules, so the full path applies — propose first.
+
+| # | Where | What |
+|---|---|---|
+| 1 | `models.py`, or `tracking.py` / `jobs/models.py` | the field on the domain model, and the query that fills it. If it is stored, its migration in `migrations/` comes first. |
+| 2 | `contract.py` | the field on the `*Out` model. The domain model is not the wire: nothing is published until it is here. |
+| 3 | `modules/terminal` → `pnpm contract:generate` | rewrites `src/data/contract.generated.ts`. Never edited by hand. |
+| 4 | `src/data/archive.ts`, the `mapX` for that shape | snake_case → camelCase, plus the ISO → epoch-seconds conversion a chart indexes by. |
+| 5 | `src/data/types.ts`, then the component | the terminal's own shape. Nothing outside `archive.ts` ever sees a wire field. |
+
+What catches a missed step, and what does not:
+
+- **Stop 3 skipped** — `pnpm contract:check`, before the terminal's tests. `checks.yml` runs
+  the terminal's whole job whenever `contract.py` changes, so a Python-only diff cannot
+  slip past it.
+- **Stops 4 and 5 half-done** — `pnpm typecheck`, in both directions: a field in `types.ts`
+  with no mapper line fails the mapper's return, a mapper line with no field in `types.ts`
+  fails as an excess property, and an ISO string handed to a `number` fails on the spot.
+- **Stops 1 and 2 disagreeing** — *nothing fails*. A field added to the domain model and
+  not to the `*Out` is simply never published. This is the one stop to check by eye.
+
+A field on a **WebSocket** message travels a shorter route with the same rule: the models
+live in `hub.py`, and `openapi.py` hangs them into the published document by hand, because
+a WebSocket has no route for FastAPI to describe. Stops 3 to 5 are unchanged.
+
+### A new indicator is not that change, and the two are easy to conflate
+
+Adding one — another moving average, another oscillator, another zone — touches **exactly
+one file**: the group's own module under `indicators/catalogue/` (`averages.py`,
+`volatility.py`, `regime.py`, `oscillators.py`, `bands.py`, `structure.py`, `zones.py`,
+`profile.py`), where it is appended to that module's tuple. Not `spec.py`, which is the
+entry *shape*, and not `__init__.py`, which only orders the groups — as long as the new
+entry's output shape (`lines`, `markers`, `zones`, `levels`) and render style are ones the
+catalogue and the terminal already know.
+
+The catalogue is data, not a generated type per entry: `GET /indicators` publishes a new
+entry the moment it lands there, and the terminal's picker offers it with **zero terminal
+changes and no `pnpm contract:generate`**. That is the whole point of this spec's "Katalog
+wystarcza do zbudowania wybieraka".
+
+The five-stop path above is for the rarer case this one is not: a genuinely **new output
+shape**, or a **render style** (`Chart.tsx`'s `canDrawIndicator` and its sync effect, a new
+`*Primitive.ts`) the terminal has no drawing code for yet. Only that touches `contract.py`,
+and only then does the full route apply.
+
 | Method | Path | Returns |
 |--------|------|---------|
 | GET | `/health` | whether the database answers, and what is being collected |

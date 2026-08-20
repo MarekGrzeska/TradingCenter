@@ -1,531 +1,251 @@
 # CLAUDE.md
 
-Orientation for an agent working in this repo. `README.md` is the fuller narrative; this
-file is the map and the things that will bite you if you assume the usual defaults.
+The map, and the traps that actually bite. Anything with another home gets a pointer here
+rather than a copy — that is both why this file is short and why it stops drifting. It is a
+cost paid in every session, so it has a ceiling with a test, the way the MCP tool surface
+does: `scripts/tests/test_guide_ceiling.py`. Raising it is a deliberate edit of that line.
 
 ## What this is
 
-A monorepo of **independent** modules supporting trading and research. Every module runs
-standalone — its own entrypoint, dependencies, tests and README — and modules cooperate
-only through a published contract (HTTP/OpenAPI or typed events).
+A monorepo of **independent** modules. Every module runs standalone — its own entrypoint,
+dependencies, tests and README — and modules cooperate only through a published contract
+(HTTP/OpenAPI or MCP).
 
-**No module imports another module.** That is the load-bearing rule and it has not moved:
-at runtime a module reaches another only through a published contract, never through its
-package, its database or its identity.
+**No module imports another module.** The load-bearing rule: at runtime a module reaches
+another only through a published contract, never through its package, its database or its
+identity. **Source may be shared at build time through `packages/`**, under three conditions
+that `docs/architecture.md` ("What may be shared, and what may not") carries with the
+measurement that put them there. A package is resolved into each module's own lock and baked
+into its own image; nothing is published or versioned. If a change seems to need something a
+package cannot give it, the change is wrong, not the rule.
 
-**Source may be shared at build time, through `packages/`, under three conditions** —
-measured as a copy (≥70% identical) *or* new and identical for every consumer from the
-first day, every difference expressible as an argument, and every consumer's tests running
-on every change to the package. `docs/architecture.md`,
-"What may be shared, and what may not", carries the rule and the measurement that changed
-it on 18 August 2026. A package is resolved into each module's own lock and baked into
-each module's own image; nothing is published or versioned. If a change seems to need
-something a package cannot give it, the change is wrong, not the rule.
+| Where | What |
+|---|---|
+| `modules/capital-gateway` | capital.com: trading, deep history, live stream. Demo only, and the only door to the provider. |
+| `modules/market-data` | the candle archive and its own indicators. Owns the PostgreSQL. Two surfaces: the REST contract, and eleven read-only MCP tools at `/mcp` — reduced for a model, no tool writes. |
+| `modules/workbench` | the operator's conversation with a model **and** the teams they compose — one process, two surfaces, two schemas (`agent`, `teams`), two OpenAI keys, two model catalogues. |
+| `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
+| `modules/terminal` | React+TS · the operator's screen. Consumes the other four, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
+| `packages/tc-runtime` | database, migrations, schema check, Easy Auth. |
+| `packages/tc-mcp-kit` | speaking MCP: caller-identity middleware, the upstream-refusal helper, the tool-schema slimmer. |
+| `packages/tc-openai` | the streamed OpenAI call, with tools — one file, taken only by the workbench, whose two surfaces were 79,4% identical here. |
+| `infra/` | Terraform · Azure. `infra/bootstrap/` is a separate root with local state. |
+| `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. |
 
-```
-modules/capital-gateway   Python · capital.com: trading, history, live stream. Demo only.
-modules/market-data       Python · the candle archive and its own indicators. Owns the PostgreSQL. Depends on the gateway. Serves two surfaces: the REST contract, and eleven read-only MCP tools at `/mcp` — reduced for a model, no tool writes.
-modules/workbench         Python · the operator's conversation with a model **and** the teams they compose — one process, two surfaces, two schemas. Two databases (`agent`, `teams`), two OpenAI keys, two model catalogues. Reads the archive through its `/mcp` tools and moves the demo account through trading-mcp's; the tools that build and run a team are a layer inside it, not a module beside it.
-modules/trading-mcp       Python · MCP tools over the gateway's demo account: positions, balance, orders. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting.
-modules/terminal          React+TS · the operator's screen. Consumes the gateway, market-data and the workbench. Publishes nothing.
-packages/tc-runtime       Python · the plumbing measured as a hand-copy across modules: database, migrations, schema check, Easy Auth. A build-time dependency, never a runtime one; its README names the consumers.
-packages/tc-mcp-kit       Python · what a module needs in order to speak MCP: caller-identity middleware, the upstream-refusal helper, the tool-schema slimmer. Taken by trading-mcp, market-data and the workbench. Apart from tc-runtime because it is about the protocol, not about running a module.
-infra/                    Terraform · Azure. `infra/bootstrap/` is a separate root with local state.
-openspec/                 specs (the truth) + change proposals
-docs/                     architecture and reference — only what is true today
-docs/archive/             research from before a decision; the road, not the state
-```
+**Inside `modules/workbench` the rule has a second form**, because two things that were
+modules are packages of one: `agent/` and `teams/` never import each other, `teams_tools/`
+imports neither, and `workbench/` — the assembly — is the only place that imports all three.
+`tests/test_layering.py` reads the imports and refuses; it is a test, not an understanding.
 
-**Inside `modules/workbench` the load-bearing rule has a second form**, because two things
-that were modules are packages of one: `agent/` and `teams/` never import each other,
-`teams_tools/` imports neither, and `workbench/` — the assembly — is the only place that
-imports all three. `tests/test_layering.py` reads the imports and refuses; it is a test, not
-an understanding.
-
-`terminal` is a consumer, not a peer — nothing depends on it. Call it the **terminal**,
-never a "console" or "dashboard".
+Why `market-mcp` and `teams-mcp` no longer exist, and why `trading-mcp` still does, is one
+measured decision each — `docs/architecture.md`, "The order path".
 
 ## Commands
 
-Run these from the module directory. Nothing at the repo root builds or tests everything.
+From the module directory; nothing at the repo root builds or tests everything. Every Python
+module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal `pnpm test` · `lint` ·
+`typecheck` · `contract:check`. What differs is how to start it:
 
-| Module | Commands |
+| Module | |
 |---|---|
-| `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
-| `market-data` | `uv run alembic upgrade head` then `uv run uvicorn market_data.app:app --reload --port 8020` — serves REST and the MCP tools at `/mcp`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
-| `workbench` | `uv run alembic -c alembic-agent.ini upgrade head` **and** `uv run alembic -c alembic-teams.ini upgrade head` (two chains, two databases — the process runs both itself at startup), then `uv run uvicorn workbench.app:app --reload --port 8030`<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
-| `packages/tc-runtime` | no entrypoint — a library<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` |
-| `packages/tc-mcp-kit` | same |
-| `packages/tc-openai` | same |
-| `trading-mcp` | `uv run python -m trading_mcp` (port 8060 — one transport, no `stdio` to choose)<br>`uv run pytest` · `uv run ruff check .` · `uv run pyright` · `uv run python scripts/contract.py check` |
-| `terminal` | `pnpm dev` · `pnpm test` · `pnpm lint` · `pnpm typecheck` · `pnpm contract:check` |
-
-Test flags that matter:
+| `capital-gateway` | `uv run uvicorn capital_gateway.app:app --reload --port 8010` |
+| `market-data` | `uv run alembic upgrade head`, then `uv run uvicorn market_data.app:app --reload --port 8020` |
+| `workbench` | two chains — `uv run alembic -c alembic-agent.ini upgrade head` **and** `-c alembic-teams.ini` (the process runs both itself) — then `uv run uvicorn workbench.app:app --reload --port 8030` |
+| `trading-mcp` | `uv run python -m trading_mcp` (8060) · plus `uv run python scripts/contract.py check`, its snapshot of the gateway's OpenAPI |
+| `terminal` | `pnpm dev` (5173) |
 
 - `uv run pytest` alone runs unit tests; anything needing a database **skips** without Docker.
-- `uv run pytest -m db` — integration tests against a throwaway PostgreSQL container
-  (testcontainers, random port — safe to run in parallel). CI runs these.
-- `uv run pytest -m live --run-live` — needs a real Capital demo session. **Never run in
-  CI**, and see the session warning below.
+- `-m db` — integration against a throwaway PostgreSQL (testcontainers, random port). CI runs these.
+- `-m live --run-live` — needs a real Capital demo session. **Never in CI.**
 - `--run-live-trading` (gateway only) **writes**: it opens, amends and closes demo positions.
 
-The whole stack: `./scripts/dev.sh` on macOS and Linux, `./scripts/dev.ps1` on Windows —
-both wrappers of about a dozen lines over `scripts/dev.py`, which is the implementation
-(`--no-terminal` / `-NoTerminal` for back end only; either spelling works on either
-platform). It starts things in dependency order — migrations → gateway → market-data →
-trading-mcp → workbench → terminal — waiting for each to actually answer.
-Ports are fixed: **8010** gateway, **8020** market-data (REST *and* the tools at `/mcp`),
-**8030** workbench, **8060** trading-mcp, **5173** terminal. **8040, 8050 and 8070 are
-nobody's** — the first since `market-mcp-into-market-data`, the other two since
-`agent-and-teams-one-workbench` — and a `.env` still pointing at any of them is a tool
-server that reads as down.
+The whole stack: `./scripts/dev.sh` or `./scripts/dev.ps1`, both thin wrappers over
+`scripts/dev.py`, which is the implementation. Start order, ports and the reason each service
+sits where it does are one table at the top of that file — `uv run python scripts/dev.py
+--explain` prints it, so it is not repeated here.
 
-That order, those ports and the reason each service sits where it does are one table at
-the top of `dev.py`, and `uv run python scripts/dev.py --explain` prints it. It used to be
-two hand-written scripts of 496 and 647 lines, and all three of their documented drifts
-were a difference between that table and itself — the last one left `dev.ps1` starting
-`teams-mcp` and then forgetting it, so its log went nowhere and its death went unnoticed
-(`one-deploy-path-one-dev-runner`). `scripts/` is a uv project with its own tests now;
-the refusals below each have one.
-
-`trading-mcp` is the one module that will not start on a wish: `CAPITAL_GATEWAY_API_KEY` in
-its `.env` must be the gateway's own `GATEWAY_API_KEY` (the gateway checks the header on
-loopback too), and it asks the gateway whether the account is a demo one *before* it opens
-a port. Both dev scripts compare the two files and refuse up front, because otherwise the
-symptom is the whole stack going down with "a service exited".
+**Ports are fixed: 8010 gateway, 8020 market-data (REST *and* `/mcp`), 8030 workbench, 8060
+trading-mcp, 5173 terminal. 8040, 8050 and 8070 are nobody's** — a `.env` still pointing at
+any of them is a tool server that reads as down.
 
 ## Things that will bite you
 
-**The dev database is the compose.yaml container.** `market-data` writes to a local
-PostgreSQL on `127.0.0.1:55432`, which the dev scripts start first — Docker is required to
-run the stack, not only to test it. Leaving `DATABASE_USER` unset is what selects this
-local mode, and it narrows the module to loopback: a `DATABASE_URL` pointing at any remote
-host (production included) is refused at startup, by `dev.py` and by `config.py` both.
-Production connects with an Entra identity instead — `DATABASE_USER` set in
-`infra/app-service.tf` — and that path is not for local use. (Do not "restore" the brief
-arrangement where dev ran on the Azure server; it was reversed the same day it was made —
-`openspec/changes/local-dev-database-in-docker`.)
+**The dev database is the `compose.yaml` container**, on `127.0.0.1:55432`, started first by
+the dev scripts — Docker is required to run the stack, not only to test it. Leaving
+`DATABASE_USER` unset is what selects this local mode, and it narrows the module to loopback: a
+`DATABASE_URL` pointing at any remote host is refused at startup, by `dev.py` and `config.py`
+both. Production uses an Entra identity instead. Do not "restore" the brief arrangement where
+dev ran on the Azure server; it was reversed the same day it was made. The `workbench`'s two
+further databases (`agent`, `teams`) live in that same container, and the dev scripts create
+each role and database themselves — `docker-entrypoint-initdb.d` only fires on an empty volume.
 
-The `workbench` writes to two further logical databases (`agent`, `teams`) in the same
-container, on the same port — one Postgres server, three schemas, the same shape as
-production's own `psql-tradingcenter` (`infra/database.tf`). It migrates both at startup,
-each under its own advisory-lock key. The dev scripts create each role and database
-themselves if either is missing, since `docker-entrypoint-initdb.d` only ever runs against
-an empty volume and would never fire for a `tradingcenter-db-data` from before those
-modules existed.
+**The terminal's contract is generated.** After changing `market_data/contract.py`, run
+`pnpm contract:generate` in the terminal — CI's `contract:check` fails on a stale file. The
+five-stop route a new field travels, and why a **new indicator** is not that change and touches
+exactly one file, are in `modules/market-data/README.md`.
 
-**The terminal's contract is generated.** `src/data/contract.generated.ts` is built from the
-schema `market-data` derives from its own models. After changing anything in
-`market_data/contract.py`, run `pnpm contract:generate` in the terminal — CI's
-`contract:check` fails on a stale file, and it runs before the terminal's tests on purpose.
-The whole route a new field travels is below, under "A new field on market-data's wire".
+**Env files are per-module and gitignored**; copy from `.env.example`, which is the list. Two
+things about them are not in any example file. First, the `workbench` reads one `.env` for two
+surfaces, and a prefix marks the four things doubled on purpose — `AGENT_`/`TEAMS_DATABASE_URL`,
+`_OPENAI_API_KEY` (two keys so teams experiments bill on their own line), `_MODELS`, and
+`AGENT_DEFAULT_MODEL_ID`, which has no teams twin because every agent in a saved revision names
+its own model. Everything else is one setting for the whole process, read only by
+`workbench/config.py`. Second, three traps, the same mistake at three dates: a file copied
+before `market-mcp-into-market-data` points `MARKET_MCP_URL` at 8040, where nothing listens; one
+copied before `agent-and-teams-one-workbench` carries `TEAMS_MCP_URL` (read by nothing) and
+carries `DATABASE_URL`, `OPENAI_API_KEY` or `MODELS` unprefixed, which refuses to start rather
+than misbehaving. `dev.py` says all of it at startup.
 
-**Capital sessions coexist — the old warning here was never measured, and it was wrong.**
-This file used to say that capital.com invalidates the previous session on every new login,
-so two gateway processes deauthenticate each other. Measured against the demo API on
-10 August 2026, all of it with `GET /accounts` proving each session usable, not merely
-present:
+**`MARKET_MCP_URL` is the setting whose *absence* is a working configuration**, not a mistake:
+without it the conversation has no archive tools, and a team whose agents were *assigned* tools
+refuses to run rather than answer without them. `TRADING_MCP_URL` is the same shape for the
+account, checked independently — and it is the one that reads least like a setting, because the
+operator asks about their positions and the agent says it cannot see them.
 
-- four sessions opened with **one** API key: all four still answered after the fourth
-  login, and still answered a minute later. No eviction, no cap at four, no delay;
-- two sessions from **two** API keys under one login: both answered, in either order;
-- two streaming connections on one account subscribed to the same epic: both kept
-  receiving quotes, whether the sessions came from one key or two.
+**`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
+`GATEWAY_API_KEY` — the gateway checks that header on every caller, loopback included — and it
+asks the gateway whether the account is a demo one *before* it opens a port. Both dev scripts
+compare the two files and refuse up front, because otherwise the symptom is the whole stack
+going down with "a service exited".
 
-An API key carries **its own password**, set when the key is created — not the account's
-login password. A second key with the first key's password answers
-`401 {"errorCode":"error.invalid.details"}`, which reads exactly like an invalidated
-session and is not one.
+**Capital sessions coexist**, and the warning that stood here until 10 August 2026 was never
+measured and was wrong. What constrains parallel work is the rate budget — 10 req/s counted against the
+**account**, so two stacks starve each other — not the session. The measurement, the API key's
+own password, and what a 401 storm really was are in `modules/capital-gateway/README.md`.
 
-What still constrains parallel work is the rate budget, not the session: capital.com counts
-its 10 requests/second against the **account**, so two stacks share one allowance and starve
-each other. Together with the fixed ports and the single dev database container, that is
-still a reason to run one stack at a time — a different reason, with a different symptom
-(slowness, not 401s). Not measured: live accounts, and whether this behaviour is stable
-over time. A 401 storm was really observed on 9–10 August; `stream_tokens_for` in
-`capital_gateway/app.py` names what does explain it, which is a session going idle.
+**Terraform `apply` is the operator's job, never CI's** — applying would hand the CI principal
+Entra directory write access. `infra/bootstrap/` keeps local state that *is* committed; its
+storage-account keys are in that file and are inert by design (`shared_access_key_enabled =
+false`, verified live). Don't "fix" that by rotating.
 
-**Env files are per-module and gitignored.** Copy from `.env.example`. The gateway needs
-`CAPITAL_*` demo credentials plus its own `GATEWAY_API_KEY`; market-data needs the same
-`GATEWAY_API_KEY`, a `DATABASE_URL` and the `AZURE_*` identity it connects to Postgres with.
-market-data's own two caller lists (`TOOL_CALLER_APPLICATION_IDS`,
-`REST_CALLER_APPLICATION_IDS`) are empty locally and read only where
-`REQUIRE_AUTHENTICATED_PRINCIPAL` is on, which is Azure.
+**A module's tools arrive at `apply`, not at deploy.** The `workbench` deployed with no
+`MARKET_MCP_URL` starts, runs and answers — without tools, a supported state its own tests walk.
+They appear only after the operator's apply sets that setting **and** puts the workbench's
+managed identity into market-data's `allowed_applications` **and** its
+`TOOL_CALLER_APPLICATION_IDS`, and the app restarts. Neither substitutes for the other: Easy
+Auth authorizes an application, not a route (`market_data/caller_access.py`). The route record
+is empty in a fresh deployment, so **the settings must reach the app before the image that
+enforces them does** — an apply landing after the deploy is an outage in between. Rolling back
+is the same lever: clear the URL, restart. `TRADING_MCP_URL` and trading-mcp's own
+`allowed_applications` are the same pairing for the account.
 
-**The `workbench` reads one `.env` for two surfaces, and the shape of it is the rule for
-reading the rest of this section.** A name with a prefix is one of the four things that stay
-doubled on purpose: `AGENT_DATABASE_URL` / `TEAMS_DATABASE_URL` (two schemas),
-`AGENT_OPENAI_API_KEY` / `TEAMS_OPENAI_API_KEY` (two keys, so the teams experiments bill on
-their own line — `openai-api-key` and `teams-openai-api-key` in Key Vault),
-`AGENT_MODELS` / `TEAMS_MODELS`, and `AGENT_DEFAULT_MODEL_ID`, which has no teams twin
-because every agent in a saved revision names its own model. Everything else is one setting
-for the whole process, and twelve names stopped existing twice when the two modules became
-one. `workbench/config.py` is the only code that reads any of it; both surfaces' own
-`Settings` are built from it by argument, validators and all.
-
-Neither OpenAI key has a managed-identity alternative the way the database does — OpenAI is
-not in Entra — and `config.py` refuses to start without either.
-
-`MARKET_MCP_URL` is the setting whose *absence* is a working configuration rather than a
-mistake: without it the conversation has no archive tools, which is what it was before it
-had any, and a team whose agents were *assigned* tools refuses to run rather than answer
-without them. `TRADING_MCP_URL` is the same shape for the account, checked independently:
-clearing one takes its tools away and leaves the other exactly where it is. The second is
-the one whose absence reads least like a setting — the operator asks about their positions
-and the agent says it cannot see them, which sounds like the account being unreachable.
-
-**Three `.env` traps, all of them the same mistake at different dates.** A file copied
-before `market-mcp-into-market-data` points `MARKET_MCP_URL` at 8040, where nothing
-listens. One copied before `agent-and-teams-one-workbench` carries `TEAMS_MCP_URL` (read by
-nothing — those tools are a layer in this process), and carries `DATABASE_URL`,
-`OPENAI_API_KEY` or `MODELS` unprefixed, which is a process that refuses to start rather
-than one that misbehaves. `dev.py` says all of it at startup rather than leaving it to be
-discovered.
-
-`trading-mcp` needs an `.env` locally where nothing else beyond the workbench does: it has
-one required setting, `CAPITAL_GATEWAY_API_KEY`, and it must be the gateway's own
-`GATEWAY_API_KEY` — the gateway checks that header on every caller, loopback included, so
-there is no local mode where it can be left out. Together with the demo check it makes at
-start-up, that is why this module exits rather than degrades when something is wrong, and
-why both dev scripts compare the two files before starting anything.
-
-**Terraform `apply` is the operator's job, never CI's.** CI plans only, deliberately —
-applying would hand the CI principal Entra directory write access. `infra/bootstrap/` keeps
-local state that *is* committed; its storage-account keys are in that file and are inert by
-design (`shared_access_key_enabled = false`, verified live). Don't "fix" that by rotating.
-
-**The archive's tools arrive at `apply`, not at deploy.** Code and infrastructure land
-separately here, and this is the pairing where it shows: the `workbench` deployed with no
-`MARKET_MCP_URL` starts, runs and answers — without tools, which is a supported state and
-one its own tests walk, not a broken one. The tools appear only after the operator's
-`terraform apply` sets that setting and puts the workbench's managed identity into
-market-data's `allowed_applications` **and** its `TOOL_CALLER_APPLICATION_IDS`, and after
-the app restarts. Both, and neither substitutes for the other: the first is the door,
-the second is which surface behind it — Easy Auth authorizes an application, not a route
-(`market_data/caller_access.py`).
-
-Those lists name **one** backend caller since `agent-and-teams-one-workbench`, where they
-named two. Nothing gained access it did not have: the conversation and the teams runner
-present the same identity because they are the same App Service — which is also why its
-resource is still called `app-tradingcenter-agent` while the module is called `workbench`.
-A name here is an identity, not a label (`infra/app-service.tf`, `local.workbench_app_name`).
-
-Both lists hold **application** ids, and the module reads the application from the token's
-`azp`/`appid` claim rather than from `X-MS-CLIENT-PRINCIPAL-ID`. That header names the
-signed-in person for a delegated token — measured on 19 August 2026 by deploying the
-opposite assumption, which refused every request the terminal made until the image went
-back. The route record is empty in a fresh deployment, so **the settings have to reach the
-app before the image that enforces them does**: an apply that lands after the deploy is an
-outage in between, not merely an ordering preference. Rolling back is the
-same lever: clear `MARKET_MCP_URL`, restart, and the module is what it was, with the rows
-in `tool_calls` still recording what happened while it had them.
-
-The same pairing holds for the account: a `workbench` image that can send orders sends
-none until `TRADING_MCP_URL` is set *and* its managed identity is in `trading-mcp`'s own
-`allowed_applications`. Either one alone gives a module that asks and is refused at the
-door, which is the intended half-state rather than a broken one.
+Both lists hold **application** ids, read from the token's `azp`/`appid` claim and never from
+`X-MS-CLIENT-PRINCIPAL-ID`, which names the signed-in *person* for a delegated token — measured
+on 19 August 2026 by deploying the opposite assumption and refusing every request the terminal
+made. They name **one** backend caller: the conversation and the teams runner are the same App
+Service, which is why its resource is still `app-tradingcenter-agent` while the module is called
+`workbench`. A name here is an identity, not a label.
 
 ## Migrations are never the operator's job
 
-**Standing rule, for every schema this repository owns — the three that exist and every one
-added later: a merge to `main` must leave production serving. No operator step between the
-merge and a working application, and none after it.** A module whose deployment cannot
-migrate its own databases is not finished, and neither is the change that added it. Three
-schemas across two modules now: the `workbench` owns two and migrates both in its own
-lifespan, each under its own advisory-lock key.
+**Standing rule, for every schema this repository owns: a merge to `main` must leave production
+serving.** No operator step between the merge and a working application, and none after it. A
+module whose deployment cannot migrate its own databases is not finished, and neither is the
+change that added it.
 
-What "satisfied" means, concretely, and all three are required:
+Three things are required, and each has a failure behind it: the deployment applies
+`alembic upgrade head` against every production database that module owns, itself, before the new
+image serves; the new tables are usable by the app's own role the moment they exist; and the
+deployment's check fails when either did not happen. A check reading the App Service control plane
+proves the site is running the right image, not that the process inside came up — the weaker
+question, and it reported `Running` over a crash-looping container on 16 August 2026.
 
-1. the deployment applies `alembic upgrade head` against every production database that
-   module owns, itself, before the new image starts serving;
-2. the new tables are usable by the app's own role the moment they exist — see the grant
-   trap below, which is what turns a successful migration into `permission denied`;
-3. the deployment's own check fails when either of those did not happen. A check that reads
-   the App Service control plane proves the site is *running the right image*, not that the
-   process inside came up — `deploy-workbench.yml` says so in its own comment.
+Each module satisfies this in its own `lifespan`, under a Postgres advisory lock keyed per module
+(`market_data/db.py` 8020, `agent/runtime.py` 8030, `teams/runtime.py` 8050 — each the port that
+module used to have) and with the module's own identity, so a table it creates belongs to it. The
+reasoning, the uneven lock waits and what `schema_version.py` still means are in
+`openspec/changes/archive/…-modules-migrate-their-own-database`.
 
-The rule is written from a failure, not from taste. Production `agent` sat dark on
-16 August 2026 with its database at `0005` and its image shipping `0009`, because nothing
-migrated it: not the container, not the workflow that deployed it, and that workflow's
-control-plane smoke check reported green over a container crash-looping on exit code 3.
-
-**How it is satisfied today** (`openspec/changes/archive/…-modules-migrate-their-own-database`):
-each module migrates in its own `lifespan`, through `migrate.py`, before it serves anything —
-and, in `market-data`, before it writes a single candle. Two properties carry it:
-
-- **A Postgres advisory lock** (`db.py`, `MIGRATION_LOCK_KEY`) rather than a rule against
-  migrating at startup. Two instances starting together give one migration and one waiter.
-  The wait is bounded and deliberately uneven: five minutes for each of the workbench's two
-  chains, twenty-five for
-  `market-data`, whose candle table is the largest thing here (`migration_lock_wait_seconds`,
-  300 s against 1500 s — this file said thirty until the numbers were read on 18 August 2026). A lock held by a process that
-  died needs no timeout — it is session scoped and dies with the connection.
-- **The module's own identity**, not the server administrator's. A table created by the app
-  role belongs to it, so nothing has to be granted afterwards. This is what closed the
-  `ALTER DEFAULT PRIVILEGES` trap — that grant is scoped to the role creating the object, so
-  it only ever worked while one identity did all the creating (`prompt_revisions`, 15 August,
-  read as `permission denied` rather than as a missing table).
-
-`schema_version.py` still runs immediately after, and now means something narrower: an
-upgrade that reported success without arriving, or an image older than the schema it found.
-The second gets *more* likely under this arrangement, not less — the schema moves forward at
-every deploy while a rollback moves only the code back.
-
-What a new module with a database has to do: migrate in its own lifespan under its own lock
-key, with its own identity, and have a deploy check that reaches the process rather than the
-control plane. `deploy-workbench.yml` reads `/health`, excluded from Easy Auth the way
-`market-data`'s `/ping` is — and because the lifespan blocks until every migration finishes,
-a process that answers is itself the proof that its schemas are at head.
-
-One thing stays the operator's, exactly once per database: the app role must own what it is
-about to alter. `scripts/grant-schema-ownership.sql` transfers ownership of everything in
-`public` and grants `CREATE` on the schema. A database that has not had this done gives a
-module that will not start.
-
-**One App Service can present one identity, and that is where this step multiplies.** The
-workbench connects to both its databases as `app-tradingcenter-agent`, so that role has to
-exist — and own the schema — in `teams` as well as in `agent`. It is the single operator
-step `agent-and-teams-one-workbench` carries, and skipping it is a process that refuses to
-start rather than one that starts and fails later.
-
-## A new field on market-data's wire
-
-The most expensive routine change in this repo — five stops, and every one of them is
-somebody's job. Nothing here needs fixing; it needs to be read before starting rather than
-rediscovered from a red CI job.
-
-**It is an OpenSpec change.** `market_data/contract.py` is a contract between modules, so
-the full path applies — propose first.
-
-| # | Where | What |
-|---|---|---|
-| 1 | `market_data/models.py`, or `tracking.py` / `jobs/models.py` | the field on the domain model, and the query that fills it. If it is stored, its migration in `migrations/` comes first. |
-| 2 | `market_data/contract.py` | the field on the `*Out` model. The domain model is not the wire: nothing is published until it is here. |
-| 3 | `modules/terminal` → `pnpm contract:generate` | rewrites `src/data/contract.generated.ts`. Never edited by hand. |
-| 4 | `src/data/archive.ts`, the `mapX` for that shape | snake_case → camelCase, plus the ISO → epoch-seconds conversion a chart indexes by. |
-| 5 | `src/data/types.ts`, then the component | the terminal's own shape. Nothing outside `archive.ts` ever sees a wire field. |
-
-What catches a missed step, and what does not:
-
-- **Stop 3 skipped** — `pnpm contract:check`, before the terminal's tests. `checks.yml`
-  runs the terminal's whole job whenever `contract.py` changes, so a Python-only diff
-  cannot slip past it.
-- **Stops 4 and 5 half-done** — `pnpm typecheck`, in both directions: a field in `types.ts`
-  with no mapper line fails the mapper's return, a mapper line with no field in `types.ts`
-  fails as an excess property, and an ISO string handed to a `number` fails on the spot.
-- **Stops 1 and 2 disagreeing** — *nothing fails*. A field added to the domain model and not
-  to the `*Out` is simply never published. This is the one stop to check by eye.
-
-A field on a **WebSocket** message travels a shorter route with the same rule: the models
-live in `market_data/hub.py`, and `openapi.py` hangs them into the published document by
-hand, because a WebSocket has no route for FastAPI to describe. Stops 3 to 5 are unchanged.
-
-## A new indicator
-
-Not the change above, and the two are easy to conflate. Adding one — another moving average,
-another oscillator, another zone — touches exactly one file: the group's own module under
-`market_data/indicators/catalogue/` (`averages.py`, `volatility.py`, `regime.py`,
-`oscillators.py`, `bands.py`, `structure.py`, `zones.py`, `profile.py`), where it is
-appended to that module's tuple. Not `spec.py`, which is the entry *shape*, and not
-`__init__.py`, which only orders the groups — as long as the new entry's output shape
-(`lines`, `markers`, `zones`, `levels`) and render style are ones the catalogue and the
-terminal already know. The catalogue is data, not a generated type per entry: `GET
-/indicators` publishes a new entry the moment it lands there, and the terminal's picker
-offers it with **zero terminal changes and no `pnpm contract:generate`** — that is the whole
-point of `market-data-indicators` spec's "Katalog wystarcza do zbudowania wybieraka"
-(`openspec/changes/add-technical-indicators/design.md`, "Katalog jako dane, nie jako typy").
-
-The five-stop path above is for the rarer case this one is not: a genuinely **new output
-shape**, or a **render style** (`Chart.tsx`'s `canDrawIndicator` and its sync effect, a new
-`*Primitive.ts`) the terminal has no drawing code for yet. Only that touches
-`market_data/contract.py`, and only then does the full route apply.
+**One thing stays the operator's, exactly once per database:** the app role must own what it is
+about to alter — `scripts/grant-schema-ownership.sql`. A database without it gives a module that
+will not start, and the workbench needs it in `teams` as well as in `agent`, since one App Service
+presents one identity.
 
 ## How much test is enough
 
-Measured on 19 August 2026 across every module: ~57,300 lines of test against ~57,500 of
-production code, ~2,800 test functions. The suite is *good* — few mocks, a real Postgres in
-a container rather than a fake, names that read as sentences, docstrings that name the bug
-the test was written from. Nothing below is a retreat from that. What the audit found was
-~18% carrying no assertion of its own, produced by four mechanisms, and the rules exist to
-stop the fifth copy rather than to lower the bar (`docs/bilans-testow.html`).
+Measured 19 August 2026: ~57,300 lines of test against ~57,500 of production code, of which ~18%
+carried no assertion of its own. These rules stop the fifth copy; they do not lower the bar
+(`docs/bilans-testow.html`).
 
-1. **A domain rule is tested once, at the lowest layer that holds it.** Above it — HTTP, the
-   tool surface, the view, telemetry — one test that the state reaches the wire, not the
-   whole matrix again. "A late pair with the market open is stalled" had four homes and four
-   identical test names; the terminal tested one PATCH through the list, the card and the
-   chart.
-2. **Don't test other people's libraries.** Pydantic validating a field, Postgres honouring
-   a CHECK or a DEFAULT, `azure-identity` picking a credential, langchain's internals. The
-   exception that stays is a *security* rule expressed through them — a credential in a URL,
-   a missing TLS, a remote host without a user.
-3. **No test of implementation.** Not `inspect.getsource`, `__mro__` or `signature`, not a
-   private attribute, not a re-render count, not a regex over Tailwind classes. A test that
-   breaks on every refactor regardless of correctness has negative value: it is a second
-   copy of the code, written in assertions.
-4. **A CRUD view gets three tests**: the happy path, one error, one refusal. Sort order is a
-   unit test of the sorting function, never through the DOM, and "the text appears" is not a
-   test.
-5. **A shared package is tested once, in `packages/`.** A consumer gets at most one
-   integration test that the real pairing works. Twin files across two surfaces — the
-   workbench's `agent/` and `teams/` — are one parameterised file; `test_auth.py` was
-   identical to the character, and `test_schema_version.py` existed in four places.
+1. **A domain rule is tested once, at the lowest layer that holds it.** Above it — HTTP, the tool
+   surface, the view — one test that the state reaches the wire, not the whole matrix again.
+2. **Don't test other people's libraries.** The exception that stays is a *security* rule
+   expressed through one: a credential in a URL, a missing TLS, a remote host without a user.
+3. **No test of implementation.** Not `getsource`, `__mro__` or `signature`, not a private
+   attribute, not a re-render count, not a regex over Tailwind classes.
+4. **A CRUD view gets three tests**: happy path, one error, one refusal. Sort order is a unit test
+   of the sorting function, never through the DOM; "the text appears" is not a test.
+5. **A shared package is tested once, in `packages/`** — a consumer gets at most one integration
+   test that the real pairing works. Twin files across the workbench's two surfaces are one
+   parameterised file.
 6. **`@pytest.mark.db` only where the test reads or writes the database.** Input-validation
-   permutations are unit tests. This is the rule with the largest effect on the day: 55% of
-   the workbench's tests needed Docker and two Postgres containers, `test_health` among them.
-7. **Setup belongs in a fixture, data in a builder.** `aclose()` in a teardown, not in fifty
-   test bodies; the chart's `computeQueue` and the team definition built rather than
-   retyped. This removes more lines than any deletion and no assertion at all.
-8. **No performance tests in the unit suite**, and no character budgets on descriptions. A
-   threshold at 10× the measured p95 catches nothing that vectorised numpy can do by
-   accident, and a ceiling on a tool's prose turns every edit red. If it is needed, it is a
-   target run by hand.
+   permutations are unit tests. This is the rule with the largest effect on the day.
+7. **Setup belongs in a fixture, data in a builder** — more lines than any deletion, no assertion lost.
+8. **No performance tests in the unit suite, and no character budget on a single description.** A
+   ceiling belongs on an aggregate surface with headroom — the tool surface, this file — never on
+   one description, where it turns every edit red.
 
-What none of this touches, because there the cost of a miss is silent corruption, a second
-position or a leaked secret rather than a red CI: archive integrity (UPSERT idempotence,
-source precedence, coverage, jobs, the snapshot/subscribe seam), trading-mcp's write path
-(never retried, a timeout is an unknown effect, a refusal is not an access failure), the
-demo guard and every refusal to start, fail-closed authorization, secrets never appearing in
-a response or a log, the Capital session's one-login/one-retry, the workbench's layering and
-route-collision tests, migrations under their advisory lock, cost limits and the trading
-trace, and the contracts — trading-mcp's snapshot of the gateway's OpenAPI, the terminal's
-wire↔domain mappers, the indicator golden file against its TA-Lib oracle.
+None of this touches where a miss is silent corruption, a second position or a leaked secret
+rather than a red CI: archive integrity, trading-mcp's write path, the demo guard and every
+refusal to start, fail-closed authorization, secrets never reaching a response or a log, the
+Capital session's one-login/one-retry, the workbench's layering and route-collision tests,
+migrations under their lock, cost limits and the trading trace, and the contracts — trading-mcp's
+OpenAPI snapshot, the terminal's wire↔domain mappers, the indicator golden file.
 
 ## Workflow
 
-**First decide whether this is an OpenSpec change at all.** Open one when the work will
-change a requirement (`openspec/specs/**`), a contract between modules
-(`market_data/contract.py`, `capital_gateway/dtos.py`, the terminal's generated contract),
-infrastructure (`infra/**`), or **an architectural rule this file calls load-bearing** —
-today: "no module imports another module", and the three conditions under which source
-may be shared at build time.
-Otherwise: branch, tests, pull request — no proposal, no design, no review artifact. Bug
-fixes, behaviour-preserving refactors, UI work that adds no requirement, documentation, CI
-and tooling all take that path.
+**First decide whether this is an OpenSpec change at all.** Open one when the work will change a
+requirement (`openspec/specs/**`), a contract between modules (`market_data/contract.py`,
+`capital_gateway/dtos.py`, the terminal's generated contract), infrastructure (`infra/**`), or
+**an architectural rule this file calls load-bearing** — today: "no module imports another
+module", and the three conditions under which source may be shared at build time. Otherwise:
+branch, tests, pull request. Bug fixes, behaviour-preserving refactors, UI adding no requirement,
+documentation, CI and tooling all take that path. The test is mechanical — name the files the work
+will touch. The fourth category exists because introducing workspace packages reverses the
+shared-library rule outright while touching no file in categories 1–3.
 
-The test is mechanical — name the files the work will touch. None in those four categories
-means there is nothing for a spec to say. One in them means the change is worth a
-proposal.
+`/opsx:explore` · `/opsx:propose` · `/opsx:apply` · `/opsx:archive`, and
+`openspec validate <change> --strict`.
 
-The fourth category is younger than the others and was added because the first three read
-as complete until a real change tested them: introducing workspace packages reverses the
-shared-library rule outright and touches no file in categories 1–3. The mechanical test
-would have waved through the most consequential architectural change on the roadmap, and
-caught it only by accident, through a bundled deletion that happened to remove a
-requirement.
+**Only `proposal.md` is unconditional.** The others are written when there is something for them to
+hold, and skipping one is a line in the proposal saying which and why — an artifact absent on
+purpose reads differently from one missing. An archived change keeps three artifacts, not five:
+`scripts/trim-openspec-archive.sh` drops the delta specs and the ticked `tasks.md`, and `--check`
+in CI catches the archive where it was not run.
 
-When it *is* a change:
+**Language convention, and it is not the obvious one:** OpenSpec artifacts are **Polish prose**
+with **English structure** — headers, `### Requirement:`, `#### Scenario:`, `**WHEN**`/`**THEN**`
+and RFC 2119 keywords stay literal English because the CLI parses them; Polish "MUSI" does not
+satisfy the validator. Everything else — code, comments, identifiers, commit messages, READMEs,
+this file — stays **English**.
 
-| Situation | Command |
-|---|---|
-| Think an idea through | `/opsx:explore` |
-| Propose a change | `/opsx:propose` |
-| Implement it | `/opsx:apply` |
-| Fold it into the specs | `/opsx:archive` |
-
-**Only `proposal.md` is unconditional.** `design.md` was already written only when there
-was a decision with alternatives worth weighing; `tasks.md` and `review.md` joined it on
-18 August 2026. Skipping one is a line in the proposal saying which and why — an artifact
-absent on purpose reads differently from one missing.
-
-`review.md` had been mandatory, enforced by a 256-line PreToolUse hook that refused any
-archive without it. Both are gone, and the hook is the more interesting half: its previous
-PowerShell version could not execute on this project's own macOS machine, so for a while
-every archive passed unchecked while `settings.json` claimed a gate stood there — and its
-own tests ran in no CI. A defence with no test of its failure mode is the thing this repo
-stopped accepting when the audit's first iteration landed, and this one could not pass its
-own rule. Write a review when the change was risky, when the verification is not obvious
-from the tests, or when something turned up worth telling the next reader.
-
-**An archived change keeps three artifacts, not five.** Once the directory has moved into
-`openspec/changes/archive/`, run `scripts/trim-openspec-archive.sh`: it removes the delta
-specs and the ticked `tasks.md`. The delta was merged into `openspec/specs/` by that same
-archive, and what was done and when is git's, with the diffs attached. Whichever of
-`proposal.md`, `design.md` and `review.md` the change wrote stay — those are what git
-cannot hand back in readable form.
-The rule rides in `openspec/config.yaml` under `operations.archive`, so `/opsx:archive` is
-told it; `--check` in CI is what catches the archive where it was not.
-
-**Language convention, and it is not the obvious one:** OpenSpec artifacts are written in
-**Polish prose** with **English structure** — section headers, `### Requirement:`,
-`#### Scenario:`, `**WHEN**`/`**THEN**`, and RFC 2119 keywords (`MUST`, `SHALL`, …) stay
-literal English because the CLI parses them and `--strict` requires them. Polish "MUSI"
-does not satisfy the validator. Everything else — code, comments, identifiers, commit
-messages, module READMEs, this file — stays **English**. Recorded in `openspec/config.yaml`.
-
-Validate with `openspec validate <change> --strict`.
-
-**Comments carry the reason, not the narration.** A comment retelling the line beneath it
-is something the next reader has to parse twice; one naming a measurement, a constraint or
-an approach that was tried and failed is the only record of it. The essays had gathered in
-the terminal — measured 10 August: ~7% comment lines in Python against 15% there — and one
-deliberate pass has since trimmed the longest of them. From here it happens at the moment a
-file is touched, not in bulk: rewriting comments wholesale is churn, and the reason a
-comment exists is usually clearest to whoever is already reading the code around it.
+**Comments carry the reason, not the narration.** One retelling the line beneath it is parsed
+twice; one naming a measurement, a constraint or an approach that failed is the only record of it.
+Trim when a file is touched, not in bulk.
 
 ## CI
 
-`.github/workflows/checks.yml` runs on every PR to `main` and every push to it: one job per
-module, running the same commands listed above, and **only for the modules the diff can
-have broken** — a `changes` job works that out first. `live` tests stay out. If you touch
-`market_data/contract.py`, or anything at all under `modules/workbench/`, expect the
-terminal's job to run too; that is deliberate, since `contract:check` and the terminal's own
-hand-written DTOs are the checks for exactly those pairings — the workbench's teams surface
-is generated the way market-data's is (`pnpm contract:generate` reads two sources and writes
-a file per source), while its conversation contract is not wired into the generator at all,
-so that half is the terminal's tests passing rather than a regenerated file. The whole
-module rather than either `contract.py`, because a document is built from routes as well as
-models, and `weekdays-on-the-shorter-rhythms` merged green over exactly that. That file used
-to pull in a third job — `market-mcp` kept its own committed snapshot of the same schema and
-a script that policed it — and both are gone with the module: the tools read `contract.py`
-in the same process now, so there is no copy left to go stale. `trading-mcp` holds a
-snapshot of the same kind one module further out — `capital-gateway`'s whole OpenAPI
-document — so **any** change under the gateway runs that job too. There used to be a third
-of that shape, `teams-mcp` watching the whole of `teams`; it went with the module, for the
-same reason market-mcp's did.
+`checks.yml` runs one job per module on every PR and push to `main`, and **only for the modules the
+diff can have broken** — a `changes` job works that out first. `live` tests stay out. Two jobs are
+not a module: `scripts` and `infra`.
 
-There is no branch protection on this repository — a private repo on the free plan cannot
-have it — so a skipped job blocks nothing. If that changes, the filter needs stand-in jobs
-or a required check will sit pending forever.
+Three pairings pull in a job you would not expect, and each is a real check: `market_data/contract.py`
+**or anything under `modules/workbench/`** runs the terminal's job, because `contract:check` and the
+terminal's hand-written DTOs are the checks for those seams; anything under `capital-gateway` runs
+trading-mcp's, which holds a committed snapshot of the gateway's whole OpenAPI document. The whole
+module rather than either `contract.py`, because a document is built from routes as well as models.
 
-Four `deploy-*.yml` workflows push images to GHCR and deploy on pushes to `main` touching
-the matching module. Since `one-deploy-path-one-dev-runner` each is about twenty lines
-calling `_deploy-app-service.yml`, and what stays with the caller is what actually differs:
-the trigger, the path filter, the probe's four parameters, and the incident comments —
-which are the most valuable content in a deploy workflow and have nowhere to live in a
-shared file. `deploy-terminal.yml` is not a caller: a Static Web App has no image and no
-container to probe.
+**There is no branch protection on this repository** — a private repo on the free plan cannot have
+it — so a skipped job blocks nothing.
 
-Every one ends in `scripts/deploy_probe.py`, which asks two questions — is this commit's
-image the one App Service will serve, and did the process inside it come up. The second is
-the one that used to go unasked, and the probe is now a function with a test of exactly
-that failure: the previous container answering 200 with the right body while the image tag
-is still the old one. Four inputs cover all of them: `probe_path`, `expected_status`,
-`body_contains`, `attempts`. market-data probes `/ws/candles` for a 404 with a `"detail"`
-body, because that is its only path excluded from Easy Auth — and it is still that one
-route rather than the tool surface it now also serves, since `/mcp` needs a session and a
-caller identity to answer anything; trading-mcp and the workbench probe
-`/health` for a 200 with `"status"`; the workbench gets twenty
-attempts rather than twelve, because its lifespan blocks on two migrations.
-trading-mcp's probe proves the most for its length: that module refuses to open a port
-unless the gateway just confirmed a demo account, so a 200 there means it reached the
-gateway, through its firewall, with the shared key. capital-gateway is the one that cannot
-be probed at all — it admits only market-data's and trading-mcp's addresses, so
-`probe_path` is empty and the control plane is the only question its deploy can ask, which
-is the weaker one: it reported `Running` over a crash-looping container on 16 August 2026.
-`terraform.yml` plans on infra PRs; `terraform-apply.yml` is a manual `workflow_dispatch`
-that applies — and refuses any plan touching `azuread_*`, because CI holds
-`Application.Read.All` and not write. Entra changes are applied locally by the operator,
-and `infra/modules/easy-auth-app/` is entirely `azuread_*`, so anything touching it is
-the operator's apply by construction.
+Four `deploy-*.yml` workflows deploy on pushes to `main`, each ~20 lines calling
+`_deploy-app-service.yml` and ending in `scripts/deploy_probe.py`, which asks whether this commit's
+image is the one App Service will serve *and* whether the process inside came up — the second being
+the one that used to go unasked. `capital-gateway` cannot be probed at all: it admits only the
+service plan's own outbound addresses, so a runner gets 403 either way. `terraform.yml` plans on
+infra PRs; `terraform-apply.yml` is a manual dispatch that applies and refuses any plan touching
+`azuread_*`, since CI holds `Application.Read.All` and not write.
 
-`checks.yml` has two jobs that are not a module: `scripts`, running the same three
-commands every module runs against `scripts/`, and `infra`, running `terraform fmt -check`
-and `validate` against both roots. The second closed a real hole — `terraform.yml` fires
-on `pull_request` only, so a push straight to `main` with infrastructure in it passed
-through nothing at all, and `infra/bootstrap/` was outside every check. Neither needs a
-credential: `init -backend=false` downloads the providers and stops.
-
-Parallel work: use `git worktree` rather than a second clone — but the dev database
-container (one `compose.yaml` project, one volume), the Capital session and the fixed ports
-are shared across worktrees, so only one agent at a
-time can run the stack or touch migrations.
+Parallel work: use `git worktree` rather than a second clone — but the dev database container, the
+Capital session and the fixed ports are shared across worktrees, so only one agent at a time can run
+the stack or touch migrations.
