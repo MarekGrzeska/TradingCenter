@@ -55,13 +55,21 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
 // here, distinct from `VITE_ARCHIVE_HTTP` / `VITE_ARCHIVE_WS`, which are client-side and
 // point at the prefix below in dev — see design.md.
 //
-// capital-gateway has no entry of its own any more: it is not public, and market-data
-// proxies the one thing the terminal used to reach it for directly (the instrument
-// catalogue) — see gatewaySource.ts and openspec/changes/provision-azure-platform.
+// capital-gateway has an entry again, and it carries the caller key on the server side.
+// The gateway demands a credential from every caller, and a browser cannot hold a shared
+// secret — in production it presents a token instead, which the platform validates before
+// the request arrives. In dev there is no platform, so the dev server is what adds the
+// key: `GATEWAY_PROXY_KEY` is server-side and never reaches the bundle
+// (openspec/changes/accounts-screen-opens-the-gateway/design.md, D5).
+//
+// The instrument catalogue still comes through market-data, unchanged — this entry is the
+// account, not a second road to the market (see gatewaySource.ts).
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
   const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
+  const gateway = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
+  const gatewayKey = env.GATEWAY_PROXY_KEY || env.GATEWAY_API_KEY || "";
 
   return {
     plugins: [react(), tailwindcss()],
@@ -97,6 +105,17 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/workbench-api/, ""),
           configure: quietProxyErrors("workbench", workbench),
+        },
+
+        // The account. The key is attached here, in the dev server, so it stays out of
+        // anything the browser downloads — set `GATEWAY_PROXY_KEY` to the same value
+        // `capital-gateway`'s own `.env` holds as `GATEWAY_API_KEY`.
+        "/gateway-api": {
+          target: gateway,
+          changeOrigin: true,
+          headers: gatewayKey ? { "X-Gateway-Key": gatewayKey } : undefined,
+          rewrite: (path) => path.replace(/^\/gateway-api/, ""),
+          configure: quietProxyErrors("capital-gateway", gateway),
         },
       },
     },

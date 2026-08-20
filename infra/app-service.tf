@@ -94,6 +94,9 @@ locals {
   market_data_api_uri   = "api://tradingcenter-market-data"
   market_data_api_scope = "access_as_user"
 
+  capital_gateway_api_uri   = "api://tradingcenter-capital-gateway"
+  capital_gateway_api_scope = "access_as_user"
+
   # Same idea, one level out, for the tool server that writes. Unlike market-data's, this
   # pairs with no delegated scope: the only caller is
   # `teams`, presenting a client-credentials token from its managed identity. A browser
@@ -140,13 +143,20 @@ locals {
   ghcr_registry_password = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.ghcr_pull_token})"
 }
 
-# capital-gateway: not public. design.md, "Uwierzytelnianie gatewaya w kodzie, nie w
-# konfiguracji platformy" — the in-code X-Gateway-Key check is the first layer; this
-# ip_restriction is the second. Its callers are market-data and, since phase 2 of the
-# teams work, trading-mcp — both on the same plan, so the exception is those apps' own
-# outbound addresses rather than "the internet." Read from their resources (5.6 does the
-# same for the database firewall) — never typed by hand, because they change with the
-# plan's SKU.
+# capital-gateway: reachable, and guarded by what the module itself checks.
+#
+# It used to be reachable only from two addresses — market-data's and trading-mcp's own
+# outbound ones — with the in-code X-Gateway-Key check as the first layer and those rules
+# as the second. That arrangement had no room for a browser, and the terminal's Accounts
+# screen is a browser: it cannot hold the shared key (a secret in downloaded code is a
+# published secret) and it does not call from a fixed address.
+#
+# So the address rules are gone and Easy Auth stands here instead, and the price is written
+# down rather than discovered: **the in-code check is now the only thing between this app
+# and the internet**. A leaked key used to be useless off the plan; now it is enough. What
+# limits the damage is unchanged and is the reason this was acceptable — the module refuses
+# to start against anything but the capital.com demo host, so there is no real money behind
+# this door (openspec/changes/accounts-screen-opens-the-gateway/design.md, D2).
 resource "azurerm_linux_web_app" "capital_gateway" {
   name                = local.capital_gateway_app_name
   resource_group_name = azurerm_resource_group.main.name
@@ -159,10 +169,8 @@ resource "azurerm_linux_web_app" "capital_gateway" {
   }
 
   site_config {
-    always_on                     = true
-    websockets_enabled            = true
-    ip_restriction_default_action = "Deny"
-
+    always_on          = true
+    websockets_enabled = true
     application_stack {
       # Placeholder — group 7's deploy workflow pushes the real GHCR image after the
       # first build. Terraform must not fight that: see the lifecycle block below.
@@ -173,37 +181,6 @@ resource "azurerm_linux_web_app" "capital_gateway" {
       docker_registry_password = local.ghcr_registry_password
     }
 
-    dynamic "ip_restriction" {
-      for_each = azurerm_linux_web_app.market_data.possible_outbound_ip_address_list
-      content {
-        name        = "AllowMarketData-${ip_restriction.key}"
-        action      = "Allow"
-        ip_address  = "${ip_restriction.value}/32"
-        priority    = 100 + tonumber(ip_restriction.key)
-        description = "market-data's own outbound address read from its resource"
-      }
-    }
-
-    # The gateway's second caller, and the first one that writes: `trading-mcp` places
-    # orders through this app (specs/trading-mcp-upstream-access). Its own block, read off
-    # its own resource, rather than a widened market-data rule — the two apps share a plan
-    # today and will very likely report the same addresses, but that is a fact about the
-    # plan, not a promise, and a rule named after the module that needs it is the one that
-    # can be removed with the module.
-    #
-    # What this does NOT buy is a second rate budget: capital.com counts its 10 req/s
-    # against the *account*, so the tools called here spend the same allowance market-data
-    # fills the archive from (design.md, "Drugi wołający `capital-gateway`").
-    dynamic "ip_restriction" {
-      for_each = azurerm_linux_web_app.trading_mcp.possible_outbound_ip_address_list
-      content {
-        name        = "AllowTradingMcp-${ip_restriction.key}"
-        action      = "Allow"
-        ip_address  = "${ip_restriction.value}/32"
-        priority    = 200 + tonumber(ip_restriction.key)
-        description = "trading-mcp's own outbound address read from its resource"
-      }
-    }
   }
 
   app_settings = {
@@ -216,7 +193,53 @@ resource "azurerm_linux_web_app" "capital_gateway" {
     CAPITAL_PASSWORD   = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.capital_password})"
     GATEWAY_API_KEY    = "@Microsoft.KeyVault(SecretUri=${local.kv_secret_uri.gateway_api_key})"
 
+    # Who may reach this module without the shared key, on a token the block below has
+    # already validated. The terminal, and nothing else — and the module reads this list
+    # itself (`capital_gateway/caller_access.py`) rather than trusting that anyone past
+    # Easy Auth belongs everywhere: Easy Auth authorizes an application, not a route, and
+    # this app serves the account next to the routes that place orders.
+    BROWSER_CALLER_APPLICATION_IDS = jsonencode([azuread_application.terminal.client_id])
+
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.capital_gateway_easy_auth.password
+
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+  }
+
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = false
+    # **Anonymous is deliberate and load-bearing.** market-data and trading-mcp call this
+    # app with the shared key and no token at all; requiring authentication here would cut
+    # both off at the moment of apply. What this setting buys is narrower and is all that
+    # is wanted: a request that *does* carry a token has it validated before the app sees
+    # it, so the claims the module reads are ones the platform vouched for.
+    unauthenticated_action = "AllowAnonymous"
+
+    active_directory_v2 {
+      client_id                  = module.capital_gateway_easy_auth.client_id
+      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
+      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      # Both spellings of the same request, for the reason market-data's own block gives —
+      # and market-data's own audience as a third, for the reason the workbench's block
+      # gives: the terminal's identity layer acquires one token, scoped to market-data, and
+      # reuses it. The scope below stands ready and pre-authorized for whenever it is
+      # changed to ask for this API by name instead.
+      allowed_audiences = [
+        local.capital_gateway_api_uri,
+        module.capital_gateway_easy_auth.client_id,
+        local.market_data_api_uri,
+      ]
+
+      # The browser, and only the browser. The two service callers are not here because
+      # they present the key instead — adding them would mean giving both modules a token
+      # to fetch and this app a second way to say yes, for no gain.
+      allowed_applications = [azuread_application.terminal.client_id]
+    }
+
+    login {
+      token_store_enabled = true
+    }
   }
 
   lifecycle {
@@ -224,6 +247,28 @@ resource "azurerm_linux_web_app" "capital_gateway" {
     # container set` / webapps-deploy — Terraform reverting that to the placeholder on
     # every apply would fight the thing that is supposed to own this value.
     ignore_changes = [site_config[0].application_stack[0].docker_image_name]
+  }
+}
+
+# The API half of the pair whose client half is `azuread_application.terminal` — the same
+# shape market-data has had since the terminal first needed a token for it. Its own
+# registration rather than reusing market-data's: a token is issued *for* an API, and the
+# two APIs are two doors with two lists of who may knock.
+module "capital_gateway_easy_auth" {
+  source = "./modules/easy-auth-app"
+
+  display_name   = "app-tradingcenter-gateway-easyauth"
+  identifier_uri = local.capital_gateway_api_uri
+  redirect_uri   = "https://${local.capital_gateway_hostname}/.auth/login/aad/callback"
+
+  id_token_issuance_enabled = true
+
+  scope = {
+    value                      = local.capital_gateway_api_scope
+    admin_consent_display_name = "Read the demo account"
+    admin_consent_description  = "Allows the app to read and fund the capital.com demo account as the signed-in operator."
+    user_consent_display_name  = "Read your demo account"
+    user_consent_description   = "Allows the app to read and fund your capital.com demo account."
   }
 }
 
