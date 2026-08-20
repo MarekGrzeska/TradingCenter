@@ -50,6 +50,19 @@ resource "azuread_application" "terminal" {
       type = "Scope"
     }
   }
+
+  # The gateway, since the Accounts screen. The terminal reads the demo account from it
+  # directly — the shared key the modules use cannot travel to a browser, so a token for
+  # this API is what the screen presents instead
+  # (openspec/changes/accounts-screen-opens-the-gateway).
+  required_resource_access {
+    resource_app_id = module.capital_gateway_easy_auth.client_id
+
+    resource_access {
+      id   = module.capital_gateway_easy_auth.scope_id
+      type = "Scope"
+    }
+  }
 }
 
 resource "azuread_service_principal" "terminal" {
@@ -64,6 +77,16 @@ resource "azuread_application_pre_authorized" "terminal" {
   application_id       = module.market_data_easy_auth.application_id
   authorized_client_id = azuread_application.terminal.client_id
   permission_ids       = [module.market_data_easy_auth.scope_id]
+}
+
+# The same, for the gateway's own API. Standing ready rather than in use today: the
+# terminal still presents its market-data token, which that app accepts as a third
+# audience (app-service.tf). This is what makes asking for the gateway by name a change to
+# the terminal alone, with no second consent prompt on the day it happens.
+resource "azuread_application_pre_authorized" "terminal_gateway" {
+  application_id       = module.capital_gateway_easy_auth.application_id
+  authorized_client_id = azuread_application.terminal.client_id
+  permission_ids       = [module.capital_gateway_easy_auth.scope_id]
 }
 
 # --- the workbench, as an API of its own ---------------------------------------------

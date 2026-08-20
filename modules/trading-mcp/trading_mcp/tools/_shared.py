@@ -68,6 +68,42 @@ async def _read(gateway: GatewayClient, path: str) -> Any:
         ) from err
 
 
+async def _send_change(
+    gateway: GatewayClient,
+    method: str,
+    path: str,
+    json: dict | None = None,
+    *,
+    read_back: str,
+) -> Any:
+    """The error translation every write shares, without any reading of what came back.
+
+    Split out of `_write` when the account tools arrived: they change the account too —
+    which account is active, how much is in it — but what they answer with is an account,
+    not an order, and the order-shaped reading below has nothing to say about it.
+
+    `read_back` is what the model should look at before trying again, and it differs by
+    what was being changed: an order's effect is read from positions, an account's from
+    the accounts themselves.
+    """
+    try:
+        return await gateway.write(method, path, json=json)
+    except GatewayUnavailable as err:
+        raise ToolRefusal(
+            f"access failure: could not reach capital-gateway ({err}). The effect of "
+            f"this request on the account is unknown — {read_back} before trying again; "
+            "do not repeat this call."
+        ) from err
+    except GatewayRefused as err:
+        if err.is_access_failure:
+            raise ToolRefusal(
+                f"access failure: capital-gateway answered {err.status_code} "
+                f"({err.detail}). The effect of this request on the account is "
+                f"unknown — {read_back} before trying again; do not repeat this call."
+            ) from err
+        raise ToolRefusal(f"refused: capital-gateway rejected the request — {err.detail}") from err
+
+
 async def _write(
     gateway: GatewayClient, method: str, path: str, json: dict | None = None
 ) -> OrderResultOut:
@@ -89,23 +125,13 @@ async def _write(
     was answering, since the field it read was a literal until the gateway learned to
     derive it (`openspec/changes/hot-paths-stop-paying-twice/design.md`, D4).
     """
-    try:
-        payload = await gateway.write(method, path, json=json)
-    except GatewayUnavailable as err:
-        raise ToolRefusal(
-            f"access failure: could not reach capital-gateway ({err}). The effect of "
-            "this request on the account is unknown — read positions or working "
-            "orders before trying again; do not repeat this call."
-        ) from err
-    except GatewayRefused as err:
-        if err.is_access_failure:
-            raise ToolRefusal(
-                f"access failure: capital-gateway answered {err.status_code} "
-                f"({err.detail}). The effect of this request on the account is "
-                "unknown — read positions or working orders before trying again; do "
-                "not repeat this call."
-            ) from err
-        raise ToolRefusal(f"refused: capital-gateway rejected the request — {err.detail}") from err
+    payload = await _send_change(
+        gateway,
+        method,
+        path,
+        json=json,
+        read_back="read positions or working orders",
+    )
 
     status: str = payload["status"]
     if status == "REJECTED":

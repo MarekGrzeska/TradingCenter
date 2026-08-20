@@ -61,6 +61,16 @@ class Settings(BaseSettings):
     capital_base_url: str = DEMO_BASE_URL
     capital_stream_url: str = DEMO_STREAM_URL
     gateway_api_key: str
+    # Applications allowed to reach this module without the shared key, on the strength of
+    # a token the platform in front of it has already validated — the terminal's Accounts
+    # screen, today. Empty everywhere but production, and empty means *nobody* comes that
+    # way rather than everybody: a caller with no key and no recognised application is the
+    # same 401 it has always been.
+    #
+    # Set from `infra/app-service.tf` alongside the platform's own allow-list, and neither
+    # substitutes for the other: that list is the door, this one is what happens past it
+    # (`caller_access.py`).
+    browser_caller_application_ids: list[str] = []
 
     @field_validator("capital_api_key", "capital_identifier", "capital_password", "gateway_api_key")
     @classmethod

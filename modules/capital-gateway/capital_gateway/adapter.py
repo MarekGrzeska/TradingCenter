@@ -112,6 +112,28 @@ class CapitalAdapter:
                 return mapping.account_from_raw(a, active=True)
         raise GatewayError(f"account {account_id} not found after switch", status_code=404)
 
+    async def top_up(self, amount: float) -> Account:
+        """Moves the demo balance and answers with the account as it stands afterwards.
+
+        The provider's own limits — the balance ceiling, the range one adjustment may
+        carry, the daily count — are not repeated here. They are checked where they are
+        set, and a copy of them in this module would be true only until the first quiet
+        change on the other side (design.md, D3). What this does is turn a refusal into a
+        refusal *with the provider's reason*, rather than into a failure to reach it.
+        """
+        r = await self._c.top_up(amount)
+        if not r.is_success:
+            raise GatewayError(
+                f"capital.com refused the balance adjustment: {r.text[:200]}",
+                status_code=400 if r.status_code < 500 else 502,
+            )
+        data = self._json_ok(await self._c.accounts())
+        active = await self._active_account_id()
+        for acc in data.get("accounts", []):
+            if acc.get("accountId") == active:
+                return mapping.account_from_raw(acc, active=True)
+        raise GatewayError("capital.com did not name an active account after the top-up")
+
     # --- market data ---
 
     async def search_instruments(self, query: str) -> list[Instrument]:

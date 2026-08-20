@@ -1,4 +1,6 @@
-"""get_positions, get_working_orders, get_balance — reading the account."""
+"""Reading the account, and choosing and funding the one being read: get_positions,
+get_working_orders, get_balance, list_accounts, switch_active_account,
+top_up_demo_account."""
 
 from __future__ import annotations
 
@@ -166,3 +168,142 @@ async def test_a_read_the_gateway_would_not_serve_is_an_access_failure(server) -
         await mcp.call_tool("get_positions", {})
 
     assert "Nothing was read" in str(excinfo.value)
+
+
+# --- choosing the account, and funding it ---
+
+_ACCOUNTS = [
+    {
+        "id": "a1",
+        "name": "EUR",
+        "currency": "EUR",
+        "balance": 51000.0,
+        "available": 51000.0,
+        "pnl": 0.0,
+        "active": False,
+    },
+    {
+        "id": "a2",
+        "name": "demo2",
+        "currency": "USD",
+        "balance": 9000.0,
+        "available": 8800.0,
+        "pnl": -12.0,
+        "active": True,
+    },
+]
+
+
+@respx.mock
+async def test_list_accounts_names_the_active_one(server) -> None:
+    # specs/trading-mcp-tools, "Model wylicza konta"
+    mcp = server
+    respx.get(f"{BASE}/accounts").mock(return_value=httpx.Response(200, json=_ACCOUNTS))
+
+    _content, structured = await mcp.call_tool("list_accounts", {})
+
+    rows = structured["result"]
+    assert [row["id"] for row in rows] == ["a1", "a2"]
+    assert [row["active"] for row in rows] == [False, True]
+
+
+@respx.mock
+async def test_switching_the_account_answers_with_the_one_now_active(server) -> None:
+    # specs/trading-mcp-tools, "Model przełącza konto"
+    mcp = server
+    sent: list[dict] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        import json as _json
+
+        sent.append(_json.loads(request.content))
+        return httpx.Response(200, json={**_ACCOUNTS[0], "active": True})
+
+    respx.put(f"{BASE}/accounts/active").mock(side_effect=record)
+
+    _content, structured = await mcp.call_tool("switch_active_account", {"account_id": "a1"})
+
+    assert sent == [{"account_id": "a1"}]
+    assert structured["id"] == "a1"
+    assert structured["active"] is True
+
+
+async def test_the_switch_tool_warns_that_it_drops_the_stream(server) -> None:
+    """specs/trading-mcp-tools: the gap this call leaves is in collected candles, not in
+    the conversation, so nothing the model sees afterwards would tell it."""
+    mcp = server
+    by_name = {t.name: t for t in await mcp.list_tools()}
+    description = (by_name["switch_active_account"].description or "").lower()
+
+    assert "stream" in description
+
+
+@respx.mock
+async def test_topping_up_answers_with_the_account_after_the_move(server) -> None:
+    # specs/trading-mcp-tools, "Model koryguje saldo konta demo"
+    mcp = server
+    sent: list[dict] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        import json as _json
+
+        sent.append(_json.loads(request.content))
+        return httpx.Response(200, json={**_ACCOUNTS[1], "balance": 14000.0})
+
+    respx.post(f"{BASE}/accounts/top-up").mock(side_effect=record)
+
+    _content, structured = await mcp.call_tool("top_up_demo_account", {"amount": 5000})
+
+    assert sent == [{"amount": 5000.0}]
+    assert structured["balance"] == 14000.0
+
+
+@respx.mock
+async def test_taking_funds_away_is_the_same_call(server) -> None:
+    mcp = server
+    sent: list[dict] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        import json as _json
+
+        sent.append(_json.loads(request.content))
+        return httpx.Response(200, json={**_ACCOUNTS[1], "balance": 4000.0})
+
+    respx.post(f"{BASE}/accounts/top-up").mock(side_effect=record)
+
+    _content, structured = await mcp.call_tool("top_up_demo_account", {"amount": -5000})
+
+    assert sent == [{"amount": -5000.0}]
+    assert structured["balance"] == 4000.0
+
+
+@respx.mock
+async def test_a_refused_top_up_says_why_and_is_not_an_access_failure(server) -> None:
+    """specs/trading-mcp-tools, "Dostawca odmawia korekty salda" — the ceiling and the
+    daily count are the provider's, and its reason is what the model has to act on."""
+    mcp = server
+    respx.post(f"{BASE}/accounts/top-up").mock(
+        return_value=httpx.Response(
+            400, json={"detail": "capital.com refused: top up balance exceeded"}
+        )
+    )
+
+    with pytest.raises(ToolError, match="refused") as excinfo:
+        await mcp.call_tool("top_up_demo_account", {"amount": 400000})
+
+    message = str(excinfo.value)
+    assert "balance exceeded" in message
+    assert "access failure" not in message
+
+
+@respx.mock
+async def test_a_top_up_the_gateway_never_served_is_an_access_failure(server) -> None:
+    mcp = server
+    respx.post(f"{BASE}/accounts/top-up").mock(
+        return_value=httpx.Response(401, json={"detail": "missing or invalid caller key"})
+    )
+
+    with pytest.raises(ToolError, match="access failure") as excinfo:
+        await mcp.call_tool("top_up_demo_account", {"amount": 100})
+
+    assert "read the accounts" in str(excinfo.value)

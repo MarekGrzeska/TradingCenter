@@ -62,6 +62,7 @@ def test_every_route_appears_in_the_published_schema(client: TestClient) -> None
         "/capabilities",
         "/accounts",
         "/accounts/active",
+        "/accounts/top-up",
         "/asset-classes",
         "/instruments",
         "/instruments/search",
@@ -297,3 +298,107 @@ def test_a_subscriber_hears_the_room_state_and_no_tokens(client: TestClient) -> 
     # The stream borrows the REST session, so this is exactly where tokens would leak.
     assert SECRETS["cst"] not in json.dumps(first)
     assert SECRETS["security_token"] not in json.dumps(first)
+
+
+# --- the demo balance ---
+
+# One of the ids `accounts.json` carries, so a read-back can find it.
+ACTIVE_ACCOUNT_ID = "325778595166630174"
+
+
+@respx.mock
+def test_a_top_up_moves_the_balance_and_answers_with_the_account(client: TestClient) -> None:
+    # specs/capital-session, "Dosypanie środków"
+    mock_login()
+    # The session names an account the fixture actually holds — the top-up answers with the
+    # active one, read back after the adjustment.
+    respx.get(f"{API}/session").mock(
+        return_value=httpx.Response(200, json={"accountId": ACTIVE_ACCOUNT_ID})
+    )
+    sent: list[dict] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json={"successful": True})
+
+    respx.post(f"{API}/accounts/topUp").mock(side_effect=record)
+    respx.get(f"{API}/accounts").mock(
+        return_value=httpx.Response(200, json=load_fixture("accounts.json"))
+    )
+
+    with client:
+        response = client.post("/accounts/top-up", json={"amount": 5000})
+
+    assert response.status_code == 200
+    assert sent == [{"amount": 5000.0}]
+    # The account it answers with is the active one, which is what the caller just changed.
+    assert response.json()["active"] is True
+
+
+@respx.mock
+def test_taking_funds_away_travels_the_same_route(client: TestClient) -> None:
+    # specs/capital-session, "Zabranie środków" — a thin account is a setup, not a mistake.
+    mock_login()
+    # The session names an account the fixture actually holds — the top-up answers with the
+    # active one, read back after the adjustment.
+    respx.get(f"{API}/session").mock(
+        return_value=httpx.Response(200, json={"accountId": ACTIVE_ACCOUNT_ID})
+    )
+    sent: list[dict] = []
+
+    def record(request: httpx.Request) -> httpx.Response:
+        sent.append(json.loads(request.content))
+        return httpx.Response(200, json={"successful": True})
+
+    respx.post(f"{API}/accounts/topUp").mock(side_effect=record)
+    respx.get(f"{API}/accounts").mock(
+        return_value=httpx.Response(200, json=load_fixture("accounts.json"))
+    )
+
+    with client:
+        response = client.post("/accounts/top-up", json={"amount": -2500})
+
+    assert response.status_code == 200
+    assert sent == [{"amount": -2500.0}]
+
+
+@respx.mock
+def test_a_refused_top_up_carries_the_providers_reason(client: TestClient) -> None:
+    # specs/capital-session, "Dostawca odmawia korekty" — the ceiling, the range and the
+    # daily count are the provider's to enforce, and its words are what reach the caller.
+    mock_login()
+    respx.post(f"{API}/accounts/topUp").mock(
+        return_value=httpx.Response(
+            400, json={"errorCode": "error.request.top.up.balance.exceeded"}
+        )
+    )
+
+    with client:
+        response = client.post("/accounts/top-up", json={"amount": 400000})
+
+    assert response.status_code == 400
+    assert "top.up.balance.exceeded" in response.text
+
+
+@respx.mock
+def test_a_top_up_of_zero_never_reaches_the_provider(client: TestClient) -> None:
+    # The one amount that means nothing, and the only limit this module keeps of its own.
+    mock_login()
+    route = respx.post(f"{API}/accounts/topUp")
+
+    with client:
+        response = client.post("/accounts/top-up", json={"amount": 0})
+
+    assert response.status_code == 422
+    assert not route.called
+
+
+def test_switching_accounts_says_it_drops_the_stream(client: TestClient) -> None:
+    """specs/capital-session, "Strumień po przełączeniu konta" — a route description is
+    contract, not commentary: the consumer reads the published document, and the
+    consequence of this call lands in a different module entirely."""
+    with client:
+        schema = client.get("/openapi.json").json()
+
+    description = schema["paths"]["/accounts/active"]["put"]["description"]
+    assert "stream" in description.lower()

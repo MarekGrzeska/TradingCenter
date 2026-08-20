@@ -58,6 +58,16 @@ export interface Endpoints {
    *  archive. No WS counterpart: both a turn and a run's progress ride plain HTTP
    *  (`fetch` + `ReadableStream`), not a socket. */
   workbenchHttp: string;
+  /** `capital-gateway`, for the account: which demo accounts exist, what is open on the
+   *  active one, and the demo money on it.
+   *
+   *  It used to have no address here at all — the gateway was reachable only from two
+   *  service addresses, and the instrument catalogue came through market-data for exactly
+   *  that reason. It still does; what changed is that the gateway now also recognises an
+   *  authenticated browser and lets it reach the account and nothing else
+   *  (`capital_gateway/caller_access.py`). In dev this is a prefix the dev server proxies,
+   *  because the shared key must not travel to a browser. */
+  gatewayHttp: string;
 }
 
 // Same defaults as .env.example: a checkout without one falls back to the dev proxy
@@ -68,11 +78,13 @@ export interface Endpoints {
 const DEFAULT_ARCHIVE_HTTP = "/archive-api";
 const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 const DEFAULT_WORKBENCH_HTTP = "/workbench-api";
+const DEFAULT_GATEWAY_HTTP = "/gateway-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
   VITE_ARCHIVE_WS?: string;
   VITE_WORKBENCH_HTTP?: string;
+  VITE_GATEWAY_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
@@ -120,5 +132,6 @@ export function resolveEndpoints(
     archiveHttp: resolveHttpBase(env.VITE_ARCHIVE_HTTP || DEFAULT_ARCHIVE_HTTP),
     archiveWs: resolveWsBase(env.VITE_ARCHIVE_WS || DEFAULT_ARCHIVE_WS, loc),
     workbenchHttp: resolveHttpBase(env.VITE_WORKBENCH_HTTP || DEFAULT_WORKBENCH_HTTP),
+    gatewayHttp: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_GATEWAY_HTTP),
   };
 }

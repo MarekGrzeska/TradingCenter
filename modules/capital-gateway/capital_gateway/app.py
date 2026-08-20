@@ -26,12 +26,17 @@ from . import telemetry
 # regardless of where `FastAPI(...)` itself is called.
 telemetry.configure()
 
-from fastapi import Depends, FastAPI, Query, Request, WebSocket, WebSocketDisconnect
+from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from .adapter import CapitalAdapter
+from .caller_access import (
+    PRINCIPAL_HEADER,
+    browser_caller_may_reach,
+    calling_application,
+)
 from .client import CapitalClient
 from .config import API_KEY_HEADER, Settings, is_production
 from .dtos import (
@@ -165,7 +170,14 @@ _UNAUTHENTICATED_PATHS = frozenset({"/", "/docs", "/openapi.json"})
 
 
 class RequireGatewayKey(BaseHTTPMiddleware):
-    """Rejects every request but the health probe unless it carries the caller key.
+    """Rejects every request but the health probe unless it carries a credential this
+    module recognises — and there are two, because its two kinds of caller cannot present
+    the same one.
+
+    A module presents the shared key and reaches everything. A browser presents a token,
+    validated by the platform in front of this app, and reaches the account and nothing
+    else (`caller_access.py` holds which paths and why). A request carrying neither is the
+    401 it has always been.
 
     `hmac.compare_digest` rather than `==`: a plain comparison returns as soon as the
     first byte differs, and the time that takes leaks how many leading bytes a guess got
@@ -177,17 +189,30 @@ class RequireGatewayKey(BaseHTTPMiddleware):
         if request.url.path in _UNAUTHENTICATED_PATHS:
             return await call_next(request)
 
-        expected: str = request.app.state.settings.gateway_api_key
+        settings = request.app.state.settings
+        expected: str = settings.gateway_api_key
         provided = request.headers.get(API_KEY_HEADER, "")
         # Compared as bytes: hmac.compare_digest raises TypeError on a `str` containing a
         # non-ASCII character, and a header can carry one — encoding first turns a caller
         # sending garbage into the intended 401 instead of an unhandled 500.
-        if not provided or not hmac.compare_digest(provided.encode(), expected.encode()):
-            return JSONResponse(
-                status_code=401, content={"detail": "missing or invalid caller key"}
-            )
+        if provided and hmac.compare_digest(provided.encode(), expected.encode()):
+            return await call_next(request)
 
-        return await call_next(request)
+        application = calling_application(request.headers.get(PRINCIPAL_HEADER))
+        if application and application in settings.browser_caller_application_ids:
+            if not browser_caller_may_reach(request.url.path):
+                # A refusal about permission, not about the provider: this request never
+                # left the module, and saying "capital.com" here would send the reader
+                # looking in the wrong place.
+                return JSONResponse(
+                    status_code=403,
+                    content={"detail": "this caller may reach the account, not this path"},
+                )
+            return await call_next(request)
+
+        return JSONResponse(
+            status_code=401, content={"detail": "missing or invalid caller key"}
+        )
 
 
 app = FastAPI(
@@ -251,8 +276,39 @@ class SetActiveAccount(BaseModel):
 
 @app.put("/accounts/active", tags=["accounts"], response_model=Account)
 async def set_active_account(body: SetActiveAccount, a: CapitalAdapter = Depends(adapter)):
-    """Switch the active account. Positions and orders act on it afterwards."""
+    """Switch the active account. Positions and orders act on it afterwards.
+
+    **Switching drops the quote stream.** capital.com ends the streaming session when the
+    financial account changes, so anything collecting candles through `/ws/quotes` sees a
+    disconnect and reconnects on its own — a gap of seconds, in data nobody is watching at
+    the moment of the switch. Said here because this route answers success while the
+    consequence lands somewhere else entirely.
+    """
     return await a.set_active_account(body.account_id)
+
+
+class TopUp(BaseModel):
+    amount: float = Field(
+        description=(
+            "how much to move the demo balance by; negative takes funds away, which is "
+            "as much a way of setting up an experiment as adding them. The provider's "
+            "own limits — the balance ceiling, the range and the daily count — are its "
+            "own, and a refusal names them."
+        )
+    )
+
+
+@app.post("/accounts/top-up", tags=["accounts"], response_model=Account)
+async def top_up(body: TopUp, a: CapitalAdapter = Depends(adapter)):
+    """Move the demo account's balance, and answer with the account as it stands after.
+
+    Acts on the **active** account — there is no account id to pass, because capital.com
+    adjusts the session's own account and a parameter here would promise a choice that
+    does not exist. Switch first if the money belongs somewhere else.
+    """
+    if body.amount == 0:
+        raise HTTPException(422, detail="amount must not be zero")
+    return await a.top_up(body.amount)
 
 
 # --- market data ---

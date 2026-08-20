@@ -1,4 +1,5 @@
 import type { ComponentType } from "react";
+import { AccountsView } from "../accounts/AccountsView";
 import { AgentSettingsView } from "../agent/settings/AgentSettingsView";
 import { CollectionHistoryView } from "../history/CollectionHistoryView";
 import { GridView } from "../grid/GridView";
@@ -33,6 +34,7 @@ export const TABS: TabDefinition[] = [
     Component: CollectionHistoryView,
   },
   { id: "teams", label: "Teams", path: "teams", Component: TeamsView },
+  { id: "accounts", label: "Accounts", path: "accounts", Component: AccountsView },
   {
     id: "agent-settings",
     label: "Agent Settings",

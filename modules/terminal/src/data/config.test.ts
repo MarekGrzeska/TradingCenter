@@ -53,6 +53,7 @@ describe("resolveEndpoints", () => {
         VITE_ARCHIVE_HTTP: "/archive-api",
         VITE_ARCHIVE_WS: "/archive-api/ws",
         VITE_WORKBENCH_HTTP: "/workbench-api",
+        VITE_GATEWAY_HTTP: "/gateway-api",
       },
       devLoc,
     );
@@ -60,6 +61,7 @@ describe("resolveEndpoints", () => {
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
       workbenchHttp: "/workbench-api",
+      gatewayHttp: "/gateway-api",
     });
   });
 
@@ -69,6 +71,7 @@ describe("resolveEndpoints", () => {
         VITE_ARCHIVE_HTTP: "https://archive.example.com",
         VITE_ARCHIVE_WS: "wss://archive.example.com/ws",
         VITE_WORKBENCH_HTTP: "https://workbench.example.com",
+        VITE_GATEWAY_HTTP: "https://gateway.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
@@ -76,6 +79,7 @@ describe("resolveEndpoints", () => {
       archiveHttp: "https://archive.example.com",
       archiveWs: "wss://archive.example.com/ws",
       workbenchHttp: "https://workbench.example.com",
+      gatewayHttp: "https://gateway.example.com",
     });
   });
 
@@ -84,6 +88,7 @@ describe("resolveEndpoints", () => {
       archiveHttp: "/archive-api",
       archiveWs: "ws://localhost:5173/archive-api/ws",
       workbenchHttp: "/workbench-api",
+      gatewayHttp: "/gateway-api",
     });
   });
 
@@ -93,13 +98,15 @@ describe("resolveEndpoints", () => {
   // server — which is why nothing in this suite noticed.
   //
   // The relative prefix is only safe if no tab claims it, so it is compared
-  // against the route list rather than eyeballed. Covers the workbench's prefix too,
-  // since it is a relative default of the same shape.
+  // against the route list rather than eyeballed. Covers the workbench's and the
+  // gateway's prefixes too, since both are relative defaults of the same shape — and the
+  // gateway's is the one that would have collided: there is an `accounts` tab now, and
+  // `/accounts` would have shadowed it exactly the way `/archive` once did.
   it("gives no back end a relative prefix that a tab route already claims", () => {
-    const { archiveHttp, archiveWs, workbenchHttp } = resolveEndpoints({}, devLoc);
+    const { archiveHttp, archiveWs, workbenchHttp, gatewayHttp } = resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
-    const prefixes = [archiveHttp, new URL(archiveWs).pathname, workbenchHttp]
+    const prefixes = [archiveHttp, new URL(archiveWs).pathname, workbenchHttp, gatewayHttp]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);
 
