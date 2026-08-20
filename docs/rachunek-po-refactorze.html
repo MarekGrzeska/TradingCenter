@@ -635,7 +635,8 @@
   <div class="dir">
     <div class="dir-head"><span class="dir-letter">D</span>
     <h4>Dieta prozy — sufit jak dla schematów narzędzi</h4>
-    <span class="horizon">~3 dni + rytm</span></div>
+    <span class="chip good">wykonane 20.08 — poza speckami, które czekają na decyzję</span>
+    <span class="horizon">szacowano ~3 dni; zajęło 1</span></div>
     <p>Repo dało schematom narzędzi sufit znaków z testem, bo powierzchnia jest kosztem
     płaconym w każdej turze. <b>CLAUDE.md jest dokładnie tym samym</b> — kosztem płaconym
     w każdej sesji — a sufitu nie ma. Zejść do ~150 linii mapy i pułapek, które gryzą
@@ -644,8 +645,69 @@
     mapą, lokalizacja <code>MIGRATION_LOCK_KEY</code>). Skonsolidować 64 mikro-specki
     w specyfikacje per moduł. Wykonać zdecydowane: alerty 9 → 3, stdio z testem parzystości
     out, martwe <code>.dockerignore</code> out.</p>
-    <p class="gain">każda sesja agenta zaczyna się taniej; przewodnik przestaje dryfować
-    szybciej, niż jest czytany.</p>
+    <p><b>Zmierzone po wykonaniu.</b> CLAUDE.md: <b>531 → 251 linii, 37 470 → 17 831
+    znaków</b>, czyli 53% mniej i około 4 560 tokenów mniej w każdej sesji. Do ~150 linii
+    nie zeszło i to jest korekta do tej karty, nie porażka pomiaru: po wyprowadzeniu
+    wszystkiego, co ma inny dom, została mapa, pułapki i reguły stosowane co sesję, a to
+    ma dno w okolicach 250 linii. Liczba 150 była szacunkiem sprzed roboty — jak
+    „1–2 tygodnie" przy B, tylko w drugą stronę.</p>
+
+    <p><b>Kryterium cięcia okazało się zarazem lekiem na dryf</b>, i to jest jedyna rzecz
+    z tej karty warta zabrania dalej. Plik nie był długi od szczegółów — był długi od
+    szczegółów <i>powtórzonych za innym miejscem</i>. Powtórzenie starzeje się, kiedy
+    oryginał się rusza, więc jedna reguła załatwia obie połowy zapowiedzi: <b>co ma inny
+    dom, dostaje wskaźnik, nie kopię</b>. Pomiar sesji capital.com poszedł do README
+    gatewaya, pięcioprzystankowa trasa nowego pola i reguła jednego pliku dla wskaźnika do
+    README market-daty, kolejność startu została w <code>dev.py</code>, który i tak ją
+    drukuje przez <code>--explain</code>, a mechanika migracji w zarchiwizowanej zmianie,
+    która ją zbudowała — i której liczby ta karta miała już raz przepisane błędnie.</p>
+
+    <p><b>Sufit ma dno</b>, bo plik trzymany pod sufitem przez kasowanie faktów byłby tani
+    i bezużyteczny. <code>scripts/tests/test_guide_ceiling.py</code>: 21 000 znaków zapasu
+    15%, plus trzy strażniki czytające <i>źródło prawdy</i>, a nie prozę — każdy katalog
+    w <code>modules/</code> i <code>packages/</code> musi być na mapie, każdy port z tabeli
+    usług <code>dev.py</code> musi być wymieniony, a trzy porty wycofane (8040, 8050, 8070)
+    muszą zostać zapisane. Wszystkie cztery sprawdzone odwróceniem, w obie strony.
+    Zasada nr 8 nie została złamana: sufit stoi na <b>agregacie z zapasem</b>, nigdy na
+    pojedynczym opisie — i reguła nr 8 mówi teraz, która to która.</p>
+
+    <p><b>Trzy nieaktualne twierdzenia — dwa były nieaktualne.</b> tc-openai nie było na
+    mapie w ogóle i jest. <code>MIGRATION_LOCK_KEY</code> było lokalizowane w
+    <code>db.py</code>, co jest prawdą wyłącznie dla market-daty: workbench ma dwa,
+    w <code>agent/runtime.py</code> i <code>teams/runtime.py</code>, a wszystkie trzy
+    klucze to port, który ten moduł kiedyś miał. Trzecie — opis tc-mcp-kit bez
+    <code>tool_schemas</code> — naprawiło się samo, kiedy A wzięło ten pakiet.</p>
+
+    <p><b>Zdecydowane: dwa wykonane, jedno okazało się już zrobione.</b> Alerty 9 → 3 mają
+    własną propozycję i własne znalezisko: dwa z sześciu skreślonych miały <i>nieaktualny
+    powód</i>, nie słaby — <code>alert-database-storage-high</code> pilnował ryzyka
+    odwróconego 9.08 (dev wrócił do kontenera), a <code>alert-app-exceptions-high</code>
+    powstał po burzy z migracji lądującej po kodzie, co od 16.08 jest konstrukcyjnie
+    niemożliwe. Martwy <code>.dockerignore</code> out — <code>modules/market-data/</code>
+    miało własny, którego docker nigdy nie czytał, bo kontekst budowania to korzeń repo.
+    „stdio z testem parzystości out" było już zrobione: ten transport i ten test odeszły
+    z market-mcp 19.08, razem z modułem. Pozycja stała na liście jako do zrobienia przez
+    dzień po tym, jak przestała istnieć.</p>
+
+    <p class="cost"><b>Specki: przesłanka nie przeżyła pomiaru, dwa razy.</b> Nie jest ich
+    64 tylko 61 i nie są mikro — 10 420 linii, 389 wymagań, średnio 171 linii, poniżej 80
+    linii jest 11 z 61. „Per moduł" dałoby dwa pliki po ponad trzy tysiące linii (terminal
+    3 168, workbench 3 573), a obiecany zysk — tańsza sesja — jest zaadresowany do
+    niewłaściwego kosztu, bo specki nie wchodzą do kontekstu sesji. Duplikacja istnieje
+    i daje się policzyć: <b>33 z 389 wymagań to drugie albo trzecie postawienie tej samej
+    nazwy</b>, i układają się w trzy grona — baza i migracje (9 nazw × 3), dostęp
+    z przeglądarki (5 × 2–3), powierzchnia narzędzi (3 × 2–3). Wszystkie trzy to kod, który
+    <code>packages-replace-the-hand-copies</code> wyniosło do <code>tc-runtime</code>
+    i <code>tc-mcp-kit</code> — a <code>packages/</code> nie ma ani jednej specki.
+    <code>agent-database-connection</code> i <code>teams-database-connection</code> mają
+    identyczną listę dziewięciu wymagań, nazwa w nazwę, o jednym procesie. Propozycja
+    <code>specs-follow-the-packages</code> czeka na decyzję, bo wprowadza kategorię, której
+    to repo nie miało: wymaganie należące do pakietu.</p>
+
+    <p class="gain">każda sesja agenta zaczyna się o ~4 560 tokenów taniej, a przewodnik
+    dostał regułę, która zatrzymuje dryf u źródła zamiast go nadrabiać: <b>co ma inny dom,
+    dostaje wskaźnik, nie kopię</b>. Trzy strażniki czytają źródło prawdy, więc moduł
+    dopisany bez mapy i port zmieniony bez przewodnika są odtąd czerwone, a nie ciche.</p>
   </div>
 
   <div class="dir">
@@ -754,7 +816,7 @@
     scaleniu, tak jak iteracja 1 sfalsyfikowała trzy liczby audytu.</p>
   </div>
 
-  <p><b>Kolejność: A(market) wykonane → B faza 1 wykonana → C rozstrzygnięte ← tu jesteśmy → D. A(teams) wypadło z sekwencji — B zjadło jego przedmiot; C skończyło się decyzją, nie robotą.</b>
+  <p><b>Kolejność: A(market) wykonane → B faza 1 wykonana → C rozstrzygnięte → D wykonane ← tu jesteśmy. A(teams) wypadło z sekwencji — B zjadło jego przedmiot; C skończyło się decyzją, nie robotą; z D została jedna propozycja czekająca na decyzję.</b>
   Resztki iteracji 5 wypadły z sekwencji (weszły 19.08, PR&nbsp;#167), <b>E jest
   wykonane i scalone</b> (PR&nbsp;#168) — dziura unieważniająca opłacony zysk iteracji 1
   zamknięta tego samego dnia, którego rachunek ją nazwał — a <b>A na market-mcp jest
