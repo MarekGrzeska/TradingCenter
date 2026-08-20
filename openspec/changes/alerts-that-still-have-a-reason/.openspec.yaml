@@ -1,0 +1,7 @@
+schema: spec-driven-reviewed
+created: 2026-08-20
+# Bez delty: żadne wymaganie nie wylicza alertów. `market-data-monitoring` żąda, żeby
+# próg spóźnienia zbierania dał się ustawić jeden dla wszystkich rozdzielczości — i to
+# jest dokładnie ten alert, który zostaje. Zmiana kwalifikuje się przez trzecią
+# kategorię wyzwalacza (infra/**), patrz proposal.md.
+skip_specs: true

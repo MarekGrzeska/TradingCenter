@@ -1,5 +1,7 @@
-# One Linux App Service Plan and every app in `local.web_app_names` — seven of them today
-# (design.md, "App Service, nie Container Apps"): all run non-stop, so one shared plan is
+# One Linux App Service Plan and every app in `local.web_app_names` — the list itself, with
+# no count repeated here, for the reason that local's own comment gives three lines down:
+# this line said "seven of them today" at four (design.md, "App Service, nie Container
+# Apps"). All of them run non-stop, so one shared plan is
 # cheaper than as many Container Apps billed by CPU-second. The list is that local rather
 # than a sentence here, because a sentence here is what said "six apps" at seven.
 #
