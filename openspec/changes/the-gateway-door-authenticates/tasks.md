@@ -24,25 +24,25 @@
 
 ## 4. Wdrożenie kodu i sprawdzenie przed przestawieniem drzwi
 
-- [ ] 4.1 Wypuścić oba moduły; sondy `/health` odpowiadają
-- [ ] 4.2 Potwierdzić w logach obu modułów brak ostrzeżenia "no token for …" — gateway nie może tego potwierdzić przed krokiem 5, bo przy `AllowAnonymous` nie czyta tokenu w ogóle
+- [x] 4.1 Wypuścić oba moduły; sondy `/health` odpowiadają
+- [x] 4.2 Potwierdzić w logach obu modułów brak ostrzeżenia "no token for …" — gateway nie może tego potwierdzić przed krokiem 5, bo przy `AllowAnonymous` nie czyta tokenu w ogóle
 
 ## 5. Drzwi zaczynają wymagać
 
-- [ ] 5.1 `require_authentication = true` i `unauthenticated_action = "Return401"` w `auth_settings_v2` gatewaya; `excluded_paths` bez zmian
-- [ ] 5.2 Komentarz przy `excluded_paths` mówi, że `/ws/stream` jest po tej zmianie jedyną trasą bronioną wyłącznie kluczem
-- [ ] 5.3 `apply` lokalny operatora
+- [x] 5.1 `require_authentication = true` i `unauthenticated_action = "Return401"` w `auth_settings_v2` gatewaya; `excluded_paths` bez zmian
+- [x] 5.2 Komentarz przy `excluded_paths` mówi, że `/ws/stream` jest po tej zmianie jedyną trasą bronioną wyłącznie kluczem
+- [x] 5.3 `apply` lokalny operatora
 
 ## 6. Sprawdzenie na produkcji
 
-- [ ] 6.1 Żądanie z nieważnym tokenem odbija się od platformy (`WWW-Authenticate`), a nie od modułu
-- [ ] 6.2 Zakładka Konta czyta konta i pozycje
-- [ ] 6.3 Terminal nadal nie sięga trasą spoza rejestru — próba dostaje odmowę uprawnienia, nie odpowiedź providera
-- [ ] 6.4 Strumień świec żyje: `market-data` ma połączenie i archiwum rośnie
-- [ ] 6.5 `trading-mcp` wstał, sonda `200`, narzędzie odczytu rachunku odpowiada
+- [x] 6.1 Żądanie z nieważnym tokenem odbija się od platformy (`WWW-Authenticate`), a nie od modułu
+- [ ] 6.2 Zakładka Konta czyta konta i pozycje — operatora, wymaga sesji w przeglądarce
+- [ ] 6.3 Terminal nadal nie sięga trasą spoza rejestru — operatora, ta sama sesja
+- [x] 6.4 Strumień świec żyje: `market-data` ma połączenie i archiwum rośnie
+- [x] 6.5 `trading-mcp` wstał, sonda `200`, narzędzie odczytu rachunku odpowiada
 
 ## 7. Prawda w plikach
 
-- [ ] 7.1 Poprawić komentarze w `capital_gateway/caller_access.py` i w terminalowym `accountsApi.ts`, które opisują dzisiejszy, nieudany stan
-- [ ] 7.2 Uzupełnić `CLAUDE.md` o postać poświadczenia zależną od miejsca — token na produkcji, klucz lokalnie i na strumieniu
-- [ ] 7.3 `review.md` z pomiarem: co odpowiedziało przed przestawieniem, co po
+- [x] 7.1 Poprawić komentarze w `capital_gateway/caller_access.py` i w terminalowym `accountsApi.ts`, które opisują dzisiejszy, nieudany stan
+- [x] 7.2 Uzupełnić `CLAUDE.md` o postać poświadczenia zależną od miejsca — token na produkcji, klucz lokalnie i na strumieniu
+- [x] 7.3 `review.md` z pomiarem: co odpowiedziało przed przestawieniem, co po

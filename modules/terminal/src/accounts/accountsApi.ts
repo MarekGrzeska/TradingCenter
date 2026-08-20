@@ -11,13 +11,14 @@
  * modules that call it over the network. In development the dev server attaches it
  * (`vite.config.ts`); in production the browser's own token was meant to do the work.
  *
- * **In production it does not, and this screen has never read an account there.** The token is
- * sent, but the gateway's Easy Auth runs with `AllowAnonymous` — it cannot require a token,
- * because two modules call that app with a shared key and none — and under that setting it
- * validates nothing and forwards no principal, so the module refuses every browser request as
- * an unidentified caller. A 401 reaches this file as "you are signed out", which is what the
- * operator saw on 20 August 2026. `capital_gateway/caller_access.py` carries the measurement;
- * the fix is a change to the gateway's door, not to this file.
+ * For its first days it did not, and the reason was never this file. The gateway's Easy Auth ran
+ * `AllowAnonymous` — it could not require a token while two modules called that app with a
+ * shared key and none — and under that setting it validated nothing and forwarded no principal,
+ * so the module refused every browser request as an unidentified caller. A 401 arrives here as
+ * "you are signed out", which is what the operator saw on 20 August 2026 and read as an expired
+ * session. Both service callers moved onto tokens of their own, the door was closed behind them
+ * (`the-gateway-door-authenticates`), and this screen started reading an account without a line
+ * of it changing.
  */
 
 import { noIdentity, type Identity } from "../auth/identity";
