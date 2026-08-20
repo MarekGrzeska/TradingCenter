@@ -197,3 +197,31 @@ reaches back about two years and nothing recovers what is past that.
 
 **A demo fill proves the contract, not the execution.** Fills are simulated and demo
 liquidity is not real liquidity.
+
+## Sessions coexist — measured, not assumed
+
+This was the opposite of what every guide here claimed until 10 August 2026. The old
+warning said capital.com invalidates the previous session on every new login, so two
+gateway processes deauthenticate each other. Measured against the demo API, all of it with
+`GET /accounts` proving each session *usable* rather than merely present:
+
+- four sessions opened with **one** API key: all four still answered after the fourth
+  login, and still answered a minute later. No eviction, no cap at four, no delay;
+- two sessions from **two** API keys under one login: both answered, in either order;
+- two streaming connections on one account subscribed to the same epic: both kept
+  receiving quotes, whether the sessions came from one key or two.
+
+**An API key carries its own password**, set when the key is created — not the account's
+login password. A second key used with the first key's password answers
+`401 {"errorCode":"error.invalid.details"}`, which reads exactly like an invalidated
+session and is not one.
+
+What still constrains parallel work is the rate budget, not the session: capital.com counts
+its 10 requests/second against the **account**, so two stacks share one allowance and
+starve each other. Together with the fixed ports and the single dev database container,
+that is still a reason to run one stack at a time — a different reason, with a different
+symptom (slowness, not 401s).
+
+Not measured: live accounts, and whether this behaviour is stable over time. A 401 storm
+was really observed on 9–10 August; `stream_tokens_for` in `capital_gateway/app.py` names
+what does explain it, which is a session going idle.
