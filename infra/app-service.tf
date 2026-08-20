@@ -171,6 +171,31 @@ resource "azurerm_linux_web_app" "capital_gateway" {
   site_config {
     always_on          = true
     websockets_enabled = true
+
+    # **The browser's preflight is answered here, by the platform, and never by the app.**
+    # The third half-copied pattern in two days, and the one that made the Accounts screen
+    # say "capital-gateway is not reachable" on 20 August 2026 with nothing in the
+    # gateway's log: the terminal was asking the right host by then, but a cross-origin
+    # `GET /accounts` carrying a bearer token is preflighted, and an `OPTIONS` carries no
+    # token at all. Easy Auth answered it `401`, the browser refused the real request, and
+    # a network-level refusal reaches `fetch` as a thrown error rather than a status —
+    # which is why the screen reported an unreachable module instead of a rejected one.
+    # Measured against production from outside: this app answered the preflight `401`
+    # where `market-data` answered `200` with `Access-Control-Allow-Origin`.
+    #
+    # Same two lines market-data and the workbench already carry, and the note there
+    # applies here word for word: **`capital_gateway` MUST NOT add a CORS middleware of
+    # its own**, because two layers each appending the header produce a doubled one and a
+    # browser rejects that response. `support_credentials` stays off — the terminal sends
+    # a bearer token, never a cookie.
+    #
+    # This opens no route: what a browser may reach past the door is `caller_access.py`'s
+    # list, and it is unchanged.
+    cors {
+      allowed_origins     = [local.terminal_origin]
+      support_credentials = false
+    }
+
     application_stack {
       # Placeholder — group 7's deploy workflow pushes the real GHCR image after the
       # first build. Terraform must not fight that: see the lifecycle block below.
