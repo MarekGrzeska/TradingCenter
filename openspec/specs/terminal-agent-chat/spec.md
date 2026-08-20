@@ -96,7 +96,9 @@ wywołania, którego serwer narzędzi nie przyjął. Odmowa narzędzia MUST NOT 
 błąd całej odpowiedzi.
 
 Zerwanie strumienia MUST być widoczne jako błąd, odróżnialny od odpowiedzi zakończonej.
-Odpowiedź niepełna MUST być oznaczona jako niepełna, a nie pokazana jako całość.
+Odpowiedź niepełna MUST być oznaczona jako niepełna, a nie pokazana jako całość. Odpowiedź
+zatrzymana przez operatora MUST być odróżnialna od obu: nie jest błędem i nie jest urwana
+sama z siebie — skończyła się, bo ktoś tak powiedział.
 
 #### Scenario: Odpowiedź w trakcie
 
@@ -131,6 +133,12 @@ Odpowiedź niepełna MUST być oznaczona jako niepełna, a nie pokazana jako ca�
 - **WHEN** strumień zostaje zerwany przed zakończeniem odpowiedzi
 - **THEN** panel oznacza odpowiedź jako niepełną i podaje, że wystąpił błąd
 - **AND** to, co dotarło, zostaje na ekranie
+
+#### Scenario: Odpowiedź zatrzymana nie jest błędem
+
+- **WHEN** tura kończy się zatrzymaniem na żądanie operatora
+- **THEN** panel oznacza tę wypowiedź jako zatrzymaną
+- **AND** MUST NOT pokazać jej jako błędu ani jako odpowiedzi zakończonej normalnie
 
 #### Scenario: Moduł agenta jest nieosiągalny
 
@@ -217,4 +225,99 @@ To samo MUST dotyczyć nieudanego odczytu naniesionych obiektów.
 
 - **WHEN** odczyt poleceń agenta się nie powiódł
 - **THEN** rozmowa i wykres zostają takie, jakie były
+
+### Requirement: Operator zatrzymuje odpowiedź z panelu
+
+Panel MUST dawać sposób zatrzymania odpowiedzi, dopóki ona trwa, i MUST go pokazywać w tym
+samym miejscu, w którym w czasie tury i tak nie da się wysłać następnego pytania. Operator,
+który po dwóch zdaniach widzi, że agent odpowiada nie na to pytanie, MUST mieć hamulec
+bliżej niż zamknięcie panelu.
+
+Zatrzymanie MUST być żądaniem skierowanym do modułu, a nie samym porzuceniem strumienia
+przez terminal: porzucone łącze zostawia turę biegnącą dalej, a operator, który kliknął
+zatrzymanie, MUST dostać turę zakończoną.
+
+Po zatrzymaniu panel MUST wrócić do stanu, w którym można pisać dalej, a to, co dotarło,
+MUST zostać na ekranie. Zatrzymanie MUST NOT wymagać przeładowania terminala ani otwarcia
+rozmowy na nowo.
+
+Zatrzymanie, którego moduł nie przyjął, MUST być powiedziane wprost, a panel MUST NOT
+pokazać tury jako zatrzymanej, dopóki moduł tego nie potwierdzi — odpowiedź, która płynie
+dalej pod napisem „zatrzymano", jest gorsza niż brak przycisku.
+
+#### Scenario: Operator zatrzymuje trwającą odpowiedź
+
+- **WHEN** odpowiedź agenta płynie, a operator wybiera zatrzymanie
+- **THEN** panel żąda zatrzymania od modułu
+- **AND** po zakończeniu tury pokazuje to, co dotarło, jako odpowiedź zatrzymaną
+- **AND** pozwala napisać następną wiadomość
+
+#### Scenario: Nie ma czego zatrzymywać
+
+- **WHEN** żadna tura nie trwa
+- **THEN** panel MUST NOT pokazywać sposobu zatrzymania
+
+#### Scenario: Moduł nie przyjął zatrzymania
+
+- **WHEN** żądanie zatrzymania kończy się błędem
+- **THEN** panel mówi to wprost
+- **AND** MUST NOT oznaczyć odpowiedzi jako zatrzymanej
+
+#### Scenario: Powrót do zatrzymanej rozmowy
+
+- **WHEN** operator otwiera sesję, w której tura została zatrzymana
+- **THEN** panel pokazuje tę wypowiedź jako zatrzymaną, tak samo jak pokazywał ją w chwili
+  zatrzymania
+
+### Requirement: Operator ustawia szerokość panelu
+
+Panel rozwinięty MUST dać się rozszerzać i zwężać ciągnięciem za jego krawędź. Szerokość,
+którą operator ustawi, MUST być zabrana albo oddana treści zakładki obok — panel odsuwa
+ją i wpuszcza z powrotem, a MUST NOT jej zakrywać.
+
+Szerokość MUST przetrwać przeładowanie terminala, tak samo jak stan zwinięcia. Panel
+zwinięty i rozwinięty z powrotem MUST wrócić do szerokości, którą operator ustawił, a nie
+do domyślnej.
+
+Szerokość MUST być ograniczona z obu stron. Panel MUST NOT dać się zwęzić poniżej miary, w
+której przestaje być czytelny, ani rozszerzyć tak, by treść zakładki zniknęła — obie
+skrajności zostawiają operatora bez drogi powrotnej inaczej niż przez wyczyszczenie
+pamięci przeglądarki. Szerokość zapamiętana wcześniej, a niemieszcząca się w oknie, którym
+terminal został właśnie otwarty, MUST zostać sprowadzona do granicy, a nie odtworzona
+dosłownie.
+
+Chwyt MUST dać się obsłużyć klawiaturą i MUST nieść dostępną nazwę mówiącą, co robi.
+
+#### Scenario: Operator poszerza panel
+
+- **WHEN** operator ciągnie krawędź panelu w lewo
+- **THEN** panel staje się szerszy
+- **AND** treść zakładki obok dostaje odpowiednio mniej miejsca, pozostając widoczna
+
+#### Scenario: Szerokość przeżywa przeładowanie
+
+- **WHEN** operator ustawia szerokość panelu i przeładowuje terminal
+- **THEN** panel ma tę samą szerokość
+
+#### Scenario: Zwinięcie i rozwinięcie nie gubi miary
+
+- **WHEN** operator zwija panel i rozwija go z powrotem
+- **THEN** panel wraca do szerokości, którą operator ustawił
+
+#### Scenario: Ciągnięcie poza granicę
+
+- **WHEN** operator ciągnie krawędź poza dopuszczalną szerokość
+- **THEN** panel zatrzymuje się na granicy
+- **AND** treść zakładki obok pozostaje widoczna
+
+#### Scenario: Okno węższe niż zapamiętana szerokość
+
+- **WHEN** terminal zostaje otwarty w oknie węższym, niż pozwala zapamiętana szerokość
+  panelu
+- **THEN** panel dostaje szerokość sprowadzoną do granicy dla tego okna
+
+#### Scenario: Chwyt z klawiatury
+
+- **WHEN** operator ustawia fokus na chwycie i używa klawiszy strzałek
+- **THEN** szerokość panelu zmienia się krok po kroku
 
