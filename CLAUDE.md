@@ -30,7 +30,7 @@ package cannot give it, the change is wrong, not the rule.
 | `packages/tc-mcp-kit` | speaking MCP: caller-identity middleware, the upstream-refusal helper, the tool-schema slimmer. |
 | `packages/tc-openai` | the streamed OpenAI call, with tools — one file, taken only by the workbench, whose two surfaces were 79,4% identical here. |
 | `infra/` | Terraform · Azure. `infra/bootstrap/` is a separate root with local state. |
-| `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. |
+| `openspec/` · `docs/` | specs (the truth) and proposals · architecture and reference, true today. `docs/archive/` is the road, not the state. A new `docs/*.html` copies `docs/style-template.html`; the written system is `docs/style.md`. |
 
 **Inside `modules/workbench` the rule has a second form**, because two things that were
 modules are packages of one: `agent/` and `teams/` never import each other, `teams_tools/`

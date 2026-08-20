@@ -1,0 +1,361 @@
+<title>Szablon dokumentu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Szablon · styl dokumentów</span>
+    <h1>Ścieżka zlecenia</h1>
+    <p class="lede">Cztery procesy dzielą operatora od rachunku demo. Każdy stoi tam <b>za jakąś cenę</b> — ten dokument liczy tę cenę.</p>
+    <div class="strip">
+      <span>TradingCenter / architektura</span>
+      <span>20 sierpnia 2026 · rew. <b>04</b></span>
+      <span>środowisko <b>demo</b></span>
+      <span><b>SZABLON</b> — treść przykładowa; stan opisuje docs/architecture.md</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">5</div><div class="l">niezależnych modułów</div></div>
+      <div class="cell"><div class="v">4</div><div class="l">skoki sieciowe na zlecenie</div></div>
+      <div class="cell"><div class="v">10/s</div><div class="l">budżet zapytań na rachunek</div></div>
+      <div class="cell"><div class="v">0</div><div class="l">narzędzi archiwum, które piszą</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Trasa</div>
+      <h2>Od zdania w terminalu do sesji u dostawcy</h2>
+      <p class="intro">Terminal nie zna capital.com i nigdy nie pozna. Rozmawia wyłącznie z workbenchem; ten wywołuje narzędzie MCP; narzędzie pyta bramkę; bramka trzyma jedyną sesję u dostawcy.</p>
+      <p><span class="hl">Pytanie o typ rachunku pada przed otwarciem portu</span>, nie przy pierwszym zleceniu — i to jest jedyny moment, w którym cała ta ścieżka może odmówić powstania.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 980 176" role="img" aria-label="Zlecenie idzie z terminala do workbencha, stamtąd wywołaniem MCP do trading-mcp, dalej REST-em do capital-gateway i na końcu sesją demo do capital.com">
+            <defs>
+              <marker id="f1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="62" width="150" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="87" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">terminal</text>
+              <text x="87" y="104" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">5173</text>
+
+              <rect x="215" y="62" width="150" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="290" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">workbench</text>
+              <text x="290" y="104" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8030</text>
+
+              <rect x="418" y="62" width="150" height="56" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="493" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">trading-mcp</text>
+              <text x="493" y="104" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">8060 · strażnik</text>
+
+              <rect x="621" y="62" width="150" height="56" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="696" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">capital-gateway</text>
+              <text x="696" y="104" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8010</text>
+
+              <rect x="824" y="62" width="144" height="56" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="896" y="86" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">capital.com</text>
+              <text x="896" y="104" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">demo</text>
+
+              <line x1="164" y1="90" x2="211" y2="90" stroke="currentColor" stroke-width="1.4" marker-end="url(#f1)"></line>
+              <text x="187" y="54" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">POST /chat</text>
+              <line x1="367" y1="90" x2="414" y2="90" stroke="currentColor" stroke-width="1.4" marker-end="url(#f1)"></line>
+              <text x="390" y="54" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">tool call</text>
+              <line x1="570" y1="90" x2="617" y2="90" stroke="currentColor" stroke-width="1.4" marker-end="url(#f1)"></line>
+              <text x="593" y="54" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">REST + klucz</text>
+              <text x="593" y="140" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.5">nagłówek sprawdzany zawsze</text>
+              <line x1="773" y1="90" x2="820" y2="90" stroke="currentColor" stroke-width="1.4" marker-end="url(#f1)"></line>
+              <text x="796" y="54" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">sesja demo</text>
+
+              <rect x="380" y="16" width="226" height="20" fill="#f2c313"></rect>
+              <text x="493" y="30" text-anchor="middle" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" fill="#14306b" letter-spacing="0.07em">KONTROLA TYPU RACHUNKU</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — cztery skoki na jedno zlecenie. Przerywana ramka po prawej to granica, za którą nic w tym repozytorium nie sięga.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Porty</div>
+      <h2>Trzy porty są niczyje</h2>
+      <p>Przydziały są stałe. Plik <code>.env</code> wskazujący na 8040, 8050 lub 8070 to serwer narzędzi, który <span class="hl">czyta się jako wyłączony</span> — skopiowany przed migracją wygląda poprawnie i milczy.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Moduł</th><th class="n">Port</th><th>Rola w ścieżce</th><th>Kto go woła</th><th>Stan</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>terminal</b></td><td class="n">5173</td><td>ekran operatora</td><td>przeglądarka</td><td><span class="tag ok">czynny</span></td></tr>
+            <tr><td><b>workbench</b></td><td class="n">8030</td><td>rozmowa i zespoły</td><td>terminal</td><td><span class="tag ok">czynny</span></td></tr>
+            <tr><td><b>trading-mcp</b></td><td class="n">8060</td><td>narzędzia nad rachunkiem</td><td>workbench</td><td><span class="tag att">tylko demo</span></td></tr>
+            <tr><td><b>capital-gateway</b></td><td class="n">8010</td><td>jedyne drzwi do dostawcy</td><td>trading-mcp</td><td><span class="tag ok">czynny</span></td></tr>
+            <tr><td><b>market-data</b></td><td class="n">8020</td><td>archiwum świec i własne <code>/mcp</code></td><td>terminal, workbench</td><td><span class="tag ok">czynny</span></td></tr>
+            <tr class="void"><td>—</td><td class="n">8040 · 8050 · 8070</td><td>niczyje</td><td>nikt</td><td><span class="tag stop">port martwy</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Strażnik</div>
+      <h2>Woli nie wstać, niż wstać na produkcji</h2>
+      <p><code>trading-mcp</code> nie uruchomi się na życzenie. Zanim otworzy port, pyta bramkę o typ rachunku — i odmawia startu, jeśli dostanie cokolwiek innego niż demo. Sprawdzane <strong>u dostawcy, nie w ustawieniu</strong>.</p>
+      <pre><code><span class="c"># Sprawdzane przed bind(), nie przy pierwszym narzędziu.</span>
+<span class="k">async def</span> _assert_demo_account(client: GatewayClient) -&gt; <span class="k">None</span>:
+    account = <span class="k">await</span> client.get_account()
+    <span class="k">if</span> account.type <span class="k">is not</span> AccountType.DEMO:
+        <span class="k">raise</span> RuntimeError(
+            <span class="s">f"trading-mcp odmawia startu: {account.id} to {account.type}"</span>
+        )</code></pre>
+      <div class="quote">Ustawienie mówi, co wpisano w pliku. Bramka mówi, czym jest rachunek.</div>
+      <p>Tylko drugie z tych zdań przeżyje skopiowany <code>.env</code> — i dlatego kontrola siedzi w starcie procesu, a nie w konfiguracji.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Pośrednik</div>
+      <h2>Jeden padł, drugi został</h2>
+      <p><code>market-mcp</code> był osobnym procesem, który tłumaczył MCP na REST tego samego archiwum. Zniknął, bo archiwum umie wystawić własne <code>/mcp</code> — jedenaście narzędzi tylko do odczytu. <code>trading-mcp</code> został, bo <span class="hl">za nim stoi rachunek</span>, a rachunek ma innego właściciela i inne uprawnienia niż archiwum.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 900 316" role="img" aria-label="Porównanie: dawniej workbench szedł do market-data przez osobny proces market-mcp, dziś idzie wprost do market-data slash mcp, a do rachunku nadal przez trading-mcp">
+            <defs>
+              <marker id="f2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+              <marker id="f2b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#14306b"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <text x="12" y="18" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.11em" fill="currentColor" opacity="0.5">PRZEDTEM — DWA PROCESY DLA JEDNEGO ARCHIWUM</text>
+              <g opacity="0.4">
+                <rect x="12" y="32" width="150" height="48" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+                <text x="87" y="61" text-anchor="middle" font-size="13" fill="currentColor">workbench</text>
+                <rect x="252" y="32" width="150" height="48" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="4 4"></rect>
+                <text x="327" y="55" text-anchor="middle" font-size="13" fill="currentColor">market-mcp</text>
+                <text x="327" y="71" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor">8040</text>
+                <rect x="492" y="32" width="170" height="48" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+                <text x="577" y="61" text-anchor="middle" font-size="13" fill="currentColor">market-data</text>
+                <line x1="164" y1="56" x2="248" y2="56" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2)"></line>
+                <line x1="404" y1="56" x2="488" y2="56" stroke="currentColor" stroke-width="1.3" marker-end="url(#f2)"></line>
+                <text x="206" y="46" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor">MCP</text>
+                <text x="446" y="46" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor">REST</text>
+                <line x1="262" y1="76" x2="392" y2="36" stroke="currentColor" stroke-width="1.8"></line>
+                <line x1="262" y1="36" x2="392" y2="76" stroke="currentColor" stroke-width="1.8"></line>
+              </g>
+
+              <rect x="12" y="112" width="330" height="18" fill="#f2c313"></rect>
+              <text x="20" y="125" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.09em" fill="#14306b">DZIŚ — ARCHIWUM WYSTAWIA WŁASNE /MCP</text>
+              <rect x="12" y="140" width="150" height="48" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="87" y="169" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">workbench</text>
+              <rect x="252" y="140" width="230" height="48" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="367" y="163" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">market-data · 8020</text>
+              <text x="367" y="179" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">REST i /mcp z jednego procesu</text>
+              <line x1="164" y1="164" x2="248" y2="164" stroke="#14306b" stroke-width="1.8" marker-end="url(#f2b)"></line>
+              <text x="206" y="154" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#14306b">11 narzędzi / 0 zapisów</text>
+
+              <text x="12" y="232" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.11em" fill="currentColor" opacity="0.5">NADAL OSOBNO — RACHUNEK MA INNEGO WŁAŚCICIELA</text>
+              <rect x="12" y="246" width="150" height="48" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="87" y="275" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">workbench</text>
+              <rect x="252" y="246" width="150" height="48" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="327" y="275" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">trading-mcp</text>
+              <rect x="492" y="246" width="170" height="48" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="577" y="275" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">capital-gateway</text>
+              <line x1="164" y1="270" x2="248" y2="270" stroke="currentColor" stroke-width="1.4" marker-end="url(#f2)"></line>
+              <line x1="404" y1="270" x2="488" y2="270" stroke="currentColor" stroke-width="1.4" marker-end="url(#f2)"></line>
+              <text x="206" y="260" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">MCP, jeden rozmówca</text>
+              <text x="446" y="260" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">REST + klucz</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 2</b> — skreślony jest ten skok, który nic nie dodawał. Trzeci wiersz zostaje: granica biegnie tam, gdzie kończy się odczyt, a zaczyna pieniądz.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Awarie</div>
+      <h2>Co się psuje</h2>
+      <p>Cztery tryby. Pierwszy krzyczy od razu, drugi nie krzyczy wcale — i to ten drugi kosztuje najwięcej czasu.</p>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Zły klucz bramki <span class="tag stop">start odmówiony</span></h3>
+          <p><code>CAPITAL_GATEWAY_API_KEY</code> musi być tym samym łańcuchem co <code>GATEWAY_API_KEY</code>. Bez kontroli w skrypcie dev objaw to cały stos padający z „usługa zakończyła działanie”.</p>
+        </div>
+        <div class="fail">
+          <h3>Brak <code>TRADING_MCP_URL</code> <span class="tag att">cicha awaria</span></h3>
+          <p>Działająca konfiguracja, nie błąd — ale czyta się najgorzej ze wszystkich: operator pyta o swoje pozycje i słyszy, że agent ich nie widzi.</p>
+        </div>
+        <div class="fail">
+          <h3>Dwa stosy naraz <span class="tag att">dławienie</span></h3>
+          <p>Sesje capital.com współistnieją. Głodzi je budżet 10&nbsp;req/s liczony <em>na rachunek</em>, nie na sesję.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Ustawienia po obrazie <span class="tag ok">kolejność</span></h3>
+          <p>Wdrożenie, które wyprzedzi <code>apply</code>, to przerwa w działaniu między jednym a drugim. Cofnięcie jest tą samą dźwignią: wyczyść URL, zrestartuj.</p>
+        </div>
+      </div>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Szablon stylu dokumentów · system opisany w docs/style.md</span>
+    <span>Tryb jasny — jedyny</span>
+  </div>
+</footer>
