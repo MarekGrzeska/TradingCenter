@@ -10,6 +10,7 @@ one route someone forgets is the one that ships open.
 from __future__ import annotations
 
 import hmac
+import logging
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -25,6 +26,8 @@ from . import telemetry
 # on an attribute this module never looks at again, and `AppRequests` never receives a point
 # regardless of where `FastAPI(...)` itself is called.
 telemetry.configure()
+
+log = logging.getLogger(__name__)
 
 from fastapi import Depends, FastAPI, HTTPException, Query, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
@@ -210,6 +213,22 @@ class RequireGatewayKey(BaseHTTPMiddleware):
                 )
             return await call_next(request)
 
+        # **The refusal says which door it was.** Until 21 August 2026 this branch answered
+        # 401 and wrote nothing anywhere, so a browser that could not get in left no trace
+        # at all: the module's traces were empty, and the only evidence was the *absence*
+        # of a row in `AppRequests`. Three different faults produced that same silence in
+        # two days — a caller key that did not match, a platform that injected no principal,
+        # and an audience this app did not list.
+        #
+        # Nothing secret goes in the line. An application id is a public identifier; the key
+        # and the token are never read into it.
+        log.warning(
+            "refused %s: caller key %s, principal header %s, application %s",
+            request.url.path,
+            "present" if provided else "absent",
+            "present" if request.headers.get(PRINCIPAL_HEADER) else "absent",
+            application or "unreadable",
+        )
         return JSONResponse(
             status_code=401, content={"detail": "missing or invalid caller key"}
         )
