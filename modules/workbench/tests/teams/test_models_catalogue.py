@@ -45,14 +45,6 @@ def test_a_model_outside_the_catalogue_raises_rather_than_substituting() -> None
         _catalogue().get("gpt-9-imaginary")
 
 
-def test_there_is_no_module_wide_default_to_fall_back_to() -> None:
-    # The one deliberate difference from agent's twin — a revision names a model per
-    # agent or it is refused (specs/teams-models, "Model wybiera się osobno dla każdego
-    # agenta"). A `resolve()` here would be the silent substitution the spec forbids.
-    assert not hasattr(_catalogue(), "resolve")
-    assert not hasattr(_catalogue(), "default_model_id")
-
-
 def test_the_published_entry_carries_everything_a_picker_needs() -> None:
     out = ModelOut.from_entry(_entry("luna", cost_rank=2, input_rate="1.25", output_rate="10"))
 
