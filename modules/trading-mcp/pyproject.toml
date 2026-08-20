@@ -17,7 +17,14 @@ dependencies = [
     "tc-mcp-kit",
     # This module's own identity, presented to capital-gateway wherever there is a
     # directory to get a token from (the-gateway-door-authenticates).
-    "azure-identity>=1.17",
+    "azure-identity>=1.19",
+    # Not transitive, and not optional: `azure.identity.aio`'s async transport imports
+    # aiohttp **lazily**, so a missing one is an `ImportError` at the first `get_token`
+    # rather than at install. market-data and tc-runtime both carry this line for the same
+    # reason, and both say so; this module shipped without it on 20 August 2026 and the
+    # container exited 1 five seconds into start-up, because the demo check is the first
+    # thing that asks for a token.
+    "aiohttp>=3.10",
 ]
 
 # Not a packaged library — uv only manages the venv and deps, no build step.

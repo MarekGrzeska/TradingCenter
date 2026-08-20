@@ -5,7 +5,8 @@ from __future__ import annotations
 import httpx
 import pytest
 import respx
-from azure.core.exceptions import ClientAuthenticationError
+from azure.core.exceptions import AzureError, ClientAuthenticationError
+from azure.identity.aio import DefaultAzureCredential
 
 from trading_mcp.client import GATEWAY_KEY_HEADER, GatewayClient
 from trading_mcp.config import Settings
@@ -240,3 +241,24 @@ async def test_a_gateway_that_refuses_the_demo_check_stops_the_port_opening(
         await client.ensure_demo_environment()
 
     await client.aclose()
+
+
+async def test_the_async_transport_is_installed() -> None:
+    """The real credential, not a double — which is the whole point of this test.
+
+    Every other test here monkeypatches `DefaultAzureCredential`, so none of them touches
+    the transport `azure.identity.aio` imports lazily on the first `get_token`. Shipping
+    without `aiohttp` is therefore an `ImportError` in production and a green suite here:
+    that is exactly what happened on 20 August 2026, when this container exited 1 five
+    seconds into start-up, because the demo check is the first thing that asks for a token.
+
+    Any `AzureError` is a pass — on a machine with no identity the answer is a refusal, and
+    a refusal proves the pipeline was built. `ImportError` is the failure being guarded.
+    """
+    credential = DefaultAzureCredential()
+    try:
+        await credential.get_token("api://tradingcenter-capital-gateway/.default")
+    except AzureError:
+        pass
+    finally:
+        await credential.close()
