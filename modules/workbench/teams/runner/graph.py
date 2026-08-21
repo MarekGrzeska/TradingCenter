@@ -5,8 +5,9 @@ LangGraph carries this because its model — explicit nodes and explicit edges �
 one onto what a revision already stores (design.md, "LangGraph, nie OpenAI Agents SDK").
 Two properties come with it rather than being written here:
 
-- **an agent starts when its predecessors have finished**, because that is what an edge
-  means to a graph runtime;
+- **an agent starts when its predecessors have finished** — *all* of them, which is what
+  declaring its incoming edges as one joint edge means (`compile_team`; a single edge
+  alone is only a trigger);
 - **agents whose dependencies are already satisfied run at the same time**, because
   LangGraph runs one superstep's nodes concurrently (specs/teams-runs, "Agenci, których
   zależności są już spełnione, MAY pracować równocześnie").
@@ -81,13 +82,19 @@ def compile_team(definition: TeamDefinition, run_agent: AgentRunner):
         graph.add_node(agent.key, _make_node(agent, predecessors[agent.key], run_agent))
 
     for agent in definition.agents:
-        if not predecessors[agent.key]:
+        sources = predecessors[agent.key]
+        if sources:
+            # The list form is load-bearing. Separate add_edge(a, c) / add_edge(b, c)
+            # calls are independent triggers, so predecessors finishing in different
+            # supersteps ran the node once per wave — run 22's `kronikarz` step was
+            # started a second time after it had finished, on 21 August 2026, and
+            # `run_steps_status_fields_match` is what caught it. Only
+            # add_edge([...], c) makes the node wait for all of them.
+            graph.add_edge(list(sources), agent.key)
+        else:
             graph.add_edge(START, agent.key)
         if agent.key not in has_successor:
             graph.add_edge(agent.key, END)
-
-    for edge in definition.edges:
-        graph.add_edge(edge.from_, edge.to)
 
     return graph.compile()
 
