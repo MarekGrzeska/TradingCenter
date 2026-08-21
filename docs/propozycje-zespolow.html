@@ -1,0 +1,413 @@
+<title>Cztery zespoły na demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Propozycje · zespoły agentowe</span>
+    <h1>Cztery zespoły na demo</h1>
+    <p class="lede">Złoto, bitcoin i US100. Swing od trendu dziennego w dół, prowadzenie pozycji na H4/H1, żadnego wolumenu, handel pn–pt — i <b>mandat działania</b>: każdy przebieg kończy się decyzją, nie odroczeniem. Wszystko poniżej da się wyklikać w terminalu dziś, bez ani jednej zmiany w kodzie.</p>
+    <div class="strip">
+      <span>TradingCenter / workbench · teams</span>
+      <span>21 sierpnia 2026 · rew. <b>01</b></span>
+      <span>rachunek <b>demo</b> — strażnik w trading-mcp</span>
+      <span>kapitał: <b>agresywny</b>, all-in dopuszczalny</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">4</div><div class="l">zespoły + wartownik na wyzwalaczach</div></div>
+      <div class="cell"><div class="v">3</div><div class="l">instrumenty: GOLD · BTC · US100</div></div>
+      <div class="cell"><div class="v">20</div><div class="l">narzędzi: 11 archiwum + 9 rachunku</div></div>
+      <div class="cell"><div class="v">pn–pt</div><div class="l">harmonogramy cron z <code>1-5</code> w polu dnia</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Założenia i tworzywo</div>
+      <h2>Co jest do dyspozycji, zanim cokolwiek dojdzie</h2>
+      <p class="intro">Rewizja zespołu niesie wszystko, czego te propozycje potrzebują: agentów z własnym promptem, modelem i listą narzędzi, krawędzie zależności (DAG), limity handlowe — każdy opcjonalny, brak znaczy bez limitu — harmonogramy cron i wyzwalacze rynkowe. Notatki międzysesyjne i newsy dojdą później; nic poniżej na nie nie czeka.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Warstwa</th><th>Co daje</th><th>Użyte w propozycjach</th></tr></thead>
+          <tbody>
+            <tr><td><b>archiwum</b> (market-data /mcp)</td><td><code>get_candles</code>, <code>get_last_price</code>, <code>summarize_range</code>, <code>describe_coverage</code>, <code>compute_indicators</code>, <code>levels_near_price</code>, <code>list_indicators</code>, <code>describe_indicator</code>, <code>search_instruments</code>, <code>list_tracked_symbols</code>, <code>list_tracked_pairs</code></td><td>trend D1, strefy H4/H1, RSI/MACD/EMA, poziomy przy cenie</td></tr>
+            <tr><td><b>rachunek</b> (trading-mcp)</td><td><code>get_balance</code>, <code>get_positions</code>, <code>get_working_orders</code>, <code>get_instrument_terms</code>, <code>size_for_margin</code>, <code>place_order</code>, <code>amend_stops</code>, <code>close_position</code>, <code>cancel_working_order</code></td><td>wejścia, dokładki, redukcje, odwrócenia, stopy</td></tr>
+            <tr><td><b>rytm</b></td><td>harmonogramy cron (pn–pt przez <code>1-5</code>), wyzwalacze na warunku z narzędzia (próg + cooldown)</td><td>przebiegi pod otwarcia sesji; Wartownik</td></tr>
+            <tr><td><b>ślad</b></td><td>trade trace per zlecenie, wypowiedzi agentów w <code>run_steps</code>, koszt per rola</td><td>informacja zwrotna po każdym przebiegu</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="fails">
+        <div class="fail">
+          <h3>Świadomość sesji — bez nowego narzędzia <span class="tag att">obejście działa dziś</span></h3>
+          <p>Runner nie podaje agentowi zegara, ale <code>get_last_price</code> zwraca znacznik czasu UTC świecy budowanej teraz. Prompt każe odczytać go na starcie i zaklasyfikować: <b>00–07 UTC Azja · 07–13:30 Europa · 13:30–20 USA</b> (nakładki są częścią klasyfikacji, nie błędem). Do tego harmonogramy strzelają w otwarcia sesji, więc czas przebiegu sam mówi, gdzie jesteśmy. Docelowo: małe narzędzie <code>describe_market_sessions</code> — osobna, późniejsza zmiana.</p>
+        </div>
+        <div class="fail">
+          <h3>Jeden rachunek, wiele zespołów <span class="tag att">reguła mandatu</span></h3>
+          <p>Wszystkie zespoły grają na tym samym rachunku demo i widzą nawzajem swoje pozycje przez <code>get_positions</code>. Każdy prompt niesie zdanie: <span class="hl">„dotykasz wyłącznie pozycji na instrumentach swojego mandatu"</span>. Skutek uboczny jest pożądany: zespół krótkoterminowy może świadomie zostawić pozycję, którą następnego ranka przejmie zespół swingowy.</p>
+        </div>
+        <div class="fail">
+          <h3>Zanim pierwszy przebieg ruszy <span class="tag ok">checklist</span></h3>
+          <p>Potwierdź symbole przez <code>search_instruments</code> („gold", „bitcoin", „US100") i sprawdź w <code>list_tracked_pairs</code>, że archiwum zbiera je na <b>DAY, HOUR_4, HOUR, MINUTE_15</b> — wskaźnik na parze, której nikt nie śledzi, to pytanie, którego archiwum nigdy nie dostało. Wolumen pomijamy wszędzie: dla CFD jest nierzetelny i katalog wskaźników go nie promuje.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Zespół pierwszy</div>
+      <h2>Rada Swingowa — trzon, styl docelowy</h2>
+      <p class="intro">Jeden zespół, trzy instrumenty, czterech agentów w łańcuchu. Trend czyta się raz, na D1; niżej się go tylko rozgrywa. To jest dokładnie podejście „z góry w dół": bias długoterminowy → strefy H4/H1 → decyzja i prowadzenie.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 960 150" role="img" aria-label="Łańcuch czterech agentów Rady Swingowej: strateg trendu na D1 przekazuje bias taktykowi H4/H1, ten strefy egzekutorowi z narzędziami rachunku, a kronikarz spisuje decyzje i warunki zmiany zdania">
+            <defs>
+              <marker id="d1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="34" width="192" height="62" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="108" y="58" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">strateg trendu</text>
+              <text x="108" y="76" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">D1 · EMA50/200 · struktura</text>
+
+              <rect x="264" y="34" width="192" height="62" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="360" y="58" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">taktyk</text>
+              <text x="360" y="76" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">H4/H1 · RSI · strefy</text>
+
+              <rect x="516" y="34" width="192" height="62" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="612" y="58" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">egzekutor</text>
+              <text x="612" y="76" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">narzędzia rachunku · mandat</text>
+
+              <rect x="768" y="34" width="180" height="62" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="858" y="58" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">kronikarz</text>
+              <text x="858" y="76" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">zapis decyzji i warunków</text>
+
+              <line x1="206" y1="65" x2="260" y2="65" stroke="currentColor" stroke-width="1.4" marker-end="url(#d1)"></line>
+              <text x="233" y="52" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">bias + inwalidacja</text>
+              <line x1="458" y1="65" x2="512" y2="65" stroke="currentColor" stroke-width="1.4" marker-end="url(#d1)"></line>
+              <text x="485" y="52" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">strefy + plan</text>
+              <line x1="710" y1="65" x2="764" y2="65" stroke="currentColor" stroke-width="1.4" marker-end="url(#d1)"></line>
+              <text x="737" y="52" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">co zrobiono</text>
+              <text x="612" y="126" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.55">wyjście kronikarza zostaje w run_steps — namiastka pamięci, dopóki nie ma notatek zespołu</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — łańcuch Rady Swingowej. Tylko egzekutor nosi narzędzia zapisujące; analitycy czytają archiwum, kronikarz nie dotyka niczego.</figcaption>
+      </figure>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parametr</th><th>Wartość</th><th>Uwaga</th></tr></thead>
+          <tbody>
+            <tr><td><b>instrumenty</b></td><td>GOLD · BTCUSD · US100</td><td>symbole potwierdzić raz przez <code>search_instruments</code></td></tr>
+            <tr><td><b>rytm</b></td><td><code>5 7 * * 1-5</code> i <code>35 13 * * 1-5</code></td><td>otwarcie Europy i USA (09:05 i 15:35 czasu PL latem)</td></tr>
+            <tr><td><b>limity handlowe</b></td><td>orders_per_run 6 · orders_per_day 12 · max_order_size — brak</td><td>rozmiar świadomie bez sufitu — rozdz. 07</td></tr>
+            <tr><td><b>modele</b></td><td>analitycy tańsi, egzekutor najmocniejszy z katalogu</td><td>koszt per rola widać w usage po przebiegu</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Strategia.</strong> Strateg liczy na D1 <code>compute_indicators</code> (EMA50, EMA200, RSI14) i czyta strukturę szczytów/dołków z <code>summarize_range</code> za 90 dni: cena nad obiema EMA i wyżej położone dołki → bias LONG; lustrzanie SHORT; sprzeczność → BRAK, z zapisanym warunkiem, co by go przełamało. Do biasu dokleja <b>poziom inwalidacji</b> — strukturalny dołek/szczyt, którego złamanie na zamknięciu D1 odwraca zdanie. Taktyk schodzi na H4/H1: <code>levels_near_price</code> daje strefy, RSI14 H4 mierzy rozciągnięcie; wyznacza strefę wejścia przy cofnięciu do EMA20 H4 lub wsparcia, strefę dokładki i strefę redukcji pod oporem. Egzekutor porównuje plan ze stanem rachunku i działa: brak pozycji w biasie → otwiera; pozycja zgodna a cena w strefie dokładki → dokłada; RSI H4 skrajne pod oporem → redukuje częściowo; złamana inwalidacja D1 → <span class="hl">zamyka i otwiera w drugą stronę w tym samym przebiegu</span> — odwrócenie jest jedną decyzją, nie dwiema sesjami. Stop zawsze za strukturą, podciągany przez <code>amend_stops</code> przy każdym przebiegu, w którym pozycja zarabia.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Zespół drugi</div>
+      <h2>Złoto trzech sesji</h2>
+      <p class="intro">Złoto ma wyraźny rytm dobowy: Azja buduje zakres, Europa go rozstrzyga, USA dowozi ruch albo go zabiera. Jeden zespół, jedna rewizja, trzy harmonogramy — a którą sesję właśnie gra, agent wie z zegara świecy.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 960 190" role="img" aria-label="Oś doby UTC z pasmami sesji Azja 0 do 8, Europa 7 do 16:30, USA 13:30 do 20, oraz czterema momentami przebiegów: 01:05, 07:05, 13:35 i 19:35">
+            <defs>
+              <marker id="s1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#14306b"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <line x1="40" y1="140" x2="930" y2="140" stroke="currentColor" stroke-width="1.4"></line>
+              <g font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">
+                <text x="40" y="158" text-anchor="middle">00</text>
+                <text x="188" y="158" text-anchor="middle">04</text>
+                <text x="336" y="158" text-anchor="middle">08</text>
+                <text x="484" y="158" text-anchor="middle">12</text>
+                <text x="632" y="158" text-anchor="middle">16</text>
+                <text x="780" y="158" text-anchor="middle">20</text>
+                <text x="928" y="158" text-anchor="middle">24 UTC</text>
+              </g>
+              <rect x="40" y="36" width="296" height="24" fill="#e6ebf5"></rect>
+              <text x="52" y="53" font-size="11" font-weight="700" fill="#14306b">AZJA 00–08</text>
+              <rect x="299" y="68" width="352" height="24" fill="#fdf3d0"></rect>
+              <text x="311" y="85" font-size="11" font-weight="700" fill="#8a6708">EUROPA 07–16:30</text>
+              <rect x="540" y="100" width="240" height="24" fill="#e0f0e8"></rect>
+              <text x="552" y="117" font-size="11" font-weight="700" fill="#17734c">USA 13:30–20</text>
+              <g stroke="#14306b" stroke-width="1.6">
+                <line x1="80" y1="132" x2="80" y2="148"></line>
+                <line x1="302" y1="132" x2="302" y2="148"></line>
+                <line x1="543" y1="132" x2="543" y2="148"></line>
+                <line x1="765" y1="132" x2="765" y2="148"></line>
+              </g>
+              <g font-size="10" font-family="Roboto Mono, monospace" fill="#14306b" font-weight="700">
+                <text x="80" y="180" text-anchor="middle">01:05 inwentarz</text>
+                <text x="302" y="180" text-anchor="middle">07:05 rozstrzygnięcie</text>
+                <text x="543" y="180" text-anchor="middle">13:35 prowadzenie</text>
+                <text x="765" y="180" text-anchor="middle">19:35 domknięcie dnia</text>
+              </g>
+              <text x="40" y="20" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.55">NAKŁADKI SESJI SĄ CZĘŚCIĄ KLASYFIKACJI — 13:30–16:30 TO EUROPA I USA NARAZ</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 2</b> — doba złota i cztery przebiegi. Momenty przebiegów to zarazem odpowiedź na pytanie „skąd agent wie, która sesja": z czasu, w którym został obudzony, potwierdzonego zegarem świecy z <code>get_last_price</code>.</figcaption>
+      </figure>
+      <p><strong>Strategia per przebieg.</strong> <b>01:05 (Azja)</b> — bez nowych wejść: spis zakresu nocy przez <code>summarize_range</code>, kontrola stopów istniejącej pozycji, nic więcej. <b>07:05 (Europa)</b> — rozstrzygnięcie: wybicie z zakresu Azji <em>w kierunku biasu D1</em> jest wejściem lub dokładką; wybicie pod bias jest tylko obserwacją z zapisanym warunkiem. <b>13:35 (USA)</b> — prowadzenie: Nowy Jork potwierdza → dokładka; neguje ruch Europy → redukcja o połowę i stop na poziom wejścia. <b>19:35</b> — domknięcie dnia: decyzja trzymać/redukować na noc, stop podciągnięty za strukturę H1. Struktura zespołu jak w Radzie, minus osobny strateg — bias D1 liczy taktyk na początku każdego przebiegu, bo złoto to jeden instrument i jedna odpowiedź.</p>
+      <p>Limity: orders_per_run 4, orders_per_day 10. Cztery przebiegi dziennie pn–pt to najszybsza pętla informacji zwrotnej z całego zestawu — <span class="hl">ten zespół będzie się mylił najczęściej i najczytelniej</span>, i po to jest.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Zespół trzeci</div>
+      <h2>BTC z bramką weekendową</h2>
+      <p class="intro">Bitcoin handluje 24/7, mandat handluje pn–pt. Ta sprzeczność jest jedyną rzeczą, którą ten zespół musi rozwiązywać inaczej niż Rada — i rozwiązuje ją osobnym przebiegiem w piątek wieczorem.</p>
+      <p><strong>Strategia.</strong> Momentum swing: bias z D1 (EMA50/200 + struktura), wejścia i dokładki na cofnięciach H4 do EMA20/wsparcia, stopy szersze niż na indeksie — krypto ma szersze świece i stop liczony jak dla US100 jest proszeniem o wybicie. Redukcja na RSI H4 powyżej 75, odwrócenie tylko na złamaniu struktury D1. Przebiegi 07:05 i 13:35 UTC pn–pt, jak Rada.</p>
+      <p><strong>Bramka: piątek <code>35 19 * * 5</code>.</strong> Jeden dodatkowy przebieg z jednym pytaniem: czy pozycja przeżywa weekend? Zostaje wyłącznie wtedy, gdy stop chroni już zysk (nie wejście — zysk); inaczej redukcja albo zamknięcie. <strong>Poniedziałek 07:05</strong> zaczyna od oceny luki weekendowej wobec piątkowego planu — to pierwszy test, jak zespół radzi sobie z ruchem, którego nie widział. Limity: orders_per_run 4, orders_per_day 8.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Zespół czwarty</div>
+      <h2>US100: otwarcie Nowego Jorku</h2>
+      <p class="intro">Test krótszego terminu — świadomie poza preferowanym stylem, po szybszą informację zwrotną. Jedna sesja, jedno okno, wynik znany tego samego dnia.</p>
+      <p><strong>Strategia.</strong> Przebieg <code>35 13 * * 1-5</code>: z M15 zakres pierwszych 30 minut po otwarciu kasowego NY (13:30–14:00 UTC), wybicie zakresu <em>w kierunku trendu H4</em> jest wejściem; wybicie pod trend — pominięciem z zapisanym powodem. Stop pod/nad zakresem otwarcia, dokładka po pierwszym cofnięciu M15, które nie wraca do zakresu. Sizing agresywny: <code>size_for_margin</code> z 30–50% wolnego depozytu — to jest zespół, w którym duża stawka na krótkim odcinku ma sens, bo inwalidacja jest blisko i tania. Przebieg <code>35 19 * * 1-5</code> zamyka dzień: pozycja znika <b>albo</b> — gdy dzień zamyka się trendem na H4 — zostaje ze stopem za strukturą i jutrzejsza Rada przejmuje ją jako zastaną. Przekazanie nie wymaga żadnej pamięci: pozycja na rachunku <em>jest</em> komunikatem.</p>
+      <p>Limity: orders_per_run 4, orders_per_day 8. Jeśli po dwóch tygodniach trace pokazuje, że wybicia pod prąd H4 były lepsze niż z prądem — to jest wynik, nie porażka; rewizja jest niezmienna, więc porównanie „miesiąc później" ma przedmiot.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Wartownik</div>
+      <h2>Wyzwalacze zamiast czekania w pętli</h2>
+      <p class="intro">Harmonogram pyta „która godzina", wyzwalacz pyta „czy rynek dojechał". Moduł sam odpytuje narzędzie co N sekund i budzi zespół, gdy warunek przejdzie próg — z cooldownem, żeby jeden dojazd nie odpalił dziesięciu przebiegów.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Wyzwalacz</th><th>Narzędzie i warunek</th><th>Budzi</th><th>Rytm</th></tr></thead>
+          <tbody>
+            <tr><td><b>złoto wyprzedane</b></td><td><code>compute_indicators</code> GOLD H4 RSI14 · <code>lte 30</code></td><td>Radę — cofnięcie w trendzie do rozegrania</td><td>poll 15 min · cooldown 6 h</td></tr>
+            <tr><td><b>złoto wykupione</b></td><td>jak wyżej · <code>gte 70</code></td><td>Radę — kandydat na redukcję</td><td>poll 15 min · cooldown 6 h</td></tr>
+            <tr><td><b>US100 nad oporem</b></td><td><code>get_last_price</code> US100 · <code>gte</code> próg z ostatniej analizy</td><td>zespół NY poza oknem otwarcia</td><td>poll 5 min · cooldown 2 h</td></tr>
+            <tr><td><b>BTC pod wsparciem</b></td><td><code>get_last_price</code> BTCUSD · <code>lte</code> poziom inwalidacji D1</td><td>zespół BTC — decyzja o odwróceniu od razu, nie o 07:05</td><td>poll 5 min · cooldown 4 h</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Progi cenowe są statyczne do czasu ręcznej edycji — po każdej zmianie poziomu inwalidacji trzeba je przestawić w terminalu. To koszt znany i akceptowalny; zniknie, gdy zespoły dostaną notatki i będą mogły same wnioskować o przestawienie. Uwaga praktyczna: wyzwalacz działa siedem dni w tygodniu — <span class="hl">mandat pn–pt egzekwuje prompt zespołu</span>, który w sobotę i niedzielę ma obowiązek odpowiedzieć „poza oknem handlu" i nie dotknąć rachunku.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Kapitał i mandat działania</div>
+      <h2>Agresywnie, ale z nazwanym powodem</h2>
+      <p class="intro">Demo jest paliwem na naukę, nie kapitałem do ochrony. Limity modułu zostają szeroko otwarte (max_order_size — brak), a dyscyplina mieszka w promptach — tam, gdzie można ją czytać, porównywać i poprawiać między rewizjami.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Sizing bazowy <span class="tag ok">20–35% depozytu</span></h3>
+          <p>Pojedyncza idea angażuje 20–35% wolnego depozytu przez <code>size_for_margin</code>, dokładki mogą doprowadzić łączne zaangażowanie instrumentu do ~60%. Zawsze od <code>get_instrument_terms</code> — wymóg depozytowy i krok rozmiaru są dostawcy, nie do zgadnięcia.</p>
+        </div>
+        <div class="fail">
+          <h3>All-in — dopuszczalny, nie bazowy <span class="tag att">świadoma decyzja</span></h3>
+          <p>Agent ma prawo zagrać całym kapitałem, jeśli nazwie powód. Prompt wymaga wtedy dwóch zdań: dlaczego ta okazja uzasadnia pełne zaangażowanie <em>i</em> co agent traci — miejsce na dokładkę, bufor na prowadzenie stopa, zdolność reakcji na sygnał na drugim instrumencie. Decyzja z tymi dwoma zdaniami jest legalna; bez nich jest hazardem, który kronikarz ma obowiązek wytknąć.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Zwłoka jest błędem, nie ostrożnością <span class="tag stop">mandat</span></h3>
+          <p>Każdy przebieg kończy się dokładnie jedną decyzją per instrument: OPEN, ADD, REDUCE, REVERSE, CLOSE albo HOLD. HOLD jest legalny wyłącznie z warunkiem falsyfikowalnym — poziomem i interwałem, którego dotknięcie zmienia decyzję. „Czekam na potwierdzenie" bez liczby nie jest decyzją i kolejna rewizja promptu ma to traktować jako defekt do naprawy.</p>
+        </div>
+      </div>
+      <div class="quote">Każdy przebieg kończy się decyzją, nie odroczeniem.</div>
+      <p>Fragment do wklejenia w pole „wytyczne" egzekutora — wspólny dla wszystkich czterech zespołów:</p>
+      <pre><code><span class="c"># Mandat egzekutora — wytyczne wspólne</span>
+Handlujesz wyłącznie pon–pt (UTC) i wyłącznie instrumentami swojego mandatu.
+Czas ustalasz z get_last_price (znacznik świecy, UTC): 00–07 Azja,
+07–13:30 Europa, 13:30–20 USA — i nazywasz sesję w swojej odpowiedzi.
+
+Kończysz KAŻDY przebieg jedną decyzją per instrument:
+OPEN / ADD / REDUCE / REVERSE / CLOSE / HOLD.
+HOLD wymaga warunku falsyfikowalnego: poziom + interwał + co wtedy zrobisz.
+Nie używasz wolumenu — dla CFD jest nierzetelny.
+
+Sizing: bazowo 20–35% wolnego depozytu (size_for_margin, cena z tej samej
+świecy, na której oparłeś decyzję). All-in dozwolony, gdy nazwiesz powód
+i cenę: co tracisz w polu manewru. Stop zawsze za strukturą; gdy pozycja
+zarabia, podciągasz go w każdym przebiegu (amend_stops).
+Odwrócenie to jedna decyzja: close_position + place_order w tym samym
+przebiegu, nigdy „zamknę dziś, otworzę jutro".</code></pre>
+    </section>
+
+    <section>
+      <div class="eyebrow">08 · Czego tu nie ma</div>
+      <h2>Braki nazwane, żadne nie blokuje startu</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Brak</th><th>Substytut na dziś</th><th>Kiedy</th></tr></thead>
+          <tbody>
+            <tr><td><b>notatki i pamięć zespołu</b> między sesjami</td><td>wyjście kronikarza w <code>run_steps</code> + trade trace + pozycja na rachunku jako komunikat</td><td>w planie — dziś/jutro, wg Twojej zapowiedzi</td></tr>
+            <tr><td><b>narzędzie sesji</b> (Azja/Europa/USA)</td><td>zegar ze świecy <code>get_last_price</code> + harmonogramy strojone pod otwarcia</td><td>mała zmiana w market-data, osobna propozycja</td></tr>
+            <tr><td><b>newsy i dane dodatkowe</b></td><td>brak — strategie powyżej są celowo czysto cenowe</td><td>później, po pamięci</td></tr>
+            <tr class="void"><td><b>wolumen</b></td><td>—</td><td>nigdy: dla CFD nierzetelny, decyzja stała</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px"><strong>Kolejność startu:</strong> najpierw Rada Swingowa (styl docelowy, najwolniejsza pętla), dzień–dwa później Złoto trzech sesji (najszybsza informacja zwrotna), potem bramka BTC i test NY. Wartownika dodać, gdy pierwsze poziomy inwalidacji będą zapisane w wyjściach kronikarza — wtedy progi ma skąd wziąć operator. Każdy zespół to osobna rewizja, więc każda zmiana promptu jest porównywalna z poprzednią wersją na tym samym śladzie transakcji.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Propozycje zespołów · wykonalne na dziś w workbench/teams</span>
+    <span>GOLD · BTCUSD · US100 · demo · pn–pt</span>
+  </div>
+</footer>

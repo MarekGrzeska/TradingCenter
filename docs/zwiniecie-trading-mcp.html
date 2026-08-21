@@ -1,0 +1,344 @@
+<title>Zwinięcie trading-mcp</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 0; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Analiza · za i przeciw</span>
+    <h1>Zwinięcie trading-mcp</h1>
+    <p class="lede">Czy narzędzia rachunku powinny mieszkać wprost w <b>capital-gateway</b>, jako jego własne <b>/mcp</b> — tak jak archiwum wchłonęło market-mcp? Pytanie zostało zmierzone i rozstrzygnięte; ten dokument zbiera obie strony rachunku w jednym miejscu.</p>
+    <div class="strip">
+      <span>TradingCenter / architektura</span>
+      <span>21 sierpnia 2026 · rew. <b>01</b></span>
+      <span>rozstrzygnięte <b>20.08.2026</b> — zostaje osobno</span>
+      <span>źródła: docs/architecture.md · rachunek-po-refactorze, karta <b>C</b></span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">−790</div><div class="l">linii ręcznego rusztowania do skasowania</div></div>
+      <div class="cell"><div class="v">+570</div><div class="l">linii autoryzacji per trasa do dopisania w bramce</div></div>
+      <div class="cell"><div class="v">1,4:1</div><div class="l">stosunek zysku — wobec 2,2:1 przy market-mcp</div></div>
+      <div class="cell"><div class="v">3</div><div class="l">argumenty przeciw, których nie widać w liniach</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Stan i wariant</div>
+      <h2>Dwa skoki dziś, jeden po zwinięciu</h2>
+      <p class="intro">Dziś zlecenie z workbencha idzie przez osobny proces: <code>trading-mcp</code> tłumaczy wywołanie narzędzia na REST bramki i nie otwiera portu, dopóki bramka nie potwierdzi, że rachunek jest demo. Zwinięcie znaczy: te same narzędzia jako <code>/mcp</code> wewnątrz bramki, jeden proces mniej, jeden skok mniej.</p>
+      <p>To dokładnie ta operacja, którą archiwum wykonało 19 sierpnia — <code>market-mcp</code> zniknął, a <code>market-data</code> wystawia własne <code>/mcp</code>. Stąd bierze się pytanie: <span class="hl">czy trzeci serwer narzędzi nie powinien pójść tą samą drogą</span>.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 960 340" role="img" aria-label="Porównanie: dziś workbench woła trading-mcp, który REST-em z kluczem pyta capital-gateway; w odrzuconym wariancie workbench szedłby wprost do capital-gateway z wmontowanym /mcp, a market-data nadal ciągnęłoby każdą świecę przez ten sam proces">
+            <defs>
+              <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+              <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#14306b"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <text x="12" y="18" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.11em" fill="currentColor" opacity="0.55">DZIŚ — OSOBNY MODUŁ, DWA SKOKI, STRAŻNIK PRZED PORTEM</text>
+              <rect x="12" y="34" width="150" height="52" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="87" y="58" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">workbench</text>
+              <text x="87" y="76" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8030</text>
+
+              <rect x="256" y="34" width="160" height="52" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="336" y="58" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">trading-mcp</text>
+              <text x="336" y="76" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">8060 · strażnik demo</text>
+
+              <rect x="510" y="34" width="170" height="52" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="595" y="58" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">capital-gateway</text>
+              <text x="595" y="76" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8010</text>
+
+              <rect x="774" y="34" width="150" height="52" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="849" y="58" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">capital.com</text>
+              <text x="849" y="76" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">demo</text>
+
+              <line x1="164" y1="60" x2="252" y2="60" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="208" y="50" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">MCP · jeden rozmówca</text>
+              <line x1="418" y1="60" x2="506" y2="60" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="462" y="50" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">REST + klucz</text>
+              <line x1="682" y1="60" x2="770" y2="60" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="726" y="50" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">sesja demo</text>
+
+              <rect x="12" y="130" width="380" height="20" fill="#f2c313"></rect>
+              <text x="20" y="144" font-size="10.5" font-weight="700" font-family="Roboto Mono, monospace" letter-spacing="0.09em" fill="#14306b">WARIANT ODRZUCONY 20.08 — /MCP WEWNĄTRZ BRAMKI</text>
+
+              <rect x="12" y="168" width="150" height="52" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="87" y="192" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">workbench</text>
+              <text x="87" y="210" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8030</text>
+
+              <rect x="256" y="168" width="250" height="52" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="381" y="190" text-anchor="middle" font-size="13.5" font-weight="700" fill="#ffffff">capital-gateway + /mcp</text>
+              <text x="381" y="208" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">autoryzacja per trasa · ~570 linii</text>
+
+              <rect x="600" y="168" width="150" height="52" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="675" y="192" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">capital.com</text>
+              <text x="675" y="210" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">demo</text>
+
+              <line x1="164" y1="194" x2="252" y2="194" stroke="#14306b" stroke-width="1.7" marker-end="url(#a2)"></line>
+              <text x="208" y="184" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#14306b">MCP + Easy Auth</text>
+              <line x1="508" y1="194" x2="596" y2="194" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="552" y="184" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">sesja demo</text>
+
+              <rect x="12" y="262" width="150" height="52" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="87" y="286" text-anchor="middle" font-size="13.5" font-weight="700" fill="currentColor">market-data</text>
+              <text x="87" y="304" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">8020 · archiwum</text>
+              <line x1="164" y1="284" x2="300" y2="224" stroke="currentColor" stroke-width="1.4" marker-end="url(#a1)"></line>
+              <text x="330" y="290" font-size="10" font-family="Roboto Mono, monospace" fill="#b8322a">każda świeca idzie tędy — awaria narzędzia zleceń gasi zasilanie archiwum</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — górny wiersz to stan; dolny to wariant, o który pyta ten dokument. Żółta etykieta w dolnym wierszu jest ceną, której nie widać na strzałkach: bramka musiałaby prowadzić zapis „kto na którą trasę”, bo Easy Auth autoryzuje aplikację, nie ścieżkę.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Za</div>
+      <h2>Co zwinięcie kupuje</h2>
+      <p>Zyski są realne i policzone — to nie jest wariant bez argumentów. Zmierzone 20.08.2026, na module liczącym wtedy cztery dni.</p>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Rusztowanie znika <span class="tag ok">−790 ręcznych · −2 723 generowanych</span></h3>
+          <p>Kod istniejący wyłącznie z powodu rozdzielenia: <code>client.py</code> (95), <code>__main__.py</code> (38), część <code>config.py</code> nazywająca upstream (~65), połowa <code>errors.py</code> mapująca statusy HTTP (~40), <code>scripts/contract.py</code> (111) — i ich testy (~440). Do tego pliki generowane: snapshot OpenAPI bramki (1 593) i <code>uv.lock</code> (1 130). Narzędzia same — pięć plików <code>tools/</code> (540) z testami (884) — przenoszą się, nie znikają.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Snapshot kontraktu przestaje istnieć <span class="tag ok">koszt bieżący</span></h3>
+          <p>W pierwszych czterech dniach modułu pięć commitów ruszyło bramkę i dwa wymusiły regenerację snapshotu. Wewnątrz jednego procesu nie ma drugiej kopii kontraktu, więc nie ma czego regenerować ani pilnować w CI.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Cała obsada infrastruktury schodzi <span class="tag ok">mniej bytów</span></h3>
+          <p>App Service, workflow deployu, job w CI, port 8060, rejestracja Entra z sekretem, polisa Key Vault, wpis w firewallu bramki i para <code>TRADING_MCP_*</code> na workbenchu — wszystko to istnieje tylko dlatego, że narzędzia są osobnym procesem.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Jeden skok sieciowy zamiast dwóch <span class="tag ok">2 → 1</span></h3>
+          <p>Wywołanie narzędzia rachunku przestaje przechodzić przez pośredni proces. Archiwum i zespoły już tak działają — narzędzia rachunku są jedyną ścieżką, która została przy dwóch hopach.</p>
+        </div>
+        <div class="fail ok">
+          <h3>Jedno sprawdzenie demo zamiast dwóch <span class="tag ok">prostota</span></h3>
+          <p>Bramka wyprowadza środowisko z hosta, do którego jest przypięta, i nie wstaje na innym; <code>trading-mcp</code> osobno czyta tę odpowiedź po sieci, zanim otworzy port. W jednym procesie drugie sprawdzenie zapada się w pierwsze — mniej kodu na tej samej gwarancji. Ten sam fakt wraca w sekcji „przeciw”, bo czyta się go w obie strony.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Przeciw</div>
+      <h2>Co zwinięcie kosztuje</h2>
+      <p>Arytmetyka wychodzi ledwo dodatnia, a trzy argumenty, których nie widać w liniach, idą w tę samą stronę — przeciw.</p>
+      <div class="fails">
+        <div class="fail stop">
+          <h3>Autoryzacja per trasa wraca do napisania <span class="tag stop">+570 linii</span></h3>
+          <p>Easy Auth autoryzuje <strong>aplikację</strong>, nie ścieżkę. Wpuszczony do <code>/mcp</code> workbench byłby wpuszczony wszędzie, więc bramka musiałaby prowadzić własny zapis „kto na którą trasę” — dokładnie ten plik, który archiwum musiało napisać przy swoim zwinięciu (<code>caller_access.py</code>: 221 linii + 348 testów). Netto zostaje ~220 linii zysku, stosunek 1,4:1 — wobec 2,2:1 tam, gdzie zwinięcie się opłaciło.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Zły wpis w zapisie tras składa zlecenie <span class="tag stop">stawka błędu</span></h3>
+          <p>W archiwum najgorsze, co wpuszcza błędny wpis, to skasowanie śledzonej pary. W bramce z wmontowanymi narzędziami — złożenie zlecenia. Ten sam mechanizm, inna stawka pomyłki.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Awaria narzędzia gasi zasilanie archiwum <span class="tag stop">promień rażenia</span></h3>
+          <p><code>market-data</code> ciągnie każdą świecę przez bramkę. Dziś awaria w kodzie narzędzia zleceń kładzie proces, od którego nic nie zależy; po zwinięciu kładzie jedyne drzwi do dostawcy. Oba udane zwinięcia miały kształt odwrotny — narzędzia szły do modułu, bez którego i tak nie działały.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Gwarancja demo traci nadmiarowość <span class="tag stop">jedna odpowiedź</span></h3>
+          <p>Druga strona zysku z sekcji „za”: dziś gwarancji demo pilnują dwa niezależne procesy i skopiowany <code>.env</code> nie ominie obu. Po zwinięciu zostaje jedno sprawdzenie — mniej kodu, ale na gwarancji, którą ten system najmniej chce stracić.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Dowód z sondy ginie <span class="tag att">połowa wycofana</span></h3>
+          <p>200 na <code>/health</code> trading-mcp dowodzi trzech rzeczy naraz: bramka osiągalna, wspólny klucz uznany, sesja jest demo. Po zwinięciu ten dowód znika. Druga połowa argumentu — że bramki „nie da się sondować” — została wycofana 20.08: żadnej restrykcji IP nie ma, <code>deploy-gateway.yml</code> sonduje ją normalnie. Zostaje jeden punkt, nie dwa.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Najbardziej zamknięty moduł otwiera się na Easy Auth <span class="tag stop">granica</span></h3>
+          <p>Bramka sprawdza dziś jeden statyczny klucz na każdym wywołującym, loopback włącznie — celowo najprostszy mechanizm w najwrażliwszym miejscu. Wmontowanie <code>/mcp</code> znaczy dołożenie Easy Auth, tożsamości Entra i listy aplikacji do modułu, który trzyma jedyną sesję u dostawcy.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Przesłanka, która upadła</div>
+      <h2>Bramka nie stoi za żadną listą adresów</h2>
+      <p class="intro">Pytanie zadano częściowo na fałszywej przesłance — i po sprawdzeniu argumentuje ona w drugą stronę, więc jest zapisana.</p>
+      <p>Bramka miała stać „za listą dwóch adresów IP”. Nie stoi za żadną: <code>ip_restriction</code> nie występuje nigdzie w <code>infra/</code>, wszystkie cztery aplikacje odpowiadają „Allow all”, a <code>/</code> bramki odpowiedziało laptopowi za pierwszym razem. <span class="hl">Każdy, kto zna hostname, do niej dociera — trzyma go na zewnątrz wyłącznie brak <code>GATEWAY_API_KEY</code></span>.</p>
+      <p>Zwinięcie nie otworzyłoby więc zamkniętej granicy sieciowej — zmieniłoby poświadczenie, które ją zamyka: ze statycznego klucza dzielonego przez dwie aplikacje na wyliczoną listę nazwanych aplikacji. To jest lepszy mechanizm, ale jest dostępny dla bramki <strong>bez</strong> zwijania — jako osobna zmiana infrastruktury, z własną propozycją.</p>
+      <div class="quote">Drzwi do dostawcy i lista, kto może zapukać, nie są tym samym artefaktem.</div>
+      <p>To zdanie jest całym powodem istnienia osobnego modułu: „który moduł może ruszyć rachunek” odpowiada dziś lista wywołujących osobnego deploymentu z osobną tożsamością — nie flaga wewnątrz procesu, który obsługuje też świece.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Bilans i werdykt</div>
+      <h2>Zostaje osobno — z zapisanym powodem</h2>
+      <p>Porównanie z jedynym wykonanym zwinięciem tego samego kształtu:</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Bilans zwinięcia</th><th class="n">A — market-mcp (wykonane)</th><th class="n">C — trading-mcp (policzone)</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>rusztowanie pisane ręcznie, do skasowania</td><td class="n">1 260</td><td class="n">~790</td></tr>
+            <tr><td>autoryzacja per trasa, do dopisania</td><td class="n">569</td><td class="n">~570</td></tr>
+            <tr><td><b>netto linii ręcznych</b></td><td class="n"><b>691</b></td><td class="n"><b>~220</b></td></tr>
+            <tr><td>stosunek</td><td class="n">2,2 : 1</td><td class="n">1,4 : 1</td></tr>
+            <tr><td>pliki generowane (snapshot + lock)</td><td class="n">4 685</td><td class="n">2 723</td></tr>
+            <tr class="void"><td>co najgorszego wpuszcza zły wpis w zapisie tras</td><td class="n">skasowanie śledzonej pary</td><td class="n">złożenie zlecenia</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p style="margin-top:16px">Reguła, która wychodzi z tego pomiaru, jest węższa niż „proxy z zasady” i na tyle mechaniczna, że następny serwer narzędzi nie wymaga nowego pomiaru: <strong>zwija się serwer narzędzi stojący przed właścicielem swoich danych; nie zwija się serwer narzędzi stojący przed inną granicą bezpieczeństwa.</strong> market-mcp i teams-mcp były tym pierwszym. trading-mcp jest tym drugim — bramka nie jest właścicielem rachunku, jest jedynymi drzwiami do dostawcy, który nim jest.</p>
+      <p><strong>Czego pomiar nie rozstrzygnął:</strong> kosztu bieżącego snapshotu. Dwie regeneracje w cztery dni to anegdota, nie szereg. Jeśli snapshot zacznie boleć, to jest nowa przesłanka — i karta C wraca do przeczytania z tą samą tabelą, która wisi wyżej.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Analiza zwinięcia trading-mcp · stan opisuje docs/architecture.md, „The order path”</span>
+    <span>Liczby: docs/rachunek-po-refactorze.html, karta C · rozstrzygnięte 20.08.2026</span>
+  </div>
+</footer>

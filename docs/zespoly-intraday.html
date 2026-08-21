@@ -1,0 +1,374 @@
+<title>Zespoły intraday</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 20ch; text-wrap: balance;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: middle; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Propozycje · zespoły intraday</span>
+    <h1>Zespoły intraday</h1>
+    <p class="lede">Druga ławka: pięć strategii szybszych niż Rada Swingowa, z innych mechanizmów — momentum kwadransowe, luka otwarcia, nocny powrót do średniej, wybicie z kompresji na wyzwalaczach i rotacja siły względnej. Projektowane tak, żeby <b>nie wchodzić Radzie w drogę</b> na wspólnym rachunku demo.</p>
+    <div class="strip">
+      <span>TradingCenter / workbench · teams</span>
+      <span>21 sierpnia 2026 · rew. <b>01</b></span>
+      <span>uzupełnia <b>docs/propozycje-zespolow.html</b></span>
+      <span>Rada Swingowa <b>działa</b> — godzinowo 08:05–22:05</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">5</div><div class="l">strategii z pięciu różnych mechanizmów</div></div>
+      <div class="cell"><div class="v">15 min</div><div class="l">najszybszy rytm — Puls kwadransa</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">wyzwalacze grające rolę zleceń stop</div></div>
+      <div class="cell"><div class="v">1</div><div class="l">rachunek wspólny — mandaty podzielone</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Zasady wspólne</div>
+      <h2>Intraday bez pamięci wymaga trzech reguł</h2>
+      <p class="intro">Zespół nie pamięta poprzedniego przebiegu. Przy dwóch przebiegach dziennie to drobiazg; przy dwudziestu sześciu — fundament projektu. Każda strategia niżej jest napisana tak, żeby dała się w całości policzyć od zera w każdym przebiegu: z archiwum i ze stanu rachunku.</p>
+      <div class="fails">
+        <div class="fail">
+          <h3>Konto jest pamięcią <span class="tag att">reguła nr 1</span></h3>
+          <p>Decyzję „czy już działałem" odczytuje się z <code>get_positions</code>: rozmiar, kierunek i położenie stopa mówią, co zrobił poprzedni przebieg. Stąd żelazna zasada anty-mielenia: <span class="hl">ADD wymaga nowego cofnięcia, REDUCE nowego dojścia</span> — stan, który wygląda na obsłużony, oznacza HOLD.</p>
+        </div>
+        <div class="fail">
+          <h3>Płasko na zamknięcie <span class="tag att">reguła nr 2</span></h3>
+          <p>Strategia intraday, która zostawia pozycję na noc, przestaje być intraday i zaczyna kolidować z Radą. Każdy zespół poniżej ma przebieg „domykający" i twardy warunek czasowy w promptcie egzekutora — czas czyta się ze znacznika świecy <code>get_last_price</code> (UTC), jak w Radzie.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Obca pozycja = pas <span class="tag stop">reguła nr 3</span></h3>
+          <p>Zespoły nie potrafią odróżnić „swojej" pozycji od cudzej na tym samym instrumencie — rachunek jest jeden. Dlatego zespół intraday, który przy starcie przebiegu widzi <em>istniejącą</em> pozycję na swoim instrumencie, a jej nie oczekuje po własnych regułach, <strong>pasuje i raportuje</strong>. Do tego podział mandatów niżej, żeby ta sytuacja była wyjątkiem, nie codziennością.</p>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Instrument</th><th>Kto gra</th><th>Wymagana zmiana w Radzie</th></tr></thead>
+          <tbody>
+            <tr><td><b>US100</b></td><td>Puls kwadransa + Luka otwarcia (sesja USA)</td><td><code>revise_team</code>: usunąć US100 z promptów Rady — indeks przechodzi do intraday</td></tr>
+            <tr><td><b>GOLD</b></td><td>Rada (08:05–22:05) · Nocny powrót do średniej (00:05–06:05, płasko przed 07:00)</td><td>żadna — okna czasowe się nie stykają, a nocny zespół pasuje przy zastanej pozycji</td></tr>
+            <tr><td><b>BTCUSD</b></td><td>Rada · Kompresja i wybicie tylko, gdy brak pozycji BTC</td><td>żadna — squeeze z definicji gra tylko na czystym instrumencie</td></tr>
+            <tr class="void"><td>Rotacja siły względnej</td><td>wszystkie trzy naraz</td><td>wariant <b>zamiast</b> Rady, nie obok niej — sekcja 06</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 960 240" role="img" aria-label="Oś doby w czasie polskim z rytmami pięciu zespołów: nocny GOLD co godzinę od 00:05 do 06:05, rotacja o 08:20, kompresja BTC o 08:35 plus wyzwalacze całodobowe, Rada godzinowo 08:05 do 22:05, luka otwarcia o 15:35, 17:05 i 21:50, puls kwadransa co 15 minut od 15:35 do 21:50">
+            <g font-family="Karla, sans-serif">
+              <line x1="60" y1="200" x2="930" y2="200" stroke="currentColor" stroke-width="1.4"></line>
+              <g font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.7">
+                <text x="60" y="218" text-anchor="middle">00</text>
+                <text x="205" y="218" text-anchor="middle">04</text>
+                <text x="350" y="218" text-anchor="middle">08</text>
+                <text x="495" y="218" text-anchor="middle">12</text>
+                <text x="640" y="218" text-anchor="middle">16</text>
+                <text x="785" y="218" text-anchor="middle">20</text>
+                <text x="930" y="218" text-anchor="middle">24 PL</text>
+              </g>
+              <g font-size="10.5" font-family="Roboto Mono, monospace">
+                <text x="60" y="44" fill="currentColor" opacity="0.8">GOLD · nocna średnia</text>
+                <g fill="#14306b">
+                  <rect x="63" y="52" width="4" height="10"></rect><rect x="99" y="52" width="4" height="10"></rect>
+                  <rect x="135" y="52" width="4" height="10"></rect><rect x="171" y="52" width="4" height="10"></rect>
+                  <rect x="207" y="52" width="4" height="10"></rect><rect x="243" y="52" width="4" height="10"></rect>
+                  <rect x="279" y="52" width="4" height="10"></rect>
+                </g>
+                <text x="300" y="61" fill="currentColor" opacity="0.55">00:05–06:05, płasko przed Europą</text>
+
+                <text x="60" y="86" fill="currentColor" opacity="0.8">ROTACJA 08:20 · KOMPRESJA BTC 08:35 + wyzwalacze</text>
+                <rect x="361" y="94" width="4" height="10" fill="#14306b"></rect>
+                <rect x="370" y="94" width="4" height="10" fill="#b8322a"></rect>
+                <rect x="60" y="97" width="870" height="3" fill="#fdf3d0"></rect>
+                <text x="700" y="90" fill="#8a6708">pasmo wyzwalaczy — całą dobę, bramka pn–pt w promptcie</text>
+
+                <text x="60" y="128" fill="currentColor" opacity="0.8">RADA SWINGOWA (działa)</text>
+                <rect x="352" y="136" width="512" height="8" fill="#e6ebf5"></rect>
+                <text x="870" y="144" fill="currentColor" opacity="0.55">co 60 min</text>
+
+                <text x="60" y="170" fill="currentColor" opacity="0.8">US100 · LUKA 15:35/17:05/21:50 · PULS co 15 min</text>
+                <rect x="623" y="176" width="167" height="8" fill="#f2c313"></rect>
+                <g fill="#14306b">
+                  <rect x="623" y="174" width="3" height="12"></rect>
+                  <rect x="676" y="174" width="3" height="12"></rect>
+                  <rect x="788" y="174" width="3" height="12"></rect>
+                </g>
+              </g>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — doba w czasie polskim. Nocny GOLD kończy zanim Rada wstanie; pasmo żółte to okno Pulsu (15:35–21:50) z trzema przebiegami Luki zaznaczonymi na granatowo; wyzwalacze BTC czuwają całą dobę, ale prompt przepuszcza tylko pn–pt.</figcaption>
+      </figure>
+      <div class="quote">Konto jest jedyną pamięcią — każda reguła musi dać się policzyć od zera co kwadrans.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · US100</div>
+      <h2>Puls kwadransa — momentum M15 w sesji USA</h2>
+      <p class="intro">Najszybsza pętla zwrotna w całym zestawie: przebieg co 15 minut przez sesję amerykańską, jeden agent, jedna decyzja. Mechanizm: indeks w godzinach USA lubi chodzić seriami — wejście po cofnięciu w kierunku dnia, prowadzenie ciasnym stopem, zero pozycji po sesji.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Parametr</th><th>Wartość</th></tr></thead>
+          <tbody>
+            <tr><td><b>skład</b></td><td>jeden agent „snajper" (archiwum + rachunek w jednym) — łańcuch analityków przy 26 przebiegach dziennie kosztuje więcej, niż wnosi</td></tr>
+            <tr><td><b>harmonogramy</b></td><td><code>35,50 15 * * 1-5</code> oraz <code>5,20,35,50 16-21 * * 1-5</code> — 26 przebiegów/dzień, 15:35–21:50</td></tr>
+            <tr><td><b>limity kosztu</b></td><td>run_limit "0.60" · daily_limit "18.00" — model mocny, ale przebieg ma być krótki</td></tr>
+            <tr><td><b>interwały</b></td><td>filtr H1, egzekucja M15</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Reguły (komplet, do promptu):</strong> <b>Filtr dnia</b> — cena powyżej EMA20 H1 → gramy wyłącznie long; poniżej → wyłącznie short; świeca H1 okrakiem na EMA20 → pas. <b>Wejście</b> — brak pozycji <em>i</em> ostatnia zamknięta M15 zamyka się w kierunku filtra po cofnięciu co najmniej 0,15% od lokalnego ekstremum M15 (ekstremum z ostatnich 8 świec M15 przez <code>get_candles</code>). <b>Stop</b> — za swingiem M15, maksymalnie 0,35% od wejścia; dalej znaczy pas. <b>Prowadzenie</b> — po zysku +0,30% stop na próg wejścia; potem co przebieg podciąganie za ostatni dołek/szczyt M15 (<code>amend_stops</code>). <b>Wyjścia</b> — stop robi swoje; nadto RSI(14) M15 powyżej 80 / poniżej 20 → REDUCE połowy. <b>Twardy koniec</b> — świeca z <code>get_last_price</code> ma czas ≥ 19:45 UTC → CLOSE wszystkiego na US100, bez wyjątków. <b>Sizing</b> — 25–35% wolnych środków, <code>size_for_margin</code>; przy stopie 0,35% to jest agresja, którą demo ma udźwignąć.</p>
+      <p>Czego ten zespół uczy najszybciej: czy mandat działania przeżywa kontakt z rynkiem bocznym. 26 przebiegów dziennie z regułą anty-mielenia to najlepszy test, czy „HOLD z warunkiem" naprawdę powstrzymuje model przed przewalaniem pozycji co kwadrans.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · US100</div>
+      <h2>Luka otwarcia — jedna decyzja o 15:35</h2>
+      <p class="intro">Klasyka statystyki indeksowej w wersji czysto cenowej: mała luka ciąży do wypełnienia, duża luka to informacja, nie okazja do fade'u. Trzy przebiegi dziennie, decyzja zapada w pierwszym.</p>
+      <p><strong>Pomiar luki (15:35):</strong> wczorajsze zamknięcie = ostatnia świeca HOUR z godziną 20:00 UTC z <code>get_candles</code>; otwarcie = pierwsza M15 po 13:30 UTC dziś. Luka = różnica w procentach. <b>|luka| &lt; 0,25%</b> → FADE: pozycja w stronę wypełnienia, cel na wczorajszym zamknięciu, stop 0,35% za ekstremum pierwszego kwadransa. <b>|luka| &gt; 0,50%</b> → Z PRĄDEM: wejście po pierwszym cofnięciu M15, które nie domyka luki, stop za tym cofnięciem. <b>0,25–0,50%</b> → PAS z zapisanym powodem — strefa, w której statystyka nie mówi nic. <strong>17:05:</strong> rewizja — cel osiągnięty albo stop wybity → raport; pozycja żyje → stop na próg wejścia, ewentualna redukcja połowy przy celu w zasięgu 0,1%. <strong>21:50:</strong> CLOSE bezwarunkowe.</p>
+      <p>Harmonogramy: <code>35 15 * * 1-5</code> · <code>5 17 * * 1-5</code> · <code>50 21 * * 1-5</code>. Skład: jeden agent. Limity: run_limit "0.80", daily_limit "3.00". <span class="hl">Luka i Puls grają na tym samym instrumencie w tym samym oknie</span> — na start odpal jeden z nich, drugi po tygodniu; jeśli mają grać równolegle, Luka dostaje wyłączność do 17:05 (Puls w promptcie pasuje przy zastanej pozycji — reguła nr 3 załatwia to bez zmian).</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · GOLD</div>
+      <h2>Nocny powrót do średniej</h2>
+      <p class="intro">Odwrotność wszystkiego, co gra reszta stajni: w nocy złoto częściej wraca do średniej, niż ucieka. Zespół kontrariański — łapie przeciągnięcia cienkiej azjatyckiej płynności i oddaje pozycję, zanim Europa wstanie.</p>
+      <p><strong>Reguły.</strong> Przebiegi co godzinę 00:05–06:05 PL (<code>5 0-6 * * 1-5</code>). Miara rozciągnięcia: średni zasięg świecy H1 z ostatnich 24 h (<code>summarize_range</code>: zakres/24). <b>Wejście</b> — tylko przy braku jakiejkolwiek pozycji GOLD (reguła nr 3: zastana pozycja, choćby Rady, znaczy pas): odchylenie ceny od EMA20 H1 przekracza 1,2× średniego zasięgu H1 <em>i</em> RSI(14) H1 poniżej 30 (long) / powyżej 70 (short) → pozycja w stronę EMA20. <b>Cel</b> — EMA20 H1; <b>stop</b> — 0,6× średniego zasięgu za ekstremum ruchu. <b>Kontrola poziomów</b> — <code>levels_near_price</code>: istotny poziom między ceną a EMA bliżej niż połowa drogi → pas, bo cel jest zasłonięty. <b>Twardy koniec</b> — przebieg 06:05 zamyka wszystko na GOLD niezależnie od wyniku: <span class="hl">Europa należy do Rady</span>. Sizing 20–30%. Skład: jeden agent. Limity: run_limit "0.60", daily_limit "5.00".</p>
+      <p>To jedyny zespół grający przeciw ruchowi — jeśli po dwóch tygodniach trace pokaże, że stopy wypadają seriami w noce z trendem (płynące z Azji dane makro), pierwsza poprawka brzmi: dodać warunek „ostatnie 3 świece H1 nie zamykają się w jednym kierunku", nie poszerzać stopa.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · BTCUSD</div>
+      <h2>Kompresja i wybicie — wyzwalacze jako zlecenia stop</h2>
+      <p class="intro">Bramka przyjmuje tylko zlecenia MARKET i LIMIT — zlecenia stop-entry nie istnieją. Ten zespół obchodzi brak elegancko: wyzwalacz na cenie <em>jest</em> zleceniem stop, które zamiast trafić do dostawcy, budzi zespół.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 960 210" role="img" aria-label="Mechanizm: poranny przebieg mierzy kompresję i wyznacza górę oraz dół zakresu; dwa wyzwalacze na get_last_price czuwają przy tych progach; dojście ceny budzi zespół, który potwierdza wybicie na M15 i składa zlecenie market">
+            <defs>
+              <marker id="t1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="12" y="30" width="216" height="62" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="120" y="55" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">przebieg 08:35</text>
+              <text x="120" y="73" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">zakres 24 h &lt; 60% średniej z 20 dni?</text>
+
+              <rect x="300" y="30" width="216" height="62" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="408" y="55" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">2 × trigger_team</text>
+              <text x="408" y="73" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">gte góra · lte dół · poll 120 s</text>
+
+              <rect x="588" y="30" width="216" height="62" fill="#14306b" stroke="#14306b" stroke-width="1.4"></rect>
+              <text x="696" y="55" text-anchor="middle" font-size="13" font-weight="700" fill="#ffffff">przebieg z wyzwalacza</text>
+              <text x="696" y="73" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="#f2c313">M15 zamknięta poza zakresem?</text>
+
+              <line x1="230" y1="61" x2="296" y2="61" stroke="currentColor" stroke-width="1.4" marker-end="url(#t1)"></line>
+              <text x="263" y="50" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">progi</text>
+              <line x1="518" y1="61" x2="584" y2="61" stroke="currentColor" stroke-width="1.4" marker-end="url(#t1)"></line>
+              <text x="551" y="50" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">cena dojechała</text>
+
+              <line x1="696" y1="96" x2="696" y2="140" stroke="currentColor" stroke-width="1.4" marker-end="url(#t1)"></line>
+              <rect x="588" y="144" width="216" height="46" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="696" y="164" text-anchor="middle" font-size="12.5" font-weight="700" fill="currentColor">place_order MARKET</text>
+              <text x="696" y="180" text-anchor="middle" font-size="10" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.65">stop: środek zakresu · cel: 1,5× szerokości</text>
+
+              <text x="12" y="150" font-size="10.5" font-family="Roboto Mono, monospace" fill="#b8322a">fałszywe wybicie: M15 wróciła do zakresu → PAS,</text>
+              <text x="12" y="166" font-size="10.5" font-family="Roboto Mono, monospace" fill="#b8322a">cooldown 3600 s trzyma zespół z dala od piły</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 2</b> — wyzwalacz zastępuje zlecenie stop-entry, którego bramka nie zna. Między dojściem ceny a wejściem stoi jeszcze potwierdzenie na M15 — to ono odsiewa knoty.</figcaption>
+      </figure>
+      <p><strong>Reguły.</strong> Przebieg poranny <code>35 8 * * 1-5</code> liczy: zakres ostatnich 24 h (<code>summarize_range</code>) i średni zakres dobowy z 20 dni. Kompresja = zakres &lt; 60% średniej. Jest kompresja → raport z progami (góra/dół zakresu ± bufor 0,1%) i <b>prośba w wypowiedzi zespołu o ustawienie dwóch wyzwalaczy</b> — <code>trigger_team</code> na <code>get_last_price</code>, <code>gte</code> góra / <code>lte</code> dół, poll 120 s, cooldown 3600 s (progi ustawia operator albo czat; to jedyny ręczny krok). Brak kompresji → „PAS — zakres normalny", wyzwalacze do skasowania, jeśli wiszą. <b>Przebieg z wyzwalacza:</b> bramka dnia (sobota/niedziela → nic); brak pozycji BTC <em>i</em> ostatnia M15 zamknięta poza zakresem → MARKET w kierunku wybicia, stop w środku zakresu, cel 1,5× szerokości; M15 wróciła do środka → PAS. Przeciwny wyzwalacz przy otwartej pozycji = sygnał odwrócenia: CLOSE + MARKET w drugą stronę. Sizing 25–35%. Limity: run_limit "0.80", daily_limit "6.00".</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Wariant zamiast Rady</div>
+      <h2>Rotacja siły względnej</h2>
+      <p class="intro">Jedyna propozycja portfelowa: nie pyta „czy US100 rośnie", tylko „które z trzech jest najsilniejsze". Long lider, short maruder — konto zawsze częściowo zhedgowane. Gra na wszystkich trzech instrumentach naraz, więc to <strong>alternatywa dla Rady, nie sąsiad</strong> — odpalać tylko przy spauzowanej Radzie.</p>
+      <p><strong>Reguły.</strong> Jeden przebieg dziennie <code>20 8 * * 1-5</code> + kontrolny <code>20 15 * * 1-5</code>. Rano: ROC 5-dniowy z zamknięć DAY (<code>get_candles</code>) dla GOLD, BTCUSD, US100 → ranking. <b>Long lidera</b>, jeśli jego ROC &gt; +1%; <b>short marudera</b>, jeśli jego ROC &lt; −1%; środek rankingu zawsze płasko. Stan rachunku porównuje się z rankingiem: pozycja niezgodna → CLOSE; zgodna → trzymana, stop za strukturą D1 (<code>levels_near_price</code>); brakująca → OPEN 30% depozytu na nogę. Popołudniowy przebieg tylko zarządza stopami — rankingu nie przelicza, <span class="hl">rotacja zmienia zdanie raz na dobę albo wcale</span>. Progi ±1% odsiewają rotację w rynku bez charakteru. Skład: analityk (MODEL_TANI) → egzekutor (MODEL_MOCNY). Limity: run_limit "1.50", daily_limit "4.00".</p>
+      <p>Dlaczego warto ją kiedyś przetestować mimo pauzowania Rady: to jedyna strategia w stajni, której wynik nie zależy od kierunku rynku, tylko od <em>różnic</em> między instrumentami — inna oś ryzyka niż wszystko powyżej, więc jej trace odpowie na pytanie, którego pozostałe nawet nie zadają.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">07 · Start i budżety</div>
+      <h2>Kolejność, koszty, jedno ostrzeżenie</h2>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Zespół</th><th>Instrument</th><th class="n">Przebiegi/dzień</th><th>Cron (czas PL)</th><th class="n">daily_limit</th><th>Start</th></tr></thead>
+          <tbody>
+            <tr><td><b>Puls kwadransa</b></td><td>US100</td><td class="n">26</td><td><code>35,50 15 * * 1-5</code> · <code>5,20,35,50 16-21 * * 1-5</code></td><td class="n">18.00</td><td><span class="tag ok">pierwszy</span></td></tr>
+            <tr><td><b>Luka otwarcia</b></td><td>US100</td><td class="n">3</td><td><code>35 15</code> · <code>5 17</code> · <code>50 21</code> (pn–pt)</td><td class="n">3.00</td><td><span class="tag att">tydzień później</span></td></tr>
+            <tr><td><b>Nocna średnia</b></td><td>GOLD</td><td class="n">7</td><td><code>5 0-6 * * 1-5</code></td><td class="n">5.00</td><td><span class="tag ok">równolegle z Pulsem</span></td></tr>
+            <tr><td><b>Kompresja</b></td><td>BTCUSD</td><td class="n">1 + wyzwalacze</td><td><code>35 8 * * 1-5</code> + 2× trigger</td><td class="n">6.00</td><td><span class="tag att">po pierwszych progach</span></td></tr>
+            <tr class="void"><td><b>Rotacja</b></td><td>wszystkie</td><td class="n">2</td><td><code>20 8</code> · <code>20 15</code> (pn–pt)</td><td class="n">4.00</td><td><span class="tag stop">tylko przy spauzowanej Radzie</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><strong>Kolejność:</strong> najpierw Puls (US100 wyjęty z Rady przez <code>revise_team</code>) i Nocna średnia — nie kolidują z niczym i dają najwięcej przebiegów do oceny mandatu. Luka po tygodniu, gdy Puls pokaże, jak US100 znosi dwa zespoły w jednym oknie. Kompresja, gdy pierwszy poranny raport wskaże progi. Rotacja — osobny eksperyment na tydzień pauzy Rady.</p>
+      <p><strong>Ostrzeżenie o wspólnym budżecie zapytań:</strong> limit dostawcy to 10 zapytań/s <em>na rachunek</em> — bramka jest jedynymi drzwiami i wszystkie zespoły, terminal i archiwum liczą się do tej samej puli. Sam Puls to góra kilka wywołań rachunku na kwadrans, więc zapasu jest dużo; ale gdyby kiedyś dwa stosy (dev i prod) grały naraz, głodzą się nawzajem — to jest zmierzone i opisane w README bramki.</p>
+      <p>Prompty budujące te zespoły — w stylu <code>docs/prompt-rada-swingowa.md</code>, z krokami weryfikacji i dosłownymi treściami — powstają na życzenie, po jednym na zespół, zaczynając od tego, który wchodzi pierwszy.</p>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Zespoły intraday · uzupełnia docs/propozycje-zespolow.html</span>
+    <span>US100 · GOLD · BTCUSD · demo · pn–pt · konto jako pamięć</span>
+  </div>
+</footer>
