@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from workbench.app import app
 
 from .scripted_provider import ScriptedProvider, says
+from .waiting import wait_for_status
 
 pytestmark = pytest.mark.db
 
@@ -69,14 +70,8 @@ def _run_to_the_end(client: TestClient, team_id: int) -> int:
     started = client.post(f"/teams/{team_id}/runs", headers=OWNER)
     assert started.status_code == 201, started.text
     run_id = started.json()["id"]
-    for _ in range(60):
-        if client.get(f"/runs/{run_id}", headers=OWNER).json()["status"] in {
-            "completed",
-            "failed",
-            "cancelled",
-        }:
-            return run_id
-    raise AssertionError("the run never finished")
+    wait_for_status(client, run_id, headers=OWNER)
+    return run_id
 
 
 def test_usage_is_broken_down_so_a_cost_can_be_put_on_a_role(client: TestClient) -> None:
