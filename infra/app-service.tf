@@ -179,7 +179,7 @@ locals {
 # and the internet**. A leaked key used to be useless off the plan; now it is enough. What
 # limits the damage is unchanged and is the reason this was acceptable — the module refuses
 # to start against anything but the capital.com demo host, so there is no real money behind
-# this door (openspec/changes/accounts-screen-opens-the-gateway/design.md, D2).
+# this door (openspec/changes/archive/…-accounts-screen-opens-the-gateway/design.md, D2).
 resource "azurerm_linux_web_app" "capital_gateway" {
   name                = local.capital_gateway_app_name
   resource_group_name = azurerm_resource_group.main.name

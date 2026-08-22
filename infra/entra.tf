@@ -54,7 +54,7 @@ resource "azuread_application" "terminal" {
   # The gateway, since the Accounts screen. The terminal reads the demo account from it
   # directly — the shared key the modules use cannot travel to a browser, so a token for
   # this API is what the screen presents instead
-  # (openspec/changes/accounts-screen-opens-the-gateway).
+  # (openspec/changes/archive/…-accounts-screen-opens-the-gateway).
   required_resource_access {
     resource_app_id = module.capital_gateway_easy_auth.client_id
 

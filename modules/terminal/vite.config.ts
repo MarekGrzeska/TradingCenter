@@ -60,7 +60,7 @@ function quietProxyErrors(label: string, target: string): ProxyOptions["configur
 // secret — in production it presents a token instead, which the platform validates before
 // the request arrives. In dev there is no platform, so the dev server is what adds the
 // key: `GATEWAY_PROXY_KEY` is server-side and never reaches the bundle
-// (openspec/changes/accounts-screen-opens-the-gateway/design.md, D5).
+// (openspec/changes/archive/…-accounts-screen-opens-the-gateway/design.md, D5).
 //
 // The instrument catalogue still comes through market-data, unchanged — this entry is the
 // account, not a second road to the market (see gatewaySource.ts).

@@ -114,7 +114,7 @@ they stopped being copies — they still are, at the same measured percentages a
 that their only consumers, the three MCP modules, have no database and were installing
 this package's whole tree (`alembic`, `sqlalchemy`, `asyncpg`, `azure-identity`, `aiohttp`,
 `fastapi`) for two imports.
-`openspec/changes/packages-replace-the-hand-copies/design.md`, D1, carries the original
+`openspec/changes/archive/…-packages-replace-the-hand-copies/design.md`, D1, carries the original
 (wrong) reasoning against a third package and the correction that reversed it.
 
 ## Adding a third package
