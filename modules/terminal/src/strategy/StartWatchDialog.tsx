@@ -26,9 +26,17 @@ export function StartWatchDialog({
   onClose(): void;
   onStarted(): void;
 }) {
-  const [strategyId, setStrategyId] = useState(strategies[0]?.id ?? "");
+  // **Which strategy is chosen is derived, not stored until it is chosen.** The catalogue
+  // can arrive after this dialog does — against a cold module in Azure that read takes
+  // seconds — and an initial state captured in that window stayed empty for good: the
+  // select filled itself, nothing in it was selected, and "Zacznij" was disabled with
+  // nothing on screen saying why. `null` here means "not chosen yet", which resolves to
+  // the first entry of whatever the catalogue turned out to hold.
+  const [chosen, setChosen] = useState<string | null>(null);
   const [symbol, setSymbol] = useState("");
   const [overrides, setOverrides] = useState<Record<string, string>>({});
+
+  const strategyId = chosen ?? strategies[0]?.id ?? "";
 
   const strategy = useMemo(
     () => strategies.find((entry) => entry.id === strategyId) ?? null,
@@ -67,8 +75,9 @@ export function StartWatchDialog({
           <select
             className="rounded border border-border bg-sunken px-2 py-1 text-ink"
             value={strategyId}
+            disabled={strategies.length === 0}
             onChange={(e) => {
-              setStrategyId(e.target.value);
+              setChosen(e.target.value);
               setOverrides({});
             }}
           >
@@ -81,6 +90,14 @@ export function StartWatchDialog({
           {strategy !== null && (
             <span className="text-ink-faint">
               {strategy.description} · decyduje na świecach {strategy.resolution}
+            </span>
+          )}
+          {/* Said rather than left to a dead button: an empty catalogue is the one reason
+              this dialog cannot start anything, and it is not the operator's doing. */}
+          {strategies.length === 0 && (
+            <span className="text-warning">
+              Katalog strategii jeszcze nie odpowiedział — dopóki nie odpowie, nie ma czego
+              zacząć. Zamknij to okno i spróbuj ponownie za chwilę.
             </span>
           )}
         </label>
