@@ -303,24 +303,28 @@ resource "azurerm_linux_web_app" "capital_gateway" {
       tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
       client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
 
-      # Four, and the fourth is not decoration — it is the one this list was missing, and
-      # the terminal's Accounts screen stayed refused for it. Two spellings of *this* API,
-      # for the reason market-data's own block gives, and two of **market-data's**, because
-      # the terminal's identity layer acquires one token scoped to market-data and reuses
-      # it here. A token asked for by scope name carries the `api://` uri as its audience;
-      # the same request as `<client-id>/.default` carries the client id — and the operator's
-      # token carries the client id, which is why listing only the uri looked like a working
-      # configuration and refused every browser request.
+      # Two spellings of **this** API and nothing else. A token asked for by scope name
+      # carries the `api://` uri as its audience; the same request as `<client-id>/.default`
+      # carries the client id, so accepting both means neither spelling is a silent 401.
       #
-      # `module.workbench_easy_auth` has carried all four since it was written. This block
-      # copied three of them, and the missing one only became visible when
-      # `require_authentication` was turned on and the platform started actually checking:
-      # before that nothing validated the audience at all, so nothing could notice.
+      # It carried market-data's two as well until 22 August 2026, and that was a deliberate
+      # concession rather than an oversight: the terminal's identity layer acquired one token
+      # scoped to market-data and presented it to every back end, so the choice was to teach
+      # the terminal to ask for this API by name or to teach this API to accept somebody
+      # else's token. The second was cheaper and was taken.
+      #
+      # `polymarket-screen-opens-the-archive` did the first, and this is the concession being
+      # paid back. What it cost while it stood: a token leaked from anywhere that could
+      # obtain a market-data token also opened the door to the broker connection — which is
+      # exactly the property an audience exists to state.
+      #
+      # Checked before removing rather than assumed, against production: `market-data` and
+      # `trading-mcp` both present `${local.capital_gateway_api_uri}/.default`, and the
+      # deployed terminal bundle asks for `${local.capital_gateway_api_uri}/access_as_user`.
+      # No caller presented market-data's audience any more.
       allowed_audiences = [
         local.capital_gateway_api_uri,
         module.capital_gateway_easy_auth.client_id,
-        local.market_data_api_uri,
-        module.market_data_easy_auth.client_id,
       ]
 
       # The browser, and — since `the-gateway-door-authenticates` — the two service callers
