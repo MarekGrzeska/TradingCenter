@@ -144,6 +144,20 @@ class Settings(BaseSettings):
     # number against the same server for the same reason.
     trading_mcp_request_timeout_seconds: float = 35.0
 
+    # --- polymarket-data, the tool server that reads the prediction-market archive ---
+    #
+    # The third of the three, and unset means what it means for the other two: the module
+    # runs and cannot answer what a market prices an event at. Two of its nine tools reach
+    # the provider live rather than the archive, which is why the ceiling below is not
+    # market-mcp's.
+    polymarket_mcp_url: str | None = None
+    polymarket_mcp_scope: str | None = None
+    # A little past polymarket-data's own ceiling on the provider (30s per request,
+    # `polymarket_data/provider.py`), for trading-mcp's reason rather than market-mcp's:
+    # `search_events` and `browse_events` ask Polymarket while the operator waits, so a
+    # ceiling below that would fire here on a call that was still being answered.
+    polymarket_mcp_request_timeout_seconds: float = 35.0
+
     # --- who may call this module from a browser ---
     #
     # Mirrors market-data's own field and its own reasoning: a request without an
@@ -166,6 +180,8 @@ class Settings(BaseSettings):
         "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
+        "polymarket_mcp_url",
+        "polymarket_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -216,8 +232,8 @@ class Settings(BaseSettings):
         (specs/agent-tool-access, "Tryb połączenia z serwerem narzędzi jest wybrany
         jednoznacznie").
 
-        Run once per server rather than once, because there are two of them and they are
-        configured independently — and every message names the one it is about, since "the
+        Run once per server rather than once, because there are several of them and they
+        are configured independently — and every message names the one it is about, since "the
         tool server" stopped being unambiguous. The teams tools are not among them: a
         source standing in this process has no mode to choose.
         """
@@ -226,6 +242,9 @@ class Settings(BaseSettings):
         )
         self.trading_mcp_url = _checked_server(
             "TRADING_MCP", self.trading_mcp_url, self.trading_mcp_scope
+        )
+        self.polymarket_mcp_url = _checked_server(
+            "POLYMARKET_MCP", self.polymarket_mcp_url, self.polymarket_mcp_scope
         )
         return self
 

@@ -3,12 +3,13 @@
 `agent.config.Settings` and `teams.config.Settings` are separate classes on purpose — the
 prefixed names are what stays doubled (`AGENT_DATABASE_URL` against `TEAMS_DATABASE_URL`,
 two keys, two catalogues). Two of their validator blocks are not doubled in any meaningful
-sense: the database-mode rules and the market-mcp mode switch were a byte-identical block
+sense: the database-mode rules and the tool-server mode switch were a byte-identical block
 in both suites apart from the word "agent" or "teams" inside a URL. A rule fixed on one
 surface could rot on the other with nothing to say so.
 
 Each surface's own `tests/*/test_config.py` keeps what is genuinely its own: its key, its
-catalogue, and — for the conversation — its default model, for teams its second tool server.
+catalogue, and — for the conversation — its default model, for teams how its several tool
+servers interact.
 """
 
 from __future__ import annotations
@@ -139,45 +140,78 @@ def test_a_missing_database_url_names_itself(surface: str) -> None:
     assert "database_url" in str(err.value)
 
 
-# --- the archive server's mode switch (specs/{agent,teams}-tool-access) ---
+# --- every tool server's mode switch (specs/{agent,teams}-tool-access) ---
+#
+# Parameterised over the servers rather than copied per server: the rule is one
+# `_checked_server` call per configured server, so a copy per name would be the same
+# assertion three times over — and the third server, added on 22 August 2026, would have
+# been that copy. Each surface's own test_config.py keeps only what is not this: how the
+# several servers interact.
 
 
-def test_no_tool_server_configured_is_a_valid_state(settings: Callable[..., Any]) -> None:
+@pytest.fixture(params=["market_mcp", "trading_mcp", "polymarket_mcp"])
+def server(request: pytest.FixtureRequest) -> str:
+    return request.param
+
+
+def test_no_tool_server_configured_is_a_valid_state(
+    settings: Callable[..., Any], server: str
+) -> None:
     # Not a misconfiguration: it is what the conversation was before it had tools, and for
     # teams it is what a team carrying no assigned tools never needs.
-    assert settings().market_mcp_url is None
+    assert getattr(settings(), f"{server}_url") is None
 
 
-def test_remote_tool_server_without_a_scope_is_refused(settings: Callable[..., Any]) -> None:
+def test_remote_tool_server_without_a_scope_is_refused(
+    settings: Callable[..., Any], server: str
+) -> None:
     with pytest.raises(ValidationError) as err:
-        settings(market_mcp_url="https://market-mcp.example.com")
-    assert "MARKET_MCP_SCOPE" in str(err.value)
+        settings(**{f"{server}_url": "https://tools.example.com"})
+    assert f"{server.upper()}_SCOPE" in str(err.value)
 
 
-def test_scope_with_a_loopback_tool_server_is_refused(settings: Callable[..., Any]) -> None:
+def test_scope_with_a_loopback_tool_server_is_refused(
+    settings: Callable[..., Any], server: str
+) -> None:
     with pytest.raises(ValidationError) as err:
-        settings(market_mcp_url="http://127.0.0.1:8020", market_mcp_scope="api://some-app/.default")
+        settings(
+            **{
+                f"{server}_url": "http://127.0.0.1:8020",
+                f"{server}_scope": "api://some-app/.default",
+            }
+        )
     assert "loopback" in str(err.value)
 
 
-def test_a_scope_with_no_url_at_all_is_refused(settings: Callable[..., Any]) -> None:
+def test_a_scope_with_no_url_at_all_is_refused(
+    settings: Callable[..., Any], server: str
+) -> None:
     with pytest.raises(ValidationError) as err:
-        settings(market_mcp_scope="api://some-app/.default")
-    assert "MARKET_MCP_URL" in str(err.value)
+        settings(**{f"{server}_scope": "api://some-app/.default"})
+    assert f"{server.upper()}_URL" in str(err.value)
 
 
-def test_loopback_tool_server_without_a_scope_is_accepted(settings: Callable[..., Any]) -> None:
-    assert settings(market_mcp_url="http://127.0.0.1:8020").market_mcp_url == "http://127.0.0.1:8020"
+def test_loopback_tool_server_without_a_scope_is_accepted(
+    settings: Callable[..., Any], server: str
+) -> None:
+    resolved = settings(**{f"{server}_url": "http://127.0.0.1:8020"})
+    assert getattr(resolved, f"{server}_url") == "http://127.0.0.1:8020"
 
 
-def test_remote_tool_server_with_a_scope_is_accepted(settings: Callable[..., Any]) -> None:
+def test_remote_tool_server_with_a_scope_is_accepted(
+    settings: Callable[..., Any], server: str
+) -> None:
     resolved = settings(
-        market_mcp_url="https://market-mcp.example.com/",
-        market_mcp_scope="api://some-app/.default",
+        **{
+            f"{server}_url": "https://tools.example.com/",
+            f"{server}_scope": "api://some-app/.default",
+        }
     )
     # The trailing slash is dropped here so nothing downstream builds `//mcp`.
-    assert resolved.market_mcp_url == "https://market-mcp.example.com"
+    assert getattr(resolved, f"{server}_url") == "https://tools.example.com"
 
 
-def test_a_blank_tool_server_url_means_unset(settings: Callable[..., Any]) -> None:
-    assert settings(market_mcp_url="   ").market_mcp_url is None
+def test_a_blank_tool_server_url_means_unset(
+    settings: Callable[..., Any], server: str
+) -> None:
+    assert getattr(settings(**{f"{server}_url": "   "}), f"{server}_url") is None

@@ -77,6 +77,15 @@ class Settings(BaseSettings):
     trading_mcp_scope: str | None = None
     trading_mcp_request_timeout_seconds: float = 35.0
 
+    # --- polymarket-data, the tool server that reads the prediction-market archive ---
+    #
+    # The third pair, read by both surfaces like the two above, and optional on its own:
+    # unset means neither surface can say what a market prices an event at, which is the
+    # state both were in before this module existed.
+    polymarket_mcp_url: str | None = None
+    polymarket_mcp_scope: str | None = None
+    polymarket_mcp_request_timeout_seconds: float = 35.0
+
     # No `TEAMS_MCP_*`. The teams tools are a layer in this process now, so there is no
     # address to configure, no token to fetch and no timeout to set — a `.env` from before
     # this change carries three settings that are read by nothing.
@@ -111,6 +120,8 @@ class Settings(BaseSettings):
         "market_mcp_scope",
         "trading_mcp_url",
         "trading_mcp_scope",
+        "polymarket_mcp_url",
+        "polymarket_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -146,6 +157,9 @@ class Settings(BaseSettings):
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
+            polymarket_mcp_url=self.polymarket_mcp_url,
+            polymarket_mcp_scope=self.polymarket_mcp_scope,
+            polymarket_mcp_request_timeout_seconds=self.polymarket_mcp_request_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
         )
 
@@ -166,6 +180,9 @@ class Settings(BaseSettings):
             trading_mcp_url=self.trading_mcp_url,
             trading_mcp_scope=self.trading_mcp_scope,
             trading_mcp_request_timeout_seconds=self.trading_mcp_request_timeout_seconds,
+            polymarket_mcp_url=self.polymarket_mcp_url,
+            polymarket_mcp_scope=self.polymarket_mcp_scope,
+            polymarket_mcp_request_timeout_seconds=self.polymarket_mcp_request_timeout_seconds,
             run_timeout_seconds=self.run_timeout_seconds,
             require_authenticated_principal=self.require_authenticated_principal,
             scheduler_enabled=self.scheduler_enabled,

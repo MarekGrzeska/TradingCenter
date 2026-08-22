@@ -69,12 +69,12 @@
 
 ## 7. Workbench
 
-- [ ] 7.1 Trzecia trójka pól w `workbench/config.py` obok `market_mcp_*` i `trading_mcp_*`, przepuszczona przez `for_conversation()` i `for_teams()` oraz `AgentSettings` i `TeamsSettings`
-- [ ] 7.2 `_blank_means_unset` obejmuje nowe pola — `POLYMARKET_MCP_URL=` znaczy to samo co linia nieobecna
-- [ ] 7.3 Kolizja nazw narzędzi: uogólnienie na dowolną liczbę serwerów, komunikat wymieniający wszystkie ogłaszające tę nazwę (`teams/`)
-- [ ] 7.4 Testy: nieobecność URL-a jest konfiguracją wspieraną; zespół z przypisanymi narzędziami odmawia startu przebiegu bez serwera; kolizja trzech serwerów wymienia trzy
-- [ ] 7.5 `.env.example` workbencha i akapit w README o trzeciej parze
-- [ ] 7.6 `uv run pytest`, `ruff check .`, `pyright`
+- [x] 7.1 Trzecia trójka pól w `workbench/config.py` obok `market_mcp_*` i `trading_mcp_*`, przepuszczona przez `for_conversation()` i `for_teams()` oraz `AgentSettings` i `TeamsSettings`
+- [x] 7.2 `_blank_means_unset` obejmuje nowe pola — `POLYMARKET_MCP_URL=` znaczy to samo co linia nieobecna
+- [x] 7.3 Kolizja nazw narzędzi: uogólnienie na dowolną liczbę serwerów, komunikat wymieniający wszystkie ogłaszające tę nazwę (`teams/`)
+- [x] 7.4 Testy: nieobecność URL-a jest konfiguracją wspieraną; zespół z przypisanymi narzędziami odmawia startu przebiegu bez serwera; kolizja trzech serwerów wymienia trzy
+- [x] 7.5 `.env.example` workbencha i akapit w README o trzeciej parze
+- [x] 7.6 `uv run pytest` (827), `ruff check .`, `pyright`
 
 ## 8. Infrastruktura i CI
 

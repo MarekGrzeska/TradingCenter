@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections.abc import Collection
 
 from .contract import TeamDefinition
-from .tools import AnnouncedSnapshot
+from .tools import AnnouncedSnapshot, and_list
 
 
 class DefinitionRefused(ValueError):
@@ -39,7 +39,8 @@ def check_definition(
     `announced` is `None` when this module has no tool server configured at all. That is
     not the same as "no server announces this tool", and the refusal below says which of
     the two it is — and, when it is neither, whether the name simply is not announced or
-    is announced by more than one server. Note the asymmetry with a *run*: a run of a
+    is announced by more than one server — and when it is that, which ones, all of them.
+    Note the asymmetry with a *run*: a run of a
     team whose agents carry no tools proceeds with no tool server at all (specs/
     teams-tool-access), and so does a save of one — only an agent actually assigned a
     tool needs the announcement to check it against.
@@ -88,8 +89,8 @@ def _every_assigned_tool_is_announced(
         raise DefinitionRefused(
             f"agent {agent.key!r} is assigned tool(s) {sorted(agent.tools)}, but this "
             "module has no tool server configured to check them against — set "
-            "MARKET_MCP_URL and/or TRADING_MCP_URL, or save the team with no tools "
-            "assigned"
+            "MARKET_MCP_URL, TRADING_MCP_URL and/or POLYMARKET_MCP_URL, or save the "
+            "team with no tools assigned"
         )
 
     for agent in assigning:
@@ -98,7 +99,10 @@ def _every_assigned_tool_is_announced(
         )
         if collided:
             tool = collided[0]
-            servers = " and ".join(announced.by_name[tool])
+            # Every server announcing it, not the first two: a message that stops short
+            # sends the operator to unconfigure one and meet this same refusal again
+            # (specs/teams-tool-access).
+            servers = and_list(announced.by_name[tool])
             raise DefinitionRefused(
                 f"agent {agent.key!r} is assigned tool {tool!r}, which more than one "
                 f"tool server announces ({servers}) — this module cannot tell which "

@@ -412,11 +412,11 @@ class ToolServerRegistry:
     """Every tool server this module knows about, by label.
 
     A registry in place of the one `ToolServer` earlier groups built around — the
-    module now has two, and every caller above `client.py` reaches them through this
+    module now has several, and every caller above `client.py` reaches them through this
     rather than naming `market_mcp` or `trading_mcp` itself (specs/teams-tool-access,
-    "Moduł MAY być skonfigurowany z więcej niż jednym serwerem narzędzi"). Adding a
-    third server later is a line in `from_settings`, not a signature change here or in
-    `assignment.py`.
+    "Moduł MAY być skonfigurowany z więcej niż jednym serwerem narzędzi"). The third one
+    arrived on 22 August 2026 as exactly what that promised: one line in `from_settings`,
+    no signature changed here or in `assignment.py`.
     """
 
     servers: dict[str, ToolServer]
@@ -429,6 +429,9 @@ class ToolServerRegistry:
                 "trading-mcp": ToolServer(
                     settings, prefix="trading_mcp", can_move_the_account=True
                 ),
+                # Reads only. Its three writing tools change a watch list, not an
+                # account, so nothing it publishes may read as account-moving here.
+                "polymarket-mcp": ToolServer(settings, prefix="polymarket_mcp"),
             }
         )
 

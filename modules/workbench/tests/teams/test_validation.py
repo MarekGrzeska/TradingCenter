@@ -71,6 +71,7 @@ def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
     assert "scout" in str(err.value)
     assert "MARKET_MCP_URL" in str(err.value)
     assert "TRADING_MCP_URL" in str(err.value)
+    assert "POLYMARKET_MCP_URL" in str(err.value)
 
 
 def test_a_team_assigning_no_tools_passes_without_a_tool_server() -> None:
@@ -93,6 +94,24 @@ def test_a_name_two_servers_announce_is_refused_naming_both() -> None:
     assert "place_order" in str(err.value)
     assert "market-mcp" in str(err.value)
     assert "trading-mcp" in str(err.value)
+
+
+def test_a_name_three_servers_announce_is_refused_naming_all_three() -> None:
+    """specs/teams-tool-access, "Kolizja obejmuje więcej niż dwa serwery" — on the save
+    path as well as the run path, and for the same reason: a message naming two of three
+    sends the operator round the same refusal twice."""
+    definition = TeamDefinition(agents=[_agent("scout", tools=["get_event"])])
+    announced = AnnouncedSnapshot(
+        by_name={"get_event": ["market-mcp", "trading-mcp", "polymarket-mcp"]}, unreachable=[]
+    )
+
+    with pytest.raises(DefinitionRefused) as err:
+        check_definition(definition, model_ids=MODELS, announced=announced)
+
+    message = str(err.value)
+    assert "market-mcp" in message
+    assert "trading-mcp" in message
+    assert "polymarket-mcp" in message
 
 
 def test_a_tool_not_confirmed_because_a_server_was_unreachable_says_so() -> None:

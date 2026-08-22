@@ -79,12 +79,16 @@ class _UnreachableServer(_Server):
         return []
 
 
-def test_from_settings_builds_the_two_servers_that_are_on_a_network() -> None:
+def test_from_settings_builds_the_servers_that_are_on_a_network() -> None:
     registry = ToolServerRegistry.from_settings(_settings())
     # Reaching inside on purpose: which sources get built is the arrangement this test
     # pins. The team tools are not among them and cannot be — settings hold no address for
     # something in this process.
-    assert [server.label for server in registry._servers] == ["market-mcp", "trading-mcp"]
+    assert [server.label for server in registry._servers] == [
+        "market-mcp",
+        "trading-mcp",
+        "polymarket-mcp",
+    ]
 
 
 def test_a_local_source_is_appended_to_the_servers_rather_than_replacing_one() -> None:
@@ -93,7 +97,7 @@ def test_a_local_source_is_appended_to_the_servers_rather_than_replacing_one() -
     registry = ToolServerRegistry.from_settings(_settings(), local_sources=[team_tools])
 
     labels = [server.label for server in registry._servers]
-    assert labels == ["market-mcp", "trading-mcp", "team tools"]
+    assert labels == ["market-mcp", "trading-mcp", "polymarket-mcp", "team tools"]
 
 
 async def test_the_local_source_answers_while_neither_server_is_configured() -> None:
