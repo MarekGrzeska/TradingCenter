@@ -1268,13 +1268,17 @@ resource "azurerm_linux_web_app" "strategy" {
     unauthenticated_action = "Return401"
     default_provider       = "azureactivedirectory"
 
-    # The two paths that answer without an identity, and no more. `/health` is what
-    # `deploy-strategy.yml`'s probe reads — the platform's own restart decision speaks no
-    # Easy Auth — and because this module's lifespan does not finish until its migration
-    # does, a process answering there at all is one whose schema is at this image's
-    # revision. `/ping` answers a constant that never varies with anything this module
-    # holds, which is what makes it exemptible at all.
-    excluded_paths = ["/health", "/ping"]
+    # One path, and it has to be the one this module's own caller record also treats as
+    # open — `strategy/caller_access.py`, `OPEN_PATHS`. Two gates stand in front of every
+    # request here, and exempting a path from only one of them is not exempting it: it
+    # reads as open in this file and answers 401 from the module.
+    #
+    # That is exactly what happened to `/health`, which sat here until the deploy of
+    # d2e2290 failed on it. `/ping` is the one this module opens, because it answers a
+    # constant that never varies with anything the module holds — and it proves as much
+    # about a deploy as `/health` would, since the lifespan serves nothing until its
+    # migration is done.
+    excluded_paths = ["/ping"]
 
     active_directory_v2 {
       client_id                  = module.strategy_easy_auth.client_id
