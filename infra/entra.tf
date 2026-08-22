@@ -64,15 +64,16 @@ resource "azuread_application" "terminal" {
     }
   }
 
-  # The strategy platform, since it grew a screen. Same shape as the three above.
-  required_resource_access {
-    resource_app_id = module.strategy_easy_auth.client_id
-
-    resource_access {
-      id   = module.strategy_easy_auth.scope_id
-      type = "Scope"
-    }
-  }
+  # **No block for the strategy platform, and that is the pattern rather than an
+  # omission.** `polymarket-data` has none either. A `resource_access.id` must be a
+  # concrete value at plan time, and a scope being created by this same apply is not one —
+  # the plan fails with "the argument … is required, but no definition was found", which
+  # is what it did on the first attempt at this change. The three above only work because
+  # their scopes have been in state for months.
+  #
+  # `azuread_application_pre_authorized` below is what actually matters: it is why the
+  # operator never sees a second consent screen. Nothing is lost by leaving this list at
+  # three.
 }
 
 resource "azuread_service_principal" "terminal" {
