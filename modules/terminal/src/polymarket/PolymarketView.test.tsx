@@ -300,6 +300,133 @@ describe("PolymarketView", () => {
     expect(screen.getAllByRole("meter").length).toBeGreaterThan(1);
   });
 
+  it("folds resolved markets away, counts them, and can still show them", async () => {
+    // A dated event resolves its markets one by one and each stays for good: ten of them is
+    // a hundred rows saying nothing about now.
+    const dated = event({
+      markets: [
+        {
+          id: 1,
+          question: "Cut in March?",
+          label: "March",
+          negRisk: false,
+          resolvedOutcome: null,
+          outcomes: [outcome(1, "Yes", 0.4), outcome(2, "No", 0.6)],
+        },
+        {
+          id: 2,
+          question: "Cut in August?",
+          label: "August 6",
+          negRisk: false,
+          resolvedOutcome: "No",
+          outcomes: [outcome(3, "Yes", 0), outcome(4, "No", 1)],
+        },
+      ],
+    });
+
+    render(<PolymarketView api={fakeApi({ listEvents: async () => [dated] })} />);
+    await unfold();
+
+    expect(await screen.findByText("March")).toBeInTheDocument();
+    // Exact match: the chart's outcome picker still offers "August 6 · Yes", and it should —
+    // a resolved market's history is the part the provider will not give back, so it stays
+    // reachable. What folds away is its row.
+    expect(screen.queryByText("August 6")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "1 resolved market" }));
+    expect(await screen.findByText("August 6")).toBeInTheDocument();
+    expect(screen.getByText(/settled on No/)).toBeInTheDocument();
+  });
+
+  it("shows no window at all for a resolved market", async () => {
+    const settled = event({
+      markets: [
+        {
+          id: 2,
+          question: "Cut in August?",
+          label: "August 6",
+          negRisk: false,
+          resolvedOutcome: "No",
+          outcomes: [outcome(3, "Yes", 0), outcome(4, "No", 1)],
+        },
+      ],
+    });
+    const changes: EventChanges = {
+      eventId: 1,
+      outcomes: [
+        {
+          outcomeId: 3,
+          name: "Yes",
+          price: 0,
+          windows: [{ window: "5m", change: 0, unavailable: null, baselineAt: new Date() }],
+        },
+      ],
+    };
+
+    render(
+      <PolymarketView api={fakeApi({ listEvents: async () => [settled], changes: async () => changes })} />,
+    );
+    await unfold();
+    await userEvent.click(await screen.findByRole("button", { name: "1 resolved market" }));
+
+    await screen.findByText(/settled on No/);
+    // `0.0 pp` would say the market did not move and "no coverage" that the archive has a
+    // hole. The truth is a third thing: there is nothing left to measure.
+    expect(screen.queryByText("0.0 pp")).not.toBeInTheDocument();
+    expect(screen.queryByText(/no coverage/i)).not.toBeInTheDocument();
+  });
+
+  it("says so when every market of an event has resolved", async () => {
+    const over = event({
+      collection: { state: "resolved", lastSampleAt: new Date(), reason: "every market resolved" },
+      markets: [
+        {
+          id: 2,
+          question: "Cut in August?",
+          label: "August 6",
+          negRisk: false,
+          resolvedOutcome: "No",
+          outcomes: [outcome(3, "Yes", 0), outcome(4, "No", 1)],
+        },
+      ],
+    });
+
+    render(<PolymarketView api={fakeApi({ listEvents: async () => [over] })} />);
+    await unfold();
+
+    expect(await screen.findByText(/every market of this event has resolved/i)).toBeInTheDocument();
+    expect(screen.getByText(/what was collected is still here/i)).toBeInTheDocument();
+  });
+
+  it("quotes a live market in the collapsed line, not one that finished in August", async () => {
+    const mixed = event({
+      markets: [
+        {
+          id: 2,
+          question: "Cut in August?",
+          label: "August 6",
+          negRisk: false,
+          resolvedOutcome: "No",
+          outcomes: [outcome(3, "Yes", 0), outcome(4, "No", 1)],
+        },
+        {
+          id: 1,
+          question: "Cut in March?",
+          label: "March",
+          negRisk: false,
+          resolvedOutcome: null,
+          outcomes: [outcome(1, "Yes", 0.4), outcome(2, "No", 0.6)],
+        },
+      ],
+    });
+
+    render(<PolymarketView api={fakeApi({ listEvents: async () => [mixed] })} />);
+
+    expect(await screen.findByText("March · Yes")).toBeInTheDocument();
+    expect(screen.getByText("40.0%")).toBeInTheDocument();
+    expect(screen.queryByText("100.0%")).not.toBeInTheDocument();
+  });
+
   it("draws the probability as well as writing it, and draws nothing when there is none", async () => {
     const blank = event({
       markets: [
