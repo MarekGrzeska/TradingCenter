@@ -1,11 +1,10 @@
-## Purpose
+# terminal-accounts Specification
 
+## Purpose
 Opisuje ekran rachunku w terminalu: co operator widzi o kontach demo bez pytania agenta, jak
 często to się odświeża i co może z tego ekranu zrobić z pieniędzmi oraz z tym, które konto
 jest aktywne.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Ekran pokazuje konta demo i ich stan
 
 Terminal MUST mieć ekran wyliczający konta demo osiągalne poświadczeniami modułu. Każde konto
@@ -79,3 +78,4 @@ Po przełączeniu ekran MUST pokazywać pozycje konta, które właśnie stało s
 - **WHEN** moduł odmawia przełączenia
 - **THEN** ekran podaje powód
 - **AND** konto aktywne na ekranie pozostaje tym, którym było
+
