@@ -65,3 +65,45 @@ export function formatAge(priceAt: Date | null, now: Date = new Date()): string 
   if (hours < 48) return `${hours} h ago`;
   return `${Math.round(hours / 24)} d ago`;
 }
+
+/** The five bands a probability's colour comes from.
+ *
+ *  Colour repeats what length already says, and that is the point: a column of bars is
+ *  scanned, not read, and a hue tells you *which end of the scale* a row is at before you
+ *  have measured anything. The bands are the operator's own reading of the scale — unlikely,
+ *  leaning against, even, leaning for, likely.
+ *
+ *  The five hues were **stepped by the validator, not by eye** (dataviz skill,
+ *  `validate_palette.js`, dark mode against `--color-panel`). The first attempt paired the
+ *  terminal's own warning orange with its amber and failed the normal-vision floor at ΔE 8.3
+ *  against a floor of 15 — two bands nobody could tell apart, colour-blind or not. These pass
+ *  adjacent-pair separation for protan, deutan and tritan, the normal-vision floor at 15.9,
+ *  and contrast against the surface. The lightness-band check the same report runs is scoped
+ *  to categorical palettes; an ordered ramp is supposed to move through lightness.
+ *
+ *  Never colour alone: the percentage is written beside every bar, and the bands are ordered
+ *  along the same axis the length uses. */
+export interface ProbabilityBand {
+  /** Inclusive lower edge, on 0..1. */
+  from: number;
+  fill: string;
+  /** What this band means, for the bar's own tooltip. */
+  reading: string;
+}
+
+export const BANDS: ProbabilityBand[] = [
+  { from: 0, fill: "#c93a3a", reading: "unlikely" },
+  { from: 0.2, fill: "#ef7a2e", reading: "leaning against" },
+  { from: 0.4, fill: "#f5e05a", reading: "close to even" },
+  { from: 0.6, fill: "#6ec96e", reading: "leaning for" },
+  { from: 0.8, fill: "#12855f", reading: "likely" },
+];
+
+/** The band a probability falls in. `null` for no price — a band would be a colour standing
+ *  for a value nobody has. */
+export function bandFor(price: number | null): ProbabilityBand | null {
+  if (price === null) return null;
+  const clamped = Math.max(0, Math.min(1, price));
+  // Walked from the top so an exact edge belongs to the band it opens.
+  return [...BANDS].reverse().find((band) => clamped >= band.from) ?? BANDS[0];
+}

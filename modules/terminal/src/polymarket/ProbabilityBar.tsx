@@ -1,4 +1,4 @@
-import { formatProbability } from "./probability";
+import { bandFor, formatProbability } from "./probability";
 
 /**
  * A probability, drawn as well as written.
@@ -8,14 +8,14 @@ import { formatProbability } from "./probability";
  * whole scale. That is what makes two outcomes comparable at a glance without reading two
  * numbers, which is the thing a column of percentages does not give.
  *
- * **One hue for every bar, not a colour per outcome.** The bar encodes magnitude; identity
- * is carried by the name beside it. A palette here would be colour doing a job the label
- * already does, and would make a market of eight outcomes a rainbow nobody can rank.
+ * **The hue follows the value, not the outcome.** It is the same variable the length
+ * encodes, said twice on purpose: a column of bars is scanned rather than read, and a colour
+ * says which end of the scale a row sits at before anything has been measured. What it must
+ * never be is a colour per outcome — that would be a rainbow nobody can rank, with hue doing
+ * a job the label beside it already does.
  *
- * The fill is the terminal's own accent on its recessive surface, and the check that applies
- * to a single magnitude fill — contrast against the surface — passes at ≥3:1 (dataviz
- * skill's validator, dark mode, surface `--color-panel`). The lightness-band check that file
- * also runs is scoped to categorical palettes and has nothing to say about one hue.
+ * The five bands were stepped by the dataviz skill's validator rather than by eye; the
+ * reasoning and the numbers are on `BANDS` in `probability.ts`, next to the values.
  *
  * **No price draws no bar.** A zero-length fill is a bar that says "zero", and zero is a
  * claim about the market where the truth is that nothing has been collected — the same
@@ -40,6 +40,7 @@ export function ProbabilityBar({
 
   const percent = Math.max(0, Math.min(1, price)) * 100;
   const label = formatProbability(price) ?? "";
+  const band = bandFor(price)!;
 
   return (
     <span
@@ -47,15 +48,21 @@ export function ProbabilityBar({
       aria-valuenow={price}
       aria-valuemin={0}
       aria-valuemax={1}
-      aria-valuetext={label}
-      title={at ? `${label} — read ${at.toISOString()}` : label}
+      aria-valuetext={`${label} · ${band.reading}`}
+      title={`${label} · ${band.reading}${at ? ` — read ${at.toISOString()}` : ""}`}
       className="inline-block h-1.5 w-24 overflow-hidden rounded-full bg-raised"
     >
       {/* Anchored at zero and rounded on the value end, so length is the only thing that
           reads as quantity. */}
       <span
-        className={`block h-full rounded-r-full ${stale ? "bg-primary-dim" : "bg-primary"}`}
-        style={{ width: `${percent}%` }}
+        className="block h-full rounded-r-full"
+        style={{
+          width: `${percent}%`,
+          background: band.fill,
+          // Dimmed rather than recoloured: a stale reading is still that band's value, and
+          // moving it to another hue would say the market had moved.
+          opacity: stale ? 0.45 : 1,
+        }}
       />
     </span>
   );
