@@ -9,10 +9,10 @@
 
 ## 2. Kontrakt wpisu i katalog strategii
 
-- [ ] 2.1 Typy kontraktu: `StrategySpec` (fakty, parametry z zakresami, `evaluate`), `Fact`, `Decision` (akcja, powód, poziomy, cechy, wersja parametrów)
-- [ ] 2.2 Rejestr wpisów + walidacja przy rejestracji (parametry w zakresach, wskaźniki ogłaszane przez archiwum)
-- [ ] 2.3 Test warstwy: dodanie wpisu nie zmienia runtime; `evaluate` bez we/wy i zegara (test, nie konwencja)
-- [ ] 2.4 Wpis baseline na istniejących wskaźnikach archiwum, z testami na ręcznych faktach
+- [x] 2.1 Typy kontraktu: `StrategySpec` (fakty, parametry z zakresami, `evaluate`), `Fact`, `Decision` (akcja, powód, poziomy, cechy, wersja parametrów)
+- [x] 2.2 Rejestr wpisów + walidacja przy rejestracji (parametry w zakresach, wskaźniki ogłaszane przez archiwum)
+- [x] 2.3 Test warstwy: dodanie wpisu nie zmienia runtime; `evaluate` bez we/wy i zegara (test, nie konwencja)
+- [x] 2.4 Wpis baseline na istniejących wskaźnikach archiwum, z testami na ręcznych faktach
 
 ## 3. Runtime
 
