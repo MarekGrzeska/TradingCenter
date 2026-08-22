@@ -78,7 +78,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         async with ctx.pool.acquire() as conn:
             group_id = (await store.create_group(conn, group)).id if group else None
             try:
-                _, already = await tracking.track(
+                event_id, already = await tracking.track(
                     conn,
                     event,
                     max_tracked_events=ctx.settings.max_tracked_events,
@@ -100,6 +100,11 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                 interval_seconds=ctx.settings.sample_interval_seconds,
                 provider_event_id=event.provider_event_id,
             )
+
+        # The note below promises "the recent past is being filled in", and until this line
+        # existed nothing kept that promise: the backfill had no caller outside its tests.
+        if not already:
+            ctx.ingest.event_tracked(event_id)
 
         return Tracked(
             event_id=out.provider_event_id,

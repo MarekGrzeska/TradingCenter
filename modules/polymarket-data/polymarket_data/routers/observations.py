@@ -94,7 +94,7 @@ async def track_event(request: Request, body: TrackRequest) -> TrackResult:
         if body.group:
             group_id = (await store.create_group(conn, body.group)).id
         try:
-            _, already = await tracking.track(
+            event_id, already = await tracking.track(
                 conn,
                 event,
                 max_tracked_events=settings.max_tracked_events,
@@ -108,6 +108,12 @@ async def track_event(request: Request, body: TrackRequest) -> TrackResult:
             interval_seconds=settings.sample_interval_seconds,
             provider_event_id=event.provider_event_id,
         )
+
+    # Outside the connection and after the row exists: the past is filled by its own task, so
+    # this request does not wait on six provider calls per outcome. Only for a new
+    # observation — re-tracking something already observed has nothing to reach back for.
+    if not already:
+        request.app.state.ingest.event_tracked(event_id)
     return TrackResult(event=out, already_tracked=already)
 
 

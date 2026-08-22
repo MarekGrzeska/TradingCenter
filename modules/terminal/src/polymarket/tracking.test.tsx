@@ -215,6 +215,29 @@ describe("groups", () => {
     expect(await screen.findByText(/the group is not yours/i)).toBeInTheDocument();
   });
 
+  it("says so when filing an event fails, instead of showing a group nothing recorded", async () => {
+    const { toastStore } = await import("../ui/toastStore");
+    render(
+      <PolymarketView
+        api={fakeApi({
+          listEvents: async () => [event({ group: "macro" })],
+          assignGroup: async () => {
+            throw new MarketDataError("refused", "the group is not yours");
+          },
+        })}
+      />,
+    );
+
+    const select = await screen.findByLabelText(/Group for Fed cuts in March/i);
+    await userEvent.selectOptions(select, "");
+
+    // It used to be an unhandled rejection, and the control went on showing a group the
+    // module had refused to record.
+    await waitFor(() =>
+      expect(toastStore.getSnapshot().some((t) => /Could not file/.test(t.title))).toBe(true),
+    );
+  });
+
   it("takes an event out of every group without ending its observation", async () => {
     const assignGroup = vi.fn(async () => {});
     render(

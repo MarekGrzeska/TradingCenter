@@ -196,6 +196,34 @@ class TestReads:
         assert (await api.get("/events/never-seen/changes")).status_code == 404
 
 
+class TestBackfillStartsOnTracking:
+    async def test_tracking_an_event_starts_filling_its_past(self, api, app) -> None:
+        """The route answers that the recent past is being filled in, and until this was
+        wired nothing kept that promise: `backfill_event` had no caller outside its tests,
+        so ninety days arrived only when the process next restarted."""
+        app.state.provider = fakes.FakeProvider(by_slug={"an-event": fakes.event_payload()})
+
+        answer = await api.post(
+            "/events", json={"reference": "https://polymarket.com/event/an-event"}
+        )
+
+        assert answer.status_code == 200
+        assert len(app.state.ingest.backfilled) == 1
+
+    async def test_tracking_the_same_event_again_reaches_back_for_nothing(
+        self, api, app
+    ) -> None:
+        app.state.provider = fakes.FakeProvider(by_slug={"an-event": fakes.event_payload()})
+        body = {"reference": "https://polymarket.com/event/an-event"}
+        await api.post("/events", json=body)
+        app.state.ingest.backfilled.clear()
+
+        answer = await api.post("/events", json=body)
+
+        assert answer.json()["already_tracked"] is True
+        assert app.state.ingest.backfilled == []
+
+
 class TestWindows:
     async def test_the_answer_carries_exactly_the_windows_the_module_computes(
         self, api, pool

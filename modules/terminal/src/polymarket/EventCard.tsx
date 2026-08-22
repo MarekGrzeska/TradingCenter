@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRead } from "../data/query";
 import { Button } from "../ui/Button";
+import { showToast } from "../ui/toastStore";
 import { DeleteHistoryDialog } from "./DeleteHistoryDialog";
 import { EndTrackingDialog } from "./EndTrackingDialog";
 import { OutcomeHistory } from "./OutcomeHistory";
@@ -96,14 +97,25 @@ export function EventCard({
           <select
             className="rounded border border-border bg-sunken px-1 py-0.5 text-ink"
             value={groups.find((entry) => entry.name === event.group)?.id ?? ""}
-            onChange={async (e) => {
+            onChange={(e) => {
               const raw = e.target.value;
-              await client.assignGroup(
-                event.id,
-                raw === "" ? null : Number(raw),
-                new AbortController().signal,
-              );
-              onChanged();
+              // Handled rather than awaited into nothing: a rejected assignment used to be
+              // an unhandled rejection, and the control went on showing a group the module
+              // had refused to record.
+              void client
+                .assignGroup(event.id, raw === "" ? null : Number(raw), new AbortController().signal)
+                .then(onChanged)
+                .catch((cause: unknown) => {
+                  showToast({
+                    key: `polymarket-assign-${event.id}`,
+                    severity: "error",
+                    title: `Could not file “${event.title}”`,
+                    detail: cause instanceof Error ? cause.message : "the module refused",
+                  });
+                  // Back to what the module actually holds, so the select stops claiming a
+                  // group that was never assigned.
+                  onChanged();
+                });
             }}
           >
             {/* Out of every group, without ending the observation — the module's own

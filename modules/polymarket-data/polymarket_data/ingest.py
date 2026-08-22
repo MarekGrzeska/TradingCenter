@@ -54,6 +54,9 @@ class Ingest:
         self._window = timedelta(days=window_days)
         self._default_depth = timedelta(days=default_backfill_days)
         self._task: asyncio.Task | None = None
+        # Backfills started by tracking, held so they are cancelled with the module rather
+        # than left writing into a closing pool.
+        self._backfills: set[asyncio.Task] = set()
         self.started_at: datetime | None = None
 
     # --- the loop --------------------------------------------------------------------
@@ -62,7 +65,38 @@ class Ingest:
         self.started_at = _now()
         self._task = asyncio.create_task(self._run(), name="polymarket-sampler")
 
+    def event_tracked(self, event_id: int) -> None:
+        """Start filling an event's past, now rather than at the next restart.
+
+        The route that brings an event under observation answers "the recent past is being
+        filled in", and `specs/polymarket-data-ingest` requires it to start on tracking.
+        Until this existed nothing called `backfill_event` outside its tests: sampling began
+        immediately and the ninety days arrived only when the process next restarted and
+        `close_gaps` happened to reach it.
+
+        Fire-and-forget on purpose — the operator's request should not wait on six requests
+        per outcome — but held in a set, because a bare `create_task` may be collected
+        mid-flight.
+        """
+        task = asyncio.create_task(
+            self._backfill_quietly(event_id), name=f"polymarket-backfill-{event_id}"
+        )
+        self._backfills.add(task)
+        task.add_done_callback(self._backfills.discard)
+
+    async def _backfill_quietly(self, event_id: int) -> None:
+        try:
+            await self.backfill_event(event_id)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # The observation stands and the tick collects from now; the past is retried by
+            # `close_gaps` on the next start.
+            log.exception("could not fill the past of event %s", event_id)
+
     async def stop(self) -> None:
+        for task in list(self._backfills):
+            task.cancel()
         if self._task is None:
             return
         self._task.cancel()
@@ -73,16 +107,16 @@ class Ingest:
         self._task = None
 
     async def _run(self) -> None:
-        # The gap first, then the steady tick. Every stop leaves a period with no samples,
-        # and on this provider that period is not recoverable later: of five recently
-        # resolved markets, four returned no history at all. Closing it at start is
-        # therefore a task rather than a nicety.
-        try:
-            await self.close_gaps()
-        except Exception:
-            # A failed catch-up must not stop the tick: yesterday's gap is already lost,
-            # and refusing to collect today would lose today's too.
-            log.exception("could not close the gap left by the last stop")
+        # The gap is closed **beside** the tick, not before it. Every stop leaves a period
+        # with no samples, and on this provider that period is not recoverable later — of
+        # five recently resolved markets, four returned no history at all — so closing it is
+        # a task rather than a nicety. But it is sequential per outcome and per window, so
+        # awaiting it first meant a restart with a full watch list collected nothing live
+        # for as long as the catch-up took: the spec's "uzupełnianie MUST NOT zagłodzić
+        # bieżącego próbkowania", broken by the one line that ordered them.
+        catch_up = asyncio.create_task(self._close_gaps_quietly(), name="polymarket-catch-up")
+        self._backfills.add(catch_up)
+        catch_up.add_done_callback(self._backfills.discard)
 
         while True:
             try:
@@ -93,6 +127,16 @@ class Ingest:
                 # One bad round is not the end of collection.
                 log.exception("a sampling round failed")
             await asyncio.sleep(self._interval)
+
+    async def _close_gaps_quietly(self) -> None:
+        try:
+            await self.close_gaps()
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # A failed catch-up must not stop the tick: yesterday's gap is already lost, and
+            # refusing to collect today would lose today's too.
+            log.exception("could not close the gap left by the last stop")
 
     # --- one round -------------------------------------------------------------------
 
@@ -146,11 +190,16 @@ class Ingest:
                 if token in tokens and (midpoint is not None or last_trade is not None)
             ]
             written = await store.record_samples(conn, samples)
-            # A tick is also a collected window: this instant was looked at, and without
-            # saying so an absence here would later read as "we were not collecting".
+            # A tick is also a collected window — **the interval it stands for, not the
+            # instant it happened at.** Recorded as a point, two consecutive ticks never
+            # touched, so nothing ever merged: the table grew a row per outcome per minute,
+            # and `is_collected` answered false for the 59 seconds between them. Backdating
+            # the start by one interval makes each tick adjacent to the last, which is what
+            # `record_collected`'s merge is written for.
+            covered_from = observed_at - timedelta(seconds=self._interval)
             for sample in samples:
                 await store.record_collected(
-                    conn, sample.outcome_id, observed_at, observed_at
+                    conn, sample.outcome_id, covered_from, observed_at
                 )
             await store.note_sampled(conn, event_id)
         return written
@@ -186,10 +235,13 @@ class Ingest:
     async def _backfill_outcome(
         self, outcome_id: int, token_id: str, since: datetime, oldest_available: datetime | None
     ) -> int:
-        # The boundary the provider taught us, honoured unless the caller asked for older
-        # data than it — which is the one act that means "check that again".
-        if oldest_available is not None and since >= oldest_available:
-            since = max(since, oldest_available)
+        # The boundary the provider taught us: nothing older than this exists, so asking for
+        # it again is a request that can only come back empty. The condition was inverted —
+        # `since >= oldest` then `max(since, oldest)` is `since`, a guaranteed no-op — so the
+        # boundary limited nothing and every restart re-requested the same known-empty
+        # windows.
+        if oldest_available is not None and since < oldest_available:
+            since = oldest_available
 
         written = 0
         window_start = since

@@ -143,6 +143,22 @@ describe("listEvents", () => {
     ]);
   });
 
+  it("can ask for the ended events to be left out, which the module includes by default", async () => {
+    const asked: string[] = [];
+    server.use(
+      http.get(`${HTTP_BASE}/events`, ({ request }) => {
+        asked.push(new URL(request.url).search);
+        return HttpResponse.json([]);
+      }),
+    );
+
+    await api().listEvents(signal(), { includeEnded: false });
+
+    // A falsy check made `false` unsendable — the one value worth passing, since the module
+    // defaults this to true.
+    expect(asked).toEqual(["?include_ended=false"]);
+  });
+
   it("asks for one group only when one was named", async () => {
     const asked: string[] = [];
     server.use(

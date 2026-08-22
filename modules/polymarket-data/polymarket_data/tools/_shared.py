@@ -52,6 +52,10 @@ class ToolContext:
         return self._state.provider
 
     @property
+    def ingest(self):
+        return self._state.ingest
+
+    @property
     def settings(self):
         return self._state.settings
 

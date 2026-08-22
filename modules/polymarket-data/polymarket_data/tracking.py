@@ -58,7 +58,9 @@ async def track(
                 "another — nothing has been changed."
             )
 
-    event_id = await store.upsert_event(conn, event, group_id=group_id)
+    # `resume=True` only here: this is the act that brings an event under observation, so
+    # it is the one that may clear an earlier ending. The sampler's own refresh must not.
+    event_id = await store.upsert_event(conn, event, group_id=group_id, resume=True)
     return event_id, already_tracking
 
 

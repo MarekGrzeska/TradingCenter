@@ -63,7 +63,9 @@ async def assign_group(conn: Conn, event_id: int, group_id: int | None) -> bool:
 # --- events, markets, outcomes ----------------------------------------------------------
 
 
-async def upsert_event(conn: Conn, event: Event, *, group_id: int | None = None) -> int:
+async def upsert_event(
+    conn: Conn, event: Event, *, group_id: int | None = None, resume: bool = False
+) -> int:
     """The event with its whole structure, in one transaction.
 
     All of it or none of it: an event row without its markets is an observation the sampler
@@ -85,15 +87,21 @@ async def upsert_event(conn: Conn, event: Event, *, group_id: int | None = None)
                 title = EXCLUDED.title,
                 group_id = COALESCE(EXCLUDED.group_id, tracked_events.group_id),
                 refreshed_at = now(),
-                -- Tracking the same event again resumes it. The history stayed, so this
-                -- continues a series rather than starting one.
-                tracking_ended_at = NULL
+                -- **Only the act of tracking resumes an observation.** Tracking the same
+                -- event again does resume it — the history stayed, so it continues a series
+                -- rather than starting one — but the sampler calls this every tick to
+                -- refresh an event's markets, and clearing the column there silently
+                -- resurrected an observation the operator had just ended, if they ended it
+                -- while a tick was in flight.
+                tracking_ended_at =
+                    CASE WHEN $5 THEN NULL ELSE tracked_events.tracking_ended_at END
             RETURNING id
             """,
             event.provider_event_id,
             event.slug,
             event.title,
             group_id,
+            resume,
         )
         event_id = row["id"]
 
