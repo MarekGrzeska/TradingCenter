@@ -81,6 +81,28 @@ const SOURCES = [
  */
 `,
   },
+  {
+    name: "strategy",
+    moduleDir: resolve(terminal, "..", "strategy"),
+    pythonModule: "strategy.openapi",
+    output: join(terminal, "src", "data", "contract.strategy.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \\\`pnpm contract:generate\\\`.
+ *
+ * The source is the strategy platform's own OpenAPI document, printed straight from its
+ * Pydantic models by \\\`python -m strategy.openapi\\\`.
+ *
+ * Most of what this contract describes is a **refusal**: a decision carrying a reason and
+ * no levels. \\\`reason_kind\\\` says which layer said no — the strategy, a gap in the data,
+ * or a platform limit — and the three have different answers, so a consumer that collapses
+ * them has thrown away the part worth reading.
+ *
+ * Every optional field on a response is generated as \\\`T | null\\\` rather than
+ * \\\`T | undefined\\\`: this module answers with the whole model, and a stop that is absent
+ * is a stop that was never set, not a field that failed to arrive.
+ */
+`,
+  },
 ];
 
 function schemaJson(source, envDir) {

@@ -55,6 +55,7 @@ describe("resolveEndpoints", () => {
         VITE_WORKBENCH_HTTP: "/workbench-api",
         VITE_GATEWAY_HTTP: "/gateway-api",
         VITE_POLYMARKET_HTTP: "/polymarket-api",
+        VITE_STRATEGY_HTTP: "/strategy-api",
       },
       devLoc,
     );
@@ -64,6 +65,7 @@ describe("resolveEndpoints", () => {
       workbenchHttp: "/workbench-api",
       gatewayHttp: "/gateway-api",
       polymarketHttp: "/polymarket-api",
+      strategyHttp: "/strategy-api",
     });
   });
 
@@ -75,6 +77,7 @@ describe("resolveEndpoints", () => {
         VITE_WORKBENCH_HTTP: "https://workbench.example.com",
         VITE_GATEWAY_HTTP: "https://gateway.example.com",
         VITE_POLYMARKET_HTTP: "https://polymarket.example.com",
+        VITE_STRATEGY_HTTP: "https://strategy.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
@@ -84,6 +87,7 @@ describe("resolveEndpoints", () => {
       workbenchHttp: "https://workbench.example.com",
       gatewayHttp: "https://gateway.example.com",
       polymarketHttp: "https://polymarket.example.com",
+      strategyHttp: "https://strategy.example.com",
     });
   });
 
@@ -94,6 +98,7 @@ describe("resolveEndpoints", () => {
       workbenchHttp: "/workbench-api",
       gatewayHttp: "/gateway-api",
       polymarketHttp: "/polymarket-api",
+      strategyHttp: "/strategy-api",
     });
   });
 
@@ -145,6 +150,7 @@ describe("resolveEntra", () => {
         workbench: null,
         gateway: null,
         polymarket: null,
+        strategy: null,
       },
     });
   });
@@ -156,17 +162,19 @@ describe("resolveEntra", () => {
         VITE_ENTRA_SCOPE_WORKBENCH: "api://agent/access_as_user",
         VITE_ENTRA_SCOPE_GATEWAY: "api://gateway/access_as_user",
         VITE_ENTRA_SCOPE_POLYMARKET: "api://polymarket/access_as_user",
+        VITE_ENTRA_SCOPE_STRATEGY: "api://strategy/access_as_user",
       })?.scopes,
     ).toEqual({
       archive: "api://market-data/access_as_user",
       workbench: "api://agent/access_as_user",
       gateway: "api://gateway/access_as_user",
       polymarket: "api://polymarket/access_as_user",
+      strategy: "api://strategy/access_as_user",
     });
   });
 
   // The rule the split exists for: a module with no scope of its own is called with no
-  // credential, not with the archive's. Falling back would be the terminal telling four
+  // credential, not with the archive's. Falling back would be the terminal telling five
   // gates the same thing, which is what this change stopped
   // (specs/terminal-identity, "Dwa moduły o różnych publicznościach").
   it("does not fall back to the archive's scope for a back end with none", () => {

@@ -123,7 +123,8 @@ locals {
   # The strategy platform's own audience. It has one for the same reason trading-mcp does:
   # its callers are backend services presenting a managed identity, so there is no consent
   # screen and no delegated scope — only client credentials.
-  strategy_api_uri = "api://tradingcenter-strategy"
+  strategy_api_uri   = "api://tradingcenter-strategy"
+  strategy_api_scope = "access_as_user"
 
   # There used to be a third of this shape, for the tool server the agent built teams
   # through. Those tools are a layer in the workbench now — no address, no audience, and
