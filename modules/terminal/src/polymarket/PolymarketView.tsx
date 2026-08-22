@@ -145,7 +145,12 @@ export function PolymarketView({ api }: { api?: PolymarketApi } = {}) {
         </p>
       )}
 
-      <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
+      {/* `flex-1` is what makes this the scrolling region rather than a block that stops at
+          its content: without it the list never grows, so the tab ended in dead space below
+          the last event and the last row was clipped instead of scrolled to. The pair
+          `min-h-0 flex-1 overflow-auto` is what `InstrumentsView` and `CollectionHistoryView`
+          already use for the same job. */}
+      <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto">
         {events.value.map((event) => (
           <EventCard
             key={event.id}
