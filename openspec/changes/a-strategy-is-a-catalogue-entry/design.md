@@ -5,11 +5,12 @@
 Motywacja w proposal.md.
 
 **Poprawka do wzorca, naniesiona przy implementacji.** Artefakty pisane były z założeniem, że
-szkielet modułu skopiujemy z `polymarket-data`. Tego modułu nie ma na `main` — żyje na
-niescalonej gałęzi — więc gałąź tej zmiany brałaby zależność od cudzej pracy w toku. Wzorcem
-jest zamiast tego `market-data` (lifespan, advisory lock, `/mcp`, `caller_access`) i
-`workbench` (użycie `tc-runtime` zamiast własnego `db.py`). Układ jest ten sam; zmienia się
-tylko, z którego pliku był przepisany.
+szkielet modułu skopiujemy z `polymarket-data`. W chwili pisania kodu tego modułu nie było na
+`main` — żył na niescalonej gałęzi — więc gałąź tej zmiany brałaby zależność od cudzej pracy
+w toku. Wzorcem jest zamiast tego `market-data` (lifespan, advisory lock, `/mcp`,
+`caller_access`) i `workbench` (użycie `tc-runtime` zamiast własnego `db.py`). Układ jest ten
+sam; zmienia się tylko, z którego pliku był przepisany. `polymarket-data` scalono później
+(#200) i ta gałąź stoi już na nim, ale przepisywanie szkieletu drugi raz nic by nie kupiło.
 
 Stan zastany, który kształtuje podejście: katalog wskaźników
 market-data (wpis = deklaracja + czysta funkcja, jeden plik, maszyneria raz), wyzwalacze
@@ -90,23 +91,22 @@ wprost zakazuje raportu bez modelu kosztów.
 
 ## Migration Plan
 
-**Najpierw ostrzeżenie, które wyszło dopiero z planu na PR #201, i nie dotyczy tej zmiany —
-dotyczy tego, na czym ona stoi.** `terraform plan` z tej gałęzi mówi
-`6 to add, 4 to change, **38 to destroy**`, a te 38 to cały produkcyjny ślad
+**Odnotowane, bo się wydarzyło i zostało rozwiązane.** Pierwszy plan tej gałęzi na PR #201
+mówił `6 to add, 4 to change, **38 to destroy**`, a te 38 to był cały produkcyjny ślad
 `polymarket-data`: 32 reguły firewalla, App Service, baza `polymarket`, trzy zasoby Easy
-Auth i polityka Key Vault. Ten moduł został **zaapplikowany na produkcję z niescalonej
-gałęzi**, więc jest w stanie Terraforma i nie ma go w kodzie na `main`. Każdy plan z `main`
-chce go usunąć — ta zmiana tylko to ujawniła, będąc pierwszym PR-em dotykającym `infra/`
-od tamtego apply.
+Auth i polityka Key Vault. Ten moduł był wtedy zaapplikowany na produkcję z gałęzi jeszcze
+niescalonej, więc żył w stanie Terraforma i nie istniał w kodzie, który czyta plan z `main`.
+Ta zmiana niczego nie zepsuła — była pierwszym PR-em dotykającym `infra/` od tamtego apply,
+więc pierwszym, który to powiedział.
 
-**Apply z tej gałęzi w obecnym kształcie skasowałby produkcyjne polymarket-data razem
-z jego bazą.** Zanim cokolwiek zostanie zaapplikowane, jedno z dwojga: scalić
-`polymarket-data-joins-the-stack` do `main` i przebazować tę gałąź, albo zrobić apply
-z gałęzi zawierającej oba moduły. Sam plan nie jest tu wystarczającą kontrolą — jest
-czytelny dopiero, gdy się przeczyta linię podsumowania.
+Rozwiązane przez scalenie `polymarket-data-joins-the-stack` do `main` (#200) i przebazowanie
+tej gałęzi na wynik. Warte zapamiętania niezależnie od tej zmiany: **apply z gałęzi, która
+nie jest jeszcze na `main`, robi z każdego następnego planu wniosek o skasowanie tego, co
+zaapplikowano** — i widać to dopiero w linii podsumowania, poniżej setek linii `Refreshing
+state`.
 
-Kolejność produkcyjna tej zmiany, już po rozwiązaniu powyższego — jak przy narzędziach
-workbencha, ustawienia przed obrazem:
+Kolejność produkcyjna tej zmiany — jak przy narzędziach workbencha, ustawienia przed
+obrazem:
 `terraform apply` (App Service, tożsamość zarządzana, wpis tożsamości modułu do
 `allowed_applications` i `REST_CALLER_APPLICATION_IDS` market-data, baza `strategy`
 z nadaniem własności schematu) musi wylądować, zanim wdrożenie da obraz, który te
