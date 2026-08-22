@@ -151,6 +151,165 @@
   color: var(--color-ink-faint);
 }
 
+/*
+ * The strategy screen.
+ *
+ * Written as rules rather than as utilities on the elements, because this screen is one
+ * table read down a column: the vocabulary — a chip, a watched pair, a decision, the kind
+ * of refusal — repeats on every row, and a badge whose colour lived in six places is a
+ * badge that means six things by the end of the month. The tab shipped naming these
+ * classes and nothing defined them, so every one of them rendered unstyled.
+ *
+ * **The kinds of no are the point of the colour.** `coverage` is the only one that means
+ * something is missing and is the only one in `warning`; `limit` is amber, the chrome
+ * colour for anything the operator can act on — a limit is raised by a person; and
+ * `strategy` is steel, because the platform declining a bar is the ordinary state and
+ * must not read as a fault (specs/terminal-strategy).
+ */
+.chip {
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-panel);
+  padding: 0.125rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-ink-secondary);
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-ink);
+}
+
+.chip-on,
+.chip-on:hover {
+  border-color: var(--color-primary-line);
+  background-color: var(--color-primary-soft);
+  color: var(--color-primary-strong);
+}
+
+/* A watched pair. Stopped is not deleted — it stays on the list, dimmed and outlined
+   rather than gone, because what it decided is still readable underneath. */
+.watch {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.25rem;
+  border: 1px dashed var(--color-border-strong);
+  background-color: var(--color-panel);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--color-ink-muted);
+}
+
+.watch-on {
+  border-style: solid;
+  border-color: var(--color-primary-line);
+  background-color: var(--color-primary-soft);
+}
+
+.watch-symbol {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.watch-on .watch-symbol {
+  color: var(--color-primary-strong);
+}
+
+.watch-strategy {
+  color: var(--color-ink-faint);
+}
+
+.decisions {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.decisions thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background-color: var(--color-canvas);
+  border-bottom: 1px solid var(--color-secondary-line);
+  padding: 0.375rem 0.75rem 0.375rem 0;
+  text-align: left;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--color-secondary);
+}
+
+.decision td {
+  border-bottom: 1px solid var(--color-border);
+  padding: 0.375rem 0.75rem 0.375rem 0;
+  vertical-align: baseline;
+  color: var(--color-ink-secondary);
+}
+
+.decision:hover td {
+  background-color: var(--color-panel);
+}
+
+/* The rare row. A left edge rather than a filled background: a setup has to be findable
+   while scrolling past a hundred refusals, and a tinted row would make the refusals look
+   like the ones that were suppressed. */
+.decision-trade td:first-child {
+  box-shadow: inset 2px 0 0 var(--color-up);
+  padding-left: 0.5rem;
+}
+
+.decision-bar,
+.decision-symbol,
+.decision-levels,
+.decision-rr {
+  white-space: nowrap;
+}
+
+.decision-symbol {
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+/* One line, and the whole of it in the row's `title`. A reason that wrapped would make
+   every row a different height, which is what makes a long list unreadable. */
+.decision-reason {
+  max-width: 44rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-ink-muted);
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 0.25rem;
+  border: 1px solid currentColor;
+  padding: 0.0625rem 0.375rem;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.badge-trade {
+  color: var(--color-up);
+}
+
+.kind-ordinary {
+  color: var(--color-secondary);
+}
+
+.kind-missing {
+  color: var(--color-warning);
+}
+
+.kind-limit {
+  color: var(--color-primary);
+}
+
 html {
   color-scheme: dark;
 }

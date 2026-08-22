@@ -174,3 +174,76 @@ describe("stopping a watch", () => {
     expect(api.listDecisions).toHaveBeenCalled();
   });
 });
+
+describe("starting a watch", () => {
+  it("sends the strategy and the pair, and asks the module to resolve the parameters", async () => {
+    const api = fakeApi({ listWatches: vi.fn().mockResolvedValue([]) });
+
+    render(<StrategyView api={api} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Obserwuj parę" }));
+    await userEvent.type(screen.getByRole("textbox"), "US100");
+    await userEvent.click(screen.getByRole("button", { name: "Zacznij" }));
+
+    // No parameters: untouched fields mean the defaults, and resolving them here would
+    // make this screen the author of values it only displayed.
+    await waitFor(() =>
+      expect(api.startWatch).toHaveBeenCalledWith(
+        "baseline_ma_cross",
+        "US100",
+        expect.anything(),
+        undefined,
+      ),
+    );
+  });
+
+  it("still starts when the catalogue arrives after the dialog does", async () => {
+    // The failure this is here for: against a cold module the catalogue read takes
+    // seconds, and an operator who opened the dialog inside that window was left with a
+    // select that filled itself and a "Zacznij" that never came back to life.
+    let answer: (strategies: Strategy[]) => void = () => {};
+    const api = fakeApi({
+      listStrategies: vi.fn().mockReturnValue(
+        new Promise<Strategy[]>((resolve) => {
+          answer = resolve;
+        }),
+      ),
+      listWatches: vi.fn().mockResolvedValue([]),
+    });
+
+    render(<StrategyView api={api} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Obserwuj parę" }));
+    answer([STRATEGY]);
+
+    await userEvent.type(screen.getByRole("textbox"), "US100");
+    // The pair alone used to leave this dead: nothing was selected, and nothing could be.
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Zacznij" })).not.toBeDisabled(),
+    );
+    await userEvent.click(screen.getByRole("button", { name: "Zacznij" }));
+
+    await waitFor(() =>
+      expect(api.startWatch).toHaveBeenCalledWith(
+        "baseline_ma_cross",
+        "US100",
+        expect.anything(),
+        undefined,
+      ),
+    );
+  });
+
+  it("keeps a refusal beside the question it answers", async () => {
+    const api = fakeApi({
+      listWatches: vi.fn().mockResolvedValue([]),
+      startWatch: vi
+        .fn()
+        .mockRejectedValue(new MarketDataError("refused", "US100 is not in the archive")),
+    });
+
+    render(<StrategyView api={api} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Obserwuj parę" }));
+    await userEvent.type(screen.getByRole("textbox"), "US100");
+    await userEvent.click(screen.getByRole("button", { name: "Zacznij" }));
+
+    expect(await screen.findByText(/not in the archive/)).toBeInTheDocument();
+  });
+});
