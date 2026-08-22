@@ -1,8 +1,8 @@
 # polymarket-data
 
 The prediction-market archive. One door to Polymarket, one database, two surfaces in one
-process: the REST contract the terminal reads, and eleven-ish tools at `/mcp` the
-workbench reads.
+process: the REST contract the terminal reads, and nine tools at `/mcp` the workbench
+reads.
 
 A market's price for an outcome is a probability, and a probability over time is a series
 of the same kind as a candle. This module keeps that series. It does not alert on it, does
@@ -25,14 +25,49 @@ module claimed it; a `.env` pointing at 8040 or 8050 still reads as a server tha
 
 The unit of collection is an **event** — a question with one or more markets under it,
 each market with one or more outcomes, each outcome with a price. A binary market is the
-special case of two outcomes, not the shape everything else is trimmed to. The source
-application this module replaces stored a sample only for markets whose outcomes were
-exactly `Yes` and `No`, and multi-market events vanished without a line in a log.
+special case of two outcomes, not the shape everything else is trimmed to.
 
 Collection is a decision, never a side effect. Searching the provider's public database
 through this module collects nothing; only tracking an event does. Ending the tracking
 stops the sampling and **keeps every sample already collected** — deleting data is a
 separate act, on the REST contract, and no tool can do it.
+
+## Nine tools, three of which write
+
+Six read: search the provider's public database live, browse by tag, list what is tracked,
+open one event, read an outcome's history, read its changes over a window. Three change the
+**list of observations** — track an event, stop tracking one, create a group.
+
+That is a deliberate departure from `market-data`, whose specification says outright that
+its tool set only reads, and it is named here rather than smuggled into the code. The rule
+there is about the candle archive: a tool that wrote would be a tool that mutated it. Here
+the writing tools change the same list an operator clicks in the terminal, and the hard
+line is drawn somewhere else instead — **no tool deletes collected history**, and none of
+the nine touches money, because this system trades nothing on Polymarket.
+
+A ceiling on how many events may be tracked exists for the same reason the writing tools
+do: "track whatever looks interesting" is a sentence a model can mean literally. Refusing
+is cheap; an invisible growth in load is not.
+
+Which caller reaches which surface is the module's own record, route by route
+(`polymarket_data/caller_access.py`), not the platform's: Easy Auth authorizes an
+application, so a caller admitted for the tools would otherwise be past every REST route
+including the one that deletes. A path the record does not name is refused, not passed.
+
+## Where the shape came from
+
+This module replaces an application the operator was already running outside this system —
+`MarekGrzeska/MarketTools`, in C#, collecting prices to send a Telegram alert and deleting
+history after seven days. It was read and measured on **22 August 2026** rather than
+translated, and the measurement is why three of its central choices are reversed here: it
+sampled per token where one request prices a whole event, it stored a sample only for
+markets whose outcomes were exactly `Yes` and `No`, and it knew only the moments its worker
+happened to be running, so a restart was a hole for good.
+
+**A third of it is deliberately not here.** The alerting layer — Telegram, Truth Social, the
+news aggregator, the model's judgement of whether an event matters — is 1 688 of its 4 715
+lines, 36%, and none of it is missing: that work is the workbench's, done on this module's
+data. What this module owes it is a series that is true.
 
 ## Two things measured on the provider, which shaped the design
 
@@ -63,3 +98,9 @@ token fetched per connection. `PROVIDER_USER_AGENT` is not decoration: the provi
 selects on that header and refuses some HTTP clients' defaults — `Python-urllib` gets a
 `403` where an absent header does not — so the module sends a value it chose rather than one
 a dependency bump could change under it.
+
+The REST contract is generated into the terminal rather than copied by hand
+(`python -m polymarket_data.openapi`, read by `modules/terminal/scripts/contract.mjs`).
+Nothing there imports those types yet — the subpage is a change of its own — but
+`pnpm contract:check` fails the day this contract moves, so that subpage starts against
+types that are true rather than against a file born stale.

@@ -88,10 +88,10 @@
 
 ## 9. Prawda w plikach
 
-- [ ] 9.1 `CLAUDE.md`: mapa modułów, tabela komend, linia portów — 8070 znika z listy niczyich, zostają 8040 i 8050
-- [ ] 9.2 `CLAUDE.md`: akapit o `MARKET_MCP_URL` dostaje trzeciego brata — nieobecność `POLYMARKET_MCP_URL` jest działającą konfiguracją
-- [ ] 9.3 `docs/architecture.md`: nowy moduł, jego dwie powierzchnie i powód, dla którego nie ma osobnej bramki
-- [ ] 9.4 README modułu: co zbiera, czego nie robi, i skąd wziął się kształt (analiza z 22 sierpnia 2026)
+- [x] 9.1 `CLAUDE.md`: mapa modułów, tabela komend, linia portów — 8070 znika z listy niczyich, zostają 8040 i 8050 (wyprzedzone w 2.8, bo `test_guide_ceiling.py` odmawia inaczej)
+- [x] 9.2 `CLAUDE.md`: akapit o `MARKET_MCP_URL` dostaje trzeciego brata — nieobecność `POLYMARKET_MCP_URL` jest działającą konfiguracją (również w 2.8)
+- [x] 9.3 `docs/architecture.md`: nowy moduł, jego dwie powierzchnie i powód, dla którego nie ma osobnej bramki
+- [x] 9.4 README modułu: co zbiera, czego nie robi, i skąd wziął się kształt (analiza z 22 sierpnia 2026)
 
 ## 10. Wdrożenie i sprawdzenie
 
