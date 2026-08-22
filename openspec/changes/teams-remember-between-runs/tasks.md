@@ -54,12 +54,12 @@
 
 ## 6. Trasy operatora
 
-- [ ] 6.1 `teams/routers/memory.py`: `GET /teams/{team_id}/memory`,
+- [x] 6.1 `teams/routers/memory.py`: `GET /teams/{team_id}/memory`,
       `DELETE /teams/{team_id}/memory/{entry_id}` (204), oba z `Depends(current_principal)`
-- [ ] 6.2 Router w `teams/surface.py` we właściwej kolejności; `tests/test_route_collisions.py` zielony
-- [ ] 6.3 Trzy testy tras: ścieżka szczęśliwa, błąd, odmowa (cudzy zespół nieodróżnialny od
+- [x] 6.2 Router w `teams/surface.py` we właściwej kolejności; `tests/test_route_collisions.py` zielony
+- [x] 6.3 Trzy testy tras: ścieżka szczęśliwa, błąd, odmowa (cudzy zespół nieodróżnialny od
       nieistniejącego)
-- [ ] 6.4 `python -m teams.openapi` i `pnpm contract:generate` w terminalu — `contract:check` zielony
+- [x] 6.4 `python -m teams.openapi` i `pnpm contract:generate` w terminalu — `contract:check` zielony
 
 ## 7. Terminal
 
