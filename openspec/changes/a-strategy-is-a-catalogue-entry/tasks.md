@@ -42,6 +42,8 @@
 
 ## 6. Wdrożenie
 
-- [ ] 6.1 `infra/`: App Service, tożsamość zarządzana, baza `strategy`; tożsamość modułu w `allowed_applications` i `REST_CALLER_APPLICATION_IDS` market-data
-- [ ] 6.2 CI: job modułu w `checks.yml`; `deploy-strategy.yml` z sondą `deploy_probe.py`
+- [x] 6.1 `infra/`: App Service, tożsamość zarządzana, baza `strategy`; tożsamość modułu w `allowed_applications` i `REST_CALLER_APPLICATION_IDS` market-data
+- [x] 6.2 CI: job modułu w `checks.yml`; `deploy-strategy.yml` z sondą `deploy_probe.py`
 - [ ] 6.3 Kolejność produkcyjna: apply przed obrazem (jak przy narzędziach workbencha); próba odwrotu — dezaktywacja strategii i usunięcie wyzwalacza
+      *(operatorska — `terraform apply` nigdy nie należy do CI, a `terraform-apply.yml` i tak odmówi planu
+      dotykającego `azuread_*`, który ta zmiana zawiera. Kolejność i odwrót opisane w design.md → Migration Plan.)*

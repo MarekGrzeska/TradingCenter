@@ -107,6 +107,17 @@ resource "azurerm_postgresql_flexible_server_database" "polymarket" {
   charset   = "UTF8"
 }
 
+# A fifth, and the reasoning has still not changed: one server, one logical database per
+# module that owns data. Its role is the same one-off `psql` step, and this one needs
+# `scripts/grant-schema-ownership.sql` run in it as well, before the first deploy tries to
+# migrate — or the module starts and refuses on a table it cannot alter.
+resource "azurerm_postgresql_flexible_server_database" "strategy" {
+  name      = "strategy"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  collation = "en_US.utf8"
+  charset   = "UTF8"
+}
+
 # `market_data_dev` used to sit beside it — the database local development wrote to for
 # the one morning that arrangement lasted (openspec/changes/local-dev-database-in-docker).
 # Applying its removal DROPS it, data and all; dev data is disposable by definition, but
@@ -167,6 +178,17 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "polymarket_data_out
   for_each = toset(azurerm_linux_web_app.polymarket_data.possible_outbound_ip_address_list)
 
   name             = "AllowPolymarketDataOutbound-${replace(each.value, ".", "-")}"
+  server_id        = azurerm_postgresql_flexible_server.main.id
+  start_ip_address = each.value
+  end_ip_address   = each.value
+}
+
+# The fourth, and the last thing to say about the shape is that it repeats: `terraform apply
+# -target=azurerm_linux_web_app.strategy` once, then the normal unrestricted apply.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "strategy_outbound" {
+  for_each = toset(azurerm_linux_web_app.strategy.possible_outbound_ip_address_list)
+
+  name             = "AllowStrategyOutbound-${replace(each.value, ".", "-")}"
   server_id        = azurerm_postgresql_flexible_server.main.id
   start_ip_address = each.value
   end_ip_address   = each.value
