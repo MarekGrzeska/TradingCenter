@@ -42,6 +42,20 @@ class TestTheCatalogue:
         assert "no_such_strategy" in response.json()["detail"]
 
 
+class TestAPlatformWatchingNothing:
+    async def test_the_surfaces_answer_empty_rather_than_failing(self, api) -> None:
+        """Zero is a supported state, not a degraded one. Every list answers with nothing
+        in it, and `/health` reports the count without treating it as a problem."""
+        for path in ("/watches", "/decisions", "/parameter-sets", "/backtests"):
+            response = await api.get(path)
+            assert response.status_code == 200, path
+            assert response.json() == [], path
+
+        health = await api.get("/health")
+        assert health.status_code == 200
+        assert health.json()["watching"] == 0
+
+
 class TestParameterSets:
     async def test_a_set_is_stored_resolved(self, api) -> None:
         """What is written down is what would be used, not what was typed."""
@@ -182,6 +196,40 @@ class TestDecisions:
         assert response.status_code == 200
         assert response.json()["facts"]["symbol"] == "US100"
         assert response.json()["rr"] == 5.0
+
+    async def test_a_decision_names_the_parameter_version_it_was_decided_under(
+        self, api, pool
+    ) -> None:
+        """And that version still reads the way it read then, resolved.
+
+        Written through the route rather than into the store, because that is where a
+        parameter set is resolved — defaults filled in before it is stored, so a decision
+        made under it means the same thing after this image's defaults change. The store
+        itself writes what it is handed; the two callers that write both resolve first.
+        """
+        written = await api.post(
+            "/parameter-sets", json={"strategy_id": "baseline_ma_cross", "params": {}}
+        )
+        parameter_set_id = written.json()["id"]
+        async with pool.acquire() as conn:
+            await store.record_decision(
+                conn,
+                strategy_id="baseline_ma_cross",
+                symbol="US100",
+                parameter_set_id=parameter_set_id,
+                as_of=BAR,
+                decision=Decision.no_trade("nothing here"),
+                reason_kind="strategy",
+                facts={},
+            )
+
+        listed = await api.get("/decisions")
+        assert listed.json()[0]["parameter_set_id"] == parameter_set_id
+
+        sets = await api.get("/parameter-sets", params={"strategy_id": "baseline_ma_cross"})
+        named = [row for row in sets.json() if row["id"] == parameter_set_id]
+        assert named, "the decision names a parameter set that cannot be read back"
+        assert named[0]["params"]["fast_period"] == 20
 
     async def test_a_decision_that_does_not_exist_is_refused(self, api) -> None:
         response = await api.get("/decisions/9999")

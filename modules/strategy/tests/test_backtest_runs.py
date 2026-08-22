@@ -57,6 +57,45 @@ class TestKeepingAReport:
         ]
 
 
+class TestARunChangesNothingElse:
+    async def test_a_backtest_leaves_the_live_record_alone(self, pool) -> None:
+        """A replay must not be able to reach the decisions the loop wrote. It cannot,
+        structurally — `run` is handed an archive and never a pool — and this is the test
+        that says so rather than the docstring."""
+        from strategy import backtest, store
+        from strategy.spec import Decision
+
+        async with pool.acquire() as conn:
+            params = await store.add_parameter_set(conn, "baseline_ma_cross", {})
+            await store.record_decision(
+                conn,
+                strategy_id="baseline_ma_cross",
+                symbol="US100",
+                parameter_set_id=params.id,
+                as_of=START,
+                decision=Decision.no_trade("from the loop"),
+                reason_kind="strategy",
+                facts={},
+            )
+
+        from test_backtest import a_history
+
+        archive = a_history()
+        await backtest.run(
+            archive,
+            "baseline_ma_cross",
+            "US100",
+            start=archive.times[10],
+            end=archive.times[-1],
+        )
+
+        async with pool.acquire() as conn:
+            live = await store.list_decisions(conn)
+            runs = await store.list_backtest_runs(conn)
+        assert [row.decision.reason for row in live] == ["from the loop"]
+        assert runs == [], "a run keeps nothing unless it is asked to"
+
+
 class TestTheRoutes:
     async def test_a_kept_run_is_readable(self, api, pool) -> None:
         async with pool.acquire() as conn:

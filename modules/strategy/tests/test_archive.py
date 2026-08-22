@@ -201,6 +201,39 @@ class TestWhenTheArchiveWillNotAnswer:
                 )
 
 
+class TestTheLastClosedBar:
+    @respx.mock
+    async def test_it_is_read_from_the_closed_candles_route(self) -> None:
+        """The whole of this module's rule about when a period ends.
+
+        `GET /candles` answers with closed bars only — the forming one has its own route,
+        `/candles/{symbol}/forming`, which nothing here calls. So the last row of a recent
+        window *is* the last closed bar, and a forming candle can never reach a strategy.
+        """
+        closed = respx.get(f"{BASE}/candles/US100").mock(
+            return_value=httpx.Response(200, json=candles_body())
+        )
+        forming = respx.get(f"{BASE}/candles/US100/forming").mock(
+            return_value=httpx.Response(200, json={})
+        )
+
+        async with client() as http:
+            bar = await Archive(BASE, http).last_closed_bar("US100", "HOUR")
+
+        assert bar == BAR
+        assert closed.called
+        assert not forming.called, "the forming candle is for looking at, not for deciding on"
+
+    @respx.mock
+    async def test_a_pair_with_no_bars_yet_answers_nothing(self) -> None:
+        respx.get(f"{BASE}/candles/US100").mock(
+            return_value=httpx.Response(200, json={**candles_body(), "candles": []})
+        )
+
+        async with client() as http:
+            assert await Archive(BASE, http).last_closed_bar("US100", "HOUR") is None
+
+
 class TestTheCatalogue:
     @respx.mock
     async def test_the_announced_indicators_are_read_by_id(self) -> None:
