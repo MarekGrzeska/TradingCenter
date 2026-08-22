@@ -46,6 +46,36 @@
 --   az account get-access-token --resource https://ossrdbms-aad.database.windows.net \
 --      --query accessToken -o tsv
 --
+-- **The role has to exist first, and creating it is a step of its own** — this script
+-- grants to a role, it does not make one. `GRANT :"role" TO current_user` on the second
+-- line below is what fails when it is missing, before anything is granted. Found on
+-- 22 August 2026 while doing this for `polymarket`: the step had been performed three
+-- times and written down nowhere.
+--
+--   -- against dbname=postgres, which is the only database carrying the extension.
+--   -- Roles are cluster-wide, so it does not matter that the new database is elsewhere.
+--   SELECT pgaadauth_create_principal_with_oid(
+--            'app-tradingcenter-polymarket-data',      -- = the App Service's name
+--            '<managed identity object id>',           -- terraform output …_principal_id
+--            'service', false, false);
+--
+-- `_with_oid` and `'service'` rather than `pgaadauth_create_principal`: the caller is an
+-- App Service's managed identity, not a person, and it is found by object id.
+--
+-- No psql on the machine is not a reason to install one:
+--   docker run --rm -e PGPASSWORD="$TOKEN" -v "$PWD/scripts:/s:ro" postgres:17-alpine \
+--     psql "host=… dbname=polymarket user='<admin upn>' sslmode=require" \
+--     -v role=app-tradingcenter-polymarket-data -f /s/grant-schema-ownership.sql
+--
+-- The server's firewall admits `var.developer_ip_address` (infra/database.tf), which is
+-- one address and is the operator's usual one. From anywhere else, add a rule for the
+-- moment and take it away afterwards rather than moving that variable to whichever
+-- network they happen to be on:
+--   az postgres flexible-server firewall-rule create -g rg-tradingcenter \
+--      -n psql-tradingcenter --rule-name TempOperatorGrant \
+--      --start-ip-address <ip> --end-ip-address <ip>
+--   … and `firewall-rule delete --rule-name TempOperatorGrant --yes` when done.
+--
 -- Idempotent: an object already owned by the role is reassigned to itself.
 
 \set ON_ERROR_STOP on
