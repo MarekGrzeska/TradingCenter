@@ -6,6 +6,7 @@ import pytest
 
 from teams.contract import AgentDefinition, TeamDefinition, TeamEdge
 from teams.tools import (
+    MEMORY_TOOL_NAMES,
     ToolAccessError,
     ToolNameCollision,
     ToolNoLongerAnnounced,
@@ -124,6 +125,10 @@ async def test_a_team_that_assigns_tools_is_refused_when_the_server_is_unreachab
 
 
 async def test_a_team_that_assigns_tools_is_refused_when_no_server_is_configured() -> None:
+    """The refusal has to name the server that is missing, and that is why it is no longer
+    decided by "is anything configured": a source this process serves itself is always
+    configured, so the question became "which *servers* have no address" (specs/
+    teams-tool-access, "Brak serwera narzędzi zatrzymuje przebieg")."""
     definition = team(agent("reader", ["get_last_price"]))
     registry = _registry(None)
     try:
@@ -132,7 +137,10 @@ async def test_a_team_that_assigns_tools_is_refused_when_no_server_is_configured
     finally:
         await registry.aclose()
 
-    assert "no tool server is configured" in str(raised.value)
+    message = str(raised.value)
+    assert "'get_last_price'" in message
+    assert "market-mcp" in message and "trading-mcp" in message
+    assert "not configured" in message
 
 
 async def test_a_team_with_no_tools_runs_though_the_server_is_unreachable() -> None:
@@ -188,24 +196,36 @@ async def test_announced_snapshot_names_the_servers_own_tools() -> None:
     async with serving(tools=("get_last_price", "read_indicators")) as url:
         snapshot = await announced_snapshot(settings_for(url))
 
-    assert snapshot is not None
-    assert set(snapshot.by_name) == {"get_last_price", "read_indicators"}
+    assert {"get_last_price", "read_indicators"} <= set(snapshot.by_name)
     assert snapshot.by_name["get_last_price"] == ["market-mcp"]
     assert snapshot.unreachable == []
 
 
-async def test_announced_snapshot_is_none_when_nothing_is_configured() -> None:
-    # `None`, not an empty snapshot: "nobody to ask" and "servers answer nothing" are
-    # different facts, and `validation.py` writes a different refusal for each.
-    assert await announced_snapshot(settings_for(None)) is None
+async def test_announced_snapshot_carries_the_tools_this_process_serves_itself() -> None:
+    """Announcing them touches no database — which is the whole reason the save path can
+    build a registry out of settings alone and still publish these names."""
+    snapshot = await announced_snapshot(settings_for(None))
+
+    assert MEMORY_TOOL_NAMES <= set(snapshot.by_name)
+    assert snapshot.by_name["memory_read"] == ["team-memory"]
+
+
+async def test_announced_snapshot_says_which_servers_have_no_address() -> None:
+    # It no longer answers `None` for "nothing is configured": there is always a source
+    # announcing something. The narrower claim the `None` used to make is this field.
+    snapshot = await announced_snapshot(settings_for(None))
+
+    assert snapshot.unconfigured == ("market-mcp", "polymarket-mcp", "trading-mcp")
+    assert snapshot.configured_servers == ()
+    assert snapshot.unreachable == []
 
 
 async def test_announced_snapshot_names_an_unreachable_configured_server() -> None:
     snapshot = await announced_snapshot(settings_for(f"http://127.0.0.1:{free_port()}"))
 
-    assert snapshot is not None
-    assert snapshot.by_name == {}
+    assert set(snapshot.by_name) == set(MEMORY_TOOL_NAMES)
     assert snapshot.unreachable == ["market-mcp"]
+    assert snapshot.configured_servers == ("market-mcp",)
 
 
 async def test_an_unknown_agent_key_is_a_programming_error() -> None:
@@ -320,8 +340,10 @@ async def test_tools_from_both_servers_resolve_to_the_server_that_announced_them
             # the market-mcp stand-in and place_order only on the trading-mcp one.
             from teams.tools import ToolOutcomeKind
 
-            first = await plan.call("read_indicators", {"symbol": "US100"})
-            second = await plan.call("place_order", {})
+            first = await plan.call(
+                "read_indicators", {"symbol": "US100"}, agent_key="trader"
+            )
+            second = await plan.call("place_order", {}, agent_key="trader")
             assert first.kind is ToolOutcomeKind.OK
             assert second.kind is ToolOutcomeKind.OK
         finally:

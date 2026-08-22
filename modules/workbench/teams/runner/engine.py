@@ -24,6 +24,7 @@ import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+from typing import Any
 
 import asyncpg
 
@@ -32,7 +33,15 @@ from ..config import Settings
 from ..contract import AgentDefinition, TeamDefinition
 from ..models_catalogue import ModelCatalogue
 from ..provider import ModelProvider
-from ..tools import ToolAccessError, ToolOutcomeKind, ToolPlan, ToolServerRegistry, plan_tools
+from ..tools import (
+    MemoryScope,
+    ToolAccessError,
+    ToolOutcome,
+    ToolOutcomeKind,
+    ToolPlan,
+    ToolServerRegistry,
+    plan_tools,
+)
 from .cost import CostGuard, CostLimitReached, limit_from
 from .graph import AgentFailed, compile_team
 from .loop import RecordedCall, briefing_for, run_agent
@@ -132,6 +141,8 @@ async def execute_run(
     pool: asyncpg.Pool,
     *,
     run_id: int,
+    team_id: int,
+    owner_principal: str,
     definition: TeamDefinition,
     provider: ModelProvider,
     tool_registry: ToolServerRegistry,
@@ -158,7 +169,16 @@ async def execute_run(
             # refused here rather than three agents into the run. `plan` remembers
             # which server announced each assigned name, so no agent's own call needs
             # to ask again (`ToolPlan.call`).
-            plan = await plan_tools(definition, tool_registry)
+            plan = await plan_tools(
+                definition,
+                tool_registry,
+                # Which team is remembering, on whose behalf, in which run — bound onto
+                # the in-process tools here because this is the first point where all
+                # three are known together.
+                memory=MemoryScope(
+                    team_id=team_id, owner_principal=owner_principal, run_id=run_id
+                ),
+            )
         except ToolAccessError as err:
             # Named as tool access rather than as a generic failure, and refused before a
             # single agent is called — nothing is paid for a run that cannot check
@@ -315,7 +335,10 @@ class _StepRunner:
             briefing=briefing_for(agent, given),
             provider=run.provider,
             tools=run.plan.for_agent(agent.key),
-            call_tool=run.plan.call,
+            # Bound to this agent, so the plan can refuse a name this agent was not
+            # assigned — being offered a narrower list is not the same as being held to it
+            # (`ToolPlan.call`).
+            call_tool=self._call_tool,
             on_tool_call=self._on_tool_call,
             before_model_call=self._before_model_call,
             on_model_call=self._on_model_call,
@@ -353,6 +376,9 @@ class _StepRunner:
                 run.run_id,
             )
         return work.text
+
+    async def _call_tool(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
+        return await self._run.plan.call(name, arguments, agent_key=self._agent.key)
 
     async def _on_tool_call(self, call: RecordedCall) -> None:
         run = self._run

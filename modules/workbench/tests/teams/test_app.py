@@ -39,7 +39,10 @@ def test_the_module_starts_with_no_tool_server_configured() -> None:
     """
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
-        assert app.state.teams.tools.configured() == []
+        # `remote()`, not `configured()`: the registry always holds the sources this
+        # process serves itself, and "no tool server" is a claim about the ones with an
+        # address.
+        assert app.state.teams.tools.remote() == []
 
 
 def test_a_tool_server_that_is_not_answering_does_not_stop_the_module(
@@ -51,7 +54,7 @@ def test_a_tool_server_that_is_not_answering_does_not_stop_the_module(
 
     with TestClient(app) as client:
         assert client.get("/health").status_code == 200
-        assert [server.label for server in app.state.teams.tools.configured()] == ["market-mcp"]
+        assert [server.label for server in app.state.teams.tools.remote()] == ["market-mcp"]
 
 
 def test_a_schema_the_image_was_not_built_for_refuses_to_start(

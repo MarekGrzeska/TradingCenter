@@ -1,17 +1,22 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from pydantic import ValidationError
 
 from teams.contract import (
+    MEMORY_ENTRY_MAX_CHARS,
     AgentDefinition,
     CostLimits,
     CreateTeamIn,
+    MemoryEntryOut,
     TeamDefinition,
     TeamEdge,
+    TeamMemoryOut,
     TeamRevisionOut,
     ToolCallOut,
     UsageOut,
@@ -259,3 +264,67 @@ def test_usage_out_keeps_a_missing_cost_as_none_not_zero() -> None:
         }
     )
     assert out.cost is None
+
+
+def test_a_memory_entry_reads_a_row_as_it_stands() -> None:
+    row = {
+        "id": 7,
+        "author_agent_key": "scout",
+        "run_id": 12,
+        "content": "gap opens usually close by noon",
+        "created_at": datetime(2026, 8, 22, 9, 0, tzinfo=UTC),
+    }
+
+    entry = MemoryEntryOut.from_row(row)
+
+    assert entry.id == 7
+    assert entry.author_agent_key == "scout"
+    assert entry.run_id == 12
+    assert entry.content == "gap opens usually close by noon"
+
+
+def test_an_entry_that_outlived_its_run_carries_no_run() -> None:
+    row = {
+        "id": 8,
+        "author_agent_key": "scout",
+        "run_id": None,
+        "content": "still true",
+        "created_at": datetime(2026, 8, 22, 9, 0, tzinfo=UTC),
+    }
+
+    assert MemoryEntryOut.from_row(row).run_id is None
+
+
+def test_the_memory_read_says_how_much_it_did_not_hand_over() -> None:
+    # specs/teams-memory, "Odczyt oddaje najnowsze wpisy, a nie całą pamięć".
+    rows = [
+        {
+            "id": index,
+            "author_agent_key": "scout",
+            "run_id": None,
+            "content": f"entry {index}",
+            "created_at": datetime(2026, 8, 22, 9, 0, tzinfo=UTC),
+        }
+        for index in (3, 2)
+    ]
+
+    memory = TeamMemoryOut.from_rows(rows, total=9)
+
+    assert [entry.content for entry in memory.entries] == ["entry 3", "entry 2"]
+    assert memory.total == 9
+
+
+def test_the_entry_ceiling_is_the_same_number_in_the_module_and_on_disk() -> None:
+    """The length ceiling is stated twice on purpose — once here, once as a CHECK in
+    migration 0008, because it is the only one of the three whose breach would land on
+    disk. Two statements of one number are a drift waiting to happen, so this is the test
+    that notices."""
+    migration = (
+        Path(__file__).resolve().parents[2] / "migrations/teams/versions/0008_team_memories.py"
+    )
+    source = migration.read_text(encoding="utf-8")
+
+    match = re.search(r"^_ENTRY_MAX_CHARS = (\d+)$", source, re.MULTILINE)
+
+    assert match is not None, "migration 0008 no longer states its own entry ceiling"
+    assert int(match.group(1)) == MEMORY_ENTRY_MAX_CHARS

@@ -18,6 +18,7 @@ from workbench.app import app
 
 from .mcp_stand_in import serving_sync
 from .scripted_provider import ScriptedProvider, says
+from .waiting import wait_for_status
 from .write_server import places_orders
 
 pytestmark = pytest.mark.db
@@ -78,14 +79,8 @@ def _a_team(client: TestClient, definition: dict | None = None) -> int:
     return response.json()["id"]
 
 
-def _wait_for_status(client: TestClient, run_id: int, wanted: set[str], tries: int = 60) -> dict:
-    """Polls the run's own route. Each request hands the loop back to the run's task,
-    which is what actually moves it along under `TestClient`."""
-    for _ in range(tries):
-        run = client.get(f"/runs/{run_id}", headers=OWNER).json()
-        if run["status"] in wanted:
-            return run
-    raise AssertionError(f"run {run_id} never reached {wanted}")
+def _wait_for_status(client: TestClient, run_id: int, wanted: set[str]) -> dict:
+    return wait_for_status(client, run_id, wanted, headers=OWNER)
 
 
 def test_a_run_starts_and_finishes_with_a_trace(client: TestClient) -> None:

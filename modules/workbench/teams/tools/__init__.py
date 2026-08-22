@@ -28,9 +28,13 @@ from .client import (
     ToolServerRegistry,
     ToolServerUnavailable,
 )
+from .memory import MEMORY_TOOL_NAMES, MemoryScope, MemoryToolSource
 
 __all__ = [
+    "MEMORY_TOOL_NAMES",
     "AnnouncedSnapshot",
+    "MemoryScope",
+    "MemoryToolSource",
     "ToolAccessError",
     "ToolDescriptor",
     "ToolNameCollision",

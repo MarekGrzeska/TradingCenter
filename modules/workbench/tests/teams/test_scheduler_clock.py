@@ -27,7 +27,7 @@ from teams.scheduler.clock import Clock, _Deps, _fire_schedule, _next_fire_and_s
 from teams.tools import ToolServerRegistry
 
 from .mcp_stand_in import settings_for
-from .scripted_provider import ScriptedProvider, breaks, says
+from .scripted_provider import ScriptedProvider, asks_for_tool, breaks, says
 
 pytestmark = pytest.mark.db
 
@@ -106,7 +106,7 @@ def _clock(pool: asyncpg.Pool, *, provider, settings=None) -> Clock:
         pool,
         catalogue=ModelCatalogue.from_settings(settings),
         provider=provider,
-        tool_registry=ToolServerRegistry.from_settings(settings),
+        tool_registry=ToolServerRegistry.from_settings(settings, pool=pool),
         settings=settings,
         registry=RunRegistry(),
     )
@@ -407,3 +407,36 @@ async def test_one_schedule_failing_does_not_silence_the_others_in_the_same_wake
     survivors = await _fires(pool, schedule_id=second["id"])
     assert len(survivors) == 1
     assert survivors[0]["outcome"] == "started"
+
+
+async def test_what_a_scheduled_run_remembers_belongs_to_the_schedules_owner(
+    pool: asyncpg.Pool,
+) -> None:
+    """specs/teams-runs, "Uruchomienie z harmonogramu". Nobody is asking for this run when
+    it starts, so the identity it writes under is the one the schedule carries — never the
+    process's own, which would leave the operator an entry they cannot read."""
+    definition = TeamDefinition(
+        agents=[
+            AgentDefinition(
+                key="scout",
+                role="scout",
+                prompt="read the market",
+                model_id=MODEL_ID,
+                tools=["memory_write"],
+            )
+        ]
+    )
+    team_id, revision_id = await _team_and_revision(pool, definition)
+    await _schedule(pool, team_id=team_id, revision_id=revision_id, next_fire_at=_past())
+    provider = ScriptedProvider(
+        default=asks_for_tool("memory_write", {"content": "quiet open"}, then="noted.")
+    )
+
+    await asyncio.gather(*await _clock(pool, provider=provider).tick())
+
+    async with pool.acquire() as conn:
+        rows, total = await store.list_memories(
+            conn, team_id=team_id, owner_principal=OWNER, limit=10
+        )
+    assert total == 1
+    assert rows[0]["content"] == "quiet open"

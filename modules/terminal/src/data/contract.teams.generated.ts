@@ -410,6 +410,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/teams/{team_id}/memory": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Memory
+         * @description A team that has remembered nothing answers with an empty memory rather than a 404 —
+         *     never having written a note is the ordinary state, and for a team whose agents carry no
+         *     memory tools it is the only one.
+         */
+        get: operations["get_memory_teams__team_id__memory_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/teams/{team_id}/memory/{entry_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Memory
+         * @description Removes one entry, so it stops reaching later runs. The runs that read or wrote it
+         *     keep their trace: what a team was told at the time is part of how that run came out,
+         *     and deleting the note does not make it untrue that the run had it.
+         */
+        delete: operations["delete_memory_teams__team_id__memory__entry_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/teams/{team_id}/revisions": {
         parameters: {
             query?: never;
@@ -711,6 +755,29 @@ export interface components {
             detail: components["schemas"]["ValidationError"][];
         };
         /**
+         * MemoryEntryOut
+         * @description One thing a team decided to keep — specs/teams-memory.
+         *
+         *     `author_agent_key` and `run_id` are legibility, not permission: nothing decides who
+         *     may read an entry from either. `run_id` is optional because an entry outlives the run
+         *     that wrote it, and the column leaves room for one the operator writes by hand.
+         */
+        MemoryEntryOut: {
+            /** Author Agent Key */
+            author_agent_key: string;
+            /** Content */
+            content: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Id */
+            id: number;
+            /** Run Id */
+            run_id: number | null;
+        };
+        /**
          * ModelOut
          * @description One entry of the model catalogue — everything a picker needs and nothing else
          *     (specs/teams-models, "Katalog modeli wystarcza do zbudowania wybieraka"). The
@@ -954,6 +1021,22 @@ export interface components {
         TeamLayoutOut: {
             /** Places */
             places: components["schemas"]["AgentPlace"][];
+        };
+        /**
+         * TeamMemoryOut
+         * @description What a team remembers, newest first — and how much of it there is.
+         *
+         *     `total` rides beside the entries rather than being left for the reader to count,
+         *     because the read is cut at a ceiling and a cut nobody can see is a memory the reader
+         *     believes is complete (specs/teams-memory, "Odczyt oddaje najnowsze wpisy, a nie całą
+         *     pamięć"). The same field answers the model through the tool and the operator through
+         *     the route.
+         */
+        TeamMemoryOut: {
+            /** Entries */
+            entries: components["schemas"]["MemoryEntryOut"][];
+            /** Total */
+            total: number;
         };
         /**
          * TeamOut
@@ -1978,6 +2061,67 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["TeamLayoutOut"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_memory_teams__team_id__memory_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TeamMemoryOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_memory_teams__team_id__memory__entry_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                team_id: number;
+                entry_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
