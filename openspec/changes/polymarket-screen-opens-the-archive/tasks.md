@@ -28,13 +28,13 @@
 
 ## 4. Obserwacje i grupy
 
-- [ ] 4.1 Objęcie obserwacją adresem albo identyfikatorem; obie drogi dają tę samą obserwację
-- [ ] 4.2 Wydarzenie już obserwowane rozpoznane jako takie, bez drugiej obserwacji
-- [ ] 4.3 Odmowa z powodu sufitu pokazana z przyczyną i z tym, co zrobić najpierw
-- [ ] 4.4 Zakończenie obserwacji z uprzedzeniem, że dane zostają
-- [ ] 4.5 Grupy: utworzenie, przypisanie, skasowanie, ograniczenie listy do grupy
-- [ ] 4.6 Testy: po trzy na trasę CRUD (ścieżka szczęśliwa, błąd, odmowa); skasowanie grupy nie kończy obserwacji
-- [ ] 4.7 `pnpm test`, `lint`, `typecheck`
+- [x] 4.1 Objęcie obserwacją adresem albo identyfikatorem; obie drogi dają tę samą obserwację
+- [x] 4.2 Wydarzenie już obserwowane rozpoznane jako takie, bez drugiej obserwacji
+- [x] 4.3 Odmowa z powodu sufitu pokazana z przyczyną i z tym, co zrobić najpierw
+- [x] 4.4 Zakończenie obserwacji z uprzedzeniem, że dane zostają
+- [x] 4.5 Grupy: utworzenie, przypisanie, skasowanie, ograniczenie listy do grupy
+- [x] 4.6 Testy: po trzy na trasę CRUD (ścieżka szczęśliwa, błąd, odmowa); skasowanie grupy nie kończy obserwacji
+- [x] 4.7 `pnpm test`, `lint`, `typecheck`
 
 ## 5. Wykres serii prawdopodobieństwa
 

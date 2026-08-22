@@ -1,8 +1,11 @@
 import { useState } from "react";
 import { useRead } from "../data/query";
+import { Button } from "../ui/Button";
+import { EndTrackingDialog } from "./EndTrackingDialog";
 import { WindowChanges } from "./WindowChanges";
 import type {
   EventChanges,
+  Group,
   Market,
   PolymarketApi,
   SnapshotEntry,
@@ -31,12 +34,17 @@ export function EventCard({
   event,
   prices,
   client,
+  groups,
+  onChanged,
 }: {
   event: TrackedEvent;
   prices: Map<number, SnapshotEntry>;
   client: PolymarketApi;
+  groups: Group[];
+  onChanged(): void;
 }) {
   const [open, setOpen] = useState(false);
+  const [ending, setEnding] = useState(false);
 
   const changes = useRead<EventChanges>({
     key: ["polymarket", "changes", event.providerEventId],
@@ -64,7 +72,32 @@ export function EventCard({
           <span>{event.title}</span>
         </button>
         <CollectionBadge event={event} />
-        {event.group !== null && <span className="text-xs text-ink-faint">{event.group}</span>}
+        <label className="text-xs text-ink-faint">
+          <span className="sr-only">Group for {event.title}</span>
+          <select
+            className="rounded border border-border bg-sunken px-1 py-0.5 text-ink"
+            value={groups.find((entry) => entry.name === event.group)?.id ?? ""}
+            onChange={async (e) => {
+              const raw = e.target.value;
+              await client.assignGroup(
+                event.id,
+                raw === "" ? null : Number(raw),
+                new AbortController().signal,
+              );
+              onChanged();
+            }}
+          >
+            {/* Out of every group, without ending the observation — the module's own
+                meaning for a null group id. */}
+            <option value="">no group</option>
+            {groups.map((entry) => (
+              <option key={entry.id} value={entry.id}>
+                {entry.name}
+              </option>
+            ))}
+          </select>
+        </label>
+
         <a
           className="ml-auto text-xs text-ink-faint underline"
           href={event.url}
@@ -73,6 +106,9 @@ export function EventCard({
         >
           on polymarket.com
         </a>
+        <Button size="2xs" tone="quiet" onClick={() => setEnding(true)}>
+          Stop tracking
+        </Button>
       </header>
 
       <div className="flex flex-col gap-3 px-3 py-2">
@@ -91,6 +127,18 @@ export function EventCard({
         <p className="px-3 pb-2 text-xs text-ink-faint">
           The windows could not be read — {changes.error}.
         </p>
+      )}
+
+      {ending && (
+        <EndTrackingDialog
+          client={client}
+          event={event}
+          onClose={() => setEnding(false)}
+          onEnded={() => {
+            setEnding(false);
+            onChanged();
+          }}
+        />
       )}
     </article>
   );

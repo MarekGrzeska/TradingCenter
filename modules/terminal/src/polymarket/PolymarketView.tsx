@@ -5,6 +5,8 @@ import { useRead } from "../data/query";
 import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { EventCard } from "./EventCard";
+import { GroupBar } from "./GroupBar";
+import { TrackEventDialog } from "./TrackEventDialog";
 import {
   createPolymarketApi,
   type Group,
@@ -47,6 +49,7 @@ export function PolymarketView({ api }: { api?: PolymarketApi } = {}) {
   );
 
   const [group, setGroup] = useState<number | null>(null);
+  const [tracking, setTracking] = useState(false);
 
   const events = useRead<TrackedEvent[]>({
     key: ["polymarket", "events", group],
@@ -90,37 +93,32 @@ export function PolymarketView({ api }: { api?: PolymarketApi } = {}) {
           {POLL_MS / 1000}s
         </span>
         <div className="ml-auto flex items-center gap-2">
-          <Button size="xs" tone="muted" onClick={() => {
-            events.reload();
-            snapshot.reload();
-          }}>
+          <Button size="xs" onClick={() => setTracking(true)}>
+            Track event
+          </Button>
+          <Button
+            size="xs"
+            tone="muted"
+            onClick={() => {
+              events.reload();
+              snapshot.reload();
+            }}
+          >
             Refresh now
           </Button>
         </div>
       </header>
 
-      {groups.value.length > 0 && (
-        <nav className="flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-ink-faint">Groups</span>
-          <Button
-            size="2xs"
-            tone={group === null ? "primary" : "quiet"}
-            onClick={() => setGroup(null)}
-          >
-            all
-          </Button>
-          {groups.value.map((entry) => (
-            <Button
-              key={entry.id}
-              size="2xs"
-              tone={group === entry.id ? "primary" : "quiet"}
-              onClick={() => setGroup(entry.id)}
-            >
-              {entry.name} ({entry.eventCount})
-            </Button>
-          ))}
-        </nav>
-      )}
+      <GroupBar
+        client={client}
+        groups={groups.value}
+        selected={group}
+        onSelect={setGroup}
+        onChanged={() => {
+          groups.reload();
+          events.reload();
+        }}
+      />
 
       {/* Two failures, told apart, because the operator's next move differs. A refusal is
           a permission that has not been granted — this module decides who reaches its REST
@@ -149,9 +147,32 @@ export function PolymarketView({ api }: { api?: PolymarketApi } = {}) {
 
       <div className="flex min-h-0 flex-col gap-3 overflow-y-auto">
         {events.value.map((event) => (
-          <EventCard key={event.id} event={event} prices={prices} client={client} />
+          <EventCard
+            key={event.id}
+            event={event}
+            prices={prices}
+            client={client}
+            groups={groups.value}
+            onChanged={() => {
+              events.reload();
+              groups.reload();
+            }}
+          />
         ))}
       </div>
+
+      {tracking && (
+        <TrackEventDialog
+          client={client}
+          groups={groups.value}
+          onClose={() => setTracking(false)}
+          onTracked={() => {
+            events.reload();
+            groups.reload();
+            snapshot.reload();
+          }}
+        />
+      )}
     </section>
   );
 }
