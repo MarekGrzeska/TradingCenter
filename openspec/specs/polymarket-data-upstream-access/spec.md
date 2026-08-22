@@ -1,10 +1,9 @@
-## Purpose
+# polymarket-data-upstream-access Specification
 
+## Purpose
 Opisuje, czym moduł jest wobec Polymarketu: jedynymi drzwiami w tym systemie, które do niego
 sięgają, i granicą, na której kształt dostawcy przestaje być kształtem tego repozytorium.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Moduł jest jedynymi drzwiami do dostawcy
 
 Żaden inny moduł ani terminal MUST NOT wywoływać API Polymarketu bezpośrednio. Wszystko, co
@@ -123,3 +122,4 @@ a historia zebranych cen MUST pozostać odczytywalna.
 - **WHEN** dostawca jest nieosiągalny, a konsument odczytuje historię obserwowanego wyniku
 - **THEN** odczyt jest obsłużony z archiwum
 - **AND** nieosiągalność dotyczy wyłącznie odpowiedzi wymagających dostawcy na żywo
+

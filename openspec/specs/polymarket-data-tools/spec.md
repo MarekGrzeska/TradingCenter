@@ -1,10 +1,9 @@
-## Purpose
+# polymarket-data-tools Specification
 
+## Purpose
 Zestaw narzędzi, który moduł publikuje klientowi MCP: na jakie pytania o rynki predykcyjne
 odpowiada, co wolno mu zmienić — i czego nie ma w nim nigdy.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Zestaw zmienia wyłącznie listę obserwacji
 
 Zestaw MUST zawierać narzędzia czytające publiczną bazę dostawcy i własne archiwum oraz narzędzia
@@ -141,3 +140,4 @@ oddaje.
 
 - **WHEN** narzędzie oddaje odpowiedź, której ogłoszony schemat nie opisuje
 - **THEN** MUST to wywrócić testy modułu, a nie ujawnić się dopiero przy realnym wywołaniu
+

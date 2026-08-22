@@ -1,10 +1,9 @@
-## Purpose
+# polymarket-data-tracking Specification
 
+## Purpose
 Rozstrzyga, co moduł w ogóle zbiera: które wydarzenie predykcyjne jest obserwowane, kto o tym
 decyduje, jak obserwacje są grupowane i co zostaje po zakończeniu obserwacji.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Obserwacja jest jawną decyzją
 
 Moduł MUST zbierać ceny wyłącznie dla wydarzeń jawnie wskazanych do obserwacji — przez operatora
@@ -165,3 +164,4 @@ tak samo jak cisza na rynku.
 - **WHEN** dla obserwowanego, nierozstrzygniętego rynku najświeższa próbka jest starsza niż kilka
   taktów próbkowania
 - **THEN** stan tej obserwacji stwierdza, że zbieranie nie nadąża albo ustało
+

@@ -1,10 +1,9 @@
-## Purpose
+# polymarket-data-store Specification
 
+## Purpose
 Trzyma próbki ceny obserwowanych wyników i wie o sobie tyle, żeby odróżnić moment, w którym
 rynkiem nikt nie handlował, od momentu, którego moduł po prostu nie zebrał.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Próbkę identyfikuje wynik i moment
 
 Archiwum MUST identyfikować próbkę parą: wynik rynku oraz znacznik czasu, którego dotyczy. Dla
@@ -149,3 +148,4 @@ oczekiwana przez obraz — nowszej tak samo jak starszej — i MUST nazwać obie
 - **WHEN** migracja przerywa się na błędzie
 - **THEN** moduł nie zaczyna odpowiadać
 - **AND** blokada zostaje zwolniona, a log niesie rewizję, na której się przerwała
+

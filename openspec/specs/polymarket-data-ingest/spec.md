@@ -1,10 +1,9 @@
-## Purpose
+# polymarket-data-ingest Specification
 
+## Purpose
 Opisuje, skąd biorą się ceny w archiwum: w jakim takcie próbkowane są obserwowane rynki, jak
 dociągana jest przeszłość, jak domykana luka po przerwie i co się dzieje, gdy dostawca odmawia.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Obserwowany rynek jest próbkowany w stałym takcie
 
 Moduł MUST próbkować cenę każdego wyniku nierozstrzygniętego rynku należącego do obserwowanego
@@ -123,3 +122,4 @@ MUST NOT zagłodzić bieżącego próbkowania ani odczytu wywołanego przez oper
 
 - **WHEN** konsument odczytuje historię w trakcie trwającego uzupełniania
 - **THEN** odczyt jest obsłużony z archiwum i nie czeka na jego zakończenie
+
