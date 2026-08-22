@@ -133,7 +133,7 @@ jobs:
           # Nothing in the terminal imports the generated polymarket types yet; the subpage
           # is a change of its own. `contract:check` is still the check that matters — it is
           # what keeps that file from being born stale.
-          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/|^modules/polymarket-data/polymarket_data/(contract|openapi)\.py$'
+          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/|^modules/polymarket-data/polymarket_data/(contract|openapi)\.py$|^modules/strategy/strategy/(contract|openapi)\.py$'
           # market-data takes `tc-mcp-kit` too since the tool surface moved into it: the
           # package's schema slimmer is what keeps eleven tools under their published
           # ceiling, and a change there is a change to what the archive announces.

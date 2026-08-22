@@ -70,6 +70,7 @@ export default defineConfig(({ mode }) => {
   const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
   const gateway = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
   const polymarket = env.POLYMARKET_PROXY_TARGET || "http://localhost:8070";
+  const strategy = env.STRATEGY_PROXY_TARGET || "http://localhost:8080";
   const gatewayKey = env.GATEWAY_PROXY_KEY || env.GATEWAY_API_KEY || "";
 
   return {
@@ -127,6 +128,17 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           rewrite: (path) => path.replace(/^\/polymarket-api/, ""),
           configure: quietProxyErrors("polymarket-data", polymarket),
+        },
+
+        // The strategy platform. Same shape as the archive above and for the same reason:
+        // a token in production, nothing locally. It is the module the terminal reaches
+        // that answers with refusals more often than with anything else, which is a fact
+        // about the screen rather than about this proxy.
+        "/strategy-api": {
+          target: strategy,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/strategy-api/, ""),
+          configure: quietProxyErrors("strategy", strategy),
         },
       },
     },

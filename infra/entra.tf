@@ -63,6 +63,17 @@ resource "azuread_application" "terminal" {
       type = "Scope"
     }
   }
+
+  # **No block for the strategy platform, and that is the pattern rather than an
+  # omission.** `polymarket-data` has none either. A `resource_access.id` must be a
+  # concrete value at plan time, and a scope being created by this same apply is not one —
+  # the plan fails with "the argument … is required, but no definition was found", which
+  # is what it did on the first attempt at this change. The three above only work because
+  # their scopes have been in state for months.
+  #
+  # `azuread_application_pre_authorized` below is what actually matters: it is why the
+  # operator never sees a second consent screen. Nothing is lost by leaving this list at
+  # three.
 }
 
 resource "azuread_service_principal" "terminal" {
@@ -140,6 +151,16 @@ resource "azuread_application_pre_authorized" "polymarket_data_terminal" {
   application_id       = module.polymarket_data_easy_auth.application_id
   authorized_client_id = azuread_application.terminal.client_id
   permission_ids       = [module.polymarket_data_easy_auth.scope_id]
+}
+
+# The fifth, and the second written on the day it is used. The strategy platform shipped
+# for machine callers, so its registration announced no delegated scope at all — the
+# terminal was already on its caller list and still met a 401, because there was nothing
+# for a browser to ask for. This and the scope beside it are what that 401 actually was.
+resource "azuread_application_pre_authorized" "strategy_terminal" {
+  application_id       = module.strategy_easy_auth.application_id
+  authorized_client_id = azuread_application.terminal.client_id
+  permission_ids       = [module.strategy_easy_auth.scope_id]
 }
 
 # The three values the terminal's build needs (deploy-terminal.yml). All three are public

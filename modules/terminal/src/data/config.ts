@@ -64,6 +64,11 @@ export interface Endpoints {
    *  it is a different App Service behind a different gate — and its own scope, because
    *  it accepts only its own audience. */
   polymarketHttp: string;
+  /** `strategy`, for the strategy platform: the catalogue of entries, which pairs are
+   *  watched, every decision with the reason it carries, and the backtest reports that
+   *  were kept. Its own address and its own scope for the same reason as the two above —
+   *  a different App Service behind a different gate. */
+  strategyHttp: string;
   /** `capital-gateway`, for the account: which demo accounts exist, what is open on the
    *  active one, and the demo money on it.
    *
@@ -86,6 +91,7 @@ const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 const DEFAULT_WORKBENCH_HTTP = "/workbench-api";
 const DEFAULT_GATEWAY_HTTP = "/gateway-api";
 const DEFAULT_POLYMARKET_HTTP = "/polymarket-api";
+const DEFAULT_STRATEGY_HTTP = "/strategy-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
@@ -93,12 +99,14 @@ export interface EnvVars {
   VITE_WORKBENCH_HTTP?: string;
   VITE_GATEWAY_HTTP?: string;
   VITE_POLYMARKET_HTTP?: string;
+  VITE_STRATEGY_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
   VITE_ENTRA_SCOPE_WORKBENCH?: string;
   VITE_ENTRA_SCOPE_GATEWAY?: string;
   VITE_ENTRA_SCOPE_POLYMARKET?: string;
+  VITE_ENTRA_SCOPE_STRATEGY?: string;
 }
 
 /** One scope per module the terminal calls, because each stands behind its own gate and
@@ -107,7 +115,7 @@ export interface EnvVars {
  *
  *  `archive` keeps `VITE_ENTRA_SCOPE`'s plain name — it was the only one when there was
  *  only one — and is the one required scope: it is also what the sign-in redirect asks
- *  for. The other three are optional, and their absence means that module is called with
+ *  for. The other four are optional, and their absence means that module is called with
  *  no credential rather than with the archive's (terminal-identity, "Dwa moduły o różnych
  *  publicznościach"). Sending one module's token to another is what this type exists to
  *  stop; a silent fallback would put it straight back. */
@@ -116,6 +124,7 @@ export interface ModuleScopes {
   workbench: string | null;
   gateway: string | null;
   polymarket: string | null;
+  strategy: string | null;
 }
 
 /** Which Entra registration the terminal signs the operator in against, and what it asks
@@ -147,10 +156,14 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
         "or left out together — a partial set cannot sign anyone in.",
     );
   }
-  // The three per-module scopes are each optional on their own, unlike the triple above:
+  // The four per-module scopes are each optional on their own, unlike the triple above:
   // a module with no scope is called with no credential, which its own gate then refuses
   // in a way the tab can name. That is deliberately not the same as reaching for the
-  // archive's token, which would be the terminal telling four gates the same thing.
+  // archive's token, which would be the terminal telling five gates the same thing.
+  //
+  // A module whose Entra registration announces no delegated scope has nothing to put
+  // here even when the terminal is on its caller list: the list says who may enter, the
+  // scope is what lets a browser ask for the key (terminal-identity).
   return {
     clientId,
     tenantId,
@@ -159,6 +172,7 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
       workbench: env.VITE_ENTRA_SCOPE_WORKBENCH?.trim() || null,
       gateway: env.VITE_ENTRA_SCOPE_GATEWAY?.trim() || null,
       polymarket: env.VITE_ENTRA_SCOPE_POLYMARKET?.trim() || null,
+      strategy: env.VITE_ENTRA_SCOPE_STRATEGY?.trim() || null,
     },
   };
 }
@@ -173,5 +187,6 @@ export function resolveEndpoints(
     workbenchHttp: resolveHttpBase(env.VITE_WORKBENCH_HTTP || DEFAULT_WORKBENCH_HTTP),
     gatewayHttp: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_GATEWAY_HTTP),
     polymarketHttp: resolveHttpBase(env.VITE_POLYMARKET_HTTP || DEFAULT_POLYMARKET_HTTP),
+    strategyHttp: resolveHttpBase(env.VITE_STRATEGY_HTTP || DEFAULT_STRATEGY_HTTP),
   };
 }

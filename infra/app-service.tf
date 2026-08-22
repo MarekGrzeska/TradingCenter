@@ -123,7 +123,8 @@ locals {
   # The strategy platform's own audience. It has one for the same reason trading-mcp does:
   # its callers are backend services presenting a managed identity, so there is no consent
   # screen and no delegated scope — only client credentials.
-  strategy_api_uri = "api://tradingcenter-strategy"
+  strategy_api_uri   = "api://tradingcenter-strategy"
+  strategy_api_scope = "access_as_user"
 
   # There used to be a third of this shape, for the tool server the agent built teams
   # through. Those tools are a layer in the workbench now — no address, no audience, and
@@ -1264,9 +1265,19 @@ module "strategy_easy_auth" {
   identifier_uri = local.strategy_api_uri
   redirect_uri   = "https://${local.strategy_hostname}/.auth/login/aad/callback"
 
-  # No scope. The terminal reads this module's decisions with a token for this app's own
-  # registration, and the workbench presents a managed identity — neither path goes
-  # through a consent screen, so there is nothing here for one to name.
+  # A delegated scope since `the-screen-is-mostly-refusals`. It had none while the
+  # workbench was the only caller — a managed identity presenting client credentials has no
+  # consent screen and nothing to consent to — and that absence was the whole reason this
+  # module answered 401 to a browser: the terminal was already on its caller list and had
+  # nothing to ask for. A list says who may enter; a scope is what lets somebody ask for
+  # the key.
+  scope = {
+    value                      = local.strategy_api_scope
+    admin_consent_display_name = "Read the strategy platform and manage what it watches"
+    admin_consent_description  = "Allows the app to reach the strategy platform as the signed-in operator: read the catalogue and every decision, and start or stop watching a pair."
+    user_consent_display_name  = "Read your strategies and manage what they watch"
+    user_consent_description   = "Allows the app to read what your strategies decided and why, and to start or stop watching an instrument. It cannot place an order."
+  }
 }
 
 resource "azurerm_linux_web_app" "strategy" {
