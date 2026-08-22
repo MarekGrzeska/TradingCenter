@@ -63,9 +63,9 @@
 
 ## 8. Prawda w plikach
 
-- [ ] 8.1 README terminala: czwarty backend, czwarty zakres, i że token jest jeden na moduł
-- [ ] 8.2 `docs/architecture.md`: terminal czyta rynki predykcyjne; rozdział publiczności tokenu przestaje być planem
-- [ ] 8.3 `.env.example` terminala i komentarz przy `resolveEntra`
+- [x] 8.1 README terminala: czwarty backend, czwarty zakres, i że token jest jeden na moduł
+- [x] 8.2 `docs/architecture.md`: terminal czyta rynki predykcyjne; rozdział publiczności tokenu przestaje być planem
+- [x] 8.3 `.env.example` terminala i komentarz przy `resolveEntra`
 
 ## 9. Wdrożenie i sprawdzenie
 
