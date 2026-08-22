@@ -66,7 +66,32 @@ the announced list rather than trusting this paragraph.
 | `strategy/archive.py` | the market-data client — the only thing here that does I/O for facts |
 | `strategy/runner/` | the loop: closed bars, shared gates, one decision per bar |
 | `strategy/backtest/` | replay over history, calling the same `evaluate` the loop calls |
+| `strategy/gates.py` | the rules every strategy is subject to, whichever one it is |
 | `strategy/routers/`, `strategy/tools/` | the two surfaces |
+
+## The backtest
+
+```bash
+uv run python -m strategy.backtest --symbol US100 --from 2025-01-01 --to 2026-01-01 \
+    --spread 1.5 --keep
+```
+
+A command rather than a route: a run over years of bars is minutes of work, and a long run
+should not be something a caller sets off by accident. `--keep` writes the report where
+`GET /backtests` reads it. Nothing about it is in the unit suite — what *is* tested is
+everything it calls.
+
+Two tests are the reason a report can be believed, and they are not two tests of one thing.
+`test_incremental_and_batch_agree` reads the whole range once and slices it, then reads a
+window per bar, and demands the two agree bar for bar — a difference is the future having
+leaked backwards. `test_a_longer_range_does_not_change_the_common_part` extends the range
+and demands the earlier decisions are untouched. Either one alone passes over the defect the
+other exists for.
+
+**A report with no cost model is not a result.** The archive holds the bid side, so the
+spread is invisible in the data; a strategy with a wide reward over risk looks robust to
+costs right up until they are put in. Every report names its costs, its parameter version
+and its range, and `compare` refuses to put two runs side by side unless all three match.
 
 ## Two rules worth knowing before changing anything
 

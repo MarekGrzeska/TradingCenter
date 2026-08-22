@@ -1,0 +1,104 @@
+"""The backtest: history walked through the very function the loop calls.
+
+`run` is the whole of it — read the range once, decide every bar, resolve every setup
+against the bars that followed, and measure. Everything it needs is either in this package
+or is the strategy's own; there is no second implementation of any rule here.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Mapping
+from datetime import datetime
+
+from ..archive import Archive
+from ..catalogue import get
+from .costs import FREE, CostModel
+from .metrics import attribute, measure
+from .replay import batch, candles_after, decide_at, incremental, slice_at
+from .report import NotComparable, Report, compare
+from .simulate import Outcome, apply_daily_stop, resolve
+
+__all__ = [
+    "FREE",
+    "CostModel",
+    "NotComparable",
+    "Outcome",
+    "Report",
+    "attribute",
+    "batch",
+    "compare",
+    "decide_at",
+    "incremental",
+    "measure",
+    "resolve",
+    "run",
+    "slice_at",
+]
+
+# How many bars a setup is given to resolve before it is closed at the market. Long enough
+# that a slow winner is not cut off, short enough that a forgotten position does not sit in
+# the accounting for a year pretending to be an open trade.
+RESOLUTION_LIMIT_BARS = 500
+
+
+async def run(
+    archive: Archive,
+    strategy_id: str,
+    symbol: str,
+    *,
+    start: datetime,
+    end: datetime,
+    params: Mapping[str, float] | None = None,
+    costs: CostModel = FREE,
+    daily_loss_limit_r: float | None = None,
+) -> Report:
+    """One strategy over one range, with the costs stated.
+
+    The read happens once for the whole range and every bar is then decided off it — see
+    `replay.slice_at` for the masking that makes that honest, and `test_backtest.py` for
+    the comparison against the bar-by-bar driver that proves it.
+    """
+    spec = get(strategy_id)
+    resolved = spec.resolve_params(params)
+    read = await archive.read_facts(spec, symbol, resolved, as_of=end, bars_from=start)
+
+    decided = []
+    for candle in read.facts.candles:
+        if not (start <= candle.time <= end):
+            continue
+        replayed = decide_at(spec, resolved, read, candle.time, gaps=read.gaps)
+        if replayed is not None:
+            decided.append(replayed)
+
+    refusals: dict[str, int] = {}
+    outcomes: list[Outcome] = []
+    unresolved = 0
+    for replayed in decided:
+        if replayed.decision.action != "trade":
+            refusals[replayed.reason_kind] = refusals.get(replayed.reason_kind, 0) + 1
+            continue
+        outcome = resolve(
+            replayed.decision,
+            opened_at=replayed.as_of,
+            following=candles_after(read, replayed.as_of, limit=RESOLUTION_LIMIT_BARS),
+            costs=costs,
+        )
+        if outcome is None:
+            unresolved += 1
+        else:
+            outcomes.append(outcome)
+
+    kept = apply_daily_stop(outcomes, limit_r=daily_loss_limit_r)
+    return Report(
+        strategy_id=spec.id,
+        symbol=symbol,
+        resolution=spec.resolution,
+        range_from=start,
+        range_to=end,
+        params=resolved,
+        costs=costs,
+        metrics=measure(kept, unresolved=unresolved),
+        attribution=attribute(kept),
+        bars=len(decided),
+        refusals=refusals,
+    )

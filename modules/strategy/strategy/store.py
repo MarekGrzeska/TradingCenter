@@ -284,7 +284,101 @@ async def count_pending_setups(
     )
 
 
+# --- backtest runs --------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class BacktestRun:
+    id: int
+    strategy_id: str
+    symbol: str
+    resolution: str
+    range_from: datetime
+    range_to: datetime
+    params: dict[str, float]
+    costs: dict[str, float]
+    report: dict[str, Any]
+    ran_at: datetime
+
+
+async def record_backtest_run(
+    conn: asyncpg.Connection,
+    *,
+    strategy_id: str,
+    symbol: str,
+    resolution: str,
+    range_from: datetime,
+    range_to: datetime,
+    params: Mapping[str, float],
+    costs: Mapping[str, float],
+    report: Mapping[str, Any],
+) -> BacktestRun:
+    """Keep a report whole. Runs are never updated — a rerun is another row, and comparing
+    a strategy against its own earlier self is a thing an operator should be able to do."""
+    row = await conn.fetchrow(
+        f"""
+        INSERT INTO backtest_runs (
+            strategy_id, symbol, resolution, range_from, range_to, params, costs, report
+        )
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)
+        RETURNING {_RUN_COLUMNS}
+        """,
+        strategy_id,
+        symbol,
+        resolution,
+        range_from,
+        range_to,
+        json.dumps(dict(params)),
+        json.dumps(dict(costs)),
+        json.dumps(dict(report)),
+    )
+    assert row is not None
+    return _run(row)
+
+
+async def list_backtest_runs(
+    conn: asyncpg.Connection, *, strategy_id: str | None = None, limit: int = 50
+) -> list[BacktestRun]:
+    rows = await conn.fetch(
+        f"""
+        SELECT {_RUN_COLUMNS} FROM backtest_runs
+        WHERE ($1::text IS NULL OR strategy_id = $1)
+        ORDER BY ran_at DESC, id DESC
+        LIMIT $2
+        """,
+        strategy_id,
+        limit,
+    )
+    return [_run(row) for row in rows]
+
+
+async def read_backtest_run(conn: asyncpg.Connection, run_id: int) -> BacktestRun | None:
+    row = await conn.fetchrow(f"SELECT {_RUN_COLUMNS} FROM backtest_runs WHERE id = $1", run_id)
+    return _run(row) if row else None
+
+
 # --- rows to objects ------------------------------------------------------------------
+
+_RUN_COLUMNS = (
+    "id, strategy_id, symbol, resolution, range_from, range_to, params, costs, report, ran_at"
+)
+
+
+def _run(row: asyncpg.Record) -> BacktestRun:
+    return BacktestRun(
+        id=row["id"],
+        strategy_id=row["strategy_id"],
+        symbol=row["symbol"],
+        resolution=row["resolution"],
+        range_from=row["range_from"],
+        range_to=row["range_to"],
+        params=_json(row["params"]),
+        costs=_json(row["costs"]),
+        report=_json(row["report"]),
+        ran_at=row["ran_at"],
+    )
+
+
 
 _DECISION_COLUMNS = (
     "id, strategy_id, symbol, parameter_set_id, as_of, action, reason, reason_kind, "

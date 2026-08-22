@@ -124,6 +124,23 @@ class DecisionOut(BaseModel):
     created_at: datetime
 
 
+class BacktestRunOut(BaseModel):
+    """One kept report. The three fields before `report` are the ones two runs must share
+    before their numbers may be read together — as fields rather than only inside the
+    blob, so a caller can check that without parsing it."""
+
+    id: int
+    strategy_id: str
+    symbol: str
+    resolution: str
+    range_from: datetime
+    range_to: datetime
+    params: dict[str, float]
+    costs: dict[str, float]
+    report: dict
+    ran_at: datetime
+
+
 class DecisionDetailOut(DecisionOut):
     """One decision with the readings it stood on — enough to re-decide it without the
     archive, which is what makes a recorded decision evidence rather than an anecdote."""

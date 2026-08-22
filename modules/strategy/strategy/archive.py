@@ -144,20 +144,29 @@ class Archive:
         params: Mapping[str, float],
         *,
         as_of: datetime,
+        bars_from: datetime | None = None,
     ) -> FactsRead:
         """Everything `evaluate` will be handed, for the bar that opened at `as_of`.
 
         One request per resolution rather than per fact: a strategy reading three averages
         of one instrument at one resolution asks the archive once.
+
+        `bars_from` widens the read to cover a whole range of bars rather than one — what
+        a backtest wants, so that two years of decisions cost one read instead of
+        seventeen thousand. The warmup each fact asks for is added *before* it, so the
+        earliest bar in the range has as much history behind it as any other; the caller
+        gets the warmup prefix too and decides for itself where its range begins.
         """
         gaps: list[Gap] = []
         start, end = window_for(spec.resolution, last_bar=as_of, bars=spec.candles)
+        if bars_from is not None:
+            start = min(start, bars_from - period_length(spec.resolution) * spec.candles)
         candles = await self._candles(symbol, spec.resolution, start, end)
 
         values: dict[str, FactValue] = {}
         for resolution, facts in _by_resolution(spec.facts).items():
             read, resolution_gaps = await self._indicators(
-                symbol, resolution, facts, params, as_of=as_of
+                symbol, resolution, facts, params, as_of=as_of, bars_from=bars_from
             )
             values.update(read)
             gaps.extend(resolution_gaps)
@@ -206,9 +215,12 @@ class Archive:
         params: Mapping[str, float],
         *,
         as_of: datetime,
+        bars_from: datetime | None = None,
     ) -> tuple[dict[str, FactValue], list[Gap]]:
         bars = max(fact.bars for fact in facts)
         start, end = window_for(resolution, last_bar=as_of, bars=bars)
+        if bars_from is not None:
+            start = min(start, bars_from - period_length(resolution) * bars)
         body = await self._post(
             f"/indicators/{symbol}",
             json={

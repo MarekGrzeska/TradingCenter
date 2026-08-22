@@ -105,6 +105,8 @@ REST_PATHS: tuple[str, ...] = (
     "/watches/{watch_id}",
     "/decisions",
     "/decisions/{decision_id}",
+    "/backtests",
+    "/backtests/{run_id}",
     # FastAPI's own, published by the framework rather than by a router. They describe the
     # REST contract, so they belong to the caller that consumes it.
     "/docs",

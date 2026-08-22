@@ -32,11 +32,13 @@
 
 ## 5. Backtest
 
-- [ ] 5.1 Sterownik odtwarzania wołający `evaluate` pętli; test przyrostowe = wsadowe; test „dłuższy zakres nie zmienia wspólnej części"
-- [ ] 5.2 Symulator wypełnień + model kosztów jako jawny parametr; raport nazywający koszty, wersję parametrów i zakres
-- [ ] 5.3 Metryki (expectancy R, profit factor, obsunięcie, seria strat) + atrybucja po cechach decyzji
-- [ ] 5.4 Porównanie strategii: wspólne dane i koszty albo odmowa; komenda `python -m strategy.backtest`
+- [x] 5.1 Sterownik odtwarzania wołający `evaluate` pętli; test przyrostowe = wsadowe; test „dłuższy zakres nie zmienia wspólnej części"
+- [x] 5.2 Symulator wypełnień + model kosztów jako jawny parametr; raport nazywający koszty, wersję parametrów i zakres
+- [x] 5.3 Metryki (expectancy R, profit factor, obsunięcie, seria strat) + atrybucja po cechach decyzji
+- [x] 5.4 Porównanie strategii: wspólne dane i koszty albo odmowa; komenda `python -m strategy.backtest`
 - [ ] 5.5 Backfill historii instrumentów docelowych jobami archiwum i kontrola `coverage` (operacyjne, nie kod)
+      *(operatorska — zlecenie jobów w market-data wymaga uruchomionego stacku i budżetu dostawcy;
+      kod backtestu jest gotowy i czeka wyłącznie na dane.)*
 
 ## 6. Wdrożenie
 
