@@ -32,9 +32,12 @@ In `scripts`: `uv run pytest -q` → 111 passed, 21 skipped — the repository's
 tests (service table, guide, deploy workflows) after this change wired the module in.
 
 In `infra`: `terraform fmt -check -recursive` clean, `terraform init -backend=false` +
-`terraform validate` → "Success! The configuration is valid." No plan and no apply: that is
-the operator's, and `terraform-apply.yml` refuses a plan touching `azuread_*` anyway, which
-this one does through the Easy Auth module.
+`terraform validate` → "Success! The configuration is valid." Locally there was no plan and
+no apply — that is the operator's, and `terraform-apply.yml` refuses a plan touching
+`azuread_*` anyway, which this one does through the Easy Auth module.
+
+CI's own `plan` job did run against real state, and it is what turned up the first finding
+below. Reading it is not optional before an apply.
 
 Not run: the stack itself. The dev database container and the fixed ports are shared across
 worktrees and another agent was working in the main one, so nothing here was exercised
@@ -44,6 +47,7 @@ against a live market-data, workbench or Postgres beyond the throwaway container
 
 | Severity | Where | Finding | Status |
 |---|---|---|---|
+| **high** | Terraform state, not this diff | The plan on PR #201 reads `6 to add, 4 to change, **38 to destroy**`, and all 38 destroys are `polymarket-data`'s production footprint: 32 firewall rules, its App Service, the `polymarket` database, three Easy Auth resources and a Key Vault policy. That module was applied to production from a branch that is not on `main`, so it lives in state and not in the code any plan from `main` reads. **Applying this branch as it stands would delete a running module and its database.** Nothing in this change caused it — this is simply the first PR to touch `infra/` since that apply, so it is the first plan to say so. Before any apply: merge `polymarket-data-joins-the-stack` and rebase, or apply from a branch holding both. | open — blocks the apply, recorded in `design.md`'s Migration Plan and on the PR |
 | medium | `strategy/caller_access.py:REST_PATHS` | The record named `/backtests` and `/backtests/{run_id}` before any route published them. A record naming routes that do not exist grants nothing and hides what it does grant. Found by writing the reverse test (`test_the_record_names_no_route_that_is_gone`), which is the half of that pair usually left out. | FIXED — 50e8e14 removed them, 8cffc96 restored them with the routes |
 | medium | `tests/test_caller_access.py` | The first version of the record-versus-document test walked `app.router.routes`; newer FastAPI wraps an included router in a `_IncludedRouter` with no `path`, so it saw four framework routes and none of this module's — a check that passed by looking at nothing. | FIXED — 50e8e14 reads `app.openapi()` instead |
 | low | `tests/test_layering.py` | The entry rules were applied to `catalogue/__init__.py` too, which imports every entry and is *supposed* to — it is the one file a new strategy changes. | FIXED — c08ea01 excludes the registry by name |

@@ -90,7 +90,23 @@ wprost zakazuje raportu bez modelu kosztów.
 
 ## Migration Plan
 
-Kolejność produkcyjna jak przy narzędziach workbencha — ustawienia przed obrazem:
+**Najpierw ostrzeżenie, które wyszło dopiero z planu na PR #201, i nie dotyczy tej zmiany —
+dotyczy tego, na czym ona stoi.** `terraform plan` z tej gałęzi mówi
+`6 to add, 4 to change, **38 to destroy**`, a te 38 to cały produkcyjny ślad
+`polymarket-data`: 32 reguły firewalla, App Service, baza `polymarket`, trzy zasoby Easy
+Auth i polityka Key Vault. Ten moduł został **zaapplikowany na produkcję z niescalonej
+gałęzi**, więc jest w stanie Terraforma i nie ma go w kodzie na `main`. Każdy plan z `main`
+chce go usunąć — ta zmiana tylko to ujawniła, będąc pierwszym PR-em dotykającym `infra/`
+od tamtego apply.
+
+**Apply z tej gałęzi w obecnym kształcie skasowałby produkcyjne polymarket-data razem
+z jego bazą.** Zanim cokolwiek zostanie zaapplikowane, jedno z dwojga: scalić
+`polymarket-data-joins-the-stack` do `main` i przebazować tę gałąź, albo zrobić apply
+z gałęzi zawierającej oba moduły. Sam plan nie jest tu wystarczającą kontrolą — jest
+czytelny dopiero, gdy się przeczyta linię podsumowania.
+
+Kolejność produkcyjna tej zmiany, już po rozwiązaniu powyższego — jak przy narzędziach
+workbencha, ustawienia przed obrazem:
 `terraform apply` (App Service, tożsamość zarządzana, wpis tożsamości modułu do
 `allowed_applications` i `REST_CALLER_APPLICATION_IDS` market-data, baza `strategy`
 z nadaniem własności schematu) musi wylądować, zanim wdrożenie da obraz, który te
