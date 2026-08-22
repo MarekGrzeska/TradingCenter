@@ -1,0 +1,59 @@
+name: deploy-strategy
+
+# Only a push to `main` deploys — the pull_request federated credential (github-oidc.tf)
+# cannot even authenticate to Azure, so this cannot run from a fork's PR by construction.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/strategy/**"
+      # Path dependencies are baked into this image (see the Dockerfile), so a merged
+      # package fix that never redeploys its consumers is a fix that never reaches
+      # production. Exactly the packages this module's pyproject.toml names.
+      - "packages/tc-runtime/**"
+      - "packages/tc-mcp-kit/**"
+      - ".github/workflows/deploy-strategy.yml"
+      - ".github/workflows/_deploy-app-service.yml"
+      - "scripts/deploy_probe.py"
+  workflow_dispatch: {}
+
+# Declared on the caller, and this is where it has to be: a reusable workflow can only
+# *narrow* the caller's GITHUB_TOKEN, never widen it. This repository's default workflow
+# permission is `read`, and `id-token` is never granted by default at all — so a caller
+# without this block hands the shared workflow a token that cannot push to GHCR and cannot
+# exchange an OIDC assertion, and every deploy fails at `azure/login`.
+permissions:
+  contents: read
+  id-token: write # azure/login's OIDC exchange
+  packages: write # docker push to GHCR
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-app-service.yml
+    with:
+      module: strategy
+      app_name: app-tradingcenter-strategy
+      # `/ping`, and the reasoning behind the path matters more than the path.
+      #
+      # Every workflow here asks whether the *process* came up, because the control plane
+      # read `Running` over a crash-looping container for the better part of an hour on
+      # 16 August 2026. For this module that question is answered by **any** path that
+      # answers at all: the lifespan does not finish until the migration does, under its
+      # advisory lock, so a process serving anything is a process whose database is at the
+      # revision this image was built for.
+      #
+      # Given that, the probe should use the path proving it while revealing least. `/ping`
+      # answers a constant; `/health` reports how many pairs are watched and whether the
+      # loop is running, and it is behind this module's own caller record
+      # (`strategy/caller_access.py`) like every other REST path — market-data's `/health`
+      # is the same.
+      #
+      # This started as `/health`, which was excluded from Easy Auth so the probe could
+      # reach it — and then refused by the module's own layer, which does not exempt it.
+      # The deploy of d2e2290 failed here and only here, on a container that was up, live
+      # and correctly migrated. Two gates in front of one path, and only one of them knew
+      # the path was meant to be open.
+      probe_path: /ping
+      expected_status: 200
+      body_contains: '"status"'
+      attempts: 20

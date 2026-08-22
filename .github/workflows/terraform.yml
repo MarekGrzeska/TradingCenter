@@ -76,7 +76,23 @@ jobs:
       # one word about Terraform. Measured on 19 August 2026 by a plan with 45 destroys in
       # it (`agent-and-teams-one-workbench`), where the plan itself was correct and the
       # job went red anyway. A file has no such ceiling.
-      - run: terraform plan -no-color -input=false | tee "$RUNNER_TEMP/plan.txt"
+      #
+      # `set -o pipefail` and `2>&1` are both load-bearing, and both were missing until
+      # 22 August 2026, when a plan that exited 1 was reported by this job as a pass.
+      #
+      # A pipeline's exit code is its *last* command's, so `terraform plan | tee` always
+      # exited 0 — which made `steps.plan.outcome` "success" and left the `exit 1` guard at
+      # the bottom of this job unreachable. The guard was written on purpose and had never
+      # once fired. The pipe arrived with the file, for the environment-size reason above,
+      # and quietly took the exit code with it.
+      #
+      # `2>&1` because Terraform writes its refusals to stderr, which the pipe never
+      # carried: the comment showed `Plan: 6 to add, 2 to change, 0 to destroy` — a real
+      # line, printed before the failure — and no error at all. A reader of the pull
+      # request saw a clean plan over one that had failed.
+      - run: |
+          set -o pipefail
+          terraform plan -no-color -input=false 2>&1 | tee "$RUNNER_TEMP/plan.txt"
         id: plan
         continue-on-error: true
       - uses: actions/github-script@v7

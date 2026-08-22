@@ -106,6 +106,10 @@ BLUE, MAGENTA, CYAN, YELLOW, GREEN, RED, DIM, RESET = (
 # route in market-data, and teams-mcp a layer in the workbench — and one of the two went
 # to polymarket-data, which is the second module serving tools from its own process.
 BRIGHT_GREEN = "\033[92m"
+# And bright blue to the strategy platform, which arrived while polymarket-data was
+# taking GREEN. Two services sharing a colour is the one thing this field exists to
+# prevent — the logs interleave, and the colour is how a reader tells them apart.
+BRIGHT_BLUE = "\033[94m"
 
 SERVICES: tuple[Service, ...] = (
     Service(
@@ -172,6 +176,22 @@ SERVICES: tuple[Service, ...] = (
         ),
     ),
     Service(
+        name="strategy",
+        module="strategy",
+        port=8080,
+        command=("uv", "run", "uvicorn", "strategy.app:app", "--reload", "--port", "8080"),
+        log_prefix="strategy",
+        colour=BRIGHT_BLUE,
+        health_path="/health",
+        why=(
+            "After market-data, whose REST contract is the only thing it reads — but not "
+            "waiting on it the way trading-mcp waits on the gateway: this one starts "
+            "without reaching its upstream at all, and an archive still coming up costs "
+            "it one evaluation that records why it could not see. Before the workbench, "
+            "because a trigger there reads pending_setups here."
+        ),
+    ),
+    Service(
         name="workbench",
         module="workbench",
         port=8030,
@@ -218,12 +238,13 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("workbench", "alembic-agent.ini"),
     ("workbench", "alembic-teams.ini"),
     ("polymarket-data", None),
+    ("strategy", None),
 )
 
 # The further logical databases in the same container, created here if missing rather than
 # through docker-entrypoint-initdb.d — that only runs against an empty volume, so it would
 # never fire for anyone holding a tradingcenter-db-data from before these modules existed.
-LOGICAL_DATABASES = ("agent", "teams", "polymarket")
+LOGICAL_DATABASES = ("agent", "teams", "polymarket", "strategy")
 
 
 # --- reading .env files --------------------------------------------------------------
@@ -280,6 +301,7 @@ REQUIRED_ENV: tuple[tuple[str, str], ...] = (
     # Nothing to fill in: Polymarket's two surfaces are public, so this module is the one
     # here whose example file is already a working configuration.
     ("polymarket-data", "copy .env.example; the defaults match compose.yaml and need no key"),
+    ("strategy", "copy .env.example; the defaults match compose.yaml"),
 )
 
 
@@ -715,7 +737,13 @@ def _psql(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
-    say(f"Ensuring the {', '.join(names)} databases exist...")
+    # Named rather than counted, and materialised first: the list grows with every module
+    # that owns a database, and a message naming two while creating three is how the third
+    # goes unnoticed. `tuple()` because a generator argument would be spent by the join
+    # below and leave the loop with nothing to create.
+    names = tuple(names)
+    listed = ", ".join(names)
+    say(f"Ensuring the {listed} databases exist...")
     for name in names:
         role_exists = "1" in _psql(
             "-tAc", f"SELECT 1 FROM pg_roles WHERE rolname = '{name}'"
@@ -734,7 +762,7 @@ def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
         ).returncode != 0:
             fail(f"could not create the '{name}' database")
             return False
-    ok(f"{', '.join(names)} databases are ready.")
+    ok(f"{listed} databases are ready.")
     return True
 
 

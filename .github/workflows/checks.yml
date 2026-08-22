@@ -40,6 +40,7 @@ jobs:
       market-data: ${{ steps.filter.outputs.market-data }}
       trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
       polymarket-data: ${{ steps.filter.outputs.polymarket-data }}
+      strategy: ${{ steps.filter.outputs.strategy }}
       workbench: ${{ steps.filter.outputs.workbench }}
       terminal: ${{ steps.filter.outputs.terminal }}
       openspec: ${{ steps.filter.outputs.openspec }}
@@ -147,6 +148,10 @@ jobs:
           # `tc-mcp-kit`. It has no upstream in this repository — Polymarket is outside it —
           # so unlike trading-mcp there is no second module in this pattern.
           PATTERNS[polymarket-data]="^modules/polymarket-data/|$tc_runtime|$tc_mcp_kit"
+          # No third pairing here, deliberately: this module reads market-data over its
+          # published REST contract at runtime and keeps no snapshot of it, so there is
+          # nothing to go stale and nothing for a change there to break at build time.
+          PATTERNS[strategy]="^modules/strategy/|$tc_runtime|$tc_mcp_kit"
           # There used to be a third of this shape — teams-mcp, watching the whole of
           # `teams` because it kept a snapshot of that module's OpenAPI document. It is
           # gone with the module: the team tools read those routes in the same process,
@@ -303,6 +308,27 @@ jobs:
       # so testcontainers starts a real PostgreSQL and they run. The `live` ones stay
       # behind --run-live: they read the real Polymarket API, which is a third party's
       # availability rather than this repository's correctness.
+      - run: uv run pytest -q
+
+  strategy:
+    name: strategy
+    needs: changes
+    if: needs.changes.outputs.strategy == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/strategy
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      - run: uv run pyright
+      # The `db` tests are gated on Docker rather than on a flag, and this runner has it,
+      # so testcontainers starts a real PostgreSQL and they run. Nothing here reaches
+      # market-data: the archive is an HTTP contract and every test doubles it at the
+      # transport, which is also the only place the "cannot see" refusals can be produced.
       - run: uv run pytest -q
 
   packages:

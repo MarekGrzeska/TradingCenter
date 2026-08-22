@@ -67,6 +67,7 @@ locals {
     "workbench"       = local.workbench_app_name
     "trading-mcp"     = local.trading_mcp_app_name
     "polymarket-data" = local.polymarket_data_app_name
+    "strategy"        = local.strategy_app_name
   }
 
   capital_gateway_app_name = "app-tradingcenter-gateway"
@@ -85,6 +86,7 @@ locals {
   # name here is an identity, so a rename later is a new identity, a new Postgres role and
   # an edit in every module that names the old one.
   polymarket_data_app_name = "app-tradingcenter-polymarket-data"
+  strategy_app_name        = "app-tradingcenter-strategy"
 
   # Deterministic App Service hostnames — used ahead of `terraform apply` (e.g. in the
   # Easy Auth redirect URI below) instead of waiting on the computed `default_hostname`,
@@ -94,6 +96,7 @@ locals {
   workbench_hostname       = "${local.workbench_app_name}.azurewebsites.net"
   trading_mcp_hostname     = "${local.trading_mcp_app_name}.azurewebsites.net"
   polymarket_data_hostname = "${local.polymarket_data_app_name}.azurewebsites.net"
+  strategy_hostname        = "${local.strategy_app_name}.azurewebsites.net"
 
   # What `market-data` is called when it is the *resource* a token is asked for, rather
   # than the app serving a request. The terminal asks Entra for `<uri>/<scope>`; Easy
@@ -110,12 +113,17 @@ locals {
   # never asks for this one, and there is nobody to consent on whose behalf.
   trading_mcp_api_uri = "api://tradingcenter-trading-mcp"
 
-  # The same shape again for the prediction-market archive. Like trading-mcp's and unlike
-  # market-data's, it pairs with no delegated scope: the only caller today is the workbench
-  # presenting a client-credentials token. The terminal will need one when it grows a
-  # subpage — that change adds it, along with the delegated scope and the REST caller.
+  # The same shape again for the prediction-market archive — and, since
+  # `polymarket-screen-opens-the-archive`, with a delegated scope as well: the workbench
+  # reaches it with a managed identity and the terminal reaches it as a person, so it is
+  # the one module here whose door is asked to recognise both.
   polymarket_data_api_uri   = "api://tradingcenter-polymarket-data"
   polymarket_data_api_scope = "access_as_user"
+
+  # The strategy platform's own audience. It has one for the same reason trading-mcp does:
+  # its callers are backend services presenting a managed identity, so there is no consent
+  # screen and no delegated scope — only client credentials.
+  strategy_api_uri = "api://tradingcenter-strategy"
 
   # There used to be a third of this shape, for the tool server the agent built teams
   # through. Those tools are a layer in the workbench now — no address, no audience, and
@@ -504,6 +512,7 @@ resource "azurerm_linux_web_app" "market_data" {
       allowed_applications = [
         azuread_application.terminal.client_id,
         data.azuread_service_principal.workbench_managed_identity.client_id,
+        data.azuread_service_principal.strategy_managed_identity.client_id,
       ]
     }
 
@@ -567,7 +576,16 @@ resource "azurerm_linux_web_app" "market_data" {
     # The module reads the claims blob now (`market_data/caller_access.py`), which is the
     # only place the calling application appears for both kinds of token.
     TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-    REST_CALLER_APPLICATION_IDS = azuread_application.terminal.client_id
+
+    # Two REST callers since the strategy platform arrived, and the second one is a
+    # program rather than a person. It reads `/candles` and `POST /indicators` — the REST
+    # contract, deliberately not `/mcp`: that surface is narrowed for a model (ten
+    # indicators a call, two hundred points a series), which is right for an agent and too
+    # tight for a loop reading three hundred bars of three facts at once.
+    REST_CALLER_APPLICATION_IDS = join(",", [
+      azuread_application.terminal.client_id,
+      data.azuread_service_principal.strategy_managed_identity.client_id,
+    ])
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
   }
@@ -802,6 +820,7 @@ locals {
     "workbench"       = azurerm_linux_web_app.workbench.identity[0].principal_id
     "trading-mcp"     = azurerm_linux_web_app.trading_mcp.identity[0].principal_id
     "polymarket-data" = azurerm_linux_web_app.polymarket_data.identity[0].principal_id
+    "strategy"        = azurerm_linux_web_app.strategy.identity[0].principal_id
   }
 }
 
@@ -1205,3 +1224,162 @@ output "polymarket_data_managed_identity_principal_id" {
 # whole App Service, an Easy Auth registration with its secret, a managed identity, a
 # service-principal lookup, a Key Vault policy and a hostname output — and the second
 # network hop every "run this team" used to make.
+
+# --- the strategy platform ------------------------------------------------------------
+#
+# The fifth app, and the second one whose callers are all programs. It reads market-data's
+# REST contract and is read by the workbench's triggers.
+#
+# **A fifth tenant on the plan is the thing to watch after this deploys.** The B3 decision
+# above was taken at six apps and 84% of 3.5 GB, and this file's own history says a module
+# weighs 150-310 MB. Read `plan_memory` (monitoring.tf, alert at 92%) over a week before
+# concluding anything — the same instruction the last two SKU changes left, and for the
+# same reason: a measurement beats an arithmetic.
+data "azuread_service_principal" "strategy_managed_identity" {
+  object_id = azurerm_linux_web_app.strategy.identity[0].principal_id
+}
+
+module "strategy_easy_auth" {
+  source = "./modules/easy-auth-app"
+
+  display_name   = "app-tradingcenter-strategy-easyauth"
+  identifier_uri = local.strategy_api_uri
+  redirect_uri   = "https://${local.strategy_hostname}/.auth/login/aad/callback"
+
+  # No scope. The terminal reads this module's decisions with a token for this app's own
+  # registration, and the workbench presents a managed identity — neither path goes
+  # through a consent screen, so there is nothing here for one to name.
+}
+
+resource "azurerm_linux_web_app" "strategy" {
+  name                = local.strategy_app_name
+  resource_group_name = azurerm_resource_group.main.name
+  location            = azurerm_resource_group.main.location
+  service_plan_id     = azurerm_service_plan.main.id
+  https_only          = true
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  site_config {
+    always_on = true
+
+    # CORS belongs here rather than in the application, for the reason the three blocks
+    # above it give: the terminal calls across origins, and a preflight carries no
+    # credential of any kind, so Easy Auth would refuse it before the app ever saw it.
+    cors {
+      allowed_origins     = [local.terminal_origin]
+      support_credentials = false
+    }
+
+    application_stack {
+      # Placeholder — `deploy-strategy.yml` pushes the real GHCR image after the first
+      # build; the lifecycle block below is what stops Terraform reverting it.
+      docker_image_name = "mcr.microsoft.com/appsvc/staticsite:latest"
+
+      docker_registry_url      = local.ghcr_registry_url
+      docker_registry_username = local.ghcr_registry_username
+      docker_registry_password = local.ghcr_registry_password
+    }
+  }
+
+  auth_settings_v2 {
+    auth_enabled           = true
+    require_authentication = true
+    unauthenticated_action = "Return401"
+    default_provider       = "azureactivedirectory"
+
+    # One path, and it has to be the one this module's own caller record also treats as
+    # open — `strategy/caller_access.py`, `OPEN_PATHS`. Two gates stand in front of every
+    # request here, and exempting a path from only one of them is not exempting it: it
+    # reads as open in this file and answers 401 from the module.
+    #
+    # That is exactly what happened to `/health`, which sat here until the deploy of
+    # d2e2290 failed on it. `/ping` is the one this module opens, because it answers a
+    # constant that never varies with anything the module holds — and it proves as much
+    # about a deploy as `/health` would, since the lifespan serves nothing until its
+    # migration is done.
+    excluded_paths = ["/ping"]
+
+    active_directory_v2 {
+      client_id                  = module.strategy_easy_auth.client_id
+      tenant_auth_endpoint       = "https://login.microsoftonline.com/${data.azurerm_client_config.current.tenant_id}/v2.0"
+      client_secret_setting_name = "MICROSOFT_PROVIDER_AUTHENTICATION_SECRET"
+
+      # Both spellings of this app's audience, for the reason `infra` learned on
+      # market-data's on 21 August 2026: a token asked for by scope name carries the
+      # `api://` uri, one asked for as `<client-id>/.default` carries the client id, and a
+      # list holding only the first looks like a working configuration until something
+      # asks the other way.
+      allowed_audiences = [
+        local.strategy_api_uri,
+        module.strategy_easy_auth.client_id,
+      ]
+
+      # Two callers, each here for one of this module's two surfaces. The workbench
+      # reaches `/mcp`, where its triggers read `pending_setups`; the terminal reaches the
+      # REST contract. Which may reach which is not something this list can say — Easy
+      # Auth authorizes an application, not a route — so the two settings below are what
+      # actually keeps them apart (`strategy/caller_access.py`). Both are required;
+      # neither substitutes for the other.
+      allowed_applications = [
+        data.azuread_service_principal.workbench_managed_identity.client_id,
+        azuread_application.terminal.client_id,
+      ]
+    }
+
+    login {
+      token_store_enabled = true
+    }
+  }
+
+  app_settings = {
+    # The archive by its own hostname, over TLS, and its REST contract rather than `/mcp`:
+    # that surface is narrowed for a model and too tight for a loop reading three hundred
+    # bars of three facts at once. market-data's `REST_CALLER_APPLICATION_IDS` admits this
+    # identity; its `allowed_applications` admits it through the door.
+    MARKET_DATA_URL = "https://${local.market_data_hostname}"
+    # What this module presents to the archive: a token of its own identity for the
+    # archive's audience. Set here rather than left to the module, because the absence of
+    # this setting is what selects local work, where there is no directory to ask.
+    MARKET_DATA_SCOPE = "${local.market_data_api_uri}/.default"
+
+    # No credential in the URL and no AZURE_* triple: `config.py` refuses a DATABASE_URL
+    # carrying one, and the App Service's own system-assigned identity is ambient.
+    # DATABASE_USER is the role the operator creates once in Postgres for this identity —
+    # named after this app on purpose, so the two never drift apart.
+    DATABASE_URL  = "postgresql://${azurerm_postgresql_flexible_server.main.fqdn}:5432/${azurerm_postgresql_flexible_server_database.strategy.name}?sslmode=require"
+    DATABASE_USER = local.strategy_app_name
+
+    MICROSOFT_PROVIDER_AUTHENTICATION_SECRET = module.strategy_easy_auth.password
+
+    # The module does not take the block above on trust: were `auth_settings_v2` switched
+    # off by a careless edit, this setting is what keeps both surfaces from answering an
+    # unidentified caller.
+    REQUIRE_AUTHENTICATED_PRINCIPAL = "true"
+
+    # Which caller reaches which surface, once Easy Auth has let it through the door.
+    # Client ids, and only client ids — the same identifiers `allowed_applications` above
+    # is written in, because the module reads the same fact from the token: the `azp` (or
+    # `appid`) claim naming the application it was issued to, never the principal-id
+    # header, which for a delegated token names the signed-in person.
+    TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
+    REST_CALLER_APPLICATION_IDS = azuread_application.terminal.client_id
+
+    APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
+  }
+
+  lifecycle {
+    ignore_changes = [site_config[0].application_stack[0].docker_image_name]
+  }
+}
+
+output "strategy_hostname" {
+  value = azurerm_linux_web_app.strategy.default_hostname
+}
+
+output "strategy_managed_identity_principal_id" {
+  description = "The operator's one-off Postgres role creation in the `strategy` database needs this object id — and `scripts/grant-schema-ownership.sql` has to be run there too, before the first deploy tries to migrate."
+  value       = azurerm_linux_web_app.strategy.identity[0].principal_id
+}

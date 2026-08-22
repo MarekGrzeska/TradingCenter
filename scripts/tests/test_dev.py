@@ -44,6 +44,7 @@ GOOD_ENV: dict[str, str] = {
     "trading-mcp": "CAPITAL_GATEWAY_API_KEY=shared-secret\n",
     # No credential to carry: both of Polymarket's surfaces are public.
     "polymarket-data": "DATABASE_URL=postgresql://polymarket:pw@127.0.0.1:55432/polymarket\n",
+    "strategy": "DATABASE_URL=postgresql://strategy:pw@127.0.0.1:55432/strategy\n",
 }
 
 ON_PATH = {"uv", "docker", "pnpm", "npm"}
@@ -170,6 +171,9 @@ class TestRefusals:
             "workbench",
             "trading-mcp",
             "polymarket-data",
+            # Listed for market-data's reason rather than trading-mcp's: no secret of its
+            # own, but `DATABASE_URL` has no default, so the process exits at start.
+            "strategy",
         }
 
     def test_the_terminal_checks_are_skipped_when_it_is_not_started(self) -> None:
@@ -256,6 +260,7 @@ class TestStartOrder:
             "market-data",
             "trading-mcp",
             "polymarket-data",
+            "strategy",
             "workbench",
             "terminal",
         ]
@@ -267,6 +272,7 @@ class TestStartOrder:
             "workbench": 8030,
             "trading-mcp": 8060,
             "polymarket-data": 8070,
+            "strategy": 8080,
             "terminal": 5173,
         }
 

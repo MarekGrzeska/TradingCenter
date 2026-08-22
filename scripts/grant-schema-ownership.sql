@@ -22,9 +22,10 @@
 --   with dbname=teams,      role=app-tradingcenter-agent — the *same* role as `agent`,
 --                           because one App Service presents one identity since the two
 --                           modules became the workbench;
---   and with dbname=polymarket, role=app-tradingcenter-polymarket-data.
+--   with dbname=polymarket, role=app-tradingcenter-polymarket-data;
+--   and with dbname=strategy, role=app-tradingcenter-strategy.
 --
--- The four databases are `agent`, `market_data`, `teams` and `polymarket`
+-- The five databases are `agent`, `market_data`, `teams`, `polymarket` and `strategy`
 -- (infra/database.tf). `tradingcenter` is the *server*, not a database on it, and asking
 -- for it by that name is a FATAL.
 --
@@ -41,6 +42,13 @@
 -- `polymarket` has NOT. It is created empty by the apply that adds the module, and this
 -- script against it is the one operator step that change carries — before the first
 -- deploy, or polymarket-data starts, tries to migrate and stops.
+--
+-- `strategy` is the same again, one change later (`a-strategy-is-a-catalogue-entry`):
+-- created empty by that apply, and owed both steps below — the principal first, then this
+-- script — before the deploy that gives it an image. The module's lifespan migrates under
+-- an advisory lock before it serves anything, so without them it starts, refuses, and the
+-- deploy probe reports what the container actually did rather than what the control plane
+-- thinks.
 --
 -- The password is an Entra access token:
 --   az account get-access-token --resource https://ossrdbms-aad.database.windows.net \

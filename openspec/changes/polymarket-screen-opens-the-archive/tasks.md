@@ -55,11 +55,11 @@
 
 ## 7. Infrastruktura
 
-- [ ] 7.1 Delegowany zakres `access_as_user` na `module.polymarket_data_easy_auth`
-- [ ] 7.2 `azuread_application_pre_authorized` dla terminala przy tej rejestracji
-- [ ] 7.3 Terminal w `allowed_applications` modułu i w `REST_CALLER_APPLICATION_IDS`; `TOOL_CALLER_APPLICATION_IDS` bez zmian
-- [ ] 7.4 Output z zakresem terminala dla tego modułu, na wzór trzech istniejących
-- [ ] 7.5 `terraform fmt`, `validate`, plan na PR
+- [x] 7.1 Delegowany zakres `access_as_user` na `module.polymarket_data_easy_auth`
+- [x] 7.2 `azuread_application_pre_authorized` dla terminala przy tej rejestracji
+- [x] 7.3 Terminal w `allowed_applications` modułu i w `REST_CALLER_APPLICATION_IDS`; `TOOL_CALLER_APPLICATION_IDS` bez zmian
+- [x] 7.4 Output z zakresem terminala dla tego modułu, na wzór trzech istniejących
+- [x] 7.5 `terraform fmt`, `validate`, plan lokalnie — **2 do dodania, 2 zmiany, 0 skasowań**. `apply` operatora, jeszcze niewykonany
 
 ## 8. Prawda w plikach
 
