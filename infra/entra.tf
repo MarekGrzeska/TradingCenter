@@ -130,6 +130,18 @@ resource "azuread_application_pre_authorized" "workbench_terminal" {
   permission_ids       = [module.workbench_easy_auth.scope_id]
 }
 
+# The fourth, and the first that is in use on the day it is written. The three above stood
+# ready and unused from August until `polymarket-screen-opens-the-archive`, because the
+# terminal asked for one scope — market-data's — and presented that token to every back end;
+# the gateway had been configured to accept it as a third audience rather than the terminal
+# being taught to ask by name. It asks by name for all four now, which is what makes these
+# resources the reason a second consent screen never appears.
+resource "azuread_application_pre_authorized" "polymarket_data_terminal" {
+  application_id       = module.polymarket_data_easy_auth.application_id
+  authorized_client_id = azuread_application.terminal.client_id
+  permission_ids       = [module.polymarket_data_easy_auth.scope_id]
+}
+
 # The three values the terminal's build needs (deploy-terminal.yml). All three are public
 # by nature — a client id and a scope name travel in every authorization request the
 # browser makes, and are visible to anyone with the developer tools open. They go through
