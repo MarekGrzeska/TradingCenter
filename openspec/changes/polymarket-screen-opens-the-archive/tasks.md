@@ -47,11 +47,11 @@
 
 ## 6. Kasowanie zebranej historii
 
-- [ ] 6.1 Czynność w zakładce, po trasie REST modułu
-- [ ] 6.2 Potwierdzenie nazywające zakres usunięcia i jego nieodwracalność
-- [ ] 6.3 Odstąpienie nie kasuje niczego
-- [ ] 6.4 Testy: potwierdzenie, odstąpienie, odmowa modułu
-- [ ] 6.5 `pnpm test`, `lint`, `typecheck`
+- [x] 6.1 Czynność w zakładce, po trasie REST modułu
+- [x] 6.2 Potwierdzenie nazywające zakres usunięcia i jego nieodwracalność
+- [x] 6.3 Odstąpienie nie kasuje niczego
+- [x] 6.4 Testy: potwierdzenie, odstąpienie, odmowa modułu
+- [x] 6.5 `pnpm test`, `lint`, `typecheck`
 
 ## 7. Infrastruktura
 

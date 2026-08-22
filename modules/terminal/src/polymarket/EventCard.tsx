@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useRead } from "../data/query";
 import { Button } from "../ui/Button";
+import { DeleteHistoryDialog } from "./DeleteHistoryDialog";
 import { EndTrackingDialog } from "./EndTrackingDialog";
 import { OutcomeHistory } from "./OutcomeHistory";
 import { WindowChanges } from "./WindowChanges";
@@ -46,6 +47,7 @@ export function EventCard({
 }) {
   const [open, setOpen] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [deletingHistory, setDeletingHistory] = useState(false);
 
   const changes = useRead<EventChanges>({
     key: ["polymarket", "changes", event.providerEventId],
@@ -110,6 +112,10 @@ export function EventCard({
         <Button size="2xs" tone="quiet" onClick={() => setEnding(true)}>
           Stop tracking
         </Button>
+        {/* The only door to it in this system: no tool the model holds deletes a sample. */}
+        <Button size="2xs" tone="critical" onClick={() => setDeletingHistory(true)}>
+          Remove history
+        </Button>
       </header>
 
       <div className="flex flex-col gap-3 px-3 py-2">
@@ -130,6 +136,15 @@ export function EventCard({
         <p className="px-3 pb-2 text-xs text-ink-faint">
           The windows could not be read — {changes.error}.
         </p>
+      )}
+
+      {deletingHistory && (
+        <DeleteHistoryDialog
+          client={client}
+          event={event}
+          onClose={() => setDeletingHistory(false)}
+          onDeleted={onChanged}
+        />
       )}
 
       {ending && (
