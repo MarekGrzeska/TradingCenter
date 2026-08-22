@@ -10,7 +10,7 @@ uv run pytest · uv run ruff check . · uv run pyright
 
 ## Why this is a package of its own, and not part of `tc-runtime`
 
-It was, until 18 August 2026. `openspec/changes/packages-replace-the-hand-copies/design.md`,
+It was, until 18 August 2026. `openspec/changes/archive/…-packages-replace-the-hand-copies/design.md`,
 D1, rejected a third package on the grounds that `network_identity.py` needs no MCP
 dependency — it is raw ASGI — and `detail.py` needs only `httpx`, so a package for ~150
 lines would cost more in three `pyproject.toml` files than it saved.

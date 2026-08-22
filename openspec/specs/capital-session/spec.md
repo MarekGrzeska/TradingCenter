@@ -3,9 +3,7 @@
 Trzyma połączenie modułu z capital.com: jak się uwierzytelnia, jak długo to uwierzytelnienie
 żyje, do którego środowiska wolno mu sięgać i na którym koncie handlowym działają kolejne
 wywołania.
-
 ## Requirements
-
 ### Requirement: Poświadczenia nie opuszczają modułu
 
 Moduł MUST uwierzytelniać się w capital.com w imieniu każdego wywołującego. Poświadczenia
@@ -65,6 +63,11 @@ przezroczyście, a równoległa seria wywołań MUST spowodować najwyżej jedno
 Moduł MUST publikować konta osiągalne skonfigurowanymi poświadczeniami, oznaczać które jest
 aktywne i pozwalać je przełączyć. Handel oraz odczyt pozycji MUST działać na koncie aktywnym.
 
+Przełączenie konta zrywa strumień notowań u dostawcy. Moduł MUST to powiedzieć wywołującemu
+— w tym, co publikuje o tej operacji — zamiast zostawiać przerwę w danych do odkrycia po
+fakcie. Sam strumień MUST wrócić bez udziału wywołującego, tą samą drogą, którą moduł
+odzyskuje każde inne zerwanie połączenia.
+
 #### Scenario: Wylistowanie kont
 
 - **WHEN** konsument wylistowuje konta
@@ -83,6 +86,13 @@ aktywne i pozwalać je przełączyć. Handel oraz odczyt pozycji MUST działać 
 - **THEN** moduł odpowiada błędem klienta nazywającym odrzucony identyfikator
 - **AND** dotychczas aktywne konto pozostaje aktywne
 
+#### Scenario: Strumień po przełączeniu konta
+
+- **WHEN** konsument przełącza aktywne konto, gdy strumień notowań jest zestawiony
+- **THEN** zerwanie strumienia jest tym samym zdarzeniem, co każde inne zerwanie: konsument
+  strumienia dostaje stan mówiący, że połączenie jest odtwarzane
+- **AND** moduł zestawia je ponownie sam, bez żądania od wywołującego
+
 ### Requirement: Moduł publikuje, co potrafi
 
 Moduł MUST publikować maszynowo czytelną deklarację swoich możliwości: providera, środowisko,
@@ -93,3 +103,39 @@ przyjmowane typy zleceń oraz to, czy streamuje.
 - **WHEN** konsument odczytuje możliwości modułu
 - **THEN** odpowiedź podaje providera `capital.com`, środowisko `demo`, dostępność streamingu
   oraz przyjmowane typy zleceń
+
+### Requirement: Saldo konta demo daje się skorygować
+
+Moduł MUST pozwalać skorygować saldo konta demo o zadaną kwotę. Kwota ujemna MUST być
+przyjmowana tak samo jak dodatnia: ustawienie chudego rachunku jest częścią ustawiania
+warunku eksperymentu, a nie pomyłką, przed którą trzeba bronić.
+
+Korekta MUST dotyczyć konta aktywnego — tego samego, na którym działa handel i odczyt
+pozycji — żeby „ile mam" i „ile dosypuję" nigdy nie dotyczyły dwóch różnych rachunków.
+
+Moduł MUST NOT powtarzać we własnym kodzie granic, które stawia dostawca: sufitu salda,
+zakresu kwoty ani limitu dobowego. Dostawca je zna i zmienia bez pytania nas, a kopia
+przestaje być prawdą w dniu, w którym się rozejdzie. Odmowa dostawcy MUST dotrzeć do
+wywołującego jako odmowa nazywająca powód, odróżnialna od awarii dostępu do dostawcy.
+
+Możliwość ta MUST być dostępna wyłącznie w środowisku demo, co wynika z hosta, do którego
+moduł jest związany, i nie wymaga osobnego sprawdzenia.
+
+#### Scenario: Dosypanie środków
+
+- **WHEN** konsument koryguje saldo konta demo o kwotę dodatnią
+- **THEN** moduł potwierdza wykonanie
+- **AND** kolejny odczyt kont pokazuje saldo powiększone o tę kwotę
+
+#### Scenario: Zabranie środków
+
+- **WHEN** konsument koryguje saldo konta demo o kwotę ujemną
+- **THEN** moduł wykonuje korektę tak samo jak dodatnią
+
+#### Scenario: Dostawca odmawia korekty
+
+- **WHEN** dostawca odrzuca korektę, bo kwota wykracza poza przyjmowany zakres, saldo
+  przekroczyłoby sufit albo limit dobowy został wyczerpany
+- **THEN** moduł odpowiada odmową nazywającą powód podany przez dostawcę
+- **AND** odmowa jest odróżnialna od awarii dostępu do dostawcy
+
