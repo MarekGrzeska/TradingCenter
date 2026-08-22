@@ -105,6 +105,21 @@ nie jest jeszcze na `main`, robi z każdego następnego planu wniosek o skasowan
 zaapplikowano** — i widać to dopiero w linii podsumowania, poniżej setek linii `Refreshing
 state`.
 
+**Apply jest dwuetapowy, i plan tego nie mówi wprost.** Po przebazowaniu plan czyta
+`6 to add, 2 to change, 0 to destroy`, ale obie modyfikacje — `market_data` i
+`capital_gateway` — pokazują się jako `-> (known after apply)`, z całą mapą `app_settings`
+i listą `allowed_applications` wypisaną ze znakiem minus. To **nie** jest kasowanie ustawień.
+`data.azuread_service_principal.strategy_managed_identity` czyta tożsamość App Service'u,
+który jeszcze nie istnieje, więc każda wartość zbudowana z tego data source'u jest na etapie
+planu nieznana — a Terraform pokazuje wtedy całą kolekcję jako do przeliczenia.
+`capital_gateway` łapie to rykoszetem, bo jego lista jest zbudowana z data source'u tożsamości
+market-daty, którą ta zmiana modyfikuje.
+
+Stąd ta sama sekwencja, którą `database.tf` opisuje dla reguł firewalla, obowiązuje tu
+szerzej: `terraform apply -target=azurerm_linux_web_app.strategy` raz, a potem normalny
+nieograniczony `terraform apply`. Po pierwszym przebiegu tożsamość istnieje, data source ma
+co przeczytać i drugi plan pokazuje już konkretne wartości zamiast `known after apply`.
+
 Kolejność produkcyjna tej zmiany — jak przy narzędziach workbencha, ustawienia przed
 obrazem:
 `terraform apply` (App Service, tożsamość zarządzana, wpis tożsamości modułu do
