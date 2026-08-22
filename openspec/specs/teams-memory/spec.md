@@ -1,11 +1,10 @@
-## Purpose
+# teams-memory Specification
 
+## Purpose
 Czym jest pamięć zespołu: co zespół może zostawić następnemu przebiegowi, do czego ten zapis
 należy, dlaczego stoi obok rewizji zamiast w niej, czego nie zmienia, jakie ma granice i kto go
 usuwa.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Pamięć należy do zespołu i przeżywa przebieg
 
 Moduł MUST przechowywać wpisy pamięci związane z **zespołem**. Wpis MUST być czytelny w kolejnych
