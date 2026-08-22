@@ -9,11 +9,11 @@
 
 ## 2. Klient kontraktu
 
-- [ ] 2.1 `src/polymarket/` — klient po `contract.polymarket.generated.ts`, na `jsonClient` z zakresem tego modułu
-- [ ] 2.2 Mapowanie wire → domena dla obserwacji, migawki, historii i zmian; `Decimal` nie istnieje na wire, prawdopodobieństwo jest liczbą 0..1
-- [ ] 2.3 Odmowa z powodu tożsamości odróżniona od braku odpowiedzi na poziomie klienta
-- [ ] 2.4 Testy mapperów wire↔domena i obu kształtów porażki
-- [ ] 2.5 `pnpm test`, `lint`, `typecheck`, `contract:check`
+- [x] 2.1 `src/polymarket/` — klient po `contract.polymarket.generated.ts`, na `jsonClient` z zakresem tego modułu
+- [x] 2.2 Mapowanie wire → domena dla obserwacji, migawki, historii i zmian; `Decimal` nie istnieje na wire, prawdopodobieństwo jest liczbą 0..1
+- [x] 2.3 Odmowa z powodu tożsamości odróżniona od braku odpowiedzi na poziomie klienta
+- [x] 2.4 Testy mapperów wire↔domena i obu kształtów porażki
+- [x] 2.5 `pnpm test`, `lint`, `typecheck`, `contract:check`
 
 ## 3. Zakładka i lista
 
