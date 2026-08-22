@@ -15,6 +15,7 @@ import asyncpg
 import pytest
 from fastapi.testclient import TestClient
 
+from teams.tools import MEMORY_TOOL_NAMES
 from workbench.app import app
 
 from .mcp_stand_in import free_port, serving_sync
@@ -49,13 +50,14 @@ def announcing(_env: None, monkeypatch: pytest.MonkeyPatch) -> Iterator[TestClie
 
 def test_what_the_server_announces_is_what_the_route_publishes(announcing: TestClient) -> None:
     published = announcing.get("/tools").json()
+    by_name = {tool["name"]: tool for tool in published}
 
-    assert [tool["name"] for tool in published] == ["get_last_price", "read_indicators"]
+    assert {"get_last_price", "read_indicators"} <= set(by_name)
     # The description travels too — it is the only thing beside the name the picker can
-    # show, and this module writes neither.
-    assert published[0]["description"].startswith("Returns the last price")
+    # show, and this module writes neither of these two.
+    assert by_name["get_last_price"]["description"].startswith("Returns the last price")
     # And nothing else: an input schema here would be a copy of somebody else's contract.
-    assert set(published[0]) == {"name", "description", "read_only"}
+    assert set(by_name["get_last_price"]) == {"name", "description", "read_only"}
 
 
 def test_tools_from_both_servers_are_published_with_write_marked(
@@ -71,22 +73,32 @@ def test_tools_from_both_servers_are_published_with_write_marked(
             published = client.get("/tools").json()
 
     by_name = {tool["name"]: tool for tool in published}
-    assert set(by_name) == {"get_last_price", "place_order"}
+    assert {"get_last_price", "place_order"} <= set(by_name)
     assert by_name["get_last_price"]["read_only"] is None  # the stand-in sets no
     # annotation for this one — unknown, not assumed
     assert by_name["place_order"]["read_only"] is False
 
 
-def test_no_tool_server_configured_announces_nothing_rather_than_failing(
+def test_no_tool_server_configured_still_announces_what_this_process_serves(
     _env: None,
 ) -> None:
-    # specs/teams-tool-access, "Moduł startuje bez skonfigurowanego serwera narzędzi" —
-    # a working configuration, so the route answers with the empty catalogue it is.
+    # specs/teams-tool-access, "Moduł startuje bez skonfigurowanego serwera narzędzi" — a
+    # working configuration, and no longer an empty catalogue: the picker can still offer
+    # the tools this process serves itself, which is the whole point of their not being on
+    # a network.
     with TestClient(app) as client:
         response = client.get("/tools")
 
     assert response.status_code == 200
-    assert response.json() == []
+    assert {tool["name"] for tool in response.json()} == set(MEMORY_TOOL_NAMES)
+
+
+def test_the_memory_tools_are_published_with_the_write_one_marked(_env: None) -> None:
+    with TestClient(app) as client:
+        by_name = {tool["name"]: tool for tool in client.get("/tools").json()}
+
+    assert by_name["memory_read"]["read_only"] is True
+    assert by_name["memory_write"]["read_only"] is False
 
 
 def test_a_configured_server_that_cannot_be_asked_is_an_outage_not_an_empty_list(

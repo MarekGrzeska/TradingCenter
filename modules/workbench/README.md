@@ -38,7 +38,7 @@ Everything else is one setting for the whole process — `workbench/config.py` i
 code that reads the environment, and both surfaces' own `Settings` are built from it by
 argument, with every validator they had.
 
-## Two tool servers on a network, and one source that is not
+## Two tool servers on a network, and two sources that are not
 
 The model can ask **market-data** for candles, coverage, indicators and levels mid-answer,
 and read *and move* the demo account through **trading-mcp** — positions, balance and
@@ -66,6 +66,32 @@ which is neither a failure nor an absence (`specs/agent-trading`). And nothing h
 order's size or counts orders: the account is a demo one, enforced by `trading-mcp` against
 the gateway before it opens a port, and that is the guard rather than a number nobody can
 raise.
+
+## A team's memory
+
+A team keeps notes between runs — `team_memories`, keyed by the **team** rather than by a
+revision or a run, so what one run works out the next one can read whichever revision it
+runs on. Inside the revision it would mint a definition per note, and two runs of "the same"
+revision would stop being comparable, which is the reason a team would want to remember
+anything at all.
+
+Two tools, `memory_read` and `memory_write`, announced by **a source that is this process
+itself** — no address, no identity, no session. It is the same shape as the team tools
+above, on the other surface: those join the conversation's registry, this one joins the
+teams registry beside `market-mcp` and `trading-mcp`. Announcing them touches no database
+(the descriptors are constants), which is what lets the save-time paths build a registry out
+of settings alone and still publish the names; calling them needs the pool, and by then
+there is a run. Which agent may read and which may write is the mechanism that was already
+there: the names a definition assigns that agent. There is no new field and no second
+permission system, so no saved revision had to be rewritten.
+
+Entries are never updated. A correction is the next note, and the only deletion is the
+operator's, one entry at a time through `GET`/`DELETE /teams/{id}/memory` — no tool handed
+to an agent removes anything, which is deliberate: an agent that could delete would have a
+way to wipe its own mistake out of the record. Three ceilings live in the code beside
+`ROUND_CEILING` rather than in settings — note length (also a CHECK in migration 0008),
+notes returned per read, notes written per run — because they bound the shape in which this
+module hands anything to a model, and that is not the operator's budget to move.
 
 ## Route surface
 

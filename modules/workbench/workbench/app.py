@@ -70,7 +70,6 @@ async def lifespan(app: FastAPI):
     conversation_tools = ToolServerRegistry.from_settings(
         conversation_settings, local_sources=[team_tools]
     )
-    teams_tool_servers = TeamsToolServerRegistry.from_settings(teams_settings)
 
     async with (
         make_pool(
@@ -88,6 +87,14 @@ async def lifespan(app: FastAPI):
             tenant_id=teams_settings.azure_tenant_id,
         ) as teams_pool,
     ):
+        # Built here rather than beside the conversation's, because one of the sources it
+        # holds is served by this process and reads the teams database directly. Announcing
+        # those tools does not touch the pool — the descriptors are constants — but calling
+        # them does, and this is the first point where there is a pool to give.
+        teams_tool_servers = TeamsToolServerRegistry.from_settings(
+            teams_settings, pool=teams_pool
+        )
+
         # The `try` opens before the schema checks, not after them: `ToolServer.__init__`
         # already holds a credential when a scope is configured, and a refused start is
         # exactly the path that would otherwise leak it.

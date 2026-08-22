@@ -51,7 +51,7 @@ async def _run_it(
     timeout: float = 30.0,
     registry: RunRegistry | None = None,
 ) -> int:
-    _, revision_id = await _team(pool, definition)
+    team_id, revision_id = await _team(pool, definition)
     async with pool.acquire() as conn:
         run, _ = await store.create_run(
             conn,
@@ -63,6 +63,8 @@ async def _run_it(
     await execute_run(
         pool,
         run_id=run["id"],
+        team_id=team_id,
+        owner_principal=OWNER,
         definition=definition,
         provider=provider,
         tool_registry=tool_registry or ToolServerRegistry.from_settings(settings),
@@ -277,7 +279,7 @@ async def test_an_interrupted_run_keeps_the_work_that_finished(pool: asyncpg.Poo
                 )
             return sleeper.stream(system_prompt=system_prompt, **kwargs)
 
-    _, revision_id = await _team(pool, definition)
+    team_id, revision_id = await _team(pool, definition)
     async with pool.acquire() as conn:
         run, _ = await store.create_run(
             conn,
@@ -291,6 +293,8 @@ async def test_an_interrupted_run_keeps_the_work_that_finished(pool: asyncpg.Poo
         execute_run(
             pool,
             run_id=run["id"],
+            team_id=team_id,
+            owner_principal=OWNER,
             definition=definition,
             provider=TwoScripts(),
             tool_registry=ToolServerRegistry.from_settings(settings),
@@ -325,7 +329,7 @@ async def test_a_watcher_sees_the_run_as_it_happens(pool: asyncpg.Pool) -> None:
     provider = ScriptedProvider(by_role={"scout": says("up"), "judge": says("long")})
     registry = RunRegistry()
 
-    _, revision_id = await _team(pool, definition)
+    team_id, revision_id = await _team(pool, definition)
     async with pool.acquire() as conn:
         run, _ = await store.create_run(
             conn,
@@ -338,6 +342,8 @@ async def test_a_watcher_sees_the_run_as_it_happens(pool: asyncpg.Pool) -> None:
     await execute_run(
         pool,
         run_id=run["id"],
+        team_id=team_id,
+        owner_principal=OWNER,
         definition=definition,
         provider=provider,
         tool_registry=ToolServerRegistry.from_settings(settings),
@@ -366,7 +372,7 @@ async def test_a_watcher_that_goes_away_does_not_stop_the_run(pool: asyncpg.Pool
     provider = ScriptedProvider(default=says("up"))
     registry = RunRegistry()
 
-    _, revision_id = await _team(pool, definition)
+    team_id, revision_id = await _team(pool, definition)
     async with pool.acquire() as conn:
         run, _ = await store.create_run(
             conn, team_revision_id=revision_id, owner_principal=OWNER, agent_keys=["scout"]
@@ -378,6 +384,8 @@ async def test_a_watcher_that_goes_away_does_not_stop_the_run(pool: asyncpg.Pool
     await execute_run(
         pool,
         run_id=run["id"],
+        team_id=team_id,
+        owner_principal=OWNER,
         definition=definition,
         provider=provider,
         tool_registry=ToolServerRegistry.from_settings(settings),

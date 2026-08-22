@@ -40,7 +40,7 @@ from ..contract import (
     TriggerOut,
 )
 from ..scheduler.timing import fires_after, next_fire_after
-from ..tools import AnnouncedSnapshot, announced_snapshot
+from ..tools import MEMORY_TOOL_NAMES, AnnouncedSnapshot, announced_snapshot
 from ..validation import DefinitionRefused, check_trigger_tool
 
 router = APIRouter()
@@ -275,13 +275,22 @@ def _take(cron_expression: str, count: int) -> list[datetime]:
 # --- triggers -----------------------------------------------------------------------
 
 
-def _check_trigger_tool(tool_name: str, *, announced: AnnouncedSnapshot | None) -> None:
-    # `announced_snapshot` answers `None` when no server is configured at all; a server
-    # that is configured and could not be asked comes back inside the snapshot instead,
-    # under `unreachable`. A trigger names one tool, so what this needs from either shape
-    # is the set of names — a name nobody announces is refused the same way whether the
-    # silence is a missing server or an unreachable one (`validation.check_trigger_tool`).
-    names = None if announced is None else sorted(announced.by_name)
+def _check_trigger_tool(tool_name: str, *, announced: AnnouncedSnapshot) -> None:
+    # A trigger's condition is a reading of the world, taken with a *tool server's* tools
+    # (specs/teams-triggers, "Warunek jest czytany narzędziami serwera narzędzi"), so the
+    # tools this process serves itself are subtracted before the check. A team's memory is
+    # not the world, and it has no run to be read inside of when the clock is the caller —
+    # a trigger naming one would be a condition that could never come true.
+    #
+    # No server configured at all is passed on as `None`, which is the shape
+    # `check_trigger_tool` writes its own refusal for; a configured server that could not
+    # be asked comes back inside the snapshot under `unreachable` instead, and a name
+    # nobody announces is refused the same way whichever silence it was.
+    names = (
+        sorted(set(announced.by_name) - MEMORY_TOOL_NAMES)
+        if announced.configured_servers
+        else None
+    )
     try:
         check_trigger_tool(tool_name, announced_tools=names)
     except DefinitionRefused as err:

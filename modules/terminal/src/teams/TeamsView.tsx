@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { useAgentTurns } from "../agent/useAgentTurns";
+import { MemoryPanel } from "./MemoryPanel";
 import { SchedulesPanel } from "./SchedulesPanel";
 import { TeamCatalogue } from "./TeamCatalogue";
 import { TeamEditor } from "./TeamEditor";
@@ -16,7 +17,8 @@ type Open =
    *  operator arrived by starting a run or by following one from a schedule's history;
    *  `null` lets the view open the newest, which is what "show me the runs" means. */
   | { kind: "runs"; teamId: number; teamName: string; runId: number | null }
-  | { kind: "schedules"; teamId: number; teamName: string };
+  | { kind: "schedules"; teamId: number; teamName: string }
+  | { kind: "memory"; teamId: number; teamName: string };
 
 /**
  * The teams tab: the catalogue, one team open on the canvas, and one run watched on it.
@@ -70,6 +72,7 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
         onRuns={(teamId, teamName) => setOpen({ kind: "runs", teamId, teamName, runId: null })}
         onNew={() => setOpen({ kind: "new" })}
         onSchedules={(id, name) => setOpen({ kind: "schedules", teamId: id, teamName: name })}
+        onMemory={(id, name) => setOpen({ kind: "memory", teamId: id, teamName: name })}
         onChanged={teams.reload}
         onReload={teams.reload}
       />
@@ -103,6 +106,17 @@ export function TeamsView({ api = teamsApi }: { api?: TeamsApi } = {}) {
         onWatchRun={(runId) =>
           setOpen({ kind: "runs", teamId: open.teamId, teamName: open.teamName, runId })
         }
+      />
+    );
+  }
+
+  if (open.kind === "memory") {
+    return (
+      <MemoryPanel
+        api={api}
+        teamId={open.teamId}
+        teamName={open.teamName}
+        onClose={() => setOpen({ kind: "catalogue" })}
       />
     );
   }

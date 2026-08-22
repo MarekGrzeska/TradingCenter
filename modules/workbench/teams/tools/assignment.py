@@ -36,10 +36,18 @@ from .client import (
     ToolAccessError,
     ToolDescriptor,
     ToolOutcome,
+    ToolOutcomeKind,
     ToolServer,
     ToolServerRegistry,
     ToolServerUnavailable,
 )
+from .memory import MemoryScope
+
+
+def _assigned_list(assigned: set[str]) -> str:
+    if not assigned:
+        return "It was assigned none."
+    return f"It has: {', '.join(sorted(assigned))}."
 
 
 class ToolNoLongerAnnounced(ToolAccessError):
@@ -77,6 +85,11 @@ class ToolPlan:
     # tool name -> whether calling it could leave the account changed. Decided once here
     # rather than per call, off the same resolution the run was admitted on.
     writes_by_name: dict[str, bool] = field(default_factory=dict)
+    # tool name -> the in-process source bound to this run. Separate from `server_by_name`
+    # because these are called with *who* is calling: a local source acts on this team's
+    # own rows and needs the agent, while a remote server authenticates as the module and
+    # would have nothing to do with the name of an agent inside it.
+    local_by_name: dict[str, Any] = field(default_factory=dict)
 
     def for_agent(self, key: str) -> tuple[ToolDescriptor, ...]:
         """Exactly what the definition assigned this agent, in the order it named them.
@@ -88,11 +101,46 @@ class ToolPlan:
         """
         return self.per_agent[key]
 
-    async def call(self, name: str, arguments: dict[str, Any]) -> ToolOutcome:
-        """Dispatch to the one server that announced `name` — collision-free by
+    async def call(
+        self, name: str, arguments: dict[str, Any], *, agent_key: str
+    ) -> ToolOutcome:
+        """Dispatch to the one source that announced `name` — collision-free by
         construction, since `plan_tools` refuses a run before this method exists for a
-        name two servers both claim."""
-        return await self.server_by_name[name].call(name, arguments)
+        name two of them both claim.
+
+        **The assignment is checked here, not only when the tools were handed out.** What
+        the model was offered is protection against a mistake; it is no protection against
+        an attempt, and the model writes the name itself — from another tool's description,
+        from a predecessor's briefing, or out of habit. While every announced tool only
+        read, the difference was theoretical. It stopped being theoretical the moment one
+        agent may write something another may only read (specs/teams-tool-access, "Agent
+        dostaje narzędzia wskazane w definicji, a nie wszystkie").
+
+        Refused as an outcome rather than raised, like `TradeGuard`'s refusals: the model
+        gets a sentence it can act on, the attempt lands in `tool_calls`, and the run
+        carries on. A model that guessed a name made a mistake worth correcting, not one
+        worth ending the experiment over.
+        """
+        assigned = {tool.name for tool in self.per_agent.get(agent_key, ())}
+        if name not in assigned:
+            return ToolOutcome(
+                ToolOutcomeKind.REFUSED,
+                f"{name} is not one of the tools assigned to {agent_key}. "
+                f"{_assigned_list(assigned)}",
+                0,
+            )
+        local = self.local_by_name.get(name)
+        if local is not None:
+            return await local.call(name, arguments, agent_key=agent_key)
+        server = self.server_by_name.get(name)
+        if server is None:
+            # Unreachable through a run, whose plan is built from the same definition it
+            # walks — but a name assigned and resolved is not the same fact as a name that
+            # still has a source, and answering is cheaper than assuming.
+            return ToolOutcome(
+                ToolOutcomeKind.UNAVAILABLE, f"no source announces {name}", 0
+            )
+        return await server.call(name, arguments)
 
     def moves_the_account(self, name: str) -> bool:
         """Whether calling `name` could leave the account changed — the question a trade
@@ -161,29 +209,31 @@ def _raise_for_collisions(resolution: _Resolution, names: set[str]) -> None:
         raise ToolNameCollision(f"more than one tool server announces: {lines}")
 
 
-async def plan_tools(definition: TeamDefinition, registry: ToolServerRegistry) -> ToolPlan:
-    """Resolve the definition's tool names against every configured server's
-    announcements.
+async def plan_tools(
+    definition: TeamDefinition,
+    registry: ToolServerRegistry,
+    *,
+    memory: MemoryScope | None = None,
+) -> ToolPlan:
+    """Resolve the definition's tool names against every source's announcements.
 
     Raises `ToolServerUnavailable` when an assigned name could not be confirmed because
-    some server could not be asked, `ToolNameCollision` when two servers both announce an
-    assigned name, and `ToolNoLongerAnnounced` when every server answered and none of
-    them announce it. All three are `ToolAccessError`, which is what a run start refuses
-    on.
+    some server could not be asked or has no address at all, `ToolNameCollision` when two
+    sources both announce an assigned name, and `ToolNoLongerAnnounced` when every source
+    answered and none of them announce it. All three are `ToolAccessError`, which is what
+    a run start refuses on.
+
+    `memory` is the run this plan belongs to. Absent — as it is on every save-time path —
+    the in-process memory tools still resolve and still count as announced; they simply
+    have no run to act in, and answer as unavailable if called.
     """
     assigned = {name for agent in definition.agents for name in agent.tools}
     if not assigned:
-        # No server is contacted at all — a team whose agents carry no tools runs
-        # whether or not any server is configured, reachable or awake (specs/
-        # teams-tool-access, "Zespół, w którym nikt nie ma narzędzi"). Asking anyway
-        # would make an outage elsewhere stop a run that never needed it.
+        # Nothing is contacted at all — a team whose agents carry no tools runs whether or
+        # not any server is configured, reachable or awake (specs/teams-tool-access,
+        # "Zespół, w którym nikt nie ma narzędzi"). Asking anyway would make an outage
+        # elsewhere stop a run that never needed it.
         return ToolPlan({agent.key: () for agent in definition.agents})
-
-    if not registry.configured():
-        raise ToolServerUnavailable(
-            "no tool server is configured, so the tool(s) this definition assigns "
-            "could not be checked"
-        )
 
     resolution = await _resolve_all(registry)
     _raise_for_collisions(resolution, assigned)
@@ -196,25 +246,53 @@ async def plan_tools(definition: TeamDefinition, registry: ToolServerRegistry) -
                 f"{_and_list(sorted(resolution.failed))} could not be reached: "
                 f"{'; '.join(str(err) for err in resolution.failed.values())}"
             )
+        # No server has an address at all — the case an early `not registry.configured()`
+        # check used to answer, which stopped being reachable once a source this process
+        # serves itself joined the registry: that one is always configured. So the question
+        # became "is any *server* configured", and the answer names the ones that are not
+        # (specs/teams-tool-access, "Brak serwera narzędzi zatrzymuje przebieg").
+        #
+        # Deliberately not "any server is unconfigured": with one server answering and the
+        # other unset, the name really is one nobody announces, and the refusal below is
+        # the true one. Pointing at the unset server there would send the operator to a
+        # setting to fix a tool the configured server had already declined to have.
+        if not registry.remote() and (unconfigured := registry.unconfigured()):
+            raise ToolServerUnavailable(
+                f"could not confirm tool(s) {_and_list(missing)}, assigned to "
+                f"{_and_list(_agents_wanting(definition, missing))} — "
+                f"{_and_list(unconfigured)} {'is' if len(unconfigured) == 1 else 'are'} "
+                "not configured"
+            )
         raise ToolNoLongerAnnounced(
             f"no configured tool server announces {_and_list(missing)}, assigned to "
             f"{_and_list(_agents_wanting(definition, missing))}. The revision is unchanged "
             "and still readable — it is this run that is refused."
         )
 
-    servers_by_label = {server.label: server for server in registry.configured()}
+    sources_by_label = {source.label: source for source in registry.configured()}
+    source_by_name = {
+        name: sources_by_label[hits[0][0]] for name, hits in resolution.by_name.items()
+    }
+    local_labels = set(registry.local)
+    local_by_name = {
+        name: (source.bound(memory) if memory is not None else source)
+        for name, source in source_by_name.items()
+        if source.label in local_labels
+    }
     server_by_name = {
-        name: servers_by_label[hits[0][0]] for name, hits in resolution.by_name.items()
+        name: source
+        for name, source in source_by_name.items()
+        if source.label not in local_labels
     }
     per_agent = {
         agent.key: tuple(resolution.by_name[name][0][1] for name in agent.tools)
         for agent in definition.agents
     }
     writes_by_name = {
-        name: _moves_the_account(server_by_name[name], hits[0][1])
+        name: _moves_the_account(source_by_name[name], hits[0][1])
         for name, hits in resolution.by_name.items()
     }
-    return ToolPlan(per_agent, server_by_name, writes_by_name)
+    return ToolPlan(per_agent, server_by_name, writes_by_name, local_by_name)
 
 
 def _moves_the_account(server: ToolServer, tool: ToolDescriptor) -> bool:
@@ -254,11 +332,24 @@ class AnnouncedSnapshot:
     # over any of those needs the operator to say so (specs/teams-schedules, "Harmonogram
     # nad rewizją z narzędziami zapisującymi wymaga jawnego potwierdzenia").
     read_only: frozenset[str] = frozenset()
+    # Servers this module knows about and has no address for. A name nobody announces
+    # while one of these is unset reads differently from the same name with every server
+    # answering, and the refusal says which (`validation.py`).
+    unconfigured: tuple[str, ...] = ()
+    # Labels of the servers that *do* have an address — empty means every tool in
+    # `by_name` came from this process itself.
+    configured_servers: tuple[str, ...] = ()
 
 
-async def announced_snapshot(settings: Settings) -> AnnouncedSnapshot | None:
-    """The save path's view of every configured server, or `None` when none is
-    configured at all.
+async def announced_snapshot(settings: Settings) -> AnnouncedSnapshot:
+    """The save path's view of every source: the servers it can reach, and the tools this
+    process serves itself.
+
+    It no longer answers `None`. It used to, for "no tool server is configured at all",
+    and that stopped being a state a snapshot could be in once a source living inside this
+    process joined the registry — there is always something announcing something. What the
+    `None` said is now said by `configured_servers` being empty, which is a narrower claim
+    and the true one.
 
     **A registry of its own, opened and closed inside this call, rather than the
     long-lived one on `app.state`.** Measured, not preferred: the streamable-http
@@ -272,8 +363,6 @@ async def announced_snapshot(settings: Settings) -> AnnouncedSnapshot | None:
     """
     registry = ToolServerRegistry.from_settings(settings)
     try:
-        if not registry.configured():
-            return None
         resolution = await _resolve_all(registry)
         return AnnouncedSnapshot(
             by_name={name: [label for label, _ in hits] for name, hits in resolution.by_name.items()},
@@ -286,6 +375,8 @@ async def announced_snapshot(settings: Settings) -> AnnouncedSnapshot | None:
                 for name, hits in resolution.by_name.items()
                 if all(tool.read_only is True for _label, tool in hits)
             ),
+            unconfigured=tuple(registry.unconfigured()),
+            configured_servers=tuple(server.label for server in registry.remote()),
         )
     finally:
         await registry.aclose()
@@ -301,8 +392,6 @@ async def announced_tools_by_server(settings: Settings) -> list[ToolDescriptor]:
     """
     registry = ToolServerRegistry.from_settings(settings)
     try:
-        if not registry.configured():
-            return []
         resolution = await _resolve_all(registry)
         if resolution.failed:
             names = _and_list(sorted(resolution.failed))

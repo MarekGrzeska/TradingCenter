@@ -28,6 +28,7 @@ export function TeamCatalogue({
   onRuns,
   onNew,
   onSchedules,
+  onMemory,
   onChanged,
   onReload,
 }: {
@@ -42,6 +43,7 @@ export function TeamCatalogue({
   onRuns(id: number, name: string): void;
   onNew(): void;
   onSchedules(id: number, name: string): void;
+  onMemory(id: number, name: string): void;
   onChanged(): void;
   onReload(): void;
 }) {
@@ -156,6 +158,9 @@ export function TeamCatalogue({
                 </Button>
                 <Button onClick={() => onSchedules(team.id, team.name)}>
                   Schedules
+                </Button>
+                <Button onClick={() => onMemory(team.id, team.name)}>
+                  Memory
                 </Button>
                 <Button
                   tone="muted"

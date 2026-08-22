@@ -49,6 +49,8 @@ async def _run(
     await execute_run(
         pool,
         run_id=run["id"],
+        team_id=team["id"],
+        owner_principal=OWNER,
         definition=definition,
         provider=provider,
         tool_registry=ToolServerRegistry.from_settings(settings),
