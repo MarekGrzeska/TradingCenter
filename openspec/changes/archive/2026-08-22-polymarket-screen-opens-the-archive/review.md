@@ -1,9 +1,9 @@
 ## Verdict
 
-Zakładka stoi na produkcji i operator jej używa. Grupy 1–8 weszły w całości, z grupy 9
-zrobione są `apply`, wdrożenie i sprawdzenie 9.3; **9.6 — zdjęcie ustępstwa w gatewayu —
-zostaje świadomie niezrobione**, bo dopóki gateway przyjmuje też publiczność `market-data`,
-stary token jest siatką pod stopami. To jest odroczenie z powodem, nie zapomniana pozycja.
+Zakładka stoi na produkcji i operator jej używa. Grupy 1–9 weszły w całości, łącznie z 9.6 —
+zdjęciem ustępstwa w gatewayu, zrobionym na końcu i osobnym `apply`, dopiero po tym jak 9.3
+potwierdziło, że rozdział publiczności działa. Do tego momentu stary token był siatką pod
+stopami i to była jedyna rzecz, która trzymała ten wpis przy życiu.
 
 Rozdział publiczności tokenu okazał się większy niż zakładka, po którą go zrobiono: terminal
 brał **jeden** token z publicznością `market-data` i wysyłał go do workbencha i gatewaya, a
@@ -59,6 +59,13 @@ o zakres, którego bez applya nikt by nie pre-autoryzował.
 | poważne | `auth/entra.ts` | Po rozdzieleniu publiczności `acquire` dalej zerowało wspólne konto przy `InteractionRequiredAuthError` — brak zgody na zakres jednego modułu wylogowywał operatora z całego terminala. | FIXED |
 | średnie | `EventCard.tsx` | Asynchroniczny `onChange` przy wyborze grupy bez obsługi błędu: odrzucone przypisanie było nieobsłużonym odrzuceniem, a kontrolka pokazywała dalej grupę, której nikt nie zapisał. | FIXED |
 | drobne | `polymarketApi.ts` | `include_ended` wysyłane tylko gdy prawdziwe, przy serwerowym domyślnym `true` — czyli jedynej wartości wartej wysłania nie dało się wysłać. | FIXED |
+
+Do tego jedno znalezisko, którego przegląd nie zgłosił, bo nie było usterką, tylko długiem
+zaciągniętym świadomie i spłaconym w 9.6: brama `capital-gateway` przyjmowała **cudzą**
+publiczność tokenu (`market-data`), żeby terminal z jednym tokenem mógł do niej sięgać.
+Dopóki tam stała, token wyciekły gdziekolwiek, gdzie da się zdobyć token do archiwum,
+otwierał też drzwi do połączenia z brokerem — czyli dokładnie tę własność, którą publiczność
+tokenu ma stwierdzać. Zdjęte po sprawdzeniu wszystkich trzech wołających, nie na wyczucie.
 
 Dwa błędy tej zmiany są tym samym błędem w dwóch warstwach: **kopia wzorca bez jednej
 części.** `cors` — trzy inne aplikacje mają ten blok, ta go nie dostała. `min-h-0 flex-1

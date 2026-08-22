@@ -1,11 +1,10 @@
-## Purpose
+# polymarket-data-caller-access Specification
 
+## Purpose
 Kto sięga po którą powierzchnię modułu: trasa narzędziowa dla modeli, REST dla terminala, i
 dlaczego samo przepuszczenie przez bramę platformy nie wystarcza, skoro obie stoją w jednej
 aplikacji.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Powierzchnia narzędziowa jest osiągalna po sieci, jedną drogą
 
 Moduł MUST udostępniać zestaw narzędzi klientowi MCP po sieci, pod jednym adresem we własnej
@@ -103,3 +102,4 @@ niosącej dane ani zmieniającej stan.
 
 - **WHEN** do zapisu tras wyjętych spod wymogu tożsamości trafia trasa niosąca dane
 - **THEN** MUST to wywrócić testy modułu
+
