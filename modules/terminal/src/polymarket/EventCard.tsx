@@ -46,11 +46,10 @@ export function EventCard({
   groups: Group[];
   onChanged(): void;
 }) {
-  // Three states, not two. The chevron was only ever adding and removing detail, so the
-  // list could not be made shorter — an operator watching a dozen events had a dozen
-  // markets' worth of rows whether or not they were reading them.
+  // Two states. It had three for a day: the middle one — outcomes without their windows —
+  // turned out to be a click nobody wanted, since an operator who unfolds an event is
+  // unfolding it to see how it moved. Folded is the state that earns its keep.
   const [open, setOpen] = useState(false);
-  const [detailed, setDetailed] = useState(false);
   const [ending, setEnding] = useState(false);
   const [deletingHistory, setDeletingHistory] = useState(false);
 
@@ -59,9 +58,9 @@ export function EventCard({
     read: (signal) => client.changes(event.providerEventId, signal),
     initial: NO_CHANGES,
     fallbackMessage: "the windows could not be read",
-    // Only in the third state. The windows are one request per event, and an operator who
-    // has merely unfolded the outcomes has not asked for them.
-    enabled: open && detailed,
+    // Still only when unfolded: one request per event, and a folded list of a dozen would
+    // otherwise be a dozen requests for numbers nobody has looked at.
+    enabled: open,
   });
 
   const windowsFor = (outcomeId: number) =>
@@ -82,11 +81,6 @@ export function EventCard({
           <span>{event.title}</span>
         </button>
         <CollectionBadge event={event} />
-        {open && (
-          <Button size="2xs" tone="quiet" onClick={() => setDetailed((was) => !was)}>
-            {detailed ? "Hide detail" : "Windows & chart"}
-          </Button>
-        )}
         <label className="text-xs text-ink-faint">
           <span className="sr-only">Group for {event.title}</span>
           <select
@@ -139,16 +133,15 @@ export function EventCard({
               key={market.id}
               market={market}
               prices={prices}
-              detailed={detailed}
               windowsFor={windowsFor}
             />
           ))}
         </div>
       )}
 
-      {open && detailed && <OutcomeHistory client={client} event={event} />}
+      {open && <OutcomeHistory client={client} event={event} />}
 
-      {open && detailed && changes.error !== null && (
+      {open && changes.error !== null && (
         <p className="px-3 pb-2 text-xs text-ink-faint">
           The windows could not be read — {changes.error}.
         </p>
@@ -202,9 +195,17 @@ function CollapsedSummary({
           const live = prices.get(outcome.id);
           return { outcome, price: live?.price ?? outcome.price, at: live?.priceAt ?? outcome.priceAt };
         })
-        .filter((row) => row.price !== null)
-        .sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
-      return priced[0] === undefined ? null : { market, ...priced[0] };
+        .filter((row) => row.price !== null);
+      if (priced.length === 0) return null;
+
+      // **A binary market is always quoted on Yes.** Quoting whichever outcome happens to
+      // lead makes the line change its subject as the market crosses 50% — the number stays
+      // large while what it is about flips, which is exactly how a fold ends up saying
+      // "100%" about `No` and reading as though it were about `Yes`.
+      const yes = priced.find((row) => row.outcome.name.toLowerCase() === "yes");
+      const chosen =
+        yes ?? [...priced].sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0];
+      return { market, ...chosen };
     })
     .filter((row) => row !== null)
     .slice(0, 4);
@@ -219,8 +220,12 @@ function CollapsedSummary({
     <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-xs">
       {leaders.map((row) => (
         <li key={row.market.id} className="flex items-center gap-2">
+          {/* The outcome is always named. The market's label alone identifies the question
+              and not the answer, so a number beside it was a number about nothing. */}
           <span className="text-ink-secondary">
-            {row.market.label ?? row.outcome.name}
+            {row.market.label === null
+              ? row.outcome.name
+              : `${row.market.label} · ${row.outcome.name}`}
           </span>
           <ProbabilityBar price={row.price} stale={isStale(row.at)} at={row.at} />
           <span className="tabular-nums text-ink">{formatProbability(row.price)}</span>
@@ -254,12 +259,10 @@ function CollectionBadge({ event }: { event: TrackedEvent }) {
 function MarketRows({
   market,
   prices,
-  detailed,
   windowsFor,
 }: {
   market: Market;
   prices: Map<number, SnapshotEntry>;
-  detailed: boolean;
   windowsFor: (outcomeId: number) => WindowChange[];
 }) {
   return (
@@ -305,7 +308,7 @@ function MarketRows({
               <span className={stale ? "text-warning" : "text-ink-faint"}>
                 {formatAge(priceAt) ?? "no reading"}
               </span>
-              {detailed && <WindowChanges windows={windowsFor(outcome.id)} />}
+              <WindowChanges windows={windowsFor(outcome.id)} />
             </li>
           );
         })}

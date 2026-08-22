@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { formatAge, formatChange, formatProbability, isStale, STALE_AFTER_MS } from "./probability";
+import {
+  BANDS,
+  bandFor,
+  formatAge,
+  formatChange,
+  formatProbability,
+  isStale,
+  STALE_AFTER_MS,
+} from "./probability";
 
 /** The lowest layer that holds the 0..1 rule, so it is tested here and not through the
  *  DOM. What the view does with these strings is the view's test. */
@@ -55,5 +63,33 @@ describe("formatAge", () => {
 
   it("answers null when there is no moment to age", () => {
     expect(formatAge(null, now)).toBeNull();
+  });
+});
+
+describe("bandFor", () => {
+  it("puts a probability in the band its value falls in", () => {
+    expect(bandFor(0.03)?.reading).toBe("unlikely");
+    expect(bandFor(0.31)?.reading).toBe("leaning against");
+    expect(bandFor(0.5)?.reading).toBe("close to even");
+    expect(bandFor(0.72)?.reading).toBe("leaning for");
+    expect(bandFor(0.97)?.reading).toBe("likely");
+  });
+
+  it("gives an edge to the band it opens, so the five cover 0..1 with no seam", () => {
+    for (const band of BANDS) {
+      expect(bandFor(band.from)).toBe(band);
+    }
+    expect(bandFor(0)).toBe(BANDS[0]);
+    expect(bandFor(1)).toBe(BANDS[BANDS.length - 1]);
+  });
+
+  it("has no band for no price — a colour would stand for a value nobody has", () => {
+    expect(bandFor(null)).toBeNull();
+  });
+
+  it("keeps the bands ordered and distinct, which is what makes the ramp readable", () => {
+    const edges = BANDS.map((band) => band.from);
+    expect(edges).toEqual([...edges].sort((a, b) => a - b));
+    expect(new Set(BANDS.map((band) => band.fill)).size).toBe(BANDS.length);
   });
 });
