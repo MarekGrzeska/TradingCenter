@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useRead } from "../data/query";
 import { Button } from "../ui/Button";
 import { EndTrackingDialog } from "./EndTrackingDialog";
+import { OutcomeHistory } from "./OutcomeHistory";
 import { WindowChanges } from "./WindowChanges";
 import type {
   EventChanges,
@@ -122,6 +123,8 @@ export function EventCard({
           />
         ))}
       </div>
+
+      {open && <OutcomeHistory client={client} event={event} />}
 
       {open && changes.error !== null && (
         <p className="px-3 pb-2 text-xs text-ink-faint">

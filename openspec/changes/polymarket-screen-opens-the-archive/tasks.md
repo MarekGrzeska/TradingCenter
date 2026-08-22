@@ -38,12 +38,12 @@
 
 ## 5. Wykres serii prawdopodobieństwa
 
-- [ ] 5.1 Wykres liniowy na `lightweight-charts`, osobny od `chart/Chart.tsx`; oś wartości 0..1, opisana
-- [ ] 5.2 Wybór wyniku i zakresu czasu
-- [ ] 5.3 Granica najstarszego osiągalnego momentu narysowana, nie domyślna z urwania się przebiegu
-- [ ] 5.4 Dziura w pokryciu zostaje dziurą — żadnego odcinka przez przerwę
-- [ ] 5.5 Testy: zakres sięgający przed granicę, przerwa w środku zakresu, seria pusta
-- [ ] 5.6 `pnpm test`, `lint`, `typecheck`
+- [x] 5.1 Wykres liniowy na `lightweight-charts`, osobny od `chart/Chart.tsx`; oś wartości 0..1, opisana
+- [x] 5.2 Wybór wyniku i zakresu czasu
+- [x] 5.3 Granica najstarszego osiągalnego momentu narysowana, nie domyślna z urwania się przebiegu
+- [x] 5.4 Dziura w pokryciu zostaje dziurą — żadnego odcinka przez przerwę
+- [x] 5.5 Testy: zakres sięgający przed granicę, przerwa w środku zakresu, seria pusta
+- [x] 5.6 `pnpm test`, `lint`, `typecheck`
 
 ## 6. Kasowanie zebranej historii
 
