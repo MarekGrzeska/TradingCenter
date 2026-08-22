@@ -33,19 +33,27 @@ jobs:
     with:
       module: strategy
       app_name: app-tradingcenter-strategy
-      # `/health`, for the reason the workbench's probe gives: the control plane read
-      # `Running` over a crash-looping container for the better part of an hour on
-      # 16 August 2026, so every workflow here asks whether the *process* came up.
+      # `/ping`, and the reasoning behind the path matters more than the path.
       #
-      # It answers that completely for this module. The lifespan does not finish until the
-      # migration chain does, under its advisory lock, so a process answering here at all
-      # is a process whose database is at the revision this image was built for. `/health`
-      # is excluded from Easy Auth (infra/app-service.tf) so the probe reaches the
-      # container rather than the platform's 401.
+      # Every workflow here asks whether the *process* came up, because the control plane
+      # read `Running` over a crash-looping container for the better part of an hour on
+      # 16 August 2026. For this module that question is answered by **any** path that
+      # answers at all: the lifespan does not finish until the migration does, under its
+      # advisory lock, so a process serving anything is a process whose database is at the
+      # revision this image was built for.
       #
-      # `"database"` rather than `"status"`: this module's `/health` reports what it can
-      # reach, and that key is one only the running process writes.
-      probe_path: /health
+      # Given that, the probe should use the path proving it while revealing least. `/ping`
+      # answers a constant; `/health` reports how many pairs are watched and whether the
+      # loop is running, and it is behind this module's own caller record
+      # (`strategy/caller_access.py`) like every other REST path — market-data's `/health`
+      # is the same.
+      #
+      # This started as `/health`, which was excluded from Easy Auth so the probe could
+      # reach it — and then refused by the module's own layer, which does not exempt it.
+      # The deploy of d2e2290 failed here and only here, on a container that was up, live
+      # and correctly migrated. Two gates in front of one path, and only one of them knew
+      # the path was meant to be open.
+      probe_path: /ping
       expected_status: 200
-      body_contains: '"database"'
+      body_contains: '"status"'
       attempts: 20
