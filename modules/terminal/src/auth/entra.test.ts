@@ -104,7 +104,7 @@ describe("createEntraIdentities", () => {
     // shell reporting signed-in until whichever module it happened to watch was called.
     const seen: IdentityState[] = [];
     identities.for(config.scopes.gateway).subscribe((state) => seen.push(state));
-    acquireTokenSilent.mockRejectedValueOnce(new InteractionRequiredAuthError());
+    acquireTokenSilent.mockRejectedValueOnce(new InteractionRequiredAuthError("interaction_required", "sign in again"));
 
     await expect(identities.shared.token()).rejects.toBeInstanceOf(SignedOut);
     expect(seen).toEqual(["signed-out"]);

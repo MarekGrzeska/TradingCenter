@@ -1,3 +1,4 @@
+import type { UTCTimestamp } from "lightweight-charts";
 import type { PricePoint } from "./polymarketApi";
 
 /**
@@ -12,7 +13,10 @@ import type { PricePoint } from "./polymarketApi";
  */
 
 export interface LinePoint {
-  time: number;
+  /** The library's own stamp type rather than a bare number: `setData` refuses one, and
+   *  the refusal is the point — seconds and milliseconds are both numbers and only one of
+   *  them draws anything. */
+  time: UTCTimestamp;
   value?: number;
 }
 
@@ -61,13 +65,10 @@ export function toLineData(points: PricePoint[]): LinePoint[] {
       // Halfway between the two readings: the break belongs to the stretch nobody
       // measured, not to either of the moments that were.
       const midpoint = (previous.at.getTime() + point.at.getTime()) / 2;
-      data.push({ time: Math.floor(midpoint / 1000) });
+      data.push({ time: Math.floor(midpoint / 1000) as UTCTimestamp });
     }
-    data.push(
-      point.price === null
-        ? { time: Math.floor(point.at.getTime() / 1000) }
-        : { time: Math.floor(point.at.getTime() / 1000), value: point.price },
-    );
+    const time = Math.floor(point.at.getTime() / 1000) as UTCTimestamp;
+    data.push(point.price === null ? { time } : { time, value: point.price });
   });
 
   return data;

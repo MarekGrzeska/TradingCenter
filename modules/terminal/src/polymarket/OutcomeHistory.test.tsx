@@ -67,7 +67,7 @@ describe("OutcomeHistory", () => {
   });
 
   it("says when the range reaches back past everything that was ever collected", async () => {
-    const read = vi.fn(async () =>
+    const read = vi.fn<PolymarketApi["history"]>(async () =>
       history({ collectedFrom: new Date("2026-08-19T12:00:00Z"), points: [] }),
     );
     render(<OutcomeHistory client={fakeApi(read)} event={EVENT} />);
@@ -90,7 +90,7 @@ describe("OutcomeHistory", () => {
   });
 
   it("asks the module for the range the operator picked", async () => {
-    const read = vi.fn(async () => history());
+    const read = vi.fn<PolymarketApi["history"]>(async () => history());
     render(<OutcomeHistory client={fakeApi(read)} event={EVENT} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "7d" }));
@@ -103,7 +103,7 @@ describe("OutcomeHistory", () => {
   });
 
   it("asks for no boundary at all when the operator wants everything", async () => {
-    const read = vi.fn(async () => history());
+    const read = vi.fn<PolymarketApi["history"]>(async () => history());
     render(<OutcomeHistory client={fakeApi(read)} event={EVENT} />);
 
     await userEvent.click(await screen.findByRole("button", { name: "all" }));
