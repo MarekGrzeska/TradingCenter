@@ -2,6 +2,8 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MarketDataError } from "../data/types";
+import type { Resolution, TrackedPair } from "../data/types";
+import type { ArchiveAdmin } from "../data/source";
 import { StrategyView } from "./StrategyView";
 import type { Decision, Strategy, StrategyApi, Watch } from "./strategyApi";
 
@@ -57,6 +59,25 @@ function decision(overrides: Partial<Decision> = {}): Decision {
     createdAt: new Date("2026-08-22T11:00:00Z"),
     ...overrides,
   };
+}
+
+/** The archive, as this screen uses it: which instruments it collects, and nothing else. */
+function pair(symbol: string, resolution: Resolution): TrackedPair {
+  return {
+    symbol,
+    resolution,
+    addedAt: 1786269600,
+    collectFrom: 1786269600,
+    earliestCandle: null,
+    latestCandle: null,
+    collection: "collecting",
+    candleCount: 0,
+    estimatedBytes: 0,
+  };
+}
+
+function fakeAdmin(pairs: TrackedPair[] = [pair("US100", "HOUR")]): ArchiveAdmin {
+  return { listPairs: vi.fn().mockResolvedValue(pairs) } as unknown as ArchiveAdmin;
 }
 
 function fakeApi(overrides: Partial<StrategyApi> = {}): StrategyApi {
@@ -176,12 +197,21 @@ describe("stopping a watch", () => {
 });
 
 describe("starting a watch", () => {
-  it("sends the strategy and the pair, and asks the module to resolve the parameters", async () => {
+  it("offers what the archive collects and sends the pair that was picked", async () => {
     const api = fakeApi({ listWatches: vi.fn().mockResolvedValue([]) });
+    // Typed by hand, a symbol the archive does not collect is a watch that can only ever
+    // record refusals — so the instrument is picked from what it does collect.
+    const admin = fakeAdmin([pair("EURUSD", "MINUTE"), pair("US100", "MINUTE"), pair("US100", "HOUR")]);
 
-    render(<StrategyView api={api} />);
+    render(<StrategyView api={api} admin={admin} />);
     await userEvent.click(await screen.findByRole("button", { name: "Obserwuj parę" }));
-    await userEvent.type(screen.getByRole("textbox"), "US100");
+    const instrument = await screen.findByRole("combobox", { name: "Instrument" });
+    expect([...instrument.querySelectorAll("option")].map((option) => option.textContent)).toEqual([
+      "EURUSD",
+      "US100",
+    ]);
+
+    await userEvent.selectOptions(instrument, "US100");
     await userEvent.click(screen.getByRole("button", { name: "Zacznij" }));
 
     // No parameters: untouched fields mean the defaults, and resolving them here would
@@ -210,12 +240,12 @@ describe("starting a watch", () => {
       listWatches: vi.fn().mockResolvedValue([]),
     });
 
-    render(<StrategyView api={api} />);
+    render(<StrategyView api={api} admin={fakeAdmin()} />);
     await userEvent.click(await screen.findByRole("button", { name: "Obserwuj parę" }));
     answer([STRATEGY]);
 
-    await userEvent.type(screen.getByRole("textbox"), "US100");
-    // The pair alone used to leave this dead: nothing was selected, and nothing could be.
+    // The instrument alone used to leave this dead: no strategy was selected, and none
+    // could be.
     await waitFor(() =>
       expect(screen.getByRole("button", { name: "Zacznij" })).not.toBeDisabled(),
     );
@@ -239,11 +269,22 @@ describe("starting a watch", () => {
         .mockRejectedValue(new MarketDataError("refused", "US100 is not in the archive")),
     });
 
-    render(<StrategyView api={api} />);
+    render(<StrategyView api={api} admin={fakeAdmin()} />);
     await userEvent.click(await screen.findByRole("button", { name: "Obserwuj parę" }));
-    await userEvent.type(screen.getByRole("textbox"), "US100");
-    await userEvent.click(screen.getByRole("button", { name: "Zacznij" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Zacznij" }));
 
     expect(await screen.findByText(/not in the archive/)).toBeInTheDocument();
+  });
+
+  it("says an empty archive is why nothing can be started", async () => {
+    // Not a dead dialog: this is the one state where the operator's next move is another
+    // tab entirely.
+    const api = fakeApi({ listWatches: vi.fn().mockResolvedValue([]) });
+
+    render(<StrategyView api={api} admin={fakeAdmin([])} />);
+    await userEvent.click(await screen.findByRole("button", { name: "Obserwuj parę" }));
+
+    expect(await screen.findByText(/Archiwum nie zbiera żadnego instrumentu/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Zacznij" })).toBeDisabled();
   });
 });
