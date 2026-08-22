@@ -32,7 +32,18 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 # Emptied between tests so that one test's rows are never another's premise. TRUNCATE
 # rather than dropping and re-migrating: the schema is the same for every test.
-TABLES: tuple[str, ...] = ()
+#
+# CASCADE is not needed — `tracked_events` and `observation_groups` are the roots and
+# everything else falls out of truncating them, but naming all six keeps the statement
+# honest about what it empties.
+TABLES: tuple[str, ...] = (
+    "price_samples",
+    "collected_ranges",
+    "outcomes",
+    "markets",
+    "tracked_events",
+    "observation_groups",
+)
 
 # Generous, because Docker Desktop wakes its VM lazily and a first call after an idle spell
 # can take several seconds.

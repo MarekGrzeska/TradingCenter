@@ -22,12 +22,14 @@
 
 ## 3. Model danych i archiwum
 
-- [ ] 3.1 Wydarzenie → rynki → wyniki, z identyfikatorami dostawcy i stanem rozstrzygnięcia; kolumny zamiast surowego JSON parsowanego przy każdym użyciu
-- [ ] 3.2 Grupy obserwacji (lokalne kategorie), przypisanie wydarzenia, skasowanie grupy bez skutków dla danych
-- [ ] 3.3 Próbka na wynik: rodzaj wyceny, moment pobrania i moment, którego wycena dotyczy; unikalność (wynik, moment) z nadpisaniem
-- [ ] 3.4 Zebrane zakresy i granica najstarszego osiągalnego momentu — zapisywana na najstarszym zwróconym punkcie, nie na krawędzi okna
-- [ ] 3.5 Sufit liczby obserwacji sprawdzany w jednym miejscu, wspólnym dla obu powierzchni
-- [ ] 3.6 Testy: rynek wielowynikowy, zapis dwiema drogami w ten sam moment, brak notowania wobec braku zbierania, `@pytest.mark.db` tylko tam, gdzie test rusza bazę
+- [x] 3.1 Wydarzenie → rynki → wyniki, z identyfikatorami dostawcy i stanem rozstrzygnięcia; kolumny zamiast surowego JSON parsowanego przy każdym użyciu
+- [x] 3.2 Grupy obserwacji (lokalne kategorie), przypisanie wydarzenia, skasowanie grupy bez skutków dla danych
+- [x] 3.3 Próbka na wynik: rodzaj wyceny, moment pobrania i moment, którego wycena dotyczy; unikalność (wynik, moment) z nadpisaniem
+- [x] 3.4 Zebrane zakresy i granica najstarszego osiągalnego momentu — zapisywana na najstarszym zwróconym punkcie, nie na krawędzi okna
+- [x] 3.5 Sufit liczby obserwacji sprawdzany w jednym miejscu, wspólnym dla obu powierzchni
+- [x] 3.6 Testy: rynek wielowynikowy, zapis dwiema drogami w ten sam moment, brak notowania wobec braku zbierania, `@pytest.mark.db` tylko tam, gdzie test rusza bazę
+- [x] 3.7 Testy migracji przeniesione z 2.7: pusta baza dochodzi do head, dwie instancje pod blokadą, odmowa przy braku rewizji, chain w dół i z powrotem
+- [x] 3.8 `uv run pytest` (w tym `-m db`), `ruff check .`, `pyright`
 
 ## 4. Klient dostawcy i zbieranie
 
