@@ -183,6 +183,24 @@ class TestOneFileAtATime:
         assert decisions["workbench"]
         assert decisions["terminal"]
 
+    def test_polymarket_datas_contract_reaches_the_terminal(self) -> None:
+        """The third generated source. Its `contract.py` and `openapi.py` rather than the
+        whole module — unlike the teams surface above, whose descriptions live all over it —
+        because the second of those two files is what marks every response field required,
+        so it moves the generated types with no edit to the first."""
+        decisions = decide(["modules/polymarket-data/polymarket_data/contract.py"])
+        assert decisions["polymarket-data"]
+        assert decisions["terminal"]
+
+        shaping = decide(["modules/polymarket-data/polymarket_data/openapi.py"])
+        assert shaping["terminal"]
+
+    def test_the_rest_of_polymarket_data_leaves_the_terminal_alone(self) -> None:
+        """The other half of the pairing: a module's own work is not the terminal's."""
+        decisions = decide(["modules/polymarket-data/polymarket_data/ingest.py"])
+        assert decisions["polymarket-data"]
+        assert not decisions["terminal"]
+
     def test_a_package_runs_every_module_that_takes_it(self) -> None:
         """The whole price of sharing source, paid in CI rather than in production."""
         decisions = decide(["packages/tc-runtime/tc_runtime/db.py"])

@@ -18,12 +18,15 @@
 --         user=<entra-admin-upn> sslmode=require" \
 --        -v role=app-tradingcenter-agent -f scripts/grant-schema-ownership.sql
 --
---   ... and again with dbname=market_data, role=app-tradingcenter-market-data,
---   and with dbname=teams,       role=app-tradingcenter-teams.
+--   ... and again with dbname=market_data, role=app-tradingcenter-market-data;
+--   with dbname=teams,      role=app-tradingcenter-agent — the *same* role as `agent`,
+--                           because one App Service presents one identity since the two
+--                           modules became the workbench;
+--   and with dbname=polymarket, role=app-tradingcenter-polymarket-data.
 --
--- The three databases are `agent`, `market_data` and `teams` (infra/database.tf).
--- `tradingcenter` is the *server*, not a database on it, and asking for it by that name
--- is a FATAL.
+-- The four databases are `agent`, `market_data`, `teams` and `polymarket`
+-- (infra/database.tf). `tradingcenter` is the *server*, not a database on it, and asking
+-- for it by that name is a FATAL.
 --
 -- **A brand-new, empty database still needs this.** Terraform creates it owned by the
 -- administrator, and `CREATE ON SCHEMA public` has not been granted to PUBLIC since
@@ -32,8 +35,12 @@
 -- to have objects in it; the loop below simply finds none.
 --
 -- `teams` has had this done — checked on 16 August 2026, before its first deployment:
--- `nspacl` on `public` carries `app-tradingcenter-teams=UC`, the same shape `agent` has,
--- and the database holds no tables to reassign. Nothing is owed before that module ships.
+-- `nspacl` on `public` carries the same shape `agent` has, and the database holds no
+-- tables to reassign. Nothing is owed before that module ships.
+--
+-- `polymarket` has NOT. It is created empty by the apply that adds the module, and this
+-- script against it is the one operator step that change carries — before the first
+-- deploy, or polymarket-data starts, tries to migrate and stops.
 --
 -- The password is an Entra access token:
 --   az account get-access-token --resource https://ossrdbms-aad.database.windows.net \

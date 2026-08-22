@@ -443,6 +443,15 @@ ADVISORIES: tuple[tuple[str, str, str, str], ...] = (
         ),
         "8060",
     ),
+    (
+        "workbench",
+        "POLYMARKET_MCP_URL",
+        (
+            "the agent cannot say what a prediction market prices an event at, and a "
+            "team assigning those tools refuses to run"
+        ),
+        "8070",
+    ),
 )
 
 # Settings that stopped existing, and what a `.env` still carrying them is a sign of. Said

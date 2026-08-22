@@ -78,13 +78,13 @@
 
 ## 8. Infrastruktura i CI
 
-- [ ] 8.1 App Service z własną tożsamością zarządzaną, Easy Auth, nazwa zasobu zgodna z modułem od pierwszego dnia
-- [ ] 8.2 Baza `polymarket` na produkcji; `scripts/grant-schema-ownership.sql` raz, przez operatora
-- [ ] 8.3 Tożsamość workbencha w `allowed_applications` i `TOOL_CALLER_APPLICATION_IDS` nowego modułu; identyfikatory aplikacji z `azp`/`appid`
-- [ ] 8.4 `POLYMARKET_MCP_URL` i zakres w ustawieniach workbencha
-- [ ] 8.5 `deploy-polymarket-data.yml` na wzór pozostałych czterech, kończący się `scripts/deploy_probe.py`
-- [ ] 8.6 `checks.yml`: nowy job z filtrem `changes` oraz para — zmiana w `polymarket_data/contract.py` odpala job terminala
-- [ ] 8.7 `terraform plan` na PR; `apply` lokalny operatora, bo zmiana rusza `azuread_*`
+- [x] 8.1 App Service z własną tożsamością zarządzaną, Easy Auth, nazwa zasobu zgodna z modułem od pierwszego dnia
+- [x] 8.2 Baza `polymarket` na produkcji; `scripts/grant-schema-ownership.sql` raz, przez operatora
+- [x] 8.3 Tożsamość workbencha w `allowed_applications` i `TOOL_CALLER_APPLICATION_IDS` nowego modułu; identyfikatory aplikacji z `azp`/`appid`
+- [x] 8.4 `POLYMARKET_MCP_URL` i zakres w ustawieniach workbencha
+- [x] 8.5 `deploy-polymarket-data.yml` na wzór pozostałych czterech, kończący się `scripts/deploy_probe.py`
+- [x] 8.6 `checks.yml`: nowy job z filtrem `changes` (wyprzedzony w 2.8) oraz para — zmiana w `polymarket_data/contract.py` **albo `openapi.py`** odpala job terminala. Para wymagała klienta, którego terminal nie miał: doszły `polymarket_data/openapi.py` i trzecie źródło w `contract.mjs`, więc `contract:check` sprawdza ten kontrakt od pierwszego dnia. Sama podstrona nadal poza zakresem — nic tych typów jeszcze nie importuje
+- [x] 8.7 `terraform plan` na PR; `apply` lokalny operatora, bo zmiana rusza `azuread_*`
 
 ## 9. Prawda w plikach
 

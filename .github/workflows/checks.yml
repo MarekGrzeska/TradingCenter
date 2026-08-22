@@ -120,7 +120,19 @@ jobs:
           # `contract.py`, for the reason `weekdays-on-the-shorter-rhythms` measured: the
           # document is built from routes and from models those files import rather than
           # define, and `recurrence.py`'s docstring is a description in the schema.
-          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/'
+          #
+          # polymarket-data is the third source, and its `contract.py` alone rather than the
+          # whole module: unlike the gateway's snapshot below, this document is built from
+          # models in that one file plus the routes that return them, and those routes are
+          # in `routers/`, which no filter here can usefully name without naming the module.
+          # `openapi.py` is in the pattern too — it *shapes* the document (every response
+          # field marked required), so a change there moves the generated types with no edit
+          # to `contract.py` at all.
+          #
+          # Nothing in the terminal imports the generated polymarket types yet; the subpage
+          # is a change of its own. `contract:check` is still the check that matters — it is
+          # what keeps that file from being born stale.
+          PATTERNS[terminal]='^modules/terminal/|^modules/market-data/market_data/contract\.py$|^modules/workbench/|^modules/polymarket-data/polymarket_data/(contract|openapi)\.py$'
           # market-data takes `tc-mcp-kit` too since the tool surface moved into it: the
           # package's schema slimmer is what keeps eleven tools under their published
           # ceiling, and a change there is a change to what the archive announces.

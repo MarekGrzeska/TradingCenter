@@ -95,6 +95,18 @@ resource "azurerm_postgresql_flexible_server_database" "teams" {
   charset   = "UTF8"
 }
 
+# A fourth, same server and the same reason once more. Its role is the one-off `psql` step
+# every database here has needed: `scripts/grant-schema-ownership.sql` against the server's
+# AD Administrator, with the object id `polymarket_data_managed_identity_principal_id`
+# (app-service.tf) names. Without it the module starts, tries to migrate and stops — which
+# is the intended failure rather than a quiet one (specs/polymarket-data-store).
+resource "azurerm_postgresql_flexible_server_database" "polymarket" {
+  name      = "polymarket"
+  server_id = azurerm_postgresql_flexible_server.main.id
+  collation = "en_US.utf8"
+  charset   = "UTF8"
+}
+
 # `market_data_dev` used to sit beside it — the database local development wrote to for
 # the one morning that arrangement lasted (openspec/changes/local-dev-database-in-docker).
 # Applying its removal DROPS it, data and all; dev data is disposable by definition, but
@@ -141,6 +153,20 @@ resource "azurerm_postgresql_flexible_server_firewall_rule" "workbench_outbound"
   for_each = toset(azurerm_linux_web_app.workbench.possible_outbound_ip_address_list)
 
   name             = "AllowAgentOutbound-${replace(each.value, ".", "-")}"
+  server_id        = azurerm_postgresql_flexible_server.main.id
+  start_ip_address = each.value
+  end_ip_address   = each.value
+}
+
+# The third of the same shape, and the same two-apply first convergence: `terraform apply
+# -target=azurerm_linux_web_app.polymarket_data` once, then the normal unrestricted apply.
+# The addresses are the plan's, so this rule set overlaps the two above entirely — written
+# out anyway, because a rule named after the app it exists for is what survives an app
+# being removed.
+resource "azurerm_postgresql_flexible_server_firewall_rule" "polymarket_data_outbound" {
+  for_each = toset(azurerm_linux_web_app.polymarket_data.possible_outbound_ip_address_list)
+
+  name             = "AllowPolymarketDataOutbound-${replace(each.value, ".", "-")}"
   server_id        = azurerm_postgresql_flexible_server.main.id
   start_ip_address = each.value
   end_ip_address   = each.value

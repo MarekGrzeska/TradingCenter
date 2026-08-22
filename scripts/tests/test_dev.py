@@ -39,6 +39,7 @@ GOOD_ENV: dict[str, str] = {
         "TEAMS_OPENAI_API_KEY=sk-test-teams\n"
         "MARKET_MCP_URL=http://127.0.0.1:8020\n"
         "TRADING_MCP_URL=http://127.0.0.1:8060\n"
+        "POLYMARKET_MCP_URL=http://127.0.0.1:8070\n"
     ),
     "trading-mcp": "CAPITAL_GATEWAY_API_KEY=shared-secret\n",
     # No credential to carry: both of Polymarket's surfaces are public.
@@ -223,7 +224,12 @@ class TestAdvisoriesAreNotRefusals:
         lines = advisories(environment(files=files))
 
         assert any("workbench/.env has no TRADING_MCP_URL" in line for line in lines)
-        assert not any("MARKET_MCP_URL" in line for line in lines)
+        # `has no ` in front of the name, because `POLYMARKET_MCP_URL` *contains*
+        # `MARKET_MCP_URL`: a bare substring test passed for the wrong reason the moment
+        # the third server existed, and would have gone on passing had the archive's own
+        # advisory fired.
+        assert not any("has no MARKET_MCP_URL" in line for line in lines)
+        assert not any("has no POLYMARKET_MCP_URL" in line for line in lines)
 
     def test_a_setting_that_stopped_existing_is_said_out_loud(self) -> None:
         """A line read by nothing looks exactly like a line that is working — which is the
