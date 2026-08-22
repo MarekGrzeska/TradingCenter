@@ -2,10 +2,10 @@
 
 ## 1. Szkielet modułu
 
-- [ ] 1.1 Katalog `modules/strategy` wg wzorca polymarket-data: pyproject (editable tc-runtime/tc-mcp-kit), alembic + `migrations/`, pakiet z `app.py`, `config.py`, `runtime.py` (lock 8080), `contract.py`, Dockerfile, README
-- [ ] 1.2 `config.py` z regułą „tożsamość albo pętla zwrotna" i testami odmów startu (wzorem `test_config.py` polymarket-data)
-- [ ] 1.3 Lifespan: logging → Settings → pula → advisory lock → migracje → weryfikacja rewizji → pętla → sesja `/mcp`; testy migracji pod lockiem
-- [ ] 1.4 `scripts/dev.py`: wiersz w `SERVICES` (8080), `strategy` w `LOGICAL_DATABASES`, wpis w `MIGRATION_CHAINS`; `grant-schema-ownership.sql` odnotowany w README modułu
+- [x] 1.1 Katalog `modules/strategy` wg wzorca polymarket-data: pyproject (editable tc-runtime/tc-mcp-kit), alembic + `migrations/`, pakiet z `app.py`, `config.py`, `runtime.py` (lock 8080), `contract.py`, Dockerfile, README
+- [x] 1.2 `config.py` z regułą „tożsamość albo pętla zwrotna" i testami odmów startu (wzorem `test_config.py` polymarket-data)
+- [x] 1.3 Lifespan: logging → Settings → pula → advisory lock → migracje → weryfikacja rewizji → pętla → sesja `/mcp`; testy migracji pod lockiem
+- [x] 1.4 `scripts/dev.py`: wiersz w `SERVICES` (8080), `strategy` w `LOGICAL_DATABASES`, wpis w `MIGRATION_CHAINS`; `grant-schema-ownership.sql` odnotowany w README modułu
 
 ## 2. Kontrakt wpisu i katalog strategii
 

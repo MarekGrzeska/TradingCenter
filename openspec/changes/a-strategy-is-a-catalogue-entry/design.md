@@ -2,7 +2,16 @@
 
 ## Context
 
-Motywacja w proposal.md. Stan zastany, który kształtuje podejście: katalog wskaźników
+Motywacja w proposal.md.
+
+**Poprawka do wzorca, naniesiona przy implementacji.** Artefakty pisane były z założeniem, że
+szkielet modułu skopiujemy z `polymarket-data`. Tego modułu nie ma na `main` — żyje na
+niescalonej gałęzi — więc gałąź tej zmiany brałaby zależność od cudzej pracy w toku. Wzorcem
+jest zamiast tego `market-data` (lifespan, advisory lock, `/mcp`, `caller_access`) i
+`workbench` (użycie `tc-runtime` zamiast własnego `db.py`). Układ jest ten sam; zmienia się
+tylko, z którego pliku był przepisany.
+
+Stan zastany, który kształtuje podejście: katalog wskaźników
 market-data (wpis = deklaracja + czysta funkcja, jeden plik, maszyneria raz), wyzwalacze
 zespołów w workbenchu (warunek progowy na polu wyniku narzędzia, czytany cyklicznie),
 joby backfillu w market-data (historia dociągana na żądanie, granica u dostawcy) oraz
