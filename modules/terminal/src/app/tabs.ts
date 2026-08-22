@@ -4,6 +4,7 @@ import { AgentSettingsView } from "../agent/settings/AgentSettingsView";
 import { CollectionHistoryView } from "../history/CollectionHistoryView";
 import { GridView } from "../grid/GridView";
 import { InstrumentsView } from "../instruments/InstrumentsView";
+import { PolymarketView } from "../polymarket/PolymarketView";
 import { TeamsView } from "../teams/TeamsView";
 
 /**
@@ -34,6 +35,7 @@ export const TABS: TabDefinition[] = [
     Component: CollectionHistoryView,
   },
   { id: "teams", label: "Teams", path: "teams", Component: TeamsView },
+  { id: "polymarket", label: "Polymarket", path: "polymarket", Component: PolymarketView },
   { id: "accounts", label: "Accounts", path: "accounts", Component: AccountsView },
   {
     id: "agent-settings",

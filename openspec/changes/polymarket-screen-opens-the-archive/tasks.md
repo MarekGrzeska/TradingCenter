@@ -17,14 +17,14 @@
 
 ## 3. Zakładka i lista
 
-- [ ] 3.1 Wpis w `src/app/tabs.ts` i widok; pusta lista nazwana jako pusta, ze wskazaniem, czym się ją zapełnia
-- [ ] 3.2 Wydarzenie → rynki → wyniki; rynek wielowynikowy jest kształtem, dwuwynikowy szczególnym przypadkiem
-- [ ] 3.3 Prawdopodobieństwa całej listy jednym żądaniem migawki; skala 0..1 nazwana w widoku
-- [ ] 3.4 Moment przy każdej cenie; cena starsza niż takt próbkowania odróżniona od bieżącej
-- [ ] 3.5 Zmiany w oknach 5m/15m/1h/4h/12h/24h/7d z momentem punktu bazowego; okno bez pokrycia jako brak z przyczyną, nie zero i nie puste pole
-- [ ] 3.6 Odmowa wobec niedostępności modułu — dwa różne komunikaty
-- [ ] 3.7 Testy: rynek wielowynikowy, jedno żądanie na listę, okno bez pokrycia, odmowa wobec awarii
-- [ ] 3.8 `pnpm test`, `lint`, `typecheck`
+- [x] 3.1 Wpis w `src/app/tabs.ts` i widok; pusta lista nazwana jako pusta, ze wskazaniem, czym się ją zapełnia
+- [x] 3.2 Wydarzenie → rynki → wyniki; rynek wielowynikowy jest kształtem, dwuwynikowy szczególnym przypadkiem
+- [x] 3.3 Prawdopodobieństwa całej listy jednym żądaniem migawki; skala 0..1 nazwana w widoku
+- [x] 3.4 Moment przy każdej cenie; cena starsza niż takt próbkowania odróżniona od bieżącej
+- [x] 3.5 Zmiany w oknach 5m/15m/1h/4h/12h/24h/7d z momentem punktu bazowego; okno bez pokrycia jako brak z przyczyną, nie zero i nie puste pole. Pobierane przy otwarciu wydarzenia, nie dla całej listy — to żądanie na wydarzenie
+- [x] 3.6 Odmowa wobec niedostępności modułu — dwa różne komunikaty
+- [x] 3.7 Testy: rynek wielowynikowy, jedno żądanie na listę, okno bez pokrycia, odmowa wobec awarii
+- [x] 3.8 `pnpm test`, `lint`, `typecheck`
 
 ## 4. Obserwacje i grupy
 
