@@ -3,6 +3,16 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { MarketDataError } from "../data/types";
 import { OutcomeHistory } from "./OutcomeHistory";
+
+// The real library draws to a canvas jsdom cannot render — it reaches into a null 2d
+// context inside a `requestAnimationFrame` callback, which surfaces after the test that
+// triggered it has already finished. What this file tests is what the panel *says* and
+// what it asks the module for; the series' own rule (where a line breaks) is a pure
+// function with its own tests in `series.test.ts`.
+vi.mock("./ProbabilityChart", () => ({
+  ProbabilityChart: () => null,
+}));
+
 import type { History, PolymarketApi, TrackedEvent } from "./polymarketApi";
 
 /**
