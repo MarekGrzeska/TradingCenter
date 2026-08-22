@@ -522,6 +522,49 @@ class ToolCallOut(BaseModel):
         )
 
 
+class MemoryEntryOut(BaseModel):
+    """One thing a team decided to keep — specs/teams-memory.
+
+    `author_agent_key` and `run_id` are legibility, not permission: nothing decides who
+    may read an entry from either. `run_id` is optional because an entry outlives the run
+    that wrote it, and the column leaves room for one the operator writes by hand.
+    """
+
+    id: int
+    author_agent_key: str
+    run_id: int | None
+    content: str
+    created_at: datetime
+
+    @classmethod
+    def from_row(cls, row: Mapping[str, Any]) -> MemoryEntryOut:
+        return cls(
+            id=row["id"],
+            author_agent_key=row["author_agent_key"],
+            run_id=row["run_id"],
+            content=row["content"],
+            created_at=row["created_at"],
+        )
+
+
+class TeamMemoryOut(BaseModel):
+    """What a team remembers, newest first — and how much of it there is.
+
+    `total` rides beside the entries rather than being left for the reader to count,
+    because the read is cut at a ceiling and a cut nobody can see is a memory the reader
+    believes is complete (specs/teams-memory, "Odczyt oddaje najnowsze wpisy, a nie całą
+    pamięć"). The same field answers the model through the tool and the operator through
+    the route.
+    """
+
+    entries: list[MemoryEntryOut]
+    total: int
+
+    @classmethod
+    def from_rows(cls, rows: Iterable[Mapping[str, Any]], *, total: int) -> TeamMemoryOut:
+        return cls(entries=[MemoryEntryOut.from_row(row) for row in rows], total=total)
+
+
 class TradeOut(BaseModel):
     """One call a run made that could change the account — specs/teams-trading, "Każde
     wywołanie zapisujące zostawia własny wiersz śladu".

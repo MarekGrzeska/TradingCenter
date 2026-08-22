@@ -13,11 +13,11 @@
 
 ## 2. Kontrakt
 
-- [ ] 2.1 `teams/contract.py`: `MemoryEntry` i odpowiedź odczytu (wpisy + informacja, że jest ich
+- [x] 2.1 `teams/contract.py`: `MemoryEntry` i odpowiedź odczytu (wpisy + informacja, że jest ich
       więcej niż oddano)
-- [ ] 2.2 Stałe sufitów `MEMORY_ENTRY_MAX_CHARS`, `MEMORY_READ_LIMIT`, `MEMORY_WRITES_PER_RUN`
+- [x] 2.2 Stałe sufitów `MEMORY_ENTRY_MAX_CHARS`, `MEMORY_READ_LIMIT`, `MEMORY_WRITES_PER_RUN`
       w jednym miejscu, obok siebie
-- [ ] 2.3 Testy kontraktu na kształt odpowiedzi i na spójność sufitu znaków z CHECK-iem migracji
+- [x] 2.3 Testy kontraktu na kształt odpowiedzi i na spójność sufitu znaków z CHECK-iem migracji
 
 ## 3. Źródło narzędzi w procesie
 
