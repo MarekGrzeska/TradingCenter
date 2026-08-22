@@ -18,11 +18,13 @@ from tc_runtime.db import asyncpg_dsn
 # references `teams` — the same convention agent's own TABLES follows. `schedule_fires`
 # references `schedules`, `triggers` and `runs`; `schedules` and `triggers` each
 # reference `team_revisions`. `team_layouts` references `teams` directly, not a revision.
+# `team_memories` references both `teams` and `runs`, so it goes before either.
 TABLES: tuple[str, ...] = (
     "trades",
     "usage",
     "tool_calls",
     "schedule_fires",
+    "team_memories",
     "run_steps",
     "runs",
     "schedules",

@@ -5,6 +5,7 @@ change to any part of `teams` pulled all of them into the reader's context.
 
     catalogue.py   teams, team_revisions — the definitions and their history
     layout.py      team_layouts — where the operator dragged each node
+    memory.py      team_memories — what a team keeps from one run to the next
     runs.py        runs, run_steps, tool_calls, and the start-up recovery
     usage.py       usage — the cost written once, and the sums read from it
     trades.py      trades — orders a run placed, and what came back
@@ -49,6 +50,12 @@ from .fires import (
     record_fire,
 )
 from .layout import get_layout, save_layout
+from .memory import (
+    add_memory,
+    count_memories_for_run,
+    delete_memory,
+    list_memories,
+)
 from .runs import (
     create_run,
     fail_running_steps,
@@ -101,13 +108,16 @@ from .usage import (
 )
 
 __all__ = [
+    "add_memory",
     "archive_team",
     "claim_due_schedule",
     "claim_trigger_for_check",
+    "count_memories_for_run",
     "create_run",
     "create_schedule",
     "create_team",
     "create_trigger",
+    "delete_memory",
     "delete_schedule",
     "delete_trigger",
     "disable_schedule_for_failures",
@@ -136,6 +146,7 @@ __all__ = [
     "list_due_triggers",
     "list_fires_for_schedule",
     "list_fires_for_trigger",
+    "list_memories",
     "list_runs_for_team",
     "list_schedules_for_team",
     "list_teams",

@@ -41,6 +41,20 @@ def _parse_jsonb(value: object) -> Any:
     return json.loads(value) if isinstance(value, str) else value
 
 
+# What a team may remember, in three numbers. Constants beside `ROUND_CEILING` rather
+# than settings, and the split is the one `docs/architecture.md` states: a number the
+# operator has a right to set is their budget and lives in the revision — the daily cost
+# ceiling and the trading limits are theirs. These three are not about their money. They
+# bound the shape in which this module hands anything to a model at all, which is why an
+# environment variable must not be able to move them.
+#
+# `MEMORY_ENTRY_MAX_CHARS` is repeated as a CHECK in migration 0008 — the only one of the
+# three whose breach would land on disk — and `test_contract.py` fails if the two drift.
+MEMORY_ENTRY_MAX_CHARS = 2000
+MEMORY_READ_LIMIT = 20
+MEMORY_WRITES_PER_RUN = 10
+
+
 class ModelOut(BaseModel):
     """One entry of the model catalogue — everything a picker needs and nothing else
     (specs/teams-models, "Katalog modeli wystarcza do zbudowania wybieraka"). The

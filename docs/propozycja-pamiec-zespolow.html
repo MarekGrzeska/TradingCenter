@@ -1,0 +1,391 @@
+<title>Pamięć zespołów</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&family=Karla:wght@400;500;700&family=Roboto+Mono:wght@400;700&display=swap">
+<style>
+  :root {
+    --paper: #fcfbf7;
+    --card: #ffffff;
+    --band: #14306b;
+    --band-2: #1d4291;
+    --line: #ddd9cd;
+    --line-soft: #ebe8de;
+    --ink: #16181d;
+    --ink-2: #4f535e;
+    --ink-3: #85899a;
+    --navy: #14306b;
+    --navy-soft: #e6ebf5;
+    --yellow: #f2c313;
+    --yellow-soft: #fdf3d0;
+    --green: #17734c;
+    --green-soft: #e0f0e8;
+    --red: #b8322a;
+    --red-soft: #fae7e4;
+    --head: "Bricolage Grotesque", system-ui, sans-serif;
+    --body: "Karla", system-ui, sans-serif;
+    --mono: "Roboto Mono", ui-monospace, monospace;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink-2);
+    font-family: var(--body); font-size: 16.5px; line-height: 1.64;
+    -webkit-font-smoothing: antialiased;
+  }
+  .inner { max-width: 1080px; margin: 0 auto; padding: 0 30px; }
+  @media (max-width: 620px) { .inner { padding: 0 18px; } }
+
+  header.hero { background: var(--band); color: #ffffff; padding: 52px 0 46px; }
+  header.hero .kicker {
+    display: inline-block; font-family: var(--mono); font-size: 10.5px; font-weight: 700;
+    letter-spacing: 0.18em; text-transform: uppercase; color: var(--band);
+    background: var(--yellow); padding: 5px 11px; margin-bottom: 22px;
+  }
+  header.hero h1 {
+    font-family: var(--head); font-weight: 800; font-size: clamp(38px, 6.6vw, 76px);
+    line-height: 0.98; letter-spacing: -0.035em; color: #ffffff; margin: 0 0 18px;
+    max-width: 17ch; text-wrap: balance;
+  }
+  header.hero .lede { font-size: 20px; line-height: 1.48; color: #d6dcec; margin: 0; max-width: 56ch; }
+  header.hero .lede b { color: #ffffff; font-weight: 700; }
+  header.hero .strip {
+    display: flex; flex-wrap: wrap; gap: 8px 30px; margin-top: 28px; padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.22);
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em; color: #a9b5d2;
+  }
+  header.hero .strip b { color: var(--yellow); font-weight: 700; }
+
+  main { padding-bottom: 96px; }
+
+  .rail {
+    background: var(--card); border: 1px solid var(--line); margin: -30px 0 0;
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    position: relative; box-shadow: 0 10px 30px -18px rgba(20, 48, 107, 0.4);
+  }
+  .rail .cell { padding: 18px 20px; border-right: 1px solid var(--line-soft); }
+  .rail .cell:last-child { border-right: none; }
+  .rail .v {
+    font-family: var(--head); font-weight: 800; font-size: 40px; line-height: 0.92;
+    letter-spacing: -0.04em; color: var(--navy); font-variant-numeric: tabular-nums;
+  }
+  .rail .l { font-size: 13px; color: var(--ink-3); line-height: 1.4; margin-top: 9px; }
+
+  section { padding-top: 60px; }
+  .eyebrow {
+    font-family: var(--mono); font-size: 10.5px; font-weight: 700; letter-spacing: 0.16em;
+    text-transform: uppercase; color: var(--navy); margin-bottom: 10px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .eyebrow::after { content: ""; flex: 1; height: 3px; background: var(--yellow); }
+  h2 {
+    font-family: var(--head); font-weight: 700; font-size: clamp(26px, 3.6vw, 38px);
+    line-height: 1.06; letter-spacing: -0.028em; color: var(--ink); margin: 0 0 18px;
+    max-width: 24ch; text-wrap: balance;
+  }
+  h3.sub {
+    font-family: var(--head); font-weight: 700; font-size: 20px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 30px 0 10px;
+  }
+  p { margin: 0 0 16px; max-width: 68ch; }
+  p.intro { font-size: 18.5px; line-height: 1.55; color: var(--ink); max-width: 60ch; }
+  strong { color: var(--ink); font-weight: 700; }
+  ul { margin: 0 0 16px; padding-left: 22px; max-width: 68ch; }
+  li { margin-bottom: 7px; }
+  .hl { background-image: linear-gradient(transparent 58%, var(--yellow-soft) 58%); box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+  a { color: var(--navy); }
+  a:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+  code { font-family: var(--mono); font-size: 0.83em; color: var(--navy); background: var(--navy-soft); padding: 1.5px 5px; }
+
+  figure { margin: 26px 0 0; background: var(--card); border: 1px solid var(--line); padding: 18px 18px 12px; }
+  .scroll { overflow-x: auto; }
+  figure svg { display: block; width: 100%; height: auto; color: var(--ink-2); }
+  figcaption {
+    font-size: 13.5px; color: var(--ink-3); margin-top: 12px; padding-top: 10px;
+    border-top: 3px solid var(--yellow); max-width: 74ch;
+  }
+  figcaption b { font-family: var(--mono); font-size: 11px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--navy); }
+
+  .table-wrap { background: var(--card); border: 1px solid var(--line); overflow-x: auto; margin: 4px 0 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 630px; }
+  th {
+    text-align: left; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.12em; text-transform: uppercase; color: #ffffff; background: var(--navy);
+    padding: 10px 16px;
+  }
+  td { padding: 11px 16px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+  tbody tr:last-child td { border-bottom: none; }
+  td b { color: var(--ink); font-weight: 700; }
+  td.n, th.n { font-family: var(--mono); font-variant-numeric: tabular-nums; text-align: right; }
+  tr.void td { color: var(--ink-3); background: var(--red-soft); }
+
+  pre {
+    background: var(--navy); color: #e7ecf8; padding: 20px 22px; overflow-x: auto; margin: 4px 0 20px;
+    font-family: var(--mono); font-size: 13px; line-height: 1.68;
+  }
+  pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+  .k { color: var(--yellow); font-weight: 700; }
+  .s { color: #8fd6b0; }
+  .c { color: #8f9ec4; }
+
+  .tag {
+    display: inline-block; font-family: var(--mono); font-size: 10px; font-weight: 700;
+    letter-spacing: 0.1em; text-transform: uppercase; padding: 3px 8px; white-space: nowrap;
+  }
+  .tag.ok { background: var(--green-soft); color: var(--green); }
+  .tag.att { background: var(--yellow-soft); color: #8a6708; }
+  .tag.stop { background: var(--red-soft); color: var(--red); }
+
+  .quote {
+    background: var(--yellow); color: var(--ink); padding: 26px 28px; margin: 30px 0;
+    font-family: var(--head); font-weight: 700; font-size: clamp(21px, 2.8vw, 29px);
+    line-height: 1.16; letter-spacing: -0.02em; max-width: 30ch;
+  }
+
+  .fails { display: grid; gap: 12px; margin-top: 6px; }
+  .fail {
+    background: var(--card); border: 1px solid var(--line); border-left: 6px solid var(--yellow);
+    padding: 15px 18px;
+  }
+  .fail.stop { border-left-color: var(--red); }
+  .fail.ok { border-left-color: var(--green); }
+  .fail h3 {
+    font-family: var(--head); font-weight: 700; font-size: 19px; letter-spacing: -0.018em;
+    color: var(--ink); margin: 0 0 5px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .fail p { margin: 0; font-size: 15px; max-width: 72ch; }
+
+  footer {
+    background: var(--band); color: #a9b5d2; margin-top: 70px; padding: 22px 0;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.07em;
+  }
+  footer .inner { display: flex; flex-wrap: wrap; gap: 8px 26px; justify-content: space-between; }
+</style>
+
+<header class="hero">
+  <div class="inner">
+    <span class="kicker">Propozycja · workbench / teams</span>
+    <h1>Pamięć zespołów</h1>
+    <p class="lede">Dziś zespół kończy przebieg i zapomina wszystko poza śladem. Ta propozycja daje mu <b>notatki, które przeżywają przebieg</b> — i operatorowi decyzję, <b>który agent wolno im pisać, a który tylko czytać</b>.</p>
+    <div class="strip">
+      <span>TradingCenter / workbench</span>
+      <span>22 sierpnia 2026 · analiza + propozycja</span>
+      <span>stan kodu: <b>main 3ab7254</b></span>
+      <span>status: <b>PROPOZYCJA</b> — nic z tego jeszcze nie istnieje</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="inner">
+    <div class="rail">
+      <div class="cell"><div class="v">0</div><div class="l">mechanizmów pamięci w kodzie dziś — sprawdzone przeszukaniem</div></div>
+      <div class="cell"><div class="v">2</div><div class="l">nowe narzędzia: <code>memory_read</code> · <code>memory_write</code></div></div>
+      <div class="cell"><div class="v">1</div><div class="l">nowa tabela i migracja <code>0008</code> w łańcuchu teams</div></div>
+      <div class="cell"><div class="v">1</div><div class="l">istniejąca luka egzekwowania do domknięcia przy okazji</div></div>
+    </div>
+
+    <section>
+      <div class="eyebrow">01 · Stan dzisiejszy</div>
+      <h2>Zespół nie pamięta niczego — i to była decyzja</h2>
+      <p class="intro">Przeszukanie całego modułu i specyfikacji nie znajduje żadnej pamięci między przebiegami. To nie przeoczenie: brak historii jest dziś zapisaną własnością systemu, w trzech miejscach.</p>
+      <ul>
+        <li><code>packages/tc-openai/tc_openai/provider.py</code> daje zespołom <code>Briefing</code> i celowo <strong>nie ma parametru historii</strong> — „zaproszeniem do hodowania transkryptu, którego zespół nie ma prawa trzymać", mówi docstring.</li>
+        <li><code>teams/runner/graph.py</code> podaje agentowi wyłącznie wypowiedzi poprzedników — wymóg „Agent widzi wypowiedzi poprzedników, a nie całą historię przebiegu" w <code>openspec/specs/teams-runs</code>.</li>
+        <li><code>ToolRound</code> „żyje tak długo jak tura i ani chwili dłużej".</li>
+      </ul>
+      <p>Pamięć zespołu jest więc <span class="hl">świadomym odwróceniem zapisanej własności, nie dopisaniem brakującej funkcji</span> — i dlatego idzie ścieżką OpenSpec, a nie zwykłą gałęzią: zmienia wymagania (nowy spec), dokłada trasę do kontraktu teams, który terminal generuje, i rozszerza to, co model dostaje do ręki.</p>
+      <p>Jedno w tej propozycji <strong>nie jest</strong> odwróceniem: pamięć to nie transkrypt. Wpis powstaje wyłącznie decyzją agenta — wywołaniem narzędzia, widocznym w śladzie przebiegu jak każde inne — a nie automatycznym zrzutem rozmowy. <code>Briefing</code> zostaje bez historii; to, co przeżywa przebieg, to zdania, które ktoś <em>postanowił</em> zostawić następcom.</p>
+      <p>Miejsce jest jedno i intuicja z pytania jest trafna: pamięć to dana eksperymentu, a właścicielem danych eksperymentu jest powierzchnia <code>teams</code> workbenchu — nie <code>market-data</code> (archiwum świec), nie <code>trading-mcp</code> (rachunek). Moduł, który trzyma rewizje i ślady, trzyma też notatki.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">02 · Kształt</div>
+      <h2>Notatki na zespole, obok rewizji, nigdy w niej</h2>
+      <p class="intro">Jedna tabela w bazie <code>teams</code>: <code>team_memories</code>. Wpis należy do zespołu, nie do rewizji i nie do przebiegu — bo wiedza ma przeżyć i jedno, i drugie.</p>
+      <p>Wzorcem struktury jest <code>team_layouts</code> (migracja <code>0004</code>): dana zmienna, kluczowana <code>team_id</code>, celowo <strong>poza</strong> niezmienną rewizją, z właścicielem osiąganym przez złączenie z <code>teams</code> — więc filtr właściciela zostaje tam, gdzie wszędzie: w samym zdaniu SQL.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Kolumna</th><th>Typ</th><th>Po co</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>id</b></td><td><code>uuid</code></td><td>klucz wpisu</td></tr>
+            <tr><td><b>team_id</b></td><td><code>fk → teams</code></td><td>zakres pamięci; archiwizacja zespołu jej nie kasuje, tak jak nie kasuje przebiegów</td></tr>
+            <tr><td><b>author_agent_key</b></td><td><code>text</code></td><td>który agent zapisał — czytelność eksperymentu, nie uprawnienie</td></tr>
+            <tr><td><b>run_id</b></td><td><code>fk → runs, null</code></td><td>z którego przebiegu wpis pochodzi; <code>null</code> zostawia miejsce na wpis ręczny operatora w przyszłości</td></tr>
+            <tr><td><b>content</b></td><td><code>text</code> + CHECK długości</td><td>treść notatki; sufit znaków w bazie, nie tylko w kodzie</td></tr>
+            <tr><td><b>created_at</b></td><td><code>timestamptz</code></td><td>porządek odczytu: najnowsze pierwsze</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><span class="hl">Wpis raz zapisany się nie zmienia</span> — ta sama zasada, która rządzi rewizją i śladem. Agent, który chce poprawić notatkę, dopisuje następną; usuwanie należy do operatora, w terminalu, nigdy do agenta. Dzięki temu ślad przebiegu sprzed tygodnia czyta się razem z pamięcią, jaką zespół wtedy zostawił, a nie z jej dzisiejszą wersją.</p>
+      <figure>
+        <div class="scroll">
+          <svg viewBox="0 0 960 300" role="img" aria-label="Przebieg N zapisuje notatkę narzędziem memory_write do tabeli team_memories; przebieg N+1 czyta ją narzędziem memory_read; operator czyta i usuwa wpisy przez REST z terminala; rewizja stoi obok, nietknięta">
+            <defs>
+              <marker id="m1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+              </marker>
+              <marker id="m1b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="#14306b"></path>
+              </marker>
+            </defs>
+            <g font-family="Karla, sans-serif">
+              <rect x="16" y="52" width="192" height="72" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="112" y="80" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">przebieg N</text>
+              <text x="112" y="100" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">agent z memory_write</text>
+
+              <rect x="16" y="176" width="192" height="72" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="112" y="204" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">przebieg N+1</text>
+              <text x="112" y="224" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">agent z memory_read</text>
+
+              <rect x="384" y="106" width="224" height="88" fill="#14306b" stroke="#14306b"></rect>
+              <text x="496" y="140" text-anchor="middle" font-size="14" font-weight="700" fill="#ffffff">team_memories</text>
+              <text x="496" y="160" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#f2c313">baza teams · migracja 0008</text>
+              <text x="496" y="178" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#a9b5d2">wpisy niezmienne, filtr właściciela w SQL</text>
+
+              <line x1="208" y1="88" x2="380" y2="130" stroke="#14306b" stroke-width="1.6" marker-end="url(#m1b)"></line>
+              <text x="288" y="86" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b">memory_write · wpis w śladzie</text>
+              <line x1="380" y1="176" x2="208" y2="212" stroke="#14306b" stroke-width="1.6" marker-end="url(#m1b)"></line>
+              <text x="290" y="212" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="#14306b">memory_read · najnowsze wpisy</text>
+
+              <rect x="760" y="106" width="184" height="88" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+              <text x="852" y="140" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">terminal</text>
+              <text x="852" y="160" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">GET · DELETE</text>
+              <text x="852" y="178" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">kontrakt generowany</text>
+              <line x1="756" y1="150" x2="612" y2="150" stroke="currentColor" stroke-width="1.4" marker-end="url(#m1)"></line>
+              <text x="684" y="140" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.75">/teams/{id}/memory</text>
+
+              <rect x="384" y="16" width="224" height="52" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="6 4"></rect>
+              <text x="496" y="38" text-anchor="middle" font-size="13" font-weight="700" fill="currentColor">rewizja zespołu</text>
+              <text x="496" y="56" text-anchor="middle" font-size="10.5" font-family="Roboto Mono, monospace" fill="currentColor" opacity="0.6">niezmienna — pamięć stoi obok, nie w niej</text>
+            </g>
+          </svg>
+        </div>
+        <figcaption><b>Rys. 1</b> — pamięć spina przebiegi tego samego zespołu, omijając rewizję. Obie strzałki do tabeli są wywołaniami narzędzi, więc obie zostają w śladzie przebiegu; strzałka terminala to zwykła trasa REST z filtrem właściciela.</figcaption>
+      </figure>
+    </section>
+
+    <section>
+      <div class="eyebrow">03 · Uprawnienia</div>
+      <h2>Kto pisze, mówi definicja — mechanizmem, który już jest</h2>
+      <p class="intro">Konfiguracja „czy i który agent może robić wpisy" nie potrzebuje nowego pola. <code>AgentDefinition.tools</code> już dziś nazywa narzędzia per agent, a spec <code>teams-tool-access</code> już gwarantuje, że model dostaje dokładnie te — więc uprawnienia do pamięci to przypisanie <code>memory_read</code> i/lub <code>memory_write</code> w definicji.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Wariant</th><th>Jak działa</th><th>Werdykt</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Uprawnienia = przypisane narzędzia</b></td>
+              <td>agent z <code>memory_write</code> w <code>tools</code> pisze; z <code>memory_read</code> czyta; bez żadnego — pamięci nie widzi. Walidacja przy zapisie rewizji, plan narzędzi przy starcie przebiegu i dobór per agent działają bez zmian; terminal pokaże nowe nazwy sam, bo <code>AgentSettingsDialog</code> czyta ogłoszony katalog z <code>GET /tools</code>.</td>
+              <td><span class="tag ok">wybrany</span></td>
+            </tr>
+            <tr>
+              <td><b>Typowane pole <code>memory: none/read/write</code></b></td>
+              <td>czytelniejsze w UI, ale dubluje istniejący mechanizm uprawnień drugim, wymaga zmiany kontraktu definicji, edytora w terminalu i osobnej ścieżki egzekwowania — trzy koszty za to samo zdanie.</td>
+              <td><span class="tag stop">odrzucony</span></td>
+            </tr>
+            <tr>
+              <td><b>Automatyczne wstrzykiwanie pamięci do briefingu</b></td>
+              <td>każdy przebieg płaciłby za całą pamięć w każdym agencie z osobna, a odczyt nie zostawałby w śladzie. Narzędzie jest jawne: model decyduje, kiedy sięgnąć, i widać to potem czarno na białym.</td>
+              <td><span class="tag stop">odrzucony</span></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">Luka, którą ta zmiana musi domknąć</h3>
+      <p>Dziś ograniczenie agenta polega wyłącznie na tym, <em>co mu podano</em>: <code>ToolPlan.call</code> (<code>teams/tools/assignment.py</code>) indeksuje słownik <strong>wszystkich ogłoszonych nazw</strong>, nie tylko przypisanych temu agentowi, i żaden test nie sprawdza odmowy przy wywołaniu nieprzypisanej nazwy. Dla narzędzi odczytu to była akademicka różnica; <span class="hl">przy pamięci „może czytać, nie może pisać" musi trzymać także wtedy, gdy model zgadnie nazwę</span> — więc wywołanie dostaje klucz agenta i sprawdzenie przypisania, z testem odmowy.</p>
+      <h3 class="sub">Zapis to nie ruch na rachunku</h3>
+      <p>Narzędzie <code>memory_write</code> jest ogłaszane jako zmieniające stan (<code>readOnlyHint</code> ustawiony uczciwie), ale jego źródło ma <code>can_move_the_account=False</code> — a logika <code>moves_the_account</code> wymaga obu naraz. Zespół z samą pamięcią pozostaje więc zespołem „bez narzędzi handlowych": harmonogramy i granice zleceń traktują go jak dziś.</p>
+    </section>
+
+    <section>
+      <div class="eyebrow">04 · Droga przez moduł</div>
+      <h2>Trzecie źródło narzędzi, w procesie, bez portu</h2>
+      <p class="intro">Rejestr narzędzi teams zna dziś dokładnie dwa serwery: <code>market-mcp</code> i <code>trading-mcp</code>, oba sieciowe. Pamięć wchodzi jako trzecie źródło — in-process, na wzór <code>LocalTeamsTools</code> z <code>workbench/team_tools.py</code> i narzędzi rysunków w <code>agent/tools/drawings.py</code>.</p>
+      <p>Źródło mieszka w <code>teams/tools/memory.py</code> — warstwowanie na to pozwala, bo <code>teams</code> czyta własny store — i podszywa się pod <code>ToolServer</code> tym samym interfejsem: <code>label</code>, <code>configured</code>, <code>list_tools()</code>, <code>call()</code>. Jedna własność jest tu warta zdania: <strong><code>list_tools()</code> nie dotyka bazy</strong> — dwa deskryptory są stałe. Dzięki temu <code>announced_snapshot</code> i <code>announced_tools_by_server</code>, które budują jednorazowy rejestr do walidacji przy zapisie rewizji, ogłaszają nowe nazwy bez połączenia i bez kłopotu z anyio, który wymusił ich dzisiejszy kształt. Store wpina dopiero assembly (<code>workbench/app.py</code>), tam gdzie jest pula połączeń.</p>
+      <p>Do domknięcia jest jeszcze jeden brak: <code>execute_run</code> dostaje dziś tylko <code>run_id</code> i definicję — <span class="hl">ani <code>team_id</code>, ani właściciela</span>, choć <code>start_run_on_revision</code> ma oba. Pamięć kluczowana zespołem wymaga przewleczenia obu do miejsca, z którego woła się narzędzia.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Element</th><th>Gdzie</th><th>Uwaga</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Migracja <code>0008_team_memories</code></b></td><td><code>migrations/teams/versions/</code></td><td>prozą we wstępie: dlaczego obok rewizji; tabela dopisana do listy TRUNCATE w <code>tests/teams/conftest.py</code></td></tr>
+            <tr><td><b>Store</b></td><td><code>teams/store/memory.py</code></td><td>append, odczyt najnowszych N, delete; re-eksport w <code>store/__init__.py</code></td></tr>
+            <tr><td><b>Źródło narzędzi</b></td><td><code>teams/tools/memory.py</code></td><td>dwa narzędzia; rejestr i obie funkcje <code>announced_*</code> przyjmują źródła lokalne</td></tr>
+            <tr><td><b>Egzekwowanie przypisania</b></td><td><code>teams/tools/assignment.py</code></td><td>wywołanie sprawdza przydział agenta — domknięcie luki z sekcji 03</td></tr>
+            <tr><td><b>Przewleczenie kontekstu</b></td><td><code>teams/runner/starter.py</code> → <code>engine.py</code> → <code>loop.py</code></td><td><code>team_id</code> + <code>owner_principal</code> do wywołań narzędzi</td></tr>
+            <tr><td><b>Trasy REST</b></td><td><code>teams/routers/memory.py</code></td><td><code>GET /teams/{id}/memory</code> · <code>DELETE /teams/{id}/memory/{entry_id}</code>; kolejność w <code>surface.py</code> pilnowana testem kolizji</td></tr>
+            <tr><td><b>Terminal</b></td><td><code>modules/terminal/src/teams/</code></td><td><code>pnpm contract:generate</code> po zmianie kontraktu — inaczej CI utnie na <code>contract:check</code>; panel notatek przy zespole, odczyt + usunięcie</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">Sufity, od pierwszego dnia</h3>
+      <p>Trzy stałe w module — jak <code>ROUND_CEILING</code>, świadomie nie ustawienia: sufit znaków wpisu (powtórzony CHECK-iem w bazie), liczba wpisów oddawanych przez <code>memory_read</code> (najnowsze N), sufit liczby wpisów zapisanych w jednym przebiegu. Pamięć bez sufitu rośnie w transkrypt, a transkrypt jest dokładnie tym, czego ten moduł postanowił nie trzymać.</p>
+      <div class="quote">Rewizja mówi, czym zespół jest. Pamięć — czego się nauczył.</div>
+    </section>
+
+    <section>
+      <div class="eyebrow">05 · Odmowy i stany</div>
+      <h2>Co odmawia, co przechodzi, co zostaje w śladzie</h2>
+      <div class="fails">
+        <div class="fail ok">
+          <h3>Stara rewizja bez pamięci <span class="tag ok">działa bez zmian</span></h3>
+          <p>Rewizja, która nie przypisuje narzędzi pamięci, uruchamia się dokładnie jak dziś — wzorzec pola <code>trading</code> z domyślną wartością: żadna zapisana definicja nie wymaga przepisania.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Zapis przez agenta bez <code>memory_write</code> <span class="tag stop">odmowa wywołania</span></h3>
+          <p>Nieprzypisana nazwa jest odmówiona przy wywołaniu, nie tylko nieoferowana — z testem, który zgaduje nazwę za model. To jest domknięcie istniejącej luki, więc chroni też narzędzia handlowe.</p>
+        </div>
+        <div class="fail stop">
+          <h3>Wpis ponad sufit znaków <span class="tag stop">odmowa narzędzia</span></h3>
+          <p>Model dostaje odmowę nazywającą sufit i zmierzoną długość — opis narzędzia mówi o tej granicy wprost, bo opis jest jedynym źródłem wiedzy modelu o module.</p>
+        </div>
+        <div class="fail">
+          <h3>Każdy odczyt i zapis w śladzie <span class="tag att">tool_calls</span></h3>
+          <p>Wywołania pamięci przechodzą przez tę samą pętlę co inne narzędzia, więc ślad przebiegu pokazuje, co zespół przeczytał i co zostawił — eksperyment pozostaje czytelny po czasie bez żadnej dodatkowej pracy.</p>
+        </div>
+        <div class="fail">
+          <h3>Archiwizacja zespołu <span class="tag att">pamięć zostaje</span></h3>
+          <p>Ta sama zasada co przy przebiegach: wycofanie z katalogu nie zabiera wyniku eksperymentu. Notatki znikają tylko ręką operatora, wpis po wpisie.</p>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <div class="eyebrow">06 · Plan</div>
+      <h2>Jedna zmiana OpenSpec, sześć kroków</h2>
+      <p class="intro">Proponowana nazwa: <code>teams-remember-between-runs</code>. Prozą po polsku, strukturą po angielsku, jak każda zmiana w <code>openspec/</code>.</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th class="n">#</th><th>Krok</th><th>Co powstaje</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="n">1</td><td><b>Propozycja i delty specyfikacji</b></td><td>nowy spec <code>teams-memory</code> (tabela, niezmienność wpisu, sufity, własność operatora); delty w <code>teams-tool-access</code> (źródło lokalne obok serwerów, egzekwowanie przypisania przy wywołaniu) i <code>terminal-teams</code> (panel notatek)</td></tr>
+            <tr><td class="n">2</td><td><b>Migracja + store</b></td><td><code>0008_team_memories</code>, <code>teams/store/memory.py</code>, testy <code>@pytest.mark.db</code> tylko tam, gdzie naprawdę jest baza</td></tr>
+            <tr><td class="n">3</td><td><b>Źródło narzędzi + egzekwowanie</b></td><td><code>teams/tools/memory.py</code>, rozszerzenie rejestru i <code>announced_*</code> o źródła lokalne, sprawdzenie przypisania w wywołaniu; testy na <code>scripted_provider</code> — co agent był <em>oferowany</em> i co mu odmówiono</td></tr>
+            <tr><td class="n">4</td><td><b>Przewleczenie kontekstu przebiegu</b></td><td><code>team_id</code> i <code>owner_principal</code> od <code>starter</code> do wywołań narzędzi; test całego przebiegu z zapisem i odczytem między dwoma przebiegami</td></tr>
+            <tr><td class="n">5</td><td><b>Trasy REST + kontrakt</b></td><td><code>routers/memory.py</code>, trzy testy CRUD wedle reguły (szczęśliwa ścieżka, błąd, odmowa), <code>pnpm contract:generate</code></td></tr>
+            <tr><td class="n">6</td><td><b>Terminal</b></td><td>panel notatek zespołu: lista + usunięcie; przypisywanie narzędzi pamięci działa od razu, bo edytor czyta ogłoszony katalog</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <h3 class="sub">Decyzje zostawione otwarte — do rozmowy, nie do kodu</h3>
+      <ul>
+        <li><strong>Widoczność wpisów:</strong> v1 daje jedną wspólną pamięć zespołu; zawężanie odczytu do wpisów wybranych autorów to możliwe v2, jeśli eksperymenty tego zażądają.</li>
+        <li><strong>Wpis ręczny operatora:</strong> kolumna <code>run_id NULL</code> zostawia na to miejsce, ale v1 nie dodaje formularza — operator wpływa na pamięć przez usuwanie.</li>
+        <li><strong>Pamięć w rozmowie operatora (chat):</strong> narzędzia pamięci mogłyby wejść też do zestawu <code>teams_tools</code> czatu, ale to osobna decyzja z własnym kosztem sufitu powierzchni (<code>SURFACE_CEILING_CHARS</code>) — poza zakresem v1.</li>
+        <li><strong>Wygasanie:</strong> żadnego TTL w v1; sufit liczby wpisów i ręka operatora wystarczą, dopóki pomiar nie powie inaczej.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <span>Propozycja: pamięć zespołów · analiza na stanie main 3ab7254</span>
+    <span>22 sierpnia 2026 · styl wg docs/style.md</span>
+  </div>
+</footer>
