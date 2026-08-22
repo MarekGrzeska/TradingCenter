@@ -179,3 +179,64 @@ async def test_there_is_no_route_that_writes_a_memory_entry(client: TestClient) 
     )
 
     assert response.status_code == 405
+
+
+def test_a_revision_may_assign_a_tool_this_process_serves_itself(
+    client: TestClient,
+) -> None:
+    """specs/teams-tool-access, "Zapis rewizji z narzędziem z procesu". No MCP server is
+    configured in this suite, so the save is confirmed by the only source that answered —
+    and the revision carries the bare name, never a description or a parameter shape."""
+    definition = {
+        "agents": [
+            {
+                "key": "scout",
+                "role": "the scout",
+                "prompt": "say something",
+                "model_id": MODEL_ID,
+                "tools": ["memory_read", "memory_write"],
+            }
+        ],
+        "edges": [],
+    }
+
+    response = client.post(
+        "/teams",
+        json={"name": "remembering desk", "description": "", "definition": definition},
+        headers=OWNER,
+    )
+
+    assert response.status_code == 201
+    team_id = response.json()["id"]
+    saved = client.get(f"/teams/{team_id}/revisions/latest", headers=OWNER).json()
+    agent = saved["definition"]["agents"][0]
+    assert agent["tools"] == ["memory_read", "memory_write"]
+    # specs/teams-tool-access, "Rewizja z narzędziem modułu": the name and nothing else.
+    assert "description" not in str(agent["tools"])
+
+
+def test_a_revision_naming_a_tool_nobody_announces_is_still_refused(
+    client: TestClient,
+) -> None:
+    # The in-process source widened what may be assigned; it did not turn the check off.
+    definition = {
+        "agents": [
+            {
+                "key": "scout",
+                "role": "the scout",
+                "prompt": "say something",
+                "model_id": MODEL_ID,
+                "tools": ["read_the_future"],
+            }
+        ],
+        "edges": [],
+    }
+
+    response = client.post(
+        "/teams",
+        json={"name": "wishful desk", "description": "", "definition": definition},
+        headers=OWNER,
+    )
+
+    assert response.status_code == 422
+    assert "read_the_future" in response.json()["detail"]

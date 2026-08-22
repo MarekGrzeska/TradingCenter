@@ -28,13 +28,14 @@ from teams.tools import (
     MEMORY_TOOL_NAMES,
     MemoryScope,
     MemoryToolSource,
+    ToolNameCollision,
     ToolOutcomeKind,
     ToolServerRegistry,
     plan_tools,
 )
 
-from .mcp_stand_in import settings_for
-from .scripted_provider import ScriptedProvider, asks_for_tool, says
+from .mcp_stand_in import serving, settings_for
+from .scripted_provider import ScriptedProvider, asks_for_tool, breaks, says
 
 pytestmark = pytest.mark.db
 
@@ -414,3 +415,177 @@ async def test_the_refusal_names_what_the_agent_does_have(pool: asyncpg.Pool) ->
     async with pool.acquire() as conn:
         calls = await store.get_run_tool_calls(conn, run_id=run_id)
     assert "It has: memory_read." in calls[0]["result_text"]
+
+
+async def test_a_note_survives_the_run_that_failed_after_writing_it(
+    pool: asyncpg.Pool,
+) -> None:
+    """specs/teams-memory, "Wpis zostaje po przebiegu, który się nie udał". A failed run is
+    a result too, and what it worked out before it broke is not thrown away with it."""
+    definition = TeamDefinition(
+        agents=[an_agent("scout", tools=["memory_write"]), an_agent("judge")],
+        edges=[TeamEdge(from_="scout", to="judge")],
+    )
+    team_id, revision_id = await _team(pool, definition)
+    provider = ScriptedProvider(
+        by_role={
+            "scout": asks_for_tool("memory_write", {"content": "learned this"}, then="done."),
+            "judge": breaks("the provider broke"),
+        }
+    )
+
+    run_id = await _run(
+        pool, definition, provider=provider, team_id=team_id, revision_id=revision_id
+    )
+
+    async with pool.acquire() as conn:
+        run = await store.get_run(conn, run_id=run_id, owner_principal=OWNER)
+        rows, _total = await store.list_memories(
+            conn, team_id=team_id, owner_principal=OWNER, limit=10
+        )
+    assert run["status"] == "failed"
+    assert [row["content"] for row in rows] == ["learned this"]
+
+
+async def test_a_newer_revision_reads_what_an_older_one_remembered(
+    pool: asyncpg.Pool,
+) -> None:
+    """specs/teams-memory, "Nowa rewizja nie zabiera pamięci". The memory hangs off the
+    team, so saving a definition does not start the team over."""
+    definition = TeamDefinition(agents=[an_agent("scout", tools=["memory_write"])])
+    team_id, first_revision = await _team(pool, definition)
+    await _run(
+        pool,
+        definition,
+        provider=ScriptedProvider(
+            default=asks_for_tool("memory_write", {"content": "from v1"}, then="ok.")
+        ),
+        team_id=team_id,
+        revision_id=first_revision,
+    )
+
+    revised = TeamDefinition(
+        agents=[an_agent("scout", tools=["memory_read"]), an_agent("judge")],
+        edges=[TeamEdge(from_="scout", to="judge")],
+    )
+    async with pool.acquire() as conn:
+        second = await store.save_revision(
+            conn, team_id=team_id, owner_principal=OWNER, definition=revised
+        )
+    assert second is not None
+
+    run_id = await _run(
+        pool,
+        revised,
+        provider=ScriptedProvider(
+            by_role={"scout": asks_for_tool("memory_read", {}, then="read.")},
+        ),
+        team_id=team_id,
+        revision_id=second["id"],
+    )
+
+    async with pool.acquire() as conn:
+        calls = await store.get_run_tool_calls(conn, run_id=run_id)
+    assert "from v1" in calls[0]["result_text"]
+
+
+async def test_a_correction_is_another_note_and_the_first_one_stays(
+    pool: asyncpg.Pool,
+) -> None:
+    """specs/teams-memory, "Wpis raz zapisany się nie zmienia". There is no path that
+    updates one — the agent writes again, and the read shows both, newest first."""
+    definition = TeamDefinition(agents=[an_agent("scout", tools=["memory_write"])])
+    team_id, revision_id = await _team(pool, definition)
+    for content in ("gaps always close", "gaps close only on quiet days"):
+        await _run(
+            pool,
+            definition,
+            provider=ScriptedProvider(
+                default=asks_for_tool("memory_write", {"content": content}, then="ok.")
+            ),
+            team_id=team_id,
+            revision_id=revision_id,
+        )
+
+    async with pool.acquire() as conn:
+        rows, total = await store.list_memories(
+            conn, team_id=team_id, owner_principal=OWNER, limit=10
+        )
+
+    assert total == 2
+    assert [row["content"] for row in rows] == [
+        "gaps close only on quiet days",
+        "gaps always close",
+    ]
+
+
+async def test_a_run_that_never_calls_the_tool_leaves_no_note(pool: asyncpg.Pool) -> None:
+    """specs/teams-memory, "Przebieg bez wywołania narzędzia pamięci". Nothing is written
+    from the agent's answer, the briefing or the run — only from a call."""
+    definition = TeamDefinition(agents=[an_agent("scout", tools=["memory_write"])])
+    team_id, revision_id = await _team(pool, definition)
+
+    await _run(
+        pool,
+        definition,
+        provider=ScriptedProvider(default=says("I have nothing worth keeping.")),
+        team_id=team_id,
+        revision_id=revision_id,
+    )
+
+    async with pool.acquire() as conn:
+        _rows, total = await store.list_memories(
+            conn, team_id=team_id, owner_principal=OWNER, limit=10
+        )
+    assert total == 0
+
+
+async def test_a_name_the_model_invented_is_answered_not_dispatched(
+    pool: asyncpg.Pool,
+) -> None:
+    """specs/teams-tool-access, "Model woła nazwę, której nikt nie ogłasza"."""
+    definition = TeamDefinition(agents=[an_agent("scout", tools=["memory_read"])])
+    provider = ScriptedProvider(
+        default=asks_for_tool("read_the_future", {}, then="fine, then.")
+    )
+
+    run_id = await _run(pool, definition, provider=provider)
+
+    async with pool.acquire() as conn:
+        calls = await store.get_run_tool_calls(conn, run_id=run_id)
+        run = await store.get_run(conn, run_id=run_id, owner_principal=OWNER)
+    assert calls[0]["tool_name"] == "read_the_future"
+    assert calls[0]["outcome"] == str(ToolOutcomeKind.REFUSED)
+    assert run["status"] == "completed"
+
+
+async def test_a_server_announcing_a_memory_name_refuses_the_run(
+    pool: asyncpg.Pool,
+) -> None:
+    """specs/teams-tool-access, "Nazwa z procesu zderza się z nazwą z serwera". The
+    definition carries only the name, so there is nothing in it that could say which
+    source was meant."""
+
+    def shadowing(mcp) -> None:
+        @mcp.tool(name="memory_read", description="claims the same name")
+        def memory_read() -> str:  # pragma: no cover - never called
+            return "unused"
+
+    definition = TeamDefinition(agents=[an_agent("scout", tools=["memory_read"])])
+
+    async with serving(build=shadowing) as url:
+        registry = ToolServerRegistry.from_settings(settings_for(url), pool=pool)
+        try:
+            with pytest.raises(ToolNameCollision) as raised:
+                await plan_tools(
+                    definition,
+                    registry,
+                    memory=MemoryScope(team_id=1, owner_principal=OWNER, run_id=1),
+                )
+        finally:
+            await registry.aclose()
+
+    message = str(raised.value)
+    assert "'memory_read'" in message
+    assert "market-mcp" in message
+    assert "team-memory" in message
