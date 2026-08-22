@@ -1,11 +1,11 @@
 ## 1. Zakres na moduł
 
-- [ ] 1.1 `EntraConfig` niesie zakres na endpoint zamiast jednego; `acquire()` przyjmuje zakres wołanego modułu
-- [ ] 1.2 `jsonClient` dostaje zakres przy budowie, tak jak dostaje adres bazowy; cztery klienty, cztery zakresy
-- [ ] 1.3 Konfiguracja z jednym zakresem dalej działa — praca lokalna i `pnpm dev` nie zależą od czterech wartości
-- [ ] 1.4 `deploy-terminal.yml`: cztery zakresy jako literały obok adresów; `vars` zostają tylko dla client id i tenant id
-- [ ] 1.5 Testy: każdy klient wysyła zakres swojego modułu; token wzięty dla jednego nie trafia do drugiego; brak zakresu dla modułu to praca bez tożsamości, nie cudze poświadczenie
-- [ ] 1.6 `pnpm test`, `lint`, `typecheck`
+- [x] 1.1 `EntraConfig` niesie zakres na endpoint zamiast jednego; `acquire()` przyjmuje zakres wołanego modułu
+- [x] 1.2 Każdy klient dostaje `Identity` swojego modułu — `jsonClient` bez zmiany podpisu, bo zakres siedzi w tożsamości, nie obok niej
+- [x] 1.3 Brak zakresu dla modułu to `noIdentity`, nie cudzy token; praca lokalna (brak całej trójki) bez zmian
+- [x] 1.4 `deploy-terminal.yml`: cztery zakresy jako literały obok adresów; `vars` zostają tylko dla client id i tenant id
+- [x] 1.5 Testy: każdy klient wysyła zakres swojego modułu; token wzięty dla jednego nie trafia do drugiego; brak zakresu dla modułu to praca bez tożsamości, nie cudze poświadczenie
+- [x] 1.6 `pnpm test`, `lint`, `typecheck`
 
 ## 2. Klient kontraktu
 

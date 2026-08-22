@@ -1,4 +1,4 @@
-import { createEntraIdentity } from "../auth/entra";
+import { createEntraIdentities } from "../auth/entra";
 import { noIdentity, type Identity } from "../auth/identity";
 import { createArchiveSource } from "./archive";
 import { resolveEndpoints, resolveEntra } from "./config";
@@ -22,6 +22,7 @@ import type { ArchiveAdmin, IndicatorSource, MarketDataSource } from "./source";
  */
 const { archiveHttp, archiveWs } = resolveEndpoints();
 
+
 /**
  * The operator's identity, or the absence of one. A wiring decision, made here for the
  * same reason the back ends are composed here: a view that consumed it directly would be
@@ -29,10 +30,43 @@ const { archiveHttp, archiveWs } = resolveEndpoints();
  * development, nothing in front of the archive — and answers "no credential" rather than
  * failing.
  */
-export const identity: Identity = (() => {
-  const config = resolveEntra();
-  return config === null ? noIdentity : createEntraIdentity(config);
-})();
+const entraConfig = resolveEntra();
+const identities = entraConfig === null ? null : createEntraIdentities(entraConfig);
+
+/** Resolves the redirect the operator is arriving back from, before the app mounts. A
+ *  no-op with no identity configured. Exported rather than reached for by a cast on
+ *  `identity`, which is what it used to be — a cast that would now silently find nothing
+ *  and skip MSAL's own initialization. */
+export const initializeIdentity = (): Promise<void> =>
+  identities?.initialize() ?? Promise.resolve();
+
+function scopeFor(pick: (s: NonNullable<typeof entraConfig>["scopes"]) => string | null) {
+  return entraConfig === null ? noIdentity : (identities?.for(pick(entraConfig.scopes)) ?? noIdentity);
+}
+
+/**
+ * The shared sign-in state, and the credential for the archive.
+ *
+ * One per module rather than one for the terminal: each back end accepts a token minted
+ * for its own audience, so a token taken for one is not sent to another
+ * (terminal-identity, "Każde wywołanie archiwum niesie poświadczenie"). They share the
+ * account and the state — `TopBar` subscribing to this one sees every change — and differ
+ * only in what they ask Entra for. A module whose scope is unset gets `noIdentity`: its
+ * calls go out bare and its own gate refuses them, which is a refusal a tab can name.
+ */
+export const identity: Identity = identities?.shared ?? noIdentity;
+
+/** The workbench — the conversation and the teams catalogue, one process and one
+ *  audience. */
+export const workbenchIdentity: Identity = scopeFor((s) => s.workbench);
+
+/** `capital-gateway`, for the Accounts screen, which calls it on its own hostname. Not
+ *  for `gatewaySource` below: that one reaches the catalogue *through* the archive, so it
+ *  is an archive call and carries the archive's token. */
+export const gatewayIdentity: Identity = scopeFor((s) => s.gateway);
+
+/** `polymarket-data`, for the prediction-market tab. */
+export const polymarketIdentity: Identity = scopeFor((s) => s.polymarket);
 
 const archiveSource = createArchiveSource(archiveHttp, archiveWs, identity);
 const gateway = createGatewaySource(archiveHttp, identity);

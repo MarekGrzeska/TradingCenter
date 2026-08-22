@@ -69,6 +69,7 @@ export default defineConfig(({ mode }) => {
   const archive = env.ARCHIVE_PROXY_TARGET || "http://localhost:8020";
   const workbench = env.WORKBENCH_PROXY_TARGET || "http://localhost:8030";
   const gateway = env.GATEWAY_PROXY_TARGET || "http://localhost:8010";
+  const polymarket = env.POLYMARKET_PROXY_TARGET || "http://localhost:8070";
   const gatewayKey = env.GATEWAY_PROXY_KEY || env.GATEWAY_API_KEY || "";
 
   return {
@@ -116,6 +117,16 @@ export default defineConfig(({ mode }) => {
           headers: gatewayKey ? { "X-Gateway-Key": gatewayKey } : undefined,
           rewrite: (path) => path.replace(/^\/gateway-api/, ""),
           configure: quietProxyErrors("capital-gateway", gateway),
+        },
+
+        // The prediction-market archive. No key and no header: it wants a token in
+        // production and nothing at all in dev, where `REQUIRE_AUTHENTICATED_PRINCIPAL`
+        // is off — so unlike the gateway above there is nothing for this proxy to add.
+        "/polymarket-api": {
+          target: polymarket,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/polymarket-api/, ""),
+          configure: quietProxyErrors("polymarket-data", polymarket),
         },
       },
     },

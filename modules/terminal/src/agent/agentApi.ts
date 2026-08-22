@@ -1,7 +1,7 @@
 import { noIdentity, type Identity } from "../auth/identity";
 import { resolveEndpoints } from "../data/config";
 import { jsonClient, statusMapper } from "../data/http";
-import { identity } from "../data/marketData";
+import { workbenchIdentity } from "../data/marketData";
 import { parseIsoToEpochSeconds } from "../data/time";
 import { MarketDataError } from "../data/types";
 import { readAgentStream, type AgentStreamEvent } from "./stream";
@@ -662,4 +662,4 @@ export function createAgentApi(httpBase: string, identity: Identity = noIdentity
  * registration's worth of session state, and a second `MSAL` instance would just be two
  * copies of the same sign-in.
  */
-export const agentApi: AgentApi = createAgentApi(resolveEndpoints().workbenchHttp, identity);
+export const agentApi: AgentApi = createAgentApi(resolveEndpoints().workbenchHttp, workbenchIdentity);

@@ -111,13 +111,33 @@ jobs:
           # parser meeting `<!doctype html>`. Nothing reached capital-gateway, whose log
           # stayed quiet and healthy throughout.
           #
-          # No token setting beside it, for the same reason the workbench has none: the
-          # terminal asks for one scope, market-data's, and the gateway's Easy Auth
-          # accepts that audience deliberately (infra/app-service.tf).
           VITE_GATEWAY_HTTP: https://app-tradingcenter-gateway.azurewebsites.net
+          # The prediction-market archive. Its own host and its own scope, like every
+          # other back end here.
+          VITE_POLYMARKET_HTTP: https://app-tradingcenter-polymarket-data.azurewebsites.net
           VITE_ENTRA_CLIENT_ID: ${{ vars.TERMINAL_ENTRA_CLIENT_ID }}
           VITE_ENTRA_TENANT_ID: ${{ vars.TERMINAL_ENTRA_TENANT_ID }}
+          # **One scope per back end since `polymarket-screen-opens-the-archive`.** The
+          # terminal used to ask for one, market-data's, and present it to all three —
+          # the gateway had been configured to accept that audience for exactly that
+          # reason. A token minted for one module is not sent to another any more
+          # (specs/terminal-identity), and the pre-authorizations that make asking by
+          # name possible without a second consent screen have been standing in
+          # `infra/entra.tf` since August.
+          #
+          # Literals rather than four `vars`, unlike the client and tenant ids above.
+          # These are the same kind of fact as the four hostnames they sit beside:
+          # deterministic, public — every authorization request the browser makes carries
+          # one — and four repository variables would be four chances to leave one unset,
+          # which surfaces at sign-in as a message about an unknown resource.
+          #
+          # A scope left out is NOT a fallback to another module's: that back end is then
+          # called with no credential and refuses, which the tab can name. Setting all
+          # four to market-data's scope is the deliberate rollback, not the default.
           VITE_ENTRA_SCOPE: ${{ vars.TERMINAL_ENTRA_SCOPE }}
+          VITE_ENTRA_SCOPE_WORKBENCH: api://tradingcenter-agent/access_as_user
+          VITE_ENTRA_SCOPE_GATEWAY: api://tradingcenter-capital-gateway/access_as_user
+          VITE_ENTRA_SCOPE_POLYMARKET: api://tradingcenter-polymarket-data/access_as_user
 
       - uses: Azure/static-web-apps-deploy@v1
         with:

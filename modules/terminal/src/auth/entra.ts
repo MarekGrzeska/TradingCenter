@@ -5,11 +5,25 @@ import {
   type AccountInfo,
 } from "@azure/msal-browser";
 import type { EntraConfig } from "../data/config";
-import { createListeners, SignedOut, type Identity, type IdentityState } from "./identity";
+import {
+  createListeners,
+  noIdentity,
+  SignedOut,
+  type Identity,
+  type IdentityState,
+} from "./identity";
 
 /**
  * The only file that knows Entra exists; everything else takes an `Identity` and asks it
  * for a token.
+ *
+ * **One session, one `Identity` per module.** Every back end this terminal calls stands
+ * behind its own gate and accepts a token minted for its own audience, so `for(scope)`
+ * hands out an `Identity` bound to one of them. They share the account, the state and the
+ * listeners — there is one operator signed in, not four — and differ only in what they
+ * ask Entra for. Until 22 August 2026 there was one token with the archive's audience,
+ * sent to all three back ends, and the gateway had been configured to accept it; the
+ * pre-authorizations for asking by name had been standing unused since (`infra/entra.tf`).
  *
  * Redirect, not a popup: a popup dies under a blocker and leaves an operator staring at
  * a terminal that will not load. The full page load it costs is affordable — the grid
@@ -18,7 +32,19 @@ import { createListeners, SignedOut, type Identity, type IdentityState } from ".
  * `sessionStorage`, because memory would send the operator through sign-in on every
  * reload and `localStorage` would keep the account after the tab is closed.
  */
-export function createEntraIdentity(config: EntraConfig): Identity {
+export interface EntraIdentities {
+  /** Resolves the redirect the operator is arriving back from. Called once, by
+   *  `main.tsx`, before the app mounts. */
+  initialize(): Promise<void>;
+  /** An `Identity` for one module's audience. `null` — the module has no scope
+   *  configured — gives the no-credential identity rather than somebody else's token. */
+  for(scope: string | null): Identity;
+  /** The shared sign-in state, for the shell. Any module's identity would answer the
+   *  same; this one is named so nothing has to pick a module to ask. */
+  shared: Identity;
+}
+
+export function createEntraIdentities(config: EntraConfig): EntraIdentities {
   const listeners = createListeners();
 
   const msal = new PublicClientApplication({
@@ -62,11 +88,11 @@ export function createEntraIdentity(config: EntraConfig): Identity {
     adopt(redirect?.account ?? msal.getActiveAccount() ?? msal.getAllAccounts()[0] ?? null);
   }
 
-  async function acquire(forceRefresh: boolean): Promise<string> {
+  async function acquire(scope: string, forceRefresh: boolean): Promise<string> {
     if (!account) throw new SignedOut();
     try {
       const result = await msal.acquireTokenSilent({
-        scopes: [config.scope],
+        scopes: [scope],
         account,
         forceRefresh,
       });
@@ -88,16 +114,28 @@ export function createEntraIdentity(config: EntraConfig): Identity {
     }
   }
 
+  /** Everything except the token is shared: one operator, one session, one state. */
+  function identityFor(scope: string): Identity {
+    return {
+      state: () => state,
+      subscribe: listeners.add,
+      token: () => acquire(scope, false),
+      refresh: () => acquire(scope, true),
+      signIn,
+    };
+  }
+
+  function signIn(): void {
+    // The archive's scope, because sign-in has to name one resource and this is the one
+    // every deployment configures. The rest are acquired silently afterwards, which the
+    // pre-authorizations in `infra/entra.tf` are what make possible without a second
+    // consent screen.
+    void msal.loginRedirect({ scopes: [config.scopes.archive] });
+  }
+
   return {
-    state: () => state,
-    subscribe: listeners.add,
-    token: () => acquire(false),
-    refresh: () => acquire(true),
-    signIn: () => {
-      void msal.loginRedirect({ scopes: [config.scope] });
-    },
-    // Not part of `Identity`: only `main.tsx` calls it, once, and putting it on
-    // the interface would oblige every stand-in in a test to implement it.
     initialize,
-  } as Identity & { initialize: () => Promise<void> };
+    for: (scope) => (scope === null ? noIdentity : identityFor(scope)),
+    shared: identityFor(config.scopes.archive),
+  };
 }

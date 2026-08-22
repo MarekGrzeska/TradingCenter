@@ -2,7 +2,7 @@ import { noIdentity, type Identity } from "../auth/identity";
 import { resolveEndpoints } from "../data/config";
 import type { components } from "../data/contract.teams.generated";
 import { jsonClient, statusMapper } from "../data/http";
-import { identity } from "../data/marketData";
+import { workbenchIdentity } from "../data/marketData";
 import { parseIsoToEpochSeconds } from "../data/time";
 import { MarketDataError } from "../data/types";
 import {
@@ -881,6 +881,6 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
   };
 }
 
-/** The one teams client the tab uses, sharing `identity` with every other module's —
+/** The one teams client the tab uses, on the workbench's own audience —
  *  same operator, one sign-in. */
-export const teamsApi: TeamsApi = createTeamsApi(resolveEndpoints().workbenchHttp, identity);
+export const teamsApi: TeamsApi = createTeamsApi(resolveEndpoints().workbenchHttp, workbenchIdentity);

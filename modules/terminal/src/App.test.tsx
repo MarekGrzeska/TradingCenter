@@ -17,6 +17,14 @@ vi.mock("./history/CollectionHistoryView", () => ({
 }));
 // Neither back end is running under the test suite; both reachability checks
 // are stubbed so these tests assert routing, not connectivity.
+const unconfigured = {
+  state: () => "unconfigured" as const,
+  subscribe: () => () => {},
+  token: async () => null,
+  refresh: async () => null,
+  signIn: () => {},
+};
+
 vi.mock("./data/marketData", () => ({
   marketData: {
     parts: [
@@ -47,13 +55,15 @@ vi.mock("./data/marketData", () => ({
   // The unconfigured identity, which is what a local run has: the top bar shows
   // no sign-in state at all, so these tests keep asserting on routing and the
   // two back ends without a third indicator appearing beside them.
-  identity: {
-    state: () => "unconfigured",
-    subscribe: () => () => {},
-    token: async () => null,
-    refresh: async () => null,
-    signIn: () => {},
-  },
+  //
+  // One per back end since the audiences were split — the module exports four, and a
+  // mock missing one fails at import rather than at the assertion, which is how this
+  // list stays honest.
+  identity: unconfigured,
+  workbenchIdentity: unconfigured,
+  gatewayIdentity: unconfigured,
+  polymarketIdentity: unconfigured,
+  initializeIdentity: async () => {},
 }));
 
 const { App } = await import("./App");
