@@ -54,6 +54,7 @@ describe("resolveEndpoints", () => {
         VITE_ARCHIVE_WS: "/archive-api/ws",
         VITE_WORKBENCH_HTTP: "/workbench-api",
         VITE_GATEWAY_HTTP: "/gateway-api",
+        VITE_POLYMARKET_HTTP: "/polymarket-api",
       },
       devLoc,
     );
@@ -62,6 +63,7 @@ describe("resolveEndpoints", () => {
       archiveWs: "ws://localhost:5173/archive-api/ws",
       workbenchHttp: "/workbench-api",
       gatewayHttp: "/gateway-api",
+      polymarketHttp: "/polymarket-api",
     });
   });
 
@@ -72,6 +74,7 @@ describe("resolveEndpoints", () => {
         VITE_ARCHIVE_WS: "wss://archive.example.com/ws",
         VITE_WORKBENCH_HTTP: "https://workbench.example.com",
         VITE_GATEWAY_HTTP: "https://gateway.example.com",
+        VITE_POLYMARKET_HTTP: "https://polymarket.example.com",
       },
       { protocol: "https:", host: "terminal.example.com" },
     );
@@ -80,6 +83,7 @@ describe("resolveEndpoints", () => {
       archiveWs: "wss://archive.example.com/ws",
       workbenchHttp: "https://workbench.example.com",
       gatewayHttp: "https://gateway.example.com",
+      polymarketHttp: "https://polymarket.example.com",
     });
   });
 
@@ -89,6 +93,7 @@ describe("resolveEndpoints", () => {
       archiveWs: "ws://localhost:5173/archive-api/ws",
       workbenchHttp: "/workbench-api",
       gatewayHttp: "/gateway-api",
+      polymarketHttp: "/polymarket-api",
     });
   });
 
@@ -103,10 +108,17 @@ describe("resolveEndpoints", () => {
   // gateway's is the one that would have collided: there is an `accounts` tab now, and
   // `/accounts` would have shadowed it exactly the way `/archive` once did.
   it("gives no back end a relative prefix that a tab route already claims", () => {
-    const { archiveHttp, archiveWs, workbenchHttp, gatewayHttp } = resolveEndpoints({}, devLoc);
+    const { archiveHttp, archiveWs, workbenchHttp, gatewayHttp, polymarketHttp } =
+      resolveEndpoints({}, devLoc);
     const routes = new Set(TABS.map((tab) => tab.path));
 
-    const prefixes = [archiveHttp, new URL(archiveWs).pathname, workbenchHttp, gatewayHttp]
+    const prefixes = [
+      archiveHttp,
+      new URL(archiveWs).pathname,
+      workbenchHttp,
+      gatewayHttp,
+      polymarketHttp,
+    ]
       .filter((base) => base.startsWith("/"))
       .map((base) => base.split("/")[1]);
 
@@ -128,8 +140,47 @@ describe("resolveEntra", () => {
     expect(resolveEntra(complete)).toEqual({
       clientId: "a-client-id",
       tenantId: "a-tenant-id",
-      scope: "api://market-data/access_as_user",
+      scopes: {
+        archive: "api://market-data/access_as_user",
+        workbench: null,
+        gateway: null,
+        polymarket: null,
+      },
     });
+  });
+
+  it("reads a scope per back end when each is configured", () => {
+    expect(
+      resolveEntra({
+        ...complete,
+        VITE_ENTRA_SCOPE_WORKBENCH: "api://agent/access_as_user",
+        VITE_ENTRA_SCOPE_GATEWAY: "api://gateway/access_as_user",
+        VITE_ENTRA_SCOPE_POLYMARKET: "api://polymarket/access_as_user",
+      })?.scopes,
+    ).toEqual({
+      archive: "api://market-data/access_as_user",
+      workbench: "api://agent/access_as_user",
+      gateway: "api://gateway/access_as_user",
+      polymarket: "api://polymarket/access_as_user",
+    });
+  });
+
+  // The rule the split exists for: a module with no scope of its own is called with no
+  // credential, not with the archive's. Falling back would be the terminal telling four
+  // gates the same thing, which is what this change stopped
+  // (specs/terminal-identity, "Dwa moduły o różnych publicznościach").
+  it("does not fall back to the archive's scope for a back end with none", () => {
+    const scopes = resolveEntra({ ...complete, VITE_ENTRA_SCOPE_GATEWAY: "api://gw/access" })
+      ?.scopes;
+
+    expect(scopes?.gateway).toBe("api://gw/access");
+    expect(scopes?.workbench).toBeNull();
+    expect(scopes?.polymarket).toBeNull();
+  });
+
+  it("reads a blank per-module scope as unset rather than as an empty audience", () => {
+    expect(resolveEntra({ ...complete, VITE_ENTRA_SCOPE_POLYMARKET: "   " })?.scopes.polymarket)
+      .toBeNull();
   });
 
   // Not a misconfiguration: locally the archive has nothing in front of it, and

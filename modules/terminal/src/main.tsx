@@ -3,7 +3,7 @@ import { createRoot } from "react-dom/client";
 import "./index.css";
 import { App } from "./App";
 import { startSignInIfNeeded } from "./auth/autoSignIn";
-import { identity } from "./data/marketData";
+import { identity, initializeIdentity } from "./data/marketData";
 
 const container = document.getElementById("root");
 if (!container) {
@@ -18,10 +18,9 @@ if (!container) {
  * the middle of signing in. In local mode there is no session to resolve.
  */
 async function start(): Promise<void> {
-  const initialize = (identity as { initialize?: () => Promise<void> }).initialize;
   // A failure here renders signed-out rather than nothing: that is a state the terminal
   // can say out loud and recover from, and a blank page is neither.
-  await initialize?.().catch((cause: unknown) => {
+  await initializeIdentity().catch((cause: unknown) => {
     console.error("could not resolve the sign-in state", cause);
   });
 

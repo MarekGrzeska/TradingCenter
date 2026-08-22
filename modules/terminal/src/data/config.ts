@@ -58,6 +58,12 @@ export interface Endpoints {
    *  archive. No WS counterpart: both a turn and a run's progress ride plain HTTP
    *  (`fetch` + `ReadableStream`), not a socket. */
   workbenchHttp: string;
+  /** `polymarket-data`, for the prediction-market archive: what is tracked, the last
+   *  probability of every tracked outcome in one request, an outcome's series and its
+   *  changes over a window. Its own address for the same reason the workbench has one —
+   *  it is a different App Service behind a different gate — and its own scope, because
+   *  it accepts only its own audience. */
+  polymarketHttp: string;
   /** `capital-gateway`, for the account: which demo accounts exist, what is open on the
    *  active one, and the demo money on it.
    *
@@ -79,25 +85,45 @@ const DEFAULT_ARCHIVE_HTTP = "/archive-api";
 const DEFAULT_ARCHIVE_WS = "/archive-api/ws";
 const DEFAULT_WORKBENCH_HTTP = "/workbench-api";
 const DEFAULT_GATEWAY_HTTP = "/gateway-api";
+const DEFAULT_POLYMARKET_HTTP = "/polymarket-api";
 
 export interface EnvVars {
   VITE_ARCHIVE_HTTP?: string;
   VITE_ARCHIVE_WS?: string;
   VITE_WORKBENCH_HTTP?: string;
   VITE_GATEWAY_HTTP?: string;
+  VITE_POLYMARKET_HTTP?: string;
   VITE_ENTRA_CLIENT_ID?: string;
   VITE_ENTRA_TENANT_ID?: string;
   VITE_ENTRA_SCOPE?: string;
+  VITE_ENTRA_SCOPE_WORKBENCH?: string;
+  VITE_ENTRA_SCOPE_GATEWAY?: string;
+  VITE_ENTRA_SCOPE_POLYMARKET?: string;
 }
 
-/** Which Entra registration the terminal signs the operator in against, and
- *  what it asks a token *for*. The scope names the archive, not the terminal:
- *  the token is presented to `market-data`, and Entra will only mint one for a
- *  resource that was asked for by name. */
+/** One scope per module the terminal calls, because each stands behind its own gate and
+ *  accepts a token minted for its **own** audience. Entra will only mint one for a
+ *  resource asked for by name, so this is what the terminal has to know per back end.
+ *
+ *  `archive` keeps `VITE_ENTRA_SCOPE`'s plain name — it was the only one when there was
+ *  only one — and is the one required scope: it is also what the sign-in redirect asks
+ *  for. The other three are optional, and their absence means that module is called with
+ *  no credential rather than with the archive's (terminal-identity, "Dwa moduły o różnych
+ *  publicznościach"). Sending one module's token to another is what this type exists to
+ *  stop; a silent fallback would put it straight back. */
+export interface ModuleScopes {
+  archive: string;
+  workbench: string | null;
+  gateway: string | null;
+  polymarket: string | null;
+}
+
+/** Which Entra registration the terminal signs the operator in against, and what it asks
+ *  a token *for* — per module, never one token for all of them. */
 export interface EntraConfig {
   clientId: string;
   tenantId: string;
-  scope: string;
+  scopes: ModuleScopes;
 }
 
 /**
@@ -121,7 +147,20 @@ export function resolveEntra(env: EnvVars = import.meta.env): EntraConfig | null
         "or left out together — a partial set cannot sign anyone in.",
     );
   }
-  return { clientId, tenantId, scope };
+  // The three per-module scopes are each optional on their own, unlike the triple above:
+  // a module with no scope is called with no credential, which its own gate then refuses
+  // in a way the tab can name. That is deliberately not the same as reaching for the
+  // archive's token, which would be the terminal telling four gates the same thing.
+  return {
+    clientId,
+    tenantId,
+    scopes: {
+      archive: scope,
+      workbench: env.VITE_ENTRA_SCOPE_WORKBENCH?.trim() || null,
+      gateway: env.VITE_ENTRA_SCOPE_GATEWAY?.trim() || null,
+      polymarket: env.VITE_ENTRA_SCOPE_POLYMARKET?.trim() || null,
+    },
+  };
 }
 
 export function resolveEndpoints(
@@ -133,5 +172,6 @@ export function resolveEndpoints(
     archiveWs: resolveWsBase(env.VITE_ARCHIVE_WS || DEFAULT_ARCHIVE_WS, loc),
     workbenchHttp: resolveHttpBase(env.VITE_WORKBENCH_HTTP || DEFAULT_WORKBENCH_HTTP),
     gatewayHttp: resolveHttpBase(env.VITE_GATEWAY_HTTP || DEFAULT_GATEWAY_HTTP),
+    polymarketHttp: resolveHttpBase(env.VITE_POLYMARKET_HTTP || DEFAULT_POLYMARKET_HTTP),
   };
 }

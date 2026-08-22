@@ -84,6 +84,14 @@ diagram. The edge is deliberately narrow: no route to the REST contract, no enti
 one, and no code that would know what to do with a candle. What it has is a tool list it did
 not write, fetched at the start of a session and used as given.
 
+**The terminal's token stopped being one token on 22 August 2026.** It had asked Entra for
+`market-data`'s scope and presented that to the workbench and the gateway too — the gateway
+accepting that audience as a third one was infrastructure bent to fit the client rather than
+the client taught to ask. The pre-authorizations for asking each back end by name had stood
+in `infra/entra.tf` since August, unused, with a comment saying so. `polymarket-screen-opens-the-archive`
+spent them: one `Identity` per audience off one MSAL session, so a leaked token opens one
+module rather than four, and an audience says which resource it is for again.
+
 That edge is the one thing in this diagram with no committed copy of its contract
 anywhere. Every other arrow has one — the terminal's generated types, trading-mcp's
 snapshot of the gateway's document, the terminal's hand-written agent DTOs — because HTTP
@@ -139,8 +147,8 @@ at all.
                │  ┌────────────┘
                ▼  ▼
           terminal   workbench
-        (a subpage,  (the third tool server)
-         not yet)
+        (the tab,    (the third tool server)
+         REST)
 ```
 
 **Why there is no gateway in front of it**, when capital.com has one: that boundary is not
@@ -152,6 +160,14 @@ Polymarket's two surfaces are public, need no credential, and this system buys a
 nothing on them. A second application would cost an App Service, an identity and a deploy
 with no argument for it. If that ever changes — if anything here starts trading there — the
 gateway/tools boundary is drawn then, and drawn for the reason it exists.
+
+**The two surfaces have two callers, and that is enforced twice.** The workbench presents a
+managed identity and reaches `/mcp`; the terminal presents the operator's own token and
+reaches the REST contract. Neither reaches the other's, and the platform's gate cannot draw
+that line — it authorizes an application, not a route — so the module keeps the record
+itself (`polymarket_data/caller_access.py`). The line does not fall between reading and
+writing, because the tool caller writes the watch list by design. It falls at **removing
+collected history**, which is REST-only and is the one act here nobody can undo.
 
 **Why it is not a widening of `market-data`.** A prediction market is not an instrument, its
 price is not a candle, and its provider is not capital.com. `market-data`'s only door to the

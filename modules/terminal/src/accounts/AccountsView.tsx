@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { createAccountsApi, type AccountsApi, type DemoAccount } from "./accountsApi";
-import { identity } from "../data/marketData";
+import { gatewayIdentity } from "../data/marketData";
 import { resolveEndpoints } from "../data/config";
 import { useRead } from "../data/query";
 import { Button } from "../ui/Button";
@@ -30,7 +30,7 @@ const POLL_MS = 5000;
 
 export function AccountsView({ api }: { api?: AccountsApi } = {}) {
   const client = useMemo(
-    () => api ?? createAccountsApi(resolveEndpoints().gatewayHttp, identity),
+    () => api ?? createAccountsApi(resolveEndpoints().gatewayHttp, gatewayIdentity),
     [api],
   );
 

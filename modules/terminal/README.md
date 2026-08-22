@@ -1,19 +1,27 @@
 # terminal
 
-The operator-facing frontend: charts, in a grid, fed by `market-data` and `capital-gateway`.
-React + TypeScript, talking to both over HTTP and WebSocket and depending on nothing else in
-this repository.
+The operator-facing frontend: charts in a grid, the agent and its teams, the demo account,
+and the prediction markets. React + TypeScript, talking to four back ends over HTTP and
+WebSocket and depending on nothing else in this repository.
 
-**Two back ends, one interface.** Candles and the live stream come from `market-data`, the
-archive, which has yesterday's as well as today's. The instrument catalogue stays with
-`capital-gateway`, which owns it. Views see one `MarketDataSource` and never learn which
-call went where — the composition is `marketData.ts` and nothing else.
+**Two of them behind one interface, and that is the market half only.** Candles and the
+live stream come from `market-data`, the archive, which has yesterday's as well as today's.
+The instrument catalogue stays with `capital-gateway`, which owns it. Views see one
+`MarketDataSource` and never learn which call went where — the composition is
+`marketData.ts` and nothing else. The workbench and `polymarket-data` are not behind it and
+should not be: a conversation and a probability series share no shape with a candle.
 
 **Nothing is archived because somebody looked at a chart.** Collecting a pair holds a
 provider connection open around the clock and the provider limits how many a session may
 hold, so what gets collected is a standing decision — made on the `Instruments` tab. It
 runs the other way too: a chart slot only offers instruments the archive already
 collects, because a chart of a pair nobody collects has nothing to draw.
+
+**The Polymarket tab is where prediction markets are watched**, and the only place in this
+system that can remove what was collected for one. Nine tools reach that module and three
+of them write, but what they write is the watch list — no tool deletes a sample. That makes
+this tab the capability's only door, and the irreversibility is sharper than the archive's:
+Polymarket does not give back the history of a market that has resolved.
 
 **Deleting a pair removes its data — irreversibly.** There is no "stop but keep the
 candles" left in the terminal; `Instruments`' Delete stops collection and takes the data
@@ -138,6 +146,15 @@ Easy Auth would rather use never leaves the browser. The terminal holds an **Ent
 instead (`src/auth/`), and the shared HTTP client attaches it to every request — no
 adapter and no route mentions it, which is what stops a route added later from quietly
 going out bare.
+
+**One token per back end, not one for the terminal.** Each of the four stands behind its
+own gate and accepts a token minted for its own audience, so `src/auth/entra.ts` hands out
+an `Identity` per audience off one MSAL session: same account, same state, one operator
+signed in. Until 22 August 2026 there was a single token with market-data's audience,
+presented to all three back ends, and the gateway had been *configured to accept it* — the
+pre-authorizations for asking by name had been standing unused in `infra/entra.tf` since
+August. A back end whose scope is unset is called with no credential and refuses, which a
+tab can name; it is deliberately not given somebody else's token.
 
 The candle stream cannot carry a header at all: the browser's WebSocket API has nowhere to
 put one. So before every handshake — including every retry after a drop — the terminal asks

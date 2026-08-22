@@ -113,11 +113,13 @@ locals {
   # never asks for this one, and there is nobody to consent on whose behalf.
   trading_mcp_api_uri = "api://tradingcenter-trading-mcp"
 
-  # The same shape again for the prediction-market archive. Like trading-mcp's and unlike
-  # market-data's, it pairs with no delegated scope: the only caller today is the workbench
-  # presenting a client-credentials token. The terminal will need one when it grows a
-  # subpage — that change adds it, along with the delegated scope and the REST caller.
-  polymarket_data_api_uri = "api://tradingcenter-polymarket-data"
+  # The same shape again for the prediction-market archive — and, since
+  # `polymarket-screen-opens-the-archive`, with a delegated scope as well: the workbench
+  # reaches it with a managed identity and the terminal reaches it as a person, so it is
+  # the one module here whose door is asked to recognise both.
+  polymarket_data_api_uri   = "api://tradingcenter-polymarket-data"
+  polymarket_data_api_scope = "access_as_user"
+
   # The strategy platform's own audience. It has one for the same reason trading-mcp does:
   # its callers are backend services presenting a managed identity, so there is no consent
   # screen and no delegated scope — only client credentials.
@@ -1058,8 +1060,17 @@ module "polymarket_data_easy_auth" {
   identifier_uri = local.polymarket_data_api_uri
   redirect_uri   = "https://${local.polymarket_data_hostname}/.auth/login/aad/callback"
 
-  # No scope: client credentials only, so there is no consent screen to name one for. The
-  # terminal's subpage is the change that adds a delegated one.
+  # A delegated scope since `polymarket-screen-opens-the-archive`. It had none while the
+  # workbench was the only caller — a managed identity presenting client credentials has
+  # no consent screen and nothing to consent to. The terminal is a browser and a person,
+  # and asks for this by name.
+  scope = {
+    value                      = local.polymarket_data_api_scope
+    admin_consent_display_name = "Read and manage the prediction-market archive"
+    admin_consent_description  = "Allows the app to reach polymarket-data as the signed-in operator, including removing collected history."
+    user_consent_display_name  = "Read and manage your prediction-market archive"
+    user_consent_description   = "Allows the app to read what you track on Polymarket, change that list, and remove collected history."
+  }
 }
 
 resource "azurerm_linux_web_app" "polymarket_data" {
@@ -1123,12 +1134,14 @@ resource "azurerm_linux_web_app" "polymarket_data" {
         module.polymarket_data_easy_auth.client_id,
       ]
 
-      # One caller, named. The workbench's managed identity, for the nine tools at `/mcp`.
-      # The terminal is deliberately not here: it has nothing to call yet, and adding it
-      # ahead of the subpage would open the REST contract — deleting history included — to
-      # a client that does not use it.
+      # Two callers, named, and each reaches exactly one of this module's two surfaces.
+      # The workbench's managed identity is here for the nine tools at `/mcp`; the terminal
+      # is here for the REST contract, since `polymarket-screen-opens-the-archive` gave the
+      # operator a screen. Being on this list is not what separates them — the platform
+      # authorizes an application and not a route — the two settings below are.
       allowed_applications = [
         data.azuread_service_principal.workbench_managed_identity.client_id,
+        azuread_application.terminal.client_id,
       ]
     }
 
@@ -1172,13 +1185,17 @@ resource "azurerm_linux_web_app" "polymarket_data" {
     # names the person at the keyboard (measured elsewhere in this repository on
     # 19 August 2026, by deploying the opposite assumption).
     #
-    # `REST_CALLER_APPLICATION_IDS` is empty on purpose, and that is a refusal rather than
-    # an omission: the REST contract has no consumer in production until the terminal grows
-    # its subpage, and an empty list means nobody reaches it. Deleting collected history is
-    # a REST route, so nobody in production can do that either — which is the intended
-    # state for an act nobody can undo, until there is a screen to do it from.
+    # The terminal is on the REST list and MUST NOT be on the tool one, and the workbench
+    # the other way round. That split is this module's whole reason for keeping a record of
+    # its own: the tool caller writes the watch list by design, so what separates the two is
+    # not reading from writing — it is that **removing collected history is a REST route**,
+    # and it is the one act here nobody can undo.
+    #
+    # `REST_CALLER_APPLICATION_IDS` was empty until `polymarket-screen-opens-the-archive`,
+    # which is why that change had to touch this file: a capability with no caller has no
+    # door, and the only way to use it was psql.
     TOOL_CALLER_APPLICATION_IDS = data.azuread_service_principal.workbench_managed_identity.client_id
-    REST_CALLER_APPLICATION_IDS = ""
+    REST_CALLER_APPLICATION_IDS = azuread_application.terminal.client_id
 
     APPLICATIONINSIGHTS_CONNECTION_STRING = azurerm_application_insights.main.connection_string
   }
@@ -1190,6 +1207,11 @@ resource "azurerm_linux_web_app" "polymarket_data" {
 
 output "polymarket_data_hostname" {
   value = azurerm_linux_web_app.polymarket_data.default_hostname
+}
+
+output "terminal_entra_scope_polymarket" {
+  description = "The scope the terminal asks for when it wants a token for polymarket-data. `deploy-terminal.yml` carries this as a literal beside the four hostnames, like the workbench's and the gateway's — a repository variable per scope would be four chances to leave one unset, and the failure surfaces at sign-in as a message about an unknown resource."
+  value       = "${local.polymarket_data_api_uri}/${local.polymarket_data_api_scope}"
 }
 
 output "polymarket_data_managed_identity_principal_id" {
