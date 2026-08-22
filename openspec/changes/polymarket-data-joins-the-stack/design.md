@@ -22,6 +22,49 @@ Powód jest w `proposal.md` — "Why". Tu tylko to, co kształtuje rozwiązanie,
 - Oba API dostawcy są publiczne i nie wymagają klucza. To pierwszy upstream w tym repozytorium,
   wobec którego moduł nie ma się czym przedstawić.
 
+### Pomiar dostawcy, 22 sierpnia 2026
+
+Zadania 1.1–1.5, wykonane przed napisaniem klienta. Osiem rzeczy, z których **cztery zaprzeczyły
+temu, co ta zmiana zakładała**, i jedna z nich zmieniła wymaganie w `polymarket-data-upstream-access`.
+
+1. **`outcomePrices` z Gammy to co do cyfry midpoint z CLOB-a, dla każdego wyniku naraz.** Zmierzone
+   na `epl-bre-tot-2026-08-22` (3 rynki, 6 wyników): Gamma `["0.465","0.535"]` wobec CLOB
+   `midpoint=0.465` i `0.535`; tak samo dla dwóch pozostałych rynków. `lastTradePrice` z Gammy
+   zgadza się z `last-trade-price` z CLOB-a dla tokenu „Yes". Skutek jest duży i opisany niżej jako
+   decyzja: **jedno wywołanie Gammy na wydarzenie daje ceny wszystkich wyników**, zamiast dwóch
+   wywołań CLOB-a na rynek. Dla wydarzenia o 128 rynkach to 1 żądanie zamiast 256.
+2. **`prices-history` ma twardy sufit okna: 15 dni.** 15 dni przechodzi, 16 już nie
+   (`400 invalid filters: 'startTs' and 'endTs' interval is too long`). Sufit jest na **przedziale
+   czasu**, nie na liczbie punktów — nie da się go obejść zgrubniejszym `fidelity`.
+3. **`endTs` nie jest respektowane.** Prośba o okno sześciu godzin kończące się dobę wcześniej
+   wróciła z punktami aż do chwili bieżącej. Krawędź górna jest po naszej stronie: to, co ląduje
+   w archiwum, musi być przycięte przy zapisie, a nie tylko w żądaniu.
+4. **`fidelity` jest życzeniem, nie kontraktem, a takt jest nierówny.** Odstępy w jednym szeregu:
+   57, 59, 60, 61, 63 sekundy, a przy szerszym oknie dostawca sam przechodzi na rzadszy takt. Punkt
+   bazowy okna zmian MUST być dopasowywany z tolerancją — to jedyna rzecz, którą źródło robiło
+   dobrze i której nie da się uprościć.
+5. **Historia rozstrzygniętego rynku bywa pusta.** Na pięciu ostatnio zamkniętych wydarzeniach:
+   jedno oddało 193 punkty, cztery oddały zero. Dostawca nie obiecuje, że pamięta — po
+   rozstrzygnięciu **nasze archiwum jest jedynym zapisem**. To zamienia „nie kasujemy" z decyzji
+   estetycznej w jedyną wersję, która ma sens, i zamyka drogę „dociągniemy sobie później".
+6. **Cloudflare odbija żądanie bez nagłówka `User-Agent`** — `403`, `error code: 1010`, na obu
+   powierzchniach. Klient MUST się przedstawiać. Objaw czyta się jak blokada adresu i prowadzi
+   śledztwo w złą stronę.
+7. **Limity tempa: 30 kolejnych wywołań w 2,5 s (~12/s) bez jednej odmowy.** Semafor 6 ze źródła
+   jest ostrożny i zostaje jako wartość początkowa, ale nie jest krawędzią, o którą ktoś się obił.
+8. **Listing Gammy jest ciężki: ~19 KiB na wydarzenie**, 100 wydarzeń to 10 MiB, i nie ma parametru
+   ograniczającego pola. Odchudzanie jest po naszej stronie — narzędzie `browse_events` MUST
+   projektować pola, zanim cokolwiek odda modelowi.
+
+Dwie rzeczy potwierdzone bez niespodzianek: `events/slug/{slug}` oddaje pojedyncze wydarzenie
+z rynkami i tokenami, a `outcomes`, `outcomePrices` i `clobTokenIds` przyjeżdżają jako **stringi
+z JSON-em w środku**, do sparsowania przy zapisie. Filtrowanie po `tag_id` działa i wystarcza za
+przeglądanie kategoriami.
+
+Jedna liczba dla porządku: dla wydarzenia `epl-bre-tot-2026-08-22` suma cen „Yes" trzech rynków
+wyniosła 1,005. Reguła wzajemnego wykluczania nie daje jedności i nie wolno na niej opierać
+dopełnienia.
+
 ## Goals / Non-Goals
 
 **Goals:**
@@ -107,9 +150,32 @@ z rynków powiązanych regułą wzajemnego wykluczania, w których suma cen „Y
 jednością. Dopełnienie byłoby liczbą wyglądającą jak dana.
 
 Cena ostatniej transakcji i wycena z księgi odpowiadają na różne pytania, a na płytkim rynku
-różnią się o wiele. Zamiast wybierać teraz, na wiarę, zapisujemy rodzaj wyceny przy próbce — dwa
-tanie pola zamiast jednej decyzji podjętej bez pomiaru. Który rodzaj jest domyślny dla odczytu,
-rozstrzyga pomiar z zadania 1.3, przed zamrożeniem kontraktu.
+różnią się o wiele — zmierzone na cienkim rynku tego samego dnia: `last_trade` 0,003 przy
+`bid/ask` 0,002/0,004, czyli spread wielkości dwóch trzecich ceny. Rodzaj wyceny jest więc polem
+przy próbce, nie założeniem.
+
+**Domyślną wyceną jest midpoint** i rozstrzygnął to pomiar 1.1, nie preferencja: midpoint jest
+jedyną wyceną, którą dostawca podaje **dla każdego wyniku naraz** (`outcomePrices`), więc jest
+jedyną, którą da się zebrać kompletnie w jednym wywołaniu na wydarzenie. `last_trade` przyjeżdża
+w tym samym wywołaniu, ale tylko dla strony „Yes" rynku, więc jest zapisywany tam, gdzie jest,
+i nie jest domyślną serią odczytu.
+
+### Próbkowanie idzie przez metadane, nie przez token
+
+Dopisane po pomiarze 1.1, bo pierwotny plan powtarzał tu źródło. Źródło odpytuje CLOB-a **osobno
+dla każdego tokenu** — dwa wywołania na rynek, w takcie minutowym. Zmierzone: `outcomePrices`
+z Gammy to ta sama liczba co `midpoint` z CLOB-a, dla wszystkich wyników wydarzenia, w jednym
+żądaniu.
+
+Moduł próbkuje więc **wywołaniem na wydarzenie**, nie na token. Dla dwudziestu obserwowanych
+wydarzeń to 20 żądań na minutę zamiast setek, a dla jednego wydarzenia typu „kto wygra" (128
+rynków) — jedno zamiast 256. Bez tego sufit obserwacji musiałby być liczony w rynkach i byłby
+niski; z tym jest liczony w wydarzeniach i jest hojny.
+
+Cena jest w tej decyzji jedna: równoważność obu powierzchni jest **zmierzona, nie obiecana**.
+Dlatego moduł zapisuje przy próbce, z której powierzchni ją wziął, a test sprawdza równoważność
+wobec CLOB-a na próbie — rozjazd ma się objawić czerwonym testem, a nie serią, która po cichu
+zmieniła znaczenie. Ścieżka przez CLOB-a zostaje w kliencie jako droga sprawdzająca i awaryjna.
 
 ### Historia nie ma terminu ważności
 
@@ -133,14 +199,25 @@ niespójności między tytułem a treścią, a alternatywą było ryzyko przy za
 
 ## Risks / Trade-offs
 
-- **Kształty API dostawcy przyjęte na wiarę** → potwierdzone działającym źródłem są tylko dwie
-  drogi: metadane wydarzenia po jego adresie i cena ostatniej transakcji. Szereg czasowy (jego
-  parametry, maksymalne okno na żądanie, rozdzielczość dla starych zakresów) i wycena z księgi
-  wymagają godziny pomiarów — zadanie 1.2, przed pisaniem klienta. Specyfikacja mówi „szereg
-  czasowy dostawcy", nie obiecuje jego kształtu.
-- **Limity tempa są nieudokumentowane** → własny throttle i backoff, obie wartości
-  konfigurowalne, wartość początkowa wzięta z tego, co u źródła działało (6 równolegle), i do
-  zmierzenia. Ryzykiem jest odcięcie modułu przy głębokim uzupełnianiu, nie utrata danych.
+- **Uzupełnianie przeszłości jest oknami po 15 dni i nie ma od tego ucieczki** → sufit jest na
+  przedziale czasu, nie na liczbie punktów, więc zgrubniejszy `fidelity` nic nie daje. Rok wstecz
+  to 25 okien na wynik. Przy głębokim uzupełnianiu to ono, a nie takt, jest głównym ruchem do
+  dostawcy.
+- **Górna krawędź okna jest po naszej stronie** → `endTs` nie jest respektowane, odpowiedź biegnie
+  do chwili bieżącej. Przycięcie MUST być sprawdzone przy zapisie, nie tylko wysłane w żądaniu;
+  inaczej okna zachodzą na siebie i „zebrany zakres" mówi więcej, niż zweryfikowano.
+- **Rozstrzygnięcie kasuje historię u dostawcy** → cztery z pięciu ostatnio zamkniętych rynków
+  oddały zero punktów. Nie ma drogi „dociągniemy po fakcie": czego nie zebraliśmy przed
+  rozstrzygnięciem, tego nie będzie. To podnosi cenę każdej przerwy w zbieraniu i jest powodem,
+  dla którego domknięcie luki przy starcie jest zadaniem, a nie usprawnieniem.
+- **Limity tempa są nieudokumentowane** → zmierzone ~12 żądań/s bez odmowy, ale to obserwacja
+  z jednej minuty, nie kontrakt. Własny throttle i backoff, obie wartości konfigurowalne, wartość
+  początkowa wzięta z tego, co u źródła działało (6 równolegle). Ryzykiem jest odcięcie modułu
+  przy głębokim uzupełnianiu, nie utrata danych.
+- **Równoważność Gammy i CLOB-a jest zmierzona, nie obiecana** → cała oszczędność próbkowania stoi
+  na tym, że `outcomePrices` to midpoint. Gdyby dostawca to rozłączył, seria zmieniłaby znaczenie
+  bez jednego błędu. Stąd zapisany rodzaj wyceny przy próbce i test sprawdzający równoważność na
+  próbie, zamiast założenia w komentarzu.
 - **Rynki wielowynikowe i reguła wzajemnego wykluczania** → model danych to udźwignie, ale
   narzędzia i podstrona MUST prezentować wydarzenie, nie udawać, że każdy rynek jest niezależną
   monetą. Podstrona jest poza tą zmianą, więc pierwszym miejscem, gdzie to widać, są narzędzia.
@@ -175,8 +252,10 @@ niespójności między tytułem a treścią, a alternatywą było ryzyko przy za
 
 ## Open Questions
 
-- Który rodzaj wyceny jest domyślny w odczycie: cena ostatniej transakcji czy wycena z księgi.
-  Zapisujemy oba; domyślny wybiera pomiar z zadania 1.3. Nie zmienia to wymagań.
+- ~~Który rodzaj wyceny jest domyślny w odczycie.~~ Rozstrzygnięte pomiarem 1.1 i 1.3: midpoint,
+  bo jest jedyną wyceną kompletną dla wszystkich wyników w jednym wywołaniu.
+- Jak głęboko uzupełniać wstecz przy nowej obserwacji. Okno kosztuje 15 dni, więc głębokość jest
+  wprost liczbą żądań; wartość początkowa jest ustawieniem, a nie decyzją tej zmiany.
 - Czy takt próbkowania ma być jeden dla wszystkich obserwacji, czy per grupa. Na tej skali jeden
   wystarcza; per grupa byłoby ustawieniem bez zmierzonej potrzeby.
 - Czy zagęszczanie starszych próbek kiedykolwiek się włączy. Specyfikacja na to pozwala, ta

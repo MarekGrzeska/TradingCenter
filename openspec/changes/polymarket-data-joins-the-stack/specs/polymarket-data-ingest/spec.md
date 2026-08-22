@@ -36,7 +36,20 @@ skonfigurowanej głębokości albo do granicy tego, co dostawca ma.
 
 Uzupełnianie MUST być wykonywane oknami, z których każde osobno się udaje, osobno zawodzi i osobno
 jest ponawiane. Nieudane okno MUST NOT zatrzymywać pozostałych ani MUST NOT zostać zapisane jako
-zakres zebrany.
+zakres zebrany. Szerokość okna MUST wynikać z tego, co dostawca przyjmuje w jednym żądaniu, i MUST
+być ustawieniem, a nie liczbą wpisaną w kod — dostawca MAY ją zmienić, a moduł MUST NOT wtedy
+przestać uzupełniać w milczeniu.
+
+Obie krawędzie okna MUST być sprawdzone **przy zapisie**, nie tylko wysłane w żądaniu. Odpowiedź
+dostawcy MAY wykraczać poza okno, o które zapytano — to, co ląduje w archiwum, jest obietnicą tego
+modułu, nie obietnicą do oddelegowania, a punkt zapisany poza sprawdzonym oknem czyni „zebrany
+zakres" twierdzeniem szerszym niż to, co zweryfikowano.
+
+#### Scenario: Odpowiedź wykracza poza żądane okno
+
+- **WHEN** dostawca oddaje dla okna uzupełniania punkty spoza jego krawędzi
+- **THEN** moduł zapisuje wyłącznie punkty mieszczące się w oknie
+- **AND** zebrany zakres obejmuje to okno, a nie zakres, który odpowiedź przyniosła
 
 #### Scenario: Nowo objęte obserwacją wydarzenie
 

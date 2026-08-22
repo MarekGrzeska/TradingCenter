@@ -1,11 +1,12 @@
 ## 1. Pomiar dostawcy, zanim powstanie klient
 
-- [ ] 1.1 Metadane wydarzenia po adresie i po identyfikatorze: kształt odpowiedzi, rynki, wyniki, identyfikatory, po których odpytuje się cenę, stan rozstrzygnięcia; zapisać przykładowe odpowiedzi
-- [ ] 1.2 Szereg czasowy ceny: parametry, maksymalne okno na żądanie, dostępna rozdzielczość dla starych zakresów, zachowanie dla rynku rozstrzygniętego
-- [ ] 1.3 Cena ostatniej transakcji wobec wyceny z księgi na kilku rynkach o różnej płynności; wybrać domyślną dla odczytu
-- [ ] 1.4 Przeglądanie publicznej bazy: tagi dostawcy, porządki sortowania, stronicowanie
-- [ ] 1.5 Limity tempa obu powierzchni: gdzie dostawca zaczyna odmawiać; wartości startowe throttle i backoff
-- [ ] 1.6 Wyniki 1.1–1.5 dopisać do `design.md`; bez nich kolejne grupy stoją
+- [x] 1.1 Metadane wydarzenia po adresie i po identyfikatorze: kształt odpowiedzi, rynki, wyniki, identyfikatory, po których odpytuje się cenę, stan rozstrzygnięcia; zapisać przykładowe odpowiedzi
+- [x] 1.2 Szereg czasowy ceny: parametry, maksymalne okno na żądanie, dostępna rozdzielczość dla starych zakresów, zachowanie dla rynku rozstrzygniętego
+- [x] 1.3 Cena ostatniej transakcji wobec wyceny z księgi na kilku rynkach o różnej płynności; wybrać domyślną dla odczytu
+- [x] 1.4 Przeglądanie publicznej bazy: tagi dostawcy, porządki sortowania, stronicowanie
+- [x] 1.5 Limity tempa obu powierzchni: gdzie dostawca zaczyna odmawiać; wartości startowe throttle i backoff
+- [x] 1.6 Wyniki 1.1–1.5 dopisać do `design.md`; bez nich kolejne grupy stoją
+- [x] 1.7 Poprawić artefakty tam, gdzie pomiar im zaprzeczył: wymaganie o dwóch powierzchniach w `polymarket-data-upstream-access`, przycinanie okna przy zapisie w `polymarket-data-ingest`, decyzja o próbkowaniu przez metadane w `design.md`
 
 ## 2. Szkielet modułu
 
@@ -28,13 +29,14 @@
 
 ## 4. Klient dostawcy i zbieranie
 
-- [ ] 4.1 Klient obu powierzchni dostawcy z throttle'em i backoffem; odmowa i limit odróżnione od braku danych
+- [ ] 4.1 Klient obu powierzchni dostawcy z throttle'em, backoffem i identyfikacją klienta w nagłówku; odmowa i limit odróżnione od braku danych
 - [ ] 4.2 Odświeżanie struktury obserwowanego wydarzenia: nowy rynek, rozstrzygnięcie rynku
-- [ ] 4.3 Próbkowanie w takcie: rusza przy objęciu obserwacją bez restartu, ustaje przy rozstrzygnięciu i przy zakończeniu obserwacji
-- [ ] 4.4 Uzupełnianie przeszłości oknami — każde osobno się udaje, zawodzi i jest ponawiane; nieudane okno nie uchodzi za zebrane
+- [ ] 4.3 Próbkowanie **wywołaniem na wydarzenie**, nie na token (design.md, „Próbkowanie idzie przez metadane"); rusza przy objęciu obserwacją bez restartu, ustaje przy rozstrzygnięciu i przy zakończeniu obserwacji
+- [ ] 4.4 Uzupełnianie przeszłości oknami o szerokości z konfiguracji (zmierzony sufit dostawcy: 15 dni) — każde osobno się udaje, zawodzi i jest ponawiane; nieudane okno nie uchodzi za zebrane; obie krawędzie sprawdzane przy zapisie, bo odpowiedź wykracza poza żądane okno
 - [ ] 4.5 Domknięcie luki przy starcie i po przerwie dłuższej niż takt
 - [ ] 4.6 Porażka nie zapisuje próbki zastępczej ani nie powtarza ostatniej ceny; powtarzające się porażki widoczne w stanie obserwacji
-- [ ] 4.7 Testy: odmowa dostawcy nie zostawia zakresu oznaczonego jako zebrany, uzupełnianie nie głodzi taktu, backoff po limicie
+- [ ] 4.7 Testy: odmowa dostawcy nie zostawia zakresu oznaczonego jako zebrany, uzupełnianie nie głodzi taktu, backoff po limicie, punkt spoza okna nie jest zapisywany
+- [ ] 4.8 Test równoważności powierzchni: wycena z metadanych wobec wyceny z księgi na próbie — rozjazd ma wywrócić test, nie zmienić po cichu znaczenia serii
 
 ## 5. Kontrakt REST
 

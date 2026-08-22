@@ -27,26 +27,44 @@ a nie w terminalu ani w workbenchu.
 - **THEN** zmiana zostaje pochłonięta w tym module
 - **AND** kontrakt publikowany konsumentom pozostaje bez zmian
 
-### Requirement: Moduł korzysta z dwóch powierzchni dostawcy i wie, po co z której
+### Requirement: Moduł wie, z której powierzchni dostawcy pochodzi każda liczba
 
-Dostawca udostępnia osobno metadane wydarzeń i rynków oraz osobno ceny i ich szeregi czasowe.
-Moduł MUST sięgać po metadane po strukturę wydarzenia i jego rozstrzygnięcie, a po ceny po wycenę
-wyniku — i MUST NOT wnioskować struktury z odpowiedzi cenowej ani ceny z metadanych, nawet gdy
-któraś z nich chwilowo taką wartość niesie.
+Dostawca udostępnia osobno metadane wydarzeń i rynków oraz osobno wyceny i szeregi czasowe, a te
+same wartości bywają publikowane przez obie. Moduł MAY brać wycenę z powierzchni metadanych, gdy
+ta podaje ją dla **wszystkich** wyników naraz — to jest tańsze o rząd wielkości niż odpytywanie
+każdego wyniku osobno. MUST NOT natomiast przyjmować takiej równoważności na wiarę: MUST zapisać
+przy każdej próbce, z której powierzchni pochodzi, i MUST mieć test sprawdzający na próbie, że obie
+powierzchnie mówią to samo.
+
+Rozejście się powierzchni MUST objawić się nieudanym testem, a nie serią, która po cichu zmieniła
+znaczenie. Moduł MUST NOT wnioskować struktury wydarzenia z odpowiedzi cenowej.
 
 Obie powierzchnie są publiczne i nie wymagają poświadczenia. Moduł MUST NOT wymagać do startu
 klucza do dostawcy — brak takiej konfiguracji nie jest awarią, bo takiej konfiguracji nie ma.
+Moduł MUST natomiast przedstawiać się dostawcy identyfikacją klienta w żądaniu; jej brak jest
+u tego dostawcy odmową, która czyta się jak blokada adresu.
 
-#### Scenario: Struktura i cena z dwóch źródeł
+#### Scenario: Wycena wzięta z powierzchni metadanych
 
-- **WHEN** moduł odświeża obserwowane wydarzenie
-- **THEN** strukturę i stan rozstrzygnięcia bierze z powierzchni metadanych
-- **AND** cenę wyniku z powierzchni cenowej
+- **WHEN** moduł zbiera ceny obserwowanego wydarzenia z powierzchni, która podaje je dla wszystkich
+  wyników w jednej odpowiedzi
+- **THEN** zapisane próbki niosą, z której powierzchni pochodzą
+
+#### Scenario: Powierzchnie przestają mówić to samo
+
+- **WHEN** wycena z powierzchni metadanych przestaje odpowiadać wycenie z powierzchni cenowej
+- **THEN** MUST to wywrócić testy modułu
+- **AND** MUST NOT ujawnić się dopiero jako zmiana znaczenia zebranej serii
 
 #### Scenario: Start bez klucza do dostawcy
 
 - **WHEN** moduł startuje bez jakiegokolwiek poświadczenia do dostawcy
 - **THEN** wstaje i pracuje normalnie
+
+#### Scenario: Żądanie bez identyfikacji klienta
+
+- **WHEN** moduł wysyła do dostawcy żądanie bez identyfikacji klienta
+- **THEN** MUST to wywrócić testy modułu, zanim objawi się na produkcji jako odmowa dostępu
 
 ### Requirement: Odmowa dostawcy jest raportowana jako odmowa, nie jako brak danych
 
