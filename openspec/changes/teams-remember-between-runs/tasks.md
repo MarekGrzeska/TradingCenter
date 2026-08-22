@@ -70,8 +70,8 @@
 
 ## 8. Domknięcie
 
-- [ ] 8.1 `.env.example` bez zmian — potwierdzić, że zmiana nie dokłada ustawienia
-- [ ] 8.2 `modules/workbench/README.md`: pamięć w opisie powierzchni teams
-- [ ] 8.3 Pełne bramki: `uv run pytest`, `ruff check .`, `pyright` w workbenchu; `pnpm test`, `lint`,
+- [x] 8.1 `.env.example` bez zmian — potwierdzić, że zmiana nie dokłada ustawienia
+- [x] 8.2 `modules/workbench/README.md`: pamięć w opisie powierzchni teams
+- [x] 8.3 Pełne bramki: `uv run pytest`, `ruff check .`, `pyright` w workbenchu; `pnpm test`, `lint`,
       `typecheck`, `contract:check` w terminalu
-- [ ] 8.4 `openspec validate teams-remember-between-runs --strict`
+- [x] 8.4 `openspec validate teams-remember-between-runs --strict`
