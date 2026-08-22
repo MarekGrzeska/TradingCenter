@@ -33,14 +33,16 @@
 
 ## 4. Klient dostawcy i zbieranie
 
-- [ ] 4.1 Klient obu powierzchni dostawcy z throttle'em, backoffem i identyfikacją klienta w nagłówku; odmowa i limit odróżnione od braku danych
-- [ ] 4.2 Odświeżanie struktury obserwowanego wydarzenia: nowy rynek, rozstrzygnięcie rynku
-- [ ] 4.3 Próbkowanie **wywołaniem na wydarzenie**, nie na token (design.md, „Próbkowanie idzie przez metadane"); rusza przy objęciu obserwacją bez restartu, ustaje przy rozstrzygnięciu i przy zakończeniu obserwacji
-- [ ] 4.4 Uzupełnianie przeszłości oknami o szerokości z konfiguracji (zmierzony sufit dostawcy: 15 dni) — każde osobno się udaje, zawodzi i jest ponawiane; nieudane okno nie uchodzi za zebrane; obie krawędzie sprawdzane przy zapisie, bo odpowiedź wykracza poza żądane okno
-- [ ] 4.5 Domknięcie luki przy starcie i po przerwie dłuższej niż takt
-- [ ] 4.6 Porażka nie zapisuje próbki zastępczej ani nie powtarza ostatniej ceny; powtarzające się porażki widoczne w stanie obserwacji
-- [ ] 4.7 Testy: odmowa dostawcy nie zostawia zakresu oznaczonego jako zebrany, uzupełnianie nie głodzi taktu, backoff po limicie, punkt spoza okna nie jest zapisywany
-- [ ] 4.8 Test równoważności powierzchni: wycena z metadanych wobec wyceny z księgi na próbie — rozjazd ma wywrócić test, nie zmienić po cichu znaczenia serii
+- [x] 4.1 Klient obu powierzchni dostawcy z throttle'em, backoffem i identyfikacją klienta w nagłówku; odmowa i limit odróżnione od braku danych
+- [x] 4.2 Odświeżanie struktury obserwowanego wydarzenia: nowy rynek, rozstrzygnięcie rynku
+- [x] 4.3 Próbkowanie **wywołaniem na wydarzenie**, nie na token (design.md, „Próbkowanie idzie przez metadane"); rusza przy objęciu obserwacją bez restartu, ustaje przy rozstrzygnięciu i przy zakończeniu obserwacji
+- [x] 4.4 Uzupełnianie przeszłości oknami o szerokości z konfiguracji (zmierzony sufit dostawcy: 15 dni) — każde osobno się udaje, zawodzi i jest ponawiane; nieudane okno nie uchodzi za zebrane; obie krawędzie sprawdzane przy zapisie, bo odpowiedź wykracza poza żądane okno
+- [x] 4.5 Domknięcie luki przy starcie i po przerwie dłuższej niż takt
+- [x] 4.6 Porażka nie zapisuje próbki zastępczej ani nie powtarza ostatniej ceny; powtarzające się porażki widoczne w stanie obserwacji
+- [x] 4.7 Testy: odmowa dostawcy nie zostawia zakresu oznaczonego jako zebrany, uzupełnianie nie głodzi taktu, backoff po limicie, punkt spoza okna nie jest zapisywany
+- [x] 4.8 Testy `live` (`--run-live`, nigdy w CI) na cztery pomiary, na których stoi projekt: równoważność powierzchni, sufit okna 15 dni, nierespektowane `endTs`, selekcja brzegu po `User-Agent`
+- [x] 4.9 Poprawiony pomiar 6: brzeg dostawcy odrzuca `Python-urllib/*`, a **nie** żądanie bez nagłówka — brak nagłówka, pusta wartość i domyślne UA httpx/requests przechodzą. Poprawione w `design.md`, specu, `config.py`, `.env.example`, README i w teście, który to teraz mierzy wprost
+- [x] 4.10 `uv run pytest` (91), `--run-live` (4), `ruff check .`, `pyright`
 
 ## 5. Kontrakt REST
 

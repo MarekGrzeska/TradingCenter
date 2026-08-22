@@ -36,10 +36,14 @@ class Settings(BaseSettings):
     gamma_base_url: str = "https://gamma-api.polymarket.com"
     clob_base_url: str = "https://clob.polymarket.com"
 
-    # How this module names itself to the provider. Not politeness: a request without a
-    # User-Agent is refused by the provider's edge with `403 error code: 1010`, on both
-    # surfaces, and the symptom reads like a blocked address rather than a missing header
-    # (design.md, measurement 6).
+    # How this module names itself to the provider. Not politeness: the provider's edge
+    # selects on this header and refuses some clients' defaults — `Python-urllib/3.12` gets
+    # `403 error code: 1010` on both surfaces, where an absent header, an empty one and
+    # httpx's own default are all served (measured 22 August 2026, design.md, measurement 6).
+    #
+    # A library's default is a value somebody else decides, and its changing on a dependency
+    # bump would be an access refusal with no change in this module — and a symptom that
+    # reads like a blocked address.
     provider_user_agent: str = "tradingcenter-polymarket-data/0.1 (+https://github.com/MarekGrzeska)"
 
     # --- the archive's own storage ---
@@ -135,8 +139,8 @@ class Settings(BaseSettings):
     def _not_blank(cls, value: str, info: ValidationInfo) -> str:
         # pydantic already rejects a variable that is absent; this catches the one that is
         # present but empty, which is what an unfilled .env actually looks like. The
-        # user-agent is in this list rather than defaulted-and-forgotten because an empty
-        # one is refused by the provider exactly like an absent one.
+        # user-agent is in this list because an empty value here would send the header
+        # empty and leave the module unnamed to a provider that reads it.
         if not value.strip():
             raise ValueError(f"{str(info.field_name).upper()} is set but empty")
         return value.strip()

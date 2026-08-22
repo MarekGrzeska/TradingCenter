@@ -18,7 +18,9 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
+from . import provider
 from .config import Settings
+from .ingest import Ingest
 from .routers import meta
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
@@ -50,13 +52,21 @@ async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
     app.state.settings = settings
 
-    async with make_pool(
-        settings.database_url,
-        user=settings.database_user,
-        client_id=settings.azure_client_id,
-        client_secret=settings.azure_client_secret,
-        tenant_id=settings.azure_tenant_id,
-    ) as pool:
+    async with (
+        make_pool(
+            settings.database_url,
+            user=settings.database_user,
+            client_id=settings.azure_client_id,
+            client_secret=settings.azure_client_secret,
+            tenant_id=settings.azure_tenant_id,
+        ) as pool,
+        provider.client(
+            gamma_base_url=settings.gamma_base_url,
+            clob_base_url=settings.clob_base_url,
+            user_agent=settings.provider_user_agent,
+            concurrency=settings.provider_concurrency,
+        ) as polymarket,
+    ):
         # One connection held for the whole of it: the advisory lock is session scoped, so
         # it has to be released on the connection that took it, and handing that connection
         # back to the pool in between would release it early.
@@ -71,8 +81,24 @@ async def lifespan(app: FastAPI):
             await schema_version.verify(conn, MIGRATIONS)
 
         app.state.pool = pool
+        app.state.provider = polymarket
+
+        # After the migration and not before it: sampling started earlier would write to a
+        # schema it does not know, and a bad write is not undone by a later error response.
+        ingest = Ingest(
+            pool,
+            polymarket,
+            interval_seconds=settings.sample_interval_seconds,
+            window_days=settings.history_window_days,
+            default_backfill_days=settings.default_backfill_days,
+        )
+        app.state.ingest = ingest
+        await ingest.start()
         log.info("polymarket-data is serving")
-        yield
+        try:
+            yield
+        finally:
+            await ingest.stop()
 
 
 def create_app() -> FastAPI:

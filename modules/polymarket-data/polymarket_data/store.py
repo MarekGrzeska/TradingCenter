@@ -561,3 +561,102 @@ async def delete_history(conn: Conn, event_id: int) -> tuple[int, int]:
             event_id,
         )
     return int(samples or 0), int(ranges or 0)
+
+
+# --- what collection is currently doing ---------------------------------------------------
+
+
+async def sampleable_events(conn: Conn) -> list[tuple[int, str]]:
+    """`(event_id, provider_event_id)` for every event still worth a request: tracked, and
+    holding at least one market the provider has not answered.
+
+    The unit is the event because the request is: one read of the metadata surface prices
+    every outcome of every market it holds.
+    """
+    rows = await conn.fetch(
+        """
+        SELECT DISTINCT e.id, e.provider_event_id
+        FROM tracked_events e
+        JOIN markets m ON m.event_id = e.id
+        WHERE e.tracking_ended_at IS NULL AND m.resolved_outcome IS NULL
+        ORDER BY e.id
+        """
+    )
+    return [(row["id"], row["provider_event_id"]) for row in rows]
+
+
+async def outcome_ids_by_token(conn: Conn, event_id: int) -> dict[str, int]:
+    """The provider speaks in tokens and this archive in outcome ids. One lookup per event
+    rather than per outcome, because one measured event holds 256 of them."""
+    rows = await conn.fetch(
+        """
+        SELECT o.token_id, o.id
+        FROM outcomes o JOIN markets m ON m.id = o.market_id
+        WHERE m.event_id = $1
+        """,
+        event_id,
+    )
+    return {row["token_id"]: row["id"] for row in rows}
+
+
+async def note_sampled(conn: Conn, event_id: int) -> None:
+    await conn.execute(
+        """
+        INSERT INTO sampling_state (event_id, last_success_at, consecutive_failures)
+        VALUES ($1, now(), 0)
+        ON CONFLICT (event_id) DO UPDATE SET
+            last_success_at = now(),
+            consecutive_failures = 0,
+            last_failure_reason = NULL
+        """,
+        event_id,
+    )
+
+
+async def note_sampling_failed(conn: Conn, event_id: int, reason: str) -> None:
+    """Counted rather than merely logged. Repeated failure is what the list of observations
+    has to be able to say out loud — silence in the data must not read as silence in the
+    market."""
+    await conn.execute(
+        """
+        INSERT INTO sampling_state (
+            event_id, last_failure_at, last_failure_reason, consecutive_failures
+        )
+        VALUES ($1, now(), $2, 1)
+        ON CONFLICT (event_id) DO UPDATE SET
+            last_failure_at = now(),
+            last_failure_reason = $2,
+            consecutive_failures = sampling_state.consecutive_failures + 1
+        """,
+        event_id,
+        reason[:500],
+    )
+
+
+async def sampling_state(conn: Conn) -> dict[int, dict]:
+    rows = await conn.fetch(
+        "SELECT event_id, last_success_at, last_failure_at, last_failure_reason, "
+        "consecutive_failures FROM sampling_state"
+    )
+    return {row["event_id"]: dict(row) for row in rows}
+
+
+async def outcomes_of_event(conn: Conn, event_id: int) -> list[tuple[int, str, datetime | None]]:
+    """`(outcome_id, token_id, oldest_available_at)` for a backfill to walk."""
+    rows = await conn.fetch(
+        """
+        SELECT o.id, o.token_id, o.oldest_available_at
+        FROM outcomes o JOIN markets m ON m.id = o.market_id
+        WHERE m.event_id = $1 AND m.resolved_outcome IS NULL
+        ORDER BY m.id, o.position
+        """,
+        event_id,
+    )
+    return [(row["id"], row["token_id"], row["oldest_available_at"]) for row in rows]
+
+
+async def newest_sample_at(conn: Conn, outcome_id: int) -> datetime | None:
+    """Where a gap-closing read has to start from."""
+    return await conn.fetchval(
+        "SELECT max(observed_at) FROM price_samples WHERE outcome_id = $1", outcome_id
+    )

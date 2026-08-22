@@ -47,9 +47,16 @@ temu, co ta zmiana zakładała**, i jedna z nich zmieniła wymaganie w `polymark
    jedno oddało 193 punkty, cztery oddały zero. Dostawca nie obiecuje, że pamięta — po
    rozstrzygnięciu **nasze archiwum jest jedynym zapisem**. To zamienia „nie kasujemy" z decyzji
    estetycznej w jedyną wersję, która ma sens, i zamyka drogę „dociągniemy sobie później".
-6. **Cloudflare odbija żądanie bez nagłówka `User-Agent`** — `403`, `error code: 1010`, na obu
-   powierzchniach. Klient MUST się przedstawiać. Objaw czyta się jak blokada adresu i prowadzi
-   śledztwo w złą stronę.
+6. **Brzeg dostawcy filtruje po `User-Agent`, i to dokładniej, niż wyglądało z pierwszego
+   pomiaru.** Pierwsze sprawdzenie mówiło „żądanie bez `User-Agent` dostaje `403 error code:
+   1010`" i było błędne — to, co dostało 403, było domyślną wartością `urllib`
+   (`Python-urllib/3.12`), na obu powierzchniach. Sprawdzone potem osobno: **brak nagłówka,
+   pusta wartość, `python-httpx/0.28.1` i `python-requests/2.32` przechodzą (200)**; blokowane
+   jest `Python-urllib/*`. Skutek dla modułu jest mniejszy, niż zapowiadał pomiar, ale
+   niezerowy: brzeg **wybiera po tym nagłówku**, więc domyślna wartość biblioteki jest
+   wartością, o której decyduje ktoś inny. Moduł wysyła własną, stałą — i to jest jedyny
+   powód, dla którego `PROVIDER_USER_AGENT` istnieje. Objaw, gdyby lista się zmieniła, czyta
+   się jak blokada adresu i prowadzi śledztwo w złą stronę.
 7. **Limity tempa: 30 kolejnych wywołań w 2,5 s (~12/s) bez jednej odmowy.** Semafor 6 ze źródła
    jest ostrożny i zostaje jako wartość początkowa, ale nie jest krawędzią, o którą ktoś się obił.
 8. **Listing Gammy jest ciężki: ~19 KiB na wydarzenie**, 100 wydarzeń to 10 MiB, i nie ma parametru

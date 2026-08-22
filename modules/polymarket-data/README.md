@@ -59,5 +59,7 @@ Both edges are therefore checked when a sample is written, not merely asked for.
 
 `.env.example` is the list. `DATABASE_USER` unset selects local mode and narrows the
 module to loopback; set, it names the Postgres role and the credential becomes an Entra
-token fetched per connection. `PROVIDER_USER_AGENT` is not decoration — a request without
-one is refused at the provider's edge with a `403` that reads like a blocked address.
+token fetched per connection. `PROVIDER_USER_AGENT` is not decoration: the provider's edge
+selects on that header and refuses some HTTP clients' defaults — `Python-urllib` gets a
+`403` where an absent header does not — so the module sends a value it chose rather than one
+a dependency bump could change under it.

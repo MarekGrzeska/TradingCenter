@@ -41,8 +41,13 @@ znaczenie. Moduł MUST NOT wnioskować struktury wydarzenia z odpowiedzi cenowej
 
 Obie powierzchnie są publiczne i nie wymagają poświadczenia. Moduł MUST NOT wymagać do startu
 klucza do dostawcy — brak takiej konfiguracji nie jest awarią, bo takiej konfiguracji nie ma.
-Moduł MUST natomiast przedstawiać się dostawcy identyfikacją klienta w żądaniu; jej brak jest
-u tego dostawcy odmową, która czyta się jak blokada adresu.
+
+Moduł MUST natomiast przedstawiać się dostawcy **własną, stałą identyfikacją klienta**, a nie
+wartością domyślną biblioteki HTTP. Brzeg dostawcy wybiera po tym nagłówku i część domyślnych
+wartości odrzuca — zmierzone: domyślna wartość jednego z klientów HTTP dostaje `403`, gdy brak
+nagłówka przechodzi. Wartość domyślna biblioteki jest wartością, o której decyduje ktoś inny,
+i jej zmiana przy aktualizacji zależności byłaby odmową dostępu bez jednej zmiany w tym
+module. Identyfikacja MUST być ustawieniem, nie stałą w kodzie.
 
 #### Scenario: Wycena wzięta z powierzchni metadanych
 
@@ -61,9 +66,10 @@ u tego dostawcy odmową, która czyta się jak blokada adresu.
 - **WHEN** moduł startuje bez jakiegokolwiek poświadczenia do dostawcy
 - **THEN** wstaje i pracuje normalnie
 
-#### Scenario: Żądanie bez identyfikacji klienta
+#### Scenario: Żądanie idzie z domyślną identyfikacją biblioteki
 
-- **WHEN** moduł wysyła do dostawcy żądanie bez identyfikacji klienta
+- **WHEN** moduł wysyła do dostawcy żądanie, którego `User-Agent` pochodzi z biblioteki HTTP,
+  a nie z ustawienia modułu
 - **THEN** MUST to wywrócić testy modułu, zanim objawi się na produkcji jako odmowa dostępu
 
 ### Requirement: Odmowa dostawcy jest raportowana jako odmowa, nie jako brak danych

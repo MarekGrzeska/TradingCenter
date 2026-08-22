@@ -33,12 +33,11 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 # Emptied between tests so that one test's rows are never another's premise. TRUNCATE
 # rather than dropping and re-migrating: the schema is the same for every test.
 #
-# CASCADE is not needed — `tracked_events` and `observation_groups` are the roots and
-# everything else falls out of truncating them, but naming all six keeps the statement
-# honest about what it empties.
+# Named in full rather than left to CASCADE, so the statement says what it empties.
 TABLES: tuple[str, ...] = (
     "price_samples",
     "collected_ranges",
+    "sampling_state",
     "outcomes",
     "markets",
     "tracked_events",
@@ -164,6 +163,17 @@ def settings() -> Settings:
         database_user="test-user",
         _env_file=None,
     )
+
+
+@pytest.fixture
+async def pool(migrated_url: str):
+    """A pool over the migrated database, emptied first — what `Ingest` takes."""
+    from tc_runtime.db import pool as make_pool
+
+    async with make_pool(migrated_url, max_size=5) as created:
+        async with created.acquire() as conn:
+            await conn.execute(f"TRUNCATE {', '.join(TABLES)}")
+        yield created
 
 
 @pytest.fixture

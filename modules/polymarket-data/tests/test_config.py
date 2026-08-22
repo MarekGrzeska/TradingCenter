@@ -73,9 +73,9 @@ class TestProvider:
         )
 
     def test_refuses_an_empty_user_agent(self):
-        # Measured 22 August 2026: the provider's edge answers 403 "error code: 1010" to a
-        # request without one, and the symptom reads like a blocked address. An empty value
-        # is refused here rather than discovered there.
+        # The provider's edge selects on this header — measured 22 August 2026, where
+        # `Python-urllib` draws a 403 and an absent header does not. An empty setting would
+        # send the header empty and leave the module unnamed to a provider that reads it.
         with pytest.raises(ValidationError, match="PROVIDER_USER_AGENT is set but empty"):
             build(provider_user_agent="  ")
 
