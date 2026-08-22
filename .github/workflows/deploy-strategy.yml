@@ -1,0 +1,51 @@
+name: deploy-strategy
+
+# Only a push to `main` deploys — the pull_request federated credential (github-oidc.tf)
+# cannot even authenticate to Azure, so this cannot run from a fork's PR by construction.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/strategy/**"
+      # Path dependencies are baked into this image (see the Dockerfile), so a merged
+      # package fix that never redeploys its consumers is a fix that never reaches
+      # production. Exactly the packages this module's pyproject.toml names.
+      - "packages/tc-runtime/**"
+      - "packages/tc-mcp-kit/**"
+      - ".github/workflows/deploy-strategy.yml"
+      - ".github/workflows/_deploy-app-service.yml"
+      - "scripts/deploy_probe.py"
+  workflow_dispatch: {}
+
+# Declared on the caller, and this is where it has to be: a reusable workflow can only
+# *narrow* the caller's GITHUB_TOKEN, never widen it. This repository's default workflow
+# permission is `read`, and `id-token` is never granted by default at all — so a caller
+# without this block hands the shared workflow a token that cannot push to GHCR and cannot
+# exchange an OIDC assertion, and every deploy fails at `azure/login`.
+permissions:
+  contents: read
+  id-token: write # azure/login's OIDC exchange
+  packages: write # docker push to GHCR
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-app-service.yml
+    with:
+      module: strategy
+      app_name: app-tradingcenter-strategy
+      # `/health`, for the reason the workbench's probe gives: the control plane read
+      # `Running` over a crash-looping container for the better part of an hour on
+      # 16 August 2026, so every workflow here asks whether the *process* came up.
+      #
+      # It answers that completely for this module. The lifespan does not finish until the
+      # migration chain does, under its advisory lock, so a process answering here at all
+      # is a process whose database is at the revision this image was built for. `/health`
+      # is excluded from Easy Auth (infra/app-service.tf) so the probe reaches the
+      # container rather than the platform's 401.
+      #
+      # `"database"` rather than `"status"`: this module's `/health` reports what it can
+      # reach, and that key is one only the running process writes.
+      probe_path: /health
+      expected_status: 200
+      body_contains: '"database"'
+      attempts: 20
