@@ -1,0 +1,78 @@
+## 1. Zakres na moduł
+
+- [ ] 1.1 `EntraConfig` niesie zakres na endpoint zamiast jednego; `acquire()` przyjmuje zakres wołanego modułu
+- [ ] 1.2 `jsonClient` dostaje zakres przy budowie, tak jak dostaje adres bazowy; cztery klienty, cztery zakresy
+- [ ] 1.3 Konfiguracja z jednym zakresem dalej działa — praca lokalna i `pnpm dev` nie zależą od czterech wartości
+- [ ] 1.4 `deploy-terminal.yml`: cztery zakresy jako literały obok adresów; `vars` zostają tylko dla client id i tenant id
+- [ ] 1.5 Testy: każdy klient wysyła zakres swojego modułu; token wzięty dla jednego nie trafia do drugiego; brak zakresu dla modułu to praca bez tożsamości, nie cudze poświadczenie
+- [ ] 1.6 `pnpm test`, `lint`, `typecheck`
+
+## 2. Klient kontraktu
+
+- [ ] 2.1 `src/polymarket/` — klient po `contract.polymarket.generated.ts`, na `jsonClient` z zakresem tego modułu
+- [ ] 2.2 Mapowanie wire → domena dla obserwacji, migawki, historii i zmian; `Decimal` nie istnieje na wire, prawdopodobieństwo jest liczbą 0..1
+- [ ] 2.3 Odmowa z powodu tożsamości odróżniona od braku odpowiedzi na poziomie klienta
+- [ ] 2.4 Testy mapperów wire↔domena i obu kształtów porażki
+- [ ] 2.5 `pnpm test`, `lint`, `typecheck`, `contract:check`
+
+## 3. Zakładka i lista
+
+- [ ] 3.1 Wpis w `src/app/tabs.ts` i widok; pusta lista nazwana jako pusta, ze wskazaniem, czym się ją zapełnia
+- [ ] 3.2 Wydarzenie → rynki → wyniki; rynek wielowynikowy jest kształtem, dwuwynikowy szczególnym przypadkiem
+- [ ] 3.3 Prawdopodobieństwa całej listy jednym żądaniem migawki; skala 0..1 nazwana w widoku
+- [ ] 3.4 Moment przy każdej cenie; cena starsza niż takt próbkowania odróżniona od bieżącej
+- [ ] 3.5 Zmiany w oknach 5m/15m/1h/4h/12h/24h/7d z momentem punktu bazowego; okno bez pokrycia jako brak z przyczyną, nie zero i nie puste pole
+- [ ] 3.6 Odmowa wobec niedostępności modułu — dwa różne komunikaty
+- [ ] 3.7 Testy: rynek wielowynikowy, jedno żądanie na listę, okno bez pokrycia, odmowa wobec awarii
+- [ ] 3.8 `pnpm test`, `lint`, `typecheck`
+
+## 4. Obserwacje i grupy
+
+- [ ] 4.1 Objęcie obserwacją adresem albo identyfikatorem; obie drogi dają tę samą obserwację
+- [ ] 4.2 Wydarzenie już obserwowane rozpoznane jako takie, bez drugiej obserwacji
+- [ ] 4.3 Odmowa z powodu sufitu pokazana z przyczyną i z tym, co zrobić najpierw
+- [ ] 4.4 Zakończenie obserwacji z uprzedzeniem, że dane zostają
+- [ ] 4.5 Grupy: utworzenie, przypisanie, skasowanie, ograniczenie listy do grupy
+- [ ] 4.6 Testy: po trzy na trasę CRUD (ścieżka szczęśliwa, błąd, odmowa); skasowanie grupy nie kończy obserwacji
+- [ ] 4.7 `pnpm test`, `lint`, `typecheck`
+
+## 5. Wykres serii prawdopodobieństwa
+
+- [ ] 5.1 Wykres liniowy na `lightweight-charts`, osobny od `chart/Chart.tsx`; oś wartości 0..1, opisana
+- [ ] 5.2 Wybór wyniku i zakresu czasu
+- [ ] 5.3 Granica najstarszego osiągalnego momentu narysowana, nie domyślna z urwania się przebiegu
+- [ ] 5.4 Dziura w pokryciu zostaje dziurą — żadnego odcinka przez przerwę
+- [ ] 5.5 Testy: zakres sięgający przed granicę, przerwa w środku zakresu, seria pusta
+- [ ] 5.6 `pnpm test`, `lint`, `typecheck`
+
+## 6. Kasowanie zebranej historii
+
+- [ ] 6.1 Czynność w zakładce, po trasie REST modułu
+- [ ] 6.2 Potwierdzenie nazywające zakres usunięcia i jego nieodwracalność
+- [ ] 6.3 Odstąpienie nie kasuje niczego
+- [ ] 6.4 Testy: potwierdzenie, odstąpienie, odmowa modułu
+- [ ] 6.5 `pnpm test`, `lint`, `typecheck`
+
+## 7. Infrastruktura
+
+- [ ] 7.1 Delegowany zakres `access_as_user` na `module.polymarket_data_easy_auth`
+- [ ] 7.2 `azuread_application_pre_authorized` dla terminala przy tej rejestracji
+- [ ] 7.3 Terminal w `allowed_applications` modułu i w `REST_CALLER_APPLICATION_IDS`; `TOOL_CALLER_APPLICATION_IDS` bez zmian
+- [ ] 7.4 Output z zakresem terminala dla tego modułu, na wzór trzech istniejących
+- [ ] 7.5 `terraform fmt`, `validate`, plan na PR
+
+## 8. Prawda w plikach
+
+- [ ] 8.1 README terminala: czwarty backend, czwarty zakres, i że token jest jeden na moduł
+- [ ] 8.2 `docs/architecture.md`: terminal czyta rynki predykcyjne; rozdział publiczności tokenu przestaje być planem
+- [ ] 8.3 `.env.example` terminala i komentarz przy `resolveEntra`
+
+## 9. Wdrożenie i sprawdzenie
+
+- [ ] 9.1 `apply` operatora — zakres, pre-autoryzacja i listy wołających **przed** wdrożeniem terminala
+- [ ] 9.2 Wdrożenie terminala; logowanie przechodzi bez dodatkowej zgody
+- [ ] 9.3 Sprawdzenie, że zakładki kont, zespołów i wykresu działają dalej po rozdziale zakresów
+- [ ] 9.4 Sprawdzenie zakładki: lista, zmiany w oknach, przebieg z granicą pokrycia
+- [ ] 9.5 Sprawdzenie odmów: wołający bez uprawnienia do REST odróżniony od modułu nieosiągalnego
+- [ ] 9.6 Zdjęcie ustępstwa w gatewayu — osobny `apply`, po 9.3
+- [ ] 9.7 `review.md` — co zmierzono, co odpowiedziało po wdrożeniu, i test na każdy scenariusz albo nazwana luka
