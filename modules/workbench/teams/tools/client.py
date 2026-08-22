@@ -41,7 +41,7 @@ import json
 import logging
 import time
 from contextlib import AsyncExitStack
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
@@ -420,24 +420,54 @@ class ToolServerRegistry:
     """
 
     servers: dict[str, ToolServer]
+    # Sources this process serves itself. Not `servers`, because none of what that word
+    # implies is true of them — no address, no identity, no session (specs/
+    # teams-tool-access, "Narzędzie w tym samym procesie jest źródłem, ale nie serwerem").
+    # Kept in a field of their own rather than mixed in, so that "which servers could not
+    # be reached" stays a question with an honest answer.
+    local: dict[str, Any] = field(default_factory=dict)
 
     @classmethod
-    def from_settings(cls, settings: Settings) -> ToolServerRegistry:
+    def from_settings(cls, settings: Settings, *, pool: Any | None = None) -> ToolServerRegistry:
+        """Every source this module offers. `pool` is the teams database, needed only to
+        *call* the in-process tools — announcing them does not touch it, which is what lets
+        the two save-time paths build a registry from settings alone and still publish the
+        names (design.md, "Rejestr buduje źródło pamięci sam")."""
+        from .memory import LABEL as MEMORY_LABEL
+        from .memory import MemoryToolSource
+
         return cls(
             {
                 "market-mcp": ToolServer(settings, prefix="market_mcp"),
                 "trading-mcp": ToolServer(
                     settings, prefix="trading_mcp", can_move_the_account=True
                 ),
-            }
+            },
+            {MEMORY_LABEL: MemoryToolSource(pool)},
         )
 
-    def configured(self) -> list[ToolServer]:
+    def configured(self) -> list[Any]:
+        """Every source that can be asked what it publishes — remote and local together,
+        which is what resolving a name has to walk."""
+        return self.remote() + list(self.local.values())
+
+    def remote(self) -> list[ToolServer]:
+        """Only the servers on the other end of a network. The distinction matters where a
+        refusal has to name what is missing: "no tool server is configured" is a sentence
+        about these, and would be false of the registry as a whole."""
         return [server for server in self.servers.values() if server.configured]
+
+    def unconfigured(self) -> list[str]:
+        """Labels of the servers this module knows about and has no address for."""
+        return sorted(
+            label for label, server in self.servers.items() if not server.configured
+        )
 
     async def aclose(self) -> None:
         for server in self.servers.values():
             await server.aclose()
+        for source in self.local.values():
+            await source.aclose()
 
 
 def _describe(err: BaseException) -> str:

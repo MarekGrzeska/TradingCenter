@@ -98,6 +98,15 @@ async def start_run_on_revision(
         execute_run(
             pool,
             run_id=run["id"],
+            # The team and the operator, carried from here rather than looked up again:
+            # anything a run leaves behind for the *next* run is anchored to the team, and
+            # a definition alone cannot say which team it is standing under
+            # (specs/teams-runs, "Przebieg niesie zespół i właściciela, a nie samą rewizję").
+            # This is also the one path a schedule takes, so the owner is the schedule's
+            # owner rather than the process — the same principal the cost ceiling above
+            # was counted against.
+            team_id=revision["team_id"],
+            owner_principal=owner_principal,
             definition=definition,
             provider=provider,
             tool_registry=tool_registry,

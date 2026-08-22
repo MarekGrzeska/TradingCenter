@@ -32,17 +32,19 @@ def check_definition(
     definition: TeamDefinition,
     *,
     model_ids: Collection[str],
-    announced: AnnouncedSnapshot | None,
+    announced: AnnouncedSnapshot,
 ) -> None:
     """Raises `DefinitionRefused` naming the agent at fault, or returns.
 
-    `announced` is `None` when this module has no tool server configured at all. That is
-    not the same as "no server announces this tool", and the refusal below says which of
-    the two it is — and, when it is neither, whether the name simply is not announced or
-    is announced by more than one server. Note the asymmetry with a *run*: a run of a
-    team whose agents carry no tools proceeds with no tool server at all (specs/
-    teams-tool-access), and so does a save of one — only an agent actually assigned a
-    tool needs the announcement to check it against.
+    The snapshot used to be optional, standing for "no tool server is configured at all".
+    It is not optional any more: some of what this module announces it serves itself, so
+    there is always a snapshot to check against, and "no server has an address" is now one
+    of the things *inside* it (`unconfigured`). The refusals below still tell the three
+    apart — a name nobody announces, a name announced by two servers, and a name that
+    could not be confirmed because a server is unreachable or unset. Note the asymmetry
+    with a *run*: a run of a team whose agents carry no tools proceeds with no tool server
+    at all (specs/teams-tool-access), and so does a save of one — only an agent actually
+    assigned a tool needs the announcement to check it against.
     """
     _every_agent_names_a_known_model(definition, model_ids)
     _every_assigned_tool_is_announced(definition, announced)
@@ -77,20 +79,11 @@ def _every_agent_names_a_known_model(
 
 
 def _every_assigned_tool_is_announced(
-    definition: TeamDefinition, announced: AnnouncedSnapshot | None
+    definition: TeamDefinition, announced: AnnouncedSnapshot
 ) -> None:
     assigning = [agent for agent in definition.agents if agent.tools]
     if not assigning:
         return
-
-    if announced is None:
-        agent = assigning[0]
-        raise DefinitionRefused(
-            f"agent {agent.key!r} is assigned tool(s) {sorted(agent.tools)}, but this "
-            "module has no tool server configured to check them against — set "
-            "MARKET_MCP_URL and/or TRADING_MCP_URL, or save the team with no tools "
-            "assigned"
-        )
 
     for agent in assigning:
         collided = sorted(
@@ -115,6 +108,18 @@ def _every_assigned_tool_is_announced(
                 f"agent {agent.key!r} is assigned tool(s) {unknown}, but "
                 f"{' and '.join(announced.unreachable)} could not be reached to "
                 "confirm them"
+            )
+        if announced.unconfigured:
+            # A server with no address at all, which used to be the `announced is None`
+            # case above. It is worth keeping apart from "answered and does not have it",
+            # because the operator's next move is a setting rather than a different tool.
+            raise DefinitionRefused(
+                f"agent {agent.key!r} is assigned tool(s) {unknown}, and "
+                f"{' and '.join(announced.unconfigured)} "
+                f"{'has' if len(announced.unconfigured) == 1 else 'have'} no address "
+                "configured to check them against — set MARKET_MCP_URL and/or "
+                "TRADING_MCP_URL, or assign only tools this module announces "
+                f"({sorted(known)})"
             )
         # Phase 2's wording: there can be two servers now, so the refusal says "no
         # configured tool server" rather than naming the one there used to be.

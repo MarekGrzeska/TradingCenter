@@ -21,35 +21,35 @@
 
 ## 3. Źródło narzędzi w procesie
 
-- [ ] 3.1 `teams/tools/memory.py`: stałe deskryptory `memory_read` i `memory_write` (opisy niosą
+- [x] 3.1 `teams/tools/memory.py`: stałe deskryptory `memory_read` i `memory_write` (opisy niosą
       sufity i warunki odmowy) oraz `MemoryToolSource` z interfejsem `ToolServer` — `label`,
       `configured`, `list_tools`, `call`, `moves_the_account`, `aclose`
-- [ ] 3.2 `list_tools()` nie dotyka bazy — test, że ogłasza obie nazwy przy `pool=None`
-- [ ] 3.3 `ToolServerRegistry.from_settings(settings, *, pool=None)` konstruuje źródło pamięci obok
+- [x] 3.2 `list_tools()` nie dotyka bazy — test, że ogłasza obie nazwy przy `pool=None`
+- [x] 3.3 `ToolServerRegistry.from_settings(settings, *, pool=None)` konstruuje źródło pamięci obok
       dwóch serwerów; `workbench/app.py` podaje pulę bazy `teams`
-- [ ] 3.4 `plan_tools`: warunek „żaden serwer nie jest skonfigurowany" pyta o serwery **sieciowe**,
+- [x] 3.4 `plan_tools`: warunek „żaden serwer nie jest skonfigurowany" pyta o serwery **sieciowe**,
       żeby odmowa nadal nazywała `market-mcp`/`trading-mcp`; test na nieskonfigurowany serwer przy
       obecnym źródle pamięci
-- [ ] 3.5 Testy: zespół z samą pamięcią rusza bez serwerów; kolizja nazwy pamięci z nazwą serwera
+- [x] 3.5 Testy: zespół z samą pamięcią rusza bez serwerów; kolizja nazwy pamięci z nazwą serwera
       odmawia przy zapisie i przy uruchomieniu; `GET /tools` i zapis rewizji widzą nazwy pamięci
 
 ## 4. Egzekwowanie przypisania przy wywołaniu
 
-- [ ] 4.1 `ToolPlan.call(name, arguments, *, agent_key)` — nazwa spoza `per_agent[agent_key]` oddaje
+- [x] 4.1 `ToolPlan.call(name, arguments, *, agent_key)` — nazwa spoza `per_agent[agent_key]` oddaje
       `ToolOutcome(REFUSED, …)` nazywający brak przypisania, bez sięgania do źródła
-- [ ] 4.2 `_StepRunner` podaje `call_tool` związany kluczem agenta; sygnatura `run_agent` w `loop.py`
+- [x] 4.2 `_StepRunner` podaje `call_tool` związany kluczem agenta; sygnatura `run_agent` w `loop.py`
       bez zmian
-- [ ] 4.3 Testy na `scripted_provider`: model woła nazwę nieprzypisaną (odmowa, źródło nietknięte),
+- [x] 4.3 Testy na `scripted_provider`: model woła nazwę nieprzypisaną (odmowa, źródło nietknięte),
       woła nazwę nieznaną nikomu, a odmowa ląduje w `tool_calls` i przebieg pracuje dalej
 
 ## 5. Kontekst przebiegu
 
-- [ ] 5.1 `start_run_on_revision` przekazuje `team_id` i `owner_principal` do `execute_run`, dalej do
+- [x] 5.1 `start_run_on_revision` przekazuje `team_id` i `owner_principal` do `execute_run`, dalej do
       `_Run` i `_StepRunner`
-- [ ] 5.2 Wywołania pamięci dostają zespół, właściciela, przebieg i klucz agenta; licznik zapisów
+- [x] 5.2 Wywołania pamięci dostają zespół, właściciela, przebieg i klucz agenta; licznik zapisów
       per przebieg egzekwuje `MEMORY_WRITES_PER_RUN`
-- [ ] 5.3 Test przebiegu z zegara: wpis należy do właściciela harmonogramu, nie do procesu
-- [ ] 5.4 Test dwóch przebiegów: pierwszy zapisuje, drugi odczytuje; wpis przeżywa przebieg
+- [x] 5.3 Test przebiegu z zegara: wpis należy do właściciela harmonogramu, nie do procesu
+- [x] 5.4 Test dwóch przebiegów: pierwszy zapisuje, drugi odczytuje; wpis przeżywa przebieg
       zakończony błędem
 
 ## 6. Trasy operatora

@@ -59,7 +59,7 @@ async def _run(
     owner: str = OWNER,
 ) -> int:
     async with pool.acquire() as conn:
-        _team_row, revision = await store.create_team(
+        team_row, revision = await store.create_team(
             conn, owner_principal=owner, name="a team", description="", definition=definition
         )
         run, _ = await store.create_run(
@@ -72,6 +72,8 @@ async def _run(
     await execute_run(
         pool,
         run_id=run["id"],
+        team_id=team_row["id"],
+        owner_principal=owner,
         definition=definition,
         provider=provider,
         tool_registry=ToolServerRegistry({"trading-mcp": server or WriteServer()}),
@@ -502,7 +504,7 @@ async def test_a_trade_row_survives_an_interrupted_run(pool: asyncpg.Pool) -> No
     provider = _PlacesThenSleeps()
 
     async with pool.acquire() as conn:
-        _team_row, revision = await store.create_team(
+        team_row, revision = await store.create_team(
             conn, owner_principal=OWNER, name="a team", description="", definition=definition
         )
         run, _ = await store.create_run(
@@ -517,6 +519,8 @@ async def test_a_trade_row_survives_an_interrupted_run(pool: asyncpg.Pool) -> No
         execute_run(
             pool,
             run_id=run["id"],
+            team_id=team_row["id"],
+            owner_principal=OWNER,
             definition=definition,
             provider=provider,
             tool_registry=ToolServerRegistry({"trading-mcp": WriteServer()}),
