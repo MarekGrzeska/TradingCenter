@@ -63,6 +63,16 @@ resource "azuread_application" "terminal" {
       type = "Scope"
     }
   }
+
+  # The strategy platform, since it grew a screen. Same shape as the three above.
+  required_resource_access {
+    resource_app_id = module.strategy_easy_auth.client_id
+
+    resource_access {
+      id   = module.strategy_easy_auth.scope_id
+      type = "Scope"
+    }
+  }
 }
 
 resource "azuread_service_principal" "terminal" {
@@ -140,6 +150,16 @@ resource "azuread_application_pre_authorized" "polymarket_data_terminal" {
   application_id       = module.polymarket_data_easy_auth.application_id
   authorized_client_id = azuread_application.terminal.client_id
   permission_ids       = [module.polymarket_data_easy_auth.scope_id]
+}
+
+# The fifth, and the second written on the day it is used. The strategy platform shipped
+# for machine callers, so its registration announced no delegated scope at all — the
+# terminal was already on its caller list and still met a 401, because there was nothing
+# for a browser to ask for. This and the scope beside it are what that 401 actually was.
+resource "azuread_application_pre_authorized" "strategy_terminal" {
+  application_id       = module.strategy_easy_auth.application_id
+  authorized_client_id = azuread_application.terminal.client_id
+  permission_ids       = [module.strategy_easy_auth.scope_id]
 }
 
 # The three values the terminal's build needs (deploy-terminal.yml). All three are public
