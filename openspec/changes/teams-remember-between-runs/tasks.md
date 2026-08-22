@@ -63,10 +63,10 @@
 
 ## 7. Terminal
 
-- [ ] 7.1 Odczyt i usunięcie w `src/teams/teamsApi.ts` z mapowaniem na camelCase
-- [ ] 7.2 Panel pamięci zespołu: lista od najnowszego (treść, agent, moment, przebieg), usunięcie
+- [x] 7.1 Odczyt i usunięcie w `src/teams/teamsApi.ts` z mapowaniem na camelCase
+- [x] 7.2 Panel pamięci zespołu: lista od najnowszego (treść, agent, moment, przebieg), usunięcie
       z potwierdzeniem, stan „nic jeszcze nie zapamiętano"
-- [ ] 7.3 Testy panelu wedle reguły dla widoku CRUD: ścieżka szczęśliwa, jeden błąd, jedna odmowa
+- [x] 7.3 Testy panelu wedle reguły dla widoku CRUD: ścieżka szczęśliwa, jeden błąd, jedna odmowa
 
 ## 8. Domknięcie
 

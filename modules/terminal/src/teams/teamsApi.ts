@@ -53,6 +53,7 @@ type RawTriggerIn = Wire["TriggerIn"];
 type RawFire = Wire["ScheduleFireOut"];
 type RawNextFires = Wire["NextFiresOut"];
 type RawTrade = Wire["TradeOut"];
+type RawMemory = Wire["TeamMemoryOut"];
 
 /** One entry of the catalogue — everything the list needs, and no definition: reading
  *  the list must not pull down every team's graph (specs/teams-catalogue). */
@@ -115,6 +116,23 @@ export interface TeamDefinition {
  *  team nobody has arranged yet (specs/terminal-teams, "Agent bez zapamiętanego miejsca").
  *  Not part of `TeamDefinition` — moving a node is not a revision. */
 export type TeamLayout = Map<string, { x: number; y: number }>;
+
+/** One note a team left for its later runs. Written by an agent, never edited, and
+ *  removed only by the operator (specs/teams-memory). */
+export interface TeamMemoryEntry {
+  id: number;
+  authorAgentKey: string;
+  runId: number | null;
+  content: string;
+  createdAt: number;
+}
+
+/** What a team remembers, newest first — and how many notes it has in total, which is
+ *  more than `entries` whenever the read hit its ceiling. */
+export interface TeamMemory {
+  entries: TeamMemoryEntry[];
+  total: number;
+}
 
 export interface TeamRevision {
   id: number;
@@ -302,6 +320,14 @@ export interface TeamsApi {
   /** Replaces the layout. Never a revision — a moved node changes where the team is
    *  drawn, not what it is. */
   saveLayout(id: number, layout: TeamLayout, signal: AbortSignal): Promise<void>;
+
+  /** What this team has learned in earlier runs, newest first. A team that has written
+   *  nothing answers with an empty memory, which is the ordinary state and not an error.
+   *  `total` above `entries.length` means the read hit its ceiling. */
+  memory(teamId: number, signal: AbortSignal): Promise<TeamMemory>;
+  /** Removes one note so it stops reaching later runs. The runs that read or wrote it
+   *  keep their trace — deleting the note does not make it untrue that they had it. */
+  deleteMemory(teamId: number, entryId: number, signal: AbortSignal): Promise<void>;
 
   /** Starts a run of the team's latest revision and comes back at once with the run, not
    *  with its result: a team takes minutes. Rejects `"refused"` when the module will not
@@ -661,6 +687,27 @@ export function createTeamsApi(httpBase: string, identity: Identity = noIdentity
         body: {
           places: [...layout].map(([agentKey, at]) => ({ agent_key: agentKey, x: at.x, y: at.y })),
         },
+        signal,
+      });
+    },
+
+    async memory(teamId, signal) {
+      const raw = await http.json<RawMemory>(`${httpBase}/teams/${teamId}/memory`, { signal });
+      return {
+        entries: raw.entries.map((entry) => ({
+          id: entry.id,
+          authorAgentKey: entry.author_agent_key,
+          runId: entry.run_id,
+          content: entry.content,
+          createdAt: parseIsoToEpochSeconds(entry.created_at),
+        })),
+        total: raw.total,
+      };
+    },
+
+    async deleteMemory(teamId, entryId, signal) {
+      await http.send(`${httpBase}/teams/${teamId}/memory/${entryId}`, {
+        method: "DELETE",
         signal,
       });
     },
