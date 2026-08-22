@@ -1089,14 +1089,28 @@ resource "azurerm_linux_web_app" "polymarket_data" {
 
   site_config {
     always_on = true
-    # No `cors`: the terminal has no subpage here yet, so no browser calls this app and
-    # there is no preflight to answer. The change that adds that subpage adds these two
-    # lines with it — and, like every other app in this file, MUST NOT also add a CORS
-    # middleware inside the module, because two layers each appending the header produce a
-    # doubled one that a browser rejects.
+
+    # **The browser's preflight is answered by the platform, never by the app.** The fourth
+    # time this exact trap has been walked into in this repository, and the first where the
+    # comment that stood here had already predicted it: it said the subpage would add these
+    # two lines and the subpage did not. A cross-origin `GET /events` carrying a bearer
+    # token is preflighted, an `OPTIONS` carries no token at all, Easy Auth answered it
+    # `401`, and a network-level refusal reaches `fetch` as a thrown error rather than a
+    # status — so the tab reported an unreachable module instead of a rejected request.
+    # Measured against production on 22 August 2026: `OPTIONS /events` from the terminal's
+    # origin answered 401 where market-data's answered 200.
     #
-    # No `ip_restriction` either, like the other four. Nothing in this root has ever set
-    # one; what differs between these apps is only which credential their door asks for.
+    # `polymarket_data` MUST NOT add a CORS middleware of its own: two layers each
+    # appending the header produce a doubled one, and a browser rejects that response.
+    # It has none (`grep CORSMiddleware` finds nothing), and that is the arrangement.
+    # `support_credentials` stays off — the terminal sends a bearer token, never a cookie.
+    cors {
+      allowed_origins     = [local.terminal_origin]
+      support_credentials = false
+    }
+
+    # No `ip_restriction`, like the other apps. Nothing in this root has ever set one;
+    # what differs between these apps is only which credential their door asks for.
 
     application_stack {
       # Placeholder — `deploy-polymarket-data.yml` pushes the real GHCR image; the
