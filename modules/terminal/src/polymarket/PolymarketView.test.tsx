@@ -62,6 +62,18 @@ function event(overrides: Partial<TrackedEvent> = {}): TrackedEvent {
   };
 }
 
+/** The card starts collapsed, so a test about an outcome row opens it first. That is the
+ *  behaviour, not a workaround: an operator watching a dozen events sees a dozen lines. */
+async function unfold(title = /Fed cuts in March/) {
+  await userEvent.click(await screen.findByRole("button", { name: title }));
+}
+
+/** …and the windows and the chart are the third state, behind their own control. */
+async function unfoldDetail(title = /Fed cuts in March/) {
+  await unfold(title);
+  await userEvent.click(screen.getByRole("button", { name: "Windows & chart" }));
+}
+
 function fakeApi(overrides: Partial<PolymarketApi> = {}): PolymarketApi {
   const base: PolymarketApi = {
     listEvents: async () => [event()],
@@ -107,6 +119,7 @@ describe("PolymarketView", () => {
     });
 
     render(<PolymarketView api={fakeApi({ listEvents: async () => [nominee] })} />);
+    await unfold(/Who wins the nomination|Fed cuts in March/);
 
     expect(await screen.findByText("Newsom")).toBeInTheDocument();
     expect(screen.getByText("Harris")).toBeInTheDocument();
@@ -165,6 +178,7 @@ describe("PolymarketView", () => {
     });
 
     render(<PolymarketView api={fakeApi({ listEvents: async () => [old] })} />);
+    await unfold();
 
     expect(await screen.findByText("40 min ago")).toBeInTheDocument();
   });
@@ -184,6 +198,7 @@ describe("PolymarketView", () => {
     });
 
     render(<PolymarketView api={fakeApi({ listEvents: async () => [blank] })} />);
+    await unfold();
 
     expect(await screen.findByText(/not collected yet/i)).toBeInTheDocument();
     expect(screen.queryByText("0.0%")).not.toBeInTheDocument();
@@ -216,8 +231,7 @@ describe("PolymarketView", () => {
     };
 
     render(<PolymarketView api={fakeApi({ changes: async () => changes })} />);
-
-    await userEvent.click(await screen.findByRole("button", { name: /Fed cuts in March/ }));
+    await unfoldDetail();
 
     expect(await screen.findByText("+2.1 pp")).toBeInTheDocument();
     const uncovered = await screen.findByText(/no coverage/i);
@@ -226,7 +240,7 @@ describe("PolymarketView", () => {
     expect(screen.queryByText("0.0 pp")).not.toBeInTheDocument();
   });
 
-  it("does not ask for the windows until an event is opened", async () => {
+  it("does not ask for the windows until they are actually asked for", async () => {
     const changes = vi.fn(async () => ({ eventId: 1, outcomes: [] }) as EventChanges);
 
     render(<PolymarketView api={fakeApi({ changes })} />);
@@ -234,8 +248,65 @@ describe("PolymarketView", () => {
     await screen.findByText("Fed cuts in March");
     expect(changes).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole("button", { name: /Fed cuts in March/ }));
+    // Unfolding the outcomes is not asking for the windows: they are one request per event,
+    // and the second state exists precisely to be cheap.
+    await unfold();
+    expect(changes).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Windows & chart" }));
     await waitFor(() => expect(changes).toHaveBeenCalledTimes(1));
+  });
+
+  it("starts collapsed, and a collapsed event still carries its leading price", async () => {
+    render(<PolymarketView api={fakeApi()} />);
+
+    // Collapsed is not hidden: a fold that cost a click to learn nothing would be worse
+    // than no fold at all.
+    expect(await screen.findByText("62.0%")).toBeInTheDocument();
+    expect(screen.queryByText("No")).not.toBeInTheDocument();
+
+    await unfold();
+    expect(await screen.findByText("No")).toBeInTheDocument();
+  });
+
+  it("keeps an event unfolded across a refresh of the list", async () => {
+    const listEvents = vi.fn(async () => [event()]);
+    render(<PolymarketView api={fakeApi({ listEvents })} />);
+
+    await unfold();
+    expect(await screen.findByText("No")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Refresh now" }));
+    await waitFor(() => expect(listEvents.mock.calls.length).toBeGreaterThan(1));
+
+    // The prices move on their own every half minute; a fold that reset with them would
+    // make the tab unusable for the one thing it is for — watching something.
+    expect(screen.getByText("No")).toBeInTheDocument();
+  });
+
+  it("draws the probability as well as writing it, and draws nothing when there is none", async () => {
+    const blank = event({
+      markets: [
+        {
+          id: 4,
+          question: "Will the Fed cut in March?",
+          label: null,
+          negRisk: false,
+          resolvedOutcome: null,
+          outcomes: [outcome(7, "Yes", 0.62), outcome(8, "No", null)],
+        },
+      ],
+    });
+
+    render(<PolymarketView api={fakeApi({ listEvents: async () => [blank] })} />);
+    await unfold();
+
+    const meters = await screen.findAllByRole("meter");
+    expect(meters).toHaveLength(1);
+    expect(meters[0]).toHaveAttribute("aria-valuenow", "0.62");
+    // A zero-length bar would read as "zero", which is a claim about the market where the
+    // truth is that nothing has been collected.
+    expect(screen.getByText(/not collected yet/i)).toBeInTheDocument();
   });
 
   it("tells a refusal apart from a module that did not answer", async () => {

@@ -193,8 +193,7 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
 
     @mcp.tool(annotations=READ_ONLY)
     async def get_price_changes(event_id: str) -> dict:
-        """How each outcome of a tracked event has moved over 5m, 15m, 1h, 4h, 12h, 24h and
-        7d.
+        """How each outcome of a tracked event has moved over 5m, 1h, 4h, 24h and 7d.
 
         A window the collected history does not reach comes back as null with the reason,
         never as zero — zero would be a claim about the market rather than about the archive.

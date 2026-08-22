@@ -21,12 +21,17 @@ from tc_runtime.db import Conn
 from . import store
 from .contract import OutcomeChanges, WindowChange
 
+# Dense near now, sparse further out, and asymmetric on purpose. Seven were chosen before
+# anybody had seen them on a screen; after a day of the terminal's tab the operator named the
+# five they actually read (`five-windows-are-enough`). The two that went — 15m and 12h — were
+# not wrong, they were unread, and each one is a separate base-point query **per outcome** on
+# every read: a two-outcome event asked fourteen where ten will do, and a 128-market event
+# asked hundreds. A prediction market moves slowly enough that a second quarter-hour window
+# says what the first one said.
 WINDOWS: tuple[tuple[str, timedelta], ...] = (
     ("5m", timedelta(minutes=5)),
-    ("15m", timedelta(minutes=15)),
     ("1h", timedelta(hours=1)),
     ("4h", timedelta(hours=4)),
-    ("12h", timedelta(hours=12)),
     ("24h", timedelta(hours=24)),
     ("7d", timedelta(days=7)),
 )

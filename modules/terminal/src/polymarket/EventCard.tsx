@@ -4,6 +4,7 @@ import { Button } from "../ui/Button";
 import { DeleteHistoryDialog } from "./DeleteHistoryDialog";
 import { EndTrackingDialog } from "./EndTrackingDialog";
 import { OutcomeHistory } from "./OutcomeHistory";
+import { ProbabilityBar } from "./ProbabilityBar";
 import { WindowChanges } from "./WindowChanges";
 import type {
   EventChanges,
@@ -45,7 +46,11 @@ export function EventCard({
   groups: Group[];
   onChanged(): void;
 }) {
+  // Three states, not two. The chevron was only ever adding and removing detail, so the
+  // list could not be made shorter — an operator watching a dozen events had a dozen
+  // markets' worth of rows whether or not they were reading them.
   const [open, setOpen] = useState(false);
+  const [detailed, setDetailed] = useState(false);
   const [ending, setEnding] = useState(false);
   const [deletingHistory, setDeletingHistory] = useState(false);
 
@@ -54,7 +59,9 @@ export function EventCard({
     read: (signal) => client.changes(event.providerEventId, signal),
     initial: NO_CHANGES,
     fallbackMessage: "the windows could not be read",
-    enabled: open,
+    // Only in the third state. The windows are one request per event, and an operator who
+    // has merely unfolded the outcomes has not asked for them.
+    enabled: open && detailed,
   });
 
   const windowsFor = (outcomeId: number) =>
@@ -75,6 +82,11 @@ export function EventCard({
           <span>{event.title}</span>
         </button>
         <CollectionBadge event={event} />
+        {open && (
+          <Button size="2xs" tone="quiet" onClick={() => setDetailed((was) => !was)}>
+            {detailed ? "Hide detail" : "Windows & chart"}
+          </Button>
+        )}
         <label className="text-xs text-ink-faint">
           <span className="sr-only">Group for {event.title}</span>
           <select
@@ -118,21 +130,25 @@ export function EventCard({
         </Button>
       </header>
 
-      <div className="flex flex-col gap-3 px-3 py-2">
-        {event.markets.map((market) => (
-          <MarketRows
-            key={market.id}
-            market={market}
-            prices={prices}
-            open={open}
-            windowsFor={windowsFor}
-          />
-        ))}
-      </div>
+      {!open && <CollapsedSummary event={event} prices={prices} />}
 
-      {open && <OutcomeHistory client={client} event={event} />}
+      {open && (
+        <div className="flex flex-col gap-3 px-3 py-2">
+          {event.markets.map((market) => (
+            <MarketRows
+              key={market.id}
+              market={market}
+              prices={prices}
+              detailed={detailed}
+              windowsFor={windowsFor}
+            />
+          ))}
+        </div>
+      )}
 
-      {open && changes.error !== null && (
+      {open && detailed && <OutcomeHistory client={client} event={event} />}
+
+      {open && detailed && changes.error !== null && (
         <p className="px-3 pb-2 text-xs text-ink-faint">
           The windows could not be read — {changes.error}.
         </p>
@@ -162,6 +178,61 @@ export function EventCard({
   );
 }
 
+/**
+ * One line, for an event nobody has opened.
+ *
+ * What it carries is the leading outcome of each market, up to a few — which is what an
+ * operator scanning a dozen events is actually after, and is why collapsed is not the same
+ * as hidden. A count alone ("3 markets") would make the fold cost a click to learn nothing.
+ *
+ * The leader is picked by price and the bar is drawn beside it, so the fold changes how much
+ * is on screen and not what a number means.
+ */
+function CollapsedSummary({
+  event,
+  prices,
+}: {
+  event: TrackedEvent;
+  prices: Map<number, SnapshotEntry>;
+}) {
+  const leaders = event.markets
+    .map((market) => {
+      const priced = market.outcomes
+        .map((outcome) => {
+          const live = prices.get(outcome.id);
+          return { outcome, price: live?.price ?? outcome.price, at: live?.priceAt ?? outcome.priceAt };
+        })
+        .filter((row) => row.price !== null)
+        .sort((a, b) => (b.price ?? 0) - (a.price ?? 0));
+      return priced[0] === undefined ? null : { market, ...priced[0] };
+    })
+    .filter((row) => row !== null)
+    .slice(0, 4);
+
+  if (leaders.length === 0) {
+    return (
+      <p className="px-3 py-1.5 text-xs text-ink-faint">Nothing collected for this event yet.</p>
+    );
+  }
+
+  return (
+    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-xs">
+      {leaders.map((row) => (
+        <li key={row.market.id} className="flex items-center gap-2">
+          <span className="text-ink-secondary">
+            {row.market.label ?? row.outcome.name}
+          </span>
+          <ProbabilityBar price={row.price} stale={isStale(row.at)} at={row.at} />
+          <span className="tabular-nums text-ink">{formatProbability(row.price)}</span>
+        </li>
+      ))}
+      {event.markets.length > leaders.length && (
+        <li className="text-ink-faint">+{event.markets.length - leaders.length} more</li>
+      )}
+    </ul>
+  );
+}
+
 /** Being on the list does not prove prices are arriving, which is the whole reason the
  *  module publishes a collection state at all. `stalled` and `ended` carry the module's
  *  own reason rather than a guess made here. */
@@ -183,12 +254,12 @@ function CollectionBadge({ event }: { event: TrackedEvent }) {
 function MarketRows({
   market,
   prices,
-  open,
+  detailed,
   windowsFor,
 }: {
   market: Market;
   prices: Map<number, SnapshotEntry>;
-  open: boolean;
+  detailed: boolean;
   windowsFor: (outcomeId: number) => WindowChange[];
 }) {
   return (
@@ -221,10 +292,11 @@ function MarketRows({
           return (
             <li key={outcome.id} className="flex flex-wrap items-baseline gap-x-3 text-xs">
               <span className="min-w-32 text-ink">{outcome.name}</span>
+              <ProbabilityBar price={price} stale={stale} at={priceAt} />
               {price === null ? (
                 <span className="text-ink-faint italic">not collected yet</span>
               ) : (
-                <span className={stale ? "text-ink-muted" : "text-ink"}>
+                <span className={`tabular-nums ${stale ? "text-ink-muted" : "text-ink"}`}>
                   {formatProbability(price)}
                 </span>
               )}
@@ -233,7 +305,7 @@ function MarketRows({
               <span className={stale ? "text-warning" : "text-ink-faint"}>
                 {formatAge(priceAt) ?? "no reading"}
               </span>
-              {open && <WindowChanges windows={windowsFor(outcome.id)} />}
+              {detailed && <WindowChanges windows={windowsFor(outcome.id)} />}
             </li>
           );
         })}
