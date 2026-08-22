@@ -41,6 +41,8 @@ GOOD_ENV: dict[str, str] = {
         "TRADING_MCP_URL=http://127.0.0.1:8060\n"
     ),
     "trading-mcp": "CAPITAL_GATEWAY_API_KEY=shared-secret\n",
+    # No credential to carry: both of Polymarket's surfaces are public.
+    "polymarket-data": "DATABASE_URL=postgresql://polymarket:pw@127.0.0.1:55432/polymarket\n",
 }
 
 ON_PATH = {"uv", "docker", "pnpm", "npm"}
@@ -153,13 +155,20 @@ class TestRefusals:
         assert any(f"modules/{module}/.env is missing" in p for p in problems)
 
     def test_the_modules_needing_an_env_are_the_ones_holding_a_credential(self) -> None:
-        """Everything trading-mcp does not read has a working loopback default; what is
-        listed here is what has no default because it is somebody's secret."""
+        """What is listed here is what has no default to fall back on.
+
+        For four of the five that is a secret nobody may write into a repository. For
+        `polymarket-data` it is one setting and no secret at all — its upstream is public
+        — but `DATABASE_URL` is deliberately undefaulted in every module that owns a
+        database, because a default connection string is how a process writes to a
+        database nobody meant it to.
+        """
         assert {module for module, _ in REQUIRED_ENV} == {
             "capital-gateway",
             "market-data",
             "workbench",
             "trading-mcp",
+            "polymarket-data",
         }
 
     def test_the_terminal_checks_are_skipped_when_it_is_not_started(self) -> None:
@@ -240,6 +249,7 @@ class TestStartOrder:
             "capital-gateway",
             "market-data",
             "trading-mcp",
+            "polymarket-data",
             "workbench",
             "terminal",
         ]
@@ -250,13 +260,21 @@ class TestStartOrder:
             "market-data": 8020,
             "workbench": 8030,
             "trading-mcp": 8060,
+            "polymarket-data": 8070,
             "terminal": 5173,
         }
 
     def test_the_ports_that_stopped_being_anybodys_are_not_listened_on(self) -> None:
-        """8050 and 8070 went with teams and teams-mcp, the way 8040 went with market-mcp.
-        A `.env` still naming one is a tool server that reads as down."""
-        assert {8040, 8050, 8070}.isdisjoint({service.port for service in SERVICES})
+        """8040 went with market-mcp and 8050 with teams-mcp; a `.env` still naming either
+        is a tool server that reads as down.
+
+        8070 was on this list until `polymarket-data-joins-the-stack` claimed it, and it
+        left deliberately rather than by accident — a port coming back into use is exactly
+        the edit CLAUDE.md's port line has to make at the same time, and this assertion is
+        what makes forgetting one of the two fail here.
+        """
+        assert {8040, 8050}.isdisjoint({service.port for service in SERVICES})
+        assert 8070 in {service.port for service in SERVICES}
 
     def test_every_back_end_is_waited_for(self) -> None:
         """A service started and not waited for is what `dev.ps1` once did to teams-mcp."""

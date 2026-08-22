@@ -25,7 +25,8 @@ package cannot give it, the change is wrong, not the rule.
 | `modules/market-data` | the candle archive and its own indicators. Owns the PostgreSQL. Two surfaces: the REST contract, and eleven read-only MCP tools at `/mcp` — reduced for a model, no tool writes. |
 | `modules/workbench` | the operator's conversation with a model **and** the teams they compose — one process, two surfaces, two schemas (`agent`, `teams`), two OpenAI keys, two model catalogues. |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
-| `modules/terminal` | React+TS · the operator's screen. Consumes the other four, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
+| `modules/polymarket-data` | the prediction-market archive. Owns its PostgreSQL, the only door to Polymarket. Two surfaces like market-data — but three of its tools **write**, and only ever the list of observations; deleting history is REST-only. |
+| `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
 | `packages/tc-runtime` | database, migrations, schema check, Easy Auth. |
 | `packages/tc-mcp-kit` | speaking MCP: caller-identity middleware, the upstream-refusal helper, the tool-schema slimmer. |
 | `packages/tc-openai` | the streamed OpenAI call, with tools — one file, taken only by the workbench, whose two surfaces were 79,4% identical here. |
@@ -52,6 +53,7 @@ module runs `uv run pytest` · `ruff check .` · `pyright`, the terminal `pnpm t
 | `market-data` | `uv run alembic upgrade head`, then `uv run uvicorn market_data.app:app --reload --port 8020` |
 | `workbench` | two chains — `uv run alembic -c alembic-agent.ini upgrade head` **and** `-c alembic-teams.ini` (the process runs both itself) — then `uv run uvicorn workbench.app:app --reload --port 8030` |
 | `trading-mcp` | `uv run python -m trading_mcp` (8060) · plus `uv run python scripts/contract.py check`, its snapshot of the gateway's OpenAPI |
+| `polymarket-data` | `uv run alembic upgrade head`, then `uv run uvicorn polymarket_data.app:app --reload --port 8070` |
 | `terminal` | `pnpm dev` (5173) |
 
 - `uv run pytest` alone runs unit tests; anything needing a database **skips** without Docker.
@@ -65,8 +67,9 @@ sits where it does are one table at the top of that file — `uv run python scri
 --explain` prints it, so it is not repeated here.
 
 **Ports are fixed: 8010 gateway, 8020 market-data (REST *and* `/mcp`), 8030 workbench, 8060
-trading-mcp, 5173 terminal. 8040, 8050 and 8070 are nobody's** — a `.env` still pointing at
-any of them is a tool server that reads as down.
+trading-mcp, 8070 polymarket-data (REST *and* `/mcp`), 5173 terminal. 8040 and 8050 are
+nobody's** — a `.env` still pointing at either is a tool server that reads as down. 8070 was
+on that list until `polymarket-data-joins-the-stack` claimed it.
 
 ## Things that will bite you
 
@@ -75,9 +78,9 @@ the dev scripts — Docker is required to run the stack, not only to test it. Le
 `DATABASE_USER` unset is what selects this local mode, and it narrows the module to loopback: a
 `DATABASE_URL` pointing at any remote host is refused at startup, by `dev.py` and `config.py`
 both. Production uses an Entra identity instead. Do not "restore" the brief arrangement where
-dev ran on the Azure server; it was reversed the same day it was made. The `workbench`'s two
-further databases (`agent`, `teams`) live in that same container, and the dev scripts create
-each role and database themselves — `docker-entrypoint-initdb.d` only fires on an empty volume.
+dev ran on the Azure server; it was reversed the same day it was made. The further databases
+(`agent`, `teams`, `polymarket`) live in that same container, and the dev scripts create each
+role and database themselves — `docker-entrypoint-initdb.d` only fires on an empty volume.
 
 **The terminal's contract is generated.** After changing `market_data/contract.py`, run
 `pnpm contract:generate` in the terminal — CI's `contract:check` fails on a stale file. The
@@ -100,7 +103,9 @@ than misbehaving. `dev.py` says all of it at startup.
 without it the conversation has no archive tools, and a team whose agents were *assigned* tools
 refuses to run rather than answer without them. `TRADING_MCP_URL` is the same shape for the
 account, checked independently — and it is the one that reads least like a setting, because the
-operator asks about their positions and the agent says it cannot see them.
+operator asks about their positions and the agent says it cannot see them. `POLYMARKET_MCP_URL`
+is the third of the shape, and the only one whose tools can *write*: three of its nine change the
+list of observations, and none of the nine deletes anything.
 
 **`trading-mcp` will not start on a wish.** `CAPITAL_GATEWAY_API_KEY` must be the gateway's own
 `GATEWAY_API_KEY` — the gateway checks that header on every caller, loopback included — and it

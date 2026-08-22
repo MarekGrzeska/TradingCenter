@@ -39,6 +39,7 @@ jobs:
       capital-gateway: ${{ steps.filter.outputs.capital-gateway }}
       market-data: ${{ steps.filter.outputs.market-data }}
       trading-mcp: ${{ steps.filter.outputs.trading-mcp }}
+      polymarket-data: ${{ steps.filter.outputs.polymarket-data }}
       workbench: ${{ steps.filter.outputs.workbench }}
       terminal: ${{ steps.filter.outputs.terminal }}
       openspec: ${{ steps.filter.outputs.openspec }}
@@ -129,6 +130,11 @@ jobs:
           # stale. The gateway's *whole* directory, not one file: that document is built
           # from its routes as well as its DTOs, so there is no narrower honest filter.
           PATTERNS[trading-mcp]="^modules/trading-mcp/|^modules/capital-gateway/|$tc_mcp_kit"
+          # The same two packages as market-data, and for the same two reasons: this module
+          # migrates its own database through `tc-runtime` and slims its tool schemas with
+          # `tc-mcp-kit`. It has no upstream in this repository — Polymarket is outside it —
+          # so unlike trading-mcp there is no second module in this pattern.
+          PATTERNS[polymarket-data]="^modules/polymarket-data/|$tc_runtime|$tc_mcp_kit"
           # There used to be a third of this shape — teams-mcp, watching the whole of
           # `teams` because it kept a snapshot of that module's OpenAPI document. It is
           # gone with the module: the team tools read those routes in the same process,
@@ -264,6 +270,27 @@ jobs:
       # Nothing here reaches capital.com or a running gateway: every test doubles the
       # upstream. The demo-only guard is exercised against that double, which is the only
       # place it can be exercised without an account to refuse.
+      - run: uv run pytest -q
+
+  polymarket-data:
+    name: polymarket-data
+    needs: changes
+    if: needs.changes.outputs.polymarket-data == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: modules/polymarket-data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+      - run: uv run ruff check .
+      - run: uv run pyright
+      # The `db` tests are gated on Docker rather than on a flag, and this runner has it,
+      # so testcontainers starts a real PostgreSQL and they run. The `live` ones stay
+      # behind --run-live: they read the real Polymarket API, which is a third party's
+      # availability rather than this repository's correctness.
       - run: uv run pytest -q
 
   packages:

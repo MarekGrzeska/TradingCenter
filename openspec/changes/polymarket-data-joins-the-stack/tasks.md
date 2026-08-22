@@ -10,13 +10,15 @@
 
 ## 2. Szkielet modułu
 
-- [ ] 2.1 `modules/polymarket-data/`: pakiet `polymarket_data`, `pyproject.toml`, lock, `Dockerfile`, README, `.env.example`
-- [ ] 2.2 `config.py` — ustawienia bazy, taktu próbkowania, głębokości uzupełniania, sufitu obserwacji, throttle'a i tożsamości wołających
-- [ ] 2.3 `tc-runtime` (baza, Easy Auth) i `tc-mcp-kit` (tożsamość wołającego, odchudzanie schematów, kształt odmowy upstreamu); `mcp` przypięty tak jak w `market-data`
-- [ ] 2.4 Baza `polymarket` w `compose.yaml`; rola i baza tworzone przez `scripts/dev.py`
-- [ ] 2.5 Alembic + migracja w `lifespan` pod blokadą doradczą z kluczem 8070, własną tożsamością modułu
-- [ ] 2.6 Wiersz w tabeli startowej `scripts/dev.py`: port 8070, kolejność, powód; kontrola `.env` przy starcie
-- [ ] 2.7 Testy: migracja przed serwowaniem, dwie instancje pod blokadą, kres czekania, odmowa przy rozjeździe rewizji
+- [x] 2.1 `modules/polymarket-data/`: pakiet `polymarket_data`, `pyproject.toml`, lock, `Dockerfile`, README, `.env.example`
+- [x] 2.2 `config.py` — ustawienia bazy, taktu próbkowania, głębokości uzupełniania, sufitu obserwacji, throttle'a i tożsamości wołających
+- [x] 2.3 `tc-runtime` (baza, Easy Auth) i `tc-mcp-kit` (tożsamość wołającego, odchudzanie schematów, kształt odmowy upstreamu); `mcp` przypięty tak jak w `market-data`
+- [x] 2.4 Baza `polymarket` w `compose.yaml`; rola i baza tworzone przez `scripts/dev.py`
+- [x] 2.5 Alembic + migracja w `lifespan` pod blokadą doradczą z kluczem 8070, własną tożsamością modułu
+- [x] 2.6 Wiersz w tabeli startowej `scripts/dev.py`: port 8070, kolejność, powód; kontrola `.env` przy starcie
+- [x] 2.7 Testy: konfiguracja (obie odmowy trybu połączenia, sufit okna dostawcy, puste listy wołających), klucz blokady, trasy zdrowia. Testy samej migracji są w 3.7 — przed pierwszą migracją nie mają czego sprawdzać
+- [x] 2.8 Wyprzedzone z grupy 8, bo `scripts/tests` odmawia inaczej: `deploy-polymarket-data.yml` (Dockerfile bez workflow deploya to nieudany test), job i filtr w `checks.yml` (moduł bez joba jest zielony dlatego, że nic go nie uruchomiło) oraz linie w `CLAUDE.md`, których wymaga `test_guide_ceiling.py`
+- [x] 2.9 `uv run pytest`, `ruff check .`, `pyright` — moduł i `scripts`
 
 ## 3. Model danych i archiwum
 

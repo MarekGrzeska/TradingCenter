@@ -103,7 +103,8 @@ BLUE, MAGENTA, CYAN, YELLOW, GREEN, RED, DIM, RESET = (
 )
 # Bright green went to trading-mcp, the one remaining tool server that is a process. Two
 # more colours freed up as the tool servers stopped being processes: market-mcp became a
-# route in market-data, and teams-mcp a layer in the workbench.
+# route in market-data, and teams-mcp a layer in the workbench — and one of the two went
+# to polymarket-data, which is the second module serving tools from its own process.
 BRIGHT_GREEN = "\033[92m"
 
 SERVICES: tuple[Service, ...] = (
@@ -153,6 +154,24 @@ SERVICES: tuple[Service, ...] = (
         ),
     ),
     Service(
+        name="polymarket-data",
+        module="polymarket-data",
+        port=8070,
+        command=(
+            "uv", "run", "uvicorn", "polymarket_data.app:app", "--reload", "--port", "8070"
+        ),
+        log_prefix="polymkt ",
+        colour=GREEN,
+        health_path="/health",
+        why=(
+            "Independent of the gateway — its upstream is Polymarket, not capital.com, so "
+            "nothing above it has to be running. Before the workbench for the same reason "
+            "market-data is: the workbench reads its tool list on the first turn that "
+            "wants one, and a server still coming up means a turn answered without those "
+            "tools rather than an error anyone would notice."
+        ),
+    ),
+    Service(
         name="workbench",
         module="workbench",
         port=8030,
@@ -162,11 +181,12 @@ SERVICES: tuple[Service, ...] = (
         health_path="/health",
         why=(
             "Last among the back ends: nothing else calls it, so nothing waits on it. The "
-            "conversation and the teams catalogue are one process here — 8050 and 8070 "
-            "belong to nobody since `agent-and-teams-one-workbench`. It calls the two "
-            "remaining tool servers, and each tool list is read on the first turn that "
-            "wants one, so a server still coming up means a turn answered without those "
-            "tools rather than an error anyone would notice."
+            "conversation and the teams catalogue are one process here — 8050 has belonged "
+            "to nobody since `agent-and-teams-one-workbench`, and 8070 stopped being "
+            "nobody's when polymarket-data claimed it. It calls three tool servers now, "
+            "and each tool list is read on the first turn that wants one, so a server "
+            "still coming up means a turn answered without those tools rather than an "
+            "error anyone would notice."
         ),
     ),
     Service(
@@ -197,12 +217,13 @@ MIGRATION_CHAINS: tuple[tuple[str, str | None], ...] = (
     ("market-data", None),
     ("workbench", "alembic-agent.ini"),
     ("workbench", "alembic-teams.ini"),
+    ("polymarket-data", None),
 )
 
 # The further logical databases in the same container, created here if missing rather than
 # through docker-entrypoint-initdb.d — that only runs against an empty volume, so it would
 # never fire for anyone holding a tradingcenter-db-data from before these modules existed.
-LOGICAL_DATABASES = ("agent", "teams")
+LOGICAL_DATABASES = ("agent", "teams", "polymarket")
 
 
 # --- reading .env files --------------------------------------------------------------
@@ -256,6 +277,9 @@ REQUIRED_ENV: tuple[tuple[str, str], ...] = (
         "trading-mcp",
         "copy .env.example and set CAPITAL_GATEWAY_API_KEY to the gateway's own GATEWAY_API_KEY",
     ),
+    # Nothing to fill in: Polymarket's two surfaces are public, so this module is the one
+    # here whose example file is already a working configuration.
+    ("polymarket-data", "copy .env.example; the defaults match compose.yaml and need no key"),
 )
 
 
@@ -682,7 +706,7 @@ def _psql(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
-    say("Ensuring the agent and teams databases exist...")
+    say(f"Ensuring the {', '.join(names)} databases exist...")
     for name in names:
         role_exists = "1" in _psql(
             "-tAc", f"SELECT 1 FROM pg_roles WHERE rolname = '{name}'"
@@ -701,7 +725,7 @@ def ensure_databases(names: Iterable[str] = LOGICAL_DATABASES) -> bool:
         ).returncode != 0:
             fail(f"could not create the '{name}' database")
             return False
-    ok("agent and teams databases are ready.")
+    ok(f"{', '.join(names)} databases are ready.")
     return True
 
 
@@ -867,8 +891,9 @@ def ready_lines(*, start_terminal: bool) -> list[str]:
         f"  Archive tools       http://{LOOPBACK}:8020/mcp",
         f"  trading-mcp health  http://{LOOPBACK}:8060/health",
         f"  Workbench docs      http://{LOOPBACK}:8030/docs",
+        f"  Polymarket docs     http://{LOOPBACK}:8070/docs",
         (
-            "  Database            market_data, agent, teams @ localhost:55432 "
+            "  Database            market_data, agent, teams, polymarket @ localhost:55432 "
             "(compose.yaml; 'docker compose down' keeps the data)"
         ),
     ]
