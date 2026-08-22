@@ -8,6 +8,8 @@ which is what specs/teams-catalogue requires of every refusal.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from teams.contract import AgentDefinition, TeamDefinition
@@ -69,7 +71,7 @@ def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
     announced = AnnouncedSnapshot(
         by_name={"memory_read": ["team-memory"]},
         unreachable=[],
-        unconfigured=("market-mcp", "trading-mcp"),
+        unconfigured=("market-mcp", "trading-mcp", "polymarket-mcp"),
         configured_servers=(),
     )
 
@@ -77,8 +79,31 @@ def test_assigned_tools_with_no_tool_server_are_refused_and_say_so() -> None:
         check_definition(definition, model_ids=MODELS, announced=announced)
 
     assert "scout" in str(err.value)
-    assert "MARKET_MCP_URL" in str(err.value)
-    assert "TRADING_MCP_URL" in str(err.value)
+    # Every setting the operator has to fill, derived from the labels rather than listed:
+    # a hand-kept list here named two on the day there were three. `\b` rather than a bare
+    # substring because `POLYMARKET_MCP_URL` *contains* `MARKET_MCP_URL` — a plain `in`
+    # passes here whether or not the archive's own setting was named at all.
+    assert re.search(r"\bMARKET_MCP_URL", str(err.value))
+    assert re.search(r"\bTRADING_MCP_URL", str(err.value))
+    assert re.search(r"\bPOLYMARKET_MCP_URL", str(err.value))
+
+
+def test_the_settings_named_are_only_the_ones_without_an_address() -> None:
+    """The other half of deriving them: a server that *is* configured must not appear in a
+    message telling the operator what to set."""
+    definition = TeamDefinition(agents=[_agent("scout", tools=["get_candles"])])
+    announced = AnnouncedSnapshot(
+        by_name={"memory_read": ["team-memory"]},
+        unreachable=[],
+        unconfigured=("polymarket-mcp",),
+        configured_servers=("market-mcp",),
+    )
+
+    with pytest.raises(DefinitionRefused) as err:
+        check_definition(definition, model_ids=MODELS, announced=announced)
+
+    assert re.search(r"\bPOLYMARKET_MCP_URL", str(err.value))
+    assert not re.search(r"\bMARKET_MCP_URL", str(err.value))
 
 
 def test_a_team_assigning_no_tools_passes_without_a_tool_server() -> None:
@@ -101,6 +126,24 @@ def test_a_name_two_servers_announce_is_refused_naming_both() -> None:
     assert "place_order" in str(err.value)
     assert "market-mcp" in str(err.value)
     assert "trading-mcp" in str(err.value)
+
+
+def test_a_name_three_servers_announce_is_refused_naming_all_three() -> None:
+    """specs/teams-tool-access, "Kolizja obejmuje więcej niż dwa serwery" — on the save
+    path as well as the run path, and for the same reason: a message naming two of three
+    sends the operator round the same refusal twice."""
+    definition = TeamDefinition(agents=[_agent("scout", tools=["get_event"])])
+    announced = AnnouncedSnapshot(
+        by_name={"get_event": ["market-mcp", "trading-mcp", "polymarket-mcp"]}, unreachable=[]
+    )
+
+    with pytest.raises(DefinitionRefused) as err:
+        check_definition(definition, model_ids=MODELS, announced=announced)
+
+    message = str(err.value)
+    assert "market-mcp" in message
+    assert "trading-mcp" in message
+    assert "polymarket-mcp" in message
 
 
 def test_a_tool_not_confirmed_because_a_server_was_unreachable_says_so() -> None:

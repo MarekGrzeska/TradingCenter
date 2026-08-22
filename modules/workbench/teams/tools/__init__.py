@@ -1,5 +1,5 @@
-"""The module's access to its tool servers — `market-mcp` for reads, `trading-mcp` for
-writes — and who gets which tools.
+"""The module's access to its tool servers — `market-mcp` and `polymarket-mcp` for
+reads, `trading-mcp` for writes — and who gets which tools.
 
 `client.py` is the only place the `mcp` package exists. Everything past this package
 speaks `ToolDescriptor`, `ToolOutcome` and `ToolPlan` — which is what keeps a run's own
@@ -14,6 +14,7 @@ from .assignment import (
     ToolNameCollision,
     ToolNoLongerAnnounced,
     ToolPlan,
+    and_list,
     announced_snapshot,
     announced_tools_by_server,
     plan_tools,
@@ -44,6 +45,7 @@ __all__ = [
     "ToolServer",
     "ToolServerRegistry",
     "ToolServerUnavailable",
+    "and_list",
     "announced_snapshot",
     "announced_tools_by_server",
     "plan_tools",

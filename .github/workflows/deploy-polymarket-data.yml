@@ -1,0 +1,50 @@
+name: deploy-polymarket-data
+
+# Only a push to `main` deploys — the pull_request federated credential (github-oidc.tf)
+# cannot even authenticate to Azure, so this cannot run from a fork's PR by construction.
+on:
+  push:
+    branches: [main]
+    paths:
+      - "modules/polymarket-data/**"
+      # Path dependencies are baked into this image (see the Dockerfile), so a merged
+      # package fix that never redeploys its consumers is a fix that never reaches
+      # production. Exactly the packages this module's pyproject.toml names.
+      - "packages/tc-runtime/**"
+      - "packages/tc-mcp-kit/**"
+      - ".github/workflows/deploy-polymarket-data.yml"
+      - ".github/workflows/_deploy-app-service.yml"
+      - "scripts/deploy_probe.py"
+  workflow_dispatch: {}
+
+# Declared on the caller, and this is where it has to be: a reusable workflow can only
+# *narrow* the caller's GITHUB_TOKEN, never widen it. This repository's default workflow
+# permission is `read`, and `id-token` is never granted by default at all.
+permissions:
+  contents: read
+  id-token: write # azure/login's OIDC exchange
+  packages: write # docker push to GHCR
+
+jobs:
+  deploy:
+    uses: ./.github/workflows/_deploy-app-service.yml
+    with:
+      module: polymarket-data
+      app_name: app-tradingcenter-polymarket-data
+      # `/` and the module's own name in the body. Every other path answers 401 from Easy
+      # Auth before the request reaches the container, so a dead process and a healthy one
+      # are indistinguishable there; `/` is excluded (infra/app-service.tf) and answers a
+      # constant naming the service, which can only have come from the running module.
+      #
+      # The name in the body is what makes it a probe of *this* module rather than of the
+      # plan: four applications share one App Service plan, and a misrouted hostname would
+      # otherwise pass on somebody else's healthy container.
+      #
+      # This probe also carries the schema, which is not obvious from the path it calls.
+      # The module refuses to start when the database is at a revision its image was not
+      # built for, so a deploy landing on an unmigrated database has no container to answer
+      # this GET and the probe runs out.
+      probe_path: /
+      expected_status: 200
+      body_contains: '"polymarket-data"'
+      attempts: 12

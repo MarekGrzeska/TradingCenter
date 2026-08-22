@@ -4,21 +4,21 @@ It is a drop-in for a single `ToolServer`: same `configured`, same `list_tools`,
 `call`, same `aclose` — so nothing above this package had to learn that there is more than
 one source now.
 
-**Two of them are servers on a network and one is not.** The archive's tools and the
-account's are reached over MCP; the team tools are a layer in this same process, handed in
-as `local_sources` because building one needs the application object this registry has no
-business knowing about (`workbench/team_tools.py`). Everything below treats the three
-alike, which is the point of the seam.
+**Most of them are servers on a network and one is not.** The candle archive's tools, the
+account's and the prediction-market archive's are reached over MCP; the team tools are a
+layer in this same process, handed in as `local_sources` because building one needs the
+application object this registry has no business knowing about (`workbench/team_tools.py`).
+Everything below treats them alike, which is the point of the seam.
 
 **Independence is the property worth stating**, because it is what `specs/agent-tool-access`
 asks for and what a union would quietly lose: one server being unconfigured, unreachable
 or slow costs the model that server's tools and nothing else. A turn keeps whatever
 answered — and a local source answers whatever the network is doing.
 
-A name announced by two sources is refused rather than resolved by picking one. It cannot
-happen with the three that exist — one reads candles, one builds teams, one moves the
-account — and if it ever does, guessing would send an operator's "run it" to whichever
-source happened to be first in a dictionary.
+A name announced by more than one source is refused rather than resolved by picking one.
+It has not happened with the four that exist — one reads candles, one builds teams, one
+moves the account, one reads prediction markets — and if it ever does, guessing would send
+an operator's "run it" to whichever source happened to be first in a dictionary.
 """
 
 from __future__ import annotations
@@ -46,7 +46,7 @@ class ToolServerRegistry:
     def from_settings(
         cls, settings: Settings, local_sources: list[ToolSource] | None = None
     ) -> ToolServerRegistry:
-        """The two network servers, plus whatever the assembly hands in.
+        """The network servers, plus whatever the assembly hands in.
 
         `local_sources` defaults to none so a test wanting the network half alone builds
         it in one line — and so this class stays buildable from settings, which is all it
@@ -59,6 +59,10 @@ class ToolServerRegistry:
                 # account is one and shared, there is nobody in whose name it could be
                 # moved differently, and trading-mcp reads no such header.
                 ToolServer(settings, prefix="trading_mcp", can_move_the_account=True),
+                # The prediction-market archive. Reads only: nothing this system does on
+                # Polymarket touches money, and the three tools of its nine that write
+                # write a watch list, not an account.
+                ToolServer(settings, prefix="polymarket_mcp"),
                 *(local_sources or []),
             ]
         )

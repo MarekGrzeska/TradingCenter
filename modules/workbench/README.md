@@ -38,16 +38,22 @@ Everything else is one setting for the whole process — `workbench/config.py` i
 code that reads the environment, and both surfaces' own `Settings` are built from it by
 argument, with every validator they had.
 
-## Two tool servers on a network, and two sources that are not
+## Three tool servers on a network, and two sources that are not
 
 The model can ask **market-data** for candles, coverage, indicators and levels mid-answer,
-and read *and move* the demo account through **trading-mcp** — positions, balance and
-working orders on the reading side, orders sent, closed, amended and cancelled on the other.
-At most eight calls per turn, a number in the code rather than a setting. Each server is
-configured and fails on its own: one being absent or unreachable costs the model that
-server's tools and nothing else.
+read *and move* the demo account through **trading-mcp** — positions, balance and working
+orders on the reading side, orders sent, closed, amended and cancelled on the other — and
+ask **polymarket-data** what a prediction market prices an event at, of its archive or of
+the provider live. At most eight calls per turn, a number in the code rather than a setting.
+Each server is configured and fails on its own: one being absent or unreachable costs the
+model that server's tools and nothing else.
 
-The **team tools** are the third source and they are not on a network at all. They keep every
+The third pair, `POLYMARKET_MCP_URL` / `POLYMARKET_MCP_SCOPE`, is shaped exactly like the two
+before it and read once for both surfaces. Three of that server's nine tools write, which is
+the one place it differs from market-data's read-only surface — and what they write is a
+watch list, not an account. Nothing this system does on Polymarket touches money.
+
+The **team tools** are the fourth source and they are not on a network at all. They keep every
 name, description, ceiling and refusal they had as a module; what went is the transport.
 They still reach the teams routes through their own contract — `httpx.ASGITransport` on this
 application — rather than calling `teams/store/`, because the owner filter, the revision
@@ -78,7 +84,7 @@ anything at all.
 Two tools, `memory_read` and `memory_write`, announced by **a source that is this process
 itself** — no address, no identity, no session. It is the same shape as the team tools
 above, on the other surface: those join the conversation's registry, this one joins the
-teams registry beside `market-mcp` and `trading-mcp`. Announcing them touches no database
+teams registry beside `market-mcp`, `trading-mcp` and `polymarket-mcp`. Announcing them touches no database
 (the descriptors are constants), which is what lets the save-time paths build a registry out
 of settings alone and still publish the names; calling them needs the pool, and by then
 there is a run. Which agent may read and which may write is the mechanism that was already
@@ -148,9 +154,9 @@ migration cannot fix: an upgrade that reported success without arriving, and an 
 than the schema it found — the second being a rollback that moved the code back and left the
 database where it was.
 
-Needs neither network tool server: `MARKET_MCP_URL` and `TRADING_MCP_URL` left unset each
-mean no tools from that one, and a server configured but not answering means the same thing
-for that turn. Pointing either off loopback needs its own `*_SCOPE` set too — the process
+Needs no network tool server: `MARKET_MCP_URL`, `TRADING_MCP_URL` and `POLYMARKET_MCP_URL`
+left unset each mean no tools from that one, and a server configured but not answering means
+the same thing for that turn. Pointing any of them off loopback needs its own `*_SCOPE` set too — the process
 refuses to start otherwise, the same way it refuses a remote database with no identity, and
 the message names which server it is about. There is no setting for the team tools and there
 cannot be: a source in this process has no address to leave unset.

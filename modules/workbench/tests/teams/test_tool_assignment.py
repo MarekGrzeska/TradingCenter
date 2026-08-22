@@ -215,7 +215,7 @@ async def test_announced_snapshot_says_which_servers_have_no_address() -> None:
     # announcing something. The narrower claim the `None` used to make is this field.
     snapshot = await announced_snapshot(settings_for(None))
 
-    assert snapshot.unconfigured == ("market-mcp", "trading-mcp")
+    assert snapshot.unconfigured == ("market-mcp", "polymarket-mcp", "trading-mcp")
     assert snapshot.configured_servers == ()
     assert snapshot.unreachable == []
 
@@ -242,8 +242,8 @@ async def test_an_unknown_agent_key_is_a_programming_error() -> None:
         plan.for_agent("nobody")
 
 
-# --- two servers (specs/teams-tool-access, "Moduł MAY być skonfigurowany z więcej niż
-# jednym serwerem narzędzi") ---
+# --- more than one server (specs/teams-tool-access, "Moduł MAY być skonfigurowany
+# z więcej niż jednym serwerem narzędzi") ---
 
 
 async def test_an_unreachable_second_server_does_not_stop_a_team_that_never_needed_it() -> None:
@@ -284,6 +284,38 @@ async def test_a_name_two_servers_both_announce_refuses_the_run_naming_both() ->
     assert "market-mcp" in message
     assert "trading-mcp" in message
     assert isinstance(raised.value, ToolAccessError)
+
+
+async def test_a_name_three_servers_announce_names_all_three() -> None:
+    """specs/teams-tool-access, "Kolizja obejmuje więcej niż dwa serwery". A message that
+    stops at two sends the operator to unconfigure one server and meet this same refusal
+    again — which is what the wording said until the third server existed."""
+    definition = team(agent("reader", ["get_event"]))
+
+    def one_tool(mcp) -> None:
+        @mcp.tool(name="get_event", description="reads an event")
+        def get_event() -> str:  # pragma: no cover - never called
+            return "unused"
+
+    async with (
+        serving(build=one_tool) as market_url,
+        serving(build=one_tool) as trading_url,
+        serving(build=one_tool) as polymarket_url,
+    ):
+        registry = _registry(
+            market_url, trading_mcp_url=trading_url, polymarket_mcp_url=polymarket_url
+        )
+        try:
+            with pytest.raises(ToolNameCollision) as raised:
+                await plan_tools(definition, registry)
+        finally:
+            await registry.aclose()
+
+    message = str(raised.value)
+    assert "'get_event'" in message
+    assert "market-mcp" in message
+    assert "trading-mcp" in message
+    assert "polymarket-mcp" in message
 
 
 async def test_tools_from_both_servers_resolve_to_the_server_that_announced_them() -> None:

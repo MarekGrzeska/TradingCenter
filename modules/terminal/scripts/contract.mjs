@@ -59,6 +59,28 @@ const SOURCES = [
  */
 `,
   },
+  {
+    name: "polymarket-data",
+    moduleDir: resolve(terminal, "..", "polymarket-data"),
+    pythonModule: "polymarket_data.openapi",
+    output: join(terminal, "src", "data", "contract.polymarket.generated.ts"),
+    banner: `/**
+ * GENERATED — do not edit. Rewrite it with \`pnpm contract:generate\`.
+ *
+ * The source is polymarket-data's own OpenAPI document, printed straight from its
+ * Pydantic models by \`python -m polymarket_data.openapi\`.
+ *
+ * **Nothing imports this file yet**, and that is on purpose: the subpage that reads this
+ * archive is a change of its own. What it buys before that exists is that
+ * \`contract:check\` fails the day the contract moves, so the subpage starts against types
+ * that are true rather than against a file born stale.
+ *
+ * Every price here is a probability on 0..1, never a percentage — the descriptions say
+ * so because reading 0.62 as 62 is wrong by two orders of magnitude with no error on
+ * the way.
+ */
+`,
+  },
 ];
 
 function schemaJson(source, envDir) {

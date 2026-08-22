@@ -14,7 +14,7 @@ revision rewritten (specs/teams-tool-access, "Moduł nie trzyma kopii tego, co o
 serwer narzędzi").
 
 **Resolving a name against more than one server** is the addition this phase makes, and
-it is the one place the two servers' announcements ever meet. `_resolve_all` queries
+it is the one place the configured servers' announcements ever meet. `_resolve_all` queries
 every *configured* server — never fewer, because a name found on one server says nothing
 about whether a second one also announces it, and that is exactly the fact a collision
 refusal needs (specs/teams-tool-access, "Ta sama nazwa narzędzia z dwóch serwerów jest
@@ -64,7 +64,8 @@ class ToolNameCollision(ToolAccessError):
     """A revision names a tool that more than one configured server announces.
 
     Refused rather than resolved by picking one: the definition carries only the name,
-    so there is nothing in it that could say which server was meant
+    so there is nothing in it that could say which server was meant. The message names
+    every server announcing it, however many that is
     (specs/teams-tool-access, "Ta sama nazwa narzędzia z dwóch serwerów jest odmową").
     """
 
@@ -203,8 +204,11 @@ def _collisions(resolution: _Resolution, names: set[str]) -> dict[str, list[str]
 def _raise_for_collisions(resolution: _Resolution, names: set[str]) -> None:
     collisions = _collisions(resolution, names)
     if collisions:
+        # Every label, not the first two: an operator handed a partial list unconfigures
+        # one server and meets the same refusal again (specs/teams-tool-access, "Ta sama
+        # nazwa narzędzia z dwóch serwerów jest odmową").
         lines = "; ".join(
-            f"{name!r} ({' and '.join(labels)})" for name, labels in sorted(collisions.items())
+            f"{name!r} ({and_list(labels)})" for name, labels in sorted(collisions.items())
         )
         raise ToolNameCollision(f"more than one tool server announces: {lines}")
 
@@ -218,10 +222,10 @@ async def plan_tools(
     """Resolve the definition's tool names against every source's announcements.
 
     Raises `ToolServerUnavailable` when an assigned name could not be confirmed because
-    some server could not be asked or has no address at all, `ToolNameCollision` when two
-    sources both announce an assigned name, and `ToolNoLongerAnnounced` when every source
-    answered and none of them announce it. All three are `ToolAccessError`, which is what
-    a run start refuses on.
+    some server could not be asked or has no address at all, `ToolNameCollision` when more
+    than one source announces an assigned name, and `ToolNoLongerAnnounced` when every
+    source answered and none of them announce it. All three are `ToolAccessError`, which is
+    what a run start refuses on.
 
     `memory` is the run this plan belongs to. Absent — as it is on every save-time path —
     the in-process memory tools still resolve and still count as announced; they simply
@@ -242,8 +246,8 @@ async def plan_tools(
     if missing:
         if resolution.failed:
             raise ToolServerUnavailable(
-                f"could not confirm tool(s) {_and_list(missing)} — "
-                f"{_and_list(sorted(resolution.failed))} could not be reached: "
+                f"could not confirm tool(s) {and_list(missing)} — "
+                f"{and_list(sorted(resolution.failed))} could not be reached: "
                 f"{'; '.join(str(err) for err in resolution.failed.values())}"
             )
         # No server has an address at all — the case an early `not registry.configured()`
@@ -258,14 +262,14 @@ async def plan_tools(
         # setting to fix a tool the configured server had already declined to have.
         if not registry.remote() and (unconfigured := registry.unconfigured()):
             raise ToolServerUnavailable(
-                f"could not confirm tool(s) {_and_list(missing)}, assigned to "
-                f"{_and_list(_agents_wanting(definition, missing))} — "
-                f"{_and_list(unconfigured)} {'is' if len(unconfigured) == 1 else 'are'} "
+                f"could not confirm tool(s) {and_list(missing)}, assigned to "
+                f"{and_list(_agents_wanting(definition, missing))} — "
+                f"{and_list(unconfigured)} {'is' if len(unconfigured) == 1 else 'are'} "
                 "not configured"
             )
         raise ToolNoLongerAnnounced(
-            f"no configured tool server announces {_and_list(missing)}, assigned to "
-            f"{_and_list(_agents_wanting(definition, missing))}. The revision is unchanged "
+            f"no configured tool server announces {and_list(missing)}, assigned to "
+            f"{and_list(_agents_wanting(definition, missing))}. The revision is unchanged "
             "and still readable — it is this run that is refused."
         )
 
@@ -394,7 +398,7 @@ async def announced_tools_by_server(settings: Settings) -> list[ToolDescriptor]:
     try:
         resolution = await _resolve_all(registry)
         if resolution.failed:
-            names = _and_list(sorted(resolution.failed))
+            names = and_list(sorted(resolution.failed))
             details = "; ".join(str(err) for err in resolution.failed.values())
             raise ToolServerUnavailable(f"{names} could not be reached: {details}")
         return [tool for hits in resolution.by_name.values() for _label, tool in hits]
@@ -409,9 +413,10 @@ def _agents_wanting(definition: TeamDefinition, tools: list[str]) -> list[str]:
     )
 
 
-def _and_list(names: list[str]) -> str:
+def and_list(names: list[str]) -> str:
     """`a`, `a and b`, `a, b and c` — the message names every one of them rather than the
-    first and a count, because the operator's next move is to fix each."""
+    first and a count, because the operator's next move is to fix each. Public because
+    the save path refuses in `validation.py` and has the same reason to list them all."""
     quoted = [f"{name!r}" for name in names]
     if len(quoted) <= 1:
         return "".join(quoted)

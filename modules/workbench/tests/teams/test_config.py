@@ -88,45 +88,13 @@ def test_a_non_positive_rate_refuses_to_start(field: str) -> None:
     assert field in str(err.value)
 
 
-# --- the second tool server, checked independently (specs/teams-tool-access,
+# --- the several tool servers, checked independently (specs/teams-tool-access,
 # "Moduł MAY być skonfigurowany z więcej niż jednym serwerem narzędzi") ---
-
-
-def test_no_trading_mcp_configured_is_a_valid_state() -> None:
-    assert settings().trading_mcp_url is None
-
-
-def test_remote_trading_mcp_without_a_scope_is_refused() -> None:
-    with pytest.raises(ValidationError) as err:
-        settings(trading_mcp_url="https://trading-mcp.example.com")
-    assert "TRADING_MCP_SCOPE" in str(err.value)
-
-
-def test_scope_with_a_loopback_trading_mcp_is_refused() -> None:
-    with pytest.raises(ValidationError) as err:
-        settings(
-            trading_mcp_url="http://127.0.0.1:8060",
-            trading_mcp_scope="api://some-app/.default",
-        )
-    assert "loopback" in str(err.value)
-
-
-def test_loopback_trading_mcp_without_a_scope_is_accepted() -> None:
-    assert settings(trading_mcp_url="http://127.0.0.1:8060").trading_mcp_url == (
-        "http://127.0.0.1:8060"
-    )
-
-
-def test_remote_trading_mcp_with_a_scope_is_accepted() -> None:
-    resolved = settings(
-        trading_mcp_url="https://trading-mcp.example.com/",
-        trading_mcp_scope="api://some-app/.default",
-    )
-    assert resolved.trading_mcp_url == "https://trading-mcp.example.com"
-
-
-def test_a_blank_trading_mcp_url_means_unset() -> None:
-    assert settings(trading_mcp_url="   ").trading_mcp_url is None
+#
+# Each server's own mode switch is one rule tested once, over every server, in
+# `tests/test_config_common.py`. What is left here is the part that only exists because
+# there is more than one of them: that a refusal names the one at fault, and that all of
+# them can be configured differently at the same time.
 
 
 def test_one_valid_server_and_one_broken_server_is_refused_naming_the_broken_one() -> None:
@@ -135,7 +103,7 @@ def test_one_valid_server_and_one_broken_server_is_refused_naming_the_broken_one
     not — an operator fixing the wrong one would still be stuck."""
     with pytest.raises(ValidationError) as err:
         settings(
-            market_mcp_url="http://127.0.0.1:8040",
+            market_mcp_url="http://127.0.0.1:8020",
             trading_mcp_url="https://trading-mcp.example.com",
         )
     message = str(err.value)
@@ -143,11 +111,24 @@ def test_one_valid_server_and_one_broken_server_is_refused_naming_the_broken_one
     assert "MARKET_MCP_SCOPE" not in message
 
 
-def test_both_servers_configured_independently_is_accepted() -> None:
+def test_every_server_configured_independently_is_accepted() -> None:
     resolved = settings(
-        market_mcp_url="http://127.0.0.1:8040",
+        market_mcp_url="http://127.0.0.1:8020",
         trading_mcp_url="https://trading-mcp.example.com",
         trading_mcp_scope="api://some-app/.default",
+        polymarket_mcp_url="http://127.0.0.1:8070",
     )
-    assert resolved.market_mcp_url == "http://127.0.0.1:8040"
+    assert resolved.market_mcp_url == "http://127.0.0.1:8020"
     assert resolved.trading_mcp_url == "https://trading-mcp.example.com"
+    assert resolved.polymarket_mcp_url == "http://127.0.0.1:8070"
+
+
+def test_two_servers_configured_and_the_third_unset_is_accepted() -> None:
+    """The state a deployment is in between the module going live and the operator's
+    apply: the third address is simply not there yet, and that is a configuration, not a
+    half-finished one (specs/teams-tool-access)."""
+    resolved = settings(
+        market_mcp_url="http://127.0.0.1:8020",
+        trading_mcp_url="http://127.0.0.1:8060",
+    )
+    assert resolved.polymarket_mcp_url is None

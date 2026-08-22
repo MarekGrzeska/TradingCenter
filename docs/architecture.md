@@ -115,6 +115,57 @@ the only place that may import all three. It is a test that reads the imports
 (`tests/test_layering.py`), not an understanding: the first convenient dependency is written
 in a hurry, and a rule with no failing case is a preference.
 
+## The prediction-market archive
+
+`polymarket-data` arrived on 22 August 2026 and is `market-data`'s shape rather than the
+gateway's: one module, its own database, the REST contract the terminal reads and nine MCP
+tools at `/mcp`, in one process. It is drawn apart from the diagram above because it touches
+none of it — a different provider, a different kind of price, and no arrow to `capital-gateway`
+at all.
+
+```
+                  polymarket.com
+              gamma (metadata) + clob (prices)
+                        │  public, no credential to present
+                        ▼
+        ┌──────────────────────────────┐
+        │  polymarket-data             │
+        │  archive · sampling · backfill│
+        │  REST  ·  MCP tools at /mcp  │
+        └──────┬───────────────┬───────┘
+      events,  │               │  the same archive,
+      history, │               │  reduced for a model
+      changes  │               │  — and a watch list it may change
+               │  ┌────────────┘
+               ▼  ▼
+          terminal   workbench
+        (a subpage,  (the third tool server)
+         not yet)
+```
+
+**Why there is no gateway in front of it**, when capital.com has one: that boundary is not
+about being an upstream, it is about where reading stops and money starts. `trading-mcp`
+exists so a write to the account has its own process, its own identity and its own demo
+check — and `capital-gateway` exists because capital.com counts a rate budget against the
+*account*, so a second client anywhere spends the same allowance twice. Neither holds here.
+Polymarket's two surfaces are public, need no credential, and this system buys and sells
+nothing on them. A second application would cost an App Service, an identity and a deploy
+with no argument for it. If that ever changes — if anything here starts trading there — the
+gateway/tools boundary is drawn then, and drawn for the reason it exists.
+
+**Why it is not a widening of `market-data`.** A prediction market is not an instrument, its
+price is not a candle, and its provider is not capital.com. `market-data`'s only door to the
+outside is the gateway, and that is the property that keeps the candle archive's integrity
+answerable; hanging a second provider off it would cost exactly that.
+
+The two surfaces divide the same way the archive's do, and the division is sharper here
+because **three of the nine tools write**. What they write is the list of observations — the
+same thing an operator clicks — so the rule `market-data-tools` states outright ("the set
+only reads") is deliberately not inherited, and is named in the specification rather than
+left to be discovered in the code. The line that *is* hard sits elsewhere and is the one the
+caller record enforces: **no tool deletes collected history.** That is a REST route, and the
+one act in the module nobody can undo.
+
 ## The order path
 
 The workbench's teams surface has one more edge than the diagram above draws, and it is
@@ -361,6 +412,13 @@ that changes what a module directory contains: `migrations/` alongside the code,
 written as the statements a deployment runs. Rebuilding three years of minute candles for a
 hundred instruments costs roughly 27 hours of provider calls, which is what turns backups
 from a good habit into a requirement.
+
+`polymarket-data`'s archive is the same kind of thing and unrecreatable for a harder reason:
+the provider's price history reaches back only so far, and a market that resolved stops being
+queryable at all. What was not collected while it mattered cannot be collected afterwards at
+any price in provider calls — which is why deleting it is a REST route no tool can reach, and
+why the module records the oldest moment it could actually get rather than the edge of the
+window it asked for.
 
 ## Relationship to TradingHub
 

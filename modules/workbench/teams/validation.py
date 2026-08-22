@@ -21,7 +21,7 @@ from __future__ import annotations
 from collections.abc import Collection
 
 from .contract import TeamDefinition
-from .tools import AnnouncedSnapshot
+from .tools import AnnouncedSnapshot, and_list
 
 
 class DefinitionRefused(ValueError):
@@ -40,11 +40,12 @@ def check_definition(
     It is not optional any more: some of what this module announces it serves itself, so
     there is always a snapshot to check against, and "no server has an address" is now one
     of the things *inside* it (`unconfigured`). The refusals below still tell the three
-    apart — a name nobody announces, a name announced by two servers, and a name that
-    could not be confirmed because a server is unreachable or unset. Note the asymmetry
-    with a *run*: a run of a team whose agents carry no tools proceeds with no tool server
-    at all (specs/teams-tool-access), and so does a save of one — only an agent actually
-    assigned a tool needs the announcement to check it against.
+    apart — a name nobody announces, a name announced by more than one source (and then
+    which ones, all of them), and a name that could not be confirmed because a server is
+    unreachable or unset. Note the asymmetry with a *run*: a run of a team whose agents
+    carry no tools proceeds with no tool server at all (specs/teams-tool-access), and so
+    does a save of one — only an agent actually assigned a tool needs the announcement to
+    check it against.
     """
     _every_agent_names_a_known_model(definition, model_ids)
     _every_assigned_tool_is_announced(definition, announced)
@@ -91,7 +92,10 @@ def _every_assigned_tool_is_announced(
         )
         if collided:
             tool = collided[0]
-            servers = " and ".join(announced.by_name[tool])
+            # Every server announcing it, not the first two: a message that stops short
+            # sends the operator to unconfigure one and meet this same refusal again
+            # (specs/teams-tool-access).
+            servers = and_list(announced.by_name[tool])
             raise DefinitionRefused(
                 f"agent {agent.key!r} is assigned tool {tool!r}, which more than one "
                 f"tool server announces ({servers}) — this module cannot tell which "
@@ -117,8 +121,8 @@ def _every_assigned_tool_is_announced(
                 f"agent {agent.key!r} is assigned tool(s) {unknown}, and "
                 f"{' and '.join(announced.unconfigured)} "
                 f"{'has' if len(announced.unconfigured) == 1 else 'have'} no address "
-                "configured to check them against — set MARKET_MCP_URL and/or "
-                "TRADING_MCP_URL, or assign only tools this module announces "
+                f"configured to check them against — set {_url_settings(announced)}, "
+                "or assign only tools this module announces "
                 f"({sorted(known)})"
             )
         # Phase 2's wording: there can be two servers now, so the refusal says "no
@@ -127,6 +131,18 @@ def _every_assigned_tool_is_announced(
             f"agent {agent.key!r} is assigned tool(s) {unknown}, which no configured "
             f"tool server announces ({sorted(known)})"
         )
+
+
+def _url_settings(announced: AnnouncedSnapshot) -> str:
+    """The settings the operator has to fill, derived from the labels rather than listed.
+
+    A hand-kept list here named two servers on the day there were three
+    (`polymarket-data-joins-the-stack`), and it would have gone on naming two: the message
+    is built from a snapshot that already knows exactly which servers have no address.
+    """
+    return " and/or ".join(
+        f"{label.replace('-', '_').upper()}_URL" for label in announced.unconfigured
+    )
 
 
 def check_trigger_tool(tool_name: str, *, announced_tools: Collection[str] | None) -> None:

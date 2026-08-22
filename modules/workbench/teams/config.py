@@ -145,6 +145,16 @@ class Settings(BaseSettings):
     # this module's own timeout firing first.
     trading_mcp_request_timeout_seconds: float = 35.0
 
+    # --- polymarket-data, the third tool server ---
+    #
+    # Same shape and the same independence as the two above. Its ceiling is trading-mcp's
+    # number for trading-mcp's reason rather than market-mcp's: two of its tools ask the
+    # provider live (30s there, `polymarket_data/provider.py`), so a lower ceiling here
+    # would fire on a call still being answered.
+    polymarket_mcp_url: str | None = None
+    polymarket_mcp_scope: str | None = None
+    polymarket_mcp_request_timeout_seconds: float = 35.0
+
     # --- how long one run may take ---
     #
     # A ceiling on the whole run, not on one agent: several agents work in it, some at the
@@ -199,7 +209,13 @@ class Settings(BaseSettings):
         return value.strip()
 
     @field_validator(
-        "database_user", "market_mcp_url", "market_mcp_scope", "trading_mcp_url", "trading_mcp_scope"
+        "database_user",
+        "market_mcp_url",
+        "market_mcp_scope",
+        "trading_mcp_url",
+        "trading_mcp_scope",
+        "polymarket_mcp_url",
+        "polymarket_mcp_scope",
     )
     @classmethod
     def _blank_means_unset(cls, value: str | None) -> str | None:
@@ -249,7 +265,7 @@ class Settings(BaseSettings):
         """The same rule market-data set for its database and market-mcp set for its
         archive, and agent set for its own tool server: name one mode, or none, never
         both — checked independently for each configured tool server, so an operator
-        fixing one does not have to guess which of the two a bare error names
+        fixing one does not have to guess which of them a bare error names
         (specs/teams-tool-access, "Tryb połączenia z serwerem narzędzi jest wybrany
         jednoznacznie", "Niespójność dotyczy drugiego serwera")."""
         self.market_mcp_url = self._coherent_tool_server_url(
@@ -257,6 +273,11 @@ class Settings(BaseSettings):
         )
         self.trading_mcp_url = self._coherent_tool_server_url(
             url=self.trading_mcp_url, scope=self.trading_mcp_scope, env_prefix="TRADING_MCP"
+        )
+        self.polymarket_mcp_url = self._coherent_tool_server_url(
+            url=self.polymarket_mcp_url,
+            scope=self.polymarket_mcp_scope,
+            env_prefix="POLYMARKET_MCP",
         )
         return self
 
