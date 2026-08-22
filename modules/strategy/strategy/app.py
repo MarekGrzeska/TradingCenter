@@ -34,10 +34,12 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
+from .archive import Archive, http_client
 from .caller_access import CallerAccess
 from .config import Settings
 from .errors import ArchiveRefused, ArchiveUnreachable, StrategyError, UnknownStrategy
 from .routers import meta
+from .runner import EvaluationLoop
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -47,13 +49,19 @@ log = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     settings = Settings()  # type: ignore[call-arg]
 
-    async with make_pool(
-        settings.database_url,
-        user=settings.database_user,
-        client_id=settings.azure_client_id,
-        client_secret=settings.azure_client_secret,
-        tenant_id=settings.azure_tenant_id,
-    ) as pool:
+    # Constructed, not connected: no request is made here. Reaching the archive at startup
+    # would make this process's health depend on another module's, and there is nothing it
+    # could usefully do with the answer at that moment anyway.
+    async with (
+        make_pool(
+            settings.database_url,
+            user=settings.database_user,
+            client_id=settings.azure_client_id,
+            client_secret=settings.azure_client_secret,
+            tenant_id=settings.azure_tenant_id,
+        ) as pool,
+        http_client(settings.market_data_scope) as client,
+    ):
         # One connection held for the whole of it: the advisory lock is session scoped, so
         # it has to be released on the connection that took it, and handing that connection
         # back to the pool in between would release it early.
@@ -70,13 +78,26 @@ async def lifespan(app: FastAPI):
 
         app.state.settings = settings
         app.state.pool = pool
+        app.state.archive = Archive(settings.market_data_url, client)
+
+        # Started last, once everything a pass could need is already on the state. A
+        # platform with no active watches starts and serves exactly the same way — zero is
+        # a supported state, not a degraded one.
+        loop = EvaluationLoop(
+            pool, app.state.archive, interval_seconds=settings.evaluation_interval_seconds
+        )
+        app.state.loop = loop
+        loop.start()
 
         # The tool surface's own machinery, started here because a mounted application's
         # lifespan is not run by the one mounting it (`mcp_app.tool_surface_session`).
         from .mcp_app import tool_surface_session
 
-        async with tool_surface_session(app):
-            yield
+        try:
+            async with tool_surface_session(app):
+                yield
+        finally:
+            await loop.aclose()
 
 
 async def _refused(request: Request, exc: StrategyError) -> JSONResponse:

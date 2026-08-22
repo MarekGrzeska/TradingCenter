@@ -16,10 +16,10 @@
 
 ## 3. Runtime
 
-- [ ] 3.1 Klient market-data: świece + `POST /indicators`, cięcie okien pod sufit 200k barów, mapowanie niedopokrycia
-- [ ] 3.2 Pętla na domkniętych świecach: fakty → bramki wspólne → `evaluate` → zapis; odmowa „pokrycie" odróżnialna od odmowy strategii
-- [ ] 3.3 Magazyn: zestawy parametrów (wersjonowane, niezmienne), decyzje ze snapshotem faktów; test odtworzenia decyzji z zapisu
-- [ ] 3.4 Stany: start bez aktywnych strategii, dezaktywacja jednej nie zatrzymuje reszty; test, że moduł nie ma klienta konta
+- [x] 3.1 Klient market-data: świece + `POST /indicators`, cięcie okien pod sufit 200k barów, mapowanie niedopokrycia
+- [x] 3.2 Pętla na domkniętych świecach: fakty → bramki wspólne → `evaluate` → zapis; odmowa „pokrycie" odróżnialna od odmowy strategii
+- [x] 3.3 Magazyn: zestawy parametrów (wersjonowane, niezmienne), decyzje ze snapshotem faktów; test odtworzenia decyzji z zapisu
+- [x] 3.4 Stany: start bez aktywnych strategii, dezaktywacja jednej nie zatrzymuje reszty; test, że moduł nie ma klienta konta
 
 ## 4. Powierzchnie
 

@@ -130,6 +130,44 @@ def test_an_entry_does_not_read_a_clock(path: Path) -> None:
     )
 
 
+# Every way this module could come to touch an account. None of them appears anywhere in
+# it, and this is the test that says so rather than the README.
+#
+# Written as words that would have to appear in a URL, a setting or a call: this module
+# reaches exactly one upstream over HTTP, so an outbound address is the shape a second one
+# would arrive in. `order` and `position` cover the case where somebody wires it to the
+# account by hand rather than by configuration.
+ACCOUNT_WORDS = (
+    "trading_mcp",
+    "trading-mcp",
+    "TRADING_MCP",
+    "capital_gateway",
+    "capital-gateway",
+    "CAPITAL_GATEWAY",
+    "place_order",
+    "close_position",
+    "amend_stops",
+)
+
+
+def test_nothing_in_this_module_can_reach_an_account() -> None:
+    """The platform decides and records; execution belongs to the teams and their limits.
+
+    Asserted over the whole package rather than at one seam, because the claim is that
+    there is no seam: no client, no setting, no call. A strategy platform that could place
+    an order is a different module with a different review, and this test is what makes
+    growing into one a deliberate act rather than an afternoon's convenience
+    (`strategy-runtime`, "Platforma nie ma drogi do konta").
+    """
+    offences: list[str] = []
+    for path in sorted(PACKAGE_ROOT.rglob("*.py")):
+        text = path.read_text(encoding="utf-8")
+        for word in ACCOUNT_WORDS:
+            if word in text:
+                offences.append(f"{path.name} mentions {word}")
+    assert not offences, "\n".join(offences)
+
+
 def _runtime_sources() -> list[Path]:
     paths = [path for package in RUNTIME_PACKAGES for path in _sources(package)]
     paths += [PACKAGE_ROOT / name for name in RUNTIME_MODULES]
