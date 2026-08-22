@@ -57,14 +57,15 @@
 
 ## 6. Powierzchnia MCP
 
-- [ ] 6.1 Sześć narzędzi odczytu: `search_events`, `browse_events`, `list_tracked_events`, `get_event`, `get_price_history`, `get_price_changes`
-- [ ] 6.2 Trzy narzędzia listy obserwacji: `track_event`, `untrack_event`, `create_group` — wspólna droga zapisu z kontraktem REST, ten sam sufit, ta sama odmowa
-- [ ] 6.3 Odpowiedzi odróżniają dane z archiwum od pobranych od dostawcy na żywo; cena niesie moment i wiek; skala ceny nazwana w opisie
-- [ ] 6.4 Wynik przeszukania wskazuje, które wydarzenia są już obserwowane
-- [ ] 6.5 Tożsamość wołającego z `tc-mcp-kit`, fail-closed; rozdział uprawnień trasa narzędziowa wobec REST; sonda zdrowia poza wymogiem
-- [ ] 6.6 Test sufitu powierzchni narzędzi z zapisaną liczbą; test schematu odpowiedzi wobec tego, co narzędzie naprawdę oddaje
-- [ ] 6.7 Testy odmowy: żadne narzędzie nie kasuje historii, nie zmienia konfiguracji i nie dotyka rachunku; każda para „tożsamość — powierzchnia bez prawa" ma test
-- [ ] 6.8 `uv run pytest`, `ruff check .`, `pyright`
+- [x] 6.1 Sześć narzędzi odczytu: `search_events`, `browse_events`, `list_tracked_events`, `get_event`, `get_price_history`, `get_price_changes`
+- [x] 6.2 Trzy narzędzia listy obserwacji: `track_event`, `untrack_event`, `create_group` — wspólna droga zapisu z kontraktem REST, ten sam sufit, ta sama odmowa
+- [x] 6.3 Odpowiedzi odróżniają dane z archiwum od pobranych od dostawcy na żywo; cena niesie moment i wiek; skala ceny nazwana w opisie
+- [x] 6.4 Wynik przeszukania wskazuje, które wydarzenia są już obserwowane
+- [x] 6.5 Tożsamość wołającego z `tc-mcp-kit`, fail-closed; rozdział uprawnień trasa narzędziowa wobec REST; sonda zdrowia poza wymogiem
+- [x] 6.6 Test sufitu powierzchni narzędzi z zapisaną liczbą; test schematu odpowiedzi wobec tego, co narzędzie naprawdę oddaje
+- [x] 6.7 Testy odmowy: żadne narzędzie nie kasuje historii, nie zmienia konfiguracji i nie dotyka rachunku; każda para „tożsamość — powierzchnia bez prawa" ma test
+- [x] 6.8 Sufit powierzchni zmierzony: 13 811 znaków na dziewięć narzędzi (~3 300 tokenów), sufit 15 500 z 12% zapasu
+- [x] 6.9 `uv run pytest` (133), `ruff check .`, `pyright`
 
 ## 7. Workbench
 

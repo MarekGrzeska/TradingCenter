@@ -196,6 +196,22 @@ async def api(app, pool, settings):
 
 
 @pytest.fixture
+async def tool_server(app, pool, settings):
+    """The FastMCP server this module publishes, wired to a real database.
+
+    Built from the same application `create_app()` builds, so the tools under test are the
+    tools that are actually served — a server assembled here would be a second surface, and
+    a ceiling measured on it would be a ceiling on nothing.
+    """
+    import fakes
+
+    app.state.pool = pool
+    app.state.settings = settings
+    app.state.provider = fakes.FakeProvider()
+    return app.state.mcp_server
+
+
+@pytest.fixture
 def app():
     """A fresh application per test.
 

@@ -57,12 +57,20 @@ class FakeProvider:
         payloads: dict[str, dict | Exception] | None = None,
         history: dict[str, list[tuple[int, str]]] | None = None,
         by_slug: dict[str, dict | Exception] | None = None,
+        public: list[dict] | None = None,
     ) -> None:
         self.payloads = payloads or {}
         self.history = history or {}
         self.by_slug = by_slug or {}
+        self.public = public if public is not None else [event_payload()]
         self.event_calls: list[str] = []
         self.history_calls: list[tuple[str, datetime, datetime]] = []
+
+    async def search_events(self, query: str, *, limit: int = 10) -> list[dict]:
+        return self.public
+
+    async def browse_events(self, **kwargs) -> list[dict]:
+        return self.public
 
     async def event_by_reference(self, reference: str):
         """What the track route calls. Keyed by slug so a test can hand it an address."""

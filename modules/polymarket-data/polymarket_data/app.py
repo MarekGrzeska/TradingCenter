@@ -18,7 +18,8 @@ from tc_runtime import migrate, schema_version
 from tc_runtime.db import advisory_lock
 from tc_runtime.db import pool as make_pool
 
-from . import provider
+from . import mcp_app, provider
+from .caller_access import CallerAccess
 from .config import Settings
 from .ingest import Ingest
 from .routers import groups, meta, observations, prices
@@ -94,11 +95,17 @@ async def lifespan(app: FastAPI):
         )
         app.state.ingest = ingest
         await ingest.start()
-        log.info("polymarket-data is serving")
-        try:
-            yield
-        finally:
-            await ingest.stop()
+
+        # The tool surface's session manager. A mounted application's lifespan is never run
+        # — only the outermost one is — so the task group the streamable-http transport
+        # dispatches into has to be started here, or every tool call answers `RuntimeError:
+        # Task group is not initialized`.
+        async with mcp_app.tool_surface_session(app):
+            log.info("polymarket-data is serving")
+            try:
+                yield
+            finally:
+                await ingest.stop()
 
 
 def create_app() -> FastAPI:
@@ -112,6 +119,16 @@ def create_app() -> FastAPI:
     app.include_router(observations.router)
     app.include_router(groups.router)
     app.include_router(prices.router)
+
+    server, tool_app = mcp_app.build_mcp_app(app)
+    app.state.mcp_server = server
+    app.mount(mcp_app.MOUNT_PATH, tool_app)
+
+    # In front of the whole application, and in this order: the address fix runs before
+    # routing so `/mcp` and `/mcp/` are one address, and the caller record runs before that
+    # so nothing decides who may call after the routing has already begun.
+    app.add_middleware(mcp_app.ToolSurfaceAddress)
+    app.add_middleware(CallerAccess, state=app.state)
     return app
 
 
