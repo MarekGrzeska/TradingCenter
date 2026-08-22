@@ -56,11 +56,25 @@ class FakeProvider:
         self,
         payloads: dict[str, dict | Exception] | None = None,
         history: dict[str, list[tuple[int, str]]] | None = None,
+        by_slug: dict[str, dict | Exception] | None = None,
     ) -> None:
         self.payloads = payloads or {}
         self.history = history or {}
+        self.by_slug = by_slug or {}
         self.event_calls: list[str] = []
         self.history_calls: list[tuple[str, datetime, datetime]] = []
+
+    async def event_by_reference(self, reference: str):
+        """What the track route calls. Keyed by slug so a test can hand it an address."""
+        from polymarket_data import parsing
+
+        slug = parsing.slug_from(reference)
+        answer = self.by_slug.get(slug)
+        if isinstance(answer, Exception):
+            raise answer
+        if answer is None:
+            raise provider.ProviderHasNothing(slug)
+        return parsing.event_from(answer)
 
     async def event_payload(self, provider_event_id: str) -> dict:
         self.event_calls.append(provider_event_id)

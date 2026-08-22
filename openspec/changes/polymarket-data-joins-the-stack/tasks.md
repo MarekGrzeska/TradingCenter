@@ -46,13 +46,14 @@
 
 ## 5. Kontrakt REST
 
-- [ ] 5.1 `polymarket_data/contract.py` — kształty publikowane konsumentom, niezależne od kształtu dostawcy
-- [ ] 5.2 Trasy obserwacji: lista, objęcie obserwacją (adres albo identyfikator, opcjonalna grupa), zakończenie obserwacji
-- [ ] 5.3 Trasy grup: utworzenie, odczyt, przypisanie, skasowanie
-- [ ] 5.4 Migawka ostatnich cen wszystkich obserwowanych wyników jednym żądaniem; historia ceny wyniku po zakresie
-- [ ] 5.5 Zmiany w oknach 5m/15m/1h/4h/12h/24h/7d liczone przy odczycie, z tolerancją na nierówny takt i z momentem punktu bazowego w odpowiedzi
-- [ ] 5.6 Kasowanie zebranej historii — wyłącznie tutaj, niepodzielnie z zapisem zebranych zakresów
-- [ ] 5.7 Testy: po trzy na trasę CRUD (ścieżka szczęśliwa, błąd, odmowa); okno bez pokrycia jako brak z przyczyną, nie jako zero
+- [x] 5.1 `polymarket_data/contract.py` — kształty publikowane konsumentom, niezależne od kształtu dostawcy
+- [x] 5.2 Trasy obserwacji: lista, objęcie obserwacją (adres albo identyfikator, opcjonalna grupa), zakończenie obserwacji
+- [x] 5.3 Trasy grup: utworzenie, odczyt, przypisanie, skasowanie
+- [x] 5.4 Migawka ostatnich cen wszystkich obserwowanych wyników jednym żądaniem; historia ceny wyniku po zakresie
+- [x] 5.5 Zmiany w oknach 5m/15m/1h/4h/12h/24h/7d liczone przy odczycie, z tolerancją na nierówny takt i z momentem punktu bazowego w odpowiedzi
+- [x] 5.6 Kasowanie zebranej historii — wyłącznie tutaj, niepodzielnie z zapisem zebranych zakresów
+- [x] 5.7 Testy: po trzy na trasę CRUD (ścieżka szczęśliwa, błąd, odmowa); okno bez pokrycia jako brak z przyczyną, nie jako zero; dziura wokół krawędzi okna nazwana, nie zamalowana
+- [x] 5.8 `uv run pytest` (112), `ruff check .`, `pyright`
 
 ## 6. Powierzchnia MCP
 

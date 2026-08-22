@@ -21,7 +21,7 @@ from tc_runtime.db import pool as make_pool
 from . import provider
 from .config import Settings
 from .ingest import Ingest
-from .routers import meta
+from .routers import groups, meta, observations, prices
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
 log = logging.getLogger(__name__)
@@ -109,6 +109,9 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
     app.include_router(meta.router)
+    app.include_router(observations.router)
+    app.include_router(groups.router)
+    app.include_router(prices.router)
     return app
 
 

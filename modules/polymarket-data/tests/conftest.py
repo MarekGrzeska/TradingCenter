@@ -177,6 +177,25 @@ async def pool(migrated_url: str):
 
 
 @pytest.fixture
+async def api(app, pool, settings):
+    """The app wired to a real database, with the provider faked.
+
+    The lifespan is bypassed rather than run: it would start the sampler, which would reach
+    a third party over the network. What is under test here is the contract.
+    """
+    import fakes
+    import httpx
+
+    app.state.pool = pool
+    app.state.settings = settings
+    app.state.provider = fakes.FakeProvider()
+
+    transport = httpx.ASGITransport(app=app)
+    async with httpx.AsyncClient(transport=transport, base_url="http://tests") as client:
+        yield client
+
+
+@pytest.fixture
 def app():
     """A fresh application per test.
 
