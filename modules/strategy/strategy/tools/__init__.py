@@ -30,9 +30,7 @@ class ToolContext:
 
 
 def register(mcp: FastMCP, context: ToolContext) -> None:
-    """Every tool this module announces, in one place so the list is readable as a list.
+    """Every tool this module announces, in one place so the list is readable as a list."""
+    from . import platform
 
-    Empty until the store these read exists: the transport, the mount and the caller
-    record are this module's plumbing and arrive with its skeleton, while what they carry
-    arrives with the decisions it reads.
-    """
+    platform.register(mcp, context)

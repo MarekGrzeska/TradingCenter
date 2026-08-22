@@ -23,10 +23,12 @@
 
 ## 4. Powierzchnie
 
-- [ ] 4.1 REST: strategie, zestawy parametrów, decyzje (lista/szczegół z powodami); trzy testy na widok
-- [ ] 4.2 `/mcp` read-only: `pending_setups(strategy)`, `last_decision`, lista strategii; test „zestaw wyłącznie czyta"
-- [ ] 4.3 Tożsamość wołającego (`caller_access` wzorem polymarket-data) + test odmowy spoza listy
+- [x] 4.1 REST: strategie, zestawy parametrów, decyzje (lista/szczegół z powodami); trzy testy na widok
+- [x] 4.2 `/mcp` read-only: `pending_setups(strategy)`, `last_decision`, lista strategii; test „zestaw wyłącznie czyta"
+- [x] 4.3 Tożsamość wołającego (`caller_access` wzorem polymarket-data) + test odmowy spoza listy
 - [ ] 4.4 Ręczna próba szwu: wyzwalacz workbencha na `pending_setups` budzi zespół na kandydacie baseline
+      *(operatorska — wymaga uruchomionego stacku; kontener bazy i porty są współdzielone między worktree,
+      a na głównym pracuje inny agent. Kształt szwu pokryty testem `test_the_number_is_the_one_the_woken_team_will_read`.)*
 
 ## 5. Backtest
 

@@ -38,7 +38,7 @@ from .archive import Archive, http_client
 from .caller_access import CallerAccess
 from .config import Settings
 from .errors import ArchiveRefused, ArchiveUnreachable, StrategyError, UnknownStrategy
-from .routers import meta
+from .routers import decisions, meta, strategies
 from .runner import EvaluationLoop
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
@@ -149,7 +149,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(StrategyError, _refused)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, _unhandled)  # type: ignore[arg-type]
 
-    for area in (meta,):
+    for area in (meta, strategies, decisions):
         app.include_router(area.router)
 
     # The tool surface, as a mounted ASGI application rather than a router: what the MCP
