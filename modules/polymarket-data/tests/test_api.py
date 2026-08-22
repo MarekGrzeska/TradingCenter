@@ -13,7 +13,7 @@ from decimal import Decimal
 import fakes
 import pytest
 
-from polymarket_data import parsing, provider, store
+from polymarket_data import changes, parsing, provider, store
 from polymarket_data.models import Sample, Surface
 
 pytestmark = pytest.mark.db
@@ -197,6 +197,24 @@ class TestReads:
 
 
 class TestWindows:
+    async def test_the_answer_carries_exactly_the_windows_the_module_computes(
+        self, api, pool
+    ) -> None:
+        """Read off `changes.WINDOWS` rather than retyped here.
+
+        A list written out in the test is a second place the set lives, and the two drift:
+        this assertion would have gone on passing with the two unread windows still being
+        queried on every read, which is what `five-windows-are-enough` removed. What it
+        pins is the shape — one entry per window, in the module's own order — not which
+        windows somebody felt like naming twice.
+        """
+        await observe(pool, fakes.event_payload())
+
+        body = (await api.get("/events/e-1/changes")).json()
+
+        expected = [label for label, _span in changes.WINDOWS]
+        assert [w["window"] for w in body["outcomes"][0]["windows"]] == expected
+
     async def test_a_window_the_history_does_not_reach_is_a_null_with_a_reason(
         self, api, pool
     ) -> None:

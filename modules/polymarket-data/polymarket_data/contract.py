@@ -183,7 +183,7 @@ class HistoryOut(BaseModel):
 
 
 class WindowChange(BaseModel):
-    window: Literal["5m", "15m", "1h", "4h", "12h", "24h", "7d"]
+    window: Literal["5m", "1h", "4h", "24h", "7d"]
     change: float | None = Field(
         default=None,
         description="the change in probability over the window, in points of the 0..1 "
