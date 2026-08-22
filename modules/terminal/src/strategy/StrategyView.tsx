@@ -1,7 +1,8 @@
 import { useMemo, useState } from "react";
 import { resolveEndpoints } from "../data/config";
-import { strategyIdentity } from "../data/marketData";
+import { archive, strategyIdentity } from "../data/marketData";
 import { useRead } from "../data/query";
+import type { ArchiveAdmin } from "../data/source";
 import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { DecisionRow } from "./DecisionRow";
@@ -41,7 +42,13 @@ const NO_STRATEGIES: Strategy[] = [];
 const NO_WATCHES: Watch[] = [];
 const NO_DECISIONS: Decision[] = [];
 
-export function StrategyView({ api }: { api?: StrategyApi } = {}) {
+export function StrategyView({
+  api,
+  // The archive, for one thing only: which instruments it collects, which is what the
+  // dialog below offers instead of a text field. This screen reads nothing else from it —
+  // the decisions and their facts come from the platform, which did the reading itself.
+  admin = archive,
+}: { api?: StrategyApi; admin?: ArchiveAdmin } = {}) {
   const client = useMemo(
     () => api ?? createStrategyApi(resolveEndpoints().strategyHttp, strategyIdentity),
     [api],
@@ -201,6 +208,7 @@ export function StrategyView({ api }: { api?: StrategyApi } = {}) {
       {starting && (
         <StartWatchDialog
           client={client}
+          admin={admin}
           strategies={strategies.value}
           onClose={() => setStarting(false)}
           onStarted={() => {
