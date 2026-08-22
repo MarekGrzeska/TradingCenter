@@ -50,6 +50,11 @@ export function EventCard({
   // turned out to be a click nobody wanted, since an operator who unfolds an event is
   // unfolding it to see how it moved. Folded is the state that earns its keep.
   const [open, setOpen] = useState(false);
+  // Resolved markets are folded, never dropped. A dated event resolves its markets one by
+  // one and each stays for good: ten of them under one event is a hundred rows saying
+  // nothing about now. The history behind them is the opposite of worthless — it is the
+  // part the provider will not give back.
+  const [showResolved, setShowResolved] = useState(false);
   const [ending, setEnding] = useState(false);
   const [deletingHistory, setDeletingHistory] = useState(false);
 
@@ -62,6 +67,11 @@ export function EventCard({
     // otherwise be a dozen requests for numbers nobody has looked at.
     enabled: open,
   });
+
+  // A market with a resolved outcome is finished: its price stands, so every window would
+  // come out zero or short of coverage, and neither is a reading.
+  const live = event.markets.filter((market) => market.resolvedOutcome === null);
+  const resolved = event.markets.filter((market) => market.resolvedOutcome !== null);
 
   const windowsFor = (outcomeId: number) =>
     changes.value.outcomes.find((outcome) => outcome.outcomeId === outcomeId)?.windows ?? [];
@@ -128,7 +138,7 @@ export function EventCard({
 
       {open && (
         <div className="flex flex-col gap-3 px-3 py-2">
-          {event.markets.map((market) => (
+          {live.map((market) => (
             <MarketRows
               key={market.id}
               market={market}
@@ -136,6 +146,31 @@ export function EventCard({
               windowsFor={windowsFor}
             />
           ))}
+
+          {live.length === 0 && (
+            <p className="text-xs text-ink-muted">
+              Every market of this event has resolved. Nothing is being collected for it any
+              more; what was collected is still here.
+            </p>
+          )}
+
+          {resolved.length > 0 && (
+            <div className="flex flex-col gap-3">
+              <Button
+                size="2xs"
+                tone="quiet"
+                className="self-start"
+                onClick={() => setShowResolved((was) => !was)}
+              >
+                {showResolved
+                  ? `Hide ${resolved.length} resolved`
+                  : `${resolved.length} resolved market${resolved.length === 1 ? "" : "s"}`}
+              </Button>
+
+              {showResolved &&
+                resolved.map((market) => <ResolvedMarket key={market.id} market={market} />)}
+            </div>
+          )}
         </div>
       )}
 
@@ -188,7 +223,10 @@ function CollapsedSummary({
   event: TrackedEvent;
   prices: Map<number, SnapshotEntry>;
 }) {
-  const leaders = event.markets
+  // Live markets only. An event with one open market and nine settled ones would otherwise
+  // quote 100% on something that finished in August.
+  const live = event.markets.filter((market) => market.resolvedOutcome === null);
+  const leaders = (live.length > 0 ? live : event.markets)
     .map((market) => {
       const priced = market.outcomes
         .map((outcome) => {
@@ -231,10 +269,42 @@ function CollapsedSummary({
           <span className="tabular-nums text-ink">{formatProbability(row.price)}</span>
         </li>
       ))}
-      {event.markets.length > leaders.length && (
-        <li className="text-ink-faint">+{event.markets.length - leaders.length} more</li>
+      {live.length > leaders.length && (
+        <li className="text-ink-faint">+{live.length - leaders.length} more</li>
       )}
+      {live.length === 0 && <li className="text-ink-faint">resolved</li>}
     </ul>
+  );
+}
+
+/**
+ * A market that is over.
+ *
+ * One line: what it settled on. **No windows**, and that is the requirement rather than a
+ * saving — after resolution the price stands, so every window comes out `0.0 pp` or "no
+ * coverage". The first reads as "the market did not move" and the second as "the archive has
+ * a hole"; the truth is a third thing, that there is nothing left to measure
+ * (specs/terminal-polymarket, "Rozstrzygnięty rynek pokazany świadomie").
+ *
+ * The prices are still shown, because they are the answer: 100% against the outcome that
+ * won is what resolution looks like.
+ */
+function ResolvedMarket({ market }: { market: Market }) {
+  return (
+    <div className="text-xs">
+      <h3 className="flex items-baseline gap-2 text-ink-faint">
+        <span>{market.label ?? market.question}</span>
+        <span className="text-ink-muted">· settled on {market.resolvedOutcome}</span>
+      </h3>
+      <ul className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
+        {market.outcomes.map((outcome) => (
+          <li key={outcome.id} className="flex items-baseline gap-2 text-ink-faint">
+            <span>{outcome.name}</span>
+            <span className="tabular-nums">{formatProbability(outcome.price) ?? "—"}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
