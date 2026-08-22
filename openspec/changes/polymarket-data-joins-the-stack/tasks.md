@@ -95,9 +95,9 @@
 
 ## 10. Wdrożenie i sprawdzenie
 
-- [ ] 10.1 Wypuścić moduł; sonda `/` odpowiada, migracja wykonana, `deploy_probe.py` przechodzi
-- [ ] 10.2 `apply` operatora — ustawienia i listy wołających **przed** wdrożeniem workbencha
-- [ ] 10.3 Wdrożyć workbench z trzecią parą
+- [x] 10.1 Wypuścić moduł; sonda `/` odpowiada, migracja wykonana, `deploy_probe.py` przechodzi
+- [x] 10.2 `apply` operatora — ustawienia i listy wołających **przed** wdrożeniem workbencha
+- [x] 10.3 Wdrożyć workbench z trzecią parą
 - [ ] 10.4 Sprawdzenie: rozmowa widzi dziewięć nowych narzędzi; objęcie obserwacją z poziomu modelu rusza próbkowanie i uzupełnianie; historia jest odczytywalna godzinę później
-- [ ] 10.5 Sprawdzenie odmów: wołający bez tożsamości odbity, wołający narzędzi nie kasuje historii, sufit obserwacji odmawia z powodem
-- [ ] 10.6 `review.md` — co zmierzono na dostawcy, co odpowiedziało po wdrożeniu, i test na każdy scenariusz albo nazwana luka
+- [x] 10.5 Sprawdzenie odmów: wołający bez tożsamości odbity, wołający narzędzi nie kasuje historii, sufit obserwacji odmawia z powodem
+- [x] 10.6 `review.md` — co zmierzono na dostawcy, co odpowiedziało po wdrożeniu, i test na każdy scenariusz albo nazwana luka

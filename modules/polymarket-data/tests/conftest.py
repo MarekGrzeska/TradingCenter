@@ -176,6 +176,21 @@ async def pool(migrated_url: str):
         yield created
 
 
+class RecordingIngest:
+    """Stands in for the sampler, and records what tracking asked it to fill.
+
+    The lifespan is bypassed here, so the real one never exists — but the two write paths
+    now start a backfill, and that call is the thing worth asserting: until it existed the
+    ninety days a caller is promised arrived only at the next process restart.
+    """
+
+    def __init__(self) -> None:
+        self.backfilled: list[int] = []
+
+    def event_tracked(self, event_id: int) -> None:
+        self.backfilled.append(event_id)
+
+
 @pytest.fixture
 async def api(app, pool, settings):
     """The app wired to a real database, with the provider faked.
@@ -189,6 +204,7 @@ async def api(app, pool, settings):
     app.state.pool = pool
     app.state.settings = settings
     app.state.provider = fakes.FakeProvider()
+    app.state.ingest = RecordingIngest()
 
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://tests") as client:
@@ -208,6 +224,7 @@ async def tool_server(app, pool, settings):
     app.state.pool = pool
     app.state.settings = settings
     app.state.provider = fakes.FakeProvider()
+    app.state.ingest = RecordingIngest()
     return app.state.mcp_server
 
 

@@ -95,6 +95,36 @@ class TestStructure:
         assert loaded.resolved and loaded.tracking
 
 
+class TestEndingAnObservationSticks:
+    async def test_the_samplers_refresh_does_not_resurrect_an_ended_observation(
+        self, pool
+    ) -> None:
+        """`upsert_event` cleared `tracking_ended_at` unconditionally, and the sampler calls
+        it every tick to refresh an event's markets — so an observation ended while a tick
+        was in flight came back and kept being sampled. Only tracking resumes now."""
+        built = builders.event(provider_event_id="e-1")
+        async with pool.acquire() as conn:
+            await store.upsert_event(conn, built, resume=True)
+            await store.end_tracking(conn, "e-1")
+
+            # What the tick does: refresh the structure, without asking to resume.
+            await store.upsert_event(conn, built)
+
+            [event] = await store.load_events(conn, provider_event_id="e-1", include_ended=True)
+        assert event.tracking_ended_at is not None, "an ended observation stays ended"
+
+    async def test_tracking_it_again_does_resume_it(self, pool) -> None:
+        built = builders.event(provider_event_id="e-1")
+        async with pool.acquire() as conn:
+            await store.upsert_event(conn, built, resume=True)
+            await store.end_tracking(conn, "e-1")
+
+            await store.upsert_event(conn, built, resume=True)
+
+            [event] = await store.load_events(conn, provider_event_id="e-1", include_ended=True)
+        assert event.tracking_ended_at is None, "the history stayed, so this continues a series"
+
+
 class TestSamples:
     @pytest.mark.db
     async def test_the_same_moment_from_two_directions_stays_one_row(self, db) -> None:

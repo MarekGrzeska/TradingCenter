@@ -22,4 +22,4 @@
 ## 4. Prawda w plikach
 
 - [x] 4.1 README modułu i `docs/architecture.md` — bezprzedmiotowe, żaden nie wymienia liczby okien. Wymieniał ją opis narzędzia `get_price_changes`, który model czyta, i to zostało poprawione
-- [ ] 4.2 `review.md`
+- [x] 4.2 `review.md`

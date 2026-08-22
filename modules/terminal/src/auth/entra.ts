@@ -99,17 +99,29 @@ export function createEntraIdentities(config: EntraConfig): EntraIdentities {
       moveTo("signed-in");
       return result.accessToken;
     } catch (cause) {
-      // The two MSAL spells for "this cannot be fixed without the operator".
-      // Anything else — a network blip on the token endpoint — is not a signed-out
-      // session and must not be reported as one, or a flaky minute would send
-      // somebody through a sign-in they did not need.
-      if (
-        cause instanceof InteractionRequiredAuthError ||
-        (cause instanceof BrowserAuthError && cause.errorCode === "no_account_error")
-      ) {
+      // The account itself is gone: there is no session, whichever module was being asked
+      // for. This one really is a sign-out.
+      if (cause instanceof BrowserAuthError && cause.errorCode === "no_account_error") {
         adopt(null);
         throw new SignedOut();
       }
+
+      // Interaction required is **per resource** now that each module has its own audience.
+      // Dropping the shared account here would mean a missing consent for one back end
+      // signing the operator out of the whole terminal — a tab they never opened taking the
+      // chart down with it. Only the scope the session was established against says
+      // anything about the session.
+      if (cause instanceof InteractionRequiredAuthError) {
+        if (scope === config.scopes.archive) {
+          adopt(null);
+          throw new SignedOut();
+        }
+        throw cause;
+      }
+
+      // Anything else — a network blip on the token endpoint — is not a signed-out session
+      // and must not be reported as one, or a flaky minute would send somebody through a
+      // sign-in they did not need.
       throw cause;
     }
   }

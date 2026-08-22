@@ -144,6 +144,28 @@ class TestTheTick:
         assert fake.event_calls == []
 
 
+class TestATickIsAWindowNotAnInstant:
+    async def test_consecutive_ticks_merge_into_one_collected_range(self, pool) -> None:
+        """Recorded as an instant, two ticks a minute apart never touched, so nothing ever
+        merged: `collected_ranges` grew a row per outcome per minute — some 368k a day for
+        one 256-outcome event — and `is_collected` answered false for the 59 seconds between
+        them. A tick stands for the interval it samples, which is what makes it adjacent to
+        the last."""
+        payload = fakes.event_payload(markets=(fakes.market_payload("m-1", prices=("0.6", "0.4")),))
+        event_id = await track(pool, payload)
+        fake = fakes.FakeProvider({"e-1": payload})
+        sampler = ingest(pool, fake)
+
+        await sampler.tick()
+        await sampler.tick()
+
+        async with pool.acquire() as conn:
+            outcomes = await store.outcomes_of_event(conn, event_id)
+            ranges = await store.collected_ranges(conn, outcomes[0][0])
+
+        assert len(ranges) == 1, "two ticks, one range — they touch"
+
+
 class TestBackfill:
     async def test_a_window_is_asked_for_in_provider_sized_pieces(self, pool) -> None:
         """Fifteen days is the provider's cap between startTs and endTs — measured, and on
@@ -233,6 +255,31 @@ class TestBackfill:
             _, _, oldest = (await store.outcomes_of_event(conn, event_id))[0]
         assert oldest is not None
         assert abs((oldest - first_point).total_seconds()) < 1
+
+
+class TestTheProvidersOwnBoundary:
+    async def test_a_backfill_does_not_reach_before_what_the_provider_admits_to(
+        self, pool
+    ) -> None:
+        """The clamp was inverted — `since >= oldest` then `max(since, oldest)` is `since`,
+        a guaranteed no-op — so the boundary the provider taught us limited nothing and every
+        restart re-requested the same known-empty windows."""
+        payload = fakes.event_payload(markets=(fakes.market_payload("m-1", prices=("0.6", "0.4")),))
+        event_id = await track(pool, payload)
+        oldest = _now() - timedelta(days=3)
+        async with pool.acquire() as conn:
+            outcomes = await store.outcomes_of_event(conn, event_id)
+            for outcome_id, _token, _oldest in outcomes:
+                await store.note_oldest_available(conn, outcome_id, oldest)
+
+        fake = fakes.FakeProvider({"e-1": payload})
+        await ingest(pool, fake).backfill_event(event_id, since=_now() - timedelta(days=60))
+
+        asked_from = [since for _token, since, _until in fake.history_calls]
+        assert asked_from, "the backfill did ask for something"
+        assert min(asked_from) >= oldest - timedelta(seconds=1), (
+            "nothing older than the provider's own boundary was requested"
+        )
 
 
 class TestClosingTheGapARestartLeaves:

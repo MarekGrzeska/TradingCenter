@@ -111,6 +111,30 @@ describe("createEntraIdentities", () => {
     expect(identities.for(config.scopes.polymarket).state()).toBe("signed-out");
   });
 
+  it("does not sign the operator out when one module needs a consent it has not got", async () => {
+    // Per-resource since the audiences were split: a tab nobody opened would otherwise take
+    // the chart down with it the first time its scope was unauthorized.
+    const identities = await signedIn();
+    acquireTokenSilent.mockRejectedValueOnce(
+      new InteractionRequiredAuthError("consent_required", "consent needed"),
+    );
+
+    await expect(identities.for(config.scopes.polymarket).token()).rejects.not.toBeInstanceOf(
+      SignedOut,
+    );
+    expect(identities.shared.state()).toBe("signed-in");
+  });
+
+  it("still signs out when the scope the session was established against needs interaction", async () => {
+    const identities = await signedIn();
+    acquireTokenSilent.mockRejectedValueOnce(
+      new InteractionRequiredAuthError("interaction_required", "sign in again"),
+    );
+
+    await expect(identities.shared.token()).rejects.toBeInstanceOf(SignedOut);
+    expect(identities.shared.state()).toBe("signed-out");
+  });
+
   it("asks the redirect for one resource, and the rest silently", async () => {
     const identities = await signedIn();
 

@@ -69,10 +69,10 @@
 
 ## 9. Wdrożenie i sprawdzenie
 
-- [ ] 9.1 `apply` operatora — zakres, pre-autoryzacja i listy wołających **przed** wdrożeniem terminala
-- [ ] 9.2 Wdrożenie terminala; logowanie przechodzi bez dodatkowej zgody
-- [ ] 9.3 Sprawdzenie, że zakładki kont, zespołów i wykresu działają dalej po rozdziale zakresów
-- [ ] 9.4 Sprawdzenie zakładki: lista, zmiany w oknach, przebieg z granicą pokrycia
-- [ ] 9.5 Sprawdzenie odmów: wołający bez uprawnienia do REST odróżniony od modułu nieosiągalnego
+- [x] 9.1 `apply` operatora — zakres, pre-autoryzacja i listy wołających **przed** wdrożeniem terminala
+- [x] 9.2 Wdrożenie terminala; logowanie przechodzi bez dodatkowej zgody
+- [x] 9.3 Sprawdzenie, że zakładki kont, zespołów i wykresu działają dalej po rozdziale zakresów
+- [x] 9.4 Sprawdzenie zakładki: lista, zmiany w oknach, przebieg z granicą pokrycia
+- [x] 9.5 Sprawdzenie odmów: wołający bez uprawnienia do REST odróżniony od modułu nieosiągalnego
 - [ ] 9.6 Zdjęcie ustępstwa w gatewayu — osobny `apply`, po 9.3
-- [ ] 9.7 `review.md` — co zmierzono, co odpowiedziało po wdrożeniu, i test na każdy scenariusz albo nazwana luka
+- [x] 9.7 `review.md` — co zmierzono, co odpowiedziało po wdrożeniu, i test na każdy scenariusz albo nazwana luka

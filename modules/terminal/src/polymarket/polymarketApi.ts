@@ -311,7 +311,12 @@ export function createPolymarketApi(
     async listEvents(signal, options) {
       const query = new URLSearchParams();
       if (options?.groupId !== undefined) query.set("group_id", String(options.groupId));
-      if (options?.includeEnded) query.set("include_ended", "true");
+      // Sent whenever it was asked for, not only when true: the module defaults it to
+      // `true`, so a falsy check made `includeEnded: false` unsendable — the one value a
+      // caller would bother passing.
+      if (options?.includeEnded !== undefined) {
+        query.set("include_ended", String(options.includeEnded));
+      }
       const suffix = query.size === 0 ? "" : `?${query}`;
       const raw = await http.json<Schemas["TrackedEventOut"][]>(`${httpBase}/events${suffix}`, {
         signal,

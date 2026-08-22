@@ -10,4 +10,4 @@
 
 ## 2. Prawda w plikach
 
-- [ ] 2.1 `review.md`
+- [x] 2.1 `review.md`
