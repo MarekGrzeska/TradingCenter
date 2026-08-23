@@ -76,8 +76,7 @@ function fakeApi(overrides: Partial<PolymarketApi> = {}): PolymarketApi {
     changes: async () => ({ eventId: 1, outcomes: [] }) as EventChanges,
     history: async () => ({ outcomeId: 7, points: [], collectedFrom: null, collectedTo: null }),
     trackEvent: async () => ({ event: event(), alreadyTracked: false }),
-    endTracking: async () => event(),
-    deleteHistory: async () => ({ samplesDeleted: 0, rangesDeleted: 0 }),
+    removeEvent: async () => {},
     listGroups: async () => [] as Group[],
     createGroup: async () => ({ id: 1, name: "macro", eventCount: 0 }),
     deleteGroup: async () => {},
@@ -147,6 +146,7 @@ describe("PolymarketView", () => {
     ];
 
     render(<PolymarketView api={fakeApi({ snapshot: async () => fresh })} />);
+    await unfold();
 
     expect(await screen.findByText("71.0%")).toBeInTheDocument();
     expect(screen.queryByText("62.0%")).not.toBeInTheDocument();
@@ -248,41 +248,26 @@ describe("PolymarketView", () => {
     await waitFor(() => expect(changes).toHaveBeenCalledTimes(1));
   });
 
-  it("starts collapsed, and a collapsed event still carries a priced outcome", async () => {
+  it("starts collapsed, carrying what identifies the observation and no price", async () => {
     render(<PolymarketView api={fakeApi()} />);
 
-    // Collapsed is not hidden: a fold that cost a click to learn nothing would be worse
-    // than no fold at all. One bar — the market's quoted outcome — not one per outcome.
-    expect(await screen.findByText("62.0%")).toBeInTheDocument();
-    expect(screen.getAllByRole("meter")).toHaveLength(1);
+    // A summary quoting one outcome per market is a market reduced to a single "for"
+    // price, which the unfolded view is forbidden to do. Folding is not an exception to
+    // that rule, only the easiest place to slip past it.
+    expect(await screen.findByText("Fed cuts in March")).toBeInTheDocument();
+    expect(screen.getByText("collecting")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove" })).toBeInTheDocument();
+    expect(screen.queryByText("62.0%")).not.toBeInTheDocument();
+    expect(screen.queryAllByRole("meter")).toHaveLength(0);
+  });
+
+  it("shows the prices once the event is unfolded", async () => {
+    render(<PolymarketView api={fakeApi()} />);
 
     await unfold();
 
-    await waitFor(() => expect(screen.getAllByRole("meter").length).toBeGreaterThan(1));
-  });
-
-  it("names the outcome a collapsed price is about, and quotes Yes rather than the leader", async () => {
-    // The bug this is for: quoting whichever outcome leads makes the line change its
-    // subject as the market crosses 50%, so a fold read "100%" while what it was about had
-    // silently become `No`.
-    const lopsided = event({
-      markets: [
-        {
-          id: 4,
-          question: "Will the Fed cut in March?",
-          label: "March cut",
-          negRisk: false,
-          resolvedOutcome: null,
-          outcomes: [outcome(7, "Yes", 0.03), outcome(8, "No", 0.97)],
-        },
-      ],
-    });
-
-    render(<PolymarketView api={fakeApi({ listEvents: async () => [lopsided] })} />);
-
-    expect(await screen.findByText("March cut · Yes")).toBeInTheDocument();
-    expect(screen.getByText("3.0%")).toBeInTheDocument();
-    expect(screen.queryByText("97.0%")).not.toBeInTheDocument();
+    expect(await screen.findByText("62.0%")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getAllByRole("meter").length).toBeGreaterThan(0));
   });
 
   it("keeps an event unfolded across a refresh of the list", async () => {
@@ -396,35 +381,6 @@ describe("PolymarketView", () => {
 
     expect(await screen.findByText(/every market of this event has resolved/i)).toBeInTheDocument();
     expect(screen.getByText(/what was collected is still here/i)).toBeInTheDocument();
-  });
-
-  it("quotes a live market in the collapsed line, not one that finished in August", async () => {
-    const mixed = event({
-      markets: [
-        {
-          id: 2,
-          question: "Cut in August?",
-          label: "August 6",
-          negRisk: false,
-          resolvedOutcome: "No",
-          outcomes: [outcome(3, "Yes", 0), outcome(4, "No", 1)],
-        },
-        {
-          id: 1,
-          question: "Cut in March?",
-          label: "March",
-          negRisk: false,
-          resolvedOutcome: null,
-          outcomes: [outcome(1, "Yes", 0.4), outcome(2, "No", 0.6)],
-        },
-      ],
-    });
-
-    render(<PolymarketView api={fakeApi({ listEvents: async () => [mixed] })} />);
-
-    expect(await screen.findByText("March · Yes")).toBeInTheDocument();
-    expect(screen.getByText("40.0%")).toBeInTheDocument();
-    expect(screen.queryByText("100.0%")).not.toBeInTheDocument();
   });
 
   it("draws the probability as well as writing it, and draws nothing when there is none", async () => {

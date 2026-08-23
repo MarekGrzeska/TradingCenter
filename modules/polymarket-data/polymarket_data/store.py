@@ -64,7 +64,7 @@ async def assign_group(conn: Conn, event_id: int, group_id: int | None) -> bool:
 
 
 async def upsert_event(
-    conn: Conn, event: Event, *, group_id: int | None = None, resume: bool = False
+    conn: Conn, event: Event, *, group_id: int | None = None
 ) -> int:
     """The event with its whole structure, in one transaction.
 
@@ -86,22 +86,13 @@ async def upsert_event(
                 slug = EXCLUDED.slug,
                 title = EXCLUDED.title,
                 group_id = COALESCE(EXCLUDED.group_id, tracked_events.group_id),
-                refreshed_at = now(),
-                -- **Only the act of tracking resumes an observation.** Tracking the same
-                -- event again does resume it — the history stayed, so it continues a series
-                -- rather than starting one — but the sampler calls this every tick to
-                -- refresh an event's markets, and clearing the column there silently
-                -- resurrected an observation the operator had just ended, if they ended it
-                -- while a tick was in flight.
-                tracking_ended_at =
-                    CASE WHEN $5 THEN NULL ELSE tracked_events.tracking_ended_at END
+                refreshed_at = now()
             RETURNING id
             """,
             event.provider_event_id,
             event.slug,
             event.title,
             group_id,
-            resume,
         )
         event_id = row["id"]
 
@@ -158,7 +149,6 @@ async def load_events(
     conn: Conn,
     *,
     group_id: int | None = None,
-    include_ended: bool = True,
     provider_event_id: str | None = None,
 ) -> list[Event]:
     """Every tracked event with its markets and outcomes, in three queries rather than
@@ -166,16 +156,14 @@ async def load_events(
     events = await conn.fetch(
         """
         SELECT e.id, e.provider_event_id, e.slug, e.title, e.group_id, g.name AS group_name,
-               e.tracked_at, e.tracking_ended_at, e.refreshed_at
+               e.tracked_at, e.refreshed_at
         FROM tracked_events e
         LEFT JOIN observation_groups g ON g.id = e.group_id
         WHERE ($1::bigint IS NULL OR e.group_id = $1)
-          AND ($2::boolean OR e.tracking_ended_at IS NULL)
-          AND ($3::text IS NULL OR e.provider_event_id = $3)
+          AND ($2::text IS NULL OR e.provider_event_id = $2)
         ORDER BY e.tracked_at, e.id
         """,
         group_id,
-        include_ended,
         provider_event_id,
     )
     if not events:
@@ -238,7 +226,6 @@ async def load_events(
             group_id=row["group_id"],
             group_name=row["group_name"],
             tracked_at=row["tracked_at"],
-            tracking_ended_at=row["tracking_ended_at"],
             refreshed_at=row["refreshed_at"],
             markets=tuple(by_event.get(row["id"], ())),
         )
@@ -249,23 +236,24 @@ async def load_events(
 async def count_tracked(conn: Conn) -> int:
     """Events under observation right now. The ceiling counts these, not markets — one
     provider request covers an event however many markets hang off it."""
-    return (
-        await conn.fetchval(
-            "SELECT count(*) FROM tracked_events WHERE tracking_ended_at IS NULL"
-        )
-        or 0
-    )
+    return await conn.fetchval("SELECT count(*) FROM tracked_events") or 0
 
 
-async def end_tracking(conn: Conn, provider_event_id: str) -> bool:
-    """Stops the sampling. Touches not one sample — deleting history is a separate act, on
-    a different surface, and no tool can reach it."""
+async def remove_event(conn: Conn, provider_event_id: str) -> bool:
+    """The observation and everything collected for it. `False` when there was no such one.
+
+    **One statement, and the atomicity is the schema's.** `markets`, `outcomes`,
+    `price_samples`, `collected_ranges` and `sampling_state` all cascade from this row, so
+    there is no order to get wrong and no half-done state to leave behind. Doing it as a
+    sequence of deletes in Python would be the same act made of four, and the one that can
+    fail between two of them — leaving history without its observation, or the reverse
+    (`openspec/specs/polymarket-data-tracking`, "Usunięcie obserwacji zabiera wszystko").
+
+    The one act in this module that cannot be undone, and the only way an event leaves the
+    list. No tool reaches it.
+    """
     result = await conn.execute(
-        """
-        UPDATE tracked_events SET tracking_ended_at = now()
-        WHERE provider_event_id = $1 AND tracking_ended_at IS NULL
-        """,
-        provider_event_id,
+        "DELETE FROM tracked_events WHERE provider_event_id = $1", provider_event_id
     )
     return result.endswith(" 1")
 
@@ -293,7 +281,7 @@ async def sampleable_outcomes(conn: Conn) -> list[tuple[int, str, int]]:
         FROM outcomes o
         JOIN markets m ON m.id = o.market_id
         JOIN tracked_events e ON e.id = m.event_id
-        WHERE e.tracking_ended_at IS NULL AND m.resolved_outcome IS NULL
+        WHERE m.resolved_outcome IS NULL
         ORDER BY e.id, m.id, o.position
         """
     )
@@ -369,7 +357,7 @@ async def history(
     ]
 
 
-async def latest_samples(conn: Conn, *, include_ended: bool = False) -> dict[int, Sample]:
+async def latest_samples(conn: Conn) -> dict[int, Sample]:
     """The newest sample of every tracked outcome, in one query.
 
     The snapshot the terminal opens on. A request per event would be a request per row of
@@ -382,11 +370,8 @@ async def latest_samples(conn: Conn, *, include_ended: bool = False) -> dict[int
         FROM price_samples s
         JOIN outcomes o ON o.id = s.outcome_id
         JOIN markets m ON m.id = o.market_id
-        JOIN tracked_events e ON e.id = m.event_id
-        WHERE ($1::boolean OR e.tracking_ended_at IS NULL)
         ORDER BY s.outcome_id, s.observed_at DESC
-        """,
-        include_ended,
+        """
     )
     return {
         row["outcome_id"]: Sample(
@@ -586,7 +571,7 @@ async def sampleable_events(conn: Conn) -> list[tuple[int, str]]:
         SELECT DISTINCT e.id, e.provider_event_id
         FROM tracked_events e
         JOIN markets m ON m.event_id = e.id
-        WHERE e.tracking_ended_at IS NULL AND m.resolved_outcome IS NULL
+        WHERE m.resolved_outcome IS NULL
         ORDER BY e.id
         """
     )

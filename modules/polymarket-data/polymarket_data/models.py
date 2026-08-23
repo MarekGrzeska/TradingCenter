@@ -79,12 +79,7 @@ class Event:
     group_id: int | None = None
     group_name: str | None = None
     tracked_at: datetime | None = None
-    tracking_ended_at: datetime | None = None
     refreshed_at: datetime | None = None
-
-    @property
-    def tracking(self) -> bool:
-        return self.tracking_ended_at is None
 
     @property
     def resolved(self) -> bool:

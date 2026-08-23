@@ -92,37 +92,58 @@ class TestStructure:
         assert await db.fetchval("SELECT count(*) FROM price_samples") == 1
         # And the event stays on the list, marked, rather than disappearing from it.
         [loaded] = await store.load_events(db)
-        assert loaded.resolved and loaded.tracking
+        assert loaded.resolved
 
 
-class TestEndingAnObservationSticks:
-    async def test_the_samplers_refresh_does_not_resurrect_an_ended_observation(
-        self, pool
-    ) -> None:
-        """`upsert_event` cleared `tracking_ended_at` unconditionally, and the sampler calls
-        it every tick to refresh an event's markets — so an observation ended while a tick
-        was in flight came back and kept being sampled. Only tracking resumes now."""
-        built = builders.event(provider_event_id="e-1")
-        async with pool.acquire() as conn:
-            await store.upsert_event(conn, built, resume=True)
-            await store.end_tracking(conn, "e-1")
+class TestRemovingAnObservation:
+    """The only way an event leaves the list, and it takes everything with it.
 
-            # What the tick does: refresh the structure, without asking to resume.
-            await store.upsert_event(conn, built)
+    What used to be here was three tests about an ending that stuck — a state produced by a
+    route and a tool that both existed to produce it. Neither exists now, so neither does
+    the state (`openspec/changes/an-observation-is-collected-or-gone`).
+    """
 
-            [event] = await store.load_events(conn, provider_event_id="e-1", include_ended=True)
-        assert event.tracking_ended_at is not None, "an ended observation stays ended"
+    @pytest.mark.db
+    async def test_removal_takes_the_markets_outcomes_samples_and_ranges(self, db) -> None:
+        """One statement, and the atomicity is the schema's: everything below the event
+        cascades from it, so there is no order to get wrong."""
+        event_id = await store.upsert_event(db, builders.event(provider_event_id="e-1"))
+        [yes_id, _] = await outcome_ids(db, event_id)
+        await store.record_samples(
+            db,
+            [Sample(outcome_id=yes_id, observed_at=NOON, midpoint=Decimal("0.4"),
+                    source=Surface.GAMMA)],
+        )
+        await store.record_collected(db, yes_id, NOON, NOON + timedelta(hours=1))
 
-    async def test_tracking_it_again_does_resume_it(self, pool) -> None:
-        built = builders.event(provider_event_id="e-1")
-        async with pool.acquire() as conn:
-            await store.upsert_event(conn, built, resume=True)
-            await store.end_tracking(conn, "e-1")
+        assert await store.remove_event(db, "e-1")
 
-            await store.upsert_event(conn, built, resume=True)
+        assert await store.load_events(db) == []
+        for table in ("markets", "outcomes", "price_samples", "collected_ranges"):
+            assert await db.fetchval(f"SELECT count(*) FROM {table}") == 0, table
 
-            [event] = await store.load_events(conn, provider_event_id="e-1", include_ended=True)
-        assert event.tracking_ended_at is None, "the history stayed, so this continues a series"
+    @pytest.mark.db
+    async def test_removing_something_that_is_not_observed_says_so(self, db) -> None:
+        assert await store.remove_event(db, "never-tracked") is False
+
+    @pytest.mark.db
+    async def test_tracking_it_again_after_removal_starts_from_nothing(self, db) -> None:
+        """The difference worth stating: ending an observation used to keep the history, so
+        re-tracking continued a series. After a removal there is no series to continue."""
+        event_id = await store.upsert_event(db, builders.event(provider_event_id="e-2"))
+        [yes_id, _] = await outcome_ids(db, event_id)
+        await store.record_samples(
+            db,
+            [Sample(outcome_id=yes_id, observed_at=NOON, midpoint=Decimal("0.6"),
+                    source=Surface.GAMMA)],
+        )
+        await store.remove_event(db, "e-2")
+
+        again = await store.upsert_event(db, builders.event(provider_event_id="e-2"))
+        [fresh_yes, _] = await outcome_ids(db, again)
+
+        assert await store.history(db, fresh_yes, since=NOON, until=NOON) == []
+        assert await store.collected_ranges(db, fresh_yes) == []
 
 
 class TestSamples:
@@ -209,9 +230,11 @@ class TestSamples:
         assert all(sample.observed_at == NOON for sample in latest.values())
 
     @pytest.mark.db
-    async def test_an_ended_observation_is_out_of_the_snapshot_and_still_readable(
+    async def test_a_removed_observation_is_out_of_the_snapshot_and_out_of_the_history(
         self, db
     ) -> None:
+        """Both, and that is the point: there is no longer a state where the snapshot has
+        dropped an event whose history is still readable."""
         event_id = await store.upsert_event(db, builders.event(provider_event_id="e-4"))
         [yes_id, _] = await outcome_ids(db, event_id)
         await store.record_samples(
@@ -220,10 +243,10 @@ class TestSamples:
                     source=Surface.GAMMA)],
         )
 
-        assert await tracking.untrack(db, "e-4")
+        assert await store.remove_event(db, "e-4")
 
         assert await store.latest_samples(db) == {}
-        assert len(await store.history(db, yes_id, since=NOON, until=NOON)) == 1
+        assert await store.history(db, yes_id, since=NOON, until=NOON) == []
 
 
 class TestWhatWasActuallyCollected:
@@ -304,9 +327,9 @@ class TestDeletion:
         assert (samples, ranges) == (2, 1)
         assert await db.fetchval("SELECT count(*) FROM price_samples") == 0
         assert await db.fetchval("SELECT count(*) FROM collected_ranges") == 0
-        # The observation itself survives — deleting data and ending an observation are
-        # two different acts.
-        assert (await store.load_events(db))[0].tracking
+        # The observation itself survives. Deleting its data and removing it are still two
+        # different acts — the second is the one that takes the event with it.
+        assert len(await store.load_events(db)) == 1
 
     @pytest.mark.db
     async def test_a_deleted_period_stops_reading_as_collected(self, db) -> None:
@@ -335,7 +358,7 @@ class TestGroups:
         assert await store.delete_group(db, group.id)
 
         [loaded] = await store.load_events(db)
-        assert loaded.tracking and loaded.group_id is None
+        assert loaded.group_id is None
         assert await db.fetchval("SELECT count(*) FROM price_samples") == 1
 
     @pytest.mark.db
@@ -355,7 +378,7 @@ class TestTheCeiling:
         await store.upsert_event(db, builders.event(provider_event_id="e-a"))
         await store.upsert_event(db, builders.event(provider_event_id="e-b"))
 
-        with pytest.raises(tracking.LimitReached, match="End the observation of one"):
+        with pytest.raises(tracking.LimitReached, match="the operator's to do"):
             await tracking.track(db, builders.event(provider_event_id="e-c"),
                                  max_tracked_events=2)
 
@@ -374,9 +397,11 @@ class TestTheCeiling:
         assert already is True
 
     @pytest.mark.db
-    async def test_an_ended_observation_frees_a_place(self, db) -> None:
+    async def test_removing_an_observation_frees_a_place(self, db) -> None:
+        """The only way one is freed now, and the reason the refusal sends the model to the
+        operator: freeing a place costs somebody's collected history."""
         await store.upsert_event(db, builders.event(provider_event_id="e-e"))
-        await tracking.untrack(db, "e-e")
+        await store.remove_event(db, "e-e")
 
         event_id, already = await tracking.track(
             db, builders.event(provider_event_id="e-f"), max_tracked_events=1
@@ -384,21 +409,3 @@ class TestTheCeiling:
 
         assert already is False
         assert event_id is not None
-
-    @pytest.mark.db
-    async def test_tracking_again_resumes_and_keeps_the_history(self, db) -> None:
-        event_id = await store.upsert_event(db, builders.event(provider_event_id="e-g"))
-        [yes_id, _] = await outcome_ids(db, event_id)
-        await store.record_samples(
-            db,
-            [Sample(outcome_id=yes_id, observed_at=NOON, midpoint=Decimal("0.6"),
-                    source=Surface.GAMMA)],
-        )
-        await tracking.untrack(db, "e-g")
-
-        await tracking.track(db, builders.event(provider_event_id="e-g"),
-                             max_tracked_events=10)
-
-        [loaded] = await store.load_events(db)
-        assert loaded.tracking
-        assert len(await store.history(db, yes_id, since=NOON, until=NOON)) == 1

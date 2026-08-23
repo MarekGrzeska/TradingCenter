@@ -129,3 +129,75 @@ async def test_the_chain_comes_back_down_and_up_again(empty_database_url: str) -
         assert await applied_heads(conn) == expected_heads(MIGRATIONS)
     finally:
         await conn.close()
+
+
+@pytest.mark.db
+async def test_0003_takes_the_stopped_observations_and_leaves_the_rest(
+    empty_database_url: str,
+) -> None:
+    """The one migration in this module that deletes collected history.
+
+    It runs once, against whatever a production database happens to hold, and there is no
+    second chance to get it right — so it is walked here rather than reasoned about: a
+    stopped observation goes with everything under it, a live one is untouched, and the
+    column that told them apart is gone afterwards.
+    """
+    from alembic import command
+    from tc_runtime.migrate import alembic_config
+
+    url = sqlalchemy_url(empty_database_url)
+    await asyncio.to_thread(command.upgrade, alembic_config(MIGRATIONS, url), "0002")
+
+    conn = await asyncpg.connect(asyncpg_dsn(empty_database_url))
+    try:
+        for provider_event_id, stopped in (("gone", True), ("kept", False)):
+            event_id = await conn.fetchval(
+                """
+                INSERT INTO tracked_events (provider_event_id, slug, title, tracking_ended_at)
+                VALUES ($1, $1, $1, CASE WHEN $2 THEN now() ELSE NULL END)
+                RETURNING id
+                """,
+                provider_event_id,
+                stopped,
+            )
+            market_id = await conn.fetchval(
+                """
+                INSERT INTO markets (event_id, provider_market_id, condition_id, question)
+                VALUES ($1, $2, $2, 'q') RETURNING id
+                """,
+                event_id,
+                f"m-{provider_event_id}",
+            )
+            outcome_id = await conn.fetchval(
+                """
+                INSERT INTO outcomes (market_id, position, name, token_id)
+                VALUES ($1, 0, 'Yes', $2) RETURNING id
+                """,
+                market_id,
+                f"t-{provider_event_id}",
+            )
+            await conn.execute(
+                """
+                INSERT INTO price_samples (outcome_id, observed_at, midpoint, source)
+                VALUES ($1, now(), 0.5, 'gamma')
+                """,
+                outcome_id,
+            )
+
+        await asyncio.to_thread(command.upgrade, alembic_config(MIGRATIONS, url), "head")
+
+        assert [
+            row["provider_event_id"]
+            for row in await conn.fetch("SELECT provider_event_id FROM tracked_events")
+        ] == ["kept"]
+        # The cascade is what makes this one act rather than four, so the sample of the
+        # stopped one has to be gone too — and the kept one's has to still be there.
+        assert await conn.fetchval("SELECT count(*) FROM price_samples") == 1
+        assert await conn.fetchval(
+            """
+            SELECT count(*) FROM information_schema.columns
+            WHERE table_name = 'tracked_events' AND column_name = 'tracking_ended_at'
+            """
+        ) == 0
+    finally:
+        await conn.close()

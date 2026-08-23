@@ -147,11 +147,6 @@ export interface TrackResult {
   alreadyTracked: boolean;
 }
 
-export interface DeletionResult {
-  samplesDeleted: number;
-  rangesDeleted: number;
-}
-
 // --- wire → domain --------------------------------------------------------------------
 
 /** A moment, or `null`. Kept in one place because every shape here has at least one, and
@@ -289,11 +284,15 @@ export interface PolymarketApi {
     range?: { since?: Date; until?: Date },
   ): Promise<History>;
   trackEvent(reference: string, signal: AbortSignal, group?: string): Promise<TrackResult>;
-  /** Stops the sampling and returns the event as it now stands. **No sample is
-   *  deleted** — that is `deleteHistory`, and keeping them apart is the whole reason a
-   *  button called "stop" may not read as a button called "delete". */
-  endTracking(providerEventId: string, signal: AbortSignal): Promise<TrackedEvent>;
-  deleteHistory(providerEventId: string, signal: AbortSignal): Promise<DeletionResult>;
+  /** The observation and everything collected for it, in one act — **the only way an event
+   *  leaves the list**, and the one call here that cannot be undone.
+   *
+   *  There is no counterpart that stops the sampling and keeps the samples: it produced an
+   *  observation that neither collected nor left, and the module no longer offers it. There
+   *  is also no call that deletes the history and keeps the observation; the module's
+   *  contract still has one, and this client deliberately does not — a method with no caller
+   *  is a road somebody takes later, not knowing it was left behind on purpose. */
+  removeEvent(providerEventId: string, signal: AbortSignal): Promise<void>;
   listGroups(signal: AbortSignal): Promise<Group[]>;
   createGroup(name: string, signal: AbortSignal): Promise<Group>;
   deleteGroup(groupId: number, signal: AbortSignal): Promise<void>;
@@ -367,20 +366,13 @@ export function createPolymarketApi(
       return { event: mapEvent(raw.event), alreadyTracked: raw.already_tracked };
     },
 
-    async endTracking(providerEventId, signal) {
-      const raw = await http.json<Schemas["TrackedEventOut"]>(
-        `${httpBase}/events/${encodeURIComponent(providerEventId)}/tracking`,
-        { signal, method: "DELETE" },
-      );
-      return mapEvent(raw);
-    },
-
-    async deleteHistory(providerEventId, signal) {
-      const raw = await http.json<Schemas["DeletionResult"]>(
-        `${httpBase}/events/${encodeURIComponent(providerEventId)}/history`,
-        { signal, method: "DELETE" },
-      );
-      return { samplesDeleted: raw.samples_deleted, rangesDeleted: raw.ranges_deleted };
+    async removeEvent(providerEventId, signal) {
+      // `send` rather than `json`: the module answers 204, because what it could return
+      // about a thing that no longer exists is a shape somebody would be tempted to read.
+      await http.send(`${httpBase}/events/${encodeURIComponent(providerEventId)}`, {
+        signal,
+        method: "DELETE",
+      });
     },
 
     async listGroups(signal) {

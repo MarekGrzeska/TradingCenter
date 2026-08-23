@@ -28,26 +28,35 @@ each market with one or more outcomes, each outcome with a price. A binary marke
 special case of two outcomes, not the shape everything else is trimmed to.
 
 Collection is a decision, never a side effect. Searching the provider's public database
-through this module collects nothing; only tracking an event does. Ending the tracking
-stops the sampling and **keeps every sample already collected** — deleting data is a
-separate act, on the REST contract, and no tool can do it.
+through this module collects nothing; only tracking an event does.
 
-## Nine tools, three of which write
+**An observation is collected, or it is gone.** There is no third state and no act that
+produces one: removing an observation takes the event, its markets, its outcomes and every
+sample collected for it, in one indivisible act on the REST contract. Stopping the sampling
+and keeping the samples used to be a separate act; it produced a row that neither collected
+nor left the list, and it is gone with the state it made.
+
+## Eight tools, two of which write
 
 Six read: search the provider's public database live, browse by tag, list what is tracked,
-open one event, read an outcome's history, read its changes over a window. Three change the
-**list of observations** — track an event, stop tracking one, create a group.
+open one event, read an outcome's history, read its changes over a window. Two change the
+**list of observations** — track an event and create a group — and both of them only add to
+it.
 
 That is a deliberate departure from `market-data`, whose specification says outright that
 its tool set only reads, and it is named here rather than smuggled into the code. The rule
 there is about the candle archive: a tool that wrote would be a tool that mutated it. Here
 the writing tools change the same list an operator clicks in the terminal, and the hard
 line is drawn somewhere else instead — **no tool deletes collected history**, and none of
-the nine touches money, because this system trades nothing on Polymarket.
+the eight touches money, because this system trades nothing on Polymarket. Since the only
+way off the observation list takes that history with it, a tool for it would be a tool that
+deletes history; that is why `untrack_event` is not here any more.
 
 A ceiling on how many events may be tracked exists for the same reason the writing tools
 do: "track whatever looks interesting" is a sentence a model can mean literally. Refusing
-is cheap; an invisible growth in load is not.
+is cheap; an invisible growth in load is not. The refusal sends the model to the operator
+rather than telling it to free a place: freeing one now costs somebody's collected history,
+and it used to cost it silently.
 
 Which caller reaches which surface is the module's own record, route by route
 (`polymarket_data/caller_access.py`), not the platform's: Easy Auth authorizes an

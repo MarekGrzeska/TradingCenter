@@ -77,7 +77,7 @@ async def _project(ctx: ToolContext, payloads: list[dict]) -> list[PublicEvent]:
     async with ctx.pool.acquire() as conn:
         tracked = {
             event.provider_event_id
-            for event in await store.load_events(conn, include_ended=False)
+            for event in await store.load_events(conn)
         }
     return [
         PublicEvent(

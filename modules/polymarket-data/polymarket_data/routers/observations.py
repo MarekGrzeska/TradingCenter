@@ -25,14 +25,15 @@ def _settings(request: Request):
 
 @router.get("/events", response_model=list[TrackedEventOut])
 async def list_events(
-    request: Request, group_id: int | None = None, include_ended: bool = True
+    request: Request, group_id: int | None = None
 ) -> list[TrackedEventOut]:
+    """Every observation. There is no filter for stopped ones, because there are none:
+    an observation is collected or it is gone."""
     async with request.app.state.pool.acquire() as conn:
         return await views.tracked_events(
             conn,
             interval_seconds=_settings(request).sample_interval_seconds,
             group_id=group_id,
-            include_ended=include_ended,
         )
 
 
@@ -118,25 +119,31 @@ async def track_event(request: Request, body: TrackRequest) -> TrackResult:
 
 
 @router.delete(
-    "/events/{provider_event_id}/tracking",
-    response_model=TrackedEventOut,
+    "/events/{provider_event_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
     responses={404: {"model": Problem}},
 )
-async def end_tracking(request: Request, provider_event_id: str) -> TrackedEventOut:
-    """Stops the sampling. Touches not one sample."""
-    settings = _settings(request)
+async def remove_event(request: Request, provider_event_id: str) -> None:
+    """The observation and everything collected for it, in one indivisible act.
+
+    **The only way an event leaves the list**, and the second of the two acts in this module
+    that cannot be undone. There is no stopping without removing: an observation that neither
+    collects nor leaves is a row nobody can say the purpose of, and it used to be produced by
+    a route that existed to produce it (`openspec/specs/polymarket-data-tracking`).
+
+    A model cannot reach this. The tool surface writes to the observation list by adding to
+    it, and adding is the whole of what it does.
+
+    `204` rather than the removed event: what is returned about a thing that no longer exists
+    is a shape somebody will be tempted to read.
+    """
     async with request.app.state.pool.acquire() as conn:
-        if not await tracking.untrack(conn, provider_event_id):
+        if not await store.remove_event(conn, provider_event_id):
             raise HTTPException(
                 status.HTTP_404_NOT_FOUND,
-                detail=f"{provider_event_id} is not currently under observation",
+                detail=f"{provider_event_id} is not an event this module observes",
             )
-        [out] = await views.tracked_events(
-            conn,
-            interval_seconds=settings.sample_interval_seconds,
-            provider_event_id=provider_event_id,
-        )
-    return out
+    log.warning("observation removed with all of its history: %s", provider_event_id)
 
 
 @router.delete(

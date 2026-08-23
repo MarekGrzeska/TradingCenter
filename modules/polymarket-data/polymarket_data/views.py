@@ -36,8 +36,6 @@ def collection_state(
     moment = now or datetime.now(UTC)
     last = (state or {}).get("last_success_at")
 
-    if not event.tracking:
-        return CollectionOut(state="ended", last_sample_at=last)
     if event.resolved:
         return CollectionOut(state="resolved", last_sample_at=last)
 
@@ -58,18 +56,16 @@ async def tracked_events(
     *,
     interval_seconds: int,
     group_id: int | None = None,
-    include_ended: bool = True,
     provider_event_id: str | None = None,
 ) -> list[TrackedEventOut]:
     events = await store.load_events(
         conn,
         group_id=group_id,
-        include_ended=include_ended,
         provider_event_id=provider_event_id,
     )
     if not events:
         return []
-    samples = await store.latest_samples(conn, include_ended=True)
+    samples = await store.latest_samples(conn)
     states = await store.sampling_state(conn)
     return [
         TrackedEventOut.of(
@@ -89,7 +85,7 @@ async def snapshot(conn: Conn) -> SnapshotOut:
     The view the terminal opens on. A request per event would be a request per row, and one
     measured event holds 128 markets.
     """
-    events = await store.load_events(conn, include_ended=False)
+    events = await store.load_events(conn)
     samples: dict[int, Sample] = await store.latest_samples(conn)
     entries: list[SnapshotEntry] = []
     for event in events:
