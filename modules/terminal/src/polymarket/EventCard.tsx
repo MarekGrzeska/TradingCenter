@@ -2,10 +2,9 @@ import { useState } from "react";
 import { useRead } from "../data/query";
 import { Button } from "../ui/Button";
 import { showToast } from "../ui/toastStore";
-import { DeleteHistoryDialog } from "./DeleteHistoryDialog";
-import { EndTrackingDialog } from "./EndTrackingDialog";
 import { OutcomeHistory } from "./OutcomeHistory";
 import { ProbabilityBar } from "./ProbabilityBar";
+import { RemoveEventDialog } from "./RemoveEventDialog";
 import { WindowChanges } from "./WindowChanges";
 import type {
   EventChanges,
@@ -30,6 +29,17 @@ import { formatAge, formatProbability, isStale } from "./probability";
  * The seven windows are fetched when the card is opened, not with the list: they are one
  * request per event, and fifty events' worth of them is fifty requests for numbers nobody
  * has looked at yet.
+ *
+ * **Folded, the card carries no price at all** — the title, the group, whether prices are
+ * arriving and the way out. The summary that used to sit here quoted one outcome per market,
+ * which is a market reduced to a single "for" price: exactly what the unfolded view is
+ * forbidden to do. Folding is not an exception to that rule, only the easiest place to slip
+ * past it (specs/terminal-polymarket, "Zwinięty wiersz identyfikuje obserwację i nie udaje
+ * odczytu").
+ *
+ * **One way out, and it takes everything.** There is no stopping without removing: that
+ * produced an observation which neither collected nor left the list, and the module no
+ * longer offers it.
  */
 
 const NO_CHANGES: EventChanges = { eventId: 0, outcomes: [] };
@@ -56,8 +66,7 @@ export function EventCard({
   // nothing about now. The history behind them is the opposite of worthless — it is the
   // part the provider will not give back.
   const [showResolved, setShowResolved] = useState(false);
-  const [ending, setEnding] = useState(false);
-  const [deletingHistory, setDeletingHistory] = useState(false);
+  const [removing, setRemoving] = useState(false);
 
   const changes = useRead<EventChanges>({
     key: ["polymarket", "changes", event.providerEventId],
@@ -137,16 +146,12 @@ export function EventCard({
         >
           on polymarket.com
         </a>
-        <Button size="2xs" tone="quiet" onClick={() => setEnding(true)}>
-          Stop tracking
-        </Button>
-        {/* The only door to it in this system: no tool the model holds deletes a sample. */}
-        <Button size="2xs" tone="critical" onClick={() => setDeletingHistory(true)}>
-          Remove history
+        {/* The only door to it in this system: no tool the model holds removes an
+            observation, and removing one is what takes its history with it. */}
+        <Button size="2xs" tone="critical" onClick={() => setRemoving(true)}>
+          Remove
         </Button>
       </header>
-
-      {!open && <CollapsedSummary event={event} prices={prices} />}
 
       {open && (
         <div className="flex flex-col gap-3 px-3 py-2">
@@ -194,98 +199,18 @@ export function EventCard({
         </p>
       )}
 
-      {deletingHistory && (
-        <DeleteHistoryDialog
+      {removing && (
+        <RemoveEventDialog
           client={client}
           event={event}
-          onClose={() => setDeletingHistory(false)}
-          onDeleted={onChanged}
-        />
-      )}
-
-      {ending && (
-        <EndTrackingDialog
-          client={client}
-          event={event}
-          onClose={() => setEnding(false)}
-          onEnded={() => {
-            setEnding(false);
+          onClose={() => setRemoving(false)}
+          onRemoved={() => {
+            setRemoving(false);
             onChanged();
           }}
         />
       )}
     </article>
-  );
-}
-
-/**
- * One line, for an event nobody has opened.
- *
- * What it carries is the leading outcome of each market, up to a few — which is what an
- * operator scanning a dozen events is actually after, and is why collapsed is not the same
- * as hidden. A count alone ("3 markets") would make the fold cost a click to learn nothing.
- *
- * The leader is picked by price and the bar is drawn beside it, so the fold changes how much
- * is on screen and not what a number means.
- */
-function CollapsedSummary({
-  event,
-  prices,
-}: {
-  event: TrackedEvent;
-  prices: Map<number, SnapshotEntry>;
-}) {
-  // Live markets only. An event with one open market and nine settled ones would otherwise
-  // quote 100% on something that finished in August.
-  const live = event.markets.filter((market) => market.resolvedOutcome === null);
-  const leaders = (live.length > 0 ? live : event.markets)
-    .map((market) => {
-      const priced = market.outcomes
-        .map((outcome) => {
-          const live = prices.get(outcome.id);
-          return { outcome, price: live?.price ?? outcome.price, at: live?.priceAt ?? outcome.priceAt };
-        })
-        .filter((row) => row.price !== null);
-      if (priced.length === 0) return null;
-
-      // **A binary market is always quoted on Yes.** Quoting whichever outcome happens to
-      // lead makes the line change its subject as the market crosses 50% — the number stays
-      // large while what it is about flips, which is exactly how a fold ends up saying
-      // "100%" about `No` and reading as though it were about `Yes`.
-      const yes = priced.find((row) => row.outcome.name.toLowerCase() === "yes");
-      const chosen =
-        yes ?? [...priced].sort((a, b) => (b.price ?? 0) - (a.price ?? 0))[0];
-      return { market, ...chosen };
-    })
-    .filter((row) => row !== null)
-    .slice(0, 4);
-
-  if (leaders.length === 0) {
-    return (
-      <p className="px-3 py-1.5 text-xs text-ink-faint">Nothing collected for this event yet.</p>
-    );
-  }
-
-  return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 px-3 py-1.5 text-xs">
-      {leaders.map((row) => (
-        <li key={row.market.id} className="flex items-center gap-2">
-          {/* The outcome is always named. The market's label alone identifies the question
-              and not the answer, so a number beside it was a number about nothing. */}
-          <span className="text-ink-secondary">
-            {row.market.label === null
-              ? row.outcome.name
-              : `${row.market.label} · ${row.outcome.name}`}
-          </span>
-          <ProbabilityBar price={row.price} stale={isStale(row.at)} at={row.at} />
-          <span className="tabular-nums text-ink">{formatProbability(row.price)}</span>
-        </li>
-      ))}
-      {live.length > leaders.length && (
-        <li className="text-ink-faint">+{live.length - leaders.length} more</li>
-      )}
-      {live.length === 0 && <li className="text-ink-faint">resolved</li>}
-    </ul>
   );
 }
 

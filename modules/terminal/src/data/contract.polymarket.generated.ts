@@ -46,7 +46,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List Events */
+        /**
+         * List Events
+         * @description Every observation. There is no filter for stopped ones, because there are none:
+         *     an observation is collected or it is gone.
+         */
         get: operations["list_events_events_get"];
         put?: never;
         /**
@@ -92,7 +96,22 @@ export interface paths {
         get: operations["read_event_events__provider_event_id__get"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Remove Event
+         * @description The observation and everything collected for it, in one indivisible act.
+         *
+         *     **The only way an event leaves the list**, and the second of the two acts in this module
+         *     that cannot be undone. There is no stopping without removing: an observation that neither
+         *     collects nor leaves is a row nobody can say the purpose of, and it used to be produced by
+         *     a route that existed to produce it (`openspec/specs/polymarket-data-tracking`).
+         *
+         *     A model cannot reach this. The tool surface writes to the observation list by adding to
+         *     it, and adding is the whole of what it does.
+         *
+         *     `204` rather than the removed event: what is returned about a thing that no longer exists
+         *     is a shape somebody will be tempted to read.
+         */
+        delete: operations["remove_event_events__provider_event_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -143,26 +162,6 @@ export interface paths {
          *     come back to it.
          */
         delete: operations["delete_history_events__provider_event_id__history_delete"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/events/{provider_event_id}/tracking": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post?: never;
-        /**
-         * End Tracking
-         * @description Stops the sampling. Touches not one sample.
-         */
-        delete: operations["end_tracking_events__provider_event_id__tracking_delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -336,7 +335,7 @@ export interface components {
              * State
              * @enum {string}
              */
-            state: "collecting" | "stalled" | "resolved" | "ended";
+            state: "collecting" | "stalled" | "resolved";
         };
         /** DeletionResult */
         DeletionResult: {
@@ -638,7 +637,6 @@ export interface operations {
         parameters: {
             query?: {
                 group_id?: number | null;
-                include_ended?: boolean;
             };
             header?: never;
             path?: never;
@@ -808,6 +806,44 @@ export interface operations {
             };
         };
     };
+    remove_event_events__provider_event_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider_event_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     event_changes_events__provider_event_id__changes_get: {
         parameters: {
             query?: never;
@@ -866,46 +902,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DeletionResult"];
-                };
-            };
-            /** @description Not Found */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    end_tracking_events__provider_event_id__tracking_delete: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                provider_event_id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["TrackedEventOut"];
                 };
             };
             /** @description Not Found */

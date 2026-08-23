@@ -54,8 +54,7 @@ function fakeApi(overrides: Partial<PolymarketApi> = {}): PolymarketApi {
     changes: async () => ({ eventId: 1, outcomes: [] }) as EventChanges,
     history: async () => ({ outcomeId: 7, points: [], collectedFrom: null, collectedTo: null }),
     trackEvent: async () => ({ event: event(), alreadyTracked: false }),
-    endTracking: async () => event(),
-    deleteHistory: async () => ({ samplesDeleted: 0, rangesDeleted: 0 }),
+    removeEvent: async () => {},
     listGroups: async () => [MACRO],
     createGroup: async () => ({ id: 9, name: "elections", eventCount: 0 }),
     deleteGroup: async () => {},
@@ -133,26 +132,33 @@ describe("tracking an event", () => {
   });
 });
 
-describe("ending an observation", () => {
-  it("says the collected data stays, before it happens", async () => {
+describe("removing an observation", () => {
+  it("says what goes and why it will not come back, before it happens", async () => {
     render(<PolymarketView api={fakeApi()} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Stop tracking" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
 
-    expect(await screen.findByText(/everything already collected stays/i)).toBeInTheDocument();
-    expect(screen.getByText(/separate action/i)).toBeInTheDocument();
+    expect(await screen.findByText(/every market, every outcome/i)).toBeInTheDocument();
+    expect(screen.getByText(/cannot be collected again at any price/i)).toBeInTheDocument();
   });
 
-  it("ends it and reloads the list", async () => {
-    const endTracking = vi.fn(async () => event({ collection: { state: "ended", lastSampleAt: null, reason: null } }));
+  it("offers no way to stop collecting without removing", async () => {
+    render(<PolymarketView api={fakeApi()} />);
+    await screen.findByRole("button", { name: "Remove" });
+
+    expect(screen.queryByRole("button", { name: /stop tracking/i })).not.toBeInTheDocument();
+  });
+
+  it("removes it and reloads the list", async () => {
+    const removeEvent = vi.fn(async () => {});
     const listEvents = vi.fn(async () => [event()]);
-    render(<PolymarketView api={fakeApi({ endTracking, listEvents })} />);
+    render(<PolymarketView api={fakeApi({ removeEvent, listEvents })} />);
 
-    await userEvent.click(await screen.findByRole("button", { name: "Stop tracking" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
     // Two now carry that name — the one in the card and the one in the dialog it opened.
-    await userEvent.click(screen.getAllByRole("button", { name: "Stop tracking" }).at(-1)!);
+    await userEvent.click(screen.getAllByRole("button", { name: "Remove" }).at(-1)!);
 
-    await waitFor(() => expect(endTracking).toHaveBeenCalledWith("0xabc", expect.anything()));
+    await waitFor(() => expect(removeEvent).toHaveBeenCalledWith("0xabc", expect.anything()));
     await waitFor(() => expect(listEvents.mock.calls.length).toBeGreaterThan(1));
   });
 
@@ -160,15 +166,15 @@ describe("ending an observation", () => {
     render(
       <PolymarketView
         api={fakeApi({
-          endTracking: async () => {
+          removeEvent: async () => {
             throw new MarketDataError("unreachable", "polymarket-data is not reachable");
           },
         })}
       />,
     );
 
-    await userEvent.click(await screen.findByRole("button", { name: "Stop tracking" }));
-    const confirm = screen.getAllByRole("button", { name: "Stop tracking" }).at(-1)!;
+    await userEvent.click(await screen.findByRole("button", { name: "Remove" }));
+    const confirm = screen.getAllByRole("button", { name: "Remove" }).at(-1)!;
     await userEvent.click(confirm);
 
     expect(await screen.findByText(/is not reachable/i)).toBeInTheDocument();

@@ -315,21 +315,20 @@ describe("tracking", () => {
     expect(body).toEqual({ reference: "slug", group: "macro" });
   });
 
-  it("returns the event after ending its observation, which deletes nothing", async () => {
+  it("removes an observation and reads nothing back about it", async () => {
+    let asked = "";
     server.use(
-      http.delete(`${HTTP_BASE}/events/0xabc/tracking`, () =>
-        HttpResponse.json({
-          ...EVENT,
-          collection: { state: "ended", last_sample_at: "2026-08-22T10:00:00Z", reason: null },
-        }),
-      ),
+      http.delete(`${HTTP_BASE}/events/0xabc`, ({ request }) => {
+        asked = new URL(request.url).pathname;
+        return new HttpResponse(null, { status: 204 });
+      }),
     );
 
-    const event = await api().endTracking("0xabc", signal());
+    await api().removeEvent("0xabc", signal());
 
-    expect(event.collection.state).toBe("ended");
-    // The samples are still there; the module answers with the event, not with a deletion.
-    expect(event.collection.lastSampleAt).toEqual(new Date("2026-08-22T10:00:00Z"));
+    // 204 and nothing parsed: what a module could answer about a thing that no longer
+    // exists is a shape somebody would be tempted to read.
+    expect(asked).toBe("/events/0xabc");
   });
 
   it("reports the ceiling as a refusal rather than as a failure", async () => {
