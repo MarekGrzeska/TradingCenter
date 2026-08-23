@@ -41,12 +41,6 @@ class Tracked(BaseModel):
     )
 
 
-class Untracked(BaseModel):
-    event_id: str
-    stopped: bool
-    note: str
-
-
 class GroupCreated(BaseModel):
     group: str
     note: str
@@ -91,8 +85,10 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                 return {
                     "refused": str(err),
                     "do_first": (
-                        "untrack_event on something no longer interesting, then try again; "
-                        "list_tracked_events shows what is being collected"
+                        "ask the operator to remove an observation in the terminal, then "
+                        "try again; list_tracked_events shows what is being collected. "
+                        "Removing one is not something this tool set can do — it takes the "
+                        "collected history with it"
                     ),
                 }
             [out] = await views.tracked_events(
@@ -119,27 +115,6 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
                 else "collection has started; the recent past is being filled in, so "
                 "get_price_changes will answer more windows over the next few minutes"
             ),
-        )
-
-    @mcp.tool(annotations=CHANGES_OBSERVATIONS)
-    async def untrack_event(event_id: str) -> Untracked | dict:
-        """Stop collecting an event's prices.
-
-        Everything already collected stays and stays readable — this stops the sampling, it
-        does not delete anything. Deleting collected history is not something any tool here
-        can do; it is an operator's action in the terminal.
-        """
-        async with ctx.pool.acquire() as conn:
-            stopped = await tracking.untrack(conn, event_id)
-        if not stopped:
-            return {
-                "refused": f"{event_id} is not currently being collected",
-                "do_first": "list_tracked_events shows what is",
-            }
-        return Untracked(
-            event_id=event_id,
-            stopped=True,
-            note="sampling stopped; every price already collected is still readable",
         )
 
     @mcp.tool(annotations=CHANGES_OBSERVATIONS)

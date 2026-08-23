@@ -90,7 +90,7 @@ class TestTracking:
         response = await api.post("/events", json={"reference": "two"})
 
         assert response.status_code == 409
-        assert "End the observation of one" in response.json()["detail"]
+        assert "the operator's to do" in response.json()["detail"]
 
     async def test_tracking_the_same_event_twice_says_so_rather_than_erring(
         self, api, app
@@ -105,7 +105,8 @@ class TestTracking:
         assert response.status_code == 200
         assert response.json()["already_tracked"] is True
 
-    async def test_ending_an_observation_keeps_the_history(self, api, pool) -> None:
+    async def test_removing_an_observation_takes_its_history_with_it(self, api, pool) -> None:
+        """The whole of the change: there is no act that leaves one without the other."""
         event_id = await observe(pool, fakes.event_payload())
         outcome_id = (await outcomes_of(pool, event_id))[0][0]
         async with pool.acquire() as conn:
@@ -115,15 +116,27 @@ class TestTracking:
                         midpoint=Decimal("0.5"), source=Surface.GAMMA)],
             )
 
-        response = await api.delete("/events/e-1/tracking")
+        response = await api.delete("/events/e-1")
 
-        assert response.status_code == 200
-        assert response.json()["collection"]["state"] == "ended"
+        assert response.status_code == 204
+        assert (await api.get("/events")).json() == []
+        # The outcome itself went with the event, so its history is not empty — it is not
+        # there. That is the difference between removing an observation and deleting its
+        # data, and it is the whole reason both acts exist.
         history = await api.get(f"/outcomes/{outcome_id}/history")
-        assert len(history.json()["points"]) == 1
+        assert history.status_code == 404
 
-    async def test_ending_an_observation_that_is_not_running_is_a_404(self, api) -> None:
-        assert (await api.delete("/events/never-seen/tracking")).status_code == 404
+    async def test_removing_an_observation_that_is_not_running_is_a_404(self, api) -> None:
+        assert (await api.delete("/events/never-seen")).status_code == 404
+
+    async def test_there_is_no_way_to_stop_collecting_without_removing(self, app) -> None:
+        """Asserted against the published document rather than against one request: a route
+        that no longer answers but is still described is still a route somebody writes a
+        client for."""
+        paths = app.openapi()["paths"]
+
+        assert "/events/{provider_event_id}/tracking" not in paths
+        assert "delete" in paths["/events/{provider_event_id}"]
 
 
 class TestDeletion:

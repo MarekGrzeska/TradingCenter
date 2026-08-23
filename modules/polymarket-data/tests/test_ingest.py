@@ -133,11 +133,11 @@ class TestTheTick:
         assert state[event_id]["consecutive_failures"] == 0
         assert state[event_id]["last_failure_reason"] is None
 
-    async def test_an_ended_observation_is_not_asked_about(self, pool) -> None:
+    async def test_a_removed_observation_is_not_asked_about(self, pool) -> None:
         payload = fakes.event_payload()
         await track(pool, payload)
         async with pool.acquire() as conn:
-            await store.end_tracking(conn, "e-1")
+            await store.remove_event(conn, "e-1")
         fake = fakes.FakeProvider({"e-1": payload})
 
         assert await ingest(pool, fake).tick() == 0

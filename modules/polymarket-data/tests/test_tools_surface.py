@@ -25,9 +25,13 @@ READ_TOOLS = {
     "get_price_changes",
 }
 
-# The three that change the list of observations — and the whole list of what this surface
-# may change. A fourth appearing here without a decision is what the equality below catches.
-OBSERVATION_TOOLS = {"track_event", "untrack_event", "create_group"}
+# The two that change the list of observations — and the whole list of what this surface may
+# change. A third appearing here without a decision is what the equality below catches.
+#
+# `untrack_event` was here until an observation became "collected or gone": the only way off
+# the list now takes the collected history with it, so a tool for it would be a tool that
+# deletes history — which the requirement above this one forbids outright.
+OBSERVATION_TOOLS = {"track_event", "create_group"}
 
 EXPECTED_TOOLS = READ_TOOLS | OBSERVATION_TOOLS
 
@@ -40,7 +44,9 @@ EXPECTED_TOOLS = READ_TOOLS | OBSERVATION_TOOLS
 #
 # Measured 13 811 characters on 22 August 2026 for nine tools — about 3 300 tokens, against
 # market-data's 19 700 for eleven. The headroom below is 12%: enough for a description to
-# grow a sentence that earns it, not enough for the essays to arrive.
+# grow a sentence that earns it, not enough for the essays to arrive. Eight tools since
+# `untrack_event` went; the ceiling is left where it was, because it is a budget for the
+# surface and not a record of its current size.
 SURFACE_CEILING_CHARS = 15_500
 
 
@@ -49,14 +55,15 @@ async def test_the_expected_tools_and_no_others(tool_server) -> None:
     assert {tool.name for tool in tools} == EXPECTED_TOOLS
 
 
-async def test_only_the_three_observation_tools_are_declared_as_changing_anything(
+async def test_only_the_two_observation_tools_are_declared_as_changing_anything(
     tool_server,
 ) -> None:
     """The annotation is a structural claim an MCP client can act on, so it has to be exact.
 
     `market-data` publishes no writing tool at all and says in its spec that no setting may
     add one. This module departs from that on purpose and in one direction only: the list of
-    observations, which is what the operator clicks in the terminal anyway.
+    observations, which is what the operator clicks in the terminal anyway — and in one
+    direction only within that: both writing tools *add*, neither takes anything away.
     """
     tools = await tool_server.list_tools()
     writing = {
@@ -110,7 +117,6 @@ async def test_no_tool_can_remove_a_single_collected_price(tool_server, pool) ->
         "get_price_history": {"outcome_id": outcomes[0][0]},
         "get_price_changes": {"event_id": "e-1"},
         "track_event": {"reference": "an-event"},
-        "untrack_event": {"event_id": "e-1"},
         "create_group": {"name": "anything"},
     }
     assert set(calls) == EXPECTED_TOOLS, "every published tool has to be exercised here"

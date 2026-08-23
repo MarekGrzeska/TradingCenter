@@ -105,7 +105,10 @@ class MarketOut(BaseModel):
 class CollectionOut(BaseModel):
     """Whether prices are actually arriving. Being on the list does not prove they are."""
 
-    state: Literal["collecting", "stalled", "resolved", "ended"]
+    # Three, and there is no fourth to add back: an observation is collected or it is gone,
+    # so a state meaning "on the list and not collecting" has no producer any more
+    # (`openspec/specs/polymarket-data-tracking`).
+    state: Literal["collecting", "stalled", "resolved"]
     last_sample_at: datetime | None = None
     reason: str | None = Field(
         default=None, description="why collection is not running, when it is not"

@@ -24,10 +24,11 @@ from .tools import ToolContext
 INSTRUCTIONS = (
     "Prediction-market data from Polymarket: search its public database, choose what to "
     "collect, and read what has been collected. Prices are probabilities on 0..1, never "
-    "percentages. Three tools change the list of what is collected — track_event, "
-    "untrack_event and create_group — and nothing here deletes collected history or "
-    "touches an account: this system trades nothing on Polymarket. Deleting collected "
-    "data is an operator's action in the terminal."
+    "percentages. Two tools change the list of what is collected — track_event and "
+    "create_group — and both of them only add to it: nothing here removes an observation, "
+    "deletes collected history or touches an account, and this system trades nothing on "
+    "Polymarket. Removing an observation takes its whole history with it and is an "
+    "operator's action in the terminal."
 )
 
 

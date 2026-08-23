@@ -47,24 +47,17 @@ async def track(
     a full archive unable to notice a market being added to an event it already holds.
     """
     existing = await store.load_events(conn, provider_event_id=event.provider_event_id)
-    already_tracking = bool(existing) and existing[0].tracking
+    already_tracking = bool(existing)
 
     if not already_tracking:
         tracked = await store.count_tracked(conn)
         if tracked >= max_tracked_events:
             raise LimitReached(
                 f"already tracking {tracked} events, which is the configured ceiling "
-                f"({max_tracked_events}). End the observation of one before adding "
-                "another — nothing has been changed."
+                f"({max_tracked_events}). Making room means removing an observation with "
+                "everything collected for it, which is the operator's to do in the "
+                "terminal — nothing has been changed here."
             )
 
-    # `resume=True` only here: this is the act that brings an event under observation, so
-    # it is the one that may clear an earlier ending. The sampler's own refresh must not.
-    event_id = await store.upsert_event(conn, event, group_id=group_id, resume=True)
+    event_id = await store.upsert_event(conn, event, group_id=group_id)
     return event_id, already_tracking
-
-
-async def untrack(conn: Conn, provider_event_id: str) -> bool:
-    """Stops the sampling and keeps every sample. Deleting collected history is a different
-    act on a different surface, and no tool reaches it."""
-    return await store.end_tracking(conn, provider_event_id)
