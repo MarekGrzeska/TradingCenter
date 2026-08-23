@@ -11,8 +11,29 @@ from __future__ import annotations
 from collections.abc import Mapping
 from datetime import datetime
 
-from strategy.archive import FactsRead, Gap
+from strategy.archive import AnnouncedIndicator, AnnouncedParam, FactsRead, Gap
 from strategy.spec import Facts, StrategySpec
+
+# The two indicators the strategy of reference reads, spelled the way the real client
+# hands them over — every bound a float, because `Archive._announced` coerces them.
+DEFAULT_CATALOGUE = {
+    "ema": AnnouncedIndicator(
+        id="ema",
+        name="Exponential moving average",
+        group="averages",
+        output="lines",
+        params=(AnnouncedParam(name="period", type="int", default=20.0, min=2.0, max=5000.0),),
+        lines=("ema",),
+    ),
+    "atr": AnnouncedIndicator(
+        id="atr",
+        name="Average true range",
+        group="volatility",
+        output="lines",
+        params=(AnnouncedParam(name="period", type="int", default=14.0, min=2.0, max=5000.0),),
+        lines=("atr",),
+    ),
+}
 
 
 class FakeArchive:
@@ -31,6 +52,8 @@ class FakeArchive:
         raises: Exception | None = None,
         facts_raises: Exception | None = None,
         indicators: frozenset[str] = frozenset({"ema", "atr"}),
+        catalogue: dict | None = None,
+        catalogue_raises: Exception | None = None,
     ) -> None:
         self.last_bar = last_bar
         self.facts = facts
@@ -41,10 +64,19 @@ class FakeArchive:
         self.raises = raises
         self.facts_raises = facts_raises
         self.indicators = indicators
+        # What `announced_catalogue` answers. Defaulted to the two the strategy of
+        # reference reads, so a test about something else does not have to state them.
+        self.catalogue = DEFAULT_CATALOGUE if catalogue is None else catalogue
+        self.catalogue_raises = catalogue_raises
         self.reads: list[tuple] = []
 
     async def announced_indicators(self) -> frozenset[str]:
         return self.indicators
+
+    async def announced_catalogue(self) -> dict:
+        if self.catalogue_raises is not None:
+            raise self.catalogue_raises
+        return self.catalogue
 
     async def last_closed_bar(self, symbol: str, resolution: str) -> datetime | None:
         self.reads.append(("last_closed_bar", symbol, resolution))

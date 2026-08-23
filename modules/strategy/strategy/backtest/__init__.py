@@ -12,6 +12,7 @@ from datetime import datetime
 
 from ..archive import Archive
 from ..catalogue import get
+from ..spec import StrategySpec
 from .costs import FREE, CostModel
 from .metrics import attribute, measure
 from .replay import batch, candles_after, decide_at, incremental, slice_at
@@ -43,7 +44,7 @@ RESOLUTION_LIMIT_BARS = 500
 
 async def run(
     archive: Archive,
-    strategy_id: str,
+    strategy: str | StrategySpec,
     symbol: str,
     *,
     start: datetime,
@@ -51,14 +52,22 @@ async def run(
     params: Mapping[str, float] | None = None,
     costs: CostModel = FREE,
     daily_loss_limit_r: float | None = None,
+    revision: int | None = None,
+    revision_id: int | None = None,
 ) -> Report:
     """One strategy over one range, with the costs stated.
 
     The read happens once for the whole range and every bar is then decided off it — see
     `replay.slice_at` for the masking that makes that honest, and `test_backtest.py` for
     the comparison against the bar-by-bar driver that proves it.
+
+    An id names an entry in this image's catalogue and is looked up here, which is what
+    keeps a run of the strategy of reference possible with no database anywhere in reach
+    (`strategy-configurator`, "Wpis kodowy bez bazy"). A written rule arrives already
+    resolved, as a `StrategySpec` with its revision named — resolving it needs a connection,
+    and a backtest has no business holding one.
     """
-    spec = get(strategy_id)
+    spec = strategy if isinstance(strategy, StrategySpec) else get(strategy)
     resolved = spec.resolve_params(params)
     read = await archive.read_facts(spec, symbol, resolved, as_of=end, bars_from=start)
 
@@ -91,6 +100,8 @@ async def run(
     kept = apply_daily_stop(outcomes, limit_r=daily_loss_limit_r)
     return Report(
         strategy_id=spec.id,
+        strategy_revision=revision,
+        strategy_revision_id=revision_id,
         symbol=symbol,
         resolution=spec.resolution,
         range_from=start,

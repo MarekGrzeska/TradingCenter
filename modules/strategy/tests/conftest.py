@@ -33,7 +33,16 @@ os.environ.setdefault("TESTCONTAINERS_RYUK_DISABLED", "true")
 
 # Emptied between tests so that one test's rows are never another's premise. TRUNCATE
 # rather than dropping and re-migrating: the schema is the same for every test.
-TABLES = ("decisions", "watches", "parameter_sets", "backtest_runs")
+# One statement listing every table, so the foreign keys between them do not decide the
+# order — a TRUNCATE naming all the referencing tables together needs no CASCADE.
+TABLES = (
+    "decisions",
+    "watches",
+    "parameter_sets",
+    "backtest_runs",
+    "strategy_revisions",
+    "strategy_definitions",
+)
 
 # Generous, because Docker Desktop wakes its VM lazily and a first call after an idle
 # spell can take several seconds.

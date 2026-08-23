@@ -1,11 +1,17 @@
 """One run's result, and the rule that keeps two of them comparable.
 
-A report names three things about itself — the range, the cost model and the parameter
-version — because without any of them it is not a result but a number somebody produced
-(`strategy-backtest`, "Wynik nazywa swoje koszty i swoje parametry"). The same three are
-what `compare` refuses to look past: two runs on different data or different costs are two
-different questions, and putting their numbers side by side is the most convincing way to
-be wrong.
+A report names four things about itself — the range, the cost model, the parameter version
+and, for a rule that was written down, its revision — because without any of them it is not
+a result but a number somebody produced (`strategy-backtest`, "Wynik nazywa swoje koszty
+i swoje parametry"). Three of them are what `compare` refuses to look past: two runs on
+different data or different costs are two different questions, and putting their numbers
+side by side is the most convincing way to be wrong.
+
+**The revision is the exception, and deliberately.** Comparing two revisions of one
+definition is the question this command exists to answer, so differing revisions are not a
+refusal — but every report prints its own, because a comparison table that cannot say which
+rule produced which column is unreadable (`strategy-backtest`, "Zestawienie dwóch rewizji
+jednej definicji").
 """
 
 from __future__ import annotations
@@ -32,6 +38,10 @@ class Report:
     params: dict[str, float]
     costs: CostModel
     metrics: Metrics
+    # The rule this run computed, when it was one that was written down. `None` means the
+    # strategy is code in the image, whose rule is in the repository under that id.
+    strategy_revision: int | None = None
+    strategy_revision_id: int | None = None
     attribution: list[FeatureSplit] = field(default_factory=list)
     # Every bar the range held, and what the platform said on each. A run that refused
     # almost everything for want of data looks identical in its metrics to one that simply
@@ -50,6 +60,7 @@ class Report:
             "range_from": self.range_from.isoformat(),
             "range_to": self.range_to.isoformat(),
             "params": dict(self.params),
+            "strategy_revision": self.strategy_revision,
             "costs": self.costs.as_dict(),
             "metrics": self.metrics.as_dict(),
             "attribution": [split.as_dict() for split in self.attribution],
@@ -60,8 +71,19 @@ class Report:
 
     @property
     def comparable_on(self) -> tuple:
-        """What two runs must share before their numbers may be read together."""
+        """What two runs must share before their numbers may be read together.
+
+        The revision is **not** here. Two revisions of one definition on the same data and
+        the same costs are the comparison this whole command is for.
+        """
         return (self.symbol, self.resolution, self.range_from, self.range_to, self.costs)
+
+    @property
+    def named(self) -> str:
+        """The strategy as a reader should see it — with its revision when it has one."""
+        if self.strategy_revision is None:
+            return self.strategy_id
+        return f"{self.strategy_id}@{self.strategy_revision}"
 
     def summary(self) -> str:
         """The run in a few lines, for a terminal. Costs first, deliberately: a reader who
@@ -69,7 +91,7 @@ class Report:
         metrics = self.metrics
         factor = "—" if metrics.profit_factor is None else f"{metrics.profit_factor:.2f}"
         lines = [
-            f"{self.strategy_id} · {self.symbol} {self.resolution}",
+            f"{self.named} · {self.symbol} {self.resolution}",
             f"  range      {self.range_from:%Y-%m-%d} → {self.range_to:%Y-%m-%d} ({self.bars} bars)",
             f"  costs      {self.costs.describe()}",
             f"  params     {self.params}",
