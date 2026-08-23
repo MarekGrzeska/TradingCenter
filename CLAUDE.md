@@ -26,7 +26,7 @@ package cannot give it, the change is wrong, not the rule.
 | `modules/workbench` | the operator's conversation with a model **and** the teams they compose — one process, two surfaces, two schemas (`agent`, `teams`), two OpenAI keys, two model catalogues. |
 | `modules/trading-mcp` | MCP tools over the gateway's demo account. Network transport only, one named caller (the workbench). Demo checked against the gateway, not against a setting. |
 | `modules/polymarket-data` | the prediction-market archive. Owns its PostgreSQL, the only door to Polymarket. Two surfaces like market-data — but three of its tools **write**, and only ever the list of observations; deleting history is REST-only. |
-| `modules/strategy` | the strategy platform. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate`. Owns its PostgreSQL, reads market-data's REST, and **never touches an account**: it decides, teams execute. |
+| `modules/strategy` | the strategy platform. A strategy is a catalogue entry — declared facts, parameters, one pure `evaluate` — and the entry is code in the image **or** an immutable revision the operator wrote. Owns its PostgreSQL, reads market-data's REST, and **never touches an account**: it decides, teams execute. |
 | `modules/terminal` | React+TS · the operator's screen. Consumes the others, publishes nothing — a consumer, not a peer. Call it the **terminal**, never a "console" or "dashboard". |
 | `packages/tc-runtime` | database, migrations, schema check, Easy Auth. |
 | `packages/tc-mcp-kit` | speaking MCP: caller-identity middleware, the upstream-refusal helper, the tool-schema slimmer. |
