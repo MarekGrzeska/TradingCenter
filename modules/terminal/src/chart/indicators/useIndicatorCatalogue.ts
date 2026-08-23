@@ -27,6 +27,12 @@ export function useIndicatorCatalogue(
   source: IndicatorSource | undefined,
 ): IndicatorCatalogueState {
   const read = useRead({
+    // **This key is owned here, and so is the shape behind it: the entries, not the
+    // document.** The query cache is shared across the whole terminal and keyed by name
+    // alone, so a second reader of this key holding the whole `IndicatorCatalogue` object
+    // overwrites what the chart reads and `entries.map` stops being a function. That is not
+    // hypothetical — the strategy configurator did it, and what broke was the chart grid.
+    // Anything else that needs the catalogue calls this hook.
     key: ["archive", "indicator-catalogue"],
     read: async (signal) => (await source!.indicatorCatalogue(signal)).indicators,
     initial: NONE,
