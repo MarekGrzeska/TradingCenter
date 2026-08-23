@@ -28,6 +28,8 @@ const STRATEGY: Strategy = {
     { name: "fast_period", type: "int", default: 20, min: 2, max: 200 },
     { name: "stop_atr", type: "float", default: 2, min: 0.5, max: 6 },
   ],
+  source: "code",
+  revision: null,
 };
 
 const WATCH: Watch = {
@@ -37,6 +39,7 @@ const WATCH: Watch = {
   parameterSetId: 5,
   active: true,
   createdAt: new Date("2026-08-22T09:00:00Z"),
+  strategyRevisionId: null,
 };
 
 function decision(overrides: Partial<Decision> = {}): Decision {
@@ -45,6 +48,8 @@ function decision(overrides: Partial<Decision> = {}): Decision {
     strategyId: "baseline_ma_cross",
     symbol: "US100",
     parameterSetId: 5,
+    strategyRevision: null,
+    strategyRevisionId: null,
     asOf: new Date("2026-08-22T10:00:00Z"),
     action: "no_trade",
     reason: "the fast average did not cross above the slow one on this bar",
@@ -89,6 +94,11 @@ function fakeApi(overrides: Partial<StrategyApi> = {}): StrategyApi {
     setWatchActive: vi.fn().mockResolvedValue({ ...WATCH, active: false }),
     listParameterSets: vi.fn().mockResolvedValue([]),
     addParameterSet: vi.fn().mockResolvedValue({}),
+    listDefinitions: vi.fn().mockResolvedValue([]),
+    listRevisions: vi.fn().mockResolvedValue([]),
+    addDefinition: vi.fn().mockResolvedValue({}),
+    addRevision: vi.fn().mockResolvedValue({}),
+    renameDefinition: vi.fn().mockResolvedValue({}),
     listDecisions: vi.fn().mockResolvedValue([decision()]),
     readDecision: vi.fn().mockResolvedValue(decision()),
     listBacktests: vi.fn().mockResolvedValue([]),

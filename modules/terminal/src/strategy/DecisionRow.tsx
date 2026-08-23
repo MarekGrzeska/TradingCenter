@@ -12,6 +12,12 @@ import type { Decision, ReasonKind } from "./strategyApi";
  * A refusal is not an error and must not read as one. `coverage` is the only kind that
  * means something is missing; `strategy` is the platform working exactly as intended and
  * is styled as the ordinary state it is.
+ *
+ * **The revision travels with the row**, and it is the revision this decision was computed
+ * under rather than the newest one. A screen showing today's rule beside a decision made by
+ * last week's answers "why did this enter" convincingly and wrongly, which is worse than
+ * not answering (`terminal-strategy-configurator`, "Ekran pokazuje rewizję jako pochodzenie").
+ * Nothing is shown for a coded entry: its rule is in the repository under that id.
  */
 
 const KIND_LABEL: Record<ReasonKind, string> = {
@@ -60,7 +66,14 @@ export function DecisionRow({
       data-testid="decision-row"
     >
       <td className="decision-bar">{formatBar(decision.asOf)}</td>
-      <td className="decision-symbol">{decision.symbol}</td>
+      <td className="decision-symbol">
+        {decision.symbol}
+        {decision.strategyRevision !== null && (
+          <span className="ml-1 text-ink-faint" title="rewizja reguły, którą to policzono">
+            @{decision.strategyRevision}
+          </span>
+        )}
+      </td>
       <td className="decision-action">
         {isTrade ? (
           <span className="badge badge-trade">

@@ -16,6 +16,12 @@
  *
  * **Nothing here can move an account.** The module has no route that does, by design, so
  * there is no call to write and none to guard against.
+ *
+ * **The rule is the one thing not mapped.** Every other shape here is translated from the
+ * wire into what the views want; `Rule` and its node types are re-exported from the
+ * generated contract unchanged, because a second shape for the vocabulary is exactly what
+ * the module avoided by defining it once (`strategy/rule.py`). A mapper here would be the
+ * place the editor and the interpreter drift apart.
  */
 
 import { noIdentity, type Identity } from "../auth/identity";
@@ -56,6 +62,44 @@ export interface Strategy {
   candles: number;
   facts: Fact[];
   params: Param[];
+  /** Code in the deployed image, or a rule somebody wrote down. The difference an operator
+   *  can act on: a coded entry has no revisions and cannot be edited from a screen. */
+  source: "code" | "revision";
+  /** Which revision this was built from; `null` for a coded entry. */
+  revision: number | null;
+}
+
+// --- the rule, as the module defines it ------------------------------------------------
+
+/** One written rule, exactly as the module spells it. Not translated — see the note at the
+ *  top of this file. The `-Output` variant differs from `-Input` only in which defaults are
+ *  optional, so a value built here satisfies both. */
+export type Rule = Schemas["RuleDefinition-Output"];
+export type RuleFact = Rule["facts"][number];
+export type RuleParam = Rule["params"][number];
+export type RuleGuard = Rule["guards"][number];
+export type RuleSetup = Rule["setups"][number];
+/** An expression producing a number — a level, a score, a measured feature. */
+export type NumericNode = RuleSetup["entry"];
+/** An expression answering a question — a guard, a setup's condition. */
+export type ConditionNode = RuleSetup["when"];
+
+export interface Definition {
+  id: number;
+  strategyId: string;
+  name: string;
+  description: string;
+  /** The newest revision. A running watch may still be pinned to an older one. */
+  latestVersion: number;
+  createdAt: Date;
+}
+
+export interface Revision {
+  id: number;
+  strategyId: string;
+  version: number;
+  definition: Rule;
+  createdAt: Date;
 }
 
 export interface Watch {
@@ -65,6 +109,9 @@ export interface Watch {
   parameterSetId: number;
   active: boolean;
   createdAt: Date;
+  /** The revision this watch computes — pinned, never followed. `null` means the strategy
+   *  is code in the image. Saving a newer revision does not change this. */
+  strategyRevisionId: number | null;
 }
 
 export interface ParameterSet {
@@ -80,6 +127,10 @@ export interface Decision {
   strategyId: string;
   symbol: string;
   parameterSetId: number;
+  /** Which revision of the rule decided this — its own number, not a surrogate id.
+   *  `null` when the strategy is code, whose rule is in the repository under that id. */
+  strategyRevision: number | null;
+  strategyRevisionId: number | null;
   /** The closing time of the bar decided on, never a wall clock. */
   asOf: Date;
   action: "trade" | "no_trade";
@@ -138,6 +189,29 @@ function mapStrategy(raw: Schemas["StrategyOut"]): Strategy {
       min: param.min,
       max: param.max,
     })),
+    source: raw.source ?? "code",
+    revision: raw.revision ?? null,
+  };
+}
+
+function mapDefinition(raw: Schemas["DefinitionOut"]): Definition {
+  return {
+    id: raw.id,
+    strategyId: raw.strategy_id,
+    name: raw.name,
+    description: raw.description,
+    latestVersion: raw.latest_version,
+    createdAt: new Date(raw.created_at),
+  };
+}
+
+function mapRevision(raw: Schemas["RevisionOut"]): Revision {
+  return {
+    id: raw.id,
+    strategyId: raw.strategy_id,
+    version: raw.version,
+    definition: raw.definition,
+    createdAt: new Date(raw.created_at),
   };
 }
 
@@ -149,6 +223,7 @@ function mapWatch(raw: Schemas["WatchOut"]): Watch {
     parameterSetId: raw.parameter_set_id,
     active: raw.active,
     createdAt: new Date(raw.created_at),
+    strategyRevisionId: raw.strategy_revision_id ?? null,
   };
 }
 
@@ -168,6 +243,8 @@ function mapDecision(raw: Schemas["DecisionOut"]): Decision {
     strategyId: raw.strategy_id,
     symbol: raw.symbol,
     parameterSetId: raw.parameter_set_id,
+    strategyRevision: raw.strategy_revision ?? null,
+    strategyRevisionId: raw.strategy_revision_id ?? null,
     asOf: new Date(raw.as_of),
     action: raw.action,
     reason: raw.reason,
@@ -233,6 +310,30 @@ export interface DecisionQuery {
 export interface StrategyApi {
   listStrategies(signal: AbortSignal): Promise<Strategy[]>;
   readStrategy(strategyId: string, signal: AbortSignal): Promise<Strategy>;
+  /** The rules somebody wrote. The coded entries are not here — `listStrategies` lists both,
+   *  and this is the list of what can be edited. */
+  listDefinitions(signal: AbortSignal): Promise<Definition[]>;
+  listRevisions(strategyId: string, signal: AbortSignal): Promise<Revision[]>;
+  /** Writes a rule and its first revision. Rejects with `refused` when the module will not
+   *  have it — an indicator the archive does not announce, a value outside its range, an id
+   *  a coded entry already carries — and with `upstream` when the archive could not be
+   *  asked at all, in which case nothing was saved. */
+  addDefinition(
+    strategyId: string,
+    name: string,
+    description: string,
+    definition: Rule,
+    signal: AbortSignal,
+  ): Promise<Revision>;
+  /** The next revision. **Running watches keep computing the one they were pinned to** —
+   *  moving them is `startWatch` again, naming the new revision. */
+  addRevision(strategyId: string, definition: Rule, signal: AbortSignal): Promise<Revision>;
+  renameDefinition(
+    strategyId: string,
+    name: string,
+    description: string,
+    signal: AbortSignal,
+  ): Promise<Definition>;
   listWatches(signal: AbortSignal, activeOnly?: boolean): Promise<Watch[]>;
   /** Starts watching a pair. Omitting `params` has the module write a set from the
    *  strategy's own defaults, resolved — which is what gets stored either way. */
@@ -241,6 +342,7 @@ export interface StrategyApi {
     symbol: string,
     signal: AbortSignal,
     params?: Record<string, number>,
+    revision?: number,
   ): Promise<Watch>;
   /** Stops or resumes evaluation of one pair. **No decision is deleted** — what the
    *  platform decided stays readable after it stops watching. */
@@ -278,6 +380,46 @@ export function createStrategyApi(
       return mapStrategy(raw);
     },
 
+    async listDefinitions(signal) {
+      const raw = await http.json<Schemas["DefinitionOut"][]>(`${httpBase}/definitions`, {
+        signal,
+      });
+      return raw.map(mapDefinition);
+    },
+
+    async listRevisions(strategyId, signal) {
+      const raw = await http.json<Schemas["RevisionOut"][]>(
+        `${httpBase}/definitions/${encodeURIComponent(strategyId)}/revisions`,
+        { signal },
+      );
+      return raw.map(mapRevision);
+    },
+
+    async addDefinition(strategyId, name, description, definition, signal) {
+      const raw = await http.json<Schemas["RevisionOut"]>(`${httpBase}/definitions`, {
+        signal,
+        method: "POST",
+        body: { strategy_id: strategyId, name, description, definition },
+      });
+      return mapRevision(raw);
+    },
+
+    async addRevision(strategyId, definition, signal) {
+      const raw = await http.json<Schemas["RevisionOut"]>(
+        `${httpBase}/definitions/${encodeURIComponent(strategyId)}/revisions`,
+        { signal, method: "POST", body: { definition } },
+      );
+      return mapRevision(raw);
+    },
+
+    async renameDefinition(strategyId, name, description, signal) {
+      const raw = await http.json<Schemas["DefinitionOut"]>(
+        `${httpBase}/definitions/${encodeURIComponent(strategyId)}`,
+        { signal, method: "PATCH", body: { name, description } },
+      );
+      return mapDefinition(raw);
+    },
+
     async listWatches(signal, activeOnly) {
       const suffix = activeOnly === undefined ? "" : `?active_only=${String(activeOnly)}`;
       const raw = await http.json<Schemas["WatchOut"][]>(`${httpBase}/watches${suffix}`, {
@@ -286,7 +428,7 @@ export function createStrategyApi(
       return raw.map(mapWatch);
     },
 
-    async startWatch(strategyId, symbol, signal, params) {
+    async startWatch(strategyId, symbol, signal, params, revision) {
       // Two requests when parameters were given, one when they were not — and the module
       // is what resolves them either way. Sending a set of its own defaults from here
       // would be this file holding an opinion about values it does not own.
@@ -305,6 +447,9 @@ export function createStrategyApi(
           strategy_id: strategyId,
           symbol,
           ...(parameterSetId === undefined ? {} : { parameter_set_id: parameterSetId }),
+          // Left out means "the newest at this moment", which the module then pins. A watch
+          // never follows later revisions, so the value it settles on is a fact about now.
+          ...(revision === undefined ? {} : { revision }),
         },
       });
       return mapWatch(raw);
