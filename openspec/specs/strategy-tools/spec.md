@@ -1,10 +1,9 @@
-## Purpose
+# strategy-tools Specification
 
+## Purpose
 Powierzchnia narzędzi, którą platforma publikuje klientowi MCP: wyłącznie odczyt stanu
 strategii i decyzji, z jednym narzędziem zaprojektowanym wprost pod wyzwalacze zespołów.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Zestaw narzędzi wyłącznie czyta
 
 Platforma MUST publikować wyłącznie narzędzia, których wykonanie nie zmienia stanu platformy
@@ -57,3 +56,4 @@ zobaczy odpowiedź.
 - **WHEN** w środowisku produkcyjnym narzędzie woła aplikacja spoza listy dopuszczonych
 - **THEN** wywołanie zostaje odrzucone
 - **AND** odpowiedź nie niesie żadnych danych platformy
+

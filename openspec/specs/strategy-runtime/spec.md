@@ -1,10 +1,9 @@
-## Purpose
+# strategy-runtime Specification
 
+## Purpose
 Wspólna maszyneria wokół wpisów: skąd biorą się fakty, kiedy wolno oceniać, co jest
 zapisywane i czego moduł nie robi nigdy — w szczególności: nie dotyka konta.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Ocena zapada wyłącznie na domkniętej świecy
 
 Pętla platformy MUST oceniać strategię dopiero wtedy, gdy świeca jej rozdzielczości jest
@@ -100,3 +99,4 @@ konfiguracją, a droga odwrotu od strategii to jej dezaktywacja, nie wdrożenie.
 
 - **WHEN** operator dezaktywuje jedną z aktywnych strategii
 - **THEN** pozostałe strategie oceniają dalej bez przerwy
+

@@ -1,10 +1,9 @@
-## Purpose
+# strategy-database-connection Specification
 
+## Purpose
 Warunki, na jakich platforma strategii łączy się ze swoją bazą: ta sama reguła, którą mają
 pozostałe schematy — tożsamość albo pętla zwrotna, własna baza, własne migracje pod blokadą.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Tożsamość albo pętla zwrotna, nigdy oba i nigdy żadne
 
 Wobec bazy zdalnej moduł MUST uwierzytelniać się poświadczeniem swojej tożsamości,
@@ -72,3 +71,4 @@ pierwsze wdrożenie spróbuje migrować.
 
 - **WHEN** migracja tworzy nową tabelę
 - **THEN** moduł czyta z niej i pisze do niej bez osobnego nadania uprawnień
+

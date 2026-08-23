@@ -1,11 +1,10 @@
-## Purpose
+# strategy-catalogue Specification
 
+## Purpose
 Kontrakt, który czyni ze strategii wpis katalogu, a nie projekt: co strategia deklaruje,
 co zwraca, i czego nie wolno jej robić — tak, żeby dodanie kolejnej nie dotykało maszynerii
 wokół.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Strategia jest wpisem katalogu, nie zmianą platformy
 
 Strategia MUST być wpisem katalogu deklarującym: fakty, których potrzebuje (wskaźnik
@@ -88,3 +87,4 @@ detektora nowej strategii i daje punkt odniesienia, z którym strategia właści
 - **WHEN** platforma rusza po raz pierwszy
 - **THEN** katalog zawiera strategię odniesienia
 - **AND** jej fakty nazywają wyłącznie wskaźniki już obecne w katalogu archiwum
+
