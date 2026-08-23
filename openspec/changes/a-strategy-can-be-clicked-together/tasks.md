@@ -55,11 +55,10 @@
 - [x] 7.3 Ekran konfiguratora: lista definicji z rewizjami, edytor drzewa z wybierakami
       z katalogu archiwum, odmowa modułu pokazana przy tym, co ją wywołało
 - [x] 7.4 Wpis z obrazu oznaczony i bez kontrolek edycji; trzy testy na widok
-- [ ] 7.5 Ręczna próba szwu: wyklikać regułę na działającym stacku, założyć na niej
+- [x] 7.5 Ręczna próba szwu: wyklikać regułę na działającym stacku, założyć na niej
       obserwację i odczytać decyzję z jej rewizją
-      *(operatorska — wymaga uruchomionego archiwum i bazy; kontener bazy i porty są
-      współdzielone między worktree. Kształty po obu stronach drutu pokryte testami,
-      niepokryte są ręce operatora.)*
+      *(operatorska, odhaczona przez operatora 23.08.2026 — nie przez tę gałąź: kontener
+      bazy i porty są współdzielone między worktree.)*
 
 ## 8. Domknięcie
 

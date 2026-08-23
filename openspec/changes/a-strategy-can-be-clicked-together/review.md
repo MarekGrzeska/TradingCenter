@@ -132,11 +132,12 @@ without one. The refusal cases still use `/strategies`, because they never reach
 
 ## Gaps
 
-**Nothing has been clicked together against a running stack.** The configurator has not met
-a real archive catalogue, and the seam that matters — write a rule, watch a pair with it, read
-the decision back with its revision — is operator work needing the whole stack up. The shapes
-are covered by tests either side of the wire; what is not covered is the operator's hands on
-it. Task 7.5.
+**The seam was walked by the operator, not by this branch.** Writing a rule against a real
+archive catalogue, watching a pair with it and reading the decision back with its revision is
+task 7.5, and the operator ticked it on 23 August 2026. Nothing automated covers it and
+nothing should: the database container and the fixed ports are shared across worktrees, so a
+test that drove the running stack would be a test that fails whenever somebody else is
+working. What the suites cover is the shape on either side of the wire.
 
 **No written rule has been backtested against `baseline_ma_cross`.** The requirement that a
 clicked rule beat the floor before anybody acts on it is stated and is not yet enforced by
