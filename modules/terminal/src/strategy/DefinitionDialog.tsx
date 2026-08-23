@@ -31,8 +31,12 @@ import type { Definition, Rule, RuleFact, RuleParam, StrategyApi } from "./strat
  */
 
 const EMPTY_CATALOGUE: IndicatorCatalogue = { algorithmVersion: 0, indicators: [] };
-const FIELD = "rounded border border-border bg-sunken px-2 py-1 text-ink";
-const SMALL = "rounded border border-border bg-sunken px-1 py-0.5 text-ink";
+// The same height every control in this dialog has, including the ones inside the tree
+// (`rule/NodeEditor.tsx`). A form where a select is two pixels shorter than the input beside
+// it reads as broken before anybody has read a word of it.
+const FIELD = "h-8 w-full rounded border border-border bg-sunken px-2 text-ink";
+const SMALL = "h-7 rounded border border-border bg-sunken px-1 text-ink";
+const HINT = "text-ink-faint";
 
 export function DefinitionDialog({
   client,
@@ -83,6 +87,9 @@ export function DefinitionDialog({
       title={existing ? `Nowa rewizja — ${existing.strategyId}` : "Nowa reguła"}
       confirmLabel={existing ? "Zapisz rewizję" : "Zapisz regułę"}
       busyLabel="Pytam moduł…"
+      // A rule is composed here, not read. At the width of a question every row of the tree
+      // wraps, and a tree whose rows wrap stops looking like a tree.
+      size="wide"
       confirmDisabled={strategyId.trim() === "" || name.trim() === ""}
       fallbackError="nie udało się zapisać reguły"
       onConfirm={async () => {
@@ -93,7 +100,7 @@ export function DefinitionDialog({
       }}
       onClose={onClose}
     >
-      <div className="flex max-h-[70vh] flex-col gap-4 overflow-auto pr-1">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-auto pr-1">
         {catalogue.error !== null && (
           <p className="text-warning">
             Katalog wskaźników nie odpowiedział — {catalogue.error}. Bez niego moduł i tak
@@ -101,10 +108,13 @@ export function DefinitionDialog({
           </p>
         )}
 
-        <fieldset className="flex flex-col gap-2 text-xs">
+        <fieldset className="grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
           <legend className="text-ink-secondary">Tożsamość</legend>
-          <label className="flex items-center gap-2">
-            <span className="w-28 text-ink-secondary">Identyfikator</span>
+          {/* The hint sits under its field rather than beside it: beside it, one long
+              sentence sets the width of the whole row and the fields stop lining up. This is
+              the shape every other form in the terminal uses. */}
+          <label className="flex flex-col gap-1">
+            <span className="text-ink-secondary">Identyfikator</span>
             <input
               className={FIELD}
               aria-label="Identyfikator"
@@ -113,30 +123,30 @@ export function DefinitionDialog({
               placeholder="np. wybicie_kanalu"
               onChange={(e) => setStrategyId(e.target.value)}
             />
-            <span className="text-ink-faint">
+            <span className={HINT}>
               małe litery i podkreślenia; identyfikator wpisu z obrazu jest zajęty
             </span>
           </label>
-          <label className="flex items-center gap-2">
-            <span className="w-28 text-ink-secondary">Nazwa</span>
+          <label className="flex flex-col gap-1">
+            <span className="text-ink-secondary">Nazwa</span>
             <input
-              className={`${FIELD} flex-1`}
+              className={FIELD}
               aria-label="Nazwa"
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
           </label>
-          <label className="flex items-center gap-2">
-            <span className="w-28 text-ink-secondary">Opis</span>
+          <label className="col-span-2 flex flex-col gap-1">
+            <span className="text-ink-secondary">Opis</span>
             <input
-              className={`${FIELD} flex-1`}
+              className={FIELD}
               aria-label="Opis"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
             />
           </label>
-          <label className="flex items-center gap-2">
-            <span className="w-28 text-ink-secondary">Decyduje na</span>
+          <label className="flex flex-col gap-1">
+            <span className="text-ink-secondary">Decyduje na</span>
             <select
               className={FIELD}
               aria-label="Rozdzielczość"
@@ -167,19 +177,19 @@ export function DefinitionDialog({
           {/* Two sentences the platform will say on the operator's behalf, so they are the
               operator's words. "Nie ustabilizowało się" means something different for an
               average than for a structure. */}
-          <label className="flex items-center gap-2">
-            <span className="w-40 text-ink-secondary">Gdy odczyt nieustalony</span>
+          <label className="flex flex-col gap-1">
+            <span className="text-ink-secondary">Gdy odczyt nieustalony</span>
             <input
-              className={`${FIELD} flex-1`}
+              className={FIELD}
               aria-label="Powód przy nieustalonym odczycie"
               value={rule.unsettled_reason}
               onChange={(e) => patch({ unsettled_reason: e.target.value })}
             />
           </label>
-          <label className="flex items-center gap-2">
-            <span className="w-40 text-ink-secondary">Gdy brak setupu</span>
+          <label className="flex flex-col gap-1">
+            <span className="text-ink-secondary">Gdy brak setupu</span>
             <input
-              className={`${FIELD} flex-1`}
+              className={FIELD}
               aria-label="Powód przy braku setupu"
               value={rule.no_setup_reason}
               onChange={(e) => patch({ no_setup_reason: e.target.value })}
@@ -490,7 +500,7 @@ function FactParam({
       </select>
       {!asParam && (
         <input
-          className="w-16 rounded border border-border bg-sunken px-1 py-0.5 text-ink"
+          className={`${SMALL} w-16`}
           type="number"
           step="any"
           aria-label={label}
@@ -545,7 +555,7 @@ function ParamsSection({
             <label key={field} className="flex items-center gap-1 text-ink-faint">
               {field === "default" ? "domyślnie" : field}
               <input
-                className="w-16 rounded border border-border bg-sunken px-1 py-0.5 text-ink"
+                className={`${SMALL} w-16`}
                 type="number"
                 step="any"
                 aria-label={`${param.name} — ${field}`}

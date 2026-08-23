@@ -43,14 +43,27 @@ export interface EditorContext {
   indicators: Map<string, IndicatorCatalogueEntry>;
 }
 
-const SELECT = "rounded border border-border bg-sunken px-1 py-0.5 text-ink";
-const NUMBER = "w-20 rounded border border-border bg-sunken px-1 py-0.5 text-ink";
+// One height for every control in the tree, and it is load-bearing rather than tidy: a row
+// mixing a 24px select with a 28px input reads as two rows, and a tree is only legible while
+// its rows read as a column.
+const CONTROL = "h-7 rounded border border-border bg-sunken px-1 text-ink";
+// The kind picker is the column an operator's eye runs down, so it has one width whatever it
+// currently says. The operator picker beside it has another, narrower one.
+const KIND = `${CONTROL} w-44`;
+const OPERATOR = `${CONTROL} w-28`;
+const SELECT = `${CONTROL} w-32`;
+const NUMBER = `${CONTROL} w-24`;
+const OFFSET = `${CONTROL} w-14`;
 
 function Row({ depth, children }: { depth: number; children: React.ReactNode }) {
   return (
     <div
-      className="flex flex-wrap items-center gap-1 py-0.5 text-xs"
-      style={{ paddingLeft: `${depth * 0.9}rem` }}
+      // The indent is a rule, not padding: nesting three deep is unreadable when the only
+      // sign of it is where a row starts.
+      className={`flex flex-wrap items-center gap-1 py-0.5 text-xs${
+        depth > 0 ? " border-l border-border pl-2" : ""
+      }`}
+      style={{ marginLeft: depth > 0 ? `${(depth - 1) * 0.85}rem` : undefined }}
     >
       {children}
     </div>
@@ -77,11 +90,11 @@ function Operands<T extends NumericNode | ConditionNode>({
     <>
       {operands.map((child, index) => (
         <div key={index} className="flex items-start gap-1">
-          <div className="flex-1">{render(child, index)}</div>
+          <div className="min-w-0 flex-1">{render(child, index)}</div>
           {operands.length > limits.min && (
             <button
               type="button"
-              className="mt-0.5 text-xs text-ink-faint hover:text-critical"
+              className="mt-1 shrink-0 text-xs text-ink-faint hover:text-critical"
               aria-label="Usuń składnik"
               onClick={() => onChange(operands.filter((_, at) => at !== index))}
             >
@@ -120,7 +133,7 @@ function KindPicker<K extends string>({
 }) {
   return (
     <select
-      className={SELECT}
+      className={KIND}
       aria-label={label}
       value={value}
       onChange={(e) => onChange(e.target.value as K)}
@@ -276,7 +289,7 @@ export function NumericEditor({
         {head}
         {node.node === "arith" ? (
           <select
-            className={SELECT}
+            className={OPERATOR}
             aria-label="Działanie"
             value={node.op}
             onChange={(e) =>
@@ -291,7 +304,7 @@ export function NumericEditor({
           </select>
         ) : (
           <select
-            className={SELECT}
+            className={OPERATOR}
             aria-label="Funkcja"
             value={node.fn}
             onChange={(e) => onChange({ ...node, fn: e.target.value as (typeof CALL_FNS)[number] })}
@@ -330,10 +343,10 @@ export function NumericEditor({
 
 function OffsetField({ value, onChange }: { value: number; onChange(next: number): void }) {
   return (
-    <label className="flex items-center gap-1 text-ink-faint">
-      świec wstecz
+    <label className="flex shrink-0 items-center gap-1 whitespace-nowrap text-ink-faint">
+      wstecz
       <input
-        className="w-12 rounded border border-border bg-sunken px-1 py-0.5 text-ink"
+        className={OFFSET}
         type="number"
         min={0}
         aria-label="Świec wstecz"
@@ -377,7 +390,7 @@ export function ConditionEditor({
           {head}
           {node.node === "compare" ? (
             <select
-              className={SELECT}
+              className={OPERATOR}
               aria-label="Znak porównania"
               value={node.op}
               onChange={(e) =>
@@ -392,7 +405,7 @@ export function ConditionEditor({
             </select>
           ) : (
             <select
-              className={SELECT}
+              className={OPERATOR}
               aria-label="Kierunek przecięcia"
               value={node.direction}
               onChange={(e) =>
@@ -459,7 +472,7 @@ export function ConditionEditor({
       <Row depth={depth}>
         {head}
         <select
-          className={SELECT}
+          className={OPERATOR}
           aria-label="Spójnik"
           value={node.op}
           onChange={(e) => onChange({ ...node, op: e.target.value as (typeof LOGIC_OPS)[number] })}

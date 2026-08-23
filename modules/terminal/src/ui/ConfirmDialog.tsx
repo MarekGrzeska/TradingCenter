@@ -24,6 +24,7 @@ export function ConfirmDialog({
   busyLabel,
   confirmDisabled = false,
   cancelLabel = "Cancel",
+  size = "question",
   tone = "normal",
   fallbackError = "the action failed",
   closeOnSuccess = true,
@@ -39,6 +40,10 @@ export function ConfirmDialog({
   confirmDisabled?: boolean;
   /** `null` for a dialog with nothing to back out of (a result being acknowledged). */
   cancelLabel?: string | null;
+  /** A question is narrow, which is right for a question. `wide` is for the case where the
+   *  consent is over something the operator is *composing* rather than reading — a rule
+   *  tree, say — and where a narrow panel makes every row wrap and the thing illegible. */
+  size?: "question" | "wide";
   tone?: "normal" | "danger";
   fallbackError?: string;
   /** `false` when the work answers with something the view underneath will not show —
@@ -73,7 +78,7 @@ export function ConfirmDialog({
       : "rounded border border-primary bg-primary-soft px-3 py-1 text-ink hover:bg-primary-strong hover:text-ink-inverse disabled:opacity-40";
 
   return (
-    <ModalShell title={title} closeDisabled={busy} onClose={onClose}
+    <ModalShell title={title} size={size} closeDisabled={busy} onClose={onClose}
       footer={
         <div className="flex flex-col gap-2">
           {failure && <p className="text-critical">{failure}</p>}
