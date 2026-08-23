@@ -37,8 +37,15 @@ from tc_runtime.db import pool as make_pool
 from .archive import Archive, http_client
 from .caller_access import CallerAccess
 from .config import Settings
-from .errors import ArchiveRefused, ArchiveUnreachable, StrategyError, UnknownStrategy
-from .routers import backtests, decisions, meta, strategies
+from .errors import (
+    ArchiveRefused,
+    ArchiveUnreachable,
+    StrategyError,
+    UnknownDefinition,
+    UnknownRevision,
+    UnknownStrategy,
+)
+from .routers import backtests, decisions, definitions, meta, strategies
 from .runner import EvaluationLoop
 from .runtime import MIGRATION_LOCK_KEY, MIGRATIONS
 
@@ -101,10 +108,11 @@ async def lifespan(app: FastAPI):
 
 
 async def _refused(request: Request, exc: StrategyError) -> JSONResponse:
-    # 404 for a strategy this image does not carry, 502/504 for the archive, 422 for the
-    # rest. The archive's two are told apart because a consumer's next move differs: one
+    # 404 for a strategy, definition or revision that is not there, 502/504 for the
+    # archive, 422 for the rest — a refused rule among them, because it was understood,
+    # declined, and would be declined again unchanged. The archive's two are told apart because a consumer's next move differs: one
     # is "try again", the other is "the request was wrong".
-    if isinstance(exc, UnknownStrategy):
+    if isinstance(exc, UnknownStrategy | UnknownDefinition | UnknownRevision):
         status = 404
     elif isinstance(exc, ArchiveUnreachable):
         status = 504
@@ -149,7 +157,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(StrategyError, _refused)  # type: ignore[arg-type]
     app.add_exception_handler(Exception, _unhandled)  # type: ignore[arg-type]
 
-    for area in (meta, strategies, decisions, backtests):
+    for area in (meta, strategies, definitions, decisions, backtests):
         app.include_router(area.router)
 
     # The tool surface, as a mounted ASGI application rather than a router: what the MCP

@@ -25,9 +25,9 @@ import logging
 from dataclasses import dataclass
 from datetime import datetime
 
+from .. import resolver
 from ..archive import Archive
-from ..catalogue import get
-from ..errors import StrategyError, UnknownStrategy
+from ..errors import StrategyError
 from ..gates import ReasonKind, apply, coverage, reward_over_risk
 from ..spec import Decision
 from ..store import (
@@ -62,17 +62,23 @@ class Evaluated:
 
 
 async def evaluate_once(pool, archive: Archive, watch: Watch) -> Evaluated:
-    """One watch, one bar, one decision — or the reason there was not one."""
-    try:
-        spec = get(watch.strategy_id)
-    except UnknownStrategy as err:
-        # A watch for a strategy this image no longer carries. Skipped rather than raised:
-        # the other watches are unaffected, and the operator's remedy is a row, not a
-        # restart.
-        return Evaluated(watch=watch, as_of=None, decision=None, skipped=str(err))
+    """One watch, one bar, one decision — or the reason there was not one.
 
+    **The watch's own revision, never the newest.** A definition may have moved on three
+    times since this watch was started; none of that changes what it decides until somebody
+    points it at a newer one (`strategy-configurator`, "Rewizja jest niezmienna, a
+    obserwacja ją przypina").
+    """
     async with pool.acquire() as conn:
+        try:
+            found = await resolver.resolve_watch(conn, watch)
+        except StrategyError as err:
+            # A watch for a strategy this image no longer carries, or a revision it cannot
+            # read. Skipped rather than raised: the other watches are unaffected, and the
+            # operator's remedy is a row, not a restart.
+            return Evaluated(watch=watch, as_of=None, decision=None, skipped=str(err))
         parameters = await read_parameter_set(conn, watch.parameter_set_id)
+    spec = found.spec
     if parameters is None:
         return Evaluated(
             watch=watch, as_of=None, decision=None, skipped="its parameter set is gone"
@@ -103,7 +109,9 @@ async def evaluate_once(pool, archive: Archive, watch: Watch) -> Evaluated:
         # Recorded, and this is the point: a strategy that could not see is not a strategy
         # that saw nothing, and the record has to say which it was.
         decision = Decision.no_trade(f"the facts could not be read: {err}")
-        recorded = await _write(pool, watch, as_of, decision, "coverage", {"error": str(err)})
+        recorded = await _write(
+            pool, watch, as_of, decision, "coverage", {"error": str(err)}, found.revision_id
+        )
         return Evaluated(
             watch=watch, as_of=as_of, decision=decision, reason_kind="coverage", recorded=recorded
         )
@@ -117,14 +125,22 @@ async def evaluate_once(pool, archive: Archive, watch: Watch) -> Evaluated:
         ],
     )
     recorded = await _write(
-        pool, watch, as_of, decision, reason_kind, facts_snapshot(read.facts, read.gaps)
+        pool,
+        watch,
+        as_of,
+        decision,
+        reason_kind,
+        facts_snapshot(read.facts, read.gaps),
+        found.revision_id,
     )
     return Evaluated(
         watch=watch, as_of=as_of, decision=decision, reason_kind=reason_kind, recorded=recorded
     )
 
 
-async def _write(pool, watch: Watch, as_of, decision, reason_kind, facts) -> bool:
+async def _write(
+    pool, watch: Watch, as_of, decision, reason_kind, facts, strategy_revision_id
+) -> bool:
     async with pool.acquire() as conn:
         return await record_decision(
             conn,
@@ -135,6 +151,7 @@ async def _write(pool, watch: Watch, as_of, decision, reason_kind, facts) -> boo
             decision=decision,
             reason_kind=reason_kind,
             facts=facts,
+            strategy_revision_id=strategy_revision_id,
         )
 
 

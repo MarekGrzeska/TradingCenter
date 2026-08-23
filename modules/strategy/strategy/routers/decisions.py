@@ -25,6 +25,8 @@ def _out(row: RecordedDecision) -> DecisionOut:
         strategy_id=row.strategy_id,
         symbol=row.symbol,
         parameter_set_id=row.parameter_set_id,
+        strategy_revision_id=row.strategy_revision_id,
+        strategy_revision=row.strategy_revision,
         as_of=row.as_of,
         action=row.decision.action,
         reason=row.decision.reason,

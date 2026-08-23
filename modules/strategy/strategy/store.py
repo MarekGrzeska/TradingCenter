@@ -1,4 +1,4 @@
-"""The only door to this module's three tables.
+"""The only door to this module's tables.
 
 One place that writes, so the rules the schema states are stated once in Python too. Two
 of them are worth reading before changing anything:
@@ -12,6 +12,12 @@ the old one stays.
 is what makes the loop idempotent: it re-reads the last closed bar on every wake and after
 every restart, and writing a second row for that bar would turn a restart into a second
 setup.
+
+**Revisions are append-only too, and for the same reason one layer up.** A rule is data
+now, so "which parameters decided this" stopped being the whole of provenance: without the
+revision the numbers are known and the rule that weighed them is not. Nothing updates a
+revision; a change of mind is the next one, and a watch keeps pointing at the one it was
+started with until somebody moves it (`strategy-configurator`).
 """
 
 from __future__ import annotations
@@ -29,12 +35,39 @@ from .spec import Candle, Decision, Facts, FactValue, Level, Marker, Zone
 
 
 @dataclass(frozen=True)
+class StrategyDefinition:
+    """A clicked-together strategy, without its rule — the rule lives in its revisions."""
+
+    id: int
+    strategy_id: str
+    name: str
+    description: str
+    latest_version: int
+    created_at: datetime
+
+
+@dataclass(frozen=True)
+class StrategyRevision:
+    """One immutable brushstroke of a definition: the whole rule, as it was written."""
+
+    id: int
+    definition_id: int
+    strategy_id: str
+    version: int
+    definition: dict[str, Any]
+    created_at: datetime
+
+
+@dataclass(frozen=True)
 class ParameterSet:
     id: int
     strategy_id: str
     version: int
     params: dict[str, float]
     created_at: datetime
+    # Which revision's declaration these values were checked against. `None` for a coded
+    # entry, whose declaration is in the image and has no row to point at.
+    strategy_revision_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +78,9 @@ class Watch:
     parameter_set_id: int
     active: bool
     created_at: datetime
+    # Pinned, never followed. Saving a newer revision leaves this one computing what it
+    # was started with, and moving it is a separate act by the operator.
+    strategy_revision_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -60,13 +96,190 @@ class RecordedDecision:
     reason_kind: ReasonKind | None
     facts: dict[str, Any]
     created_at: datetime
+    strategy_revision_id: int | None = None
+    # The revision's own number, joined in so a reader never has to resolve a surrogate id
+    # to answer "which rule was this". `None` for a decision made by a coded entry.
+    strategy_revision: int | None = None
+
+
+# --- definitions and their revisions ----------------------------------------------------
+
+
+async def add_definition(
+    conn: asyncpg.Connection,
+    *,
+    strategy_id: str,
+    name: str,
+    description: str,
+    definition: Mapping[str, Any],
+) -> tuple[StrategyDefinition, StrategyRevision]:
+    """A new clicked strategy and its first revision, in one transaction.
+
+    One act rather than two, because a definition with no revision is a name with no rule —
+    a state nothing downstream knows how to read and nobody meant to create.
+    """
+    async with conn.transaction():
+        row = await conn.fetchrow(
+            """
+            INSERT INTO strategy_definitions (strategy_id, name, description)
+            VALUES ($1, $2, $3)
+            RETURNING id, strategy_id, name, description, created_at
+            """,
+            strategy_id,
+            name,
+            description,
+        )
+        assert row is not None
+        revision = await _insert_revision(conn, row["id"], strategy_id, definition)
+    return (
+        StrategyDefinition(
+            id=row["id"],
+            strategy_id=row["strategy_id"],
+            name=row["name"],
+            description=row["description"],
+            latest_version=revision.version,
+            created_at=row["created_at"],
+        ),
+        revision,
+    )
+
+
+async def add_revision(
+    conn: asyncpg.Connection, strategy_id: str, definition: Mapping[str, Any]
+) -> StrategyRevision | None:
+    """The next revision of an existing definition, or `None` when there is no such one.
+
+    Append-only: nothing here updates a revision, and nothing may. A watch already pointing
+    at an older one keeps computing it — that is the whole point of pinning rather than
+    following (`strategy-configurator`, "Rewizja jest niezmienna, a obserwacja ją przypina").
+    """
+    async with conn.transaction():
+        definition_id = await conn.fetchval(
+            "SELECT id FROM strategy_definitions WHERE strategy_id = $1", strategy_id
+        )
+        if definition_id is None:
+            return None
+        return await _insert_revision(conn, int(definition_id), strategy_id, definition)
+
+
+async def _insert_revision(
+    conn: asyncpg.Connection, definition_id: int, strategy_id: str, definition: Mapping[str, Any]
+) -> StrategyRevision:
+    """The version is chosen inside the statement, for the reason `add_parameter_set` gives."""
+    row = await conn.fetchrow(
+        """
+        INSERT INTO strategy_revisions (definition_id, version, definition)
+        VALUES (
+            $1,
+            coalesce((SELECT max(version) FROM strategy_revisions WHERE definition_id = $1), 0) + 1,
+            $2::jsonb
+        )
+        RETURNING id, definition_id, version, definition, created_at
+        """,
+        definition_id,
+        json.dumps(dict(definition)),
+    )
+    assert row is not None
+    return _revision(row, strategy_id)
+
+
+async def rename_definition(
+    conn: asyncpg.Connection, strategy_id: str, *, name: str, description: str
+) -> StrategyDefinition | None:
+    """The two things about a definition that are not the rule.
+
+    Updated in place rather than minted as a revision: a revision is what a decision points
+    at, and a decision whose provenance changed because somebody fixed a typo in a title
+    would be provenance nobody could trust.
+    """
+    row = await conn.fetchrow(
+        """
+        UPDATE strategy_definitions SET name = $2, description = $3
+        WHERE strategy_id = $1
+        RETURNING id, strategy_id, name, description, created_at,
+                  coalesce((SELECT max(version) FROM strategy_revisions
+                            WHERE definition_id = strategy_definitions.id), 0) AS latest_version
+        """,
+        strategy_id,
+        name,
+        description,
+    )
+    return _definition(row) if row else None
+
+
+async def list_definitions(conn: asyncpg.Connection) -> list[StrategyDefinition]:
+    rows = await conn.fetch(
+        f"SELECT {_DEFINITION_COLUMNS} FROM strategy_definitions d ORDER BY d.strategy_id"
+    )
+    return [_definition(row) for row in rows]
+
+
+async def read_definition(
+    conn: asyncpg.Connection, strategy_id: str
+) -> StrategyDefinition | None:
+    row = await conn.fetchrow(
+        f"SELECT {_DEFINITION_COLUMNS} FROM strategy_definitions d WHERE d.strategy_id = $1",
+        strategy_id,
+    )
+    return _definition(row) if row else None
+
+
+async def list_revisions(conn: asyncpg.Connection, strategy_id: str) -> list[StrategyRevision]:
+    rows = await conn.fetch(
+        """
+        SELECT r.id, r.definition_id, r.version, r.definition, r.created_at
+        FROM strategy_revisions r
+        JOIN strategy_definitions d ON d.id = r.definition_id
+        WHERE d.strategy_id = $1
+        ORDER BY r.version DESC
+        """,
+        strategy_id,
+    )
+    return [_revision(row, strategy_id) for row in rows]
+
+
+async def read_revision(conn: asyncpg.Connection, revision_id: int) -> StrategyRevision | None:
+    """One revision by its own id — how a recorded decision finds the rule that made it."""
+    row = await conn.fetchrow(
+        """
+        SELECT r.id, r.definition_id, r.version, r.definition, r.created_at, d.strategy_id
+        FROM strategy_revisions r
+        JOIN strategy_definitions d ON d.id = r.definition_id
+        WHERE r.id = $1
+        """,
+        revision_id,
+    )
+    return _revision(row, row["strategy_id"]) if row else None
+
+
+async def read_revision_at(
+    conn: asyncpg.Connection, strategy_id: str, version: int | None
+) -> StrategyRevision | None:
+    """One numbered revision of a definition, or its newest when `version` is `None`."""
+    row = await conn.fetchrow(
+        """
+        SELECT r.id, r.definition_id, r.version, r.definition, r.created_at
+        FROM strategy_revisions r
+        JOIN strategy_definitions d ON d.id = r.definition_id
+        WHERE d.strategy_id = $1 AND ($2::int IS NULL OR r.version = $2)
+        ORDER BY r.version DESC
+        LIMIT 1
+        """,
+        strategy_id,
+        version,
+    )
+    return _revision(row, strategy_id) if row else None
 
 
 # --- parameter sets -------------------------------------------------------------------
 
 
 async def add_parameter_set(
-    conn: asyncpg.Connection, strategy_id: str, params: Mapping[str, float]
+    conn: asyncpg.Connection,
+    strategy_id: str,
+    params: Mapping[str, float],
+    *,
+    strategy_revision_id: int | None = None,
 ) -> ParameterSet:
     """The next version for this strategy, whatever the last one was.
 
@@ -74,19 +287,25 @@ async def add_parameter_set(
     requests arriving together would otherwise both read the same last version and one
     would lose on the unique constraint — which is the right outcome but a needlessly
     confusing way to reach it.
+
+    `strategy_revision_id` is the declaration these values were checked against, and it is
+    part of the row rather than inferred later: which ranges a set satisfied is a fact about
+    the moment it was written (design.md, decision 6).
     """
     row = await conn.fetchrow(
-        """
-        INSERT INTO parameter_sets (strategy_id, version, params)
+        f"""
+        INSERT INTO parameter_sets (strategy_id, version, params, strategy_revision_id)
         VALUES (
             $1,
             coalesce((SELECT max(version) FROM parameter_sets WHERE strategy_id = $1), 0) + 1,
-            $2::jsonb
+            $2::jsonb,
+            $3
         )
-        RETURNING id, strategy_id, version, params, created_at
+        RETURNING {_PARAMETER_SET_COLUMNS}
         """,
         strategy_id,
         json.dumps(dict(params)),
+        strategy_revision_id,
     )
     assert row is not None  # an INSERT ... RETURNING that inserted cannot answer nothing
     return _parameter_set(row)
@@ -94,7 +313,7 @@ async def add_parameter_set(
 
 async def read_parameter_set(conn: asyncpg.Connection, parameter_set_id: int) -> ParameterSet | None:
     row = await conn.fetchrow(
-        "SELECT id, strategy_id, version, params, created_at FROM parameter_sets WHERE id = $1",
+        f"SELECT {_PARAMETER_SET_COLUMNS} FROM parameter_sets WHERE id = $1",
         parameter_set_id,
     )
     return _parameter_set(row) if row else None
@@ -104,8 +323,8 @@ async def list_parameter_sets(
     conn: asyncpg.Connection, strategy_id: str | None = None
 ) -> list[ParameterSet]:
     rows = await conn.fetch(
-        """
-        SELECT id, strategy_id, version, params, created_at
+        f"""
+        SELECT {_PARAMETER_SET_COLUMNS}
         FROM parameter_sets
         WHERE ($1::text IS NULL OR strategy_id = $1)
         ORDER BY strategy_id, version DESC
@@ -119,7 +338,12 @@ async def list_parameter_sets(
 
 
 async def put_watch(
-    conn: asyncpg.Connection, strategy_id: str, symbol: str, parameter_set_id: int
+    conn: asyncpg.Connection,
+    strategy_id: str,
+    symbol: str,
+    parameter_set_id: int,
+    *,
+    strategy_revision_id: int | None = None,
 ) -> Watch:
     """Start watching a pair with a strategy, or point an existing watch at new parameters.
 
@@ -127,18 +351,25 @@ async def put_watch(
     of the operator's intent, and whether a row already existed is this module's business.
     A watch that had been deactivated comes back active — asking for it again is asking
     for it to run.
+
+    The revision is written on the same upsert, which is what makes moving a watch to a
+    newer rule the same single, deliberate act as changing its parameters — and what makes
+    *not* asking leave it exactly where it was.
     """
     row = await conn.fetchrow(
-        """
-        INSERT INTO watches (strategy_id, symbol, parameter_set_id, active)
-        VALUES ($1, $2, $3, true)
+        f"""
+        INSERT INTO watches (strategy_id, symbol, parameter_set_id, active, strategy_revision_id)
+        VALUES ($1, $2, $3, true, $4)
         ON CONFLICT (strategy_id, symbol) DO UPDATE
-            SET parameter_set_id = excluded.parameter_set_id, active = true
-        RETURNING id, strategy_id, symbol, parameter_set_id, active, created_at
+            SET parameter_set_id = excluded.parameter_set_id,
+                strategy_revision_id = excluded.strategy_revision_id,
+                active = true
+        RETURNING {_WATCH_COLUMNS}
         """,
         strategy_id,
         symbol,
         parameter_set_id,
+        strategy_revision_id,
     )
     assert row is not None
     return _watch(row)
@@ -146,9 +377,9 @@ async def put_watch(
 
 async def set_watch_active(conn: asyncpg.Connection, watch_id: int, active: bool) -> Watch | None:
     row = await conn.fetchrow(
-        """
+        f"""
         UPDATE watches SET active = $2 WHERE id = $1
-        RETURNING id, strategy_id, symbol, parameter_set_id, active, created_at
+        RETURNING {_WATCH_COLUMNS}
         """,
         watch_id,
         active,
@@ -158,8 +389,8 @@ async def set_watch_active(conn: asyncpg.Connection, watch_id: int, active: bool
 
 async def list_watches(conn: asyncpg.Connection, *, active_only: bool = False) -> list[Watch]:
     rows = await conn.fetch(
-        """
-        SELECT id, strategy_id, symbol, parameter_set_id, active, created_at
+        f"""
+        SELECT {_WATCH_COLUMNS}
         FROM watches
         WHERE (NOT $1::boolean OR active)
         ORDER BY strategy_id, symbol
@@ -182,6 +413,7 @@ async def record_decision(
     decision: Decision,
     reason_kind: ReasonKind | None,
     facts: Mapping[str, Any],
+    strategy_revision_id: int | None = None,
 ) -> bool:
     """Write one decision. `False` when this bar already had one.
 
@@ -192,9 +424,10 @@ async def record_decision(
         """
         INSERT INTO decisions (
             strategy_id, symbol, parameter_set_id, as_of, action, reason, reason_kind,
-            direction, entry, stop, target, rr, score, features, facts
+            direction, entry, stop, target, rr, score, features, facts, strategy_revision_id
         )
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14::jsonb, $15::jsonb,
+                $16)
         ON CONFLICT (strategy_id, symbol, as_of) DO NOTHING
         RETURNING id
         """,
@@ -213,6 +446,7 @@ async def record_decision(
         decision.score,
         json.dumps(dict(decision.features)),
         json.dumps(dict(facts)),
+        strategy_revision_id,
     )
     return written is not None
 
@@ -221,8 +455,8 @@ async def last_decision(
     conn: asyncpg.Connection, strategy_id: str, symbol: str
 ) -> RecordedDecision | None:
     row = await conn.fetchrow(
-        f"SELECT {_DECISION_COLUMNS} FROM decisions WHERE strategy_id = $1 AND symbol = $2 "
-        "ORDER BY as_of DESC LIMIT 1",
+        f"SELECT {_DECISION_COLUMNS} FROM {_DECISION_SOURCE} "
+        "WHERE d.strategy_id = $1 AND d.symbol = $2 ORDER BY d.as_of DESC LIMIT 1",
         strategy_id,
         symbol,
     )
@@ -231,7 +465,7 @@ async def last_decision(
 
 async def read_decision(conn: asyncpg.Connection, decision_id: int) -> RecordedDecision | None:
     row = await conn.fetchrow(
-        f"SELECT {_DECISION_COLUMNS} FROM decisions WHERE id = $1", decision_id
+        f"SELECT {_DECISION_COLUMNS} FROM {_DECISION_SOURCE} WHERE d.id = $1", decision_id
     )
     return _decision(row) if row else None
 
@@ -246,11 +480,11 @@ async def list_decisions(
 ) -> list[RecordedDecision]:
     rows = await conn.fetch(
         f"""
-        SELECT {_DECISION_COLUMNS} FROM decisions
-        WHERE ($1::text IS NULL OR strategy_id = $1)
-          AND ($2::text IS NULL OR symbol = $2)
-          AND ($3::text IS NULL OR action = $3)
-        ORDER BY as_of DESC, id DESC
+        SELECT {_DECISION_COLUMNS} FROM {_DECISION_SOURCE}
+        WHERE ($1::text IS NULL OR d.strategy_id = $1)
+          AND ($2::text IS NULL OR d.symbol = $2)
+          AND ($3::text IS NULL OR d.action = $3)
+        ORDER BY d.as_of DESC, d.id DESC
         LIMIT $4
         """,
         strategy_id,
@@ -291,6 +525,7 @@ async def count_pending_setups(
 class BacktestRun:
     id: int
     strategy_id: str
+    strategy_revision_id: int | None
     symbol: str
     resolution: str
     range_from: datetime
@@ -305,6 +540,7 @@ async def record_backtest_run(
     conn: asyncpg.Connection,
     *,
     strategy_id: str,
+    strategy_revision_id: int | None = None,
     symbol: str,
     resolution: str,
     range_from: datetime,
@@ -318,12 +554,14 @@ async def record_backtest_run(
     row = await conn.fetchrow(
         f"""
         INSERT INTO backtest_runs (
-            strategy_id, symbol, resolution, range_from, range_to, params, costs, report
+            strategy_id, strategy_revision_id, symbol, resolution, range_from, range_to,
+            params, costs, report
         )
-        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb)
+        VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb)
         RETURNING {_RUN_COLUMNS}
         """,
         strategy_id,
+        strategy_revision_id,
         symbol,
         resolution,
         range_from,
@@ -359,8 +597,17 @@ async def read_backtest_run(conn: asyncpg.Connection, run_id: int) -> BacktestRu
 
 # --- rows to objects ------------------------------------------------------------------
 
+_PARAMETER_SET_COLUMNS = (
+    "id, strategy_id, version, params, created_at, strategy_revision_id"
+)
+
+_WATCH_COLUMNS = (
+    "id, strategy_id, symbol, parameter_set_id, active, created_at, strategy_revision_id"
+)
+
 _RUN_COLUMNS = (
-    "id, strategy_id, symbol, resolution, range_from, range_to, params, costs, report, ran_at"
+    "id, strategy_id, strategy_revision_id, symbol, resolution, range_from, range_to, "
+    "params, costs, report, ran_at"
 )
 
 
@@ -368,6 +615,7 @@ def _run(row: asyncpg.Record) -> BacktestRun:
     return BacktestRun(
         id=row["id"],
         strategy_id=row["strategy_id"],
+        strategy_revision_id=row["strategy_revision_id"],
         symbol=row["symbol"],
         resolution=row["resolution"],
         range_from=row["range_from"],
@@ -380,9 +628,14 @@ def _run(row: asyncpg.Record) -> BacktestRun:
 
 
 
+# Joined rather than looked up afterwards: every reader of a decision wants the revision's
+# number, and none of them wants to resolve a surrogate id to get it.
+_DECISION_SOURCE = "decisions d LEFT JOIN strategy_revisions sr ON sr.id = d.strategy_revision_id"
+
 _DECISION_COLUMNS = (
-    "id, strategy_id, symbol, parameter_set_id, as_of, action, reason, reason_kind, "
-    "direction, entry, stop, target, rr, score, features, facts, created_at"
+    "d.id, d.strategy_id, d.symbol, d.parameter_set_id, d.as_of, d.action, d.reason, "
+    "d.reason_kind, d.direction, d.entry, d.stop, d.target, d.rr, d.score, d.features, "
+    "d.facts, d.created_at, d.strategy_revision_id, sr.version AS strategy_revision"
 )
 
 
@@ -392,6 +645,35 @@ def _json(value: Any) -> Any:
     return json.loads(value) if isinstance(value, str | bytes) else value
 
 
+_DEFINITION_COLUMNS = (
+    "d.id, d.strategy_id, d.name, d.description, d.created_at, "
+    "coalesce((SELECT max(version) FROM strategy_revisions r WHERE r.definition_id = d.id), 0) "
+    "AS latest_version"
+)
+
+
+def _definition(row: asyncpg.Record) -> StrategyDefinition:
+    return StrategyDefinition(
+        id=row["id"],
+        strategy_id=row["strategy_id"],
+        name=row["name"],
+        description=row["description"],
+        latest_version=int(row["latest_version"]),
+        created_at=row["created_at"],
+    )
+
+
+def _revision(row: asyncpg.Record, strategy_id: str) -> StrategyRevision:
+    return StrategyRevision(
+        id=row["id"],
+        definition_id=row["definition_id"],
+        strategy_id=strategy_id,
+        version=row["version"],
+        definition=_json(row["definition"]),
+        created_at=row["created_at"],
+    )
+
+
 def _parameter_set(row: asyncpg.Record) -> ParameterSet:
     return ParameterSet(
         id=row["id"],
@@ -399,6 +681,7 @@ def _parameter_set(row: asyncpg.Record) -> ParameterSet:
         version=row["version"],
         params=_json(row["params"]),
         created_at=row["created_at"],
+        strategy_revision_id=row["strategy_revision_id"],
     )
 
 
@@ -410,6 +693,7 @@ def _watch(row: asyncpg.Record) -> Watch:
         parameter_set_id=row["parameter_set_id"],
         active=row["active"],
         created_at=row["created_at"],
+        strategy_revision_id=row["strategy_revision_id"],
     )
 
 
@@ -434,6 +718,8 @@ def _decision(row: asyncpg.Record) -> RecordedDecision:
         reason_kind=row["reason_kind"],
         facts=_json(row["facts"]),
         created_at=row["created_at"],
+        strategy_revision_id=row["strategy_revision_id"],
+        strategy_revision=row["strategy_revision"],
     )
 
 

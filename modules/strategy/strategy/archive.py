@@ -100,6 +100,38 @@ class Gap:
 
 
 @dataclass(frozen=True)
+class AnnouncedParam:
+    """One parameter of an archive indicator, with the range the archive publishes."""
+
+    name: str
+    type: str
+    default: float
+    min: float
+    max: float
+
+
+@dataclass(frozen=True)
+class AnnouncedIndicator:
+    """One catalogue entry of the archive, as much of it as this module has a use for.
+
+    Its `params` and `lines` are what makes a configurator possible without inventing a
+    second catalogue: the archive already publishes the ranges and the line keys, so the
+    picker on the screen and the refusal in `rule_validation.py` read the same source
+    (`strategy-configurator`, "Definicja jest odrzucana w chwili zapisu").
+    """
+
+    id: str
+    name: str
+    group: str
+    output: str
+    params: tuple[AnnouncedParam, ...] = ()
+    lines: tuple[str, ...] = ()
+
+    def param(self, name: str) -> AnnouncedParam | None:
+        return next((param for param in self.params if param.name == name), None)
+
+
+@dataclass(frozen=True)
 class FactsRead:
     """Everything one evaluation needs, and what was missing from it."""
 
@@ -122,6 +154,18 @@ class Archive:
         """
         body = await self._get("/indicators", params={}, what="the indicator catalogue")
         return frozenset(str(entry["id"]) for entry in body.get("indicators", []))
+
+    async def announced_catalogue(self) -> dict[str, AnnouncedIndicator]:
+        """The archive's indicator catalogue, keyed by id.
+
+        The same document `announced_indicators` reads, kept whole rather than reduced to a
+        set of ids: what a rule needs checking against is the parameters and their ranges,
+        the line keys and what kind of thing the indicator answers at all. Nothing here is
+        cached — a definition is written once in a while, and a stale copy of the ranges is
+        exactly the kind of second truth this module has no business holding.
+        """
+        body = await self._get("/indicators", params={}, what="the indicator catalogue")
+        return {entry.id: entry for entry in (_announced(row) for row in body.get("indicators", []))}
 
     async def last_closed_bar(self, symbol: str, resolution: str) -> datetime | None:
         """When the most recent closed bar of this pair opened, or `None` if there is none.
@@ -293,6 +337,26 @@ def _detail(response: httpx.Response) -> str:
     if isinstance(body, dict) and isinstance(body.get("detail"), str):
         return body["detail"]
     return str(body)
+
+
+def _announced(row: Any) -> AnnouncedIndicator:
+    return AnnouncedIndicator(
+        id=str(row["id"]),
+        name=str(row.get("name", row["id"])),
+        group=str(row.get("group", "")),
+        output=str(row.get("output", "lines")),
+        params=tuple(
+            AnnouncedParam(
+                name=str(param["name"]),
+                type=str(param.get("type", "float")),
+                default=float(param["default"]),
+                min=float(param["min"]),
+                max=float(param["max"]),
+            )
+            for param in (row.get("params") or [])
+        ),
+        lines=tuple(str(line["key"]) for line in (row.get("lines") or [])),
+    )
 
 
 def _by_resolution(facts: Iterable[Fact]) -> dict[str, list[Fact]]:
