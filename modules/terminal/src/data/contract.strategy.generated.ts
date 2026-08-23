@@ -114,6 +114,103 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Definitions
+         * @description Every rule that was written down. The coded entries are not here — they are in
+         *     `/strategies`, which lists both, and this route is about what can be edited.
+         */
+        get: operations["list_definitions_definitions_get"];
+        put?: never;
+        /**
+         * Add Definition
+         * @description A new rule and its first revision.
+         *
+         *     Answers with the revision rather than the definition, because the revision is the thing
+         *     anything else points at: a watch pins one, a decision names one, and a caller that got
+         *     only the definition back would have to ask again to do anything with it.
+         */
+        post: operations["add_definition_definitions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/definitions/{strategy_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read Definition */
+        get: operations["read_definition_definitions__strategy_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Rename Definition
+         * @description The title and the sentence under it — never the rule.
+         *
+         *     Editing the rule is a new revision, and this route deliberately cannot do it: a title
+         *     fixed in place must not change what any recorded decision points at.
+         */
+        patch: operations["rename_definition_definitions__strategy_id__patch"];
+        trace?: never;
+    };
+    "/definitions/{strategy_id}/revisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Revisions
+         * @description Newest first. Nothing is ever removed from this list.
+         */
+        get: operations["list_revisions_definitions__strategy_id__revisions_get"];
+        put?: never;
+        /**
+         * Add Revision
+         * @description The next revision. The previous one stays exactly as it was, and so do its watches.
+         */
+        post: operations["add_revision_definitions__strategy_id__revisions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/definitions/{strategy_id}/revisions/{version}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read Revision
+         * @description One numbered revision, in the wording it had when it was written.
+         */
+        get: operations["read_revision_definitions__strategy_id__revisions__version__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -154,6 +251,10 @@ export interface paths {
          *     Resolved before it is stored — defaults filled in, every value checked against its
          *     declared range — so what is written down is what would be used, not what was typed. A
          *     value out of range is refused here rather than discovered at the next evaluation.
+         *
+         *     The set is stamped with the revision whose declaration it satisfied. Which ranges a set
+         *     was checked against is a fact about the moment it was written, and one revision later it
+         *     may not be true any more (design.md, decision 6).
          */
         post: operations["add_parameter_set_parameter_sets_post"];
         delete?: never;
@@ -196,8 +297,10 @@ export interface paths {
         };
         /**
          * List Strategies
-         * @description Every strategy this image carries. Read from the catalogue, never from a table —
-         *     the entries are code, and a row claiming otherwise would be a second truth.
+         * @description Every strategy this platform can run: the image's entries and the written rules.
+         *
+         *     One list rather than two, because everything downstream treats them identically and a
+         *     screen that had to merge two lists would be the first place the distinction leaked.
          */
         get: operations["list_strategies_strategies_get"];
         put?: never;
@@ -215,7 +318,13 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Read Strategy */
+        /**
+         * Read Strategy
+         * @description One strategy, at a named revision or at its newest.
+         *
+         *     `revision` on a coded entry is refused rather than ignored: it is a caller believing
+         *     something untrue about which kind of strategy this is.
+         */
         get: operations["read_strategy_strategies__strategy_id__get"];
         put?: never;
         post?: never;
@@ -237,14 +346,20 @@ export interface paths {
         put?: never;
         /**
          * Put Watch
-         * @description Start watching a pair with a strategy.
+         * @description Start watching a pair with a strategy, or move an existing watch.
          *
          *     **This is where a strategy is registered**, and where its facts are checked against
          *     what the archive actually announces. The check is made here rather than at import
          *     because the answer can only be had by asking — and an archive that cannot be asked
          *     means the registration is refused, not that it is waved through: registering a
          *     strategy whose facts may not exist is how a platform ends up watching nothing and
-         *     saying nothing.
+         *     saying nothing. It stays here even though a written rule was already checked when it was
+         *     saved: the archive's catalogue can change in between, and this is the check that guards
+         *     the loop (design.md, decision 8).
+         *
+         *     **The revision is pinned, not followed.** Omitting `revision` pins the newest at this
+         *     moment; a revision written afterwards changes nothing about this watch until somebody
+         *     calls here again.
          */
         post: operations["put_watch_watches_post"];
         delete?: never;
@@ -278,6 +393,36 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** Arith */
+        "Arith-Input": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "arith";
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "+" | "-" | "*" | "/";
+            /** Operands */
+            operands: (components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"])[];
+        };
+        /** Arith */
+        "Arith-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "arith";
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "+" | "-" | "*" | "/";
+            /** Operands */
+            operands: (components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"])[];
+        };
         /**
          * BacktestRunOut
          * @description One kept report. The three fields before `report` are the ones two runs must share
@@ -318,8 +463,154 @@ export interface components {
             resolution: string;
             /** Strategy Id */
             strategy_id: string;
+            /**
+             * Strategy Revision Id
+             * @description the revision this run computed; null for a coded entry
+             */
+            strategy_revision_id: number | null;
             /** Symbol */
             symbol: string;
+        };
+        /** BarRead */
+        BarRead: {
+            /**
+             * Field
+             * @default close
+             * @enum {string}
+             */
+            field: "open" | "high" | "low" | "close";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "bar";
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
+        /** Call */
+        "Call-Input": {
+            /**
+             * Fn
+             * @enum {string}
+             */
+            fn: "abs" | "min" | "max" | "round";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "call";
+            /** Operands */
+            operands: (components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"])[];
+        };
+        /** Call */
+        "Call-Output": {
+            /**
+             * Fn
+             * @enum {string}
+             */
+            fn: "abs" | "min" | "max" | "round";
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "call";
+            /** Operands */
+            operands: (components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"])[];
+        };
+        /** Compare */
+        "Compare-Input": {
+            /** Left */
+            left: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "compare";
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "<" | "<=" | ">" | ">=";
+            /** Right */
+            right: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"];
+        };
+        /** Compare */
+        "Compare-Output": {
+            /** Left */
+            left: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "compare";
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "<" | "<=" | ">" | ">=";
+            /** Right */
+            right: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"];
+        };
+        /** Const */
+        Const: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "const";
+            /** Value */
+            value: number;
+        };
+        /**
+         * Crossed
+         * @description Two expressions crossing on this bar — the one piece of sugar in the vocabulary.
+         *
+         *     Written as a node rather than left to the operator because the pairing of "before" and
+         *     "now" is where hand-written crossing tests go wrong, and because a crossing expressed
+         *     as four comparisons over two frames is four places for one of them to drift.
+         */
+        "Crossed-Input": {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "above" | "below";
+            /** Left */
+            left: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "crossed";
+            /** Right */
+            right: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"];
+        };
+        /**
+         * Crossed
+         * @description Two expressions crossing on this bar — the one piece of sugar in the vocabulary.
+         *
+         *     Written as a node rather than left to the operator because the pairing of "before" and
+         *     "now" is where hand-written crossing tests go wrong, and because a crossing expressed
+         *     as four comparisons over two frames is four places for one of them to drift.
+         */
+        "Crossed-Output": {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "above" | "below";
+            /** Left */
+            left: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"];
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "crossed";
+            /** Right */
+            right: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"];
         };
         /**
          * DecisionDetailOut
@@ -386,6 +677,16 @@ export interface components {
             stop: number | null;
             /** Strategy Id */
             strategy_id: string;
+            /**
+             * Strategy Revision
+             * @description that revision's own number, so a reader needs no second call
+             */
+            strategy_revision: number | null;
+            /**
+             * Strategy Revision Id
+             * @description which revision of the rule decided this; null for code
+             */
+            strategy_revision_id: number | null;
             /** Symbol */
             symbol: string;
             /** Target */
@@ -445,10 +746,77 @@ export interface components {
             stop: number | null;
             /** Strategy Id */
             strategy_id: string;
+            /**
+             * Strategy Revision
+             * @description that revision's own number, so a reader needs no second call
+             */
+            strategy_revision: number | null;
+            /**
+             * Strategy Revision Id
+             * @description which revision of the rule decided this; null for code
+             */
+            strategy_revision_id: number | null;
             /** Symbol */
             symbol: string;
             /** Target */
             target: number | null;
+        };
+        /**
+         * DefinitionIn
+         * @description A new clicked strategy: its identity, its name, and the first version of its rule.
+         */
+        DefinitionIn: {
+            definition: components["schemas"]["RuleDefinition-Input"];
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Name */
+            name: string;
+            /**
+             * Strategy Id
+             * @description lowercase, from the same namespace the coded entries use — one that a coded entry already claims is refused
+             */
+            strategy_id: string;
+        };
+        /** DefinitionOut */
+        DefinitionOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Description */
+            description: string;
+            /** Id */
+            id: number;
+            /**
+             * Latest Version
+             * @description the newest revision; a running watch may still be pinned to an older one
+             */
+            latest_version: number;
+            /** Name */
+            name: string;
+            /** Strategy Id */
+            strategy_id: string;
+        };
+        /**
+         * DefinitionPatch
+         * @description The two things about a definition that are not the rule.
+         *
+         *     Changed in place rather than minted as a revision: a decision points at a revision, and
+         *     provenance that shifted because somebody fixed a typo in a title is provenance nobody
+         *     could trust.
+         */
+        DefinitionPatch: {
+            /**
+             * Description
+             * @default
+             */
+            description: string;
+            /** Name */
+            name: string;
         };
         /** FactOut */
         FactOut: {
@@ -474,10 +842,89 @@ export interface components {
             /** Resolution */
             resolution: string;
         };
+        /**
+         * FactRead
+         * @description One line of one declared fact, at this bar or a few bars back.
+         *
+         *     `offset` counts backwards from the bar being decided on, so `0` is the reading the loop
+         *     would call "now" and `1` is the other half of every crossing test.
+         */
+        FactRead: {
+            /** Key */
+            key: string;
+            /** Line */
+            line: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "fact";
+            /**
+             * Offset
+             * @default 0
+             */
+            offset: number;
+        };
+        /**
+         * Guard
+         * @description A reason to refuse, in the order it should be asked.
+         *
+         *     Ordered because the cheapest and commonest refusal belongs first: the usual answer of a
+         *     strategy worth running is "no", and it should also be the shortest path to one.
+         */
+        "Guard-Input": {
+            /** Reason */
+            reason: string;
+            /** When */
+            when: components["schemas"]["Compare-Input"] | components["schemas"]["Logic-Input"] | components["schemas"]["Crossed-Input"] | components["schemas"]["Settled-Input"];
+        };
+        /**
+         * Guard
+         * @description A reason to refuse, in the order it should be asked.
+         *
+         *     Ordered because the cheapest and commonest refusal belongs first: the usual answer of a
+         *     strategy worth running is "no", and it should also be the shortest path to one.
+         */
+        "Guard-Output": {
+            /** Reason */
+            reason: string;
+            /** When */
+            when: components["schemas"]["Compare-Output"] | components["schemas"]["Logic-Output"] | components["schemas"]["Crossed-Output"] | components["schemas"]["Settled-Output"];
+        };
         /** HTTPValidationError */
         HTTPValidationError: {
             /** Detail */
             detail: components["schemas"]["ValidationError"][];
+        };
+        /** Logic */
+        "Logic-Input": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "logic";
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "all" | "any" | "not";
+            /** Operands */
+            operands: (components["schemas"]["Compare-Input"] | components["schemas"]["Logic-Input"] | components["schemas"]["Crossed-Input"] | components["schemas"]["Settled-Input"])[];
+        };
+        /** Logic */
+        "Logic-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "logic";
+            /**
+             * Op
+             * @enum {string}
+             */
+            op: "all" | "any" | "not";
+            /** Operands */
+            operands: (components["schemas"]["Compare-Output"] | components["schemas"]["Logic-Output"] | components["schemas"]["Crossed-Output"] | components["schemas"]["Settled-Output"])[];
         };
         /** ParamOut */
         ParamOut: {
@@ -494,6 +941,16 @@ export interface components {
              * @enum {string}
              */
             type: "int" | "float";
+        };
+        /** ParamRef */
+        ParamRef: {
+            /** Name */
+            name: string;
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "param";
         };
         /** ParameterSetIn */
         ParameterSetIn: {
@@ -526,10 +983,275 @@ export interface components {
             /** Strategy Id */
             strategy_id: string;
             /**
+             * Strategy Revision Id
+             * @description the revision whose declaration these values were checked against; null for a coded entry, whose declaration is in the image
+             */
+            strategy_revision_id: number | null;
+            /**
              * Version
              * @description append-only; a change of mind is the next version
              */
             version: number;
+        };
+        /**
+         * Previous
+         * @description The same expression, evaluated one bar earlier.
+         *
+         *     A frame shift rather than an offset on every leaf inside it: `previous(fast − slow)`
+         *     says what it means, while shifting each leaf by hand is three places to forget one.
+         */
+        "Previous-Input": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "previous";
+            /** Of */
+            of: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"];
+        };
+        /**
+         * Previous
+         * @description The same expression, evaluated one bar earlier.
+         *
+         *     A frame shift rather than an offset on every leaf inside it: `previous(fast − slow)`
+         *     says what it means, while shifting each leaf by hand is three places to forget one.
+         */
+        "Previous-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "previous";
+            /** Of */
+            of: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"];
+        };
+        /**
+         * RevisionIn
+         * @description The next revision of an existing definition. The previous one stays as it was.
+         */
+        RevisionIn: {
+            definition: components["schemas"]["RuleDefinition-Input"];
+        };
+        /** RevisionOut */
+        RevisionOut: {
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            definition: components["schemas"]["RuleDefinition-Output"];
+            /** Id */
+            id: number;
+            /** Strategy Id */
+            strategy_id: string;
+            /** Version */
+            version: number;
+        };
+        /**
+         * RuleDefinition
+         * @description The whole of what a revision carries. One immutable blob per revision.
+         *
+         *     `unsettled_reason` is declared rather than fixed by the platform because "it has not
+         *     settled" means something different for a moving average than for a structure: the
+         *     operator writing the rule is the one who can say what a reader should do about it.
+         */
+        "RuleDefinition-Input": {
+            /**
+             * Candles
+             * @default 300
+             */
+            candles: number;
+            /** Facts */
+            facts?: components["schemas"]["RuleFact"][];
+            /** Features */
+            features?: {
+                [key: string]: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"];
+            };
+            /** Guards */
+            guards?: components["schemas"]["Guard-Input"][];
+            /** No Setup Reason */
+            no_setup_reason: string;
+            /** Params */
+            params?: components["schemas"]["RuleParam"][];
+            /**
+             * Resolution
+             * @description the bars whose closes drive evaluation
+             */
+            resolution: string;
+            /** Setups */
+            setups: components["schemas"]["Setup-Input"][];
+            /** Unsettled Reason */
+            unsettled_reason: string;
+        };
+        /**
+         * RuleDefinition
+         * @description The whole of what a revision carries. One immutable blob per revision.
+         *
+         *     `unsettled_reason` is declared rather than fixed by the platform because "it has not
+         *     settled" means something different for a moving average than for a structure: the
+         *     operator writing the rule is the one who can say what a reader should do about it.
+         */
+        "RuleDefinition-Output": {
+            /**
+             * Candles
+             * @default 300
+             */
+            candles: number;
+            /** Facts */
+            facts: components["schemas"]["RuleFact"][];
+            /** Features */
+            features: {
+                [key: string]: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"];
+            };
+            /** Guards */
+            guards: components["schemas"]["Guard-Output"][];
+            /** No Setup Reason */
+            no_setup_reason: string;
+            /** Params */
+            params: components["schemas"]["RuleParam"][];
+            /**
+             * Resolution
+             * @description the bars whose closes drive evaluation
+             */
+            resolution: string;
+            /** Setups */
+            setups: components["schemas"]["Setup-Output"][];
+            /** Unsettled Reason */
+            unsettled_reason: string;
+        };
+        /**
+         * RuleFact
+         * @description One reading the platform fetches on this rule's behalf, named the archive's way.
+         */
+        RuleFact: {
+            /**
+             * Bars
+             * @default 300
+             */
+            bars: number;
+            /**
+             * Indicator
+             * @description the archive's catalogue id
+             */
+            indicator: string;
+            /**
+             * Key
+             * @description what the rule reads this back under
+             */
+            key: string;
+            /**
+             * Params
+             * @description a string names one of this rule's own parameters
+             */
+            params?: {
+                [key: string]: number | string;
+            };
+            /** Resolution */
+            resolution: string;
+        };
+        /**
+         * RuleParam
+         * @description One tunable number of a clicked strategy, with the range outside which it is not a
+         *     value at all. The same shape `spec.Param` has, on the wire and in the row.
+         */
+        RuleParam: {
+            /** Default */
+            default: number;
+            /** Max */
+            max: number;
+            /** Min */
+            min: number;
+            /** Name */
+            name: string;
+            /**
+             * Type
+             * @enum {string}
+             */
+            type: "int" | "float";
+        };
+        /**
+         * Settled
+         * @description Whether every one of these readings exists at all. Never undetermined itself.
+         *
+         *     The one node that answers rather than propagating a missing reading, and the reason it
+         *     exists: "refuse unless these have settled" is a thing an operator wants to state *first*,
+         *     ahead of the guards that would otherwise be evaluated against a series that has not
+         *     filled yet. Everything else in this file treats a missing reading as undetermined; this
+         *     is how a rule asks about that state instead of being carried along by it.
+         */
+        "Settled-Input": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "settled";
+            /** Of */
+            of: (components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"])[];
+        };
+        /**
+         * Settled
+         * @description Whether every one of these readings exists at all. Never undetermined itself.
+         *
+         *     The one node that answers rather than propagating a missing reading, and the reason it
+         *     exists: "refuse unless these have settled" is a thing an operator wants to state *first*,
+         *     ahead of the guards that would otherwise be evaluated against a series that has not
+         *     filled yet. Everything else in this file treats a missing reading as undetermined; this
+         *     is how a rule asks about that state instead of being carried along by it.
+         */
+        "Settled-Output": {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            node: "settled";
+            /** Of */
+            of: (components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"])[];
+        };
+        /**
+         * Setup
+         * @description One way this rule says yes — a direction, its levels, and what it calls itself.
+         */
+        "Setup-Input": {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "long" | "short";
+            /** Entry */
+            entry: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"];
+            /** Reason */
+            reason: string;
+            /** Score */
+            score?: (components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"]) | null;
+            /** Stop */
+            stop: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"];
+            /** Target */
+            target: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Input"] | components["schemas"]["Call-Input"] | components["schemas"]["Previous-Input"];
+            /** When */
+            when: components["schemas"]["Compare-Input"] | components["schemas"]["Logic-Input"] | components["schemas"]["Crossed-Input"] | components["schemas"]["Settled-Input"];
+        };
+        /**
+         * Setup
+         * @description One way this rule says yes — a direction, its levels, and what it calls itself.
+         */
+        "Setup-Output": {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "long" | "short";
+            /** Entry */
+            entry: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"];
+            /** Reason */
+            reason: string;
+            /** Score */
+            score: (components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"]) | null;
+            /** Stop */
+            stop: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"];
+            /** Target */
+            target: components["schemas"]["Const"] | components["schemas"]["ParamRef"] | components["schemas"]["FactRead"] | components["schemas"]["BarRead"] | components["schemas"]["Arith-Output"] | components["schemas"]["Call-Output"] | components["schemas"]["Previous-Output"];
+            /** When */
+            when: components["schemas"]["Compare-Output"] | components["schemas"]["Logic-Output"] | components["schemas"]["Crossed-Output"] | components["schemas"]["Settled-Output"];
         };
         /**
          * StrategyOut
@@ -553,6 +1275,18 @@ export interface components {
              * @description the bars whose closes drive evaluation
              */
             resolution: string;
+            /**
+             * Revision
+             * @description the revision this was built from; null for a coded entry
+             */
+            revision: number | null;
+            /**
+             * Source
+             * @description whether this entry is code in the deployed image or a stored revision — a coded entry has no revisions and cannot be edited
+             * @default code
+             * @enum {string}
+             */
+            source: "code" | "revision";
         };
         /** ValidationError */
         ValidationError: {
@@ -574,6 +1308,11 @@ export interface components {
              * @description omit to have a set written from this strategy's defaults
              */
             parameter_set_id?: number | null;
+            /**
+             * Revision
+             * @description which revision to pin this watch to; omit for the newest at this moment. A watch never follows later revisions — moving it is a second call
+             */
+            revision?: number | null;
             /** Strategy Id */
             strategy_id: string;
             /** Symbol */
@@ -594,6 +1333,11 @@ export interface components {
             parameter_set_id: number;
             /** Strategy Id */
             strategy_id: string;
+            /**
+             * Strategy Revision Id
+             * @description the revision this watch computes — pinned, never followed. Null means the strategy is code in the image
+             */
+            strategy_revision_id: number | null;
             /** Symbol */
             symbol: string;
         };
@@ -761,6 +1505,223 @@ export interface operations {
             };
         };
     };
+    list_definitions_definitions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinitionOut"][];
+                };
+            };
+        };
+    };
+    add_definition_definitions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefinitionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_definition_definitions__strategy_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinitionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_definition_definitions__strategy_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DefinitionPatch"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DefinitionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_revisions_definitions__strategy_id__revisions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionOut"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    add_revision_definitions__strategy_id__revisions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RevisionIn"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    read_revision_definitions__strategy_id__revisions__version__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                strategy_id: string;
+                version: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RevisionOut"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     health_health_get: {
         parameters: {
             query?: never;
@@ -891,7 +1852,9 @@ export interface operations {
     };
     read_strategy_strategies__strategy_id__get: {
         parameters: {
-            query?: never;
+            query?: {
+                revision?: number | null;
+            };
             header?: never;
             path: {
                 strategy_id: string;

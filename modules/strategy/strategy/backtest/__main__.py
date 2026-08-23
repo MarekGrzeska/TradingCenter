@@ -6,7 +6,17 @@ work belongs in the unit suite. What *is* tested is everything it calls.
 
     uv run python -m strategy.backtest --symbol US100 --from 2025-01-01 --to 2026-01-01
     uv run python -m strategy.backtest --symbol US100 --from ... --to ... \\
-        --strategy baseline_ma_cross --strategy something_else --spread 1.5
+        --strategy baseline_ma_cross --strategy my_rule@3 --spread 1.5
+
+**`name@version` names a revision**, which is what makes comparing two revisions of one
+definition — the question this command exists for — a matter of naming it twice:
+
+    --strategy my_rule@3 --strategy my_rule@4
+
+**The database is reached only when something needs it.** Naming coded entries and nothing
+else runs against the archive alone, so the floor every strategy is measured against can
+always be recomputed with nothing else standing (`strategy-configurator`, "Wpis kodowy bez
+bazy"). A written rule, or no `--strategy` at all, needs a connection to resolve.
 """
 
 from __future__ import annotations
@@ -15,12 +25,15 @@ import argparse
 import asyncio
 import json
 import sys
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
+from .. import resolver
 from ..archive import Archive, http_client
 from ..catalogue import all_entries
 from ..config import Settings
 from ..errors import StrategyError
+from ..resolver import Resolved
 from . import run
 from .costs import CostModel
 from .report import NotComparable, compare
@@ -29,6 +42,18 @@ from .report import NotComparable, compare
 def _instant(value: str) -> datetime:
     parsed = datetime.fromisoformat(value)
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+
+
+def named(value: str) -> tuple[str, int | None]:
+    """`my_rule@3` as its id and its revision; a bare name as its id and "the newest"."""
+    id_, _, version = value.partition("@")
+    if not version:
+        return id_, None
+    if not version.isdigit():
+        raise argparse.ArgumentTypeError(
+            f"{value!r}: what follows '@' is a revision number, e.g. my_rule@3"
+        )
+    return id_, int(version)
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
@@ -40,7 +65,11 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--strategy",
         action="append",
         default=None,
-        help="repeat to compare; omitted runs every strategy in the catalogue",
+        type=named,
+        help=(
+            "repeat to compare; `name@3` names a revision of a written rule. Omitted runs "
+            "every strategy this platform can run, written ones included"
+        ),
     )
     # No defaults that flatter: a zero-cost run has to be asked for, and the report says
     # what it assumed either way.
@@ -62,27 +91,65 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
+@asynccontextmanager
+async def _pool(settings: Settings):
+    """A connection of this command's own.
+
+    Its own rather than the running module's: this is a separate process, and a backtest
+    must not need the platform to be serving to be run. What it does need, when a written
+    rule is in play, is the database the rules live in.
+    """
+    from tc_runtime.db import pool as make_pool
+
+    async with make_pool(
+        settings.database_url,
+        user=settings.database_user,
+        client_id=settings.azure_client_id,
+        client_secret=settings.azure_client_secret,
+        tenant_id=settings.azure_tenant_id,
+    ) as pool:
+        yield pool
+
+
+async def _chosen(settings: Settings, asked: list[tuple[str, int | None]] | None) -> list[Resolved]:
+    """What to run, resolved — reaching the database only if something asked for a rule."""
+    coded = {spec.id for spec in all_entries()}
+    if asked is not None and all(id_ in coded and version is None for id_, version in asked):
+        from ..catalogue import get
+
+        return [Resolved(spec=get(id_)) for id_, _ in asked]
+
+    async with _pool(settings) as pool, pool.acquire() as conn:
+        if asked is None:
+            return await resolver.all_available(conn)
+        return [
+            await resolver.resolve(conn, id_, version=version) for id_, version in asked
+        ]
+
+
 async def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     settings = Settings()  # type: ignore[call-arg]
     costs = CostModel(
         spread=args.spread, slippage=args.slippage, commission_r=args.commission_r
     )
-    strategies = args.strategy or [spec.id for spec in all_entries()]
+    chosen = await _chosen(settings, args.strategy)
 
     async with http_client(settings.market_data_scope) as client:
         archive = Archive(settings.market_data_url, client)
         reports = []
-        for strategy_id in strategies:
+        for one in chosen:
             reports.append(
                 await run(
                     archive,
-                    strategy_id,
+                    one.spec,
                     args.symbol,
                     start=args.start,
                     end=args.end,
                     costs=costs,
                     daily_loss_limit_r=args.daily_loss_r,
+                    revision=None if one.revision is None else one.revision.version,
+                    revision_id=one.revision_id,
                 )
             )
 
@@ -96,7 +163,8 @@ async def main(argv: list[str] | None = None) -> int:
     if len(reports) > 1:
         # Every run here shares a symbol, a range and a cost model by construction; the
         # check is kept anyway, because the day this command grows a way to load a report
-        # from disk is the day it stops being true by construction.
+        # from disk is the day it stops being true by construction. Revisions may differ
+        # freely — that comparison is the point.
         compare(reports)
 
     if args.keep:
@@ -110,26 +178,15 @@ async def main(argv: list[str] | None = None) -> int:
 
 
 async def _keep(settings: Settings, reports: list) -> None:
-    """Write each report where `/backtests` reads it.
-
-    Its own connection rather than the running module's: this command is a separate
-    process, and a backtest must not need the platform to be up to be run.
-    """
-    from tc_runtime.db import pool as make_pool
-
+    """Write each report where `/backtests` reads it."""
     from .. import store
 
-    async with make_pool(
-        settings.database_url,
-        user=settings.database_user,
-        client_id=settings.azure_client_id,
-        client_secret=settings.azure_client_secret,
-        tenant_id=settings.azure_tenant_id,
-    ) as pool, pool.acquire() as conn:
+    async with _pool(settings) as pool, pool.acquire() as conn:
         for report in reports:
             await store.record_backtest_run(
                 conn,
                 strategy_id=report.strategy_id,
+                strategy_revision_id=report.strategy_revision_id,
                 symbol=report.symbol,
                 resolution=report.resolution,
                 range_from=report.range_from,

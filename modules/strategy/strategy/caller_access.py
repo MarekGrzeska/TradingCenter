@@ -100,6 +100,12 @@ REST_PATHS: tuple[str, ...] = (
     "/health",
     "/strategies",
     "/strategies/{strategy_id}",
+    # The configurator's four. Written rules are the operator's, like every other write
+    # here — the workbench reads what a strategy decided and has no business composing one.
+    "/definitions",
+    "/definitions/{strategy_id}",
+    "/definitions/{strategy_id}/revisions",
+    "/definitions/{strategy_id}/revisions/{version}",
     "/parameter-sets",
     "/watches",
     "/watches/{watch_id}",

@@ -20,8 +20,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 from pydantic import BaseModel, Field
 
-from .. import store
-from ..catalogue import all_entries
+from .. import resolver, store
 from . import ToolContext
 
 # Applied to every tool here — a structural claim an MCP client can act on, not just a
@@ -42,6 +41,13 @@ class StrategyRow(BaseModel):
     name: str
     description: str
     resolution: str = Field(description="the bars whose closes drive evaluation")
+    source: str = Field(
+        description="'code' for an entry in the deployed image, 'revision' for a rule the "
+        "operator wrote down"
+    )
+    revision: int | None = Field(
+        default=None, description="which revision of that rule; absent for a coded entry"
+    )
 
 
 class PendingSetupsOut(BaseModel):
@@ -64,6 +70,11 @@ class DecisionRow(BaseModel):
         default=None,
         description="which layer refused: the strategy, a gap in the data, or a platform limit",
     )
+    strategy_revision: int | None = Field(
+        default=None,
+        description="which revision of the rule decided this; absent when the strategy is "
+        "code in the image, whose rule is in the repository under that id",
+    )
     direction: str | None = None
     entry: float | None = None
     stop: float | None = None
@@ -78,18 +89,24 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
     async def list_strategies() -> list[StrategyRow]:
         """Which strategies this platform carries, and what rhythm each decides on.
 
-        The catalogue is code in the running image, so this is what exists — not what was
-        configured. Reach for `pending_setups` to ask whether one of them is standing on
-        anything right now.
+        Both kinds at once: entries that are code in the running image, and rules the
+        operator wrote down. `source` tells them apart, and it matters for one thing only —
+        a coded entry's rule can be read in the repository under that id, while a written
+        one exists only as the revision named here. Reach for `pending_setups` to ask
+        whether one of them is standing on anything right now.
         """
+        async with ctx.pool.acquire() as conn:
+            found = await resolver.all_available(conn)
         return [
             StrategyRow(
-                id=spec.id,
-                name=spec.name,
-                description=spec.description,
-                resolution=spec.resolution,
+                id=one.spec.id,
+                name=one.spec.name,
+                description=one.spec.description,
+                resolution=one.spec.resolution,
+                source="code" if one.from_code else "revision",
+                revision=None if one.revision is None else one.revision.version,
             )
-            for spec in all_entries()
+            for one in found
         ]
 
     @mcp.tool(annotations=READ_ONLY)
@@ -153,6 +170,7 @@ def _row(row) -> DecisionRow:
         action=row.decision.action,
         reason=row.decision.reason,
         reason_kind=row.reason_kind,
+        strategy_revision=row.strategy_revision,
         direction=row.decision.direction,
         entry=row.decision.entry,
         stop=row.decision.stop,

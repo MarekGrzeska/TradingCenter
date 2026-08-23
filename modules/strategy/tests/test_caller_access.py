@@ -104,7 +104,10 @@ class TestWhoGetsIn:
         assert response.json() == {"detail": "not authenticated"}
 
     async def test_the_rest_caller_reaches_rest(self, guarded) -> None:
-        response = await guarded.get("/strategies", headers=principal("terminal-app-id"))
+        # The root rather than `/strategies`, which the refusals below use: what is under
+        # test is the gate, and the gate is the only thing this application has that can
+        # answer without a database behind it.
+        response = await guarded.get("/", headers=principal("terminal-app-id"))
 
         assert response.status_code == 200
 

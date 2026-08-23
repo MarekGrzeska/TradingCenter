@@ -1,10 +1,9 @@
-## Purpose
+# strategy-backtest Specification
 
+## Purpose
 Weryfikacja strategii na historii: jedno odtwarzanie i jeden model kosztów dla każdego
 wpisu katalogu, z wynikiem, który da się odtworzyć i uczciwie porównać między strategiami.
-
-## ADDED Requirements
-
+## Requirements
 ### Requirement: Backtest woła tę samą funkcję oceny co pętla
 
 Backtest MUST wyliczać decyzje tą samą funkcją oceny, którą woła pętla na żywo — druga
@@ -82,3 +81,4 @@ Przebieg backtestu MUST NOT zmieniać stanu żadnego innego modułu ani stanu st
 - **WHEN** backtest wykonuje przebieg po historii
 - **THEN** żaden inny moduł nie odnotowuje zapisu
 - **AND** zapis decyzji pętli na żywo pozostaje nietknięty
+

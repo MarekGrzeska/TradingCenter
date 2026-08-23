@@ -8,17 +8,20 @@ Either one alone passes over the defect the other exists for.
 
 from __future__ import annotations
 
+import argparse
 from datetime import UTC, datetime, timedelta
 
 import pytest
 
 from strategy.archive import FactsRead
 from strategy.backtest import batch, incremental, measure, resolve, run, slice_at
+from strategy.backtest.__main__ import _chosen, named
 from strategy.backtest.costs import FREE, CostModel
 from strategy.backtest.metrics import attribute
 from strategy.backtest.report import NotComparable, Report, compare
 from strategy.backtest.simulate import apply_daily_stop
 from strategy.catalogue import get
+from strategy.config import Settings
 from strategy.spec import Candle, Decision, Facts, FactValue, Marker, Zone
 
 SPEC = get("baseline_ma_cross")
@@ -421,6 +424,25 @@ class TestTheReport:
         assert sum(report.refusals.values()) > 0
         assert report.bars > 0
 
+    async def test_a_run_over_a_written_rule_names_its_revision(self) -> None:
+        """Two runs of one definition from either side of a change are otherwise
+        indistinguishable, and differ in exactly what was being measured."""
+        archive = a_history()
+
+        report = await run(
+            archive,
+            get("baseline_ma_cross"),
+            "US100",
+            start=archive.times[10],
+            end=archive.times[-1],
+            revision=3,
+            revision_id=41,
+        )
+
+        assert report.as_dict()["strategy_revision"] == 3
+        assert report.named == "baseline_ma_cross@3"
+        assert "baseline_ma_cross@3" in report.summary()
+
     async def test_the_same_run_twice_gives_the_same_report(self) -> None:
         archive = a_history()
         window = {"start": archive.times[10], "end": archive.times[-1]}
@@ -429,6 +451,33 @@ class TestTheReport:
         other = await run(archive, "baseline_ma_cross", "US100", **window)
 
         assert one.as_dict() == other.as_dict()
+
+
+class TestNamingARevisionOnTheCommandLine:
+    def test_a_bare_name_means_the_newest(self) -> None:
+        assert named("my_rule") == ("my_rule", None)
+
+    def test_an_at_sign_names_a_revision(self) -> None:
+        assert named("my_rule@3") == ("my_rule", 3)
+
+    def test_something_that_is_not_a_number_after_the_at_sign_is_refused(self) -> None:
+        with pytest.raises(argparse.ArgumentTypeError, match="revision number"):
+            named("my_rule@latest")
+
+    async def test_naming_only_coded_entries_reaches_no_database(self) -> None:
+        """The floor every strategy is measured against has to be recomputable with nothing
+        else standing. The settings below point at a host that does not exist, so a run that
+        reached for a connection would say so."""
+        settings = Settings(
+            database_url="postgresql://nowhere.invalid:5432/strategy?sslmode=require",
+            database_user="nobody",
+            _env_file=None,
+        )
+
+        chosen = await _chosen(settings, [("baseline_ma_cross", None)])
+
+        assert [one.spec.id for one in chosen] == ["baseline_ma_cross"]
+        assert chosen[0].revision is None
 
 
 class TestComparing:
@@ -448,6 +497,16 @@ class TestComparing:
 
     def test_runs_on_the_same_data_and_costs_compare(self) -> None:
         reports = [self._report(), self._report(strategy_id="two")]
+
+        assert compare(reports) == reports
+
+    def test_two_revisions_of_one_definition_compare(self) -> None:
+        """The comparison this command exists for, so differing revisions are the one
+        difference `compare` may not refuse."""
+        reports = [
+            self._report(strategy_revision=1),
+            self._report(strategy_revision=2),
+        ]
 
         assert compare(reports) == reports
 

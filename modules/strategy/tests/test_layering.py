@@ -1,9 +1,14 @@
 """The two rules that make this a platform rather than one strategy with ambitions.
 
-    strategy/catalogue/**   MUST import nothing of this module but `spec` and `errors`,
-                            and MUST NOT reach for I/O or a clock
+    the pure layer          MUST import nothing of this module but the contract, and
+                            MUST NOT reach for I/O or a clock
     the runtime             MUST NOT import an individual catalogue entry — only the
                             catalogue itself
+
+The pure layer is the catalogue's entries **and** the two files that evaluate a rule written
+as data. `interpreter.py` is `evaluate` for every clicked-together strategy at once, so an
+impurity there would take the property away from all of them in one go rather than from one
+entry — which is why it is held to the entry's rule and not to the runtime's.
 
 The second is "adding a strategy changes no file of the runtime" in its enforceable form.
 The first is what makes `evaluate` a pure function, which everything downstream stands on:
@@ -26,10 +31,16 @@ import pytest
 
 PACKAGE_ROOT = Path(__file__).resolve().parent.parent / "strategy"
 
-# What a catalogue entry is allowed to know about this module. Anything else — the archive
-# client, the store, the loop, the surfaces, even the settings — is the runtime, and an
-# entry that reached for it would stop being a function of its arguments.
-CATALOGUE_MAY_IMPORT = {"spec", "errors"}
+# What the pure layer is allowed to know about this module. Anything else — the archive
+# client, the store, the loop, the surfaces, even the settings — is the runtime, and a file
+# here that reached for it would stop being a function of its arguments.
+#
+# `rule` and `periods` are contract, not runtime: the first is the vocabulary a written rule
+# is spelled in, the second is the archive's list of resolutions. Neither reaches anywhere.
+PURE_MAY_IMPORT = {"spec", "errors", "rule", "periods", "interpreter"}
+
+# The pure files that do not live under `catalogue/`.
+PURE_MODULES = ("rule.py", "interpreter.py")
 
 # Reaching outside the process at all. A pure function has no business with any of these,
 # and each of them is how a strategy would stop being replayable without looking wrong.
@@ -43,7 +54,14 @@ CLOCK_ATTRIBUTES = {"now", "utcnow", "today", "monotonic", "time"}
 # Everything that is the runtime. These may import `catalogue`; none of them may import a
 # module *inside* it.
 RUNTIME_PACKAGES = ("runner", "routers", "tools", "backtest")
-RUNTIME_MODULES = ("archive.py", "store.py", "app.py", "gates.py")
+RUNTIME_MODULES = (
+    "archive.py",
+    "store.py",
+    "app.py",
+    "gates.py",
+    "resolver.py",
+    "rule_validation.py",
+)
 
 
 def _sources(package: str) -> list[Path]:
@@ -57,6 +75,23 @@ def _entries() -> list[Path]:
     file a new strategy changes. The rules below are about what an *entry* may know.
     """
     return [path for path in _sources("catalogue") if path.name != "__init__.py"]
+
+
+def _pure() -> list[Path]:
+    """Everything held to the entry's rule: the entries, plus the rule vocabulary and the
+    interpreter that evaluates it."""
+    return _entries() + [PACKAGE_ROOT / name for name in PURE_MODULES]
+
+
+def _catalogue_module_names() -> set[str]:
+    """The entries' own module names.
+
+    Allowed as imports of one another, and deliberately: the rule-as-data twin of the
+    strategy of reference reads the fact keys the coded entry declares, and a second copy of
+    those three constants is how a twin silently stops being one. What none of them may
+    import is the runtime, which is what the rest of this file is about.
+    """
+    return {path.stem for path in _entries()}
 
 
 def _tree(path: Path) -> ast.AST:
@@ -99,9 +134,10 @@ def _top_level_packages_imported(tree: ast.AST) -> set[str]:
     return names
 
 
-@pytest.mark.parametrize("path", _entries(), ids=lambda p: p.name)
+@pytest.mark.parametrize("path", _pure(), ids=lambda p: p.name)
 def test_an_entry_knows_only_the_contract(path: Path) -> None:
-    reached = _own_modules_imported(_tree(path)) - CATALOGUE_MAY_IMPORT - {"catalogue"}
+    allowed = PURE_MAY_IMPORT | {"catalogue"} | _catalogue_module_names()
+    reached = _own_modules_imported(_tree(path)) - allowed
     assert not reached, (
         f"{path.name} imports {', '.join(sorted(reached))} from this module. A catalogue "
         "entry may know the contract and nothing else — the moment it knows the runtime, "
@@ -109,13 +145,13 @@ def test_an_entry_knows_only_the_contract(path: Path) -> None:
     )
 
 
-@pytest.mark.parametrize("path", _entries(), ids=lambda p: p.name)
+@pytest.mark.parametrize("path", _pure(), ids=lambda p: p.name)
 def test_an_entry_does_no_io(path: Path) -> None:
     reached = _top_level_packages_imported(_tree(path)) & FORBIDDEN_PACKAGES
     assert not reached, f"{path.name} imports {', '.join(sorted(reached))}"
 
 
-@pytest.mark.parametrize("path", _entries(), ids=lambda p: p.name)
+@pytest.mark.parametrize("path", _pure(), ids=lambda p: p.name)
 def test_an_entry_does_not_read_a_clock(path: Path) -> None:
     """A decision belongs to a bar. One that consulted the wall clock would replay to a
     different answer tomorrow, and the replay is what makes a recorded decision evidence."""

@@ -11,6 +11,13 @@ contract for an entry plus one machinery around it, and adding an indicator touc
 one file. The same shape, one level up: adding a strategy must not change a file of this
 module's runtime, and `tests/test_layering.py` refuses when it does.
 
+**An entry comes from one of two places, and nothing downstream can tell which.** It is
+either code in the deployed image — `strategy/catalogue/`, reviewed like any other code — or
+a rule the operator wrote on a screen, stored as an immutable revision and evaluated by
+`strategy/interpreter.py`. `strategy/resolver.py` is the only file that knows there are two;
+above it the loop, the gates, the record, the surfaces and the backtest are handed a
+`StrategySpec` and never learn where it came from.
+
 ## What it does not do
 
 **It never touches an account.** No client for trading-mcp, none for the gateway; nothing
@@ -62,7 +69,11 @@ the announced list rather than trusting this paragraph.
 | | |
 |---|---|
 | `strategy/spec.py` | the contract of an entry: `Fact`, `Param`, `Decision`, `StrategySpec` |
-| `strategy/catalogue/` | the entries themselves, one file each |
+| `strategy/rule.py` | the node vocabulary a written rule is spelled in, and every check decidable without the archive |
+| `strategy/interpreter.py` | evaluating one of those trees — `evaluate` for every written rule at once |
+| `strategy/rule_validation.py` | the other half of a rule's validation, the half only the archive can answer |
+| `strategy/resolver.py` | the one place an id becomes a `StrategySpec`, from either source |
+| `strategy/catalogue/` | the coded entries themselves, one file each |
 | `strategy/archive.py` | the market-data client — the only thing here that does I/O for facts |
 | `strategy/runner/` | the loop: closed bars, shared gates, one decision per bar |
 | `strategy/backtest/` | replay over history, calling the same `evaluate` the loop calls |
@@ -91,13 +102,42 @@ other exists for.
 **A report with no cost model is not a result.** The archive holds the bid side, so the
 spread is invisible in the data; a strategy with a wide reward over risk looks robust to
 costs right up until they are put in. Every report names its costs, its parameter version
-and its range, and `compare` refuses to put two runs side by side unless all three match.
+and its range, and `compare` refuses to put two runs side by side unless all three match. The revision is
+the deliberate exception — `--strategy my_rule@3 --strategy my_rule@4` is the comparison this
+command exists for, so it is named in every report rather than refused.
+
+## A rule the operator wrote
+
+A written rule is a tree of typed nodes in JSON — `const`, `param`, `fact`, `bar`,
+arithmetic, comparisons, three-valued logic, `crossed`, `previous`, `settled` — with no
+loops, no variables, no user functions and nothing reaching outside the facts and parameters
+it is handed. There is no text syntax and no parser: the configurator composes the tree, so
+the class of syntax errors does not exist.
+
+That closure is what stands in for the code review a written rule will never get, together
+with three more things: the definition is refused at the moment it is saved (against the
+archive's own catalogue, so a nonexistent indicator or a range wider than the archive
+accepts never becomes a strategy that records nothing), the module still has no route to an
+account, and a written rule is expected to beat `baseline_ma_cross` on the same data and the
+same costs before anyone acts on it.
+
+**A revision is immutable and a watch pins one.** Saving a newer revision changes nothing a
+running watch computes; moving it is a second, deliberate call. A parameter set belongs to a
+revision rather than to a strategy, because a value inside its range under one revision may
+have no declaration at all under the next.
+
+`baseline_ma_cross` stays code, and `catalogue/baseline_rule.py` is the same rule written in
+the vocabulary. It is deliberately not a second catalogue entry — it is the measuring stick:
+`tests/test_baseline_rule.py` runs both over the same readings and demands the same answers,
+which is the only honest test that the vocabulary carries a real strategy and that the
+interpreter computes what it appears to.
 
 ## Two rules worth knowing before changing anything
 
-**`evaluate` is pure.** No I/O, no clock, nothing outside its arguments. Everything downstream
-stands on it: the unit tests hand it facts by hand, a recorded decision replays to the same
-answer, and the backtest calls it directly rather than reimplementing it.
+**`evaluate` is pure.** No I/O, no clock, nothing outside its arguments — and that holds for
+the interpreter as well as for a hand-written entry, under the same layering test.
+Everything downstream stands on it: the unit tests hand it facts by hand, a recorded decision
+replays to the same answer, and the backtest calls it directly rather than reimplementing it.
 
 **A rule that binds every strategy belongs to the runtime; a rule one strategy might not
 want belongs to its entry.** The first is written once and tested once. The second is what a

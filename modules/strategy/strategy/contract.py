@@ -3,6 +3,12 @@
 Written as models rather than dictionaries so the published document describes it, and so
 a field added here has to be added on purpose. Nothing in this file reaches a database or
 a strategy — it is the shape of the wire and nothing else.
+
+**The rule travels as itself.** `RuleDefinition` and its node types come from `rule.py`
+rather than being restated here as a second set of models: one definition of the vocabulary
+means the wire, the stored row and the interpreter can never disagree about what a node is,
+and it is what lets the terminal generate a typed editor from this document instead of
+hand-writing the tree.
 """
 
 from __future__ import annotations
@@ -11,6 +17,8 @@ from datetime import datetime
 from typing import Literal
 
 from pydantic import BaseModel, Field
+
+from .rule import RuleDefinition
 
 
 class Problem(BaseModel):
@@ -50,6 +58,69 @@ class StrategyOut(BaseModel):
     candles: int
     facts: list[FactOut]
     params: list[ParamOut]
+    source: Literal["code", "revision"] = Field(
+        default="code",
+        description="whether this entry is code in the deployed image or a stored "
+        "revision — a coded entry has no revisions and cannot be edited",
+    )
+    revision: int | None = Field(
+        default=None, description="the revision this was built from; null for a coded entry"
+    )
+
+
+# --- definitions and their revisions ------------------------------------------------------
+
+
+class DefinitionIn(BaseModel):
+    """A new clicked strategy: its identity, its name, and the first version of its rule."""
+
+    strategy_id: str = Field(
+        min_length=1,
+        max_length=64,
+        pattern=r"^[a-z][a-z0-9_]*$",
+        description="lowercase, from the same namespace the coded entries use — one that "
+        "a coded entry already claims is refused",
+    )
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=2_000)
+    definition: RuleDefinition
+
+
+class RevisionIn(BaseModel):
+    """The next revision of an existing definition. The previous one stays as it was."""
+
+    definition: RuleDefinition
+
+
+class DefinitionPatch(BaseModel):
+    """The two things about a definition that are not the rule.
+
+    Changed in place rather than minted as a revision: a decision points at a revision, and
+    provenance that shifted because somebody fixed a typo in a title is provenance nobody
+    could trust.
+    """
+
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=2_000)
+
+
+class DefinitionOut(BaseModel):
+    id: int
+    strategy_id: str
+    name: str
+    description: str
+    latest_version: int = Field(
+        description="the newest revision; a running watch may still be pinned to an older one"
+    )
+    created_at: datetime
+
+
+class RevisionOut(BaseModel):
+    id: int
+    strategy_id: str
+    version: int
+    definition: RuleDefinition
+    created_at: datetime
 
 
 # --- parameter sets -------------------------------------------------------------------
@@ -68,6 +139,11 @@ class ParameterSetOut(BaseModel):
     version: int = Field(description="append-only; a change of mind is the next version")
     params: dict[str, float] = Field(description="resolved — defaults filled in")
     created_at: datetime
+    strategy_revision_id: int | None = Field(
+        default=None,
+        description="the revision whose declaration these values were checked against; "
+        "null for a coded entry, whose declaration is in the image",
+    )
 
 
 # --- watches --------------------------------------------------------------------------
@@ -79,6 +155,11 @@ class WatchIn(BaseModel):
     parameter_set_id: int | None = Field(
         default=None,
         description="omit to have a set written from this strategy's defaults",
+    )
+    revision: int | None = Field(
+        default=None,
+        description="which revision to pin this watch to; omit for the newest at this "
+        "moment. A watch never follows later revisions — moving it is a second call",
     )
 
 
@@ -93,6 +174,11 @@ class WatchOut(BaseModel):
     parameter_set_id: int
     active: bool
     created_at: datetime
+    strategy_revision_id: int | None = Field(
+        default=None,
+        description="the revision this watch computes — pinned, never followed. Null means "
+        "the strategy is code in the image",
+    )
 
 
 # --- decisions ------------------------------------------------------------------------
@@ -103,6 +189,12 @@ class DecisionOut(BaseModel):
     strategy_id: str
     symbol: str
     parameter_set_id: int = Field(description="which version of the parameters decided this")
+    strategy_revision_id: int | None = Field(
+        default=None, description="which revision of the rule decided this; null for code"
+    )
+    strategy_revision: int | None = Field(
+        default=None, description="that revision's own number, so a reader needs no second call"
+    )
     as_of: datetime = Field(description="the closing time of the bar decided on, never a wall clock")
     action: Literal["trade", "no_trade"]
     reason: str | None = None
@@ -131,6 +223,9 @@ class BacktestRunOut(BaseModel):
 
     id: int
     strategy_id: str
+    strategy_revision_id: int | None = Field(
+        default=None, description="the revision this run computed; null for a coded entry"
+    )
     symbol: str
     resolution: str
     range_from: datetime

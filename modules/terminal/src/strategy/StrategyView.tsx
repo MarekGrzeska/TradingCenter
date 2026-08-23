@@ -6,6 +6,7 @@ import type { ArchiveAdmin } from "../data/source";
 import { Button } from "../ui/Button";
 import { UnreachableNotice } from "../ui/UnreachableNotice";
 import { DecisionRow } from "./DecisionRow";
+import { DefinitionsPanel } from "./DefinitionsPanel";
 import { StartWatchDialog } from "./StartWatchDialog";
 import {
   createStrategyApi,
@@ -29,9 +30,12 @@ import {
  * places, amends or cancels an order and will not grow one; a button suggesting otherwise
  * would be the only place in this terminal promising execution where there is none.
  *
- * The catalogue is read-only for the same kind of reason: a strategy is code in the
- * deployed image, not a row in a table, and an edit control would promise something this
- * module cannot do about the logic that decides on money.
+ * **The catalogue now has two kinds in it**, and the difference is one an operator can act
+ * on. An entry that is code in the deployed image has no revisions and is not editable from
+ * here — its rule is in the repository under that id. A rule somebody wrote is a row, and
+ * writing the next revision of it is what the panel below is for. Neither kind can move an
+ * account, and no revision saved here changes what a running watch computes: a watch is
+ * pinned to the revision it was started with (specs/terminal-strategy-configurator).
  */
 
 /** How often the decisions are re-asked. The platform decides on closed bars — hourly for
@@ -144,9 +148,20 @@ export function StrategyView({
             title={strategy.description}
           >
             {strategy.name}
+            {/* Which revision this chip stands for, when it stands for one at all. */}
+            {strategy.revision !== null && (
+              <span className="ml-1 text-ink-faint">@{strategy.revision}</span>
+            )}
           </button>
         ))}
       </div>
+
+      <DefinitionsPanel
+        client={client}
+        strategies={strategies.value}
+        watches={watches.value}
+        onChanged={() => strategies.reload()}
+      />
 
       {nothingWatched && (
         <p className="text-xs text-ink-muted" data-testid="nothing-watched">
