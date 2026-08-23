@@ -1,8 +1,8 @@
 import { useMemo, useState } from "react";
-import { useRead } from "../data/query";
+import { useIndicatorCatalogue } from "../chart/indicators/useIndicatorCatalogue";
 import { indicators as archiveIndicators } from "../data/marketData";
 import type { IndicatorSource } from "../data/source";
-import type { IndicatorCatalogue, IndicatorCatalogueEntry } from "../data/types";
+import type { IndicatorCatalogueEntry } from "../data/types";
 import { RESOLUTIONS } from "../data/types";
 import { ConfirmDialog } from "../ui/ConfirmDialog";
 import { RESOLUTION_LABEL } from "../ui/resolutionLabel";
@@ -19,6 +19,11 @@ import type { Definition, Rule, RuleFact, RuleParam, StrategyApi } from "./strat
  * would be a second opinion about numbers this screen does not own
  * (`terminal-strategy-configurator`).
  *
+ * Read through `useIndicatorCatalogue` rather than through a `useRead` of its own, and that
+ * is not tidiness. The cache is shared and keyed by name: two readers of one key holding two
+ * *shapes* is one poisoning the other, whichever answered last. This dialog did exactly that
+ * once, and what broke was the chart grid — a screen it has nothing to do with.
+ *
  * **The refusal is the module's, and it is shown where it happened.** Nothing is validated
  * here beyond what the shape needs to exist at all. A rule the module will not have comes
  * back naming the one thing to change, and `ConfirmDialog` keeps the dialog open with that
@@ -30,7 +35,6 @@ import type { Definition, Rule, RuleFact, RuleParam, StrategyApi } from "./strat
  * says so rather than leaving it to be discovered.
  */
 
-const EMPTY_CATALOGUE: IndicatorCatalogue = { algorithmVersion: 0, indicators: [] };
 // The same height every control in this dialog has, including the ones inside the tree
 // (`rule/NodeEditor.tsx`). A form where a select is two pixels shorter than the input beside
 // it reads as broken before anybody has read a word of it.
@@ -60,23 +64,18 @@ export function DefinitionDialog({
   const [description, setDescription] = useState(existing?.description ?? "");
   const [rule, setRule] = useState<Rule>(() => startFrom ?? blankRule());
 
-  const catalogue = useRead<IndicatorCatalogue>({
-    key: ["archive", "indicator-catalogue"],
-    read: (signal) => source.indicatorCatalogue(signal),
-    initial: EMPTY_CATALOGUE,
-    fallbackMessage: "nie udało się odczytać katalogu wskaźników",
-  });
+  const catalogue = useIndicatorCatalogue(source);
 
   const indicators = useMemo(
-    () => new Map(catalogue.value.indicators.map((entry) => [entry.id, entry])),
-    [catalogue.value],
+    () => new Map(catalogue.entries.map((entry) => [entry.id, entry])),
+    [catalogue.entries],
   );
   // Only the ones this vocabulary can read. An indicator answering zones or markers is a
   // real entry of the archive and simply not something a comparison can point at yet —
   // offering it would end in a refusal the operator could do nothing about.
   const readable = useMemo(
-    () => catalogue.value.indicators.filter((entry) => entry.output === "lines"),
-    [catalogue.value],
+    () => catalogue.entries.filter((entry) => entry.output === "lines"),
+    [catalogue.entries],
   );
 
   const context: EditorContext = { facts: rule.facts, params: rule.params, indicators };

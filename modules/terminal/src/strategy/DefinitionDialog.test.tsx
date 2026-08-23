@@ -1,6 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { useIndicatorCatalogue } from "../chart/indicators/useIndicatorCatalogue";
 import type { IndicatorSource } from "../data/source";
 import type { IndicatorCatalogue } from "../data/types";
 import { DefinitionDialog } from "./DefinitionDialog";
@@ -121,6 +122,31 @@ describe("writing a rule", () => {
     // underneath would have lost the rule it explains.
     expect(screen.getByLabelText("Nazwa")).toHaveValue("Wybicie");
     expect(saved).not.toHaveBeenCalled();
+  });
+
+  it("leaves the catalogue where every other reader of it looks", async () => {
+    // The query cache is shared and keyed by name alone. This dialog once read the
+    // catalogue under the chart's key while holding the whole document rather than its
+    // entries, and the screen that broke was the chart grid — a screen this one has nothing
+    // to do with. The assertion is the chart's own read, after this dialog has done its.
+    const source = fakeSource();
+    render(
+      <DefinitionDialog
+        client={fakeApi()}
+        source={source}
+        onClose={() => {}}
+        onSaved={() => {}}
+      />,
+    );
+    await screen.findByLabelText("Identyfikator");
+
+    function AChartWouldRead() {
+      const catalogue = useIndicatorCatalogue(source);
+      return <span data-testid="ids">{catalogue.entries.map((one) => one.id).join(",")}</span>;
+    }
+    render(<AChartWouldRead />);
+
+    await waitFor(() => expect(screen.getByTestId("ids")).toHaveTextContent("ema,atr"));
   });
 
   it("says that saving a revision moves no running watch", async () => {
