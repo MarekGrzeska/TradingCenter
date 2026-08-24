@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
 from typing import ClassVar
 
+import pytest
+
 from capital_gateway.dtos import Resolution
+from capital_gateway.stream import hub as hub_module
 from capital_gateway.stream.forming import Bar
 from capital_gateway.stream.hub import Hub
 from capital_gateway.stream.messages import (
@@ -15,6 +19,7 @@ from capital_gateway.stream.messages import (
     QuoteMessage,
     StatusMessage,
 )
+from tests.conftest import until
 
 BASE_MS = 1_784_988_000_000
 BASE_S = BASE_MS // 1000
@@ -456,3 +461,147 @@ async def test_a_late_joiner_is_not_handed_a_finished_period_as_forming() -> Non
     [candle] = [m for m in got if isinstance(m, CandleMessage)]
     assert candle.forming is False
     assert candle.time == BASE_S
+
+
+# --- a boundary that does not wait for a quote -----------------------------------------
+#
+# The failure of 24 August 2026, which the tests above could not have caught: every one of
+# them reaches `place_boundary` through a quote, and the room that broke was the one no
+# quote ever reached again.
+
+
+async def test_a_daily_room_asks_about_its_boundary_without_a_single_quote(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(hub_module, "BOUNDARY_TICK_SECONDS", 0.005)
+    monkeypatch.setattr(hub_module, "BOUNDARY_RETRY_SECONDS", 0.0)
+    # Nothing to build on at first — the state a room is left in when a period is sealed
+    # and the next one has not opened yet.
+    seeded = Bar(time=BASE_S + 86_400, open=104.0, high=104.0, low=104.0, close=104.0)
+    hub, asked = make_seeded_hub([None, seeded])
+    subscriber, received = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    try:
+        await until(lambda: len(asked) >= 2)
+        # And the room is ready for the quotes when they come back, rather than waiting
+        # for one in order to start being ready.
+        await FakeUpstream.instances[0].emit(
+            {"kind": "quote", "t": (BASE_S + 86_400 + 60) * 1000, "bid": 120.0, "ask": 120.2}
+        )
+    finally:
+        await hub.aclose()
+
+    candles = [m for m in received if isinstance(m, CandleMessage)]
+    assert candles[-1].time == BASE_S + 86_400
+    assert candles[-1].forming is True
+
+
+async def test_a_fixed_period_room_is_given_no_clock_to_ask_with(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Nothing to ask about: the boundary is arithmetic, and a timer per room is 21 tasks
+    in this account doing nothing but waking up."""
+    monkeypatch.setattr(hub_module, "BOUNDARY_TICK_SECONDS", 0.005)
+    hub, asked = make_seeded_hub([Bar(time=BASE_S, open=1.0, high=1.0, low=1.0, close=1.0)])
+    subscriber, _ = collector()
+
+    await hub.subscribe("US100", Resolution.MINUTE_5, subscriber)
+    try:
+        await asyncio.sleep(0.05)
+    finally:
+        await hub.aclose()
+
+    assert asked == []
+
+
+async def test_closing_the_hub_stops_the_boundary_clocks(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(hub_module, "BOUNDARY_TICK_SECONDS", 0.005)
+    monkeypatch.setattr(hub_module, "BOUNDARY_RETRY_SECONDS", 0.0)
+    hub, asked = make_seeded_hub([None])
+    subscriber, _ = collector()
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    await until(lambda: len(asked) >= 2)
+
+    await hub.aclose()
+    settled = len(asked)
+    await asyncio.sleep(0.05)
+
+    # A timer outliving its room asks the provider about a pair nobody is watching, once
+    # per tick, for as long as the process lives.
+    assert len(asked) == settled
+
+
+async def test_the_last_leaver_stops_the_boundary_clock(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(hub_module, "BOUNDARY_TICK_SECONDS", 0.005)
+    monkeypatch.setattr(hub_module, "BOUNDARY_RETRY_SECONDS", 0.0)
+    hub, asked = make_seeded_hub([None])
+    subscriber, _ = collector()
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    await until(lambda: len(asked) >= 2)
+
+    await hub.unsubscribe("US100", Resolution.DAY, subscriber)
+    settled = len(asked)
+    await asyncio.sleep(0.05)
+
+    assert len(asked) == settled
+
+
+def test_a_provider_that_keeps_saying_not_yet_is_asked_less_and_less() -> None:
+    """The answer does not change from one minute to the next, and over a weekend it does
+    not change for two days. Eight session-bound rooms asking every 30 seconds is 960
+    requests an hour out of ten per second shared by the whole account."""
+    waits = [hub_module.BOUNDARY_RETRY_SECONDS]
+    for _ in range(8):
+        waits.append(hub_module.next_boundary_wait(waits[-1]))
+
+    assert waits == [30.0, 60.0, 120.0, 240.0, 480.0, 600.0, 600.0, 600.0, 600.0]
+
+
+async def test_the_growing_wait_is_wired_in_not_merely_written(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    asked_with: list[float] = []
+    policy = hub_module.next_boundary_wait
+
+    def recording(wait: float) -> float:
+        asked_with.append(wait)
+        return policy(wait)
+
+    monkeypatch.setattr(hub_module, "BOUNDARY_TICK_SECONDS", 0.005)
+    monkeypatch.setattr(hub_module, "BOUNDARY_RETRY_SECONDS", 0.001)
+    monkeypatch.setattr(hub_module, "next_boundary_wait", recording)
+    hub, _asked = make_seeded_hub([None])
+    subscriber, _ = collector()
+
+    await hub.subscribe("US100", Resolution.DAY, subscriber)
+    try:
+        await until(lambda: len(asked_with) >= 3)
+    finally:
+        await hub.aclose()
+
+    assert asked_with[:3] == [0.001, 0.002, 0.004]
+
+
+async def test_a_joiner_is_handed_an_assembled_bar_as_forming_not_as_settled() -> None:
+    """A period can end without the provider sealing it, and then the only bar the room
+    has for it is its own assembly. A consumer stores what is marked settled, so handing
+    that one over as settled writes a candle nobody closed into an archive."""
+    hub, _ = make_seeded_hub([Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0)])
+    first, _ = collector()
+    await hub.subscribe("US100", Resolution.DAY, first)
+    # A quote a whole day later: the period this room is holding has certainly ended, and
+    # no seal came.
+    await FakeUpstream.instances[0].emit(
+        {"kind": "quote", "t": (BASE_S + 86_400) * 1000, "bid": 120.0, "ask": 120.2}
+    )
+
+    joiner, received = collector()
+    await hub.subscribe("US100", Resolution.DAY, joiner)
+
+    candles = [m for m in received if isinstance(m, CandleMessage)]
+    assert [c.forming for c in candles] == [True]

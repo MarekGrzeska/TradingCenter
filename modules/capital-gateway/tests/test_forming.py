@@ -5,7 +5,12 @@ from __future__ import annotations
 import pytest
 
 from capital_gateway.dtos import Resolution
-from capital_gateway.stream.forming import Bar, FormingCandle
+from capital_gateway.stream.forming import (
+    BUCKET_SECONDS,
+    NOMINAL_SECONDS,
+    Bar,
+    FormingCandle,
+)
 
 # 2026-07-23T14:00:00Z, a clean five-minute boundary.
 BASE_MS = 1_784_988_000_000
@@ -178,3 +183,83 @@ def test_a_break_and_a_seal_are_told_apart(resolution: Resolution) -> None:
     f.on_sealed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
     assert f.needs_boundary is True
     assert f.period_is_over is True
+
+
+# --- a period that ended without the provider saying so ---------------------------------
+#
+# Measured 24 August 2026: every weekly room was holding a bar opened on the 17th and
+# folding the 24th's quotes into it. The week had rolled at midnight, the provider's seal
+# for it never arrived, and a seal was the only thing that could move the boundary.
+
+
+@pytest.mark.parametrize(
+    ("resolution", "period"), [(Resolution.DAY, 86_400), (Resolution.WEEK, 604_800)]
+)
+def test_a_quote_a_whole_period_later_does_not_stretch_the_bar(
+    resolution: Resolution, period: int
+) -> None:
+    f = FormingCandle(resolution)
+    f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
+
+    assert f.on_quote(BASE_MS + period * 1_000, 120.0) is None
+    # Not published, and not silently kept either: the boundary is now the provider's to
+    # give again.
+    assert f.needs_boundary is True
+    assert f.current is not None
+    assert f.current.high == 100.0
+
+
+@pytest.mark.parametrize(
+    ("resolution", "period"), [(Resolution.DAY, 86_400), (Resolution.WEEK, 604_800)]
+)
+def test_a_quote_inside_the_nominal_period_still_stretches_the_bar(
+    resolution: Resolution, period: int
+) -> None:
+    """The bound overstates elapsed time on purpose, so everything under it is left alone.
+
+    A venue's day is shorter than 24 hours; reading this as a boundary rather than as a
+    ceiling would cut the candle at the wrong moment — which is the mistake the whole
+    module is built to avoid."""
+    f = FormingCandle(resolution)
+    f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
+
+    bar = f.on_quote(BASE_MS + (period - 1) * 1_000, 120.0)
+
+    assert bar is not None
+    assert bar.time == BASE_S
+    assert bar.high == 120.0
+
+
+def test_the_nominal_length_is_never_a_boundary_to_floor_by() -> None:
+    """The one way this change could undo the decision it is built on.
+
+    `NOMINAL_SECONDS` answers "has this period certainly ended". `BUCKET_SECONDS` answers
+    "where does the period start", and a daily boundary computed from UTC midnight looks
+    right and is wrong — so these two must not converge."""
+    assert Resolution.DAY not in BUCKET_SECONDS
+    assert Resolution.WEEK not in BUCKET_SECONDS
+    assert set(NOMINAL_SECONDS) == set(BUCKET_SECONDS) | {Resolution.DAY, Resolution.WEEK}
+    assert FormingCandle(Resolution.DAY).boundary_comes_from_provider is True
+    assert FormingCandle(Resolution.MINUTE_5).boundary_comes_from_provider is False
+
+
+@pytest.mark.parametrize("resolution", [Resolution.DAY, Resolution.WEEK])
+def test_a_bar_this_module_assembled_is_never_the_providers_sealed_one(
+    resolution: Resolution,
+) -> None:
+    """What a joiner is handed hangs on this, and a consumer stores what is marked
+    settled. A period can now end without a seal, so "over" and "sealed" have to be
+    separable — otherwise the room's own assembly of an unfinished period goes out as a
+    settled candle and lands in an archive."""
+    f = FormingCandle(resolution)
+    f.seed(Bar(time=BASE_S, open=100.0, high=100.0, low=100.0, close=100.0))
+    assert f.held_is_sealed is False
+
+    f.on_quote(BASE_MS + NOMINAL_SECONDS[resolution] * 1_000, 120.0)
+
+    assert f.period_is_over is True
+    assert f.held_is_sealed is False
+
+    f.on_sealed(Bar(time=BASE_S, open=100.0, high=105.0, low=99.0, close=104.0))
+
+    assert f.held_is_sealed is True

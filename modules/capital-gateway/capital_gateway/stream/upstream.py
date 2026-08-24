@@ -44,6 +44,27 @@ RECONNECT_DELAY_SECONDS = 3.0
 MAX_RECONNECT_DELAY_SECONDS = 60.0
 RECONNECT_BACKOFF_FACTOR = 2.0
 
+# How long a connection may deliver no market data before it is treated as broken.
+#
+# The failure this answers, measured on 24 August 2026: one room received nothing for
+# fourteen hours while 28 others on the same session carried 47 to 265 quotes per 25
+# seconds. The socket was open the whole time — `websockets` pings every 20 seconds and
+# drops a peer that stops answering, so the transport was healthy and the *subscription*
+# was dead. Nothing that watches the socket can see that; only counting data can.
+#
+# Data, and not any frame: the provider answers a keepalive, and a connection whose
+# subscriptions are gone still answers it. A watchdog fed by those would have sat through
+# all fourteen hours. Two minutes is two orders of magnitude past what a live feed does.
+SILENCE_TOLERANCE_SECONDS = 120.0
+
+# Where the tolerance ends up when reconnecting keeps producing silence — which is what a
+# closed market looks like, and a market can be closed all weekend. At the ceiling, the 29
+# rooms this account runs cost about 0.05 requests a second; at a flat two minutes they
+# would cost ten times that for two days, out of ten per second shared with every read an
+# operator makes.
+MAX_SILENCE_TOLERANCE_SECONDS = 10 * 60.0
+SILENCE_TOLERANCE_FACTOR = 2.0
+
 # How long a session has to have lasted for the next drop to start from the short delay
 # again. Measured on the socket rather than on how it ended, because the failure that
 # needs backing off does not always raise: dead tokens are answered with an error frame
@@ -57,6 +78,27 @@ _KEPT_PRICE_TYPE = "bid"
 
 Emit = Callable[[dict], Awaitable[None]]
 Tokens = Callable[[], Awaitable[tuple[str, str]]]
+
+
+class SilentFeed(Exception):
+    """The provider stopped sending market data without closing the connection.
+
+    An exception because that is what the loop already understands: `_session` raising is
+    how a session ends, and ending it is exactly the answer here.
+    """
+
+
+def next_silence_tolerance(tolerance: float, heard_data: bool) -> float:
+    """How long the next session may say nothing before it is written off.
+
+    A session that carried data was a healthy one, so the next one starts from the short
+    tolerance again. A run of sessions that carried none is either a market that is shut
+    or a provider that will not serve this pair right now, and neither is answered by
+    asking every two minutes for two days.
+    """
+    if heard_data:
+        return SILENCE_TOLERANCE_SECONDS
+    return min(tolerance * SILENCE_TOLERANCE_FACTOR, MAX_SILENCE_TOLERANCE_SECONDS)
 
 
 def next_reconnect_delay(delay: float, session_lasted: float) -> float:
@@ -97,6 +139,8 @@ class Upstream:
         self._emit = emit
         self._task: asyncio.Task | None = None
         self._stopping = False
+        self._silence_tolerance = SILENCE_TOLERANCE_SECONDS
+        self._heard_data = False
 
     def start(self) -> None:
         if self._task is None:
@@ -119,6 +163,7 @@ class Upstream:
         delay = RECONNECT_DELAY_SECONDS
         while not self._stopping:
             started = time.monotonic()
+            self._heard_data = False
             try:
                 await self._session()
             except asyncio.CancelledError:
@@ -133,6 +178,11 @@ class Upstream:
             # Computed after the sleep, so the first reconnect after a drop is as quick as
             # it has always been and only a *run* of failures is slowed down.
             delay = next_reconnect_delay(delay, lasted)
+            # The silence tolerance grows on its own schedule: what widens it is a session
+            # that carried nothing, which is not the same thing as one that ended quickly.
+            self._silence_tolerance = next_silence_tolerance(
+                self._silence_tolerance, self._heard_data
+            )
 
     async def _session(self) -> None:
         cst, token = await self._tokens()
@@ -141,12 +191,36 @@ class Upstream:
             await self._emit({"kind": "status", "state": "connected"})
             ping = asyncio.create_task(self._ping_forever(ws, cst, token))
             try:
-                async for raw in ws:
-                    await self._on_message(raw)
+                await self._read_until_silent(ws)
             finally:
                 ping.cancel()
                 with contextlib.suppress(asyncio.CancelledError):
                     await ping
+
+    async def _read_until_silent(self, ws) -> None:
+        """Read frames until the socket ends — or until the data stops arriving.
+
+        A deadline rather than a timeout on each read, because the two are not the same
+        question once keepalive answers are on the wire: every frame would restart a
+        per-read timeout, and the frames that prove a *subscription* is alive are only the
+        ones carrying market data. So the deadline moves for those and for nothing else.
+        """
+        loop = asyncio.get_running_loop()
+        frames = ws.__aiter__()
+        deadline = loop.time() + self._silence_tolerance
+        while True:
+            try:
+                raw = await asyncio.wait_for(frames.__anext__(), deadline - loop.time())
+            except StopAsyncIteration:
+                return
+            except TimeoutError:
+                raise SilentFeed(
+                    f"no market data for {self._epic} {self._resolution.value} in "
+                    f"{self._silence_tolerance:.0f}s, though the connection is open"
+                ) from None
+            if await self._on_message(raw):
+                self._heard_data = True
+                deadline = loop.time() + self._silence_tolerance
 
     async def _subscribe(self, ws, cst: str, token: str) -> None:
         await ws.send(
@@ -190,17 +264,23 @@ class Upstream:
                 )
             )
 
-    async def _on_message(self, raw: str | bytes) -> None:
+    async def _on_message(self, raw: str | bytes) -> bool:
+        """Translate one frame, and say whether it carried market data.
+
+        The return value is what the silence watchdog counts. A keepalive answer and a
+        refusal both arrive as frames and neither proves the subscription is still being
+        served — which is the whole distinction the watchdog rests on.
+        """
         try:
             msg = json.loads(raw)
         except ValueError:
-            return
+            return False
         payload = msg.get("payload") or {}
         destination = msg.get("destination")
 
         if destination == "ohlc.event" and payload.get("epic") == self._epic:
             if payload.get("priceType") != _KEPT_PRICE_TYPE:
-                return  # the ask-side copy of a candle already published
+                return True  # the ask-side copy of a candle already published
             await self._emit(
                 {
                     "kind": "sealed",
@@ -211,6 +291,7 @@ class Upstream:
                     "c": payload["c"],
                 }
             )
+            return True
         elif destination == "quote" and payload.get("epic") == self._epic:
             await self._emit(
                 {
@@ -220,6 +301,7 @@ class Upstream:
                     "ask": payload["ofr"],
                 }
             )
+            return True
         elif msg.get("status") and msg.get("status") != "OK":
             # A subscription refused is silence otherwise, which reads as a quiet market.
             #
@@ -229,3 +311,4 @@ class Upstream:
             detail = payload.get("errorCode") or payload.get("error") or ""
             message = f"{msg['status']}: {detail}" if detail else str(msg["status"])
             await self._emit({"kind": "error", "message": message[:200]})
+        return False

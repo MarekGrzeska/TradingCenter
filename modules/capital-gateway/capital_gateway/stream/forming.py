@@ -32,6 +32,22 @@ BUCKET_SECONDS: dict[Resolution, int] = {
     Resolution.HOUR_4: 14400,
 }
 
+# How long a period lasts at most, this time with DAY and WEEK. **Not a boundary**, and
+# nothing here may floor a timestamp with it — that is what the map above is for, and why
+# these two are missing from it. A venue's day is shorter than 24 hours and its week
+# shorter than seven days, so this overstates elapsed time, which is the safe direction
+# for the one question it answers: has the period a bar covers *certainly* ended.
+#
+# Measured 24 August 2026, and this is why it exists: all four weekly rooms were holding a
+# bar opened on the 17th and folding the 24th's quotes into it, because the provider's
+# seal for that week never arrived and a seal was the only thing that could move the
+# boundary. `history.mark_forming` already reasons this way on the REST side.
+NOMINAL_SECONDS: dict[Resolution, int] = {
+    **BUCKET_SECONDS,
+    Resolution.DAY: 86_400,
+    Resolution.WEEK: 604_800,
+}
+
 
 @dataclass
 class Bar:
@@ -52,14 +68,34 @@ class FormingCandle:
     be the current one, and usually is. Told apart because the answer to "the provider
     handed back the same period" differs: after a seal that is no progress, after a break
     it is the confirmation being asked for.
+
+    Whether the bar was *sealed* is a third thing again, and only since a period can now
+    end without the provider saying so: a caller handing a bar to a joiner needs to know
+    whether it is the provider's candle or this module's assembly of one.
     """
 
     def __init__(self, resolution: Resolution) -> None:
         self._step = BUCKET_SECONDS.get(resolution)
+        self._nominal = NOMINAL_SECONDS[resolution]
         self._bar: Bar | None = None
         # Both only meaningful without a step.
         self._period_over = False
         self._boundary_stale = False
+        # Whether the bar in hand is the provider's own sealed candle rather than one
+        # this module assembled. Only a sealed one may be handed to a joiner as settled:
+        # a consumer stores what is marked settled, and an assembled bar is the module's
+        # partial view of a period nobody has closed yet.
+        self._sealed = False
+
+    @property
+    def boundary_comes_from_provider(self) -> bool:
+        """Whether this resolution's period start is something only the provider knows.
+
+        What a caller needs in order to decide whether asking about a boundary is a
+        question worth putting on a timer at all — for a resolution with an arithmetic
+        boundary it never becomes one.
+        """
+        return self._step is None
 
     @property
     def current(self) -> Bar | None:
@@ -82,6 +118,16 @@ class FormingCandle:
         )
 
     @property
+    def held_is_sealed(self) -> bool:
+        """Whether the bar in hand came from the provider closing the period.
+
+        Not the same question as ``period_is_over``: a period can be known to be over
+        because a whole nominal period has passed, while the only bar this module holds
+        for it is still the one it assembled itself.
+        """
+        return self._sealed
+
+    @property
     def period_is_over(self) -> bool:
         """Whether the bar in hand covers a period the provider has already sealed.
 
@@ -100,6 +146,7 @@ class FormingCandle:
         self._bar = bar
         self._period_over = False
         self._boundary_stale = False
+        self._sealed = False
         return bar
 
     def invalidate(self) -> None:
@@ -123,6 +170,7 @@ class FormingCandle:
         start only the provider knows.
         """
         self._bar = bar
+        self._sealed = True
         if self._step is None:
             self._period_over = True
             self._boundary_stale = False
@@ -141,6 +189,14 @@ class FormingCandle:
             # provider named, and nothing else — a bar whose period has ended is left
             # alone until `seed` names the next one.
             if prev is None or self._period_over or self._boundary_stale:
+                return None
+            if ts_ms // 1000 - prev.time >= self._nominal:
+                # A whole nominal period has passed since this bar opened, so its own
+                # period is over whatever the venue's calendar says — the bound
+                # overstates elapsed time and still leaves this certain. The provider's
+                # seal is the usual way to learn that; this is the way that does not
+                # depend on the seal arriving.
+                self._period_over = True
                 return None
             bucket = prev.time
         else:
