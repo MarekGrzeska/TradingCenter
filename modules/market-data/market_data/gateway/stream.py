@@ -7,11 +7,19 @@ the four kinds of message it sends.
 Reconnection is not here. A dropped feed is not only a socket to reopen, it is a gap in
 the archive to close, and deciding that needs the coverage the ingest side keeps. This
 module hands up a clean stream and lets it end.
+
+Silence ends it too, and that is the one judgement this file makes. A subscription that
+delivers nothing is not a subscription that was dropped — nothing above notices, so
+nothing reconnects and nothing closes the gap. Measured on 24 August 2026: one pair's
+ingest ran forty hours without a single break while receiving nothing for the last
+fourteen of them.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -27,6 +35,22 @@ from ..errors import GatewayUnreachable, UnreadablePayload
 from ..models import Candle, CandleSource, PriceSide, Resolution
 from ..periods import from_epoch_millis, from_epoch_seconds
 from ._http import GATEWAY_KEY_HEADER
+
+log = logging.getLogger(__name__)
+
+# How long a subscription may deliver nothing at all before this module calls it over.
+#
+# Deliberately slower than the gateway's own watchdog, which tears down a provider
+# connection that stops carrying market data and rebuilds it — with its own escalation up
+# to ten minutes. This is the second line, and a second line that fires first would have
+# the wrong module doing the recovering: a subscription ended here costs a gap fill and a
+# fresh room, where the gateway's answer costs one reconnect.
+#
+# Counted from any frame, not from a candle: the gateway sends quotes several times a
+# second and status messages while it is reconnecting, so a frame of any kind is proof
+# that the module in front of us is alive and working. A DAY candle arrives once a day,
+# so a threshold measured in candles would measure the resolution rather than the feed.
+SILENCE_TOLERANCE_SECONDS = 20 * 60.0
 
 
 class FeedState(str, Enum):
@@ -205,7 +229,23 @@ async def subscribe(
         ) from err
 
     async def messages() -> AsyncIterator[StreamMessage]:
-        async for frame in connection:
+        frames = connection.__aiter__()
+        while True:
+            try:
+                frame = await asyncio.wait_for(
+                    frames.__anext__(), SILENCE_TOLERANCE_SECONDS
+                )
+            except StopAsyncIteration:
+                return
+            except TimeoutError:
+                log.warning(
+                    "%s %s: the gateway sent nothing for %.0f minutes; ending the "
+                    "subscription so it is opened again and the gap is closed",
+                    symbol,
+                    resolution.value,
+                    SILENCE_TOLERANCE_SECONDS / 60,
+                )
+                return
             message = read_message(frame)
             if message is not None:
                 yield message

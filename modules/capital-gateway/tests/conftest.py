@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import os
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -75,6 +77,24 @@ def settings(_no_ambient_credentials: None, monkeypatch: pytest.MonkeyPatch) -> 
         if value:
             monkeypatch.setenv(name, value)
     return Settings()  # type: ignore[call-arg]
+
+
+async def until(predicate: Callable[[], bool], timeout: float = 2.0) -> None:
+    """Let a loop run until it has done the thing, or fail the test saying it did not.
+
+    Here rather than in one test module because two of them drive background tasks — the
+    connection loop and the room's boundary clock — and both need the same "wait for the
+    effect, not for a number of seconds".
+    """
+
+    async def poll() -> None:
+        while not predicate():
+            await asyncio.sleep(0.005)
+
+    try:
+        await asyncio.wait_for(poll(), timeout)
+    except TimeoutError:
+        raise AssertionError(f"condition not reached within {timeout}s") from None
 
 
 def load_fixture(name: str) -> dict:

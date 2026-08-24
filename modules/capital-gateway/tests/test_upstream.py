@@ -15,7 +15,6 @@ from __future__ import annotations
 import asyncio
 import json
 from collections import deque
-from collections.abc import Callable
 from typing import Self
 
 import pytest
@@ -24,6 +23,7 @@ from websockets.exceptions import ConnectionClosedError
 from capital_gateway.dtos import Resolution
 from capital_gateway.stream import upstream as upstream_module
 from capital_gateway.stream.upstream import Tokens, Upstream
+from tests.conftest import until
 
 EPIC = "US100"
 
@@ -298,19 +298,6 @@ def run_upstream(
     return up, emitted, provider
 
 
-async def until(predicate: Callable[[], bool], timeout: float = 2.0) -> None:
-    """Let the loop run until it has done the thing, or fail the test saying it did not."""
-
-    async def poll() -> None:
-        while not predicate():
-            await asyncio.sleep(0.005)
-
-    try:
-        await asyncio.wait_for(poll(), timeout)
-    except TimeoutError:
-        raise AssertionError(f"condition not reached within {timeout}s") from None
-
-
 QUOTE_FRAME = json.dumps(
     {
         "destination": "quote",
@@ -521,3 +508,120 @@ async def test_the_loop_grows_its_wait_between_consecutive_failures(
 
     assert [delay for delay, _lasted in asked[:2]] == [0.001, 0.002]
     assert all(lasted < upstream_module.HEALTHY_SESSION_SECONDS for _delay, lasted in asked)
+
+
+# --- a connection that is open and says nothing -----------------------------------------
+#
+# The failure of 24 August 2026. One room received nothing for fourteen hours while 28
+# others on the same session carried 47 to 265 quotes per 25 seconds; the socket stayed
+# open the whole time, so every check the loop had — an exception, a close — said the feed
+# was fine.
+
+
+async def test_a_keepalive_answer_is_not_evidence_the_subscription_lives() -> None:
+    """The distinction the watchdog rests on. The provider answers a keepalive whether or
+    not it is still serving the subscription, so a watchdog fed by any frame at all would
+    have sat through all fourteen hours."""
+    up, _ = make_upstream()
+
+    assert await up._on_message(json.dumps({"status": "OK", "destination": "ping"})) is False
+    assert await up._on_message(json.dumps({"status": "ERROR", "payload": {}})) is False
+    assert await up._on_message(QUOTE_FRAME) is True
+    assert await up._on_message(ohlc("bid")) is True
+    # The ask-side copy is dropped rather than published, and it is still the provider
+    # serving this subscription.
+    assert await up._on_message(ohlc("ask")) is True
+    assert await up._on_message(ohlc("bid", epic="GOLD")) is False
+
+
+async def test_a_connection_that_stops_carrying_data_is_torn_down_and_remade(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(upstream_module, "SILENCE_TOLERANCE_SECONDS", 0.02)
+    up, emitted, provider = run_upstream(monkeypatch, [ScriptedSocket(), ScriptedSocket()])
+    up.start()
+    try:
+        await until(lambda: len(provider.opened) == 2)
+    finally:
+        await up.stop()
+
+    reported = next(e for e in emitted if e["kind"] == "error")
+    assert "no market data" in reported["message"]
+    # The same road a dropped connection takes, because the destination is the same: a
+    # subscriber that can read "reconnecting", and a fresh socket that resubscribes.
+    assert [e.get("state") or e["kind"] for e in emitted][:4] == [
+        "connected",
+        "error",
+        "reconnecting",
+        "connected",
+    ]
+    assert [m["destination"] for m in provider.opened[1].sent] == [
+        "OHLCMarketData.subscribe",
+        "marketData.subscribe",
+    ]
+
+
+async def test_a_connection_still_carrying_data_is_left_alone(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A quiet stretch inside a live feed is not the failure — quotes arriving is."""
+    monkeypatch.setattr(upstream_module, "SILENCE_TOLERANCE_SECONDS", 0.05)
+    quotes = ScriptedSocket([QUOTE_FRAME] * 30)
+    up, emitted, provider = run_upstream(monkeypatch, [quotes])
+    up.start()
+    try:
+        await until(lambda: sum(e["kind"] == "quote" for e in emitted) == 30)
+    finally:
+        await up.stop()
+
+    assert len(provider.opened) == 1
+    assert not [e for e in emitted if e["kind"] == "error"]
+
+
+def test_a_run_of_silent_sessions_widens_the_tolerance_towards_the_ceiling() -> None:
+    """A closed market is silent by definition and can stay shut all weekend. At the
+    ceiling the 29 rooms this account runs cost about 0.05 requests a second; at a flat
+    two minutes they would cost ten times that, for two days."""
+    tolerances = [upstream_module.SILENCE_TOLERANCE_SECONDS]
+    for _ in range(5):
+        tolerances.append(
+            upstream_module.next_silence_tolerance(tolerances[-1], heard_data=False)
+        )
+
+    assert tolerances == [120.0, 240.0, 480.0, 600.0, 600.0, 600.0]
+
+
+def test_a_session_that_carried_data_puts_the_tolerance_back() -> None:
+    narrowed = upstream_module.next_silence_tolerance(
+        upstream_module.MAX_SILENCE_TOLERANCE_SECONDS, heard_data=True
+    )
+
+    assert narrowed == upstream_module.SILENCE_TOLERANCE_SECONDS
+
+
+async def test_the_widening_tolerance_is_wired_in_not_merely_written(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """And it widens on what the session *carried*, not on how it ended: a socket that
+    drops after delivering quotes is a healthy feed with a broken connection."""
+    asked: list[tuple[float, bool]] = []
+    policy = upstream_module.next_silence_tolerance
+
+    def recording(tolerance: float, heard_data: bool) -> float:
+        asked.append((tolerance, heard_data))
+        return policy(tolerance, heard_data)
+
+    monkeypatch.setattr(upstream_module, "SILENCE_TOLERANCE_SECONDS", 0.02)
+    monkeypatch.setattr(upstream_module, "next_silence_tolerance", recording)
+    up, _emitted, _provider = run_upstream(
+        monkeypatch,
+        [ScriptedSocket(), ScriptedSocket(), ScriptedSocket([QUOTE_FRAME], ending="drop")],
+    )
+    up.start()
+    try:
+        await until(lambda: len(asked) >= 3)
+    finally:
+        await up.stop()
+
+    assert [heard for _tolerance, heard in asked[:3]] == [False, False, True]
+    assert [tolerance for tolerance, _heard in asked[:3]] == [0.02, 0.04, 0.08]

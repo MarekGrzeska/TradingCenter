@@ -178,8 +178,17 @@ stored history and live data.
 
 **`DAY` and `WEEK` never guess a boundary.** Flooring a timestamp to a period is exact only
 while a period is a fixed number of seconds, and a daily candle starts at the venue's session
-open, not UTC midnight. At those resolutions quotes extend the last known candle and only a
-sealed candle moves the boundary.
+open, not UTC midnight. At those resolutions quotes extend the last known candle, and the
+boundary moves only on an answer from the provider — asked for when a period is sealed, when
+the feed breaks, and on the room's own clock, so a room nobody quotes still gets one.
+
+**A period can end without the provider saying so, and a bar is then left alone.** A quote
+later than the bar's start by a whole nominal period — 24 hours, 7 days — means that period
+is certainly over, whatever the venue's calendar does, so it is not folded in. Measured 24
+August 2026: every weekly room was holding a bar opened on the 17th and folding the 24th's
+quotes into it, because the seal for that week never arrived. The nominal length is a
+**ceiling on elapsed time**, never a boundary to floor by; those two live in separate maps in
+[`stream/forming.py`](capital_gateway/stream/forming.py) for exactly that reason.
 
 **Streamed candles carry no volume.** `volume` is always `null` on the WebSocket feed —
 neither the provider's candle event nor its quotes report it. The field is there so the
@@ -188,6 +197,19 @@ indicator cannot be computed on this feed; read it from `/candles` or `/history`
 
 **One connection per `(symbol, resolution)`**, shared by every subscriber and closed when the
 last one leaves.
+
+**Silence is a broken connection, and the socket cannot tell you.** A connection carrying no
+market data for two minutes is torn down and remade, subscriptions and all. The measurement
+behind it, 24 August 2026: one room received nothing for **fourteen hours** while 28 others on
+the same session carried 47–265 quotes per 25 s. `websockets` pings every 20 s and drops a
+peer that stops answering, so the transport was healthy the whole time — the *subscription*
+was dead, and only counting data can see that. A keepalive answer therefore does not count as
+data: the provider answers one whether or not it is still serving the subscription.
+
+**The tolerance widens when reconnecting keeps producing silence**, doubling to a ceiling of
+ten minutes, and snaps back to two on the first data. A shut market is silent by definition
+and can be shut all weekend; at the ceiling the 29 rooms this account runs cost about **0.05
+requests a second**, out of the ten per second the whole account shares.
 
 **Ten requests per second, per process.** The gate lives on the client, and the app owns one
 client — so two clients in one process would be two gates and twice the rate.

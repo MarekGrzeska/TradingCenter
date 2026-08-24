@@ -20,6 +20,7 @@ from market_data.gateway import (
     stream_url,
     subscribe,
 )
+from market_data.gateway import stream as stream_module
 from market_data.gateway.stream import _read_quote
 from market_data.models import CandleSource, PriceSide, Resolution
 
@@ -223,6 +224,30 @@ async def test_the_socket_closes_when_the_caller_is_done(
         assert not hung_up.is_set()
 
     await asyncio.wait_for(hung_up.wait(), timeout=5)
+
+
+async def test_a_subscription_that_goes_quiet_ends_instead_of_waiting_forever(
+    idle_feed: tuple[str, asyncio.Event], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Measured 24 August 2026: one pair's ingest ran forty hours without a single break
+    while receiving nothing for the last fourteen of them. A subscription nobody ends is a
+    subscription nobody reopens — and reopening is what closes the gap."""
+    monkeypatch.setattr(stream_module, "SILENCE_TOLERANCE_SECONDS", 0.05)
+    url, _hung_up = idle_feed
+
+    async with subscribe(url, "US100", Resolution.DAY, "test-key") as messages:
+        received = [message async for message in messages]
+
+    # The one frame the feed sent, and then the ending this module supplied itself.
+    assert [type(m) for m in received] == [FeedStatus]
+
+
+def test_the_second_line_of_defence_fires_after_the_first() -> None:
+    """The gateway tears down a provider connection that stops carrying data and rebuilds
+    it, widening its own tolerance up to ten minutes. Firing sooner than that would have
+    the wrong module recovering: a subscription ended here costs a gap fill and a fresh
+    room, where the gateway's answer costs one reconnect."""
+    assert stream_module.SILENCE_TOLERANCE_SECONDS >= 2 * 10 * 60
 
 
 async def test_a_gateway_that_is_not_listening_is_named_as_unreachable() -> None:
