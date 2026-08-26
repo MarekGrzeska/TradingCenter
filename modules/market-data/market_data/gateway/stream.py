@@ -1,19 +1,5 @@
-"""Reading the gateway's live feed at `/ws/stream`.
-
-There is no client protocol to get wrong: the subscription is the query string, and the
-gateway reads nothing back. So this is a reader, not a conversation — connect, and take
-the four kinds of message it sends.
-
-Reconnection is not here. A dropped feed is not only a socket to reopen, it is a gap in
-the archive to close, and deciding that needs the coverage the ingest side keeps. This
-module hands up a clean stream and lets it end.
-
-Silence ends it too, and that is the one judgement this file makes. A subscription that
-delivers nothing is not a subscription that was dropped — nothing above notices, so
-nothing reconnects and nothing closes the gap. Measured on 24 August 2026: one pair's
-ingest ran forty hours without a single break while receiving nothing for the last
-fourteen of them.
-"""
+"""Reading the gateway's live feed at `/ws/stream` — a reader, not a conversation. Reconnection is not
+here: a dropped feed is also a gap to close, and deciding that needs the coverage ingest keeps."""
 
 from __future__ import annotations
 
@@ -38,28 +24,14 @@ from ._http import GATEWAY_KEY_HEADER
 
 log = logging.getLogger(__name__)
 
-# How long a subscription may deliver nothing at all before this module calls it over.
-#
-# Deliberately slower than the gateway's own watchdog, which tears down a provider
-# connection that stops carrying market data and rebuilds it — with its own escalation up
-# to ten minutes. This is the second line, and a second line that fires first would have
-# the wrong module doing the recovering: a subscription ended here costs a gap fill and a
-# fresh room, where the gateway's answer costs one reconnect.
-#
-# Counted from any frame, not from a candle: the gateway sends quotes several times a
-# second and status messages while it is reconnecting, so a frame of any kind is proof
-# that the module in front of us is alive and working. A DAY candle arrives once a day,
-# so a threshold measured in candles would measure the resolution rather than the feed.
+# How long a subscription may deliver nothing before this module calls it over. Deliberately slower
+# than the gateway's own watchdog, and counted from any frame: a DAY candle arrives once a day.
 SILENCE_TOLERANCE_SECONDS = 20 * 60.0
 
 
 class FeedState(str, Enum):
-    """What the gateway says about its own connection to the provider.
-
-    Carried through rather than collapsed into a boolean, because "reconnecting" and
-    "closed" call for different answers: one is a gap that is about to close itself, the
-    other is a gap that will not.
-    """
+    """What the gateway says about its own connection to the provider. Carried through rather than
+    collapsed into a boolean: "reconnecting" is a gap about to close itself, "closed" is not."""
 
     CONNECTING = "connecting"
     CONNECTED = "connected"
@@ -68,21 +40,16 @@ class FeedState(str, Enum):
 
 
 class CandleUpdate(BaseModel):
-    """A candle, forming or closed. The gateway sends one kind for both and marks which,
-    because a chart upserts by timestamp; the archive reads the mark and stores only the
-    closed ones."""
+    """A candle, forming or closed. The gateway sends one kind for both and marks which, because a
+    chart upserts by timestamp; the archive reads the mark and stores only the closed ones."""
 
     kind: Literal["candle"] = "candle"
     candle: Candle
 
 
 class Quote(BaseModel):
-    """Bid and ask, about five a second.
-
-    Not stored — quotes are two to three orders of magnitude more data than candles and
-    nothing needs them yet — but read, because they are how the gateway's forming candle
-    moves and how silence is told from a flat market.
-    """
+    """Bid and ask, about five a second. Not stored — orders of magnitude more data than candles —
+    but read, because they move the forming candle and tell silence from a flat market."""
 
     kind: Literal["quote"] = "quote"
     symbol: str
@@ -108,21 +75,15 @@ StreamMessage = CandleUpdate | Quote | FeedStatus | FeedFailure
 
 
 def stream_url(base_url: str, symbol: str, resolution: Resolution) -> str:
-    """The subscription, which is the URL. A missing symbol or an unknown resolution is
-    refused by the gateway before the handshake, so a bad one fails to connect rather
-    than handing back a socket that dies a moment later."""
+    """The subscription, which is the URL. A missing symbol or unknown resolution is refused before
+    the handshake, so a bad one fails to connect rather than dying a moment later."""
     query = urlencode({"symbol": symbol, "resolution": resolution.value})
     return f"{base_url.rstrip('/')}?{query}"
 
 
 def read_message(raw: str | bytes) -> StreamMessage | None:
-    """One frame, read.
-
-    Returns `None` for a kind this module does not consume, so that the gateway adding a
-    fifth message kind is not an outage here. Raises `UnreadablePayload` for a kind it
-    does consume that does not match its published shape — that is the two modules'
-    contract having drifted, and swallowing it would turn a broken feed into a quiet one.
-    """
+    """One frame, read. `None` for a kind this module does not consume, so a fifth message kind is not
+    an outage; `UnreadablePayload` for one it does, which is the two contracts having drifted."""
     try:
         payload = json.loads(raw)
     except (json.JSONDecodeError, UnicodeDecodeError) as err:
@@ -154,9 +115,8 @@ def _read_candle(payload: dict) -> CandleUpdate:
             high=message.high,
             low=message.low,
             close=message.close,
-            # Always absent on this feed: neither the provider's candle event nor its
-            # quotes carry volume. A candle backfilled later may have it, which is one
-            # more reason a history value outranks a streamed one for the same period.
+                # Always absent on this feed: neither the candle event nor the quotes carry volume.
+                # A candle backfilled later may have it, one more reason history outranks a stream.
             volume=message.volume,
             price_side=PriceSide.BID,
             source=CandleSource.STREAM,
@@ -183,15 +143,8 @@ def _read_error(payload: dict) -> FeedFailure:
     return FeedFailure(message=str(payload["message"]))
 
 
-# `quote` is deliberately absent, and it is the busiest kind on the feed: about five a
-# second per pair, times the pairs this module tracks. Nothing here consumes one —
-# `ingest/live.py`'s listener has a branch for a candle, a status and a failure, and none
-# for a quote — so parsing them built hundreds of objects a second for the garbage
-# collector. `read_message` answers `None` for a kind this module does not consume, which
-# is the same thing it already did for the orderbook.
-#
-# `_read_quote` and `Quote` stay: they describe a frame the gateway still sends, and the
-# reader is one line from being wanted again the day something here needs a tick.
+# `quote` is deliberately absent, and it is the busiest kind on the feed. Nothing here consumes one,
+# so parsing them built hundreds of objects a second for the garbage collector.
 _READERS = {
     "candle": _read_candle,
     "status": _read_status,
@@ -203,23 +156,12 @@ _READERS = {
 async def subscribe(
     base_url: str, symbol: str, resolution: Resolution, api_key: str
 ) -> AsyncIterator[AsyncIterator[StreamMessage]]:
-    """One subscription, for as long as the socket lives.
-
-    A context manager rather than a bare generator so the socket closes when the caller
-    is done with it — the gateway holds one provider connection per room and keeps it
-    only while somebody is listening, so a socket left open is a provider session spent
-    on nobody.
-    """
+    """One subscription, for as long as the socket lives. A context manager so the socket closes when
+    the caller is done: the gateway holds a provider connection per room while somebody listens."""
     url = stream_url(base_url, symbol, resolution)
     try:
-        # The key, and only the key — no bearer token beside it, unlike every REST call
-        # this module makes since `the-gateway-door-authenticates`. `/ws/stream` is
-        # excluded from the gateway's authenticator, because that authenticator intercepts
-        # a WebSocket upgrade and never completes it: measured 20 August 2026, when every
-        # feed died with "timed out during opening handshake" the minute the exclusion was
-        # missing. So this handshake is checked inside the gateway's own WebSocket handler,
-        # by this header, and after that flip it is the one path where the key is still
-        # what opens the door.
+        # The key, and only the key. `/ws/stream` is excluded from the gateway's authenticator, which
+        # intercepts an upgrade and never completes it — measured 20 August 2026, every feed dead.
         connection = await websockets.connect(
             url, additional_headers={GATEWAY_KEY_HEADER: api_key}
         )

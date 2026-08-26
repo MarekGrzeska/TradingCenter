@@ -1,23 +1,12 @@
-"""How far back a recursive filter needs to be read before its answer can be trusted.
-
-The rule (docs/wskazniki-techniczne.html, "Co znaczy deterministycznie"): a first-order
-filter with decay `alpha` weighs its seed sample `(1 - alpha) ** m` after `m` bars. Read
-enough bars that the weight of the seed falls below `epsilon` and the seed — which is the
-one thing that would otherwise differ between "computed from January" and "computed from
-March" — no longer moves the answer by more than the precision anyone reads a price at.
-
-A finite window (`sma`, `wma`, `stdev`, the two rolling extremes) has no such question:
-its answer is already independent of anything before the window, so its warmup is exactly
-its period, not an approximation of one.
-"""
+"""How far back a recursive filter must be read before its answer can be trusted: enough bars that
+the seed's weight falls below epsilon. A finite window has no such question — its warmup is its period."""
 
 from __future__ import annotations
 
 import math
 
-# Below the precision anyone reads a price or an oscillator at. Not a knob: raising it
-# shortens warmup at the cost of the seed still being visible in the answer, which is the
-# one thing this whole scheme exists to make negligible.
+# Below the precision anyone reads a price or an oscillator at. Not a knob: raising it shortens
+# warmup at the cost of the seed still being visible in the answer.
 EPSILON = 1e-9
 
 
@@ -39,7 +28,6 @@ def rma_warmup_bars(period: int) -> int:
 
 
 def kama_warmup_bars(period: int, slow: int) -> int:
-    """`period` bars for the efficiency ratio's own window, plus the decay warmup
-    of `kama`'s slowest possible smoothing constant — see `kernel.kama` for why
-    that constant is always a safe upper bound on the seed's influence."""
+    """`period` bars for the efficiency ratio's own window, plus the decay warmup of `kama`'s slowest
+    possible smoothing constant — see `kernel.kama` for why that is a safe upper bound."""
     return period + decay_warmup_bars(2.0 / (slow + 1))

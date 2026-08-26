@@ -1,32 +1,5 @@
-"""Which caller may reach which surface of this application.
-
-The platform's own gate answers a narrower question than it looks like it does: Easy Auth
-authorizes an **application** (`allowed_applications` in `infra/app-service.tf`), and once a
-caller is through that door every path in this process is behind it. That was harmless while
-this module served one surface to one consumer. It stopped being harmless the day the tool
-surface moved in: letting `agent` and `teams` in so they can call eleven read-only tools
-would, with nothing else in the way, also let them start collecting a pair and delete one.
-
-So the record below is not a second copy of Easy Auth's list. It is the thing Easy Auth
-cannot express — route by route, which identity has business there:
-
-- the tool callers (`agent`, `teams`) reach `/mcp` and nothing else;
-- the REST caller (the terminal) reaches the REST contract and never `/mcp`;
-- two paths are open with no identity at all, each for a reason written beside it.
-
-**The identity is the calling application, read from the token's own claims.** Not the
-principal-id header, which for a delegated token names the person at the keyboard — see
-`calling_application` below, and the production measurement that put it there.
-
-**A path not in the record is refused, not passed.** The default matters more than any
-single entry: a new REST route added next month would otherwise be reachable by the agent
-on the day it is written, and nothing would say so.
-
-Raw ASGI, not `BaseHTTPMiddleware`, and that is load-bearing rather than stylistic:
-`BaseHTTPMiddleware` buffers a response body in some Starlette versions, which would break
-the streamable-http transport `/mcp` is served over. `tc_mcp_kit.network_identity` carries
-the same constraint for the same reason, with tests that read its source.
-"""
+"""Which caller may reach which surface: Easy Auth authorizes an application, not a route, so this
+record is what it cannot express. A path not in it is refused, and raw ASGI because `/mcp` streams."""
 
 from __future__ import annotations
 
@@ -42,25 +15,14 @@ from starlette.types import ASGIApp, Receive, Scope, Send
 
 log = logging.getLogger(__name__)
 
-# What a platform authenticator puts on every request it lets through, in bytes because raw
-# ASGI headers are bytes.
-#
-# The **id** header is what `routers/stream.py` reads, and it answers a different question
-# than this file asks. Measured in production on 19 August 2026: for the terminal's
-# delegated token it carries the signed-in **person's** object id
-# (`e6b7d7ba-…`), not the application's — so a record of application identifiers can never
-# match it, and every REST request was refused until the image was rolled back. The claims
-# blob below is where the calling application actually is.
+# What a platform authenticator puts on every request, in bytes because raw ASGI headers are.
+# The id header names the signed-in *person* for a delegated token — measured 19 August 2026.
 PRINCIPAL_ID_HEADER = b"x-ms-client-principal-id"
 PRINCIPAL_NAME_HEADER = b"x-ms-client-principal-name"
 PRINCIPAL_HEADER = b"x-ms-client-principal"
 
-# The token claim naming the application the token was issued to. `azp` in a v2 token,
-# `appid` in a v1 one, and Easy Auth passes some claim types through as the long URI form.
-# All three are the same fact: **who is calling**, which is what `allowed_applications` in
-# `infra/app-service.tf` is written in terms of too.
-#
-# Deliberately not `oid` or `sub`: those name the person, and this module admits programs.
+# The token claim naming the application the token was issued to: `azp` in v2, `appid` in v1, and
+# Easy Auth's long URI form. Deliberately not `oid` or `sub`: those name the person.
 APPLICATION_CLAIMS = (
     "azp",
     "appid",
@@ -72,10 +34,7 @@ UNAUTHENTICATED = "anonymous"
 
 def calling_application(headers: dict[bytes, bytes]) -> str | None:
     """The application identifier this request was issued to, or `None` if it cannot be named.
-
-    `None` is a refusal, never a pass: a request whose calling application cannot be read is
-    exactly the request this record has nothing to say about.
-    """
+    `None` is a refusal, never a pass."""
     raw = headers.get(PRINCIPAL_HEADER)
     if not raw:
         return None
@@ -105,29 +64,15 @@ class Surface(str, Enum):
     OPEN = "open"
 
 
-# Both of these are outside Easy Auth in production (`infra/app-service.tf`,
-# `excluded_paths`), which is exactly why they are named here rather than left to a
-# prefix rule:
-#
-#   /ping        answers a constant. It reads nothing, so its answer cannot vary with
-#                anything the archive holds — that is what makes it exemptible at all.
-#   /ws/candles  cannot carry a header: a browser does not put one on a WebSocket
-#                handshake. Its defence is the single-use ticket minted at
-#                `POST /stream-tickets`, which *is* behind the requirement
-#                (specs/market-data-browser-access).
-#
-# The test on this set asserts equality, not membership, so **any** addition here fails
-# CI — including one that carries data, which is the case the assertion exists for.
+# Both are outside Easy Auth in production. `/ping` answers a constant, so it can vary with nothing;
+# `/ws/candles` cannot carry a header, and its defence is the single-use ticket. Asserted by equality.
 OPEN_PATHS = frozenset({"/ping", "/ws/candles"})
 
 # The mount, and everything the MCP transport hangs below it.
 TOOLS_PREFIX = "/mcp"
 
-# Every REST path this module publishes, as its route template. Written out rather than
-# read off `app.routes` on purpose: a record derived from the application can never
-# disagree with it, and disagreeing is the whole job — `test_caller_access.py` holds this
-# list against the published document, so a new route fails a test until somebody decides
-# which surface it belongs to.
+# Every REST path this module publishes, written out rather than read off `app.routes`: a record
+# derived from the application can never disagree with it, and disagreeing is the whole job.
 REST_PATHS: tuple[str, ...] = (
     "/",
     "/health",
@@ -180,12 +125,8 @@ def surface_for(path: str) -> Surface | None:
 
 
 class CallerAccess:
-    """The record, applied in front of the whole application.
-
-    Holds `app.state` rather than a `Settings`: this is built while `create_app()` runs
-    and the settings are put on the state by the lifespan, long afterwards. The same
-    lateness `ToolContext` works around, for the same reason.
-    """
+    """The record, applied in front of the whole application. Holds `app.state` rather than a
+    `Settings`: this is built while `create_app()` runs, and the lifespan fills the state later."""
 
     def __init__(self, app: ASGIApp, state) -> None:
         self._app = app
@@ -210,15 +151,12 @@ class CallerAccess:
             await self._app(scope, receive, send)
             return
 
-        # A WebSocket that is not one of the open paths is refused here rather than left
-        # to the route: `RequireCallerIdentity` passes the whole `websocket` scope through,
-        # which costs a module with no WebSockets nothing and would cost this one a hole
-        # (design.md, D4).
+        # A WebSocket that is not an open path is refused here rather than left to the route:
+        # `RequireCallerIdentity` passes the whole scope through, which would cost this one a hole.
         settings = getattr(self._state, "settings", None)
         if settings is None:
-            # The lifespan puts them there before anything serves, so this is not a state a
-            # running process reaches. Refused rather than passed anyway: "the settings were
-            # missing" must never be the reading under which everything is allowed.
+            # The lifespan puts them there before anything serves, so a running process never
+            # reaches this. "The settings were missing" must never be the reading that allows all.
             log.error("request refused: settings are not on the application state yet")
             await self._refuse(scope, receive, send, 503, "the archive is still starting")
             return
@@ -234,9 +172,8 @@ class CallerAccess:
         )
 
         if not settings.require_authenticated_principal:
-            # Local work: nothing stands in front, so there is no identity to have and no
-            # list to be on. Logged as such rather than silently — a deployed instance
-            # printing this line is a misconfiguration somebody needs to see.
+            # Local work: nothing stands in front, so there is no identity to have. Logged rather
+            # than silent — a deployed instance printing this is a misconfiguration to see.
             log.info("request on %s from %s", path, application or principal or UNAUTHENTICATED)
             await self._app(scope, receive, send)
             return
@@ -269,11 +206,8 @@ class CallerAccess:
     async def _refuse(
         self, scope: Scope, receive: Receive, send: Send, status: int, detail: str
     ) -> None:
-        """One refusal, in whichever shape the connection can carry.
-
-        The body matches `contract.Problem` — a refused caller reads the same shape here
-        as it would from any route that turned it down.
-        """
+        """One refusal, in whichever shape the connection can carry. The body matches
+        `contract.Problem`, so a refused caller reads the same shape as from any route."""
         if scope["type"] == "websocket":
             # 1008 is what `/ws/candles` closes a ticketless handshake with; a refusal
             # arriving in two different shapes for one reason is a refusal nobody handles.

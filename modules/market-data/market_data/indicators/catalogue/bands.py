@@ -1,8 +1,5 @@
-"""Envelopes around a moving centre, and the two readings derived from one.
-
-`donchian` is also "where the last n bars' extremes sit" — the same number serving two
-very different purposes (docs/wskazniki-plan-wdrozenia.html, "Wstęgi i kanały").
-"""
+"""Envelopes around a moving centre, and the two readings derived from one. `donchian` is also
+"where the last n bars' extremes sit" — one number serving two very different purposes."""
 
 from __future__ import annotations
 
@@ -55,9 +52,8 @@ _BBANDS_PERCENT_B = IndicatorSpec(
         Param(name="mult", type="float", default=2.0, min=0.1, max=10.0),
     ),
     lines=(LineSpec(key="percent_b", label="%B {period}"),),
-    # Not pinned to [0, 1] like the geometry ratios in `volatility.py` — a price outside
-    # its own bands is exactly what this line exists to show, and a fixed scale
-    # would clip that off screen.
+    # Not pinned to [0, 1] like the geometry ratios: a price outside its own bands is exactly
+    # what this line exists to show, and a fixed scale would clip that off screen.
     render=Render(pane="own", style="line", scale="own", autoscale=True, levels=(0.0, 1.0)),
     warmup=Warmup(kind="fixed", bars=lambda p: int(p["period"])),
     computer=Lines(_compute_bbands_percent_b),

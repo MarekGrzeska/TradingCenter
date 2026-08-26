@@ -1,10 +1,5 @@
-"""How much a bar moved, and where its close sat inside that move.
-
-Three families that share `_safe_divide` and read the same OHLC: the ATR pair, the six
-normalised candle-geometry ratios, and the OHLC volatility estimators — none of which
-reads volume, because this archive has none worth reading
-(docs/wskazniki-plan-wdrozenia.html, "Geometria świecy", "Zmienność z OHLC").
-"""
+"""How much a bar moved, and where its close sat inside that move. Three families reading the same
+OHLC, none of which reads volume, because this archive has none worth reading."""
 
 from __future__ import annotations
 
@@ -47,10 +42,6 @@ _ATR_PCT = IndicatorSpec(
         )
     }),
 )
-
-# --- candle geometry: six numbers every candlestick pattern and every "reaction
-# at a level" is built from, normalised so they compare across candles and
-# instruments (docs/wskazniki-plan-wdrozenia.html, "Geometria świecy"). ---
 
 _BAR_RANGE_ATR = IndicatorSpec(
     id="bar_range_atr",
@@ -136,10 +127,6 @@ _GAP_PREV_CLOSE_ATR = IndicatorSpec(
     }),
 )
 
-# --- position in the range: where the close sits against its own recent history,
-# without naming the halves "premium" or "discount" — that split is a threshold,
-# a strategy's job, not a measure's (spec "Katalog mierzy, a nie orzeka"). ---
-
 _RANGE_POSITION = IndicatorSpec(
     id="range_position",
     name="Range Position",
@@ -173,12 +160,8 @@ _ZSCORE = IndicatorSpec(
     }),
 )
 
-# --- volatility from OHLC: a family with no volume in it at all, built for exactly
-# the data this archive has (docs/wskazniki-plan-wdrozenia.html, "Zmienność z
-# OHLC"). None of these annualise — the module has no trading calendar to
-# annualise against (design.md, Ichimoku/Alligator decision) — so every one reads
-# in the same per-bar log-return units as the others. ---
-
+# None of these annualise: the module has no trading calendar to annualise against, so every
+# one reads in the same per-bar log-return units.
 _STDEV = IndicatorSpec(
     id="stdev",
     name="Standard Deviation",
@@ -298,10 +281,8 @@ _ULCER = IndicatorSpec(
     params=(Param(name="period", type="int", default=14, min=2, max=5000),),
     lines=(LineSpec(key="ulcer", label="Ulcer {period}"),),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
-    # Doubly rolling — the highest-close window, then the mean-square-drawdown
-    # window on top of it — so it needs two window's worth of history, the same
-    # "sum of consecutive windows" rule `stoch` (oscillators.py) and `hma`
-    # (averages.py) use too.
+    # Doubly rolling — the highest-close window, then the mean-square-drawdown window on top —
+    # so it needs two windows' worth of history, the same rule `stoch` and `hma` use.
     warmup=Warmup(kind="fixed", bars=lambda p: 2 * int(p["period"])),
     computer=Lines(_compute_ulcer),
 )

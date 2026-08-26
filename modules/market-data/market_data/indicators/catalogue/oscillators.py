@@ -1,9 +1,5 @@
-"""Bounded measures, mostly for divergence-hunting.
-
-Every threshold these are usually read against (30/70, ±100) is a `render.levels` hint
-the caller may ignore, never a verdict baked into the value
-(`market-data-indicators` spec, "Katalog mierzy, a nie orzeka").
-"""
+"""Bounded measures, mostly for divergence-hunting. Every threshold they are usually read against
+is a `render.levels` hint the caller may ignore, never a verdict baked into the value."""
 
 from __future__ import annotations
 
@@ -18,8 +14,7 @@ from .spec import IndicatorSpec, Lines, LineSpec, Param, Render, Series, Warmup
 
 def _rsi_values(close: np.ndarray, period: int) -> np.ndarray:
     change = kernel.diff(close, 1)
-    # Bar 0 has no earlier bar to change from — read as "0 change", not "unknown
-    # change", the same reasoning `_compute_adx` documents: `rma` seeds
+    # Bar 0 has no earlier bar to change from — read as "0 change", not "unknown": `rma` seeds
     # recursively from index 0, and a NaN seed poisons every bar after it.
     no_prior_bar = np.isnan(change)
     gains = np.where(no_prior_bar, 0.0, np.maximum(change, 0.0))
@@ -63,9 +58,8 @@ _MACD = IndicatorSpec(
         LineSpec(key="histogram", label="Histogram", style="histogram"),
     ),
     render=Render(pane="own", style="line", scale="own", autoscale=True),
-    # The slow EMA's own decay, plus the signal EMA's decay stacked on top of it —
-    # the same two-stage-recursion reasoning as `adx`'s warmup, since `signal` is
-    # an `ema` of a series that already contains an unstabilised `ema`.
+    # The slow EMA's own decay plus the signal EMA's stacked on top, the same two-stage recursion
+    # as `adx`: `signal` is an `ema` of a series that already contains an unstabilised one.
     warmup=Warmup(
         kind="decay",
         bars=lambda p: warmup.ema_warmup_bars(int(p["slow_period"]))

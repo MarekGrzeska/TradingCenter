@@ -1,18 +1,5 @@
-"""Settings, and the guard that keeps this module behind the gateway.
-
-The guard here mirrors the one in `capital-gateway`'s config, for the same kind of
-reason. That module refuses to start against a live host because a runtime check would
-leave an authenticated live session sitting in the process. This one refuses to start
-against capital.com at all.
-
-capital.com counts its 10 requests/second against the *account*, not the process. A
-second client anywhere — another process, another machine — is a second budget spent
-from the same allowance, and the provider answers the overflow with a rate-limit error
-that reaches a caller looking exactly like missing data. The gateway owns the only
-rate gate; this module is a consumer of the gateway's contract and nothing else.
-
-Refusing to build the settings leaves nothing running to misuse.
-"""
+"""Settings, and the guard that keeps this module behind the gateway. capital.com counts its 10
+requests/second per account, and the gateway owns the only rate gate; this module is a consumer."""
 
 from __future__ import annotations
 
@@ -21,14 +8,12 @@ from urllib.parse import parse_qs, urlparse
 from pydantic import ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Any host carrying this belongs to the provider. Matched as a substring on purpose:
-# the demo, live and streaming hosts are all variants of it, and a rule tight enough
-# to name one of them is loose enough to let the others through.
+# Any host carrying this belongs to the provider. A substring on purpose: demo, live and streaming
+# are all variants, and a rule tight enough to name one lets the others through.
 PROVIDER_HOST_MARKER = "capital.com"
 
-# `prefer`/`allow` still let the client fall back to plaintext if the server does not
-# offer TLS — specs/market-data-database-connection, "Połączenie z bazą jest
-# szyfrowane" requires the connection MUST be encrypted, not merely offered it.
+# `prefer`/`allow` still let the client fall back to plaintext if the server offers no TLS, and the
+# spec requires the connection MUST be encrypted, not merely offered it.
 _TLS_REQUIRING_SSLMODES = {"require", "verify-ca", "verify-full"}
 
 
@@ -40,123 +25,56 @@ def _identifiers(raw: str) -> frozenset[str]:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
-    # --- the gateway, this module's only upstream ---
     gateway_base_url: str = "http://localhost:8010"
     gateway_stream_url: str = "ws://localhost:8010/ws/stream"
-    # capital-gateway is not public — every REST call and every stream handshake must
-    # carry this, or the gateway answers 401 before capital.com is touched. Required,
-    # not defaulted: a module that started without it would run and archive nothing,
-    # and the gap would surface as silence hours later instead of as a refusal now.
+    # capital-gateway is not public — every call must carry this or the gateway answers 401.
+    # Required, not defaulted: without it the module archives nothing and the gap surfaces later.
     gateway_api_key: str
-    # The gateway's own audience, when this module has an identity to present to it.
-    # Absent is a working configuration and the local one: without a directory there is no
-    # token to get, and the shared key above is the whole credential — which is what
-    # `market-data-upstream-access` means by the credential's shape following the place.
-    # Set, it is `api://tradingcenter-capital-gateway/.default`, and every REST request
-    # carries a bearer token beside the key.
-    #
-    # The stream is deliberately not covered by it: `/ws/stream` sits outside the
-    # gateway's authenticator, so the key checked inside its WebSocket handler is the only
-    # check that path has (`the-gateway-door-authenticates/design.md`).
+    # The gateway's own audience, when this module has an identity to present. Absent is a working
+    # configuration and the local one. The stream is not covered: `/ws/stream` is outside the door.
     gateway_scope: str | None = None
 
-    # --- the archive's own storage ---
-    #
-    # `database_user` selects between the module's two connection modes, and it is the
-    # only switch (openspec: market-data-database-connection):
-    #
-    #   set    — identity mode, the remote/production shape. The value is the Postgres
-    #            role this module authenticates as; what it authenticates *with* is an
-    #            Entra token fetched at connection time (db.py). The URL must require
-    #            TLS and must not carry a credential of its own.
-    #   unset  — local mode. `DATABASE_URL` is used exactly as given, password and all,
-    #            and must point at this machine's loopback — without an identity this
-    #            module refuses to reach beyond localhost, so a `.env` pointing at
-    #            production is a startup error rather than a quiet write.
+    # `database_user` selects between the two connection modes and is the only switch: set means
+    # identity mode over TLS with no credential in the URL, unset means the URL as given, on loopback.
     database_url: str
     database_user: str | None = None
 
-    # Identity mode only, and unset even there when running in Azure — the App Service's
-    # system-assigned managed identity needs no configuration, `db.py`'s
-    # `DefaultAzureCredential` finds it on its own.
+    # Identity mode only, and unset even there when running in Azure: the App Service's
+    # system-assigned identity needs no configuration, `DefaultAzureCredential` finds it.
     azure_client_id: str | None = None
     azure_client_secret: str | None = None
     azure_tenant_id: str | None = None
 
-    # How long this module waits for another process to finish migrating before it gives
-    # up and refuses to start. Twenty-five minutes, against the agent's five: the candle
-    # table is the largest thing in this system, and an index rebuilt over it takes far
-    # longer than a start. A wait shorter than the migration ahead of it turns a slow
-    # migration into a restart loop that never finishes one
-    # (`market-data-database-connection`, "Kres MUST być dłuższy niż najdłuższa
-    # migracja").
-    #
-    # Not thirty: App Service caps `WEBSITES_CONTAINER_START_TIME_LIMIT` at 1800s
-    # (`infra/app-service.tf`), and this module has to be the one that gives up first.
-    # The platform giving up first restarts the container, which starts the same
-    # migration again and says nothing about why.
+    # How long this module waits for another process to finish migrating. Twenty-five minutes against
+    # the agent's five, and not thirty: App Service caps the container start at 1800s and must not win.
     migration_lock_wait_seconds: float = 1500.0
 
-    # --- how much of the provider's allowance this module may take ---
-    #
-    # One backfill at a time by default. A deep read is dozens of back-to-back requests
-    # through the gateway's shared rate gate, so two of them running together are enough
-    # to starve the chart an operator is looking at right now.
+    # One backfill at a time by default: a deep read is dozens of back-to-back requests through the
+    # gateway's shared rate gate, and two together starve the chart an operator is looking at.
     backfill_concurrency: int = 1
 
     # How far back a newly tracked pair reaches on its first fill. The gateway pages past
     # the provider's 1000-row ceiling itself, so this is a candle count, not a page count.
     default_backfill_bars: int = 5000
 
-    # The gateway holds one provider connection per (symbol, resolution) and the provider
-    # limits how many a session may hold. The ceiling is therefore real, and it is a budget
-    # to raise on evidence, not a guess to discover by having the feed die.
-    #
-    # It counts pairs, not instruments — the earlier 20 read as "20 instruments" and was
-    # spent by three. One instrument watched across every `Resolution` is 8 pairs, so the
-    # number below is 20 instruments' worth of them.
+    # The gateway holds one provider connection per (symbol, resolution), and the provider limits how
+    # many a session may hold. It counts pairs, not instruments: the earlier 20 was spent by three.
     max_tracked_pairs: int = 160
 
-    # An indicator computation is a Python loop for every recursive filter it touches, and
-    # that loop holds the GIL — a thread would not free the event loop the way it does for
-    # I/O, so the limit here is a plain gate, not a pool. Bounds how many `POST
-    # /indicators/*` requests compute at once, so one asking for many indicators over a
-    # long range cannot stall the candle stream every other request depends on.
+    # An indicator computation is a Python loop holding the GIL, so this is a plain gate, not a pool.
+    # One request asking for many indicators cannot stall the candle stream the rest depends on.
     indicator_concurrency: int = 4
 
-    # --- how a browser gets in ---
-    #
-    # A ticket is minted for one handshake and dies on use (`tickets.py`). This is the
-    # window between asking for one and spending it: enough for a slow network, short
-    # enough that a ticket sitting in a log is worthless long before anyone reads it.
-    # Single use is the real protection — this is the second line, for the ticket nobody
-    # ever spent.
+    # The window between asking for a ticket and spending it: long enough for a slow network, short
+    # enough that a ticket in a log is worthless. Single use is the real protection; this is second.
     stream_ticket_ttl_seconds: int = 30
 
-    # Whether a platform authenticator stands in front of this module. Where it does,
-    # only a caller it has already identified may be handed a ticket, and a request
-    # arriving without an identity is refused rather than served.
-    #
-    # The module MUST NOT simply assume the layer in front is doing its job: one wrong
-    # line in Terraform would otherwise leave a ticket factory open to the internet —
-    # which is an open stream — and nothing about it would look wrong from here. Set in
-    # Azure (`infra/app-service.tf`); off locally, where nothing stands in front and
-    # there is no identity to have.
+    # Whether a platform authenticator stands in front. The module MUST NOT assume the layer in front
+    # is doing its job: one wrong line in Terraform would leave a ticket factory open to the internet.
     require_authenticated_principal: bool = False
 
-    # --- who may reach which surface, once they are through the door ---
-    #
-    # Easy Auth authorizes an application, not a route (`caller_access.py`). These two
-    # lists are what it cannot say: which callers are here for the tool surface at `/mcp`
-    # — `agent` and `teams`, which must never reach the routes that start collecting a
-    # pair or delete one — and which are here for the REST contract, which is the
-    # terminal. A caller on neither list is refused even with a token the platform
-    # accepted.
-    #
-    # Comma-separated application identifiers rather than names: a name is a description,
-    # an identifier is what arrives in the header. Empty locally, where
-    # `require_authenticated_principal` is off and there is no identity to match — the
-    # lists are read only where that requirement is on.
+    # Easy Auth authorizes an application, not a route: these two lists are what it cannot say — who
+    # is here for `/mcp` and who for the REST contract. Identifiers, not names: a name is a description.
     tool_caller_application_ids: str = ""
     rest_caller_application_ids: str = ""
 
@@ -202,18 +120,8 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def _connection_mode_is_coherent(self) -> Settings:
-        """The two connection modes, each with its own failure to refuse.
-
-        Identity mode (`database_user` set — production's shape, `infra/app-service.tf`):
-        the database is off this machine, so the URL must require TLS and must not carry
-        a credential that would never be read anyway.
-
-        Local mode (`database_user` unset): the URL is used exactly as given, password
-        and all — and must point at loopback. Without an identity this module refuses to
-        reach beyond this machine: a `.env` aimed at production fails here at startup
-        instead of quietly writing (openspec: market-data-database-connection, "Praca bez
-        tożsamości nie wychodzi poza maszynę").
-        """
+        """The two connection modes, each with its own failure to refuse. Identity mode is off this
+        machine, so TLS and no credential; local mode is the URL as given, and must be loopback."""
         parsed = urlparse(self.database_url)
         if self.database_user is not None:
             sslmode = parse_qs(parsed.query).get("sslmode", [None])[0]

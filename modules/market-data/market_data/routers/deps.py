@@ -1,9 +1,5 @@
-"""The two things a route reaches for, and nothing else.
-
-Kept apart from `app.py` so a router never imports the module that mounts it. That import
-would be a cycle, and the shape of the cycle — routes reaching back for the application
-object — is what made a single 773-line module feel unavoidable in the first place.
-"""
+"""The two things a route reaches for, and nothing else. Kept apart from `app.py` so a router never
+imports the module that mounts it — that cycle is what made one 773-line module feel unavoidable."""
 
 from __future__ import annotations
 
@@ -25,9 +21,8 @@ def hub(websocket: WebSocket) -> Hub:
 
 
 def hub_over_http(request: Request) -> Hub:
-    # The same hub, reached the other way. Two functions rather than a union parameter,
-    # because FastAPI resolves the dependency by its annotation: a `Request | WebSocket`
-    # is not something it knows how to hand over on either transport.
+    # The same hub, reached the other way. Two functions rather than a union parameter, because
+    # FastAPI resolves the dependency by its annotation and cannot hand over a `Request | WebSocket`.
     return request.app.state.hub
 
 

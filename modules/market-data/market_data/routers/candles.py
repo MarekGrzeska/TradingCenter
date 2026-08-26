@@ -44,8 +44,6 @@ DERIVED_NOTE = (
 router = APIRouter()
 
 
-# --- candles ---
-
 
 @router.get(
     "/candles/{symbol}",
@@ -157,11 +155,8 @@ async def coverage(
 
 
 def _window(from_: datetime | None, to: datetime | None) -> tuple[datetime, datetime]:
-    """`reads.window`, with its refusal spelled as this transport spells refusals.
-
-    A range whose end precedes its start is the request being wrong, not the archive, and
-    answering 500 would send a caller looking for a fault here.
-    """
+    """`reads.window`, with its refusal spelled as this transport spells refusals. A range whose end
+    precedes its start is the request being wrong, and a 500 would send a caller looking here."""
     try:
         return window(from_, to)
     except WindowRejected as refused:

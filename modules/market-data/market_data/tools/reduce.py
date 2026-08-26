@@ -1,7 +1,5 @@
-"""Turning "more than the ceiling" into "the ceiling, and a note about it" — the one
-place a tool's aggregation and truncation happens, so "nic nie znika po cichu"
-(specs/market-data-answers) is satisfied once instead of once per tool.
-"""
+"""Turning "more than the ceiling" into "the ceiling, and a note about it" — the one place a tool's
+aggregation and truncation happens, so nothing disappears quietly."""
 
 from __future__ import annotations
 
@@ -65,8 +63,5 @@ def thin_series(values: list, target_count: int) -> tuple[list, int | None]:
     return values[::stride], stride
 
 
-# `cap_by_freshness(items, time_key, limit)` stood here until the tools moved into
-# market-data. It indexed its items as dicts, which was true while they arrived as JSON off
-# a wire and stopped being true when they arrived as models — and it had no test, so nothing
-# said so. Its two callers now sort explicitly and call `truncate`, which reads the same as
-# the third branch beside them, whose key is a fallback no shared helper could express.
+# `cap_by_freshness` stood here until the tools moved in. It indexed its items as dicts, which stopped
+# being true when they arrived as models, and it had no test to say so.

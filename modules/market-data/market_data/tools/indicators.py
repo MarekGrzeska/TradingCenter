@@ -1,7 +1,5 @@
-"""The indicator catalogue, and computing entries from it — reduced to what changed
-recently rather than the full series a chart would draw
-(`market-data-tools`, "Zestaw odpowiada na pytania o wskaźniki").
-"""
+"""The indicator catalogue, and computing entries from it — reduced to what changed recently rather
+than the full series a chart would draw."""
 
 from __future__ import annotations
 
@@ -34,13 +32,9 @@ NEAR_PRICE_LIMIT = 20
 LATEST_LOOKBACK_BARS = 50
 SLOPE_LOOKBACK_BARS = 10
 
-# `levels_near_price` surveys structural indicators (swing points, session ranges,
-# htf pivots) whose meaningful recent state does not fit in a handful of bars the way
-# a moving average's does — a starting point, like every other ceiling here
-# (design.md, "Sufity są liczbami w kodzie... do zmierzenia po E2").
+# `levels_near_price` surveys structural indicators whose meaningful recent state does not fit in a
+# handful of bars the way a moving average's does. A starting point, like every other ceiling here.
 LEVELS_LOOKBACK = timedelta(days=30)
-
-# --- output shapes ---
 
 
 class IndicatorParamOut(BaseModel):
@@ -128,11 +122,8 @@ class IndicatorMarkerOut(BaseModel):
 
 
 class IndicatorZoneOut(BaseModel):
-    # The two aliases rather than `alias="from"`, for `WindowedOut`'s reason: with one
-    # alias pyright synthesizes an `__init__` taking a parameter literally named `from`,
-    # which is a keyword and so unwritable, and rejects every construction here. These
-    # used to be built by `model_validate` off a dict, where that never came up; they are
-    # built by name now that the shapes arrive as models rather than as JSON.
+    # The two aliases rather than `alias="from"`, for `WindowedOut`'s reason: one alias makes pyright
+    # synthesize an `__init__` taking a parameter named `from`, which is a keyword and unwritable.
     from_: datetime = Field(validation_alias="from", serialization_alias="from")
     to: datetime | None = None
     top: float
@@ -204,16 +195,10 @@ class LevelsNearPriceOut(BaseModel):
     notes: list[str] = Field(default_factory=list)
 
 
-# --- the catalogue, read where it lives ---
-
 
 class _Catalogue:
-    """The catalogue as two lookups, built once at first use.
-
-    It used to be fetched over HTTP and cached because the fetch cost a request. There is
-    no request now — this is the same tuple the REST route serves — so what is left of the
-    cache is the two dictionaries, worth building once rather than per call.
-    """
+    """The catalogue as two lookups, built once at first use. It used to be fetched over HTTP; there is
+    no request now, so what is left of the cache is two dictionaries worth building once."""
 
     def __init__(self) -> None:
         self._entries: dict | None = None
@@ -302,8 +287,6 @@ def _detail_out(entry) -> IndicatorDetailOut:
         warmup_kind=entry.warmup_kind,
     )
 
-
-# --- "latest" mode: a line's current reading against price ---
 
 
 def _latest_window(to_iso: str | None, resolution: str) -> tuple[datetime, datetime]:
@@ -487,8 +470,6 @@ def _reduce_result(
     return ComputedIndicatorOut(**base)
 
 
-# --- levels_near_price ---
-
 
 def _chunks(items: list, size: int) -> Iterator[list]:
     for i in range(0, len(items), size):
@@ -525,10 +506,7 @@ async def _compute(
     specs: list[tuple[str, dict[str, float]]],
 ):
     """One computation, through the same service and the same ceiling the REST route uses.
-
-    `ctx.indicator_limiter` is that route's own semaphore, not a second one: two entrances
-    to one computation with one ceiling between them (design.md, D1).
-    """
+    `ctx.indicator_limiter` is that route's own semaphore, not a second one."""
     request = IndicatorsRequest(
         resolution=resolution_of(resolution),
         from_=start,

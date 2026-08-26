@@ -33,10 +33,8 @@ def register(mcp: FastMCP, ctx: ToolContext) -> None:
         person would actually type — "Nasdaq" rather than "US100". Up to 10 matches;
         further ones are counted in `omitted`, not dropped silently.
         """
-        # The one tool whose answer still crosses a network: the instrument catalogue
-        # belongs to capital-gateway, and this archive holds the only key to it. A failure
-        # there is the gateway's, and it reaches the model as a refusal naming that rather
-        # than as an empty result set.
+        # The one tool whose answer still crosses a network: the catalogue belongs to capital-gateway
+        # and this archive holds the only key. A failure there reaches the model as a refusal naming it.
         try:
             rows = await ctx.instruments.search(query)
         except GatewayError as failed:
